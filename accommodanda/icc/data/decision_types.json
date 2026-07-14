@@ -1,0 +1,17 @@
+{
+  "_comment": "Curated ICC decision types -- the jurisprudentially significant Rome-Statute decisions, one harvest engine over all (rule:configured-by-data). `facet` is the icc-cpi.int /decisions type-of-decision facet id that scopes the scrape; `kind` is the catalog/facet doctype; `label` is the Swedish heading it files under on the folkrätt landing. The ~10k procedural orders (Decision/Order, plain Decision) are deliberately excluded.",
+  "types": [
+    {"facet": "793", "kind": "judgment", "label": "Domar – fällande/friande (art. 74)"},
+    {"facet": "800", "kind": "sentence", "label": "Straffmätning (art. 76)"},
+    {"facet": "792", "kind": "confirmation", "label": "Bekräftelse av åtal (art. 61)"},
+    {"facet": "791", "kind": "arrest-warrant", "label": "Häktning och kallelser (art. 58)"},
+    {"facet": "788", "kind": "appeal-judgment", "label": "Överklagandedomar – skuld/straff (art. 81)"},
+    {"facet": "789", "kind": "appeal-interlocutory", "label": "Överklaganden – interimistiska (art. 82)"},
+    {"facet": "790", "kind": "appeal-reparations", "label": "Överklaganden – gottgörelse (art. 82.4)"},
+    {"facet": "798", "kind": "reparations", "label": "Gottgörelse (art. 75)"},
+    {"facet": "794", "kind": "investigation", "label": "Tillstånd till utredning (art. 15)"},
+    {"facet": "795", "kind": "admissibility", "label": "Jurisdiktion och tillåtlighet (art. 18-19)"},
+    {"facet": "796", "kind": "prosecutor-review", "label": "Omprövning av åklagarbeslut (art. 53.3)"},
+    {"facet": "797", "kind": "sentence-review", "label": "Omprövning av straff (art. 110)"}
+  ]
+}

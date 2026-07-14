@@ -1,0 +1,19 @@
+{
+  "base": "ICC-01/04-02/06-2359",
+  "kind": "judgment",
+  "icc": {
+    "title": "Judgment",
+    "case_name": "The Prosecutor v. Bosco Ntaganda",
+    "date": "8 July 2019",
+    "chamber": "Trial Chamber VI"
+  },
+  "lt": {
+    "slug": "80578a",
+    "externalId": "ICC-01/04-02/06-2359",
+    "title": "Judgment",
+    "caseName": "The Prosecutor v. Bosco Ntaganda",
+    "caseNumber": "ICC-01/04-02/06",
+    "dateCreated": "2019-07-08T00:00:00.000Z",
+    "source": "Trial Chamber"
+  }
+}
