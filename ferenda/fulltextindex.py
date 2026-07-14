@@ -85,6 +85,7 @@ class FulltextIndex(object):
 
     def get_default_schema(self):
         return {'uri': Identifier(),
+                'order': Integer(),
                 'repo': Label(),
                 # 'rdftype': Label(),
                 'basefile': Label(),
@@ -410,6 +411,7 @@ class WhooshIndex(FulltextIndex):
                     (URI(),           whoosh.fields.ID(stored=True, field_boost=1.1)),
                     (Keyword(),       whoosh.fields.KEYWORD(stored=True)),
                     (Resource(),      whoosh.fields.IDLIST(stored=True)),
+                    (Integer(),       whoosh.fields.NUMERIC(stored=True)),
                     )
 
     def __init__(self, location, repos):
