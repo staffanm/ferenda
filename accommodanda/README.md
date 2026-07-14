@@ -1,7 +1,7 @@
 # accommodanda — developer setup
 
 The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, hudoc, coe,
-eurlex, forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
+icrc, untc, icc, eurlex, forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
 for wiki/site, hand-authored) source files to a typed document model and a JSON
 artifact, with the citation engine as a shared library. For *why* it's
 shaped this way and what's done vs. pending, read
@@ -93,7 +93,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `pins.py` | citation-shaped query → search-hit-shaped resolved targets (`resolved_results`/`merge_pinned`), shared by the REST `/search` endpoint and the MCP `search`/`resolve_citation` tools |
 | `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
 | `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`) |
-| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`) that ship in the package tree |
+| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`) that ship in the package tree |
 | `concepts.py` | begrepp (concept) normalization — a hand-rolled, corpus-aware Swedish de-inflector collapsing inflected term forms onto one canonical `begrepp/<Name>`, plus the hand-edited override file `data/begrepp_aliases.json` |
 | `diff.py` | the "jämför lydelser" version-diff view — block-align + word-level `<ins>`/`<del>` over two parsed artifact versions, computed on demand |
 | `history.py` | read layer over the SFS version-history sidecar + amendment-register join, shared by the renderer's compare panel and `/api/v1/document/versions` |
@@ -184,16 +184,52 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `parse.py` | official English PDF → article/subarticle tree (`#A8`, `#A6P3Ld`) via `pdftohtml -> page_paragraphs -> build_structure`; supports numeric, Roman and compound article designations plus section-only amending instruments, and context-suffixes repeated printed designators so every node id is unique |
 | `data/names.json` | Council-of-Europe treaties by Swedish name → ETS/CETS number, hand-edited; read by `lib.lagrum.load_treaties` (citation grammar) **and** by `render._coe_named` — its keys are the curated *central* treaties surfaced first on the folkrätt landing, and its `abbr` is the badge (EKMR, …) |
 
-`coe` and `hudoc` share one masthead entry, **Folkrätt** (`/folkratt/`, an
-international-law umbrella for the later UN/ICJ sources). The bespoke
-`render.render_folkratt` landing lists every CoE instrument alphabetically by its
-significant title (`lib.coe.significant_title`, the SFS "Lag (yyyy:nn) om …"
-convention), each with its amending protocols nested beneath the convention they
-amend (`lib.coe.protocol_reference` + a longest-prefix title match), split into
-*Centrala* (the `names.json` treaties) and *Övriga* A–Z. Beside it sits the
-Europadomstolen (hudoc) faceted case browse, which relocates under
-`/folkratt/hudoc/`; coe has no faceted browse tree of its own. Treaty/case
-document *pages* keep their canonical addresses (`/coe/{number}`,
+**icrc vertical (ICRC international humanitarian law treaties)**
+| File | What |
+|---|---|
+| `download.py` | one paginated list call (`page[limit]=50`) over the ICRC's anonymous Drupal 10 JSON:API (`ihl-databases.icrc.org/en/jsonapi/node/treaty`) enumerates all 111 IHL instruments; one per-treaty `include=`-expanded fetch returns the whole self-contained envelope — metadata, authentic article text (`field_treaty_content`), per-state participation (`field_treaty_state_parties`), depositary/topics/languages taxonomy terms — the stored record, so parse never touches the network; incremental off the node's `changed` stamp + `HarvestWatermark`; `--only <ICRC-number>`, `--limit`, `--force` |
+| `model.py` | typed `Treaty`/`Provision`/`Party`; canonical `ext/icrc/{ICRC-number}` identity kept local to the vertical (rule:second-use-goes-to-lib — nothing in `lib` mints an ICRC target yet); article-fragment ids `A<n>`/`Preamble`/`Testimonium`/`Annex<n>`; `kind` classifies doctype as treaty/protocol/declaration |
+| `parse.py` | resolves the envelope's `included` relationship graph into the `Treaty` model, then `.to_artifact()`; article body HTML → stycken via BeautifulSoup; skips commentary front matter (ToC/Foreword/Introduction) |
+| `data/names.json` | the four 1949 Geneva Conventions and their three Additional Protocols (ICRC numbers 365/370/375/380/470/475/615), hand-edited, with informal Swedish names and acronyms (GK I–IV, TP I–III) — the curated *central* instruments surfaced first on the folkrätt landing, mirroring `coe/data/names.json` |
+
+**untc vertical (UN Treaty Collection — MTDSG status)**
+| File | What |
+|---|---|
+| `download.py` | one static-HTML fetch per curated treaty from `ViewDetailsIII.aspx?src=TREATY&mtdsg_no={id}&chapter={n}&clang=_en` (an ASP.NET page that answers unattended clients directly); the corpus is a tiny fixed set, so this is a plain loop, skipping a page already on disk unless `--full` re-fetches it; `--only <MTDSG-id>`, `--limit` |
+| `model.py` | typed `Treaty`/`Party`; canonical `ext/untc/{mtdsg_no}` identity kept local to the vertical (rule:second-use-goes-to-lib); `structure` is deliberately empty — the MTDSG carries status only, a treaty's authentic text lives in per-treaty UNTS PDFs outside this uniform scrape, and the page links out to it |
+| `parse.py` | scrapes the stable ASP.NET control ids for conclusion/entry-into-force/UNTS registration and the participation grid (anchored on the grid's own control id `tblgrid`, not a header cell — some treaties precede it with a decoy territorial-notification table under the same "Participant" header); footnote `<sup>` stripping, `<a class="noteIndex">`-wrapped declaring states, and consent-form markers (`a` accession, `d` succession, `c` formal confirmation, `A` acceptance, plain date ratification). Offline (reads the stored page) |
+| `data/treaties.json` | the curated 14-instrument list (one harvest engine over all, rule:configured-by-data) — VCLT, UNCLOS, the Genocide Convention, the core human-rights instruments (ICERD/ICESCR/ICCPR/CEDAW/CAT/CRC/CMW/CRPD/CED) and the Refugee Convention + Protocol; `mtdsg_no`/`chapter` complete the query, `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkrätt listing, `group` is the Swedish subject heading it files under |
+
+**icc vertical (International Criminal Court case law)**
+| File | What |
+|---|---|
+| `download.py` | two-source harvest, both Cloudflare-free (the ICC's own `/court-record` detail pages are Cloudflare-walled): a facet scrape over icc-cpi.int `/decisions` (`decision_type_of_decision`, curated by `data/decision_types.json`) enumerates the curated substantive set and yields each record's document number; the ICC Legal Tools API (`legal-tools.org/api/ltdDocs`, `externalId` `like` prefix match, case-sensitive) resolves that number to metadata, slug and the decision PDF (`/doc/<slug>/pdf`), preferring the English primary over `-t<LANG>` translation variants; incremental via a date watermark, `--only <ICC-doc-number>`, `--limit` |
+| `model.py` | typed `Decision`/`Block` (HUDOC-shaped); `to_artifact()` turns numbered paragraphs into the citation-unit article tree (`P<n>` ids); canonical `ext/icc/{doc-number}` identity (slashes flattened to underscores) kept local to the vertical (rule:second-use-goes-to-lib) |
+| `parse.py` | Legal Tools metadata (ICC-listing fallback) + PDF text (`lib/pdftext`) → artifact; strips the per-page court-record running header, classifies numbered paragraphs vs. section headings (`_classify`, pure); a decision Legal Tools couldn't resolve stays metadata-only (empty structure) |
+| `data/decision_types.json` | the curated Rome-Statute decision types (one harvest engine over all, rule:configured-by-data) — Art 74 verdicts, 76 sentences, 61 confirmation, 58 arrest warrants, 81/82/82.4 appeal judgments, 75 reparations, 15/18-19/53.3/110 — each with the icc-cpi.int facet id, the catalog/facet `kind`, and the Swedish heading it files under on the folkrätt landing; deliberately excludes the ~10k procedural Decision/Order mass |
+
+`coe`, `hudoc`, `icrc`, `untc` and `icc` share one masthead entry, **Folkrätt**
+(`/folkratt/`, an international-law umbrella for the later ICJ sources). The
+bespoke `render.render_folkratt` landing lists every CoE instrument
+alphabetically by its significant title (`lib.coe.significant_title`, the SFS
+"Lag (yyyy:nn) om …" convention), each with its amending protocols nested
+beneath the convention they amend (`lib.coe.protocol_reference` + a
+longest-prefix title match), split into *Centrala* (the `names.json` treaties)
+and *Övriga* A–Z; beside it the ICRC IHL instruments lead with
+"Genèvekonventionerna och tilläggsprotokollen" (the `icrc/data/names.json`
+central instruments), then carve the rest into a subject index by the ICRC's
+own `field_treaty_topics` taxonomy (Stridsmetoder och stridsmedel, Sjö- och
+luftkrigföring, Skydd av krigets offer, …), each group chronological; the UN
+half lists the `untc/data/treaties.json` curated instruments grouped by
+subject (Traktaträtt och havsrätt, Mänskliga rättigheter, Flyktingrätt), each
+group chronological; the ICC half lists the curated substantive decisions
+grouped by Rome-Statute decision type (`icc/data/decision_types.json`'s
+labels, e.g. "Domar – fällande/friande (art. 74)"), each group newest first.
+Beside all four sits the Europadomstolen (hudoc) faceted case browse, which
+relocates under `/folkratt/hudoc/`; none of coe, icrc, untc or icc has a
+faceted browse tree of its own — their whole listing lives on the landing
+page. Treaty/case document *pages* keep their canonical addresses
+(`/coe/{number}`, `/icrc/{number}`, `/untc/{mtdsg_no}`, `/icc/{doc-number}`,
 `/dom/echr/{itemid}`).
 
 **wiki vertical (git-backed markdown — begrepp + kommentar)**
@@ -266,7 +302,7 @@ shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 `legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
 ruamel.yaml round-trip mode so a bad value's line number is reported. It
 deliberately locates nothing else — curated source resources shipped in the
-tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`,
+tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`,
 `sfs/data/resources.json`, …) are anchored by their own callers, not here.
 
 ## Running the pipelines
@@ -373,7 +409,7 @@ uv run python -m accommodanda.build avg parse           # incremental, like ever
 uv run python -m accommodanda.build avg download jo --only jo/2340-2025   # one decision
 ```
 
-**HUDOC + Council of Europe treaties**:
+**HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law**:
 
 ```sh
 uv run python -m accommodanda.build coe download                 # all Treaty Office instruments
@@ -381,6 +417,12 @@ uv run python -m accommodanda.build coe parse                    # official PDF 
 uv run python -m accommodanda.build hudoc download               # English GC+Chamber judgments, incremental
 uv run python -m accommodanda.build hudoc download --lang ENG,FRE --limit 1000
 uv run python -m accommodanda.build hudoc parse
+uv run python -m accommodanda.build icrc download                # all ICRC IHL treaties
+uv run python -m accommodanda.build icrc parse                   # JSON:API envelope -> article artifacts
+uv run python -m accommodanda.build untc download                # the 14 curated MTDSG treaties
+uv run python -m accommodanda.build untc parse                   # status page -> metadata + participation artifact
+uv run python -m accommodanda.build icc download                 # the curated ICC substantive decisions
+uv run python -m accommodanda.build icc parse                    # Legal Tools metadata + PDF -> article artifacts
 uv run python -m accommodanda.build all relate                   # joins HUDOC cases to CoE articles
 ```
 
@@ -392,7 +434,22 @@ returns all 233 treaties with metadata in that one response, then downloads
 each official English text as a plain PDF from `rm.coe.int`. HUDOC itself is
 directly harvestable off `/app/query/results` and needs no browser automation
 either; its body fetches run through a small worker pool (`WORKERS=4` in
-`hudoc/download.py`) since they are the whole cost of a harvest.
+`hudoc/download.py`) since they are the whole cost of a harvest. `icrc
+download` reads the ICRC's own anonymous Drupal 10 JSON:API
+(`ihl-databases.icrc.org`) directly — one paginated list call enumerates the
+111 treaties, one `include=`-expanded fetch per treaty returns the whole
+envelope including the authentic article text, so there is no separate PDF
+step and `icrc parse` never touches the network. `untc download` fetches one
+static-HTML status page per curated treaty from `treaties.un.org`'s
+`ViewDetailsIII.aspx`; the MTDSG carries status only (dates, UNTS
+registration, per-state participation), not the treaty text, so `untc parse`
+scrapes that offline and the rendered page links out to the UN authentic text.
+`icc download` also avoids the Cloudflare-fronted `/court-record` pages: it
+facet-scrapes icc-cpi.int `/decisions` for the curated Rome-Statute decision
+types to get each record's document number, then resolves that number
+against the ICC Legal Tools API (`legal-tools.org/api/ltdDocs`) for metadata
+and the decision PDF, so `icc parse` reads the stored Legal Tools record and
+PDF text and never touches the network either.
 
 **remisser — regeringen.se referral responses** (operates on
 `site/data/{downloaded,artifact}/remisser/` — case records and answer PDFs
@@ -599,6 +656,9 @@ site/data/artifact/dom/identity-index.json    # canonical case -> source records
 site/data/downloaded/avg/{jo,jk,arn}/         # JO/JK/ARN records (+ jo/arn PDFs, jk landing html)
 site/data/downloaded/hudoc/                   # HUDOC metadata JSON + converted full-text HTML
 site/data/downloaded/coe/                     # Treaty Office records + official English texts
+site/data/downloaded/icrc/                    # ICRC JSON:API treaty envelopes (metadata + authentic text, no PDF)
+site/data/downloaded/untc/                    # MTDSG status pages (metadata + participation, no treaty text)
+site/data/downloaded/icc/                     # ICC Legal Tools records (metadata) + decision PDFs
 site/data/downloaded/forarbete/<type>/        # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr)
 site/data/downloaded/forarbete/bet/           # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
 site/data/downloaded/forarbete/rskr/          # data.riksdagen.se harvest (riksdagsskrivelser; record json + HTML body, no PDF)

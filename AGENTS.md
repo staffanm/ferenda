@@ -20,9 +20,11 @@ formatting quirks, the citation grammar) and discards the framework.
 - Implemented verticals: **SFS** (statutes), **DV** (court decisions),
   **forarbete** (legislative preparatory works), **eurlex** (EU law),
   **HUDOC** (European Court of Human Rights case law), **CoE** (Council of
-  Europe treaties),
+  Europe treaties), **ICRC** (international humanitarian law treaties),
+  **UNTC** (UN Treaty Collection treaties), **ICC** (International Criminal
+  Court case law),
   **foreskrift** (agency regulations), **avg** (JO/JK decisions),
-  **wiki** (begrepp/definitions).
+  **remisser** (consultation responses), **wiki** (begrepp/definitions).
   We are not at full parity with the old system, but new sources beyond the
   original scope (notably eurlex and foreskrift) are now handled.
 
@@ -35,7 +37,7 @@ architecture and status change.
 
 Three layers, realized in the `accommodanda/` package:
 
-1. **Vertical source pipelines** (`accommodanda/{sfs,dv,hudoc,coe,eurlex,forarbete,foreskrift,avg,wiki}/`)
+1. **Vertical source pipelines** (`accommodanda/{sfs,dv,hudoc,coe,icrc,untc,icc,eurlex,forarbete,foreskrift,avg,remisser,wiki}/`)
    — each owns its full chain (download → parse → typed model → JSON
    artifact) and its *own* document model.
 2. **Horizontal libraries** (`accommodanda/lib/`) — genuinely cross-source
@@ -99,9 +101,10 @@ Stop-hook ruff/ty/layer checks). The essentials:
 ## Commit conventions
 
 - Subject is `scope: short lowercase summary`, no trailing period.
-- `scope` is a vertical (`sfs`, `dv`, `hudoc`, `coe`, `eurlex`, `forarbete`, `foreskrift`,
-  `avg`, `wiki`) or a layer/concern (`lib`, `build`, `render`, `api`, `search`,
-  `catalog`, `structure`, `golden`, `docs`, `chore`).
+- `scope` is a vertical (`sfs`, `dv`, `hudoc`, `coe`, `icrc`, `untc`, `icc`,
+  `eurlex`, `forarbete`, `foreskrift`, `avg`, `remisser`, `wiki`) or a
+  layer/concern (`lib`, `build`, `render`, `api`, `search`, `catalog`,
+  `structure`, `golden`, `docs`, `chore`).
 - Keep the subject to one line; use `,`/`;`/`—` to separate clauses when a
   commit touches several related things. Add a body explaining the *why*
   and the scope when the change is broad.
