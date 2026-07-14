@@ -1,0 +1,10 @@
+{
+  "_comment": "Curated central IHL instruments, keyed by ICRC treaty number. label/abbr are the informal Swedish name and acronym shown in the folkrätt listing; the keys also mark which treaties surface under 'Genèvekonventionerna och tilläggsprotokollen'. Annexes to AP I (471-473) are deliberately absent -- they nest under their protocol, not the central listing.",
+  "365": {"label": "första Genèvekonventionen", "abbr": "GK I"},
+  "370": {"label": "andra Genèvekonventionen", "abbr": "GK II"},
+  "375": {"label": "tredje Genèvekonventionen", "abbr": "GK III"},
+  "380": {"label": "fjärde Genèvekonventionen", "abbr": "GK IV"},
+  "470": {"label": "första tilläggsprotokollet", "abbr": "TP I"},
+  "475": {"label": "andra tilläggsprotokollet", "abbr": "TP II"},
+  "615": {"label": "tredje tilläggsprotokollet", "abbr": "TP III"}
+}

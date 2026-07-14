@@ -1,0 +1,1334 @@
+{
+ "jsonapi": {
+  "version": "1.0",
+  "meta": {
+   "links": {
+    "self": {
+     "href": "http://jsonapi.org/format/1.0/"
+    }
+   }
+  }
+ },
+ "data": [
+  {
+   "type": "node--treaty",
+   "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa?resourceVersion=id%3A202639"
+    }
+   },
+   "attributes": {
+    "status": true,
+    "title": "Convention (I) for the Amelioration of the Condition of the Wounded and Sick in Armed Forces in the Field. Geneva, 12 August 1949.",
+    "created": "1996-10-24T08:16:00+00:00",
+    "changed": "2026-03-26T13:08:07+00:00",
+    "metatag_normalized": [
+     {
+      "tag": "meta",
+      "attributes": {
+       "name": "title",
+       "content": "Convention (I) for the Amelioration of the Condition of the Wounded and Sick in Armed Forces in the Field. Geneva, 12 August 1949. | IHL Databases"
+      }
+     },
+     {
+      "tag": "link",
+      "attributes": {
+       "rel": "canonical",
+       "href": "https://ihl-databases.icrc.org/en/ihl-treaties/gci-1949"
+      }
+     }
+    ],
+    "field_historical": false,
+    "field_notes": null,
+    "field_path": "/ihl-treaties/gci-1949",
+    "field_short_title": "Geneva Convention (I) on Wounded and Sick in Armed Forces in the Field,1949",
+    "field_treaty_alias": null,
+    "field_treaty_cihl_source_title": [
+     "Geneva Convention I"
+    ],
+    "field_treaty_date_of_adoption": "1949-08-12",
+    "field_treaty_display_map": true,
+    "field_treaty_entry_in_force": "1950-10-21",
+    "field_treaty_in_force": "yes",
+    "field_treaty_number": 365,
+    "field_treaty_number_articles": "64 + 2 annexes",
+    "field_treaty_presentation": "<p class=\"treaty__description-paragraph-mx\">This Convention represents the fourth updated version of the Geneva Convention on the wounded and sick following those adopted in 1864, 1906 and 1929. It contains 64 articles. These provide protection for the wounded and sick, but also for medical and religious personnel, medical units and medical transports. The Convention also recognizes the distinctive emblems. It has two annexes containing a draft agreement relating to hospital zones and a model identity card for medical and religious personnel.</p>\n\n<p class=\"treaty__description-paragraph-mx\">The updated Commentary on this Convention was published online on 22 March 2016 and takes into account developments up to this date. This commentary can be referred to (in full) as ICRC, Commentary on the First Geneva Convention: Convention (I) for the Amelioration of the Condition of the Wounded and Sick in Armed Forces in the Field, 2nd edition, 2016, or (in brief) as ICRC, Commentary on the First Geneva Convention, 2016. This web page can be referred to as: <a href=\"/ihl/full/GCI-commentary\">https://ihl-databases.icrc.org/ihl/full/GCI-commentary</a>.</p>\n\n<p class=\"treaty__description-paragraph-mx\">A print and ebook versions of this commentary are available from Cambridge University Press:</p>\n\n<p class=\"treaty__description-paragraph-mx\"><a href=\"https://www.cambridge.org/ch/academic/subjects/law/humanitarian-law/series/commentaries-1949-geneva-conventions\" rel=\"noopener\" target=\"_blank\">https://www.cambridge.org/ch/academic/subjects/law/humanitarian-law/series/commentaries-1949-geneva-conventions</a>.</p>",
+    "field_treaty_research_guides": [
+     {
+      "uri": "https://blogs.icrc.org/cross-files/drafting-history-1949-geneva-conventions",
+      "title": "Drafting history of the 1949 Geneva Conventions",
+      "options": []
+     }
+    ],
+    "field_treaty_source": "Final Record of the Diplomatic Conference of Geneva of 1949, Vol. I,  Federal Political Department, Bern pp. 205-224",
+    "field_treaty_tiny_title": "GC I-IV 1949",
+    "field_treaty_type": "geneva_conventions",
+    "field_treaty_unid": "4825657B0C7E6BF0C12563CD002D6B0B",
+    "_has_state_parties": true
+   },
+   "relationships": {
+    "field_treaty_authentic_text": {
+     "data": [
+      {
+       "type": "taxonomy_term--languages",
+       "id": "ff2601ca-58ea-475b-8fd2-6b56ee73054c",
+       "meta": {
+        "drupal_internal__target_id": 251
+       }
+      },
+      {
+       "type": "taxonomy_term--languages",
+       "id": "1a9dd7aa-a32e-4153-833a-542394eee857",
+       "meta": {
+        "drupal_internal__target_id": 255
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/field_treaty_authentic_text?resourceVersion=id%3A202639"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/relationships/field_treaty_authentic_text?resourceVersion=id%3A202639"
+      }
+     }
+    },
+    "field_treaty_content": {
+     "data": [
+      {
+       "type": "paragraph--treaty_content",
+       "id": "beed6761-7ffb-419b-aa2d-a0fe7c903412",
+       "meta": {
+        "target_revision_id": 2828612,
+        "drupal_internal__target_id": 1405932
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "91889bd5-2652-4fa6-b97c-91966517f034",
+       "meta": {
+        "target_revision_id": 2828615,
+        "drupal_internal__target_id": 1403640
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "2ab042c5-438e-432f-9d45-6830dc67b16a",
+       "meta": {
+        "target_revision_id": 2828618,
+        "drupal_internal__target_id": 1405869
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "9cf70cdd-d72a-4bb9-a077-cda0d6da706c",
+       "meta": {
+        "target_revision_id": 2828621,
+        "drupal_internal__target_id": 1402996
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "bb94d0d8-c521-4975-8cfc-17c1bf9b0652",
+       "meta": {
+        "target_revision_id": 2828624,
+        "drupal_internal__target_id": 1403698
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "8a375341-4a59-4ba7-a19e-b2a671ee0ac6",
+       "meta": {
+        "target_revision_id": 2828627,
+        "drupal_internal__target_id": 1405021
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "e88626b4-967e-428e-b037-4e8aa261ce93",
+       "meta": {
+        "target_revision_id": 2828654,
+        "drupal_internal__target_id": 1405863
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "ec6efbed-44e6-4b7a-b1c5-a42337260e49",
+       "meta": {
+        "target_revision_id": 2828678,
+        "drupal_internal__target_id": 1405864
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "6a5f4924-2a8f-4fac-8e8e-36bff24a60dc",
+       "meta": {
+        "target_revision_id": 2828734,
+        "drupal_internal__target_id": 1405913
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "b2f5ce34-c349-41aa-9712-fceeeee21bc9",
+       "meta": {
+        "target_revision_id": 2828745,
+        "drupal_internal__target_id": 1405909
+       }
+      },
+      {
+       "type": "paragraph--treaty_content",
+       "id": "5581c8c9-d950-416a-b9f6-8aab3db2f324",
+       "meta": {
+        "target_revision_id": 2828768,
+        "drupal_internal__target_id": 1405911
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/field_treaty_content?resourceVersion=id%3A202639"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/relationships/field_treaty_content?resourceVersion=id%3A202639"
+      }
+     }
+    },
+    "field_treaty_depositary": {
+     "data": [
+      {
+       "type": "taxonomy_term--cit_countries_information",
+       "id": "6c45317e-d9b7-4a52-b6e3-fbfa618b8c01",
+       "meta": {
+        "drupal_internal__target_id": 17894
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/field_treaty_depositary?resourceVersion=id%3A202639"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/relationships/field_treaty_depositary?resourceVersion=id%3A202639"
+      }
+     }
+    },
+    "field_treaty_state_parties": {
+     "data": [
+      {
+       "type": "paragraph--treaty_participant",
+       "id": "558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d",
+       "meta": {
+        "target_revision_id": 2828868,
+        "drupal_internal__target_id": 1405995
+       }
+      },
+      {
+       "type": "paragraph--treaty_participant",
+       "id": "33aa7995-3022-4398-95a6-842447bbe738",
+       "meta": {
+        "target_revision_id": 2828869,
+        "drupal_internal__target_id": 1405996
+       }
+      },
+      {
+       "type": "paragraph--treaty_participant",
+       "id": "a69de12b-293a-4414-b4a9-d83a550f5d6a",
+       "meta": {
+        "target_revision_id": 2828870,
+        "drupal_internal__target_id": 1405997
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/field_treaty_state_parties?resourceVersion=id%3A202639"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/relationships/field_treaty_state_parties?resourceVersion=id%3A202639"
+      }
+     }
+    },
+    "field_treaty_topics": {
+     "data": [
+      {
+       "type": "taxonomy_term--treaty_topics",
+       "id": "b6205b3e-d7d0-4d9d-9fc0-03d71aa00271",
+       "meta": {
+        "drupal_internal__target_id": 263
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/field_treaty_topics?resourceVersion=id%3A202639"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/node/treaty/377f0d4f-59c4-4a94-938d-8200ac9eaeaa/relationships/field_treaty_topics?resourceVersion=id%3A202639"
+      }
+     }
+    }
+   }
+  }
+ ],
+ "included": [
+  {
+   "type": "paragraph--treaty_content",
+   "id": "beed6761-7ffb-419b-aa2d-a0fe7c903412",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/beed6761-7ffb-419b-aa2d-a0fe7c903412?resourceVersion=id%3A2828612"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Title of the Convention",
+    "field_treaty_content_pre_title": "Title",
+    "field_treaty_content_section": "Title",
+    "field_treaty_content_title": "Title of the Convention",
+    "field_treaty_content_unid": "title"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "53640b36-9253-4571-8cc1-7445394a10af",
+       "meta": {
+        "target_revision_id": 2828611,
+        "drupal_internal__target_id": 1401908
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/beed6761-7ffb-419b-aa2d-a0fe7c903412/field_treaty_commentary?resourceVersion=id%3A2828612"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/beed6761-7ffb-419b-aa2d-a0fe7c903412/relationships/field_treaty_commentary?resourceVersion=id%3A2828612"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/beed6761-7ffb-419b-aa2d-a0fe7c903412/treaty?resourceVersion=id%3A2828612"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/beed6761-7ffb-419b-aa2d-a0fe7c903412/relationships/treaty?resourceVersion=id%3A2828612"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "91889bd5-2652-4fa6-b97c-91966517f034",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/91889bd5-2652-4fa6-b97c-91966517f034?resourceVersion=id%3A2828615"
+    }
+   },
+   "attributes": {
+    "_has_content": true,
+    "field_treaty_content_content": "<p class=\"treaty__description-paragraph-sm\">The undersigned Plenipotentiaries of the Governments represented at the Diplomatic Conference held at Geneva from April 21 to August 12, 1949, for the purpose of revising the Geneva Convention for the Relief of the Wounded and Sick in Armies in the Field of July 27, 1929, have agreed as follows:</p>",
+    "field_treaty_content_list_title": "Preamble",
+    "field_treaty_content_pre_title": "Preamble",
+    "field_treaty_content_section": "Preamble",
+    "field_treaty_content_title": "Preamble",
+    "field_treaty_content_unid": "preamble"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "0ae6755c-a247-4128-8808-d1e131d81c0e",
+       "meta": {
+        "target_revision_id": 2828613,
+        "drupal_internal__target_id": 1401862
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "1b06f898-6be1-44b3-a43d-7e2389c915ac",
+       "meta": {
+        "target_revision_id": 2828614,
+        "drupal_internal__target_id": 1402666
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/91889bd5-2652-4fa6-b97c-91966517f034/field_treaty_commentary?resourceVersion=id%3A2828615"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/91889bd5-2652-4fa6-b97c-91966517f034/relationships/field_treaty_commentary?resourceVersion=id%3A2828615"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/91889bd5-2652-4fa6-b97c-91966517f034/treaty?resourceVersion=id%3A2828615"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/91889bd5-2652-4fa6-b97c-91966517f034/relationships/treaty?resourceVersion=id%3A2828615"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "2ab042c5-438e-432f-9d45-6830dc67b16a",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/2ab042c5-438e-432f-9d45-6830dc67b16a?resourceVersion=id%3A2828618"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter I : General provisions",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter I : General provisions",
+    "field_treaty_content_unid": "chapter-1"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "2ad839c9-4d9c-4d1c-9036-c2c657d7b92a",
+       "meta": {
+        "target_revision_id": 2828616,
+        "drupal_internal__target_id": 1402143
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "1c5fac32-e350-491d-a027-87f0d5d458b3",
+       "meta": {
+        "target_revision_id": 2828617,
+        "drupal_internal__target_id": 1402638
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/2ab042c5-438e-432f-9d45-6830dc67b16a/field_treaty_commentary?resourceVersion=id%3A2828618"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/2ab042c5-438e-432f-9d45-6830dc67b16a/relationships/field_treaty_commentary?resourceVersion=id%3A2828618"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/2ab042c5-438e-432f-9d45-6830dc67b16a/treaty?resourceVersion=id%3A2828618"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/2ab042c5-438e-432f-9d45-6830dc67b16a/relationships/treaty?resourceVersion=id%3A2828618"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "9cf70cdd-d72a-4bb9-a077-cda0d6da706c",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/9cf70cdd-d72a-4bb9-a077-cda0d6da706c?resourceVersion=id%3A2828621"
+    }
+   },
+   "attributes": {
+    "_has_content": true,
+    "field_treaty_content_content": "<p class=\"treaty__description-paragraph-sm\">The High Contracting Parties undertake to respect and to ensure respect for the present Convention in all circumstances.</p>",
+    "field_treaty_content_list_title": "Article 1 - Respect for the Convention",
+    "field_treaty_content_pre_title": "Article 1",
+    "field_treaty_content_section": "Article",
+    "field_treaty_content_title": "Article 1 - Respect for the Convention",
+    "field_treaty_content_unid": "article-1"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "e6dac80c-3de7-4911-b4ef-9daba5503db8",
+       "meta": {
+        "target_revision_id": 2828619,
+        "drupal_internal__target_id": 1402016
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "f6af2c7b-5991-4b49-a7ba-b8ee510603bb",
+       "meta": {
+        "target_revision_id": 2828620,
+        "drupal_internal__target_id": 1402633
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/9cf70cdd-d72a-4bb9-a077-cda0d6da706c/field_treaty_commentary?resourceVersion=id%3A2828621"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/9cf70cdd-d72a-4bb9-a077-cda0d6da706c/relationships/field_treaty_commentary?resourceVersion=id%3A2828621"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/9cf70cdd-d72a-4bb9-a077-cda0d6da706c/treaty?resourceVersion=id%3A2828621"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/9cf70cdd-d72a-4bb9-a077-cda0d6da706c/relationships/treaty?resourceVersion=id%3A2828621"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "bb94d0d8-c521-4975-8cfc-17c1bf9b0652",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/bb94d0d8-c521-4975-8cfc-17c1bf9b0652?resourceVersion=id%3A2828624"
+    }
+   },
+   "attributes": {
+    "_has_content": true,
+    "field_treaty_content_content": "<p class=\"treaty__description-paragraph-sm\">In addition to the provisions which shall be implemented in peacetime, the present Convention shall apply to all cases of declared war or of any other armed conflict which may arise between two or more of the High Contracting Parties, even if the state of war is not recognized by one of them.</p>\n\n<p class=\"treaty__description-paragraph-sm\">The Convention shall also apply to all cases of partial or total occupation of the territory of a High Contracting Party, even if the said occupation meets with no armed resistance.</p>\n\n<p class=\"treaty__description-paragraph-sm\">Although one of the Powers in conflict may not be a party to the present Convention, the Powers who are parties thereto shall remain bound by it in their mutual relations. They shall furthermore be bound by the Convention in relation to the said Power, if the latter accepts and applies the provisions thereof.</p>",
+    "field_treaty_content_list_title": "Article 2 - Application of the Convention",
+    "field_treaty_content_pre_title": "Article 2",
+    "field_treaty_content_section": "Article",
+    "field_treaty_content_title": "Article 2 - Application of the Convention",
+    "field_treaty_content_unid": "article-2"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "930ccfcd-83b4-4bfd-8e40-8431c3bff15a",
+       "meta": {
+        "target_revision_id": 2828622,
+        "drupal_internal__target_id": 1401846
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "8cc3d13f-9780-45b2-8e40-d414d3417414",
+       "meta": {
+        "target_revision_id": 2828623,
+        "drupal_internal__target_id": 1402634
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/bb94d0d8-c521-4975-8cfc-17c1bf9b0652/field_treaty_commentary?resourceVersion=id%3A2828624"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/bb94d0d8-c521-4975-8cfc-17c1bf9b0652/relationships/field_treaty_commentary?resourceVersion=id%3A2828624"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/bb94d0d8-c521-4975-8cfc-17c1bf9b0652/treaty?resourceVersion=id%3A2828624"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/bb94d0d8-c521-4975-8cfc-17c1bf9b0652/relationships/treaty?resourceVersion=id%3A2828624"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "8a375341-4a59-4ba7-a19e-b2a671ee0ac6",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/8a375341-4a59-4ba7-a19e-b2a671ee0ac6?resourceVersion=id%3A2828627"
+    }
+   },
+   "attributes": {
+    "_has_content": true,
+    "field_treaty_content_content": "<p class=\"treaty__description-paragraph-sm\">In the case of armed conflict not of an international character occurring in the territory of one of the High Contracting Parties, each Party to the conflict shall be bound to apply, as a minimum, the following provisions:</p>\n\n<p class=\"treaty__description-paragraph-sm\">(1) Persons taking no active part in the hostilities, including members of armed forces who have laid down their arms and those placed 'hors de combat' by sickness, wounds, detention, or any other cause, shall in all circumstances be treated humanely, without any adverse distinction founded on race, colour, religion or faith, sex, birth or wealth, or any other similar criteria.</p>\n\n<p class=\"treaty__description-paragraph-sm\">To this end, the following acts are and shall remain prohibited at any time and in any place whatsoever with respect to the above-mentioned persons:<br>\n(a) violence to life and person, in particular murder of all kinds, mutilation, cruel treatment and torture;<br>\n(b) taking of hostages;<br>\n(c) outrages upon personal dignity, in particular humiliating and degrading treatment;<br>\n(d) the passing of sentences and the carrying out of executions without previous judgment pronounced by a regularly constituted court, affording all the judicial guarantees which are recognized as indispensable by civilized peoples.</p>\n\n<p class=\"treaty__description-paragraph-sm\">(2) The wounded and sick shall be collected and cared for.</p>\n\n<p class=\"treaty__description-paragraph-sm\">An impartial humanitarian body, such as the International Committee of the Red Cross, may offer its services to the Parties to the conflict.</p>\n\n<p class=\"treaty__description-paragraph-sm\">The Parties to the conflict should further endeavour to bring into force, by means of special agreements, all or part of the other provisions of the present Convention.</p>\n\n<p class=\"treaty__description-paragraph-sm\">The application of the preceding provisions shall not affect the legal status of the Parties to the conflict.</p>",
+    "field_treaty_content_list_title": "Article 3 - Conflicts not of an international character",
+    "field_treaty_content_pre_title": "Article 3",
+    "field_treaty_content_section": "Article",
+    "field_treaty_content_title": "Article 3 - Conflicts not of an international character",
+    "field_treaty_content_unid": "article-3"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "3efff337-4c00-4b95-a082-97262e2cd477",
+       "meta": {
+        "target_revision_id": 2828625,
+        "drupal_internal__target_id": 1401915
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "e639d7b7-3e56-40d0-93ab-6a937efbc33d",
+       "meta": {
+        "target_revision_id": 2828626,
+        "drupal_internal__target_id": 1402635
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/8a375341-4a59-4ba7-a19e-b2a671ee0ac6/field_treaty_commentary?resourceVersion=id%3A2828627"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/8a375341-4a59-4ba7-a19e-b2a671ee0ac6/relationships/field_treaty_commentary?resourceVersion=id%3A2828627"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/8a375341-4a59-4ba7-a19e-b2a671ee0ac6/treaty?resourceVersion=id%3A2828627"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/8a375341-4a59-4ba7-a19e-b2a671ee0ac6/relationships/treaty?resourceVersion=id%3A2828627"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "e88626b4-967e-428e-b037-4e8aa261ce93",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/e88626b4-967e-428e-b037-4e8aa261ce93?resourceVersion=id%3A2828654"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter II : Wounded and sick",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter II : Wounded and sick",
+    "field_treaty_content_unid": "chapter-2"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "d45a07cb-2033-4334-9c7f-707258d0d0d9",
+       "meta": {
+        "target_revision_id": 2828652,
+        "drupal_internal__target_id": 1402452
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "ca640041-2574-4f53-886a-77cdaf201c53",
+       "meta": {
+        "target_revision_id": 2828653,
+        "drupal_internal__target_id": 1402596
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/e88626b4-967e-428e-b037-4e8aa261ce93/field_treaty_commentary?resourceVersion=id%3A2828654"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/e88626b4-967e-428e-b037-4e8aa261ce93/relationships/field_treaty_commentary?resourceVersion=id%3A2828654"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/e88626b4-967e-428e-b037-4e8aa261ce93/treaty?resourceVersion=id%3A2828654"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/e88626b4-967e-428e-b037-4e8aa261ce93/relationships/treaty?resourceVersion=id%3A2828654"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "ec6efbed-44e6-4b7a-b1c5-a42337260e49",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/ec6efbed-44e6-4b7a-b1c5-a42337260e49?resourceVersion=id%3A2828678"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter III : Medical units and establishments",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter III : Medical units and establishments",
+    "field_treaty_content_unid": "chapter-3"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "287f41e8-9870-465b-ab83-73e3e9b174c3",
+       "meta": {
+        "target_revision_id": 2828676,
+        "drupal_internal__target_id": 1402450
+       }
+      },
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "1cef4a0d-7800-4e87-b184-cfa6f015b414",
+       "meta": {
+        "target_revision_id": 2828677,
+        "drupal_internal__target_id": 1402664
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/ec6efbed-44e6-4b7a-b1c5-a42337260e49/field_treaty_commentary?resourceVersion=id%3A2828678"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/ec6efbed-44e6-4b7a-b1c5-a42337260e49/relationships/field_treaty_commentary?resourceVersion=id%3A2828678"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/ec6efbed-44e6-4b7a-b1c5-a42337260e49/treaty?resourceVersion=id%3A2828678"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/ec6efbed-44e6-4b7a-b1c5-a42337260e49/relationships/treaty?resourceVersion=id%3A2828678"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "6a5f4924-2a8f-4fac-8e8e-36bff24a60dc",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/6a5f4924-2a8f-4fac-8e8e-36bff24a60dc?resourceVersion=id%3A2828734"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter VI : Medical transports",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter VI : Medical transports",
+    "field_treaty_content_unid": "chapter-6"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "43f050c2-3990-4a45-9b3a-0de08a60991e",
+       "meta": {
+        "target_revision_id": 2828733,
+        "drupal_internal__target_id": 1402649
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/6a5f4924-2a8f-4fac-8e8e-36bff24a60dc/field_treaty_commentary?resourceVersion=id%3A2828734"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/6a5f4924-2a8f-4fac-8e8e-36bff24a60dc/relationships/field_treaty_commentary?resourceVersion=id%3A2828734"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/6a5f4924-2a8f-4fac-8e8e-36bff24a60dc/treaty?resourceVersion=id%3A2828734"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/6a5f4924-2a8f-4fac-8e8e-36bff24a60dc/relationships/treaty?resourceVersion=id%3A2828734"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "b2f5ce34-c349-41aa-9712-fceeeee21bc9",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/b2f5ce34-c349-41aa-9712-fceeeee21bc9?resourceVersion=id%3A2828745"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter VII : The distinctive emblem",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter VII : The distinctive emblem",
+    "field_treaty_content_unid": "chapter-7"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "6f7e2f27-519a-4c08-af1a-f4d7b54c8d82",
+       "meta": {
+        "target_revision_id": 2828744,
+        "drupal_internal__target_id": 1402643
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/b2f5ce34-c349-41aa-9712-fceeeee21bc9/field_treaty_commentary?resourceVersion=id%3A2828745"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/b2f5ce34-c349-41aa-9712-fceeeee21bc9/relationships/field_treaty_commentary?resourceVersion=id%3A2828745"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/b2f5ce34-c349-41aa-9712-fceeeee21bc9/treaty?resourceVersion=id%3A2828745"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/b2f5ce34-c349-41aa-9712-fceeeee21bc9/relationships/treaty?resourceVersion=id%3A2828745"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_content",
+   "id": "5581c8c9-d950-416a-b9f6-8aab3db2f324",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/5581c8c9-d950-416a-b9f6-8aab3db2f324?resourceVersion=id%3A2828768"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_treaty_content_content": null,
+    "field_treaty_content_list_title": "Chapter VIII : Execution of the convention",
+    "field_treaty_content_pre_title": "Chapter",
+    "field_treaty_content_section": "Chapter",
+    "field_treaty_content_title": "Chapter VIII : Execution of the convention",
+    "field_treaty_content_unid": "chapter-8"
+   },
+   "relationships": {
+    "field_treaty_commentary": {
+     "data": [
+      {
+       "type": "paragraph--treaty_commentary",
+       "id": "a69b9b5e-ea33-4d23-b952-9871dff493f8",
+       "meta": {
+        "target_revision_id": 2828767,
+        "drupal_internal__target_id": 1402648
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/5581c8c9-d950-416a-b9f6-8aab3db2f324/field_treaty_commentary?resourceVersion=id%3A2828768"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/5581c8c9-d950-416a-b9f6-8aab3db2f324/relationships/field_treaty_commentary?resourceVersion=id%3A2828768"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/5581c8c9-d950-416a-b9f6-8aab3db2f324/treaty?resourceVersion=id%3A2828768"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_content/5581c8c9-d950-416a-b9f6-8aab3db2f324/relationships/treaty?resourceVersion=id%3A2828768"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_participant",
+   "id": "558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d?resourceVersion=id%3A2828868"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_participant_action": "accession",
+    "field_participant_date_notif": "1968-09-10",
+    "field_participant_text": null
+   },
+   "relationships": {
+    "field_participant_country": {
+     "data": {
+      "type": "taxonomy_term--cit_countries_information",
+      "id": "204892e3-3f76-4617-a325-b910822c5907",
+      "meta": {
+       "drupal_internal__target_id": 17874
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d/field_participant_country?resourceVersion=id%3A2828868"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d/relationships/field_participant_country?resourceVersion=id%3A2828868"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d/treaty?resourceVersion=id%3A2828868"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/558fdf94-5b1f-4fbd-87f5-4beadd6c2b5d/relationships/treaty?resourceVersion=id%3A2828868"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_participant",
+   "id": "33aa7995-3022-4398-95a6-842447bbe738",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/33aa7995-3022-4398-95a6-842447bbe738?resourceVersion=id%3A2828869"
+    }
+   },
+   "attributes": {
+    "_has_content": true,
+    "field_participant_action": "declaration",
+    "field_participant_date_notif": "1968-09-10",
+    "field_participant_text": {
+     "value": "<p class=\"treaty__description-paragraph-sm\">Declaration made upon succession:</p><p class=\"treaty__description-paragraph-sm\">\"The Government of Barbados notes that the following countries have made reservations with respect to Article 85 of the Convention Relative to the Treatment of Prisoners of War, Albania, Byelorussia, Bulgaria, Czechoslovakia, Poland, Rumania, Ukraine, and Soviet Union; and Yugoslavia has made reservations with respect to Article 12 of the Convention Relative to the Treatment of Prisoners of War and to Article 45 of the Convention Relative to the Treatment of Civilian Persons in Time of War. The Government of Barbados states that whilst it regards all the abovementioned States as being parties to abovementioned Conventions it does not regard the abovementioned reservations thereto made by those States as valid and will therefore regard any application of any of those reservations as constituting a breach of the Convention to which the reservation relates.</p><p class=\"treaty__description-paragraph-sm\">The Government of Barbados notes that the People's Republic of China has deposited a reservation in respect to Article 85 of the Convention relative to the treatment of Prisoners of War but considers that China is a party to the Convention and does not accept the validity of any reservations made the Government of the People 'Republic.\"</p><p class=\"treaty__description-paragraph-sm\">SOURCE: Notification by the depositary addressed to the ICRC on 12.12.1968. UNTS, Vol.653, 1968, p.454.</p>",
+     "format": "basic_html",
+     "processed": "<p class=\"treaty__description-paragraph-sm\">Declaration made upon succession:</p><p class=\"treaty__description-paragraph-sm\">\"The Government of Barbados notes that the following countries have made reservations with respect to Article 85 of the Convention Relative to the Treatment of Prisoners of War, Albania, Byelorussia, Bulgaria, Czechoslovakia, Poland, Rumania, Ukraine, and Soviet Union; and Yugoslavia has made reservations with respect to Article 12 of the Convention Relative to the Treatment of Prisoners of War and to Article 45 of the Convention Relative to the Treatment of Civilian Persons in Time of War. The Government of Barbados states that whilst it regards all the abovementioned States as being parties to abovementioned Conventions it does not regard the abovementioned reservations thereto made by those States as valid and will therefore regard any application of any of those reservations as constituting a breach of the Convention to which the reservation relates.</p><p class=\"treaty__description-paragraph-sm\">The Government of Barbados notes that the People's Republic of China has deposited a reservation in respect to Article 85 of the Convention relative to the treatment of Prisoners of War but considers that China is a party to the Convention and does not accept the validity of any reservations made the Government of the People 'Republic.\"</p><p class=\"treaty__description-paragraph-sm\">SOURCE: Notification by the depositary addressed to the ICRC on 12.12.1968. UNTS, Vol.653, 1968, p.454.</p>"
+    }
+   },
+   "relationships": {
+    "field_participant_country": {
+     "data": {
+      "type": "taxonomy_term--cit_countries_information",
+      "id": "204892e3-3f76-4617-a325-b910822c5907",
+      "meta": {
+       "drupal_internal__target_id": 17874
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/33aa7995-3022-4398-95a6-842447bbe738/field_participant_country?resourceVersion=id%3A2828869"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/33aa7995-3022-4398-95a6-842447bbe738/relationships/field_participant_country?resourceVersion=id%3A2828869"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/33aa7995-3022-4398-95a6-842447bbe738/treaty?resourceVersion=id%3A2828869"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/33aa7995-3022-4398-95a6-842447bbe738/relationships/treaty?resourceVersion=id%3A2828869"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "paragraph--treaty_participant",
+   "id": "a69de12b-293a-4414-b4a9-d83a550f5d6a",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/a69de12b-293a-4414-b4a9-d83a550f5d6a?resourceVersion=id%3A2828870"
+    }
+   },
+   "attributes": {
+    "_has_content": false,
+    "field_participant_action": "succession",
+    "field_participant_date_notif": "1968-09-10",
+    "field_participant_text": null
+   },
+   "relationships": {
+    "field_participant_country": {
+     "data": {
+      "type": "taxonomy_term--cit_countries_information",
+      "id": "204892e3-3f76-4617-a325-b910822c5907",
+      "meta": {
+       "drupal_internal__target_id": 17874
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/a69de12b-293a-4414-b4a9-d83a550f5d6a/field_participant_country?resourceVersion=id%3A2828870"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/a69de12b-293a-4414-b4a9-d83a550f5d6a/relationships/field_participant_country?resourceVersion=id%3A2828870"
+      }
+     }
+    },
+    "treaty": {
+     "data": {
+      "type": "node--treaty",
+      "id": "377f0d4f-59c4-4a94-938d-8200ac9eaeaa",
+      "meta": {
+       "drupal_internal__target_id": 115794
+      }
+     },
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/a69de12b-293a-4414-b4a9-d83a550f5d6a/treaty?resourceVersion=id%3A2828870"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/paragraph/treaty_participant/a69de12b-293a-4414-b4a9-d83a550f5d6a/relationships/treaty?resourceVersion=id%3A2828870"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "taxonomy_term--cit_countries_information",
+   "id": "204892e3-3f76-4617-a325-b910822c5907",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/204892e3-3f76-4617-a325-b910822c5907?resourceVersion=id%3A17874"
+    }
+   },
+   "attributes": {
+    "name": "Barbados",
+    "field_citf_iso2_code": "BB",
+    "drupal_internal__tid": 17874,
+    "langcode": "en",
+    "description": null,
+    "field_active": true,
+    "field_citf_continent": null,
+    "field_citf_iso3_code": null,
+    "field_citf_official_name": "Barbados",
+    "field_location": {
+     "lat": 13.16733971,
+     "lng": -59.55495714,
+     "data": [],
+     "value": "13.16733971, -59.55495714"
+    }
+   },
+   "relationships": {
+    "parent": {
+     "data": [
+      {
+       "type": "taxonomy_term--cit_countries_information",
+       "id": "virtual",
+       "meta": {
+        "links": {
+         "help": {
+          "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+          "meta": {
+           "about": "Usage and meaning of the 'virtual' resource identifier."
+          }
+         }
+        }
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/204892e3-3f76-4617-a325-b910822c5907/parent?resourceVersion=id%3A17874"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/204892e3-3f76-4617-a325-b910822c5907/relationships/parent?resourceVersion=id%3A17874"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "taxonomy_term--cit_countries_information",
+   "id": "6c45317e-d9b7-4a52-b6e3-fbfa618b8c01",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/6c45317e-d9b7-4a52-b6e3-fbfa618b8c01?resourceVersion=id%3A17894"
+    }
+   },
+   "attributes": {
+    "name": "Switzerland",
+    "field_citf_iso2_code": "CH",
+    "drupal_internal__tid": 17894,
+    "langcode": "en",
+    "description": null,
+    "field_active": true,
+    "field_citf_continent": null,
+    "field_citf_iso3_code": null,
+    "field_citf_official_name": "Swiss Confederation",
+    "field_location": {
+     "lat": 46.81126533,
+     "lng": 8.22775031,
+     "data": [],
+     "value": "46.81126533, 8.22775031"
+    }
+   },
+   "relationships": {
+    "parent": {
+     "data": [
+      {
+       "type": "taxonomy_term--cit_countries_information",
+       "id": "virtual",
+       "meta": {
+        "links": {
+         "help": {
+          "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+          "meta": {
+           "about": "Usage and meaning of the 'virtual' resource identifier."
+          }
+         }
+        }
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/6c45317e-d9b7-4a52-b6e3-fbfa618b8c01/parent?resourceVersion=id%3A17894"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/cit_countries_information/6c45317e-d9b7-4a52-b6e3-fbfa618b8c01/relationships/parent?resourceVersion=id%3A17894"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "taxonomy_term--treaty_topics",
+   "id": "b6205b3e-d7d0-4d9d-9fc0-03d71aa00271",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/treaty_topics/b6205b3e-d7d0-4d9d-9fc0-03d71aa00271?resourceVersion=id%3A263"
+    }
+   },
+   "attributes": {
+    "drupal_internal__tid": 263,
+    "name": "Victims of Armed Conflicts",
+    "weight": 0
+   }
+  },
+  {
+   "type": "taxonomy_term--languages",
+   "id": "ff2601ca-58ea-475b-8fd2-6b56ee73054c",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/ff2601ca-58ea-475b-8fd2-6b56ee73054c?resourceVersion=id%3A251"
+    }
+   },
+   "attributes": {
+    "drupal_internal__tid": 251,
+    "name": "English",
+    "weight": 0,
+    "field_iso_639_2b_code": "eng",
+    "field_langcode": "en"
+   },
+   "relationships": {
+    "parent": {
+     "data": [
+      {
+       "type": "taxonomy_term--languages",
+       "id": "virtual",
+       "meta": {
+        "links": {
+         "help": {
+          "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+          "meta": {
+           "about": "Usage and meaning of the 'virtual' resource identifier."
+          }
+         }
+        }
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/ff2601ca-58ea-475b-8fd2-6b56ee73054c/parent?resourceVersion=id%3A251"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/ff2601ca-58ea-475b-8fd2-6b56ee73054c/relationships/parent?resourceVersion=id%3A251"
+      }
+     }
+    }
+   }
+  },
+  {
+   "type": "taxonomy_term--languages",
+   "id": "1a9dd7aa-a32e-4153-833a-542394eee857",
+   "links": {
+    "self": {
+     "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/1a9dd7aa-a32e-4153-833a-542394eee857?resourceVersion=id%3A255"
+    }
+   },
+   "attributes": {
+    "drupal_internal__tid": 255,
+    "name": "French",
+    "weight": 0,
+    "field_iso_639_2b_code": "fre",
+    "field_langcode": "fr"
+   },
+   "relationships": {
+    "parent": {
+     "data": [
+      {
+       "type": "taxonomy_term--languages",
+       "id": "virtual",
+       "meta": {
+        "links": {
+         "help": {
+          "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+          "meta": {
+           "about": "Usage and meaning of the 'virtual' resource identifier."
+          }
+         }
+        }
+       }
+      }
+     ],
+     "links": {
+      "related": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/1a9dd7aa-a32e-4153-833a-542394eee857/parent?resourceVersion=id%3A255"
+      },
+      "self": {
+       "href": "https://ihl-databases.icrc.org/en/jsonapi/taxonomy_term/languages/1a9dd7aa-a32e-4153-833a-542394eee857/relationships/parent?resourceVersion=id%3A255"
+      }
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "count": 1
+ },
+ "links": {
+  "self": {
+   "href": "(fixture)"
+  }
+ }
+}
