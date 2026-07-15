@@ -13,10 +13,12 @@ logs every failed response (status, headers, body) to stderr so a WAF/rate-limit
 block is distinguishable from a genuine error.
 """
 
+import json
 import ssl
 import sys
 import time
 
+import httpx
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -48,6 +50,23 @@ def make_session(user_agent):
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
+
+def make_http2_session(user_agent):
+    """An HTTP/2-capable client for a host that refuses HTTP/1.1. Konkurrensverket
+    sits behind a Cloudflare front that 403s every HTTP/1.1 request and only serves
+    HTTP/2, which requests/urllib3 cannot speak; httpx (the ``httpx2`` fork, with
+    the ``h2`` codec from its ``[http2]`` extra) can. The returned client presents
+    the same small surface the harvest engine uses -- ``.request(method, url,
+    ...)`` returning a response with ``raise_for_status``/``json``/``text``/
+    ``content``/``status_code``/``headers``/``url``, plus a mutable ``.headers``
+    dict -- so it drops into :func:`request` interchangeably with a requests
+    Session, riding out failures via that function's ``httpx.HTTPError`` branch.
+    ``follow_redirects`` mirrors requests' default; :func:`request`'s own retry
+    loop stands in for the urllib3 transport-level retry a requests session gets."""
+    client = httpx.Client(http2=True, follow_redirects=True)
+    client.headers["User-Agent"] = user_agent
+    return client
 
 
 class _LegacyTLSAdapter(HTTPAdapter):
@@ -113,13 +132,18 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
             response = session.request(method, url, **kwargs)
             response.raise_for_status()
             return response.json() if parse_json else response
-        except requests.exceptions.RequestException as exc:
+        # both transports: requests raises RequestException (its JSONDecodeError
+        # included, a subclass); the httpx HTTP/2 client raises httpx.HTTPError for
+        # transport/status failures and a bare json.JSONDecodeError for an
+        # empty/non-JSON 2xx body (requests' JSONDecodeError also subclasses it).
+        except (requests.exceptions.RequestException, httpx.HTTPError,
+                json.JSONDecodeError) as exc:
             response = getattr(exc, "response", None) or response
             status = getattr(response, "status_code", None)
             if not diagnosed:
                 _log_failure(exc, response)
                 diagnosed = True
-            transient = (isinstance(exc, requests.exceptions.JSONDecodeError)
+            transient = (isinstance(exc, json.JSONDecodeError)
                          or status is None or status in RETRY_STATUS)
             if not transient or attempt == retries - 1:
                 raise

@@ -11,10 +11,14 @@ from typing import Any
 
 def write_atomic(path, data):
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
-    atomic rename, so an interrupted run never leaves a partial file behind."""
+    atomic rename, so an interrupted run never leaves a partial file behind.
+    The temp name is per-process unique: concurrent writers (parallel `lagen`
+    invocations both pruning the runlog) must not consume each other's temp
+    file -- with a fixed name, one writer's os.replace() raced away the file
+    the other had just written and crashed it with FileNotFoundError."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_suffix(path.suffix + ".tmp%d" % os.getpid())
     try:
         tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
         os.replace(tmp, path)

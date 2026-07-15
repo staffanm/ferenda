@@ -39,8 +39,10 @@ dependencies = [
     "fastapi",
     # starlette's TestClient (used in-process for static browse-page generation)
     # requires httpx2; without it starlette falls back to httpx with a deprecation
-    # warning on every import.
-    "httpx2",
+    # warning on every import. The [http2] extra pulls in h2, which the foreskrift
+    # harvest engine needs for the HTTP/2-only Cloudflare front on
+    # konkurrensverket.se (KKVFS) -- see lib/net.make_http2_session.
+    "httpx2[http2]",
     "jpype1>=1.7.1",
     "langdetect",
     "lark",
