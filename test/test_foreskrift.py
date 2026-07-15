@@ -11,12 +11,15 @@ from accommodanda.foreskrift import harvest
 from accommodanda.foreskrift.harvest import (
     DocRef,
     Skip,
-    _ref,
     classify_file,
     classify_href,
     classify_section,
     classify_single,
 )
+
+# aliased: the tests below bind a local `ref` to each result, which would
+# otherwise shadow the imported function
+from accommodanda.foreskrift.harvest import ref as _ref
 from accommodanda.foreskrift.parse import extract_publisher
 from accommodanda.lib.harvest import guarded_enumerate
 
@@ -33,6 +36,7 @@ class _Agency:
     base_url: str = "https://example.se"
     index_url: str = "https://example.se/list"
     params: dict = field(default_factory=dict)
+    designation: str | None = None
 
 
 # --- classify_file: role + number from link text ---------------------------
@@ -56,6 +60,9 @@ def test_classify_section_uses_heading():
     assert classify_section(kons, *base)[0] == "consolidation"
     amend = anchor('<div><h2>Ändringsföreskrifter</h2><p><a>KIFS 2026:1</a></p></div>')
     assert classify_section(amend, *base) == ("amendment", "2026", "1")
+    # the short 'konsol.' heading form (not full 'konsoliderad') is a consolidation
+    konsol = anchor('<div><h2>Konsol. KIFS 2022:3</h2><p><a>KIFS 2022:3</a></p></div>')
+    assert classify_section(konsol, *base)[0] == "consolidation"
     # a konsekvensutredning under the amendment heading is a memo, not law
     memo = anchor('<div><h2>Ändringsföreskrifter</h2><p><a>Konsekvensutredning av KIFS 2026:1</a></p></div>')
     assert classify_section(memo, *base)[0] == "memo"
@@ -74,6 +81,14 @@ def test_classify_href_by_filename():
     assert classify_href(anchor('<a href="/x/andring-...-ptsfs-2023-3.pdf">a</a>'), *pts)[0] == "amendment"
     # a konsekvensutredning PDF is dropped entirely
     assert classify_href(anchor('<a href="/x/konsekvensutredning-ptsfs-2023-2.pdf">m</a>'), *pts) is None
+    # Swedac abbreviates the consolidated version '-konsol' (not the full
+    # 'konsoliderad'); RE_KONSOLIDERAD must catch the short form as consolidation
+    stafs = ("stafs", "2022", "9")
+    assert classify_href(anchor('<a href="/x/stafs-2022-9-konsol.pdf">k</a>'), *stafs) \
+        == ("consolidation", "2022", "9")
+    # the base (non-konsol) file of the same regulation stays a regulation
+    assert classify_href(anchor('<a href="/x/stafs-2022-9.pdf">g</a>'), *stafs) \
+        == ("regulation", "2022", "9")
 
 
 def test_classify_single_is_always_regulation():
@@ -128,12 +143,54 @@ def test_ref_fs_from_designation_keeps_inherited_samling_identity():
     assert hslf.basefile == "hslffs/2019:4" and hslf.identifier == "HSLF-FS 2019:4"
 
 
+def test_ref_fs_from_designation_preserves_mixed_case_designation():
+    # the printed designation is kept verbatim (never upper()'d), so a mixed-case
+    # series keeps its identity in the identifier while its fs code lowercases:
+    # SiS's SiSFS and the SiSUVFS (ungdomsvård) series it mixes on one page.
+    seen = set()
+    agency = _Agency(fs="sisfs", designation="SiSFS", params={"fs_from_designation": True})
+    own = _ref(agency, "SiSFS 2025:1", "/x/sisfs-2025-1.pdf", seen, direct=True)
+    assert own.basefile == "sisfs/2025:1" and own.identifier == "SiSFS 2025:1"
+    uv = _ref(agency, "SiSUVFS 2025:1", "/x/sisuvfs-2025-1.pdf", seen, direct=True)
+    assert uv.basefile == "sisuvfs/2025:1" and uv.fs == "sisuvfs" \
+        and uv.identifier == "SiSUVFS 2025:1"
+
+
 def test_ref_without_fs_from_designation_normalises_to_agency_fs():
     # the default (no opt-in): a stray designation is still normalised onto the
     # agency's own fs, so ordinary agencies are unaffected by the new capability
     seen = set()
     ref = _ref(_Agency(fs="kifs"), "KIFS 2017:7", "/kifs-20177", seen)
     assert ref.basefile == "kifs/2017:7" and ref.fs is None
+
+
+# --- direct_docref / newest_first: the shared tail of a bespoke enumerator ----
+
+def test_direct_docref_builds_deduped_direct_ref():
+    # the shared tail the filename-slug enumerators (skogs/prvfs/csnfs/…) use:
+    # deduped basefile + the resolve_direct extra payload, number parsed by caller
+    agency = _Agency(fs="sksfs")
+    seen = set()
+    r = harvest.direct_docref(agency, "sksfs", "2015", "4",
+                              "https://example.se/x/sksfs-2015-4.pdf", seen, title="t")
+    assert r.basefile == "sksfs/2015:4" and r.fs is None \
+        and r.identifier == "SKSFS 2015:4" \
+        and r.extra["regulation_url"] == "https://example.se/x/sksfs-2015-4.pdf"
+    # a second sighting of the same base dedupes to None
+    assert harvest.direct_docref(agency, "sksfs", "2015", "4", "u2", seen) is None
+    # a routed predecessor series keeps its own DocRef.fs + explicit identifier
+    routed = harvest.direct_docref(agency, "rsfs", "1999", "1", "u3", seen,
+                                   identifier="RSFS 1999:1")
+    assert routed.fs == "rsfs" and routed.identifier == "RSFS 1999:1"
+
+
+def test_newest_first_orders_numerically_not_lexically():
+    # 2026:12 must sort ahead of 2026:3 (the incremental watermark needs a true
+    # newest-first stream, so the lopnummer compares as an int, not a string)
+    refs = [DocRef("x/2019:5", "X 2019:5", "u"), DocRef("x/2026:3", "X 2026:3", "u"),
+            DocRef("x/2026:12", "X 2026:12", "u")]
+    assert [r.basefile for r in harvest.newest_first(refs)] \
+        == ["x/2026:12", "x/2026:3", "x/2019:5"]
 
 
 # --- enumeration resilience: a flaky index must not abort the run -----------

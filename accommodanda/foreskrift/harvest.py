@@ -43,7 +43,7 @@ from bs4 import BeautifulSoup
 from ..lib import compress
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import make_http2_session, make_session, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 
@@ -60,7 +60,7 @@ class DocRef:
     ``fs`` is the författningssamling this one document belongs to, which is
     normally ``agency.fs`` but need not be: an agency that has taken over a
     renamed/disbanded agency's samling lists several författningssamlingar on one
-    page (see ``fs_from_designation`` in :func:`_ref`), and each document is
+    page (see ``fs_from_designation`` in :func:`ref`), and each document is
     stored and identified under *its own* fs, read from here by the resolvers and
     the downloaded-check. ``None`` means "use ``agency.fs``"."""
     basefile: str
@@ -90,6 +90,7 @@ class Agency:
     user_agent: str | None = None          # override (a few sites gate on UA)
     headers: dict | None = None            # extra request headers (e.g. Accept-Language)
     designation: str | None = None         # printed FS prefix ("HSLF-FS") when != fs.upper()
+    http2: bool = False                    # use the HTTP/2 client (Cloudflare front that 403s HTTP/1.1: KKVFS)
 
 
 def absolute(base_url, href):
@@ -116,7 +117,8 @@ def absolute(base_url, href):
 #   amendment      an ändringsförfattning's own text (a later FS number)
 #   memo           beslutspromemoria / konsekvensutredning (related, not law)
 #   attachment     anvisning / blankett / bilaga
-RE_KONSOLIDERAD = re.compile(r"konsolider", re.IGNORECASE)
+# "konsol", not "konsolider": Swedac's filenames abbreviate ("stafs-2022-9-konsol.pdf")
+RE_KONSOLIDERAD = re.compile(r"konsol", re.IGNORECASE)
 RE_MEMO = re.compile(r"beslutsprom|besluts-?pm|konsekvensutredning", re.IGNORECASE)
 RE_ATTACHMENT = re.compile(r"anvisning|blankett|bilaga|mall|vägledning", re.IGNORECASE)
 RE_FS_NUMBER = re.compile(r"\b([A-ZÅÄÖ-]+FS)\s*(\d{4}):(\d+)", re.IGNORECASE)
@@ -155,7 +157,7 @@ def classify_section(a, fs, base_ars, base_lop):
         return ("memo", ars, lop)
     head = a.find_previous(["h2", "h3"])
     head = head.get_text(" ", strip=True).lower() if head else ""
-    if "konsolider" in head:
+    if RE_KONSOLIDERAD.search(head):
         return ("consolidation", ars or base_ars, lop or base_lop)
     if "grundför" in head:
         return ("regulation", base_ars, base_lop)
@@ -174,7 +176,7 @@ def classify_href(a, fs, base_ars, base_lop):
     m = RE_SLUG_NUMBER.search(name)
     if "konsekvensutred" in href:                 # impact assessment, not the law
         return None
-    if "konsolider" in href:
+    if RE_KONSOLIDERAD.search(href):              # incl. Swedac's '-konsol' abbreviation
         return ("consolidation", base_ars, base_lop)
     if not m:
         return None
@@ -357,7 +359,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
 RE_COLON_NUMBER = re.compile(r"(\d{4}):(\d+)")
 
 
-def _ref(agency, ident_text, href, seen, title=None, direct=False):
+def ref(agency, ident_text, href, seen, title=None, direct=False):
     """Build a DocRef for a base regulation from a designation string ('NFS
     2026:6' / 'SSMFS 2018:1 …') and an href. The (year, lopnummer) come from the
     first ``YYYY:N`` in the text. When ``direct``, the href *is* the PDF (no
@@ -390,9 +392,12 @@ def _ref(agency, ident_text, href, seen, title=None, direct=False):
     # "hslffs"); it only applies when the row actually names a designation.
     fs = agency.fs
     doc_fs = None      # DocRef.fs override; None == agency.fs (the common case)
-    identifier = "%s %s:%s" % (agency.fs.upper(), arsutgava, lopnummer)
+    identifier = "%s %s:%s" % (agency.designation or agency.fs.upper(),
+                               arsutgava, lopnummer)
     if agency.params.get("fs_from_designation") and fsm:
-        designation = fsm.group(1).upper()
+        # the printed designation verbatim -- uppercasing would mangle the
+        # mixed-case series (SiSFS, SiSUVFS)
+        designation = fsm.group(1)
         fs = doc_fs = re.sub(r"[^0-9a-zåäö]", "", designation.lower())
         identifier = "%s %s:%s" % (designation, arsutgava, lopnummer)
     basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
@@ -404,6 +409,41 @@ def _ref(agency, ident_text, href, seen, title=None, direct=False):
         if direct else {}
     return DocRef(basefile=basefile, fs=doc_fs, identifier=identifier,
                   url=url, title=title, extra=extra)
+
+
+def direct_docref(agency, fs, arsutgava, lopnummer, url, seen, *, identifier=None, title=None):
+    """The shared tail of a bespoke direct-PDF enumerator that has parsed a base
+    regulation's own (fs, year, lopnummer) itself -- typically off a filename
+    slug the generic :func:`ref` can't read. Builds the deduped DocRef with the
+    ``{regulation_url, title, source_url}`` extra payload every direct enumerator
+    hands :func:`resolve_direct`. ``fs`` is the document's own samling (``==
+    agency.fs`` in the common case, a predecessor series when the caller routes
+    it); ``DocRef.fs`` is set only when it differs from ``agency.fs``.
+    ``identifier`` defaults to ``"<designation> <year>:<lop>"`` from
+    ``agency.designation or agency.fs.upper()``; a routed series passes its own.
+    Returns ``None`` if this base was already yielded (dedup keeps one per base).
+    A *landing* enumerator (no direct PDF href) keeps its own tail -- its DocRef
+    carries no extra payload."""
+    basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
+    if basefile in seen:
+        return None
+    seen.add(basefile)
+    return DocRef(
+        basefile=basefile, fs=(fs if fs != agency.fs else None),
+        identifier=identifier or "%s %s:%s" % (agency.designation or agency.fs.upper(),
+                                               arsutgava, lopnummer),
+        url=url, title=title,
+        extra={"regulation_url": url, "title": title, "source_url": agency.index_url})
+
+
+def newest_first(refs):
+    """Sort DocRefs newest-first by their basefile's ``(year, lopnummer)``, so an
+    enumerate that reads oldest-first (a printed förteckning, an unordered
+    listing) still hands the incremental walk the newest documents first -- the
+    ``HarvestWatermark`` date-boundary stop is only valid on a newest-first
+    stream."""
+    return sorted(refs, key=lambda r: [int(x) for x in r.basefile.split("/", 1)[1].split(":")],
+                  reverse=True)
 
 
 def indexed_enumerate(session, agency):
@@ -439,7 +479,7 @@ def indexed_enumerate(session, agency):
             text = a.get_text(" ", strip=True)
             if skip and skip.search(text):
                 continue
-            docref = _ref(agency, text, a.get("href", ""), seen,
+            docref = ref(agency, text, a.get("href", ""), seen,
                           title=text if direct else None, direct=direct)
             if docref:
                 yield docref
@@ -462,7 +502,7 @@ def paginated_enumerate(session, agency):
         if not rows:
             return
         for a in rows:
-            docref = _ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
+            docref = ref(agency, a.get_text(" ", strip=True), a.get("href", ""), seen)
             if docref:
                 yield docref
         page += 1
@@ -481,7 +521,7 @@ def json_enumerate(session, agency):
         data = data[p["unwrap"]]
     seen = set()
     for r in data.get(p.get("results_key", "results"), []):
-        docref = _ref(agency, str(r[p["id_field"]]), r[p["url_field"]], seen,
+        docref = ref(agency, str(r[p["id_field"]]), r[p["url_field"]], seen,
                       title=r.get(p.get("title_field", "heading")), direct=direct)
         if docref:
             yield docref
@@ -507,7 +547,7 @@ def sitemap_enumerate(session, agency):
             m = idre.search(loc)
             if not m:
                 continue
-            docref = _ref(agency, "%s:%s" % (m.group(1), m.group(2)), loc, seen)
+            docref = ref(agency, "%s:%s" % (m.group(1), m.group(2)), loc, seen)
             if docref:
                 yield docref
 
@@ -526,7 +566,8 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     falls past the watermark's date boundary (or after a run of consecutive
     already-downloaded items). ``only`` (a basefile) fetches just that one.
     Returns ``(seen, new)``."""
-    session = make_session(agency.user_agent or USER_AGENT)
+    session = (make_http2_session if agency.http2 else make_session)(
+        agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
     marker = Path(root) / agency.fs / ".complete"
@@ -543,7 +584,7 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     rejects: list[str] = []
 
     def item_key(ref):
-        # basefile is always "<fs>/<year>:<lopnummer>" (built by _ref, above, off
+        # basefile is always "<fs>/<year>:<lopnummer>" (built by ref, above, off
         # a regex that only ever captures a 4-digit year) -- the year anchors the
         # date watermark; a shape that violates this is this module's own bug,
         # not a data quirk to route around
