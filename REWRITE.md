@@ -1700,11 +1700,27 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   5 pre-1994 NFS `ar-YY-N` two-digit-year filenames). Per-fs: tfs 339, nfs 210,
   fffs 126, bfs 124, msbfs 97, lmfs 93, ssmfs 46, ptsfs 45, livsfs 32, kovfs 26,
   stemfs 26, sifs 22, elsakfs 20, rgkfs 9, kifs 3 (only 3 in-force base regs).
+- ✅ **Registry grown to the full lagrummet.se government-agency list**
+  (`foreskrift/agencies.py`) — from the 15-agency exemplar corpus above to **71
+  registered författningssamlingar** (county `\d+FS` series excluded), **64 live**
+  through the shared harvest engine + **7 frozen-only** stubs: skvfs/rsfs,
+  sosfs/hslffs (§7g, harvest-blocked), plus sjvfs (SharePoint/Microsoft 365 auth
+  wall), svkfs (no register left of its own — delegated to eifs), mtfs (F5/Shape
+  bot-defense). Predecessor författningssamlingar route via
+  `fs_from_designation`/`DocRef.fs` at harvest time with no registry entry of
+  their own (the MCFFS precedent): fifs, difs, rnfs, trmfs, nutfs, mprtfs,
+  mrtvfs, sisuvfs, amsfs, rffs, lfs, jvsfs, vvfs, trvtfs. KKVFS (Konkurrensverket)
+  sits behind a Cloudflare front that 403s HTTP/1.1 and only serves HTTP/2; its
+  `Agency.http2` flag routes it through a new `make_http2_session`
+  (`lib/net.py`, the `httpx2[http2]` extra) instead of the default `requests`
+  session. A full harvest at the new scale is in progress: **~6,750 base
+  regulations** across the 64 live fs (skolfs 2557, tsfs 925, fkfs 543, rams 366,
+  rfs 274, dvfs 263 the largest), followed by a full `lagen foreskrift rebuild`.
 - ✅ **Enumeration resilience** (`harvest.py`) — these agency indexes are flaky and
   badly maintained, so the harvest survives any single index page failing without
   losing the rest: `_guarded_enumerate` turns an enumerator that dies outright (a
   single-call API down, malformed JSON, 403) into a logged `Skip` and moves to the
-  next agency (one bad source can't abort the 15-agency run); multi-page enumerators
+  next agency (one bad source can't abort the whole run); multi-page enumerators
   (`indexed_enumerate` per-year, `paginated`, `sitemap`) yield a `Skip` for one
   unreachable page and keep walking the tail. A `Skip` is *logged* (never swallowed)
   and *withholds the watermark save* so the page is retried next run; an
@@ -1905,7 +1921,7 @@ only a one-time import is built**. The raw trees live in `ferenda.old/data/`
 | `souregeringen`/`dsregeringen`/`dirregeringen` | 3,046/1,418/2,294 | ~1993–2025 | landing HTML + PDF | overlap with §7a's harvest — import missing basefiles only |
 | `dirtrips`/`dirasp` | 5,096/1,826 | 1987–2016 | plaintext-HTML / PDF | moderate (dir is the least-cited type) |
 | `arn` | 1,027 | 1992–2022 | decision file (pdf/doc/wpd) + `fragment.html` metadata | high, small — the avg vertical's third organ (`fmt_arn_refs` already mints `avg/arn/{dnr}`) |
-| `skvfs`, `sosfs` (+ other myndfs trees) | — | varies | agency PDFs | fills exactly the two harvest-blocked föreskrift agencies (§7e 💤) |
+| `skvfs`, `sosfs` (+ other myndfs trees) | — | varies | agency PDFs | fills the harvest-blocked föreskrift agencies (§7e 💤) — skvfs/sosfs from the frozen legacy tree; sjvfs (SharePoint auth wall), svkfs (no register left, delegated to eifs) and mtfs (F5 bot-wall) are registered frozen-only with no legacy corpus to import yet; kkvfs, previously deferred as Cloudflare-fronted, is now live via `lib/net.make_http2_session` |
 | `pbr` | ~12,300 | 1977–2016 (court dissolved) | case HTML + PDFs | skip — the old module was download-only, never parsed, no URIs minted |
 | `keyword`/`myndprax`/`forarbeten`/`sitenews`/`mediawiki`/`eurlex*`/`sfs` | — | — | — | skip — facades, derived output, or superseded (wiki migration, CELLAR, golden) |
 
@@ -2370,7 +2386,7 @@ rewrite work.
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 17 agencies live + 4 frozen-only), `download`, `legacy` (one-time import of the two harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: 1218 regs harvested, parsed 0-fail |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 64 live + 7 frozen-only), `download`, `legacy` (one-time import of the harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: full 64-agency harvest (~6,750 regs) and `rebuild` in progress |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
@@ -2494,6 +2510,26 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **foreskrift** (2026-07-15) — the agency registry grew from ~21 to the full
+  lagrummet.se government-agency list: `foreskrift/agencies.py` now registers
+  71 författningssamlingar (64 live through the shared harvest engine, 7
+  frozen-only stubs — skvfs/rsfs, sosfs/hslffs plus new sjvfs, svkfs, mtfs),
+  county `\d+FS` series still excluded. Predecessor series (fifs, difs, rnfs,
+  trmfs, nutfs, mprtfs, mrtvfs, sisuvfs, amsfs, rffs, lfs, jvsfs, vvfs, trvtfs)
+  route via `fs_from_designation`/`DocRef.fs` at harvest time with no registry
+  entry of their own, per the MCFFS precedent. `harvest.py`'s `_ref` was
+  promoted to public `ref` for the bespoke per-agency enumerators to reuse;
+  `Agency` gained an `http2: bool` flag so KKVFS (behind a Cloudflare front
+  that 403s HTTP/1.1) rides `lib/net.make_http2_session` (new, `httpx2[http2]`
+  extra) instead of the default `requests` session; `RE_KONSOLIDERAD` widened
+  to match "konsol" (Swedac abbreviates to `-konsol.pdf`). Two library fixes
+  fell out of running the full corpus: `lib/net.request` rides out failures
+  for both the `requests` and `httpx` transports, and `lib/util.write_atomic`
+  uses a per-process temp name (a fixed name raced two concurrent `lagen`
+  invocations pruning the runlog, one crashing the other with
+  `FileNotFoundError`). A full harvest at the new scale is under way (~6,750
+  base regulations across the 64 live fs; skolfs, tsfs, fkfs, rams, rfs, dvfs
+  the largest), followed by a full `lagen foreskrift rebuild`.
 - **sfs** (2026-07-14) — 🚧 convention appendices are parsed by one
   `sfs/parallelappendix.py` with **no per-law knowledge**: article sequences
   locate the per-language blocks, `langdetect` labels each complete block, and

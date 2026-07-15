@@ -106,11 +106,11 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `markdown.py` | parse the git-backed wiki markdown (commentary/concept/site) into the shared inline-run artifact shape — the markdown counterpart of `wikitext.py` |
 | `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
 | `runlog.py` | run instrumentation behind the ops dashboard — `runs.ndjson`/`errors.json`/`status.json` under `DATA/.build/` |
-| `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`) |
+| `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging, riding out failures from both the `requests` and `httpx` transports); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`); `make_http2_session` (`httpx2[http2]`) is an HTTP/2-only fallback for hosts that refuse HTTP/1.1 behind a Cloudflare front (foreskrift's kkvfs) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
-| `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename) |
+| `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename, per-process temp name so concurrent `lagen` invocations can't race each other's rename) |
 
 **DV vertical (court decisions)**
 | File | What |
@@ -149,7 +149,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 **foreskrift vertical (agency regulations)**
 | File | What |
 |---|---|
-| `agencies.py` | the data registry driving one shared harvest engine — 17 live författningssamlingar + 4 frozen-only (skvfs/rsfs, sosfs/hslffs, §7g), no per-agency pipelines (~100 agencies share a few publishing architectures) |
+| `agencies.py` | the data registry driving one shared harvest engine — 71 registered författningssamlingar (the full lagrummet.se agency list, county `\d+FS` series excluded), 64 live + 7 frozen-only (skvfs/rsfs, sosfs/hslffs, sjvfs, svkfs, mtfs, §7g), no per-agency pipelines (a shared engine covers the publishing architectures) |
 | `harvest.py` | per-agency enumerate/resolve architectures (indexed/paginated/json/sitemap enumerators; landing/direct resolvers + file classifiers) wired onto `lib/harvest.py`'s shared `walk`/`HarvestWatermark` loop |
 | `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`; frozen-only fs are a logged no-op) |
 | `legacy.py` | one-time import of the two harvest-blocked corpora (`lagen foreskrift import-legacy {skvfs\|sosfs}`) — frozen bytes referenced in place (§7g) |
