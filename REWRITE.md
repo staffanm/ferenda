@@ -352,8 +352,18 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   and refuses a partial final result. Each artifact node has a stable semantic
   `key` (hash of structural path + kind/code + normalized anchor + occurrence
   within its container); the `.graphics` layer is keyed by it and stores the
-  unhashed identity beside the crop. Temporal aliases share a key, while a
-  changed identity cannot inherit an old verified crop. The pass writes the
+  unhashed identity beside the crop. Content duplicates share a key, while a
+  changed identity cannot inherit an old verified crop. A *pending* temporal
+  variant is the exception: when the source prints an announced amendment as a
+  second copy of a bilaga (`/Träder i kraft I:.../` beside the in-force copy's
+  `/Upphör att gälla U:.../`), the pending copy gets its own keys and its own
+  provenance — the text's markers beat the register's dates, which may already
+  know the entry-into-force day while the text is still split. So 2004:629
+  renders the in-force bilaga 1 maps from 2018:200 and the pending copy's from
+  2023:395, with no per-document code. The NF keeps each temporal variant's
+  `upphor`/`ikrafttrader` (ISO date or the verbatim "den dag som regeringen
+  bestämmer"), and the renderer prints them as a `temporal-status` banner so a
+  reader can tell the copies apart, as the official source does. The pass writes the
   resulting layer in the curated store
   (`lib/annstore.py`) — a peer of `.ann`/`.corr`, with per-entry `"verified":
   true` surviving a rerun so a reviewer can sign off graphics one at a time

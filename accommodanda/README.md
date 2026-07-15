@@ -64,7 +64,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `register.py` | SFSR register page → amendments + change tuples; `resource_map`/`lookup_resource` resolve org/series labels via the ported `data/resources.json` dataset |
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
-| `graphics.py` | recovers content omitted by the text-only SFST source. Detection is deterministic and runs at parse time: the slash-delimited and plain `... är inte med här` corpus forms plus otherwise unmarked road-sign cells in 2007:90 become typed `grafik` nodes. Each node carries a stable semantic `key`, hashed from structural path + kind/code + normalized anchor + occurrence within its container; transient `G1` ids remain diagnostic only. Localization resolves provenance, deduplicates temporal aliases by key, strictly validates complete vision output and writes `.graphics` entries keyed by that semantic key with the unhashed identity alongside; wired as `lagen sfs ai-includegraphics` |
+| `graphics.py` | recovers content omitted by the text-only SFST source. Detection is deterministic and runs at parse time: the slash-delimited and plain `... är inte med här` corpus forms plus otherwise unmarked road-sign cells in 2007:90 become typed `grafik` nodes. Each node carries a stable semantic `key`, hashed from structural path + kind/code + normalized anchor + occurrence within its container; transient `G1` ids remain diagnostic only. Localization resolves provenance (variant-aware: a pending, not-yet-in-force copy of a bilaga gets its own keys and its own source PDF), deduplicates content duplicates by key, strictly validates complete vision output and writes `.graphics` entries keyed by that semantic key with the unhashed identity alongside; wired as `lagen sfs ai-includegraphics` |
 | `pdfmirror.py` | official published-SFS PDF mirror, the crop source for graphic localization. Each act's source follows from its SFS number: `1998:306`–`2018:159` from direct rkrattsdb URLs, `2018:160`– from svenskforfattningssamling.se document pages, and nothing before `1998:306` (print only). Fetched bytes must be PDFs. `.mirror.json` records the acts an upstream answered it has no PDF for, which is the only thing telling those apart from "not fetched yet" and so the only thing keeping a rerun free. Runs as part of `lagen sfs download` and as `lagen sfs mirror-pdf`, not as a parse stage |
 | `correspond.py` | the old-law → new-law paragraf correspondence map for a restructured statute, three routes into the same `.corr` payload: an LLM pass over the proposition's författningskommentar (`lagen sfs ai-correspond`), and the mechanical `table_correspond` over the prop's own jämförelsetabell bilagor (`lagen sfs table-correspond <new> <prop> [<old>[=TAG] ...]`, rows extracted by `forarbete/jamforelse.py`; several old laws — SFB's 23, SFL's 3 — merge into one layer, `=TAG` names an old law's prop-local shorthand so tagged cell references resolve against the right law) — every edge validated against both laws' paragraf inventories either way; plus the *same-law* renumbering route (`lagen sfs renumber-correspond <sfs>`), reading the register's "nuvarande … betecknas …" omfattning clauses into `betecknas` edges carrying the amendment's ikrafttradandedatum, which generate uses to split inbound references temporally ("Hänvisningar till tidigare beteckning 4 kap. 4 §" on RF 4 kap. 6 §) |
 | `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); a per-transition hash ledger admits only strict append-only updates, while `--rebuild-history` atomically recreates corrected/backfilled history; implements `docs/prd-sfs-history-as-git.md` |
@@ -367,12 +367,18 @@ per-entry `verified` flags that survive a rerun only while both provenance and
 semantic identity still match. The artifact's local `G1` id is not persisted as
 identity: the layer is keyed by a `g-…` hash of structural path, kind/code,
 normalized anchor and container-local occurrence, and stores the unhashed
-`identity` object in each entry for review. Temporal copies of the same semantic
-appendix share a key/crop. Generated candidates are not publicly rendered until
+`identity` object in each entry for review. Content copies of the same semantic
+appendix share a key/crop; a *pending* temporal variant (a container the source
+prints beside its in-force sibling with `/Träder i kraft I:.../`) instead gets
+its own keys and its own provenance-correct source PDF. Generated candidates
+are not publicly rendered until
 their entry (or whole layer) is verified. `GET /api/v1/sfs-graphic?uri=&node=` serves the
 crop (`lib/facsimile.py`'s `render_region`/`cached_region`) lazily from the
 provenance-correct PDF; the renderer shows the crop where the layer has placed
-one, an honest placeholder otherwise.
+one — captioned "Karta ur SFS X", linked to the amendment's `#L{nr}` register
+entry on the same page — an honest placeholder otherwise, and prints each
+temporal variant's entry-into-force state as a subdued slash-delimited
+marker (`/Träder i kraft: den dag som regeringen bestämmer/`).
 
 **SFS version history** (historical consolidations / time travel / diff): the
 downloader archives every superseded consolidation under

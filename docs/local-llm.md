@@ -175,7 +175,17 @@ Three things that bite, in descending order of how much time they cost:
    `response_format: {"type": "json_schema", …}` parsed strictly on the first try.
    `strip_fence` handles code fences; it cannot handle this. A schema makes the
    failure class structurally impossible.
-3. **`temperature=0` is wrong for this model.** It is the default (right for
+3. **Vision localization finds the page, not the pixel.** The first real
+   `sfs ai-includegraphics` run (2004:629, six maps across three published
+   PDFs, ~3 min/PDF): every gap was placed on a plausible page with a good
+   alt text, but no bbox survived review unedited — one map was split in two,
+   one "located" on the amendment's text-only title page, most boundaries
+   clipped the figure. That failure mode is exactly what the per-entry
+   `verified` workflow absorbs: treat the model's output as candidate
+   geometry, hand-fix the bboxes in the `.graphics` layer (raw PDF points,
+   `px * 72 / 150`), verify entry by entry. Berget's Kimi remains the pick
+   for a large batch where hand-curating every crop is unaffordable.
+4. **`temperature=0` is wrong for this model.** It is the default (right for
    gpt-oss on Berget) but not here: Qwen3.6 asks for temp 1.0 / top_p 0.95 /
    top_k 20 in thinking mode (0.7 / 0.8 / 20 for instruct), and greedy decoding
    in thinking mode tends to loop. Set `llm_temperature`/`llm_top_p` alongside
@@ -207,7 +217,10 @@ rather than 401 halfway through a corpus.
 
 `llm_model`/`BERGET_MODEL` is irrelevant here — llama.cpp serves whatever GGUF it
 loaded and ignores the name — but set it to something honest anyway so `/ops` and
-the run ledger record which model authored a sidecar.
+the run ledger record which model authored a sidecar. The same goes for
+`vision_model`/`BERGET_VISION_MODEL`, which the vision passes
+(`sfs ai-includegraphics`) record instead of `llm_model`; Qwen3.6's vision
+encoder serves those too (see §6 for what to expect from it).
 
 Set the sampling keys **together with** the base URL. The default temperature 0
 is right for gpt-oss on Berget but wrong here: Qwen3.6 asks for 1.0 / top_p 0.95
