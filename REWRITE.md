@@ -319,14 +319,30 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   (a projection-time overlay, like reference links — no model dataclass),
   preserving `sort` and the governing amendment (`satt_av`), and also
   recognizes the otherwise unmarked road-sign designator cells in 2007:90.
-  `sfs/pdfmirror.py`, exposed as `lagen sfs mirror-pdf [<sfs> ...] [--full]`,
-  mirrors the official PDFs under `downloaded/sfs/pdf/`: derivable rkrattsdb
-  URLs for 1998–2017, a new-site→printed-series fallback across the April 2018
-  boundary, and links resolved through svenskforfattningssamling.se document
-  pages thereafter; fetched bodies are PDF-signature checked. Pre-1998 PDFs are unavailable through these
-  sources. Localization is the opt-in, nondeterministic vision half:
-  `lagen sfs ai-includegraphics <basefile> [...]` (mirror-pdf must have run
-  first) resolves each gap's *provenance* — the amending SFS that last set
+  `sfs/pdfmirror.py`, exposed as `lagen sfs mirror-pdf [<sfs> ...] [--full]`
+  and run as part of `lagen sfs download`, mirrors the official PDFs under
+  `downloaded/sfs/pdf/`. Which source holds an act follows from its SFS number,
+  and both boundaries are exact act numbers, not dates: `2018:160`– resolves
+  through svenskforfattningssamling.se document pages (the authentic online
+  series, from the 1 April 2018 switch), `1998:306`–`2018:159` through derivable
+  rkrattsdb URLs, and anything before `1998:306` exists only in print — a named
+  act there is an error, a swept one is skipped without a request. Fetched
+  bodies are PDF-signature checked. What keeps a rerun cheap is entirely local:
+  an act already mirrored is skipped from disk, and one an upstream answered it
+  has no PDF for is skipped from `.mirror.json`'s `absent` set — the record that
+  exists because a missing file cannot itself say whether an act was never
+  fetched or has nothing to fetch, which is what made every such act cost a
+  request on every run. Each act is asked about at most once; the price is that
+  a negative is permanent, and only `--full` revisits one. (An earlier design
+  also harvested the publisher's `/regulations` listing into a watermarked index
+  of what the online series carries. It was dropped: it saved no fetches — the
+  doc page has to be fetched anyway for every act that *has* a PDF, and `absent`
+  already covers the rest — and its remaining value, each act's publication
+  date, was only wanted for an SFST reconciliation nobody had asked for.)
+  Localization is the opt-in, nondeterministic vision half:
+  `lagen sfs ai-includegraphics <basefile> [...]` (mirroring any source PDF it
+  still needs, so mirror-pdf need not have run first) resolves each gap's
+  *provenance* — the amending SFS that last set
   that wording, deterministically (register-first for bilaga gaps, so
   2004:629's two independently-amended map appendices resolve to different
   source PDFs; changenote-then-base otherwise) — then asks the vision model

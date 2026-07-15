@@ -248,9 +248,13 @@ def sfs_sfsr(basefile):                 # legacy register HTML
     return SFS_DOWNLOADED / "sfsr" / year / (nr + ".html")
 
 
+def sfs_pdf_dir():                      # the facsimile mirror's root (+ its harvest state)
+    return SFS_DOWNLOADED / "pdf"
+
+
 def sfs_pdf(basefile):                  # officially published SFS PDF (facsimile source)
     year, nr = _sfs_parts(basefile)
-    return SFS_DOWNLOADED / "pdf" / year / (nr + ".pdf")
+    return sfs_pdf_dir() / year / (nr + ".pdf")
 
 
 # --------------------------------------------------------------------------

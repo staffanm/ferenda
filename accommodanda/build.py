@@ -686,7 +686,16 @@ def sfs_harvest(scopes):
     """Bulk discovery harvest -- a search_after sweep of the whole corpus, the
     only way to find acts not yet on disk (the old download_new). Incremental
     by default (stops at the first page with nothing new); `--force` walks the
-    entire corpus oldest-first. Throttled and self-logging (per page)."""
+    entire corpus oldest-first. Throttled and self-logging (per page).
+
+    Mirrors the official PDFs of whatever it found, too: the facsimiles are the
+    same acts from the same publisher, and leaving them to a separate command
+    let the two drift. Always incrementally, `--force` or not -- an act already
+    mirrored, or known to have no PDF, costs nothing, so only the first harvest
+    pays for the corpus-wide backfill. `--force` here scopes *discovery* (walk
+    the whole corpus rather than stop at the first known page); re-fetching
+    every facsimile is `mirror-pdf --full`, and asking for one is no way to ask
+    for the other."""
     if RUN.dry_run:
         print("sfs download: would download the corpus into %s"
               % layout.SFS_DOWNLOADED)
@@ -697,6 +706,7 @@ def sfs_harvest(scopes):
                                                     resume_after=resume_after)
     print("sfs download: %d seen, %d new, %d updated, %d skipped"
           % (seen, new, updated, skipped))
+    _sfs_mirror_pdf_run(sfs_pdfmirror.corpus_beteckningar(sfs_list()), force=False)
 
 
 def sfs_parse_run(basefile):
@@ -976,23 +986,60 @@ def sfs_mirror_pdf(basefiles):
     PDFs the consolidated text drops its graphics from, keyed by SFS number,
     into downloaded/sfs/pdf/. With no arguments, mirror the whole corpus (every
     base act + every andringsforfattning across the downloaded registers);
-    otherwise just the named acts. Idempotent -- already-present PDFs are
-    skipped unless --full is given. The source for the localization crop."""
-    force = "--full" in basefiles
+    otherwise just the named acts -- `mirror-pdf 2007:90` fetches that one PDF
+    and nothing else. Each act's source follows from its SFS number
+    (`pdfmirror.has_facsimile` / `is_online_series`); naming one older than both
+    sources is an error. Idempotent -- already-present PDFs are skipped unless
+    --full is given. The source for the localization crop.
+
+    A rerun is cheap because both answers are local: an act already mirrored is
+    skipped from disk, and one the upstream has already denied from the mirror's
+    record of those (`pdfmirror.MirrorState`). Only an act nobody has asked
+    about yet costs a request."""
     targets = [b for b in basefiles if not b.startswith("--")]
-    targets = targets or sfs_pdfmirror.corpus_beteckningar(sfs_list())
+    # A named act older than every facsimile source is a question with no
+    # answer, so say so rather than report it as "no published PDF" -- during a
+    # corpus sweep those acts are simply the era that predates the mirrors.
+    for beteckning in targets:
+        if not sfs_pdfmirror.has_facsimile(beteckning):
+            sys.exit("sfs mirror-pdf: %s predates every published-PDF source -- "
+                     "the printed series' mirror begins at %s and acts before it "
+                     "exist only on paper"
+                     % (beteckning, sfs_pdfmirror.RKRATTSDB_FIRST))
+    _sfs_mirror_pdf_run(targets or sfs_pdfmirror.corpus_beteckningar(sfs_list()),
+                        force="--full" in basefiles or RUN.force)
+
+
+def _sfs_mirror_pdf_run(targets, force):
+    """Mirror `targets`, reporting what each of the three outcomes cost. `force`
+    is taken as an argument rather than read off RUN: it means "re-fetch every
+    PDF already on disk and re-ask about every act the upstream once denied",
+    which is mirror-pdf's own `--full`, and must not be inferred from a
+    `--force` that was aimed at another action (`sfs download --force` means
+    walk the corpus for discovery, not re-download tens of thousands of
+    facsimiles)."""
     if RUN.dry_run:
         print("sfs mirror-pdf: would mirror %d SFS PDF(s)" % len(targets))
         return
     session = _sfs_session()
-    fetched = missing = 0
-    for beteckning in targets:
-        if sfs_pdfmirror.fetch_one(session, beteckning, force=force or RUN.force):
+    state = sfs_pdfmirror.MirrorState(layout.sfs_pdf_dir())
+    fetched = no_pdf = print_only = 0
+    reporter = util.Reporter()
+    for seen, beteckning in enumerate(targets, 1):
+        # no delay= here: the two publishers have very different patience, and
+        # pdfmirror is what knows which one an act's number will reach
+        if sfs_pdfmirror.fetch_one(session, state, beteckning, force=force):
             fetched += 1
+        elif not sfs_pdfmirror.has_facsimile(beteckning):
+            print_only += 1        # predates every source -- never asked about
         elif not compress.exists(layout.sfs_pdf(beteckning)):
-            missing += 1
-    print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d target(s)"
-          % (fetched, missing, len(targets)))
+            no_pdf += 1            # a source covers the act; it has no PDF for it
+        reporter.update(seen, len(targets), scope="sfs pdf",
+                        fetched=fetched, no_pdf=no_pdf, print_only=print_only)
+    reporter.done()
+    print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d older than "
+          "any facsimile source, %d target(s)"
+          % (fetched, no_pdf, print_only, len(targets)))
 
 
 def sfs_ai_includegraphics(basefiles):
@@ -1004,12 +1051,29 @@ def sfs_ai_includegraphics(basefiles):
     deterministically (provenance_sfs), never by the model. One vision call per
     source PDF (chunked for a many-page source); a verified layer refuses
     regeneration sans --force, and per-entry `verified` flags survive a rerun.
-    The LLM is never called from parse/relate/generate."""
+    Any source PDF not mirrored yet is fetched first, so mirror-pdf need not
+    have run. The LLM is never called from parse/relate/generate."""
     if not basefiles:
-        sys.exit("usage: lagen sfs ai-includegraphics <basefile> [...]  "
-                 "(mirror-pdf must have run first)")
+        sys.exit("usage: lagen sfs ai-includegraphics <basefile> [...]")
     for basefile in basefiles:
         _sfs_includegraphics_one(basefile)
+
+
+def _sfs_mirror_on_demand(beteckningar):
+    """Mirror each of `beteckningar` whose PDF is not on disk yet, one attempt
+    apiece. Returns those still missing afterwards: an act that predates every
+    facsimile source (never asked -- there is nothing to ask), and one the
+    publisher turns out to have no PDF for."""
+    if not beteckningar:
+        return []
+    session = _sfs_session()
+    state = sfs_pdfmirror.MirrorState(layout.sfs_pdf_dir())
+    for beteckning in beteckningar:
+        if not sfs_pdfmirror.has_facsimile(beteckning):
+            continue
+        vlog("sfs ai-includegraphics: mirroring source PDF %s" % beteckning)
+        sfs_pdfmirror.fetch_one(session, state, beteckning)
+    return [b for b in beteckningar if not compress.exists(layout.sfs_pdf(b))]
 
 
 def _sfs_includegraphics_one(basefile):
@@ -1025,13 +1089,16 @@ def _sfs_includegraphics_one(basefile):
     # no longer equals the resolved provenance) is re-localized, not kept stale.
     existing = json.loads(out.read_text()) if out.exists() else {}
     keep, todo = sfs_graphics.plan_localization(gaps, existing, register, basefile)
-    # fail fast, before any vision spend, if a source PDF is not mirrored yet
-    missing = [s for s in todo if not compress.exists(layout.sfs_pdf(s))]
+    # Before any vision spend, make sure every source PDF is on disk -- fetching
+    # the few this act needs beats making the caller run mirror-pdf by hand and
+    # is trivially cheap beside the vision call. One attempt each: if the
+    # publisher still has nothing, that is an answer, not a flake to retry.
+    missing = _sfs_mirror_on_demand(sorted(s for s in todo
+                                           if not compress.exists(layout.sfs_pdf(s))))
     if missing:
-        raise ValueError("%s: source PDF(s) not mirrored: %s -- run `lagen sfs "
-                         "mirror-pdf %s` first"
-                         % (basefile, ", ".join(sorted(missing)),
-                            " ".join(sorted(missing))))
+        raise ValueError("%s: source PDF(s) unavailable: %s -- the publisher has "
+                         "no facsimile for them, so their graphics cannot be "
+                         "localized" % (basefile, ", ".join(missing)))
     todo_n = sum(len(g) for g in todo.values())
     if RUN.dry_run:
         print("sfs ai-includegraphics %s: %d gap(s); keep %d verified, localize "
@@ -1098,11 +1165,16 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
          "rewrites it from the current complete corpus\n"
          "mirror-pdf [<sfs> ...]: mirror the officially published SFS PDFs "
          "(graphics/maps the consolidated text drops) into downloaded/sfs/pdf/; "
-         "no args = whole corpus, --full re-fetches existing\n"
+         "named act(s) mirror just those, no args = whole corpus (and runs as "
+         "part of `download`). 2018:160 and later come from "
+         "svenskforfattningssamling.se, 1998:306-2018:159 from rkrattsdb.gov.se, "
+         "and a named act before 1998:306 is an error -- it exists only in "
+         "print. --full re-fetches existing and re-asks about acts an upstream "
+         "once said it had no PDF for\n"
          "ai-includegraphics <basefile> [...]: vision-localize the dropped "
          "graphics to page+bbox in the provenance-correct published PDF into a "
-         ".graphics layer (mirror-pdf must have run); per-entry verified flags "
-         "survive reruns, --force overrides a verified layer")
+         ".graphics layer (mirroring any source PDF it still needs); per-entry "
+         "verified flags survive reruns, --force overrides a verified layer")
 
 
 # --------------------------------------------------------------------------

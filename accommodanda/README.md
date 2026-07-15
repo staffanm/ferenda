@@ -65,7 +65,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
 | `graphics.py` | recovers content omitted by the text-only SFST source. Detection is deterministic and runs at parse time: the slash-delimited and plain `... är inte med här` corpus forms plus otherwise unmarked road-sign cells in 2007:90 become typed `grafik` nodes. Each node carries a stable semantic `key`, hashed from structural path + kind/code + normalized anchor + occurrence within its container; transient `G1` ids remain diagnostic only. Localization resolves provenance, deduplicates temporal aliases by key, strictly validates complete vision output and writes `.graphics` entries keyed by that semantic key with the unhashed identity alongside; wired as `lagen sfs ai-includegraphics` |
-| `pdfmirror.py` | official published-SFS PDF mirror, the crop source for graphic localization: direct rkrattsdb URLs for 1998–2017, a new-site→printed-series fallback across the April 2018 boundary, and publisher document pages thereafter; fetched bytes must be PDFs; wired as `lagen sfs mirror-pdf`, not as a parse stage |
+| `pdfmirror.py` | official published-SFS PDF mirror, the crop source for graphic localization. Each act's source follows from its SFS number: `1998:306`–`2018:159` from direct rkrattsdb URLs, `2018:160`– from svenskforfattningssamling.se document pages, and nothing before `1998:306` (print only). Fetched bytes must be PDFs. `.mirror.json` records the acts an upstream answered it has no PDF for, which is the only thing telling those apart from "not fetched yet" and so the only thing keeping a rerun free. Runs as part of `lagen sfs download` and as `lagen sfs mirror-pdf`, not as a parse stage |
 | `correspond.py` | the old-law → new-law paragraf correspondence map for a restructured statute, three routes into the same `.corr` payload: an LLM pass over the proposition's författningskommentar (`lagen sfs ai-correspond`), and the mechanical `table_correspond` over the prop's own jämförelsetabell bilagor (`lagen sfs table-correspond <new> <prop> [<old>[=TAG] ...]`, rows extracted by `forarbete/jamforelse.py`; several old laws — SFB's 23, SFL's 3 — merge into one layer, `=TAG` names an old law's prop-local shorthand so tagged cell references resolve against the right law) — every edge validated against both laws' paragraf inventories either way; plus the *same-law* renumbering route (`lagen sfs renumber-correspond <sfs>`), reading the register's "nuvarande … betecknas …" omfattning clauses into `betecknas` edges carrying the amendment's ikrafttradandedatum, which generate uses to split inbound references temporally ("Hänvisningar till tidigare beteckning 4 kap. 4 §" on RF 4 kap. 6 §) |
 | `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); a per-transition hash ledger admits only strict append-only updates, while `--rebuild-history` atomically recreates corrected/backfilled history; implements `docs/prd-sfs-history-as-git.md` |
 | `_validate.py` | worker functions for `lagen sfs validate`, in an importable module so `ProcessPoolExecutor` workers can resolve them under `python -m` |
@@ -325,20 +325,36 @@ uv run python -m accommodanda.sfs refs FILE PARSED.xhtml  # citation diff for on
 The SFST consolidation is text-only. During the normal SFS parse, omission
 markers and the road-sign tables in 2007:90 are projected as typed `grafik`
 nodes; the source model retains the original marker text. Mirror the official
-published PDFs (the crop source), then vision-localize the gaps onto them —
-both opt-in, elective actions (cost tokens/bandwidth), never part of a
+published PDFs (the crop source), then vision-localize the gaps onto them.
+Mirroring runs as part of `sfs download` and costs only bandwidth; the
+vision pass is opt-in and elective (it costs tokens) and is never part of a
 production build:
 
 ```sh
-uv run python -m accommodanda.build sfs mirror-pdf                     # every base act + registered amendment
+uv run python -m accommodanda.build sfs mirror-pdf                     # every base act + registered amendment (also run by `sfs download`)
 uv run python -m accommodanda.build sfs mirror-pdf 2007:90             # named SFS act(s) only
-uv run python -m accommodanda.build sfs mirror-pdf --full              # re-fetch already mirrored PDFs
+uv run python -m accommodanda.build sfs mirror-pdf --full              # re-fetch existing + re-ask about acts once denied
 uv run python -m accommodanda.build sfs ai-includegraphics 2007:90     # vision-localize that act's gaps
 ```
 
-The mirror writes `site/data/downloaded/sfs/pdf/{year}/{number}.pdf` and can
-reach publications from 1998 onward. `ai-includegraphics` requires `mirror-pdf`
-to have already fetched the relevant PDF(s); it resolves each gap's provenance
+The mirror writes `site/data/downloaded/sfs/pdf/{year}/{number}.pdf`. Which
+source holds an act follows from its SFS number, and both boundaries are exact
+act numbers rather than dates: `2018:160` onward is the authentic online series
+at svenskforfattningssamling.se, `1998:306`–`2018:159` is the printed series'
+rkrattsdb mirror (so early-2018 acts, published before the 1 April switch, come
+from there), and anything before `1998:306` exists only on paper — naming one
+is an error. Beside the PDFs, `.mirror.json` records the acts an upstream
+answered it has no PDF for: a missing file alone cannot say whether an act was
+never fetched or has nothing to fetch, so without that record every such act
+cost a request on every run. Each act is therefore asked about at most once —
+the price being that a negative is permanent, so if the publisher posts a PDF it
+previously lacked, only `--full` will find it. `ai-includegraphics` mirrors any
+source PDF it still needs, so `mirror-pdf` need not have been run first.
+
+Note that rkrattsdb.gov.se rate-limits: it starts returning `403` for a few
+minutes after a burst, which `lib/net.py` rides out with backoff but which can
+still abort a corpus-wide sweep. A rerun resumes cheaply (everything already on
+disk is skipped). `ai-includegraphics` resolves each gap's provenance
 deterministically — the amending SFS that last set that wording (register-first
 for bilaga gaps, e.g. 2004:629's two independently-amended map appendices),
 never guessed by the model — then asks the vision model (`VISION_MODEL` in
