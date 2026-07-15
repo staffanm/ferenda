@@ -389,6 +389,15 @@ td.grafik .grafik-img { max-height: 3.5rem; width: auto; border: 0;
 .grafik-saknas { font-family: var(--serif); font-style: italic;
                font-size: .85rem; color: var(--ink-3); }
 td.grafik-saknas { white-space: nowrap; color: var(--ink-3); }
+/* a temporal variant's entry-into-force state ("/Träder i kraft: den dag
+   regeringen bestämmer/"), printed beside its in-force sibling. Subdued:
+   the slash delimiters already mark it as editorial, like the source */
+.temporal-status { font-family: var(--serif); font-style: italic;
+               font-size: .8rem; color: var(--ink-3);
+               margin: .25rem 0 .75rem; }
+/* marker row above a pending/expiring table-row variant */
+.temporal-status-rad td { border: 0; padding-bottom: 0; }
+.temporal-status-rad .temporal-status { margin: .25rem 0 0; }
 
 /* -- Context rail (populated by the client from the JSON island) -- */
 .rail { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);

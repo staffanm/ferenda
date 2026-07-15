@@ -212,20 +212,33 @@ def _container_segment(node):
     """Stable semantic address component for an id-bearing/container node.
 
     Generated NF ids are positional and therefore deliberately excluded. The
-    legal ordinal or heading is the identity; a temporal duplicate of the same
-    appendix consequently gets the same segment and can share one crop.
+    legal ordinal or heading is the identity; a *content* duplicate of the same
+    container consequently gets the same segment and can share one crop. A
+    temporal variant that is announced but not yet in force (its NF node
+    carries ``ikrafttrader`` -- a bilaga, kapitel or paragraf the source prints
+    beside its in-force sibling) is the exception: its graphics come from a
+    *different* published PDF than its in-force sibling's, so the pending
+    variant gets its own segment (and thus its own gap keys). The in-force
+    sibling keeps the unmarked segment, so its curation survives the pending
+    amendment appearing -- and, once consolidated, the merged container aliases
+    back onto it (provenance drift then triggers re-localization).
     """
     kind = node.get("type")
     ordinal = node.get("ordinal")
     if ordinal:
-        return "%s:%s" % (kind, _norm_identity_text(str(ordinal)))
-    if kind in {"bilaga", "avdelning", "underavdelning"}:
+        segment = "%s:%s" % (kind, _norm_identity_text(str(ordinal)))
+    elif kind in {"bilaga", "avdelning", "underavdelning"}:
         heading = next((_node_text(kid) for kid in node.get("children", [])
                         if kid.get("type") == "rubrik" and _node_text(kid)), "")
-        return "%s:%s" % (kind, _norm_identity_text(heading or kind))
-    if kind == "stycke" and node.get("children"):
+        segment = "%s:%s" % (kind, _norm_identity_text(heading or kind))
+    elif kind == "stycke" and node.get("children"):
         return "stycke:%s" % _norm_identity_text(_node_text(node))
-    return kind if node.get("children") and kind not in {"tabell"} else None
+    else:
+        return kind if node.get("children") and kind not in {"tabell"} else None
+    if node.get("ikrafttrader"):
+        segment += "@ikrafttrader:%s" % _norm_identity_text(
+            str(node["ikrafttrader"]))
+    return segment
 
 
 def _identity(node, path, anchor, occurrence):
@@ -253,8 +266,9 @@ def _scan_gaps(structure, assign=False):
     same published graphic instead of asking vision to locate it twice.
     """
     gaps = []
+    pending_bilagor = set()          # ordinals with an announced incoming copy
 
-    def walk(nodes, path, bilaga_ord, in_bilaga):
+    def walk(nodes, path, bilaga_ord, in_bilaga, variant):
         prev = ""
         occurrences = {}
         for node in nodes:
@@ -273,20 +287,42 @@ def _scan_gaps(structure, assign=False):
                 elif graphic.get("key"):
                     assert graphic["key"] == key, \
                         "%s: stored gap key does not match semantic identity" % graphic["id"]
+                # a pending *row* variant (marker on the rad itself) needs no
+                # variant here: its cells differ from its sibling's, so anchor/
+                # occurrence already split the keys, and non-bilaga provenance
+                # resolves by change note either way
                 gaps.append({"id": graphic["id"], "key": key,
                              "identity": identity, "sort": graphic["sort"],
                              "satt_av": graphic.get("satt_av"),
                              "code": graphic.get("code"),
                              "bilaga_ordinal": bilaga_ord,
-                             "in_bilaga": in_bilaga, "anchor": anchor})
+                             "in_bilaga": in_bilaga, "variant": variant,
+                             "anchor": anchor})
             segment = _container_segment(node)
             subpath = path + ((segment,) if segment else ())
             sub_bilaga = _bilaga_ordinal(node) if kind == "bilaga" else bilaga_ord
+            # the consolidated source prints an announced-but-not-consolidated
+            # amendment as a sibling variant pair: /Träder i kraft I:.../ on the
+            # incoming copy, /Upphör att gälla U:.../ on the one still in force
+            sub_variant = (("kommande" if node.get("ikrafttrader") else
+                            "utgaende" if node.get("upphor") else variant)
+                           if kind == "bilaga" else variant)
+            if kind == "bilaga" and node.get("ikrafttrader"):
+                pending_bilagor.add(sub_bilaga)
             walk(node.get("children", []), subpath, sub_bilaga,
-                 in_bilaga or kind == "bilaga")
+                 in_bilaga or kind == "bilaga", sub_variant)
             prev = _node_text(node) or prev
 
-    walk(structure, (), None, False)
+    walk(structure, (), None, False, None)
+    # an "utgaende" copy is only half of a variant *pair*. A bilaga marked
+    # /Upphör att gälla U:.../ with no incoming sibling is a pending wholesale
+    # repeal: its content is simply the current content, and the repealing
+    # amendment never enters bilaga_amenders (upph. publishes no graphic), so
+    # the exclude-the-newest provenance rule must not apply to it
+    for gap in gaps:
+        if (gap["variant"] == "utgaende"
+                and gap["bilaga_ordinal"] not in pending_bilagor):
+            gap["variant"] = None
     return gaps
 
 
@@ -338,23 +374,34 @@ def _in_force(amendment, as_of):
     return datetime.fromisoformat(value).date() <= as_of
 
 
+def bilaga_amenders(register, ordinal):
+    """Every SFS whose register note publishes new content for bilaga
+    `ordinal`, ascending by (year, löpnr) -- regardless of entry into force.
+    The raw material for both the date-filtered 'latest' and the variant-aware
+    provenance (which trusts the text's own markers over the register's
+    dates)."""
+    return sorted({af["beteckning"]
+                   for af in register.get("andringsforfattningar") or []
+                   if af.get("beteckning")
+                   and _touches_bilaga(af.get("anteckningar") or "", ordinal)},
+                  key=_sfs_key)
+
+
 def latest_bilaga_amender(register, ordinal, as_of=None):
-    """The latest SFS whose register note changes bilaga `ordinal`, or None.
-    A wholesale-replaced map/appendix bilaga leaves NO trailing change note in
-    the consolidated text, so the register `Omfattning` is authoritative here,
-    not the Phase-1 `satt_av` hint (2004:629: bil. 1 -> 2023:395, bil. 2 ->
-    2020:120, two independent histories). 'Latest' names the bilaga explicitly,
-    so no betecknas back-mapping is needed to get the *current* graphic: older
-    bare-``bil.`` touches predate any renumbering and are never the latest."""
-    best = None
+    """The latest in-force SFS whose register note changes bilaga `ordinal`, or
+    None. A wholesale-replaced map/appendix bilaga leaves NO trailing change
+    note in the consolidated text, so the register `Omfattning` is
+    authoritative here, not the Phase-1 `satt_av` hint (2004:629: bil. 1 ->
+    2023:395, bil. 2 -> 2020:120, two independent histories). 'Latest' names
+    the bilaga explicitly, so no betecknas back-mapping is needed to get the
+    *current* graphic: older bare-``bil.`` touches predate any renumbering and
+    are never the latest."""
     as_of = as_of or date.today()
-    for af in register.get("andringsforfattningar") or []:
-        bet = af.get("beteckning")
-        if (bet and _in_force(af, as_of)
-                and _touches_bilaga(af.get("anteckningar") or "", ordinal)):
-            if best is None or _sfs_key(bet) > _sfs_key(best):
-                best = bet
-    return best
+    in_force = {af["beteckning"]
+                for af in register.get("andringsforfattningar") or []
+                if af.get("beteckning") and _in_force(af, as_of)}
+    candidates = [b for b in bilaga_amenders(register, ordinal) if b in in_force]
+    return candidates[-1] if candidates else None
 
 
 def provenance_sfs(gap, register, base):
@@ -368,12 +415,39 @@ def provenance_sfs(gap, register, base):
       is keyed on the enclosing bilaga, NOT the marker noun -- 2004:629's maps
       are ``karta`` gaps, yet their provenance is bilaga 1 -> 2023:395 / bilaga
       2 -> 2020:120, the two independent appendix histories.
+    - a gap in a **temporal variant pair** of a bilaga (the source prints an
+      announced amendment as a second copy): the text's own markers are
+      authoritative, not the register's dates -- the register may already know
+      the entry-into-force day while the text is still split (2023:395 via
+      2024:519). The ``kommande`` copy's graphics live in the newest ``ändr.
+      bil. N`` amendment's PDF; the ``utgaende`` copy's in the newest one
+      before it (else the base act's own). Positional exclusion is sound
+      because SFSR registration precedes SFST consolidation -- a split text
+      implies the pending amendment is the register's newest bil.-N touch --
+      and because collect_gaps demotes a pair-less ``utgaende`` (a pending
+      wholesale *repeal*, whose ``upph.`` clause never enters
+      `bilaga_amenders`) back to the ordinary register-first rule. A
+      ``kommande`` copy the register cannot explain at all raises rather than
+      guessing a PDF.
     - **any other** gap (a formula in the main text or a road sign): the
       change-note ``satt_av`` that set the surrounding wording, else the base
       act's own PDF."""
     if gap.get("in_bilaga", gap.get("bilaga_ordinal") is not None):
-        candidates = [c for c in (latest_bilaga_amender(
-            register, gap["bilaga_ordinal"]), gap.get("satt_av")) if c]
+        variant = gap.get("variant")
+        if variant:
+            amenders = bilaga_amenders(register, gap["bilaga_ordinal"])
+            register_pick = (amenders[-1:] if variant == "kommande"
+                             else amenders[-2:-1])
+            candidates = [c for c in register_pick + [gap.get("satt_av")] if c]
+            if variant == "kommande" and not candidates:
+                raise ValueError(
+                    "bilaga %s: the text prints a pending variant but the "
+                    "register has no ändr. bil. entry for it and the text no "
+                    "change note -- cannot resolve which published PDF "
+                    "carries its graphics" % gap["bilaga_ordinal"])
+        else:
+            candidates = [c for c in (latest_bilaga_amender(
+                register, gap["bilaga_ordinal"]), gap.get("satt_av")) if c]
         if candidates:
             return max(candidates, key=_sfs_key)
     return gap.get("satt_av") or base

@@ -1198,6 +1198,13 @@ _GRAFIK_LABEL = {
     "forteckning": "Förteckning", "tabell": "Tabell", "vagmarke": "Vägmärke"}
 
 
+def register_anchor(nr):
+    """Fragment id of an amendment's entry in the statute's own amendment
+    register section (the ``L{nr}`` ids the andringar renderer mints); spaces
+    in old s.-numbered identifiers normalize to underscores, as there."""
+    return "L" + nr.replace(" ", "_")
+
+
 def _grafik_crop(entry, doc_uri, gap_key, alt):
     """The `<img>` for one located graphic: the /api/v1/sfs-graphic crop of the
     provenance-correct published PDF (geometry lives server-side in the layer,
@@ -1228,10 +1235,13 @@ def render_grafik(node, site, doc_uri):
                 'konsoliderade texten — se %s</p>'
                 % (escape(nid), escape(label), escape(where)))
     alt = entry.get("alt") or ("%s ur SFS %s" % (label, entry["sfs"]))
+    # the attribution links to the amending act's entry in this document's own
+    # amendment register (#L{nr}), not the amendment's standalone page
     return ('<figure class="grafik" data-grafik="%s">%s<figcaption>%s ur '
-            '<a href="/%s">SFS %s</a></figcaption></figure>'
+            '<a href="#%s">SFS %s</a></figcaption></figure>'
             % (escape(nid), _grafik_crop(entry, doc_uri, nid, alt),
-               escape(label), escape(entry["sfs"]), escape(entry["sfs"])))
+               escape(label), escape(register_anchor(entry["sfs"])),
+               escape(entry["sfs"])))
 
 
 LANGUAGE_LABELS = {
@@ -1312,6 +1322,22 @@ def render_konventionsbilaga(node, site, doc_uri, toc, rail):
         len(languages), language_head, instruments)
 
 
+def _temporal_notice(node):
+    """The entry-into-force banner for a temporal variant the consolidated
+    source prints alongside its in-force sibling ('' for a plain node). The
+    value is either an ISO date or the source's verbatim authorization phrase
+    ("den dag som regeringen bestämmer") -- shown as-is; interpreting a later
+    "ikrafttr. av"-decree is the reader's (or a future pass's) job."""
+    parts = ["%s: %s" % (label, node[key]) for label, key in
+             (("Upphör att gälla", "upphor"), ("Träder i kraft", "ikrafttrader"))
+             if node.get(key)]
+    if not parts:
+        return ""
+    # slash-delimited like the source's editorial markers, so it reads as an
+    # annotation about the text rather than as legal text
+    return '<p class="temporal-status">/%s/</p>' % escape(" — ".join(parts))
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -1338,7 +1364,15 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             else:  # unlocalized: the honest gap beside the code
                 cells = ('<td class="grafik-saknas" data-grafik="%s">[%s]</td>'
                          % (escape(gid), escape(g.get("code", ""))) + cells)
-        return "<tr>%s</tr>" % cells
+        # a pending/expiring row variant carries the temporal marker itself
+        # (a 2007:90 road-sign row amended with deferred entry into force);
+        # print it as a marker row above, spanning the full width
+        notice = _temporal_notice(node)
+        if notice:
+            width = len(node.get("cells", [])) + (1 if g else 0)
+            notice = ('<tr class="temporal-status-rad"><td colspan="%d">%s'
+                      "</td></tr>" % (width, notice))
+        return "%s<tr>%s</tr>" % (notice, cells)
     if t == "grafik":
         return render_grafik(node, site, doc_uri)
     if t == "lista":
@@ -1422,7 +1456,8 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                 escape(("%s %s" % (node.get("ordinal", ""), label)).strip()))
             body = kids[1:] if title is not None else kids
         children = "".join(render_node(c, site, doc_uri, toc, rail) for c in body)
-        return '<section class="%s"%s>%s%s</section>' % (t, ra, head, children)
+        return '<section class="%s"%s>%s%s%s</section>' % (
+            t, ra, head, _temporal_notice(node), children)
 
     if t == "paragraf":
         # hanging §-numeral in the gutter; the first stycke drops its inline number
@@ -1437,13 +1472,21 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         gutter = ('<div class="paragraf-gutter"><span class="n">%s</span>'
                   '<a class="pilcrow" href="#%s" aria-label="Permalänk">¶</a></div>'
                   % (escape("%s §" % ordinal if ordinal else "§"), escape(nid or "")))
-        return ('<section class="paragraf"%s%s>%s<div class="paragraf-body">%s</div>'
-                '</section>' % (_id_attr(nid), ra, gutter, children))
+        return ('<section class="paragraf"%s%s>%s<div class="paragraf-body">%s%s</div>'
+                '</section>' % (_id_attr(nid), ra, gutter,
+                                _temporal_notice(node), children))
 
-    children = "".join(render_node(c, site, doc_uri, toc, rail)
-                       for c in node.get("children", []))
+    # a bilaga's notice follows its heading (first child rubrik), matching the
+    # source's "Bilaga 1 /Träder i kraft I:.../" heading line
+    notice = _temporal_notice(node)
+    kids = node.get("children", [])
+    rendered = [render_node(c, site, doc_uri, toc, rail) for c in kids]
+    if notice and kids and kids[0].get("type") == "rubrik":
+        rendered.insert(1, notice)
+    else:
+        rendered.insert(0, notice)
     return '<section class="%s"%s%s>%s</section>' % (t or "node", _id_attr(nid),
-                                                     ra, children)
+                                                     ra, "".join(rendered))
 
 
 # --------------------------------------------------------------------------
@@ -1862,7 +1905,7 @@ def _andringar(art, base_id, own_version, versions, site, toc, rail):
         # the anchor: the övergångsbestämmelse node already mints L{nr}; the
         # wrapper carries it only when no child does (no duplicate DOM ids)
         child_ids = {c.get("id") for c in am.get("content", [])}
-        wrapper_id = ("L" + nr.replace(" ", "_")) if nr else None
+        wrapper_id = register_anchor(nr) if nr else None
         ida = (' id="%s"' % escape(wrapper_id)
                if wrapper_id and wrapper_id not in child_ids else "")
         posts.append('<div class="andring"%s><h2>%s</h2>%s%s%s</div>'

@@ -190,7 +190,7 @@ def test_collect_gaps_roadsign_anchor_is_the_row():
     assert "A1 Varning för farlig kurva" in gaps[0]["anchor"]
 
 
-def test_gap_key_is_semantic_and_temporal_duplicates_alias():
+def test_gap_key_is_semantic_and_content_duplicates_alias():
     doc = Forfattning(children=[
         Bilaga(rubrik="Bilaga 1", children=[
             Stycke("Stockholms innerstad"), Stycke("/Kartan är inte med här/"),
@@ -206,6 +206,39 @@ def test_gap_key_is_semantic_and_temporal_duplicates_alias():
     assert gaps[0]["key"] != gaps[1]["key"]
     assert all(g["key"].startswith("g-") for g in gaps)
     assert [g["key"] for g in grafiks(nf)] == [g["key"] for g in gaps]
+
+
+def test_pending_temporal_variant_gets_own_keys_and_variant():
+    # the 2004:629 shape: an announced-but-not-consolidated amendment prints
+    # bilaga 1 twice -- the in-force copy marked upphor, the incoming copy
+    # marked ikrafttrader. Their graphics come from DIFFERENT published PDFs,
+    # so the pending copy must NOT alias the in-force copy's crops.
+    pending = "den dag som regeringen bestämmer"
+    doc = Forfattning(children=[
+        Bilaga(rubrik="Bilaga 1", upphor=pending, children=[
+            Stycke("Stockholms innerstad"), Stycke("/Kartan är inte med här/"),
+            Stycke("Essingeleden"), Stycke("/Kartan är inte med här/")]),
+        Bilaga(rubrik="Bilaga 1", ikrafttrader=pending, children=[
+            Stycke("Stockholms innerstad"), Stycke("/Kartan är inte med här/"),
+            Stycke("Essingeleden"), Stycke("/Kartan är inte med här/")]),
+    ])
+    nf = to_normalform(doc, BASEFILE)
+    # the NF bilaga nodes keep the source's markers for the reader
+    assert nf["structure"][0]["upphor"] == pending
+    assert nf["structure"][1]["ikrafttrader"] == pending
+    gaps = graphics.collect_gaps(nf["structure"])
+    assert [g["variant"] for g in gaps] == [
+        "utgaende", "utgaende", "kommande", "kommande"]
+    # four distinct keys: the pair no longer aliases across the variant split
+    assert len({g["key"] for g in gaps}) == 4
+    # the in-force copy keeps the unmarked segment (same key as an unsplit
+    # bilaga would have), so its curation survives the amendment's announcement
+    plain = graphics.collect_gaps(to_normalform(Forfattning(children=[
+        Bilaga(rubrik="Bilaga 1", children=[
+            Stycke("Stockholms innerstad"), Stycke("/Kartan är inte med här/"),
+            Stycke("Essingeleden"), Stycke("/Kartan är inte med här/")]),
+    ]), BASEFILE)["structure"])
+    assert [g["key"] for g in gaps[:2]] == [g["key"] for g in plain]
 
 
 # ---- provenance ------------------------------------------------------------
@@ -265,6 +298,77 @@ def test_provenance_in_numbered_bilaga_is_register_first():
     # bilaga 2 -> its own independent latest touch
     g2 = {"sort": "karta", "bilaga_ordinal": 2, "satt_av": "2020:120"}
     assert graphics.provenance_sfs(g2, REGISTER_2004_629, "2004:629") == "2020:120"
+
+
+def test_provenance_variant_pair_splits_histories():
+    # 2004:629 while 2023:395 awaits consolidation: the register already knows
+    # its entry-into-force day (via 2024:519's ikrafttr.), but the TEXT still
+    # prints two bilaga 1 variants -- so the text's markers, not the register's
+    # dates, decide which PDF each variant's maps come from.
+    utgaende = {"sort": "karta", "bilaga_ordinal": 1, "in_bilaga": True,
+                "variant": "utgaende", "satt_av": None}
+    kommande = {"sort": "karta", "bilaga_ordinal": 1, "in_bilaga": True,
+                "variant": "kommande", "satt_av": None}
+    assert graphics.provenance_sfs(
+        utgaende, REGISTER_2004_629, "2004:629") == "2018:200"
+    assert graphics.provenance_sfs(
+        kommande, REGISTER_2004_629, "2004:629") == "2023:395"
+    # a pending amendment to a never-before-amended bilaga: the in-force copy
+    # is the base act's own graphic
+    reg = {"andringsforfattningar": [
+        {"beteckning": "2023:395", "anteckningar": "ändr. bil. 1"}]}
+    assert graphics.provenance_sfs(utgaende, reg, "2004:629") == "2004:629"
+    assert graphics.provenance_sfs(kommande, reg, "2004:629") == "2023:395"
+
+
+def test_pending_repeal_is_not_a_variant_pair():
+    # a bilaga marked ONLY /Upphör att gälla U:.../ (a pending wholesale
+    # repeal, no incoming sibling): its content is simply the current content.
+    # The repealing amendment's upph. clause never enters bilaga_amenders, so
+    # the variant must be demoted to None -- the ordinary register-first rule
+    # -- rather than "utgaende" skipping the newest content amendment
+    doc = Forfattning(children=[
+        Bilaga(rubrik="Bilaga 1", upphor="den dag som regeringen bestämmer",
+               children=[
+                   Stycke("Stockholms innerstad"),
+                   Stycke("/Kartan är inte med här/")]),
+    ])
+    gaps = graphics.collect_gaps(to_normalform(doc, BASEFILE)["structure"])
+    assert [g["variant"] for g in gaps] == [None]
+    assert graphics.provenance_sfs(
+        gaps[0], REGISTER_2004_629, "2004:629") == "2023:395"
+
+
+def test_pending_variant_without_register_trace_raises():
+    # SFSR registration precedes SFST consolidation, so a split text whose
+    # pending amendment the register cannot explain (and whose text carries no
+    # note) is a corpus inconsistency -- refuse rather than crop a wrong PDF
+    kommande = {"sort": "karta", "bilaga_ordinal": 1, "in_bilaga": True,
+                "variant": "kommande", "satt_av": None}
+    with pytest.raises(ValueError, match="pending variant"):
+        graphics.provenance_sfs(
+            kommande, {"andringsforfattningar": []}, "2004:629")
+    # an in-text note alone is enough to resolve it
+    noted = {**kommande, "satt_av": "2023:395"}
+    assert graphics.provenance_sfs(
+        noted, {"andringsforfattningar": []}, "2004:629") == "2023:395"
+
+
+def test_pending_paragraf_variant_gets_own_keys():
+    # the pending-variant key split is general, not bilaga-only: a paragraf
+    # printed in two temporal copies must not alias one formula crop
+    pending = "den dag som regeringen bestämmer"
+    doc = Forfattning(children=[
+        Paragraf(ordinal="5", children=[
+            Stycke("1 Balanstalet, BT"),
+            Stycke("/Formeln är inte med här/ Förordning (2018:200).")]),
+        Paragraf(ordinal="5", ikrafttrader=pending, children=[
+            Stycke("1 Balanstalet, BT"),
+            Stycke("/Formeln är inte med här/ Förordning (2023:395).")]),
+    ])
+    gaps = graphics.collect_gaps(to_normalform(doc, BASEFILE)["structure"])
+    assert len({g["key"] for g in gaps}) == 2
+    assert [g["satt_av"] for g in gaps] == ["2018:200", "2023:395"]
 
 
 def test_provenance_bilaga_takes_latest_of_register_and_note():
@@ -486,8 +590,9 @@ def test_render_grafik_figure_when_localized():
     assert "/api/v1/sfs-graphic?uri=https%3A%2F%2Flagen.nu%2F2002%3A780" in html
     assert "node=g-formula" in html and "&amp;v=" in html
     assert 'alt="Formel för balanstalet"' in html
-    # attribution names the *source* (provenance) SFS, linked
-    assert '<figcaption>Formel ur <a href="/2021:734">SFS 2021:734</a>' in html
+    # attribution names the *source* (provenance) SFS, linked to its entry in
+    # the viewed statute's own amendment register, not its standalone page
+    assert '<figcaption>Formel ur <a href="#L2021:734">SFS 2021:734</a>' in html
 
 
 def test_render_roadsign_cell_localized_and_not():
@@ -504,6 +609,52 @@ def test_render_roadsign_cell_localized_and_not():
     bare = render.render_node(row, _site({}), DOC_URI, render.Toc(),
                               render.Rail(_site({}), DOC_URI))
     assert '<td class="grafik-saknas" data-grafik="g-a1">[A1]</td>' in bare
+
+
+def test_pending_row_variant_carries_marker_and_renders_it():
+    # a Tabellrad amended with deferred entry into force: the NF rad keeps the
+    # marker and the renderer prints it as a full-width marker row above
+    pending = "den dag som regeringen bestämmer"
+    doc = Forfattning(children=[Kapitel(ordinal="2", rubrik="2 kap.", children=[
+        Paragraf(ordinal="5", children=[Stycke("Vägmärken", children=[
+            Tabell(rows=[
+                Tabellrad(cells=["A1 Varning för farlig kurva", "Märket…"],
+                          ikrafttrader=pending),
+            ])])])])])
+    nf = to_normalform(doc, "2007:90")
+    site = _site({})
+    rad = (nf["structure"][0]["children"][1]["children"][0]     # paragraf > stycke
+           ["children"][0]["children"][0])                      # > tabell > rad
+    assert rad["type"] == "rad" and rad["ikrafttrader"] == pending
+    html = render.render_node(rad, site, DOC_URI, render.Toc(),
+                              render.Rail(site, DOC_URI))
+    assert ('<tr class="temporal-status-rad"><td colspan="3">'
+            '<p class="temporal-status">/Träder i kraft: %s/</p>' % pending
+            ) in html
+
+
+def test_render_temporal_notice_marks_pending_variant():
+    # a bilaga variant pair: the banner follows the heading, mirrors the
+    # source's marker, and the unmarked sibling renders without one
+    site = _site({})
+    pending = {"type": "bilaga", "id": None,
+               "ikrafttrader": "den dag som regeringen bestämmer",
+               "children": [{"type": "rubrik", "id": None, "level": 1,
+                             "text": ["Bilaga 1"]}]}
+    html = render.render_node(pending, site, DOC_URI, render.Toc(),
+                              render.Rail(site, DOC_URI))
+    assert ('</h2><p class="temporal-status">/Träder i kraft: '
+            'den dag som regeringen bestämmer/</p>') in html
+    plain_bilaga = {"type": "bilaga", "id": None, "children": [
+        {"type": "rubrik", "id": None, "level": 1, "text": ["Bilaga 1"]}]}
+    assert "temporal-status" not in render.render_node(
+        plain_bilaga, site, DOC_URI, render.Toc(), render.Rail(site, DOC_URI))
+    # a dated upphor on a paragraf variant shows its ISO date in the body
+    paragraf = {"type": "paragraf", "id": None, "ordinal": "1",
+                "upphor": "2027-01-01", "children": []}
+    assert ('<p class="temporal-status">/Upphör att gälla: 2027-01-01/</p>'
+            in render.render_node(paragraf, site, DOC_URI, render.Toc(),
+                                  render.Rail(site, DOC_URI)))
 
 
 def test_graphic_cache_buster_covers_source_page_and_bbox():

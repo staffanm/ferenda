@@ -404,6 +404,24 @@ def extend(pairs, letter, frag):
     return None if pairs is None else pairs + ((letter, frag),)
 
 
+def temporal_fields(node):
+    """The upphor/ikrafttrader state of a temporal variant, JSON-ready for the
+    NF node: a datetime becomes its ISO date, the source's verbatim
+    authorization string ("den dag som regeringen bestämmer") passes through,
+    unset fields are omitted. The consolidated source prints announced but not
+    yet consolidated amendments as sibling variants; without these fields the
+    reader cannot tell which variant is in force (and graphics cannot resolve
+    a per-variant provenance)."""
+    out = {}
+    for attr in ("upphor", "ikrafttrader"):
+        value = getattr(node, attr)   # every caller's type defines both fields
+        if isinstance(value, datetime):
+            out[attr] = value.date().isoformat()
+        elif value:
+            out[attr] = value
+    return out
+
+
 def grafik_node(proj, sort, satt_av, **extra):
     """A typed graphic-gap node: an omitted graphic/formula/table the published
     SFS carries. `satt_av` is the amending SFS whose PDF holds the in-force
@@ -446,7 +464,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 kids += project_children(node.children, sub if node_id else None,
                                          proj, ctx, clive, satt_av=gov)
                 out.append({"type": "kapitel", "id": node_id,
-                            "ordinal": node.ordinal, "children": kids})
+                            "ordinal": node.ordinal,
+                            **temporal_fields(node), "children": kids})
             case UpphavtKapitel() | UpphavdParagraf():
                 out.append({"type": "upphavd",
                             "text": proj.inline(
@@ -457,6 +476,7 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 plive = live and _in_force(node, proj.minter)
                 out.append({"type": "paragraf", "id": node_id,
                             "ordinal": node.ordinal,
+                            **temporal_fields(node),
                             "children": project_paragraf(
                                 node, sub if node_id else None, proj,
                                 node_id or frag, plive, satt_av=gov)})
@@ -464,10 +484,11 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 sub = extend(pairs, "R", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
                 heading, sort = graphics.heading_gap(node.text or "")
-                out.append(rubrik_nf(heading,
-                                     3 if node.underrubrik else 2,
-                                     proj, node_id or frag, id=node_id,
-                                     live=live and _in_force(node, proj.minter)))
+                out.append({**rubrik_nf(heading,
+                                        3 if node.underrubrik else 2,
+                                        proj, node_id or frag, id=node_id,
+                                        live=live and _in_force(node, proj.minter)),
+                            **temporal_fields(node)})
                 if sort:
                     out.append(grafik_node(
                         proj, sort, graphics.marker_provenance(node.text) or gov))
@@ -491,7 +512,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=blive)]
                 kids += project_children(node.children, sub if node_id else None,
                                          proj, ctx, blive, satt_av=gov)
-                out.append({"type": "bilaga", "id": node_id, "children": kids})
+                out.append({"type": "bilaga", "id": node_id,
+                            **temporal_fields(node), "children": kids})
             case Konventionsbilaga():
                 out.append(project_konventionsbilaga(node, frag, proj, live))
             case Overgangsbestammelser():
@@ -672,7 +694,7 @@ def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None):
         cells = [proj.inline(util.normalize_space(cell), context, live,
                              subject_term=(term if i == 0 else None))
                  for i, cell in enumerate(row.cells)]
-        rad = {"type": "rad", "cells": cells}
+        rad = {"type": "rad", "cells": cells, **temporal_fields(row)}
         # a road-sign designator cell (2007:90) is the trace of a dropped sign
         # image; no marker exists, so the code itself flags the gap
         code = (graphics.roadsign_code(util.normalize_space(row.cells[0]))
