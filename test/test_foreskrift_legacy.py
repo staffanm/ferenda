@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from accommodanda import config
-from accommodanda.foreskrift import legacy, parse
+from accommodanda.foreskrift import parse
 from accommodanda.foreskrift.agencies import REGISTRY
 from accommodanda.foreskrift.legacy import _source_tag, import_corpus
 from accommodanda.lib import legacy_import
@@ -67,10 +67,17 @@ def frozen(tmp_path, monkeypatch):
 
 # --- registry: the frozen-only agencies are registered, no live harvester ----
 
-def test_frozen_agencies_registered_without_harvester():
-    for fs in ("skvfs", "rsfs", "sosfs", "hslffs"):
+def test_frozen_agencies_and_browser_sources_registered():
+    for fs in ("rsfs", "sosfs", "hslffs"):
         assert fs in REGISTRY
         assert REGISTRY[fs].enumerate is None and REGISTRY[fs].resolve is None
+    assert REGISTRY["skvfs"].enumerate is not None
+    assert REGISTRY["skvfs"].resolve is not None
+    assert REGISTRY["skvfs"].browser is True
+    assert REGISTRY["skvfs"].browser_settle == 20.0
+    assert REGISTRY["mtfs"].enumerate is not None
+    assert REGISTRY["mtfs"].resolve is not None
+    assert REGISTRY["mtfs"].browser is True
     # the hslffs naming decision: slug hyphen-stripped, printed designation kept
     assert REGISTRY["hslffs"].designation == "HSLF-FS"
     assert REGISTRY["rsfs"].designation == "RSFS"

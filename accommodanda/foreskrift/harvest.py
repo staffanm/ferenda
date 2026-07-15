@@ -20,12 +20,12 @@ An architecture is two callables over that shared loop:
     resolve.
 
 Four ``enumerate`` shapes are implemented (``indexed``/``paginated``/``json``/
-``sitemap``, plus a couple of bespoke per-agency enumerators such as PMFS's
-in-force listing) and two ``resolve`` shapes (``resolve_landing``,
-``resolve_direct`` -- the listing anchor already *is* the PDF), driving the
-17 live agencies configured in :mod:`agencies` -- new shapes are added when an
-agency that needs one is built, not speculatively (the rewrite's "don't design
-the horizontal layer from one source" rule).
+``sitemap``, plus bespoke per-agency enumerators) and two ordinary HTTP
+``resolve`` shapes (``resolve_landing``, ``resolve_direct`` -- the listing
+anchor already *is* the PDF). Browser-protected sources supply the same two
+seams but select the detached headful-Chrome transport in their ``Agency``
+config. New shapes are added when an agency needs one, not speculatively (the
+rewrite's "don't design the horizontal layer from one source" rule).
 """
 
 import json
@@ -41,6 +41,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress
+from ..lib.browser import DetachedChrome
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, request
@@ -77,7 +78,7 @@ class Agency:
     and ``resolve`` name the architecture; everything else is per-agency data the
     architecture reads (URLs, the org behind ``dcterms:publisher``, selectors).
     ``enumerate``/``resolve`` are None for a **frozen-only** författningssamling
-    (SKVFS/SOSFS, §7g): it has no live harvester, only a one-time import from the
+    (SOSFS, §7g): it has no live harvester, only a one-time import from the
     frozen legacy tree (:mod:`legacy`); :func:`download.sync` skips it as a no-op."""
     fs: str                                # författningssamling code, "fffs"
     name: str                              # "Finansinspektionen"
@@ -91,6 +92,8 @@ class Agency:
     headers: dict | None = None            # extra request headers (e.g. Accept-Language)
     designation: str | None = None         # printed FS prefix ("HSLF-FS") when != fs.upper()
     http2: bool = False                    # use the HTTP/2 client (Cloudflare front that 403s HTTP/1.1: KKVFS)
+    browser: bool = False                  # detached headful Chrome instead of HTTP (F5: SKVFS/MTFS)
+    browser_settle: float = 20.0           # CDP-free seconds per protected browser navigation
 
 
 def absolute(base_url, href):
@@ -224,6 +227,44 @@ def classify_default_regulation(a, fs, base_ars, base_lop):
 # full amendment graph without the download cost -- and a later pass can fetch an
 # amendment body on demand. Overridable per agency (params['download_roles']).
 DOWNLOAD_ROLES = frozenset({"regulation", "consolidation"})
+
+
+def save_single_pdf_record(root, agency, ref, pdf_url, pdf_data, *, source_url=None):
+    """Store one direct official PDF and its ordinary föreskrift record.
+
+    Browser-protected direct sources still produce exactly the layout an HTTP
+    ``resolve_direct`` source does. Source modules own how they discover and
+    fetch the bytes; this shared tail owns the format they write.
+    """
+    assert document_extension(pdf_data) == ".pdf", \
+        "%s body is not a PDF" % ref.identifier
+    fs = ref.fs or agency.fs
+    name = "%s-regulation.pdf" % slug(ref.basefile)
+    compress.write_download(Path(root) / fs / name, pdf_data)
+    record = {
+        "fs": fs,
+        "basefile": ref.basefile,
+        "identifier": ref.identifier,
+        "title": ref.title,
+        "publisher": agency.publisher,
+        "url": source_url or ref.url,
+        "files": {
+            "regulation": {
+                "name": name,
+                "url": pdf_url,
+                "identifier": ref.identifier,
+            },
+            "consolidation": [],
+            "amendment": [],
+            "memo": [],
+            "attachment": [],
+        },
+    }
+    compress.write_download(
+        record_path(root, fs, ref.basefile),
+        json.dumps(record, ensure_ascii=False, indent=2),
+    )
+    return record
 
 
 def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects=None):
@@ -566,10 +607,21 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
     falls past the watermark's date boundary (or after a run of consecutive
     already-downloaded items). ``only`` (a basefile) fetches just that one.
     Returns ``(seen, new)``."""
+    if agency.browser:
+        assert not agency.http2 and agency.headers is None and agency.user_agent is None, \
+            "%s browser transport cannot also configure an HTTP session" % agency.fs
+        with DetachedChrome(Path(root) / agency.fs / ".browser-profile",
+                            settle=agency.browser_settle) as session:
+            return _harvest_session(agency, root, session, full, only, limit, delay, log)
     session = (make_http2_session if agency.http2 else make_session)(
         agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
+    return _harvest_session(agency, root, session, full, only, limit, delay, log)
+
+
+def _harvest_session(agency, root, session, full, only, limit, delay, log):
+    """Run the shared walk over an already-selected HTTP or browser transport."""
     marker = Path(root) / agency.fs / ".complete"
     watermark_path = Path(root) / agency.fs / ".watermark.json"
 

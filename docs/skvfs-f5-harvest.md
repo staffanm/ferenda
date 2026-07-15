@@ -1,23 +1,28 @@
 # SKVFS (and MTFS): the F5/Shape bot-wall — harvest handover
 
-**Status (2026-07-15):** SKVFS/RSFS remain **frozen-only** (§7g). No live harvester
-exists or is currently buildable from this environment. The blocker is a
-commercial bot-defense, not a code problem. This note records what was tried,
-what was learned, and what might still work, so the next attempt doesn't repeat
-the dead ends.
+**Status (2026-07-15):** **live incremental SKVFS and MTFS work** through the
+ordinary `lagen foreskrift download {skvfs|mtfs}` sweep. SKVFS layers over the
+frozen SKVFS/RSFS baseline (§7g); MTFS has no frozen baseline. Their two
+`Agency.browser` flags select a real headful Chrome transport; every other
+agency keeps `requests`/HTTP2. F5 still blocks direct HTTP and any browser
+instrumented while the challenge runs, so the working transport is
+operationally heavier and more fragile than an open-data feed.
 
-## What SKVFS is and why it's stuck
+## The sources
 
 - **SKVFS** = Skatteverkets författningssamling; **RSFS** = its Riksskatteverket
   predecessor. Both are binding law and public records. Skatteverket publishes a
   lot, and stale tax regulation is actively harmful, so *timely* access matters.
-- Registered in `accommodanda/foreskrift/agencies.py` as **frozen-only** stubs
-  (`SKVFS`/`RSFS` via `frozen_agency`), fed once from the legacy tree by
-  `foreskrift/legacy.py` (`lagen foreskrift import-legacy skvfs`). On disk:
-  ~509 skvfs + 31 rsfs records, parsed and generated. The gap is everything
-  published **since** the legacy freeze.
-- **MTFS (Tillväxtanalys)** sits behind the **same wall** and is frozen for the
-  same reason — anything that unblocks SKVFS likely unblocks MTFS too.
+- The frozen import remains the baseline: `foreskrift/legacy.py` (`lagen
+  foreskrift import-legacy skvfs`) supplies ~509 SKVFS + 31 RSFS records. The
+  live `SKVFS` Agency fills only missing records; its one register also emits
+  the closed RSFS predecessor into the `rsfs/` namespace. The separate `RSFS`
+  registry entry remains frozen because no second browser sweep is needed.
+- **MTFS (Tillväxtanalys)** sits behind the **same wall**. Its Sitevision page
+  contains both current and repealed MTFS headings, each followed directly by
+  the official PDF. The live Agency now harvests all 16 listed regulations.
+  Five older PDF filenames omit “MTFS”, so enumeration deliberately keys off
+  the authoritative headings rather than filename patterns.
 
 ## The wall
 
@@ -38,10 +43,11 @@ the dead ends.
 
 Relevant register URLs:
 - SKVFS/RSFS: `https://www4.skatteverket.se/rattsligvagledning/115.html?year=Alla`
+- MTFS: `https://www.tillvaxtanalys.se/statistik/tillvaxtanalysforeskrifter.125740.html`
 - Rättsliga ställningstaganden (future want, same host/wall):
   `https://www4.skatteverket.se/rattsligvagledning/121.html`
 
-## What was tried (all failed)
+## What was tried
 
 ### Plain HTTP clients (`accommodanda/lib/net`)
 | Attempt | Result |
@@ -65,11 +71,54 @@ Isolated venv, `chromium` + `chromium_headless_shell`. Against the register:
 | Plain headless (`headless_shell`) | **Hard-rejected** — "Request Rejected", 255 B, 0 SKVFS links |
 | Stealth headless (UA, sv-SE, Europe/Stockholm TZ, real viewport, `navigator.webdriver` masked) | **Hard-rejected**, identical 255 B |
 | Full chromium `--headless=new` + heavy stealth (WebGL vendor spoof, chrome runtime, plugins, hwConcurrency) | **Hard-rejected**; 2nd navigation in same context also rejected |
-| Headful under xvfb | **Not testable** — no X server, no xvfb, no sudo in that env |
+| Playwright-launched headful Chrome, webdriver masked | **Hard-rejected** — CDP was attached while F5 classified the page |
 
 **Key finding:** a headless browser *executes* Shape's telemetry, **fails the
 bot classification, and is actively banned** — strictly worse than a dumb client
 (which at least gets the challenge page). Do **not** ship a headless harvester.
+
+### Headful Chrome with delayed Playwright attachment — **works**
+
+The differentiator was not more fingerprint spoofing. It was keeping
+Playwright's Chrome DevTools Protocol (CDP) connection absent while F5 ran:
+
+1. Start the system `google-chrome` headfully with a dedicated persistent
+   profile and a fixed remote-debugging port, but no DevTools client connected.
+2. Ask that ordinary Chrome process to open the protected URL and leave it
+   completely uninstrumented for **20 seconds** (18 seconds was the observed
+   minimum). Chrome executes the TSPD challenge and reaches the real page.
+3. Only then connect Playwright over CDP. This is "attaching": Playwright gets
+   handles to the tabs that already exist; it does not relaunch or reload them.
+   Read the completed DOM, close that tab, and disconnect Playwright again
+   before the next navigation.
+4. A PDF is likewise navigated to while detached. Once Chrome has rendered and
+   cached it, attach and use CDP `Network.loadNetworkResource` + `IO.read` to
+   recover the exact response bytes; assert `Content-Type: application/pdf` and
+   `%PDF-` before storing them.
+
+Live proof from this environment (Chrome 149, Playwright 1.61, real `DISPLAY=:0`):
+
+- register: 1,048,875-byte real HTML, 139 rows / 134 unique FS identifiers;
+- detail: `SKVFS 2026:7`, 75,553-byte real HTML;
+- PDF: 180,063 exact bytes, `%PDF-1.6`;
+- integrated `--only skvfs/2026:7` run: ordinary föreskrift record + HTML + PDF,
+  reported as one new document.
+- full post-freeze SKVFS gap: 34/34 records, SKVFS 2025:4 through 2026:8,
+  downloaded in one session with no errors;
+- MTFS register: 71,599-byte real HTML with 16 regulation headings/PDFs;
+- MTFS 2023:3 PDF: 720,726 exact bytes, `%PDF-1.7`.
+- full MTFS sweep: 16/16 records, MTFS 2009:1 through 2023:3, including the
+  five older filenames that omit “MTFS”, with no errors.
+
+The register duplicates SKVFS 2021:19, 2021:20 and 2009:6 under multiple
+subject/detail ids. Their titles are identical; `skvfs.parse_index` keeps the
+first only after asserting that duplicate titles agree. The frozen fixture locks
+both this rule and the site's `SKVFS 2026_3` underscore typo.
+
+Solved cookies were not a durable hand-off to `requests`: after Chrome exited,
+the protected cookies were empty/expired and a direct PDF request returned the
+7,461-byte challenge again. Keep the browser process alive for the whole agency
+run.
 
 ### Other data channels — none carry SKVFS
 - **Rättsliga regler API** (`api.skatteverket.se/regelverk/rattsligaregler/v1`):
@@ -88,9 +137,10 @@ bot classification, and is actively banned** — strictly worse than a dumb clie
 ### Operational gotcha
 Repeated probing degraded the **source IP reputation** — during the Playwright
 test the VPS/dev IP began getting immediate ASM rejections even from `curl`.
-**Stop probing this wall from the dev/VPS box**; it risks flagging the IP.
+Do not repeatedly probe or retry this wall from the dev/VPS box; one slow nightly
+session is materially safer than bursts of new profiles and failed challenges.
 
-## What might still work
+## Operations and the preferred long-term channel
 
 Ranked by realism and durability.
 
@@ -107,28 +157,36 @@ Ranked by realism and durability.
    traffic). The allowlist path is the one to push for — bulk export doesn't
    scale for continuous updates.
 
-2. **Headful Chromium under a real X server / xvfb + Swedish residential IP.**
-   The *only* technical config with a realistic chance (Shape weights
-   headless/automation signals heavily; genuine headful is the differentiator).
-   **Unproven** — never demonstrated. Would also need: full stealth (patched
-   `navigator.webdriver`, realistic GPU/WebGL, plugins, sv-SE/Stockholm), a
-   warm-up navigation to mint the TSPD cookie, **very slow human-like pacing**
-   for 500+ docs (Shape scores behaviour and rate), and a residential/Swedish
-   egress (datacenter IPs are penalised — see the reputation gotcha). Treat as a
-   research spike to run on a real desktop, **off the nightly pipeline**, and
-   prove it holds a session before investing. This is an arms race, not a
-   one-time build — prefer option 1.
+2. **Current nightly posture.** `Agency.browser=True` is configured only for
+   SKVFS and MTFS. `foreskrift.harvest` selects `lib.browser.DetachedChrome` for
+   those two; all other agencies still select `requests` or `Agency.http2`. The job requires:
+   Playwright (a project dependency), system `google-chrome`, and a real X display
+   exported as `DISPLAY` to the nightly process. It fails fast if any is absent.
+   Each dedicated profile/cache lives under
+   `downloaded/foreskrift/{skvfs|mtfs}/.browser-profile/`.
 
-## When a channel opens: how to wire it
+   A no-change run pays one 20-second register navigation per selected browser
+   source. The normal SKVFS incremental walk then skips every frozen/live record;
+   each genuinely new document adds two protected navigations (~40 seconds:
+   detail + PDF). MTFS links directly from its register, so a new document adds
+   one protected PDF navigation (~20 seconds). Do not reduce
+   `browser_settle=20.0` without a fresh live measurement; attaching at four
+   seconds observed the challenge stub, and challenge-time attachment is exactly
+   the rejected posture.
 
-Whichever channel SKV opens (open-data feed or an allowlisted register path), the
-harvester itself is **just config over the existing engine** — replace the
-`SKVFS`/`RSFS` `frozen_agency(...)` stubs in `agencies.py` with live `Agency`
-entries (an `enumerate` + a `resolve`), keeping `foreskrift/legacy.py`,
-`LEGACY_CORPORA`, and the RSFS entry intact. If it's an allowlisted *register*
-path, set `user_agent`/`headers` (and the shared-secret header if granted); if
-it's a browser-driven fetch, keep it a **standalone off-pipeline stage**, not a
-client wired into the nightly build.
+## How it is wired
+
+The sources still follow the same configured-by-data engine. `SKVFS` names
+`skvfs.enumerate_register` + `skvfs.resolve`; `MTFS` names
+`mtfs.enumerate_register` + `mtfs.resolve`; both set `browser=True`.
+`foreskrift.harvest` chooses the transport, then hands those callables to the
+same `lib.harvest.walk`, watermark, `--only`, `--full`, error ledger and record
+layout as every HTTP agency. Browser mechanics are generic in `lib/browser.py`;
+source selectors and identity rules stay in `foreskrift/{skvfs,mtfs}.py`.
+
+If Skatteverket supplies an open feed or allowlisted endpoint, the replacement
+is therefore small: remove `browser=True` and point the enumerator/resolver at
+that channel. Keep `foreskrift/legacy.py`, `LEGACY_CORPORA`, and the RSFS entry.
 
 **Critical interaction — live harvest vs. frozen corpus** (verified in
 `lib/harvest.walk` + `harvest.item_key`):
@@ -148,10 +206,12 @@ client wired into the nightly build.
   SKVFS.
 
 ## Pointers
-- Frozen stubs + `frozen_agency`: `accommodanda/foreskrift/agencies.py`
+- SKVFS Agency config: `accommodanda/foreskrift/agencies.py`
+- SKVFS register/detail semantics: `accommodanda/foreskrift/skvfs.py`
+- MTFS register/direct-PDF semantics: `accommodanda/foreskrift/mtfs.py`
+- Detached headful transport: `accommodanda/lib/browser.py`
 - Frozen import: `accommodanda/foreskrift/legacy.py`, `lib/legacy_import.py`
 - HTTP/2 transport (KKVFS precedent, wrong tool for this wall):
   `Agency.http2`, `lib/net.make_http2_session`
-- Session scratch artifacts (ephemeral): Playwright HTML dumps + `datasets.json`
-  under `scratchpad/skvfs_playwright/`; the draft access request at
-  `scratchpad/skv_atkomstbegaran.md`.
+- Regression fixtures/tests: `test/files/{skvfs,mtfs}/`,
+  `test/test_foreskrift_{skvfs,mtfs}.py`

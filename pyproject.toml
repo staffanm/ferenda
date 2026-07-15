@@ -52,6 +52,9 @@ dependencies = [
     "mcp>=1.13",
     "opensearch-py",
     "pillow>=12.3.0",  # 12.2.0 carries PYSEC-2026-2253..2257
+    # Headful, detached-CDP transport for the F5-protected SKVFS/MTFS registers.
+    # It drives the system google-chrome; Playwright does not download a browser.
+    "playwright>=1.61",
     "python-dotenv>=1.2.2",
     "rdflib",
     "requests",

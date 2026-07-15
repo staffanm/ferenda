@@ -3,8 +3,9 @@ lagrummet.se list (the per-county samlingar excluded) as configuration over the
 shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
-plus ``params``. 71 fs codes are registered -- ~64 live-harvested, the rest
-frozen-only (§7g: SKVFS/RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS, MTFS).
+plus ``params``. 71 fs codes are registered -- 66 live-harvested, the rest
+frozen-only (§7g: RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS). SKVFS and MTFS select a
+detached headful-Chrome transport in config; ordinary agencies stay on HTTP.
 
 An agency is *config*, not a pipeline. Many sites are covered by the four
 generic enumerate shapes (``indexed``/``paginated``/``json``/``sitemap``) plus a
@@ -48,7 +49,7 @@ from ..lib import compress
 from ..lib.net import BROWSER_UA, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
-from . import harvest
+from . import harvest, mtfs, skvfs
 from .harvest import (
     Agency,
     DocRef,
@@ -2270,16 +2271,13 @@ PFS = Agency(
 
 
 # --------------------------------------------------------------------------
-# Frozen-only författningssamlingar (REWRITE.md §7g priority 6). SKVFS
-# (Skatteverket, behind an F5 bot-defense) and Socialstyrelsen's SOSFS / HSLF-FS
-# (a React SPA) are the plan's two known-hard, *deferred* harvests: no live
-# enumerate/resolve is written for them (both need a bot-evading harvest posture
-# nobody has built yet). Their only source is the frozen legacy tree, materialized
-# once by :mod:`legacy` (`lagen foreskrift import-legacy skvfs|sosfs`). They are
-# registered so the fs codes are first-class scopes / URIs (browse facets,
-# render); a `download` over them is a logged no-op (`download.sync`), and the
-# import stamps each record with a `source` marker so a future live harvester's
-# record is never clobbered by a re-import.
+# Frozen-baseline författningssamlingar (REWRITE.md §7g priority 6).
+# Socialstyrelsen's SOSFS / HSLF-FS remain frozen-only. SKVFS now layers a live
+# incremental harvest over its frozen import, but must use detached headful
+# Chrome because F5 rejects both HTTP clients and Playwright-instrumented
+# navigation. Its Agency.browser flag selects that transport without affecting
+# any other agency. The one SKVFS register also enumerates the closed RSFS
+# predecessor into its own namespace; RSFS needs no second browser sweep.
 #
 # Each frozen corpus tree carries *two* fs series: SKVFS + its Riksskatteverket
 # predecessor RSFS (cited "RSFS 1985:20", so its own code + URIs), and SOSFS +
@@ -2314,18 +2312,31 @@ SVKFS = frozen_agency("svkfs", "Affärsverket svenska kraftnät",
                       "Affärsverket svenska kraftnät", "SvKFS",
                       "https://www.svk.se")
 
-# MTFS (Tillväxtanalys) sits behind an F5/Shape "TSPD" JavaScript bot-defense
-# (the same class of wall as SKVFS): a plain request returns only the challenge
-# stub, never the listing, and no public API or alternate host was found -- so
-# no live enumerate/resolve until a bot-evading harvest posture exists (§7g).
-# Unlike SKVFS/SOSFS there is no frozen legacy corpus for it either; the entry
-# just reserves the fs code.
-MTFS = frozen_agency("mtfs", "Tillväxtanalys",
-                     "Myndigheten för tillväxtpolitiska utvärderingar och analyser",
-                     "MTFS", "https://www.tillvaxtanalys.se")
+# MTFS (Tillväxtanalys) sits behind the same F5/Shape JavaScript bot-defense as
+# SKVFS. Its one-page Sitevision register and direct PDFs work through the same
+# detached headful-Chrome transport, selected only by these two Agency configs.
+MTFS = Agency(
+    fs="mtfs", name="Tillväxtanalys",
+    publisher="Myndigheten för tillväxtpolitiska utvärderingar och analyser",
+    base_url="https://www.tillvaxtanalys.se",
+    index_url=mtfs.INDEX_URL,
+    enumerate=mtfs.enumerate_register,
+    resolve=mtfs.resolve,
+    designation="MTFS",
+    browser=True,
+    browser_settle=20.0,
+)
 
-SKVFS = frozen_agency("skvfs", "Skatteverket", "Skatteverket", "SKVFS",
-                      "https://www.skatteverket.se")
+SKVFS = Agency(
+    fs="skvfs", name="Skatteverket", publisher="Skatteverket",
+    base_url="https://www4.skatteverket.se",
+    index_url=skvfs.INDEX_URL,
+    enumerate=skvfs.enumerate_register,
+    resolve=skvfs.resolve,
+    designation="SKVFS",
+    browser=True,
+    browser_settle=20.0,
+)
 RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
                      "https://www.skatteverket.se")
 SOSFS = frozen_agency("sosfs", "Socialstyrelsen", "Socialstyrelsen", "SOSFS",
@@ -2358,6 +2369,7 @@ REGISTRY = {a.fs: a for a in (
     SCBFS, STAFS, TVFS,
     AFS, TSFS, TRVFS,
     AFFS, AGVFS, FKFS, PFS,
-    SJVFS, SVKFS, MTFS,                                       # frozen-only: no register / F5 bot-wall
-    SKVFS, RSFS, SOSFS, HSLFFS,                        # frozen-only (§7g): SKV/SOS
+    SJVFS, SVKFS,                                      # frozen-only: no public documents/register
+    MTFS, SKVFS,                                       # live: detached Chrome for the F5 wall
+    RSFS, SOSFS, HSLFFS,                               # frozen-only (§7g); RSFS also emitted by SKVFS
 )}

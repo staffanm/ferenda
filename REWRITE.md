@@ -1702,11 +1702,14 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   stemfs 26, sifs 22, elsakfs 20, rgkfs 9, kifs 3 (only 3 in-force base regs).
 - ✅ **Registry grown to the full lagrummet.se government-agency list**
   (`foreskrift/agencies.py`) — from the 15-agency exemplar corpus above to **71
-  registered författningssamlingar** (county `\d+FS` series excluded), **64 live**
-  through the shared harvest engine + **7 frozen-only** stubs: skvfs/rsfs,
-  sosfs/hslffs (§7g, harvest-blocked), plus sjvfs (SharePoint/Microsoft 365 auth
-  wall), svkfs (no register left of its own — delegated to eifs), mtfs (F5/Shape
-  bot-defense). Predecessor författningssamlingar route via
+  registered författningssamlingar** (county `\d+FS` series excluded), **66 live**
+  through the shared harvest engine + **5 frozen-only** stubs: rsfs,
+  sosfs/hslffs (§7g), sjvfs (SharePoint/Microsoft 365 auth wall), and svkfs (no
+  register left of its own — delegated to eifs). SKVFS and MTFS are live through
+  a detached headful-Chrome transport: `Agency.browser` keeps Playwright/CDP
+  absent while their F5/Shape challenge runs, while all other agencies retain
+  requests/HTTP2. The SKVFS register also emits its closed RSFS predecessor, so
+  RSFS needs no second browser sweep. Predecessor författningssamlingar route via
   `fs_from_designation`/`DocRef.fs` at harvest time with no registry entry of
   their own (the MCFFS precedent): fifs, difs, rnfs, trmfs, nutfs, mprtfs,
   mrtvfs, sisuvfs, amsfs, rffs, lfs, jvsfs, vvfs, trvtfs. KKVFS (Konkurrensverket)
@@ -1714,7 +1717,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `Agency.http2` flag routes it through a new `make_http2_session`
   (`lib/net.py`, the `httpx2[http2]` extra) instead of the default `requests`
   session. A full harvest at the new scale is in progress: **~6,750 base
-  regulations** across the 64 live fs (skolfs 2557, tsfs 925, fkfs 543, rams 366,
+  regulations** across the ordinary live fs (skolfs 2557, tsfs 925, fkfs 543, rams 366,
   rfs 274, dvfs 263 the largest), followed by a full `lagen foreskrift rebuild`.
 - ✅ **Enumeration resilience** (`harvest.py`) — these agency indexes are flaky and
   badly maintained, so the harvest survives any single index page failing without
@@ -1746,9 +1749,9 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   Wired: `lagen foreskrift download [fs…]` (`--full` refreshes existing, `--only
   fs/year:num`); bare = all agencies.
 - ✅ **SKVFS + SOSFS/HSLF-FS backfilled from the frozen legacy trees** (`foreskrift/legacy.py`,
-  §7g pri 6) — the two known-hard, deferred harvests (SKVFS behind an F5 bot-defense,
-  Socialstyrelsen a React SPA) are registered as **frozen-only** agencies (`agencies.py`:
-  no live enumerate/resolve; `download` is a logged no-op) and imported once:
+  §7g pri 6) — both known-hard sources retain their frozen baseline. Socialstyrelsen
+  remains **frozen-only** (no live enumerate/resolve; `download` is a logged no-op),
+  while SKVFS now layers a live browser harvest over its import:
   `lagen foreskrift import-legacy {skvfs|sosfs}` walks the frozen `entries/`, routes each
   doc to its own fs by the authoritative basefile (SKVFS + the RSFS predecessor, SOSFS +
   the joint HSLF-FS — `hslffs` slug, "HSLF-FS" designation), and writes a record pointing
@@ -1759,8 +1762,14 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   (417 PDF-body, 2 metadata-only), 22 null, 77 konsolidering skipped** (a
   `konsolidering/{fs}/{year}:{n}` 3-part namespace whose index.pdf is in fact HTML — outside
   the vertical's URI/layout, deferred to a future SOSFS harvester's native Consolidation).
-  Parse runs end-to-end over the frozen bytes (bemyndigande/§§ where the PDF has a text
+  A normal SKVFS run skips every frozen record and fills only later identifiers; the
+  post-freeze 2025:4–2026:8 gap was downloaded live as 34 exact official PDFs. Parse
+  runs end-to-end over the frozen bytes (bemyndigande/§§ where the PDF has a text
   layer; older SOSFS scans have none → metadata-only, by design). `test/test_foreskrift_legacy.py`.
+- ✅ **MTFS live through the same detached Chrome transport** — its Sitevision page
+  maps authoritative `MTFS YYYY:N` headings directly to PDFs. All 16 regulations
+  (2009:1–2023:3) downloaded end-to-end; five older filenames omit “MTFS”, so the
+  enumerator never infers identity from the file slug.
 - ✅ **Shared PDF parser** (`foreskrift/{parse,structure}.py`) — one parser for all 15 fs.
   The font-aware extraction + paragraph reflow it shares with the förarbete parser was
   promoted to `lib/pdftext.py` (the rewrite's "extract after the second instance" rule);
@@ -1921,7 +1930,7 @@ only a one-time import is built**. The raw trees live in `ferenda.old/data/`
 | `souregeringen`/`dsregeringen`/`dirregeringen` | 3,046/1,418/2,294 | ~1993–2025 | landing HTML + PDF | overlap with §7a's harvest — import missing basefiles only |
 | `dirtrips`/`dirasp` | 5,096/1,826 | 1987–2016 | plaintext-HTML / PDF | moderate (dir is the least-cited type) |
 | `arn` | 1,027 | 1992–2022 | decision file (pdf/doc/wpd) + `fragment.html` metadata | high, small — the avg vertical's third organ (`fmt_arn_refs` already mints `avg/arn/{dnr}`) |
-| `skvfs`, `sosfs` (+ other myndfs trees) | — | varies | agency PDFs | fills the harvest-blocked föreskrift agencies (§7e 💤) — skvfs/sosfs from the frozen legacy tree; sjvfs (SharePoint auth wall), svkfs (no register left, delegated to eifs) and mtfs (F5 bot-wall) are registered frozen-only with no legacy corpus to import yet; kkvfs, previously deferred as Cloudflare-fronted, is now live via `lib/net.make_http2_session` |
+| `skvfs`, `sosfs` (+ other myndfs trees) | — | varies | agency PDFs | fills the frozen baseline for hard föreskrift sources (§7e) — skvfs/sosfs from the frozen legacy tree; SKVFS now adds live records through `lib.browser.DetachedChrome`, and MTFS uses the same transport without a legacy baseline; sjvfs (SharePoint auth wall) and svkfs (no register left, delegated to eifs) remain frozen-only with no legacy corpus to import; kkvfs is live via `lib/net.make_http2_session` |
 | `pbr` | ~12,300 | 1977–2016 (court dissolved) | case HTML + PDFs | skip — the old module was download-only, never parsed, no URIs minted |
 | `keyword`/`myndprax`/`forarbeten`/`sitenews`/`mediawiki`/`eurlex*`/`sfs` | — | — | — | skip — facades, derived output, or superseded (wiki migration, CELLAR, golden) |
 
@@ -1986,10 +1995,10 @@ links), skanning2007 (prop 1971:40, 122 SFS links incl. paragraf-anchored
 regeringen.se records never overwritten, idempotent re-runs. ARN (priority 1) is
 a sibling in-flight.
 
-*Progress (2026-07-02):* priority 6 landed — `foreskrift/legacy.py` imports the two
-harvest-blocked författningssamlingar (`lagen foreskrift import-legacy {skvfs|sosfs}`).
-They are registered as **frozen-only** agencies (`agencies.py`: no live enumerate/resolve,
-`download.sync` a logged no-op) with a `designation` for the printed prefix (HSLF-FS →
+*Progress (2026-07-02, live SKVFS added 2026-07-15):* priority 6 landed —
+`foreskrift/legacy.py` imports the two harvest-blocked baselines (`lagen foreskrift
+import-legacy {skvfs|sosfs}`). SOSFS/HSLF-FS remain frozen-only; SKVFS now has live
+enumerate/resolve seams over the frozen baseline. Each has a `designation` for the printed prefix (HSLF-FS →
 `hslffs` slug). Each frozen tree carries two fs series (skvfs+rsfs, sosfs+hslffs), routed
 by each entry's authoritative basefile; records point at the frozen regulation PDF in place
 (`files.regulation.legacy`, resolved by `parse.body_path` under LEGACY_ROOT) and carry a
@@ -1999,7 +2008,7 @@ always wins; own re-import is idempotent, `--force` rewrites). null-basefile stu
 regulation PDF) and text-less scanned PDFs become metadata-only records. Verified on real
 data (`--limit` slices): skvfs 540 / sosfs 419 importable, parse end-to-end — hslffs 2015:15
 → 22 §§ + 4 paragraf-precise bemyndigande edges, skvfs 2012:1 → bemyndigande into SFS
-1999:1229/2000:866; idempotent re-runs, download no-op. `test/test_foreskrift_legacy.py`
+1999:1229/2000:866; idempotent re-runs. `test/test_foreskrift_legacy.py`
 (13 hermetic tests). See §7e for the full note.
 
 *Progress (2026-07-02):* priorities 3–5 landed — `forarbete/legacy.py` now imports the
@@ -2386,7 +2395,8 @@ rewrite work.
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 64 live + 7 frozen-only), `download`, `legacy` (one-time import of the harvest-blocked corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). Corpus: full 64-agency harvest (~6,750 regs) and `rebuild` in progress |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 frozen-only), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `legacy` (one-time import of the frozen corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors) |
+| `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
@@ -2512,8 +2522,8 @@ in `git log`. This document is the forest-level status; section markers
 
 - **foreskrift** (2026-07-15) — the agency registry grew from ~21 to the full
   lagrummet.se government-agency list: `foreskrift/agencies.py` now registers
-  71 författningssamlingar (64 live through the shared harvest engine, 7
-  frozen-only stubs — skvfs/rsfs, sosfs/hslffs plus new sjvfs, svkfs, mtfs),
+  71 författningssamlingar (66 live through the shared harvest engine, 5
+  frozen-only stubs — rsfs, sosfs/hslffs, sjvfs and svkfs),
   county `\d+FS` series still excluded. Predecessor series (fifs, difs, rnfs,
   trmfs, nutfs, mprtfs, mrtvfs, sisuvfs, amsfs, rffs, lfs, jvsfs, vvfs, trvtfs)
   route via `fs_from_designation`/`DocRef.fs` at harvest time with no registry
@@ -2521,14 +2531,15 @@ in `git log`. This document is the forest-level status; section markers
   promoted to public `ref` for the bespoke per-agency enumerators to reuse;
   `Agency` gained an `http2: bool` flag so KKVFS (behind a Cloudflare front
   that 403s HTTP/1.1) rides `lib/net.make_http2_session` (new, `httpx2[http2]`
-  extra) instead of the default `requests` session; `RE_KONSOLIDERAD` widened
+  extra) instead of the default `requests` session. SKVFS and MTFS alone set
+  `Agency.browser` and ride `lib.browser.DetachedChrome`; `RE_KONSOLIDERAD` widened
   to match "konsol" (Swedac abbreviates to `-konsol.pdf`). Two library fixes
   fell out of running the full corpus: `lib/net.request` rides out failures
   for both the `requests` and `httpx` transports, and `lib/util.write_atomic`
   uses a per-process temp name (a fixed name raced two concurrent `lagen`
   invocations pruning the runlog, one crashing the other with
   `FileNotFoundError`). A full harvest at the new scale is under way (~6,750
-  base regulations across the 64 live fs; skolfs, tsfs, fkfs, rams, rfs, dvfs
+  base regulations across the ordinary live fs; skolfs, tsfs, fkfs, rams, rfs, dvfs
   the largest), followed by a full `lagen foreskrift rebuild`.
 - **sfs** (2026-07-14) — 🚧 convention appendices are parsed by one
   `sfs/parallelappendix.py` with **no per-law knowledge**: article sequences
@@ -2900,7 +2911,8 @@ in `git log`. This document is the forest-level status; section markers
   across three verticals (ARN → avg incl. a new live arn.se harvester,
   9 förarbete corpora 1867–2023 with format-probed body routing +
   ABBYY/Mso/TRIPS adapters + the live-wins/format-tier precedence rule,
-  skvfs/sosfs → foreskrift as frozen-only agencies); `legacy_root` config,
+  skvfs/sosfs → foreskrift as frozen baselines; SKVFS later gained a live overlay);
+  `legacy_root` config,
   point-at-bytes records, re-OCR sidecar seam.
 - **guardrails** — docs/conventions.md rule catalog (citable slugs) +
   mechanical enforcement: PreToolUse hooks (conventions reminders,

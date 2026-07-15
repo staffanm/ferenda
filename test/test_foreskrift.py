@@ -216,6 +216,39 @@ def test_guarded_enumerate_passes_skips_and_docs_through():
     assert [type(o).__name__ for o in out] == ["DocRef", "Skip", "DocRef"]
 
 
+def test_browser_agency_selects_detached_chrome_only(tmp_path, monkeypatch):
+    selected = {}
+
+    class Browser:
+        def __init__(self, profile, settle):
+            selected.update(profile=profile, settle=settle)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+    agency = harvest.Agency(
+        fs="skvfs", name="SKV", publisher="Skatteverket",
+        base_url="https://example.se", index_url="https://example.se/list",
+        enumerate=lambda *_args: (), resolve=lambda *_args: None,
+        browser=True, browser_settle=23,
+    )
+    monkeypatch.setattr(harvest, "DetachedChrome", Browser)
+    monkeypatch.setattr(
+        harvest, "_harvest_session",
+        lambda selected_agency, _root, session, *_args: (selected_agency.fs, session),
+    )
+
+    fs, session = harvest.harvest(agency, tmp_path)
+    assert fs == "skvfs" and isinstance(session, Browser)
+    assert selected == {
+        "profile": tmp_path / "skvfs" / ".browser-profile",
+        "settle": 23,
+    }
+
+
 # --- magic-sniff: a non-PDF body is logged + counted, never silently dropped -
 
 def _agency_fffs():
