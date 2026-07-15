@@ -2492,7 +2492,9 @@ def cmd_index(names, jobs=1):
     default http://localhost:9200)."""
     store = load_watermarks()
     dirty = False
-    index = search.SearchIndex()
+    # one keep-alive connection per bulk thread, or the pool discards and
+    # re-handshakes on every round-trip
+    index = search.SearchIndex(pool_maxsize=jobs)
     con = catalog.connect(CATALOG)
     # a dropped index invalidates every watermark -- skipping would leave the
     # source's docs unindexed, so nothing may be skipped until it's rebuilt

@@ -51,6 +51,9 @@ DELETE_TIMEOUT = 600      # delete_by_query over a large source can run minutes
 DELETE_BATCH = 1024       # doc_uris per terms-delete (well under max_terms_count)
 RETRIES = 6               # backoff attempts before surfacing a transient failure
 BACKOFF_CAP = 60          # seconds -- 2, 4, 8, 16, 32, 60, 60 …
+POOL_MAXSIZE = 16         # keep-alive connections per host (urllib3 defaults to 1);
+                          # enough for the serving threadpool -- `lagen index` sizes
+                          # it to its own --jobs
 _TRANSIENT = (ConnectionTimeout, OpenSearchConnectionError)
 
 
@@ -354,10 +357,14 @@ class SearchIndex:
     """A thin wrapper over the OpenSearch client -- the only place that talks to
     the cluster, so everything above stays pure and testable."""
 
-    def __init__(self, url=None, index=INDEX):
+    def __init__(self, url=None, index=INDEX, pool_maxsize=POOL_MAXSIZE):
         self.index = index
+        # urllib3 pools one connection per host by default, so every caller past
+        # the first (parallel_bulk's threads, the API's threadpool) opens a
+        # connection the pool then discards on return -- a new TCP handshake per
+        # request plus a urllib3 warning each time. Size the pool to the callers.
         self.client = OpenSearch(
-            hosts=[url or config.OPENSEARCH_URL],
+            hosts=[url or config.OPENSEARCH_URL], pool_maxsize=pool_maxsize,
             timeout=REQUEST_TIMEOUT, max_retries=3, retry_on_timeout=True)
 
     def ensure_index(self, recreate=False):
