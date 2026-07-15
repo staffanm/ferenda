@@ -2536,6 +2536,29 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **local LLM** (2026-07-15) — `docs/local-llm.md`, an operator runbook for
+  running Qwen3.6-35B-A3B (35B MoE, 3B active, vision, reasoning) on llama.cpp
+  against one 24 GB GPU, as an unmetered/private alternative to Berget for the
+  opt-in `ai-*` passes. Its hybrid attention (10 of 40 layers full, 30 linear
+  Gated DeltaNet) makes the full native 262k context cost only ~5.2 GB of KV, so
+  the model plus a whole EU act plus ~120 rasterized pages fit in 21.5 GB.
+  Validated end-to-end on the real corpus: the GDPR article↔recital mapping over
+  all 173 recitals + 99 articles (~97k prompt tokens) came back accurate, and a
+  98-act batch ran 98/98 clean. `lib/llm.py` grew the endpoint and sampling that
+  needs: **`llm_base_url`** (env `LLM_BASE_URL`) aims the passes at any
+  OpenAI-compatible server, and **`llm_temperature`/`llm_top_p`** make the
+  sampling configurable — the hardcoded `temperature=0` suits gpt-oss but makes
+  Qwen3.6's thinking mode loop (it wants 1.0/0.95). `auth_headers` demands
+  `BERGET_API_KEY` only for a remote host, since a llama.cpp server takes no key
+  and requiring one there was the thing that made localhost unreachable.
+  Defaults are unchanged, so the Berget path stays byte-identical. Two upstream
+  llama.cpp bugs bound what is possible today: `--parallel > 1` and
+  `--spec-type draft-mtp` both crash the hybrid arch, capping the box at one
+  request at a time (~911 tok/s) and leaving a measured ~1.5x (MTP, 127 vs
+  87 t/s) on the table until fixed. Corpus sizing measured while there: EUR-Lex is
+  ~21,600 acts / ~192M prompt tokens, median act ~7.2k tokens — GDPR at ~97k is a
+  p99.9 outlier, not a typical unit of work.
+
 - **foreskrift** (2026-07-15) — the agency registry grew from ~21 to the full
   lagrummet.se government-agency list: `foreskrift/agencies.py` now registers
   71 författningssamlingar (66 live through the shared harvest engine, 5

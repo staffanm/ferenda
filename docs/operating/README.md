@@ -88,6 +88,11 @@ legacy_root: ../ferenda.old/data     # frozen legacy corpora, referenced in plac
 # --- services --------------------------------------------------------
 opensearch_url: http://localhost:9200   # search cluster
 llm_model: openai/gpt-oss-120b           # Berget chat model for opt-in ai-* passes
+llm_base_url: https://api.berget.ai/v1   # OpenAI-compatible endpoint; point at a local
+                                         # llama.cpp (http://127.0.0.1:8123/v1) to run the
+                                         # ai-* passes on the workstation GPU (docs/local-llm.md)
+llm_temperature: 0                       # sampling for the ai-* passes; raise for a model
+llm_top_p: 0.95                          # whose thinking mode needs it (Qwen3.6: 1.0/0.95)
 
 # --- on-disk storage -------------------------------------------------
 compress: true                       # store artifact/ + generated/ as Brotli (.json.br/.html.br); default on
@@ -113,6 +118,9 @@ editors:                             # hand-curated; there is no self-signup
 | `legacy_root` | `LEGACY_ROOT` | `<repo>/../ferenda.old/data` |
 | `opensearch_url` | `OPENSEARCH_URL` | `http://localhost:9200` |
 | `llm_model` | `BERGET_MODEL` | `openai/gpt-oss-120b` |
+| `llm_base_url` | `LLM_BASE_URL` | `https://api.berget.ai/v1` |
+| `llm_temperature` | `LLM_TEMPERATURE` | `0` |
+| `llm_top_p` | `LLM_TOP_P` | unset (endpoint's default) |
 | `compress` | `FERENDA_COMPRESS` | `true` |
 | `compress_quality` | `FERENDA_COMPRESS_QUALITY` | `11` |
 | `ops_token` | `OPS_TOKEN` | unset (dashboard disabled) |
@@ -255,6 +263,13 @@ lagen eurlex ai-annotate 32016R0679       # author the editorial recital/article
 lagen kommentar ai-annotate <basefile>    # link an act's articles to external guidance documents
 lagen remisser ai-analyze <case>/<org>    # map one remiss answer onto the referred förarbete's sections
 ```
+
+These calls go to Berget by default, and are metered. Pointing them at a local,
+vision-capable model instead (Qwen3.6-35B-A3B on llama.cpp, one 24 GB GPU) is a
+matter of setting `llm_base_url` — unmetered and private, which is what makes bulk
+passes over a whole corpus affordable. A local endpoint needs no API key. The
+runbook, including the sampling keys it wants and the measured limits, is
+[`../local-llm.md`](../local-llm.md).
 
 The full per-source command reference (every source's exact arguments and
 actions) is in

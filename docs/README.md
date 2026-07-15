@@ -18,3 +18,4 @@ Background and reference (not audience guides):
 - [`../accommodanda/README.md`](../accommodanda/README.md) — the module map.
 - [`conventions.md`](conventions.md) — the citable coding-rule catalog.
 - [`deploy-vps.md`](deploy-vps.md) — the production deployment runbook.
+- [`local-llm.md`](local-llm.md) — running a local vision/reasoning model (Qwen3.6 on llama.cpp) for the `ai-*` passes.

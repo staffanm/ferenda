@@ -102,7 +102,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `compress.py` | transparent Brotli-only compression for `artifact/`/`generated/`/`downloaded/`, written atomically via `util.write_atomic`; the `downloaded/` tree skips already-compressed payloads (`INCOMPRESSIBLE_SUFFIXES` — PDF/zip/docx/images/…) and sub-512-byte files, storing them plain, and hosts the compress-aware `glob`/`list_basefiles` used by downloaders and parsers walking that tree |
 | `facsimile.py` | on-demand page facsimiles: one source-PDF page → a retina PNG (`pdftoppm`, 150 DPI), rendered lazily into the `cache/facsimile/` disk cache (evicted externally); `render_region`/`cached_region` crop a bbox of a page instead of rendering the whole thing (the SFS graphic-crop path), `page_count` bounds a PDF's pages; served by the API's `/api/v1/facsimile` (+ the legacy `/prop/2022/23:10/sid1.png` path grammar) and `/api/v1/sfs-graphic`, and toggled inline by the page-number buttons on förarbete pages |
 | `pdftext.py` | shared font-aware PDF text extraction pipeline for the PDF-bodied verticals — `pdf_pages`/`flat_lines` (poppler `pdftohtml -xml`, `hidden=True` recovers an OCR text layer pdftohtml otherwise drops) → `page_paragraphs` → a vertical's own `classify` |
-| `llm.py` | shared client for the Berget chat-completions endpoint used by the opt-in `ai-*` passes (eurlex/wiki annotate, remisser ai-analyze, sfs ai-includegraphics) — `complete`/`complete_thread` plus `author`, the source-agnostic validate/self-repair-retry loop; `images=`/`vision_content` add vision-model support (page images alongside the prompt), used by `sfs.graphics.localize_group` |
+| `llm.py` | shared client for the OpenAI-compatible chat-completions endpoint used by the opt-in `ai-*` passes — Berget by default, or any compatible server `llm_base_url` points at (e.g. a local llama.cpp, `docs/local-llm.md`) (eurlex/wiki annotate, remisser ai-analyze, sfs ai-includegraphics) — `complete`/`complete_thread` plus `author`, the source-agnostic validate/self-repair-retry loop; `images=`/`vision_content` add vision-model support (page images alongside the prompt), used by `sfs.graphics.localize_group` |
 | `annstore.py` | the curated store for authored layers (`.ann`/`.corr`/`.graphics` files from the `ai-*` actions and the mechanical `sfs table-correspond`) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; every layer is an envelope (`meta`: status generated/verified, model, generated date, input sha256 hashes) beside the payload's own keys; `guard` refuses to regenerate a `verified` layer without `--force`, `drifted` derives staleness from recorded input hashes rather than storing it; `meta_extra` merges source-specific envelope fields (the `.graphics` layer's `through` provenance horizon). Per-entry curation (a `"verified": true` flag on one `.graphics` gap) is the source's concern — `sfs.graphics.plan_localization` keeps a verified entry only while its source still matches the resolved provenance and hands `write` the final payload, so `write` stays a blunt writer; inventoried by `lagen ann status` |
 | `markdown.py` | parse the git-backed wiki markdown (commentary/concept/site) into the shared inline-run artifact shape — the markdown counterpart of `wikitext.py` |
 | `wikitext.py` | parse MediaWiki dump pages into the same inline-run shape; retired from the live pipeline, kept only as the migration/diff tools' reference |
@@ -300,10 +300,13 @@ its sibling for authoring source-fix **patch files** (`lib/patch.py`,
 citation-shaped-query resolver (a name+pinpoint → one exact fragment target)
 shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 
-**Top-level**: `config.py` locates the corpus — the `data_root` (and
-`legacy_root`/`wiki_root`) keys in the optional `config.yml`, read with
-ruamel.yaml round-trip mode so a bad value's line number is reported. It
-deliberately locates nothing else — curated source resources shipped in the
+**Top-level**: `config.py` resolves the optional `config.yml` — the corpus
+roots (`data_root`, `legacy_root`, `wiki_root`), the services the pipeline
+talks to (`opensearch_url`, `llm_base_url`/`llm_model`/`llm_temperature`/
+`llm_top_p`/`vision_model`) and the deployment's own settings (`ops_token`,
+`editor_secret`, `editors`, `compress`/`compress_quality`, `cookie_secure`) —
+read with ruamel.yaml round-trip mode so a bad value's line number is reported.
+What it deliberately does *not* locate is curated source data shipped in the
 tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`,
 `sfs/data/resources.json`, …) are anchored by their own callers, not here.
 
