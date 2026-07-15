@@ -1,22 +1,27 @@
-"""Shared client for the Berget OpenAI-compatible chat-completions endpoint used
-by the opt-in LLM passes (eurlex ai-annotate, wiki ai-annotate, remisser
-ai-analyze). Besides the raw `complete`/`complete_thread` calls it owns `author`
--- the validate/self-repair-retry loop every ai-* pass runs, taking a
-source-supplied validator as data so this stays source-agnostic. The LLM is
-called only from those explicit ai-* actions on named ids -- never from a
+"""Shared client for the OpenAI-compatible chat-completions endpoint used by the
+opt-in LLM passes (eurlex ai-annotate, wiki ai-annotate, remisser ai-analyze) --
+Berget by default, or any compatible server `llm_base_url` points at (a local
+llama.cpp, docs/local-llm.md). Besides the raw `complete`/`complete_thread` calls
+it owns `author` -- the validate/self-repair-retry loop every ai-* pass runs,
+taking a source-supplied validator as data so this stays source-agnostic. The LLM
+is called only from those explicit ai-* actions on named ids -- never from a
 corpus-wide parse/relate/generate."""
 
 import base64
 import os
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
 
 from .. import config
 
-API_URL = "https://api.berget.ai/v1/chat/completions"
+API_URL = config.LLM_BASE_URL + "/chat/completions"   # `llm_base_url` / $LLM_BASE_URL
 DEFAULT_MODEL = config.LLM_MODEL   # config.yml `llm_model` / $BERGET_MODEL override
+TEMPERATURE = config.LLM_TEMPERATURE   # `llm_temperature` / $LLM_TEMPERATURE
+TOP_P = config.LLM_TOP_P               # `llm_top_p` / $LLM_TOP_P; None => unset
 TIMEOUT = 600          # the inputs are large and the model reasons over the whole
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 def vision_content(text, images):
@@ -42,13 +47,29 @@ def strip_fence(content):
     return s.strip()
 
 
+def auth_headers(url):
+    """The ``Authorization`` header for `url` -- empty for a local endpoint. A
+    llama.cpp server on the workstation takes no key, so demanding one there would
+    be a fabricated precondition; against a remote host a missing key *is* a real
+    misconfiguration and must fail before the pass starts rather than 401 halfway
+    through a corpus."""
+    if urlsplit(url).hostname in LOCAL_HOSTS:
+        return {}
+    load_dotenv()
+    api_key = os.environ.get("BERGET_API_KEY")
+    assert api_key, "BERGET_API_KEY is not set (add it to .env)"
+    return {"Authorization": "Bearer %s" % api_key}
+
+
 def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
-    """The model's reply (temperature 0) to a full `messages` thread
+    """The model's reply to a full `messages` thread
     (`[{"role": "user"|"assistant", "content": ...}, ...]`), code-fence stripped.
-    Reads BERGET_API_KEY from the environment/.env. `max_tokens` caps the
-    completion -- raise it for a reasoning model (gpt-oss) on a large input,
-    whose chain-of-thought otherwise exhausts the endpoint's small default before
-    it emits the answer (a `length` finish leaves the reply truncated).
+    Sampling comes from config (`llm_temperature`/`llm_top_p`, default temperature
+    0 and no `top_p`); the endpoint is `llm_base_url` and needs BERGET_API_KEY only
+    when it is remote (`auth_headers`). `max_tokens` caps the completion -- raise
+    it for a reasoning model (gpt-oss, Qwen3.6) on a large input, whose
+    chain-of-thought otherwise exhausts the endpoint's small default before it
+    emits the answer (a `length` finish leaves the reply truncated).
 
     Use this (over `complete`) for a self-repair retry: replaying the model's own
     prior reply as a real `assistant` turn, followed by a short `user` turn naming
@@ -56,15 +77,13 @@ def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=N
     whole answer from a single ever-growing user message with the correction
     tacked onto the end, which forces it to redo the entire task from scratch and
     often reproduces the same mistake."""
-    load_dotenv()
-    api_key = os.environ.get("BERGET_API_KEY")
-    assert api_key, "BERGET_API_KEY is not set (add it to .env)"
-    payload = {"model": model, "temperature": 0, "messages": messages}
+    payload = {"model": model, "temperature": TEMPERATURE, "messages": messages}
+    if TOP_P is not None:
+        payload["top_p"] = TOP_P
     if max_tokens:
         payload["max_tokens"] = max_tokens
     resp = requests.post(
-        API_URL, headers={"Authorization": "Bearer %s" % api_key},
-        json=payload, timeout=timeout)
+        API_URL, headers=auth_headers(API_URL), json=payload, timeout=timeout)
     resp.raise_for_status()
     choice = resp.json()["choices"][0]
     # a `length` finish means the model ran out of budget mid-answer -- the reply
@@ -103,8 +122,9 @@ def author(prompt, validate, model=DEFAULT_MODEL, timeout=TIMEOUT,
     `user` message naming exactly what failed. This lets the model correct the one
     broken part directly, rather than re-deriving the whole answer from an
     ever-growing single user message with the correction tacked on (which forces a
-    from-scratch redo and often reproduces the same mistake). The calls are
-    temperature 0, so a bare re-prompt would just repeat the rejected answer.
+    from-scratch redo and often reproduces the same mistake). At the default
+    temperature 0 a bare re-prompt would just repeat the rejected answer; naming
+    the fault is what earns the extra turn at any temperature.
 
     `validate(reply)` is a source-supplied callable that parses and shape-checks
     the reply and returns the payload to write, or raises `ValueError` naming the
