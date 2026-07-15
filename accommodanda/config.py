@@ -32,6 +32,11 @@ DEFAULT_WIKI_ROOT = REPO.parent / "lagen-wiki"   # git-backed markdown content r
 DEFAULT_LEGACY_ROOT = REPO.parent / "ferenda.old" / "data"   # frozen legacy corpora
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
 DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
+# the OpenAI-compatible endpoint the ai-* passes call, minus the
+# /chat/completions path (lib/llm appends it). Berget unless pointed elsewhere.
+DEFAULT_LLM_BASE_URL = "https://api.berget.ai/v1"
+DEFAULT_LLM_TEMPERATURE = 0
+DEFAULT_LLM_TOP_P = None                     # None => leave top_p out of the payload
 # the multimodal model for the vision passes (sfs ai-includegraphics): localizing
 # a dropped graphic to a page+bbox. Kimi-K2.6 was the Phase-0 spike winner -- the
 # only Berget vision model robust on both accuracy and a generic prompt, and it
@@ -142,6 +147,74 @@ def resolve_llm_model(doc):
         raise ConfigError("llm_model set to invalid value %r at %s"
                           % (value, _at(doc, "llm_model")))
     return value
+
+
+def resolve_llm_base_url(doc):
+    """The OpenAI-compatible chat-completions endpoint the opt-in LLM passes call,
+    without the ``/chat/completions`` path (``lib/llm`` appends it). Point it at a
+    local llama.cpp server (``http://127.0.0.1:8123/v1``) to run the passes on the
+    workstation GPU instead of Berget -- unmetered and private, which is what makes
+    bulk passes over a whole corpus affordable (``docs/local-llm.md``). A local
+    endpoint needs no API key: ``lib/llm`` demands ``BERGET_API_KEY`` only for a
+    remote host. Precedence: the ``LLM_BASE_URL`` environment variable, then the
+    ``llm_base_url`` key in config.yml, then Berget."""
+    env = os.environ.get("LLM_BASE_URL")
+    if env:
+        return env.rstrip("/")
+    if "llm_base_url" not in doc:
+        return DEFAULT_LLM_BASE_URL
+    value = doc["llm_base_url"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("llm_base_url set to invalid value %r at %s"
+                          % (value, _at(doc, "llm_base_url")))
+    return value.rstrip("/")
+
+
+def _resolve_float(doc, key, env_name, default, lo, hi):
+    """Shared parse + range check for the float sampling knobs
+    (`resolve_llm_temperature`, `resolve_llm_top_p`): env var, then the config key,
+    else ``default``. Out-of-range or unparseable raises rather than clamping -- a
+    silently corrected sampling knob would change every reply without saying so."""
+    # `if env` rather than `env is not None`, as every sibling resolver here
+    # does: an exported-but-empty variable is how a shell spells "unset", and it
+    # must fall through to the config key rather than fail to parse as a float.
+    env = os.environ.get(env_name)
+    raw = env if env else doc.get(key)
+    if raw is None:
+        return default
+    where = env_name if env else "%s at %s" % (key, _at(doc, key))
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        raise ConfigError("%s set to invalid value %r (expected a number %g-%g)"
+                          % (where, raw, lo, hi)) from None
+    if not lo <= value <= hi:
+        raise ConfigError("%s set to %g (out of the valid range %g-%g)"
+                          % (where, value, lo, hi))
+    return value
+
+
+def resolve_llm_temperature(doc):
+    """The sampling temperature for the opt-in LLM passes. Default 0: the passes
+    read structure out of a document and want the most probable reading, and
+    `lib/llm.author`'s retry replays the rejected reply as a real follow-up turn
+    rather than relying on resampling to shake out a different answer. Raise it for
+    a model whose thinking mode degrades under greedy decoding -- Qwen3.6 asks for
+    1.0 and loops without it (``docs/local-llm.md``). Precedence: the
+    ``LLM_TEMPERATURE`` environment variable, then the ``llm_temperature`` key in
+    config.yml, else 0."""
+    return _resolve_float(doc, "llm_temperature", "LLM_TEMPERATURE",
+                          DEFAULT_LLM_TEMPERATURE, 0, 2)
+
+
+def resolve_llm_top_p(doc):
+    """Nucleus-sampling cutoff for the opt-in LLM passes, or ``None`` (the default)
+    to leave ``top_p`` out of the payload entirely so the endpoint's own default
+    applies -- Berget's passes have never set it and must not start now. Set it
+    alongside a raised `llm_temperature`, which is not the whole recipe on its own:
+    Qwen3.6 wants 0.95 in thinking mode. Precedence: the ``LLM_TOP_P`` environment
+    variable, then the ``llm_top_p`` key in config.yml, else unset."""
+    return _resolve_float(doc, "llm_top_p", "LLM_TOP_P", DEFAULT_LLM_TOP_P, 0, 1)
 
 
 def resolve_vision_model(doc):
@@ -324,6 +397,9 @@ WIKI_ROOT = resolve_wiki_root(_doc)
 LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)
+LLM_BASE_URL = resolve_llm_base_url(_doc)
+LLM_TEMPERATURE = resolve_llm_temperature(_doc)
+LLM_TOP_P = resolve_llm_top_p(_doc)
 VISION_MODEL = resolve_vision_model(_doc)
 OPS_TOKEN = resolve_ops_token(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
