@@ -44,7 +44,7 @@ from ..lib import compress
 from ..lib.browser import DetachedChrome
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_http2_session, make_session, request
+from ..lib.net import is_not_found, make_http2_session, make_session, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 
@@ -504,7 +504,7 @@ def indexed_enumerate(session, agency):
         try:
             response = request(session, method, url, data=p.get("post_data"))
         except requests.exceptions.HTTPError as exc:
-            if p.get("optional_pages") and getattr(exc.response, "status_code", None) == 404:
+            if p.get("optional_pages") and is_not_found(exc):
                 continue                       # a year with no regulations -- no page
             if multi:                          # one bad page in a per-year index
                 yield Skip("%s: %r" % (url, exc))

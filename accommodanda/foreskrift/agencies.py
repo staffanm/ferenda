@@ -46,7 +46,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.net import BROWSER_UA, request
+from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 from . import harvest, mtfs, skvfs
@@ -1983,7 +1983,7 @@ def ts_enumerate(session, agency):
         try:
             response = request(session, "GET", "%s%d/" % (agency.index_url, year))
         except requests.exceptions.HTTPError as exc:
-            if getattr(exc.response, "status_code", None) == 404:
+            if is_not_found(exc):
                 continue                       # a year with no register page
             raise
         soup = BeautifulSoup(response.text, "html.parser")

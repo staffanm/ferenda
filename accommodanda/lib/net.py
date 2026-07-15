@@ -116,6 +116,15 @@ def _retry_after(response):
     return float(value) if value and value.isdigit() else None
 
 
+def is_not_found(exc):
+    """Whether `exc` is a 404 raised by :func:`request`. A 404 is the one
+    status a harvester routinely reads as *content* -- "the upstream holds no
+    such document" -- rather than as a failure, so telling it apart from every
+    other error is a recurring need. (`request` raises any non-throttle 4xx at
+    once, so this is only ever reached for a real answer.)"""
+    return exc.response is not None and exc.response.status_code == 404
+
+
 def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs):
     """Perform an HTTP request, riding out the transient failures a long
     unattended harvest meets: an empty/non-JSON 2xx body, a throttle (403/429),
