@@ -68,15 +68,39 @@ Canonical flow for grounding a legal question:
 All data is read-only and public; nothing here mutates anything.\
 """
 
+
+@contextlib.contextmanager
+def _root_logging_preserved():
+    """Undo any reconfiguration of the *root* logger done inside the block.
+
+    FastMCP's constructor calls logging.basicConfig() -- a library claiming the
+    root logger, which belongs to whoever owns the process. Since `mcp` is built
+    at module scope (the @mcp.tool decorators below need it), merely importing
+    this module would otherwise install FastMCP's RichHandler at INFO on every
+    process that reaches api/app.py -- including the `lagen` CLI, where it made
+    opensearch-py narrate every bulk round-trip into the build output. Snapshot
+    and restore, so importing us configures nothing: the app decides (uvicorn's
+    own config when serving; app.py's basicConfig under __main__).
+    """
+    root = logging.getLogger()
+    handlers, level = root.handlers[:], root.level
+    try:
+        yield
+    finally:
+        root.handlers[:] = handlers
+        root.setLevel(level)
+
+
 # DNS-rebinding protection guards localhost-bound servers from hostile web
 # pages; this server is public, unauthenticated and read-only, served behind
 # nginx which already routes by vhost. Left on (FastMCP's default), it would
 # 421 every request whose Host isn't localhost -- i.e. all production traffic.
-mcp = FastMCP("lagen.nu", instructions=INSTRUCTIONS,
-              stateless_http=True, json_response=True,
-              streamable_http_path="/",
-              transport_security=TransportSecuritySettings(
-                  enable_dns_rebinding_protection=False))
+with _root_logging_preserved():
+    mcp = FastMCP("lagen.nu", instructions=INSTRUCTIONS,
+                  stateless_http=True, json_response=True,
+                  streamable_http_path="/",
+                  transport_security=TransportSecuritySettings(
+                      enable_dns_rebinding_protection=False))
 
 # one search client for the process; constructing it opens no connection, so
 # importing/mounting never needs a running OpenSearch -- only a `search` call
