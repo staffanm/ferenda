@@ -59,6 +59,7 @@ from .coe import download as coe_download
 from .coe import parse as coe_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
+from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
@@ -1184,6 +1185,7 @@ DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
 DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
 DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
+           PKG / "dv" / "legacy.py", PKG / "dv" / "word.py",
            PKG / "dv" / "structure.py", PKG / "lib" / "casenaming.py",
            PKG / "lib" / "lagrum.py")
 
@@ -1191,7 +1193,7 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
 @functools.cache
 def _dv_cases():
     cases = json.loads(DV_INDEX.read_text())
-    return {c["canonical_id"]: c for c in cases if api_member(c)}
+    return {c["canonical_id"]: c for c in cases}
 
 
 @functools.cache
@@ -1204,8 +1206,12 @@ def dv_artifact(basefile):
 
 
 def dv_record(basefile):
+    """The preferred raw representation: API JSON, else a legacy Word original."""
+    case = _dv_cases()[basefile]
+    member = api_member(case) or dv_legacy.legacy_member(case)
+    assert member, "%s has no DV source member" % basefile
     # the identity index stores paths data_root-relative (portable); resolve here
-    return util.load_relpath(layout.DATA, api_member(_dv_cases()[basefile])["path"])
+    return util.load_relpath(layout.DATA, member["path"])
 
 
 def dv_download_run(basefile):
@@ -1214,6 +1220,7 @@ def dv_download_run(basefile):
     (bare `lagen dv download`) + identity reindex -- a case has no uuid to
     fetch until the harvest has seen it, so it can't enter through here."""
     member = api_member(_dv_cases()[basefile])
+    assert member, "%s is legacy-only and cannot be fetched from the API" % basefile
     record = dv_download.fetch_record(_dv_session(), member["uuid"])
     out = dv_record(basefile)
     util.write_atomic(out, json.dumps(
@@ -1231,8 +1238,8 @@ def dv_harvest(scopes):
     Rebuilds the identity index afterwards so new cases are immediately
     visible to parse. The rebuild is a single whole-corpus pass (the index is
     a global union-find, not incrementally updatable) and needs no parsing
-    (keys come from raw record fields + legacy filenames), so it runs once at
-    the end rather than per page."""
+    (keys come from raw API fields + validated legacy identity sidecars), so it
+    runs once at the end rather than per page."""
     if RUN.dry_run:
         print("dv download: would download into %s, then rebuild %s"
               % (DOM_DOWNLOADED, DV_INDEX))
@@ -1265,10 +1272,27 @@ def dv_reindex(args=()):
               % (DV_INDEX, DOM_DOWNLOADED, DV_LEGACY_DOWNLOADED))
         return
     print("dv reindex: rebuilding identity index ...")
-    dv_identity.reindex(dvdir=str(DV_LEGACY_DOWNLOADED),
-                        domstoldir=str(DOM_DOWNLOADED),
-                        out=str(DV_INDEX))
+    cases = dv_identity.reindex(dvdir=str(DV_LEGACY_DOWNLOADED),
+                                domstoldir=str(DOM_DOWNLOADED),
+                                out=str(DV_INDEX))
     _dv_cases.cache_clear()
+    print("dv reindex: pruned %d superseded artifact(s)"
+          % _dv_prune_artifacts(cases))
+
+
+def _dv_prune_artifacts(cases):
+    """Remove parsed DV documents no longer named by the rebuilt index.
+
+    A corrected entity-resolution rule can merge cases or change a non-referat
+    canonical id. Parse writes the new path but cannot discover the abandoned
+    one; leaving it behind would make relate/dump publish both identities.
+    Raw API/Word inputs are deliberately outside this reconciliation.
+    """
+    valid = {dv_artifact(case["canonical_id"]) for case in cases}
+    stale = set(layout.artifacts("dv")) - valid
+    for path in stale:
+        compress.unlink(path)
+    return len(stale)
 
 
 def dv_namedcases(args=()):
@@ -1288,12 +1312,19 @@ def dv_namedcases(args=()):
 
 
 def dv_parse_run(basefile):
-    record = json.loads(compress.read_text(dv_record(basefile)))
-    av = parse_api_record(record, basefile)
-    # the case's public publication-search page is keyed by the record's
-    # gruppKorrelationsnummer (the publication group), not derivable from basefile
-    grupp = record.get("gruppKorrelationsnummer")
-    art = to_artifact(av, canonical_id=basefile)
+    case = _dv_cases()[basefile]
+    member = api_member(case)
+    if member:
+        record = json.loads(compress.read_text(dv_record(basefile)))
+        av = parse_api_record(record, basefile)
+        # the public publication-search page is keyed by the record's publication
+        # group, which cannot be derived from the canonical case id
+        grupp = record.get("gruppKorrelationsnummer")
+    else:
+        av = dv_legacy.parse_legacy_file(dv_record(basefile), case)
+        grupp = None
+    art = to_artifact(av, canonical_id=basefile,
+                      canonical_malnummer=(case.get("malnummer") or [None])[0])
     # stamp the canonical, name-prefixed display title onto the artifact here, so
     # the pure catalog reads it off the artifact without recomputing (the naming
     # grammar itself lives in lib.casenaming, read identically by page + catalog)

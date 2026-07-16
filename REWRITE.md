@@ -26,9 +26,10 @@ sections below explain each item and retain the historical measurements.
   tail is bounded: SFS special-law/bilaga and amendment-register improvements,
   plus 15 DV date conflicts for which neither date survives in the published
   body (§3d, §4).
-- ⬜ **DV coverage and published identity:** ingest the recoverable NJA
-  notisfall and restore the verified legacy verdict URI grammar for non-referat
-  cases (§4, §6).
+- ✅ **DV coverage and published identity:** the recoverable NJA notisfall are
+  ingested, all withheld direct-file ambiguities are adjudicated, and the
+  verified legacy verdict URI grammar is restored for non-referat cases (§4,
+  §6; [closure record](docs/rewrite-parity/01-dv-legacy-coverage-and-identity.md)).
 - ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
   offsets, general/continued tables and the remaining legacy DOC/DOCX bodies;
   unify the two författningskommentar bounds and repair the known truncated law
@@ -535,7 +536,7 @@ horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
   or `--limit`-truncated run leaves the watermark dirty, so the next run
   re-walks the backlog instead of trusting it; a periodic cron'd `--full`
   sweep is the backstop for record edits/late publication past the window.
-- ✅ **Full harvest done:** 17,254 records across 22 courts (1981–today),
+- ✅ **Full harvest done:** 17,325 records across 22 courts (1981–today),
   656/657 PDFs (1 upstream glitch — registered attachment never
   uploaded). Mostly HTML `innehall`, not PDF — good for parsing. Keep
   current via cron'd plain (incremental) run.
@@ -554,40 +555,53 @@ horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
   - Court mapping: REG→REGR, MIG→MIOD, MÖD→MOD, MMD→MMOD, PMD→PMOD.
   - Keys: ("M", canonical_court, norm_malnr) and ("R", norm_referat). API
     records carry explicit mål/referatnummer; legacy identity comes from
-    the filename — målnummer for almost every court, but ADO encodes the
-    referat (`1993-100` → "AD 1993 nr 100") and HDO notisfall
-    (`2003_not_1` → "NJA 2003 not 1") get reconstructed referat keys.
-  - Error modes both reported: under-linking → duplicate (audited,
-    negligible); over-linking → component spanning >1 court (zero found).
-  - **Result on the real corpus: 18,728 canonical cases — 14,838 linked
-    across both sources, 2,252 API-only (post-feed + 6 new courts), 1,638
-    legacy-only** (825 NJA notisfall the API doesn't carry, 514 older AD
-    referat, 231 HSV, …). Index at `site/data/artifact/dom/identity-index.json`.
+    the filename plus a hash-checked `legacy-index.json` generated from each
+    non-empty Word header. The sidecar is necessary because some opaque or
+    incorrect filenames hide an API-backed referat. ADO filenames still encode
+    the referat (`1993-100` → "AD 1993 nr 100"); all HDO/HFD/REG zero-byte
+    notis placeholders are expanded from the exact bundle index.
+  - Error modes both reported: under-linking → duplicate; over-linking → an
+    unexpected component spanning >1 court. The 31 `MOD`/`MMOD` components are
+    separately reported as the expected 2011 court-succession overlap.
+  - **Result on the bounded real corpus (2026-07-16): 23,770 canonical cases —
+    267 linked across both sources, 17,052 API-only and 6,451 legacy-only.**
+    The last group is 5,936 bundle-backed notis cases plus 515 direct Word
+    cases. Index at `site/data/artifact/dom/identity-index.json`.
   - `test/test_dv_identity.py` (linkage, reconstruction,
     court-scoping/no-over-link, attachment grouping).
 
-#### Coverage: legacy feed vs new API ✅ (analysis)
+#### Coverage: legacy feed vs new API ✅ (bounded materialization)
 
-The 1,638 legacy-only cases are **not a temporal cutoff** — for every
-affected court the missing cases fall *inside* the API's year range. The
-gaps are categorical, three themes covering 1,572 of them:
+The machine deliberately does not materialize the complete old download tree.
+The bounded direct import transferred exactly 1,638 selected files
+(23,248,023 bytes); with seven pre-existing originals the local tree has 1,645
+direct files, 793 non-empty and 852 zero-byte notis placeholders. Parsing the
+non-empty headers proved that some filename-only "legacy-only" components were
+actually API duplicates and merged them before publication.
 
-- **HD notisfall — 825 (HDO), confirmed.** "NJA YYYY not N" brief notices;
-  the API publishes full NJA referat but carries zero notisfall.
-- **Arbetsdomstolen referat 2006–2017 — 514 (ADO), confirmed.** The API
-  covers those years with *other* AD referat yet is missing ~30–65 more
-  per year that the old feed has (verified absent in the harvested
-  corpus). The new API's AD coverage for that decade is partial.
-- **Non-referat Svea hovrätt judgments — 231 (HSV).** Målnummer-only
-  (0% referat), heavy on `ÖH` hyresmål. ~10–20 may be linkage artifacts
-  from malformed legacy filenames (`B3689`, `T8372-08t`) — a cleanup pass
-  on the legacy filename parser would confirm.
+The shared notis originals were transferred separately: 197 Word bundles
+(47,409,809 bytes) cover all 5,936 HDO/HFD/REG identities in the remote
+zero-placeholder ledger. An exact hash-checked index intersects parsed bundle
+headings with that ledger; it excludes seven unledgered headings and never
+trusts the approximate range in a filename (21 bundle names disagree with their
+contents). No frozen HTML intermediate is needed.
 
-Tail (~66) scattered across MOD/REGR/HFD — individual non-referat
-decisions. **Implication:** for these ~1,600 verdicts the legacy Word/OOXML
-is the *only* source (no API record to fall back on), including the entire
-HD notisfall series and a decade of AD referat — so the legacy-OOXML path
-below is not optional polish, it's the only way they enter the corpus.
+The 57 remote direct candidates withheld because a reused målnummer could name
+more than one component have now been header-adjudicated. Fifty-six match an API
+publication by exact referat and date; the referat-less `PMÖÄ8867-16_1.docx`
+matches the unique same-date/målnummer API record and its complete editorial
+summary. The machine-readable ledger is
+`accommodanda/dv/data/legacy-ambiguities.json`: all 57 are API duplicates, zero
+are unresolved, and no additional permanent Word transfer was needed.
+
+The final reconciliation also repaired two identity traps exposed by the old
+golden. Legacy publications sharing a målnummer stay separate unless their
+source filenames prove they are attachment variants, restoring 23 distinct AD
+referat. A målnummer cannot bridge API/legacy components that already have
+conflicting strong referat identifiers, keeping `RH 2016:61` and `RH 2016:62`
+separate. The focused `tools/golden_dv_legacy.py` manifest covers direct Word,
+HDO/REG notis and modern HFD notis formats; all four cases pass URI, references,
+metadata and applicable structure checks.
 - ✅ **DV parser core** — `accommodanda/dv/model.py`, `parse.py` and
   `structure.py` emit metadata plus a content-bearing instance/ruling tree
   (instances, betänkande vs dom, domskäl/domslut, skiljaktig), with a flattening
@@ -611,9 +625,11 @@ below is not optional polish, it's the only way they enter the corpus.
     / `REFERAT` body / `Sökord`/`Litteratur` footer → `Avgorande`,
     preferring the identity index's canonical referat/court. The whole
     referat is one Word table, so the body discriminator is the `REFERAT`
-    marker, not table membership. **15,624 legacy docs parse, 0 empty
-    bodies, 0 failures.** `test/test_dv_legacy.py` (14 JVM-free unit tests
-    over synthetic streams).
+    marker, not table membership. The normal build driver selects API when
+    present and Word otherwise, then sends both through the same artifact
+    projection. **All 23,770 current identities parse with 0 failures; all
+    6,451 legacy-only artifacts have non-empty structures.** Reindex prunes
+    superseded artifact paths after an identity correction.
   - ✅ **Field-level merge — investigated and rejected.** Measured the gaps
     a merge could fill for the 14,838 cases with both sources: body-fallback
     opportunity is **0** (all 965 API-empty bodies are summary-only nämnd
@@ -623,14 +639,13 @@ below is not optional polish, it's the only way they enter the corpus.
     empty API-wide (not a parser bug) and absent from legacy too. So the
     architecture is **single-best-source per canonical case** (API when
     present, POI-legacy otherwise), not a merge.
-  - ⬜ **Notisfall coverage.** 852 sole-source cases (6 from the 1990s,
-    504 from the 2000s, 304 from the 2010s, 38 from the 2020s) whose
-    individual originals are zero-byte. 851/852 have the frozen `<body>`
-    intermediate; the recent `notiser_*.zip` carries multi-notis `.docx`
-    (`HDO_2017_notis_007-016.docx`) POI-able for ~342 but needing
-    per-notis splitting + canonical-ID matching (the old `parse_not`
-    lineage). Pre-2010 majority has only the frozen intermediate regardless.
-    This is a bounded import/parser task, not a missing DV architecture seam.
+  - ✅ **Notisfall coverage.** The 852 locally copied zero-byte files are only
+    placeholders; 197 multi-notis Word bundles contain the bodies. The parser
+    splits the HDO, REG/RÅ and HFD generations (including repeated lettered
+    sections and grouped modern HFD rulings), matches 5,936 exact old
+    placeholder identities through the sidecar and emits one ordinary
+    `Avgorande` artifact per notis. Corpus result: 5,936/5,936 non-empty,
+    0 parse failures.
   - ✅ **Citation extraction from body text** — KORTLAGRUM ported
     (`AbbrevLawNormalRef` "3 § MBL"/"MBL 3 §", `AbbrevLawShortRef`
     "JB 22:2"), law-abbrev terminal built from the 110 `dcterms:alternative`
@@ -1000,13 +1015,14 @@ to a future per-doc incremental generate.
   cases parse, 0 fall back** (verified across the whole index). `test/test_dv_parse.py`
   (`case_uri` + minting tests). Required a full DV re-parse → re-relate →
   re-generate (the `uri` lives inside each artifact).
-  - ⬜ **Non-referat cases (~1,335, ~7%)** keep a stable slug URI for now.
-    They are never citation targets (RATTSFALL only names referat/notis), so
-    the graph doesn't need them; but the old pipeline published them under the
-    *verdict* scheme `dom/{publisher_slug}/{malnummer}/{avgorandedatum}`
-    (`swedishlegalsource.space.ttl`). Restoring that needs a verified DV-court
-    → rinfo-org-slug map (HDO→hd, ADO→ad, … across every hovrätt/kammarrätt) —
-    deferred rather than guessed, since the URI is a published identifier.
+  - ✅ **Non-referat verdict identity restored.** `lib/casenaming.py` carries
+    the verified court→`abbrSlug` map from the old
+    `swedishlegalsource.slugs.ttl` (including MIOD→mig, MMOD→mmd and HYOD under
+    Svea's hsv) and mints the old
+    `dom/{publisher_slug}/{malnummer}/{avgorandedatum}` URI. Repeated
+    målnummer decisions are date-qualified in the identity index; multi-number
+    records use its canonical primary målnummer. Whole-corpus audit: zero
+    duplicate artifact URIs.
 - ✅ **Per-doc incremental generate.** `generate` treats `relate` as its upstream
   dep and **auto-runs it** for any source whose artifacts are newer than the
   catalog (`stale_sources()`, make's target-older-than-prerequisite rule;
@@ -2592,7 +2608,18 @@ in `git log`. This document is the forest-level status; section markers
   87 t/s) on the table until fixed. Corpus sizing measured while there: EUR-Lex is
   ~21,600 acts / ~192M prompt tokens, median act ~7.2k tokens — GDPR at ~97k is a
   p99.9 outlier, not a typical unit of work.
-
+- **dv legacy coverage/identity** (2026-07-16) — the bounded old-feed import is
+  live in the production driver: 1,638 selected direct files plus 197 shared
+  notis Word bundles, with hash-checked direct/bundle identity sidecars. POI
+  parsers cover HDO, REG/RÅ and HFD notis generations and emit 5,936 non-empty
+  notis artifacts without frozen HTML. Header-derived direct identities remove
+  filename-only false components; all 57 withheld direct ambiguities are
+  adjudicated API duplicates. The corrected index has 23,770 cases (267 both,
+  17,052 API-only, 6,451 legacy-only), exactly one artifact and public URI each,
+  zero parse failures and zero empty legacy structures. The old non-referat
+  verdict URI grammar is restored; focused old-corpus goldens pass; catalog,
+  dump and generated pages each reconcile at 23,770 DV documents. Reindex
+  prunes superseded artifacts.
 - **foreskrift** (2026-07-15) — the agency registry grew from ~21 to the full
   lagrummet.se government-agency list: `foreskrift/agencies.py` now registers
   71 författningssamlingar (66 live through the shared harvest engine, 5

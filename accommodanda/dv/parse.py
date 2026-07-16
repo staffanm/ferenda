@@ -1,14 +1,14 @@
 """Parse a court decision (DV) into the Avgorande model and project it to
 a JSON artifact.
 
-Driven by the identity index (accommodanda.dv_identity): each canonical
-case may have several source records, and metadata is merged field by
-field rather than picking one source whole. The API path is implemented
-(body from the record's `innehall` HTML, metadata from its curated
-fields), and the body is scanned for citations across every ported
-grammar (DV_PARSE_TYPES) to populate `references`. The legacy Word/OOXML
-path (for the ~1,600 legacy-only cases) remains the next increment; its
-seam is marked below.
+Driven by the identity index (accommodanda.dv.identity): each canonical case
+may have several source records. The build driver uses the API representation
+when present and the Word representation otherwise; a measured field-level
+merge did not justify its complexity. API records supply `innehall` HTML plus
+curated metadata; legacy-only cases are parsed from their Word originals by
+`accommodanda.dv.legacy`. Both paths produce the same
+`Avgorande` model and pass through `to_artifact`, including citation scanning
+across every ported grammar (DV_PARSE_TYPES).
 
 The body HTML is flat: each <p> is either a section heading (a short,
 all-caps or known-label paragraph) or a body paragraph (optionally
@@ -24,7 +24,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 
 from ..lib import patch
-from ..lib.casenaming import case_uri
+from ..lib.casenaming import case_uri, verdict_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
@@ -365,7 +365,7 @@ def _scanner():
                         parse_types=DV_PARSE_TYPES, named_acts=named_acts)
 
 
-def to_artifact(av, canonical_id=None):
+def to_artifact(av, canonical_id=None, canonical_malnummer=None):
     runs = scan_body(av.body)
     def block(b, text):
         if isinstance(b, Rubrik):
@@ -374,8 +374,11 @@ def to_artifact(av, canonical_id=None):
     cid = canonical_id or (av.referat[0] if av.referat
                            else "%s %s" % (av.court, av.malnummer[0])
                            if av.malnummer else av.court)
+    uri = (case_uri(cid) if av.referat else
+           verdict_uri(av.court, canonical_malnummer or av.malnummer[0],
+                       av.avgorandedatum))
     return {
-        "uri": case_uri(cid),
+        "uri": uri,
         "court": av.court,
         "court_namn": av.court_namn,
         "malnummer": av.malnummer,

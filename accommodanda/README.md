@@ -117,13 +117,14 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | File | What |
 |---|---|
 | `download.py` | downloader for the rättspraxis API |
-| `identity.py` | entity-resolution index (one canonical case ← many source records) |
+| `identity.py` | entity-resolution index (one canonical case ← many API/direct-Word/notis-bundle records); validates the two legacy identity sidecars, keeps distinct decisions that reuse one målnummer apart, and reports unexpected cross-court unions separately from the MOD→MMOD succession |
 | `model.py` | `Avgorande` model (metadata + ordered Rubrik/Stycke body + footnotes) |
-| `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
+| `parse.py` | common artifact projection; API body from `innehall` HTML, or the legacy model below, both producing the same JSON shape and old public URI grammar |
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
 | `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
-| `legacy.py` | legacy stream → head/body split → `Avgorande` |
+| `legacy.py` | direct Word head/body split plus HDO/REG/HFD multi-notis bundle splitting → `Avgorande`; writes the hash-checked direct and bundle identity indexes |
+| `import_legacy.py` | bounded SSH importer: selects one direct Word file per filename-derived legacy-only component, streams shared notis members out of remote zip snapshots, generates both identity sidecars, and adjudicates withheld ambiguous originals against the API |
 
 **forarbete vertical (preparatory works — prop/sou/ds/dir)**
 | File | What |
@@ -408,20 +409,51 @@ uv run python -m accommodanda.build sfs history-as-git /path/to/repo 1998:204   
 **DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):
 
 ```sh
+# bounded legacy import (the remote tree is listed before any bytes are copied)
+uv run python -m accommodanda.dv.import_legacy pop-os \
+  /home/staffan/repos/ferenda.old/data/dv/downloaded \
+  --expected-count 1638 --copy
+uv run python -m accommodanda.dv.import_legacy pop-os \
+  /home/staffan/repos/ferenda.old/data/dv/downloaded \
+  --all-notis-bundles --copy
+# one-off review after staging the withheld originals under REVIEW_DIR
+uv run python -m accommodanda.dv.import_legacy pop-os \
+  /home/staffan/repos/ferenda.old/data/dv/downloaded \
+  --adjudicate-ambiguous REVIEW_DIR
+
 # download + build the identity index
 uv run python -m accommodanda.dv.download site/data/downloaded/dom   # [--full] [--no-bilagor] [--limit N]
 uv run python -m accommodanda.build dv reindex                  # -> site/data/artifact/dom/identity-index.json
                                                                   # (also auto-run after any harvest that changed records)
 
-# parse (API path is driver-owned; `[ids…]` parses just those, empty = all stale)
-uv run python -m accommodanda.build dv parse                                       # API path, incremental
+# parse (`[ids…]` parses just those, empty = all stale)
+uv run python -m accommodanda.build dv parse                         # API or Word, incremental
 uv run python -m accommodanda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy POI path, batch report
-uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
+uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> JSON on stdout
 ```
 
 The DV parsers are driven by the identity index: each canonical case is
 parsed from its single best source — the API record when present, the
 legacy Word original otherwise (no cross-source merge; see REWRITE.md §4).
+Direct files remain at `downloaded/dv/{COURT}/`; shared notis sources live at
+`downloaded/dv/notis-bundles/{HDO,HFD,REG}/{year}/`. `legacy-index.json`
+contains the parsed identity + size/SHA-256 of every non-empty direct Word
+original. `notis-bundles/index.json` maps only identities in the old zero-byte
+placeholder ledger to headings actually parsed from the bundles; filename
+ranges are deliberately not identities. Reindex validates both sidecars before
+using them and prunes parsed artifacts whose superseded canonical ID disappeared.
+Reviewed withheld originals are recorded separately in the committed
+`accommodanda/dv/data/legacy-ambiguities.json` ledger.
+
+The bounded 2026-07-16 materialization has 1,645 direct files (1,638 copied plus
+seven pre-existing; 793 non-empty and 852 placeholders) and 197 bundle members.
+It resolves to 23,770 cases: 17,052 API-only, 267 in both stores and 6,451
+legacy-only (5,936 notis plus 515 direct). All 57 ambiguous remote direct
+candidates were header-adjudicated as API duplicates, so none needed permanent
+transfer and none remain unresolved. The identity index, artifacts, catalog,
+DV dump and generated DV pages reconcile at 23,770; the focused old-corpus
+check is `python tools/golden_dv_legacy.py`. See
+`docs/rewrite-parity/01-dv-legacy-coverage-and-identity.md`.
 The incremental download only covers late publication within its 365-day
 safety window below the watermark; a record edit or a referat published
 later than that surfaces only under `--full`, so a periodic cron'd `--full`

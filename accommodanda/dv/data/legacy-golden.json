@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "kind": "direct-word",
+      "canonical_id": "AD 2008 nr 50",
+      "oracle": "ADO/2008-50",
+      "structure": null
+    },
+    {
+      "kind": "hdo-notis-bundle",
+      "canonical_id": "NJA 2006 not 63",
+      "oracle": "HDO/2006_not_63",
+      "structure": "exact"
+    },
+    {
+      "kind": "reg-notis-bundle",
+      "canonical_id": "RÅ 1994 not 257",
+      "oracle": "REG/1994_not_257",
+      "structure": "exact"
+    },
+    {
+      "kind": "modern-hfd-notis-bundle",
+      "canonical_id": "HFD 2016 not 1",
+      "oracle": "HFD/2016_not_1",
+      "structure": "core"
+    }
+  ]
+}

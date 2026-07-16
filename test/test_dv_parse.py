@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from accommodanda.dv.model import Fotnot, Rubrik, Stycke
+from accommodanda.dv.model import Avgorande, Fotnot, Rubrik, Stycke
 from accommodanda.dv.parse import (
     case_uri,
     decision_date_from_text,
@@ -12,6 +12,7 @@ from accommodanda.dv.parse import (
     parse_body,
     parse_innehall,
     to_artifact,
+    verdict_uri,
 )
 from accommodanda.dv.structure import flatten
 
@@ -28,6 +29,23 @@ def test_case_uri_mints_old_rinfo_scheme():
 def test_case_uri_falls_back_for_non_referat():
     # a non-referat id RATTSFALL can't parse keeps a stable slug URI
     assert case_uri("HSV B3689-08") == "https://lagen.nu/dom/HSV_B3689_08"
+
+
+def test_non_referat_artifact_restores_old_verdict_uri():
+    assert verdict_uri("HDO", "T 1-20", "2020-01-02") == \
+        "https://lagen.nu/dom/hd/T1-20/2020-01-02"
+    # The old COIN slug transform removed spaces but preserved uppercase
+    # Swedish målnummer prefixes.
+    assert verdict_uri("HDO", "Ö 3043-25", "2025-01-02") == \
+        "https://lagen.nu/dom/hd/Ö3043-25/2025-01-02"
+    artifact = to_artifact(Avgorande(
+        court="HDO", court_namn="Högsta domstolen",
+        malnummer=["B 367-24", "B 2043-24"],
+        avgorandedatum="2025-11-05",
+    ), canonical_id="HDO B 2043-24 2025-11-05",
+       canonical_malnummer="B 2043-24")
+    assert artifact["uri"] == \
+        "https://lagen.nu/dom/hd/B2043-24/2025-11-05"
 
 
 def kinds(blocks):

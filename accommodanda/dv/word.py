@@ -8,7 +8,7 @@ and the bold run markers that antiword's DocBook conversion flattened.
 
 The whole referat sits inside one Word table, so table membership is not
 the body discriminator; the 'REFERAT' marker and bold metadata labels are.
-Downstream parsing lives in dv_legacy.py.
+Downstream parsing lives in legacy.py.
 """
 
 import glob
@@ -18,11 +18,13 @@ from pathlib import Path
 import jpype
 import jpype.imports
 
-_JARS = sorted(glob.glob(str(Path(__file__).parent.parent / "vendor" / "poi" / "*.jar")))
+_POI_DIR = Path(__file__).parents[2] / "vendor" / "poi"
+_JARS = sorted(glob.glob(str(_POI_DIR / "*.jar")))
 
 # Word's field-result placeholder, emitted for empty form fields (Avdelning,
 # Domsnummer …). It carries no value, so we strip it to empty.
 _FORMTEXT = "FORMTEXT"
+_C0_CONTROLS = dict.fromkeys(range(32))
 
 _OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _ZIP_MAGIC = b"PK\x03\x04"
@@ -37,7 +39,7 @@ class Para:
 
 def _ensure_jvm():
     if not jpype.isJVMStarted():
-        assert _JARS, "no POI jars found under vendor/poi/"
+        assert _JARS, "no POI jars found under %s" % _POI_DIR
         # We ship only log4j-api (no -core); point it at the built-in
         # SimpleLogger so it stops printing "could not find a logging
         # provider" to stdout, and silence that logger.
@@ -51,8 +53,9 @@ def _ensure_jvm():
 
 def _clean(text):
     # \x07 is the HWPF cell/row terminator bell; drop it, the form-field
-    # placeholder, and CRs, then collapse remaining whitespace.
-    text = text.replace("\x07", "").replace("\r", "").replace(_FORMTEXT, "")
+    # placeholder, Word field begin/separator/end controls, and CRs, then
+    # collapse remaining whitespace.
+    text = text.translate(_C0_CONTROLS).replace(_FORMTEXT, "")
     return " ".join(text.split())
 
 
@@ -108,11 +111,12 @@ def _read_xwpf(path):
 
 def read(path):
     """A legacy Word file -> ordered list[Para]. Dispatches on file magic."""
-    _ensure_jvm()
     path = Path(path)
     magic = path.read_bytes()[:8]
+    if not (magic.startswith(_ZIP_MAGIC) or magic.startswith(_OLE2_MAGIC)):
+        raise ValueError("%s: neither OLE2 (.doc) nor ZIP (.docx): %r" %
+                         (path, magic))
+    _ensure_jvm()
     if magic.startswith(_ZIP_MAGIC):
         return _read_xwpf(path)
-    if magic.startswith(_OLE2_MAGIC):
-        return _read_hwpf(path)
-    raise ValueError("%s: neither OLE2 (.doc) nor ZIP (.docx): %r" % (path, magic))
+    return _read_hwpf(path)

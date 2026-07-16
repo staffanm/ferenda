@@ -37,6 +37,7 @@ from accommodanda.dv.structure import flatten
 from accommodanda.lib import (
     casenaming,
     catalog,
+    compress,
     layout,
 )
 
@@ -217,7 +218,7 @@ def index_new():
     # layout.artifacts filters out index sidecars (identity-index.json), which a
     # raw glob of the dv artifact dir would choke on (it's a JSON list, not a doc)
     for p in layout.artifacts("dv"):
-        raw = Path(p).read_bytes()
+        raw = compress.read_bytes(p)
         if raw.strip():
             out[json.loads(raw)["uri"]] = p
     return out
@@ -260,7 +261,7 @@ def main():
             uri_absent += 1
             continue
         matched += 1
-        art = json.loads(Path(np_).read_bytes())
+        art = json.loads(compress.read_bytes(np_))
         n = new_refs(art)
         new_meta = new_metadata(art)
         for field in meta_counts:

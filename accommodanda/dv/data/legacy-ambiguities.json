@@ -1,0 +1,1202 @@
+{
+  "version": 1,
+  "case_count": 57,
+  "cases": [
+    {
+      "legacy_path": "HDO/B3645-14.docx",
+      "legacy_size": 38845,
+      "legacy_sha256": "dea43890c31b6ba19a99ae23c8b9d2e829605d1af5943744c1d7d1800c2e9207",
+      "legacy_malnummer": [
+        "B3645-14"
+      ],
+      "legacy_referat": [
+        "NJA 2015 s. 811",
+        "NJA 2015:74"
+      ],
+      "legacy_avgorandedatum": "2015-11-19",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/1b5612af-80b0-4948-9fef-62cbd8662745.json",
+      "api_uuid": "1b5612af-80b0-4948-9fef-62cbd8662745",
+      "api_referat": [
+        "NJA 2015 s. 811",
+        "NJA 2015:74"
+      ],
+      "api_avgorandedatum": "2015-11-19"
+    },
+    {
+      "legacy_path": "HDO/B3947-00_1.doc",
+      "legacy_size": 58880,
+      "legacy_sha256": "2dd8836fd6542cc4bd572a203a4a3894bd1725d641501ab8721bac52d0418e8f",
+      "legacy_malnummer": [
+        "B3947-00"
+      ],
+      "legacy_referat": [
+        "NJA 2001 s. 527",
+        "NJA 2001:72"
+      ],
+      "legacy_avgorandedatum": "2001-07-09",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/3c055bef-bfe3-44c3-9165-1d12648722f9.json",
+      "api_uuid": "3c055bef-bfe3-44c3-9165-1d12648722f9",
+      "api_referat": [
+        "NJA 2001 s. 527",
+        "NJA 2001:72"
+      ],
+      "api_avgorandedatum": "2001-07-09"
+    },
+    {
+      "legacy_path": "HDO/B6278-15.docx",
+      "legacy_size": 20444,
+      "legacy_sha256": "b56ef158faa2899e4734aac17d8921a1e712ff678422e5822bc404afad14b309",
+      "legacy_malnummer": [
+        "B6278-15"
+      ],
+      "legacy_referat": [
+        "NJA 2016 s. 262",
+        "NJA 2016:23"
+      ],
+      "legacy_avgorandedatum": "2016-04-19",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/6e46fa73-e849-47ea-a8df-b30d23f2aded.json",
+      "api_uuid": "6e46fa73-e849-47ea-a8df-b30d23f2aded",
+      "api_referat": [
+        "NJA 2016 s. 262",
+        "NJA 2016:23"
+      ],
+      "api_avgorandedatum": "2016-04-19"
+    },
+    {
+      "legacy_path": "HDO/B712-03.doc",
+      "legacy_size": 80384,
+      "legacy_sha256": "df1a602f2fd240d3f82c4a292324e46dd64b42a663351e7785856b57f3ed223b",
+      "legacy_malnummer": [
+        "B712-03"
+      ],
+      "legacy_referat": [
+        "NJA 2004 s. 137",
+        "NJA 2004:16"
+      ],
+      "legacy_avgorandedatum": "2004-03-26",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/d23a248e-dd6d-4551-8e65-473695803ce8.json",
+      "api_uuid": "d23a248e-dd6d-4551-8e65-473695803ce8",
+      "api_referat": [
+        "NJA 2004 s. 137",
+        "NJA 2004:16"
+      ],
+      "api_avgorandedatum": "2004-03-26"
+    },
+    {
+      "legacy_path": "HDO/T1418-02.doc",
+      "legacy_size": 54272,
+      "legacy_sha256": "10f0851cdb763925f6908151c03dc6d37709105c1557d6c58eb1fd8b35c0f475",
+      "legacy_malnummer": [
+        "T1418-02"
+      ],
+      "legacy_referat": [
+        "NJA 2003 s. 263",
+        "NJA 2003:39"
+      ],
+      "legacy_avgorandedatum": "2003-06-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/5bc547b7-1c57-41bb-a510-5e37cb65df53.json",
+      "api_uuid": "5bc547b7-1c57-41bb-a510-5e37cb65df53",
+      "api_referat": [
+        "NJA 2003 s. 263",
+        "NJA 2003:39"
+      ],
+      "api_avgorandedatum": "2003-06-18"
+    },
+    {
+      "legacy_path": "HDO/T1470-12.docx",
+      "legacy_size": 23980,
+      "legacy_sha256": "d907520fdc70fd931766cb087854754366d52212a36b32ae65ee3f5a51879fb9",
+      "legacy_malnummer": [
+        "T1470-12"
+      ],
+      "legacy_referat": [
+        "NJA 2013 s. 3",
+        "NJA 2013:1"
+      ],
+      "legacy_avgorandedatum": "2013-01-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/8088ed77-87f8-4906-8dbf-ab31e3b2412f.json",
+      "api_uuid": "8088ed77-87f8-4906-8dbf-ab31e3b2412f",
+      "api_referat": [
+        "NJA 2013 s. 3",
+        "NJA 2013:1"
+      ],
+      "api_avgorandedatum": "2013-01-18"
+    },
+    {
+      "legacy_path": "HDO/T165-06.doc",
+      "legacy_size": 48128,
+      "legacy_sha256": "3bfd0bd5702a49afdcf8a79c5a212c0eb4adcee268bc08f02df8f51dac194dfc",
+      "legacy_malnummer": [
+        "T165-06"
+      ],
+      "legacy_referat": [
+        "NJA 2007 s. 105",
+        "NJA 2007:15"
+      ],
+      "legacy_avgorandedatum": "2007-02-20",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/bfbaa7a0-a02a-4187-9518-7e91dd30eec4.json",
+      "api_uuid": "bfbaa7a0-a02a-4187-9518-7e91dd30eec4",
+      "api_referat": [
+        "NJA 2007 s. 105",
+        "NJA 2007:15"
+      ],
+      "api_avgorandedatum": "2007-02-20"
+    },
+    {
+      "legacy_path": "HDO/T179-90_1.doc",
+      "legacy_size": 45056,
+      "legacy_sha256": "43a32711697aa4cd5da9ad66f2eef46e494978cd7fe9c56a93390e022360d537",
+      "legacy_malnummer": [
+        "T179-90"
+      ],
+      "legacy_referat": [
+        "NJA 1991 s. 275",
+        "NJA 1991:46"
+      ],
+      "legacy_avgorandedatum": "1991-05-13",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/391b4ede-9f8f-45e6-8684-2fb4bec4b995.json",
+      "api_uuid": "391b4ede-9f8f-45e6-8684-2fb4bec4b995",
+      "api_referat": [
+        "NJA 1991 s. 275",
+        "NJA 1991:46"
+      ],
+      "api_avgorandedatum": "1991-05-13"
+    },
+    {
+      "legacy_path": "HDO/T2106-01_1.doc",
+      "legacy_size": 84480,
+      "legacy_sha256": "11b226215390a1ac03623c10e19d5dd5a858c79c1b35c7950c04c1dd5c0e9930",
+      "legacy_malnummer": [
+        "T2106-01"
+      ],
+      "legacy_referat": [
+        "NJA 2002 s. 398",
+        "NJA 2002:51"
+      ],
+      "legacy_avgorandedatum": "2002-09-10",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/9d783bcf-36f0-4b94-90c1-bd03af055701.json",
+      "api_uuid": "9d783bcf-36f0-4b94-90c1-bd03af055701",
+      "api_referat": [
+        "NJA 2002 s. 398",
+        "NJA 2002:51"
+      ],
+      "api_avgorandedatum": "2002-09-10"
+    },
+    {
+      "legacy_path": "HDO/T3067-98.doc",
+      "legacy_size": 84992,
+      "legacy_sha256": "93a29cb9c96f3265e654e748f7387390cd64f33137ed7cad7373f83faf248893",
+      "legacy_malnummer": [
+        "T3067-98"
+      ],
+      "legacy_referat": [
+        "NJA 2002 s. 75",
+        "NJA 2002:8"
+      ],
+      "legacy_avgorandedatum": "2002-02-14",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/aa298cbb-7b15-4d2b-acaf-6f176f866f03.json",
+      "api_uuid": "aa298cbb-7b15-4d2b-acaf-6f176f866f03",
+      "api_referat": [
+        "NJA 2002 s. 75",
+        "NJA 2002:8"
+      ],
+      "api_avgorandedatum": "2002-02-14"
+    },
+    {
+      "legacy_path": "HDO/T3158-12.docx",
+      "legacy_size": 24742,
+      "legacy_sha256": "dbe4139a0d235c78ec4ceeec7837c4f32fa665b02dd66190358662223d81fd54",
+      "legacy_malnummer": [
+        "T3158-12"
+      ],
+      "legacy_referat": [
+        "NJA 2012 s. 623",
+        "NJA 2012:62"
+      ],
+      "legacy_avgorandedatum": "2012-10-17",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/f0e427ba-f91a-40ef-ba69-ad4d038d8a8a.json",
+      "api_uuid": "f0e427ba-f91a-40ef-ba69-ad4d038d8a8a",
+      "api_referat": [
+        "NJA 2012 s. 623",
+        "NJA 2012:62"
+      ],
+      "api_avgorandedatum": "2012-10-17"
+    },
+    {
+      "legacy_path": "HDO/T3205-97_1.doc",
+      "legacy_size": 43520,
+      "legacy_sha256": "d7a838a513ff8415599e2cac06de9c88d30e7171022298761d7d69c9e9d198aa",
+      "legacy_malnummer": [
+        "T3205-97"
+      ],
+      "legacy_referat": [
+        "NJA 1997 s. 577",
+        "NJA 1997:96"
+      ],
+      "legacy_avgorandedatum": "1997-09-04",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/2b37c5aa-2bbb-4147-8605-d78f31469b64.json",
+      "api_uuid": "2b37c5aa-2bbb-4147-8605-d78f31469b64",
+      "api_referat": [
+        "NJA 1997 s. 577",
+        "NJA 1997:96"
+      ],
+      "api_avgorandedatum": "1997-09-04"
+    },
+    {
+      "legacy_path": "HDO/T327-91_1.doc",
+      "legacy_size": 46592,
+      "legacy_sha256": "e576b40182600f513cbe444c409c253ecd7990121346c85ac857849c27c3438f",
+      "legacy_malnummer": [
+        "T327-91"
+      ],
+      "legacy_referat": [
+        "NJA 1991 s. 794",
+        "NJA 1991:137"
+      ],
+      "legacy_avgorandedatum": "1991-12-20",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/ecfe6a53-2538-4ad6-81d4-55b1283aa1ef.json",
+      "api_uuid": "ecfe6a53-2538-4ad6-81d4-55b1283aa1ef",
+      "api_referat": [
+        "NJA 1991 s. 794",
+        "NJA 1991:137"
+      ],
+      "api_avgorandedatum": "1991-12-20"
+    },
+    {
+      "legacy_path": "HDO/T3310-00_1.doc",
+      "legacy_size": 54272,
+      "legacy_sha256": "97682465bb1d407a9cde9b86710de62c4c5b78479aca59fe4322e8a09aa76046",
+      "legacy_malnummer": [
+        "T3310-00"
+      ],
+      "legacy_referat": [
+        "NJA 2001 s. 210",
+        "NJA 2001:28"
+      ],
+      "legacy_avgorandedatum": "2001-04-06",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/8478768f-3ebf-451d-95cf-dfe32b16fc5f.json",
+      "api_uuid": "8478768f-3ebf-451d-95cf-dfe32b16fc5f",
+      "api_referat": [
+        "NJA 2001 s. 210",
+        "NJA 2001:28"
+      ],
+      "api_avgorandedatum": "2001-04-06"
+    },
+    {
+      "legacy_path": "HDO/T351-90_1.doc",
+      "legacy_size": 56832,
+      "legacy_sha256": "a65c20ddd887211ae76ad705eb586a067d47d23e24764acfe91bd46628f8c3ad",
+      "legacy_malnummer": [
+        "T351-90"
+      ],
+      "legacy_referat": [
+        "NJA 1991 s. 370",
+        "NJA 1991:59"
+      ],
+      "legacy_avgorandedatum": "1991-06-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/b964d3f6-3d55-4a5e-9ed3-b46883cc82af.json",
+      "api_uuid": "b964d3f6-3d55-4a5e-9ed3-b46883cc82af",
+      "api_referat": [
+        "NJA 1991 s. 370",
+        "NJA 1991:59"
+      ],
+      "api_avgorandedatum": "1991-06-18"
+    },
+    {
+      "legacy_path": "HDO/T4435-16.docx",
+      "legacy_size": 46178,
+      "legacy_sha256": "529a89cc136e55aabeaa625c2df8200d98fb803df3e8ae473ad5f3ef6ab39deb",
+      "legacy_malnummer": [
+        "T4435-16"
+      ],
+      "legacy_referat": [
+        "NJA 2017 s. 938",
+        "NJA 2017:87"
+      ],
+      "legacy_avgorandedatum": "2017-11-24",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/bc6f1273-ade6-421e-a2fa-2834197a0b23.json",
+      "api_uuid": "bc6f1273-ade6-421e-a2fa-2834197a0b23",
+      "api_referat": [
+        "NJA 2017 s. 938",
+        "NJA 2017:87"
+      ],
+      "api_avgorandedatum": "2017-11-24"
+    },
+    {
+      "legacy_path": "HDO/T916-13.docx",
+      "legacy_size": 48767,
+      "legacy_sha256": "a3d8fa4b076ef9225dfeeeb065f72744d3a4034c60b29264a2f8009d8dc9c6ff",
+      "legacy_malnummer": [
+        "T916-13"
+      ],
+      "legacy_referat": [
+        "NJA 2015 s. 110",
+        "NJA 2015:11"
+      ],
+      "legacy_avgorandedatum": "2015-03-19",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/b3bb943e-53ef-415d-b26f-09fb64599419.json",
+      "api_uuid": "b3bb943e-53ef-415d-b26f-09fb64599419",
+      "api_referat": [
+        "NJA 2015 s. 110",
+        "NJA 2015:11"
+      ],
+      "api_avgorandedatum": "2015-03-19"
+    },
+    {
+      "legacy_path": "HDO/Ö11-01_1.doc",
+      "legacy_size": 53760,
+      "legacy_sha256": "dbf7a1ae96bec2230c104e1fca61d4fb057303fc58e7b5bb1ade9256a21f914b",
+      "legacy_malnummer": [
+        "Ö11-01"
+      ],
+      "legacy_referat": [
+        "NJA 2001 s. 282",
+        "NJA 2001:39"
+      ],
+      "legacy_avgorandedatum": "2001-05-03",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/de5fc904-9548-4f7e-b184-64087730c6b7.json",
+      "api_uuid": "de5fc904-9548-4f7e-b184-64087730c6b7",
+      "api_referat": [
+        "NJA 2001 s. 282",
+        "NJA 2001:39"
+      ],
+      "api_avgorandedatum": "2001-05-03"
+    },
+    {
+      "legacy_path": "HDO/Ö3001-98_1.doc",
+      "legacy_size": 53760,
+      "legacy_sha256": "fafefdd1d840c26cc5fde1e49f91823cfd154afb62ca093e79f07da628c78b87",
+      "legacy_malnummer": [
+        "Ö3001-98"
+      ],
+      "legacy_referat": [
+        "NJA 1998 s. 747",
+        "NJA 1998:114"
+      ],
+      "legacy_avgorandedatum": "1998-12-02",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/16351939-aef8-419f-aed6-0a6610f1da6e.json",
+      "api_uuid": "16351939-aef8-419f-aed6-0a6610f1da6e",
+      "api_referat": [
+        "NJA 1998 s. 747",
+        "NJA 1998:114"
+      ],
+      "api_avgorandedatum": "1998-12-02"
+    },
+    {
+      "legacy_path": "HDO/Ö3013-92_1.doc",
+      "legacy_size": 47616,
+      "legacy_sha256": "5c98e3e04cf98289739fa5b4824579db5cf1d711fd69bd6549cf765e1466b29f",
+      "legacy_malnummer": [
+        "Ö3013-92"
+      ],
+      "legacy_referat": [
+        "NJA 1993 s. 679",
+        "NJA 1993:120"
+      ],
+      "legacy_avgorandedatum": "1993-11-22",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/d4fdc1ad-aaca-4292-81fd-9f8d354223dc.json",
+      "api_uuid": "d4fdc1ad-aaca-4292-81fd-9f8d354223dc",
+      "api_referat": [
+        "NJA 1993 s. 679",
+        "NJA 1993:120"
+      ],
+      "api_avgorandedatum": "1993-11-22"
+    },
+    {
+      "legacy_path": "HDO/Ö3278-16_1.docx",
+      "legacy_size": 21145,
+      "legacy_sha256": "71250aac84ba07e7762951843aa547d5faeedb0c75298eeab9229cd06c3d8c1c",
+      "legacy_malnummer": [
+        "Ö3278-16"
+      ],
+      "legacy_referat": [
+        "NJA 2016 s. 796",
+        "NJA 2016:67"
+      ],
+      "legacy_avgorandedatum": "2016-09-16",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/f84b57b2-fb4a-4f10-bdf0-3bfce01d76bf.json",
+      "api_uuid": "f84b57b2-fb4a-4f10-bdf0-3bfce01d76bf",
+      "api_referat": [
+        "NJA 2016 s. 796",
+        "NJA 2016:67"
+      ],
+      "api_avgorandedatum": "2016-09-16"
+    },
+    {
+      "legacy_path": "HDO/Ö3625-94_1.doc",
+      "legacy_size": 46080,
+      "legacy_sha256": "15d196aa45ff5c060c0915d2fb210298e2e53620f6e8d734ddc742041164ac4a",
+      "legacy_malnummer": [
+        "Ö3625-94"
+      ],
+      "legacy_referat": [
+        "NJA 1996 s. 393",
+        "NJA 1996:63"
+      ],
+      "legacy_avgorandedatum": "1996-06-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/7a72c4eb-ecf6-48cd-97f9-d16dd9526979.json",
+      "api_uuid": "7a72c4eb-ecf6-48cd-97f9-d16dd9526979",
+      "api_referat": [
+        "NJA 1996 s. 393",
+        "NJA 1996:63"
+      ],
+      "api_avgorandedatum": "1996-06-18"
+    },
+    {
+      "legacy_path": "HDO/Ö4474-04.doc",
+      "legacy_size": 137728,
+      "legacy_sha256": "b11e3ac472b5decc331bd682a1083ba910e166560819b29d7a9088c58440b74c",
+      "legacy_malnummer": [
+        "Ö4474-04"
+      ],
+      "legacy_referat": [
+        "NJA 2005 s. 764",
+        "NJA 2005:85"
+      ],
+      "legacy_avgorandedatum": "2005-11-24",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/350ad4fb-d972-421a-8525-73ed412bbffe.json",
+      "api_uuid": "350ad4fb-d972-421a-8525-73ed412bbffe",
+      "api_referat": [
+        "NJA 2005 s. 764",
+        "NJA 2005:85"
+      ],
+      "api_avgorandedatum": "2005-11-24"
+    },
+    {
+      "legacy_path": "HDO/Ö451-83_1.doc",
+      "legacy_size": 44032,
+      "legacy_sha256": "0bf40ff22f348c36f32f63c48ae375981519f4f69acc057380fde2be552258e1",
+      "legacy_malnummer": [
+        "Ö451-83"
+      ],
+      "legacy_referat": [
+        "NJA 1984 s. 330",
+        "NJA 1984:59"
+      ],
+      "legacy_avgorandedatum": "1984-05-10",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/e53c1776-7742-4395-9d19-716ec35ef51e.json",
+      "api_uuid": "e53c1776-7742-4395-9d19-716ec35ef51e",
+      "api_referat": [
+        "NJA 1984 s. 330",
+        "NJA 1984:59"
+      ],
+      "api_avgorandedatum": "1984-05-10"
+    },
+    {
+      "legacy_path": "HDO/Ö4778-97_1.doc",
+      "legacy_size": 48640,
+      "legacy_sha256": "49f4cccae4eebeef580cb499d27bb8e83d63683540730af9f26958c085ba19aa",
+      "legacy_malnummer": [
+        "Ö4778-97"
+      ],
+      "legacy_referat": [
+        "NJA 1997 s. 849",
+        "NJA 1997:143"
+      ],
+      "legacy_avgorandedatum": "1997-12-22",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/964bc50f-5a73-42ec-87e3-b3bcfb6e31ff.json",
+      "api_uuid": "964bc50f-5a73-42ec-87e3-b3bcfb6e31ff",
+      "api_referat": [
+        "NJA 1997 s. 849",
+        "NJA 1997:143"
+      ],
+      "api_avgorandedatum": "1997-12-22"
+    },
+    {
+      "legacy_path": "HDO/Ö5118-93_1.doc",
+      "legacy_size": 58368,
+      "legacy_sha256": "a48185f11adce207d9cbb19f6bbda51b6087fb85fafe1c6f07e61f760a420fb0",
+      "legacy_malnummer": [
+        "Ö5118-93"
+      ],
+      "legacy_referat": [
+        "NJA 1995 s. 178",
+        "NJA 1995:29"
+      ],
+      "legacy_avgorandedatum": "1995-03-31",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/3752e39d-fa24-4e13-b411-a0bbb3b0f939.json",
+      "api_uuid": "3752e39d-fa24-4e13-b411-a0bbb3b0f939",
+      "api_referat": [
+        "NJA 1995 s. 178",
+        "NJA 1995:29"
+      ],
+      "api_avgorandedatum": "1995-03-31"
+    },
+    {
+      "legacy_path": "HDO/Ö5209-13.docx",
+      "legacy_size": 20002,
+      "legacy_sha256": "08a108924150e32748b88f24ba3979bab0c806ab0c53c6a9ebed267ef018dd26",
+      "legacy_malnummer": [
+        "Ö5209-13"
+      ],
+      "legacy_referat": [
+        "NJA 2016 s. 798",
+        "NJA 2016:68"
+      ],
+      "legacy_avgorandedatum": "2016-09-29",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/10a0de6e-0e20-43b1-8dc7-1b52d9740faa.json",
+      "api_uuid": "10a0de6e-0e20-43b1-8dc7-1b52d9740faa",
+      "api_referat": [
+        "NJA 2016 s. 798",
+        "NJA 2016:68"
+      ],
+      "api_avgorandedatum": "2016-09-29"
+    },
+    {
+      "legacy_path": "HDO/Ö904-16.docx",
+      "legacy_size": 20577,
+      "legacy_sha256": "e86222acf4d7ee75f820fe0bd91613f4ea60281e4352b025935b52caaae77f68",
+      "legacy_malnummer": [
+        "Ö904-16"
+      ],
+      "legacy_referat": [
+        "NJA 2016 s. 140",
+        "NJA 2016:14"
+      ],
+      "legacy_avgorandedatum": "2016-03-16",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/bd55f5d2-12fd-4d6e-8dfe-fc05dc5e5e85.json",
+      "api_uuid": "bd55f5d2-12fd-4d6e-8dfe-fc05dc5e5e85",
+      "api_referat": [
+        "NJA 2016 s. 140",
+        "NJA 2016:14"
+      ],
+      "api_avgorandedatum": "2016-03-16"
+    },
+    {
+      "legacy_path": "HDO/Ö928-82_1.doc",
+      "legacy_size": 47616,
+      "legacy_sha256": "2d9b9148d74a71f2cad7204bb790f5604d535af792512efdfd1f14133ba0e168",
+      "legacy_malnummer": [
+        "Ö928-82"
+      ],
+      "legacy_referat": [
+        "NJA 1984 s. 113",
+        "NJA 1984:20"
+      ],
+      "legacy_avgorandedatum": "1984-02-28",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HDO/f2fc93ad-9aba-45e6-9b6c-5e5e400dc69a.json",
+      "api_uuid": "f2fc93ad-9aba-45e6-9b6c-5e5e400dc69a",
+      "api_referat": [
+        "NJA 1984 s. 113",
+        "NJA 1984:20"
+      ],
+      "api_avgorandedatum": "1984-02-28"
+    },
+    {
+      "legacy_path": "HFD/1968-17.docx",
+      "legacy_size": 22366,
+      "legacy_sha256": "c29c1913c14f6e8c68ec71c343446c258f194730c6e8080aa8f979e422292906",
+      "legacy_malnummer": [
+        "1968-17"
+      ],
+      "legacy_referat": [
+        "HFD 2017 ref. 60"
+      ],
+      "legacy_avgorandedatum": "2017-10-26",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HFD/c4f48ddf-a789-4aa2-97f2-6ff62afc2f6c.json",
+      "api_uuid": "c4f48ddf-a789-4aa2-97f2-6ff62afc2f6c",
+      "api_referat": [
+        "HFD 2017 ref. 60"
+      ],
+      "api_avgorandedatum": "2017-10-26"
+    },
+    {
+      "legacy_path": "HFD/3544-16.docx",
+      "legacy_size": 22936,
+      "legacy_sha256": "5fb7d959d8005b0654b15fe32c99ee60c27f02357dacc3d95089ca7513076093",
+      "legacy_malnummer": [
+        "3544-16"
+      ],
+      "legacy_referat": [
+        "HFD 2017 ref. 54"
+      ],
+      "legacy_avgorandedatum": "2017-06-22",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HFD/0d64b613-44ec-4116-a98e-bd768adb99ea.json",
+      "api_uuid": "0d64b613-44ec-4116-a98e-bd768adb99ea",
+      "api_referat": [
+        "HFD 2017 ref. 54"
+      ],
+      "api_avgorandedatum": "2017-06-22"
+    },
+    {
+      "legacy_path": "HFD/6184-19.docx",
+      "legacy_size": 26030,
+      "legacy_sha256": "cad71b3bf9115cb429bdb0b55edc5860068b5d26a76b08fa8f757b38bfd40ad9",
+      "legacy_malnummer": [
+        "6184-19"
+      ],
+      "legacy_referat": [
+        "HFD 2021 ref. 36"
+      ],
+      "legacy_avgorandedatum": "2021-06-11",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HFD/b0cfd1b3-0de2-49d7-bb15-8003324c478b.json",
+      "api_uuid": "b0cfd1b3-0de2-49d7-bb15-8003324c478b",
+      "api_referat": [
+        "HFD 2021 ref. 36"
+      ],
+      "api_avgorandedatum": "2021-06-11"
+    },
+    {
+      "legacy_path": "HFD/6578-14.docx",
+      "legacy_size": 38330,
+      "legacy_sha256": "1a87e228f6ff56bee0458e525fd2beed5946f657f484170f26021a8824906b91",
+      "legacy_malnummer": [
+        "6578-14"
+      ],
+      "legacy_referat": [
+        "HFD 2016 ref. 3"
+      ],
+      "legacy_avgorandedatum": "2016-01-28",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HFD/eec0384c-6f7c-483f-a6ff-004c1226e8e2.json",
+      "api_uuid": "eec0384c-6f7c-483f-a6ff-004c1226e8e2",
+      "api_referat": [
+        "HFD 2016 ref. 3"
+      ],
+      "api_avgorandedatum": "2016-01-28"
+    },
+    {
+      "legacy_path": "HNN/B357-09_1.doc",
+      "legacy_size": 41984,
+      "legacy_sha256": "4e7f9c838a8131401f5ab63ab9f8f7d3a9531d18fac4bec45aabf56009ddc38b",
+      "legacy_malnummer": [
+        "B357-09"
+      ],
+      "legacy_referat": [
+        "RH 2009:121"
+      ],
+      "legacy_avgorandedatum": "2009-06-08",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HNN/fc30faf0-4b28-4c12-aa6f-39603a00afee.json",
+      "api_uuid": "fc30faf0-4b28-4c12-aa6f-39603a00afee",
+      "api_referat": [
+        "RH 2009:121"
+      ],
+      "api_avgorandedatum": "2009-06-08"
+    },
+    {
+      "legacy_path": "HNN/B535-02_1.doc",
+      "legacy_size": 46080,
+      "legacy_sha256": "3be84d9b771ecd6c8bb1e34a51fcf16f64ddce78752b0c1704afd1718a993f61",
+      "legacy_malnummer": [
+        "B535-02"
+      ],
+      "legacy_referat": [
+        "RH 2002:44"
+      ],
+      "legacy_avgorandedatum": "2002-06-25",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HNN/c13c23fa-81c4-4666-8068-bd73b62d3764.json",
+      "api_uuid": "c13c23fa-81c4-4666-8068-bd73b62d3764",
+      "api_referat": [
+        "RH 2002:44"
+      ],
+      "api_avgorandedatum": "2002-06-25"
+    },
+    {
+      "legacy_path": "HSB/B2597-13.docx",
+      "legacy_size": 19880,
+      "legacy_sha256": "6043d2d6391f50db5df87ea29be7ceb1f16217da59439b7c45df934eef57dff9",
+      "legacy_malnummer": [
+        "B2597-13"
+      ],
+      "legacy_referat": [
+        "RH 2013:57"
+      ],
+      "legacy_avgorandedatum": "2013-12-02",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HSB/72988656-1ac0-4fcf-a341-3eb23a8b5ef0.json",
+      "api_uuid": "72988656-1ac0-4fcf-a341-3eb23a8b5ef0",
+      "api_referat": [
+        "RH 2013:57"
+      ],
+      "api_avgorandedatum": "2013-12-02"
+    },
+    {
+      "legacy_path": "HSV/B2856-13.docx",
+      "legacy_size": 25574,
+      "legacy_sha256": "231bf1ecaf94d439736e4bf31fc002c51aa57316d29e57964ec2db22f6e1a9b9",
+      "legacy_malnummer": [
+        "B2856-13"
+      ],
+      "legacy_referat": [
+        "RH 2013:41"
+      ],
+      "legacy_avgorandedatum": "2013-04-26",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HSV/9c118aeb-3565-4b6d-9a21-d606d97ddfd3.json",
+      "api_uuid": "9c118aeb-3565-4b6d-9a21-d606d97ddfd3",
+      "api_referat": [
+        "RH 2013:41"
+      ],
+      "api_avgorandedatum": "2013-04-26"
+    },
+    {
+      "legacy_path": "HSV/B4041-09.doc",
+      "legacy_size": 68096,
+      "legacy_sha256": "3699736a3f308cac155ad48111573c06ff46f69e83741a6d76101ecea8193322",
+      "legacy_malnummer": [
+        "B4041-09"
+      ],
+      "legacy_referat": [
+        "RH 2009:39"
+      ],
+      "legacy_avgorandedatum": "2009-06-25",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/HSV/e878a5cc-30bb-4b95-a419-163e3562b674.json",
+      "api_uuid": "e878a5cc-30bb-4b95-a419-163e3562b674",
+      "api_referat": [
+        "RH 2009:39"
+      ],
+      "api_avgorandedatum": "2009-06-25"
+    },
+    {
+      "legacy_path": "MMD/P1508-12.docx",
+      "legacy_size": 21556,
+      "legacy_sha256": "772705f1d820437bfd76b5c9d4f523d0abb23a4c24b8a2a45ef7baa63b3f39ad",
+      "legacy_malnummer": [
+        "P1508-12"
+      ],
+      "legacy_referat": [
+        "MÖD 2012:23"
+      ],
+      "legacy_avgorandedatum": "2012-06-14",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MMOD/debf73a0-31a7-4c46-a1cb-d5aee72fc4df.json",
+      "api_uuid": "debf73a0-31a7-4c46-a1cb-d5aee72fc4df",
+      "api_referat": [
+        "MÖD 2012:23"
+      ],
+      "api_avgorandedatum": "2012-06-14"
+    },
+    {
+      "legacy_path": "MMD/P1991-18.doc",
+      "legacy_size": 47104,
+      "legacy_sha256": "81c23b3000b450bc14a6f0b29b95dd73c7dd015c69a57874c017fbe45630c9d9",
+      "legacy_malnummer": [
+        "P1991-18"
+      ],
+      "legacy_referat": [
+        "MÖD 2018:10"
+      ],
+      "legacy_avgorandedatum": "2018-05-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MMOD/4ff0e0e6-915d-49f0-a25e-e740b1cc6a6c.json",
+      "api_uuid": "4ff0e0e6-915d-49f0-a25e-e740b1cc6a6c",
+      "api_referat": [
+        "MÖD 2018:10"
+      ],
+      "api_avgorandedatum": "2018-05-18"
+    },
+    {
+      "legacy_path": "MÖD/M1894-03.doc",
+      "legacy_size": 137216,
+      "legacy_sha256": "096cac6e04de4d0a847d6dcc163c88da6bd2c235dae415ffc8100895d46e33de",
+      "legacy_malnummer": [
+        "M1894-03"
+      ],
+      "legacy_referat": [
+        "MÖD 2003:100"
+      ],
+      "legacy_avgorandedatum": "2003-10-17",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/39ddd0f0-67a4-4e50-979f-221fc24f2444.json",
+      "api_uuid": "39ddd0f0-67a4-4e50-979f-221fc24f2444",
+      "api_referat": [
+        "MÖD 2003:100"
+      ],
+      "api_avgorandedatum": "2003-10-17"
+    },
+    {
+      "legacy_path": "MÖD/M294-08_1.doc",
+      "legacy_size": 43520,
+      "legacy_sha256": "ef982403e061a152457b82479f5c97d40c8e4fcfe444fd6372b1f5daf8e15b03",
+      "legacy_malnummer": [
+        "M294-08"
+      ],
+      "legacy_referat": [
+        "MÖD 2008:28"
+      ],
+      "legacy_avgorandedatum": "2008-03-25",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/c0576a7b-8180-4426-9a29-ce347e310ef2.json",
+      "api_uuid": "c0576a7b-8180-4426-9a29-ce347e310ef2",
+      "api_referat": [
+        "MÖD 2008:28"
+      ],
+      "api_avgorandedatum": "2008-03-25"
+    },
+    {
+      "legacy_path": "MÖD/M5005-02.doc",
+      "legacy_size": 65536,
+      "legacy_sha256": "f44e406f4fb639ce02d5be191556fd18afefd3a63aec094685f9e46e2bf6c36c",
+      "legacy_malnummer": [
+        "M5005-02"
+      ],
+      "legacy_referat": [
+        "MÖD 2003:112"
+      ],
+      "legacy_avgorandedatum": "2003-11-19",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/85ec065f-6924-4964-b752-babc298863cc.json",
+      "api_uuid": "85ec065f-6924-4964-b752-babc298863cc",
+      "api_referat": [
+        "MÖD 2003:112"
+      ],
+      "api_avgorandedatum": "2003-11-19"
+    },
+    {
+      "legacy_path": "MÖD/M5008-02.doc",
+      "legacy_size": 64000,
+      "legacy_sha256": "ca8a9c1049a44fcc23332e0994ca9a99c6c9a8e89b52a28f0708173ed0462196",
+      "legacy_malnummer": [
+        "M5008-02"
+      ],
+      "legacy_referat": [
+        "MÖD 2003:112"
+      ],
+      "legacy_avgorandedatum": "2003-11-19",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/85ec065f-6924-4964-b752-babc298863cc.json",
+      "api_uuid": "85ec065f-6924-4964-b752-babc298863cc",
+      "api_referat": [
+        "MÖD 2003:112"
+      ],
+      "api_avgorandedatum": "2003-11-19"
+    },
+    {
+      "legacy_path": "MÖD/M5057-04.doc",
+      "legacy_size": 43008,
+      "legacy_sha256": "7004382486863dfcdb038de1099c54846db2541d821eff66a4732b43fae02c92",
+      "legacy_malnummer": [
+        "M5057-04"
+      ],
+      "legacy_referat": [
+        "MÖD 2004:55"
+      ],
+      "legacy_avgorandedatum": "2004-09-13",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/2004b36e-e910-421e-b512-e85907fa3015.json",
+      "api_uuid": "2004b36e-e910-421e-b512-e85907fa3015",
+      "api_referat": [
+        "MÖD 2004:55"
+      ],
+      "api_avgorandedatum": "2004-09-13"
+    },
+    {
+      "legacy_path": "MÖD/M5475-00.doc",
+      "legacy_size": 79872,
+      "legacy_sha256": "69c8984d4152862d5c42c9371bf5cd5f2ef9d17c3f94d7e3c00924d8e60f0732",
+      "legacy_malnummer": [
+        "M5475-00"
+      ],
+      "legacy_referat": [
+        "MÖD 2002:48"
+      ],
+      "legacy_avgorandedatum": "2002-06-25",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/a97b92d1-1d20-42e0-89d3-3e8c502c650f.json",
+      "api_uuid": "a97b92d1-1d20-42e0-89d3-3e8c502c650f",
+      "api_referat": [
+        "MÖD 2002:48"
+      ],
+      "api_avgorandedatum": "2002-06-25"
+    },
+    {
+      "legacy_path": "MÖD/M6361-09.doc",
+      "legacy_size": 50176,
+      "legacy_sha256": "c468d015dcf585946694677a51981227277c84c5bccfb66090ccb9cfa9a3d3da",
+      "legacy_malnummer": [
+        "M6361-09"
+      ],
+      "legacy_referat": [
+        "MÖD 2009:24"
+      ],
+      "legacy_avgorandedatum": "2009-11-30",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/f9e6967f-3f1f-4be2-a3d7-1ee25fc96f7b.json",
+      "api_uuid": "f9e6967f-3f1f-4be2-a3d7-1ee25fc96f7b",
+      "api_referat": [
+        "MÖD 2009:24"
+      ],
+      "api_avgorandedatum": "2009-11-30"
+    },
+    {
+      "legacy_path": "MÖD/M7173-99.doc",
+      "legacy_size": 81408,
+      "legacy_sha256": "3d906130eb00b70cefd84bb43323c30e5aa34319f4e574efdeb58941bd4e019e",
+      "legacy_malnummer": [
+        "M7173-99"
+      ],
+      "legacy_referat": [
+        "MÖD 2000:52"
+      ],
+      "legacy_avgorandedatum": "2000-12-01",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/2297989b-ea3d-4233-9c56-34113121d65f.json",
+      "api_uuid": "2297989b-ea3d-4233-9c56-34113121d65f",
+      "api_referat": [
+        "MÖD 2000:52"
+      ],
+      "api_avgorandedatum": "2000-12-01"
+    },
+    {
+      "legacy_path": "MÖD/M8366-03.doc",
+      "legacy_size": 45056,
+      "legacy_sha256": "c2cae77b2d1bfbf9f56a0e245242192a64e95adf21083a0092e36e9ec9bd9790",
+      "legacy_malnummer": [
+        "M8366-03"
+      ],
+      "legacy_referat": [
+        "MÖD 2004:54"
+      ],
+      "legacy_avgorandedatum": "2004-09-20",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/2c33b148-3d50-43fe-9100-6268a6de826d.json",
+      "api_uuid": "2c33b148-3d50-43fe-9100-6268a6de826d",
+      "api_referat": [
+        "MÖD 2004:54"
+      ],
+      "api_avgorandedatum": "2004-09-20"
+    },
+    {
+      "legacy_path": "MÖD/M8675-08.doc",
+      "legacy_size": 46080,
+      "legacy_sha256": "88d25762c6c90d455fdbd2ce9cd9c4ca1c8857c2ee527f63994507cb488d46d8",
+      "legacy_malnummer": [
+        "M8675-08"
+      ],
+      "legacy_referat": [
+        "MÖD 2009:28"
+      ],
+      "legacy_avgorandedatum": "2009-04-27",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/0605d019-4f22-480b-8013-d060357bb478.json",
+      "api_uuid": "0605d019-4f22-480b-8013-d060357bb478",
+      "api_referat": [
+        "MÖD 2009:28"
+      ],
+      "api_avgorandedatum": "2009-04-27"
+    },
+    {
+      "legacy_path": "MÖD/M9655-99.doc",
+      "legacy_size": 86528,
+      "legacy_sha256": "ba9e1369def37be6ccc0713c3c587d01ad4b63b1742d5dbbeb36db803b3e2de7",
+      "legacy_malnummer": [
+        "M9655-99"
+      ],
+      "legacy_referat": [
+        "MÖD 2002:25"
+      ],
+      "legacy_avgorandedatum": "2002-04-02",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/MOD/77ee834f-6900-4554-a20a-e89a9a79a1a2.json",
+      "api_uuid": "77ee834f-6900-4554-a20a-e89a9a79a1a2",
+      "api_referat": [
+        "MÖD 2002:25"
+      ],
+      "api_avgorandedatum": "2002-04-02"
+    },
+    {
+      "legacy_path": "PMD/PMT7498-16.docx",
+      "legacy_size": 22825,
+      "legacy_sha256": "42bc18a775aeca7433c05d993e59ce9b8d46f41157808881665372fbf93a8ffa",
+      "legacy_malnummer": [
+        "PMT7498-16"
+      ],
+      "legacy_referat": [
+        "PMÖD 2017:5"
+      ],
+      "legacy_avgorandedatum": "2017-08-29",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/PMOD/ac0f2181-c4e4-4b95-baa0-b59c4f17e23e.json",
+      "api_uuid": "ac0f2181-c4e4-4b95-baa0-b59c4f17e23e",
+      "api_referat": [
+        "PMÖD 2017:5"
+      ],
+      "api_avgorandedatum": "2017-08-29"
+    },
+    {
+      "legacy_path": "PMD/PMT7499-16.docx",
+      "legacy_size": 143496,
+      "legacy_sha256": "e14eb9740857a942bd1a09d47bfa956fd90100ea55e3ca929ac0f0ccddf40998",
+      "legacy_malnummer": [
+        "PMT7499-16"
+      ],
+      "legacy_referat": [
+        "PMÖD 2016:3"
+      ],
+      "legacy_avgorandedatum": "2016-11-24",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/PMOD/4906a717-95b5-4c7b-8dfe-87b7a6428b8d.json",
+      "api_uuid": "4906a717-95b5-4c7b-8dfe-87b7a6428b8d",
+      "api_referat": [
+        "PMÖD 2016:3"
+      ],
+      "api_avgorandedatum": "2016-11-24"
+    },
+    {
+      "legacy_path": "PMD/PMÖÄ8867-16_1.docx",
+      "legacy_size": 24605,
+      "legacy_sha256": "c1c64191edd67ad3b1256e395a6c12a14c60369579c563390f5c2f629062249b",
+      "legacy_malnummer": [
+        "PMÖÄ8867-16"
+      ],
+      "legacy_referat": [],
+      "legacy_avgorandedatum": "2016-10-27",
+      "disposition": "api-duplicate",
+      "reason": "same-malnummer-date-and-summary",
+      "api_path": "downloaded/dom/PMOD/03c62e65-214b-4a42-b69c-fabfd7bcb253.json",
+      "api_uuid": "03c62e65-214b-4a42-b69c-fabfd7bcb253",
+      "api_referat": [
+        "PMÖD 2016:1"
+      ],
+      "api_avgorandedatum": "2016-10-27"
+    },
+    {
+      "legacy_path": "REG/3841-04.doc",
+      "legacy_size": 47616,
+      "legacy_sha256": "0661f5224744928628e8d2a17474db572ce544c2e5a36010168eddcd45551efd",
+      "legacy_malnummer": [
+        "3841-04"
+      ],
+      "legacy_referat": [
+        "RÅ 2005 ref. 1"
+      ],
+      "legacy_avgorandedatum": "2005-02-04",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/REGR/7c293978-524c-461a-873f-65428fc72fb2.json",
+      "api_uuid": "7c293978-524c-461a-873f-65428fc72fb2",
+      "api_referat": [
+        "RÅ 2005 ref. 1"
+      ],
+      "api_avgorandedatum": "2005-02-04"
+    },
+    {
+      "legacy_path": "REG/7160-04_1.doc",
+      "legacy_size": 86528,
+      "legacy_sha256": "b3635dae343724c6d847b41b3b1c005b80fef4c1514d4eb064628bd74c7626f5",
+      "legacy_malnummer": [
+        "7160-04"
+      ],
+      "legacy_referat": [
+        "RÅ 2005 ref. 87"
+      ],
+      "legacy_avgorandedatum": "2005-11-23",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/REGR/0bad11e6-893b-4337-9bcb-87546062e934.json",
+      "api_uuid": "0bad11e6-893b-4337-9bcb-87546062e934",
+      "api_referat": [
+        "RÅ 2005 ref. 87"
+      ],
+      "api_avgorandedatum": "2005-11-23"
+    },
+    {
+      "legacy_path": "REG/8006-99_1.doc",
+      "legacy_size": 48640,
+      "legacy_sha256": "dc41c878d30824d0b3632f66847ea2bc6383ad9ff3f1633922b56a4b2a5eac0e",
+      "legacy_malnummer": [
+        "8006-99"
+      ],
+      "legacy_referat": [
+        "RÅ 2001 ref. 23"
+      ],
+      "legacy_avgorandedatum": "2001-04-18",
+      "disposition": "api-duplicate",
+      "reason": "same-referat-and-date",
+      "api_path": "downloaded/dom/REGR/787d176a-e1ea-4b58-93f2-c37846818c55.json",
+      "api_uuid": "787d176a-e1ea-4b58-93f2-c37846818c55",
+      "api_referat": [
+        "RÅ 2001 ref. 23"
+      ],
+      "api_avgorandedatum": "2001-04-18"
+    }
+  ]
+}
