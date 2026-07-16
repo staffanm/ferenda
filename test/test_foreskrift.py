@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from bs4 import BeautifulSoup
 
 from accommodanda.foreskrift import harvest
+from accommodanda.foreskrift.agencies import REGISTRY
 from accommodanda.foreskrift.harvest import (
     DocRef,
     Skip,
@@ -345,3 +346,13 @@ def test_publisher_prose_allmanna_rad_is_not_a_possessive_agency():
     mast = ("Räddningsverket meddelar härmed följande allmänna råd för "
             "tillämpningen av ovannämnda föreskrifter.")
     assert extract_publisher(mast) is None
+
+
+def test_closed_series_agencies_registered_without_a_live_harvester():
+    # RSFS/SOSFS/HSLF-FS are closed series: registered (their documents live in
+    # the corpus) but with no live enumerate/resolve, so a harvest skips them.
+    for fs, designation in (("rsfs", "RSFS"), ("sosfs", "SOSFS"),
+                            ("hslffs", "HSLF-FS")):
+        assert fs in REGISTRY
+        assert REGISTRY[fs].enumerate is None and REGISTRY[fs].resolve is None
+        assert REGISTRY[fs].designation == designation

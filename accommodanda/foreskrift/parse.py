@@ -30,7 +30,6 @@ import functools
 import re
 from pathlib import Path
 
-from .. import config
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -328,12 +327,8 @@ def amendment_uri(identifier):
 
 
 def body_path(root, fs, entry):
-    """Absolute path of a body PDF a record's ``files`` entry references. A
-    live-harvest file is stored under ``root/fs/<name>``; a frozen-import file
-    (the §7g point-at-the-bytes rule) carries a ``legacy`` relpath resolved under
-    ``config.LEGACY_ROOT`` in place, never copied into the corpus tree."""
-    if "legacy" in entry:
-        return config.LEGACY_ROOT / entry["legacy"]
+    """Absolute path of a body PDF a record's ``files`` entry references, stored
+    under ``root/fs/<name>``."""
     return Path(root) / fs / entry["name"]
 
 
@@ -345,8 +340,7 @@ def parse_record(record, root):
     role, but not every entry has to fill each role), the base `Regulation`
     keeps an empty `structure` and only its `consolidations` carry a parsed
     body. Each downloaded consolidation PDF is parsed into its own
-    ``structure``. A frozen-import record (§7g) points the ``regulation``
-    entry at the frozen PDF via ``body_path``."""
+    ``structure``."""
     fs, basefile = record["fs"], record["basefile"]
     arsutgava, lopnummer = basefile.split("/", 1)[1].split(":", 1)
     files = record.get("files", {})

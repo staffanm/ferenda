@@ -127,7 +127,7 @@ accommodanda/
   icrc/     ICRC international humanitarian law treaty vertical — download·model·parse
   untc/     UN Treaty Collection (MTDSG status) vertical — download·model·parse
   icc/      International Criminal Court case-law vertical — download·model·parse
-  foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure·legacy
+  foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
   avg/      JO/JK/ARN-decisions vertical — download·model·parse·legacy
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
@@ -1729,9 +1729,11 @@ are not yet citation *targets*; the inbound value comes from the edges above.
 - ✅ **Registry grown to the full lagrummet.se government-agency list**
   (`foreskrift/agencies.py`) — from the 15-agency exemplar corpus above to **71
   registered författningssamlingar** (county `\d+FS` series excluded), **66 live**
-  through the shared harvest engine + **5 frozen-only** stubs: rsfs,
-  sosfs/hslffs (§7g), sjvfs (SharePoint/Microsoft 365 auth wall), and svkfs (no
-  register left of its own — delegated to eifs). SKVFS and MTFS are live through
+  through the shared harvest engine + **5 closed-series stubs with no live
+  harvester**: rsfs, sosfs/hslffs (backfilled once from a frozen corpus, §7g,
+  since migrated to ordinary harvested records), sjvfs (SharePoint/Microsoft 365
+  auth wall), and svkfs (no register left of its own — delegated to eifs). SKVFS
+  and MTFS are live through
   a detached headful-Chrome transport: `Agency.browser` keeps Playwright/CDP
   absent while their F5/Shape challenge runs, while all other agencies retain
   requests/HTTP2. The SKVFS register also emits its closed RSFS predecessor, so
@@ -1774,24 +1776,28 @@ are not yet citation *targets*; the inbound value comes from the edges above.
     no landing page.
   Wired: `lagen foreskrift download [fs…]` (`--full` refreshes existing, `--only
   fs/year:num`); bare = all agencies.
-- ✅ **SKVFS + SOSFS/HSLF-FS backfilled from the frozen legacy trees** (`foreskrift/legacy.py`,
-  §7g pri 6) — both known-hard sources retain their frozen baseline. Socialstyrelsen
-  remains **frozen-only** (no live enumerate/resolve; `download` is a logged no-op),
-  while SKVFS now layers a live browser harvest over its import:
-  `lagen foreskrift import-legacy {skvfs|sosfs}` walks the frozen `entries/`, routes each
-  doc to its own fs by the authoritative basefile (SKVFS + the RSFS predecessor, SOSFS +
-  the joint HSLF-FS — `hslffs` slug, "HSLF-FS" designation), and writes a record pointing
-  at the frozen regulation PDF in place (`files.regulation.legacy`, resolved under
-  LEGACY_ROOT by `parse.body_path`). A `source: "<corpus>-legacy"` marker means a future
-  bot-evading harvester's record (no marker) is never clobbered. **skvfs: 540 imported
-  (492 PDF-body, 48 html-only → metadata-only), 8 null stubs skipped; sosfs: 419 imported
-  (417 PDF-body, 2 metadata-only), 22 null, 77 konsolidering skipped** (a
-  `konsolidering/{fs}/{year}:{n}` 3-part namespace whose index.pdf is in fact HTML — outside
-  the vertical's URI/layout, deferred to a future SOSFS harvester's native Consolidation).
-  A normal SKVFS run skips every frozen record and fills only later identifiers; the
-  post-freeze 2025:4–2026:8 gap was downloaded live as 34 exact official PDFs. Parse
-  runs end-to-end over the frozen bytes (bemyndigande/§§ where the PDF has a text
-  layer; older SOSFS scans have none → metadata-only, by design). `test/test_foreskrift_legacy.py`.
+- ✅ **SKVFS + SOSFS/HSLF-FS backfilled from the frozen legacy trees** (originally
+  `foreskrift/legacy.py`, §7g pri 6) — both known-hard sources gained a baseline this
+  way. Socialstyrelsen remains **without a live harvester** (no live
+  enumerate/resolve; `download` is a logged no-op), while SKVFS layers a live
+  browser harvest over its imported baseline. The one-time import walked the frozen
+  `entries/`, routed each doc to its own fs by the authoritative basefile (SKVFS + the
+  RSFS predecessor, SOSFS + the joint HSLF-FS — `hslffs` slug, "HSLF-FS" designation),
+  and wrote a record pointing at the frozen regulation PDF in place. A
+  `source: "<corpus>-legacy"` marker meant a future bot-evading harvester's record (no
+  marker) was never clobbered. **skvfs: 540 imported (492 PDF-body, 48 html-only →
+  metadata-only), 8 null stubs skipped; sosfs: 419 imported (417 PDF-body, 2
+  metadata-only), 22 null, 77 konsolidering skipped** (a `konsolidering/{fs}/{year}:{n}`
+  3-part namespace whose index.pdf is in fact HTML — outside the vertical's URI/layout,
+  deferred to a future SOSFS harvester's native Consolidation). A normal SKVFS run
+  skips every already-imported record and fills only later identifiers; the post-freeze
+  2025:4–2026:8 gap was downloaded live as 34 exact official PDFs. Parse ran
+  end-to-end over the frozen bytes (bemyndigande/§§ where the PDF has a text layer;
+  older SOSFS scans have none → metadata-only, by design). **Superseded 2026-07**: all
+  909 imported records were migrated into ordinary harvested form (PDFs copied into
+  `FORESKRIFT_DOWNLOADED/<fs>/`, records repointed from `{"legacy": relpath}` to
+  `{"name": ...}`), proven byte-identical; `foreskrift/legacy.py` and the
+  `import-legacy` verb were then deleted.
 - ✅ **MTFS live through the same detached Chrome transport** — its Sitevision page
   maps authoritative `MTFS YYYY:N` headings directly to PDFs. All 16 regulations
   (2009:1–2023:3) downloaded end-to-end; five older filenames omit “MTFS”, so the
@@ -2022,20 +2028,26 @@ regeringen.se records never overwritten, idempotent re-runs. ARN (priority 1) is
 a sibling in-flight.
 
 *Progress (2026-07-02, live SKVFS added 2026-07-15):* priority 6 landed —
-`foreskrift/legacy.py` imports the two harvest-blocked baselines (`lagen foreskrift
-import-legacy {skvfs|sosfs}`). SOSFS/HSLF-FS remain frozen-only; SKVFS now has live
-enumerate/resolve seams over the frozen baseline. Each has a `designation` for the printed prefix (HSLF-FS →
-`hslffs` slug). Each frozen tree carries two fs series (skvfs+rsfs, sosfs+hslffs), routed
-by each entry's authoritative basefile; records point at the frozen regulation PDF in place
-(`files.regulation.legacy`, resolved by `parse.body_path` under LEGACY_ROOT) and carry a
+`foreskrift/legacy.py` imported the two harvest-blocked baselines (`lagen foreskrift
+import-legacy {skvfs|sosfs}`). SOSFS/HSLF-FS remained frozen-only; SKVFS gained live
+enumerate/resolve seams over the frozen baseline. Each had a `designation` for the printed prefix (HSLF-FS →
+`hslffs` slug). Each frozen tree carried two fs series (skvfs+rsfs, sosfs+hslffs), routed
+by each entry's authoritative basefile; records pointed at the frozen regulation PDF in place
+(`files.regulation.legacy`, resolved by `parse.body_path` under LEGACY_ROOT) and carried a
 `source: "<corpus>-legacy"` precedence marker (a future live harvester's record, no marker,
-always wins; own re-import is idempotent, `--force` rewrites). null-basefile stubs and the
-77 SOSFS `konsolidering/` texts are skipped with logged counts; html-only docs (no
-regulation PDF) and text-less scanned PDFs become metadata-only records. Verified on real
+always wins; own re-import was idempotent, `--force` rewrote). null-basefile stubs and the
+77 SOSFS `konsolidering/` texts were skipped with logged counts; html-only docs (no
+regulation PDF) and text-less scanned PDFs became metadata-only records. Verified on real
 data (`--limit` slices): skvfs 540 / sosfs 419 importable, parse end-to-end — hslffs 2015:15
 → 22 §§ + 4 paragraf-precise bemyndigande edges, skvfs 2012:1 → bemyndigande into SFS
-1999:1229/2000:866; idempotent re-runs. `test/test_foreskrift_legacy.py`
-(13 hermetic tests). See §7e for the full note.
+1999:1229/2000:866; idempotent re-runs.
+(13 hermetic tests, `test/test_foreskrift_legacy.py`). See §7e for the full note.
+**Superseded 2026-07**: all 909 imported records were migrated into ordinary harvested
+form (PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, records repointed from
+`{"legacy": relpath}` to `{"name": ...}`, proven byte-identical); `foreskrift/legacy.py`,
+the `import-legacy` verb and `test/test_foreskrift_legacy.py` were deleted — the one
+surviving assertion (closed-series agencies registered with no live harvester) moved into
+`test/test_foreskrift.py`.
 
 *Progress (2026-07-02):* priorities 3–5 landed — `forarbete/legacy.py` now imports the
 remaining eight frozen förarbete corpora as thin walkers over the propriksdagen
@@ -2110,7 +2122,9 @@ references, the `iter_entries`/`docdir`/`read_record` walk primitives) is
 extracted to `accommodanda/lib/legacy_import.py`; `forarbete/legacy.py`,
 `foreskrift/legacy.py` and `avg/legacy.py` all call the shared module now,
 with förarbete supplying its body-tier/source-rank comparison as the
-`better()` tie-break callback.
+`better()` tie-break callback. (**Superseded 2026-07**: `foreskrift/legacy.py`
+was deleted once its imports were migrated to ordinary harvested records —
+`forarbete/legacy.py` and `avg/legacy.py` still call the shared module.)
 
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 
@@ -2421,7 +2435,7 @@ rewrite work.
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 frozen-only), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `legacy` (one-time import of the frozen corpora, §7g), `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors) |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). The 909 §7g frozen-import records (SKVFS/SOSFS/HSLF-FS) were migrated into ordinary harvested form in 2026-07 — body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, records rewritten from `{"legacy": relpath}` to `{"name": ...}`; `foreskrift/legacy.py` and the `import-legacy` verb are gone |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
@@ -2429,7 +2443,7 @@ rewrite work.
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
-| `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `foreskrift/legacy.py`, `avg/legacy.py` |
+| `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `avg/legacy.py` (`foreskrift/legacy.py` was removed 2026-07 once its frozen imports were migrated to ordinary harvested records) |
 | `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py`, `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py` | EU parser, defined-terms and case-naming suites |
 | `accommodanda/lib/wikitext.py` | shared MediaWiki-dump parser (wikilinks + citation engine → runs) |
@@ -2440,7 +2454,6 @@ rewrite work.
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
 | `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se); the shared dokumentlista `harvest()` engine also drives `rskr.py` |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | förarbete frozen-corpus import + body-adapter suites |
-| `test/test_foreskrift_legacy.py` | föreskrift frozen-corpus import suite |
 | `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
 | `tools/golden_dv.py` | DV golden cross-check (references vs old distilled RDF) |
 | `tools/golden_dv_structure.py` | DV structural golden (instance/ruling skeleton vs old parsed XHTML) |
@@ -2546,6 +2559,17 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **foreskrift** (2026-07-16) — the §7g frozen-import machinery for foreskrift
+  was removed now that its 909 records (SKVFS/SOSFS/HSLF-FS) are ordinary
+  harvested artifacts: body PDFs copied into `FORESKRIFT_DOWNLOADED/<fs>/`,
+  records rewritten from `{"legacy": relpath}` to `{"name": ...}` pointers,
+  migration proven byte-identical for all 909. `foreskrift/legacy.py`, the
+  `foreskrift import-legacy` verb and `LEGACY_CORPORA` are deleted;
+  `parse.py:body_path` no longer branches on `LEGACY_ROOT`.
+  `test/test_foreskrift_legacy.py` is gone — its one still-valid assertion
+  (closed-series agencies rsfs/sosfs/hslffs register with no live harvester)
+  moved into `test/test_foreskrift.py`. `lib/legacy_import.py` is unaffected
+  and still backs `forarbete/legacy.py` and `avg/legacy.py`.
 - **local LLM** (2026-07-15) — `docs/local-llm.md`, an operator runbook for
   running Qwen3.6-35B-A3B (35B MoE, 3B active, vision, reasoning) on llama.cpp
   against one 24 GB GPU, as an unmetered/private alternative to Berget for the

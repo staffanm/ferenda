@@ -78,7 +78,6 @@ from .forarbete import rskr as fa_rskr
 from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
-from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
@@ -1855,8 +1854,6 @@ def foreskrift_inputs(basefile):
         fsdir = layout.FORESKRIFT_DOWNLOADED / record["fs"]
         files = record.get("files", {})
         reg = files.get("regulation")
-        # a live-harvest file lives under fsdir/<name>; a frozen-import file (§7g)
-        # is resolved in place under LEGACY_ROOT -- body_path handles both.
         if reg:
             paths.append(foreskrift_parse.body_path(
                 str(layout.FORESKRIFT_DOWNLOADED), record["fs"], reg))
@@ -1873,30 +1870,9 @@ def foreskrift_parse_run(basefile):
     write_artifact("foreskrift", basefile, reg.to_artifact())
 
 
-def foreskrift_import_legacy(args):
-    """`lagen foreskrift import-legacy {skvfs|sosfs} [<path>]` -- one-time import of
-    a harvest-blocked författningssamling corpus (§7g pri 6) from the frozen legacy
-    tree into the föreskrift record layout, so `parse` then treats each regulation
-    like a harvested one (no network). Records reference the frozen regulation PDF
-    bytes in place (relative to LEGACY_ROOT), never copying them; each frozen tree
-    holds two fs series (skvfs+rsfs, sosfs+hslffs). Path defaults to
-    `LEGACY_ROOT/<corpus>`. `--limit N` caps the run (a test slice); `--force`
-    re-imports the corpus's own records (never overwriting a live-harvest one)."""
-    if not args or args[0] not in foreskrift_legacy.LEGACY_CORPORA or len(args) > 2:
-        sys.exit("usage: lagen foreskrift import-legacy {skvfs|sosfs} [<path>]")
-    corpus = args[0]
-    path = args[1] if len(args) == 2 else str(config.LEGACY_ROOT / corpus)
-    if RUN.dry_run:
-        print("foreskrift import-legacy: would import %s %s into %s"
-              % (corpus, path, layout.FORESKRIFT_DOWNLOADED))
-        return
-    foreskrift_legacy.import_corpus(corpus, path, str(layout.FORESKRIFT_DOWNLOADED),
-                                    limit=RUN.limit, force=RUN.force)
-
 
 # No per-document download stage: the body PDFs arrive only through the bulk
-# `foreskrift_harvest` sweep (or, for the two harvest-blocked corpora, the
-# `import-legacy` action), so parse depends on no upstream stage -- it runs over
+# `foreskrift_harvest` sweep, so parse depends on no upstream stage -- it runs over
 # whatever the harvest has put on disk (relate/index/dump/generate then act on the
 # artifacts by source name, like every other source).
 SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
@@ -1909,11 +1885,8 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
     origin="the %d agency sites in foreskrift/agencies.py"
            % len(FORESKRIFT_AGENCIES),
     scopes=frozenset(FORESKRIFT_AGENCIES),
-    actions={"import-legacy": foreskrift_import_legacy},
     notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
-          "scopes are författningssamling codes (fffs, …); empty = all agencies\n"
-          "import-legacy {skvfs|sosfs} [<path>]: one-time import of the frozen "
-          "harvest-blocked corpus (--limit N caps it; --force re-imports)")
+          "scopes are författningssamling codes (fffs, …); empty = all agencies")
 
 
 # --------------------------------------------------------------------------

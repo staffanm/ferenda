@@ -15,9 +15,9 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print):
     totals = {}
     for fs in (scopes or list(REGISTRY)):
         agency = REGISTRY[fs]
-        if agency.enumerate is None:       # frozen-only fs (§7g): no live downloader
-            log("foreskrift %s: no live downloader -- import the frozen corpus via "
-                "`lagen foreskrift import-legacy` (§7g)" % fs)
+        if agency.enumerate is None:       # closed/static fs: no live downloader
+            log("foreskrift %s: no live downloader -- a closed series, its "
+                "documents already in the corpus" % fs)
             totals[fs] = (0, 0)
             continue
         totals[fs] = harvest.harvest(agency, root, full=full, only=only,

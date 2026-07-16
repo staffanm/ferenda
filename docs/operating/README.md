@@ -245,7 +245,7 @@ lagen dv parse                # each source's parse has its own specifics (DV is
 Beyond those standard actions, a source can define **source-specific actions**
 that do something meaningful only for that source. Examples: `lagen sfs
 versions` builds a statute's historical consolidations (only statutes have
-those); `lagen foreskrift import-legacy skvfs` imports a frozen legacy corpus.
+those); `lagen avg import-legacy arn <path>` imports a frozen legacy corpus.
 Run `lagen <source> --help` to see what a given source offers.
 
 One recurring family is the **`ai-*` actions**. Any action whose name starts

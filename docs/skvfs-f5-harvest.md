@@ -13,11 +13,12 @@ operationally heavier and more fragile than an open-data feed.
 - **SKVFS** = Skatteverkets författningssamling; **RSFS** = its Riksskatteverket
   predecessor. Both are binding law and public records. Skatteverket publishes a
   lot, and stale tax regulation is actively harmful, so *timely* access matters.
-- The frozen import remains the baseline: `foreskrift/legacy.py` (`lagen
-  foreskrift import-legacy skvfs`) supplies ~509 SKVFS + 31 RSFS records. The
-  live `SKVFS` Agency fills only missing records; its one register also emits
-  the closed RSFS predecessor into the `rsfs/` namespace. The separate `RSFS`
-  registry entry remains frozen because no second browser sweep is needed.
+- The baseline ~509 SKVFS + 31 RSFS records are ordinary corpus records (they
+  were once a frozen import, since migrated to normal harvested form — their
+  body PDFs live under the download tree like any other source's). The live
+  `SKVFS` Agency fills only missing records; its one register also emits the
+  closed RSFS predecessor into the `rsfs/` namespace. The separate `RSFS`
+  registry entry has no live harvester because no second browser sweep is needed.
 - **MTFS (Tillväxtanalys)** sits behind the **same wall**. Its Sitevision page
   contains both current and repealed MTFS headings, each followed directly by
   the official PDF. The live Agency now harvests all 16 listed regulations.
@@ -186,22 +187,20 @@ source selectors and identity rules stay in `foreskrift/{skvfs,mtfs}.py`.
 
 If Skatteverket supplies an open feed or allowlisted endpoint, the replacement
 is therefore small: remove `browser=True` and point the enumerator/resolver at
-that channel. Keep `foreskrift/legacy.py`, `LEGACY_CORPORA`, and the RSFS entry.
+that channel. Keep the RSFS entry (the SKVFS register is its only source).
 
-**Critical interaction — live harvest vs. frozen corpus** (verified in
+**Critical interaction — live harvest vs. the existing corpus** (verified in
 `lib/harvest.walk` + `harvest.item_key`):
 - `is_downloaded = compress.exists(record_path(root, fs, basefile))`, and the
-  frozen import writes records at exactly that path → **every frozen basefile
-  reads as already-downloaded**.
+  existing SKVFS/RSFS records sit at exactly that path → **every existing
+  basefile reads as already-downloaded**.
 - A normal live run (`if key.is_downloaded and not full: continue`) therefore
-  **fetches only basefiles absent from the frozen corpus** and leaves the frozen
-  509+31 records untouched (their `source` marker and in-place `LEGACY_ROOT` PDF
-  pointers preserved). This is the correct "frozen stays, new fills the gaps"
-  behaviour, and a *first* live run (no watermark yet) still honours the skip.
-- **`--full` clobbers frozen records.** It sets `backfill=True` and bypasses the
+  **fetches only basefiles absent from the corpus** and leaves the existing
+  509+31 records untouched. This is the correct "keep what's there, new fills the
+  gaps" behaviour, and a *first* live run (no watermark yet) still honours the skip.
+- **`--full` clobbers existing records.** It sets `backfill=True` and bypasses the
   `is_downloaded` guard, so the resolvers re-resolve every enumerated basefile
-  and overwrite frozen records with freshly-harvested ones — the resolvers write
-  plain records and do **not** consult `legacy_import.should_write`. Intended
+  and overwrite the existing records with freshly-harvested ones. Intended
   "live-wins" direction, but know it before running `--full` on a future live
   SKVFS.
 
@@ -210,7 +209,7 @@ that channel. Keep `foreskrift/legacy.py`, `LEGACY_CORPORA`, and the RSFS entry.
 - SKVFS register/detail semantics: `accommodanda/foreskrift/skvfs.py`
 - MTFS register/direct-PDF semantics: `accommodanda/foreskrift/mtfs.py`
 - Detached headful transport: `accommodanda/lib/browser.py`
-- Frozen import: `accommodanda/foreskrift/legacy.py`, `lib/legacy_import.py`
+- Shared frozen-import core (other verticals): `lib/legacy_import.py`
 - HTTP/2 transport (KKVFS precedent, wrong tool for this wall):
   `Agency.http2`, `lib/net.make_http2_session`
 - Regression fixtures/tests: `test/files/{skvfs,mtfs}/`,

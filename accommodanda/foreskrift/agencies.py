@@ -4,8 +4,9 @@ shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
 plus ``params``. 71 fs codes are registered -- 66 live-harvested, the rest
-frozen-only (§7g: RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS). SKVFS and MTFS select a
-detached headful-Chrome transport in config; ordinary agencies stay on HTTP.
+closed series with no live harvester (RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS): their
+documents live in the corpus. SKVFS and MTFS select a detached headful-Chrome
+transport in config; ordinary agencies stay on HTTP.
 
 An agency is *config*, not a pipeline. Many sites are covered by the four
 generic enumerate shapes (``indexed``/``paginated``/``json``/``sitemap``) plus a
@@ -2271,27 +2272,23 @@ PFS = Agency(
 
 
 # --------------------------------------------------------------------------
-# Frozen-baseline författningssamlingar (REWRITE.md §7g priority 6).
-# Socialstyrelsen's SOSFS / HSLF-FS remain frozen-only. SKVFS now layers a live
-# incremental harvest over its frozen import, but must use detached headful
-# Chrome because F5 rejects both HTTP clients and Playwright-instrumented
-# navigation. Its Agency.browser flag selects that transport without affecting
-# any other agency. The one SKVFS register also enumerates the closed RSFS
-# predecessor into its own namespace; RSFS needs no second browser sweep.
-#
-# Each frozen corpus tree carries *two* fs series: SKVFS + its Riksskatteverket
-# predecessor RSFS (cited "RSFS 1985:20", so its own code + URIs), and SOSFS +
-# the joint HSLF-FS series. So one import writes records for two agencies, keyed
-# by each entry's authoritative (post-sanitization) basefile. HSLF-FS is slugged
-# `hslffs` (hyphen stripped) -- the entries' own basefile field, the ELSÄK-FS ->
-# `elsakfs` precedent, and the `^[a-zåäö]+fs/…` layout locator all agree; the
-# `designation` carries the printed "HSLF-FS" the identifier needs.
+# Closed and browser-gated författningssamlingar. Socialstyrelsen's SOSFS /
+# HSLF-FS are closed series (no live harvester; their documents live in the
+# corpus). SKVFS is live but must use detached headful Chrome because F5 rejects
+# both HTTP clients and Playwright-instrumented navigation; its Agency.browser
+# flag selects that transport without affecting any other agency. The one SKVFS
+# register also enumerates the closed RSFS predecessor (cited "RSFS 1985:20", so
+# its own code + URIs) into its own namespace, so RSFS needs no second sweep.
+# HSLF-FS is slugged `hslffs` (hyphen stripped) -- the ELSÄK-FS -> `elsakfs`
+# precedent and the `^[a-zåäö]+fs/…` layout locator agree; the `designation`
+# carries the printed "HSLF-FS" the identifier needs.
 # --------------------------------------------------------------------------
 
 def frozen_agency(fs, name, publisher, designation, site):
-    """A författningssamling whose only source is the frozen legacy tree: a
-    registry entry with no live enumerate/resolve (§7g deferred harvest). ``site``
-    is the agency's home page, kept for provenance though no harvester reads it."""
+    """A closed/static författningssamling: a registry entry with no live
+    enumerate/resolve, so nothing new is harvested -- its historical documents
+    live in the corpus like any other source's. ``site`` is the agency's home
+    page, kept for provenance though no harvester reads it."""
     return Agency(fs=fs, name=name, publisher=publisher, base_url=site,
                   index_url=site, designation=designation)
 
@@ -2345,10 +2342,6 @@ HSLFFS = frozen_agency(
     "hslffs", "Gemensamma författningssamlingen (hälso- och sjukvård m.m.)",
     "Socialstyrelsen", "HSLF-FS", "https://www.socialstyrelsen.se")
 
-# corpus (a frozen tree name) -> the fs series it holds. Drives the import verb:
-# the corpus is walked once and each entry routed to its own fs by basefile.
-LEGACY_CORPORA = {"skvfs": ("skvfs", "rsfs"), "sosfs": ("sosfs", "hslffs")}
-
 
 # fs code -> Agency. New agencies append here; a new *site shape* is a new
 # enumerate/classify in harvest.py, not a new pipeline.
@@ -2369,7 +2362,7 @@ REGISTRY = {a.fs: a for a in (
     SCBFS, STAFS, TVFS,
     AFS, TSFS, TRVFS,
     AFFS, AGVFS, FKFS, PFS,
-    SJVFS, SVKFS,                                      # frozen-only: no public documents/register
+    SJVFS, SVKFS,                                      # closed: no public documents/register
     MTFS, SKVFS,                                       # live: detached Chrome for the F5 wall
-    RSFS, SOSFS, HSLFFS,                               # frozen-only (§7g); RSFS also emitted by SKVFS
+    RSFS, SOSFS, HSLFFS,                               # closed series; RSFS also emitted by SKVFS
 )}
