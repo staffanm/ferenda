@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -80,23 +81,32 @@ def sniff_extension(path):
         return document_extension(f.read(8))
 
 # ETA timing state for `status`, self-tracked so callers need not thread a start
-# time. A current/total run (sfs parse, then dv parse, …) is timed from its first
-# line; a new run is detected when `done` restarts or `total` changes, which
-# re-bases the clock -- so each source is estimated on its own pace.
-_eta: dict[str, Any] = {"start": None, "start_done": 0, "last_done": 0, "total": object()}
+# time. A current/total run (sfs parse, then dv parse, …) is timed over a sliding
+# window of its most recent items; a new run is detected when `done` restarts or
+# `total` changes, which empties the window -- so each source is estimated on its
+# own pace. The window (rather than the whole-run average) is what keeps the
+# estimate honest when a run's pace changes partway: `sfs mirror-pdf` over a
+# corpus that is 40k/75k mirrored already skips those 40k at ~0s each, and a
+# run-long average would then bill the 35k real ~0.5s downloads at the skips'
+# rate and start the ETA near zero. Only the last `_ETA_WINDOW` items count, so
+# the work that was never performed drops out of the estimate.
+_ETA_WINDOW = 64
+_eta: dict[str, Any] = {"samples": deque(maxlen=_ETA_WINDOW), "total": object()}
 
 
 def _eta_suffix(done, total):
-    """``ETA MM:SS`` for a current/total sequence, from (elapsed/processed) over
-    the docs since timing began, or '' when there is no usable estimate (the
-    first line of a run, an unknown total, or the final line)."""
+    """``ETA MM:SS`` for a current/total sequence, from the pace over the last
+    `_ETA_WINDOW` items, or '' when there is no usable estimate (the first line
+    of a run, an unknown total, or the final line)."""
     now = time.monotonic()
-    if done <= 1 or done < _eta["last_done"] or total != _eta["total"]:
-        _eta.update(start=now, start_done=done, last_done=done, total=total)
-        return ""                                  # first line of the run: re-base
-    _eta["last_done"] = done
-    processed = done - _eta["start_done"]
-    elapsed = now - _eta["start"]
+    samples = _eta["samples"]
+    if not samples or done <= 1 or done < samples[-1][1] or total != _eta["total"]:
+        samples.clear()                            # first line of the run: re-base
+        samples.append((now, done))
+        _eta["total"] = total
+        return ""
+    samples.append((now, done))
+    elapsed, processed = now - samples[0][0], done - samples[0][1]
     if total is None or done >= total or processed <= 0 or elapsed <= 0:
         return ""
     remaining = (elapsed / processed) * (total - done)
