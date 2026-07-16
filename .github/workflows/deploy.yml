@@ -41,7 +41,18 @@ jobs:
         run: |
           set -euo pipefail
           cd /srv/ferenda/ferenda
-          git fetch --prune origin
+          # A prior run cancelled mid-git (e.g. the 6h rebuild timeout) can leave a
+          # stale lock that fails the next fetch/reset with exit 128; clear it first.
+          rm -f .git/index.lock .git/shallow.lock .git/refs/remotes/origin/*.lock || true
+          # Retry the fetch: transient GitHub connectivity has intermittently 128'd
+          # this step (it self-heals on the next push, but shouldn't fail a deploy).
+          # git's own stderr is printed, so a genuine, persistent failure is visible.
+          for attempt in 1 2 3; do
+            if git fetch --prune origin; then break; fi
+            [ "$attempt" = 3 ] && { echo "git fetch failed after 3 attempts" >&2; exit 1; }
+            echo "git fetch failed (attempt $attempt/3); retrying in $((attempt * 5))s" >&2
+            sleep $((attempt * 5))
+          done
           git reset --hard "${GITHUB_SHA}"
 
       - name: Build the accommodanda image
