@@ -37,6 +37,10 @@ def norm_title(t):
     return re.sub(r"\s+", " ", re.sub(r"\(\d{4}:\d+\)", "", t)).strip().lower()
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,   -- 'data_root' => absolute corpus root when the
+    value TEXT                -- catalog lives outside it (catalog_root != data_root)
+);
 CREATE TABLE IF NOT EXISTS documents (
     uri          TEXT PRIMARY KEY,
     source       TEXT NOT NULL,    -- 'sfs' | 'dv'
@@ -108,14 +112,38 @@ CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 """
 
 
-def connect(path):
+def connect(path, data_root=None, exclusive=False):
+    """A read-write connection to the catalog at `path`, schema ensured.
+
+    `data_root` records the corpus root the stored (data_root-relative) artifact
+    paths resolve against, for when the catalog lives outside it (`catalog_root !=
+    data_root`). The build passes it on every relate (full or incremental), so the
+    recorded root is written on a full rebuild and kept current thereafter; None
+    (read-only callers, tests) leaves whatever is recorded untouched. `exclusive`
+    opens a throwaway scratch for a full rebuild that will be atomically swapped in:
+    it holds the file lock for the connection's whole life instead of re-locking per
+    statement (each lock is a synchronous round-trip -- the cost that dominates a
+    million-row rebuild, and the difference between local and NFS), and drops the
+    rollback journal + fsync entirely, since a crashed rebuild is discarded and
+    restarted, never recovered."""
     con = sqlite3.connect(path)
-    # the catalog is derived and rebuildable, so durability is not precious:
-    # WAL (persistent, set once) lets readers proceed during a relate, and
-    # NORMAL skips the per-commit fsync that FULL pays on multi-GB rebuilds
-    con.execute("PRAGMA journal_mode=WAL")
-    con.execute("PRAGMA synchronous=NORMAL")
+    if exclusive:
+        # EXCLUSIVE before any journal pragma so the lock is held from the start
+        # (and, on NFS, so WAL's index could live in heap -- moot here, journal is
+        # OFF). OFF/OFF: no journal, no fsync -- maximum write throughput for a
+        # scratch whose only durable moment is the final rename (cmd_relate fsyncs
+        # it then).
+        con.execute("PRAGMA locking_mode=EXCLUSIVE")
+        con.execute("PRAGMA journal_mode=OFF")
+        con.execute("PRAGMA synchronous=OFF")
+    else:
+        # the catalog is derived and rebuildable, so durability is not precious:
+        # WAL (persistent, set once) lets readers proceed during a relate, and
+        # NORMAL skips the per-commit fsync that FULL pays on multi-GB rebuilds
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA synchronous=NORMAL")
     con.executescript(SCHEMA)
+    _record_data_root(con, path, data_root)
     # additive migration for catalogs built before a column existed -- CREATE
     # TABLE IF NOT EXISTS never alters an existing table. The new column is NULL
     # until that source is re-related (which re-reads every artifact anyway).
@@ -176,16 +204,88 @@ def strip_fragment(uri):
     return uri.split("#", 1)[0]
 
 
-def data_root(con):
-    """The corpus root a catalog's stored artifact paths are relative to: the
-    directory the catalog file itself lives in (`CATALOG = DATA/catalog.sqlite`).
-    Paths are stored data_root-relative rather than absolute so the catalog is
-    portable -- rsync a dev catalog to a deploy host with a different data_root and
-    every artifact still resolves (see `rebuild`)."""
+def _catalog_file(con):
+    """The filesystem path backing a catalog connection's main database."""
     main = [file for _seq, name, file in con.execute("PRAGMA database_list")
             if name == "main"]
     assert main and main[0], "catalog connection is not backed by a file"
-    return Path(main[0]).parent
+    return Path(main[0])
+
+
+def _record_data_root(con, path, data_root):
+    """Persist (or clear) the corpus root the catalog's stored paths resolve
+    against. `None` leaves whatever is recorded untouched (read-only callers and
+    tests). When the corpus root *is* the catalog file's own directory (the
+    colocated default, catalog_root == data_root) nothing is stored, so `data_root`
+    falls back to the file's parent and the catalog stays rsync-portable across
+    hosts whose data_root differs (the historical contract). Only a genuinely
+    separated layout records an absolute root -- which pins the catalog to *this*
+    host's corpus path, so a separated catalog is not rsync-portable to a host whose
+    data_root differs until that host runs its own relate (which re-records it)."""
+    if data_root is None:
+        return
+    if Path(data_root).resolve() == Path(path).parent.resolve():
+        con.execute("DELETE FROM meta WHERE key = 'data_root'")
+    else:
+        con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES "
+                    "('data_root', ?)", (str(Path(data_root).resolve()),))
+
+
+def _data_root(con):
+    row = con.execute("SELECT value FROM meta WHERE key = 'data_root'").fetchone()
+    if row and row[0]:
+        return Path(row[0])
+    return _catalog_file(con).parent
+
+
+def data_root(con):
+    """The corpus root a catalog's stored (data_root-relative) artifact paths
+    resolve against. When the catalog lives outside the corpus (catalog_root !=
+    data_root) a full rebuild records the absolute root in `meta`; otherwise this
+    falls back to the directory the catalog file itself lives in (the colocated
+    default -- which also keeps the catalog rsync-portable, see `_record_data_root`)."""
+    return _data_root(con)
+
+
+def quiesce_wal(path):
+    """Fold a catalog's write-ahead log back into its main file and drop the
+    `-wal`/`-shm` sidecars, leaving a self-contained single file.
+
+    This is a precondition for renaming a freshly built catalog over a live one
+    (`build._swap_catalog`): SQLite pairs a `-wal` with a database by *filename*,
+    not content, so a stale `-wal` left beside the swapped-in file is silently
+    re-applied by the next reader onto the new base -- serving a corrupt old/new
+    mix (`integrity_check` still reports "ok"). The live catalog is in WAL mode
+    after any incremental relate, and the serving layer holds read connections that
+    keep the sidecars present, so this is the common case, not a corner one.
+
+    A `PASSIVE` checkpoint (never blocks on readers) folds every committed frame
+    into the main file, which then stands alone: running it *before* the rename
+    leaves the old file complete for in-flight readers (they keep their open fds),
+    while new readers, once the rename lands, find no `-wal` to misapply. A reader
+    can only pin frames out of the checkpoint by holding a snapshot older than a
+    later commit -- which cannot happen here (a full rebuild writes the scratch,
+    never this live catalog, so nothing commits to it concurrently), so anything
+    short of a full fold means a concurrent writer that must not exist: raise rather
+    than strip a `-wal` whose un-folded frames the main file still needs. A no-op
+    when `path` doesn't exist yet (first build) or carries no WAL (`log ==
+    checkpointed` holds trivially: `0/0`, or `-1/-1` for a non-WAL file)."""
+    path = Path(path)
+    if not path.exists():
+        return
+    con = sqlite3.connect(path)
+    try:
+        _busy, log, checkpointed = con.execute(
+            "PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+    finally:
+        con.close()
+    if log != checkpointed:
+        raise RuntimeError(
+            "catalog WAL only partially checkpointed (%d/%d frames) at %s -- a "
+            "concurrent writer to the live catalog during a full rebuild?"
+            % (checkpointed, log, path))
+    for suffix in ("-wal", "-shm"):
+        path.with_name(path.name + suffix).unlink(missing_ok=True)
 
 
 def artifact_path(root, stored):
@@ -586,7 +686,8 @@ def _relativize_paths(con, source, root):
                     (util.store_relpath(path, root), uri))
 
 
-def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
+def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
+            data_root=None, exclusive=False):
     """Sync one source's rows in the catalog to its artifacts on disk.
     Incremental by content hash: an artifact whose bytes are unchanged since the
     last relate is left in place (not re-parsed); new/changed ones are
@@ -597,10 +698,12 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False):
 
     Returns (documents, links, changed): the source's row + link totals after the
     sync, and how many documents were (re)written this run."""
-    con = connect(catalog_path)
-    # artifact paths are stored data_root-relative (portable catalog), relative to
-    # the directory the catalog file lives in (CATALOG = DATA/catalog.sqlite).
-    root = Path(catalog_path).parent
+    con = connect(catalog_path, data_root=data_root, exclusive=exclusive)
+    # artifact paths are stored data_root-relative (portable catalog); the root is
+    # what `connect` just recorded (or the catalog file's own directory when the two
+    # are colocated), never assumed to be catalog_path.parent -- catalog_root may
+    # differ from data_root (config.CATALOG_ROOT).
+    root = _data_root(con)
     _relativize_paths(con, source, root)
     # current catalog state for this source, keyed by artifact path (1:1 with a
     # document): path -> (uri, content_hash, art_size, art_mtime_ns). Path-less

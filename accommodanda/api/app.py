@@ -55,7 +55,7 @@ from ..lib.util import basefile_slug
 from . import auth, edit, ops, patch
 from . import mcp as mcp_server
 
-CATALOG = config.DATA / "catalog.sqlite"
+CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
 
 app = FastAPI(
@@ -614,7 +614,14 @@ def _fa_pdf(local):
             or [config.LEGACY_ROOT / f
                 for f in record.get("legacy_files", [])
                 if f.lower().endswith(".pdf")])
-    return ("forarbete", basefile, pdfs[0]) if pdfs else None
+    if pdfs:
+        return ("forarbete", basefile, pdfs[0])
+    # no PDF body, but the document may still have a page-image scan beside its
+    # record (the KB propkb facsimiles -- forarbete/propkb.py). Resolved by rule
+    # + existence, like the mirrored SFS PDFs in `_sfs_pdf`: it is a facsimile
+    # source, not a parse input, so it is deliberately not named in the record.
+    scan = layout.fa_facsimile_pdf(typ, m.group(2))
+    return ("forarbete", basefile, scan) if scan.exists() else None
 
 
 def _foreskrift_pdf(local):

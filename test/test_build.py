@@ -4,14 +4,16 @@ temp files -- no real corpus, no JVM, fast."""
 
 
 import json
+import os
 import socket
+import sqlite3
 from urllib.parse import urlparse
 
 import pytest
 
 from accommodanda import build, config
 from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
-from accommodanda.lib import layout, runlog
+from accommodanda.lib import annstore, catalog, layout, runlog
 from accommodanda.lib.errors import SkipDocument
 
 
@@ -688,3 +690,146 @@ def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
     ])
     # the public URLs the endpoint reports back
     assert urls == ["/1962:700", "/celex/32024R2847", "/begrepp/Avtal", "/om/kontakt"]
+
+
+# --------------------------------------------------------------------------
+# catalog_root (catalog off data_root) + the full-rebuild scratch/swap
+# --------------------------------------------------------------------------
+
+def _fake_sfs_artifact(data_root):
+    """A minimal SFS artifact on disk under `data_root`, returning its path."""
+    art = data_root / "sfs" / "artifact" / "9999" / "1.json"
+    art.parent.mkdir(parents=True, exist_ok=True)
+    art.write_text(json.dumps({"uri": "https://lagen.nu/9999:1", "kind": "law",
+                               "label": "9999:1", "title": "Testlag", "body": []}))
+    return art
+
+
+def test_catalog_records_and_resolves_separated_data_root(tmp_path):
+    """When the catalog lives outside the corpus (catalog_root != data_root), a
+    rebuild records the absolute corpus root so stored (relative) artifact paths
+    still resolve; a colocated build records nothing and falls back to the file's
+    own directory (keeping the catalog rsync-portable)."""
+
+    data_root = tmp_path / "corpus"
+    data_root.mkdir()
+    art = _fake_sfs_artifact(data_root)
+
+    # separated: catalog on its own (fast) root, corpus elsewhere
+    cat_root = tmp_path / "fast"
+    cat_root.mkdir()
+    db = cat_root / "catalog.sqlite"
+    catalog.rebuild(db, "sfs", [art], data_root=data_root, exclusive=True)
+    con = catalog.connect(db)
+    assert catalog.data_root(con) == data_root
+    stored = con.execute("SELECT path FROM documents WHERE source='sfs'").fetchone()[0]
+    assert not os.path.isabs(stored)                       # stored data_root-relative
+    assert catalog.load_artifact(catalog.data_root(con), stored)["title"] == "Testlag"
+    con.close()
+
+    # colocated: no meta row, so data_root falls back to the file's parent
+    db2 = data_root / "catalog.sqlite"
+    catalog.rebuild(db2, "sfs", [art], data_root=data_root)
+    con2 = catalog.connect(db2)
+    assert con2.execute("SELECT value FROM meta WHERE key='data_root'").fetchone() is None
+    assert catalog.data_root(con2) == data_root
+    con2.close()
+
+
+def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_path):
+    """A missing catalog and (--force + whole corpus) each trigger a full rebuild
+    that builds a scratch file and atomically swaps it in, leaving no `.building`
+    file behind; an incremental relate writes in place and never makes a scratch."""
+
+    data_root = tmp_path / "corpus"
+    data_root.mkdir()
+    art = _fake_sfs_artifact(data_root)
+    cat = tmp_path / "fast" / "catalog.sqlite"          # parent doesn't exist yet
+    scratch = cat.with_name("catalog.sqlite.building")
+
+    monkeypatch.setattr(build, "DATA", data_root)
+    monkeypatch.setattr(build, "CATALOG", cat)
+    monkeypatch.setattr(build, "WATERMARKS", tmp_path / "wm.json")
+    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(build, "ERRORS", tmp_path / "err.json")
+    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
+    # the whole relatable corpus is just this one source, so `relate sfs` == "all"
+    monkeypatch.setattr(build, "ARTIFACTS", {"sfs": lambda: [art]})
+    # neutralise the cross-document post-passes (their own coverage is elsewhere)
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    monkeypatch.setattr(annstore, "tree", lambda s: empty)
+    monkeypatch.setattr(build.fa_genomforande, "resolve", lambda con: 0)
+    monkeypatch.setattr(build.fa_fk, "resolve", lambda con: 0)
+    monkeypatch.setattr(build.catalog, "set_correspondence", lambda con, rows: None)
+    monkeypatch.setattr(build, "kommentar_anchor_warnings", lambda con: [])
+    # count swaps so we can tell a full rebuild (scratch+swap) from an incremental
+    swaps = []
+    real_swap = build._swap_catalog
+    monkeypatch.setattr(build, "_swap_catalog",
+                        lambda s, d: (swaps.append(d), real_swap(s, d))[1])
+
+    # 1) missing catalog -> full rebuild via scratch+swap
+    assert not cat.exists()
+    build.cmd_relate(["sfs"])
+    assert cat.exists() and not scratch.exists()
+    assert len(swaps) == 1
+    con = catalog.connect(cat)
+    assert con.execute("SELECT COUNT(*) FROM documents WHERE source='sfs'").fetchone()[0] == 1
+    # separated layout -> the corpus root was recorded and resolves
+    assert catalog.data_root(con) == data_root
+    con.close()
+
+    # 2) --force over the whole corpus -> full rebuild again (a second swap)
+    build.RUN.force = True
+    build.cmd_relate(["sfs"])
+    build.RUN.force = False
+    assert cat.exists() and not scratch.exists()
+    assert len(swaps) == 2
+
+    # 3) incremental (catalog present, no force) -> in place, no scratch, no swap
+    build.cmd_relate(["sfs"])
+    assert not scratch.exists()
+    assert len(swaps) == 2
+
+
+def test_swap_catalog_discards_stale_wal_of_old_catalog(tmp_path):
+    """The atomic swap must quiesce the *old* catalog's WAL first. A live catalog is
+    in WAL mode (any incremental relate leaves it so) and the serving layer keeps a
+    `-wal`/`-shm` beside it; SQLite pairs a `-wal` with a database by filename, so a
+    stale one left after the rename is silently re-applied onto the swapped-in file
+    -- serving a corrupt old/new mix that `integrity_check` still calls "ok". Guards
+    against a regression where `_swap_catalog` renames without discarding sidecars."""
+    dest = tmp_path / "catalog.sqlite"
+    # an old catalog in WAL mode with committed-but-uncheckpointed frames (tag OLD),
+    # left open like a live serving connection so the sidecars persist through swap
+    live = sqlite3.connect(dest)
+    live.execute("PRAGMA journal_mode=WAL")
+    live.execute("PRAGMA wal_autocheckpoint=0")
+    live.execute("CREATE TABLE d (uri TEXT, tag TEXT)")
+    live.executemany("INSERT INTO d VALUES (?,?)", [(f"u{i}", "OLD") for i in range(200)])
+    live.commit()
+    assert dest.with_name("catalog.sqlite-wal").exists()   # the hazard is present
+    reader = sqlite3.connect("file:%s?mode=ro" % dest, uri=True)
+    reader.execute("BEGIN")
+    reader.execute("SELECT COUNT(*) FROM d").fetchone()    # a reader mid-transaction
+
+    # a freshly built scratch (journal OFF, single file) with tag NEW
+    scratch = dest.with_name("catalog.sqlite.building")
+    sc = sqlite3.connect(scratch)
+    sc.execute("PRAGMA journal_mode=OFF")
+    sc.execute("CREATE TABLE d (uri TEXT, tag TEXT)")
+    sc.executemany("INSERT INTO d VALUES (?,?)", [(f"u{i}", "NEW") for i in range(200)])
+    sc.commit()
+    sc.close()
+
+    build._swap_catalog(scratch, dest)
+
+    fresh = sqlite3.connect("file:%s?mode=ro" % dest, uri=True)
+    assert fresh.execute("SELECT DISTINCT tag FROM d").fetchall() == [("NEW",)]
+    assert fresh.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    assert not dest.with_name("catalog.sqlite-wal").exists()
+    assert not dest.with_name("catalog.sqlite-shm").exists()
+    fresh.close()
+    reader.close()
+    live.close()

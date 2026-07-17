@@ -67,13 +67,42 @@ def _at(doc, key):
 
 
 def resolve_data_root(doc):
-    """The corpus root from ``doc``, defaulting to ``<repo>/site/data``."""
+    """The corpus root: where the downloaded + generated corpus is stored.
+    Precedence mirrors every other scalar setting here -- the ``DATA_ROOT``
+    environment variable, then the ``data_root`` key in config.yml, then
+    ``<repo>/site/data``."""
+    env = os.environ.get("DATA_ROOT")
+    if env:
+        return Path(env).expanduser()
     if "data_root" not in doc:
         return DEFAULT_DATA
     value = doc["data_root"]
     if not isinstance(value, str) or not value.strip():
         raise ConfigError(
             "data_root set to invalid value %r at %s" % (value, _at(doc, "data_root")))
+    return Path(value).expanduser()
+
+
+def resolve_catalog_root(doc):
+    """The directory holding ``catalog.sqlite``, decoupled from ``data_root`` so
+    the small, latency-sensitive SQLite index can sit on fast local disk while the
+    bulk artifact corpus sits on slower/NFS storage. This matters because SQLite's
+    per-statement locking turns into synchronous network round-trips on NFS -- a
+    catalog read that is ~0.2 ms on local disk is ~8 ms per fresh connection over
+    NFS, and a query-heavy page pays that many times over. Keeping the artifacts on
+    NFS is fine (they are streamed/mmap'd, served from page cache); only the catalog
+    must stay local. Precedence: the ``CATALOG_ROOT`` environment variable, then the
+    ``catalog_root`` key in config.yml, then ``data_root`` (colocated -- the
+    historical layout, and still the default)."""
+    env = os.environ.get("CATALOG_ROOT")
+    if env:
+        return Path(env).expanduser()
+    if "catalog_root" not in doc:
+        return resolve_data_root(doc)
+    value = doc["catalog_root"]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("catalog_root set to invalid value %r at %s"
+                          % (value, _at(doc, "catalog_root")))
     return Path(value).expanduser()
 
 
@@ -393,6 +422,7 @@ def resolve_editors(doc):
 
 _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
+CATALOG_ROOT = resolve_catalog_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
 LEGACY_ROOT = resolve_legacy_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)

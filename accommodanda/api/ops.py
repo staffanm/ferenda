@@ -28,7 +28,7 @@ from ..lib import catalog, runlog
 RUNS = config.DATA / ".build" / "runs.ndjson"
 ERRORS = config.DATA / ".build" / "errors.json"
 STATUS = config.DATA / ".build" / "status.json"
-CATALOG = config.DATA / "catalog.sqlite"
+CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 
 # the canonical pipeline stages, in run order, the health matrix lays out as
 # columns (a source that never ran a stage simply has no cell there). The actual

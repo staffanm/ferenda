@@ -30,9 +30,8 @@ sections below explain each item and retain the historical measurements.
   notisfall and restore the verified legacy verdict URI grammar for non-referat
   cases (§4, §6).
 - ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
-  offsets, general/continued tables and the remaining legacy DOC/DOCX bodies;
-  unify the two författningskommentar bounds and repair the known truncated law
-  headings (§7a, §7d, §7g).
+  offsets, general/continued tables; unify the two författningskommentar bounds
+  and repair the known truncated law headings (§7a, §7d, §7g).
 - ⬜ **Derived legal relations:** extract/publish föreskrift `ändrar` and publish
   its `upphäver`/`genomför` metadata as typed graph edges (§7e).
 - ⬜ **Source validation tail:** establish a representative EUR-Lex metadata
@@ -117,7 +116,7 @@ Current code layout (this three-layer split is now realized in the package):
 ```
 accommodanda/
   lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, legacy_import, concepts, diff, history, assets, coe, coe_ids
-  config.py runtime config (config.yml / data_root / wiki_root)
+  config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·word·legacy
   forarbete/ preparatory-works vertical — download·riksdagen·rskr·model·parse·structure·kommentar·genomforande·fk·jamforelse·lydelse·legacy·legacy_formats
@@ -600,20 +599,24 @@ below is not optional polish, it's the only way they enter the corpus.
   failures**; the 966 empty bodies are exactly the records with no
   `innehall` (995 summary-only) — zero content dropped. `test/test_dv_parse.py`.
   Source/coverage increments:
-  - ✅ **Legacy Word path (POI)** — `accommodanda/dv/word.py` reads the
-    *original* binary `.doc` (POI **HWPF**) and `.docx` (POI **XWPF**) via
-    jpype, **not** the antiword DocBook intermediate — a real DOM
-    (paragraphs, table cells, bold runs) recovering the label/value
-    structure antiword flattened. POI 5.4.1 jars vendored in `vendor/poi/`;
-    OpenJDK 21 + `jpype1` deps; log4j-api pointed at SimpleLogger so its
-    "no provider" notice stays off stdout. `accommodanda/dv/legacy.py`
-    splits the flat `(text, bold)` stream into header / bold-label metadata
-    / `REFERAT` body / `Sökord`/`Litteratur` footer → `Avgorande`,
-    preferring the identity index's canonical referat/court. The whole
-    referat is one Word table, so the body discriminator is the `REFERAT`
-    marker, not table membership. **15,624 legacy docs parse, 0 empty
-    bodies, 0 failures.** `test/test_dv_legacy.py` (14 JVM-free unit tests
-    over synthetic streams).
+  - ✅ **Legacy Word path (POI)** — `accommodanda/lib/poi.py` (moved from
+    `dv/word.py`, 2026-07-17, once förarbete became its second caller —
+    rule:second-use-goes-to-lib) reads the *original* binary `.doc` (POI
+    **HWPF**) and `.docx` (POI **XWPF**) via jpype, **not** the antiword
+    DocBook intermediate — a real DOM (paragraphs, table cells, bold runs)
+    recovering the label/value structure antiword flattened. POI 5.4.1 jars
+    vendored in `vendor/poi/`; OpenJDK 21 + `jpype1` deps; log4j-api pointed at
+    SimpleLogger so its "no provider" notice stays off stdout. `accommodanda/
+    dv/legacy.py` (`from ..lib import poi as word`) splits the flat
+    `(text, bold)` stream into header / bold-label metadata / `REFERAT` body /
+    `Sökord`/`Litteratur` footer → `Avgorande`, preferring the identity
+    index's canonical referat/court. The whole referat is one Word table, so
+    the body discriminator is the `REFERAT` marker, not table membership.
+    **15,624 legacy docs parse, 0 empty bodies, 0 failures.**
+    `test/test_dv_legacy.py` (14 JVM-free unit tests over synthetic streams).
+    Förarbete's own proptrips-era `.doc` bodies are mostly Word 6/95 binaries
+    POI's HWPF refuses, so that vertical routes `.doc` through `antiword`
+    instead and reserves `lib/poi.py` for `.docx` (§7g).
   - ✅ **Field-level merge — investigated and rejected.** Measured the gaps
     a merge could fill for the 14,838 cases with both sources: body-fallback
     opportunity is **0** (all 965 API-empty bodies are summary-only nämnd
@@ -930,13 +933,31 @@ to a future per-doc incremental generate.
   verticals mint the same `https://lagen.nu/<id>#<fragment>` URIs.
   `rebuild()` is per-source (drop + re-insert that source's rows),
   single-process and transactional (sidesteps multi-writer SQLite
-  contention). `lagen all relate` → **catalog at `site/data/catalog.sqlite`**.
-  `documents.path` is stored **`data_root`-relative** (relative to the catalog
-  file's own directory), never absolute — so the catalog is *portable*: rsync a
-  dev catalog to a deploy host with a different `data_root` and every artifact
-  still resolves. Read sites resolve through `catalog.data_root(con)` /
-  `catalog.artifact_path(root, stored)`; `rebuild()` migrates any pre-relative
-  absolute rows in place (`_relativize_paths`) on the host that built them.
+  contention). `lagen all relate` → **catalog at `<catalog_root>/catalog.sqlite`**
+  (`config.CATALOG_ROOT`, default `data_root`).
+  `documents.path` is stored **`data_root`-relative**, never absolute — so a
+  *colocated* catalog is *portable*: rsync a dev catalog to a deploy host with a
+  different `data_root` and every artifact still resolves. Read sites resolve
+  through `catalog.data_root(con)` / `catalog.artifact_path(root, stored)`;
+  `rebuild()` migrates any pre-relative absolute rows in place
+  (`_relativize_paths`) on the host that built them.
+  **Storage decoupled from the corpus** (`catalog_root`, env `CATALOG_ROOT`): the
+  latency-sensitive catalog can sit on fast local disk while the bulk artifact
+  tree lives on NFS (SQLite's per-statement locking turns into synchronous
+  round-trips there — ~8 ms per fresh connection vs ~0.2 ms local, paid many times
+  per query-heavy page). The catalog is self-describing about which root its paths
+  resolve against: a `meta` table records the absolute `data_root` **only** when
+  the catalog lives outside it; a colocated catalog records nothing and falls back
+  to its own file's directory, keeping the rsync-portability above (a *separated*
+  catalog is pinned to its host's corpus path until that host re-relates).
+  A **full rebuild** (missing catalog, or `--force` over the whole corpus) is
+  built in a scratch file opened `locking_mode=EXCLUSIVE`/`journal_mode=OFF` (one
+  lock for the whole build instead of per-statement, no journal/fsync — a crashed
+  rebuild is discarded, not recovered) and **atomically swapped** over the live
+  catalog on completion (`build._swap_catalog`: `catalog.quiesce_wal` folds+drops
+  the old WAL so a stale `-wal` can't be misapplied onto the new file, then fsync
+  file, `os.replace`, fsync dir); readers keep serving the old catalog until the
+  rename. Incremental `relate` is unchanged — in-place, WAL.
 - ✅ **Cross-source inbound-link graph** — the killer feature, working
   end-to-end. `catalog.inbound(con, uri)` = the distinct docs citing exactly
   that fragment uri. Verified on the partial corpus: **2,037 cases cite
@@ -1249,14 +1270,20 @@ them resolve.
   - **basefile = the document's own identifier** (prop "2025/26:279", sou
     "2020:1", …), per user requirement, so the same act from other sources
     (riksdagen/KB) for older periods reconciles by identity. The two types
-    regeringen.se publishes untitled-by-number (SÖ, lagrådsremiss) fall back to
-    the landing-page slug.
+    regeringen.se publishes untitled-by-number key on the document itself, never
+    the unreliable URL slug: **SÖ** on the number in its landing-page vignette
+    (`resolve_identity` reads the `h1-vignette`, rejecting a non-SÖ item that the
+    SÖ index happened to list); **lagrådsremiss** on `<year>/<title-slug>`
+    (`lr_identity`, the title carrying the identity since the vignette is only
+    the bare word "Lagrådsremiss"). A curated `regeringen.is_misleading`
+    skip-list drops the dual-published/mislabelled landing pages that would
+    otherwise mint a wrong identity.
   - **`pm` (promemorior outside the Ds series)** shares category 1325
     ("Departementsserien och promemorior") with `ds`; `parse_listing`'s
     `EXCLUDE` map gives `ds` the items numbered `Ds YYYY:N` and `pm` the rest.
     A pm without a Ds number is keyed by its **diarienummer** (`Ju2026/01691`,
     `KN2026/01475`, …); one with neither Ds number nor dnr falls back to the
-    landing-page slug like SÖ/lr. Same downloader, same parse pipeline.
+    landing-page slug. Same downloader, same parse pipeline.
   - Incremental (newest-first, through the shared `lib/harvest.walk`/
     `HarvestWatermark` begin/complete lifecycle — dv, §4) + `--full`; atomic
     writes; browser UA (regeringen.se 403s bots); politeness delay. Fixed
@@ -2108,13 +2135,13 @@ verdict** (user-adjudicated): the PDFs' embedded text layer is ABBYY
 Recognition Server output and reads well across decades — it is used as-is;
 no bulk re-OCR (the `forarbete/ocr/` sidecar seam remains for targeted
 upgrades), and the old pipeline's 36 GB of Tesseract-3 `intermediate/*.hocr*`
-can be dropped. Remaining ⬜: `.doc/.docx`-only proptrips bodies (reuse the
-POI/soffice route), the SOSFS `konsolidering/` texts, OCR-garbled citations
-in scan-era docs (e.g. an impossible 1992 SFS link in a 1971 prop — a
-future "no citations newer than the document" sanity pass), relate/generate
-at the new corpus scale. 💤 `.wpd` is deliberately dropped rather than adding
-a WordPerfect converter; PBR is archived, not imported, and outside the rewrite
-scope.
+can be dropped. Remaining ⬜: the SOSFS `konsolidering/` texts, OCR-garbled
+citations in scan-era docs (e.g. an impossible 1992 SFS link in a 1971 prop —
+a future "no citations newer than the document" sanity pass), relate/generate
+at the new corpus scale. (`.doc/.docx`-only proptrips bodies landed 2026-07-17,
+below — via `antiword`, not POI/soffice.) 💤 `.wpd` is deliberately dropped
+rather than adding a WordPerfect converter; PBR is archived, not imported, and
+outside the rewrite scope.
 
 *Progress (2026-07-03):* the corpus-independent core each vertical had grown its
 own copy of (`should_write` precedence, `rel` in-place LEGACY_ROOT-relative
@@ -2125,6 +2152,58 @@ with förarbete supplying its body-tier/source-rank comparison as the
 `better()` tie-break callback. (**Superseded 2026-07**: `foreskrift/legacy.py`
 was deleted once its imports were migrated to ordinary harvested records —
 `forarbete/legacy.py` and `avg/legacy.py` still call the shared module.)
+
+**Superseded 2026-07-17 (prop slice): prop is fully migrated frozen→harvested.**
+All 28,288 `downloaded/forarbete/prop/*.json` records now carry `files`
+(relative to `downloaded/prop/`) instead of `source`/`legacy_files`; zero
+frozen prop records remain. This matters because `legacy_files` pointed at
+`config.LEGACY_ROOT`, a dev-only mount — production held no such tree, so it
+re-parsed and failed every frozen prop on every run. Final `body_format`
+census: abbyy 17,295, none/pdf 7,052, skanning2007 2,334, text/tml 1,051,
+trips 118, word 438; 2,236 records are metadata-only. `parse.parse_record`
+stays additive rather than a rip-out: it branches on `legacy_files` present →
+`_legacy_body` (still serving sou/dir/ds, whose frozen corpora are untouched
+by this slice and remain under `LEGACY_ROOT`), else `_harvested_body` (the new
+route, reading `files` under `downloaded/<type>/`). Removing
+`forarbete/legacy.py` entirely is the last slice of §7g, after sou/dir/ds
+migrate the same way.
+
+Two library moves fell out of giving förarbete its own Word body: **POI moved
+`accommodanda/dv/word.py` → `accommodanda/lib/poi.py`** (förarbete became its
+second caller, so keeping it under `dv/` would have been a sibling-vertical
+import — rule:second-use-goes-to-lib; `dv/legacy.py` now does
+`from ..lib import poi as word`). `forarbete/legacy_formats.word_paras` adds
+the new `.doc`/`.docx` body route, but **`.doc` is read with `antiword`, not
+POI**: the proptrips-era `.doc` bodies are mostly Word 6/95 binaries that
+POI's HWPF refuses (`OldWordFileFormatException`); POI (`lib/poi.py`) handles
+only `.docx`. `antiword` is a new system dependency at parse time, alongside
+`poppler-utils`, and has been added to `docker/accommodanda/Dockerfile`.
+
+Also new: `accommodanda/forarbete/propkb.py`, a facsimile fetcher for the KB
+two-chamber proposition scans (1867–1970). It adds no documents — the ABBYY
+OCR text layer is already complete for all 19,066 propkb records — only a
+facsimile "proof" view for the 17,295 that were fetched XML-only. No index
+crawl: the scan-PDF url is derived mechanically from each record's stored
+ABBYY xml `orig_url` (`/xml/`→`/pdf/web/`, `.xml`→`.pdf`), so the record set
+*is* the work list and no basefile can be minted that the corpus lacks.
+
+The scan lands at a **layout rule, `layout.fa_facsimile_pdf`, and is resolved
+from disk by existence** (`api/app.py::_fa_pdf`) — the same bargain as the
+mirrored SFS PDFs (`_sfs_pdf`). **No record is written**, for two independent
+reasons: `parse._harvested_body` prefers a PDF over an xml, so naming the scan
+in `files` would silently flip 17,295 bodies off KB's ABBYY OCR onto a
+`pdftotext` of the scan; and the record is a *parse input*
+(`build.fa_parse_inputs`, content-hashed by `build.hash_files`), so writing
+*any* key into it — even one parse never reads — would re-stale all 17,295 prop
+parses and re-run the ABBYY parse of the whole KB century for a set of images.
+A record's `files` says what parse reads; the layout rule says what a facsimile
+rasterizes, and the two are only sometimes the same file. Verified: the
+parse-input hash is byte-identical with and without the scan present.
+
+Exposed as its own verb, `lagen forarbete propkb-scans` (never part of
+`harvest`), resumable from disk. **Built, not run**: the ~79 GB pass has not
+been executed — only prop 1867:1 and 1937:141 were fetched, as end-to-end
+verification, not a corpus pass.
 
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 
@@ -2424,10 +2503,10 @@ rewrite work.
 |---|---|
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
-| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar) |
+| `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
-| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `word`, `legacy`, `namedcases` (HD named-precedent harvester); canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks), `legacy` (one-time import of the nine frozen förarbete corpora, §7g), `legacy_formats` (frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
+| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record` branches `legacy_files` present → `_legacy_body`, else `_harvested_body`), `legacy` (one-time import of the frozen förarbete corpora, §7g — prop is fully migrated to ordinary harvested form, 2026-07-17; sou/dir/ds remain frozen, still served by this module), `legacy_formats` (body adapters, frozen and harvested alike — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions |
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
@@ -2442,7 +2521,7 @@ rewrite work.
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
-| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`, also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
+| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`/`catalog_root` — the latter decoupling `catalog.sqlite`'s location from the bulk corpus, env `CATALOG_ROOT`; also resolves `legacy_root`/`LEGACY_ROOT` for the §7g frozen-corpus imports), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `accommodanda/lib/legacy_import.py` | shared frozen-import core (§7g): `should_write` (live-wins / own-import-idempotent-unless-force / optional `better()` tie-break), `rel` (in-place LEGACY_ROOT-relative body references), `iter_entries`/`docdir`/`read_record` (frozen-tree walk primitives) — used by `forarbete/legacy.py`, `avg/legacy.py` (`foreskrift/legacy.py` was removed 2026-07 once its frozen imports were migrated to ordinary harvested records) |
 | `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py`, `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py` | EU parser, defined-terms and case-naming suites |
@@ -2468,7 +2547,7 @@ rewrite work.
 | `accommodanda/api/app.py` | FastAPI REST/OpenAPI service, mounted on `lagen all serve` |
 | `accommodanda/api/mcp.py` | public MCP server (Model Context Protocol), mounted at `/mcp` |
 | `accommodanda/lib/pins.py` | citation-shaped-query resolver, shared by REST `/search` and the MCP tools |
-| `site/data/catalog.sqlite` | derived catalog (documents + links) |
+| `<catalog_root>/catalog.sqlite` | derived catalog (documents + links); `catalog_root` defaults to `data_root` |
 | `site/data/generated/` | generated static site (`index.html`, `sfs/`, `dom/`) |
 | `test/test_site.py` | derived-layer suite |
 | `site/data/downloaded/sfs/sfsr/` | downloaded SFSR register pages (11,231) |
@@ -2559,6 +2638,39 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **forarbete** (2026-07-17) — the §7g frozen→harvested migration's prop slice
+  lands: all 28,288 `downloaded/forarbete/prop/*.json` records now carry
+  `files` (relative to `downloaded/prop/`) instead of `source`/`legacy_files`,
+  zero frozen prop records left. This matters in production, where
+  `legacy_files`' `LEGACY_ROOT` mount doesn't exist, so every frozen prop
+  re-parsed and failed on every run. Body-format census: abbyy 17,295,
+  none/pdf 7,052, skanning2007 2,334, text/tml 1,051, trips 118, word 438;
+  2,236 metadata-only. `parse.parse_record` stays additive
+  (`legacy_files` present → `_legacy_body`, still serving sou/dir/ds; else the
+  new `_harvested_body`) — full removal of `forarbete/legacy.py` waits on
+  migrating those three the same way. Two library moves fell out of giving
+  förarbete its own Word body: **POI moved `dv/word.py` → `lib/poi.py`**
+  (förarbete's second caller made `dv/`-housing a sibling-vertical import —
+  rule:second-use-goes-to-lib; `dv/legacy.py` now does
+  `from ..lib import poi as word`), and `legacy_formats.word_paras` adds a
+  `.doc`/`.docx` body route where **`.doc` goes through `antiword`, not
+  POI** — the proptrips-era `.doc` bodies are mostly Word 6/95 binaries POI's
+  HWPF refuses (`OldWordFileFormatException`); POI (`lib/poi.py`) handles only
+  `.docx`. `antiword` is a new system dependency at parse time, added to
+  `docker/accommodanda/Dockerfile` alongside `poppler-utils`. Also new:
+  `forarbete/propkb.py`, a facsimile-only fetcher for the KB two-chamber
+  proposition scans (1867–1970) — it adds no documents (the ABBYY OCR text
+  layer is already complete for all 19,066 propkb records), only a page-image
+  "proof" view for the 17,295 fetched XML-only, the scan-PDF url derived
+  mechanically from each record's stored ABBYY xml `orig_url` with no index
+  crawl. The scan lands at the `layout.fa_facsimile_pdf` rule and is resolved
+  from disk by existence (like `_sfs_pdf`); **no record is written**, both
+  because `_harvested_body` prefers a PDF over an xml (naming it in `files`
+  would flip 17,295 bodies off KB's ABBYY OCR onto a `pdftotext` of the scan)
+  and because the record is a content-hashed parse input, so any key written
+  into it would re-stale 17,295 parses for bytes parse never reads. Its own
+  verb, `lagen forarbete propkb-scans`. Built, not run: the ~79 GB pass has not
+  been executed corpus-wide, only prop 1867:1 and 1937:141 as end-to-end checks.
 - **foreskrift** (2026-07-16) — the §7g frozen-import machinery for foreskrift
   was removed now that its 909 records (SKVFS/SOSFS/HSLF-FS) are ordinary
   harvested artifacts: body PDFs copied into `FORESKRIFT_DOWNLOADED/<fs>/`,

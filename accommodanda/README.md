@@ -11,9 +11,13 @@ shaped this way and what's done vs. pending, read
 
 - **Python 3.10+** and **[uv](https://docs.astral.sh/uv/)**. `uv sync`
   installs everything in `pyproject.toml` (incl. `jpype1`).
-- **A JVM — only for the legacy DV Word path** (`dv_word.py` reads binary
-  `.doc`/`.docx` through Apache POI via jpype). Everything else (SFS, the
-  citation engine, the DV API path) is pure Python and needs no Java.
+- **A JVM — only for the shared POI Word path** (`lib/poi.py`, read by DV's
+  legacy path for `.doc`/`.docx` and by förarbete's `legacy_formats.word_paras`
+  for `.docx` only, via jpype). Everything else (SFS, the citation engine, the
+  DV API path) is pure Python and needs no Java.
+- **`antiword`** — förarbete's legacy `.doc` bodies (mostly proptrips-era Word
+  6/95 binaries that POI's HWPF refuses) are read through it instead of POI.
+  `sudo apt-get install -y antiword` on Ubuntu.
 
   On Ubuntu 24.04:
 
@@ -38,7 +42,7 @@ shaped this way and what's done vs. pending, read
 
 ```sh
 uv sync                      # Python deps
-./tools/fetch_poi.sh         # POI jars (legacy DV only)
+./tools/fetch_poi.sh         # POI jars (legacy DV path + förarbete's .docx bodies)
 uv run python -m pytest      # bare pytest collects exactly the new suites
 ```
 
@@ -84,7 +88,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `regeringen.py` | shared regeringen.se harvest knowledge — the doctype table (`TYPES`: url segment, taxonomy category id, identifier regex) and the `ul.list--block` listing walk (`listing_items`); used by `forarbete/download.py` and `remisser/download.py` |
 | `harvest.py` | shared incremental-download core — `HarvestWatermark` (begin/complete lifecycle, never-regress date save, crash-safe `dirty` flag that disables the consecutive-hit stop but not the date-conclusive one) + `walk`/`Skip`/`ItemKey`/`guarded_enumerate` (the newest-first download loop over an enumerate/resolve pair); each source states its own `lookahead_limit`/`safety_days` window (dv: 365-day safety window, ~5000-item lookahead; forarbete/riksdagen/foreskrift/avg-jo: 14 days/20 items); used by `dv/download.py`, `foreskrift/harvest.py`, `avg/download.py` (jo), and directly by `forarbete/download.py` + `forarbete/riksdagen.py` (also driving `forarbete/rskr.py`) |
 | `browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources — navigate with no Playwright/CDP client attached, wait the source-configured settle interval, then attach briefly to read the completed DOM or exact browser-cached PDF bytes; selected only by the SKVFS and MTFS `Agency.browser` configs |
-| `catalog.py` | the SQLite catalog (`documents`/`links`/`fragments`/`genomforande`/`fk_kommentar`/`correspondence`/concept tables) built by `relate`, derived and rebuildable — `correspondence` holds the `.corr` edges incl. `ikrafttrader` (when a same-law renumbering took effect, driving the temporal inbound split); `documents.path` is stored `data_root`-relative so the catalog is portable across hosts; `connect_ro`/`load_artifact`/`artifact_updated` are the shared read-only serving-layer helpers used by both REST and MCP |
+| `catalog.py` | the SQLite catalog (`documents`/`links`/`fragments`/`genomforande`/`fk_kommentar`/`correspondence`/concept tables) built by `relate`, derived and rebuildable — `correspondence` holds the `.corr` edges incl. `ikrafttrader` (when a same-law renumbering took effect, driving the temporal inbound split); `documents.path` is stored `data_root`-relative so the catalog is portable across hosts; a `meta` table records the absolute `data_root` only when the catalog lives outside it (`catalog_root != data_root`, `config.CATALOG_ROOT`) — a colocated catalog (the default) records nothing and resolves paths against the catalog file's own directory, preserving rsync-portability (`catalog.data_root(con)`); a full rebuild (missing catalog, or `--force` over the whole corpus) is built in an `EXCLUSIVE`/journal-`OFF` scratch and atomically swapped in (`catalog.quiesce_wal` + `build._swap_catalog`), incremental relate stays in-place under WAL; `connect_ro`/`load_artifact`/`artifact_updated` are the shared read-only serving-layer helpers used by both REST and MCP |
 | `render.py` | the `generate` phase — a single generic node walk renders every source's artifact to static, interlinked HTML (live outbound links, an inbound-context rail collected from the catalog); also renders the full ⌘K-backed search page (`render_search_page`, `fullsearch.js`) served at `/sok` |
 | `assets/` | the browser-facing static chrome as real on-disk files (`style.css`, `editor.css`, `dom.js`, `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `drawers.js`, `editor.js`, `robots.txt`) — formerly embedded string constants in `render.py`. `render.write_assets` ships them through the same Brotli precompression as pages: the JS files are concatenated in load order into a single **`script.js`** bundle (the page links one URL, so adding a module changes only the bundle, never the per-page HTML — it publishes via `generate --assets-only`, not a full regenerate), `style.css` is written with `editor.css` appended, `robots.txt` copied as-is. `dom.js` (first in the bundle) is the scripts' shared vocabulary (`window.lagenDom`: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse); `search.js` leads the ⌘K palette with instant *local* hits (a terse pinpoint — `4`, `11:2`, `art 5`, `(42`, `skäl 42`, `bilaga III` — resolved against the current page's own anchors, no network); `popover.js` gives every internal reference a hover preview of the target's rendered text (replacing the old title-attribute tooltip) whose ↗ escalates to a split reading view — the target document in its own pane with its own TOC/rail and scrollspy instance (`lagenScrollspy`), resizable/reorderable/closable |
 | `feeds.py` | legacy dataset-alias map (`sfs`/`dv`/`forarbeten`/`myndfs`/`myndprax`/`keyword`/`eurlex` → the rebuilt source names) + pure Atom/HTML feed renderer, shared by static `/dataset/<alias>/feed[.atom]` generation and the live query-param endpoints in `api/app.py` |
@@ -110,6 +114,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging, riding out failures from both the `requests` and `httpx` transports); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`); `make_http2_session` (`httpx2[http2]`) is an HTTP/2-only fallback for hosts that refuse HTTP/1.1 behind a Cloudflare front (foreskrift's kkvfs) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
+| `poi.py` | Apache POI (HWPF/XWPF) via jpype → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) once förarbete's `legacy_formats.word_paras` became its second caller (rule:second-use-goes-to-lib) — `dv/legacy.py` imports it as `poi as word`, förarbete uses it for `.docx` only (`.doc` goes through `antiword` instead, since proptrips-era `.doc` bodies are mostly Word 6/95 binaries POI's HWPF refuses) |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
 | `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename, per-process temp name so concurrent `lagen` invocations can't race each other's rename) |
 
@@ -122,18 +127,18 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
-| `word.py` | **legacy path** — POI (HWPF/XWPF) → flat `(text, bold, in_table)` stream |
-| `legacy.py` | legacy stream → head/body split → `Avgorande` |
+| `legacy.py` | **legacy path** — `lib/poi.py` (moved here from `dv/word.py` once förarbete became its second caller, `from ..lib import poi as word`) → flat `(text, bold, in_table)` stream → head/body split → `Avgorande` |
 
 **forarbete vertical (preparatory works — prop/sou/ds/dir)**
 | File | What |
 |---|---|
 | `download.py` | regeringen.se harvester (`lagen forarbete download [prop\|sou\|…]`); basefile = the document's own identifier; a `source`-carrying import record is treated as absent so live always wins; `pm` (promemorior outside the Ds series, category 1325 shared with `ds`) keys by diarienummer when the listing shows one, else the landing-page slug |
-| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `_legacy_body` prefers a re-OCR sidecar at `layout.fa_ocr_pdf`. Font size gates heading detection (footnotes → `fotnot` blocks, body-sized "N Title" patterns stay stycken) and wrapped multi-line headings fold in `lib/pdftext`. `parse.tag_frontmatter` (prop/skr) retags the un-bold överlämnande page: the "huvudsakliga innehåll" heading becomes a rubrik (so the ingress gets its own avsnitt) and post-signature names become `signatur` blocks; `structure.signers`/`structure.ingress` read them back for `sfs/asgit.py` |
+| `model.py` / `structure.py` / `parse.py` | `Forarbete` model, PDF (font-aware `pdftohtml`, or `pdftotext` fallback for OCR-layer scans) / html → nested structure → citation-scanned artifact; `parse_record` branches on `legacy_files` (still-frozen sou/dir/ds) → `_legacy_body`, else the harvested-form route → `_harvested_body` (reads `files`/a re-OCR sidecar at `layout.fa_ocr_pdf` from `downloaded/<type>/`, incl. the now fully-migrated prop). Font size gates heading detection (footnotes → `fotnot` blocks, body-sized "N Title" patterns stay stycken) and wrapped multi-line headings fold in `lib/pdftext`. `parse.tag_frontmatter` (prop/skr) retags the un-bold överlämnande page: the "huvudsakliga innehåll" heading becomes a rubrik (so the ingress gets its own avsnitt) and post-signature names become `signatur` blocks; `structure.signers`/`structure.ingress` read them back for `sfs/asgit.py` |
 | `jamforelse.py` | extracts a re-enacting prop's provision-mapping tables (titled *Jämförelsetabell*, *Jämförelse mellan …*, *Paragrafnyckel* or *Paragrafregister*) (old↔new provision tables, often in a bilaga volume the artifact parse never reads) from per-run coordinates: a bilaga region is bounded by the "Bilaga N" page-margin marker, a body-chapter table (PBL) by its repeated header pair; each page's columns re-derived by clustering cell starts, headerless/merged-run headers tolerated, per-law sections of a multi-law register split into sibling tables; consumed by `sfs/correspond.table_correspond` |
 | `lydelse.py` | reconstructs the two-column *nuvarande/föreslagen lydelse* comparison tables from per-run coordinates: the italic header gives the column boundary, cell lines reflow per column and pair into aligned rows (`tabell` blocks, the SFS `rad`/`cells` shape); page-centered "2 kap."/"28 §" markers come back as kapitel/paragraf blocks |
-| `legacy.py` | one-time import of the nine frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null) |
-| `legacy_formats.py` | frozen body adapters — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`) |
+| `legacy.py` | one-time import of the frozen förarbete corpora (`lagen forarbete import-legacy <corpus>`, §7g) — shared precedence core; regeringen-era + KB corpora entries-driven, the TRIPS family (proptrips/dirtrips/dirasp) walked downloaded-first (path-derived basefile, ~half their entries are null). **prop is fully migrated to ordinary harvested form (2026-07-17)** — its 28,288 records now carry `files`, not `legacy_files`; sou/dir/ds remain frozen and still route through this module and `LEGACY_ROOT`. Full removal is the last §7g slice, once those three migrate too |
+| `legacy_formats.py` | body adapters, used by both the still-frozen corpora and the harvested-form route — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML (`abbyy_pages`, now also fed decompressed bytes from the harvested `downloaded/` tree, not just a frozen on-disk path), scanned-PDF OCR text (`scanned_pdf_pages`), TRIPS `div.body-text` (`trips_paras`), legacy Word (`word_paras` — `.doc` via `antiword`, since the proptrips-era binaries are mostly Word 6/95 that POI's HWPF refuses; `.docx` via `lib/poi.py`) |
+| `propkb.py` | facsimile-only fetcher for the KB two-chamber proposition scans (1867–1970) — adds no documents (the ABBYY OCR text layer is already complete for all 19,066 propkb records), only a page-image "proof" view for the 17,295 fetched XML-only; the scan-PDF url is derived mechanically from each record's stored ABBYY xml `orig_url`, no index crawl; the scan lands at the `layout.fa_facsimile_pdf` rule and is resolved from disk by existence, writing **no record** — naming it in `files` would flip bodies off the ABBYY OCR, and the record is a content-hashed parse input, so any key written into it would re-stale 17,295 parses. Own verb: `lagen forarbete propkb-scans`. **Built, not run at corpus scale** — only prop 1867:1 + 1937:141 fetched as end-to-end checks; the full pass is ~79 GB |
 | `riksdagen.py` | doctype-agnostic data.riksdagen.se dokumentlista harvest engine (`harvest`/`_walk`, riksmöte-sliced backfill, watermark lifecycle); driven with the `bet` (utskottsbetänkanden, the prop→enacted-law link) specifics — PDF-only bodies (printed page = citation anchor), basefile `"<rm>:<beteckning>"` matching the FORARBETEN grammar's bet URIs, the planned/published upgrade cycle; full backfill walks all 161 riksmöten (the API caps one query's pagination at ~10k docs); no frozen legacy corpus |
 | `rskr.py` | second driver over `riksdagen.py`'s engine, for riksdagsskrivelser (`rskr`, the chamber's decision letter to the government — the prop→bet→rskr chain's last hop); basefile `"<rm>:<beteckning>"`; body is the API's own small HTML rendering (`dokument_url_html`), not a PDF filbilaga (an rskr is a few boilerplate sentences ending in the talman's/tjänsteman's signature — the committer identity `sfs/asgit.py` mines); every feed entry is published and final, so no planned/published upgrade cycle |
 | `kommentar.py` / `genomforande.py` | författningskommentar → `implements` (EU directive article) edges; extracted from `prop` and `fm` (förordningsmotiv) documents — both accompany the final enacted text, unlike a lagrådsremiss/SOU/Ds; `fk_section` also slices out the per-law FK prose consumed by `sfs/correspond.py` (reading a proposition artifact stays förarbete's job) |
@@ -300,7 +305,10 @@ citation-shaped-query resolver (a name+pinpoint → one exact fragment target)
 shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 
 **Top-level**: `config.py` resolves the optional `config.yml` — the corpus
-roots (`data_root`, `legacy_root`, `wiki_root`), the services the pipeline
+roots (`data_root`, `catalog_root`, `legacy_root`, `wiki_root` — `catalog_root`
+decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite
+catalog can sit on fast local disk while the bulk artifact corpus is on NFS;
+defaults to `data_root`, colocated), the services the pipeline
 talks to (`opensearch_url`, `llm_base_url`/`llm_model`/`llm_temperature`/
 `llm_top_p`/`vision_model`) and the deployment's own settings (`ops_token`,
 `editor_secret`, `editors`, `compress`/`compress_quality`, `cookie_secure`) —
@@ -863,8 +871,8 @@ except the `certbot` sidecar, which is root inside its own container.
 
 `accommodanda` is built on the box from this checkout (`docker/accommodanda/Dockerfile`):
 the code is baked in, and it carries the full pipeline toolchain (poppler-utils,
-tesseract+swe, ocrmypdf, raptor2-utils, a JRE + the POI jars), so **download +
-rebuild run in the container** against the read-write corpus mount:
+tesseract+swe, ocrmypdf, raptor2-utils, a JRE + the POI jars, antiword), so
+**download + rebuild run in the container** against the read-write corpus mount:
 
 ```sh
 docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→generate
@@ -892,6 +900,15 @@ rsync the artifact tree, `catalog.sqlite`, and `generated/` into the host's
 `data_root`, then let the host update incrementally (`lagen all rebuild` only
 re-does what changed). The paths resolve against the host's own `data_root`, not
 the dev machine's.
+
+If the host sets `catalog_root` separately from `data_root` (catalog on local
+disk, corpus on NFS), rsync `catalog.sqlite` to *that* directory, not into
+`data_root`. Note this portability is a property of the *colocated* layout only:
+a catalog built under a separate `catalog_root` records its corpus path inside
+itself, so it resolves against the dev machine's `data_root` until the host runs
+its own `lagen all relate` (which re-records the host's `data_root`). Seed a
+separated host from a *colocated* dev catalog, or run one relate on the host
+after rsync.
 
 One caveat: migrate the dev catalog **before** rsyncing. An older catalog holds
 absolute paths; `rebuild()` rewrites them to relative in place, but only on the

@@ -73,6 +73,7 @@ from .forarbete import jamforelse as fa_jamforelse
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
+from .forarbete import propkb as fa_propkb
 from .forarbete import riksdagen as fa_riksdagen
 from .forarbete import rskr as fa_rskr
 from .forarbete import structure as fa_structure
@@ -132,7 +133,7 @@ WATERMARKS = DATA / ".build" / "watermarks.json"   # small per-(step,source) gat
 RUNS = DATA / ".build" / "runs.ndjson"             # append-only run ledger
 ERRORS = DATA / ".build" / "errors.json"           # per-doc latest-outcome store
 STATUS = DATA / ".build" / "status.json"           # rolling health snapshot
-CATALOG = DATA / "catalog.sqlite"
+CATALOG = config.CATALOG_ROOT / "catalog.sqlite"   # may live off data_root (fast local disk)
 GENERATED = layout.GENERATED
 DUMPS = DATA / "dumps"                         # NDJSON bulk exports
 
@@ -1440,19 +1441,42 @@ def fa_import_legacy(args):
                             limit=RUN.limit, force=RUN.force)
 
 
+def fa_propkb_scans(args):
+    """`lagen forarbete propkb-scans` -- one-time bulk fetch of the KB
+    two-chamber proposition scans (1867-1970), the page images behind the
+    facsimile view. Adds no documents: the ABBYY OCR text of every propkb prop is
+    already downloaded (see forarbete/propkb.py). ~79 GB over ~17k documents, so
+    it is its own verb, never part of `harvest`. Writes only PDFs beside the
+    records -- no record is touched, so it re-stales no parse. Resumable: a scan
+    already on disk is skipped, so a killed run just gets rerun. `--limit N` caps
+    the fetch (a test slice)."""
+    if args:
+        sys.exit("usage: lagen forarbete propkb-scans")
+    if RUN.dry_run:
+        print("forarbete propkb-scans: would fetch the missing KB scans into %s"
+              % (layout.FA_DOWNLOADED / "prop"))
+        return
+    seen, fetched = fa_propkb.sync(layout.FA_DOWNLOADED, limit=RUN.limit)
+    print("forarbete propkb-scans: %d seen, %d fetched" % (seen, fetched))
+
+
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
-   actions={"import-legacy": fa_import_legacy},
+   actions={"import-legacy": fa_import_legacy,
+            "propkb-scans": fa_propkb_scans},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
          "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "
          "to one riksmöte; needs that single scope, never advances the "
          "watermark)\n"
          "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
-         "corpus (--limit N caps it; --force re-imports)" % FA_LEGACY_CORPORA)
+         "corpus (--limit N caps it; --force re-imports)\n"
+         "propkb-scans: one-time ~79 GB fetch of the KB proposition page-image "
+         "scans for the facsimile view (--limit N caps it; adds no documents, "
+         "re-stales no parse)" % FA_LEGACY_CORPORA)
 
 
 # --------------------------------------------------------------------------
@@ -2438,6 +2462,29 @@ INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
 DUMP_CODE = (PKG / "lib" / "dump.py",)
 
 
+def _swap_catalog(scratch, dest):
+    """Atomically replace `dest` with the freshly built `scratch`, durably.
+
+    First quiesce the *old* catalog's write-ahead log: a live `dest` is in WAL
+    mode (any incremental relate leaves it so, and the serving layer keeps the
+    sidecars present), and a stale `dest-wal` left beside the swapped-in file would
+    be silently re-applied by the next reader onto the new base -- a corrupt old/new
+    mix (`catalog.quiesce_wal`). Then the swap: the scratch was built with fsync off
+    for speed (a crashed rebuild is discarded, not recovered), so this is its one
+    durable moment -- fsync the finished file, rename it over `dest` (atomic within
+    the directory, which is why scratch and dest must share one), then fsync the
+    directory so the rename itself survives a host crash rather than leaving `dest`
+    pointing at a half-synced inode."""
+    catalog.quiesce_wal(dest)
+    fd = os.open(scratch, os.O_RDONLY)
+    os.fsync(fd)
+    os.close(fd)
+    os.replace(scratch, dest)
+    dfd = os.open(dest.parent, os.O_RDONLY)
+    os.fsync(dfd)
+    os.close(dfd)
+
+
 def cmd_relate(names):
     """(Re)build each named source's rows in the shared catalog from its
     artifacts on disk -- documents + the citation edges they carry inline.
@@ -2448,6 +2495,19 @@ def cmd_relate(names):
     # a missing catalog invalidates every watermark -- the rows it claims are
     # current don't exist, so nothing may be skipped (matches stale_sources())
     catalog_missing = not CATALOG.exists()
+    # a full rebuild rewrites every row anyway: a missing catalog, or --force over
+    # the whole corpus. Build it in a scratch file opened EXCLUSIVE (holds the lock
+    # once instead of per statement -- the round-trip cost that dominates a
+    # million-row rebuild, and the local-vs-NFS gap -- and drops the journal +
+    # fsync), then swap it in atomically. Live readers keep serving the old catalog
+    # untouched until the rename. Under --force the per-source `up_to_date` check
+    # already returns False, and a missing catalog forbids skipping, so the scratch
+    # is guaranteed to receive every requested source (never a partial catalog).
+    full_rebuild = catalog_missing or (RUN.force and set(ARTIFACTS) <= set(names))
+    CATALOG.parent.mkdir(parents=True, exist_ok=True)
+    target = CATALOG.with_name(CATALOG.name + ".building") if full_rebuild else CATALOG
+    if full_rebuild:
+        target.unlink(missing_ok=True)   # discard a scratch left by an aborted rebuild
     dirty = False
     for name in names:
         if name not in ARTIFACTS:
@@ -2471,7 +2531,8 @@ def cmd_relate(names):
             print("relate %s: extraction code changed -- re-extracting all" % name)
         t0 = time.perf_counter()
         docs, edges, changed = catalog.rebuild(
-            CATALOG, name, paths, progress=progress, force=RUN.force or recode)
+            target, name, paths, progress=progress, force=RUN.force or recode,
+            data_root=DATA, exclusive=full_rebuild)
         _emit_segment("relate", name, time.perf_counter() - t0, total=docs,
                       ran=changed, status="ok")
         record_step(store, "relate", name, wm, RELATE_CODE)
@@ -2490,7 +2551,7 @@ def cmd_relate(names):
     if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
-        con = catalog.connect(CATALOG)
+        con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
         pinned = fa_genomforande.resolve(con)
         fk_rows = fa_fk.resolve(con)
         corr = [row for p in annstore.tree("sfs").glob("*/*.corr")
@@ -2520,6 +2581,12 @@ def cmd_relate(names):
     else:
         print("relate: nothing changed -- cross-document passes skipped")
         _emit_segment("relate", "__corr__", 0.0, status="skipped")
+    # publish the freshly built scratch over the live catalog atomically -- only now,
+    # after every source + the cross-document passes have landed, so a reader never
+    # sees a half-built catalog. (Guarded on existence for the degenerate case where
+    # no artifact-backed source was requested and nothing was written.)
+    if full_rebuild and target.exists():
+        _swap_catalog(target, CATALOG)
     if dirty:
         save_watermarks(store)
     print("catalog: %s" % CATALOG)

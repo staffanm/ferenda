@@ -34,7 +34,7 @@ from .. import config
 from ..lib import catalog, layout, pins, text
 from ..lib.search import SearchIndex
 
-CATALOG = config.DATA / "catalog.sqlite"
+CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 
 log = logging.getLogger(__name__)
 
