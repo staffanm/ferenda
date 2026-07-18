@@ -1,5 +1,8 @@
 """Tests for the förarbete PDF parser's font-aware blocks logic (PDF-free)."""
 
+from pathlib import Path
+
+from accommodanda.forarbete import parse as fa_parse
 from accommodanda.forarbete.model import Block
 from accommodanda.forarbete.parse import (
     classify,
@@ -8,7 +11,27 @@ from accommodanda.forarbete.parse import (
     tag_frontmatter,
 )
 from accommodanda.forarbete.structure import ingress, nest, signers
+from accommodanda.lib import compress, layout
 from accommodanda.lib.pdftext import Line, Para, line_body_size, page_paragraphs
+
+
+def _stage(tmp_path, typ, basefile, name, data):
+    """Write a body fixture to the year-segmented download slot a förarbete
+    record resolves (``<root>/<typ>/<year>/<name>``), so these tests track the
+    real layout rule rather than a hand-built flat path."""
+    dest = layout.fa_dir(tmp_path, typ, basefile) / name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_download(dest, data)
+    return dest
+
+FIXTURES = Path(__file__).parent / "files" / "forarbete-legacy"
+
+
+def _harvested_rec(**kw):
+    rec = {"type": "prop", "basefile": "1999/2000:1",
+           "identifier": "Prop. 1999/2000:1"}
+    rec.update(kw)
+    return rec
 
 
 def test_mint_uri_matches_citation_form():
@@ -186,17 +209,73 @@ def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
 
     seen = {}
 
+    # a born-digital PDF's yield: non-empty, so `_legacy_pdf_body` keeps these
+    # blocks instead of reading the stub as a textless scan and falling through
+    # to the pdftotext OCR route (which would shell out on a 5-byte fake PDF)
     def fake_parse_pdf(path, identifier, patch_key=None):
         seen["patch_key"] = patch_key
-        return []
+        return [Block("stycke", "Regeringens proposition", 1)]
 
     monkeypatch.setattr(fa_parse, "parse_pdf", fake_parse_pdf)
-    (tmp_path / "sou").mkdir()
-    (tmp_path / "sou" / "2021-82.pdf").write_bytes(b"%PDF-")
+    _stage(tmp_path, "sou", "2021:82", "2021-82.pdf", b"%PDF-")
     fa_parse.parse_record({"type": "sou", "basefile": "2021:82",
                            "identifier": "SOU 2021:82",
                            "files": ["2021-82.pdf"]}, tmp_path)
     assert seen["patch_key"] == ("forarbete", "sou/2021-82")
+
+
+# --- _harvested_body routing (the propkb facsimile design leans on these) ---
+
+def test_harvested_body_routes_xml_to_abbyy(tmp_path):
+    """A record whose only body is an ABBYY .xml routes to the page-anchored
+    abbyy parser. This is the invariant propkb depends on -- the xml stays the
+    body -- so lock the branch against a reorder that would silently re-route
+    17k KB props (rule:lock-in-with-fixture)."""
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.xml",
+           (FIXTURES / "abbyy_propkb.xml").read_bytes())
+    doc = fa_parse.parse_record(_harvested_rec(files=["1999-2000-1.xml"]), tmp_path)
+    assert doc.body                                  # real ABBYY text came through
+    assert all(b.page is not None for b in doc.body)  # abbyy route is page-anchored
+
+
+def test_harvested_body_prefers_pdf_over_xml(tmp_path, monkeypatch):
+    """When a record lists both a .pdf and a .xml, the PDF wins. This is exactly
+    why propkb keeps its facsimile scan OUT of `files`: listing it would flip an
+    ABBYY-bodied doc onto a pdftotext of the scan. Lock the precedence."""
+    seen = {}
+
+    def fake_pdf(path, identifier, patch_key=None):
+        seen["path"] = str(path)
+        return [Block("stycke", "from pdf", 1)]
+
+    monkeypatch.setattr(fa_parse, "_legacy_pdf_body", fake_pdf)
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.pdf", b"%PDF-1.4 x")
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.xml", b"<document/>")
+    fa_parse.parse_record(
+        _harvested_rec(files=["1999-2000-1.pdf", "1999-2000-1.xml"]), tmp_path)
+    assert seen["path"].endswith("prop/1999/1999-2000-1.pdf")   # pdf branch, not xml
+
+
+def test_harvested_body_ocr_sidecar_wins_and_carries_patch_key(tmp_path, monkeypatch):
+    """A re-OCR sidecar at `fa_ocr_pdf` is parsed instead of the record's own
+    listed body (the prod ocrmypdf upgrade path), and it must carry the
+    document's patch key -- keying only the `files` branch would silently unpatch
+    every re-OCR'd doc."""
+    sidecar = tmp_path / "ocr" / "1999-2000-1.pdf"
+    sidecar.parent.mkdir(parents=True)
+    sidecar.write_bytes(b"%PDF-1.4 ocr")
+    monkeypatch.setattr(fa_parse.layout, "fa_ocr_pdf", lambda typ, bf: sidecar)
+    seen = {}
+
+    def fake_pdf(path, identifier, patch_key=None):
+        seen["path"], seen["patch_key"] = str(path), patch_key
+        return [Block("stycke", "x", 1)]
+
+    monkeypatch.setattr(fa_parse, "_legacy_pdf_body", fake_pdf)
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.pdf", b"%PDF-1.4 body")
+    fa_parse.parse_record(_harvested_rec(files=["1999-2000-1.pdf"]), tmp_path)
+    assert seen["path"] == str(sidecar)              # sidecar parsed, not the pdf
+    assert seen["patch_key"] == ("forarbete", "prop/1999-2000-1")
 
 
 def test_classify_font_size_gates_footnotes_and_fake_headings():

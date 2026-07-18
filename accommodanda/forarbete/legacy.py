@@ -56,9 +56,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..lib import compress, legacy_import
+from ..lib import compress, layout, legacy_import
 from ..lib.util import (
-    record_path,
     sniff_extension,
     split_numalpha,
 )
@@ -68,13 +67,15 @@ from . import download, legacy_formats
 SOURCE = "propriksdagen"
 
 # a frozen record's body-format tier: any of these extensions among its
-# legacy_files is a tier-2 (real document) body; an html-only body is tier 1; no
-# body is tier 0. The tier is what handles the PDF-gap window -- a later corpus's
-# pdf copy outranks propriksdagen's html-only record regardless of source rank.
-# Only .pdf is listed: no walker ever emits a .doc/.docx/.wpd/.rtf legacy_files
-# entry (those bodies have no parse route, so they are left out of legacy_files
-# entirely -- see _pick_proptrips), so a wider set here would be speculative
-# (rule:no-speculative-code).
+# legacy_files is a tier-2 (real document) body; a text-inferred body (.html,
+# .doc, .docx) is tier 1; no body is tier 0. The tier is what handles the
+# PDF-gap window -- a later corpus's pdf copy outranks propriksdagen's html-only
+# record regardless of source rank.
+# Only .pdf is listed, and the word bodies `_pick_proptrips` emits are
+# deliberately *not*: a .doc carries no layout, so it must beat a metadata-only
+# record (tier 0) without ever displacing a real PDF or the TRIPS plaintext,
+# which source rank then settles at the shared tier 1. .wpd/.rtf stay unlisted
+# because no walker emits one (rule:no-speculative-code).
 BODY_FORMATS = frozenset({".pdf"})
 
 # static source rank breaking an equal-tier tie (lower number wins). Ranks are
@@ -124,7 +125,8 @@ RE_RM_DIR = re.compile(r"\d{4}(?:-\d{2}|-2000)?")
 
 def body_tier(legacy_files):
     """The body-format tier of a frozen record's `legacy_files`: 2 for a
-    pdf/doc/docx/wpd/rtf body, 1 for an html-only body, 0 for no body."""
+    `BODY_FORMATS` (pdf) body, 1 for any other listed body -- in practice the
+    text-inferred html/doc/docx -- and 0 for no body at all."""
     exts = {Path(f).suffix.lower() for f in legacy_files}
     if exts & BODY_FORMATS:
         return 2
@@ -332,7 +334,7 @@ def import_propriksdagen(source_path, root, limit=None, force=False, log=print):
             break
         meta = legacy_formats.dokumentstatus_meta((nrdir / "index.xml").read_bytes())
         basefile = meta["basefile"]
-        recpath = record_path(root, "prop", basefile)
+        recpath = layout.fa_record_file(root, "prop", basefile)
         existing = legacy_import.read_record(recpath)
         if _preskip(existing, SOURCE, force, counts):
             continue
@@ -405,7 +407,7 @@ def _walk_entries(corpus, source_path, limit, force, counts, root, pick, log):
         if basefile is None:                              # a failed-download stub
             counts["null_stub"] += 1
             continue
-        recpath = record_path(root, typ, basefile)
+        recpath = layout.fa_record_file(root, typ, basefile)
         existing = legacy_import.read_record(recpath)
         if _preskip(existing, corpus, force, counts):
             continue
@@ -544,9 +546,11 @@ def _pick_proptrips(docdir):
     records in the upstream-PDF gap), else the `index.html` TRIPS plaintext (trips
     route, tier 1) when it actually carries a `div.body-text` (some frozen pages
     are search-result shells the crawl saved instead of the document, like
-    dirtrips' 5 known shells -- no recoverable body), else metadata-only.
-    `.doc`/`.docx`/`.wpd` have no parse route so are not listed. An empty dir (a
-    legacy sanitizer stray) is a no-doc skip."""
+    dirtrips' 5 known shells -- no recoverable body), else a Word `.doc`/`.docx`
+    body (word route, tier 1 -- read via antiword/POI at parse time; recovers the
+    ~438 proptrips props whose only competitor is a metadata-only record), else
+    metadata-only. `.wpd` (296, all covered elsewhere -- no WordPerfect converter)
+    is still not listed. An empty dir (a legacy sanitizer stray) is a no-doc skip."""
     if not any(docdir.iterdir()):
         return None
     pdf = docdir / "index.pdf"
@@ -555,7 +559,10 @@ def _pick_proptrips(docdir):
     html = docdir / "index.html"
     if html.exists() and "body-text" in html.read_text("utf-8"):
         return [legacy_import.rel(html)], "trips", "trips_route"
-    return [], None, "metadata_only"      # only a doc/docx/wpd body, or a shell page
+    words = sorted(docdir.glob("*.docx")) or sorted(docdir.glob("*.doc"))
+    if words:
+        return [legacy_import.rel(words[0])], "word", "word_route"
+    return [], None, "metadata_only"      # only a .wpd body, or a shell page
 
 
 def _pick_dirasp(docdir):
@@ -588,7 +595,7 @@ def _walk_trips_dirs(corpus, source_path, root, pick, counts, limit, force, log)
             if limit is not None and counts["imported"] >= limit:
                 return
             basefile = _trips_basefile(bucket.name, nrdir.name)
-            recpath = record_path(root, typ, basefile)
+            recpath = layout.fa_record_file(root, typ, basefile)
             existing = legacy_import.read_record(recpath)
             if _preskip(existing, corpus, force, counts):
                 continue
@@ -642,7 +649,7 @@ def import_propkb(source_path, root, limit=None, force=False, log=print):
 
 
 def import_proptrips(source_path, root, limit=None, force=False, log=print):
-    counts = _base_counts(pdf_route=0, trips_route=0, metadata_only=0)
+    counts = _base_counts(pdf_route=0, trips_route=0, word_route=0, metadata_only=0)
     _walk_trips_dirs("proptrips", source_path, root, _pick_proptrips, counts,
                      limit, force, log)
     return _report("proptrips", counts, log)
@@ -677,7 +684,7 @@ def import_dirtrips(source_path, root, limit=None, force=False, log=print):
             if limit is not None and counts["imported"] >= limit:
                 return _report("dirtrips", counts, log)
             basefile = _trips_basefile(bucket.name, html.stem)
-            recpath = record_path(root, "dir", basefile)
+            recpath = layout.fa_record_file(root, "dir", basefile)
             existing = legacy_import.read_record(recpath)
             if _preskip(existing, "dirtrips", force, counts):
                 continue

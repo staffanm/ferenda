@@ -18,7 +18,6 @@ case law) and carry inline links, like SFS and DV.
 import functools
 import re
 import subprocess
-from pathlib import Path
 
 from bs4 import BeautifulSoup
 
@@ -204,16 +203,19 @@ def _paged_body(pages):
     return [b for pageno, paras in pages for b in classify(paras, pageno, body)]
 
 
-def _legacy_pdf_body(pdf_path, identifier):
-    """A frozen PDF body: the font-aware `pdf_pages` path for born-digital PDFs
-    (regeringen-era, proptrips 2007+), falling back to a `pdftotext` OCR-text
-    extraction for the scans (soukb, propkb's scan-only props) whose text layer
-    `pdftohtml -xml` renders empty -- and sometimes errors on. Born-digital vs
-    scan is decided by *result*, not by guessing the corpus: a born-digital PDF
-    yields font blocks; a scan yields none there and its OCR text through the
-    pdftotext fallback (page-anchored, so `#sid{N}` still resolves)."""
+def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
+    """A PDF body from a scanned-or-born-digital corpus: the font-aware
+    `pdf_pages` path for born-digital PDFs (regeringen-era, proptrips 2007+),
+    falling back to a `pdftotext` OCR-text extraction for the scans (soukb,
+    propkb's scan-only props) whose text layer `pdftohtml -xml` renders empty --
+    and sometimes errors on. Born-digital vs scan is decided by *result*, not by
+    guessing the corpus: a born-digital PDF yields font blocks; a scan yields
+    none there and its OCR text through the pdftotext fallback (page-anchored, so
+    `#sid{N}` still resolves). `patch_key` threads the record's patch identity to
+    `parse_pdf` (a re-housed prop is a normal harvested doc, patchable like any
+    other)."""
     try:
-        blocks = parse_pdf(pdf_path, identifier)
+        blocks = parse_pdf(pdf_path, identifier, patch_key)
     except subprocess.CalledProcessError:   # pdftohtml chokes on some KB scans
         blocks = []
     return blocks or _paged_body(legacy_formats.scanned_pdf_pages(pdf_path))
@@ -246,6 +248,52 @@ def _legacy_body(record):
     if htmls:
         return classify(LEGACY_HTML_PARAS[record["body_format"]](
             htmls[0].read_text("utf-8")), None)
+    words = [f for f in files if f.suffix.lower() in (".doc", ".docx")]
+    if words:
+        return classify(legacy_formats.word_paras(words[0]), None)
+    return []
+
+
+def _harvested_body(record, root):
+    """The body of a harvested-form record whose body file(s) live in the raw
+    `downloaded/<type>/` tree (`files`), read through `compress`.
+
+    The live-harvest twin of `_legacy_body` (§7g re-housed): a re-OCR sidecar
+    (`fa_ocr_pdf`) wins first, else the first PDF -> the shared PDF path (the
+    born-digital-or-scan `_legacy_pdf_body`, so a re-housed propkb/soukb scan
+    still reaches the pdftotext OCR fallback), an ABBYY `.xml` -> the page-
+    anchored abbyy route (its bytes decompressed for the streaming parser, since
+    the download tree brotli's the xml), else an html body dispatched on the
+    record's `body_format`. Else no body. A plain regeringen/riksdagen PDF record
+    (no `body_format`, one PDF) flows through the PDF branch unchanged."""
+    typ, basefile = record["type"], record["basefile"]
+    # the document's patch identity, shared by both PDF routes: a re-OCR sidecar
+    # is still *this* document, so its parse must honour this document's patches
+    # -- keying only the `files` branch would silently unpatch every document
+    # someone re-OCRs, with the patch still on disk and the build still green
+    patch_key = ("forarbete", "%s/%s" % (typ, basefile_slug(basefile)))
+    ocr = layout.fa_ocr_pdf(typ, basefile)
+    if ocr.exists():
+        return _legacy_pdf_body(ocr, record["identifier"], patch_key)
+    files = record.get("files", [])
+    pdfs = [f for f in files if f.lower().endswith(".pdf")]
+    if pdfs:
+        return _legacy_pdf_body(layout.fa_dir(root, typ, basefile) / pdfs[0],
+                                record["identifier"], patch_key)
+    xmls = [f for f in files if f.lower().endswith(".xml")]
+    if xmls:
+        return _paged_body(legacy_formats.abbyy_pages(
+            compress.read_bytes(layout.fa_dir(root, typ, basefile) / xmls[0])))
+    htmls = [f for f in files if f.lower().endswith(".html")]
+    if htmls:
+        return classify(LEGACY_HTML_PARAS[record["body_format"]](
+            compress.read_text(layout.fa_dir(root, typ, basefile) / htmls[0])), None)
+    words = [f for f in files if f.lower().endswith((".doc", ".docx"))]
+    if words:
+        # .doc/.docx are incompressible -> stored plain, so antiword/POI read the
+        # path directly (unlike the brotli'd xml/html above)
+        return classify(legacy_formats.word_paras(
+            layout.fa_dir(root, typ, basefile) / words[0]), None)
     return []
 
 
@@ -275,19 +323,17 @@ def parse_record(record, root):
     import record (`legacy_files`) resolves its body under LEGACY_ROOT. A record
     with no body yields metadata only (still a real catalog document at its URI)."""
     typ, basefile = record["type"], record["basefile"]
-    if "legacy_files" in record:
+    if "legacy_files" in record:            # unmigrated frozen import (sou/dir/ds)
         body = _legacy_body(record)
     elif typ == "rskr":
         body = rskr_body(compress.read_text(
-            Path(root) / typ / record["files"][0]))
+            layout.fa_dir(root, typ, basefile) / record["files"][0]))
     else:
-        pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
-        # the patch key carries the build-style basefile ("sou/2021-82" --
-        # typ-qualified slug, what layout.relpath decomposes); the record's own
-        # basefile ("2021:82") has no typ and is not filesystem-safe
-        body = (parse_pdf(Path(root) / typ / pdfs[0], record["identifier"],
-                          ("forarbete", "%s/%s" % (typ, basefile_slug(basefile))))
-                if pdfs else [])
+        # live harvest + re-housed prop: body file(s) in downloaded/<type>/.
+        # The patch key inside `_harvested_body` carries the build-style basefile
+        # ("sou/2021-82" -- typ-qualified slug, what layout.relpath decomposes);
+        # the record's own basefile ("2021:82") has no typ and is not filesystem-safe
+        body = _harvested_body(record, root)
     if typ in ("prop", "skr"):
         body = tag_frontmatter(body)
     return Forarbete(type=typ, basefile=basefile,

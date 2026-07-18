@@ -17,17 +17,22 @@ FROM python:3.12-slim
 #   tesseract-ocr(+swe)    OCR language data for scanned eurlex PDFs
 #   ocrmypdf               eurlex OCR (pulls ghostscript/qpdf/unpaper)
 #   raptor2-utils          `rapper` -- eurlex RDF/XML -> n-triples notice stream
-#   default-jre-headless   JVM for the DV legacy .doc/.docx path (POI via jpype)
+#   default-jre-headless   JVM for the .docx path (POI via jpype; needs Java 9+)
+#   antiword               the .doc path -- forarbete's legacy Word bodies
 #   git                    pull updates in the mounted wiki content repo
 #   curl, ca-certificates  fetch the POI jar stack at build time
-# (ImageMagick/antiword/libreoffice are NOT needed: `convert` in eurlex is
-# Pillow's method, and the .doc/.docx path is POI, not antiword.)
+# antiword is NOT redundant with POI: the proptrips-era .doc bodies are mostly
+# Word 6/95 binaries, which POI's HWPF refuses outright (OldWordFileFormatException)
+# and its Word6Extractor mangles -- so `legacy_formats.word_paras` reads .doc with
+# antiword and keeps POI for .docx only. (ImageMagick/libreoffice stay out:
+# `convert` in eurlex is Pillow's method.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         poppler-utils \
         tesseract-ocr tesseract-ocr-swe \
         ocrmypdf \
         raptor2-utils \
         default-jre-headless \
+        antiword \
         git \
         curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*

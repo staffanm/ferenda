@@ -23,6 +23,8 @@ import verb (a later task) drives:
     the fallback for the scans the font-aware ``pdftohtml`` path cannot read.
   * :func:`trips_paras`          -- a TRIPS ``div.body-text`` plaintext-HTML body
     -> a Para stream.
+  * :func:`word_paras`           -- a legacy Word body (.doc via antiword, .docx
+    via ``lib.poi``; proptrips/regeringen-era) -> a Para stream.
 
 Three of the body formats carry no font/bold signal: the ``text/tml`` body is
 ``<br>``-hard-wrapped plaintext with no markup but the line break, the TRIPS
@@ -34,13 +36,17 @@ recovers headings from numbering alone, exactly as for a text-inferred PDF. The
 its Paras carry the bold heading signal.
 """
 
+import io
 import re
 import subprocess
 from datetime import date
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from lxml import html as lxml_html
+
+from ..lib import poi
 
 # de-hyphenation is the same soft-hyphen rule the PDF verticals already use; the
 # ABBYY loader reuses it rather than replicating it (rule:second-use-goes-to-lib)
@@ -205,15 +211,20 @@ def _join_ocr_lines(lines):
     return acc
 
 
-def abbyy_pages(xml_path):
+def abbyy_pages(source):
     """``[(pageno, [Para])]`` for an ABBYY FineReader OCR-XML export, pageno the
     1-based page order. Each ``<par>`` of a ``blockType="Text"`` block becomes
     one Para -- its ``<line>``s joined with de-hyphenation, whitespace collapsed;
     empty pars and non-Text blocks (separators, pictures, tables -- a table's
     cell text would otherwise leak in) are skipped. Streamed with ``iterparse``
-    plus a per-page clear, since a budget prop's XML runs to tens of MB."""
+    plus a per-page clear, since a budget prop's XML runs to tens of MB.
+
+    ``source`` is the XML file path or the raw XML bytes -- the harvested
+    ``downloaded/`` tree brotli-compresses the ``.xml``, so parse hands the
+    decompressed bytes rather than a readable on-disk path."""
+    src = io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else str(source)
     out = []
-    for _event, page in etree.iterparse(str(xml_path), events=("end",),
+    for _event, page in etree.iterparse(src, events=("end",),
                                         tag=ABBYY_NS + "page"):
         paras = []
         for block in page.iter(ABBYY_NS + "block"):
@@ -268,3 +279,22 @@ def trips_paras(html_text):
         # keeps this from firing in the ordinary case (rule:errors-drive-retry-use-raise)
         raise ValueError("TRIPS html has no div.body-text")
     return _reflow_plaintext(body.get_text())
+
+
+# --- Adapter 5: legacy Word bodies (.doc/.docx) ---------------------------
+
+def word_paras(path):
+    """A legacy Word body (.doc/.docx) -> a page-less Para stream, like the TRIPS
+    body. A **.doc** is read with ``antiword``: POI's HWPF cannot open the Word
+    6/95 binary that dominates the proptrips era (`OldWordFileFormatException`),
+    while antiword reads Word 2-2003 uniformly and emits blank-line-delimited
+    plaintext that reflows exactly like the text/tml body. A **.docx** rides the
+    shared POI XWPF path (`lib.poi`), one Para per paragraph. No font survives
+    either route, so the förarbete classify recovers headings from numbering, not
+    weight -- as for every other text-inferred body."""
+    path = Path(path)
+    if path.suffix.lower() == ".docx":
+        return [Para(normalize_space(p.text)) for p in poi.read(path) if p.text.strip()]
+    text = subprocess.run(["antiword", str(path)], capture_output=True,
+                          check=True).stdout.decode("utf-8", "replace")
+    return _reflow_plaintext(text)

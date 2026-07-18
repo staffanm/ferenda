@@ -17,6 +17,7 @@ from accommodanda.forarbete.legacy_formats import (
     riksdagen_html_paras,
     riksdagen_mso_paras,
     trips_paras,
+    word_paras,
 )
 
 FIXTURES = Path(__file__).parent / "files" / "forarbete-legacy"
@@ -152,3 +153,31 @@ def test_trips_paras_dirtrips():
     assert any("utreda handeln med tjänster med Sydafrika" in t for t in texts)
     assert any(t.startswith("I prop. 1984/85:56") for t in texts)
     assert all(not p.bold for p in paras)
+
+
+# --- Adapter 5: legacy Word bodies ---------------------------------------
+
+def test_word_paras_word95_doc():
+    """The proptrips era's dominant format: a Word 6/95 binary, which POI's HWPF
+    refuses outright -- so `word_paras` routes .doc through antiword. Locks in
+    that the old binary yields real text, not the one-line garbage Word6Extractor
+    returned (rule:lock-in-with-fixture)."""
+    paras = word_paras(FIXTURES / "proptrips_word95.doc")
+    texts = [p.text for p in paras]
+    assert texts[0] == ("Utdrag ur protokoll vid regeringssammanträde "
+                        "den 6 april 1998")
+    assert any("statsministern Persson, ordförande" in t for t in texts)
+    assert all("  " not in t for t in texts)         # runs collapsed like TRIPS
+    # no font survives antiword's plaintext, so classify must recover headings
+    # from numbering rather than weight -- as for every text-inferred body
+    assert all(not p.bold and p.size == 0 for p in paras)
+
+
+def test_word_paras_docx():
+    """A .docx rides the shared POI XWPF reader (lib/poi), one Para per
+    paragraph -- the other half of the word route."""
+    paras = word_paras(FIXTURES / "proptrips_word.docx")
+    texts = [p.text for p in paras]
+    assert texts[:3] == ["Regeringens proposition", "2011/12:94",
+                         "Nya faktureringsregler för mervärdesskatt m.m."]
+    assert all(t.strip() for t in texts)             # empty paragraphs dropped
