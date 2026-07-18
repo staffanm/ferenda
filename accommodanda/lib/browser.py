@@ -25,18 +25,77 @@ class DetachedChrome:
     """One real Chrome session whose navigations happen without Playwright."""
 
     def __init__(self, profile, settle=20.0):
-        assert os.environ.get("DISPLAY"), "headful Chrome requires a real X display"
         assert settle > 0, "detached navigation settle time must be positive"
         chrome = shutil.which("google-chrome")
-        assert chrome is not None, "google-chrome is not installed"
+        # a runtime environment check, not an internal invariant: raise so it
+        # survives `python -O` (an assert would strip to Popen([None, ...]) and a
+        # cryptic TypeError far from the cause) -- rule:errors-drive-retry-use-raise
+        if chrome is None:
+            raise RuntimeError("google-chrome is not installed")
         self.chrome: str = chrome
         self.profile = Path(profile)
         self.settle = settle
         self.process: subprocess.Popen[bytes] | None = None
         self.endpoint: str | None = None
         self.command: list[str] | None = None
+        self.xvfb: subprocess.Popen[bytes] | None = None
+        self._prev_display: str | None = None
+
+    def _ensure_display(self):
+        """Guarantee a real X display for headful Chrome. A desktop's ``DISPLAY``
+        is used as-is; on a headless host (runlevel 3, no X) start a private Xvfb
+        virtual framebuffer and point ``DISPLAY`` at it. Chrome runs *headful*
+        against Xvfb exactly as against a monitor -- which is the whole point: the
+        F5/Shape WAF rejects ``--headless``, not the absence of a screen. Torn
+        down in ``__exit__``; a genuinely headless host without Xvfb is a
+        fail-fast (rule:fail-fast), not a silent fall back to headless."""
+        if os.environ.get("DISPLAY"):
+            return
+        xvfb = shutil.which("Xvfb")
+        # runtime environment check -> raise, not assert: it must fail the same
+        # way under `python -O` (rule:errors-drive-retry-use-raise)
+        if xvfb is None:
+            raise RuntimeError(
+                "headless host has no DISPLAY and no Xvfb -- `apt install xvfb` "
+                "so headful Chrome has a virtual framebuffer to draw on")
+        # -displayfd lets Xvfb pick a free display number and report it back, so
+        # concurrent runs never fight over a fixed :99
+        read_fd, write_fd = os.pipe()
+        self.xvfb = subprocess.Popen(
+            [xvfb, "-displayfd", str(write_fd), "-screen", "0", "1440x900x24",
+             "-nolisten", "tcp"],
+            pass_fds=(write_fd,), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.close(write_fd)
+        number = b""
+        while not number.endswith(b"\n"):
+            chunk = os.read(read_fd, 64)      # Xvfb writes the number once ready
+            # EOF means Xvfb died before reporting its display. This is the loop's
+            # only exit on that path, so it must raise, not assert -- under
+            # `python -O` an assert strips and the loop busy-spins on b"" forever
+            # (rule:errors-drive-retry-use-raise).
+            if not chunk:
+                os.close(read_fd)
+                raise OSError("Xvfb exited before reporting a display number")
+            number += chunk
+        os.close(read_fd)
+        self._prev_display = os.environ.get("DISPLAY")
+        os.environ["DISPLAY"] = ":" + number.strip().decode()
 
     def __enter__(self):
+        self._ensure_display()
+        # _ensure_display already spawned Xvfb and mutated os.environ["DISPLAY"];
+        # if launching Chrome now fails, __exit__ will NOT run (the `with` never
+        # bound), so tear the half-built session down here or the Xvfb process
+        # leaks and DISPLAY stays pointed at a dead framebuffer for whatever runs
+        # next in this process (rule:fail-fast -- no half-initialized session).
+        try:
+            self._launch_chrome()
+        except BaseException:
+            self._teardown()
+            raise
+        return self
+
+    def _launch_chrome(self):
         self.profile.mkdir(parents=True, exist_ok=True)
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
@@ -69,15 +128,35 @@ class DetachedChrome:
                 continue
             break
         else:
-            raise AssertionError("Google Chrome debugging endpoint did not start")
-        return self
+            raise RuntimeError("Google Chrome debugging endpoint did not start")
 
     def __exit__(self, _exc_type, _exc, _traceback):
+        self._teardown()
+
+    def _teardown(self):
+        """Stop Chrome (if it started) and tear the private Xvfb display back
+        down, restoring the prior ``DISPLAY``. Idempotent and safe to call from a
+        failed ``__enter__`` as well as ``__exit__`` -- neither half need have
+        been reached, so each is guarded by its own handle."""
         process = self.process
-        assert process is not None, "Google Chrome was not started"
-        if process.poll() is None:
+        if process is not None and process.poll() is None:
             process.terminate()
             process.wait(timeout=10)
+        self._teardown_display()
+
+    def _teardown_display(self):
+        """Tear down the private Xvfb framebuffer (if we started one) and restore
+        the ``DISPLAY`` that was in effect before ``_ensure_display``."""
+        if self.xvfb is None:                         # a real desktop DISPLAY was used
+            return
+        if self.xvfb.poll() is None:
+            self.xvfb.terminate()
+            self.xvfb.wait(timeout=10)
+        if self._prev_display is None:
+            os.environ.pop("DISPLAY", None)
+        else:
+            os.environ["DISPLAY"] = self._prev_display
+        self.xvfb = None
 
     def _navigate(self, url):
         command = self.command
