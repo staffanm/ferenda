@@ -27,10 +27,15 @@ link (`<ul class="list--block"> <li> <div class="sortcompact"> <a>`); the
 landing page links the content PDF under `/contentassets/` (or `/globalassets/`).
 
 The **basefile is the document's own identifier** (prop "2025/26:279", sou
-"2020:1", …) -- never a regeringen.se slug -- so the same act from another
-source (riksdagen, KB) for older periods reconciles by identity, exactly as the
-user requires. The two types regeringen.se publishes without a number (SÖ,
-lagrådsremiss) fall back to the landing-page slug as basefile.
+"2020:1", …) -- never a regeringen.se URL slug, which is unreliable (the
+infomaster reuses and mis-numbers them) -- so the same act from another source
+(riksdagen, KB) for older periods reconciles by identity. The two types that
+carry no number in the listing are handled explicitly: a **SÖ** keys on the
+``SÖ YYYY:NN`` from its landing-page vignette (`resolve_identity`), and an item
+under the SÖ index without one is rejected; a **lagrådsremiss** keys on
+``<year>/<title-slug>`` (`lr_identity`), since it has only a title. A URL on the
+curated ``misleading_urls`` skip-list (dual-published or mislabelled pages) is
+never harvested.
 
 Downloaded via `lagen forarbete download [prop|sou|ds|...]`; no doctype = all.
 A single document: `lagen forarbete download <doctype> --only <basefile>`.
@@ -50,16 +55,16 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import compress, layout
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
-from ..lib.regeringen import BASE, TYPES, listing_items
+from ..lib.regeringen import BASE, TYPES, is_misleading, landing_vignette, listing_items
 from ..lib.util import (
     Reporter,
     basefile_slug,
     document_extension,
-    record_path,
+    text_slug,
 )
 
 # BASE and the doctype table (TYPES: url segment, taxonomy category id,
@@ -88,6 +93,61 @@ DNR_RE = re.compile(r"\b([A-ZÅÄÖ][a-zA-Zåäö]{0,3}\d{4}/\d{2,6})\b")
 # only in the link text, "… (pdf 2 MB)"), so a suffix filter misses those and the
 # document is read from the served bytes instead -- see document_extension.
 CONTENT_HREF = re.compile(r"/(?:contentassets|globalassets)/", re.IGNORECASE)
+
+# SÖ (Sveriges internationella överenskommelser) numbering. `SO_OWN` is
+# end-anchored: a SÖ title often *cites* other överenskommelser mid-text (e.g.
+# "... (SÖ 1974:41) ..., SÖ 1980:72"), and only the trailing one is the
+# document's own -- so the best-effort listing-text read takes the last. The
+# landing-page vignette (SO_VIGNETTE, full-match) is the authority; see
+# resolve_identity.
+SO_OWN = re.compile(r"SÖ\s*(\d{4}:\d+)\s*$")
+# the vignette is scoped to the SÖ index, so any YYYY:NN in it IS the SÖ number
+# -- regeringen.se prints it bare ("1993:80"), prefixed ("Diarienummer: SÖ …"),
+# or suffixed ("… m.fl."); all yield the document's own number.
+SO_VIGNETTE = re.compile(r"(\d{4}:\d+)")
+# the trailing ", Lagrådsremiss" a title carries is stripped before slugging
+_LR_SUFFIX = re.compile(r",?\s*Lagrådsremiss\s*$", re.IGNORECASE)
+
+LR_SLUG_LEN = 60           # 30 collapsed distinct docs sharing a title prefix
+                           # ("Behandling av personuppgifter …"); 60 leaves only
+                           # genuine duplicates, which the caller dedups.
+
+
+def lr_identity(date, title):
+    """A lagrådsremiss's (basefile, identifier). Lagrådsremisser carry no unique
+    number (the landing vignette is the bare word "Lagrådsremiss"), only a title
+    that may recur across years -- so the basefile is ``<year>/<title-slug>`` and
+    the identifier is the cleaned title. Raises when either is missing
+    (rule:fail-fast) rather than minting a colliding stub."""
+    year = (date or "")[:4]
+    clean = _LR_SUFFIX.sub("", title).strip()
+    slug = text_slug(clean, maxlen=LR_SLUG_LEN)
+    if not (year.isdigit() and slug):
+        raise ValueError("lagrådsremiss without a year+title: date=%r title=%r"
+                         % (date, title))
+    return "%s/%s" % (year, slug), clean
+
+
+def resolve_identity(typ, item, landing_html):
+    """The authoritative (basefile, identifier) for a document, resolved once its
+    landing page is in hand. Only `so` needs the landing (its number lives in the
+    page vignette, not reliably in the listing text); every other type was
+    settled from the listing. Returns None to REJECT the document -- a listing
+    item under the SÖ index whose vignette (and title) carry no real
+    ``SÖ YYYY:NN`` (the index also holds pressmeddelanden and the like).
+
+    The vignette is *searched*, not full-matched: regeringen.se prints the number
+    in several shapes -- ``SÖ 1980:72``, ``Diarienummer: SÖ 1921:36`` (older
+    överenskommelser), ``SÖ 1968:15 m.fl.`` (a multi-treaty publication) -- all of
+    which yield the document's own number. When the page has no vignette at all,
+    the title's trailing own-number is the fallback."""
+    if typ != "so":
+        return item["basefile"], item["identifier"]
+    vignette = landing_vignette(landing_html) or ""
+    match = SO_VIGNETTE.search(vignette) or SO_OWN.search(item.get("title") or "")
+    if not match:
+        return None
+    return match.group(1), "SÖ " + match.group(1)
 
 
 def fetch(session, url, timeout=60):
@@ -125,6 +185,8 @@ def parse_listing(html, typ):
     raw = 0
     for li, href, url, text in listing_items(html, hrefpat):
         raw += 1
+        if is_misleading(url):
+            continue  # curated skip: dual-published / mislabelled / wrong-number
         slug = href.rstrip("/").rsplit("/", 1)[-1]
         time_el = li.find("time")
         date = time_el.get("datetime") if time_el else None
@@ -145,9 +207,22 @@ def parse_listing(html, typ):
                 title = text[:m.start()].rstrip(", ").strip() or text
             else:
                 basefile, identifier, title = slug, text, text
-        else:
-            basefile = identifier = slug
+        elif typ == "lr":
+            # lagrådsremiss: no number, but the title is in the listing text, so
+            # the <year>/<title-slug> basefile is settled here.
             title = text
+            basefile, identifier = lr_identity(date, text)
+        elif typ == "so":
+            # SÖ: the number is the landing-page vignette, not reliably in the
+            # listing text -- so best-effort here (the trailing own-number, for
+            # the incremental skip), authoritative later in resolve_identity.
+            m = SO_OWN.search(text)
+            basefile = m.group(1) if m else None
+            identifier = ("SÖ " + basefile) if basefile else None
+            title = SO_OWN.sub("", text).rstrip(", ").strip() or text
+        else:
+            raise ValueError("couldn't extract basefile: type %r has no "
+                             "identifier rule for %r" % (typ, text))
         out.append({"type": typ, "basefile": basefile, "identifier": identifier,
                     "title": title, "date": date, "url": url, "slug": slug})
     return out, raw
@@ -214,9 +289,15 @@ def find_content_links(html):
 
 def download_document(session, root, item, delay):
     """Fetch the landing page + its content file(s); store the record JSON,
-    the landing HTML, and each file. Returns the stored record."""
+    the landing HTML, and each file. Returns the stored record, or None when the
+    document is rejected on inspection of its landing page (a non-SÖ item under
+    the SÖ index) -- nothing is written in that case."""
     landing = fetch(session, item["url"])
-    typ, basefile = item["type"], item["basefile"]
+    typ = item["type"]
+    identity = resolve_identity(typ, item, landing.text)
+    if identity is None:
+        return None
+    basefile, identifier = identity
     slug = basefile_slug(basefile)
     files = []
     for href in find_content_links(landing.text):
@@ -226,14 +307,15 @@ def download_document(session, root, item, delay):
         if ext is None:                    # not a document (image, error page)
             continue
         name = "%s%s%s" % (slug, ("-%d" % len(files) if files else ""), ext)
-        compress.write_download(Path(root) / typ / name, data)
+        compress.write_download(layout.fa_dir(root, typ, basefile) / name, data)
         files.append(name)
         time.sleep(delay)
-    compress.write_download(Path(root) / typ / (slug + ".html"), landing.text)
-    record = {k: item[k] for k in
-              ("type", "basefile", "identifier", "title", "date", "url")}
-    record["files"] = files
-    compress.write_download(record_path(root, typ, basefile),
+    compress.write_download(layout.fa_dir(root, typ, basefile) / (slug + ".html"),
+                            landing.text)
+    record = {"type": typ, "basefile": basefile, "identifier": identifier,
+              "title": item["title"], "date": item["date"], "url": item["url"],
+              "files": files}
+    compress.write_download(layout.fa_record_file(root, typ, basefile),
                             json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
@@ -248,7 +330,7 @@ def has_live_record(root, typ, basefile):
     reasons: live always wins, so the downloader must fetch its better copy and
     overwrite the import; and a legacy record must not trip the newest-first
     incremental stop (`done = True`) as if the corpus were already caught up."""
-    recpath = record_path(root, typ, basefile)
+    recpath = layout.fa_record_file(root, typ, basefile)
     return compress.exists(recpath) and "source" not in json.loads(compress.read_text(recpath))
 
 
@@ -303,14 +385,19 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 if only is not None:
                     if item["basefile"] != only:
                         continue
-                    download_document(session, root, item, delay)
-                    new, done = 1, True
+                    new, done = (1 if download_document(session, root, item, delay)
+                                 else 0), True
                     break
 
                 if newest_date is None and item.get("date"):
                     newest_date = item["date"]
 
-                is_downloaded = has_live_record(root, typ, item["basefile"])
+                # `so` items whose SÖ number isn't in the listing text carry
+                # basefile None (the landing settles it); they can't match an
+                # on-disk record, so they're never skipped -- the landing check in
+                # download_document dedups/rejects them instead.
+                is_downloaded = (item["basefile"] is not None
+                                 and has_live_record(root, typ, item["basefile"]))
                 if not backfill:
                     if watermark.should_stop(is_downloaded, item.get("date")):
                         done = True
@@ -319,11 +406,11 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     continue
 
                 try:
-                    download_document(session, root, item, delay)
-                    new += 1
+                    if download_document(session, root, item, delay):
+                        new += 1
                 except requests.HTTPError as exc:
                     errors += 1
-                    log("  %s %s: %s" % (typ, item["basefile"], exc))
+                    log("  %s %s: %s" % (typ, item["url"], exc))
                 if limit and new >= limit:
                     done = True
                     break

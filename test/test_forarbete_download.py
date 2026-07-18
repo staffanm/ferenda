@@ -14,7 +14,8 @@ from accommodanda.forarbete.download import (
     iter_listing,
     parse_listing,
 )
-from accommodanda.lib.util import record_path, write_atomic
+from accommodanda.lib import layout
+from accommodanda.lib.util import write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
 # div.sortcompact > a (link text = "Title, <Identifier>") + a <time>
@@ -99,13 +100,65 @@ def test_parse_listing_numbered_type():
     assert items[1]["basefile"] == "2025/26:276"
 
 
-def test_parse_listing_slug_type_falls_back_to_slug():
+def test_parse_listing_lagradsremiss_keys_on_year_and_title():
     items, raw = parse_listing(LISTING_SLUG, "lr")
     assert raw == 1
     assert len(items) == 1
-    # lagrådsremiss has no number on regeringen.se -> basefile is the slug
-    assert items[0]["basefile"] == "andrade-regler-om-avdrag"
+    # a lagrådsremiss has no number, so its basefile is <year>/<title-slug>
+    # (never the unreliable URL slug) -- settled from the listing text + date
+    assert items[0]["basefile"] == "2026/andrade-regler-om-avdrag"
+    assert items[0]["identifier"] == "Ändrade regler om avdrag"
     assert items[0]["title"] == "Ändrade regler om avdrag"
+
+
+# a SÖ listing item: the own number is end-anchored, after a *cited* other SÖ
+LISTING_SO = """
+<ul class="list--block">
+  <li><div class="sortcompact">
+    <a href="/rattsliga-dokument/sveriges-internationella-overenskommelser/1979/06/so-198072/">
+      Ändring i konventionen (SÖ 1974:41), Bonn den 22 juni 1979, SÖ 1980:72</a>
+    <time datetime="1979-06-22">22 juni 1979</time>
+  </div></li>
+</ul>
+"""
+
+
+def test_parse_listing_so_takes_the_end_anchored_own_number():
+    items, _ = parse_listing(LISTING_SO, "so")
+    # best-effort key from the listing is the OWN (trailing) SÖ number, not the
+    # cited SÖ 1974:41 earlier in the title
+    assert items[0]["basefile"] == "1980:72"
+    assert items[0]["identifier"] == "SÖ 1980:72"
+    assert "SÖ 1980:72" not in items[0]["title"]
+
+
+def test_parse_listing_skips_a_misleading_url():
+    # the curated dual-published copy of SÖ 1980:72 is dropped entirely
+    dup = LISTING_SO.replace("1979/06/so-198072/", "1994/01/so-198072-/")
+    items, raw = parse_listing(dup, "so")
+    assert raw == 1 and items == []
+
+
+def test_resolve_identity_so_authoritative_from_vignette():
+    item = {"basefile": None, "identifier": None, "title": "x"}
+    landing = '<span class="h1-vignette">SÖ 1980:72</span><h1>x</h1>'
+    assert download.resolve_identity("so", item, landing) == ("1980:72", "SÖ 1980:72")
+
+
+def test_resolve_identity_so_rejects_non_so_landing():
+    # an item under the SÖ index whose vignette is not a real SÖ number
+    item = {"basefile": None, "identifier": None, "title": "x"}
+    landing = '<span class="h1-vignette">Pressmeddelande</span><h1>x</h1>'
+    assert download.resolve_identity("so", item, landing) is None
+
+
+def test_parse_listing_unhandled_type_raises(monkeypatch):
+    # the final else is a hard error, never a silent slug fallback
+    monkeypatch.setitem(download.TYPES, "zz", ("zztype", 9999, None))
+    html = LISTING_SLUG.replace("lagradsremiss/2026/06/andrade-regler-om-avdrag",
+                                "zztype/2026/06/whatever")
+    with pytest.raises(ValueError, match="no identifier rule"):
+        parse_listing(html, "zz")
 
 
 def test_parse_listing_skips_items_without_the_types_identifier():
@@ -158,12 +211,12 @@ def test_basefile_slug():
 
 def test_has_live_record_treats_import_as_absent(tmp_path):
     # a genuine live-harvest record (no `source`) blocks re-download / stops the walk
-    write_atomic(record_path(tmp_path, "prop", "2020/21:1"),
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "2020/21:1"),
                  json.dumps({"type": "prop", "files": []}))
     assert has_live_record(tmp_path, "prop", "2020/21:1") is True
     # a frozen import record (carries `source`, §7g) is treated as absent, so the
     # live downloader fetches its better copy AND it never trips the incremental stop
-    write_atomic(record_path(tmp_path, "prop", "1997/98:45"),
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "1997/98:45"),
                  json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
     assert has_live_record(tmp_path, "prop", "1997/98:45") is False
     assert has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
@@ -184,7 +237,7 @@ def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
     def mock_download_document(session, root, item, delay):
         downloads.append(item["basefile"])
         # Create the live record so has_live_record is True next time
-        write_atomic(record_path(root, "prop", item["basefile"]),
+        write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
                      json.dumps({"type": "prop", "files": []}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
@@ -233,7 +286,7 @@ def test_sync_error_advances_date_but_leaves_store_dirty_and_retries(tmp_path, m
     downloads = []
     def mock_download_document(session, root, item, delay):
         downloads.append(item["basefile"])
-        write_atomic(record_path(root, "prop", item["basefile"]),
+        write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
                      json.dumps({"type": "prop", "files": []}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
@@ -252,7 +305,7 @@ def test_sync_limit_truncation_leaves_store_dirty(tmp_path, monkeypatch):
     monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 2, 1)])
 
     def mock_download_document(session, root, item, delay):
-        write_atomic(record_path(root, "prop", item["basefile"]),
+        write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
                      json.dumps({"type": "prop", "files": []}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
@@ -354,7 +407,7 @@ def test_sync_downloads_pm_doc_below_a_ds_only_page(tmp_path, monkeypatch):
     downloads = []
     def mock_download_document(session, root, item, delay):
         downloads.append(item["basefile"])
-        write_atomic(record_path(root, "pm", item["basefile"]),
+        write_atomic(layout.fa_record_file(root, "pm", item["basefile"]),
                      json.dumps({"type": "pm", "files": []}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
