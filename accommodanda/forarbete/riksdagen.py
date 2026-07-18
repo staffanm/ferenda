@@ -71,14 +71,13 @@ from urllib.parse import quote
 
 import requests
 
-from ..lib import compress
+from ..lib import compress, layout
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
     Reporter,
     basefile_slug,
-    record_path,
 )
 from .download import has_live_record
 
@@ -196,10 +195,11 @@ def download_document(session, root, entry, delay):
             raise ValueError("%s: filbilaga %s is not a PDF"
                              % (record["basefile"], fil["url"]))
         name = slug + ".pdf"
-        compress.write_download(Path(root) / TYPE / name, data)
+        compress.write_download(
+            layout.fa_dir(root, TYPE, record["basefile"]) / name, data)
         record["files"] = [name]
         time.sleep(delay)
-    compress.write_download(record_path(root, TYPE, record["basefile"]),
+    compress.write_download(layout.fa_record_file(root, TYPE, record["basefile"]),
                             json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
@@ -228,7 +228,8 @@ def _currency(root, basefile, entry):
     filbilaga)."""
     if not has_live_record(root, TYPE, basefile):
         return None
-    record = json.loads(compress.read_text(record_path(root, TYPE, basefile)))
+    record = json.loads(compress.read_text(
+        layout.fa_record_file(root, TYPE, basefile)))
     if record["files"]:
         return "final"
     return "provisional" if pdf_fil(entry) is None else None

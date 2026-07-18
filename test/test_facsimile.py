@@ -30,9 +30,10 @@ def corpus(tmp_path, monkeypatch):
     rather than a plain-file fallback that production never has."""
     monkeypatch.setattr(config, "COMPRESS", True)
     fa = tmp_path / "forarbete"
-    (fa / "prop").mkdir(parents=True)
-    (fa / "prop" / "2013-14-116.pdf").write_bytes(MINI_PDF)
-    compress.write_download(fa / "prop" / "2013-14-116.json", json.dumps(
+    propdir = layout.fa_dir(fa, "prop", "2013/14:116")     # year-segmented slot
+    propdir.mkdir(parents=True)
+    (propdir / "2013-14-116.pdf").write_bytes(MINI_PDF)
+    compress.write_download(propdir / "2013-14-116.json", json.dumps(
         {"type": "prop", "basefile": "2013/14:116",
          "identifier": "Prop. 2013/14:116", "files": ["2013-14-116.pdf"],
          "padding": "x" * 600}))
@@ -72,14 +73,15 @@ def corpus(tmp_path, monkeypatch):
 
 def test_render_page_produces_png(corpus, tmp_path):
     out = facsimile.render_page(
-        tmp_path / "forarbete" / "prop" / "2013-14-116.pdf", 1,
+        layout.fa_dir(tmp_path / "forarbete", "prop", "2013/14:116")
+        / "2013-14-116.pdf", 1,
         tmp_path / "out" / "sid1.png")
     assert out.read_bytes()[:4] == PNG_MAGIC
     assert not list(out.parent.glob("*.tmp*"))       # temp root cleaned up
 
 
 def test_cached_page_renders_once(corpus, monkeypatch):
-    pdf = corpus / "forarbete" / "prop" / "2013-14-116.pdf"
+    pdf = layout.fa_dir(corpus / "forarbete", "prop", "2013/14:116") / "2013-14-116.pdf"
     calls = []
     real = facsimile.render_page
     monkeypatch.setattr(facsimile, "render_page",

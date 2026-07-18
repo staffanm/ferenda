@@ -85,7 +85,8 @@ def _forarbete_intermediate(basefile):
     pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
     if not pdfs:
         raise SkipDocument("%s: no body PDF" % basefile)
-    return _pdf_xml(layout.FA_DOWNLOADED / record["type"] / pdfs[0])
+    return _pdf_xml(layout.fa_dir(layout.FA_DOWNLOADED, record["type"],
+                                  record["basefile"]) / pdfs[0])
 
 
 def _foreskrift_intermediate(basefile):

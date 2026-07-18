@@ -139,7 +139,7 @@ def relpath(source, basefile):
         return Path(case_slug(basefile))
     if source == "forarbete":
         typ, rest = basefile.split("/", 1)
-        return Path(typ) / rest
+        return Path(typ) / fa_year(rest) / rest
     if source == "eurlex":
         return Path(basefile[1:5]) / basefile.replace("/", "_")
     if source == "foreskrift":
@@ -345,9 +345,36 @@ def sfs_sidecar_basefile(path):
                       path.name[:-len(".versions.json")].replace("_", " "))
 
 
+def fa_year(slug):
+    """The year segment of a förarbete document's on-disk sub-path, from its
+    filesystem slug. Every förarbete id but ``pm`` leads with a 4-digit year (a
+    riksmöte's first year for prop/bet/rskr/skr, the utgivningsår otherwise), so
+    that is the segment; ``pm`` is keyed by title-slug or diarienummer with no
+    year and buckets under ``_``. Segmenting by year keeps each directory small
+    -- prop/bet/rskr each hold tens of thousands of files flat otherwise, the same
+    reason SFS files by ``<year>/<nr>``."""
+    return slug[:4] if slug[:4].isdigit() else "_"
+
+
+def fa_dir(root, typ, ident):
+    """The directory a förarbete document's record and body files share:
+    ``<root>/<typ>/<year>``. `root` is a download root (``FA_DOWNLOADED``, or a
+    test/scratch root); `ident` the per-type basefile (``2021:82`` or its slug),
+    off which the year is read. Record and files live together, so a bare `files`
+    name still resolves beside its record after segmentation."""
+    return Path(root) / typ / fa_year(basefile_slug(ident))
+
+
+def fa_record_file(root, typ, ident):
+    """The record JSON path for a förarbete document under a download `root`:
+    ``<root>/<typ>/<year>/<slug>.json``. The writer-side companion to
+    `fa_record` (which resolves under the global ``FA_DOWNLOADED``)."""
+    return fa_dir(root, typ, ident) / (basefile_slug(ident) + ".json")
+
+
 def fa_record(basefile):
     typ, rest = basefile.split("/", 1)
-    return FA_DOWNLOADED / typ / (rest + ".json")
+    return fa_record_file(FA_DOWNLOADED, typ, rest)
 
 
 # on-demand page facsimiles (rendered PNGs of source-PDF pages), keyed like the
@@ -379,7 +406,27 @@ def fa_ocr_pdf(typ, basefile):
     OCR layer is weak) upgrades that document's parse -- parse prefers it over the
     legacy-root scan -- without touching the one-time import. The path is a parse
     input, so a new sidecar re-stales that document's parse."""
-    return OCR / "forarbete" / typ / (basefile_slug(basefile) + ".pdf")
+    return fa_dir(OCR / "forarbete", typ, basefile) / (basefile_slug(basefile) + ".pdf")
+
+
+def fa_facsimile_pdf(typ, basefile):
+    """The page-image PDF a förarbete document's facsimile renders from:
+    ``downloaded/forarbete/<type>/<slug>.pdf``, beside the record and slugged like
+    it. Raw fetched bytes, so it lives in the download tree (`.pdf` -> stored
+    plain).
+
+    Deliberately a *rule*, not a record field, and deliberately NOT a parse input
+    -- the same bargain as `sfs_pdf` (the mirrored SFS PDFs `api._sfs_pdf`
+    resolves by existence alone). A record's `files` says what parse reads; this
+    says what a facsimile rasterizes, and the two are only sometimes the same
+    file. That split is what lets the propkb scan fetch (`forarbete/propkb.py`)
+    add 17k page-image PDFs without rewriting 17k records -- a record rewrite
+    would change its content hash and re-stale 17k parses (`build.hash_files`
+    over `fa_parse_inputs`) for bytes parse never reads.
+
+    For a document whose body already *is* a PDF the rule resolves to that same
+    file, so it is consistent rather than merely non-conflicting."""
+    return fa_dir(FA_DOWNLOADED, typ, basefile) / (basefile_slug(basefile) + ".pdf")
 
 
 def eurlex_dir(basefile):

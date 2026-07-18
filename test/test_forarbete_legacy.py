@@ -171,7 +171,7 @@ def test_import_pdf_route(legacy_root):
          pdf=_text_pdf(), html="ignored (pdf wins)")
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["pdf_route"]) == (1, 1)
-    rec = json.loads((out / "prop" / "1971-40.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1971-40")).read_text())
     assert rec["basefile"] == "1971:40"
     assert rec["type"] == "prop" and rec["source"] == "propriksdagen"
     assert rec["identifier"] == "Prop. 1971:40"
@@ -189,7 +189,7 @@ def test_import_textless_pdf_falls_to_skanning_html(legacy_root):
     _doc(downloaded, "1971", "30", _xml("1971", "30"), pdf=PDF_MAGIC, html=mso)
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["html_route"]) == (1, 1)
-    rec = json.loads((out / "prop" / "1971-30.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1971-30")).read_text())
     assert rec["body_format"] == "skanning2007"
     assert rec["legacy_files"] == ["propriksdagen/downloaded/1971/30/index.html"]
     assert body_tier(rec["legacy_files"]) == 1
@@ -204,7 +204,7 @@ def test_import_textless_pdf_falls_to_texttml_html(legacy_root):
          pdf=PDF_MAGIC, html=body)
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["html_route"]) == (1, 1)
-    rec = json.loads((out / "prop" / "1991-92-104.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1991-92-104")).read_text())
     assert rec["body_format"] == "text/tml"
     assert rec["legacy_files"] == ["propriksdagen/downloaded/1991-92/104/index.html"]
 
@@ -217,7 +217,7 @@ def test_import_html_ec_is_never_a_body(legacy_root):
          pdf=PDF_MAGIC, html="<div>positioned junk</div>")
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["metadata_only"]) == (1, 1)
-    rec = json.loads((out / "prop" / "1996-97-1.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1996-97-1")).read_text())
     assert rec["legacy_files"] == [] and "body_format" not in rec
 
 
@@ -228,7 +228,7 @@ def test_import_html_route_text_tml(legacy_root):
          html=body)
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["html_route"]) == (1, 1)
-    rec = json.loads((out / "prop" / "1995-96-80.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1995-96-80")).read_text())
     assert rec["basefile"] == "1995/96:80"
     assert rec["body_format"] == "text/tml"
     assert rec["legacy_files"] == ["propriksdagen/downloaded/1995-96/80/index.html"]
@@ -242,7 +242,7 @@ def test_import_metadata_only(legacy_root):
     _doc(downloaded, "1997-98", "45", _xml("1997/98", "45", htmlformat="text/tml"))
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert (counts["imported"], counts["metadata_only"]) == (2, 2)
-    rec = json.loads((out / "prop" / "1975-76-100.json").read_text())
+    rec = json.loads((layout.fa_record_file(out, "prop", "1975-76-100")).read_text())
     assert rec["legacy_files"] == []
 
 
@@ -253,7 +253,7 @@ def test_import_skips_junk_dirs(legacy_root):
     _doc(downloaded, "2017-htgen.nu-prop-2017-18", "1", _xml("2017/18", "1"))
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert counts["imported"] == 1 and counts["junk_dirs"] == 2
-    assert not (out / "prop" / "2006-07-1.json").exists()
+    assert not (layout.fa_record_file(out, "prop", "2006-07-1")).exists()
 
 
 def test_import_accepts_1999_2000_shape(legacy_root):
@@ -261,7 +261,7 @@ def test_import_accepts_1999_2000_shape(legacy_root):
     _doc(downloaded, "1999-2000", "1", _xml("1999/2000", "1"))
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert counts["imported"] == 1 and counts["junk_dirs"] == 0
-    assert (out / "prop" / "1999-2000-1.json").exists()
+    assert (layout.fa_record_file(out, "prop", "1999-2000-1")).exists()
 
 
 def test_import_ej_utgiven_skipped(legacy_root):
@@ -271,14 +271,14 @@ def test_import_ej_utgiven_skipped(legacy_root):
          html=ej)
     counts = import_propriksdagen(source, out, log=lambda *_: None)
     assert counts["imported"] == 0 and counts["ej_utgiven"] == 1
-    assert not (out / "prop" / "1994-95-7.json").exists()
+    assert not (layout.fa_record_file(out, "prop", "1994-95-7")).exists()
 
 
 def test_import_skips_live_record_unchanged(legacy_root):
     source, downloaded, out = legacy_root
     _doc(downloaded, "1996-97", "115", _xml("1996/97", "115", htmlformat="text/tml"),
          html="Regeringens proposition<br>1996/97:115<br>")
-    live = out / "prop" / "1996-97-115.json"
+    live = layout.fa_record_file(out, "prop", "1996-97-115")
     live.parent.mkdir(parents=True)
     live.write_text(json.dumps({"type": "prop", "basefile": "1996/97:115",
                                 "url": "https://www.regeringen.se/x", "files": []}))
@@ -292,7 +292,7 @@ def test_import_idempotent_rerun_and_force(legacy_root):
     source, downloaded, out = legacy_root
     _doc(downloaded, "1971", "40", _xml("1971", "40"), pdf=_text_pdf())
     import_propriksdagen(source, out, log=lambda *_: None)
-    rec = out / "prop" / "1971-40.json"
+    rec = layout.fa_record_file(out, "prop", "1971-40")
     rec.write_text(rec.read_text() + "\n")              # a local edit to detect rewrite
     marked = rec.read_text()
     # plain re-run keeps the record untouched (its mtime, so parse stays fresh)
@@ -418,7 +418,7 @@ def frozen(tmp_path, monkeypatch):
 
 
 def _read_rec(out, typ, slug):
-    return json.loads((out / typ / (slug + ".json")).read_text())
+    return json.loads(layout.fa_record_file(out, typ, slug).read_text())
 
 
 # --- souregeringen / dsregeringen / dirregeringen -------------------------
@@ -547,7 +547,7 @@ def test_proptrips_pdf_html_doc_and_empty_dir(frozen):
     assert trec["body_format"] == "trips"
     assert trec["legacy_files"] == ["proptrips/downloaded/1993-94/1/index.html"]
     assert _read_rec(out, "prop", "1995-96-100")["legacy_files"] == []   # .wpd not listed
-    assert not (out / "prop" / "2071-72-1.json").exists()           # empty dir skipped
+    assert not (layout.fa_record_file(out, "prop", "2071-72-1")).exists()           # empty dir skipped
 
 
 def test_proptrips_search_shell_page_imports_metadata_only(frozen):
@@ -606,7 +606,7 @@ def test_dirasp_pdf_downloaded_first(frozen):
     assert counts["imported"] == 1 and counts["pdf_route"] == 1
     rec = _read_rec(out, "dir", "2007-23")
     assert rec["identifier"] == "Dir. 2007:23" and rec["url"] is None
-    assert not (out / "dir" / "1997-1.json").exists()   # entry-only stub not minted
+    assert not layout.fa_record_file(out, "dir", "1997-1").exists()   # entry-only stub not minted
 
 
 def test_dirtrips_search_shell_page_imports_metadata_only(frozen):
@@ -674,7 +674,7 @@ def test_trips_null_entry_doc_is_recovered_by_path(frozen):
 # --- SOURCE_RANK / tier interplay at the walk level (gap-window handoff) ----
 
 def _preexisting(out, typ, slug, record):
-    p = out / typ / (slug + ".json")
+    p = layout.fa_record_file(out, typ, slug)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(record))
 

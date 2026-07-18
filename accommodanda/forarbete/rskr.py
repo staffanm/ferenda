@@ -30,10 +30,10 @@ import json
 import time
 from pathlib import Path
 
-from ..lib import compress
+from ..lib import compress, layout
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import request
-from ..lib.util import basefile_slug, record_path
+from ..lib.util import basefile_slug
 from . import riksdagen
 from .download import has_live_record
 
@@ -73,10 +73,11 @@ def download_document(session, root, entry, delay):
         raise ValueError("%s: empty rskr body at %s"
                          % (record["basefile"], record["url"]))
     name = basefile_slug(record["basefile"]) + ".html"
-    compress.write_download(Path(root) / TYPE / name, html)
+    compress.write_download(
+        layout.fa_dir(root, TYPE, record["basefile"]) / name, html)
     record["files"] = [name]
     time.sleep(delay)
-    compress.write_download(record_path(root, TYPE, record["basefile"]),
+    compress.write_download(layout.fa_record_file(root, TYPE, record["basefile"]),
                             json.dumps(record, ensure_ascii=False, indent=2))
     return record
 

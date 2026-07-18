@@ -17,7 +17,7 @@ from accommodanda.forarbete import parse as fa_parse
 from accommodanda.forarbete import riksdagen
 from accommodanda.forarbete.parse import mint_uri
 from accommodanda.lib import layout
-from accommodanda.lib.util import basefile_slug, record_path, write_atomic
+from accommodanda.lib.util import basefile_slug, write_atomic
 
 FIXTURES = Path(__file__).parent / "files" / "forarbete"
 PAGE1 = json.loads((FIXTURES / "bet_dokumentlista_page1.json").read_text())
@@ -125,9 +125,9 @@ def test_download_writes_record_and_pdf(monkeypatch, tmp_path):
     _patch(monkeypatch, net)
     record = riksdagen.download_document(None, tmp_path, _entry(PAGE1, "JuU47"), delay=0)
     assert record["files"] == ["2025-26-JuU47.pdf"]
-    pdf = tmp_path / "bet" / "2025-26-JuU47.pdf"
+    pdf = layout.fa_dir(tmp_path, "bet", "2025/26:JuU47") / "2025-26-JuU47.pdf"
     assert pdf.read_bytes() == PDF_BYTES
-    on_disk = json.loads(record_path(tmp_path, "bet", "2025/26:JuU47").read_text())
+    on_disk = json.loads(layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").read_text())
     assert on_disk == record
     # exactly one binary fetch happened (the PDF), no HTML/XML body fetch
     assert sum("/fil/" in u for u in net.fetched) == 1
@@ -140,8 +140,8 @@ def test_download_metadata_only_for_null_filbilaga(monkeypatch, tmp_path):
     record = riksdagen.download_document(None, tmp_path, _entry(PAGE1, "FiU8"), delay=0)
     assert record["files"] == []                       # metadata-only record
     assert net.fetched == []                           # no PDF, no body fetched
-    assert record_path(tmp_path, "bet", "2026/27:FiU8").exists()
-    assert not (tmp_path / "bet" / "2026-27-FiU8.pdf").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2026/27:FiU8").exists()
+    assert not (layout.fa_dir(tmp_path, "bet", "2026/27:FiU8") / "2026-27-FiU8.pdf").exists()
 
 
 def test_basefile_slug_round_trips_record_path():
@@ -149,7 +149,7 @@ def test_basefile_slug_round_trips_record_path():
     # slug of the record's own basefile, and layout.fa_record must find it back.
     slug = basefile_slug("2025/26:JuU47")
     assert slug == "2025-26-JuU47"
-    path = record_path(layout.FA_DOWNLOADED, "bet", "2025/26:JuU47")
+    path = layout.fa_record_file(layout.FA_DOWNLOADED, "bet", "2025/26:JuU47")
     assert path.name == slug + ".json"
     # fa_list would yield "bet/2025-26-JuU47"; layout.fa_record resolves it back
     assert layout.fa_record("bet/" + slug) == path
@@ -229,8 +229,8 @@ def test_sync_backfill_walks_riksmoten_and_saves_watermark(monkeypatch, tmp_path
     # datum lies in the future and would erode the gate's safety margin
     assert _watermark(tmp_path) == "2026-06-16"
     assert _dirty(tmp_path) is False               # a clean run completes clean
-    assert record_path(tmp_path, "bet", "2026/27:FiU8").exists()
-    assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2026/27:FiU8").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").exists()
     # the newest-riksmöte probe hits the un-narrowed listing once; every listing
     # fetch after it is an rm-narrowed walk (or a followed @nasta_sida)
     listing_urls = [u for u in net.fetched if "dokumentlista" in u]
@@ -261,11 +261,11 @@ def test_sync_backfill_skips_known_docs_but_keeps_walking(monkeypatch, tmp_path)
     _backfill_net(monkeypatch)
     known = riksdagen.descriptor(_entry(PAGE1, "KU45"))
     known["files"] = ["2025-26-KU45.pdf"]        # a completed download is current
-    write_atomic(record_path(tmp_path, "bet", known["basefile"]),
+    write_atomic(layout.fa_record_file(tmp_path, "bet", known["basefile"]),
                  json.dumps(known))
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert seen == 3 and new == 2                # KU45 skipped, walk continued
-    assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").exists()
     assert _watermark(tmp_path) == "2026-06-16"
 
 
@@ -290,7 +290,7 @@ def test_full_rewalk_with_errors_leaves_store_dirty_and_next_run_heals(monkeypat
     assert _watermark(tmp_path) == "2026-06-16"
     # the JuU47 copy goes missing and its refetch now yields non-PDF bytes
     juu47 = _entry(PAGE1, "JuU47")
-    record_path(tmp_path, "bet", "2025/26:JuU47").unlink()
+    layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").unlink()
     net2 = _backfill_net(monkeypatch)
     net2.bad_fil.add(riksdagen.pdf_fil(juu47)["url"])
     seen, new = riksdagen.sync(tmp_path, delay=0, full=True)
@@ -305,7 +305,7 @@ def test_full_rewalk_with_errors_leaves_store_dirty_and_next_run_heals(monkeypat
     _patch(monkeypatch, net3)
     seen3, new3 = riksdagen.sync(tmp_path, delay=0)
     assert new3 == 1                                      # exactly the stranded doc
-    assert record_path(tmp_path, "bet", "2025/26:JuU47").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").exists()
     assert _dirty(tmp_path) is False                      # healed run completes clean
 
 
@@ -322,8 +322,8 @@ def test_download_rejects_non_pdf_bytes(monkeypatch, tmp_path):
     _patch(monkeypatch, net)
     with pytest.raises(ValueError, match="not a PDF"):
         riksdagen.download_document(None, tmp_path, entry, delay=0)
-    assert not (tmp_path / "bet" / "2025-26-JuU47.pdf").exists()
-    assert not record_path(tmp_path, "bet", "2025/26:JuU47").exists()
+    assert not (layout.fa_dir(tmp_path, "bet", "2025/26:JuU47") / "2025-26-JuU47.pdf").exists()
+    assert not layout.fa_record_file(tmp_path, "bet", "2025/26:JuU47").exists()
 
 
 def test_incremental_error_leaves_store_dirty_and_next_run_heals(monkeypatch, tmp_path):
@@ -344,7 +344,7 @@ def test_incremental_error_leaves_store_dirty_and_next_run_heals(monkeypatch, tm
     _patch(monkeypatch, net2)
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert new == 0                                       # the failure was counted, not raised
-    assert not record_path(tmp_path, "bet", "2025/26:JuU45").exists()
+    assert not layout.fa_record_file(tmp_path, "bet", "2025/26:JuU45").exists()
     assert _watermark(tmp_path) == "2026-06-16"           # newest published datum
     assert _dirty(tmp_path) is True                       # errors withhold the clean save
     # 3) the next incremental run (still one un-narrowed walk, no rm backfill)
@@ -354,8 +354,8 @@ def test_incremental_error_leaves_store_dirty_and_next_run_heals(monkeypatch, tm
     _patch(monkeypatch, net3)
     seen3, new3 = riksdagen.sync(tmp_path, delay=0)
     assert new3 == 1                                      # exactly the missed doc
-    assert record_path(tmp_path, "bet", "2025/26:JuU45").exists()
-    assert (tmp_path / "bet" / "2025-26-JuU45.pdf").read_bytes() == PDF_BYTES
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:JuU45").exists()
+    assert (layout.fa_dir(tmp_path, "bet", "2025/26:JuU45") / "2025-26-JuU45.pdf").read_bytes() == PDF_BYTES
     assert [u for u in net3.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
     assert _dirty(tmp_path) is False                      # the healing run was clean
 
@@ -379,7 +379,7 @@ def test_malformed_feed_entries_are_recorded_and_skipped(monkeypatch, tmp_path):
     messages = []
     seen, new = riksdagen.sync(tmp_path, delay=0, log=messages.append)
     assert (seen, new) == (4, 1)                   # only the good doc downloaded
-    assert record_path(tmp_path, "bet", "2025/26:KU45").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:KU45").exists()
     assert sum("malformed" in m for m in messages) == 3
     assert _dirty(tmp_path) is True                # recorded errors keep it dirty
 
@@ -405,7 +405,7 @@ def test_incremental_upgrades_metadata_only_record_once_pdf_appears(monkeypatch,
     # count as known forever (that would freeze it body-less permanently)
     _backfill_net(monkeypatch)
     riksdagen.sync(tmp_path, delay=0)                     # FiU8 stored metadata-only
-    fiu8_record = record_path(tmp_path, "bet", "2026/27:FiU8")
+    fiu8_record = layout.fa_record_file(tmp_path, "bet", "2026/27:FiU8")
     assert json.loads(fiu8_record.read_text())["files"] == []
     # the feed now shows FiU8 published, KU45 (current, has its PDF) below it
     fiu8_pub = _with_filbilaga(_entry(PAGE1, "FiU8"),
@@ -416,7 +416,7 @@ def test_incremental_upgrades_metadata_only_record_once_pdf_appears(monkeypatch,
     seen, new = riksdagen.sync(tmp_path, delay=0)         # incremental
     assert new == 1                                       # the upgrade
     assert json.loads(fiu8_record.read_text())["files"] == ["2026-27-FiU8.pdf"]
-    assert (tmp_path / "bet" / "2026-27-FiU8.pdf").read_bytes() == PDF_BYTES
+    assert (layout.fa_dir(tmp_path, "bet", "2026/27:FiU8") / "2026-27-FiU8.pdf").read_bytes() == PDF_BYTES
     # the clean run saves the watermark; FiU8 now counts as published, so its
     # datum (the newest) is the new last_harvest
     assert _watermark(tmp_path) == "2026-06-30"
@@ -444,7 +444,7 @@ def test_incremental_stops_only_at_final_records(monkeypatch, tmp_path):
     _patch(monkeypatch, net2)
     seen, new = riksdagen.sync(tmp_path, delay=0)
     assert (seen, new) == (3, 1)          # FiU8 skipped, JuU45 fetched, stop at KU45
-    assert record_path(tmp_path, "bet", "2025/26:JuU45").exists()
+    assert layout.fa_record_file(tmp_path, "bet", "2025/26:JuU45").exists()
     assert [u for u in net2.fetched if "dokumentlista" in u] == [riksdagen.LISTING]
 
 
