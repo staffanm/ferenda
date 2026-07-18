@@ -13,7 +13,8 @@ import pytest
 
 from accommodanda import build, config
 from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
-from accommodanda.lib import annstore, catalog, layout, runlog
+from accommodanda.foreskrift.model import Consolidation, Regulation
+from accommodanda.lib import annstore, catalog, compress, layout, runlog
 from accommodanda.lib.errors import SkipDocument
 
 
@@ -306,6 +307,62 @@ def test_artifacts_excludes_index_sidecars(tmp_path, monkeypatch):
     law = sfs / "1.json"; law.write_text("{}")
     (sfs / "1.versions.json").write_text("[]")                   # not a document
     assert layout.artifacts("sfs") == [law]
+
+    fs = tmp_path / "foreskrift" / "fffs"; fs.mkdir(parents=True)
+    reg = fs / "2013-10.json"; reg.write_text("{}")
+    (fs / "2013-10.grund.json").write_text("{}")                 # not a document
+    assert layout.artifacts("foreskrift") == [reg]
+
+
+def test_foreskrift_parse_run_retires_grund_projection(tmp_path, monkeypatch):
+    # the /grund page is a derived projection of the sidecar: when a re-parse
+    # stops presenting a consolidation, the sidecar AND the generated page must
+    # both go -- generate only plans pages whose sidecar exists, so a surviving
+    # page would keep serving as an unrefreshable orphan
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(build, "GENERATED", tmp_path / "generated")
+    record = tmp_path / "record.json"; record.write_text("{}")
+    monkeypatch.setattr(build, "foreskrift_record", lambda bf: record)
+
+    def reg(consolidations):
+        return Regulation(
+            uri="https://lagen.nu/fffs/2013:10", identifier="FFFS 2013:10",
+            fs="fffs", arsutgava="2013", lopnummer="10",
+            structure=[{"id": "P1"}], consolidations=consolidations)
+
+    cons = Consolidation(of="https://lagen.nu/fffs/2013:10",
+                         structure=[{"id": "P1"}])
+    monkeypatch.setattr(build.foreskrift_parse, "parse_record",
+                        lambda record, root: reg([cons]))
+    build.foreskrift_parse_run("fffs/2013:10")
+    sidecar = layout.foreskrift_grund_artifact("fffs/2013:10")
+    assert compress.exists(sidecar)
+    page = build.GENERATED / "fffs" / "2013_10_grund.html"
+    page.parent.mkdir(parents=True); page.write_text("<html>")
+
+    monkeypatch.setattr(build.foreskrift_parse, "parse_record",
+                        lambda record, root: reg([]))
+    build.foreskrift_parse_run("fffs/2013:10")
+    assert not compress.exists(sidecar)
+    assert not page.exists()
+
+
+def test_foreskrift_grund_pages_enumerates_sidecars(tmp_path, monkeypatch):
+    # the /grund sidecars become generate's extra page rows (the föreskrift
+    # counterpart of build.sfs_version_pages): uri, source, path, title
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+    fs = tmp_path / "foreskrift" / "fffs"; fs.mkdir(parents=True)
+    (fs / "2013-10.json").write_text("{}")
+    (fs / "2013-10.grund.json").write_text("{}")
+    assert layout.foreskrift_grund_pages() == [
+        ("https://lagen.nu/fffs/2013:10/grund", "foreskrift",
+         str(fs / "2013-10.grund.json"),
+         "FFFS 2013:10 i ursprunglig lydelse")]
+    # a sidecar name that does not decode to a föreskrift identity is a
+    # layout bug, not a page -- refuse, never guess
+    (fs / "trasig.grund.json").write_text("{}")
+    with pytest.raises(ValueError):
+        layout.foreskrift_grund_pages()
 
 
 def test_stage_watermark_tracks_inputs(tmp_path):

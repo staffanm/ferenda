@@ -369,8 +369,12 @@ def parse_record(record, root):
             cstruct, tom = parse_consolidation(
                 Path(root) / fs / cons["name"], record["identifier"],
                 fs, arsutgava, lopnummer, _fresh_parser())
+            if any(c.konsolideradTom == tom and c.structure == cstruct
+                   for c in reg.consolidations):
+                continue          # the landing page listed the same PDF twice
             reg.consolidations.append(Consolidation(
-                of=reg.uri, konsolideradTom=tom, structure=cstruct))
+                of=reg.uri, konsolideradTom=tom, url=cons.get("url"),
+                structure=cstruct))
     for am in files.get("amendment", []):
         # the harvest record always carries both keys (harvest.py normalizes);
         # identifier may be None (unreadable link text) -- the url still pins it

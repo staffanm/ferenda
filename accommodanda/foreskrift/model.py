@@ -64,6 +64,7 @@ class Consolidation:
     of: str                      # base regulation uri
     konsolideradTom: str | None = None   # uri of the most recent amendment folded in
     file: str | None = None      # stored konsoliderad PDF
+    url: str | None = None       # the agency's own link for the konsoliderad PDF
     structure: list = field(default_factory=list)
 
 
@@ -123,7 +124,7 @@ class Regulation:
             "structure": self.structure,
             "consolidations": [
                 {"of": c.of, "konsolideradTom": c.konsolideradTom,
-                 "structure": c.structure}
+                 "url": c.url, "structure": c.structure}
                 for c in self.consolidations
             ],
             "amendments": [

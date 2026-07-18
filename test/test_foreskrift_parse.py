@@ -5,6 +5,7 @@ exercised against the downloaded corpus during a batch parse, not here."""
 
 from accommodanda.lib.pdftext import Para
 from accommodanda.foreskrift import structure
+from accommodanda.foreskrift import parse as fp
 from accommodanda.foreskrift.parse import (classify, extract_metadata, _iso,
                                            _body_start, _dedupe_bemyndigande,
                                            konsoliderad_tom, _fresh_parser,
@@ -184,3 +185,26 @@ def test_parse_record_mints_amendment_uris_and_keeps_source_urls(tmp_path):
     assert known.url == "https://ex/a.pdf"
     assert unreadable.identifier is None and unreadable.uri is None
     assert unreadable.url == "https://ex/b.pdf"
+
+
+def test_parse_record_dedupes_twice_listed_consolidation(tmp_path, monkeypatch):
+    # fffs/2015:12's landing page lists the same konsoliderad PDF twice; two
+    # identical Consolidations would masquerade as two historical versions.
+    # A *distinct* second consolidation (a genuinely archived older one, as on
+    # bfs/2007:5) must survive. The agency url rides into the model.
+    bodies = {"a.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13"),
+              "b.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13"),
+              "c.pdf": ([{"id": "P1", "old": True}],
+                        "https://lagen.nu/fffs/2014:2")}
+    monkeypatch.setattr(fp, "parse_consolidation",
+                        lambda path, *a: bodies[path.name])
+    record = {"fs": "fffs", "basefile": "fffs/2015:12",
+              "identifier": "FFFS 2015:12",
+              "files": {"consolidation": [
+                  {"name": "a.pdf", "url": "https://ex/k.pdf"},
+                  {"name": "b.pdf", "url": "https://ex/k.pdf"},
+                  {"name": "c.pdf", "url": "https://ex/gammal.pdf"}]}}
+    reg = parse_record(record, tmp_path)
+    assert len(reg.consolidations) == 2
+    assert reg.consolidations[0].url == "https://ex/k.pdf"
+    assert reg.consolidations[1].konsolideradTom == "https://lagen.nu/fffs/2014:2"

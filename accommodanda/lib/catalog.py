@@ -23,7 +23,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import compress, concepts, util
+from . import compress, concepts, text, util
 from .markdown import begrepp_uri
 
 BASE = "https://lagen.nu/"
@@ -357,14 +357,17 @@ def implements_links(art):
 def artifact_links(art):
     """Every inline citation in an artifact, from the body-bearing sections
     of either source: SFS `structure` + the amendments' `content`, DV `body`,
-    plus a förarbete's `implements` (genomför-direktiv) edges and generic
-    top-level `references` for relations expressed by source metadata rather
-    than a literal body span (HUDOC's article facet, treaty crosswalks)."""
+    a föreskrift's presented consolidation (which replaces its base
+    `structure` -- text.body_sections owns that choice, so the graph carries
+    exactly the citations the rendered page shows), plus a förarbete's
+    `implements` (genomför-direktiv) edges and generic top-level `references`
+    for relations expressed by source metadata rather than a literal body
+    span (HUDOC's article facet, treaty crosswalks)."""
     out = []
-    collect_links(art.get("structure"), None, out)
+    for nodes in text.body_sections(art):
+        collect_links(nodes, None, out)
     for amendment in art.get("amendments", []):
         collect_links(amendment.get("content"), None, out)
-    collect_links(art.get("body"), None, out)
     out += implements_links(art)
     # Source metadata can carry legal relations that have no literal span in
     # the body (HUDOC's article facet, a treaty's Swedish implementation).

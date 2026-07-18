@@ -443,6 +443,82 @@ def test_case_page_renders_curated_groups(tmp_path):
     assert "Förarbeten</h2>" not in html
 
 
+# --- föreskrift: consolidation publishing ----------------------------------
+
+FORESKRIFT = {
+    "uri": "https://lagen.nu/fffs/2013:10", "type": "foreskrift",
+    "identifier": "FFFS 2013:10", "fs": "fffs",
+    "metadata": {"title": "Föreskrifter om försäkring", "publisher": "FI",
+                 "bemyndigande": [], "genomfor": []},
+    "structure": [
+        {"type": "paragraf", "id": "P1", "text": [
+            "Ursprunglig hänvisning till ",
+            {"predicate": "dcterms:references", "text": "gamla lagen",
+             "uri": "https://lagen.nu/1975:635#P5"}, "."]}],
+    "consolidations": [
+        {"of": "https://lagen.nu/fffs/2013:10",
+         "konsolideradTom": "https://lagen.nu/fffs/2016:13", "url": None,
+         "structure": [
+             {"type": "paragraf", "id": "P1", "text": [
+                 "Konsoliderad hänvisning till ",
+                 {"predicate": "dcterms:references", "text": "6 § räntelagen",
+                  "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}],
+    "amendments": [
+        {"identifier": "FFFS 2016:13", "uri": "https://lagen.nu/fffs/2016:13",
+         "url": "https://fi.se/fffs-2016-13.pdf", "beslutsdatum": None}],
+}
+
+
+def test_foreskrift_links_come_from_presented_consolidation():
+    # the page shows the consolidation, so the graph must carry exactly its
+    # citations -- not the superseded base text's, and never both (same §§
+    # would double every edge)
+    out = catalog.artifact_links(FORESKRIFT)
+    assert [run["uri"] for _, run in out] == ["https://lagen.nu/1975:635#P6"]
+
+
+def test_foreskrift_page_presents_consolidation(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    html = render.render_foreskrift(FORESKRIFT, site)
+    assert "Konsoliderad version" in html               # labelled, not silent
+    assert "inofficiell sammanställning" in html
+    assert "FFFS 2016:13" in html                       # the cutoff amendment
+    assert 'href="/fffs/2013:10/grund"' in html         # way to the base text
+    assert "Konsoliderad hänvisning" in html            # consolidation body...
+    assert "Ursprunglig hänvisning" not in html         # ...replaces the base
+    # the ändringsförfattningar register, with the agency's own document link
+    assert "Ändringsförfattningar</h2>" in html
+    assert 'href="https://fi.se/fffs-2016-13.pdf"' in html
+
+
+def test_foreskrift_grund_page_shows_base_text(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    grund = dict(json.loads(json.dumps(FORESKRIFT)),
+                 uri=FORESKRIFT["uri"] + "/grund", version="grund",
+                 consolidations=[])
+    html = render.render_foreskrift(grund, site)
+    assert "Ursprunglig lydelse" in html
+    assert 'href="/fffs/2013:10"' in html               # way back
+    assert "Ursprunglig hänvisning" in html             # the as-enacted body
+    assert "Konsoliderad hänvisning" not in html
+    assert "inaktuell" in html                          # subdued treatment
+
+
+def test_foreskrift_page_links_unparsed_consolidation(tmp_path):
+    # a konsoliderad PDF that yielded no text (image-only scan, cover sheet)
+    # must not vanish: the base text renders, with the agency's PDF linked
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = json.loads(json.dumps(FORESKRIFT))
+    art["consolidations"] = [{"of": art["uri"], "konsolideradTom": None,
+                              "url": "https://fi.se/konsoliderad.pdf",
+                              "structure": []}]
+    html = render.render_foreskrift(art, site)
+    assert "Ursprunglig hänvisning" in html             # base text presented
+    assert "inte kunnat läsas in" in html
+    assert 'href="https://fi.se/konsoliderad.pdf"' in html
+    assert 'href="/fffs/2013:10/grund"' not in html     # no separate grund page
+
+
 # --- authoritative source url ---------------------------------------------
 
 def test_eurlex_source_url_derives_eli():

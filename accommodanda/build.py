@@ -100,6 +100,7 @@ from .lib import (
     render,
     runlog,
     search,
+    text,
     util,
 )
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
@@ -1894,7 +1895,10 @@ def foreskrift_harvest(scopes):
 FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
                    PKG / "foreskrift" / "model.py",
                    PKG / "foreskrift" / "structure.py",
-                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                   # picks the presented consolidation, which decides whether
+                   # the parse run emits a .grund.json sidecar
+                   PKG / "lib" / "text.py")
 
 
 def foreskrift_record(basefile):
@@ -1928,10 +1932,33 @@ def foreskrift_inputs(basefile):
 
 def foreskrift_parse_run(basefile):
     """One harvested record -> its JSON artifact: the body structure, the masthead
-    metadata, and the bemyndigande/genomför citation edges the model carries."""
+    metadata, and the bemyndigande/genomför citation edges the model carries.
+    When the artifact presents a konsoliderad version *and* the as-enacted base
+    text is parsed, the base is re-projected as a ``.grund.json`` sidecar -- the
+    uncatalogued ``/grund`` page generate appends to its plan (the föreskrift
+    counterpart of the sfs lydelse artifacts); a re-parse that no longer
+    presents one removes the sidecar."""
     record = json.loads(compress.read_text(foreskrift_record(basefile)))
     reg = foreskrift_parse.parse_record(record, str(layout.FORESKRIFT_DOWNLOADED))
-    write_artifact("foreskrift", basefile, reg.to_artifact())
+    art = reg.to_artifact()
+    write_artifact("foreskrift", basefile, art)
+    sidecar = layout.foreskrift_grund_artifact(basefile)
+    if text.presented_consolidation(art) and art["structure"]:
+        grund = dict(art, uri=art["uri"] + "/grund", version="grund",
+                     consolidations=[])
+        compress.write_text(sidecar,
+                            json.dumps(grund, ensure_ascii=False, indent=2,
+                                       sort_keys=True),
+                            encodings=compress.ARTIFACT_ENCODINGS)
+    else:
+        # a re-parse that stopped presenting a consolidation retires the whole
+        # /grund projection: the sidecar AND the generated page, which would
+        # otherwise keep serving as an unrefreshable orphan (generate only
+        # plans pages whose sidecar exists). The page's manifest entry may
+        # linger, but it is inert without the sidecar, and generate's
+        # existence check re-renders the page if the sidecar reappears.
+        compress.unlink(sidecar)
+        compress.unlink(GENERATED / layout.page_relpath(art["uri"] + "/grund"))
 
 
 
@@ -2840,7 +2867,7 @@ def stale_sources():
 # projection) are part of generate's recipe: a facet-rule edit must re-stale the
 # browse pages, not leave them "up to date -- skipped".
 GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
-                 PKG / "lib" / "feeds.py",
+                 PKG / "lib" / "text.py", PKG / "lib" / "feeds.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
@@ -3057,6 +3084,13 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
             sorted(layout.SFS_ARTIFACT.glob("*/*.versions.json")))
     else:
         extra = []
+    # likewise the föreskrift /grund pages (the as-enacted base text beside a
+    # presented consolidation) whenever the run covers foreskrift
+    if only is not None:
+        extra += [row for row in layout.foreskrift_grund_pages()
+                  if row[2].replace(".grund.json", ".json") in only]
+    elif source in (None, "foreskrift"):
+        extra += layout.foreskrift_grund_pages()
 
     total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
                                            fresh=fresh, record=record, only=only,

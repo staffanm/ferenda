@@ -57,7 +57,7 @@ from .catalog import BASE
 from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
 from .markdown import begrepp_uri
-from .text import runs_text
+from .text import presented_consolidation, runs_text
 from .util import basefile_slug, split_numalpha
 
 # the browser-facing static chrome (stylesheet, client scripts, robots.txt),
@@ -2592,9 +2592,94 @@ def _ref_list(site, heading, uris):
             % (escape(heading), items))
 
 
+def _amendment_label(am):
+    """An ändringsförfattning's display: its designation linked to the agency's
+    own page for it where the harvest captured one. The hosted-page link is
+    deliberately not minted here: an amendment that is also harvested as its
+    own record gets its page linked wherever its uri occurs in body text; this
+    register lists the *source* documents."""
+    ident = escape(am.get("identifier") or "ändringsförfattning utan läsbar "
+                   "beteckning")
+    if am.get("url"):
+        return '<a class="ext" href="%s" rel="external">%s</a>' % (
+            escape(am["url"]), ident)
+    return ident
+
+
+def _foreskrift_amendments(amendments, toc):
+    """The bottom-of-page ändringsförfattningar register (the föreskrift
+    counterpart of the SFS `_andringar` view, reduced to what the harvest
+    knows: designation + the agency's own document link)."""
+    if not amendments:
+        return ""
+    anchor = toc.add("L", "Ändringsförfattningar", 1)
+    return ('<section class="andringar" id="%s"><h2 class="kaprubrik">'
+            'Ändringsförfattningar</h2><ul>%s</ul></section>'
+            % (escape(anchor),
+               "".join("<li>%s</li>" % _amendment_label(am)
+                       for am in amendments)))
+
+
+def _konsoliderad_banner(art, site, tom):
+    """The callout on a föreskrift page that presents a konsoliderad version:
+    which amendment cutoff it folds in, that the compilation is inofficial
+    (the grundförfattning + ändringsförfattningar stay the authoritative
+    texts), and the way to the as-enacted base text where we parsed it."""
+    if tom:
+        ident = next((a["identifier"] for a in art.get("amendments", [])
+                      if a.get("uri") == tom and a.get("identifier")),
+                     catalog.local(tom).replace("/", " ").upper())
+        cutoff = ("med ändringar införda till och med "
+                  + ('<a href="%s">%s</a>' % (escape(layout.page_url(tom)),
+                                              escape(ident))
+                     if site.has(tom) else escape(ident)))
+    else:
+        cutoff = "med senare ändringar införda"
+    grund = (' <a href="%s">Visa grundförfattningen i ursprunglig lydelse</a>.'
+             % escape(layout.page_url(art["uri"] + "/grund"))
+             if art.get("structure") else "")
+    return ('<div class="version-banner"><strong>Konsoliderad version</strong>'
+            '<span>Texten nedan är en inofficiell sammanställning %s. '
+            'Grundförfattningen och ändringsförfattningarna är de officiella '
+            'texterna.%s</span></div>' % (cutoff, grund))
+
+
+def _unparsed_konsoliderad_note(consolidations):
+    """The pointer shown when a record's konsoliderad PDF exists but yielded no
+    parsed text (an image-only scan, or a cover sheet standing in for the
+    document): the page presents the as-enacted base text, so at least link the
+    agency's own consolidated PDF."""
+    urls = [c["url"] for c in consolidations
+            if not c.get("structure") and c.get("url")]
+    if not urls:
+        return ""
+    return ('<div class="version-banner"><strong>Konsoliderad version</strong>'
+            '<span>Myndigheten tillhandahåller en konsoliderad version som '
+            'inte kunnat läsas in här: <a class="ext" href="%s" '
+            'rel="external">PDF hos myndigheten</a>.</span></div>'
+            % escape(urls[0]))
+
+
+def _grund_banner(base_uri):
+    """The callout on a föreskrift ``/grund`` page: the as-enacted base text,
+    without later amendments, and the way back to the presented version."""
+    return ('<div class="version-banner"><strong>Ursprunglig lydelse</strong>'
+            '<span>Grundförfattningen som beslutad, utan senare ändringar. '
+            '<a href="%s">Visa konsoliderad version</a>.</span></div>'
+            % escape(layout.page_url(base_uri)))
+
+
 def render_foreskrift(art, site):
     md = art.get("metadata", {})
-    ident = art.get("identifier") or catalog.local(art["uri"])
+    # a /grund sidecar (the as-enacted base text beside a presented
+    # consolidation) renders the base structure with a way-back banner and --
+    # like an SFS äldre lydelse -- no inbound panel: citations always target
+    # the canonical page
+    grund = art.get("version") == "grund"
+    base_uri = art["uri"].removesuffix("/grund") if grund else art["uri"]
+    cons = None if grund else presented_consolidation(art)
+    structure = cons["structure"] if cons else art.get("structure", [])
+    ident = art.get("identifier") or catalog.local(base_uri)
     title = md.get("title") or ident
     meta = _meta_dl([
         ("Utgivare", md.get("publisher")),
@@ -2608,12 +2693,20 @@ def render_foreskrift(art, site):
             + _ref_list(site, "Genomför EU-direktiv", md.get("genomfor")))
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + refs + "".join(
-        render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", []))
+    banner = (_grund_banner(base_uri) if grund
+              else _konsoliderad_banner(art, site, cons["konsolideradTom"])
+              if cons
+              else _unparsed_konsoliderad_note(art.get("consolidations", [])))
+    body = banner \
+        + ("" if grund else document_inbound(site, art["uri"])) + refs \
+        + "".join(render_node(n, site, art["uri"], toc, rail)
+                  for n in structure) \
+        + _foreskrift_amendments(art.get("amendments", []), toc)
     return page(title, "Föreskrift", meta, body, render_toc(toc),
-                eyebrow=ident, island=rail.island(),
-                source_url=art.get("source_url"))
+                eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
+                island=rail.island(),
+                source_url=art.get("source_url"),
+                body_class=" inaktuell" if grund else "")
 
 
 def render_avg(art, site):

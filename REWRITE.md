@@ -34,6 +34,11 @@ sections below explain each item and retain the historical measurements.
   projected as typed graph edges, with the grupp join as authoritative
   fallback (§4; implemented 2026-07-18, `docs/rewrite-parity/03`; full-corpus
   verification folds into the acceptance run).
+- ✅ **Föreskrift consolidation publishing:** the parsed konsoliderad version
+  is now the presented text — rendered, searched, fragment-indexed and
+  citation-scanned as one body, with the as-enacted base text at `{uri}/grund`
+  (§7e; implemented 2026-07-18, `docs/rewrite-parity/02`; the corpus-wide
+  re-parse folds into the acceptance run).
 - ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
   offsets, general/continued tables; unify the two författningskommentar bounds
   and repair the known truncated law headings (§7a, §7d, §7g).
@@ -1911,6 +1916,20 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   (The legacy DV Word path, `dv/legacy.py`, keeps its CLI — it has no driver stage yet.)
 - ✅ **OpenSearch indexing** is source-generic and already indexes föreskrift
   artifacts, including their id-bearing paragrafer.
+- ✅ **Consolidations published as the presented text** (2026-07-18,
+  `docs/rewrite-parity/02`). Measured: 1,624 of 9,056 records carry a
+  konsoliderad version, only 3 genuinely carry two — so no version selector;
+  `lib/text.presented_consolidation` picks the latest parsed one and
+  `text.body_sections` lets it *replace* the base `structure` for render,
+  search/fragments, the MCP reader and `catalog.artifact_links` alike (same
+  §§ ids — walking both would double every anchor). The page banners the
+  cutoff amendment and the compilation's inofficial status, renders the
+  ändringsförfattningar register, and links the as-enacted text at
+  `{uri}/grund` — a `.grund.json` sidecar the parse run emits when both
+  texts exist (1,577 records), rendered as an uncatalogued extra page like
+  the SFS lydelse artifacts. The 8 unparseable konsoliderad PDFs (image-only
+  scans, cover-sheet stubs) fall back to the base text with the agency's own
+  PDF linked.
 - ⬜ **Remaining:** publish the already-extracted `upphäver` and `genomför`
   metadata as typed edges, extract/publish `ändrar`, and validate all three
   through the same catalog/render mechanism as `bemyndigande`.

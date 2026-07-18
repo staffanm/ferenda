@@ -198,14 +198,17 @@ def patch(source, basefile, suffix=".patch"):
 
 
 # non-document json files that share a source's artifact dir: the index sidecars
-# (by basename, so the filter is independent of where ARTIFACT is rooted) and the
-# sfs `.versions.json` historical-consolidation sidecars.
+# (by basename, so the filter is independent of where ARTIFACT is rooted), the
+# sfs `.versions.json` historical-consolidation sidecars and the föreskrift
+# `.grund.json` as-enacted sidecars -- extra *pages*, not corpus documents, so
+# relate/dump must never see them.
 _NON_ARTIFACT_NAMES = frozenset({DOM_INDEX.name, GUIDANCE_INDEX.name})
 
 
 def _is_document_artifact(path):
     return (path.name not in _NON_ARTIFACT_NAMES
-            and not path.name.endswith(".versions.json"))
+            and not path.name.endswith(".versions.json")
+            and not path.name.endswith(".grund.json"))
 
 
 def artifacts(source):
@@ -336,6 +339,35 @@ def sfs_versions_sidecar(basefile):
     recovered version ids and their parse status."""
     rel = relpath("sfs", basefile)
     return SFS_ARTIFACT / rel.with_name(rel.name + ".versions.json")
+
+
+def foreskrift_grund_artifact(basefile):
+    """The as-enacted sidecar beside a föreskrift's main artifact: the base
+    structure re-projected as its own page artifact (uri ``…/grund``), written
+    by parse only when the main artifact presents a consolidation *and* the
+    base text is parsed. Not a corpus document (see `_is_document_artifact`) --
+    generate appends it as an extra page, like the sfs lydelse artifacts."""
+    rel = relpath("foreskrift", basefile)
+    return artifact_dir("foreskrift") / rel.with_name(rel.name + ".grund.json")
+
+
+def foreskrift_grund_pages():
+    """Every föreskrift ``/grund`` sidecar on disk -> sorted (uri, source,
+    path, title) page rows for generate's extra-page plan (the föreskrift
+    counterpart of build.sfs_version_pages)."""
+    rows = []
+    for path in sorted(compress.glob(artifact_dir("foreskrift"),
+                                     "*/*.grund.json")):
+        fs = path.parent.name
+        year, _, nr = path.name[:-len(".grund.json")].partition("-")
+        basefile = "%s/%s:%s" % (fs, year, nr)
+        if not _FORESKRIFT_LOC.match(basefile):
+            raise ValueError("grund sidecar %s does not decode to a "
+                             "föreskrift basefile (%r)" % (path, basefile))
+        rows.append(("%s%s/grund" % (BASE, basefile), "foreskrift",
+                     str(path),
+                     "%s %s:%s i ursprunglig lydelse" % (fs.upper(), year, nr)))
+    return rows
 
 
 def sfs_sidecar_basefile(path):
@@ -538,9 +570,11 @@ def page_relpath(uri):
         # prop/2024/25:1 -> prop/2024_25_1.html (served at /prop/…)
         typ, _, rest = loc.partition("/")
         return "%s/%s.html" % (typ, _alnum_slug(rest))
-    elif _FORESKRIFT_LOC.match(loc):
+    elif _FORESKRIFT_PAGE.match(loc):
         # an agency regulation, lagen.nu's /{fs}/{år}:{nr} grammar -- the
-        # författningssamling is the top segment: fffs/2013:10 -> fffs/2013-10.html
+        # författningssamling is the top segment: fffs/2013:10 ->
+        # fffs/2013_10.html; the as-enacted view beside a presented
+        # consolidation rides the same rule (…/grund -> fffs/2013_10_grund.html)
         fs, _, rest = loc.partition("/")
         return "%s/%s.html" % (fs, _alnum_slug(rest))
     elif loc.startswith("avg/"):
@@ -606,3 +640,7 @@ def url_to_relpath(path):
 # a föreskrift loc is "<fs>/<år>:<nr>"; every författningssamling code ends in FS
 # (fffs, nfs, kifs, …), which sets it apart from an SFS loc ("2013:635")
 _FORESKRIFT_LOC = re.compile(r"^[a-zåäö]+fs/\d{4}:\d+$")
+# a föreskrift *page* address: the document itself or its /grund view (the
+# as-enacted base text beside a presented consolidation). Distinct from
+# _FORESKRIFT_LOC, which stays the strict basefile/identity grammar.
+_FORESKRIFT_PAGE = re.compile(r"^[a-zåäö]+fs/\d{4}:\d+(/grund)?$")

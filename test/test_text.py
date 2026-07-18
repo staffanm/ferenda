@@ -54,6 +54,46 @@ def test_fragment_texts_one_per_id_bearing_node():
     assert all(u.startswith("https://lagen.nu/1962:700#K") for u in frags)
 
 
+FORESKRIFT = {
+    "uri": "https://lagen.nu/fffs/2013:10",
+    "structure": [{"type": "paragraf", "id": "P1",
+                   "text": ["Ursprunglig lydelse."]}],
+    "consolidations": [
+        {"of": "https://lagen.nu/fffs/2013:10",
+         "konsolideradTom": "https://lagen.nu/fffs/2014:2",
+         "structure": [{"type": "paragraf", "id": "P1",
+                        "text": ["Äldre konsoliderad lydelse."]}]},
+        {"of": "https://lagen.nu/fffs/2013:10",
+         "konsolideradTom": "https://lagen.nu/fffs/2016:13",
+         "structure": [{"type": "paragraf", "id": "P1",
+                        "text": ["Gällande konsoliderad lydelse."]}]},
+    ],
+}
+
+
+def test_presented_consolidation_is_latest_parsed():
+    cons = text.presented_consolidation(FORESKRIFT)
+    assert cons["konsolideradTom"] == "https://lagen.nu/fffs/2016:13"
+    # a consolidation without parsed structure never presents (an image-only
+    # scan or a cover-sheet PDF) -- the base text stays the reading text
+    unparsed = {**FORESKRIFT,
+                "consolidations": [{"konsolideradTom": None, "structure": []}]}
+    assert text.presented_consolidation(unparsed) is None
+    assert text.presented_consolidation(ART) is None    # no consolidations key
+
+
+def test_presented_consolidation_replaces_base_text_and_fragments():
+    # the presented consolidation IS the document text; the base structure is
+    # excluded (same §§ mint the same fragment ids -- walking both would
+    # double every anchor and index superseded text beside its replacement)
+    assert text.document_text(FORESKRIFT) == "Gällande konsoliderad lydelse."
+    assert text.fragment_texts(FORESKRIFT) == [
+        ("https://lagen.nu/fffs/2013:10#P1", "Gällande konsoliderad lydelse.")]
+    # without any parsed consolidation the base structure carries the text
+    base_only = {k: v for k, v in FORESKRIFT.items() if k != "consolidations"}
+    assert text.document_text(base_only) == "Ursprunglig lydelse."
+
+
 def test_dv_body_section():
     art = {"uri": "https://lagen.nu/dom/nja/2009s796",
            "body": [{"type": "rubrik", "id": "r1", "text": ["Domskäl"]},
