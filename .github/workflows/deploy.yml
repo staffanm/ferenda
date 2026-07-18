@@ -1,22 +1,35 @@
-# Continuous deploy to ferenda-vps.
+# Continuous deploy to the lagen.nu prod host (ferenda.lagen.nu).
 #
-# Runs on a SELF-HOSTED runner installed on the VPS (as the `ferenda` user, in
-# the docker group) -- see docs/deploy-vps.md for registration. On every push to
-# the deployed branch it fast-forwards the on-box checkout, rebuilds the
-# accommodanda image, brings the stack up, and folds any new input DATA into the
-# corpus.
+# Runs on a SELF-HOSTED runner (`lagen-nu`) installed on the host as the
+# `staffan` user, in the docker group -- see docs/deploy-vps.md for registration.
+#
+# The host runs ONE merged docker compose project that fronts both sites behind a
+# single nginx: the legacy lagen.nu stack AND the rebuilt accommodanda site
+# (ferenda.lagen.nu). Two on-box checkouts, distinct roles:
+#
+#   ~/wds/accommodanda  the modernization code + build context for the
+#                       accommodanda image (this repo/branch). THIS is what the
+#                       deploy fast-forwards to the pushed commit.
+#   ~/wds/ferenda       the operational compose project. Its docker-compose.yml
+#                       builds the accommodanda service from `../accommodanda`,
+#                       and owns the legacy services + the shared nginx/certbot.
+#                       Mostly frozen -- the deploy only drives compose from here,
+#                       it does NOT reset this tree.
+#
+# On every push to the deployed branch the deploy fast-forwards ~/wds/accommodanda,
+# rebuilds + restarts ONLY the accommodanda service (the legacy stack is left
+# untouched), and folds any new input DATA into the corpus.
 #
 # It deliberately runs the rebuild with `--ignore-code-changes`, so a code push
-# does NOT trigger a reparse/regenerate: the small prod host can't re-parse
-# ~100K förarbeten within a deploy's time budget (the from-scratch reparse blew
-# past GitHub's 6h ceiling and was cancelled). A code-driven rebuild is instead
-# done deliberately on the fast dev box and pushed up with `sync-data`, after
-# tools/vps/download-data.sh pulls the live corpus down first. This step still
-# incrementally folds in new input data and redeploys.
+# does NOT trigger a reparse/regenerate: the host can't re-parse ~100K förarbeten
+# within a deploy's time budget (the from-scratch reparse blew past GitHub's 6h
+# ceiling and was cancelled). A code-driven rebuild is instead done on the fast
+# dev box and pushed up with `sync-up` (after tools/vps/download-data.sh pulls the
+# live corpus down first). This step still incrementally folds in new input data.
 #
-# No secrets travel through GitHub: the runner already sits on the box with the
-# checkout, the mounted corpus and docker access. The nightly `lagen all all`
-# (download + rebuild) is a separate host cron, not this workflow.
+# No secrets travel through GitHub: the runner already sits on the host with the
+# checkouts, the corpus and docker access. The nightly `lagen all all` (download +
+# rebuild) is a separate host cron, not this workflow.
 
 name: deploy
 
@@ -28,20 +41,23 @@ on:
 # Never let two deploys run at once (a rebuild can take a while); queue instead
 # of cancelling a rebuild already in flight.
 concurrency:
-  group: ferenda-vps-deploy
+  group: lagen-nu-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: [self-hosted, ferenda-vps]
+    runs-on: [self-hosted, lagen-nu]
     # No actions/checkout: we deploy the persistent on-box checkout, not the
     # runner's throwaway workspace.
+    env:
+      CODE: /home/staffan/wds/accommodanda   # git checkout + accommodanda build context
+      COMPOSE: /home/staffan/wds/ferenda      # the merged operational compose project
     steps:
-      - name: Update the on-box checkout to the pushed commit
+      - name: Update the on-box code checkout to the pushed commit
         run: |
           set -euo pipefail
-          cd /srv/ferenda/ferenda
-          # A prior run cancelled mid-git (e.g. the 6h rebuild timeout) can leave a
+          cd "$CODE"
+          # A prior run cancelled mid-git (e.g. a rebuild timeout) can leave a
           # stale lock that fails the next fetch/reset with exit 128; clear it first.
           rm -f .git/index.lock .git/shallow.lock .git/refs/remotes/origin/*.lock || true
           # Retry the fetch: transient GitHub connectivity has intermittently 128'd
@@ -58,19 +74,19 @@ jobs:
       - name: Build the accommodanda image
         run: |
           set -euo pipefail
-          cd /srv/ferenda/ferenda
+          cd "$COMPOSE"
           docker compose build accommodanda
 
-      - name: Bring the stack up (opensearch + app + nginx + certbot)
+      - name: Restart the accommodanda service (legacy stack left untouched)
         run: |
           set -euo pipefail
-          cd /srv/ferenda/ferenda
-          docker compose --profile prod up -d
+          cd "$COMPOSE"
+          docker compose --profile prod up -d accommodanda
 
       - name: Fold new input data into the corpus and redeploy
         # --ignore-code-changes: rebuild only on input-data changes, never on a
         # parser/render code change (that reparse is done on dev + synced up).
         run: |
           set -euo pipefail
-          cd /srv/ferenda/ferenda
+          cd "$COMPOSE"
           docker compose exec -T accommodanda lagen all rebuild --ignore-code-changes

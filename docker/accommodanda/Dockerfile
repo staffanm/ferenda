@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # accommodanda (the rebuilt lagen.nu) -- serve AND run the pipeline.
 #
 # One image both serves the site+API (`lagen all serve`, the CMD) and carries
@@ -57,20 +58,39 @@ ENV UV_LINK_MODE=copy \
 # uids must line up or the mounted trees are unwritable to the download/rebuild.
 ARG UID=1000
 ARG GID=1000
-RUN groupadd -g "$GID" app && useradd -m -u "$UID" -g "$GID" -s /bin/bash app
+RUN groupadd -g "$GID" app && useradd -m -u "$UID" -g "$GID" -s /bin/bash app \
+    && mkdir -p /app && chown app:app /app
+# The editor commits to the bind-mounted /wiki repo as `app`; git refuses to
+# operate in a repo owned by a different uid unless it is marked safe. System
+# config, so it lands in an early, rarely-invalidated layer.
+RUN git config --system --add safe.directory /wiki \
+    && git config --system --add safe.directory /app
 
 WORKDIR /app
 
-# 1) dependencies only -- cached until pyproject.toml/uv.lock change.
-#    README.rst is copied because pyproject points its readme at it.
-COPY pyproject.toml uv.lock README.rst ./
-RUN uv sync --frozen --no-dev --no-install-project
+# POI jar stack in its OWN layer -- only tools/fetch_poi.sh is needed, so a code
+# change never re-downloads the jars (they're uncommitted, fetched from Maven).
+# They land in /app/vendor/poi (where dv/word.py globs) and survive `COPY . .`.
+COPY --chown=app:app tools/fetch_poi.sh tools/fetch_poi.sh
+RUN bash tools/fetch_poi.sh && chown -R app:app /app/vendor
 
-# 2) the project itself, then fetch the POI jars into /app/vendor/poi (where
-#    dv/word.py globs for them). This layer changes each release.
-COPY . .
-RUN uv sync --frozen --no-dev \
-    && bash tools/fetch_poi.sh
+# 1) dependencies only -- cached until pyproject.toml/uv.lock change (README.rst
+#    is copied because pyproject points its readme at it). The venv is chowned to
+#    app HERE, in this cached layer, and uv's download cache is a BuildKit cache
+#    mount -- so a code change re-runs neither the chown nor any re-download, and
+#    even a dependency bump re-resolves without re-fetching everything.
+COPY --chown=app:app pyproject.toml uv.lock README.rst ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project \
+    && chown -R app:app /app/.venv
+
+# 2) the project itself. `COPY --chown` keeps the code app-owned; the editable
+#    install only adds a few console-script/.pth entries to the (already app-
+#    owned) venv, world-readable so `app` runs `lagen` fine -- so NO whole-tree
+#    `chown -R /app` is needed on every build. This layer changes each release.
+COPY --chown=app:app . .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # venv console scripts (incl. `lagen`) on PATH; point search + wiki at the
 # sidecar cluster / mounted content repo (config.py reads these env vars).
@@ -78,14 +98,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
     OPENSEARCH_URL="http://opensearch:9200" \
     WIKI_ROOT="/wiki"
 
-# Everything built above ran as root; hand the whole app tree (code + venv +
-# vendored POI jars) to the unprivileged user it now runs as. The corpus and
-# wiki are bind-mounted at runtime and chowned to this uid on the host.
-RUN chown -R app:app /app
-# The editor commits to the bind-mounted /wiki repo as `app`; git refuses to
-# operate in a repo owned by a different uid unless it is marked safe.
-RUN git config --system --add safe.directory /wiki \
-    && git config --system --add safe.directory /app
 USER app
 
 EXPOSE 8000

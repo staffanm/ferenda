@@ -78,15 +78,22 @@ services:
   # same container runs maintenance in place:
   #     docker compose exec accommodanda lagen all rebuild   # CI, after a push
   #     docker compose exec accommodanda lagen all all       # nightly cron
-  # Runs as uid 1000 (see the image's USER app) -- the host bind mounts are
-  # chowned to that uid.
+  # Runs as uid 1001 / gid 3362 (see the image's USER app) -- the host bind mounts
+  # are owned by that uid, and the gid is REQUIRED to write the data_root.
   accommodanda:
     build:
       context: .
       dockerfile: docker/accommodanda/Dockerfile
       args:
-        UID: "1000"           # pin to the host `ferenda` user that owns the mounts
-        GID: "1000"
+        # uid 1001 = the host `staffan` user that owns the bind-mounted corpus
+        # (both /mnt/forstor/accommodanda and the /mnt/data catalog dir).
+        UID: "1001"
+        # gid 3362 = the host `lagen-nfs` group. The data_root lives on the
+        # Forstor NFS mount, which is root_squashed (root -> nobody, no write) and
+        # group-writable only by lagen-nfs -- so the in-container pipeline writes
+        # (lagen all all / rebuild: downloaded/, artifact/, generated/) must run
+        # under gid 3362, NOT root, or they get EPERM against the NFS export.
+        GID: "3362"
     container_name: accommodanda
     profiles: [prod]
     environment:
