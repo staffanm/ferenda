@@ -203,6 +203,35 @@ suppression. The default move is to fix the finding; the suppression is
 for the irreducible cases (third-party stubs, untyped artifact dicts,
 the sanctioned sites above).
 
+### rule:one-line-progress
+
+Long-running work reports through the shared progress renderer in
+`lib/util`, never with a fresh `print`/`log` line per item. The three
+entry points are one mechanism:
+
+- **`util.status(done, total, message, *, prefix, tail)`** — the single
+  live counter. One line on **stderr**, rewound with `\r` and cleared with
+  `\033[K` so it overwrites in place, clipped to one terminal row, with an
+  `ETA MM:SS` right-aligned at the edge whenever `total` is known (pass
+  `total=None` for an unknown total — no ETA, rendered `?`). Used by every
+  per-item build loop (parse, generate, relate, index, dump, bulk unpack).
+- **`util.progress(seen, total, *, scope, page, stamp, elapsed, **counts)`**
+  and **`util.Reporter`** — the downloader/harvest form over `status`:
+  `Reporter.update(seen, total, scope=…, **counts)` rewrites the live line,
+  `.done()` drops a newline so a finished segment (a year/sweep/doctype)
+  persists above the next one, `.reset()` rebases the elapsed clock after a
+  slow per-segment query. `counts` are `label=value` tallies shown in call
+  order (`fetched=…, skipped=…`).
+
+Progress is a live view, so it goes to **stderr**; the **stdout** stream
+carries only the final one-shot summary (`print("<source> <action>: <n>
+seen, <n> fetched")`), so a redirected stdout stays a clean record and the
+progress noise does not pollute it. Compute the total up front when it is
+knowable (the work-list length) so the ETA works — a downloader that can
+enumerate its targets should, rather than counting up against an unknown
+total. A per-100-items newline dump is the anti-pattern this rule exists to
+stop (`forarbete/propkb.sync`, `untc/download.sync` predate it).
+
 ---
 
 ## Process
