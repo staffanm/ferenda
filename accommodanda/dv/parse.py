@@ -32,11 +32,12 @@ from ..lib.lagrum import (
     LagrumParser,
     Ref,
     interleave,
+    lagrum_uri,
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
 )
-from .model import Avgorande, Fotnot, Lagrum, Rubrik, Stycke
+from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
 # Court decisions cite across the whole spectrum of legal sources, so the
@@ -284,10 +285,22 @@ def parse_api_record(d, basefile=None):
         lagrum=[Lagrum(referens=l.get("referens", "").strip(),
                        sfsnummer=l.get("sfsNummer"))
                 for l in d.get("lagrumLista", [])],
-        forarbeten=[f.strip() for f in d.get("forarbeteLista", [])],
+        forarbeten=[f.strip() for f in d.get("forarbeteLista", [])
+                    if f.strip() and not RE_SEPARATOR.match(f.strip())],
         sammanfattning=(d.get("sammanfattning") or "").strip() or None,
-        related=[p for p in d.get("hanvisadePubliceringarLista", [])]
-                + [e for e in d.get("europarattsligaAvgorandenLista", [])],
+        # europarattsligaAvgorandenLista never holds citations, only coarse
+        # topic labels (3 distinct values corpus-wide, 2026-07-18) -- kept as
+        # labels beside rattsomrade, never projected as relation edges
+        europarattslig=[e.strip() for e in
+                        d.get("europarattsligaAvgorandenLista", [])
+                        if e.strip()],
+        related=[Hanvisning(fritext=p["fritext"].strip(),
+                            grupp=p.get("gruppKorrelationsnummer"))
+                 for p in d.get("hanvisadePubliceringarLista", [])],
+        litteratur=[", ".join(part for part in
+                              (l.get("forfattare", "").strip(),
+                               l.get("titel", "").strip()) if part)
+                    for l in d.get("litteraturLista", [])],
         body=body,
         footnotes=footnotes,
         sources=["domstol"],
@@ -365,7 +378,45 @@ def _scanner():
                         parse_types=DV_PARSE_TYPES, named_acts=named_acts)
 
 
-def to_artifact(av, canonical_id=None):
+def curated_runs(text, predicate, fallback_uri=None):
+    """One curated metadata string normalized to an inline-run list through the
+    same citation grammar the body uses, every resolved reference carrying the
+    field's typed `predicate`. Unresolved text survives as plain runs -- a
+    failed normalization retains the editor's string, it never erases it. When
+    the grammar finds nothing and the source supplies an authoritative identity
+    beside the string (lagrumLista's sfsNummer, a hanvisning's grupp join), the
+    whole string links to that `fallback_uri` instead."""
+    parser = _scanner()
+    parser.reset()
+    refs = parser.parse_text(text, context={}, predicate=predicate)
+    if not refs and fallback_uri:
+        return [{"predicate": predicate, "uri": fallback_uri, "text": text}]
+    return interleave(text, refs)
+
+
+def _related_entry(h, grupp_uris):
+    """A hanvisad publicering as a curated artifact entry. The fritext grammar
+    resolves the published citation form; a fritext the grammar cannot read
+    falls back to the grupp join (the cited case's publication group), which is
+    authoritative but only present on newer records. When both resolve and
+    *disagree* -- a grammar mis-read, or an editor's string citing a different
+    case than the group names -- the grammar's link stands but the conflict is
+    recorded as `grupp_konflikt`, so the acceptance pass can list exactly the
+    edges that may be wrong instead of the disagreement being undetectable."""
+    grupp_id = grupp_uris.get(h.grupp) if h.grupp else None
+    grupp_uri = case_uri(grupp_id) if grupp_id else None
+    runs = curated_runs(h.fritext, "rpubl:rattsfallshanvisning", grupp_uri)
+    entry = {"text": h.fritext, "runs": runs}
+    if h.grupp:
+        entry["grupp"] = h.grupp
+    if grupp_uri and grupp_uri not in [r["uri"] for r in runs
+                                       if isinstance(r, dict)]:
+        entry["grupp_konflikt"] = grupp_uri
+    return entry
+
+
+def to_artifact(av, canonical_id=None, grupp_uris=None):
+    grupp_uris = grupp_uris or {}
     runs = scan_body(av.body)
     def block(b, text):
         if isinstance(b, Rubrik):
@@ -386,12 +437,27 @@ def to_artifact(av, canonical_id=None):
             "publiceringsform": av.publiceringsform,
             "typ": av.typ,
             "rattsomrade": av.rattsomrade,
+            "europarattslig": av.europarattslig,
             "nyckelord": av.nyckelord,
-            "lagrum": [{"referens": l.referens, "sfsnummer": l.sfsnummer}
-                       for l in av.lagrum],
-            "forarbeten": av.forarbeten,
+            # the curated fields, normalized through the citation grammar into
+            # the same inline-run shape body text uses ({"text": raw string,
+            # "runs": [...]}) -- the typed relation edges the catalog projects
+            # (rpubl:lagrum / rpubl:forarbete / rpubl:rattsfallshanvisning /
+            # dcterms:relation), with unresolved strings retained as plain runs
+            "lagrum": [{"text": l.referens, "sfsnummer": l.sfsnummer,
+                        "runs": curated_runs(
+                            l.referens, "rpubl:lagrum",
+                            lagrum_uri({"law": l.sfsnummer})
+                            if l.sfsnummer else None)}
+                       for l in av.lagrum if l.referens],
+            "forarbeten": [{"text": f,
+                            "runs": curated_runs(f, "rpubl:forarbete")}
+                           for f in av.forarbeten],
             "sammanfattning": av.sammanfattning,
-            "related": av.related,
+            "related": [_related_entry(h, grupp_uris) for h in av.related],
+            "litteratur": [{"text": t,
+                            "runs": curated_runs(t, "dcterms:relation")}
+                           for t in av.litteratur if t],
         },
         # the content-bearing instance/ruling tree (delmål → instans →
         # betänkande/dom → domskäl/domslut → …) with the prose attached as leaves

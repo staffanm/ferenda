@@ -14,6 +14,7 @@ from accommodanda.dv.parse import (
     to_artifact,
 )
 from accommodanda.dv.structure import flatten
+from accommodanda.lib import catalog
 
 
 def test_case_uri_mints_old_rinfo_scheme():
@@ -428,3 +429,112 @@ def test_appended_lower_court_judgment_opens_a_new_instance():
                     if child["type"] == "dom"]
         assert len([child for child in ruling["children"]
                     if child["type"] == "domslut"]) == 1
+
+
+# --- curated metadata normalization (lagrum/förarbeten/rättsfall/litteratur) --
+
+def test_curated_lagrum_resolves_with_typed_predicate():
+    art = to_artifact(parse_api_record(RECORD))
+    [entry] = art["metadata"]["lagrum"]
+    assert entry["text"] == "8 kap. 2 § inkomstskattelagen (1999:1229)"
+    assert entry["sfsnummer"] == "1999:1229"
+    assert entry["runs"] == [{"predicate": "rpubl:lagrum",
+                              "uri": "https://lagen.nu/1999:1229#K8P2",
+                              "text": "8 kap. 2 § inkomstskattelagen (1999:1229)"}]
+
+
+def test_curated_lagrum_sfsnummer_backstop():
+    # a referens the grammar cannot read still links law-level through the
+    # source's own sfsNummer (the authoritative identity beside the string)
+    record = {**RECORD, "lagrumLista": [
+        {"referens": "Mervärdesskattelag", "sfsNummer": "2023:200"}]}
+    [entry] = to_artifact(parse_api_record(record))["metadata"]["lagrum"]
+    assert entry["runs"] == [{"predicate": "rpubl:lagrum",
+                              "uri": "https://lagen.nu/2023:200",
+                              "text": "Mervärdesskattelag"}]
+
+
+def test_curated_related_grammar_grupp_and_retention():
+    record = {**RECORD, "hanvisadePubliceringarLista": [
+        # the citation grammar reads the fritext
+        {"fritext": "NJA 2015 s. 141", "gruppKorrelationsnummer": "g-nja"},
+        # unreadable fritext + grupp join -> whole string links to the case
+        {"fritext": "Se det opublicerade avgörandet",
+         "gruppKorrelationsnummer": "g-odd"},
+        # unreadable fritext, no grupp -> retained as plain text, never erased
+        {"fritext": "SvJT 1955 rf s. 76"},
+    ]}
+    art = to_artifact(parse_api_record(record),
+                      grupp_uris={"g-odd": "RH 1991:78",
+                                  "g-nja": "NJA 2015 s. 141"})
+    grammar, grupp, kept = art["metadata"]["related"]
+    assert grammar["runs"] == [{"predicate": "rpubl:rattsfallshanvisning",
+                                "uri": "https://lagen.nu/dom/nja/2015s141",
+                                "text": "NJA 2015 s. 141"}]
+    assert grammar["grupp"] == "g-nja"
+    # grammar and grupp join agree -> no conflict recorded
+    assert "grupp_konflikt" not in grammar
+    assert grupp["runs"] == [{"predicate": "rpubl:rattsfallshanvisning",
+                              "uri": "https://lagen.nu/dom/rh/1991:78",
+                              "text": "Se det opublicerade avgörandet"}]
+    assert kept == {"text": "SvJT 1955 rf s. 76",
+                    "runs": ["SvJT 1955 rf s. 76"]}
+
+
+def test_curated_related_conflict_between_grammar_and_grupp_is_recorded():
+    # the editor's string resolves to one case, the publication-group join to
+    # another: the grammar's link stands, but the disagreement is recorded so
+    # the acceptance pass can list exactly the edges that may be wrong
+    record = {**RECORD, "hanvisadePubliceringarLista": [
+        {"fritext": "NJA 2015 s. 141", "gruppKorrelationsnummer": "g-x"}]}
+    art = to_artifact(parse_api_record(record),
+                      grupp_uris={"g-x": "RH 1991:78"})
+    [entry] = art["metadata"]["related"]
+    assert entry["runs"][0]["uri"] == "https://lagen.nu/dom/nja/2015s141"
+    assert entry["grupp_konflikt"] == "https://lagen.nu/dom/rh/1991:78"
+
+
+def test_curated_forarbeten_resolve_and_junk_is_dropped():
+    record = {**RECORD, "forarbeteLista": ["Prop. 2019/20:9 s. 70", "-", " "]}
+    [entry] = to_artifact(parse_api_record(record))["metadata"]["forarbeten"]
+    assert entry["text"] == "Prop. 2019/20:9 s. 70"
+    [link] = [r for r in entry["runs"] if isinstance(r, dict)]
+    assert link["predicate"] == "rpubl:forarbete"
+    assert link["uri"].startswith("https://lagen.nu/prop/2019/20:9")
+
+
+def test_litteratur_joined_and_kept_as_text():
+    record = {**RECORD, "litteraturLista": [
+        {"forfattare": "Ekelöf m.fl. Rättegång IV", "titel": "2009, s. 42 ff."}]}
+    [entry] = to_artifact(parse_api_record(record))["metadata"]["litteratur"]
+    assert entry == {"text": "Ekelöf m.fl. Rättegång IV, 2009, s. 42 ff.",
+                     "runs": ["Ekelöf m.fl. Rättegång IV, 2009, s. 42 ff."]}
+
+
+def test_europarattsliga_labels_kept_as_labels_not_relations():
+    # the field carries coarse topic labels ("EU-rätt", "Mänskliga
+    # rättigheter"), never citations -- kept as metadata beside rattsomrade,
+    # but no relation edge is minted from them
+    record = {**RECORD, "europarattsligaAvgorandenLista": ["EU-rätt "]}
+    av = parse_api_record(record)
+    assert av.europarattslig == ["EU-rätt"]     # stripped
+    assert av.related == []
+    art = to_artifact(av)
+    assert art["metadata"]["europarattslig"] == ["EU-rätt"]
+    assert all(run["predicate"] != "rpubl:rattsfallshanvisning"
+               for _, run in catalog.curated_links(art))
+
+
+def test_curated_links_reach_the_catalog_graph():
+    record = {**RECORD, "hanvisadePubliceringarLista": [
+        {"fritext": "NJA 2015 s. 141"}]}
+    art = to_artifact(parse_api_record(record))
+    links = catalog.curated_links(art)
+    # unanchored typed edges: the curated lagrum + the related case
+    assert (None, {"predicate": "rpubl:lagrum",
+                   "uri": "https://lagen.nu/1999:1229#K8P2",
+                   "text": "8 kap. 2 § inkomstskattelagen (1999:1229)"}) in links
+    assert (None, {"predicate": "rpubl:rattsfallshanvisning",
+                   "uri": "https://lagen.nu/dom/nja/2015s141",
+                   "text": "NJA 2015 s. 141"}) in links
+    assert len(links) == 2

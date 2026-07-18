@@ -8,7 +8,7 @@ paragraph streams, so they run without Java.
 from accommodanda.lib.poi import Para
 from accommodanda.dv.legacy import (
     build_avgorande, parse_head_body, _classify, _split_malnummer)
-from accommodanda.dv.model import Rubrik, Stycke
+from accommodanda.dv.model import Hanvisning, Rubrik, Stycke
 
 
 def P(text, bold=False, in_table=True):
@@ -33,6 +33,7 @@ SAMPLE = [
     P("4 Kap ARBETSTID", bold=True),
     P("1. Den ordinarie veckoarbetstiden är 40 timmar."),
     P("Sökord:", bold=True), P("Kollektivavtal; Veckovila"),
+    P("Litteratur:", bold=True), P("Ekelöf, Rättegång IV; Fitger, Rättegångsbalken"),
 ]
 
 
@@ -117,7 +118,11 @@ def test_build_avgorande_maps_fields():
     assert av.avgorandedatum == "1993-05-26"
     assert av.malnummer == ["A-31-1992", "A-125-1992"]
     assert av.lagrum[0].referens == "14 § arbetstidslagen (1982:673)"
-    assert av.related == ["NJA 1985 s. 717", "NJA 1990 s. 591"]
+    # legacy Rättsfall strings carry no grupp join key -- fritext only
+    assert av.related == [Hanvisning("NJA 1985 s. 717"),
+                          Hanvisning("NJA 1990 s. 591")]
+    # a Litteratur footer line packs several works separated by ";"
+    assert av.litteratur == ["Ekelöf, Rättegång IV", "Fitger, Rättegångsbalken"]
     assert av.nyckelord == ["Kollektivavtal", "Veckovila"]
     assert av.sammanfattning == "Enligt en bestämmelse i arbetstidslagen."
 

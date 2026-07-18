@@ -6,6 +6,7 @@ import json
 from accommodanda.dv.identity import (
     build_index,
     canonical_court,
+    grupp_map,
     legacy_identity,
     norm_malnr,
     norm_referat,
@@ -67,6 +68,7 @@ def test_scan_api_skips_watermark_and_stores_relative_path(tmp_path, monkeypatch
     (dom / "ADO").mkdir(parents=True)
     (dom / "ADO" / "u1.json").write_text(json.dumps({
         "domstol": {"domstolKod": "ADO"}, "id": "u1",
+        "gruppKorrelationsnummer": "g-1",
         "malNummerLista": ["A 1-99"], "referatNummerLista": ["AD 1999 nr 1"],
         "avgorandedatum": "1999-01-01", "innehall": "x", "bilagaLista": []}))
     (dom / ".watermark.json").write_text(json.dumps({"last_harvest": "2020-01-01"}))
@@ -74,6 +76,9 @@ def test_scan_api_skips_watermark_and_stores_relative_path(tmp_path, monkeypatch
     assert [r["uuid"] for r in records] == ["u1"]           # watermark skipped
     # paths are stored data_root-relative (portable index), not absolute
     assert records[0]["path"] == "downloaded/dom/ADO/u1.json"
+    # the publication-group key is recorded: grupp_map resolves hanvisade
+    # publiceringar through it
+    assert records[0]["grupp"] == "g-1"
 
 
 def test_links_on_shared_malnummer():
@@ -155,3 +160,17 @@ def test_legacy_only_case_is_kept():
     assert len(cases) == 1
     assert cases[0]["sources"] == ["dv"]
     assert cases[0]["canonical_id"] == "NJA 2003 not 5"
+
+
+def test_grupp_map_resolves_only_unambiguous_groups():
+    # g1 is claimed by one canonical case -> resolves; g2 by two (a split
+    # publication group) -> dropped rather than guessed; a memberless grupp
+    # never appears
+    cases = [
+        {"canonical_id": "NJA 1981 s. 253",
+         "members": [{"grupp": "g1"}, {"grupp": None}]},
+        {"canonical_id": "AD 1993 nr 100", "members": [{"grupp": "g2"}]},
+        {"canonical_id": "AD 1994 nr 1", "members": [{"grupp": "g2"}]},
+        {"canonical_id": "NJA 2003 not 5", "members": [{}]},
+    ]
+    assert grupp_map(cases) == {"g1": "NJA 1981 s. 253"}

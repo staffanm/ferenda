@@ -395,6 +395,25 @@ def bemyndigande_links(art):
             for uri in art.get("metadata", {}).get("bemyndigande", [])]
 
 
+def curated_links(art):
+    """The typed relation edges a court decision's curated metadata carries:
+    the editor's Lagrum (`rpubl:lagrum`), Förarbeten (`rpubl:forarbete`),
+    related cases (`rpubl:rattsfallshanvisning`) and Litteratur
+    (`dcterms:relation`), normalized at parse time into the same inline-run
+    shape body text uses ({"text": raw string, "runs": [...]}). These are
+    metadata, not body text, so the inline-link walk misses them; much of it is
+    editor-derived and never cited verbatim in the prose, so without this edge
+    the graph is strictly weaker than the source. Field-driven: any source
+    whose metadata stores runs-bearing entries under these keys contributes.
+    Unanchored -- a curated relation belongs to the document, not a fragment."""
+    md = art.get("metadata", {})
+    return [(None, run)
+            for key in ("lagrum", "forarbeten", "related", "litteratur")
+            for entry in md.get(key) or [] if isinstance(entry, dict)
+            for run in entry.get("runs") or []
+            if isinstance(run, dict) and "uri" in run]
+
+
 def definition_links(art):
     """Concept (begrepp) edges from an EU act's defined terms: each
     definitions-article point whose `defines` names a term tags the act with that
@@ -633,7 +652,8 @@ def _index_document(con, art, path, source):
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)
                                 + definition_links(art)
-                                + bemyndigande_links(art))]
+                                + bemyndigande_links(art)
+                                + curated_links(art))]
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
     # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))

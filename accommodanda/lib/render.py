@@ -2076,6 +2076,7 @@ def render_dv(art, site):
         ("Målnummer", ", ".join(art.get("malnummer") or [])),
         ("Löpnummer", ", ".join(casenaming.lopnummer(art))),
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
+        ("Europarätt", ", ".join(md.get("europarattslig") or [])),
     ])
     sokord = _keywords(md.get("nyckelord") or [], site)
     toc = Toc()
@@ -2086,10 +2087,31 @@ def render_dv(art, site):
     body = (document_inbound(site, art["uri"]) + sokord
             + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
                        ruling=_dv_ruling_word(art))
-            + _dv_footnotes(art.get("footnotes", []), site))
+            + _dv_footnotes(art.get("footnotes", []), site)
+            + _dv_curated(md, site))
     return page(title, "Rättsfall", meta, body, render_toc(toc),
                 eyebrow=art.get("court_namn"), summary=summary,
                 island=rail.island(), source_url=art.get("source_url"))
+
+
+def _dv_curated(md, site):
+    """The curated relation groups on a decision page -- the editor's Lagrum,
+    Förarbeten, Rättsfall and Litteratur lists, each entry rendered from its
+    normalized runs so a resolved citation links and unresolved text stays
+    visible as the editor wrote it. An artifact parsed before the runs shape
+    contributes nothing here (like the label fallback in the catalog)."""
+    sections = []
+    for key, label in (("lagrum", "Lagrum"), ("forarbeten", "Förarbeten"),
+                       ("related", "Rättsfall"), ("litteratur", "Litteratur")):
+        entries = [e for e in md.get(key) or []
+                   if isinstance(e, dict) and e.get("runs")]
+        if entries:
+            sections.append(
+                '<section class="curated %s"><h2>%s</h2><ul>%s</ul></section>'
+                % (key, label,
+                   "".join("<li>%s</li>" % render_runs(e["runs"], site)
+                           for e in entries)))
+    return "".join(sections)
 
 
 def _keywords(nyckelord, site):

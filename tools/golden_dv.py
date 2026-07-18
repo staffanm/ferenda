@@ -111,8 +111,16 @@ def strip_eu_frag(uri):
 
 
 def new_refs(art):
-    return {strip_eu_frag(run["uri"])
-            for _, run in catalog.artifact_links(art)}
+    """(body, curated): the reference sets from the two extraction routes --
+    prose citation scanning over the body vs the normalized curated metadata
+    (lagrum/förarbeten/rättsfall/litteratur). Reported separately as well as
+    unioned, so scanner recall and metadata completeness stay distinguishable
+    (much of the old graph is editor-derived and never cited verbatim in the
+    prose -- a curated-projection concern, not a scanner limitation)."""
+    return ({strip_eu_frag(run["uri"])
+             for _, run in catalog.artifact_links(art)},
+            {strip_eu_frag(run["uri"])
+             for _, run in catalog.curated_links(art)})
 
 
 def new_metadata(art):
@@ -247,6 +255,7 @@ def main():
     matched = uri_absent = 0
     exact = subset = superset = overlap = disjoint = 0
     tot_old = tot_new = tot_common = 0
+    tot_body_common = tot_curated_common = 0
     examples = []
     meta_counts = {field: Counter() for field in
                    ("identifier", "referatrubrik", "avgorandedatum", "malnummer")}
@@ -261,7 +270,8 @@ def main():
             continue
         matched += 1
         art = json.loads(Path(np_).read_bytes())
-        n = new_refs(art)
+        body, curated = new_refs(art)
+        n = body | curated
         new_meta = new_metadata(art)
         for field in meta_counts:
             old_values = canonical_metadata(field, old_meta[field])
@@ -279,6 +289,8 @@ def main():
         tot_old += len(o)
         tot_new += len(n)
         tot_common += len(o & n)
+        tot_body_common += len(o & body)
+        tot_curated_common += len(o & curated)
         if o == n:
             exact += 1
         elif o and o <= n:
@@ -305,6 +317,11 @@ def main():
     recall = 100 * tot_common / tot_old if tot_old else 0
     print("\nold-reference recall: %d/%d (%.1f%%)  |  new total refs: %d"
           % (tot_common, tot_old, recall, tot_new))
+    if tot_old:
+        print("  by route: body %d (%.1f%%), curated metadata %d (%.1f%%) "
+              "-- union above"
+              % (tot_body_common, 100 * tot_body_common / tot_old,
+                 tot_curated_common, 100 * tot_curated_common / tot_old))
     for doc, miss, extra in examples:
         print("  %s\n     old-only: %s\n     new-only: %s" % (doc, miss, extra))
     print("\nmetadata agreement (change detector; differences need adjudication):")

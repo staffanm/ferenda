@@ -37,6 +37,16 @@ class Lagrum:
 
 
 @dataclass
+class Hanvisning:
+    """A curated related-case reference (the API's hanvisadePubliceringar, the
+    legacy footer's Rättsfall). `fritext` is the editor's citation string;
+    `grupp` the API's gruppKorrelationsnummer of the cited case's publication
+    group, when given -- an authoritative join key independent of the string."""
+    fritext: str
+    grupp: str | None = None
+
+
+@dataclass
 class Avgorande:
     court: str                  # canonical court code (HDO, HFD, MOD, …)
     court_namn: str
@@ -47,11 +57,16 @@ class Avgorande:
     publiceringsform: str | None = None
     typ: str | None = None
     rattsomrade: list[str] = field(default_factory=list)
+    # coarse europarätt topic labels ("EU-rätt", "Mänskliga rättigheter") --
+    # the API's europarattsligaAvgorandenLista never holds citations, only
+    # these tags (3 distinct values corpus-wide), so they are kept as labels
+    europarattslig: list[str] = field(default_factory=list)
     nyckelord: list[str] = field(default_factory=list)
     lagrum: list[Lagrum] = field(default_factory=list)
     forarbeten: list[str] = field(default_factory=list)
     sammanfattning: str | None = None
-    related: list[str] = field(default_factory=list)
+    related: list[Hanvisning] = field(default_factory=list)
+    litteratur: list[str] = field(default_factory=list)
     body: list[Rubrik | Stycke] = field(default_factory=list)
     footnotes: list[Fotnot] = field(default_factory=list)  # document end
     sources: list[str] = field(default_factory=list)  # provenance paths

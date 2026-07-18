@@ -106,6 +106,7 @@ def scan_api(domstoldir):
             "store": "domstol", "court": court,
             "path": util.store_relpath(path, layout.DATA),
             "uuid": d["id"],
+            "grupp": d.get("gruppKorrelationsnummer"),
             "malnummer": [m.strip() for m in d.get("malNummerLista", [])],
             "referat": [r.strip() for r in d.get("referatNummerLista", [])],
             "avgorandedatum": d.get("avgorandedatum"),
@@ -224,6 +225,22 @@ def dedup_malnr(items):
         if k and (k not in best or len(item) > len(best[k])):
             best[k] = item
     return sorted(best.values())
+
+
+def grupp_map(cases):
+    """gruppKorrelationsnummer -> canonical case id, over the identity index.
+    The grupp is the publication group a hanvisad publicering names, so this is
+    the authoritative resolution for a related-case reference whose fritext the
+    citation grammar cannot read. A grupp claimed by more than one canonical
+    case (a handful of split groups) is dropped: guessing would link the wrong
+    decision, and the fritext route remains for those."""
+    claims = defaultdict(set)
+    for case in cases:
+        for member in case["members"]:
+            if member.get("grupp"):
+                claims[member["grupp"]].add(case["canonical_id"])
+    return {grupp: next(iter(ids))
+            for grupp, ids in claims.items() if len(ids) == 1}
 
 
 def canonical_id(courts, malnummer, referat):

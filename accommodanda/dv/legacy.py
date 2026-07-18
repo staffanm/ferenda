@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ..lib import layout, util
 from ..lib import poi as word
-from .model import Avgorande, Lagrum, Rubrik, Stycke
+from .model import Avgorande, Hanvisning, Lagrum, Rubrik, Stycke
 from .parse import RE_NUMPARA, is_heading, to_artifact
 
 # Footer labels that end the body region.
@@ -151,7 +151,10 @@ def build_avgorande(head, body, case=None, sources=None):
         lagrum=[Lagrum(referens=l) for l in head.get("Lagrum", [])],
         forarbeten=[],
         sammanfattning=" ".join(head.get("Rubrik", [])) or None,
-        related=head.get("Rättsfall", []),
+        related=[Hanvisning(fritext=r) for r in head.get("Rättsfall", [])],
+        # a legacy Litteratur line packs several works separated by ";"
+        litteratur=[w.strip() for line in head.get("Litteratur", [])
+                    for w in line.split(";") if w.strip()],
         body=[_classify(p) for p in body],
         sources=sources or [],
     )

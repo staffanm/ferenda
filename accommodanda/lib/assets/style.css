@@ -477,6 +477,14 @@ section.forarbeten ul { list-style: none; margin: 0; padding: 0; }
 section.forarbeten li { margin: .15rem 0; line-height: 1.4; }
 section.forarbeten a { color: var(--forarbete); }
 
+/* -- Curated relation groups on a decision page (Lagrum / Förarbeten /
+      Rättsfall / Litteratur) -- same compact metadata-list voice -- */
+section.curated { margin: 1.25rem 0; font-size: .85rem; }
+section.curated h2 { font-family: var(--serif); font-style: italic; font-size: .85rem;
+                     color: var(--ink-3); font-weight: 400; margin: 0 0 .4rem; border: 0; }
+section.curated ul { list-style: none; margin: 0; padding: 0; }
+section.curated li { margin: .15rem 0; line-height: 1.4; }
+
 /* -- Document-level inbound panel (whole-doc citations) -- */
 .inbound-doc { background: var(--surf); border: 1px solid var(--rule); border-radius: 6px;
                padding: .9rem 1.25rem; margin: 1.5rem 0 2.5rem; font-size: .85rem; }

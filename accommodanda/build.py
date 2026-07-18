@@ -1184,15 +1184,29 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
 DOM_DOWNLOADED = layout.DOM_DOWNLOADED            # dv api records (primary)
 DV_LEGACY_DOWNLOADED = layout.DV_LEGACY_DOWNLOADED  # legacy raw feed
 DV_INDEX = layout.DOM_INDEX
+# identity.py is here because parse *reads* it (grupp_map resolves curated
+# hanvisningar), like casenaming. DV_INDEX itself is deliberately NOT a parse
+# input: it churns on every harvest and would re-stale all ~17k artifacts each
+# time, so a reindex that newly resolves a grupp reaches existing artifacts
+# only at the next code-staleness or --force pass.
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
-           PKG / "dv" / "structure.py", PKG / "lib" / "casenaming.py",
-           PKG / "lib" / "lagrum.py")
+           PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
+           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
 def _dv_cases():
     cases = json.loads(DV_INDEX.read_text())
     return {c["canonical_id"]: c for c in cases if api_member(c)}
+
+
+@functools.cache
+def _dv_grupps():
+    """gruppKorrelationsnummer -> canonical case id, for resolving curated
+    related-case references whose fritext the citation grammar cannot read.
+    Over the whole index (not just API-backed cases): a grupp can name any
+    published case."""
+    return dv_identity.grupp_map(json.loads(DV_INDEX.read_text()))
 
 
 @functools.cache
@@ -1270,6 +1284,7 @@ def dv_reindex(args=()):
                         domstoldir=str(DOM_DOWNLOADED),
                         out=str(DV_INDEX))
     _dv_cases.cache_clear()
+    _dv_grupps.cache_clear()
 
 
 def dv_namedcases(args=()):
@@ -1294,7 +1309,7 @@ def dv_parse_run(basefile):
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
-    art = to_artifact(av, canonical_id=basefile)
+    art = to_artifact(av, canonical_id=basefile, grupp_uris=_dv_grupps())
     # stamp the canonical, name-prefixed display title onto the artifact here, so
     # the pure catalog reads it off the artifact without recomputing (the naming
     # grammar itself lives in lib.casenaming, read identically by page + catalog)

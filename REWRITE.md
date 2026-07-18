@@ -26,9 +26,14 @@ sections below explain each item and retain the historical measurements.
   tail is bounded: SFS special-law/bilaga and amendment-register improvements,
   plus 15 DV date conflicts for which neither date survives in the published
   body (§3d, §4).
-- ⬜ **DV coverage and published identity:** ingest the recoverable NJA
-  notisfall and restore the verified legacy verdict URI grammar for non-referat
-  cases (§4, §6).
+- ✅ **DV coverage and published identity:** the recoverable NJA notisfall are
+  ingested and the legacy verdict URI grammar for non-referat cases restored
+  (§4, §6; closed 2026-07-16, `docs/rewrite-parity/01`).
+- ✅ **DV curated legal relations:** the API's curated lagrum/förarbete/
+  rättsfall/litteratur metadata normalized through the citation grammar and
+  projected as typed graph edges, with the grupp join as authoritative
+  fallback (§4; implemented 2026-07-18, `docs/rewrite-parity/03`; full-corpus
+  verification folds into the acceptance run).
 - ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
   offsets, general/continued tables; unify the two författningskommentar bounds
   and repair the known truncated law headings (§7a, §7d, §7g).
@@ -647,6 +652,31 @@ below is not optional polish, it's the only way they enter the corpus.
     **81.2% `lagrumLista` recall** (the shortfall is editor-derived lagrum
     not cited verbatim, not scanner misses — a signal, per the oracle's
     change-detector posture).
+  - ✅ **Curated legal relations projected as typed graph edges**
+    (2026-07-18, `docs/rewrite-parity/03`). The API's curated
+    lagrumLista/forarbeteLista/hanvisadePubliceringarLista/litteraturLista
+    (and the legacy footer's Lagrum/Rättsfall/Litteratur) are normalized at
+    parse time through the same citation grammar the body uses, into
+    inline-run lists stored beside the raw strings
+    (`metadata.{lagrum,forarbeten,related,litteratur}`), predicates preserved
+    (`rpubl:lagrum`/`rpubl:forarbete`/`rpubl:rattsfallshanvisning`/
+    `dcterms:relation`); unresolved strings survive as plain runs. Fallbacks
+    where the grammar fails: lagrumLista's `sfsNummer` (law-level link) and a
+    hanvisning's `gruppKorrelationsnummer` — an authoritative join to the
+    cited case's publication group, resolved via the identity index
+    (13,307/13,307 grupp-carrying entries resolve; ambiguous split groups
+    dropped, not guessed). `europarattsligaAvgorandenLista` never holds
+    citations (corpus-wide it takes exactly three topic-label values, on 98
+    records) — kept as labels in `metadata.europarattslig` beside
+    Rättsområde, minting no relation edge; `litteraturLista` — previously
+    dropped entirely — is retained. `lib.catalog.curated_links` projects the
+    runs into the links table (unanchored, so `inbound_collapsed` dedups
+    against body pinpoints naturally); `render_dv` shows the four groups.
+    `golden_dv` now reports body/curated/union recall separately, resolving
+    the 81%-vs-96% conflation: a 300-case oracle sample measures body 96.1%,
+    curated 44.2%, union 96.4%, with the residual old-only refs absent from
+    both prose and API metadata (old-pipeline context artifacts, not
+    projection loss). Corpus re-parse + relate pending (the acceptance run).
   - Summary-only nämnd records (no `innehall`) get the sammanfattning as
     body downstream.
 - ✅ **DV golden corpus (reference graph)** — `tools/golden_dv.py`. The old

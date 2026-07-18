@@ -420,6 +420,29 @@ def test_case_page_links_into_law(tmp_path):
     assert "Om dröjsmålsränta." in html  # sammanfattning rendered
 
 
+def test_case_page_renders_curated_groups(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    case = json.loads(json.dumps(CASE))
+    case["metadata"].update({
+        "lagrum": [{"text": "6 § räntelagen (1975:635)", "sfsnummer": "1975:635",
+                    "runs": [{"predicate": "rpubl:lagrum",
+                              "uri": "https://lagen.nu/1975:635#P6",
+                              "text": "6 § räntelagen (1975:635)"}]}],
+        "related": [{"text": "SvJT 1955 rf s. 76",
+                     "runs": ["SvJT 1955 rf s. 76"]}],
+        "litteratur": [{"text": "Ekelöf, Rättegång IV",
+                        "runs": ["Ekelöf, Rättegång IV"]}],
+    })
+    html = render.render_dv(case, site)
+    # a resolved curated lagrum links; unresolved entries stay visible as text
+    assert '<section class="curated lagrum"><h2>Lagrum</h2>' in html
+    assert html.count('href="/1975:635#P6"') == 2   # body + curated lagrum
+    assert "SvJT 1955 rf s. 76" in html and "Rättsfall</h2>" in html
+    assert "Ekelöf, Rättegång IV" in html and "Litteratur</h2>" in html
+    # no förarbeten entries -> no empty section
+    assert "Förarbeten</h2>" not in html
+
+
 # --- authoritative source url ---------------------------------------------
 
 def test_eurlex_source_url_derives_eli():
