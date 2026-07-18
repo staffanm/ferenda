@@ -174,8 +174,8 @@ def test_word_paras_word95_doc():
 
 
 def test_word_paras_docx():
-    """A .docx rides the shared POI XWPF reader (lib/poi), one Para per
-    paragraph -- the other half of the word route."""
+    """A .docx is read directly as OOXML (no JVM in the parse workers), one
+    Para per w:p -- the other half of the word route."""
     paras = word_paras(FIXTURES / "proptrips_word.docx")
     texts = [p.text for p in paras]
     assert texts[:3] == ["Regeringens proposition", "2011/12:94",

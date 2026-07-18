@@ -24,7 +24,7 @@ import verb (a later task) drives:
   * :func:`trips_paras`          -- a TRIPS ``div.body-text`` plaintext-HTML body
     -> a Para stream.
   * :func:`word_paras`           -- a legacy Word body (.doc via antiword, .docx
-    via ``lib.poi``; proptrips/regeringen-era) -> a Para stream.
+    read directly as OOXML; proptrips/regeringen-era) -> a Para stream.
 
 Three of the body formats carry no font/bold signal: the ``text/tml`` body is
 ``<br>``-hard-wrapped plaintext with no markup but the line break, the TRIPS
@@ -39,14 +39,13 @@ its Paras carry the bold heading signal.
 import io
 import re
 import subprocess
+import zipfile
 from datetime import date
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from lxml import html as lxml_html
-
-from ..lib import poi
 
 # de-hyphenation is the same soft-hyphen rule the PDF verticals already use; the
 # ABBYY loader reuses it rather than replicating it (rule:second-use-goes-to-lib)
@@ -55,6 +54,9 @@ from ..lib.util import normalize_space
 
 # the ABBYY export namespaces every element; Clark-notation prefix for lookups
 ABBYY_NS = "{http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml}"
+
+# OOXML WordprocessingML namespace, Clark-notation prefix for .docx lookups
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 # a text/tml (and empty-htmlformat) body that is literally this string is a
 # never-published proposition; the import verb turns the ValueError into a skip
@@ -285,16 +287,28 @@ def trips_paras(html_text):
 
 def word_paras(path):
     """A legacy Word body (.doc/.docx) -> a page-less Para stream, like the TRIPS
-    body. A **.doc** is read with ``antiword``: POI's HWPF cannot open the Word
-    6/95 binary that dominates the proptrips era (`OldWordFileFormatException`),
-    while antiword reads Word 2-2003 uniformly and emits blank-line-delimited
-    plaintext that reflows exactly like the text/tml body. A **.docx** rides the
-    shared POI XWPF path (`lib.poi`), one Para per paragraph. No font survives
-    either route, so the förarbete classify recovers headings from numbering, not
-    weight -- as for every other text-inferred body."""
+    body. A **.doc** is read with ``antiword``: it reads Word 2-2003 uniformly
+    (including the Word 6/95 binary that dominates the proptrips era) and emits
+    blank-line-delimited plaintext that reflows exactly like the text/tml body.
+    A **.docx** is read directly as OOXML (``word/document.xml``), one Para per
+    ``w:p`` in document order -- table-cell and text-box paragraphs included.
+    No font survives either route, so the förarbete classify recovers headings
+    from numbering, not weight -- as for every other text-inferred body."""
     path = Path(path)
     if path.suffix.lower() == ".docx":
-        return [Para(normalize_space(p.text)) for p in poi.read(path) if p.text.strip()]
+        return [p for p in (Para(normalize_space(t)) for t in _docx_texts(path))
+                if p.text]
     text = subprocess.run(["antiword", str(path)], capture_output=True,
                           check=True).stdout.decode("utf-8", "replace")
     return _reflow_plaintext(text)
+
+
+def _docx_texts(path):
+    """Per-paragraph text of a .docx: for each ``w:p``, its ``w:t`` runs joined
+    in document order, with ``w:tab``/``w:br`` rendered as a space so the words
+    they separate don't fuse (normalize_space collapses the rest)."""
+    with zipfile.ZipFile(path) as zf:
+        root = etree.fromstring(zf.read("word/document.xml"))
+    return ["".join(el.text or "" if el.tag == W_NS + "t" else " "
+                    for el in p.iter(W_NS + "t", W_NS + "tab", W_NS + "br"))
+            for p in root.iter(W_NS + "p")]
