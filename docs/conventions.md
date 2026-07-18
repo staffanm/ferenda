@@ -174,7 +174,7 @@ neither.
 ### rule:no-infunction-imports  [ruff PLC0415]
 
 All imports at the top of the file, grouped stdlib / third-party / local.
-The one sanctioned exception: `dv/word.py`'s POI/jpype imports, which
+The one sanctioned exception: `lib/poi.py`'s POI/jpype imports, which
 must follow JVM start — cited inline.
 
 ### rule:no-speculative-code

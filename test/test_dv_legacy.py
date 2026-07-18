@@ -1,11 +1,11 @@
 """Tests for the legacy DV parser (POI Word path).
 
-The POI extraction itself needs a JVM and lives in dv_word; these tests
+The POI extraction itself needs a JVM and lives in lib/poi; these tests
 exercise the format-parsing and model-mapping logic over synthetic
 paragraph streams, so they run without Java.
 """
 
-from accommodanda.dv.word import Para
+from accommodanda.lib.poi import Para
 from accommodanda.dv.legacy import (
     build_avgorande, parse_head_body, _classify, _split_malnummer)
 from accommodanda.dv.model import Rubrik, Stycke

@@ -23,7 +23,7 @@ from collections import Counter
 from pathlib import Path
 
 from ..lib import layout, util
-from . import word
+from ..lib import poi as word
 from .model import Avgorande, Lagrum, Rubrik, Stycke
 from .parse import RE_NUMPARA, is_heading, to_artifact
 

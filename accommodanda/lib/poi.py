@@ -1,14 +1,18 @@
-"""POI-backed extraction of legacy court-decision Word files (.doc/.docx).
+"""POI-backed extraction of legacy Word files (.doc/.docx) into a flat paragraph
+stream. Shared machinery: the DV vertical reads court-decision Word bodies and
+the förarbete vertical reads proptrips/regeringen-era Word bodies through it.
 
-The old DV feed stores each decision as a Word document. The binary
-Word 97-2003 format (.doc) and the OOXML format (.docx) are read through
-Apache POI (HWPF / XWPF) over jpype into a *single* flat paragraph stream
--- (text, bold, in_table) -- recovering the label/value table structure
-and the bold run markers that antiword's DocBook conversion flattened.
+The binary Word 97-2003 format (.doc) and the OOXML format (.docx) are read
+through Apache POI (HWPF / XWPF) over jpype into a *single* flat paragraph
+stream -- (text, bold, in_table) -- recovering the label/value table structure
+and the bold run markers that antiword's DocBook conversion flattened. Callers
+map that stream onto their own model (DV's referat head/body, förarbete's Para
+classify).
 
-The whole referat sits inside one Word table, so table membership is not
-the body discriminator; the 'REFERAT' marker and bold metadata labels are.
-Downstream parsing lives in dv_legacy.py.
+The jars are not committed (`vendor/poi/*.jar`, gitignored); fetch once with
+`tools/fetch_poi.sh`, which populates the repo-root `vendor/poi/` this module
+globs. A JVM (Java 9+, jpype's floor; the README pins openjdk-21-jdk-headless)
+must be discoverable -- jpype auto-finds `libjvm.so`.
 """
 
 import glob
@@ -18,7 +22,9 @@ from pathlib import Path
 import jpype
 import jpype.imports
 
-_JARS = sorted(glob.glob(str(Path(__file__).parent.parent / "vendor" / "poi" / "*.jar")))
+# repo-root vendor/poi (accommodanda/lib/poi.py -> parents[2] is the repo root),
+# the location tools/fetch_poi.sh writes to.
+_JARS = sorted(glob.glob(str(Path(__file__).parents[2] / "vendor" / "poi" / "*.jar")))
 
 # Word's field-result placeholder, emitted for empty form fields (Avdelning,
 # Domsnummer …). It carries no value, so we strip it to empty.
@@ -37,7 +43,7 @@ class Para:
 
 def _ensure_jvm():
     if not jpype.isJVMStarted():
-        assert _JARS, "no POI jars found under vendor/poi/"
+        assert _JARS, "no POI jars found under vendor/poi/ (run tools/fetch_poi.sh)"
         # We ship only log4j-api (no -core); point it at the built-in
         # SimpleLogger so it stops printing "could not find a logging
         # provider" to stdout, and silence that logger.

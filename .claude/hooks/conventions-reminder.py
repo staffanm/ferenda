@@ -25,7 +25,7 @@ LEGACY_TREES = ("ferenda", "lagen")
 
 # A suppression comment with nothing after the code(s) is "bare" unless a
 # comment on one of the two preceding lines carries the rationale (the
-# dv/word.py jpype pattern). Judging rationale *quality* is the
+# lib/poi.py jpype pattern). Judging rationale *quality* is the
 # conventions-enforcer agent's job, not this hook's.
 BARE_SUPPRESSIONS = (
     re.compile(r"#\s*noqa(?::\s*[A-Z]+\d+(?:\s*,\s*[A-Z]+\d+)*)?\s*$"),
