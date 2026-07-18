@@ -5,9 +5,23 @@ import re
 import shutil
 import sys
 import time
+import unicodedata
 from collections import deque
 from pathlib import Path
 from typing import Any
+
+
+def text_slug(text, *, sep="-", maxlen=None):
+    """A stable, URL/file-safe slug from arbitrary text: NFKD-folded to ASCII (so
+    å/ä/ö/é/ü/… degrade to a/a/o/e/u), lower-cased, every run of non-alphanumerics
+    collapsed to a single `sep`, optionally truncated to `maxlen` characters (the
+    trailing `sep` a mid-word cut can leave is stripped). Stability, not
+    readability, is the point -- it keys documents with no number of their own (a
+    lagrådsremiss title, an atom feed id). The NFKD fold covers every diacritic,
+    unlike a hand-rolled character map."""
+    ascii_ = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", sep, ascii_.lower()).strip(sep)
+    return slug[:maxlen].strip(sep) if maxlen else slug
 
 
 def write_atomic(path, data):

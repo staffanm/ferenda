@@ -8,13 +8,12 @@ live query-parameter endpoints.
 """
 
 import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
 from urllib.parse import urlencode
 
-from . import catalog, facets, layout
+from . import catalog, facets, layout, util
 
 BASE = catalog.BASE.rstrip("/")
 LIMIT = 200                    # legacy main feeds held up to 2 * archivesize(100)
@@ -67,8 +66,7 @@ def feed_url(alias, atom=False, params=None):
 
 
 def _slug(value):
-    value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    return util.text_slug(value, sep="_")
 
 
 def _rfc3339(value):
