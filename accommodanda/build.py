@@ -76,6 +76,7 @@ from .forarbete import parse as fa_parse
 from .forarbete import propkb as fa_propkb
 from .forarbete import riksdagen as fa_riksdagen
 from .forarbete import rskr as fa_rskr
+from .forarbete import soukb as fa_soukb
 from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
@@ -835,10 +836,9 @@ def sfs_table_correspond(basefiles):
         olds = [(old_uri.rsplit("/", 1)[-1], None)]
     out = annstore.path("sfs", new_sfs, ".corr")
     typ, slug = prop.split("/", 1)
-    record = json.loads(compress.read_bytes(
-        layout.FA_DOWNLOADED / typ / (slug + ".json")))
-    pdfs = [layout.FA_DOWNLOADED / typ / f for f in record["files"]
-            if f.lower().endswith(".pdf")]
+    record = json.loads(compress.read_bytes(layout.fa_record(prop)))
+    pdfs = [layout.fa_dir(layout.FA_DOWNLOADED, typ, slug) / f
+            for f in record["files"] if f.lower().endswith(".pdf")]
     if RUN.dry_run:
         print("sfs table-correspond: would map %s <- %s from %d pdf(s) of %s "
               "-> %s" % (new_sfs, "+".join(o for o, _t in olds), len(pdfs),
@@ -1344,10 +1344,12 @@ def fa_artifact(basefile):
 
 
 def fa_list():
-    """Every harvested record as 'type/slug' (the artifact subdir excluded by
-    the single-level glob)."""
-    return sorted("%s/%s" % (p.parent.name, p.stem)
-                  for p in compress.glob(layout.FA_DOWNLOADED, "*/*.json")
+    """Every harvested record as 'type/slug', read from the year-segmented
+    download tree (`<type>/<year>/<slug>.json`); the type is the grandparent dir.
+    Per-type dotfiles (`.watermark.json`, `.complete`) sit a level up at
+    `<type>/`, so the three-level glob never reaches them."""
+    return sorted("%s/%s" % (p.parent.parent.name, p.stem)
+                  for p in compress.glob(layout.FA_DOWNLOADED, "*/*/*.json")
                   if not p.name.startswith("."))
 
 
@@ -1460,13 +1462,33 @@ def fa_propkb_scans(args):
     print("forarbete propkb-scans: %d seen, %d fetched" % (seen, fetched))
 
 
+def fa_soukb_scans(args):
+    """`lagen forarbete soukb-scans` -- one-time bulk re-download of the
+    KB-digitised SOUs (1922-1999), the scanned OCR'd PDFs that *are* the body (no
+    XML sibling, unlike propkb-scans). Walks `https://sou.kb.se/` as the source of
+    truth, forgetting the legacy soukb records, and writes a fresh record per
+    basefile pointing at its PDF(s). Hundreds of GB over ~5,800 documents, so it is
+    its own verb, never part of `harvest`. Resumable: a PDF already on disk is
+    skipped, so a killed run just gets rerun. `--limit N` caps the fetch (a test
+    slice)."""
+    if args:
+        sys.exit("usage: lagen forarbete soukb-scans")
+    if RUN.dry_run:
+        print("forarbete soukb-scans: would re-download the KB SOU bodies into %s"
+              % (layout.FA_DOWNLOADED / "sou"))
+        return
+    seen, fetched = fa_soukb.sync(layout.FA_DOWNLOADED, limit=RUN.limit)
+    print("forarbete soukb-scans: %d seen, %d fetched" % (seen, fetched))
+
+
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"import-legacy": fa_import_legacy,
-            "propkb-scans": fa_propkb_scans},
+            "propkb-scans": fa_propkb_scans,
+            "soukb-scans": fa_soukb_scans},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
          "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "
@@ -1476,7 +1498,10 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
          "corpus (--limit N caps it; --force re-imports)\n"
          "propkb-scans: one-time ~79 GB fetch of the KB proposition page-image "
          "scans for the facsimile view (--limit N caps it; adds no documents, "
-         "re-stales no parse)" % FA_LEGACY_CORPORA)
+         "re-stales no parse)\n"
+         "soukb-scans: one-time hundreds-of-GB re-download of the KB SOU bodies "
+         "(1922-1999) from sou.kb.se as the source of truth (--limit N caps it; "
+         "the scanned PDF is the body)" % FA_LEGACY_CORPORA)
 
 
 # --------------------------------------------------------------------------
@@ -2428,7 +2453,7 @@ ARTIFACTS = {
     # excludes the non-document index sidecars (DOM_INDEX / guidance-index.json)
     # -- no hand-globbed carve-out here (else the exclusion drifts across surfaces)
     "dv": lambda: layout.artifacts("dv"),
-    "forarbete": lambda: sorted(compress.glob(layout.artifact_dir("forarbete"), "*/*.json")),
+    "forarbete": lambda: layout.artifacts("forarbete"),
     "kommentar": lambda: layout.artifacts("kommentar"),
     "begrepp": lambda: sorted(compress.glob(layout.artifact_dir("begrepp"), "*.json")),
     "eurlex": lambda: sorted(compress.glob(layout.artifact_dir("eurlex"), "*/*.json")),

@@ -1295,7 +1295,8 @@ them resolve.
     (a truncated/broken listing now raises rather than silently stopping).
     Stores per doc:
     `<slug>.json` record + landing `<slug>.html` + content PDF(s) under
-    `site/data/downloaded/forarbete/<type>/`. `test/test_forarbete_download.py`.
+    `site/data/downloaded/forarbete/<type>/<year>/` (year-segmented since
+    2026-07-18, `pm` bucketed under `_`). `test/test_forarbete_download.py`.
   - ✅ **Older-period sources imported from the frozen corpora** —
     propriksdagen, KB and the regeringen-era gap-fill trees use the same
     identifier-keyed records and precedence machinery; see §7g. A live
@@ -2205,6 +2206,23 @@ Exposed as its own verb, `lagen forarbete propkb-scans` (never part of
 been executed — only prop 1867:1 and 1937:141 were fetched, as end-to-end
 verification, not a corpus pass.
 
+Also new (2026-07-18): `accommodanda/forarbete/soukb.py`, a **body
+re-downloader** for the KB-digitised SOUs (1922–1999). Unlike `propkb.py`,
+there is no ABBYY XML sibling — the scanned, OCR'd PDF *is* the body — so
+this adds real documents rather than a facsimile: it walks
+`https://sou.kb.se/` as the sole source of truth (the old `regina.kb.se`
+start URL is dead, so the legacy soukb records are forgotten entirely) and
+writes a fresh harvested record per basefile, `files` pointing at the
+fetched PDF(s). Basefile comes from the index label via a broadened port of
+the legacy SOUKB regex (`1922:1 första serien`→`1922:1fs`, letter suffixes
+lowercased, `/`-double-issues hyphenated); 5,814 distinct basefiles. 128 of
+them are multi-volume (one label repeats across several URNs, e.g. `1987:3`
+= 28 volumes of the Långtidsutredning), so `files` is a list in index order,
+one record per basefile. Exposed as its own verb, `lagen forarbete
+soukb-scans` (never part of `harvest`), resumable per part. **Built,
+verified end-to-end on one small doc (1922:1, 10.5 MB) into a scratch
+tree — not run at corpus scale**; the full pass is hundreds of GB.
+
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 
 `accommodanda/remisser/` — remiss (public referral) cases from
@@ -2506,7 +2524,7 @@ rewrite work.
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer) |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record` branches `legacy_files` present → `_legacy_body`, else `_harvested_body`), `legacy` (one-time import of the frozen förarbete corpora, §7g — prop is fully migrated to ordinary harvested form, 2026-07-17; sou/dir/ds remain frozen, still served by this module), `legacy_formats` (body adapters, frozen and harvested alike — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record` branches `legacy_files` present → `_legacy_body`, else `_harvested_body`), `legacy` (one-time import of the frozen förarbete corpora, §7g — prop is fully migrated to ordinary harvested form, 2026-07-17; sou/dir/ds remain frozen, still served by this module), `legacy_formats` (body adapters, frozen and harvested alike — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model`, `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`) |
 | `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions |
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
@@ -2529,7 +2547,7 @@ rewrite work.
 | `accommodanda/wiki/` | **kommentar + begrepp sources**: `parse` (commentary anchored to §§, concept glossary) |
 | `site/data/downloaded/mediawiki/` | MediaWiki dump (SFS commentary + concept pages) |
 | `test/test_wiki.py` | wiki parsing suite |
-| `site/data/downloaded/forarbete/<type>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records |
+| `site/data/downloaded/forarbete/<type>/<year>/` | harvested förarbeten (record json + landing html + content pdf) + frozen-import records, year-segmented (`fa_year`/`fa_dir` in `lib/layout.py`; `pm` buckets under `_`, dotfile markers stay at the `<type>/` level) |
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
 | `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se); the shared dokumentlista `harvest()` engine also drives `rskr.py` |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | förarbete frozen-corpus import + body-adapter suites |
@@ -2638,6 +2656,30 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **forarbete** (2026-07-18) — downloaded + artifact trees year-segmented
+  (`<typ>/<year>/<slug>`), ~287k files migrated; pm buckets under `_`; URLs
+  unchanged. `lib/layout.py` gains `fa_year`/`fa_dir`/`fa_record_file`; the
+  reader `fa_record`, `fa_facsimile_pdf`, `fa_ocr_pdf` and `relpath("forarbete",
+  …)` all route through the year segment. A record and its body files stay
+  co-located under the same `<typ>/<year>/` dir; per-type dotfile markers
+  (`.watermark.json`, `.complete`) stay at the `<typ>/` level so the record
+  glob (`*/*/*.json`) never reaches them. The big types (prop ~62k, bet ~42k,
+  rskr ~40k) held tens of thousands of files flat before this, the same
+  problem SFS's `<year>/<nr>` layout already solved.
+- **forarbete** (2026-07-18) — `forarbete/soukb.py`, a **body re-downloader**
+  for the KB-digitised SOUs (1922–1999), sibling to `propkb.py` but adding real
+  documents rather than a facsimile: there is no ABBYY XML sibling for these
+  scans, the OCR'd PDF *is* the body. It walks `https://sou.kb.se/` as the sole
+  source of truth (the old `regina.kb.se` start URL is dead, so legacy soukb
+  records are forgotten entirely) and writes a fresh harvested record per
+  basefile, `files` pointing at the fetched PDF(s); basefile comes from the
+  index label via a broadened port of the legacy SOUKB regex. 5,814 distinct
+  basefiles, 128 of them multi-volume (one label repeats across several URNs,
+  e.g. `1987:3` = 28 volumes of the Långtidsutredning), so `files` is a list in
+  index order, one record per basefile. Own verb, `lagen forarbete
+  soukb-scans`, resumable per part. Built, verified end-to-end on one small doc
+  (1922:1, 10.5 MB) into a scratch tree — not run at corpus scale; the full
+  pass is hundreds of GB.
 - **forarbete** (2026-07-17) — the §7g frozen→harvested migration's prop slice
   lands: all 28,288 `downloaded/forarbete/prop/*.json` records now carry
   `files` (relative to `downloaded/prop/`) instead of `source`/`legacy_files`,
