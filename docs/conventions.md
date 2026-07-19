@@ -55,6 +55,14 @@ before the review consolidated it. Corollary: a vertical is the wrong
 home for anything generic — the `foreskrift` harvest engine belongs in
 `lib/harvest` for the next source to build on.
 
+### rule:respect-politeness
+
+Every action for any source that downloads more than a single resource
+must respect `accommodanda.build.POLITENESS` (or accept a `delay` parameter
+that defaults to it). Multi-item network operations — harvests, scan
+downloads, index walks, and body refetches — must sleep between network
+fetches to avoid overwhelming upstream servers or triggering rate limits.
+
 ### rule:legacy-read-only  [hook]
 
 `ferenda/` and `lagen/` are frozen reference — port knowledge out of

@@ -41,16 +41,33 @@ sections below explain each item and retain the historical measurements.
   citation-scanned as one body, with the as-enacted base text at `{uri}/grund`
   (§7e; implemented 2026-07-18, `docs/rewrite-parity/02`; the corpus-wide
   re-parse folds into the acceptance run).
-- ⬜ **Förarbete correctness tail:** fetch lr/SÖ bodies; handle printed-page
-  offsets, general/continued tables; unify the two författningskommentar bounds
-  and repair the known truncated law headings (§7a, §7d, §7g).
-- ⬜ **Derived legal relations:** extract/publish föreskrift `ändrar` and publish
-  its `upphäver`/`genomför` metadata as typed graph edges (§7e).
-- ⬜ **Source validation tail:** establish a representative EUR-Lex metadata
-  cross-check; compare a complete live JO harvest with the frozen corpus, add
-  JO `official_report` and remove ARN masthead noise (§7d, §7f).
-- ⬜ **Frozen-corpus tail:** decide/model the skipped SOSFS consolidations and
-  add a chronology sanity check for OCR-garbled citations (§7g).
+- ✅ **Förarbete correctness tail (2026-07-19):** lr/SÖ bodies recovered by
+  the `refetch-bodies` second-chance pass (the landings always carried the
+  links; the assets served transient non-documents at harvest time);
+  printed-page offsets derived from marginal folios (`page_offset`, ambiguity
+  fails visibly; SOU 1989:67's anchors were off by 3); a conservative generic
+  data-table model with cross-page continuation (`forarbete/tabell.py`); the
+  FK bounds unified onto `fk_span` (+972 genomför-direktiv edges, appendix
+  false-edges dropped, validated corpus-wide); the truncated "lag om ändring
+  i" rubriks re-joined (115/126 corpus-wide, fixture-locked). DOC recovery had
+  landed earlier (ead96b82); `.wpd` stays excluded by scope — but note 82
+  wpd-only props have *no* body anywhere and soffice converts them cleanly
+  (§7a, §7d, §7g; `docs/rewrite-parity/04`).
+- ✅ **Derived legal relations:** föreskrift `ändrar` extracted (title +
+  konsoliderad-masthead evidence) and published with `upphäver`/`genomför`/
+  `ändradAv` as typed graph edges, rendered both directions (§7e).
+- ✅ **Source validation tail (2026-07-19):** the EUR-Lex metadata cross-check
+  landed — `tools/golden_eurlex.py` validates the carried fields (CELEX, date,
+  title, OJ ref, ECLI, doctype) of a 502-document stratified sample against a
+  retained CELLAR snapshot with an adjudication ledger; zero unexplained
+  differences after fixing four parser defects it caught (§7d). The JO/ARN
+  half landed the same day: live-vs-frozen JO inventory reconciled (five
+  genuine omissions imported), `official_report` modeled/rendered/searchable,
+  ARN masthead noise stripped (§7f).
+- ✅ **Frozen-corpus tail (2026-07-19):** the skipped SOSFS consolidations
+  landed as `files.consolidation` entries on their base records, and the OCR
+  chronology sanity check demotes-and-reports citations whose target year
+  post-dates the citing document (§7e, §7g).
 - ✅ **SFS omitted graphics:** the graphics/formulas/maps/road-signs the
   text-only SFST source omits are detected, vision-localized to the
   provenance-correct published PDF, cropped and rendered (§3d).
@@ -2176,6 +2193,11 @@ untouched.
   XML/HTML is small; ABBYY-XML → a `pdftext.Para`-stream loader is one new
   format route (and buys 19k documents); `.doc`/`.docx` ride the DV POI path;
   `.wpd` (347 files) is dropped rather than chasing a WordPerfect converter.
+  (Correction 2026-07-19: the "wpd all covered elsewhere" premise is false —
+  82 of the 284 wpd-only proptrips docdirs, all 1995/96, have *no* parsed
+  body in any corpus. `soffice --convert-to docx` (libwpd) converts them
+  cleanly and `word_paras` parses the result, so recovery is a scope
+  decision, not a technical gap.)
 - **Priority**: (1) ARN into `avg` (smallest; the vertical is shaped for it);
   (2) propriksdagen (biggest citation-resolution payoff — förarbete citations
   in DV/SFS are dominated by 1971–1990s props that render as dead `.noref`
@@ -2283,10 +2305,34 @@ verdict** (user-adjudicated): the PDFs' embedded text layer is ABBYY
 Recognition Server output and reads well across decades — it is used as-is;
 no bulk re-OCR (the `forarbete/ocr/` sidecar seam remains for targeted
 upgrades), and the old pipeline's 36 GB of Tesseract-3 `intermediate/*.hocr*`
-can be dropped. Remaining ⬜: the SOSFS `konsolidering/` texts, OCR-garbled
-citations in scan-era docs (e.g. an impossible 1992 SFS link in a 1971 prop —
-a future "no citations newer than the document" sanity pass), relate/generate
-at the new corpus scale. (`.doc/.docx`-only proptrips bodies landed 2026-07-17,
+can be dropped. Remaining ⬜: relate/generate at the new corpus scale. ✅ The
+OCR chronology sanity check landed 2026-07-19: parse now knows which route a
+body came through (`Forarbete.ocr` — the pdftotext scan fallback, ABBYY xml,
+and the skanning2007/trips html adapters; text/tml and born-digital PDFs are
+not OCR), and `censor_future_citations` demotes any link whose target year
+exceeds the basefile year + 1 *and* whose own text carries that year — the
+year-in-text condition scopes it to digit garbling, so a named-law reference
+resolving to a modern namesake ("kommunallagen" in a 1971 prop →
+lagen.nu/2017:725, a *name-resolution* defect the sweep surfaced, 231
+instances in 18 sampled docs) is deliberately left to its own fix. The
+suspect text is preserved verbatim (never rewritten), the link is simply not
+minted, and each demotion is reported in the artifact's
+`suspect_citations` [{text, uri, page}]. A 150-doc sweep over 1970s props +
+1935–1975 SOUs found zero genuine future citations; the corpus-wide count
+falls out of the full re-parse (finding 6). ✅ The
+SOSFS `konsolidering/` texts landed 2026-07-19: they are consolidations of
+their base regulations (self-titled "Senaste version av SOSFS X:Y"), served
+by Socialstyrelsen as HTML pages despite the frozen `index.pdf` filenames
+(one real PDF among 87 docs). Migrated into `files.consolidation` on their
+base records — 76 attached (5 duplicate fetches skipped, 7 byteless entries
+excluded incl. the wholly-absent sosfs/2014:7), 2 missing bases imported
+(sosfs/2011:9, hslffs/2018:54; sosfs/2000:6 already existed as a plain-.json
+record) — and parsed by the new `parse_consolidation_html` route (same
+classify/nest text pipeline over the page's h2/h3/p blocks; the "Ändrad:
+[t.o.m.] …" preamble line yields konsolideradTom + register refs, each under
+its own printed samling — a SOSFS base consolidated t.o.m. an HSLF-FS
+amendment is the 2015 series transition). All 76 present substantial
+consolidated text; 41 carry a cutoff + register; 73 emit `/grund` sidecars. (`.doc/.docx`-only proptrips bodies landed 2026-07-17,
 below — via `antiword`, not POI/soffice.) 💤 `.wpd` is deliberately dropped
 rather than adding a WordPerfect converter; PBR is archived, not imported, and
 outside the rewrite scope.
