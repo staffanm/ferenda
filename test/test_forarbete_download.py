@@ -416,3 +416,38 @@ def test_sync_downloads_pm_doc_below_a_ds_only_page(tmp_path, monkeypatch):
     assert downloads == ["Ju2026/01691", "andring-av-detaljplaner"]
     state = json.loads((tmp_path / "pm" / ".watermark.json").read_text())
     assert state["dirty"] is False and state["last_harvest"] == "2026-07-03"
+
+
+def test_refetch_bodies_recovers_from_the_stored_landing(tmp_path, monkeypatch):
+    # a body-less record (finding 04's lr/SÖ gap): the stored landing carries
+    # the content link, the asset now serves a real PDF -- the refetch stores
+    # the body and updates the record; a record with a body is left alone
+    from accommodanda.lib import compress
+    docdir = layout.fa_dir(tmp_path, "lr", "2000/ungdomsmal")
+    docdir.mkdir(parents=True)
+    compress.write_download(docdir / "2000-ungdomsmal.html",
+                            '<a href="/contentassets/abc/ungdomsmal/">pdf</a>')
+    rec = {"type": "lr", "basefile": "2000/ungdomsmal",
+           "identifier": "Ändringar i handläggningen av ungdomsmål",
+           "url": "https://www.regeringen.se/x/", "files": []}
+    write_atomic(layout.fa_record_file(tmp_path, "lr", "2000/ungdomsmal"),
+                 json.dumps(rec).encode())
+
+    fetched = []
+    def fake_fetch(session, url, timeout=60):
+        fetched.append(url)
+        return SimpleNamespace(content=b"%PDF-1.4 fake", text="")
+    monkeypatch.setattr(download, "fetch", fake_fetch)
+    monkeypatch.setattr(download, "make_session", lambda ua: None)
+
+    checked, recovered, errors = download.refetch_bodies(
+        tmp_path, types=("lr",), delay=0, log=lambda *a: None)
+    assert (checked, recovered, errors) == (1, 1, 0)
+    assert fetched == ["https://www.regeringen.se/contentassets/abc/ungdomsmal/"]
+    updated = json.loads(compress.read_text(
+        layout.fa_record_file(tmp_path, "lr", "2000/ungdomsmal")))
+    assert updated["files"] == ["2000-ungdomsmal.pdf"]
+    assert compress.exists(docdir / "2000-ungdomsmal.pdf")
+    # idempotent: the record now has a body, so a second run skips it
+    assert download.refetch_bodies(tmp_path, types=("lr",), delay=0,
+                                   log=lambda *a: None) == (0, 0, 0)

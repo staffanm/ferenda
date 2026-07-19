@@ -1,7 +1,58 @@
 # Förarbete correctness tail
 
-**Status:** Open
+**Status:** Resolved 2026-07-19 (corpus-wide re-parse folds into
+[finding 6](06-corpus-acceptance-and-verification.md))
 **Priority:** P1
+
+## Resolution
+
+1. **lr/SÖ bodies** — the landings always carried the `/contentassets/`
+   links; the assets served transient non-documents at harvest time, leaving
+   1,523 lr + 1,214 SÖ records body-less. `lagen forarbete refetch-bodies`
+   (download.py:`refetch_bodies`) re-reads each stored landing's content
+   links and fetches them again. Full sweep run 2026-07-19: **2,732
+   body-less records checked, 2,707 bodies recovered, 0 errors** — the
+   corpus now stands at lr 2,738/2,744 with bodies, SÖ 3,505/3,524; the 25
+   residual records genuinely serve no document today (re-tried by any
+   later run). Spot-checked recovered bodies parse end-to-end (a 2000
+   lagrådsremiss, 1919/1921 SÖ scans). Regression-locked in
+   `test_forarbete_download.py`.
+2. **Printed-page offsets** — `lib/pdftext.py` gains `printed_pageno` (the
+   marginal folio, header-stripped) and `page_offset` (the constant offset
+   from per-page evidence: mode with majority support; competing offsets
+   raise — a wrong page anchor is silent citation corruption, so ambiguity
+   fails visibly). `parse_pdf` stamps *printed* pages on every block;
+   unnumbered cover matter gets no anchor. A 42-PDF era sweep: 37 at offset
+   0, five real corrections (SOU 1989:67 was off by 3), zero ambiguous.
+   The OCR/scan route keeps the page≈printed assumption (its `\f` split has
+   no marginal geometry to read).
+3. **General tables** — `forarbete/tabell.py`: a conservative geometric
+   detector for *data* tables (aligned column starts, numeric-evidence gate,
+   TOC/margin/lydelse exclusions) plus `merge_continued` joining a table
+   across a page break with its repeated header dropped. Prose-celled
+   listings stay out of this first cut by design — the legally significant
+   lydelse/jämförelse tables have their own reconstructions, and the gate
+   exists precisely so OCR-era fragmented prose can never shred into cell
+   salad (SOU 1989:67: 30 genuine statistics tables, no prose loss).
+4. **DOC/DOCX recovery** — landed earlier (commit ead96b82: `.docx` read as
+   OOXML, `.doc` via antiword; ~1,308 props recovered). Re-scoped here: the
+   296 remaining word-era docdirs are all `.wpd`-only. WordPerfect stays an
+   explicit scope exclusion, **but** the "all covered elsewhere" premise was
+   false: 82 of them (all 1995/96) have no parsed body in any corpus, and
+   `soffice --convert-to docx` (libwpd) converts them cleanly — recovery is
+   a scope decision, not a technical gap.
+5. **FK bounds unified** — `fk_span` moved to `kommentar.py` (fk.py imports
+   it); `kommentar.extract` now uses it instead of the level-1-bounded
+   `find_kommentar` (which remains only for förordningsmotiv's level-3
+   layout). Corpus-validated: implements edges 2,000 → 2,972, gains exactly
+   the in-FK-pseudo-rubrik truncation class; the few removed edges sat in
+   bilagor (Lagrådet quotes) — false authoritative-commentary edges.
+6. **Truncated rubriks** — `join_dangling_rubriks` re-attaches the statute
+   name dropped off "Förslag till lag om ändring i" rubriks (following
+   stycke, mis-classified rubrik, all-caps era style, TOC dotted leaders,
+   glued-onto-next-paragraph). 115 of 126 corpus-wide re-join; the residual
+   11 are genuinely ambiguous (mid-word OCR truncation, 1902-era chancery
+   prose). Fixture-locked in `test_forarbete_parse.py`.
 
 ## Finding
 

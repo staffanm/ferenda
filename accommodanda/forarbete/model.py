@@ -26,7 +26,9 @@ class Block:
     page: int | None = None   # printed page number (the #sid{N} anchor)
     level: int | None = None  # heading depth = dotted segments ("4.1.2" -> 3)
     num: str | None = None     # chapter/§ number for kapitel/paragraf markers
-    rows: list[tuple[str, str]] | None = None  # tabell cell rows
+    rows: list[tuple[str, ...]] | None = None  # tabell cell rows: a lydelse
+                                               # pair, or a generic table's
+                                               # N-column tuples
     th: bool = False           # tabell: row 0 is the column header pair
 
 
@@ -39,4 +41,7 @@ class Forarbete:
     uri: str                  # https://lagen.nu/prop/2025/26:161
     title: str
     date: str | None = None
+    ocr: bool = False         # body came through an OCR route (ABBYY xml or
+                              # the pdftotext scan fallback) -- gates the
+                              # future-citation sanity check at projection
     body: list[Block] = field(default_factory=list)   # document order

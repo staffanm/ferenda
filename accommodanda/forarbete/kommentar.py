@@ -236,34 +236,73 @@ def directive_uri(name, aliases):
     return aliases.get("default")    # bare "direktivet" / unrecognised alias
 
 
-def find_kommentar(blocks, any_level=False):
-    """The block index range [start, end) of the författningskommentar section,
-    or None. In a proposition the section is a level-1 chapter, bounded by the
-    next level-1 heading. A förordningsmotiv (`any_level`) writes it at heading
-    level 3 (unnumbered), and its own kapitel/paragraf subheadings share that
-    level, so the section runs from the heading to the next heading of a
-    *shallower* level -- in practice to the end of the document, förordningsmotiv
-    put the commentary last."""
-    if any_level:
-        start = next((i for i, b in enumerate(blocks)
-                      if b["type"] == "rubrik"
-                      and "författningskommentar" in plain(b["text"]).lower()),
-                     None)
-        if start is None:
-            return None
-        level = blocks[start].get("level") or 1
-        end = next((i for i in range(start + 1, len(blocks))
-                    if blocks[i]["type"] == "rubrik"
-                    and (blocks[i].get("level") or 1) < level), len(blocks))
-        return start, end
-    start = next((i for i, b in enumerate(blocks)
-                  if b["type"] == "rubrik" and (b.get("level") or 1) == 1
-                  and "författningskommentar" in plain(b["text"]).lower()), None)
+# the FK chapter heading, tolerating the page-header marginalia the column
+# merge can fuse into it ("7 Författningskommentar Prop. 1997:74"), and its
+# stycke-reflowed form ("Författningskommentar 18" -- the parser loses the
+# rubrik and reflows "18 Författningskommentar")
+RE_FK_HEAD = re.compile(
+    r"^(?:\d+ )?författningskommentar(?:er)?"
+    r"(?: prop\.? ?\d{4}(?:/\d{2,4})?:\d+)?$"
+    r"|^specialmotivering$")
+RE_FK_STYCKE = re.compile(r"^författningskommentar(?:er)?(?: \d+)?$")
+
+# trailing matter that ends the FK chapter. The reliable signal is the bilaga
+# marginalia: the column merge stamps "Bilaga N" into the text of every
+# appendix block ("Sammanfattning av betänkandet En ny Bilaga 1
+# säkerhetsskyddslag …"), and FK prose never carries that capitalised token --
+# verified across the whole curated corpus. The protocol extract and a
+# rubrik-shaped bilaga heading ("1 Förslag till säkerhetsskyddslag", undotted
+# number unlike the FK's own "16.1 Förslaget till …") are backstops.
+RE_FK_END_ANY = re.compile(
+    r"\bBilaga \d+\b|^Utdrag ur protokoll\b"
+    r"|\bUtdrag ur protokoll vid regeringssammanträde\b")
+RE_FK_END_RUBRIK = re.compile(
+    r"^bilaga\b|^rättsdatablad\b|^\d+ förslag(?:et|en)? till ")
+
+
+def fk_span(blocks):
+    """The block index range [start, end) of the författningskommentar chapter,
+    or None. Opens at the FK level-1 rubrik (or its stycke-reflowed ghost) and
+    runs to the trailing matter (protocol extract / bilagor / rättsdatablad) or
+    the document end -- never bounded by rubrik levels, which in-FK chapter
+    headings ("1 kap." mis-tagged level-1) corrupt. The single span
+    implementation for every FK consumer (rewrite-parity finding 04 unified
+    `extract` onto it; `fk.extract` always used it)."""
+    start = next(
+        (i for i, b in enumerate(blocks)
+         if (b["type"] == "rubrik" and (b.get("level") or 1) == 1
+             and RE_FK_HEAD.match(normalize_fold(plain(b["text"]))))
+         or (b["type"] == "stycke"
+             and RE_FK_STYCKE.match(normalize_fold(plain(b["text"]))))),
+        None)
     if start is None:
         return None
     end = next((i for i in range(start + 1, len(blocks))
+                if RE_FK_END_ANY.search(plain(blocks[i]["text"]))
+                or (blocks[i]["type"] == "rubrik"
+                    and RE_FK_END_RUBRIK.match(
+                        normalize_fold(plain(blocks[i]["text"]))))),
+               len(blocks))
+    return start, end
+
+
+def find_kommentar(blocks):
+    """The [start, end) of a förordningsmotiv's författningskommentar. An fm
+    writes it at heading level 3 (unnumbered), and its own kapitel/paragraf
+    subheadings share that level, so the section runs from the heading to the
+    next heading of a *shallower* level -- in practice to the end of the
+    document, förordningsmotiv put the commentary last. (A proposition's FK
+    chapter is bounded by `fk_span`, never by rubrik levels.)"""
+    start = next((i for i, b in enumerate(blocks)
+                  if b["type"] == "rubrik"
+                  and "författningskommentar" in plain(b["text"]).lower()),
+                 None)
+    if start is None:
+        return None
+    level = blocks[start].get("level") or 1
+    end = next((i for i in range(start + 1, len(blocks))
                 if blocks[i]["type"] == "rubrik"
-                and (blocks[i].get("level") or 1) == 1), len(blocks))
+                and (blocks[i].get("level") or 1) < level), len(blocks))
     return start, end
 
 
@@ -320,7 +359,7 @@ def extract(art):
     if typ not in {"prop", "fm"}:
         return []
     blocks = flatten(art["structure"])      # document-order flat view of the tree
-    span = find_kommentar(blocks, any_level=typ == "fm")
+    span = find_kommentar(blocks) if typ == "fm" else fk_span(blocks)
     if span is None:                      # no författningskommentar (most types)
         return []
     parser = _refparser()

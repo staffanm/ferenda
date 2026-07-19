@@ -39,11 +39,13 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     line_body_size,
+    page_offset,
     page_paragraphs,
     pdf_pages,
+    printed_pageno,
 )
 from ..lib.util import basefile_slug
-from . import legacy_formats, lydelse
+from . import legacy_formats, lydelse, tabell
 from .model import Block, Forarbete
 from .structure import RE_TRAILING_PAREN, nest
 
@@ -117,19 +119,53 @@ def classify(paras, page, body=0):
 
 
 def parse_pdf(pdf_path, identifier, patch_key=None):
-    """All body blocks of a förarbete PDF, page by page (page = pdf index).
+    """All body blocks of a förarbete PDF, page by page. The page a block
+    carries is the *printed* page (the `#sid{N}` anchor citations resolve to):
+    the marginal folio numbers are read off every page (`printed_pageno`) and
+    a constant PDF-index ↔ printed-page offset is derived (`page_offset`) --
+    zero for modern regeringen.se PDFs numbered from the title page, negative
+    where unnumbered cover matter precedes page 1 (SOU 1989:67: printed 1 is
+    PDF page 4), and failing visibly when the evidence is ambiguous.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction.
     Each page is first split around its nuvarande/föreslagen lydelse tables
     (lydelse.split_page); the normal segments reflow and classify as before,
     a table segment becomes one `tabell` block whose rows pair the aligned
     cell paragraphs (row 0 the column header pair)."""
-    # (pageno, [("paras", [Para], None) | ("tabell", header, rows)])
+    raw = list(pdf_pages(pdf_path, patch_key))
+    offset = page_offset({pageno: n for pageno, lines in raw
+                          if (n := printed_pageno(lines, identifier)) is not None})
+    # (printed pageno, [("paras", [Para], None)
+    #                   | ("tabell", header, rows)         (a lydelse table)
+    #                   | ("gtabell", th, rows)])          (a generic table)
     pages = []
-    for pageno, lines in pdf_pages(pdf_path, patch_key):
-        segs = [("paras", page_paragraphs(seg[1], identifier, pageno), None)
-                if seg[0] == "lines" else seg
-                for seg in lydelse.split_page(lines)]
-        pages.append((pageno, segs))
+    for pageno, lines in raw:
+        # unnumbered cover matter ahead of printed page 1 carries no anchor
+        printed = pageno + offset if pageno + offset >= 1 else None
+        lydelse_segs = lydelse.split_page(lines)
+        # a page holding a lydelse table is a two-column statute page: its
+        # leftover lines are statute text in columns, never a generic data
+        # table -- the generic detector runs only on lydelse-free pages
+        page_has_lydelse = any(s[0] == "tabell" for s in lydelse_segs)
+        segs = []
+        for seg in lydelse_segs:
+            if seg[0] != "lines":
+                segs.append(seg)
+                continue
+            if page_has_lydelse:
+                segs.append(("paras",
+                             page_paragraphs(seg[1], identifier, printed),
+                             None))
+                continue
+            # generic tables (budget tables, bilaga listings) within the
+            # non-lydelse lines; the rest reflows as prose
+            for gkind, gdata, grows in tabell.split_generic(seg[1]):
+                if gkind == "lines":
+                    segs.append(("paras",
+                                 page_paragraphs(gdata, identifier, printed),
+                                 None))
+                else:
+                    segs.append(("gtabell", gdata, grows))
+        pages.append((printed, segs))
     body = line_body_size([p for _pg, segs in pages
                            for kind, data, _x in segs if kind == "paras"
                            for p in data])
@@ -138,13 +174,16 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
         for kind, data, rows in segs:
             if kind == "paras":
                 blocks += classify(data, pageno, body)
+            elif kind == "gtabell":
+                blocks.append(Block("tabell", "", pageno, rows=list(rows or []),
+                                    th=bool(data)))
             else:
                 header, cells = data, list(rows or [])
                 if header is not None:      # the region's first chunk only
                     cells.insert(0, (header.runs[0].text, header.runs[1].text))
                 blocks.append(Block("tabell", "", pageno, rows=cells,
                                     th=header is not None))
-    return blocks
+    return tabell.merge_continued(blocks)
 
 
 def _is_signer_name(text):
@@ -191,6 +230,10 @@ def tag_frontmatter(blocks):
 LEGACY_HTML_PARAS = {"text/tml": legacy_formats.riksdagen_html_paras,
                      "skanning2007": legacy_formats.riksdagen_mso_paras,
                      "trips": legacy_formats.trips_paras}
+# the html bodies whose text came off print (riksdagen's 2007 OCR Word export,
+# the keyed-in TRIPS databases) -- the chronology check applies to them like
+# to the ABBYY/pdftotext routes; text/tml is the born-digital feed window
+OCR_HTML_FORMATS = frozenset({"skanning2007", "trips"})
 
 
 def _paged_body(pages):
@@ -213,12 +256,15 @@ def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
     none there and its OCR text through the pdftotext fallback (page-anchored, so
     `#sid{N}` still resolves). `patch_key` threads the record's patch identity to
     `parse_pdf` (a re-housed prop is a normal harvested doc, patchable like any
-    other)."""
+    other). Returns (blocks, ocr) -- the route taken is the one fact that says
+    whether the text is OCR output (the chronology check keys on it)."""
     try:
         blocks = parse_pdf(pdf_path, identifier, patch_key)
     except subprocess.CalledProcessError:   # pdftohtml chokes on some KB scans
         blocks = []
-    return blocks or _paged_body(legacy_formats.scanned_pdf_pages(pdf_path))
+    if blocks:
+        return blocks, False
+    return _paged_body(legacy_formats.scanned_pdf_pages(pdf_path)), True
 
 
 def _legacy_body(record):
@@ -243,15 +289,16 @@ def _legacy_body(record):
         return _legacy_pdf_body(pdfs[0], record["identifier"])
     xmls = [f for f in files if f.suffix.lower() == ".xml"]
     if xmls:
-        return _paged_body(legacy_formats.abbyy_pages(xmls[0]))
+        return _paged_body(legacy_formats.abbyy_pages(xmls[0])), True
     htmls = [f for f in files if f.suffix.lower() == ".html"]
     if htmls:
-        return classify(LEGACY_HTML_PARAS[record["body_format"]](
-            htmls[0].read_text("utf-8")), None)
+        return (classify(LEGACY_HTML_PARAS[record["body_format"]](
+            htmls[0].read_text("utf-8")), None),
+            record["body_format"] in OCR_HTML_FORMATS)
     words = [f for f in files if f.suffix.lower() in (".doc", ".docx")]
     if words:
-        return classify(legacy_formats.word_paras(words[0]), None)
-    return []
+        return classify(legacy_formats.word_paras(words[0]), None), False
+    return [], False
 
 
 def _harvested_body(record, root):
@@ -283,18 +330,21 @@ def _harvested_body(record, root):
     xmls = [f for f in files if f.lower().endswith(".xml")]
     if xmls:
         return _paged_body(legacy_formats.abbyy_pages(
-            compress.read_bytes(layout.fa_dir(root, typ, basefile) / xmls[0])))
+            compress.read_bytes(layout.fa_dir(root, typ, basefile)
+                                / xmls[0]))), True
     htmls = [f for f in files if f.lower().endswith(".html")]
     if htmls:
-        return classify(LEGACY_HTML_PARAS[record["body_format"]](
-            compress.read_text(layout.fa_dir(root, typ, basefile) / htmls[0])), None)
+        return (classify(LEGACY_HTML_PARAS[record["body_format"]](
+            compress.read_text(layout.fa_dir(root, typ, basefile)
+                               / htmls[0])), None),
+            record["body_format"] in OCR_HTML_FORMATS)
     words = [f for f in files if f.lower().endswith((".doc", ".docx"))]
     if words:
         # .doc/.docx are incompressible -> stored plain, so antiword/POI read the
         # path directly (unlike the brotli'd xml/html above)
         return classify(legacy_formats.word_paras(
-            layout.fa_dir(root, typ, basefile) / words[0]), None)
-    return []
+            layout.fa_dir(root, typ, basefile) / words[0]), None), False
+    return [], False
 
 
 def rskr_body(html):
@@ -316,6 +366,58 @@ def rskr_body(html):
     return blocks
 
 
+# a rubrik the flattened PDF cut mid-phrase -- "4.1 Förslag till lag om
+# ändring i" with the statute name dropped to the next line (rewrite-parity
+# finding 04: the truncated "lag om ändring i" rubriks)
+RE_DANGLING_RUBRIK = re.compile(r"\bändring(?:ar)?\s+i\s*$", re.IGNORECASE)
+# the orphaned continuation: a short lowercase-led line naming the statute
+# ("sekretesslagen", "föreningsbankslagen (1987:620)"), possibly with a TOC
+# dotted leader + page number after it. A real body stycke opens uppercase,
+# so lowercase-led + short is the continuation signature. The line sometimes
+# survives classification as a (fake) rubrik of its own, or -- in the all-caps
+# heading style of older props -- as "UTSÖKNINGSLAGEN".
+RE_TOC_LEADER = re.compile(r"[\s.]*\.{3,}[\s.\d]*$")
+RE_CONTINUATION = re.compile(r"[a-zåäö][^.!?]{2,90}")
+RE_UPPER_CONTINUATION = re.compile(r"[A-ZÅÄÖ][A-ZÅÄÖ\s\d:()-]{2,60}")
+# reflow can glue the statute name straight onto the next paragraph's opening
+# ("trafikskadelagen (1975:1410)14 § Från ett fordons..."): the name runs up
+# to its SFS parenthesis, the glued remainder opens with a digit/uppercase
+RE_GLUED_CONTINUATION = re.compile(
+    r"([a-zåäö][a-zåäö\s-]{2,60}?\(\d{4}:\s?\d+\))\s*(?=[A-ZÅÄÖ0-9])")
+RE_BILAGA_MARGIN = re.compile(r"^Bilaga \d+$")
+
+
+def join_dangling_rubriks(body):
+    """Re-attach the statute name a flattened PDF dropped off a "Förslag till
+    lag om ändring i"-style rubrik: the following short statute-name line
+    (a stycke or a mis-classified rubrik of its own; an interposed "Bilaga N"
+    margin marker is skipped and stays in place) is folded into the rubrik
+    text, with any TOC dotted leader stripped. A name glued onto the next
+    paragraph's opening is split off it. The rubrik then resolves to its SFS
+    number again (kommentar/genomförande key on the proposed-law name)."""
+    drop = set()
+    for i, b in enumerate(body):
+        if b.kind != "rubrik" or not RE_DANGLING_RUBRIK.search(b.text):
+            continue
+        j = i + 1
+        if (j < len(body) and body[j].kind == "stycke"
+                and RE_BILAGA_MARGIN.match(body[j].text)):
+            j += 1
+        if j >= len(body) or body[j].kind not in ("stycke", "rubrik") \
+                or j in drop:
+            continue
+        core = RE_TOC_LEADER.sub("", body[j].text).strip()
+        if RE_CONTINUATION.fullmatch(core) or (
+                b.text == b.text.upper()
+                and RE_UPPER_CONTINUATION.fullmatch(core)):
+            b.text = "%s %s" % (b.text, core)
+            drop.add(j)
+        elif body[j].kind == "stycke" and (m := RE_GLUED_CONTINUATION.match(core)):
+            b.text = "%s %s" % (b.text, m.group(1))
+            body[j].text = core[m.end():].lstrip()
+    return [b for i, b in enumerate(body) if i not in drop]
+
+
 def parse_record(record, root):
     """A downloaded record (the `<slug>.json`) -> a Forarbete. A live-harvest
     record uses the first PDF the downloader stored under `root/<type>/` (for
@@ -323,8 +425,9 @@ def parse_record(record, root):
     import record (`legacy_files`) resolves its body under LEGACY_ROOT. A record
     with no body yields metadata only (still a real catalog document at its URI)."""
     typ, basefile = record["type"], record["basefile"]
+    ocr = False
     if "legacy_files" in record:            # unmigrated frozen import (sou/dir/ds)
-        body = _legacy_body(record)
+        body, ocr = _legacy_body(record)
     elif typ == "rskr":
         body = rskr_body(compress.read_text(
             layout.fa_dir(root, typ, basefile) / record["files"][0]))
@@ -333,13 +436,14 @@ def parse_record(record, root):
         # The patch key inside `_harvested_body` carries the build-style basefile
         # ("sou/2021-82" -- typ-qualified slug, what layout.relpath decomposes);
         # the record's own basefile ("2021:82") has no typ and is not filesystem-safe
-        body = _harvested_body(record, root)
+        body, ocr = _harvested_body(record, root)
+    body = join_dangling_rubriks(body)
     if typ in ("prop", "skr"):
         body = tag_frontmatter(body)
     return Forarbete(type=typ, basefile=basefile,
                      identifier=record["identifier"], uri=mint_uri(typ, basefile),
                      title=record.get("title", ""), date=record.get("date"),
-                     body=body)
+                     ocr=ocr, body=body)
 
 
 @functools.cache
@@ -352,6 +456,45 @@ def _refparser():
 def _scan(text, parser):
     """Citation-scan one text into an inline-run list."""
     return interleave(text, parser.parse_text(text, context={}))
+
+
+# the year a lagen.nu citation target carries in its uri: an SFS number
+# (https://lagen.nu/1984:437#P3) or a förarbete id (…/prop/1992/93:100); other
+# namespaces (dom/, avg/, ext/…) carry no comparable year and are never checked
+RE_TARGET_YEAR = re.compile(
+    r"^https://lagen\.nu/(?:(?:prop|sou|ds|dir|skr|bet|so|fm|pm|lr)/)?(\d{4})[:/]")
+
+
+def censor_future_citations(blocks, doc_year):
+    """The OCR chronology sanity check (rewrite-parity finding 05): a garbled
+    citation must not point to legislation *newer* than the citing document
+    (a 1971 prop whose OCR read '1934:437' as '1984:437'). Every link run
+    whose target year exceeds ``doc_year + 1`` (the riksmöte spills into the
+    next calendar year, so +1 is never suspect) *and* whose own text carries
+    that year is demoted to its plain text -- the text is preserved verbatim,
+    never rewritten; the link just is not minted -- and reported in the
+    returned suspect list [{text, uri, page}]. The year-in-text condition is
+    what scopes this to OCR digit garbling: a named-law reference
+    ("kommunallagen" in a 1971 prop resolving to today's namesake) is a
+    name-resolution question, not a scan error, and is left alone here.
+    Mutates ``blocks`` in place (the flat pre-nest run lists)."""
+    suspects = []
+
+    def sweep(runs, page):
+        for i, run in enumerate(runs):
+            if isinstance(run, dict) and (m := RE_TARGET_YEAR.match(run["uri"])):
+                if (int(m.group(1)) > doc_year + 1
+                        and m.group(1) in (run.get("text") or "")):
+                    suspects.append({"text": run.get("text"), "uri": run["uri"],
+                                     "page": page})
+                    runs[i] = run.get("text") or ""
+
+    for b in blocks:
+        sweep(b.get("text") or [], b.get("page"))
+        for rad in b.get("children") or []:
+            for cell in rad.get("cells") or []:
+                sweep(cell, b.get("page"))
+    return suspects
 
 
 def to_artifact(fa):
@@ -376,6 +519,13 @@ def to_artifact(fa):
                 | ({"th": True} if b.th and i == 0 else {})
                 for i, row in enumerate(b.rows)]
         blocks.append(block)
-    return {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
-            "basefile": fa.basefile, "title": fa.title, "date": fa.date,
-            "structure": nest(blocks)}
+    art = {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
+           "basefile": fa.basefile, "title": fa.title, "date": fa.date}
+    # OCR bodies get the chronology sanity check before the tree is built:
+    # the basefile always leads with the riksmöte/calendar year, even when
+    # `date` is missing (metadata-only era records)
+    if fa.ocr and (m := re.match(r"\d{4}", fa.basefile)):
+        if suspects := censor_future_citations(blocks, int(m.group(0))):
+            art["suspect_citations"] = suspects
+    art["structure"] = nest(blocks)
+    return art

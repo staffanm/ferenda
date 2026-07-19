@@ -171,6 +171,50 @@ def flat_lines(pdf_path, hidden=False):
             for line in lines]
 
 
+RE_BARE_PAGENO = re.compile(r"\d{1,4}")
+
+
+def printed_pageno(lines, identifier):
+    """The printed page number a page's marginal header/footer carries, or
+    None. Looks at the outermost lines (running header at the top, folio at the
+    bottom), strips the running-header identifier, and takes a line whose
+    remainder is a bare number. The evidence for the PDF-page ↔ printed-page
+    mapping (`page_offset`): a document's printed numbering can start after
+    unnumbered cover matter, or -- a multi-volume SOU -- continue from the
+    previous volume."""
+    header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
+                 if identifier else None)
+    for l in lines[:3] + lines[-3:]:
+        t = (header_re.sub(" ", l.text) if header_re else l.text).strip()
+        if RE_BARE_PAGENO.fullmatch(t):
+            return int(t)
+    return None
+
+
+def page_offset(detections):
+    """The document-wide printed-page offset from per-page evidence:
+    ``detections`` maps pdf page index -> detected printed number. The offset
+    must be *constant* to be trusted: the mode of the per-page differences
+    wins when it carries at least three pages and a clear majority (stray
+    bare numbers in margins -- years, annex numbering -- are tolerated as a
+    minority). Too little evidence -> 0, the PDF-index-equals-printed-page
+    assumption. Two well-supported competing offsets are a genuinely
+    ambiguous mapping and raise -- a wrong page anchor is a silent citation
+    corruption, so ambiguity must fail visibly, not guess."""
+    diffs = Counter(printed - pdfno for pdfno, printed in detections.items())
+    if not diffs:
+        return 0
+    (offset, support), *rest = diffs.most_common()
+    if support < 3 or support < 0.6 * sum(diffs.values()):
+        return 0                      # sparse/noisy evidence: keep the default
+    runner = rest[0][1] if rest else 0
+    if runner >= 3 and runner >= 0.3 * sum(diffs.values()):
+        raise ValueError(
+            "ambiguous printed-page mapping: competing offsets %s"
+            % dict(diffs.most_common(4)))
+    return offset
+
+
 def dehyphenate(acc, line):
     if acc.endswith("-") and line[:1].islower():
         return acc[:-1] + line          # soft hyphen: "för-\nfogar" -> "förfogar"

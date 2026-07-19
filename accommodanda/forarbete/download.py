@@ -320,6 +320,69 @@ def download_document(session, root, item, delay):
     return record
 
 
+def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
+    """Second-chance body fetch for body-less live-harvest records
+    (rewrite-parity finding 04: the lr/SÖ body gap). The original harvest
+    stored the landing page and record but ended with no document file --
+    the content asset served a transient non-document at the time -- so this
+    re-reads each stored landing's content links and fetches them again,
+    live-refetching the landing where the stored copy carries no links.
+    Stored bodies update the record's `files` (re-staling its parse); a
+    document whose links still yield nothing is left as it was, and re-tried
+    by the next run. Returns (checked, recovered, errors)."""
+    root = Path(root)
+    session = make_session(USER_AGENT)
+    checked = recovered = errors = 0
+    rep = Reporter()
+    for typ in types:
+        recs = sorted(compress.glob(root / typ, "*/*.json"))
+        for i, recpath in enumerate(recs):
+            record = json.loads(compress.read_text(recpath))
+            if ("legacy_files" in record or "source" in record
+                    or record.get("files")):
+                continue
+            if limit and checked >= limit:
+                return checked, recovered, errors
+            checked += 1
+            basefile = record["basefile"]
+            slug = basefile_slug(basefile)
+            docdir = layout.fa_dir(root, typ, basefile)
+            landing_path = docdir / (slug + ".html")
+            try:
+                hrefs = (find_content_links(compress.read_text(landing_path))
+                         if compress.exists(landing_path) else [])
+                if not hrefs:
+                    landing = fetch(session, record["url"])
+                    compress.write_download(landing_path, landing.text)
+                    hrefs = find_content_links(landing.text)
+                    time.sleep(delay)
+                stored = []
+                for href in hrefs:
+                    url = (BASE + href) if href.startswith("/") else href
+                    data = fetch(session, url).content
+                    time.sleep(delay)
+                    ext = document_extension(data)
+                    if ext is None:      # still not a document: leave for next run
+                        continue
+                    name = "%s%s%s" % (slug, ("-%d" % len(stored)
+                                              if stored else ""), ext)
+                    compress.write_download(docdir / name, data)
+                    stored.append(name)
+                if stored:
+                    recovered += 1
+                    record["files"] = stored
+                    compress.write_download(
+                        layout.fa_record_file(root, typ, basefile),
+                        json.dumps(record, ensure_ascii=False, indent=2))
+            except requests.HTTPError as exc:
+                errors += 1
+                log("  %s %s: %s" % (typ, record["url"], exc))
+            rep.update(i + 1, len(recs), scope="refetch " + typ,
+                       recovered=recovered, errors=errors)
+        rep.done()
+    return checked, recovered, errors
+
+
 # --------------------------------------------------------------------------
 # download loop
 # --------------------------------------------------------------------------

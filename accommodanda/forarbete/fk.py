@@ -58,6 +58,7 @@ from ..lib import catalog, compress, layout
 from ..lib.text import runs_text
 from ..lib.util import normalize_fold
 from . import genomforande, kommentar
+from .kommentar import fk_span
 from .parse import parse_record, to_artifact
 from .structure import flatten
 
@@ -97,29 +98,6 @@ RE_KAP = re.compile(r"^(\d+(?: ?[a-z])?) ?[Kk]ap\b")
 # props write it as a bare rubrik or stycke)
 RE_LAW = re.compile(r"^(?:\d+(?:\.\d+)+ )?förslag(?:et|en)? till ")
 RE_LAW_BARE = re.compile(r"^förslag(?:et|en)? till (?:lag|förordning)\b")
-
-# the FK chapter heading, tolerating the page-header marginalia the column
-# merge can fuse into it ("7 Författningskommentar Prop. 1997:74"), and its
-# stycke-reflowed form ("Författningskommentar 18" -- the parser loses the
-# rubrik and reflows "18 Författningskommentar")
-RE_FK_HEAD = re.compile(
-    r"^(?:\d+ )?författningskommentar(?:er)?"
-    r"(?: prop\.? ?\d{4}(?:/\d{2,4})?:\d+)?$"
-    r"|^specialmotivering$")
-RE_FK_STYCKE = re.compile(r"^författningskommentar(?:er)?(?: \d+)?$")
-
-# trailing matter that ends the FK chapter. The reliable signal is the bilaga
-# marginalia: the column merge stamps "Bilaga N" into the text of every
-# appendix block ("Sammanfattning av betänkandet En ny Bilaga 1
-# säkerhetsskyddslag …"), and FK prose never carries that capitalised token --
-# verified across the whole curated corpus. The protocol extract and a
-# rubrik-shaped bilaga heading ("1 Förslag till säkerhetsskyddslag", undotted
-# number unlike the FK's own "16.1 Förslaget till …") are backstops.
-RE_FK_END_ANY = re.compile(
-    r"\bBilaga \d+\b|^Utdrag ur protokoll\b"
-    r"|\bUtdrag ur protokoll vid regeringssammanträde\b")
-RE_FK_END_RUBRIK = re.compile(
-    r"^bilaga\b|^rättsdatablad\b|^\d+ förslag(?:et|en)? till ")
 
 # a footnote of the quoted lagtext, tagged rubrik by the parser -- noise
 # inside an entry, never a boundary
@@ -170,30 +148,6 @@ RE_GROUP_KOMM = re.compile(
 # text after the marker is unmistakably a commentary opener
 RE_EMBEDDED = re.compile(
     r"\b(%s) ?§,? (?=\(?(?:Av p|I p|Enligt p|Genom p|P)aragrafen\b)" % _MARK)
-
-
-def fk_span(blocks):
-    """The block index range [start, end) of the författningskommentar chapter,
-    or None. Opens at the FK level-1 rubrik (or its stycke-reflowed ghost) and
-    runs to the trailing matter (protocol extract / bilagor / rättsdatablad) or
-    the document end -- never bounded by rubrik levels, which in-FK chapter
-    headings corrupt (see module docstring)."""
-    start = next(
-        (i for i, b in enumerate(blocks)
-         if (b["type"] == "rubrik" and (b.get("level") or 1) == 1
-             and RE_FK_HEAD.match(normalize_fold(runs_text(b["text"]))))
-         or (b["type"] == "stycke"
-             and RE_FK_STYCKE.match(normalize_fold(runs_text(b["text"]))))),
-        None)
-    if start is None:
-        return None
-    end = next((i for i in range(start + 1, len(blocks))
-                if RE_FK_END_ANY.search(runs_text(blocks[i]["text"]))
-                or (blocks[i]["type"] == "rubrik"
-                    and RE_FK_END_RUBRIK.match(
-                        normalize_fold(runs_text(blocks[i]["text"]))))),
-               len(blocks))
-    return start, end
 
 
 def parse_marks(refs):

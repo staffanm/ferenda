@@ -349,3 +349,30 @@ def test_directive_alias_ignores_co_cited_regulation():
         "samband med flygresor (jfr artikel 13.8 i direktivet)."]}]
     aliases = resolve_directives(blocks, _refparser(), "prop")
     assert CELEX + "32006R1107" not in aliases.values()
+
+
+def test_extract_survives_in_fk_chapter_pseudo_rubrik():
+    # an in-FK "1 kap." heading mis-tagged as a level-1 rubrik used to end the
+    # extraction span (the old level-1-bounded find_kommentar); the unified
+    # fk_span bound (rewrite-parity finding 04) scans past it, so an implements
+    # statement deeper in the chapter is found -- while a statement inside the
+    # trailing bilagor still is not
+    art = {"type": "prop", "structure": nest([
+        {"type": "stycke", "text": [
+            "Europaparlamentets och rådets direktiv 2011/61/EU "
+            "(AIFM-direktivet) ska genomföras."]},
+        {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
+        {"type": "rubrik", "level": 2,
+         "text": ["16.1 Förslaget till lag om förvaltare av alternativa "
+                  "investeringsfonder"]},
+        {"type": "rubrik", "level": 1, "text": ["8 kap. Skydd för investerare"]},
+        {"type": "paragraf", "num": "32", "text": ["8 kap. 32 §"]},
+        {"type": "stycke", "page": 135, "text": [
+            "Paragrafen genomför artikel 37.13 i AIFM-direktivet."]},
+        {"type": "stycke", "text": ["Sammanfattning av promemorian Bilaga 1"]},
+        {"type": "stycke", "text": [
+            "Paragrafen genomför artikel 45 i AIFM-direktivet."]},  # in a bilaga
+    ])}
+    [rec] = extract(art)
+    assert rec["pinpoints"] == ["37.13"]
+    assert rec["paragraf"] == "32"

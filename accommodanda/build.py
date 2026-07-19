@@ -1511,6 +1511,26 @@ def fa_import_legacy(args):
                             limit=RUN.limit, force=RUN.force)
 
 
+def fa_refetch_bodies(args):
+    """`lagen forarbete refetch-bodies [<type> ...]` -- second-chance body
+    fetch for body-less live-harvest records (default lr + so, the two types
+    whose original harvest left large body gaps; see finding 04). Re-reads
+    each stored landing's content links and fetches them again; a recovered
+    body updates the record, re-staling its parse. `--limit N` caps the run."""
+    types = tuple(args) or ("lr", "so")
+    unknown = [t for t in types if t not in fa_download.TYPES]
+    if unknown:
+        sys.exit("unknown förarbete type(s): %s" % ", ".join(unknown))
+    if RUN.dry_run:
+        print("forarbete refetch-bodies: would refetch %s bodies under %s"
+              % ("/".join(types), layout.FA_DOWNLOADED))
+        return
+    checked, recovered, errors = fa_download.refetch_bodies(
+        layout.FA_DOWNLOADED, types=types, limit=RUN.limit, delay=POLITENESS)
+    print("forarbete refetch-bodies: %d body-less checked, %d recovered, "
+          "%d errors" % (checked, recovered, errors))
+
+
 def fa_propkb_scans(args):
     """`lagen forarbete propkb-scans` -- one-time bulk fetch of the KB
     two-chamber proposition scans (1867-1970), the page images behind the
@@ -1545,7 +1565,8 @@ def fa_soukb_scans(args):
         print("forarbete soukb-scans: would re-download the KB SOU bodies into %s"
               % (layout.FA_DOWNLOADED / "sou"))
         return
-    seen, fetched = fa_soukb.sync(layout.FA_DOWNLOADED, limit=RUN.limit)
+    seen, fetched = fa_soukb.sync(layout.FA_DOWNLOADED, limit=RUN.limit,
+                                  delay=POLITENESS)
     print("forarbete soukb-scans: %d seen, %d fetched" % (seen, fetched))
 
 
@@ -1556,7 +1577,8 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"import-legacy": fa_import_legacy,
             "propkb-scans": fa_propkb_scans,
-            "soukb-scans": fa_soukb_scans},
+            "soukb-scans": fa_soukb_scans,
+            "refetch-bodies": fa_refetch_bodies},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
          "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "

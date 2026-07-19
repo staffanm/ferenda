@@ -748,7 +748,12 @@ def test_parse_scanned_pdf_falls_back_to_pdftotext(frozen):
     assert art["structure"], "scanned pdf fell back to an empty body"
     flat = json.dumps(art["structure"])
     assert '"page": 1' in flat                         # form-feed page = #sid anchor
-    assert any("1960:729" in u for u in _link_uris(art))   # OCR text was scanned
+    # the OCR text WAS citation-scanned -- but a 1945 SOU cannot cite a 1960
+    # law, so the chronology check demotes the impossible link to plain text
+    # and reports it instead of minting the edge
+    assert not any("1960:729" in u for u in _link_uris(art))
+    assert {s["uri"] for s in art["suspect_citations"]} \
+        == {"https://lagen.nu/1960:729"}
 
 
 def test_parse_trips_record_is_page_less(frozen):
