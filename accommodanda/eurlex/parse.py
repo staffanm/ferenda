@@ -19,7 +19,9 @@ into the rest of the corpus.
 import functools
 import io
 import json
+import re
 import zipfile
+from datetime import date
 from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
@@ -262,7 +264,10 @@ def act_metadata(root):
         date = node.get("ISO") if node is not None else None
         ref = bib.find(".//DOCUMENT.REF")
         if ref is not None:
+            # NO.OJ is zero-padded in Formex ("042"); the citable form -- and
+            # the one CELLAR's OJ identifiers carry -- is unpadded ("L 42")
             coll, no = _text(ref, "COLL"), _text(ref, "NO.OJ")
+            no = no.lstrip("0") or no
             oj = ("%s %s" % (coll, no)).strip() or None
     return date, oj
 
@@ -312,8 +317,17 @@ def judgment_metadata(root):
     if bib is not None:
         node = bib.find("NO.ECLI")
         ecli = node.get("ECLI") if node is not None else None
-    date = root.find(".//JUDGMENT.INIT//DATE")
-    return (date.get("ISO") if date is not None else None), ecli
+    # the delivery date sits in the judgment's TITLE ("Domstolens dom ... den
+    # 16 juli 2020") or the CURR.TITLE page header. JUDGMENT.INIT's DATEs are
+    # the referral/receipt (or a cited treaty's) dates and must not stand in
+    # for it -- the golden cross-check caught exactly that. Old ECR Formex has
+    # an empty TITLE and no ECLI: the notice work date fills the date in
+    # downstream (parse_dir); the ECLI is genuinely absent from the source.
+    for holder in (root.find("TITLE"), root.find("CURR.TITLE")):
+        node = holder.find(".//DATE") if holder is not None else None
+        if node is not None:
+            return node.get("ISO"), ecli
+    return None, ecli
 
 
 # --------------------------------------------------------------------------
@@ -454,6 +468,14 @@ def _first(value):
     return value[0] if isinstance(value, list) else value
 
 
+def _isodate(value):
+    """Formex DATE@ISO is compact ('20200716'); the artifact carries the dashed
+    ISO form (what the page shows and what CELLAR's work date uses)."""
+    if value and re.fullmatch(r"\d{8}", value):
+        return "%s-%s-%s" % (value[:4], value[4:6], value[6:8])
+    return value
+
+
 def to_artifact(doc):
     """Project to the artifact JSON: metadata + body blocks whose text is an
     inline-run list (plain runs + {predicate,uri,text} citation links). Defined
@@ -490,7 +512,7 @@ def to_artifact(doc):
             block["defines"] = b.defines
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
-           "lang": doc.lang, "title": doc.title, "date": doc.date,
+           "lang": doc.lang, "title": doc.title, "date": _isodate(doc.date),
            "structure": nest(body)}
     # a short, distinctive human handle shown instead of the bare CELEX (the page
     # heading, the browse index / search, an inbound-citation label). The two
@@ -574,3 +596,55 @@ def parse_content(path, route, celex, lang):
     if route == "pdf":
         return parse_pdf(path, celex, lang)
     raise ValueError("no parser for route %r" % route)
+
+
+# the work date line in a stored notice.ttl, in both its shapes: the live
+# path's synthesized n-triples ('<...cdm#work_date_document> "2016-04-27"^^...')
+# and the bulk unpacker's turtle subset ('j.0:work_date_document "1982-03-31"^^...')
+RE_NOTICE_WDATE = re.compile(r'work_date_document>?\s+"(\d{4}-\d{2}-\d{2})')
+
+
+def notice_work_date(doc_dir):
+    """The CELLAR work date kept in the document dir's notice.ttl, or None.
+    The authoritative document date for a manifestation that carries none of
+    its own (old ECR judgment Formex has an empty TITLE; pre-2004 OJ html has
+    no bibliographic markup)."""
+    path = Path(doc_dir) / "notice.ttl"
+    if not compress.exists(path):
+        return None
+    m = RE_NOTICE_WDATE.search(compress.read_bytes(path).decode("utf-8", "replace"))
+    return m.group(1) if m else None
+
+
+# a corrigendum CELEX: the parent act's number + 'R(NN)'
+RE_CORRIGENDUM = re.compile(r"R\(\d+\)$")
+
+
+def _plausible_date(value):
+    """A Formex DATE@ISO can be garbled at digitisation (61981CJ0025 carries
+    '19820231' -- the 31st of February); an impossible calendar date cannot be
+    the document's, so it yields to the notice work date."""
+    try:
+        date.fromisoformat(_isodate(value))
+        return True
+    except ValueError:
+        return False
+
+
+def parse_dir(doc_dir, celex):
+    """A document dir -> artifact dict: the best content file parsed, the
+    notice work date filling in a missing or impossible document date. None
+    when the dir has no swe/eng content -- the parse pipeline's single entry
+    point per CELEX.
+
+    A corrigendum's Formex bibliography carries the *corrected act's* date, not
+    its own; its notice work date (the correcting OJ's publication) is the
+    document's actual date, so it wins there."""
+    path, lang, route = content_file(doc_dir)
+    if path is None:
+        return None
+    doc = parse_content(path, route, celex, lang)
+    if (doc.date is None or not _plausible_date(doc.date)
+            or RE_CORRIGENDUM.search(celex)):
+        doc.date = notice_work_date(doc_dir) or doc.date
+    return to_artifact(doc)

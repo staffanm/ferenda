@@ -1604,11 +1604,9 @@ def eurlex_artifact(basefile):
 
 
 def eurlex_parse_run(basefile):
-    path, lang, route = eurlex_parse.content_file(layout.eurlex_dir(basefile))
-    if path is None:
+    art = eurlex_parse.parse_dir(layout.eurlex_dir(basefile), basefile)
+    if art is None:
         raise SkipDocument("%s: no swe/eng content" % basefile)
-    art = eurlex_parse.to_artifact(
-        eurlex_parse.parse_content(path, route, basefile, lang))
     write_artifact("eurlex", basefile, art)
 
 

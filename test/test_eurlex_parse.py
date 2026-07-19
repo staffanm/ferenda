@@ -11,6 +11,8 @@ from accommodanda.eurlex.parse import (
     doctype,
     flatten,
     load_formex,
+    notice_work_date,
+    parse_dir,
     parse_document,
     parse_formex,
     to_artifact,
@@ -145,9 +147,11 @@ def test_definition_list_entries_are_paragraphs_with_nested_points():
 
 JUDGMENT_XML = """<JUDGMENT>
   <BIB.JUDGMENT><NO.ECLI ECLI="ECLI:EU:C:2020:981">EU:C:2020:981</NO.ECLI></BIB.JUDGMENT>
-  <TITLE><TI>Domstolens dom</TI></TITLE>
+  <TITLE><TI><P>Domstolens dom</P>
+    <P>den <DATE ISO="20201217">17 december 2020</DATE></P></TI></TITLE>
   <INTERMEDIATE><INDEX><KEYWORD>Frihet att tillhandahålla tjänster</KEYWORD></INDEX></INTERMEDIATE>
-  <JUDGMENT.INIT><P>I mål <DATE ISO="20190321">C-311/19</DATE>,</P></JUDGMENT.INIT>
+  <JUDGMENT.INIT><P>genom beslut av den <DATE ISO="20190321">21 mars
+    2019</DATE>, i mål C-311/19,</P></JUDGMENT.INIT>
   <CONTENTS.JUDGMENT>
     <GR.SEQ LEVEL="1"><TITLE><TI>Bakgrund</TI></TITLE></GR.SEQ>
     <NP.ECR IDENTIFIER="NP0001"><TXT>Den nationella domstolen frågar.</TXT></NP.ECR>
@@ -161,8 +165,10 @@ def test_parse_judgment():
     doc = parse_formex(ET.fromstring(JUDGMENT_XML), "62019CJ0311", "swe")
     assert doc.doctype == "judgment"
     assert doc.ecli == "ECLI:EU:C:2020:981"
-    assert doc.date == "20190321"
-    assert doc.title == "Domstolens dom"
+    # the delivery date from TITLE -- never JUDGMENT.INIT's referral date (the
+    # golden cross-check caught the artifact carrying the referral date)
+    assert doc.date == "20201217"
+    assert doc.title == "Domstolens dom den 17 december 2020"
     seen = [(b.kind, b.num, b.text) for b in doc.body]
     assert ("keyword", None, "Frihet att tillhandahålla tjänster") in seen
     assert ("heading", None, "Bakgrund") in [(b.kind, b.num, b.text) for b in doc.body]
@@ -170,10 +176,31 @@ def test_parse_judgment():
     assert ("ruling", "1", "Artikel 56 FEUF ska tolkas.") in seen
 
 
+def test_judgment_without_title_date_has_none_not_the_referral_date():
+    # old ECR Formex: empty TITLE, only referral/protocol dates in
+    # JUDGMENT.INIT -- those must never stand in for the delivery date
+    # (parse_dir fills the date from the notice work date instead)
+    xml = """<JUDGMENT><TITLE><TI><P><IE/></P></TI></TITLE>
+      <JUDGMENT.INIT><P>REFERENCE under the Protocol of
+        <DATE ISO="19710603">3 June 1971</DATE></P></JUDGMENT.INIT>
+    </JUDGMENT>"""
+    assert parse_formex(ET.fromstring(xml), "61981CJ0025", "eng").date is None
+
+
+def test_act_oj_number_is_unpadded():
+    # Formex zero-pads NO.OJ ("042"); the citable form is "L 42"
+    xml = """<ACT><BIB.INSTANCE>
+      <DOCUMENT.REF><COLL>L</COLL><NO.OJ>042</NO.OJ></DOCUMENT.REF>
+      <DATE ISO="20060210">20060210</DATE></BIB.INSTANCE>
+      <TITLE><TI><P>Test</P></TI></TITLE></ACT>"""
+    assert parse_formex(ET.fromstring(xml), "32006R0249", "swe").oj == "L 42"
+
+
 def test_to_artifact_shape_and_runs():
     art = to_artifact(parse_formex(ET.fromstring(ACT_XML), "32022L2555", "swe"))
     assert art["uri"] == "https://lagen.nu/ext/celex/32022L2555"
     assert art["celex"] == "32022L2555" and art["oj"] == "L 333"
+    assert art["date"] == "2022-12-14"     # compact Formex DATE@ISO, dashed out
     # every block text is an inline-run list (plain strings / link dicts)
     blocks = flatten_structure(art["structure"])
     for block in blocks:
@@ -265,3 +292,60 @@ def test_load_formex_rejects_zip_without_formex_member(tmp_path):
         zf.writestr("L_2016001SV.doc.xml", "<wrapper/>")
     with pytest.raises(ValueError, match="no Formex member"):
         load_formex(bundle)
+
+
+# both notice shapes: the live path's synthesized n-triples and the bulk
+# unpacker's turtle subset
+NOTICE_NT = (b'<http://publications.europa.eu/resource/celex/X> '
+             b'<http://publications.europa.eu/ontology/cdm#work_date_document> '
+             b'"2016-04-27"^^<http://www.w3.org/2001/XMLSchema#date> .\n')
+NOTICE_TTL = (b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+              b'<x> j.0:work_date_document "1982-03-31"^^xsd:date ;\n'
+              b'  j.0:resource_legal_id_celex "61981CJ0025" .\n')
+
+
+def test_notice_work_date_reads_both_notice_shapes(tmp_path):
+    (tmp_path / "notice.ttl").write_bytes(NOTICE_NT)
+    assert notice_work_date(tmp_path) == "2016-04-27"
+    (tmp_path / "notice.ttl").write_bytes(NOTICE_TTL)
+    assert notice_work_date(tmp_path) == "1982-03-31"
+    (tmp_path / "notice.ttl").unlink()
+    assert notice_work_date(tmp_path) is None
+
+
+def _doc_dir(tmp_path, xml, notice=NOTICE_TTL):
+    (tmp_path / "swe.fmx4").write_bytes(xml.encode())
+    if notice is not None:
+        (tmp_path / "notice.ttl").write_bytes(notice)
+    return tmp_path
+
+
+def test_parse_dir_fills_missing_date_from_notice(tmp_path):
+    xml = """<JUDGMENT><TITLE><TI><P><IE/></P></TI></TITLE>
+      <JUDGMENT.INIT><P>REFERENCE under the Protocol of
+        <DATE ISO="19710603">3 June 1971</DATE></P></JUDGMENT.INIT>
+    </JUDGMENT>"""
+    art = parse_dir(_doc_dir(tmp_path, xml), "61981CJ0025")
+    assert art["date"] == "1982-03-31"
+
+
+def test_parse_dir_replaces_impossible_date_from_notice(tmp_path):
+    # 61981CJ0025's source carries DATE ISO="19820231" -- the 31st of February
+    xml = """<JUDGMENT><TITLE><TI><P>Judgment of
+      <DATE ISO="19820231">31 February 1982</DATE></P></TI></TITLE></JUDGMENT>"""
+    art = parse_dir(_doc_dir(tmp_path, xml), "61981CJ0025")
+    assert art["date"] == "1982-03-31"
+
+
+def test_parse_dir_corrigendum_takes_its_own_notice_date(tmp_path):
+    # a corrigendum's Formex bib is dated by the *corrected act*; its notice
+    # work date (the correcting OJ's publication) is the document's own date
+    xml = """<ACT><BIB.INSTANCE><DATE ISO="20120615">20120615</DATE>
+      </BIB.INSTANCE><TITLE><TI><P>Rättelse</P></TI></TITLE></ACT>"""
+    notice = (b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+              b'<x> j.0:work_date_document "2021-04-15"^^xsd:date .\n')
+    art = parse_dir(_doc_dir(tmp_path, xml, notice), "32012R0509R(03)")
+    assert art["date"] == "2021-04-15"
+    # the same act under a non-corrigendum CELEX keeps its own bib date
+    art = parse_dir(_doc_dir(tmp_path, xml, notice), "32012R0509")
+    assert art["date"] == "2012-06-15"

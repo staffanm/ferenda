@@ -52,6 +52,25 @@ def test_legacy_classless_html_recovers_title_from_header_shape():
         "siktfältet i motorfordon")
 
 
+def test_title_classed_non_title_content_is_rejected():
+    # an old consolidated-treaty page marks its whole table of contents (or
+    # even the full preamble) as doc-ti; a "title" past TITLE_MAX is
+    # misextraction and no title beats a page-long one
+    toc = " ".join('<p class="doc-ti">PROTOKOLL OM %d</p>' % i
+                   for i in range(80))
+    doc = parse_html("<body>%s</body>" % toc, "12010A/TXT", "swe")
+    assert doc.title == ""
+
+
+def test_giant_title_shaped_paragraph_is_rejected():
+    # a treaty's txt_te HTML is one giant <p> that passes the act-title shape
+    # test (it cites directives and dates somewhere in the running text)
+    giant = ("TREATY ON EUROPEAN UNION HIS MAJESTY THE KING recalling directive "
+             "83/349/EEC of 13 June 1983 " + "and further provisions " * 100)
+    html = "<body><p>%s</p><p>Artikel 1</p></body>" % giant
+    assert parse_html(html, "11992M/TXT", "eng").title == ""
+
+
 def test_legacy_classless_html_does_not_take_a_recital_as_title():
     # with no title-shaped header line, the visa ("med beaktande av …") -- which
     # also cites an act by number+date -- must NOT be picked up as the title

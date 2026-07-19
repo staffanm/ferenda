@@ -38,6 +38,16 @@ _PREAMBLE_START = re.compile(
 _OJ_REF = re.compile(r"\s*(?:Europeiska (?:gemenskapernas|unionens) officiella "
                      r"tidning|Official Journal)\b", re.IGNORECASE)
 
+# an extracted title is a phrase, not a document. The legacy formats sometimes
+# put whole other content in title position -- a treaty's txt_te HTML is one
+# giant <p> that passes the act-title shape test (it cites directives and
+# dates *somewhere*), and old consolidated-treaty pages mark their entire
+# table of contents as doc-ti. The longest genuine official titles observed
+# run ~500 characters (accession treaties enumerating every member state); a
+# candidate past this bound is misextraction, and no title (the page heading
+# falls back to the identifier) beats a page-long one.
+TITLE_MAX = 1000
+
 
 def _role(el):
     """The element's first CSS class, lower-cased and `oj-`-stripped."""
@@ -120,6 +130,8 @@ def parse_html(markup, celex, lang):
 
     doc.title = normalize_space(" ".join(
         _flat(p) for p in body.find_all(class_=re.compile(r"^(oj-)?(doc-ti|ti-doc)$"))))
+    if len(doc.title) > TITLE_MAX:
+        doc.title = ""                       # title-classed non-title content
     if not doc.title:
         # legacy "Avis juridique important" HTML has no semantic title class -- the
         # title is the class-less header line carrying the act number + date. Scan
@@ -131,7 +143,9 @@ def parse_html(markup, celex, lang):
             if _PREAMBLE_START.match(text):
                 break
             if looks_like_act_title(text):
-                doc.title = _OJ_REF.split(text, 1)[0].strip()
+                candidate = _OJ_REF.split(text, 1)[0].strip()
+                if len(candidate) <= TITLE_MAX:
+                    doc.title = candidate
                 break
     hd_date = body.find(class_=re.compile(r"^(oj-)?hd-date$"))
     if hd_date is not None:

@@ -1736,13 +1736,35 @@ law, keyed by **CELEX** (the basefile throughout).
 - ✅ **Formex annex parsing:** multi-file manifestations embed each annex after
   the main act, with stable `bilaga-N` anchors; headings, paragraphs, lists and
   tables are retained and tested in `test/test_eurlex_parse.py`.
-- ⬜ **Remaining:** a representative metadata/golden cross-check (no EU oracle
-  yet); the ~8 truncated `"lag om ändring i"` rubriks the flattened PDF cut off
-  (no SFS number to resolve); and consolidating `kommentar.extract`'s FK
-  bounding onto `fk.fk_span` — it still uses the level-1-rubrik-bounded
-  `find_kommentar`, which the in-FK "1 kap." pseudo-rubriks truncate, so some
-  genomför-direktiv statements deeper in the chapter are never scanned (a
-  behavior change to the EU-edges layer that needs its own validated pass).
+- ✅ **Metadata cross-check (2026-07-19):** there is no legacy EU oracle (the
+  old code never supported EUR-Lex beyond an experimental module), so
+  `tools/golden_eurlex.py` validates the carried fields — CELEX, date, title,
+  OJ ref, ECLI, doctype — against authoritative CELLAR metadata itself,
+  frozen to a retained snapshot (`test/files/eurlex/cellar-snapshot.json`,
+  502 documents deterministically stratified over treaties / regulations /
+  directives / corrigenda / judgments; decisions and consolidated acts are
+  outside the corpus by harvest design). Change-detector + adjudication
+  ledger (the golden_sfs pattern); `compare --reparse` exercises the current
+  parser rather than the stored artifacts. The run drove four parser fixes —
+  judgment dates were the *referral* date (JUDGMENT.INIT's first DATE) rather
+  than the delivery date in TITLE; missing/impossible dates and corrigendum
+  dates now come from the notice.ttl work date already on disk; OJ numbers
+  unpadded ("L 042"→"L 42"); page-long misextracted titles rejected
+  (`TITLE_MAX`) — and ends at zero unexplained differences. Artifact dates
+  are now dashed ISO; the corpus re-parse (EURLEX_CODE changed) folds into
+  the finding-6 acceptance run.
+- ✅ **Truncated rubriks + FK-bound unification (2026-07-19, finding 04):**
+  `join_dangling_rubriks` re-attaches the statute name a flattened PDF dropped
+  off a "Förslag till lag om ändring i" rubrik (the following lowercase-led
+  line, a mis-classified rubrik continuation, the all-caps era style, and a
+  name glued onto the next paragraph are all handled; 115 of the 126
+  corpus-wide re-join, fixture-locked). `kommentar.extract` now bounds on the
+  unified `fk_span` (moved into kommentar.py; fk.py imports it): validated
+  corpus-wide, the implements extraction grows from 2,000 to 2,972 edges —
+  the gains exactly the in-FK-pseudo-rubrik truncation class (2012/13:155:
+  5 → 122) — while the handful of "lost" edges were appendix-derived
+  (Lagrådet's opinion in a bilaga), i.e. false authoritative-commentary edges
+  the old level-1 bound overran into.
 
 ### 7e. Myndighetsföreskrifter vertical (agency regulations) 🚧
 
@@ -2656,6 +2678,7 @@ rewrite work.
 | `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
 | `tools/golden_dv.py` | DV golden cross-check (references vs old distilled RDF) |
 | `tools/golden_dv_structure.py` | DV structural golden (instance/ruling skeleton vs old parsed XHTML) |
+| `tools/golden_eurlex.py` | EUR-Lex metadata cross-check against a retained CELLAR snapshot (no legacy oracle exists for this vertical) |
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
 | `accommodanda/lib/render.py` | static HTML site w/ inbound annotations + live ⌘K search (`generate`) |
@@ -2749,6 +2772,14 @@ RDF) and **`python tools/golden_dv_structure.py …`** (`normalize` | `compare
 PARSED ARTIFACT` | `validate` — the instance/ruling skeleton vs old parsed
 XHTML; §4). The structural one measures `accommodanda/dv/structure.py`'s
 segmenter against the parser's emitted `structure` section.
+
+**EUR-Lex golden — `python tools/golden_eurlex.py {snapshot,compare}`** — there
+is no legacy oracle for EUR-Lex, so this validates the carried metadata fields
+(CELEX, date, title, OJ ref, ECLI, doctype) of a deterministic stratified
+sample against a retained CELLAR metadata snapshot (`snapshot` draws/freezes
+it over the network, `compare` is the offline change detector); `compare
+--reparse` exercises the current parser instead of the stored artifact tree.
+Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 
 ---
 
