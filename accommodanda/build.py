@@ -59,6 +59,7 @@ from .coe import download as coe_download
 from .coe import parse as coe_parse
 from .dv import download as dv_download
 from .dv import identity as dv_identity
+from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
 from .dv.parse import api_member, parse_api_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
@@ -1192,13 +1193,18 @@ DV_INDEX = layout.DOM_INDEX
 # only at the next code-staleness or --force pass.
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
+           PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
            PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py")
 
 
 @functools.cache
 def _dv_cases():
+    """canonical id -> index case, for every case with a parseable source:
+    an API record, or -- legacy-only -- a non-empty frozen original (Word
+    referat / imported notis XML)."""
     cases = json.loads(DV_INDEX.read_text())
-    return {c["canonical_id"]: c for c in cases if api_member(c)}
+    return {c["canonical_id"]: c for c in cases
+            if api_member(c) or dv_legacy.legacy_original(c)}
 
 
 @functools.cache
@@ -1219,9 +1225,16 @@ def dv_artifact(basefile):
     return layout.artifact("dv", basefile)
 
 
+def dv_member(basefile):
+    """The member record parse reads for a case: the API record when the case
+    has one, else the legacy original (a frozen Word referat or notis XML)."""
+    case = _dv_cases()[basefile]
+    return api_member(case) or dv_legacy.legacy_original(case)
+
+
 def dv_record(basefile):
     # the identity index stores paths data_root-relative (portable); resolve here
-    return util.load_relpath(layout.DATA, api_member(_dv_cases()[basefile])["path"])
+    return util.load_relpath(layout.DATA, dv_member(basefile)["path"])
 
 
 def dv_download_run(basefile):
@@ -1230,6 +1243,8 @@ def dv_download_run(basefile):
     (bare `lagen dv download`) + identity reindex -- a case has no uuid to
     fetch until the harvest has seen it, so it can't enter through here."""
     member = api_member(_dv_cases()[basefile])
+    assert member, ("%s is a legacy-only case: its frozen original is already "
+                    "on disk and nothing upstream serves it" % basefile)
     record = dv_download.fetch_record(_dv_session(), member["uuid"])
     out = dv_record(basefile)
     util.write_atomic(out, json.dumps(
@@ -1305,6 +1320,14 @@ def dv_namedcases(args=()):
 
 
 def dv_parse_run(basefile):
+    member = dv_member(basefile)
+    if member["store"] == "dv":   # legacy-only: frozen Word referat / notis XML
+        av = dv_legacy.parse_legacy_file(dv_record(basefile),
+                                         _dv_cases()[basefile])
+        art = to_artifact(av, canonical_id=basefile, grupp_uris=_dv_grupps())
+        art["label"] = casenaming.case_label(art)
+        write_artifact("dv", basefile, art)
+        return
     record = json.loads(compress.read_text(dv_record(basefile)))
     av = parse_api_record(record, basefile)
     # the case's public publication-search page is keyed by the record's
@@ -1319,13 +1342,42 @@ def dv_parse_run(basefile):
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
 
+DV_LEGACY_DISTILLED = config.LEGACY_ROOT / "dv" / "distilled"
+DV_LEGACY_INTERMEDIATE = config.LEGACY_ROOT / "dv" / "intermediate"
+
+
+def dv_import_legacy(args=()):
+    """One-time migration of the frozen legacy facts the store needs
+    (`lagen dv import-legacy [DISTILLED [INTERMEDIATE]]`): the distilled-RDF
+    identity sidecar (referat/målnummer/date per case -- what lets a frozen
+    file with no API partner mint its published identity) and the notis
+    bodies the legacy feed shipped as zero-byte Word files. Rebuilds the
+    identity index afterwards, like a harvest."""
+    args = list(args)
+    distilled = Path(args[0]) if args else DV_LEGACY_DISTILLED
+    intermediate = Path(args[1]) if len(args) > 1 else DV_LEGACY_INTERMEDIATE
+    if RUN.dry_run:
+        print("dv import-legacy: would write %s/%s from %s, import notis "
+              "bodies from %s, then rebuild %s"
+              % (DV_LEGACY_DOWNLOADED, dv_identity.IDENTITIES, distilled,
+                 intermediate, DV_INDEX))
+        return
+    assert distilled.is_dir() and intermediate.is_dir(), (
+        "frozen legacy trees not found (%s, %s) -- this import reads the old "
+        "checkout's scaffolding" % (distilled, intermediate))
+    dv_legacy.import_notiser(intermediate, DV_LEGACY_DOWNLOADED)
+    dv_legacy.import_identities(distilled, DV_LEGACY_DOWNLOADED)
+    dv_reindex()
+
+
 SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "download": Stage("download", dv_download_run, dv_record),
     "parse": Stage("parse", dv_parse_run, dv_artifact,
                    inputs=lambda bf: [dv_record(bf)] + _patch_input("dv", bf),
                    code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
-   actions={"reindex": dv_reindex, "namedcases": dv_namedcases})
+   actions={"reindex": dv_reindex, "namedcases": dv_namedcases,
+            "import-legacy": dv_import_legacy})
 
 
 # --------------------------------------------------------------------------

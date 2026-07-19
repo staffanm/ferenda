@@ -28,7 +28,9 @@ sections below explain each item and retain the historical measurements.
   body (§3d, §4).
 - ✅ **DV coverage and published identity:** the recoverable NJA notisfall are
   ingested and the legacy verdict URI grammar for non-referat cases restored
-  (§4, §6; closed 2026-07-16, `docs/rewrite-parity/01`).
+  (§4, §6; closed 2026-07-16, re-implemented after a divergent-branch loss
+  2026-07-19 — 6,418 frozen-era cases including all notis bodies, 23,901
+  parsed with zero errors, 21,594/21,595 old RDFs matched, `docs/rewrite-parity/01`).
 - ✅ **DV curated legal relations:** the API's curated lagrum/förarbete/
   rättsfall/litteratur metadata normalized through the citation grammar and
   projected as typed graph edges, with the grupp join as authoritative
@@ -527,7 +529,7 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
 
 ---
 
-## 4. DV vertical (second vertical) 🚧
+## 4. DV vertical (second vertical) ✅
 
 Court decisions (vägledande avgöranden). Forces the two highest-value
 horizontal pieces: KORTLAGRUM citations and the cross-source link graph.
@@ -636,14 +638,13 @@ below is not optional polish, it's the only way they enter the corpus.
     empty API-wide (not a parser bug) and absent from legacy too. So the
     architecture is **single-best-source per canonical case** (API when
     present, POI-legacy otherwise), not a merge.
-  - ⬜ **Notisfall coverage.** 852 sole-source cases (6 from the 1990s,
-    504 from the 2000s, 304 from the 2010s, 38 from the 2020s) whose
-    individual originals are zero-byte. 851/852 have the frozen `<body>`
-    intermediate; the recent `notiser_*.zip` carries multi-notis `.docx`
-    (`HDO_2017_notis_007-016.docx`) POI-able for ~342 but needing
-    per-notis splitting + canonical-ID matching (the old `parse_not`
-    lineage). Pre-2010 majority has only the frozen intermediate regardless.
-    This is a bounded import/parser task, not a missing DV architecture seam.
+  - ✅ **Notisfall coverage — closed as part of the frozen-referat coverage
+    closure (2026-07-19, below).** `lagen dv import-legacy` imports the
+    5,935 frozen notis bodies from the old pipeline's intermediate XML (the
+    legacy feed itself shipped notiser as zero-byte Word files), and
+    `dv/legacy.py` gained a notis parse route (TRIPS `<para>` / OOXML
+    `<w:p>` flavors) rather than the `.docx`-splitting approach this bullet
+    originally scoped.
   - ✅ **Citation extraction from body text** — KORTLAGRUM ported
     (`AbbrevLawNormalRef` "3 § MBL"/"MBL 3 §", `AbbrevLawShortRef`
     "JB 22:2"), law-abbrev terminal built from the 110 `dcterms:alternative`
@@ -694,10 +695,19 @@ below is not optional polish, it's the only way they enter the corpus.
   (73,454/76,836), 65.8% exact + 15.2% superset. The
   residual misses are editor-derived lagrum not cited verbatim in the body
   (the same signal as the 81% lagrumLista recall) + the new scanner filling old
-  all-or-nothing holes — change-detector posture, investigated not assumed. The
-  6,418 old RDF records without a matching artifact remain a coverage/input
-  inventory, not an inferred parser failure (the tree contains duplicate and
-  non-canonical old records as well as deferred notisfall). ✅ **Metadata
+  all-or-nothing holes — change-detector posture, investigated not assumed.
+  ✅ **The 2026-07-19 rerun (after the frozen-referat coverage closure, §7g)
+  matches 21,594 of 21,595 old RDFs** — the single miss is a source header
+  typo the old pipeline propagated (`AD 2004 nr 59` vs the published
+  AD 2005 nr 59); identifier agreement is 16,624 exact + 4,970 new-superset
+  with zero conflicts, referatrubrik 20,275 exact with zero new-missing
+  (notis summaries now carry the oracle's published rubrik), avgörandedatum
+  21,370 exact / 183 text-confirmed / 13 disjoint (all pre-existing
+  old-feed-vs-API disagreements on API-backed cases). Whole-corpus
+  old-reference recall over the doubled matched set is 89.2% — the newly
+  covered legacy/notis population cites more sparsely through curated
+  metadata than the API records, and the diff classes mirror the ones already
+  adjudicated above. ✅ **Metadata
   comparison surface added:** the same corpus pass now
   reports exact/diff/old-missing/new-missing counts for identifier,
   referatrubrik/sammanfattning, avgörandedatum and målnummer, including one
@@ -2271,6 +2281,49 @@ one record per basefile. Exposed as its own verb, `lagen forarbete
 soukb-scans` (never part of `harvest`), resumable per part. **Built,
 verified end-to-end on one small doc (1922:1, 10.5 MB) into a scratch
 tree — not run at corpus scale**; the full pass is hundreds of GB.
+
+**Legacy-corpus completeness audit (2026-07-19, the full sweep):** every
+`ferenda.old/data/*/downloaded` corpus was diffed against the new corpus.
+Imported: 2,177 föreskrift docs (see §7e), 37 JK decisions (§7f), 76 EUR-Lex
+docs the harvest excludes by shape — 66 pre-1969 Swedish-HTML acts, 3 CP
+"view" documents (the CELEX descriptor CASELAW_TYPES deliberately skips) and
+7 non-`/TXT` treaty PDFs (the original Treaty of Rome among them; six parse,
+11957A is a pure scan awaiting ocrmypdf). Proven already covered: ARN (0
+missing after the dnr join), JO (§7f), SFS (golden-migrated;
+`sfs-copy`/`sfs-copy2` are dev duplicates), mediawiki (876/876 files),
+prop/sou/dir/ds (import-legacy records reference the frozen bytes in place
+by design — the 371 GB soukb tree is pointed at, not copied). Excluded by
+design: `keyword` (derived per-term subject aggregations the new catalog
+recomputes), `pbr` (archived, outside closure), `sitenews` (empty).
+
+✅ **DV frozen-referat coverage closed (2026-07-19).** The last real gap —
+6,418 frozen-era DV cases (RÅ/HFD/NJA notiser, older NJA/AD/RÅ referats)
+whose sources sit in `downloaded/dv/` but which the courts API never serves —
+is materialized. Three pieces: (1) `lagen dv import-legacy` migrates the two
+frozen facts the store lacked — the 5,935 notis *bodies* (the legacy feed
+shipped notiser as zero-byte Word files; the text survives only in the old
+pipeline's intermediate XML, copied in as parseable `.xml` beside them) and a
+`legacy-identities.json` oracle sidecar distilled from the 21,595 old
+distilled RDFs (referat/målnummer/date/referatrubrik per case). (2) The
+identity index mints referat identities for frozen-only files: REG/HFD notis
+filenames now yield their published identity like HDO's, and the oracle
+sidecar attaches referats to målnummer-named files (unambiguous joins only —
+målnummer is reused across years, so oracle målnummer is metadata, never a
+linkage key, and an M-bridge is refused when the two components already
+publish conflicting referats; colon vs "ref."/"nr" spellings normalize to one
+identity). (3) `dv/legacy.py` gained the notis parse route (TRIPS `<para>`
+and OOXML `<w:p>` flavors; header målnummer/date, Uppslagsord/Lagrum
+sections, HD's month-compilation lead) and build.py routes any case without
+an API record through the legacy parser (Word referat via POI, notis XML).
+Notis summaries come from the oracle's published referatrubrik. Full-corpus
+parse: **23,901 cases, zero errors**; golden: 21,594/21,595 old RDFs match an
+artifact by URI — the single miss is old `ADO/2005-59.rdf` propagating a
+source header typo (`AD 2004 nr 59`; decided 2005-06-01, mål B 134-2004,
+API and filename agree on AD 2005 nr 59, where the artifact lives). All 13
+avgörandedatum disjoints are pre-existing old-feed-vs-API metadata
+disagreements on API-backed cases, none from the legacy route. A HWPF bug
+was fixed en route (Word field-control characters `\x13\x14\x15` leaked into
+extracted text; instruction segments now stripped, results kept).
 
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 

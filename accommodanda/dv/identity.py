@@ -59,25 +59,44 @@ def norm_malnr(s):
     return re.sub(r"\s+", "", s).upper()
 
 
+RE_REFERAT_FORMS = re.compile(
+    r"([A-ZÅÄÖ]+)\s*((?:19|20)\d{2})\s*(?::|ref\.?|nr)\s*(\d+)$", re.I)
+
+
 def norm_referat(s):
+    # "RÅ 1994:69", "RÅ 1994 ref. 69" and "AD 1993 nr 100" spellings of one
+    # published identity normalize to the same key (the old RDF uses the colon
+    # form where the API spells out "ref."). NJA page vs löpnummer identity is
+    # untouched: the page form ("NJA 2016 s. 540") never matches this shape.
+    m = RE_REFERAT_FORMS.match(s.strip())
+    if m:
+        return "".join(m.groups()).upper()
     return "".join(c for c in s.upper() if c.isalnum())
+
+
+# courts whose notisfall filenames (YYYY_not_N) encode the published notis
+# identity; the value is the publication series the referat is minted in
+NOTIS_SERIES = {"HDO": "NJA", "REG": "RÅ", "HFD": "HFD"}
 
 
 def legacy_identity(court, filename):
     """(malnummer, referat) lists derived from a legacy filename, or
     (None, None) if it is not a recognizable case document."""
-    stem = re.sub(r"\.(docx?)$", "", filename, flags=re.I)
-    if stem == filename:  # not a .doc/.docx
+    stem = re.sub(r"\.(docx?|xml)$", "", filename, flags=re.I)
+    if stem == filename:  # not a case document
         return None, None
-    # HDO notisfall: the _N here is the notis number, not an attachment
+    # notisfall: the _N here is the notis number, not an attachment
     m = re.match(r"(\d{4})_not_(\d+)(?:_\d+)?$", stem)
-    if court == "HDO" and m:
-        return [], ["NJA %s not %s" % m.groups()]
-    stem = re.sub(r"_\d+$", "", stem)  # drop attachment-variant suffix
+    if court in NOTIS_SERIES and m:
+        return [], ["%s %s not %s" % (NOTIS_SERIES[court], *m.groups())]
     if court == "ADO":
-        m = re.match(r"(\d{4})-(\d+)$", stem)
+        # the dash form (1993-100, with optional attachment variant _N) and
+        # the late underscore form (2022_48) both encode year + referat number
+        m = (re.match(r"(\d{4})-(\d+)(?:_\d+)?$", stem)
+             or re.match(r"(\d{4})_(\d+)$", stem))
         if m:
             return [], ["AD %s nr %s" % m.groups()]
+    stem = re.sub(r"_\d+$", "", stem)  # drop attachment-variant suffix
     return [stem], []
 
 
@@ -116,10 +135,17 @@ def scan_api(domstoldir):
     return records
 
 
+# frozen-oracle identities beside the legacy files (written by
+# `lagen dv import-legacy` from the old pipeline's distilled RDF): the referat
+# identity a filename alone cannot supply, keyed by court + målnummer/referat
+IDENTITIES = "legacy-identities.json"
+
+
 def scan_legacy(dvdir):
     records, unrecognized = [], []
     for path in sorted(Path(dvdir).rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in (".doc", ".docx"):
+        if not path.is_file() or path.suffix.lower() not in (".doc", ".docx",
+                                                             ".xml"):
             continue
         court = canonical_court(path.parent.name)
         malnummer, referat = legacy_identity(path.parent.name, path.name)
@@ -129,7 +155,56 @@ def scan_legacy(dvdir):
         records.append({"store": "dv", "court": court,
                         "path": util.store_relpath(path, layout.DATA),
                         "malnummer": malnummer, "referat": referat})
+    sidecar = Path(dvdir) / IDENTITIES
+    if sidecar.exists():
+        enrich_legacy(records, json.loads(sidecar.read_text()))
     return records, unrecognized
+
+
+def enrich_legacy(records, identities):
+    """Attach frozen-oracle identity facts to filename-derived legacy records.
+
+    A record whose filename yields only a målnummer gains the referat the old
+    pipeline published it under -- but only when the (court, målnummer) key is
+    unambiguous over the oracle: målnummer is reused across years (AD 1993 nr
+    22 and AD 1994 nr 13 share A 112-92), and guessing would publish one
+    decision's text under another referat's URI. A record whose filename yields
+    the referat (notisfall, ADO) gains the målnummer and date the document
+    itself often lacks."""
+    by_malnr, by_referat = defaultdict(list), {}
+    for ident in identities:
+        for m in ident["malnummer"]:
+            by_malnr[(ident["court"], norm_malnr(m))].append(ident)
+        for r in ident["referat"]:
+            by_referat[(ident["court"], norm_referat(r))] = ident
+    for rec in records:
+        if rec["referat"]:
+            hits = [by_referat.get((rec["court"], norm_referat(r)))
+                    for r in rec["referat"]]
+            hits = [h for h in hits if h]
+        else:
+            found = {id(h): h for m in rec["malnummer"]
+                     for h in by_malnr.get((rec["court"], norm_malnr(m)), ())}
+            distinct = {tuple(h["referat"]) for h in found.values()}
+            hits = list(found.values()) if len(distinct) == 1 else []
+        if not hits:
+            continue
+        rec["referat"] = dedup(rec["referat"]
+                               + [r for h in hits for r in h["referat"]])
+        # Oracle målnummer is *metadata*, never a linkage key: distinct
+        # decisions reuse a målnummer (AD 1993 nr 22 / AD 1994 nr 13 under
+        # A 112-92), so letting it mint M keys fuses referats. It is kept
+        # apart from the filename-derived list keys() reads.
+        rec["oracle_malnummer"] = dedup_malnr(
+            m for h in hits for m in h["malnummer"])
+        dates = sorted({h["avgorandedatum"] for h in hits
+                        if h.get("avgorandedatum")})
+        if len(dates) == 1:
+            rec["avgorandedatum"] = dates[0]
+        rubriks = sorted({h["referatrubrik"] for h in hits
+                          if h.get("referatrubrik")})
+        if len(rubriks) == 1:
+            rec["referatrubrik"] = rubriks[0]
 
 
 class UnionFind:
@@ -172,6 +247,12 @@ def build_index(api_records, legacy_records):
         for i in legacy[1:]:
             uf.union(legacy[0], i)
 
+    component_referat = defaultdict(set)
+    for i, rec in enumerate(records):
+        component_referat[uf.find(i)].update(
+            norm_referat(r) for r in rec["referat"] if norm_referat(r))
+
+    for indices in malnummer_records.values():
         # M is a cross-store bridge only when it is unambiguous after the strong
         # R links and legacy attachment grouping. Distinct API components with
         # the same M stay distinct; guessing would publish one decision's text
@@ -181,7 +262,18 @@ def build_index(api_records, legacy_records):
         legacy_roots = {uf.find(i) for i in indices
                         if records[i]["store"] == "dv"}
         if len(api_roots) == len(legacy_roots) == 1:
-            uf.union(next(iter(api_roots)), next(iter(legacy_roots)))
+            api_root, legacy_root = next(iter(api_roots)), next(iter(legacy_roots))
+            # When both components already publish referat identities and they
+            # disagree, M is weaker contradictory evidence, not a bridge (one
+            # API record lists both RH 2016:61 and :62 case numbers under :62
+            # while the old feed correctly publishes one decision per referat).
+            if (component_referat[api_root] and component_referat[legacy_root]
+                    and component_referat[api_root].isdisjoint(
+                        component_referat[legacy_root])):
+                continue
+            uf.union(api_root, legacy_root)
+            component_referat[uf.find(api_root)] = (
+                component_referat[api_root] | component_referat[legacy_root])
 
     groups = defaultdict(list)
     for i, rec in enumerate(records):
@@ -189,18 +281,25 @@ def build_index(api_records, legacy_records):
 
     cases = []
     for members in groups.values():
-        malnummer = dedup_malnr(m for r in members for m in r["malnummer"])
+        malnummer = dedup_malnr(m for r in members
+                                for m in r["malnummer"]
+                                + r.get("oracle_malnummer", []))
         referat = dedup(r for rec in members for r in rec["referat"])
         courts = sorted({r["court"] for r in members})
         dates = sorted({r["avgorandedatum"] for r in members
                         if r.get("avgorandedatum")})
         stores = sorted({r["store"] for r in members})
+        # the frozen oracle's published summary (rpubl:referatrubrik), carried
+        # for legacy-only cases whose document body has no rubrik of its own
+        rubriks = sorted({r["referatrubrik"] for r in members
+                          if r.get("referatrubrik")}, key=len, reverse=True)
         cases.append({
             "canonical_id": canonical_id(courts, malnummer, referat),
             "courts": courts,
             "malnummer": malnummer,
             "referat": referat,
             "avgorandedatum": dates[0] if dates else None,
+            "referatrubrik": rubriks[0] if rubriks else None,
             "sources": sorted(stores),
             "members": sorted(members, key=lambda r: (r["store"], r["path"])),
         })

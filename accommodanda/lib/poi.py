@@ -16,6 +16,7 @@ must be discoverable -- jpype auto-finds `libjvm.so`.
 """
 
 import glob
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +30,12 @@ _JARS = sorted(glob.glob(str(Path(__file__).parents[2] / "vendor" / "poi" / "*.j
 # Word's field-result placeholder, emitted for empty form fields (Avdelning,
 # Domsnummer …). It carries no value, so we strip it to empty.
 _FORMTEXT = "FORMTEXT"
+
+# A .doc field: \x13 field-begin, then the field *instruction* (" FORMTEXT ",
+# " REF foo "), \x14 separator, then the displayed *result*, \x15 field-end.
+# Only the result is document text; the instruction (and a resultless field)
+# is dropped. Applied repeatedly so nested fields unwrap inside-out.
+_FIELD_INSTRUCTION = re.compile("\x13[^\x13\x14\x15]*[\x14\x15]")
 
 _OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _ZIP_MAGIC = b"PK\x03\x04"
@@ -59,6 +66,13 @@ def _clean(text):
     # \x07 is the HWPF cell/row terminator bell; drop it, the form-field
     # placeholder, and CRs, then collapse remaining whitespace.
     text = text.replace("\x07", "").replace("\r", "").replace(_FORMTEXT, "")
+    while "\x13" in text:
+        text, n = _FIELD_INSTRUCTION.subn("", text)
+        if not n:
+            break   # unbalanced field-begin: strip the stray marker below
+    # \x01/\x02/\x05 are embedded-object / annotation anchors; stray field
+    # markers survive an unbalanced field.
+    text = re.sub("[\x01\x02\x05\x13\x14\x15]", "", text)
     return " ".join(text.split())
 
 

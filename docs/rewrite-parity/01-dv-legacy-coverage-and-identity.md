@@ -1,7 +1,28 @@
 # DV legacy coverage and published identity
 
-**Status:** Closed (2026-07-16)
+**Status:** Closed (2026-07-16; re-implemented 2026-07-19, see below)
 **Priority:** P0
+
+## Re-closure (2026-07-19)
+
+The implementation this document's evidence describes was committed as
+`8226f5eb` but survives only on `origin/modernization` — the local line
+diverged before it and kept the documentation without the code, which is why
+the 7g legacy-corpus audit rediscovered 6,418 uncovered frozen referats. The
+coverage was re-implemented on the current line with a different mechanism:
+notis bodies imported from the old pipeline's frozen intermediate XML and an
+oracle identity sidecar distilled from the old distilled RDFs
+(`lagen dv import-legacy`), rather than the shared-Word-bundle ledger below.
+Three of `8226f5eb`'s validated identity rules were ported: oracle målnummer
+is metadata, never a linkage key (AD 1993 nr 22 / AD 1994 nr 13 under
+A 112-92); an M-bridge is refused between components with conflicting
+referat identities (RH 2016:61/62); and referat spelling variants
+(colon / "ref." / "nr") normalize to one identity. Final census: 23,938
+canonical cases, 23,901 parsed with zero errors, 21,594/21,595 old distilled
+RDFs matched by URI (the one miss is a source header typo the old pipeline
+propagated). See REWRITE.md §7g and `tools/golden_dv.py` for the adjudicated
+result. The evidence below is retained as the record of the earlier,
+unmerged implementation.
 
 ## Finding
 

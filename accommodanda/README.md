@@ -119,7 +119,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging, riding out failures from both the `requests` and `httpx` transports); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`); `make_http2_session` (`httpx2[http2]`) is an HTTP/2-only fallback for hosts that refuse HTTP/1.1 behind a Cloudflare front (foreskrift's kkvfs) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
-| `poi.py` | Apache POI (HWPF/XWPF) via jpype → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) once förarbete's `legacy_formats.word_paras` became its second caller (rule:second-use-goes-to-lib) — `dv/legacy.py` imports it as `poi as word`, förarbete uses it for `.docx` only (`.doc` goes through `antiword` instead, since proptrips-era `.doc` bodies are mostly Word 6/95 binaries POI's HWPF refuses) |
+| `poi.py` | Apache POI (HWPF/XWPF) via jpype → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) once förarbete's `legacy_formats.word_paras` became its second caller (rule:second-use-goes-to-lib) — `dv/legacy.py` imports it as `poi as word`, förarbete uses it for `.docx` only (`.doc` goes through `antiword` instead, since proptrips-era `.doc` bodies are mostly Word 6/95 binaries POI's HWPF refuses); strips Word field-control characters (`\x13`/`\x14`/`\x15`) and their instruction segments, which otherwise leaked into extracted text |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
 | `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename, per-process temp name so concurrent `lagen` invocations can't race each other's rename) |
 
@@ -132,7 +132,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
-| `legacy.py` | **legacy path** — `lib/poi.py` (moved here from `dv/word.py` once förarbete became its second caller, `from ..lib import poi as word`) → flat `(text, bold, in_table)` stream → head/body split → `Avgorande` |
+| `legacy.py` | **legacy path** — Word referats via `lib/poi.py` (`from ..lib import poi as word`, flat `(text, bold, in_table)` stream → head/body split → `Avgorande`) and notis intermediate XML (TRIPS `<para>` / OOXML `<w:p>` flavors); also the `lagen dv import-legacy` importers: the 5,935 frozen notis bodies + the `legacy-identities.json` oracle sidecar (referat/målnummer/date/referatrubrik distilled from the old RDFs) that lets frozen-only files mint their published identity |
 
 **forarbete vertical (preparatory works — prop/sou/ds/dir)**
 | File | What |
@@ -427,9 +427,13 @@ uv run python -m accommodanda.dv.download site/data/downloaded/dom   # [--full] 
 uv run python -m accommodanda.build dv reindex                  # -> site/data/artifact/dom/identity-index.json
                                                                   # (also auto-run after any harvest that changed records)
 
-# parse (API path is driver-owned; `[ids…]` parses just those, empty = all stale)
-uv run python -m accommodanda.build dv parse                                       # API path, incremental
-uv run python -m accommodanda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy POI path, batch report
+# one-time frozen-legacy migration (notis bodies + oracle identity sidecar, then reindex)
+uv run python -m accommodanda.build dv import-legacy   # reads ../ferenda.old/data/dv/{distilled,intermediate}
+
+# parse (driver-owned; `[ids…]` parses just those, empty = all stale; a case
+# without an API record routes through the legacy parser automatically)
+uv run python -m accommodanda.build dv parse                                       # incremental, both paths
+uv run python -m accommodanda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy path, batch report
 uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
 ```
 
