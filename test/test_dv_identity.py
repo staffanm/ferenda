@@ -266,3 +266,68 @@ def test_norm_referat_spelling_variants_one_identity():
     # NJA page identity stays distinct from the editorial löpnummer
     assert norm_referat("NJA 2016 s. 540") != norm_referat("NJA 2016:31")
     assert norm_referat("HFD 2012 not 30") != norm_referat("HFD 2012 ref. 30")
+
+
+def test_apply_adjudications_attaches_ledger_referat(tmp_path):
+    # a withheld original whose målnummer is ambiguous gains the referat its
+    # ledger entry content-matched, hash-verified against the store
+    import hashlib
+    from accommodanda.dv import identity
+    from accommodanda.dv.identity import apply_adjudications
+    (tmp_path / "HDO").mkdir()
+    (tmp_path / "HDO" / "B1-14.docx").write_bytes(b"frozen body")
+    ledger = {"version": 1, "cases": [{
+        "legacy_path": "HDO/B1-14.docx",
+        "legacy_sha256": hashlib.sha256(b"frozen body").hexdigest(),
+        "api_referat": ["NJA 2015 s. 811", "NJA 2015:74"],
+        "legacy_avgorandedatum": "2015-11-19"}]}
+    (tmp_path / "ledger.json").write_text(json.dumps(ledger))
+    recs = [{"store": "dv", "court": "HDO", "path": "downloaded/dv/HDO/B1-14.docx",
+             "malnummer": ["B1-14"], "referat": []}]
+    orig = identity.AMBIGUITIES
+    identity.AMBIGUITIES = tmp_path / "ledger.json"
+    try:
+        apply_adjudications(recs, tmp_path)
+    finally:
+        identity.AMBIGUITIES = orig
+    assert recs[0]["referat"] == ["NJA 2015 s. 811", "NJA 2015:74"]
+    assert recs[0]["avgorandedatum"] == "2015-11-19"
+
+
+def test_apply_adjudications_hash_mismatch_raises(tmp_path):
+    import pytest
+    from accommodanda.dv import identity
+    from accommodanda.dv.identity import apply_adjudications
+    (tmp_path / "HDO").mkdir()
+    (tmp_path / "HDO" / "B1-14.docx").write_bytes(b"drifted body")
+    ledger = {"version": 1, "cases": [{
+        "legacy_path": "HDO/B1-14.docx", "legacy_sha256": "0" * 64,
+        "api_referat": ["NJA 2015 s. 811"]}]}
+    (tmp_path / "ledger.json").write_text(json.dumps(ledger))
+    recs = [{"store": "dv", "court": "HDO", "path": "downloaded/dv/HDO/B1-14.docx",
+             "malnummer": ["B1-14"], "referat": []}]
+    orig = identity.AMBIGUITIES
+    identity.AMBIGUITIES = tmp_path / "ledger.json"
+    try:
+        with pytest.raises(ValueError, match="adjudication ledger hash"):
+            apply_adjudications(recs, tmp_path)
+    finally:
+        identity.AMBIGUITIES = orig
+
+
+def test_shared_filename_stem_distinct_referats_stay_separate():
+    # the old feed reused MÖD/M5005-02 for two publications: the base file is
+    # MÖD 2003:112 and the _2 variant MÖD 2002:92 (adjudication ledger).
+    # Camp-wise fusion keeps them apart; the unidentified M5008-02_2 variant
+    # attaches to its single sibling camp.
+    cases = build_index(
+        [api("u20", "MOD", ["M 5005-02", "M 5008-02"], ["MÖD 2003:112"]),
+         api("u21", "MOD", ["M 5005-02"], ["MÖD 2002:92"])],
+        [legacy("M5005-02.doc", "MOD", ["M5005-02"], ["MÖD 2003:112"]),
+         legacy("M5005-02_2.doc", "MOD", ["M5005-02"], ["MÖD 2002:92"]),
+         legacy("M5008-02.doc", "MOD", ["M5008-02"], ["MÖD 2003:112"]),
+         legacy("M5008-02_2.doc", "MOD", ["M5008-02"])])
+    by_id = {c["canonical_id"]: c for c in cases}
+    assert sorted(by_id) == ["MÖD 2002:92", "MÖD 2003:112"]
+    assert len(by_id["MÖD 2002:92"]["members"]) == 2   # api + _2 variant
+    assert len(by_id["MÖD 2003:112"]["members"]) == 4  # api + 3 files

@@ -28,6 +28,52 @@ from .datasets import NAMEDCASES
 from .lagrum import RATTSFALL, LagrumParser
 from .layout import case_slug as slug
 
+# The old published-verdict URI used the publisher's ``abbrSlug`` from
+# ``lagen/nu/res/uri/swedishlegalsource.slugs.ttl``. Keep the mapping explicit:
+# a court code is source vocabulary, while these values are a public URI
+# contract (not a lowercasing rule -- notably MIOD -> mig and MMOD -> mmd).
+COURT_URI_SLUG = {
+    "ADO": "ad",
+    "HDO": "hd",
+    "HFD": "hfd",
+    "HGO": "hgo",
+    "HNN": "hnn",
+    "HON": "hon",
+    "HSB": "hsb",
+    "HSV": "hsv",
+    "HVS": "hvs",
+    "HYOD": "hsv",  # Svea hovrätts hyresrättsliga avgöranden
+    "KGG": "kgg",
+    "KJO": "kjo",
+    "KST": "kst",
+    "KSU": "ksu",
+    "MDO": "md",
+    "MIOD": "mig",
+    "MMOD": "mmd",
+    "MOD": "mod",
+    "PBR": "pbr",
+    "PMOD": "pmod",
+    "REGR": "regr",
+    "RHN": "rhn",
+}
+
+
+def verdict_uri(court, malnummer, avgorandedatum):
+    """The old published URI for a verdict that has no referat.
+
+    Mirrors the legacy COIN template
+    ``/dom/{publisher}/{malnummer}/{avgorandedatum}`` and its space-removing
+    slug transform. The old minter preserved uppercase Swedish målnummer
+    prefixes (``Ö``, ``Ä``), so this does too.
+    """
+    assert court in COURT_URI_SLUG, "no published verdict URI slug for %s" % court
+    assert malnummer, "a verdict URI requires a målnummer"
+    assert avgorandedatum, "a verdict URI requires an avgörandedatum"
+    malnummer = (malnummer.replace("ä", "ae").replace("å", "aa")
+                 .replace("é", "e").replace("ö", "oe").replace(" ", ""))
+    return "https://lagen.nu/dom/%s/%s/%s" % (
+        COURT_URI_SLUG[court], malnummer, avgorandedatum)
+
 
 @functools.cache
 def _rattsfall_parser():
@@ -44,9 +90,10 @@ def case_uri(cid):
     `dom/nja/{year}s{page}` / `.../not/{n}` scheme. This is the published
     identifier the old site used; it must not change.
 
-    A non-referat case (~7%, never a citation target) has no such canonical
-    form; it keeps a stable slug URI for now -- restoring the old verdict
-    scheme `dom/{court}/{malnummer}/{date}` for these is tracked separately."""
+    This string-only helper keeps a stable slug fallback when it receives no
+    recognizable referat. Artifact projection has the court, målnummer and
+    date needed to call :func:`verdict_uri` and restore the old non-referat
+    scheme; only a case missing one of those facts stays on the slug."""
     refs = _rattsfall_parser().parse_text(cid, context={})
     return refs[0].uri if refs else "https://lagen.nu/dom/" + slug(cid)
 

@@ -2459,6 +2459,21 @@ disagreements on API-backed cases, none from the legacy route. A HWPF bug
 was fixed en route (Word field-control characters `\x13\x14\x15` leaked into
 extracted text; instruction segments now stripped, results kept).
 
+The parallel closure commit was then merged (kept as history, its code
+superseded) and its useful parts salvaged: the **withheld-originals
+adjudication ledger** (`dv/data/legacy-ambiguities.json`, 57 legacy Word
+files content-matched to the API publication each duplicates) is now applied
+at identity scan time, hash-verified — before it, 54 of those files minted
+duplicate målnummer-keyed cases beside their API referats; the ledger also
+exposed that the old feed reused one filename stem for *distinct*
+publications (MÖD/M5005-02.doc is MÖD 2003:112, its `_2` variant MÖD
+2002:92), so attachment-variant fusion is now camp-wise by referat
+compatibility. And **the old published verdict-URI scheme is restored**:
+`casenaming.verdict_uri` mints `/dom/{publisher}/{malnummer}/{date}` (the
+legacy COIN template, explicit abbrSlug map — MIOD→mig, MMOD→mmd) for a
+non-referat case whose court, målnummer and date are all known; only a
+fact-less stray keeps the slug fallback.
+
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 
 `accommodanda/remisser/` — remiss (public referral) cases from

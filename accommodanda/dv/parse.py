@@ -24,7 +24,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 
 from ..lib import patch
-from ..lib.casenaming import case_uri
+from ..lib.casenaming import COURT_URI_SLUG, case_uri, verdict_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
@@ -425,8 +425,15 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
     cid = canonical_id or (av.referat[0] if av.referat
                            else "%s %s" % (av.court, av.malnummer[0])
                            if av.malnummer else av.court)
+    # a referat case mints through the citation grammar; a raw verdict gets
+    # the old published /dom/{publisher}/{malnummer}/{date} scheme when all
+    # three facts are known, and only a fact-less stray keeps the slug URI
+    uri = (verdict_uri(av.court, av.malnummer[0], av.avgorandedatum)
+           if not av.referat and av.malnummer and av.avgorandedatum
+           and av.court in COURT_URI_SLUG
+           else case_uri(cid))
     return {
-        "uri": case_uri(cid),
+        "uri": uri,
         "court": av.court,
         "court_namn": av.court_namn,
         "malnummer": av.malnummer,

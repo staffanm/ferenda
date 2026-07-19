@@ -40,3 +40,14 @@ def test_given_name_leads_the_label(monkeypatch):
     # an unnamed case is just its bare identity
     plain = _art(referat=["NJA 2024 s. 5"], uri=case_uri("NJA 2024 s. 5"))
     assert naming.case_label(plain) == "NJA 2024 s. 5"
+
+
+def test_verdict_uri_old_coin_template():
+    from accommodanda.lib.casenaming import verdict_uri
+    assert (verdict_uri("HDO", "Ö 528-08", "2008-03-13")
+            == "https://lagen.nu/dom/hd/OE528-08/2008-03-13".replace("OE", "Ö"))
+    # the abbrSlug mapping is a URI contract, not a lowercasing rule
+    assert verdict_uri("MIOD", "UM 1-10", "2010-01-05").startswith(
+        "https://lagen.nu/dom/mig/")
+    assert verdict_uri("MMOD", "P 1-16", "2016-02-01").startswith(
+        "https://lagen.nu/dom/mmd/")

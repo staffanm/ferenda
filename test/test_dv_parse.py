@@ -538,3 +538,17 @@ def test_curated_links_reach_the_catalog_graph():
                    "uri": "https://lagen.nu/dom/nja/2015s141",
                    "text": "NJA 2015 s. 141"}) in links
     assert len(links) == 2
+
+
+def test_to_artifact_non_referat_case_gets_verdict_uri():
+    # a raw verdict (no referat) publishes at the old COIN scheme when court,
+    # målnummer and date are all known; a fact-less stray keeps the slug URI
+    from accommodanda.dv.model import Avgorande, Stycke
+    from accommodanda.dv.parse import to_artifact
+    av = Avgorande(court="HDO", court_namn="Högsta domstolen",
+                   malnummer=["Ö 528-08"], avgorandedatum="2008-03-13",
+                   body=[Stycke("Beslutet.")])
+    assert to_artifact(av)["uri"] == "https://lagen.nu/dom/hd/Ö528-08/2008-03-13"
+    dateless = Avgorande(court="HDO", court_namn="Högsta domstolen",
+                         malnummer=["Ö 528-08"], body=[Stycke("Beslutet.")])
+    assert to_artifact(dateless)["uri"] == "https://lagen.nu/dom/HDO_Ö_528_08"

@@ -39,12 +39,21 @@ fuses distinct cases (a component spanning >1 court is flagged).
 Rebuilt from the records already on disk (no network) via `lagen dv reindex`.
 """
 
+import hashlib
 import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..lib import compress, layout, util
+
+# The withheld-originals adjudication ledger (salvaged from the parallel
+# closure commit): 57 legacy Word files whose målnummer alone cannot choose
+# between API publications, each content-matched (same referat and date, one
+# also by its verbatim editorial summary) to the API record it duplicates.
+# Without it each file minted its own målnummer-keyed case beside the API's
+# referat -- the same decision published twice.
+AMBIGUITIES = Path(__file__).parent / "data" / "legacy-ambiguities.json"
 
 # legacy court dir code -> code used by the new API (others are identical)
 COURT_CANON = {"REG": "REGR", "MÖD": "MOD", "MMD": "MMOD",
@@ -155,10 +164,36 @@ def scan_legacy(dvdir):
         records.append({"store": "dv", "court": court,
                         "path": util.store_relpath(path, layout.DATA),
                         "malnummer": malnummer, "referat": referat})
+    apply_adjudications(records, dvdir)
     sidecar = Path(dvdir) / IDENTITIES
     if sidecar.exists():
         enrich_legacy(records, json.loads(sidecar.read_text()))
     return records, unrecognized
+
+
+def apply_adjudications(records, dvdir):
+    """Attach the ledger's adjudicated referat identities (see AMBIGUITIES).
+
+    Each ledger entry names one file by court-relative path and sha256; the
+    hash is verified against the store before its identity is trusted, and a
+    mismatch raises -- a changed byte under a frozen adjudication means the
+    store is broken, not that the adjudication should silently lapse."""
+    ledger = json.loads(AMBIGUITIES.read_text())
+    by_path = {c["legacy_path"]: c for c in ledger["cases"]}
+    for rec in records:
+        path = Path(dvdir) / Path(rec["path"]).parent.name / Path(rec["path"]).name
+        entry = by_path.get("%s/%s" % (path.parent.name, path.name))
+        if not entry:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != entry["legacy_sha256"]:
+            raise ValueError(
+                "%s does not match its adjudication ledger hash (%s != %s) -- "
+                "the frozen store changed under a content-matched identity"
+                % (path, digest, entry["legacy_sha256"]))
+        rec["referat"] = dedup(rec["referat"] + entry["api_referat"])
+        if entry.get("legacy_avgorandedatum"):
+            rec["avgorandedatum"] = entry["legacy_avgorandedatum"]
 
 
 def enrich_legacy(records, identities):
@@ -241,11 +276,37 @@ def build_index(api_records, legacy_records):
                 malnummer_records[key].append(i)
 
     for indices in malnummer_records.values():
-        # Multiple frozen files with one M are attachment variants of the same
-        # legacy case; their filename-derived identity is the same by design.
+        # Multiple frozen files with one M are usually attachment variants of
+        # the same legacy case -- but the old feed also reused a filename stem
+        # for *distinct* publications (MÖD/M5005-02.doc is MÖD 2003:112 while
+        # M5005-02_2.doc is MÖD 2002:92, per the adjudication ledger), so
+        # files fuse only into a camp whose referat identity is compatible;
+        # an unidentified variant attaches only when there is no ambiguity.
         legacy = [i for i in indices if records[i]["store"] == "dv"]
-        for i in legacy[1:]:
-            uf.union(legacy[0], i)
+        camps: list[list] = []   # [mutable referat-key set, representative]
+        unidentified = []
+        for i in legacy:
+            refs = {norm_referat(r) for r in records[i]["referat"]
+                    if norm_referat(r)}
+            if not refs:
+                unidentified.append(i)
+                continue
+            for camp in camps:
+                if camp[0] & refs:
+                    uf.union(camp[1], i)
+                    camp[0] |= refs
+                    break
+            else:
+                camps.append([refs, i])
+        if len(camps) == 1:
+            for i in unidentified:
+                uf.union(camps[0][1], i)
+        elif not camps:
+            for i in unidentified[1:]:
+                uf.union(unidentified[0], i)
+        # several camps: an unidentified variant is ambiguous between distinct
+        # publications sharing the stem -- left as its own component rather
+        # than guessed onto one of them
 
     component_referat = defaultdict(set)
     for i, rec in enumerate(records):

@@ -21,8 +21,16 @@ referat identities (RH 2016:61/62); and referat spelling variants
 canonical cases, 23,901 parsed with zero errors, 21,594/21,595 old distilled
 RDFs matched by URI (the one miss is a source header typo the old pipeline
 propagated). See REWRITE.md §7g and `tools/golden_dv.py` for the adjudicated
-result. The evidence below is retained as the record of the earlier,
-unmerged implementation.
+result. The earlier commit was subsequently merged into this line (2026-07-19,
+code superseded by resolution) and two of its assets salvaged and wired: the
+withheld-originals adjudication ledger
+([`legacy-ambiguities.json`](../../accommodanda/dv/data/legacy-ambiguities.json),
+applied hash-verified at identity scan — it had 54 files minting duplicate
+målnummer cases beside their API referats, and exposed filename-stem reuse
+across distinct publications, now handled by camp-wise attachment fusion) and
+`casenaming.verdict_uri`, restoring the old published
+`/dom/{publisher}/{malnummer}/{date}` scheme for non-referat cases. The
+evidence below is retained as the record of the earlier implementation.
 
 ## Finding
 
