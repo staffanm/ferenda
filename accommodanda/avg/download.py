@@ -67,7 +67,29 @@ from ..lib.util import (
     normalize_space,
     record_path,
 )
-from .legacy import RE_ARN_DNR, arn_pdf_path, jo_pdf_path
+
+RE_ARN_DNR = re.compile(r"\d{4}-\d{4,}")
+
+
+def arn_pdf_path(root, basefile):
+    """The materialized decision PDF beside the record ("arn/1992-3657" ->
+    ``<root>/arn/arn-1992-3657.pdf``) -- the JO body-file shape."""
+    return Path(root) / "arn" / (basefile_slug(basefile) + ".pdf")
+
+
+def jo_pdf_path(root, basefile):
+    """The decision PDF beside a JO record ("jo/2340-2025" ->
+    ``<root>/jo/jo-2340-2025.pdf``), shared by the harvester, parse inputs
+    and the patch workflow."""
+    return Path(root) / "jo" / (basefile_slug(basefile) + ".pdf")
+
+
+def jo_officialreport_path(root):
+    """The dnr -> ämbetsberättelse-citation map re-housed beside the JO
+    records (dotfile: never a record). parse_jo grafts the citation onto live
+    records -- jo.se does not publish it, only the frozen corpus did."""
+    return Path(root) / "jo" / ".officialreport.json"
+
 
 COMPLETE = ".complete"    # marker under the org dir: corpus walked clean once
 

@@ -609,11 +609,8 @@ def _fa_pdf(local):
     if not compress.exists(record_path):
         return None
     record = json.loads(compress.read_text(record_path))
-    pdfs = ([layout.fa_dir(layout.FA_DOWNLOADED, typ, num) / f
-             for f in record.get("files", []) if f.lower().endswith(".pdf")]
-            or [config.LEGACY_ROOT / f
-                for f in record.get("legacy_files", [])
-                if f.lower().endswith(".pdf")])
+    pdfs = [layout.fa_dir(layout.FA_DOWNLOADED, typ, num) / f
+            for f in record.get("files", []) if f.lower().endswith(".pdf")]
     if pdfs:
         return ("forarbete", basefile, pdfs[0])
     # no PDF body, but the document may still have a page-image scan beside its

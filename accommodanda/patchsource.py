@@ -19,8 +19,7 @@ successive edits compound rather than fight an applied patch)."""
 import json
 from pathlib import Path
 
-from .avg.download import jk_html_path, jo_dnrs
-from .avg.legacy import arn_pdf_path, jo_pdf_path
+from .avg.download import arn_pdf_path, jk_html_path, jo_dnrs, jo_pdf_path
 from .eurlex.parse import content_file, formex_members
 from .foreskrift.parse import body_path as fs_body_path
 from .lib import compress, layout, patch, pdftext

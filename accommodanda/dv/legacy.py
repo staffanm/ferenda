@@ -9,8 +9,8 @@ Two legacy body formats, one entry point (`parse_legacy_file`):
   body, and bold "Sökord:" / "Litteratur:" in the footer.
 
 * Notisfall (.xml): the legacy feed shipped notiser as zero-byte Word files;
-  the text survives only in the old pipeline's frozen intermediate XML
-  (imported into the store by `lagen dv import-legacy`). Two flavors: a
+  the text was re-housed into the store from the old pipeline's intermediate
+  XML (§7g, teardown-complete). Two flavors: a
   TRIPS-era `<para>` stream headed by "R4 M:REGR … Lnr:RÅ1997not50" /
   "G:… D:målnr A:date" lines, and an OOXML-run `<w:p>` stream -- HD's
   carrying no header at all, just a month heading and a "Den 9:e. N.
@@ -22,16 +22,11 @@ målnummer, and the curated fields (Rubrik→sammanfattning, Lagrum,
 Rättsfall, Sökord/Uppslagsord) -- is recovered here from the document
 itself.
 
-`import_identities`/`import_notiser` (the `lagen dv import-legacy` verb)
-migrate the frozen oracle facts this store needs from the old checkout:
-the distilled-RDF identities sidecar and the notis intermediate bodies.
-
   python -m accommodanda.dv.legacy FILE                 # one file -> artifact
   python -m accommodanda.dv.legacy --index INDEX [--limit N]  # batch + report
 """
 
 import argparse
-import bz2
 import json
 import re
 import sys
@@ -39,12 +34,9 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 
-from rdflib import Graph, URIRef
-from rdflib.namespace import DCTERMS, RDF
-
 from ..lib import layout, util
 from ..lib import poi as word
-from .identity import IDENTITIES, NOTIS_SERIES, canonical_court
+from .identity import NOTIS_SERIES, canonical_court
 from .model import Avgorande, Hanvisning, Lagrum, Rubrik, Stycke
 from .parse import RE_NUMPARA, is_heading, to_artifact
 
@@ -194,14 +186,6 @@ def build_avgorande(head, body, case=None, sources=None):
 # Notisfall (frozen intermediate XML)
 
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-# the xmlns declarations most intermediates carry; a handful froze without
-# them (unbound `w:` prefixes), repaired at import time by re-adding these
-_OOXML_NS = (' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"'
-             ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/'
-             '2006/main"'
-             ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/'
-             '2006/relationships"')
-
 COURT_NAMN = {"REGR": "Regeringsrätten", "HFD": "Högsta förvaltningsdomstolen",
               "HDO": "Högsta domstolen"}
 
@@ -364,94 +348,6 @@ def parse_notis(text, courtdir, filename, case=None, sources=None):
         body=[_classify(p) for p in body],
         sources=sources or [],
     )
-
-
-# ---------------------------------------------------------------------------
-# One-time import of the frozen legacy facts (lagen dv import-legacy)
-
-RPUBL = "http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
-_REFERAT_TYPES = (URIRef(RPUBL + "Rattsfallsreferat"),
-                  URIRef(RPUBL + "Rattsfallsnotis"))
-_REFERAT_AV = URIRef(RPUBL + "referatAvDomstolsavgorande")
-_MALNUMMER = URIRef(RPUBL + "malnummer")
-_AVGORANDEDATUM = URIRef(RPUBL + "avgorandedatum")
-_REFERATRUBRIK = URIRef(RPUBL + "referatrubrik")
-
-
-def _distilled_identity(rdf_path):
-    """{court-agnostic identity facts} from one old distilled RDF, or None if
-    the graph holds no referat-typed document."""
-    g = Graph()
-    g.parse(str(rdf_path))
-    doc = next((s for t in _REFERAT_TYPES for s in g.subjects(RDF.type, t)),
-               None)
-    if doc is None:
-        return None
-    verdicts = list(g.objects(doc, _REFERAT_AV))
-    dates = sorted({str(v) for verdict in verdicts
-                    for v in g.objects(verdict, _AVGORANDEDATUM)})
-    rubriks = sorted({" ".join(str(v).split())
-                      for v in g.objects(doc, _REFERATRUBRIK)})
-    return {
-        "referat": sorted({" ".join(str(v).split())
-                           for v in g.objects(doc, DCTERMS.identifier)}),
-        "malnummer": sorted({" ".join(str(v).split()) for verdict in verdicts
-                             for v in g.objects(verdict, _MALNUMMER)}),
-        "avgorandedatum": dates[0] if len(dates) == 1 else None,
-        "referatrubrik": rubriks[0] if len(rubriks) == 1 else None,
-    }
-
-
-def import_identities(distilled, dvdir, log=print):
-    """Distill the frozen oracle's identity facts (referat, målnummer, date
-    per case) from `distilled` (the old checkout's dv/distilled RDF tree)
-    into the `legacy-identities.json` sidecar the identity scan reads."""
-    out = []
-    skipped = 0
-    for rdf_path in sorted(Path(distilled).glob("*/*.rdf")):
-        if "#" in rdf_path.name or not rdf_path.is_file():
-            continue   # editor junk beside the frozen tree
-        ident = _distilled_identity(rdf_path)
-        if ident is None or not ident["referat"]:
-            skipped += 1
-            continue
-        ident["court"] = canonical_court(rdf_path.parent.name)
-        out.append(ident)
-    sidecar = Path(dvdir) / IDENTITIES
-    util.write_atomic(sidecar, json.dumps(out, ensure_ascii=False, indent=1))
-    log("dv import-legacy: %d oracle identities -> %s (%d graphs without a "
-        "referat document)" % (len(out), sidecar, skipped))
-    return out
-
-
-def import_notiser(intermediate, dvdir, log=print):
-    """Copy the frozen notis bodies (`intermediate/{COURT}/YYYY_not_N.xml.bz2`)
-    into the store as plain XML beside the zero-byte Word originals the legacy
-    feed shipped. The store copy is the parseable source of record; a handful
-    frozen with unbound `w:` prefixes are repaired by re-adding the xmlns
-    declarations their siblings carry."""
-    copied = repaired = 0
-    for src in sorted(Path(intermediate).glob("*/*_not_*.xml.bz2")):
-        if src.name.startswith(".") or "#" in src.name or not src.is_file():
-            continue
-        court = src.parent.name
-        assert court in NOTIS_SERIES, (
-            "notis intermediate under unexpected court dir %s" % court)
-        text = bz2.decompress(src.read_bytes()).decode("utf-8")
-        try:
-            ET.fromstring(text)
-        except ET.ParseError:
-            assert text.startswith("<body>"), (
-                "%s: unparseable and not the known bare-<body> form" % src)
-            text = text.replace("<body>", "<body%s>" % _OOXML_NS, 1)
-            ET.fromstring(text)   # must parse after repair
-            repaired += 1
-        dest = Path(dvdir) / court / (src.name[:-len(".xml.bz2")] + ".xml")
-        util.write_atomic(dest, text)
-        copied += 1
-    log("dv import-legacy: %d notis bodies -> %s (%d xmlns-repaired)"
-        % (copied, dvdir, repaired))
-    return copied
 
 
 def legacy_original(case):

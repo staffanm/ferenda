@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 
 from accommodanda.avg import download as avg_download
-from accommodanda.avg import legacy as avg_legacy
 from accommodanda.avg import parse as avg_parse
 from accommodanda.avg.model import Beslut, Block, beslut_uri
 from accommodanda.lib import catalog, compress, facets, layout
@@ -244,77 +243,8 @@ def test_record_roundtrip(tmp_path):
 
 
 # --------------------------------------------------------------------------
-# ARN -- the frozen third organ (imported by avg/legacy.py)
+# ARN -- the frozen third organ (re-housed frozen corpus)
 # --------------------------------------------------------------------------
-
-def _fragment(dnr):
-    return (ARN_FIXTURES / (dnr + ".html")).read_text(encoding="utf-8")
-
-
-def test_arn_parse_fragment():
-    # 1992-3657: metadata cells + a title whose trailing self-citation uses the
-    # 4-digit-year date form (with the corpus's stray internal space "11- 12")
-    meta = avg_legacy.parse_fragment(_fragment("1992-3657"))
-    assert meta["dnr"] == "1992-3657"
-    assert meta["beslutsdatum"] == "1992-11-12"
-    assert meta["avdelning"] == "Resor"
-    assert meta["title"].startswith("Då det på grund av lastbilsstrejk")
-    # the "Avgörande 1992-11- 12; 92-3657." self-citation is stripped from the end
-    assert meta["title"].endswith("outnyttjade delen av resan.")
-    assert "Avgörande" not in meta["title"]
-
-
-def test_arn_title_sanitization_two_digit_year():
-    # 1992-1536's self-citation uses the 2-digit-year form "Avgörande 92-09-21;
-    # 92-1536." -- also stripped, anchored to the end
-    meta = avg_legacy.parse_fragment(_fragment("1992-1536"))
-    assert meta["dnr"] == "1992-1536"
-    assert meta["title"].endswith("skadeståndsbeloppets storlek.")
-    assert "92-1536" not in meta["title"]
-
-
-def test_arn_title_sanitization_colon_form():
-    # 1991-4398's self-citation uses the colon, space-separated form the old
-    # regex missed entirely: "Avgörande: 1991-12-05 91-4398" (no semicolon)
-    meta = avg_legacy.parse_fragment(_fragment("1991-4398"))
-    assert meta["dnr"] == "1991-4398"
-    assert meta["title"] == "Fråga om nyttoavdrag vid hävning av bilköp."
-
-
-@pytest.mark.parametrize("summary,expected", [
-    # the dominant "; " form, 4- and 2-digit years
-    ("Text. Avgörande 1992-11-12; 1992-3657.", "Text."),
-    ("Text. Avgörande 92-09-21; 92-1536.", "Text."),
-    # colon after Avgörande, space-separated dnr
-    ("Text. Avgörande: 1991-12-05 91-4398", "Text."),
-    # comma separator, parenthesised dnr, stray internal date space
-    ("Text. Avgörande 2001-08-28, 2001-0438", "Text."),
-    ("Text. Avgörande: 1998-11-02 (98-1207)", "Text."),
-    ("Text. Avgörande 1992-11- 12; 92-3657.", "Text."),
-    # "Änr" word before the dnr, and a multi-dnr "och" list
-    ("Text. Avgörande 1999-05-05; Änr 1999-0677.", "Text."),
-    ("Text. Avgörande 2001-08-28; 2000-4837 och 2001-0438", "Text."),
-    # reversed order: dnr before the date
-    ("Text. Avgörande 1992-3657; 1992-11-12", "Text."),
-    # a citation embedded mid-summary (the fragment's summary div swallowed the
-    # whole decision body, so the citation is followed by a long tail) is left
-    # intact -- stripping it would delete the entire decision text
-    ("Fråga om x. Avgörande 1995-09-28; 95-2094 " + "Bakgrunden var att " * 12,
-     "Fråga om x. Avgörande 1995-09-28; 95-2094 "
-     + ("Bakgrunden var att " * 12).strip()),
-])
-def test_arn_self_citation_regex(summary, expected):
-    assert avg_legacy.RE_SELF_CITE.sub("", summary).strip() == expected
-
-
-def test_arn_empty_summary():
-    # 1993-3084 carries a blank summary paragraph -> an empty title (the parse
-    # importer pairs this with an empty body to detect the excised stub)
-    meta = avg_legacy.parse_fragment(_fragment("1993-3084"))
-    assert meta["dnr"] == "1993-3084"
-    assert meta["beslutsdatum"] == "1993-11-11"
-    assert meta["title"] == ""
-
 
 def test_document_extension_magic():
     assert document_extension(b"%PDF-1.4") == ".pdf"
@@ -322,16 +252,6 @@ def test_document_extension_magic():
     assert document_extension(b"\xffWPC\x5e\x00\x00\x00") == ".wpd"    # WordPerfect
     assert document_extension(b"{\\rtf1") == ".rtf"
     assert document_extension(b"<!DOCTYPE HTML PUBLIC") is None        # error page
-
-
-def test_arn_pick_body_prefers_valid_doc_over_corrupt_pdf(tmp_path):
-    # the five 2001 cases store a Digiforms HTML error page as index.pdf; the real
-    # decision is the sibling index.doc. Selection sniffs magic bytes, so the
-    # mislabelled .pdf is rejected and the valid .doc chosen.
-    (tmp_path / "index.pdf").write_bytes(b"<!DOCTYPE HTML PUBLIC \"-//W3C//\">")
-    (tmp_path / "index.doc").write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1rest")
-    chosen, ext = avg_legacy.pick_body(tmp_path)
-    assert (chosen.name, ext) == ("index.doc", ".doc")
 
 
 def test_arn_year_facet():
@@ -438,60 +358,9 @@ JO_HEADNOTE = ('<html><body><a href="/JO-beslut/x">Ämbetsberättelse: %s '
                'Beslutsdatum: %s Diarienummer : %s %s</a></body></html>')
 
 
-def _jo_frozen_case(source, year, num, dnr, title, date, citation=None,
-                    headnote_dnr=None, headnote_title=None):
-    d = source / "distilled" / year
-    d.mkdir(parents=True, exist_ok=True)
-    cit = ("<dcterms:bibliographicCitation>%s</dcterms:bibliographicCitation>"
-           % citation if citation else "")
-    (d / (num + ".rdf")).write_text(JO_RDF % dict(
-        dnr=dnr, title=title, date=date, citation=cit), "utf-8")
-    case = source / "downloaded" / year / num
-    case.mkdir(parents=True, exist_ok=True)
-    (case / "index.pdf").write_bytes(b"%PDF-1.4 frozen body")
-    if headnote_dnr:
-        (case / "headnote.html").write_text(JO_HEADNOTE % (
-            citation or "-", date, headnote_dnr, headnote_title or ""), "utf-8")
-
-
-def test_import_jo_maps_citations_and_imports_only_missing(tmp_path):
-    source, root = tmp_path / "frozen", tmp_path / "root"
-    (root / "jo").mkdir(parents=True)
-    # covered by live: a live record carries the dnr -> map only, no import
-    write_atomic(root / "jo" / "jo-1672-1987.json", json.dumps(
-        {"diary_number": "1672-1987", "post_title": "Live"}).encode())
-    _jo_frozen_case(source, "1987", "1672", "1672-1987", "Förföljande",
-                    "1990-06-28", citation="JO 1990/91 s. 70")
-    # garbled identity: the RDF says 2484-2487 but the headnote knows the
-    # true dnr, which a live record covers -> mapped onto it, not imported
-    write_atomic(root / "jo" / "jo-2484-2001.json", json.dumps(
-        {"diary_number": "2484-2001", "post_title": "Live"}).encode())
-    _jo_frozen_case(source, "2487", "2484", "2484-2487", "Initiativet",
-                    "2002-02-28", citation="JO 2002/03 s. 357",
-                    headnote_dnr="2484-2001", headnote_title="Handläggning")
-    # genuinely missing -> imported, named by the headnote identity/title
-    _jo_frozen_case(source, "2000", "2450", "2450-2000", "rdf-titel",
-                    "2002-02-14", headnote_dnr="2450-2000",
-                    headnote_title="Kritik mot en överförmyndare")
-    mapped, imported, skipped = avg_legacy.import_jo(source, root,
-                                                     log=lambda *a: None)
-    assert (mapped, imported, skipped) == (2, 1, 0)
-    report = json.loads(
-        avg_legacy.jo_officialreport_path(root).read_text("utf-8"))
-    assert report["1672-1987"] == "JO 1990/91 s. 70"
-    assert report["2484-2001"] == "JO 2002/03 s. 357"   # the live identity
-    rec = json.loads((root / "jo" / "jo-2450-2000.json").read_text())
-    assert rec["source"] == "jo-legacy"
-    assert rec["diary_number"] == "2450-2000"
-    assert rec["post_title"] == "Kritik mot en överförmyndare"
-    assert (root / "jo" / "jo-2450-2000.pdf").read_bytes().startswith(b"%PDF")
-    # idempotent: a re-run imports nothing new and never touches live records
-    assert avg_legacy.import_jo(source, root, log=lambda *a: None) == (2, 0, 1)
-
-
 def test_parse_jo_grafts_official_report_from_the_map(tmp_path):
     (tmp_path / "jo").mkdir()
-    avg_legacy.jo_officialreport_path(tmp_path).write_text(
+    avg_download.jo_officialreport_path(tmp_path).write_text(
         json.dumps({"1672-1987": "JO 1990/91 s. 70"}), "utf-8")
     avg_parse._officialreport_map.cache_clear()
     record = {"diary_number": "1672-1987", "post_title": "Förföljande",
@@ -561,7 +430,7 @@ def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
     # one parse path, both provenances. Body extraction (poppler) is stubbed so
     # the test stays hermetic; the assertion is on metadata + source_url passthrough.
     monkeypatch.setattr(avg_parse, "pdf_pages", lambda p, patch_key=None: [])
-    pdf = avg_legacy.arn_pdf_path(tmp_path, "arn/2026-00382")
+    pdf = avg_download.arn_pdf_path(tmp_path, "arn/2026-00382")
     pdf.parent.mkdir(parents=True, exist_ok=True)
     pdf.write_bytes(b"%PDF-1.7\n")
     live = {"basefile": "arn/2026-00382", "org": "arn",
@@ -578,7 +447,7 @@ def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
     # a frozen-import record (no source_url) parses through the same path and its
     # artifact carries no Källa link -- the legacy behaviour is unchanged
     frozen = {k: v for k, v in live.items() if k != "source_url"}
-    frozen["source"] = avg_legacy.SOURCE
+    frozen["source"] = "arn-legacy"
     frozen["imported_from"] = "2026/00382/index.pdf"
     art2 = avg_parse.parse_arn(frozen, tmp_path).to_artifact(
         avg_parse._fresh_parser())
@@ -601,11 +470,11 @@ def test_arn_save_live_wins_over_frozen(tmp_path, monkeypatch):
     root, dnr = str(tmp_path), "2020-08372"
     basefile = "arn/" + dnr
     recpath = record_path(root, "arn", basefile)
-    pdfpath = avg_legacy.arn_pdf_path(root, basefile)
+    pdfpath = avg_download.arn_pdf_path(root, basefile)
     write_atomic(recpath, json.dumps(
         {"basefile": basefile, "org": "arn", "diarienummer": dnr,
          "beslutsdatum": "2020-05-05", "avdelning": "Bank",
-         "title": "frozen title", "source": avg_legacy.SOURCE,
+         "title": "frozen title", "source": "arn-legacy",
          "imported_from": "2020/08372/index.doc"}))
     write_atomic(pdfpath, b"%PDF-1.4 frozen converted body")
     item = {"dnrs": [dnr], "beslutsdatum": "2020-05-05", "avdelning": "Bank",
@@ -698,49 +567,6 @@ def test_jk_full_keeps_old_landing_when_refetch_fails(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         avg_download.jk_sync(root, full=True)
     assert landing.read_text() == "OLD GOOD HTML"   # not pre-deleted
-
-
-# --- jk-legacy import (the legacy-corpus sweep) ------------------------------
-
-JK_RDF = """<?xml version="1.0" encoding="utf-8"?>
-<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-         xmlns:dcterms="http://purl.org/dc/terms/"
-         xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#">
-  <rpubl:VagledandeMyndighetsavgorande rdf:about="https://lagen.nu/avg/jk/859-97-21">
-    <dcterms:title xml:lang="sv">Klagomål mot en lantmäterimyndighet</dcterms:title>
-    <rpubl:beslutsdatum>1999-09-15</rpubl:beslutsdatum>
-  </rpubl:VagledandeMyndighetsavgorande>
-</rdf:RDF>"""
-
-
-def _jk_frozen(tmp_path):
-    src = tmp_path / "frozen"
-    for sub in ("entries/1997", "downloaded/1997", "distilled/1997"):
-        (src / sub).mkdir(parents=True)
-    (src / "entries/1997/859-97-21.json").write_text(json.dumps(
-        {"basefile": "859-97-21", "orig_url": "https://www.jk.se/old/859-97-21"}))
-    (src / "downloaded/1997/859-97-21.html").write_text("<html>beslut</html>")
-    (src / "distilled/1997/859-97-21.rdf").write_text(JK_RDF, encoding="utf-8")
-    return src
-
-
-def test_import_jk_imports_only_uncovered_and_is_idempotent(tmp_path):
-    src = _jk_frozen(tmp_path)
-    root = tmp_path / "avg"
-    (root / "jk").mkdir(parents=True)
-    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (1, 0)
-    rec = json.loads(compress.read_text(root / "jk" / "jk-859-97-21.json"))
-    assert rec["source"] == "jk-legacy"
-    assert rec["title"] == "Klagomål mot en lantmäterimyndighet"
-    assert rec["beslutsdatum_raw"] == "1999-09-15"
-    assert compress.exists(root / "jk" / "jk-859-97-21.html")
-    # second run: its own record does not count as live, but should_write skips
-    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (0, 1)
-    # a live record covering the dnr in the dotted display form blocks import
-    compress.write_download(root / "jk" / "jk-859-97-21.json", json.dumps(
-        {"basefile": "jk/859-97-2.1", "org": "jk",
-         "diarienummer_raw": "859-97-2.1"}))
-    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (0, 0)
 
 
 def test_jk_date_accepts_iso_passthrough():

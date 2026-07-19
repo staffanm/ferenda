@@ -37,8 +37,14 @@ from ..lib.lagrum import (
 )
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import record_path
-from .download import jk_canonical, jk_html_path, jo_dnrs
-from .legacy import arn_pdf_path, jo_officialreport_path, jo_pdf_path
+from .download import (
+    arn_pdf_path,
+    jk_canonical,
+    jk_html_path,
+    jo_dnrs,
+    jo_officialreport_path,
+    jo_pdf_path,
+)
 from .model import ORG_NAME, Beslut, Block
 
 AVG_PARSE_TYPES = ALL_PARSE_TYPES

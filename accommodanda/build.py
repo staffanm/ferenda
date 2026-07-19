@@ -53,7 +53,6 @@ from .api import app as api_app
 from .api import edit as api_edit
 from .api import patch as api_patch
 from .avg import download as avg_download
-from .avg import legacy as avg_legacy
 from .avg import parse as avg_parse
 from .coe import download as coe_download
 from .coe import parse as coe_parse
@@ -72,7 +71,6 @@ from .forarbete import fk as fa_fk
 from .forarbete import genomforande as fa_genomforande
 from .forarbete import jamforelse as fa_jamforelse
 from .forarbete import kommentar as fa_kommentar
-from .forarbete import legacy as fa_legacy
 from .forarbete import parse as fa_parse
 from .forarbete import propkb as fa_propkb
 from .forarbete import riksdagen as fa_riksdagen
@@ -81,7 +79,6 @@ from .forarbete import soukb as fa_soukb
 from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
-from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
@@ -1344,42 +1341,13 @@ def dv_parse_run(basefile):
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
 
-DV_LEGACY_DISTILLED = config.LEGACY_ROOT / "dv" / "distilled"
-DV_LEGACY_INTERMEDIATE = config.LEGACY_ROOT / "dv" / "intermediate"
-
-
-def dv_import_legacy(args=()):
-    """One-time migration of the frozen legacy facts the store needs
-    (`lagen dv import-legacy [DISTILLED [INTERMEDIATE]]`): the distilled-RDF
-    identity sidecar (referat/målnummer/date per case -- what lets a frozen
-    file with no API partner mint its published identity) and the notis
-    bodies the legacy feed shipped as zero-byte Word files. Rebuilds the
-    identity index afterwards, like a harvest."""
-    args = list(args)
-    distilled = Path(args[0]) if args else DV_LEGACY_DISTILLED
-    intermediate = Path(args[1]) if len(args) > 1 else DV_LEGACY_INTERMEDIATE
-    if RUN.dry_run:
-        print("dv import-legacy: would write %s/%s from %s, import notis "
-              "bodies from %s, then rebuild %s"
-              % (DV_LEGACY_DOWNLOADED, dv_identity.IDENTITIES, distilled,
-                 intermediate, DV_INDEX))
-        return
-    assert distilled.is_dir() and intermediate.is_dir(), (
-        "frozen legacy trees not found (%s, %s) -- this import reads the old "
-        "checkout's scaffolding" % (distilled, intermediate))
-    dv_legacy.import_notiser(intermediate, DV_LEGACY_DOWNLOADED)
-    dv_legacy.import_identities(distilled, DV_LEGACY_DOWNLOADED)
-    dv_reindex()
-
-
 SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "download": Stage("download", dv_download_run, dv_record),
     "parse": Stage("parse", dv_parse_run, dv_artifact,
                    inputs=lambda bf: [dv_record(bf)] + _patch_input("dv", bf),
                    code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
-   actions={"reindex": dv_reindex, "namedcases": dv_namedcases,
-            "import-legacy": dv_import_legacy})
+   actions={"reindex": dv_reindex, "namedcases": dv_namedcases})
 
 
 # --------------------------------------------------------------------------
@@ -1487,32 +1455,6 @@ def fa_parse_run(basefile):
     write_artifact("forarbete", basefile, art, source_url=record.get("url"))
 
 
-FA_LEGACY_CORPORA = "|".join(fa_legacy.IMPORTERS)
-
-
-def fa_import_legacy(args):
-    """`lagen forarbete import-legacy <corpus> [<path>]` -- one-time import of a
-    frozen förarbete corpus (§7g) into the forarbete record layout, so `parse`
-    then treats each doc like a harvested one (no network). `<corpus>` is one of
-    propriksdagen, souregeringen, dsregeringen, dirregeringen, soukb, dirasp,
-    propkb, proptrips, dirtrips. The records reference the frozen body bytes in
-    place (relative to LEGACY_ROOT), never copying them (the 371 GB soukb tree is
-    pointed at, not duplicated). Path defaults to `LEGACY_ROOT/<corpus>`. `--limit
-    N` caps the run (a test slice); `--force` re-imports the corpus's own records
-    (never overwriting a live or better-format record)."""
-    if not args or args[0] not in fa_legacy.IMPORTERS or len(args) > 2:
-        sys.exit("usage: lagen forarbete import-legacy {%s} [<path>]"
-                 % FA_LEGACY_CORPORA)
-    corpus = args[0]
-    path = args[1] if len(args) == 2 else str(config.LEGACY_ROOT / corpus)
-    if RUN.dry_run:
-        print("forarbete import-legacy: would import %s %s into %s"
-              % (corpus, path, layout.FA_DOWNLOADED))
-        return
-    fa_legacy.import_corpus(corpus, path, layout.FA_DOWNLOADED,
-                            limit=RUN.limit, force=RUN.force)
-
-
 def fa_refetch_bodies(args):
     """`lagen forarbete refetch-bodies [<type> ...]` -- second-chance body
     fetch for body-less live-harvest records (default lr + so, the two types
@@ -1577,8 +1519,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE),
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
-   actions={"import-legacy": fa_import_legacy,
-            "propkb-scans": fa_propkb_scans,
+   actions={"propkb-scans": fa_propkb_scans,
             "soukb-scans": fa_soukb_scans,
             "refetch-bodies": fa_refetch_bodies},
    notes="download flag: --only BASEFILE (fetch one document; needs one "
@@ -1586,14 +1527,12 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
          "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "
          "to one riksmöte; needs that single scope, never advances the "
          "watermark)\n"
-         "import-legacy {%s} [<path>]: one-time import of a frozen förarbete "
-         "corpus (--limit N caps it; --force re-imports)\n"
          "propkb-scans: one-time ~79 GB fetch of the KB proposition page-image "
          "scans for the facsimile view (--limit N caps it; adds no documents, "
          "re-stales no parse)\n"
          "soukb-scans: one-time hundreds-of-GB re-download of the KB SOU bodies "
          "(1922-1999) from sou.kb.se as the source of truth (--limit N caps it; "
-         "the scanned PDF is the body)" % FA_LEGACY_CORPORA)
+         "the scanned PDF is the body)")
 
 
 # --------------------------------------------------------------------------
@@ -2040,44 +1979,11 @@ def foreskrift_parse_run(basefile):
 # `foreskrift_harvest` sweep, so parse depends on no upstream stage -- it runs over
 # whatever the harvest has put on disk (relate/index/dump/generate then act on the
 # artifacts by source name, like every other source).
-def foreskrift_import_legacy(args):
-    """`lagen foreskrift import-legacy [<corpus> ...]` -- one-time import of
-    the frozen lagen.nu myndfs corpora (default: all of them). Each legacy
-    document the live corpus does not carry -- as a base record or as an
-    amendment under one -- is imported as its own record (body PDF + record
-    JSON marked ``"source": "myndfs-legacy"``, the original source URL kept
-    even where it now 404s); live documents are never touched. `--limit N`
-    caps the per-corpus import (a test slice)."""
-    corpora = tuple(args) or foreskrift_legacy.CORPORA
-    unknown = [c for c in corpora if c not in foreskrift_legacy.CORPORA]
-    if unknown:
-        sys.exit("unknown myndfs corpus/corpora: %s" % ", ".join(unknown))
-    if RUN.dry_run:
-        print("foreskrift import-legacy: would import %s from %s into %s"
-              % (", ".join(corpora), config.LEGACY_ROOT,
-                 layout.FORESKRIFT_DOWNLOADED))
-        return
-    bases, amendments = foreskrift_legacy.live_coverage(
-        layout.FORESKRIFT_DOWNLOADED)
-    totals = [0] * 6
-    for corpus in corpora:
-        counts = foreskrift_legacy.import_corpus(
-            config.LEGACY_ROOT / corpus, layout.FORESKRIFT_DOWNLOADED,
-            bases, amendments, limit=RUN.limit)
-        totals = [a + b for a, b in zip(totals, counts, strict=True)]
-        print("  %-8s %4d seen, %4d imported, %4d live-covered, "
-              "%3d bodyless, %3d non-pdf, %2d unrecognized"
-              % (corpus, *counts))
-    print("foreskrift import-legacy: %d seen, %d imported, %d live-covered, "
-          "%d bodyless, %d non-pdf, %d unrecognized" % tuple(totals))
-
-
 SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
     "parse": Stage("parse", foreskrift_parse_run, foreskrift_artifact,
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
-    actions={"import-legacy": foreskrift_import_legacy},
     # display label only, nothing is ever fetched from a central index: the
     # harvest engine drives each agency's own site from foreskrift/agencies.py
     origin="the %d agency sites in foreskrift/agencies.py"
@@ -2111,16 +2017,16 @@ def avg_inputs(basefile):
     landing page) -- re-downloading/re-importing either re-stales the parse."""
     paths = [avg_record(basefile)]
     if basefile.startswith("jo/"):
-        pdf = avg_legacy.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
+        pdf = avg_download.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
         if pdf.exists():
             paths.append(pdf)
-        # the frozen corpus's ämbetsberättelse map (import-legacy jo): a
-        # rewritten map re-stales every JO parse that could graft from it
-        report = avg_legacy.jo_officialreport_path(layout.AVG_DOWNLOADED)
+        # the frozen corpus's ämbetsberättelse map: a rewritten map
+        # re-stales every JO parse that could graft from it
+        report = avg_download.jo_officialreport_path(layout.AVG_DOWNLOADED)
         if report.exists():
             paths.append(report)
     elif basefile.startswith("arn/"):
-        paths.append(avg_legacy.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
+        paths.append(avg_download.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
     else:
         paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
     return paths + _patch_input("avg", basefile)
@@ -2154,36 +2060,9 @@ def avg_harvest(scopes):
         print("avg %s: %d seen, %d new" % (org, seen, new))
 
 
-def avg_import_legacy(args):
-    """`lagen avg import-legacy {arn,jo,jk} <frozen-tree>` -- one-time imports
-    of the frozen corpora into the avg record layout, so `parse` then treats
-    each decision like a harvested one (no network). **arn**: a decision file +
-    fragment.html metadata per case; doc/wpd/rtf bodies converted to PDF via
-    LibreOffice. **jo**: the ämbetsberättelse map (dnr -> "JO 1990/91 s. 70",
-    grafted onto live records at parse) plus jo-legacy records for the few
-    cases live jo.se does not carry. **jk**: jk-legacy records + the frozen
-    jk.se landing pages for the decisions live jk.se no longer carries (mostly
-    1997-1999). `--force` re-imports records already on disk; `--limit N` caps
-    the ARN run (a test slice)."""
-    if len(args) != 2 or args[0] not in ("arn", "jo", "jk"):
-        sys.exit("usage: lagen avg import-legacy {arn,jo,jk} <frozen-tree>")
-    if RUN.dry_run:
-        print("avg import-legacy: would import %s corpus %s into %s"
-              % (args[0], args[1], layout.AVG_DOWNLOADED))
-        return
-    if args[0] == "arn":
-        avg_legacy.import_arn(args[1], layout.AVG_DOWNLOADED, limit=RUN.limit,
-                              force=RUN.force)
-    elif args[0] == "jo":
-        avg_legacy.import_jo(args[1], layout.AVG_DOWNLOADED, force=RUN.force)
-    else:
-        avg_legacy.import_jk(args[1], layout.AVG_DOWNLOADED, force=RUN.force)
-
-
 # No per-document download stage (the foreskrift rule): decisions arrive only
-# through the bulk `avg_harvest` sweep (or, for the frozen ARN corpus, the
-# `import-legacy` action), so parse runs over whatever is on disk;
-# relate/index/dump/generate act on the artifacts by source name.
+# through the bulk `avg_harvest` sweep, so parse runs over whatever is on
+# disk; relate/index/dump/generate act on the artifacts by source name.
 SOURCES["avg"] = Source("avg", avg_list, {
     "parse": Stage("parse", avg_parse_run, avg_artifact,
                    inputs=avg_inputs, code=AVG_CODE),
@@ -2191,14 +2070,11 @@ SOURCES["avg"] = Source("avg", avg_list, {
     harvest=avg_harvest,
     origin="https://www.jo.se/",
     scopes=frozenset({"jo", "jk", "arn"}),
-    actions={"import-legacy": avg_import_legacy},
     notes="download flag: --only org/dnr (fetch one; needs its organ scope)\n"
           "scopes are the organs: jo (Riksdagens ombudsmän), jk "
           "(Justitiekanslern), arn (Allmänna reklamationsnämnden); empty = all\n"
           "the arn scope downloads the live vägledande-beslut listing (2017-); it "
-          "overwrites any frozen import of the same dnr (live wins)\n"
-          "import-legacy arn <path>: one-time import of the frozen ARN corpus "
-          "(1991-2022; --limit N caps it; --force re-imports)")
+          "overwrites any frozen import of the same dnr (live wins)")
 
 
 # --------------------------------------------------------------------------

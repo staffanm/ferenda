@@ -21,7 +21,6 @@ import subprocess
 
 from bs4 import BeautifulSoup
 
-from .. import config
 from ..lib import compress, layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
@@ -267,45 +266,12 @@ def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
     return _paged_body(legacy_formats.scanned_pdf_pages(pdf_path)), True
 
 
-def _legacy_body(record):
-    """The body of a frozen-import record (§7g), whose `legacy_files` reference
-    the frozen bytes in place under LEGACY_ROOT (never copied).
-
-    A re-OCR sidecar wins first: a modern-OCR'd PDF dropped at the record's
-    `fa_ocr_pdf` path (a later `ocrmypdf` pass over the weaker embedded scan
-    layers, run in prod) upgrades this document's parse without touching the
-    import -- it is parsed instead of the legacy scan. Otherwise the first legacy
-    PDF -> the shared PDF path (a pdf is listed only when the import's text-layer
-    probe passed); an ABBYY `.xml` -> the page-anchored abbyy route; else an html
-    body dispatched on the record's `body_format` -> paragraphs classified with no
-    page (a page-less body carries `page=None`; `#sid{N}` anchors just don't
-    apply). Else no body."""
-    ocr = layout.fa_ocr_pdf(record["type"], record["basefile"])
-    if ocr.exists():
-        return _legacy_pdf_body(ocr, record["identifier"])
-    files = [config.LEGACY_ROOT / f for f in record["legacy_files"]]
-    pdfs = [f for f in files if f.suffix.lower() == ".pdf"]
-    if pdfs:
-        return _legacy_pdf_body(pdfs[0], record["identifier"])
-    xmls = [f for f in files if f.suffix.lower() == ".xml"]
-    if xmls:
-        return _paged_body(legacy_formats.abbyy_pages(xmls[0])), True
-    htmls = [f for f in files if f.suffix.lower() == ".html"]
-    if htmls:
-        return (classify(LEGACY_HTML_PARAS[record["body_format"]](
-            htmls[0].read_text("utf-8")), None),
-            record["body_format"] in OCR_HTML_FORMATS)
-    words = [f for f in files if f.suffix.lower() in (".doc", ".docx")]
-    if words:
-        return classify(legacy_formats.word_paras(words[0]), None), False
-    return [], False
-
-
 def _harvested_body(record, root):
     """The body of a harvested-form record whose body file(s) live in the raw
     `downloaded/<type>/` tree (`files`), read through `compress`.
 
-    The live-harvest twin of `_legacy_body` (§7g re-housed): a re-OCR sidecar
+    Every §7g frozen corpus is re-housed into this tree, so this is the one
+    body route: a re-OCR sidecar
     (`fa_ocr_pdf`) wins first, else the first PDF -> the shared PDF path (the
     born-digital-or-scan `_legacy_pdf_body`, so a re-housed propkb/soukb scan
     still reaches the pdftotext OCR fallback), an ABBYY `.xml` -> the page-
@@ -419,16 +385,14 @@ def join_dangling_rubriks(body):
 
 
 def parse_record(record, root):
-    """A downloaded record (the `<slug>.json`) -> a Forarbete. A live-harvest
-    record uses the first PDF the downloader stored under `root/<type>/` (for
-    rskr: the stored HTML body); a frozen
-    import record (`legacy_files`) resolves its body under LEGACY_ROOT. A record
-    with no body yields metadata only (still a real catalog document at its URI)."""
+    """A downloaded record (the `<slug>.json`) -> a Forarbete. The body file(s)
+    live beside the record in `root/<type>/` -- the downloader's, or re-housed
+    frozen-corpus bytes (a `source`-carrying record; §7g) read identically. For
+    rskr the stored HTML is the body. A record with no body yields metadata
+    only (still a real catalog document at its URI)."""
     typ, basefile = record["type"], record["basefile"]
     ocr = False
-    if "legacy_files" in record:            # unmigrated frozen import (sou/dir/ds)
-        body, ocr = _legacy_body(record)
-    elif typ == "rskr":
+    if typ == "rskr":
         body = rskr_body(compress.read_text(
             layout.fa_dir(root, typ, basefile) / record["files"][0]))
     else:

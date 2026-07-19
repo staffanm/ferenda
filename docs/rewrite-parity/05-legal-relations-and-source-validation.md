@@ -78,8 +78,9 @@ snapshot used for adjudication.
 diarienummer, 2-digit years normalized, garbled identities adjudicated by the
 frozen headnote's own "Diarienummer :" value): of 3,291 frozen cases, five
 are genuinely absent from live jo.se — imported as `jo-legacy` records via
-the new `avg/legacy.py:import_jo` (`lagen avg import-legacy jo …`), with
-headnote-curated titles and the frozen PDFs. The same import writes the
+`avg/legacy.py:import_jo` (`lagen avg import-legacy jo …`), a one-time
+importer since deleted (§7g teardown, 2026-07-19), with headnote-curated
+titles and the frozen PDFs. The same import writes the
 ämbetsberättelse map (1,619 citations, 1,774 dnr keys) from the distilled
 RDFs; `parse_jo` grafts `official_report` onto live records too (modeled,
 serialized as `metadata.officialReport`, rendered, and folded into the
