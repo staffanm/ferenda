@@ -398,6 +398,31 @@ def bemyndigande_links(art):
             for uri in art.get("metadata", {}).get("bemyndigande", [])]
 
 
+# metadata relation-list keys -> the stable typed predicate each publishes.
+# andradAv is the register inverse (the listed ändringsförfattning X ändrar
+# this document); genomforDirektiv is the same predicate the förarbete
+# implements-edges and the SFS genomförande layer use.
+_RELATION_PREDICATES = (("andrar", "rpubl:andrar"),
+                        ("upphaver", "rpubl:upphaver"),
+                        ("genomfor", "rpubl:genomforDirektiv"),
+                        ("andradAv", "rinfoex:andradAv"))
+
+
+def relation_links(art):
+    """The typed relation edges a document's metadata carries as plain uri
+    lists: what it amends (`andrar`), replaces/repeals (`upphaver`), transposes
+    (`genomfor`) and is amended by (`andradAv`, the amendment register's
+    inverse). These are metadata, not body text, so the inline-link walk misses
+    them. Field-driven: any source whose metadata stores uri lists under these
+    keys contributes (today the föreskrift vertical). Unanchored -- the
+    relation belongs to the document; `text` carries the document's own id so
+    the target's mirror display can name it."""
+    label = art.get("identifier") or local(art["uri"])
+    return [(None, {"uri": uri, "predicate": pred, "text": label})
+            for key, pred in _RELATION_PREDICATES
+            for uri in art.get("metadata", {}).get(key) or []]
+
+
 def curated_links(art):
     """The typed relation edges a court decision's curated metadata carries:
     the editor's Lagrum (`rpubl:lagrum`), Förarbeten (`rpubl:forarbete`),
@@ -656,6 +681,7 @@ def _index_document(con, art, path, source):
             for anchor, run in (artifact_links(art) + subject_links(art)
                                 + definition_links(art)
                                 + bemyndigande_links(art)
+                                + relation_links(art)
                                 + curated_links(art))]
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
     # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
@@ -1018,11 +1044,14 @@ def correspondence_for_new(con, new_uri):
 # internal "enligt 3 §" cross-refs -- 41% of all edges) are excluded: they are
 # the document's own outbound links, navigable in place, not external inbound.
 _NOT_SELF = " AND l.from_uri <> l.to_root"
-# bemyndigande is a typed relation with its own statute-paragraf margin
-# ("Föreskrifter meddelade med stöd av …"), so it is kept out of the generic
-# "Hänvisat till av" citation panel (and its count) -- like genomför, which is
-# stored as an outbound edge and so never lands in the target's inbound at all.
-_NOT_BEMYNDIGANDE = " AND l.predicate <> 'rpubl:bemyndigande'"
+# typed relations with their own dedicated displays are kept out of the
+# generic "Hänvisat till av" citation panel (and its count): bemyndigande has
+# the statute-paragraf margin, upphäver the target's "Upphävs eller ersätts
+# av" group, andrar/andradAv the amendment register. genomforDirektiv stays
+# in: the directive page's inbound panel is exactly where its transposing
+# documents (förarbete implements-edges, föreskrifter) belong.
+_NOT_TYPED = (" AND l.predicate NOT IN ('rpubl:bemyndigande', 'rpubl:andrar',"
+              " 'rpubl:upphaver', 'rinfoex:andradAv')")
 
 
 def inbound(con, uri, limit=None):
@@ -1035,7 +1064,7 @@ def inbound(con, uri, limit=None):
     # document with a page of its own, so it never appears as an inbound link
     sql = ("SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
-           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
+           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_TYPED
            + " AND d.source <> 'kommentar' "
            "GROUP BY l.from_uri, l.from_anchor "
            "ORDER BY d.source, d.label, l.from_anchor")
@@ -1060,7 +1089,7 @@ def inbound_collapsed(con, uri, exclude_from=()):
     sql = ("SELECT l.from_uri, d.label, d.title, d.source, d.kind, d.date, "
            "GROUP_CONCAT(DISTINCT l.from_anchor) "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
-           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_BEMYNDIGANDE
+           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_TYPED
            + " AND d.source <> 'kommentar'" + excl
            + " GROUP BY l.from_uri "
            "ORDER BY d.source, d.date, d.label")
@@ -1077,6 +1106,28 @@ def bemyndigande_inbound(con, uri):
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.to_uri = ? AND l.predicate = 'rpubl:bemyndigande' "
         "ORDER BY d.label", (uri,)).fetchall()
+
+
+def upphaver_inbound(con, uri):
+    """The regulations whose own text says they replace or repeal `uri` -- the
+    inbound side of the rpubl:upphaver edge: (from_uri, label, title), one per
+    replacing regulation. Drives the target page's 'Upphävs eller ersätts av'
+    group (the wording matches the evidence: the extraction reads the
+    'ersätter/upphäver …' clause, which conflates the two)."""
+    return con.execute(
+        "SELECT DISTINCT l.from_uri, d.label, d.title "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_uri = ? AND l.predicate = 'rpubl:upphaver' "
+        "ORDER BY d.label", (uri,)).fetchall()
+
+
+def upphaver_targets(con):
+    """Every uri some other document's text repeals or replaces (the target
+    side of all rpubl:upphaver edges) -- what the föreskrift browse listing
+    subdues as no longer in force. The evidence is the replacing documents'
+    own repeal clauses; there is no authoritative status field."""
+    return {r[0] for r in con.execute(
+        "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
 
 
 def document_inbound_count(con, root_uri):

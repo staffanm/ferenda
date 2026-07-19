@@ -433,11 +433,14 @@ def browse_label(row):
     return row.display or row.label or row.local
 
 
-def browse_doc(source, row):
+def browse_doc(source, row, repealed=frozenset()):
     """A leaf-bucket document entry for the browse model. Every source carries
     `uri`/`url`/`display`; a statute additionally carries the split title
     (`pre` subdued + `key` emphasised), whether it is primary law (`subdued`
-    when not), and its `year` -- what the listing renders and filters on."""
+    when not), and its `year` -- what the listing renders and filters on. A
+    föreskrift some other regulation's text repeals (`repealed`, the
+    rpubl:upphaver targets) stays listed -- point-in-time law determination
+    needs it findable -- but subdued, so it never reads as in force."""
     doc = {"uri": row.uri, "url": layout.page_url(row.uri),
            "display": browse_label(row)}
     if source == "sfs":
@@ -445,6 +448,8 @@ def browse_doc(source, row):
         doc.update(pre=pre, key=key or doc["display"],
                    subdued=not sfs_is_statute(row.title or "", row.local),
                    year=row.local.split(":", 1)[0])
+    elif row.uri in repealed:
+        doc["subdued"] = True
     return doc
 
 
@@ -545,6 +550,8 @@ def browse_view(con, source):
     no other access to the data store)."""
     grouped = group(con, source)
     view = tree(con, source, grouped)
+    repealed = (catalog.upphaver_targets(con) if source == "foreskrift"
+                else frozenset())
 
     def attach(nodes, prefix):
         for n in nodes:
@@ -552,7 +559,7 @@ def browse_view(con, source):
             if n["children"] is not None:
                 attach(n["children"], keypath)
             else:
-                n["documents"] = [browse_doc(source, r)
+                n["documents"] = [browse_doc(source, r, repealed)
                                   for r in grouped.get(keypath, [])]
 
     attach(view["buckets"], ())

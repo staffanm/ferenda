@@ -639,8 +639,13 @@ def url_to_relpath(path):
 
 # a föreskrift loc is "<fs>/<år>:<nr>"; every författningssamling code ends in FS
 # (fffs, nfs, kifs, …), which sets it apart from an SFS loc ("2013:635")
-_FORESKRIFT_LOC = re.compile(r"^[a-zåäö]+fs/\d{4}:\d+$")
+# the författningssamling slug alphabet: every registered series slug ends in
+# -fs except BFNAR (Bokföringsnämndens allmänna råd) and RA-MS ("rams") --
+# test_layout_grammar_covers_every_registered_fs keeps this in lock-step with
+# foreskrift.agencies.REGISTRY (layout cannot import the vertical itself)
+_FS_SLUG = r"(?:[a-zåäö]+fs|bfnar|rams)"
+_FORESKRIFT_LOC = re.compile(r"^%s/\d{4}:\d+$" % _FS_SLUG)
 # a föreskrift *page* address: the document itself or its /grund view (the
 # as-enacted base text beside a presented consolidation). Distinct from
 # _FORESKRIFT_LOC, which stays the strict basefile/identity grammar.
-_FORESKRIFT_PAGE = re.compile(r"^[a-zåäö]+fs/\d{4}:\d+(/grund)?$")
+_FORESKRIFT_PAGE = re.compile(r"^%s/\d{4}:\d+(/grund)?$" % _FS_SLUG)

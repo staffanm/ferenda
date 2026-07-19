@@ -12,11 +12,27 @@ require code, fixtures or an explicit modelling decision.
 
 ## Föreskrift relations
 
-The föreskrift model has fields for `bemyndigande`, `upphaver`, `andrar` and
-`genomfor`. The parser extracts some of these, but `andrar` remains empty and
-the catalog adds only `bemyndigande` as a dedicated metadata edge.
+**Resolved 2026-07-19.** `andrar` is extracted from the ändringsförfattning's
+own harvest title (designated refs, chained titles, and the bare
+"föreskrifter (2007:12)" form that implies the record's own series — an SFS
+parenthesis never mints a target); the konsoliderad masthead's amendment list
+folds into the register and the register's minted uris project as
+`metadata.andradAv`. `catalog.relation_links` publishes `rpubl:andrar`,
+`rpubl:upphaver`, `rpubl:genomforDirektiv` and `rinfoex:andradAv` as typed
+edges (field-driven on metadata keys, excluded from the generic inbound
+panel); render shows Ändrar/Upphäver outbound and "Upphävs eller ersätts av"
+on the target via `catalog.upphaver_inbound`, and the directive page's
+inbound panel now lists transposing föreskrifter. Outbound and inbound
+mirrors are covered by `test_site.py` and `test_foreskrift_parse.py`; two
+identity bugs found en route (ÅFS/RÅFS minting under the wrong samling, the
+`bfnar`/`rams` slugs falling out of layout's föreskrift grammar) are fixed
+and regression-locked. The corpus-wide re-parse/relate/generate folds into
+[finding 6](06-corpus-acceptance-and-verification.md).
 
-Required closure:
+The original finding: the föreskrift model has fields for `bemyndigande`,
+`upphaver`, `andrar` and `genomfor`. The parser extracts some of these, but
+`andrar` remains empty and the catalog adds only `bemyndigande` as a
+dedicated metadata edge. Required closure:
 
 - extract `ändrar` from the amendment/consolidation evidence;
 - publish `ändrar`, `upphäver` and `genomför` with stable typed predicates;

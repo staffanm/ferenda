@@ -3,13 +3,18 @@ classification, the kapitel/paragraf nesting + SFS anchors, and the best-effort
 masthead metadata extraction. The live PDF extraction (``lib.pdftext``) is
 exercised against the downloaded corpus during a batch parse, not here."""
 
+import shutil
+from pathlib import Path
+
 from accommodanda.lib.pdftext import Para
+from accommodanda.lib.text import node_text
 from accommodanda.foreskrift import structure
 from accommodanda.foreskrift import parse as fp
 from accommodanda.foreskrift.parse import (classify, extract_metadata, _iso,
                                            _body_start, _dedupe_bemyndigande,
                                            konsoliderad_tom, _fresh_parser,
-                                           amendment_uri, parse_record)
+                                           amendment_uri, andrar_target,
+                                           masthead_amendments, parse_record)
 
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
@@ -158,6 +163,20 @@ def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
     assert meta["genomfor"] == ["https://lagen.nu/ext/celex/32011L0061"]
 
 
+def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
+    # PMFS 2022:1's shape: the repeal sits in the ikraftträdande provisions as
+    # a passive "Genom föreskrifterna upphävs … (PMFS 2019:2)". An earlier
+    # bare provision repeal ("5 § upphävs.") names no regulation and must not
+    # stop the scan at the first match.
+    text = ("Säkerhetspolisens föreskrifter om säkerhetsskydd; "
+            "5 § upphävs. "
+            "1. Dessa föreskrifter träder i kraft den 1 mars 2022. "
+            "2. Genom föreskrifterna upphävs Säkerhetspolisens föreskrifter "
+            "om säkerhetsskydd (PMFS 2019:2).")
+    meta = extract_metadata(text, _fresh_parser())
+    assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
+
+
 # --- amendments: minted uris + preserved source urls (review C3) -------------
 
 def test_amendment_uri_minted_from_the_identifiers_own_fs_code():
@@ -165,6 +184,10 @@ def test_amendment_uri_minted_from_the_identifiers_own_fs_code():
     # amendments) mint under the amendment's own samling
     assert amendment_uri("ELSÄK-FS 2026:27") == "https://lagen.nu/elsakfs/2026:27"
     assert amendment_uri("PMFS 2020:5") == "https://lagen.nu/pmfs/2020:5"
+    # the registry overrides the naive åäö transliteration: ÅFS is aafs (afs is
+    # Arbetsmiljöverkets samling), RÅFS is raafs (rafs is Riksarkivets RA-FS)
+    assert amendment_uri("ÅFS 2006:3") == "https://lagen.nu/aafs/2006:3"
+    assert amendment_uri("RÅFS 1998:1") == "https://lagen.nu/raafs/1998:1"
     assert amendment_uri("FFFS 2014:07") == "https://lagen.nu/fffs/2014:7"
     assert amendment_uri(None) is None          # unreadable link text
     assert amendment_uri("Ändringsregister") is None
@@ -187,15 +210,31 @@ def test_parse_record_mints_amendment_uris_and_keeps_source_urls(tmp_path):
     assert unreadable.url == "https://ex/b.pdf"
 
 
+def test_parse_record_drops_self_upphaver(tmp_path, monkeypatch):
+    # LIVSFS 2022:4's upphäver clause restates its own designation; a
+    # regulation never replaces itself
+    monkeypatch.setattr(fp, "parse_pdf", lambda *a, **kw: ([], {
+        "upphaver": ["https://lagen.nu/livsfs/2022:4",
+                     "https://lagen.nu/livsfs/2005:20"],
+        "bemyndigande": [], "genomfor": [], "andrar": [],
+        "beslutsdatum": None, "utkomFranTryck": None,
+        "ikrafttradandedatum": None, "publisher": None}))
+    record = {"fs": "livsfs", "basefile": "livsfs/2022:4",
+              "identifier": "LIVSFS 2022:4",
+              "files": {"regulation": {"name": "r.pdf"}}}
+    reg = parse_record(record, tmp_path)
+    assert reg.upphaver == ["https://lagen.nu/livsfs/2005:20"]
+
+
 def test_parse_record_dedupes_twice_listed_consolidation(tmp_path, monkeypatch):
     # fffs/2015:12's landing page lists the same konsoliderad PDF twice; two
     # identical Consolidations would masquerade as two historical versions.
     # A *distinct* second consolidation (a genuinely archived older one, as on
     # bfs/2007:5) must survive. The agency url rides into the model.
-    bodies = {"a.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13"),
-              "b.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13"),
+    bodies = {"a.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13", []),
+              "b.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13", []),
               "c.pdf": ([{"id": "P1", "old": True}],
-                        "https://lagen.nu/fffs/2014:2")}
+                        "https://lagen.nu/fffs/2014:2", [])}
     monkeypatch.setattr(fp, "parse_consolidation",
                         lambda path, *a: bodies[path.name])
     record = {"fs": "fffs", "basefile": "fffs/2015:12",
@@ -208,3 +247,107 @@ def test_parse_record_dedupes_twice_listed_consolidation(tmp_path, monkeypatch):
     assert len(reg.consolidations) == 2
     assert reg.consolidations[0].url == "https://ex/k.pdf"
     assert reg.consolidations[1].konsolideradTom == "https://lagen.nu/fffs/2014:2"
+
+
+def test_parse_record_folds_masthead_amendments_into_the_register(tmp_path,
+                                                                  monkeypatch):
+    # the konsoliderad masthead names the amendments folded in; ones the
+    # landing page didn't list join the register (with minted uris), ones it
+    # did stay single entries (the landing url wins)
+    monkeypatch.setattr(fp, "parse_consolidation", lambda path, *a: (
+        [{"id": "P1"}], "https://lagen.nu/fffs/2017:7",
+        [("FFFS", "2014", "29"), ("FFFS", "2017", "7")]))
+    record = {"fs": "fffs", "basefile": "fffs/2013:10",
+              "identifier": "FFFS 2013:10",
+              "files": {"consolidation": [{"name": "k.pdf", "url": "https://ex/k"}],
+                        "amendment": [
+                            {"identifier": "FFFS 2014:29", "url": "https://ex/a"}]}}
+    reg = parse_record(record, tmp_path)
+    assert [(a.identifier, a.uri, a.url) for a in reg.amendments] == [
+        ("FFFS 2014:29", "https://lagen.nu/fffs/2014:29", "https://ex/a"),
+        ("FFFS 2017:7", "https://lagen.nu/fffs/2017:7", None)]
+
+
+# --- andrar: the amendment's own title names its target ----------------------
+
+def test_andrar_target_reads_the_first_ref_after_the_andring_phrase():
+    uri = "https://lagen.nu/aafs/2006:11"
+    assert andrar_target("Åklagarmyndighetens föreskrifter om ändring i "
+                         "Åklagarmyndighetens föreskrifter (ÅFS 2005:5) om "
+                         "åklagarkamrarnas lokalisering", "aafs", uri) \
+        == "https://lagen.nu/aafs/2005:5"
+    # chained: "(ÅFS 2006:3) om ändring i (ÅFS 2005:5)" amends 2006:3 directly
+    assert andrar_target("föreskrifter om ändring i föreskrifter (ÅFS 2006:3) "
+                         "om ändring i föreskrifter (ÅFS 2005:5)", "aafs", uri) \
+        == "https://lagen.nu/aafs/2006:3"
+    # a mixed-prefix graph mints under the target's own samling
+    assert andrar_target("ändring i föreskrifterna (KAMFS 2012:3, TRAFAFS "
+                         "2012:3) om uppgifter", "kamfs", uri) \
+        == "https://lagen.nu/kamfs/2012:3"
+    assert andrar_target("föreskrifter om åklagarväsendet", "aafs", uri) is None
+
+
+def test_andrar_target_own_series_implied_and_self_excluded():
+    # "föreskrifter (2007:12)" drops the designation -- the possessive title
+    # implies the record's own fs; an SFS parenthesis must never mint a target
+    uri = "https://lagen.nu/aafs/2010:2"
+    assert andrar_target("Åklagarmyndighetens föreskrifter om ändring i "
+                         "Åklagarmyndighetens föreskrifter (2007:12) om "
+                         "internationellt samarbete", "aafs", uri) \
+        == "https://lagen.nu/aafs/2007:12"
+    assert andrar_target("föreskrifter om ändring som avses i förordningen "
+                         "(2001:512) om deponering", "aafs", uri) is None
+    # a title restating the record's own designation is never the target
+    assert andrar_target("Ändring av FFS 2017:9", "ffs",
+                         "https://lagen.nu/ffs/2017:9") is None
+
+
+# --- konsoliderad HTML (the frozen SOSFS/HSLF-FS konsolidering corpus) -------
+
+KONSOLIDERING_HTML = Path(__file__).parent / "files/foreskrift/konsolidering.html"
+
+
+def test_parse_consolidation_html_builds_statute_tree_and_cutoff():
+    struct, tom, refs = fp.parse_consolidation_html(KONSOLIDERING_HTML,
+                                                    _fresh_parser())
+    # the cutoff is the numerically latest ref on the "Ändrad:" line, minted
+    # under its own samling (HSLF-FS beats SOSFS 2013:6: the series transition)
+    assert tom == "https://lagen.nu/hslffs/2017:27"
+    assert refs == [("SOSFS", "2013", "6"), ("HSLF-FS", "2017", "27")]
+    # h2 -> kapitel, h3 -> rubrik, p with "N §" -> paragraf; the h1 page title
+    # and the three preamble lines never reach the body
+    assert [n["id"] for n in struct] == ["K1", "K2"]
+    assert struct[0]["children"][1]["id"] == "K1P1"
+    full = " ".join(node_text(n) for n in struct)
+    assert "informationssystem" in full
+    assert "första punkten i en lista" in full          # li rows stay stycken
+    assert "Observera att" not in full
+    assert "Senaste version av" not in full
+    assert "Meny som aldrig" not in full                 # chrome outside <main>
+
+
+def test_parse_record_routes_html_consolidation(tmp_path):
+    (tmp_path / "sosfs").mkdir()
+    shutil.copyfile(KONSOLIDERING_HTML,
+                    tmp_path / "sosfs" / "sosfs-2008-1-consolidation-0.html")
+    record = {"fs": "sosfs", "basefile": "sosfs/2008:1",
+              "identifier": "SOSFS 2008:1",
+              "files": {"consolidation": [
+                  {"name": "sosfs-2008-1-consolidation-0.html",
+                   "url": "https://sos.example/2008-1"}]}}
+    reg = parse_record(record, tmp_path)
+    [cons] = reg.consolidations
+    assert cons.konsolideradTom == "https://lagen.nu/hslffs/2017:27"
+    assert cons.url == "https://sos.example/2008-1"
+    assert cons.structure                                 # parsed body
+    # the Ändrad-line refs join the register, each under its own samling
+    assert [(a.identifier, a.uri) for a in reg.amendments] == [
+        ("SOSFS 2013:6", "https://lagen.nu/sosfs/2013:6"),
+        ("HSLF-FS 2017:27", "https://lagen.nu/hslffs/2017:27")]
+
+
+def test_masthead_amendments_lists_this_fs_sorted_base_excluded():
+    masthead = ("FFFS 2013:10 Konsoliderad Ändringar: FFFS 2017:7, "
+                "FFFS 2014:29, NFS 2015:1, FFFS 2013:10")
+    assert masthead_amendments(masthead, "fffs", "2013", "10") == [
+        ("FFFS", "2014", "29"), ("FFFS", "2017", "7")]

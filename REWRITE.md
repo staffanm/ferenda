@@ -1893,6 +1893,32 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `FORESKRIFT_DOWNLOADED/<fs>/`, records repointed from `{"legacy": relpath}` to
   `{"name": ...}`), proven byte-identical; `foreskrift/legacy.py` and the
   `import-legacy` verb were then deleted.
+- ✅ **Full legacy-corpus sweep (2026-07-19)** — `foreskrift/legacy.py` reborn for
+  all ~30 frozen lagen.nu myndfs corpora: every legacy document the live corpus
+  does not carry (as a base record or an amendment under one) imported as its own
+  record — body PDF copied, title from the frozen distilled RDF, original source
+  URL kept though it may now 404, `"source": "myndfs-legacy"` marking provenance
+  for presentation disclaimers; live always wins, re-runs are idempotent.
+  **2,177 imported** (4,402 legacy docs seen, 4,249 live-covered, 50 bodyless +
+  15 non-PDF reported and left frozen): the agency-purged repealed regulations
+  (248 pre-reform AFS, PMFS 2019:2, 197 HSLF-FS), whole predecessor series
+  (RPSFS, LSFS, LMVFS, KBMFS, RTVFS), and the frozen SJVFS (900) / SVKFS /
+  LIFS / LVFS samlingar. Entries the old pipeline downloaded but never parsed
+  (`"basefile": null`) recover their id from the entry path. `lagen foreskrift
+  import-legacy`, tested in `test_foreskrift_legacy.py`.
+- ✅ **Repealed-föreskrift presentation (2026-07-19)** — a regulation some
+  other regulation's text repeals must never read as in force, even though
+  its own artifact carries no repeal field (the evidence is the *replacing*
+  document's clause, an inbound rpubl:upphaver edge). Three surfaces, all
+  catalog-derived at generate time: the top-of-page "Upphävd eller ersatt"
+  banner naming the replacer(s); the samling browse listing keeps the
+  repealed regulation findable (point-in-time law) but subdued
+  (`catalog.upphaver_targets` → `facets.browse_doc`); and the replacing
+  regulation's metadata header carries a linked "Upphäver" row. The
+  extraction also learned the transitional-provision passive ("Genom
+  föreskrifterna upphävs … (PMFS 2019:2)") scanning *all* clauses, not the
+  first. Acceptance pair PMFS 2019:2 (myndfs-legacy import) / PMFS 2022:1
+  verified end-to-end; locked in `test_site.py`/`test_foreskrift_parse.py`.
 - ✅ **MTFS live through the same detached Chrome transport** — its Sitevision page
   maps authoritative `MTFS YYYY:N` headings directly to PDFs. All 16 regulations
   (2009:1–2023:3) downloaded end-to-end; five older filenames omit “MTFS”, so the
@@ -1962,9 +1988,24 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   the SFS lydelse artifacts. The 8 unparseable konsoliderad PDFs (image-only
   scans, cover-sheet stubs) fall back to the base text with the agency's own
   PDF linked.
-- ⬜ **Remaining:** publish the already-extracted `upphäver` and `genomför`
-  metadata as typed edges, extract/publish `ändrar`, and validate all three
-  through the same catalog/render mechanism as `bemyndigande`.
+- ✅ **Typed relation edges (2026-07-19):** `andrar` is extracted from an
+  ändringsförfattning's own harvest title ("… om ändring i … (ÅFS 2005:5)",
+  chained titles take the first ref, a bare "(2007:12)" implies the record's
+  own series; 823 designated + most of 174 bare-ref titles resolve); the
+  konsoliderad masthead's amendment list folds into the register (entries the
+  landing page missed get minted uris), and the register's uris project as
+  `metadata.andradAv`. `catalog.relation_links` publishes all four as typed
+  edges (`rpubl:andrar`/`rpubl:upphaver`/`rpubl:genomforDirektiv`/
+  `rinfoex:andradAv`), field-driven on metadata keys; they stay out of the
+  generic inbound panel (`_NOT_TYPED`) while genomförDirektiv joins the
+  directive page's inbound like the förarbete implements-edges. Render adds
+  Ändrar/Upphäver outbound groups and the target's "Upphävs eller ersätts av"
+  mirror (`catalog.upphaver_inbound`). En route, `_fs_key` now consults the
+  registry's designation→slug rows — the naive transliteration minted 'ÅFS'
+  amendments under Arbetsmiljöverkets `afs` (and 'RÅFS' under Riksarkivets
+  `rafs`); and layout's föreskrift slug grammar gained the two non-`-fs`
+  series (`bfnar`, `rams`), which had been silently falling through to the
+  SFS page branch (locked by a registry↔grammar test).
 
 ### 7f. avg vertical — JO + JK + ARN myndighetsavgöranden ✅ (first cut)
 
@@ -2656,7 +2697,7 @@ rewrite work.
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing), `legacy` (one-time import of the frozen ARN corpus 1991–2022, §7g), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). The 909 §7g frozen-import records (SKVFS/SOSFS/HSLF-FS) were migrated into ordinary harvested form in 2026-07 — body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, records rewritten from `{"legacy": relpath}` to `{"name": ...}`; `foreskrift/legacy.py` and the `import-legacy` verb are gone |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). The 909 §7g frozen-import records (SKVFS/SOSFS/HSLF-FS) were migrated into ordinary harvested form in 2026-07 — body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, records rewritten from `{"legacy": relpath}` to `{"name": ...}`. `legacy` (reborn 2026-07-19, the legacy-corpus sweep): one-time import of the ~30 frozen lagen.nu myndfs corpora — 2,177 documents the live harvest cannot see (agency-purged repealed regulations, the RPSFS/LSFS/LMVFS/KBMFS/RTVFS predecessor series, the frozen SJVFS/SVKFS/LIFS/LVFS samlingar) imported as ordinary records marked `"source": "myndfs-legacy"`, titles from the frozen distilled RDF, original source URLs kept though they may 404 (`lagen foreskrift import-legacy`) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |

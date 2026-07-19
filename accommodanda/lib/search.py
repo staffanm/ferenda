@@ -196,9 +196,15 @@ def doc_actions(row, inbound_count, version=None):
     # operates over exactly one unit per document (exact total + search_after).
     # Fragment units remain for a bounded second query that finds the best
     # paragraph/article pinpoint for each document on the returned page.
+    # a published alternate citation with no body span (a JO decision's
+    # ämbetsberättelse "JO 1990/91 s. 70") rides the searchable body text, so
+    # querying the citation form finds the decision. Field-driven on the
+    # metadata key; sources without one contribute nothing.
+    alt = art.get("metadata", {}).get("officialReport")
     doc = {**shared, "uri": uri, "is_doc": True,
            "identifier": label, "title": title, "label": label,
-           "display": display, "text": text.document_text(art)}
+           "display": display,
+           "text": ((alt + "\n") if alt else "") + text.document_text(art)}
     yield {"_id": uri, "_source": doc}
     for frag_uri, frag_text in frags:
         yield {"_id": frag_uri,

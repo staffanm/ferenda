@@ -115,6 +115,21 @@ def test_doc_actions_no_fragments_carries_full_text(tmp_path):
     assert unit["_source"]["text"] == "Domskälen anför följande."
 
 
+def test_doc_actions_alternate_citation_is_searchable(tmp_path):
+    # a published alternate citation with no body span (a JO decision's
+    # ämbetsberättelse) rides the whole-doc unit's text, so querying
+    # "JO 1990/91 s. 70" finds the decision
+    art = tmp_path / "jo.json"
+    art.write_text(json.dumps({
+        "uri": "https://lagen.nu/avg/jo/1672-1987",
+        "metadata": {"officialReport": "JO 1990/91 s. 70"},
+        "structure": [{"type": "stycke", "text": ["Beslutets text."]}]}))
+    [unit] = list(search.doc_actions(
+        ("https://lagen.nu/avg/jo/1672-1987", "avg", "jo",
+         "JO dnr 1672-1987", "Förföljande med polisfordon", str(art)), 0))
+    assert unit["_source"]["text"] == "JO 1990/91 s. 70\nBeslutets text."
+
+
 def test_doc_actions_skips_empty_artifact(tmp_path):
     # a row whose artifact file is empty yields nothing
     empty = tmp_path / "empty.json"

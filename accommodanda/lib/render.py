@@ -2240,8 +2240,15 @@ def render_forarbete(art, site):
                 island=rail.island(), source_url=art.get("source_url"))
 
 
+class _RawHTML(str):
+    """A `_meta_dl` value that is already rendered HTML (a linked identifier
+    row) -- spliced in as-is instead of being escaped."""
+
+
 def _meta_dl(pairs):
-    rows = "".join("<dt>%s</dt><dd>%s</dd>" % (escape(k), escape(str(v)))
+    rows = "".join("<dt>%s</dt><dd>%s</dd>"
+                   % (escape(k), v if isinstance(v, _RawHTML)
+                      else escape(str(v)))
                    for k, v in pairs if v)
     return '<dl class="meta">%s</dl>' % rows if rows else ""
 
@@ -2592,6 +2599,40 @@ def _ref_list(site, heading, uris):
             % (escape(heading), items))
 
 
+def _upphavd_av(rows):
+    """The regulations whose own text says they replace or repeal this one --
+    the inbound mirror of the Upphäver group, from the catalog's typed
+    rpubl:upphaver edges. Worded 'Upphävs eller ersätts av' because the source
+    clause conflates the two; the claim comes from the *replacing* document's
+    text, so this page's own status is not asserted beyond it."""
+    if not rows:
+        return ""
+    items = "".join(
+        '<li><a href="%s">%s</a></li>'
+        % (escape(layout.page_url(from_uri)),
+           escape("%s — %s" % (label, title) if title and title != label
+                  else label))
+        for from_uri, label, title in rows)
+    return ('<section class="refs"><h2>Upphävs eller ersätts av</h2>'
+            '<ul>%s</ul></section>' % items)
+
+
+def _foreskrift_repealed_banner(rows):
+    """The top-of-page callout when another regulation's text says it repeals
+    or replaces this one: a repealed föreskrift must never read as in force.
+    The evidence is the replacing documents' own repeal clauses (there is no
+    authoritative status field in the agency registers), so the banner names
+    them rather than asserting a repeal date of its own."""
+    if not rows:
+        return ""
+    links = ", ".join('<a href="%s">%s</a>'
+                      % (escape(layout.page_url(from_uri)), escape(label))
+                      for from_uri, label, _title in rows)
+    return ('<div class="expired-banner"><strong>Upphävd eller ersatt</strong>'
+            '<span>Denna föreskrift anges som upphävd eller ersatt av %s.'
+            '</span></div>' % links)
+
+
 def _amendment_label(am):
     """An ändringsförfattning's display: its designation linked to the agency's
     own page for it where the harvest captured one. The hosted-page link is
@@ -2686,17 +2727,28 @@ def render_foreskrift(art, site):
         ("Beslutad", md.get("beslutsdatum")),
         ("Ikraftträdande", md.get("ikrafttradandedatum")),
         ("Utkom från trycket", md.get("utkomFranTryck")),
+        # the repeal target belongs in the header, not only the refs section:
+        # what this regulation replaces is identity-level metadata
+        ("Upphäver", _RawHTML(", ".join(
+            _ref_link(site, u) for u in md.get("upphaver") or []))),
     ])
-    # outbound: the empowering statute paragrafer (the inbound mirror of which is
-    # the SFS paragraf's "Föreskrifter meddelade med stöd av …" margin) + EU dir
-    refs = (_ref_list(site, "Bemyndigande", md.get("bemyndigande"))
-            + _ref_list(site, "Genomför EU-direktiv", md.get("genomfor")))
+    # outbound typed relations: what this regulation amends and replaces, the
+    # empowering statute paragrafer (whose inbound mirror is the SFS paragraf's
+    # "Föreskrifter meddelade med stöd av …" margin) and the EU directives it
+    # transposes -- plus the inbound mirror of upphäver: who replaced *this*
+    upphavd_rows = [] if grund else catalog.upphaver_inbound(site.con, base_uri)
+    refs = (_ref_list(site, "Ändrar", md.get("andrar"))
+            + _ref_list(site, "Upphäver", md.get("upphaver"))
+            + _ref_list(site, "Bemyndigande", md.get("bemyndigande"))
+            + _ref_list(site, "Genomför EU-direktiv", md.get("genomfor"))
+            + _upphavd_av(upphavd_rows))
     toc = Toc()
     rail = Rail(site, art["uri"])
-    banner = (_grund_banner(base_uri) if grund
-              else _konsoliderad_banner(art, site, cons["konsolideradTom"])
-              if cons
-              else _unparsed_konsoliderad_note(art.get("consolidations", [])))
+    banner = _foreskrift_repealed_banner(upphavd_rows) \
+        + (_grund_banner(base_uri) if grund
+           else _konsoliderad_banner(art, site, cons["konsolideradTom"])
+           if cons
+           else _unparsed_konsoliderad_note(art.get("consolidations", [])))
     body = banner \
         + ("" if grund else document_inbound(site, art["uri"])) + refs \
         + "".join(render_node(n, site, art["uri"], toc, rail)
@@ -2718,6 +2770,7 @@ def render_avg(art, site):
         ("Beslutsdatum", md.get("beslutsdatum")),
         ("Diarienummer", ", ".join(md.get("diarienummer", []))),
         ("Avgjord av", md.get("avgjordAv")),
+        ("Ämbetsberättelse", md.get("officialReport")),
         ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
     ])
     summary = ('<p class="sammanfattning">%s</p>'
@@ -3425,8 +3478,11 @@ def _browse_item(doc):
         return ('<li%s data-name="%s" data-year="%s"><a href="%s">%s</a></li>'
                 % (cls, escape(name.lower()), escape(doc.get("year") or ""),
                    escape(doc["url"]), label))
-    return ('<li><a href="%s">%s</a></li>'
-            % (escape(doc["url"]), escape(doc["display"])))
+    # a repealed föreskrift stays listed but dims (facets.browse_doc sets
+    # `subdued` from the catalog's inbound rpubl:upphaver edges)
+    cls = ' class="subdued"' if doc.get("subdued") else ""
+    return ('<li%s><a href="%s">%s</a></li>'
+            % (cls, escape(doc["url"]), escape(doc["display"])))
 
 
 def _facet_links(source, buckets, parent_slugs, active_keys, depth):

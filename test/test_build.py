@@ -13,6 +13,7 @@ import pytest
 
 from accommodanda import build, config
 from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
+from accommodanda.foreskrift.agencies import REGISTRY
 from accommodanda.foreskrift.model import Consolidation, Regulation
 from accommodanda.lib import annstore, catalog, compress, layout, runlog
 from accommodanda.lib.errors import SkipDocument
@@ -358,11 +359,30 @@ def test_foreskrift_grund_pages_enumerates_sidecars(tmp_path, monkeypatch):
         ("https://lagen.nu/fffs/2013:10/grund", "foreskrift",
          str(fs / "2013-10.grund.json"),
          "FFFS 2013:10 i ursprunglig lydelse")]
+    # a series slug outside the -fs suffix convention (BFNAR, RA-MS) is still
+    # a valid föreskrift identity -- the slug grammar carries the exceptions
+    bfnar = tmp_path / "foreskrift" / "bfnar"; bfnar.mkdir()
+    (bfnar / "2002-1.grund.json").write_text("{}")
+    assert layout.foreskrift_grund_pages()[0] == (
+        "https://lagen.nu/bfnar/2002:1/grund", "foreskrift",
+        str(bfnar / "2002-1.grund.json"), "BFNAR 2002:1 i ursprunglig lydelse")
     # a sidecar name that does not decode to a föreskrift identity is a
     # layout bug, not a page -- refuse, never guess
     (fs / "trasig.grund.json").write_text("{}")
     with pytest.raises(ValueError):
         layout.foreskrift_grund_pages()
+
+
+def test_layout_grammar_covers_every_registered_fs():
+    # the layout slug grammar (an -fs suffix plus named exceptions) must accept
+    # every registered författningssamling -- a slug it misses falls through to
+    # the SFS page branch and crashes grund-sidecar decoding, as bfnar and rams
+    # once did. New series: extend layout._FS_SLUG's exceptions if needed.
+    for fs in REGISTRY:
+        assert layout.page_relpath("https://lagen.nu/%s/2020:1" % fs) \
+            == "%s/2020_1.html" % fs, fs
+        assert layout.page_relpath("https://lagen.nu/%s/2020:1/grund" % fs) \
+            == "%s/2020_1_grund.html" % fs, fs
 
 
 def test_stage_watermark_tracks_inputs(tmp_path):
@@ -890,3 +910,16 @@ def test_swap_catalog_discards_stale_wal_of_old_catalog(tmp_path):
     fresh.close()
     reader.close()
     live.close()
+
+
+def test_fa_soukb_scans_passes_politeness(monkeypatch):
+    called = {}
+
+    def fake_sync(root, limit=None, delay=None):
+        called["delay"] = delay
+        return 0, 0
+
+    monkeypatch.setattr(build.fa_soukb, "sync", fake_sync)
+    build.fa_soukb_scans([])
+    assert called.get("delay") == build.POLITENESS
+

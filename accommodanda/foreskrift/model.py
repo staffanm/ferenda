@@ -80,8 +80,6 @@ class Regulation:
     lopnummer: str               # "10"
     title: str | None = None
     publisher: str | None = None         # the issuing agency (org)
-    is_amendment: bool = False           # grund vs ändringsförfattning
-    amends: str | None = None            # base reg uri, iff is_amendment
 
     # metadata that only the PDF text carries (filled at parse, not harvest)
     beslutsdatum: str | None = None
@@ -114,12 +112,14 @@ class Regulation:
                 "beslutsdatum": self.beslutsdatum,
                 "ikrafttradandedatum": self.ikrafttradandedatum,
                 "utkomFranTryck": self.utkomFranTryck,
-                "is_amendment": self.is_amendment,
-                "amends": self.amends,
                 "bemyndigande": self.bemyndigande,
                 "upphaver": self.upphaver,
                 "andrar": self.andrar,
                 "genomfor": self.genomfor,
+                # the amendment register's minted uris, projected as the typed
+                # inverse relation (X ändrar this regulation) so the catalog's
+                # field-driven producer sees relations only under metadata
+                "andradAv": [a.uri for a in self.amendments if a.uri],
             },
             "structure": self.structure,
             "consolidations": [

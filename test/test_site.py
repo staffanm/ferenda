@@ -519,6 +519,143 @@ def test_foreskrift_page_links_unparsed_consolidation(tmp_path):
     assert 'href="/fffs/2013:10/grund"' not in html     # no separate grund page
 
 
+# --- föreskrift: typed relation edges (finding 05) ---------------------------
+
+ANDRINGSFS = {
+    "uri": "https://lagen.nu/aafs/2006:11", "type": "foreskrift",
+    "identifier": "ÅFS 2006:11", "fs": "aafs",
+    "metadata": {"title": "Föreskrifter om ändring i föreskrifterna "
+                          "(ÅFS 1999:1) om expediering",
+                 "andrar": ["https://lagen.nu/aafs/2005:5"],
+                 "upphaver": ["https://lagen.nu/aafs/1999:1"],
+                 "genomfor": ["https://lagen.nu/ext/celex/32011L0061"],
+                 "andradAv": ["https://lagen.nu/aafs/2007:2"]},
+    "structure": [],
+}
+
+UPPHAVDFS = {
+    "uri": "https://lagen.nu/aafs/1999:1", "type": "foreskrift",
+    "identifier": "ÅFS 1999:1", "fs": "aafs",
+    "metadata": {"title": "Föreskrifter om expediering"},
+    "structure": [],
+}
+
+
+def _foreskrift_catalog(tmp_path):
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for art in (ANDRINGSFS, UPPHAVDFS):
+        p = tmp_path / (art["uri"].rsplit("/", 2)[-2] + "-"
+                        + art["uri"].rsplit("/", 1)[-1].replace(":", "-")
+                        + ".json")
+        p.write_text(json.dumps(art))
+        paths.append(p)
+    catalog.rebuild(db, "foreskrift", paths)
+    return catalog.connect(db)
+
+
+def test_relation_links_publishes_typed_predicates():
+    # every metadata relation list becomes a stable typed edge, labelled with
+    # the document's own id for the target's mirror display
+    out = catalog.relation_links(ANDRINGSFS)
+    assert out == [
+        (None, {"uri": "https://lagen.nu/aafs/2005:5",
+                "predicate": "rpubl:andrar", "text": "ÅFS 2006:11"}),
+        (None, {"uri": "https://lagen.nu/aafs/1999:1",
+                "predicate": "rpubl:upphaver", "text": "ÅFS 2006:11"}),
+        (None, {"uri": "https://lagen.nu/ext/celex/32011L0061",
+                "predicate": "rpubl:genomforDirektiv", "text": "ÅFS 2006:11"}),
+        (None, {"uri": "https://lagen.nu/aafs/2007:2",
+                "predicate": "rinfoex:andradAv", "text": "ÅFS 2006:11"})]
+    # sources without these metadata keys contribute nothing (SFS keeps its
+    # register-prose form; the field-driven contract stays opt-in)
+    assert catalog.relation_links(LAW) == []
+
+
+def test_foreskrift_relation_edges_and_inbound_mirrors(tmp_path):
+    con = _foreskrift_catalog(tmp_path)
+    # outbound: all four typed predicates land in the links table
+    preds = {row[0] for row in con.execute(
+        "SELECT predicate FROM links WHERE from_uri = ?",
+        (ANDRINGSFS["uri"],))}
+    assert preds == {"rpubl:andrar", "rpubl:upphaver",
+                     "rpubl:genomforDirektiv", "rinfoex:andradAv"}
+    # inbound mirror: the replaced regulation knows its replacer
+    assert catalog.upphaver_inbound(con, UPPHAVDFS["uri"]) == [
+        ("https://lagen.nu/aafs/2006:11", "ÅFS 2006:11",
+         "Föreskrifter om ändring i föreskrifterna (ÅFS 1999:1) om expediering")]
+    # typed relations stay out of the generic citation panel (they have their
+    # own displays); genomforDirektiv is generic-visible on the directive page
+    assert catalog.inbound(con, UPPHAVDFS["uri"]) == []
+    assert con.execute(
+        "SELECT from_uri FROM links WHERE to_uri = ? "
+        "AND predicate = 'rpubl:genomforDirektiv'",
+        ("https://lagen.nu/ext/celex/32011L0061",)).fetchone() == (
+        ANDRINGSFS["uri"],)
+
+
+def test_foreskrift_page_renders_relation_groups(tmp_path):
+    con = _foreskrift_catalog(tmp_path)
+    site = render.Site.from_catalog(con)
+    html = render.render_foreskrift(ANDRINGSFS, site)
+    assert "Ändrar</h2>" in html
+    assert "Upphäver</h2>" in html
+    # the catalogued target links; the uncatalogued one stays a plain span
+    assert 'href="/aafs/1999:1"' in html
+    assert '<span class="noref">' in html               # aafs/2005:5 unhosted
+    # the replaced regulation's page names its replacer from the typed edge
+    out = render.render_foreskrift(UPPHAVDFS, site)
+    assert "Upphävs eller ersätts av</h2>" in out
+    assert 'href="/aafs/2006:11"' in out and "ÅFS 2006:11" in out
+    # ... and flags the status at the top: a repealed föreskrift must never
+    # read as in force, even though its own artifact carries no repeal field
+    assert '<div class="expired-banner"><strong>Upphävd eller ersatt</strong>' in out
+    assert "Upphävd eller ersatt" not in html          # the replacer itself: no banner
+    # the replacer's metadata header names its repeal target with a link (not
+    # only the refs section further down)
+    assert re.search(r'<dt>Upphäver</dt><dd><a href="/aafs/1999:1">', html)
+
+
+def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
+    from accommodanda.lib import facets
+    con = _foreskrift_catalog(tmp_path)
+    view = facets.browse_view(con, "foreskrift")
+
+    def docs(nodes):
+        for n in nodes:
+            if n.get("children"):
+                yield from docs(n["children"])
+            else:
+                yield from n.get("documents", [])
+
+    by_uri = {d["uri"]: d for d in docs(view["buckets"])}
+    # the repealed regulation stays listed (point-in-time law needs it
+    # findable) but dims; its replacer reads normally
+    assert by_uri[UPPHAVDFS["uri"]].get("subdued") is True
+    assert '<li class="subdued">' in render._browse_item(by_uri[UPPHAVDFS["uri"]])
+    assert by_uri[ANDRINGSFS["uri"]].get("subdued") is None
+    assert 'class="subdued"' not in render._browse_item(by_uri[ANDRINGSFS["uri"]])
+
+
+# --- avg: JO official_report (ämbetsberättelse) ------------------------------
+
+def test_jo_page_shows_official_report(tmp_path):
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = {"uri": "https://lagen.nu/avg/jo/1672-1987", "type": "avgorande",
+           "org": "jo", "identifier": "JO dnr 1672-1987",
+           "metadata": {"title": "Förföljande med polisfordon",
+                        "publisher": "Justitieombudsmannen",
+                        "diarienummer": ["1672-1987"],
+                        "beslutsdatum": "1990-06-28",
+                        "officialReport": "JO 1990/91 s. 70"},
+           "structure": [{"type": "stycke", "id": "S1", "text": ["Beslut."]}]}
+    html = render.render_avg(art, site)
+    assert "<dt>Ämbetsberättelse</dt><dd>JO 1990/91 s. 70</dd>" in html
+    # a decision without one (every jk/arn, most live jo) shows no empty row
+    del art["metadata"]["officialReport"]
+    assert "Ämbetsberättelse" not in render.render_avg(art, site)
+
+
 # --- authoritative source url ---------------------------------------------
 
 def test_eurlex_source_url_derives_eli():

@@ -81,6 +81,7 @@ from .forarbete import soukb as fa_soukb
 from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
+from .foreskrift import legacy as foreskrift_legacy
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
@@ -2038,11 +2039,44 @@ def foreskrift_parse_run(basefile):
 # `foreskrift_harvest` sweep, so parse depends on no upstream stage -- it runs over
 # whatever the harvest has put on disk (relate/index/dump/generate then act on the
 # artifacts by source name, like every other source).
+def foreskrift_import_legacy(args):
+    """`lagen foreskrift import-legacy [<corpus> ...]` -- one-time import of
+    the frozen lagen.nu myndfs corpora (default: all of them). Each legacy
+    document the live corpus does not carry -- as a base record or as an
+    amendment under one -- is imported as its own record (body PDF + record
+    JSON marked ``"source": "myndfs-legacy"``, the original source URL kept
+    even where it now 404s); live documents are never touched. `--limit N`
+    caps the per-corpus import (a test slice)."""
+    corpora = tuple(args) or foreskrift_legacy.CORPORA
+    unknown = [c for c in corpora if c not in foreskrift_legacy.CORPORA]
+    if unknown:
+        sys.exit("unknown myndfs corpus/corpora: %s" % ", ".join(unknown))
+    if RUN.dry_run:
+        print("foreskrift import-legacy: would import %s from %s into %s"
+              % (", ".join(corpora), config.LEGACY_ROOT,
+                 layout.FORESKRIFT_DOWNLOADED))
+        return
+    bases, amendments = foreskrift_legacy.live_coverage(
+        layout.FORESKRIFT_DOWNLOADED)
+    totals = [0] * 6
+    for corpus in corpora:
+        counts = foreskrift_legacy.import_corpus(
+            config.LEGACY_ROOT / corpus, layout.FORESKRIFT_DOWNLOADED,
+            bases, amendments, limit=RUN.limit)
+        totals = [a + b for a, b in zip(totals, counts, strict=True)]
+        print("  %-8s %4d seen, %4d imported, %4d live-covered, "
+              "%3d bodyless, %3d non-pdf, %2d unrecognized"
+              % (corpus, *counts))
+    print("foreskrift import-legacy: %d seen, %d imported, %d live-covered, "
+          "%d bodyless, %d non-pdf, %d unrecognized" % tuple(totals))
+
+
 SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
     "parse": Stage("parse", foreskrift_parse_run, foreskrift_artifact,
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
+    actions={"import-legacy": foreskrift_import_legacy},
     # display label only, nothing is ever fetched from a central index: the
     # harvest engine drives each agency's own site from foreskrift/agencies.py
     origin="the %d agency sites in foreskrift/agencies.py"
