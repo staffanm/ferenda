@@ -12,9 +12,11 @@ shaped this way and what's done vs. pending, read
 - **Python 3.10+** and **[uv](https://docs.astral.sh/uv/)**. `uv sync`
   installs everything in `pyproject.toml` (incl. `jpype1`).
 - **A JVM — only for the shared POI Word path** (`lib/poi.py`, read by DV's
-  legacy path for `.doc`/`.docx` and by förarbete's `legacy_formats.word_paras`
-  for `.docx` only, via jpype). Everything else (SFS, the citation engine, the
-  DV API path) is pure Python and needs no Java.
+  legacy path for `.doc`/`.docx`). The JVM never runs inside the build
+  process: `poi.read()` drives a persistent `lib/poi_worker.py` subprocess
+  which owns jpype/POI, speaking line-delimited JSON over its pipes.
+  Everything else (SFS, the citation engine, the DV API path, förarbete's
+  `.docx` bodies via plain lxml) is pure Python and needs no Java.
 - **`antiword`** — förarbete's legacy `.doc` bodies (mostly proptrips-era Word
   6/95 binaries that POI's HWPF refuses) are read through it instead of POI.
   `sudo apt-get install -y antiword` on Ubuntu.
@@ -47,7 +49,7 @@ shaped this way and what's done vs. pending, read
 
 ```sh
 uv sync                      # Python deps
-./tools/fetch_poi.sh         # POI jars (legacy DV path + förarbete's .docx bodies)
+./tools/fetch_poi.sh         # POI jars (legacy DV Word path)
 uv run python -m pytest      # bare pytest collects exactly the new suites
 ```
 
@@ -119,7 +121,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging, riding out failures from both the `requests` and `httpx` transports); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`); `make_http2_session` (`httpx2[http2]`) is an HTTP/2-only fallback for hosts that refuse HTTP/1.1 behind a Cloudflare front (foreskrift's kkvfs) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
-| `poi.py` | Apache POI (HWPF/XWPF) via jpype → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) once förarbete's `legacy_formats.word_paras` became its second caller (rule:second-use-goes-to-lib) — `dv/legacy.py` imports it as `poi as word`, förarbete uses it for `.docx` only (`.doc` goes through `antiword` instead, since proptrips-era `.doc` bodies are mostly Word 6/95 binaries POI's HWPF refuses); strips Word field-control characters (`\x13`/`\x14`/`\x15`) and their instruction segments, which otherwise leaked into extracted text |
+| `poi.py` / `poi_worker.py` | Apache POI (HWPF/XWPF) → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) under rule:second-use-goes-to-lib — `dv/legacy.py` imports it as `poi as word` (förarbete's `.docx` bodies went back to plain lxml, and its `.doc` bodies go through `antiword`, since proptrips-era `.doc` is mostly Word 6/95 binaries POI's HWPF refuses); strips Word field-control characters (`\x13`/`\x14`/`\x15`) and their instruction segments, which otherwise leaked into extracted text. Split client/worker (2026-07-19): `poi.py` is jpype-free and drives a persistent `poi_worker` subprocess (line-delimited JSON over pipes, one JVM per build worker, exits on stdin EOF) so the JVM never shares an address space with the build — nothing may import `poi_worker` |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
 | `util.py` | small shared utilities ported from `ferenda.util`, incl. `write_atomic` (same-directory temp file + rename, per-process temp name so concurrent `lagen` invocations can't race each other's rename) |
 

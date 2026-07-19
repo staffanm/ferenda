@@ -18,7 +18,15 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from playwright.sync_api import sync_playwright
+
+def _sync_playwright():
+    # deferred: importing playwright loads the greenlet C extension, and
+    # build.py pulls this module (through foreskrift.harvest) into *every*
+    # worker process -- parse workers must not carry a coroutine-switching C
+    # extension they never use (rule:no-infunction-imports sanctioned
+    # exception, mirrored in pyproject per-file-ignores)
+    from playwright.sync_api import sync_playwright
+    return sync_playwright()
 
 
 class DetachedChrome:
@@ -182,7 +190,7 @@ class DetachedChrome:
     def html(self, url, marker):
         """Navigate detached, then return a verified completed HTML document."""
         self._navigate(url)
-        playwright = sync_playwright().start()
+        playwright = _sync_playwright().start()
         try:
             endpoint = self.endpoint
             assert endpoint is not None, "Google Chrome debugging endpoint is absent"
@@ -202,7 +210,7 @@ class DetachedChrome:
     def pdf(self, url):
         """Navigate detached, then read the exact cached PDF through Chrome."""
         self._navigate(url)
-        playwright = sync_playwright().start()
+        playwright = _sync_playwright().start()
         try:
             endpoint = self.endpoint
             assert endpoint is not None, "Google Chrome debugging endpoint is absent"

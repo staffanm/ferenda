@@ -1195,6 +1195,7 @@ DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
+           PKG / "lib" / "poi_worker.py",
            PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py")
 
 

@@ -9,23 +9,25 @@ and the bold run markers that antiword's DocBook conversion flattened. Callers
 map that stream onto their own model (DV's referat head/body, förarbete's Para
 classify).
 
+The JVM never runs inside the calling process. This module is a thin client:
+``read()`` lazily spawns one persistent ``poi_worker`` subprocess (which owns
+jpype and the JVM) and speaks line-delimited JSON with it over its pipes, so a
+build worker's address space stays free of the _jpype C extension and the JVM's
+threads/signal handlers. One worker per process, amortizing JVM startup over a
+whole legacy corpus; it exits on stdin EOF when its parent goes away.
+
 The jars are not committed (`vendor/poi/*.jar`, gitignored); fetch once with
-`tools/fetch_poi.sh`, which populates the repo-root `vendor/poi/` this module
+`tools/fetch_poi.sh`, which populates the repo-root `vendor/poi/` the worker
 globs. A JVM (Java 9+, jpype's floor; the README pins openjdk-21-jdk-headless)
 must be discoverable -- jpype auto-finds `libjvm.so`.
 """
 
-import glob
+import json
 import re
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-
-import jpype
-import jpype.imports
-
-# repo-root vendor/poi (accommodanda/lib/poi.py -> parents[2] is the repo root),
-# the location tools/fetch_poi.sh writes to.
-_JARS = sorted(glob.glob(str(Path(__file__).parents[2] / "vendor" / "poi" / "*.jar")))
 
 # Word's field-result placeholder, emitted for empty form fields (Avdelning,
 # Domsnummer …). It carries no value, so we strip it to empty.
@@ -48,20 +50,6 @@ class Para:
     in_table: bool
 
 
-def _ensure_jvm():
-    if not jpype.isJVMStarted():
-        assert _JARS, "no POI jars found under vendor/poi/ (run tools/fetch_poi.sh)"
-        # We ship only log4j-api (no -core); point it at the built-in
-        # SimpleLogger so it stops printing "could not find a logging
-        # provider" to stdout, and silence that logger.
-        jpype.startJVM(
-            "-Dlog4j2.loggerContextFactory="
-            "org.apache.logging.log4j.simple.SimpleLoggerContextFactory",
-            "-Dorg.apache.logging.log4j.simplelog.StatusLogger.level=OFF",
-            classpath=_JARS,
-        )
-
-
 def _clean(text):
     # \x07 is the HWPF cell/row terminator bell; drop it, the form-field
     # placeholder, and CRs, then collapse remaining whitespace.
@@ -76,63 +64,41 @@ def _clean(text):
     return " ".join(text.split())
 
 
-def _read_hwpf(path):
-    # POI/jpype classes resolve only after startJVM, so unlike every other
-    # import in this package these must stay in-function (see _ensure_jvm).
-    from java.io import FileInputStream  # ty: ignore[unresolved-import]
-    from org.apache.poi.hwpf import HWPFDocument  # ty: ignore[unresolved-import]
-
-    doc = HWPFDocument(FileInputStream(str(path)))
-    try:
-        rng = doc.getRange()
-        out = []
-        for i in range(rng.numParagraphs()):
-            p = rng.getParagraph(i)
-            bold = any(p.getCharacterRun(j).isBold()
-                       for j in range(p.numCharacterRuns()))
-            out.append(Para(_clean(str(p.text())), bold, bool(p.isInTable())))
-        return out
-    finally:
-        doc.close()   # also closes the FileInputStream; skipping it on a
-        # malformed doc would leak a JVM-side file handle per failure
+_WORKER: subprocess.Popen[str] | None = None
 
 
-def _read_xwpf(path):
-    # POI/jpype classes resolve only after startJVM (see _read_hwpf).
-    from java.io import FileInputStream  # ty: ignore[unresolved-import]
-    from org.apache.poi.xwpf.usermodel import (  # ty: ignore[unresolved-import]
-        XWPFDocument,
-    )
-
-    doc = XWPFDocument(FileInputStream(str(path)))
-    try:
-        out = []
-
-        def emit(p, in_table):
-            bold = any(r.isBold() for r in p.getRuns())
-            out.append(Para(_clean(str(p.getText())), bold, in_table))
-
-        for el in doc.getBodyElements():
-            kind = str(el.getClass().getSimpleName())
-            if kind == "XWPFParagraph":
-                emit(el, False)
-            elif kind == "XWPFTable":
-                for row in el.getRows():
-                    for cell in row.getTableCells():
-                        for p in cell.getParagraphs():
-                            emit(p, True)
-        return out
-    finally:
-        doc.close()
+def _worker():
+    global _WORKER
+    if _WORKER is None or _WORKER.poll() is not None:
+        # stderr inherited: JVM/POI diagnostics surface on the build's stderr
+        # instead of vanishing (the worker also re-points the JVM's stdout at
+        # stderr so stray Java prints can never corrupt the JSON protocol)
+        _WORKER = subprocess.Popen(
+            [sys.executable, "-m", "accommodanda.lib.poi_worker"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    return _WORKER
 
 
 def read(path):
-    """A legacy Word file -> ordered list[Para]. Dispatches on file magic."""
-    _ensure_jvm()
+    """A legacy Word file -> ordered list[Para], extracted in the persistent
+    ``poi_worker`` subprocess. Dispatches on file magic here so junk input
+    fails fast without ever spawning a JVM."""
     path = Path(path)
     magic = path.read_bytes()[:8]
-    if magic.startswith(_ZIP_MAGIC):
-        return _read_xwpf(path)
-    if magic.startswith(_OLE2_MAGIC):
-        return _read_hwpf(path)
-    raise ValueError("%s: neither OLE2 (.doc) nor ZIP (.docx): %r" % (path, magic))
+    if not magic.startswith((_ZIP_MAGIC, _OLE2_MAGIC)):
+        raise ValueError("%s: neither OLE2 (.doc) nor ZIP (.docx): %r" % (path, magic))
+    proc = _worker()
+    assert proc.stdin is not None and proc.stdout is not None
+    proc.stdin.write(json.dumps(str(path)) + "\n")
+    proc.stdin.flush()
+    line = proc.stdout.readline()
+    if not line:
+        # the worker segfaulted or was killed mid-request; its stderr already
+        # went to ours. Raise (not assert): this must fail identically under
+        # `python -O` (rule:errors-drive-retry-use-raise), and the next read()
+        # respawns a fresh worker via the poll() check.
+        raise RuntimeError("poi worker died while reading %s" % path)
+    reply = json.loads(line)
+    if "error" in reply:
+        raise RuntimeError("poi worker failed on %s: %s" % (path, reply["error"]))
+    return [Para(text, bold, in_table) for text, bold, in_table in reply["paras"]]

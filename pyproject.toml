@@ -132,9 +132,12 @@ select = ["F", "I", "B", "BLE", "PLC0415", "S110", "S112", "RUF100"]
 "accommodanda/api/auth.py" = ["B008"]
 "accommodanda/api/edit.py" = ["B008"]
 "accommodanda/api/patch.py" = ["B008"]
-# POI/jpype classes resolve only after startJVM — the one sanctioned
-# in-function-import site (rule:no-infunction-imports).
-"accommodanda/lib/poi.py" = ["PLC0415"]
+# Sanctioned in-function-import sites (rule:no-infunction-imports): POI/jpype
+# classes resolve only after startJVM (poi_worker), and the playwright import
+# is deferred so build workers never load the greenlet C extension they
+# don't use.
+"accommodanda/lib/poi_worker.py" = ["PLC0415"]
+"accommodanda/lib/browser.py" = ["PLC0415"]
 
 [tool.ty.src]
 include = ["accommodanda"]
