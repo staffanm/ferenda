@@ -67,7 +67,7 @@ from ..lib.util import (
     normalize_space,
     record_path,
 )
-from .legacy import RE_ARN_DNR, arn_pdf_path
+from .legacy import RE_ARN_DNR, arn_pdf_path, jo_pdf_path
 
 COMPLETE = ".complete"    # marker under the org dir: corpus walked clean once
 
@@ -156,10 +156,6 @@ def jo_save(root, hit, session, delay, full=False):
                   % basefile, flush=True)
         time.sleep(delay)
     return changed
-
-
-def jo_pdf_path(root, basefile):
-    return Path(root) / "jo" / (basefile_slug(basefile) + ".pdf")
 
 
 def jo_sync(root, full=False, only=None, limit=None, delay=0.5, log=print):

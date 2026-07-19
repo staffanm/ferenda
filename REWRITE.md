@@ -2086,14 +2086,39 @@ now have internal targets.
     (Organ → År; `_avg_year` keys ARN on the organ — its year-*first* dnr
     collides with JO's year-last shape), "ARN-beslut" page label,
     `test_uri_matches_citation_grammar` extended to arn.
-- ⬜ **Remaining implementation/validation:** compare a complete live JO
-  harvest with the legacy corpus (old lagen.nu carried JO decisions the
-  redesigned jo.se may have pruned) and import any genuine omissions; add JO
-  ämbetsberättelse citation (`official_report`) as metadata; an ARN masthead
-  noise filter (the live PDFs' margin header line + repeated bold summary
-  currently surface as leading blocks). Running the full JO/JK harvest and
-  relate is deployment materialization, not implementation status (note above
-  §1).
+- ✅ **JO/ARN validation (2026-07-19):** the live-vs-frozen JO inventory
+  reconciled — of 3,291 frozen cases, all but **five** join a live jo.se
+  record on some diarienummer (after normalizing 2-digit years and two
+  identities the old pipeline read off printed dnr *ranges*; the frozen
+  headnote's own "Diarienummer :" value adjudicates those). The pruning
+  hypothesis was essentially false. `avg/legacy.py:import_jo` imports the
+  five as `jo-legacy` records (headnote-curated titles, frozen PDFs) and
+  writes the **ämbetsberättelse map** (`jo/.officialreport.json`, 1,619
+  citations keyed by 1,774 dnr) from the distilled RDFs'
+  `dcterms:bibliographicCitation` — jo.se does not publish the citation, so
+  `parse_jo` grafts it onto live records too (`Beslut.official_report` →
+  `metadata.officialReport`, rendered as the Ämbetsberättelse row, folded
+  into the search doc's text so "JO 1990/91 s. 70" finds the decision; the
+  map is a parse input, so a rewrite re-stales JO parses).
+  `classify_arn` now strips the live arn.se PDF noise, anchored to the
+  referat's *own* änr (citations to other decisions untouched): the margin
+  "änr + date" header wherever a column boundary drops it (line start,
+  mid-sentence, glued onto other lines) and the restated-summary front
+  matter ending at the "Beslut <date>; <änr>" marker — verified over all
+  140 live artifacts with the 25-case frozen snapshot byte-identical.
+  Running the full JO/JK harvest and relate is deployment materialization,
+  not implementation status (note above §1).
+- ✅ **JK frozen deltas (2026-07-19, the legacy-corpus sweep):** the same
+  live-vs-frozen join for JK — dot-insensitive over every diarienummer a
+  live record names (the frozen ids write the avdelning undotted,
+  '859-97-21'; live jk.se writes '859-97-2.1') — reduced an apparent
+  231-decision gap to **37 genuinely absent** (almost all 1997–1999, before
+  jk.se's archive thins out). `avg/legacy.py:import_jk` imports them as
+  `jk-legacy` records with the frozen jk.se landing pages (the live parse's
+  own input format); titles/dates from the distilled RDFs. 19 of the pages
+  froze the pre-2016 ASP.NET skin, so `jk_body` gained a
+  `beslutmetadatacontainer`-anchored skin reader. All 37 parse clean;
+  ARN needed nothing (0 missing after the join).
 
 ### 7g. Frozen legacy corpora — import, don't port ✅ (first cut; plan 2026-07-01, landed 2026-07-02)
 

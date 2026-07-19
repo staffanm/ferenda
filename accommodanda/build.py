@@ -2110,9 +2110,14 @@ def avg_inputs(basefile):
     landing page) -- re-downloading/re-importing either re-stales the parse."""
     paths = [avg_record(basefile)]
     if basefile.startswith("jo/"):
-        pdf = avg_download.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
+        pdf = avg_legacy.jo_pdf_path(layout.AVG_DOWNLOADED, basefile)
         if pdf.exists():
             paths.append(pdf)
+        # the frozen corpus's ämbetsberättelse map (import-legacy jo): a
+        # rewritten map re-stales every JO parse that could graft from it
+        report = avg_legacy.jo_officialreport_path(layout.AVG_DOWNLOADED)
+        if report.exists():
+            paths.append(report)
     elif basefile.startswith("arn/"):
         paths.append(avg_legacy.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
     else:
@@ -2149,20 +2154,29 @@ def avg_harvest(scopes):
 
 
 def avg_import_legacy(args):
-    """`lagen avg import-legacy arn <frozen-arn-tree>` -- one-time import of the
-    frozen ARN corpus (a decision file + fragment.html metadata per case) into the
-    avg record layout, so `parse` then treats each referat like a harvested
-    decision (no network). doc/wpd/rtf bodies are converted to PDF via
-    LibreOffice; native PDFs are copied. `--force` re-imports records already on
-    disk; `--limit N` caps the run (a test slice)."""
-    if len(args) != 2 or args[0] != "arn":
-        sys.exit("usage: lagen avg import-legacy arn <frozen-arn-tree>")
+    """`lagen avg import-legacy {arn,jo,jk} <frozen-tree>` -- one-time imports
+    of the frozen corpora into the avg record layout, so `parse` then treats
+    each decision like a harvested one (no network). **arn**: a decision file +
+    fragment.html metadata per case; doc/wpd/rtf bodies converted to PDF via
+    LibreOffice. **jo**: the ämbetsberättelse map (dnr -> "JO 1990/91 s. 70",
+    grafted onto live records at parse) plus jo-legacy records for the few
+    cases live jo.se does not carry. **jk**: jk-legacy records + the frozen
+    jk.se landing pages for the decisions live jk.se no longer carries (mostly
+    1997-1999). `--force` re-imports records already on disk; `--limit N` caps
+    the ARN run (a test slice)."""
+    if len(args) != 2 or args[0] not in ("arn", "jo", "jk"):
+        sys.exit("usage: lagen avg import-legacy {arn,jo,jk} <frozen-tree>")
     if RUN.dry_run:
-        print("avg import-legacy: would import ARN corpus %s into %s"
-              % (args[1], layout.AVG_DOWNLOADED))
+        print("avg import-legacy: would import %s corpus %s into %s"
+              % (args[0], args[1], layout.AVG_DOWNLOADED))
         return
-    avg_legacy.import_arn(args[1], layout.AVG_DOWNLOADED, limit=RUN.limit,
-                          force=RUN.force)
+    if args[0] == "arn":
+        avg_legacy.import_arn(args[1], layout.AVG_DOWNLOADED, limit=RUN.limit,
+                              force=RUN.force)
+    elif args[0] == "jo":
+        avg_legacy.import_jo(args[1], layout.AVG_DOWNLOADED, force=RUN.force)
+    else:
+        avg_legacy.import_jk(args[1], layout.AVG_DOWNLOADED, force=RUN.force)
 
 
 # No per-document download stage (the foreskrift rule): decisions arrive only

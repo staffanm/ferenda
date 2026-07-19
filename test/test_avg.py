@@ -353,7 +353,7 @@ def test_classify_arn_and_citation_scan():
         Para(text="", bold=False),                       # blank Para dropped
         Para(text="Enligt 2 kap. 6 § regeringsformen gäller skydd.", bold=False),
     ]
-    blocks = avg_parse.classify_arn(paras)
+    blocks = avg_parse.classify_arn(paras, "1992-3657")
     assert [(b.kind, b.level) for b in blocks] == [
         ("rubrik", 1), ("stycke", 1), ("stycke", 1)]
     beslut = Beslut(org="arn", diarienummer=["1992-3657"],
@@ -367,6 +367,144 @@ def test_classify_arn_and_citation_scan():
     assert art["metadata"]["nyckelord"] == ["Resor"]
     runs = [r for b in art["structure"] for r in b["text"] if isinstance(r, dict)]
     assert any(r["uri"] == "https://lagen.nu/1974:152#K2P6" for r in runs)
+
+
+def test_classify_arn_strips_live_pdf_front_matter():
+    # a live arn.se PDF restates the curated summary in bold (mixed with the
+    # margin änr/date column) before a "Beslut <date>; <änr>" marker; all of
+    # it is front matter -- the body starts after the marker (arn/2017-03049)
+    paras = [
+        Para(text="Kompensation enligt artikel 7 på grund av inställd", bold=True),
+        Para(text="028 flygning. En passagerare har rest från ett EU-land.",
+             bold=False),
+        Para(text="2017-03049 2018-08-13", bold=False),   # margin änr + date
+        Para(text="Beslut 2018-05-22; 2017-03049", bold=True),
+        Para(text="AF begärde kompensation med 600 euro.", bold=False),
+    ]
+    blocks = avg_parse.classify_arn(paras, "2017-03049")
+    assert [(b.kind, b.text) for b in blocks] == [
+        ("stycke", "AF begärde kompensation med 600 euro.")]
+
+
+def test_classify_arn_marker_glued_mid_para_and_inline_margin():
+    # the extraction can glue margin + marker + body into ONE para
+    # (arn/2023-28076), and interleave the margin pair mid-sentence at a
+    # column boundary (arn/2024-20746) -- both anchored to the OWN änr, so a
+    # citation to another decision's änr is untouched
+    paras = [
+        Para(text="Summering i fetstil av referatet.", bold=True),
+        Para(text="2023-28076 2024-12-28 Beslut 2024-12-28; 2023-28076 "
+                  "HS begärde ersättning med 67 000 kr.", bold=True),
+        Para(text="Nämnden 2023-28076 2024-12-28 ska därför lägga uppgiften "
+                  "till grund för bedömningen.", bold=False),
+        Para(text="Jfr ARN:s änr 2020-12345.", bold=False),
+    ]
+    blocks = avg_parse.classify_arn(paras, "2023-28076")
+    assert [(b.kind, b.text) for b in blocks] == [
+        ("stycke", "HS begärde ersättning med 67 000 kr."),
+        ("stycke", "Nämnden ska därför lägga uppgiften till grund för "
+                   "bedömningen."),
+        ("stycke", "Jfr ARN:s änr 2020-12345.")]
+
+
+def test_classify_arn_frozen_body_passes_unchanged():
+    # the frozen Digiforms bodies carry no live-PDF noise; a decision that
+    # cites a date or another änr must not lose text to the own-änr filters
+    paras = [Para(text="Avgörande 1992-11-12; 92-3657.", bold=False),
+             Para(text="Nämnden fann att yrkandet skulle bifallas.", bold=False)]
+    blocks = avg_parse.classify_arn(paras, "1992-3657")
+    assert [b.text for b in blocks] == [
+        "Avgörande 1992-11-12; 92-3657.",
+        "Nämnden fann att yrkandet skulle bifallas."]
+
+
+# --------------------------------------------------------------------------
+# JO frozen-corpus deltas: the ämbetsberättelse map + missing-case import
+# --------------------------------------------------------------------------
+
+JO_RDF = """<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rpubl:VagledandeMyndighetsavgorande rdf:about="https://lagen.nu/avg/jo/%(dnr)s">
+    <rpubl:diarienummer>%(dnr)s</rpubl:diarienummer>
+    <dcterms:title xml:lang="sv">%(title)s</dcterms:title>
+    <rpubl:avgorandedatum>%(date)s</rpubl:avgorandedatum>
+    %(citation)s
+  </rpubl:VagledandeMyndighetsavgorande>
+</rdf:RDF>"""
+
+JO_HEADNOTE = ('<html><body><a href="/JO-beslut/x">Ämbetsberättelse: %s '
+               'Beslutsdatum: %s Diarienummer : %s %s</a></body></html>')
+
+
+def _jo_frozen_case(source, year, num, dnr, title, date, citation=None,
+                    headnote_dnr=None, headnote_title=None):
+    d = source / "distilled" / year
+    d.mkdir(parents=True, exist_ok=True)
+    cit = ("<dcterms:bibliographicCitation>%s</dcterms:bibliographicCitation>"
+           % citation if citation else "")
+    (d / (num + ".rdf")).write_text(JO_RDF % dict(
+        dnr=dnr, title=title, date=date, citation=cit), "utf-8")
+    case = source / "downloaded" / year / num
+    case.mkdir(parents=True, exist_ok=True)
+    (case / "index.pdf").write_bytes(b"%PDF-1.4 frozen body")
+    if headnote_dnr:
+        (case / "headnote.html").write_text(JO_HEADNOTE % (
+            citation or "-", date, headnote_dnr, headnote_title or ""), "utf-8")
+
+
+def test_import_jo_maps_citations_and_imports_only_missing(tmp_path):
+    source, root = tmp_path / "frozen", tmp_path / "root"
+    (root / "jo").mkdir(parents=True)
+    # covered by live: a live record carries the dnr -> map only, no import
+    write_atomic(root / "jo" / "jo-1672-1987.json", json.dumps(
+        {"diary_number": "1672-1987", "post_title": "Live"}).encode())
+    _jo_frozen_case(source, "1987", "1672", "1672-1987", "Förföljande",
+                    "1990-06-28", citation="JO 1990/91 s. 70")
+    # garbled identity: the RDF says 2484-2487 but the headnote knows the
+    # true dnr, which a live record covers -> mapped onto it, not imported
+    write_atomic(root / "jo" / "jo-2484-2001.json", json.dumps(
+        {"diary_number": "2484-2001", "post_title": "Live"}).encode())
+    _jo_frozen_case(source, "2487", "2484", "2484-2487", "Initiativet",
+                    "2002-02-28", citation="JO 2002/03 s. 357",
+                    headnote_dnr="2484-2001", headnote_title="Handläggning")
+    # genuinely missing -> imported, named by the headnote identity/title
+    _jo_frozen_case(source, "2000", "2450", "2450-2000", "rdf-titel",
+                    "2002-02-14", headnote_dnr="2450-2000",
+                    headnote_title="Kritik mot en överförmyndare")
+    mapped, imported, skipped = avg_legacy.import_jo(source, root,
+                                                     log=lambda *a: None)
+    assert (mapped, imported, skipped) == (2, 1, 0)
+    report = json.loads(
+        avg_legacy.jo_officialreport_path(root).read_text("utf-8"))
+    assert report["1672-1987"] == "JO 1990/91 s. 70"
+    assert report["2484-2001"] == "JO 2002/03 s. 357"   # the live identity
+    rec = json.loads((root / "jo" / "jo-2450-2000.json").read_text())
+    assert rec["source"] == "jo-legacy"
+    assert rec["diary_number"] == "2450-2000"
+    assert rec["post_title"] == "Kritik mot en överförmyndare"
+    assert (root / "jo" / "jo-2450-2000.pdf").read_bytes().startswith(b"%PDF")
+    # idempotent: a re-run imports nothing new and never touches live records
+    assert avg_legacy.import_jo(source, root, log=lambda *a: None) == (2, 0, 1)
+
+
+def test_parse_jo_grafts_official_report_from_the_map(tmp_path):
+    (tmp_path / "jo").mkdir()
+    avg_legacy.jo_officialreport_path(tmp_path).write_text(
+        json.dumps({"1672-1987": "JO 1990/91 s. 70"}), "utf-8")
+    avg_parse._officialreport_map.cache_clear()
+    record = {"diary_number": "1672-1987", "post_title": "Förföljande",
+              "resolve_date": "1990-06-28", "pdf_text": "Beslutets text."}
+    beslut = avg_parse.parse_jo(record, tmp_path)      # no PDF: text fallback
+    assert beslut.official_report == "JO 1990/91 s. 70"
+    art = beslut.to_artifact(avg_parse._fresh_parser())
+    assert art["metadata"]["officialReport"] == "JO 1990/91 s. 70"
+    # a dnr the map does not know stays clean
+    other = avg_parse.parse_jo({"diary_number": "1-2001",
+                                "post_title": "X", "pdf_text": "t"}, tmp_path)
+    assert other.official_report is None
+    avg_parse._officialreport_map.cache_clear()
 
 
 def test_arn_catalog_and_uri():
@@ -560,3 +698,69 @@ def test_jk_full_keeps_old_landing_when_refetch_fails(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         avg_download.jk_sync(root, full=True)
     assert landing.read_text() == "OLD GOOD HTML"   # not pre-deleted
+
+
+# --- jk-legacy import (the legacy-corpus sweep) ------------------------------
+
+JK_RDF = """<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:dcterms="http://purl.org/dc/terms/"
+         xmlns:rpubl="http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#">
+  <rpubl:VagledandeMyndighetsavgorande rdf:about="https://lagen.nu/avg/jk/859-97-21">
+    <dcterms:title xml:lang="sv">Klagomål mot en lantmäterimyndighet</dcterms:title>
+    <rpubl:beslutsdatum>1999-09-15</rpubl:beslutsdatum>
+  </rpubl:VagledandeMyndighetsavgorande>
+</rdf:RDF>"""
+
+
+def _jk_frozen(tmp_path):
+    src = tmp_path / "frozen"
+    for sub in ("entries/1997", "downloaded/1997", "distilled/1997"):
+        (src / sub).mkdir(parents=True)
+    (src / "entries/1997/859-97-21.json").write_text(json.dumps(
+        {"basefile": "859-97-21", "orig_url": "https://www.jk.se/old/859-97-21"}))
+    (src / "downloaded/1997/859-97-21.html").write_text("<html>beslut</html>")
+    (src / "distilled/1997/859-97-21.rdf").write_text(JK_RDF, encoding="utf-8")
+    return src
+
+
+def test_import_jk_imports_only_uncovered_and_is_idempotent(tmp_path):
+    src = _jk_frozen(tmp_path)
+    root = tmp_path / "avg"
+    (root / "jk").mkdir(parents=True)
+    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (1, 0)
+    rec = json.loads(compress.read_text(root / "jk" / "jk-859-97-21.json"))
+    assert rec["source"] == "jk-legacy"
+    assert rec["title"] == "Klagomål mot en lantmäterimyndighet"
+    assert rec["beslutsdatum_raw"] == "1999-09-15"
+    assert compress.exists(root / "jk" / "jk-859-97-21.html")
+    # second run: its own record does not count as live, but should_write skips
+    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (0, 1)
+    # a live record covering the dnr in the dotted display form blocks import
+    compress.write_download(root / "jk" / "jk-859-97-21.json", json.dumps(
+        {"basefile": "jk/859-97-2.1", "org": "jk",
+         "diarienummer_raw": "859-97-2.1"}))
+    assert avg_legacy.import_jk(src, root, log=lambda *a: None) == (0, 0)
+
+
+def test_jk_date_accepts_iso_passthrough():
+    assert avg_parse.jk_date("1999-09-15") == "1999-09-15"
+    assert avg_parse.jk_date("20 apr 2026") == "2026-04-20"
+
+
+def test_jk_body_reads_the_pre_2016_skin():
+    html = """<html><body>
+      <div class="beslutmetadatacontainer">
+        <div class="beslutmetadata">Beslutsdatum 2005-10-06</div>
+        <div class="beslutmetadata">Diarienummer 930-03-21</div>
+      </div>
+      <h1>Justitiekanslerns beslut</h1>
+      <p>Justitiekanslern uttalar kritik mot myndigheten.</p>
+      <p></p>
+      <p>Beslutet expedieras.</p>
+    </body></html>"""
+    blocks = avg_parse.jk_body(html)
+    assert [(b.kind, b.text) for b in blocks] == [
+        ("rubrik", "Justitiekanslerns beslut"),
+        ("stycke", "Justitiekanslern uttalar kritik mot myndigheten."),
+        ("stycke", "Beslutet expedieras.")]

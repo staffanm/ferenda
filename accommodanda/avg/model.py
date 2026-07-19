@@ -46,6 +46,8 @@ class Beslut:
     beslutsdatum: str | None = None     # ISO date
     sammanfattning: str | None = None   # JO's "Beslutet i korthet" / summary
     avgjord_av: str | None = None       # JO: the deciding ombudsman
+    official_report: str | None = None  # JO: the ämbetsberättelse citation
+                                        # ("JO 1990/91 s. 70"), frozen-corpus only
     nyckelord: list[str] = field(default_factory=list)  # JO: sakområden
     body: list[Block] = field(default_factory=list)
     source_url: str | None = None       # the decision's own page at jo.se/jk.se
@@ -80,6 +82,8 @@ class Beslut:
             metadata["beslutsdatum"] = self.beslutsdatum
         if self.avgjord_av:
             metadata["avgjordAv"] = self.avgjord_av
+        if self.official_report:
+            metadata["officialReport"] = self.official_report
         if self.nyckelord:
             metadata["nyckelord"] = self.nyckelord
         art = {"uri": self.uri, "type": "avgorande", "org": self.org,

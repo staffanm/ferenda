@@ -1,4 +1,4 @@
-"""One-time import of the frozen ARN corpus into the avg vertical (§7g).
+"""One-time imports of the frozen ARN and JO corpora into the avg vertical (§7g).
 
 Allmänna reklamationsnämnden (ARN) published its referat through a Digiforms
 web application whose document URLs are session-bound and long dead -- the
@@ -34,6 +34,18 @@ carries the ``source: "arn-legacy"`` marker; a record written by the live
 arn.se harvester has no ``source`` key and always wins, even under ``--force``
 (the frozen corpus never beats a live copy). The record also keeps
 ``imported_from`` -- pure provenance naming the frozen file the body came from.
+
+**JO** (:func:`import_jo`): the live jo.se harvest covers the frozen corpus
+almost completely (measured 2026-07-19: of 3,291 frozen cases, all but five
+join a live record on some diarienummer, after normalizing 2-digit years and
+two identities the old pipeline garbled from printed dnr *ranges*). The import
+therefore does two things: (1) writes the **ämbetsberättelse map**
+(``jo/.officialreport.json``, dnr -> "JO 1990/91 s. 70") from every distilled
+RDF's ``dcterms:bibliographicCitation`` -- the citation exists *only* in the
+frozen corpus (jo.se does not publish it), and ``parse_jo`` grafts it onto
+live records too; (2) imports the genuinely missing cases as ``jo-legacy``
+records with their frozen PDFs, shaped like live search records so the
+ordinary parse path serves them.
 """
 
 import json
@@ -41,11 +53,12 @@ import re
 import shutil
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress, legacy_import
+from ..lib import compress, legacy_import, util
 from ..lib.pdftext import pdf_pages
 from ..lib.util import (
     basefile_slug,
@@ -88,6 +101,14 @@ def arn_pdf_path(root, basefile):
     """The materialized decision PDF beside the record ("arn/1992-3657" ->
     ``<root>/arn/arn-1992-3657.pdf``) -- the JO body-file shape."""
     return Path(root) / "arn" / (basefile_slug(basefile) + ".pdf")
+
+
+def jo_pdf_path(root, basefile):
+    """The decision PDF beside a JO record ("jo/2340-2025" ->
+    ``<root>/jo/jo-2340-2025.pdf``), shared by the live harvester and the
+    frozen import. Lives here (not download.py) because download already
+    imports the ARN twin from this module."""
+    return Path(root) / "jo" / (basefile_slug(basefile) + ".pdf")
 
 
 def parse_fragment(html_text):
@@ -264,3 +285,237 @@ def import_arn(source, root, limit=None, force=False, log=print):
         shutil.rmtree(profile, ignore_errors=True)
     log("arn import: %d imported, %d skipped, %d empty" % (imported, skipped, empty))
     return imported, skipped, empty
+
+
+# --------------------------------------------------------------------------
+# JO: the ämbetsberättelse map + the (few) frozen-only cases
+# --------------------------------------------------------------------------
+
+JO_SOURCE = "jo-legacy"
+RE_JO_DNR = re.compile(r"\d+-\d{4}")
+
+_RDF = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
+_RPUBL = "{http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#}"
+_DCT = "{http://purl.org/dc/terms/}"
+
+
+def jo_officialreport_path(root):
+    """The dnr -> ämbetsberättelse-citation map the import writes beside the JO
+    records (dotfile: never a record). parse_jo grafts the citation onto live
+    records too -- jo.se does not publish it, only the frozen corpus does."""
+    return Path(root) / "jo" / ".officialreport.json"
+
+
+def _norm_dnr(dnr):
+    """A frozen diarienummer in comparable form: 2-digit years widened
+    ("4643-07" -> "4643-2007"; the corpus has no pre-1951 cases)."""
+    m = re.fullmatch(r"(\d+)-(\d{2})", dnr)
+    if m:
+        century = "19" if int(m.group(2)) > 50 else "20"
+        return "%s-%s%s" % (m.group(1), century, m.group(2))
+    return dnr
+
+
+def _headnote_meta(casedir):
+    """The jo.se-curated (dnr, title) from a frozen case's ``headnote.html``
+    search-result row -- "… Diarienummer : 2484-2001 <title>". Authoritative
+    where the old pipeline garbled the identity (it read printed dnr *ranges*
+    as single dnrs: the frozen 2484-2487 is really 2484-2001). (None, None)
+    when the case has no headnote or the row carries no dnr."""
+    headnote = casedir / "headnote.html"
+    if not headnote.exists():
+        return None, None
+    text = BeautifulSoup(headnote.read_text("utf-8"),
+                         "html.parser").get_text(" ", strip=True)
+    m = re.search(r"Diarienummer\s*:?\s*(\d+-\d{2,4})\s*(\S.*?)?(?:\s*Läs mer|$)",
+                  text)
+    if not m:
+        return None, None
+    return _norm_dnr(m.group(1)), normalize_space(m.group(2) or "") or None
+
+
+def _jo_case(rdf_path):
+    """One distilled RDF -> (canonical dnr, all dnrs, title, date, citation),
+    or None when the file describes no VagledandeMyndighetsavgorande."""
+    root = ET.parse(rdf_path).getroot()
+    main = root.find(".//%sVagledandeMyndighetsavgorande" % _RPUBL)
+    if main is None:
+        return None
+    uri = main.get(_RDF + "about") or ""
+    canonical = uri.rsplit("/", 1)[-1]
+    dnrs = {_norm_dnr(e.text.strip().rstrip(","))
+            for e in main.findall(_RPUBL + "diarienummer") if e.text}
+    title = next((e.text for e in main.findall(_DCT + "title") if e.text), None)
+    date = next((e.text for e in (main.findall(_RPUBL + "avgorandedatum")
+                                  + main.findall(_DCT + "issued")) if e.text),
+                None)
+    citation = next((e.text.strip()
+                     for e in main.findall(_DCT + "bibliographicCitation")
+                     if e.text and e.text.strip()), None)
+    return _norm_dnr(canonical), dnrs, normalize_space(title or ""), date, citation
+
+
+def import_jo(source, root, force=False, log=print):
+    """Import the frozen JO corpus's *deltas* at ``source`` into the avg records
+    under ``root``: the ämbetsberättelse map for every case that has one, plus a
+    ``jo-legacy`` record + PDF for each case no live jo.se record covers (five,
+    measured 2026-07-19 -- the live harvest carries everything else). Join is on
+    *any* diarienummer, 2-digit years normalized. Idempotent; ``force`` rewrites
+    the import's own records. Returns (mapped, imported, skipped)."""
+    distilled = Path(source) / "distilled"
+    downloaded = Path(source) / "downloaded"
+    assert distilled.is_dir() and downloaded.is_dir(), \
+        "%s is not a frozen JO tree (need distilled/ + downloaded/)" % source
+
+    live = set()          # every dnr a *live-harvested* jo record carries
+                          # (multi-dnr cases list several, split on ;/,)
+    for recpath in compress.glob(Path(root) / "jo", "*.json"):
+        if recpath.name.startswith("."):
+            continue
+        rec = json.loads(compress.read_text(recpath))
+        if rec.get("source") == JO_SOURCE:
+            continue      # import's own records answer to should_write, not
+                          # coverage -- else a re-run could never refresh them
+        live |= {d.strip() for d in re.split(r"[;,]", rec.get("diary_number") or "")
+                 if d.strip()}
+
+    mapped = imported = skipped = 0
+    report = {}
+    for rdf_path in sorted(distilled.glob("*/*.rdf")):
+        case = _jo_case(rdf_path)
+        if case is None:
+            continue
+        canonical, dnrs, title, date, citation = case
+        casedir = downloaded / rdf_path.parent.name / rdf_path.stem
+        hd_dnr, hd_title = _headnote_meta(casedir)
+        if hd_dnr:
+            dnrs = dnrs | {hd_dnr}    # jo.se's own identity joins + gets mapped
+            canonical = hd_dnr        # ...and names any imported record's uri
+        title = hd_title or title     # prefer the jo.se-curated referat rubrik
+        if citation:
+            for dnr in dnrs | {canonical}:
+                report[dnr] = citation
+            mapped += 1
+        if dnrs & live or canonical in live:
+            continue
+        if not RE_JO_DNR.fullmatch(canonical):
+            log("jo %s: canonical dnr unusable -- skipping import" % canonical)
+            skipped += 1
+            continue
+        basefile = "jo/" + canonical
+        recpath = record_path(root, "jo", basefile)
+        if not legacy_import.should_write(legacy_import.read_record(recpath),
+                                          JO_SOURCE, force):
+            skipped += 1
+            continue
+        pdf = (downloaded / rdf_path.parent.name / rdf_path.stem / "index.pdf")
+        if not (pdf.exists() and sniff_extension(pdf) == ".pdf"):
+            log("jo %s: no frozen decision PDF -- skipping import" % canonical)
+            skipped += 1
+            continue
+        record = {"basefile": basefile,
+                  "diary_number": "; ".join(
+                      [canonical] + sorted(dnrs - {canonical})),
+                  "post_title": title, "resolve_date": date,
+                  "source": JO_SOURCE,
+                  "imported_from": "%s/%s/index.pdf"
+                                   % (rdf_path.parent.name, rdf_path.stem)}
+        compress.write_download(jo_pdf_path(root, basefile), pdf.read_bytes())
+        compress.write_download(recpath,
+                                json.dumps(record, ensure_ascii=False, indent=2))
+        imported += 1
+        log("jo import: %s (%s)" % (canonical, title[:60]))
+    # a parse input (avg_inputs lists it): atomic, so a crash never leaves a
+    # truncated map that every subsequent JO parse would choke on
+    util.write_atomic(jo_officialreport_path(root),
+                      json.dumps(dict(sorted(report.items())),
+                                 ensure_ascii=False, indent=0))
+    log("jo import: %d citations mapped, %d cases imported, %d skipped"
+        % (mapped, imported, skipped))
+    return mapped, imported, skipped
+
+
+# --------------------------------------------------------------------------
+# JK: the frozen-only decisions (jk.se's archive thins out before ~2000)
+# --------------------------------------------------------------------------
+
+JK_SOURCE = "jk-legacy"
+
+
+def _jk_norm(dnr):
+    """The dot/space-insensitive diarienummer normal form the frozen/live join
+    runs on: the frozen ids write the avdelning undotted ('859-97-21'), live
+    jk.se writes it dotted ('859-97-2.1')."""
+    return re.sub(r"[.\s,]+", "", (dnr or "").lower())
+
+
+def _jk_case(rdf_path):
+    """One frozen-JK distilled RDF -> (title, ISO beslutsdatum), best-effort."""
+    if not rdf_path.exists():
+        return None, None
+    main = ET.parse(rdf_path).getroot().find(
+        ".//%sVagledandeMyndighetsavgorande" % _RPUBL)
+    if main is None:
+        return None, None
+    title = next((e.text for e in main.findall(_DCT + "title") if e.text), None)
+    date = next((e.text for e in (main.findall(_RPUBL + "beslutsdatum")
+                                  + main.findall(_RPUBL + "avgorandedatum")
+                                  + main.findall(_DCT + "issued")) if e.text),
+                None)
+    return normalize_space(title or "") or None, date
+
+
+def import_jk(source, root, force=False, log=print):
+    """Import the frozen JK corpus's not-live decisions at ``source`` into the
+    avg records under ``root``: a ``jk-legacy`` record + the frozen jk.se
+    landing page (the same markup the live harvest stores, so `parse_jk` reads
+    it unchanged) for each decision no live record covers. The join is
+    dot-insensitive over every diarienummer a live record names (37 genuinely
+    absent, measured 2026-07-19 -- almost all 1997-1999). Idempotent; ``force``
+    rewrites the import's own records. Returns (imported, skipped)."""
+    source = Path(source)
+    assert (source / "entries").is_dir() and (source / "downloaded").is_dir(), \
+        "%s is not a frozen JK tree (need entries/ + downloaded/)" % source
+
+    live = set()
+    for recpath in compress.glob(Path(root) / "jk", "*.json"):
+        if recpath.name.startswith("."):
+            continue
+        rec = json.loads(compress.read_text(recpath))
+        if rec.get("source") == JK_SOURCE:
+            continue
+        for part in re.split(r"\s+och\s+|[;,]", rec.get("diarienummer_raw", "")):
+            if part.strip():
+                live.add(_jk_norm(part))
+
+    imported = skipped = 0
+    for entry_path in sorted(source.glob("entries/*/*.json")):
+        entry = json.loads(entry_path.read_text())
+        dnr = entry.get("basefile")
+        if not dnr or _jk_norm(dnr) in live:
+            continue
+        html = source / "downloaded" / entry_path.parent.name / (dnr + ".html")
+        if not html.exists():
+            log("jk %s: no frozen landing page -- skipping import" % dnr)
+            skipped += 1
+            continue
+        basefile = "jk/" + dnr
+        recpath = record_path(root, "jk", basefile)
+        if not legacy_import.should_write(legacy_import.read_record(recpath),
+                                          JK_SOURCE, force):
+            skipped += 1
+            continue
+        title, date = _jk_case(
+            source / "distilled" / entry_path.parent.name / (dnr + ".rdf"))
+        record = {"basefile": basefile, "org": "jk", "diarienummer_raw": dnr,
+                  "beslutsdatum_raw": date, "title": title or dnr,
+                  "url": entry.get("orig_url"), "source": JK_SOURCE}
+        compress.write_download(
+            Path(root) / "jk" / (basefile_slug(basefile) + ".html"),
+            html.read_bytes())
+        compress.write_download(recpath,
+                                json.dumps(record, ensure_ascii=False, indent=2))
+        imported += 1
+        log("jk import: %s (%s)" % (dnr, (title or "")[:60]))
+    log("jk import: %d imported, %d skipped" % (imported, skipped))
+    return imported, skipped

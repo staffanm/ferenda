@@ -156,7 +156,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 |---|---|
 | `model.py` | `Beslut` model; URI = `avg/{org}/{dnr}`, byte-identical to what MYNDIGHETSBESLUT citations mint |
 | `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs), JK harvester (jk.se listing → per-decision landing pages; `jk_canonical` dnr normalization) and ARN harvester (arn.se one-page vägledande-beslut listing → decision PDFs; a live record overwrites a frozen-import one) |
-| `legacy.py` | one-time import of the frozen ARN corpus 1991–2022 (`lagen avg import-legacy arn <tree>`, §7g) — fragment.html metadata, magic-sniffed bodies converted to PDF via soffice |
+| `legacy.py` | `lagen avg import-legacy {arn,jo,jk} <tree>` (§7g): one-time import of the frozen ARN corpus 1991–2022 (fragment.html metadata, magic-sniffed bodies converted to PDF via soffice); `import_jo`/`import_jk` import the small live-vs-frozen deltas a diarienummer join can't otherwise reach — 5 JO cases (dnr-normalization edge cases, headnote-curated titles + frozen PDFs) and 37 JK cases (almost all 1997–1999, before jk.se's archive thins out; frozen jk.se landing pages, some on the pre-2016 ASP.NET skin) — plus the JO ämbetsberättelse citation map (`jo/.officialreport.json`) distilled from the frozen RDFs |
 | `parse.py` | JO/ARN: PDF body via `lib/pdftext` (bold rubriker; JO's "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); all citation-scanned with the DV parse-type set |
 
 **foreskrift vertical (agency regulations)**
