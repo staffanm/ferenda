@@ -98,6 +98,9 @@ services:
         # under gid 3362, NOT root, or it EPERMs against the NFS mount.
         UID: "1001"
         GID: "3362"
+        # the deployed revision, baked into the image for the ops dashboard;
+        # the deploy passes GIT_SHA=$GITHUB_SHA (see .github/workflows/deploy.yml).
+        GIT_SHA: ${GIT_SHA:-unknown}
     profiles: [prod]
     environment:
       - OPENSEARCH_URL=http://opensearch:9200

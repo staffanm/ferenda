@@ -92,11 +92,17 @@ COPY --chown=app:app . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+# The deployed revision, baked in: .git is dockerignored so there's no repo to
+# `git rev-parse` at runtime -- the deploy passes GIT_SHA (the pushed commit),
+# and the ops dashboard reads ACCOMMODANDA_GIT_SHA. Unset -> "unknown".
+ARG GIT_SHA=unknown
+
 # venv console scripts (incl. `lagen`) on PATH; point search + wiki at the
 # sidecar cluster / mounted content repo (config.py reads these env vars).
 ENV PATH="/app/.venv/bin:$PATH" \
     OPENSEARCH_URL="http://opensearch:9200" \
-    WIKI_ROOT="/wiki"
+    WIKI_ROOT="/wiki" \
+    ACCOMMODANDA_GIT_SHA="${GIT_SHA}"
 
 USER app
 

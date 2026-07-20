@@ -9,11 +9,12 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from opensearchpy.exceptions import OpenSearchException
 
 from accommodanda import config
 from accommodanda.api import app as api
 from accommodanda.api import auth, ops
-from accommodanda.lib import runlog
+from accommodanda.lib import catalog, runlog
 
 
 @pytest.fixture
@@ -29,6 +30,14 @@ def editor_auth(monkeypatch):
     monkeypatch.setattr(config, "EDITORS", {"anna": {
         "name": "Anna Ek", "email": "anna@example.org",
         "pwhash": auth.hash_password("hunter2", rounds=1000)}})
+
+
+@pytest.fixture(autouse=True)
+def _stub_index(monkeypatch):
+    """Keep the ops tests hermetic (the docstring's "no network" promise): the
+    overview reads _index.store_size(), which would otherwise open a cluster
+    connection. Stub a fixed byte count; individual tests override as needed."""
+    monkeypatch.setattr(ops._index, "store_size", lambda: 42_000_000)
 
 
 def _login(client):
@@ -121,6 +130,48 @@ def test_overview_renders_matrix_and_failures(client):
 def test_overview_lists_recent_runs(client, ledger):
     body = client.get("/ops").text
     assert ledger["good"] in body and ledger["bad"] in body
+
+
+# -- system section (version / wiki / index size) -------------------------
+
+def test_system_section_renders_version_wiki_and_index_size(client, monkeypatch):
+    monkeypatch.setattr("accommodanda.api.ops.git.push_state", lambda repo: (2, True))
+    body = client.get("/ops").text
+    assert "<h2>system</h2>" in body
+    assert "accommodanda" in body and "lagen-wiki" in body
+    assert "2 unpushed commits" in body and "uncommitted changes" in body
+    assert "42.0 MB" in body                         # _human_bytes(42_000_000)
+
+
+def test_system_section_wiki_up_to_date(client, monkeypatch):
+    monkeypatch.setattr("accommodanda.api.ops.git.push_state", lambda repo: (0, False))
+    assert "up to date" in client.get("/ops").text
+
+
+def test_system_section_index_unavailable_when_cluster_down(client, monkeypatch):
+    def boom():
+        raise OpenSearchException("cluster down")
+    monkeypatch.setattr(ops._index, "store_size", boom)
+    assert "unavailable" in client.get("/ops").text
+
+
+def test_corpus_section_lists_docs_and_size_per_source(client, tmp_path, monkeypatch):
+    cat = tmp_path / "corpus.sqlite"
+    con = catalog.connect(cat)
+    con.executemany(
+        "INSERT INTO documents (uri, source, kind, label, title, path, art_size) "
+        "VALUES (?,?,?,?,?,?,?)",
+        [("u1", "sfs", "law", "L1", "T1", "p1", 1000),
+         ("u2", "sfs", "law", "L2", "T2", "p2", 2000),
+         ("u3", "dv", "case", "C1", "T3", "p3", 500)])
+    con.commit()
+    con.close()
+    monkeypatch.setattr(ops, "CATALOG", cat)
+    body = client.get("/ops").text
+    assert "<h2>corpus</h2>" in body
+    assert "3.0 kB" in body                          # sfs: 1000 + 2000
+    assert "500 B" in body                           # dv
+    assert "3.5 kB" in body                          # total 3500
 
 
 def test_versions_cell_renders_a_column(tmp_path, monkeypatch, editor_auth):

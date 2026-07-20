@@ -1283,7 +1283,10 @@ to a future per-doc incremental generate.
     dashboard itself is `/ops` on the FastAPI app (HTML, gated by the inline
     editor's session — any logged-in editor may view it; an unset
     `editor_secret` disables it, 403) with `/ops/runs`, `/ops/runs/{id}` and
-    `/ops/failures` drill-downs. `test/test_runlog.py`, `test/test_ops.py`.
+    `/ops/failures` drill-downs, plus a system panel (deployed git revision baked
+    at image build, lagen-wiki push state, OpenSearch index size) and a per-source
+    corpus inventory (docs + artifact size). A successful login on `/admin/`
+    redirects here. `test/test_runlog.py`, `test/test_ops.py`, `test/test_git.py`.
   - ✅ **Inline content editor** (`api/auth.py` + `api/edit.py` + `api/editcontent.py`
     + `api/editcart.py`; the write side of the service, first cut 2026-07-05) — a
     logged-in user edits the git-backed markdown (kommentar / begrepp / editorial

@@ -288,8 +288,10 @@ lagen all runs [N]        # recent runs from the ledger
   distinguishable from one *never touched*.
 - `status.json` — rolling per-source × per-stage health snapshot.
 
-`/ops` is an HTML health dashboard mounted on the same FastAPI app (per-source
-× per-stage matrix, failing-doc drill-downs with tracebacks, run timings). It
+`/ops` is an HTML health dashboard mounted on the same FastAPI app (a system
+panel — deployed git revision, lagen-wiki push state, OpenSearch index size — a
+per-source corpus inventory of documents + artifact size, the per-source ×
+per-stage matrix, failing-doc drill-downs with tracebacks, run timings). It
 is gated by the inline editor's session — any logged-in editor can view it,
 sharing the edit routes' auth rather than a separate token. With no session it
 answers 401; an unset `editor_secret` disables it entirely (every `/ops` route

@@ -97,6 +97,9 @@ services:
         # (lagen all all / rebuild: downloaded/, artifact/, generated/) must run
         # under gid 3362, NOT root, or they get EPERM against the NFS export.
         GID: "3362"
+        # the deployed revision, baked into the image for the ops dashboard;
+        # the deploy passes GIT_SHA=$GITHUB_SHA (see .github/workflows/deploy.yml).
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: accommodanda
     profiles: [prod]
     environment:

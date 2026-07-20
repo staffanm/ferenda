@@ -598,3 +598,14 @@ class SearchIndex:
 
     def doccount(self):
         return _retry(lambda: self.client.count(index=self.index), "count")["count"]
+
+    def store_size(self):
+        """Total on-disk size (bytes) of the index -- primaries only, which on the
+        single-node clusters here is the whole thing -- or None when the index
+        doesn't exist yet. A cluster that can't be reached raises (the ops caller
+        renders that as 'unavailable' so the health page still loads)."""
+        if not self.client.indices.exists(index=self.index):
+            return None
+        stats = _retry(lambda: self.client.indices.stats(
+            index=self.index, metric="store"), "store stats")
+        return stats["_all"]["primaries"]["store"]["size_in_bytes"]

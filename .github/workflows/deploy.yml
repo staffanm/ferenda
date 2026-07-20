@@ -75,7 +75,9 @@ jobs:
         run: |
           set -euo pipefail
           cd "$COMPOSE"
-          docker compose build accommodanda
+          # bake the deployed revision into the image (the ops dashboard reads it);
+          # .git is dockerignored, so there's no repo to rev-parse at runtime.
+          GIT_SHA="${GITHUB_SHA}" docker compose build accommodanda
 
       - name: Restart the accommodanda service (legacy stack left untouched)
         run: |

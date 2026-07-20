@@ -16,14 +16,16 @@ target a JSON API endpoint, not this page.
 """
 
 import html
+import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from opensearchpy.exceptions import OpenSearchException
 
 from .. import config
-from ..lib import catalog, runlog
+from ..lib import catalog, git, runlog, search
 from .auth import require_editor
 
 RUNS = config.DATA / ".build" / "runs.ndjson"
@@ -41,6 +43,10 @@ STAGES = ["download", "parse", "versions", "relate", "index", "dump", "generate"
 STALE_AFTER_H = 26        # snapshot-age warning threshold (a daily run + slack)
 
 router = APIRouter()
+
+# one search client for the module (constructing it opens no connection -- only
+# an actual store_size() call does), mirroring api/app.py's single _index.
+_index = search.SearchIndex()
 
 
 # --------------------------------------------------------------------------
@@ -147,6 +153,48 @@ def _catalog_counts():
         con.close()
 
 
+def _source_stats():
+    """{source: (docs, bytes)} from the catalog, or None when it isn't built."""
+    if not CATALOG.exists():
+        return None
+    con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
+    try:
+        return catalog.source_stats(con)
+    finally:
+        con.close()
+
+
+def _version():
+    """The running accommodanda revision: the git sha baked into the image at
+    build (ACCOMMODANDA_GIT_SHA, .git being dockerignored), else -- in a dev
+    working tree -- the live short HEAD, else 'unknown'."""
+    return (os.environ.get("ACCOMMODANDA_GIT_SHA")
+            or git.run(config.REPO, "rev-parse", "--short=12", "HEAD",
+                       capture=True, check=False)
+            or "unknown")
+
+
+def _index_size():
+    """Human size of the OpenSearch index, 'index not built' when absent, or
+    'unavailable' when the cluster can't be reached -- the health page must load
+    even when search is down (same spirit as _catalog_counts' None)."""
+    try:
+        size = _index.store_size()
+    except OpenSearchException:
+        return "unavailable"
+    return _human_bytes(size) if size is not None else "index not built"
+
+
+def _human_bytes(n):
+    """A compact decimal size ('39.5 GB', '812 MB', '4.0 kB'), matching how
+    OpenSearch's own _cat output sizes stores."""
+    size = float(n)
+    for unit in ("B", "kB", "MB", "GB", "TB"):
+        if size < 1000 or unit == "TB":
+            return "%d %s" % (size, unit) if unit == "B" else "%.1f %s" % (size, unit)
+        size /= 1000
+
+
 # --------------------------------------------------------------------------
 # routes
 # --------------------------------------------------------------------------
@@ -173,6 +221,42 @@ def ops_overview():
                      % (html.escape(updated), _age(updated)))
     parts.append('<p class="small">snapshot updated %s. %d docs failing overall.</p>'
                  % (html.escape(_age(updated)) if updated else "never", len(errors)))
+
+    # system: running revision, wiki push state, search-index size
+    ahead, dirty = git.push_state(config.WIKI_ROOT)
+    dirty_html = '<span class="regress">uncommitted changes</span>'
+    if ahead is None:
+        wiki = "no upstream" + (", " + dirty_html if dirty else "")
+    elif ahead or dirty:
+        wiki = ", ".join(
+            (['<span class="regress">%d unpushed commit%s</span>'
+              % (ahead, "" if ahead == 1 else "s")] if ahead else [])
+            + ([dirty_html] if dirty else []))
+    else:
+        wiki = "up to date"
+    parts.append('<h2>system</h2><table>'
+                 '<tr><th>accommodanda</th><td><code>%s</code></td></tr>'
+                 '<tr><th>lagen-wiki</th><td>%s</td></tr>'
+                 '<tr><th>opensearch index</th><td>%s</td></tr></table>'
+                 % (html.escape(_version()), wiki, html.escape(_index_size())))
+
+    # corpus: document count + artifact size per source, from the catalog
+    stats = _source_stats()
+    parts.append("<h2>corpus</h2>")
+    if not stats:
+        parts.append('<p class="empty">catalog not built -- run `lagen all relate`.</p>')
+    else:
+        crows, tot_docs, tot_bytes = [], 0, 0
+        for src in sorted(stats):
+            docs, nbytes = stats[src]
+            tot_docs += docs
+            tot_bytes += nbytes
+            crows.append("<tr><th>%s</th><td>%d</td><td>%s</td></tr>"
+                         % (html.escape(src), docs, _human_bytes(nbytes)))
+        crows.append("<tr><th>total</th><td>%d</td><td>%s</td></tr>"
+                     % (tot_docs, _human_bytes(tot_bytes)))
+        parts.append("<table><tr><th>source</th><th>docs</th><th>size</th></tr>"
+                     "%s</table>" % "".join(crows))
 
     # last-5-runs strip
     if runs:

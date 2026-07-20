@@ -246,7 +246,7 @@
     host.appendChild(u); host.appendChild(pw); host.appendChild(go); host.appendChild(err);
     function submit() {
       j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
-        .then(function (r) { if (r.ok) location.assign('/'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
+        .then(function (r) { if (r.ok) location.assign('/ops/'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
     }
     go.addEventListener('click', submit);
     pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });

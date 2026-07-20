@@ -26,3 +26,20 @@ def run(repo, *args, env=None, capture=False, check=True):
     subprocess.run(["git", "-C", str(repo), *args], check=True, env=env,
                    stdout=subprocess.DEVNULL)
     return None
+
+
+def push_state(repo):
+    """`(ahead, dirty)` for a working checkout: how many commits `HEAD` is ahead
+    of its configured upstream, and whether the working tree has uncommitted
+    changes. `ahead` is ``None`` when there is no upstream (nothing to be ahead
+    of) or `repo` isn't a git checkout at all. All probes run capture-mode with
+    ``check=False`` -- a missing upstream / non-repo is an answer, not an error
+    (the ops dashboard reads this best-effort and must render regardless)."""
+    if run(repo, "rev-parse", "--is-inside-work-tree", capture=True, check=False) != "true":
+        return None, False
+    upstream = run(repo, "rev-parse", "--abbrev-ref", "@{u}", capture=True, check=False)
+    ahead = (int(run(repo, "rev-list", "--count", "@{u}..HEAD",
+                     capture=True, check=False) or 0)
+             if upstream else None)
+    dirty = bool(run(repo, "status", "--porcelain", capture=True, check=False))
+    return ahead, dirty

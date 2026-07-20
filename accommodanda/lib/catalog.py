@@ -1156,6 +1156,15 @@ def counts(con):
         "SELECT source, COUNT(*) FROM documents GROUP BY source").fetchall())
 
 
+def source_stats(con):
+    """{source: (docs, bytes)}: document count and summed artifact size per
+    source, for the ops dashboard. `art_size` is NULL on synthesized stubs (rows
+    with no artifact on disk), so COALESCE it to 0."""
+    return {row[0]: (row[1], row[2]) for row in con.execute(
+        "SELECT source, COUNT(*), COALESCE(SUM(art_size), 0) "
+        "FROM documents GROUP BY source ORDER BY source").fetchall()}
+
+
 def expired_uris(con, today):
     """The uris whose declared repeal date (`expired`) is on or before `today` (an
     ISO date string) -- repealed statutes to drop from the browse listings. A

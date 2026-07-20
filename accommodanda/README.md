@@ -738,9 +738,11 @@ uv run python -m accommodanda.build ann status         # inventory the curated L
 ```
 
 `/ops` is an HTML health dashboard mounted on the same FastAPI app as the REST
-API (`api/ops.py`) — the per-source × per-stage matrix, a stale-snapshot
-banner, failing-doc totals, the last runs, duration-regression flags, and the
-catalog delta — with `/ops/runs`, `/ops/runs/{id}` (per-source timing bars +
+API (`api/ops.py`) — a system panel (deployed revision baked at image build,
+the lagen-wiki repo's push state, OpenSearch index size), a per-source corpus
+inventory (documents + artifact size), the per-source × per-stage matrix, a
+stale-snapshot banner, failing-doc totals, the last runs, duration-regression
+flags, and the catalog delta — with `/ops/runs`, `/ops/runs/{id}` (per-source timing bars +
 segments + errors) and `/ops/failures` (drill-down with tracebacks) alongside
 it. It's gated by the inline editor's session (`auth.require_editor`) — it
 rides the same editor login rather than a separate credential, so any editor
