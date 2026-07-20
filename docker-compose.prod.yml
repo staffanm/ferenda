@@ -115,7 +115,11 @@ services:
       - /mnt/forstor/accommodanda:/app/site/data
       # catalog_root: just catalog.sqlite (+ -wal/-shm), on the fast local disk.
       - /mnt/data/accommodanda:/app/catalog
-      - /mnt/data/lagen-wiki:/wiki         # begrepp/kommentar markdown repo (git clone on the host)
+      # begrepp/kommentar/site markdown repo (a git clone on the host). Lives on
+      # the roomy /mnt/forstor NFS mount (only latency-sensitive SQLite is kept on
+      # local /mnt/data); it's root_squashed, so the checkout is owned 1001:3362
+      # (staffan:lagen-nfs) and pushes are done from the host, not the container.
+      - /mnt/forstor/lagen-wiki:/wiki
       # Secrets + editor registry (editor_secret, editors[].pwhash, ops_token, LLM
       # key). config.py reads config.yml from the repo root (/app); without this
       # mount the file is absent and everything falls back to defaults -- the inline
