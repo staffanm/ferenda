@@ -140,7 +140,26 @@ MAPPING = {
     }
 }
 
+# A whole-document unit carries its artifact's ENTIRE body in `text`; the large
+# statutes and förarbeten run past a million characters. OpenSearch refuses to
+# highlight a field longer than `index.highlight.max_analyzed_offset` (default
+# 1_000_000) and fails the WHOLE search with a 400 -- so a common prefix that
+# happens to match one oversized document 500s the endpoint ("arbets", "arbetsmiljöl").
+# The query-level `max_analyzer_offset` caps analysis at a fixed offset instead of
+# erroring, which also bounds the per-hit highlight cost -- the real match is either
+# near the top of the body or, for an id-bearing document, recovered precisely by
+# the fragment query below. It MUST stay <= the index's max_analyzed_offset (the
+# 1_000_000 default) or the 400 comes back; test_highlight_cap_stays_under_index_limit
+# locks that in (the client is mocked, so no unit test can exercise the live path).
+#
+# Verified live against the pinned OpenSearch 2.9.0 cluster (both compose files):
+# the query-level key really is `max_analyzer_offset` (note: NOT the `_analyzed_`
+# index-setting spelling) -- the cluster REJECTS an unknown highlight key with
+# `x_content_parse_exception: unknown field [max_analyzed_offset] did you mean
+# [max_analyzer_offset]?` (so a silent no-op is impossible), and supplying the
+# correct key turned `q=arbets` from 400 to 200 (~200ms) against a >1M-char doc.
 HIGHLIGHT = {"fields": {"text": {}, "title": {}},
+             "max_analyzer_offset": 100_000,
              # the client injects the fragment as innerHTML: html-encode the
              # body (parsed remote content) so only the <em> markers are markup
              "encoder": "html",

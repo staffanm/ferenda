@@ -204,6 +204,18 @@ def test_prefix_query_handles_incomplete_legal_compounds_and_syntax():
     assert search.prefix_query('\"upphovsr rätt\" (36 §)') == "upphovsr* rätt* 36*"
 
 
+def test_highlight_cap_stays_under_index_limit():
+    # A whole-document unit's `text` runs past 1M chars for large statutes; without
+    # a query-level cap OpenSearch 400s the whole search on such a hit. The cap must
+    # be present in the highlight body AND stay <= the index default max_analyzed_offset
+    # (1_000_000), or the 400 returns. Verified live against OpenSearch 2.9.0 (see the
+    # HIGHLIGHT comment in search.py); this guards the invariant the mocked client can't.
+    offset = search.HIGHLIGHT["max_analyzer_offset"]
+    assert 0 < offset <= 1_000_000
+    body = search.query_body("mord")
+    assert body["highlight"]["max_analyzer_offset"] == offset
+
+
 def test_parse_hit_fragment_representative():
     # a fragment unit won the group -> its pinpoint + highlight surface, and the
     # document identity comes from the display-only doc_title / doc_label
