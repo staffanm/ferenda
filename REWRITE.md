@@ -1280,9 +1280,9 @@ to a future per-doc incremental generate.
     on full-source runs, updates a rolling per-source × per-stage snapshot
     (`status.json`). `lagen <source> status` writes the authoritative
     snapshot cell; `lagen all runs [N]` lists recent runs from the CLI. The
-    dashboard itself is `/ops` on the FastAPI app (HTML, HTTP Basic user
-    `ops`, password = the new `ops_token` config knob / `OPS_TOKEN` env —
-    unset disables it, 403) with `/ops/runs`, `/ops/runs/{id}` and
+    dashboard itself is `/ops` on the FastAPI app (HTML, gated by the inline
+    editor's session — any logged-in editor may view it; an unset
+    `editor_secret` disables it, 403) with `/ops/runs`, `/ops/runs/{id}` and
     `/ops/failures` drill-downs. `test/test_runlog.py`, `test/test_ops.py`.
   - ✅ **Inline content editor** (`api/auth.py` + `api/edit.py` + `api/editcontent.py`
     + `api/editcart.py`; the write side of the service, first cut 2026-07-05) — a
@@ -1298,7 +1298,8 @@ to a future per-doc incremental generate.
     scoped rebuild (`build.rebuild_after_commit`: parse → relate → regenerate just
     the touched pages) so the edit is live when the call returns. Auth is a signed
     session cookie (stdlib HMAC over the `editor_secret` knob — unset disables
-    editing, 403, like `ops_token`); passwords are `pbkdf2$…` strings minted by
+    editing, and the `/ops` dashboard that shares this session, 403); passwords
+    are `pbkdf2$…` strings minted by
     `python -m accommodanda.api.auth hash`. The static site stays byte-identical for
     anonymous readers — the affordances are grafted client-side (`render.EDITOR`,
     `editor.js`) after a `/auth/me` check, keyed off a `<meta name="lagen-doc">`
@@ -3410,9 +3411,10 @@ in `git log`. This document is the forest-level status; section markers
 - **§6** (2026-07-04) — operations/health dashboard: `lib/runlog.py` owns the
   three `DATA/.build/` state files (run ledger, per-doc error store, rolling
   status snapshot), `build.py` instruments every invocation and extends
-  `status` + adds `lagen all runs`, and `api/ops.py` serves `/ops` (Basic-auth,
-  new `ops_token` config knob) as a self-contained health matrix + run/failure
-  drill-down, independent of the site render.
+  `status` + adds `lagen all runs`, and `api/ops.py` serves `/ops` (originally
+  HTTP-Basic via an `ops_token` knob, later unified onto the inline editor's
+  session) as a self-contained health matrix + run/failure drill-down,
+  independent of the site render.
 - **§7h** (2026-07-04) — remisser vertical landed: regeringen.se remiss/referral
   harvest (two-pass sync, stub records for unreachable case pages so an
   incremental watermark can't hide a failure), PDF parse over the shared

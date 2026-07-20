@@ -17,8 +17,9 @@ table, so it survives a restart and adds no state to guard. The pwhash
 fingerprint is the session's revocation lever: change an editor's password
 and every session issued under the old one stops matching (see
 ``_pwhash_fingerprint``). An unset ``editor_secret`` disables editing
-wholesale: ``require_editor`` answers 403, mirroring how an unset
-``ops_token`` disables ``/ops``.
+wholesale: ``require_editor`` answers 403 -- which also gates the ops
+dashboard (`/ops`, api/ops.py), since it rides this same editor session
+rather than a separate credential.
 
 Passwords are stored only as ``pbkdf2$rounds$salt$hash`` strings (stdlib
 ``hashlib.pbkdf2_hmac``); ``python -m accommodanda.api.auth hash`` mints one to

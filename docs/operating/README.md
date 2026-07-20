@@ -98,11 +98,8 @@ llm_top_p: 0.95                          # whose thinking mode needs it (Qwen3.6
 compress: true                       # store artifact/ + generated/ as Brotli (.json.br/.html.br); default on
 compress_quality: 11                 # Brotli quality 0-11; default 11 (lower for faster builds)
 
-# --- ops dashboard (/ops) --------------------------------------------
-ops_token: <random>                  # HTTP-Basic password for user `ops`; unset ⇒ /ops disabled (403)
-
-# --- inline content editor (the only mutating surface) ---------------
-editor_secret: <random hex>          # signs the session cookie; unset ⇒ editing off (403)
+# --- inline content editor (mutating surface) + /ops dashboard -------
+editor_secret: <random hex>          # signs the session cookie; unset ⇒ editing AND /ops off (403)
 cookie_secure: true                  # Secure flag on the session cookie; off only for plain-http dev
 editors:                             # hand-curated; there is no self-signup
   staffan:
@@ -123,8 +120,7 @@ editors:                             # hand-curated; there is no self-signup
 | `llm_top_p` | `LLM_TOP_P` | unset (endpoint's default) |
 | `compress` | `FERENDA_COMPRESS` | `true` |
 | `compress_quality` | `FERENDA_COMPRESS_QUALITY` | `11` |
-| `ops_token` | `OPS_TOKEN` | unset (dashboard disabled) |
-| `editor_secret` | `EDITOR_SECRET` | unset (editing disabled) |
+| `editor_secret` | `EDITOR_SECRET` | unset (editing + `/ops` disabled) |
 | `cookie_secure` | `EDITOR_COOKIE_SECURE` | `true` |
 | `editors` | — (config only) | `{}` |
 
@@ -294,8 +290,10 @@ lagen all runs [N]        # recent runs from the ledger
 
 `/ops` is an HTML health dashboard mounted on the same FastAPI app (per-source
 × per-stage matrix, failing-doc drill-downs with tracebacks, run timings). It
-is gated by HTTP Basic auth (user `ops`, password = `ops_token`); leaving
-`ops_token` unset disables it (every `/ops` route answers 403).
+is gated by the inline editor's session — any logged-in editor can view it,
+sharing the edit routes' auth rather than a separate token. With no session it
+answers 401; an unset `editor_secret` disables it entirely (every `/ops` route
+answers 403).
 
 ### Seeding a new host by rsync (skip the from-scratch rebuild)
 

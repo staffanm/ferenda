@@ -1,7 +1,8 @@
 """The ops dashboard (accommodanda/api/ops.py) over FastAPI's TestClient: a
 fixture ledger/errors/status written into tmp_path with the runlog emit_*
-helpers, the ops path constants + config.OPS_TOKEN monkeypatched. No network,
-no build driver."""
+helpers and the ops path constants monkeypatched. The dashboard rides the inline
+editor's session (auth.require_editor), so tests log in as an editor rather than
+present a token. No network, no build driver."""
 
 import json
 import os
@@ -11,14 +12,36 @@ from fastapi.testclient import TestClient
 
 from accommodanda import config
 from accommodanda.api import app as api
-from accommodanda.api import ops
+from accommodanda.api import auth, ops
 from accommodanda.lib import runlog
-
-AUTH = ("ops", "s3cret")
 
 
 @pytest.fixture
-def ledger(tmp_path, monkeypatch):
+def editor_auth(monkeypatch):
+    """Editor-session scaffolding shared by every ops test: `/ops` is gated by
+    auth.require_editor, so a request is authorised by a logged-in editor cookie
+    (config.EDITORS), not a token. COOKIE_SECURE off so TestClient's plain-http
+    jar replays the cookie; a fresh rate limiter so login attempts don't bleed
+    across tests (the real one is a module singleton keyed on the fake IP)."""
+    monkeypatch.setattr(config, "EDITOR_SECRET", "test-signing-key")
+    monkeypatch.setattr(config, "COOKIE_SECURE", False)
+    monkeypatch.setattr(auth, "_login_limiter", auth._RateLimiter())
+    monkeypatch.setattr(config, "EDITORS", {"anna": {
+        "name": "Anna Ek", "email": "anna@example.org",
+        "pwhash": auth.hash_password("hunter2", rounds=1000)}})
+
+
+def _login(client):
+    """Log the TestClient in as editor `anna` (sets the session cookie on its
+    jar) and return it, so subsequent /ops requests carry the editor session."""
+    assert client.post("/api/v1/auth/login",
+                       json={"username": "anna", "password": "hunter2"}
+                       ).status_code == 200
+    return client
+
+
+@pytest.fixture
+def ledger(tmp_path, monkeypatch, editor_auth):
     """A small but realistic .build ledger: one clean run and one run with a
     failing sfs parse, a matching errors.json, and a status snapshot with one
     failed cell. Returns the run ids so tests can address the detail view."""
@@ -57,44 +80,33 @@ def ledger(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "ERRORS", errors)
     monkeypatch.setattr(ops, "STATUS", status)
     monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")  # absent
-    monkeypatch.setattr(config, "OPS_TOKEN", "s3cret")
     return {"good": good, "bad": bad, "dir": build}
 
 
 @pytest.fixture
 def client(ledger):
-    return TestClient(api.app)
+    return _login(TestClient(api.app))
 
 
 # -- auth -----------------------------------------------------------------
 
-def test_unauthenticated_401(client):
-    r = client.get("/ops")
-    assert r.status_code == 401
-    assert r.headers["www-authenticate"] == "Basic"
+def test_unauthenticated_401(ledger):
+    # /ops rides the editor session: no cookie -> 401 (log in), like the edit routes
+    assert TestClient(api.app).get("/ops").status_code == 401
 
 
-def test_wrong_password_401(client):
-    assert client.get("/ops", auth=("ops", "nope")).status_code == 401
-
-
-def test_non_ascii_password_401_not_500(client):
-    # secrets.compare_digest raises TypeError on a non-ASCII str; the auth gate
-    # must compare on bytes so a garbage password is a clean 401, not a 500
-    assert client.get("/ops", auth=("ops", "pässwörd")).status_code == 401
-
-
-def test_token_unset_403(client, monkeypatch):
-    monkeypatch.setattr(config, "OPS_TOKEN", None)
-    r = client.get("/ops", auth=AUTH)
+def test_editing_disabled_403(ledger, monkeypatch):
+    # an unset editor_secret disables editing wholesale -- and the dashboard with it
+    monkeypatch.setattr(config, "EDITOR_SECRET", None)
+    r = TestClient(api.app).get("/ops")
     assert r.status_code == 403
-    assert "ops_token" in r.json()["detail"]
+    assert "editor_secret" in r.json()["detail"]
 
 
 # -- /ops overview --------------------------------------------------------
 
 def test_overview_renders_matrix_and_failures(client):
-    r = client.get("/ops", auth=AUTH)
+    r = client.get("/ops")
     assert r.status_code == 200
     body = r.text
     assert "pipeline health" in body
@@ -107,11 +119,11 @@ def test_overview_renders_matrix_and_failures(client):
 
 
 def test_overview_lists_recent_runs(client, ledger):
-    body = client.get("/ops", auth=AUTH).text
+    body = client.get("/ops").text
     assert ledger["good"] in body and ledger["bad"] in body
 
 
-def test_versions_cell_renders_a_column(tmp_path, monkeypatch):
+def test_versions_cell_renders_a_column(tmp_path, monkeypatch, editor_auth):
     # sfs writes a ("sfs", "versions") status cell; the matrix must grow a
     # versions column for it rather than silently hiding the cell
     build = tmp_path / ".build"
@@ -124,15 +136,14 @@ def test_versions_cell_renders_a_column(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
     monkeypatch.setattr(ops, "STATUS", status)
     monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")
-    monkeypatch.setattr(config, "OPS_TOKEN", "s3cret")
-    body = TestClient(api.app).get("/ops", auth=AUTH).text
+    body = _login(TestClient(api.app)).get("/ops").text
     assert "<th>versions</th>" in body
 
 
 # -- /ops/runs ------------------------------------------------------------
 
 def test_runs_table_newest_first(client, ledger):
-    r = client.get("/ops/runs", auth=AUTH)
+    r = client.get("/ops/runs")
     assert r.status_code == 200
     body = r.text
     assert "lagen sfs parse" in body
@@ -143,7 +154,7 @@ def test_runs_table_newest_first(client, ledger):
 # -- /ops/runs/{id} -------------------------------------------------------
 
 def test_run_detail_shows_bars_segments_and_errors(client, ledger):
-    r = client.get("/ops/runs/%s" % ledger["bad"], auth=AUTH)
+    r = client.get("/ops/runs/%s" % ledger["bad"])
     assert r.status_code == 200
     body = r.text
     assert "timings" in body and "segments" in body
@@ -153,19 +164,19 @@ def test_run_detail_shows_bars_segments_and_errors(client, ledger):
 
 
 def test_run_detail_skipped_segment_present(client, ledger):
-    body = client.get("/ops/runs/%s" % ledger["good"], auth=AUTH).text
+    body = client.get("/ops/runs/%s" % ledger["good"]).text
     # the watermark-skipped dv parse must still show in the segment table
     assert "dv" in body
 
 
 def test_run_detail_unknown_404(client):
-    assert client.get("/ops/runs/nope-0", auth=AUTH).status_code == 404
+    assert client.get("/ops/runs/nope-0").status_code == 404
 
 
 # -- /ops/failures --------------------------------------------------------
 
 def test_failures_lists_traceback_in_details(client):
-    r = client.get("/ops/failures", auth=AUTH)
+    r = client.get("/ops/failures")
     assert r.status_code == 200
     body = r.text
     assert "1 failing docs" in body
@@ -173,32 +184,31 @@ def test_failures_lists_traceback_in_details(client):
 
 
 def test_failures_source_filter(client):
-    assert client.get("/ops/failures", params={"source": "sfs"},
-                      auth=AUTH).text.count("1999:9") >= 1
-    body = client.get("/ops/failures", params={"source": "dv"}, auth=AUTH).text
+    assert client.get("/ops/failures", params={"source": "sfs"}
+                      ).text.count("1999:9") >= 1
+    body = client.get("/ops/failures", params={"source": "dv"}).text
     assert "0 failing docs" in body and "1999:9" not in body
 
 
 def test_failures_stage_filter(client):
-    body = client.get("/ops/failures", params={"stage": "generate"}, auth=AUTH).text
+    body = client.get("/ops/failures", params={"stage": "generate"}).text
     assert "0 failing docs" in body
 
 
 # -- empty states ---------------------------------------------------------
 
-def test_empty_states_render_without_files(tmp_path, monkeypatch):
+def test_empty_states_render_without_files(tmp_path, monkeypatch, editor_auth):
     empty = tmp_path / ".build"
     monkeypatch.setattr(ops, "RUNS", empty / "runs.ndjson")
     monkeypatch.setattr(ops, "ERRORS", empty / "errors.json")
     monkeypatch.setattr(ops, "STATUS", empty / "status.json")
     monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")
-    monkeypatch.setattr(config, "OPS_TOKEN", "s3cret")
-    c = TestClient(api.app)
-    assert "no runs recorded yet" in c.get("/ops", auth=AUTH).text
-    assert c.get("/ops/runs", auth=AUTH).status_code == 200
-    assert "no matching failures" in c.get("/ops/failures", auth=AUTH).text
+    c = _login(TestClient(api.app))
+    assert "no runs recorded yet" in c.get("/ops").text
+    assert c.get("/ops/runs").status_code == 200
+    assert "no matching failures" in c.get("/ops/failures").text
     # a status snapshot older than the threshold would banner; with none, no banner
-    assert '<div class="banner">' not in c.get("/ops", auth=AUTH).text
+    assert '<div class="banner">' not in c.get("/ops").text
 
 
 def test_stale_snapshot_banner(client, ledger):
@@ -207,5 +217,5 @@ def test_stale_snapshot_banner(client, ledger):
     data = json.loads(status.read_text())
     data["_updated"] = "2020-01-01T00:00:00Z"
     status.write_text(json.dumps(data))
-    body = client.get("/ops", auth=AUTH).text
+    body = client.get("/ops").text
     assert '<div class="banner">' in body and "No completed run since" in body

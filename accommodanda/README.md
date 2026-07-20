@@ -316,8 +316,8 @@ decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite
 catalog can sit on fast local disk while the bulk artifact corpus is on NFS;
 defaults to `data_root`, colocated), the services the pipeline
 talks to (`opensearch_url`, `llm_base_url`/`llm_model`/`llm_temperature`/
-`llm_top_p`/`vision_model`) and the deployment's own settings (`ops_token`,
-`editor_secret`, `editors`, `compress`/`compress_quality`, `cookie_secure`) —
+`llm_top_p`/`vision_model`) and the deployment's own settings (`editor_secret`,
+`editors`, `compress`/`compress_quality`, `cookie_secure`) —
 read with ruamel.yaml round-trip mode so a bad value's line number is reported.
 What it deliberately does *not* locate is curated source data shipped in the
 tree (`lib/datasets.py`'s `NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`,
@@ -742,9 +742,10 @@ API (`api/ops.py`) — the per-source × per-stage matrix, a stale-snapshot
 banner, failing-doc totals, the last runs, duration-regression flags, and the
 catalog delta — with `/ops/runs`, `/ops/runs/{id}` (per-source timing bars +
 segments + errors) and `/ops/failures` (drill-down with tracebacks) alongside
-it. It's gated by HTTP Basic auth (user `ops`, password = the `ops_token` key
-in `config.yml` or the `OPS_TOKEN` env var); leaving it unset disables the
-dashboard (every route answers 403).
+it. It's gated by the inline editor's session (`auth.require_editor`) — it
+rides the same editor login rather than a separate credential, so any editor
+can view it: no session answers 401, and an unset `editor_secret` disables it
+entirely (403), exactly as the edit routes do.
 
 ## Inline editing (web UI)
 
@@ -775,8 +776,8 @@ uv run python -m accommodanda.api.auth hash '<the password>'   # prints the pbkd
 
 `editor_secret`/`editors` follow the same env→config.yml precedence as the other
 knobs (`EDITOR_SECRET` env; `editors` is config-only). Leaving `editor_secret`
-unset disables editing wholesale — every `/api/v1/{auth,edit}/*` route answers
-403 — exactly as an unset `ops_token` disables `/ops`.
+unset disables editing wholesale — every `/api/v1/{auth,edit}/*` route, and the
+`/ops` dashboard that rides the same session, answers 403.
 
 The session cookie's `Secure` flag is `cookie_secure` (`EDITOR_COOKIE_SECURE`
 env), on by default; flip it off in `config.yml` only for a plain-http dev

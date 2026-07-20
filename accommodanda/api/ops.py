@@ -7,23 +7,24 @@ because the health page must load precisely when the corpus is broken or no
 site has been built. It only *reads* the runlog files through the same
 module the build driver writes them with -- neither side imports the other.
 
-Auth is HTTP Basic (user ``ops``, password = ``config.OPS_TOKEN``): the
-browser prompts natively and caches credentials (no login page, no JS), it
-is curl-friendly, and the token never lands in access logs. A token left
-unset disables the dashboard -- every route answers 403 with a hint.
+Auth is the inline editor's session (``auth.require_editor``): the dashboard
+serves the same small hand-curated set of editors, so it rides their login
+rather than carrying a second credential. No/expired session -> 401 (log in);
+editing disabled (no ``editor_secret``) -> 403 -- exactly as the edit routes
+answer. This is an HTML view for humans; a curl/monitoring integration should
+target a JSON API endpoint, not this page.
 """
 
 import html
-import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from .. import config
 from ..lib import catalog, runlog
+from .auth import require_editor
 
 RUNS = config.DATA / ".build" / "runs.ndjson"
 ERRORS = config.DATA / ".build" / "errors.json"
@@ -40,25 +41,6 @@ STAGES = ["download", "parse", "versions", "relate", "index", "dump", "generate"
 STALE_AFTER_H = 26        # snapshot-age warning threshold (a daily run + slack)
 
 router = APIRouter()
-_basic = HTTPBasic(auto_error=False)
-
-
-def require_ops(credentials: HTTPBasicCredentials = Depends(_basic)):
-    """The single auth gate on every ops route. Unset token -> 403 with a hint
-    (the dashboard is off until `ops_token` is configured); missing or wrong
-    credentials -> 401 with a Basic challenge so the browser prompts."""
-    if config.OPS_TOKEN is None:
-        raise HTTPException(403, "ops dashboard disabled -- set `ops_token` "
-                                 "(config.yml) or the OPS_TOKEN env var")
-    # compare on bytes, not str: secrets.compare_digest raises TypeError on a
-    # non-ASCII str, which would surface as an unauthenticated 500 instead of 401
-    ok = (credentials is not None
-          and secrets.compare_digest(credentials.username.encode("utf-8"), b"ops")
-          and secrets.compare_digest(credentials.password.encode("utf-8"),
-                                     config.OPS_TOKEN.encode("utf-8")))
-    if not ok:
-        raise HTTPException(401, "bad ops credentials",
-                            headers={"WWW-Authenticate": "Basic"})
 
 
 # --------------------------------------------------------------------------
@@ -169,7 +151,7 @@ def _catalog_counts():
 # routes
 # --------------------------------------------------------------------------
 
-@router.get("/ops", response_class=HTMLResponse, dependencies=[Depends(require_ops)])
+@router.get("/ops", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
 def ops_overview():
     """Health overview: the per-source x per-stage matrix, a snapshot-age
     banner, total failing docs, the last-5-runs strip, per-cell last-success
@@ -266,7 +248,7 @@ def ops_overview():
 
 
 @router.get("/ops/runs", response_class=HTMLResponse,
-            dependencies=[Depends(require_ops)])
+            dependencies=[Depends(require_editor)])
 def ops_runs():
     """Run history, newest first: start time, wall-clock, argv, the
     ok/errors/aborted/running outcome, and the segment count."""
@@ -290,7 +272,7 @@ def ops_runs():
 
 
 @router.get("/ops/runs/{run_id}", response_class=HTMLResponse,
-            dependencies=[Depends(require_ops)])
+            dependencies=[Depends(require_editor)])
 def ops_run_detail(run_id: str):
     """One run: per-step timing bars (a coloured block per source, width
     proportional to seconds), a segment table, and the run's errors grouped by
@@ -362,7 +344,7 @@ def ops_run_detail(run_id: str):
 
 
 @router.get("/ops/failures", response_class=HTMLResponse,
-            dependencies=[Depends(require_ops)])
+            dependencies=[Depends(require_editor)])
 def ops_failures(source: str | None = Query(None), stage: str | None = Query(None)):
     """The `errors.json` drill-down: one row per currently-failing doc,
     optionally filtered by ?source= and ?stage=, each traceback tucked into a

@@ -244,26 +244,6 @@ def resolve_vision_model(doc):
     return value
 
 
-def resolve_ops_token(doc):
-    """The shared secret guarding the ops dashboard (`/ops`, api/ops.py). It is
-    the HTTP-Basic password for user ``ops``; unset (``None``) leaves the
-    dashboard disabled (its routes answer 403 with a hint). Precedence: the
-    ``OPS_TOKEN`` environment variable, then the ``ops_token`` key in
-    config.yml, else ``None``. Like its siblings, a present-but-invalid value
-    (non-string or empty) raises ``ConfigError`` rather than silently falling
-    back to ``None`` -- a typo must not disable auth quietly."""
-    env = os.environ.get("OPS_TOKEN")
-    if env:
-        return env
-    if "ops_token" not in doc:
-        return None
-    value = doc["ops_token"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("ops_token set to invalid value %r at %s"
-                          % (value, _at(doc, "ops_token")))
-    return value
-
-
 def resolve_compress(doc):
     """Whether the artifact/ and generated/ trees are stored precompressed
     (lib/compress). On (the default) => a parsed artifact lands as ``.json.br``
@@ -321,10 +301,11 @@ def resolve_compress_quality(doc):
 def resolve_editor_secret(doc):
     """The HMAC key that signs the inline editor's session cookie (api/auth.py).
     Unset (``None``) disables editing entirely -- every mutating route answers
-    403, exactly like an unset ``ops_token`` disables the dashboard. Precedence:
-    the ``EDITOR_SECRET`` environment variable, then the ``editor_secret`` key in
-    config.yml, else ``None``. A present-but-invalid value raises ``ConfigError``
-    rather than silently disabling auth."""
+    403 -- and, since the ops dashboard (`/ops`) now rides the same editor
+    session, disables that too. Precedence: the ``EDITOR_SECRET`` environment
+    variable, then the ``editor_secret`` key in config.yml, else ``None``. A
+    present-but-invalid value raises ``ConfigError`` rather than silently
+    disabling auth."""
     env = os.environ.get("EDITOR_SECRET")
     if env:
         return env
@@ -409,7 +390,6 @@ LLM_BASE_URL = resolve_llm_base_url(_doc)
 LLM_TEMPERATURE = resolve_llm_temperature(_doc)
 LLM_TOP_P = resolve_llm_top_p(_doc)
 VISION_MODEL = resolve_vision_model(_doc)
-OPS_TOKEN = resolve_ops_token(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)
 COMPRESS = resolve_compress(_doc)
