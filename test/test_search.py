@@ -151,6 +151,27 @@ def test_doc_actions_pathless_stub_indexes_identity_only():
     assert "text" not in unit["_source"]            # no body, no fragments
 
 
+def test_doc_actions_carries_repeal_date_when_present():
+    # the repeal date rides onto every unit so the query can time-filter it (S6/S7)
+    [unit] = list(search.doc_actions(
+        ("https://lagen.nu/1960:1", "sfs", "law", "1960:1", "Gammal lag", ""),
+        0, version="v", expired="2020-01-01"))
+    assert unit["_source"]["expired"] == "2020-01-01"
+    # no repeal date -> no field (so the range filter never matches it)
+    [live] = list(search.doc_actions(
+        ("https://lagen.nu/2020:1", "sfs", "law", "2020:1", "Ny lag", ""),
+        0, version="v"))
+    assert "expired" not in live["_source"]
+
+
+def test_query_excludes_in_force_repeals_but_keeps_future_ones():
+    # a repeal already in force is filtered out; a future/absent repeal is kept
+    # (S6/S7) -- evaluated against `now` at query time, not baked in
+    body = search.query_body("mord")
+    must_not = body["query"]["function_score"]["query"]["bool"]["must_not"]
+    assert {"range": {"expired": {"lte": "now/d"}}} in must_not
+
+
 def test_query_body_pages_exact_document_units_and_ranks_by_inbound():
     body = search.query_body("mord", source="sfs", year="1962",
                              limit=5, offset=10)
@@ -159,8 +180,12 @@ def test_query_body_pages_exact_document_units_and_ranks_by_inbound():
     assert body["track_total_hits"] is True                # exact result count
     assert body["sort"] == [{"_score": "desc"}, {"doc_uri": "asc"}]
     fs = body["query"]["function_score"]
-    assert fs["field_value_factor"]["field"] == "inbound_count"
-    assert fs["boost_mode"] == "sum"
+    assert fs["functions"][0]["field_value_factor"]["field"] == "inbound_count"
+    # the acts tier (sfs/foreskrift/EU acts) gets a flat score bonus (S3)
+    assert fs["functions"][1]["weight"] == search.ACT_TIER_BOOST
+    assert {"term": {"source": "sfs"}} in \
+        fs["functions"][1]["filter"]["bool"]["should"]
+    assert fs["boost_mode"] == "sum" and fs["score_mode"] == "sum"
     # filtering happens in post_filter only (facet counts stay unnarrowed)
     assert {"term": {"is_doc": True}} in fs["query"]["bool"]["filter"]
     assert {"term": {"source": "sfs"}} in body["post_filter"]["bool"]["filter"]

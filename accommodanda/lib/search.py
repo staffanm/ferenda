@@ -40,7 +40,7 @@ from .. import config
 from . import catalog, compress, facets, text
 
 INDEX = "lagen"
-INDEX_FORMAT = "3"        # bump when emitted units change without artifact changes
+INDEX_FORMAT = "4"        # bump when emitted units change without artifact changes
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -92,6 +92,26 @@ def _index_version(content_hash):
 # inbound_count (function_score).
 SEARCH_FIELDS = ["identifier^16", "title^4", "label^3", "text", "all"]
 
+# repealed acts whose repeal is in force are excluded from results; a future,
+# not-yet-in-force repeal date (and a null expired) is kept (S6/S7). Evaluated at
+# query time against `now` so it stays correct between reindexes.
+REPEALED_IN_FORCE = {"range": {"expired": {"lte": "now/d"}}}
+
+# The "acts" tier that outranks every other source at equal relevance (S3):
+# Swedish statutes/ordinances (sfs), agency regulations (foreskrift) and EU
+# acts + treaties (eurlex, minus its case law -- judgments/AG opinions). The
+# bonus is a flat score summed onto the text + inbound score; tune ACT_TIER_BOOST
+# against the live index (higher = more decisive tiering).
+ACT_TIER_BOOST = 12.0
+ACT_TIER_FILTER = {"bool": {"minimum_should_match": 1, "should": [
+    {"term": {"source": "sfs"}},
+    {"term": {"source": "foreskrift"}},
+    {"bool": {"must": [
+        {"term": {"source": "eurlex"}},
+        {"terms": {"kind": ["regulation", "directive", "decision",
+                            "treaty", "act"]}}]}},
+]}}
+
 MAPPING = {
     "settings": {
         # 0 replicas: the dev cluster (docker-compose.yml) is single-node, so a
@@ -120,6 +140,10 @@ MAPPING = {
             "source":        {"type": "keyword"},
             "kind":          {"type": "keyword"},
             "year":          {"type": "keyword"},
+            # the declared repeal date (catalog `expired`), so a query-time range
+            # can drop acts whose repeal is in force while keeping a future,
+            # not-yet-in-force repeal visible (S6/S7). Absent when never repealed.
+            "expired":       {"type": "date", "format": "yyyy-MM-dd"},
             "pinpoint":      {"type": "keyword"},
             "inbound_count": {"type": "long"},
             "is_doc":        {"type": "boolean"},    # whole-document unit vs fragment
@@ -170,7 +194,7 @@ HIGHLIGHT = {"fields": {"text": {}, "title": {}},
 # extraction -- artifact + catalog row -> bulk actions (pure)
 # --------------------------------------------------------------------------
 
-def doc_actions(row, inbound_count, version=None):
+def doc_actions(row, inbound_count, version=None, expired=None):
     """Yield the index units for one catalogued document: one whole-document unit
     plus one unit per id-bearing fragment, all standalone (no join/routing) and
     all carrying `doc_uri` (the collapse key) + the document's display metadata,
@@ -193,6 +217,8 @@ def doc_actions(row, inbound_count, version=None):
               "version": version, "inbound_count": inbound_count}
     if year:
         shared["year"] = year
+    if expired:
+        shared["expired"] = expired          # repeal date -> query-time filter (S6/S7)
     if not path:
         # a synthesized stub (e.g. a begrepp concept minted from references) has
         # no artifact on disk -- only its identity is searchable: one whole-doc
@@ -317,9 +343,18 @@ def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
         "track_total_hits": True,
         "query": {"function_score": {
             "query": {"bool": {"must": _text_query(q),
-                               "filter": [{"term": {"is_doc": True}}]}},
-            "field_value_factor": {"field": "inbound_count",
-                                   "modifier": "log1p", "missing": 0},
+                               "filter": [{"term": {"is_doc": True}}],
+                               "must_not": [REPEALED_IN_FORCE]}},
+            # ranking authority is inbound_count (log1p) plus a flat tier bonus
+            # for the *acts* -- statutes, agency regulations and EU acts/treaties
+            # -- so a search for a law's name lands on the law itself rather than
+            # its preparatory works (S3). Both functions and the text score sum.
+            "functions": [
+                {"field_value_factor": {"field": "inbound_count",
+                                        "modifier": "log1p", "missing": 0}},
+                {"filter": ACT_TIER_FILTER, "weight": ACT_TIER_BOOST},
+            ],
+            "score_mode": "sum",
             "boost_mode": "sum",
         }},
         "post_filter": {"bool": {"filter": filters}},
@@ -507,13 +542,13 @@ class SearchIndex:
         (documents, indexed, errors, missing, skipped, deleted)."""
         self.ensure_index()
         rows = con.execute(
-            "SELECT uri, source, kind, label, title, path, content_hash "
+            "SELECT uri, source, kind, label, title, path, content_hash, expired "
             "FROM documents WHERE source = ? ORDER BY uri", (source,)).fetchall()
         # stored paths are data_root-relative (portable catalog); resolve to
         # absolute so the missing-artifact check and doc_actions (which reads the
         # artifact bytes) work in absolute paths. A stub's empty path stays empty.
         root = catalog.data_root(con)
-        rows = [(*r[:5], str(root / r[5]) if r[5] else r[5], r[6]) for r in rows]
+        rows = [(*r[:5], str(root / r[5]) if r[5] else r[5], r[6], r[7]) for r in rows]
         have = self.indexed_versions(source)
         present = {row[0] for row in rows}
 
@@ -546,7 +581,8 @@ class SearchIndex:
         def actions():
             for i, row in enumerate(todo):
                 yield from doc_actions(row[:6], counts[row[0]],
-                                       version=_index_version(row[6]))
+                                       version=_index_version(row[6]),
+                                       expired=row[7])
                 if progress:
                     progress(i + 1, len(todo), catalog.local(row[0]))
 
