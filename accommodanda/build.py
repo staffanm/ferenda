@@ -34,12 +34,11 @@ import faulthandler
 import functools
 import hashlib
 import json
+import multiprocessing
 import os
 import sys
 import time
 import traceback
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -380,10 +379,15 @@ def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
         res.errors.append((stage_name, basefile, "%s: %s"
                            % (type(e).__name__, e), traceback.format_exc()))
         return False
-    res.timings.append((stage_name, basefile, time.perf_counter() - t0))
+    elapsed = time.perf_counter() - t0
+    res.timings.append((stage_name, basefile, elapsed))
     res.updates[manifest_key(source.name, stage_name, basefile)] = {
         "inputs": inputs_hash,
-        "version": recipe_version(stage.code)}
+        "version": recipe_version(stage.code),
+        # last real build duration -- _run_parallel schedules descending on it
+        # (unknown first), so slice pools stay duration-homogeneous and the
+        # end-of-slice straggler barrier stays small
+        "secs": round(elapsed, 3)}
     res.done.append((stage_name, basefile))
     return True
 
@@ -473,21 +477,21 @@ def build_one(source, action, basefile, manifest):
 
 def _worker(job):
     source_name, action, basefile = job
-    return build_one(SOURCES[source_name], action, basefile, _WORKER_MANIFEST)
+    return basefile, build_one(SOURCES[source_name], action, basefile,
+                               load_manifest())
 
 
-_WORKER_MANIFEST: dict = {}
-
-
-def _worker_init(manifest, run_options):
+def _worker_init(run_options: RunOptions):
     # child processes re-import this module fresh -- carry the run options
-    # and the pre-run manifest snapshot across the process boundary
-    global _WORKER_MANIFEST, RUN
-    _WORKER_MANIFEST = manifest
+    # across the process boundary. The manifest is NOT shipped through
+    # initargs: it can exceed 100 MB, and worker recycling would re-pickle it
+    # per generation -- each worker reads the checkpointed manifest file once
+    # (load_manifest caches; a later generation just sees a fresher snapshot).
+    global RUN
     RUN = run_options
-    # a worker that segfaults in a C extension leaves the parent only a bare
-    # BrokenProcessPool; faulthandler dumps the crashing worker's Python stack
-    # (and thus the basefile in flight) to stderr before it dies
+    # a worker that dies hard in a C extension leaves the parent little to go
+    # on; faulthandler dumps the crashing worker's Python stack (and thus the
+    # basefile in flight) to stderr before it dies
     faulthandler.enable()
 
 
@@ -503,30 +507,51 @@ def _progress(source, action, done, total, merged, basefile):
 
 SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 
+# A worker is retired and replaced after this many docs: CPython 3.14's
+# incremental GC has corrupted long-lived worker heaps under allocation storms
+# (a segfault "Garbage-collecting" in lark's Earley objects, ~90k docs into
+# one worker's lifetime), and recycling caps how much damage can accumulate.
+# multiprocessing.Pool's decades-old maxtasksperchild -- not
+# ProcessPoolExecutor's max_tasks_per_child, whose respawn path deadlocked
+# under rapid task churn (all workers hit the limit, none were replaced, and
+# the driver waited forever on futures no worker would ever take).
+MAX_DOCS_PER_WORKER = 1000
 
-def _run_parallel(source, action, basefiles, jobs, manifest, absorb):
+
+def _run_parallel(source, action, basefiles, jobs, absorb):
     """Fan the basefiles out across `jobs` worker processes, absorbing each
-    result as it completes."""
-    with ProcessPoolExecutor(max_workers=jobs, initializer=_worker_init,
-                             initargs=(manifest, RUN)) as pool:
-        # as_completed -> results in completion order (a slow doc no longer
-        # stalls the display), each paired with its basefile
-        futures = {pool.submit(_worker, (source.name, action, bf)): bf
-                   for bf in basefiles}
-        try:
-            for fut in as_completed(futures):
-                absorb(fut.result(), futures[fut])
-        except BrokenProcessPool as e:
-            # a worker died hard (segfault/OOM in a C extension) and took the
-            # whole pool down with it -- every pending future is now unresolvable.
-            # _worker_init's faulthandler already dumped the crashing worker's
-            # Python stack (and the basefile in flight) to stderr; nothing here is
-            # recoverable, so fail loudly rather than silently drop the remaining
-            # docs. Rerun with --jobs 1 to isolate the offending basefile.
-            raise RuntimeError(
-                "parallel build pool crashed -- see the faulthandler traceback "
-                "above for the worker's stack; rerun with --jobs 1 to isolate "
-                "the offending basefile") from e
+    result as it completes (imap_unordered: continuous feeding, no barriers,
+    a slow doc stalls nothing but itself).
+
+    Dispatch order is descending expected duration (the last real build
+    duration the manifest recorded; a basefile without one -- new, or never
+    built by this recipe -- counts as slowest and goes first). This is the
+    old pipeline's scheduling rule: the slow tail starts earliest and the
+    run's final straggler is a fast doc, not a forty-minute scan."""
+    manifest = load_manifest()
+
+    def expected(bf):
+        entry = manifest.get(manifest_key(source.name, action, bf))
+        return entry.get("secs", float("inf")) if entry else float("inf")
+
+    jobs_list = [(source.name, action, bf)
+                 for bf in sorted(basefiles, key=expected, reverse=True)]
+    # Known gap: a worker that dies hard (a C-extension segfault) before it hits
+    # maxtasksperchild hangs imap_unordered on the lost result rather than
+    # raising -- multiprocessing.Pool has no BrokenProcessPool equivalent to
+    # ProcessPoolExecutor's, whose respawn path we can't use (it deadlocked, see
+    # MAX_DOCS_PER_WORKER). Not silent: _worker_init's faulthandler dumps the
+    # crashing worker's stack (and the basefile in flight) to stderr first, and
+    # recycling every MAX_DOCS_PER_WORKER docs makes an early crash unlikely (the
+    # observed corruption surfaced ~90k docs into a worker's life). The serial
+    # `--jobs 1` path takes no pool at all and is the diagnostic fallback; a
+    # CI/cron job timeout is the outer backstop against the hang.
+    with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
+                              initargs=(RUN,),
+                              maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
+        for basefile, res in pool.imap_unordered(_worker, jobs_list,
+                                                 chunksize=1):
+            absorb(res, basefile)
 
 
 def run_action(source, action, basefiles, jobs):
@@ -550,7 +575,7 @@ def run_action(source, action, basefiles, jobs):
 
     try:
         if jobs > 1 and not RUN.dry_run:
-            _run_parallel(source, action, basefiles, jobs, manifest, absorb)
+            _run_parallel(source, action, basefiles, jobs, absorb)
         else:
             for bf in basefiles:
                 absorb(build_one(source, action, bf, manifest), bf)
