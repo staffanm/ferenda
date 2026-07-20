@@ -711,12 +711,14 @@ def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
 
 
 def test_page_renders_source_link(tmp_path):
+    # the source ("Källa") link lives in the context-rail island now, not the
+    # frontmatter (C1) -- so the rail always has content on load
     site = render.Site.from_catalog(build_catalog(tmp_path))
     art = dict(LAW, source_url="https://rkrattsbaser.gov.se/sfst?bet=1975:635")
     html = render.render_sfs(art, site)
-    assert ('<a class="ext" href="https://rkrattsbaser.gov.se/sfst?bet=1975:635" '
-            'rel="external">Källa</a>') in html
-    # absent source_url -> no Källa link
+    assert "https://rkrattsbaser.gov.se/sfst?bet=1975:635" in html   # in the rail
+    assert "Källa" in html                                           # rail section head
+    # absent source_url -> no Källa section at all
     assert "Källa" not in render.render_sfs(LAW, site)
 
 
@@ -942,7 +944,9 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     assert "api.delete('page'); api.delete('offset')" in bundle
     # ... and the ⌘K palette (search.js)
     assert "Avgränsa " in bundle and "e.key === 'ArrowRight'" in bundle
-    assert 'class="search-refine" href="/sok/" hidden></a><input' in bundle
+    # the refine link renders to the right of the input (S2), so input first
+    assert '<input autofocus' in bundle
+    assert '<a class="search-refine" href="/sok/" hidden></a>' in bundle
     assert "refine.hidden = true;" in bundle
     # fullsearch.js's own ordering guard (seq bumped before the empty-q return, so
     # an empty query still invalidates a pending request) -- asserted against the
@@ -1289,10 +1293,12 @@ def test_inbound_collapsed_aggregates_pinpoints_and_excludes(tmp_path):
 def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
     site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
     section, own = render.forarbeten_section(site, FORARB_LAW)
-    # hosted own works link under their full-title label; the unhosted Bet. shows bare
+    # hosted own works link under their full-title label
     assert "Prop. 2019/20:5: Ursprungspropositionen" in section
     assert "SOU 2018:9: Utredningen" in section
-    assert "Bet. 2019/20:XX1" in section
+    # bet./rskr. are dropped from the display (T2), but hosted own works still
+    # populate `own` so they don't reappear in the citation panel below
+    assert "Bet. 2019/20:XX1" not in section
     assert own == {"https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"}
     # the citation panel below excludes them; only the unrelated prop remains
     panel = render.document_inbound(site, "https://lagen.nu/2020:100", own)

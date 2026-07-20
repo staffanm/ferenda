@@ -37,7 +37,14 @@
              frag: decodeURIComponent(url.hash.replace(/^#/, '')) };
   }
 
+  // index / aggregation views (frontpage, browse listings, search) are the
+  // solo-column pages; a reader following a link from a list already knows
+  // where they are going, so previews add only noise there (L1). Document
+  // pages -- and imported panes, which are always documents -- keep them.
+  var indexPage = !!document.querySelector('.gr-body.solo');
+
   function eligible(a) {
+    if (indexPage && !a.closest('[data-pane]')) return false;
     if (!a.closest('.gr-main, .rail, [data-pane]')) return false;
     if (a.closest('nav.toc, .search-overlay, .lagen-popover, .pane-bar')) return false;
     if (a.classList.contains('pilcrow') || a.classList.contains('ext') ||
@@ -60,9 +67,32 @@
   // the anchor's element within `doc` -- for the live document, never one
   // inside an imported pane (another document's ids)
   function fragEl(doc, frag) {
-    if (!frag) return ownMain(doc).querySelector('header.frontmatter') || ownMain(doc);
+    // a whole-document preview leads straight into the text: the title is
+    // already in the popover head, so the body shows the opening prose, not
+    // the frontmatter's dl.meta block (L2)
+    if (!frag) return documentLede(doc) || ownMain(doc);
     return doc === document ? lagenDom.ownEl(frag)
                             : doc.querySelector(lagenDom.sel(frag));
+  }
+
+  // the first couple of real prose paragraphs of a document's reading column,
+  // skipping the frontmatter (eyebrow/title/subtitle/dl.meta/source link) and
+  // any short label lines, as a synthesized excerpt element -- or null if the
+  // document has no prose (a stub concept, a bare listing)
+  function documentLede(doc) {
+    var main = ownMain(doc);
+    var ps = main.querySelectorAll('p');
+    var wrap = doc.createElement('div');
+    // the frontmatter and the pre-text furniture (banners, förarbeten list,
+    // version compare, the inbound-citation panel) are not the document's prose
+    var SKIP = 'header.frontmatter, .forarbeten, .inbound-doc, details, ' +
+      '.version-banner, .expired-banner, .diff-note';
+    for (var i = 0; i < ps.length && wrap.childNodes.length < 2; i++) {
+      if (ps[i].closest(SKIP)) continue;
+      if (ps[i].textContent.trim().length < 20) continue;
+      wrap.appendChild(ps[i].cloneNode(true));
+    }
+    return wrap.childNodes.length ? wrap : null;
   }
 
   // the document's *own* reading column / grid -- in the live document,

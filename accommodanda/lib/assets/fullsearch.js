@@ -89,7 +89,9 @@
   function load(push, state) {
     var mine = ++seq;            // invalidates an older request even for empty q
     var q = (params.get('q') || '').trim();
-    input.value = q;
+    // note: load() must NOT write input.value -- it runs on every as-you-type
+    // keystroke, and rewriting the field would strip a trailing space and jump
+    // the caret. The input is synced explicitly on initial load / popstate.
     if (push) history.pushState(state || null, '', address());
     if (!q) {
       nextCursor = null;
@@ -114,11 +116,26 @@
       if (mine === seq) status.textContent = 'Sökningen kunde inte nås. Prova igen.';
     });
   }
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
+  // search-as-you-type: debounce the field and query without a full submit (S4).
+  // The URL is kept current with replaceState (shareable/refreshable) rather than
+  // pushState, so typing doesn't stack a history entry per keystroke; Enter still
+  // does an explicit pushState submit below.
+  var typingTimer = null;
+  function queryFromInput(push) {
     var q = input.value.trim();
     if (q) params.set('q', q); else params.delete('q');
-    resetPaging(); load(true);
+    resetPaging();
+    if (push) load(true);
+    else { history.replaceState(null, '', address()); load(false); }
+  }
+  input.addEventListener('input', function () {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(function () { queryFromInput(false); }, 200);
+  });
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearTimeout(typingTimer);
+    queryFromInput(true);
   });
   facets.addEventListener('click', function (e) {
     var button = e.target.closest('[data-facet]');
@@ -139,7 +156,10 @@
     window.scrollTo({top:0, behavior:'smooth'});
   });
   window.addEventListener('popstate', function () {
-    params = new URLSearchParams(location.search); load(false);
+    params = new URLSearchParams(location.search);
+    input.value = (params.get('q') || '').trim();   // load() no longer syncs it
+    load(false);
   });
+  input.value = (params.get('q') || '').trim();
   load(false);
 })();

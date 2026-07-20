@@ -110,6 +110,27 @@
     hs[sel].scrollIntoView({ block: 'nearest' });
   }
 
+  // roll a count from its previous value to `to` odometer-style over `ms` (S2),
+  // so changing the query (avta -> avtal) tweens 46 690 -> 45 358 rather than
+  // hard-swapping. Honours prefers-reduced-motion (and equal values) by jumping.
+  var NUM = new Intl.NumberFormat('sv-SE');
+  function rollNumber(el, from, to, ms) {
+    if (from === to ||
+        (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      el.textContent = NUM.format(to);
+      return;
+    }
+    var start = null;
+    (function frame(ts) {
+      if (!el.isConnected) return;             // superseded by a newer query
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / ms);
+      var eased = 1 - Math.pow(1 - p, 3);      // easeOutCubic
+      el.textContent = NUM.format(Math.round(from + (to - from) * eased));
+      if (p < 1) requestAnimationFrame(frame);
+    })();
+  }
+
   // `total` is null while the API round-trip is pending: local hits paint
   // instantly, the emptiness verdict ("Inga träffar") waits for the API
   function render(local, items, total, q) {
@@ -148,10 +169,12 @@
     }).join('');
     if (total === null || !total) {
       refine.hidden = true;
+      refine._count = 0;              // next appearance counts up from zero
     } else {
       refine.href = '/sok/?q=' + encodeURIComponent(q);
-      refine.innerHTML = 'Avgränsa ' +
-        esc(new Intl.NumberFormat('sv-SE').format(total)) + ' träffar';
+      refine.innerHTML = 'Avgränsa <span class="refine-count"></span> träffar';
+      rollNumber(refine.querySelector('.refine-count'), refine._count || 0, total, 150);
+      refine._count = total;
       refine.hidden = false;
     }
     results.innerHTML = localHtml + hitHtml;
@@ -203,9 +226,10 @@
     if (overlay) return;
     overlay = document.createElement('div');
     overlay.className = 'search-overlay';
+    // the refine link sits to the *right* of the input (S2)
     overlay.innerHTML = '<div class="search-box"><div class="search-input-row">' +
-      '<a class="search-refine" href="/sok/" hidden></a><input autofocus ' +
-      'placeholder="Sök lag, paragraf, rättsfall…"></div>' +
+      '<input autofocus placeholder="Sök lag, paragraf, rättsfall…">' +
+      '<a class="search-refine" href="/sok/" hidden></a></div>' +
       '<div class="search-results"></div></div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
@@ -254,4 +278,13 @@
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-search]')) { e.preventDefault(); open(); }
   });
+  // The shortcut hint is server-rendered as the Mac glyph (⌘K); rewrite it to
+  // "Ctrl K" off the Mac so the label matches the accelerator that actually
+  // works there (Ctrl+K). (S1)
+  var isMac = /Mac|iPhone|iPad|iPod/.test((navigator.userAgentData
+      && navigator.userAgentData.platform) || navigator.platform || '');
+  if (!isMac) {
+    Array.prototype.forEach.call(document.querySelectorAll('.masthead .search .k'),
+      function (el) { el.textContent = 'Ctrl K'; });
+  }
 })();

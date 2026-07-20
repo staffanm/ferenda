@@ -32,7 +32,12 @@
 
   --serif:"Source Serif 4","Charter",Georgia,serif;
   --sans:"Inter","Helvetica Neue",system-ui,sans-serif;
-  --col-toc:18rem; --col-rail:20rem;
+  --col-toc:16rem; --col-rail:18rem; --col-main:56rem;
+  /* the whole reading block (TOC + reading column + rail) is centered on the
+     page and capped at this width; columns are border-box and sit flush, so
+     the cap is their exact sum. Any surplus viewport becomes symmetric
+     left/right margin rather than a gap between text and rail (U1/U2). */
+  --page-max:calc(var(--col-toc) + var(--col-main) + var(--col-rail));
   /* anchor clearance under the sticky masthead; the mobile breakpoint (whose
      masthead is static and scrolls away) shrinks it in one place */
   --scroll-clear:5rem;
@@ -77,9 +82,10 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* -- Masthead -- */
-.masthead { position: sticky; top: 0; z-index: 10; display: flex;
-            align-items: center; gap: 1.5rem; height: 4rem; padding: 0 1.75rem;
+.masthead { position: sticky; top: 0; z-index: 10; height: 4rem;
             background: var(--surf); border-bottom: 1px solid var(--rule); }
+.mast-inner { display: flex; align-items: center; gap: 1.5rem; height: 100%;
+              max-width: var(--page-max); margin: 0 auto; padding: 0 1.5rem; }
 .masthead .brand { font-family: var(--serif); font-size: 1.5rem; font-weight: 500;
                    letter-spacing: -.015em; color: var(--ink); }
 .masthead .brand em { color: var(--accent); font-style: italic; }
@@ -118,8 +124,9 @@ a:hover { text-decoration: underline; }
 }
 
 /* -- Body grid -- */
-.gr-body { display: grid; align-items: start;
-           grid-template-columns: var(--col-toc) minmax(0,1fr) var(--col-rail); }
+.gr-body { display: grid; align-items: start; max-width: var(--page-max);
+           margin: 0 auto;
+           grid-template-columns: var(--col-toc) minmax(0,var(--col-main)) var(--col-rail); }
 .gr-body.solo { display: block; max-width: 56rem; margin: 0 auto; }
 .gr-main { min-width: 0; padding: 2.5rem clamp(1.5rem, 4vw, 4rem) 8rem; max-width: 56rem; }
 .gr-body.solo .gr-main { max-width: none; }
@@ -225,8 +232,14 @@ body.inaktuell::before { content: "Inaktuell författning"; position: fixed;
 .version-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
                          text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
 .version-banner a { color: var(--accent); }
-details.lydelser { margin: 0 0 2rem; padding: .55rem 1rem; border: 1px solid var(--rule);
-                   border-radius: 5px; background: var(--surf); font-size: .92rem; }
+details.lydelser { margin: 0 0 .6rem; padding: .45rem .9rem; border: 1px solid var(--rule);
+                   border-radius: 5px; background: var(--surf); font-size: .9rem; }
+details.lydelser:not([open]) { display: inline-block; }
+/* the compare status: a small heading that names what is being diffed, shown
+   the instant a lydelse is picked (versions.js) so the change is visible (T1) */
+.lydelser-status { font-family: var(--serif); font-style: italic; font-weight: 400;
+                   font-size: 1.05rem; color: var(--ink-2); margin: 0 0 1.25rem;
+                   padding: 0; border: 0; }
 details.lydelser summary { cursor: pointer; font-weight: 500; color: var(--ink-2); }
 details.lydelser summary .count { color: var(--ink-4); font-weight: 400; }
 details.lydelser label { display: block; margin: .8rem 0 .3rem; color: var(--ink-3); }
@@ -476,6 +489,10 @@ section.forarbeten h2 { font-family: var(--serif); font-style: italic; font-size
 section.forarbeten ul { list-style: none; margin: 0; padding: 0; }
 section.forarbeten li { margin: .15rem 0; line-height: 1.4; }
 section.forarbeten a { color: var(--forarbete); }
+section.forarbeten .forarbeten-mer > summary { cursor: pointer; color: var(--ink-3);
+                        font-style: italic; margin: .2rem 0; list-style: none; }
+section.forarbeten .forarbeten-mer > summary::-webkit-details-marker { display: none; }
+section.forarbeten .forarbeten-mer[open] > summary { margin-bottom: .15rem; }
 
 /* -- Curated relation groups on a decision page (Lagrum / Förarbeten /
       Rättsfall / Litteratur) -- same compact metadata-list voice -- */
@@ -588,12 +605,6 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .browse-list .pre { color: var(--ink-4); }
 .browse-list li.subdued a { color: var(--ink-3); }
 .browse-list li.subdued .pre { color: var(--ink-4); }
-.browse-filter { width: 100%; max-width: 24rem; margin: .1rem 0 .9rem;
-                 padding: .45rem .7rem; font-family: var(--sans); font-size: .9rem;
-                 color: var(--ink); background: var(--surf-2);
-                 border: 1px solid var(--rule); border-radius: 6px; }
-.browse-filter:focus { outline: none; border-color: var(--accent);
-                       background: var(--surf); }
 .empty { color: var(--ink-3); font-style: italic; }
 
 /* -- folkrätt landing: the CoE treaty listing (alphabetical, protocols nested)
@@ -622,6 +633,24 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
 .facet-list a[aria-current] { background: var(--accent); color: var(--on-accent); }
 .facet-list .c { color: var(--ink-4); font-size: .72rem; margin-left: .25rem; }
 .facet-list a[aria-current] .c { color: color-mix(in oklab, var(--on-accent) 72%, transparent); }
+
+/* -- Browse index: facets in a left rail beside the list (X1) --
+   the browse page is solo but widened to hold the two columns; the folkrätt
+   banner (if any) stays a full-width pill row above the layout. */
+body.browse .gr-body.solo { max-width: var(--page-max); }
+.browse-layout { display: grid; align-items: start; gap: 2.5rem;
+                 grid-template-columns: var(--col-toc) minmax(0, 1fr); }
+.browse-facets { position: sticky; top: 5rem; }
+.browse-main { min-width: 0; }
+/* link-like, vertical facets sharing the search rail's tokens -- not pills */
+.browse-facets .facets { margin: 0; }
+.browse-facets .facet-list { flex-direction: column; flex-wrap: nowrap; gap: .05rem; }
+.browse-facets .facet-list a { display: block; background: transparent;
+                 padding: .18rem .45rem; color: var(--ink-2); }
+.browse-facets .facet-list a:hover { background: var(--surf-2); }
+.browse-facets .facet-list a[aria-current] { background: transparent;
+                 color: var(--accent); font-weight: 500; }
+.browse-facets .facet-list a[aria-current] .c { color: var(--ink-4); }
 
 /* -- search palette (live full-text search via the REST API) -- */
 .search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
@@ -655,11 +684,14 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                         font-size: .82rem; margin-top: .15rem; }
 .search-hit .hit-snip em { font-style: normal; background: var(--mark);
                            border-radius: 2px; padding: 0 1px; }
-.search-refine { display: inline-flex; align-items: center; margin: .55rem 0 .55rem .65rem;
+.search-refine { display: inline-flex; align-items: center; margin: .55rem .8rem .55rem 0;
+                 flex: 0 0 auto; align-self: center;
                  padding: .4rem .65rem; border-radius: 5px; white-space: nowrap;
                  color: var(--accent); font-family: var(--sans); font-size: .86rem;
                  font-weight: 600; text-decoration: none; background: var(--surf-2); }
 .search-refine[hidden] { display: none; }
+/* tabular figures so the odometer roll (search.js rollNumber) doesn't reflow */
+.search-refine .refine-count { font-variant-numeric: tabular-nums; }
 .search-refine:hover, .search-refine.sel { background: var(--surf-3);
                                            box-shadow: inset 0 0 0 1px var(--rule); }
 
@@ -769,8 +801,8 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
    section nav on its own horizontally scrollable line -- and scrolls away
    rather than staying stuck over a small screen. -- */
 @media (max-width: 64rem) {
-  .masthead { position: static; height: auto; flex-wrap: wrap;
-              gap: .5rem .9rem; padding: .6rem 1rem; }
+  .masthead { position: static; height: auto; }
+  .mast-inner { flex-wrap: wrap; height: auto; gap: .5rem .9rem; padding: .6rem 1rem; }
   .masthead .search { flex: 0 0 auto; margin-left: auto;
                       padding: .45rem .55rem; border-radius: 999px; }
   .masthead .search > span { display: none; }   /* icon-only; opens the palette */
@@ -834,6 +866,12 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .full-search-layout { grid-template-columns: 1fr; gap: .75rem; }
   .full-search-facets { display: grid; grid-template-columns: repeat(3, 1fr);
                         gap: .75rem; }
+
+  /* browse facets go back on top, flowing horizontally, above the list */
+  .browse-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .browse-facets { position: static; }
+  .browse-facets .facet-list { flex-direction: row; flex-wrap: wrap; gap: .35rem .7rem; }
+  .browse-facets .facet-list a { background: var(--surf-2); }
 }
 @media (max-width: 38rem) {
   .full-search-facets { grid-template-columns: 1fr; }

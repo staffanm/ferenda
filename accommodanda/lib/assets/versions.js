@@ -9,10 +9,26 @@
   var sel = document.querySelector('select[data-diff]');
   var doc = document.getElementById('dokument');
   if (!sel || !doc) return;
+  var status = document.querySelector('.lydelser-status');
   var original = null;
+
+  // the human name of the version being compared against: another named
+  // lydelse (data-to) or, by default, the current consolidation
+  var against = sel.dataset.to ? 'SFS ' + sel.dataset.to : 'aktuell lydelse';
+
+  function setStatus(version) {
+    if (!status) return;
+    if (version) {
+      status.textContent = 'SFS ' + version + ' jämfört med ' + against;
+      status.hidden = false;
+    } else {
+      status.hidden = true;
+    }
+  }
 
   function show(version) {
     var url = new URL(location.href);
+    setStatus(version);          // instant, before the diff round-trip returns
     if (!version) {
       if (original !== null) doc.innerHTML = original;
       url.searchParams.delete('diff');

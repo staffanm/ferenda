@@ -52,7 +52,7 @@ def _site():
     ])
     known = {L + "2025:400", L + "2001:453", L + "1980:620",
              L + "dom/ra/1993:11", L + "dom/nja/1993s679"}
-    return SimpleNamespace(con=con,
+    return SimpleNamespace(con=con, expired=set(),
                            has=lambda uri: uri.partition("#")[0] in known)
 
 
@@ -108,7 +108,7 @@ def _rf_site():
     catalog.set_correspondence(con, [
         (L + "1974:152#K4P6", L + "1974:152#K4P4", "betecknas", "helt",
          None, "2011-01-01")])
-    return SimpleNamespace(con=con, has=lambda uri: True)
+    return SimpleNamespace(con=con, expired=set(), has=lambda uri: True)
 
 
 def test_renumbered_refs_margin_splits_by_date():
@@ -160,7 +160,7 @@ def _chain_site():
         (L + "1974:152#K13P2", L + "1974:152#K13P1", "betecknas", "helt",
          None, "1995-01-01"),
     ])
-    return SimpleNamespace(con=con, has=lambda uri: True)
+    return SimpleNamespace(con=con, expired=set(), has=lambda uri: True)
 
 
 def test_renumbered_chain_stays_on_lineage():
