@@ -40,13 +40,18 @@ services:
       - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
       - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
       - bootstrap.memory_lock=true            # keep the JVM heap out of swap
-      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g    # the prod host has 15GB total and the
-                                              # legacy Elasticsearch already reserves
-                                              # 8g; 3g pushed the host into swap
-                                              # thrashing. Revisit upward (comment
-                                              # above still applies re: ~1M+ docs)
-                                              # once host memory or the legacy ES
-                                              # heap frees up headroom.
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g    # 15GB host. Headroom opened up: the
+                                              # legacy Elasticsearch dropped 8g->3g
+                                              # and fuseki (2g) now runs ONLY during
+                                              # the nightly legacy regen (host cron
+                                              # start/stops it around `build all
+                                              # all`), so it isn't resident by day.
+                                              # 2g is generous already -- measured
+                                              # heap use is ~24% of 1g (the collapse
+                                              # index is deliberately not heap-hungry:
+                                              # no parent-child join). The bigger win
+                                              # from the freed RAM is OS page cache
+                                              # for the on-disk index, not JVM heap.
     ulimits:
       memlock:
         soft: -1
