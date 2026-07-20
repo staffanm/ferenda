@@ -12,7 +12,7 @@ The rewrite keeps two decades of accumulated domain knowledge (SFS/DV
 formatting quirks, the citation grammar) and discards the framework.
 
 - **Active code lives in `accommodanda/`.** This is where all new work
-  happens. Target Python 3.10+ only.
+  happens. Target Python 3.14+ only.
 - **`ferenda/` and `lagen/` are the legacy codebase** being replaced. Treat
   them as read-only reference — port knowledge out of them; don't extend
   them. (The Python 2/3 modernization of the legacy tree is *done*; there

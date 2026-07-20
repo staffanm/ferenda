@@ -18,14 +18,23 @@
    lagrådsremiss, 1919/1921 SÖ scans). Regression-locked in
    `test_forarbete_download.py`.
 2. **Printed-page offsets** — `lib/pdftext.py` gains `printed_pageno` (the
-   marginal folio, header-stripped) and `page_offset` (the constant offset
-   from per-page evidence: mode with majority support; competing offsets
-   raise — a wrong page anchor is silent citation corruption, so ambiguity
-   fails visibly). `parse_pdf` stamps *printed* pages on every block;
-   unnumbered cover matter gets no anchor. A 42-PDF era sweep: 37 at offset
-   0, five real corrections (SOU 1989:67 was off by 3), zero ambiguous.
-   The OCR/scan route keeps the page≈printed assumption (its `\f` split has
-   no marginal geometry to read).
+   marginal folio, header-stripped) and `printed_pages` (a *running* offset
+   in the old pipeline's style: PDF page = printed page until a detected
+   number proves otherwise, each implied offset holding until the next
+   trusted detection changes it — piecewise by design, since PDFs omit blank
+   printed leaves between chapters and bind in unnumbered dividers, so no
+   single document-wide offset exists). Detection trust: the first detection
+   applies retroactively (cover matter below printed 1 gets no anchor),
+   small shifts adopt at once, a large forward jump needs the next detection
+   to agree (one misread folio must not drag the document), and a large
+   backward jump is an appendix restarting its own numbering — never
+   adopted, and once confirmed the remaining pages carry no anchors rather
+   than duplicate `#sid` targets. `parse_pdf` stamps *printed* pages on
+   every block. The initial constant-offset cut (mode + ambiguity-raises)
+   rejected 13 real documents whose numbering genuinely shifts mid-file
+   (a 2,600-page prop, multi-part SOU/SÖ volumes); the running model parses
+   all 13. The OCR/scan route keeps the page≈printed assumption (its `\f`
+   split has no marginal geometry to read).
 3. **General tables** — `forarbete/tabell.py`: a conservative geometric
    detector for *data* tables (aligned column starts, numeric-evidence gate,
    TOC/margin/lydelse exclusions) plus `merge_continued` joining a table

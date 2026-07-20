@@ -44,8 +44,12 @@ sections below explain each item and retain the historical measurements.
 - ✅ **Förarbete correctness tail (2026-07-19):** lr/SÖ bodies recovered by
   the `refetch-bodies` second-chance pass (the landings always carried the
   links; the assets served transient non-documents at harvest time);
-  printed-page offsets derived from marginal folios (`page_offset`, ambiguity
-  fails visibly; SOU 1989:67's anchors were off by 3); a conservative generic
+  printed-page numbers derived from marginal folios (`printed_pages`, a
+  running piecewise offset in the old pipeline's style — 2026-07-20: the
+  first constant-offset cut rejected 13 documents whose numbering shifts
+  mid-file, so the offset now follows detections, with misread folios
+  quarantined and appendix numbering-restarts never adopted; SOU 1989:67's
+  anchors were off by 3); a conservative generic
   data-table model with cross-page continuation (`forarbete/tabell.py`); the
   FK bounds unified onto `fk_span` (+972 genomför-direktiv edges, appendix
   false-edges dropped, validated corpus-wide); the truncated "lag om ändring
@@ -71,10 +75,14 @@ sections below explain each item and retain the historical measurements.
 - ✅ **SFS omitted graphics:** the graphics/formulas/maps/road-signs the
   text-only SFST source omits are detected, vision-localized to the
   provenance-correct published PDF, cropped and rendered (§3d).
-- ⬜ **Corpus acceptance run (operations):** materialize the authoritative
-  source trees, then complete parse → relate → index → dump → generate with no
-  unexplained failures. Counts are recorded per run, not hard-coded as code
-  completion criteria.
+- ✅ **Corpus acceptance run (operations, 2026-07-20):** `lagen all rebuild
+  -j28` ran parse → relate → index → dump → generate over all 15 sources
+  (~295k documents) with **zero failing documents corpus-wide**, a clean
+  <30 s no-op incremental re-run, exact inventory reconciliation, DV/SFS
+  goldens adjudicated with no corpus-wide regression, and 14/14
+  published-URL classes resolving. See
+  `docs/rewrite-parity/06-corpus-acceptance-and-verification.md`. Counts are
+  recorded per run, not hard-coded as code completion criteria.
 
 Explicitly outside closure scope: new source families; PBR; WordPerfect bodies;
 greenfield citation grammars with no active caller; optional wiki taxonomy and
@@ -2860,7 +2868,7 @@ rewrite work.
 
 ## Conventions (from CLAUDE.md)
 
-Target Python 3.10+. Avoid fallback code — assert how the environment
+Target Python 3.14+. Avoid fallback code — assert how the environment
 should be. Don't catch exceptions you can't recover from. Imports at top,
 grouped. DRY, small functions, no "just in case" complexity.
 
@@ -2934,6 +2942,21 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **acceptance** (2026-07-20) — first full-corpus acceptance run:
+  `lagen all rebuild -j28` over all 15 sources (~295k documents) parsed →
+  related → indexed → dumped → generated with **zero failing documents**,
+  including the first fully clean förarbete sweep (97,073) after the
+  printed-page mapping was rebuilt as a running piecewise offset
+  (`lib/pdftext.py` `printed_pages`). A second run is a <30 s no-op (23.8 s);
+  inventory counts reconcile exactly; DV/SFS goldens show no corpus-wide
+  regression; 14/14 published-URL classes resolve. Two build-driver defects
+  surfaced and were addressed: `build.py` now recycles pool workers every
+  1,000 docs (`multiprocessing.Pool(maxtasksperchild=…)`) to contain a
+  CPython 3.14 incremental-GC worker corruption that `ProcessPoolExecutor`'s
+  equivalent deadlocked on, and dispatches longest-expected-first from
+  manifest-recorded durations. `requires-python` was raised to >=3.14 (the
+  tested/deployed runtime). Full record:
+  `docs/rewrite-parity/06-corpus-acceptance-and-verification.md`.
 - **forarbete** (2026-07-18) — downloaded + artifact trees year-segmented
   (`<typ>/<year>/<slug>`), ~287k files migrated; pm buckets under `_`; URLs
   unchanged. `lib/layout.py` gains `fa_year`/`fa_dir`/`fa_record_file`; the
