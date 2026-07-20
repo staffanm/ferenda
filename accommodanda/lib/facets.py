@@ -167,20 +167,29 @@ def _dated_year(r):
 # (HDO -> nja, MMOD -> mod, the kammarrätt codes -> rk, …). PBR and RHN have no
 # referat series of their own, so they get their own bucket.
 DV_COURTS = {
-    "nja":  "NJA – Högsta domstolen",
-    "hfd":  "HFD – Högsta förvaltningsdomstolen",
-    "ra":   "RÅ – Regeringsrätten",
-    "rh":   "RH – Hovrätterna",
-    "ad":   "AD – Arbetsdomstolen",
-    "mod":  "MÖD – Mark- och miljööverdomstolen",
-    "mig":  "MIG – Migrationsöverdomstolen",
-    "md":   "MD – Marknadsdomstolen",
-    "pmod": "PMÖD – Patent- och marknadsöverdomstolen",
-    "rk":   "RK – Kammarrätterna",
-    "pbr":  "PBR – Patentbesvärsrätten",
+    "nja":  "Högsta domstolen (NJA)",
+    # HFD and its pre-2011 self, Regeringsrätten (RÅ), are one court renamed --
+    # one combined bucket (R1); the 'ra' series aliases into it below
+    "hfd":  "Högsta förvaltningsdomstolen (HFD, tidigare RÅ)",
+    "rh":   "Hovrätterna (RH)",
+    "ad":   "Arbetsdomstolen (AD)",
+    "mod":  "Mark- och miljööverdomstolen (MÖD)",
+    "mig":  "Migrationsöverdomstolen (MIG)",
+    "md":   "Marknadsdomstolen (MD)",
+    "pmod": "Patent- och marknadsöverdomstolen (PMÖD)",
+    "rk":   "Kammarrätterna (RK)",
+    "pbr":  "Patentbesvärsrätten (PBR)",
     "rhn":  "Rättshjälpsnämnden",
     "övriga": "Övriga",
 }
+
+# a referat series segment that files under a *different* bucket than its own
+# name -- Regeringsrätten's referat (dom/ra/…) join the HFD bucket (R1)
+SERIES_ALIAS = {"ra": "hfd"}
+
+# every lowercase referat series segment (the browse buckets plus the aliased
+# ones) -- used to tell a referat uri ('dom/nja/…') from a raw avgörande
+REFERAT_SERIES = set(DV_COURTS) | set(SERIES_ALIAS)
 
 # raw-avgörande court-code prefix ('dom/HDO_10868_25' -> 'HDO') -> the canonical
 # court bucket it belongs in (its referat series, or its own bucket)
@@ -195,12 +204,29 @@ RAW_COURT = {
 # 'CODE[_TYPE]_<num>_<YEAR>' (the year trails after the målnummer)
 RAW_YEAR_FIRST = {"MDO", "PBR"}
 
+# a verdict with no referat yet gets the legacy published URI shape
+# 'dom/{slug}/{malnummer}/{avgorandedatum}' (casenaming.verdict_uri /
+# COURT_URI_SLUG). Its slug is lowercase and, for most courts, *not* the referat
+# series name -- so an HD verdict ('dom/hd/Ö4337-25/2026-07-14') must be mapped
+# to its series bucket explicitly or it falls into övriga (R2). Every slug in
+# lib.casenaming.COURT_URI_SLUG must appear here (guarded by a test).
+VERDICT_BUCKET = {
+    "ad": "ad", "hd": "nja", "hfd": "hfd", "regr": "hfd",
+    "hgo": "rh", "hnn": "rh", "hon": "rh", "hsb": "rh", "hsv": "rh", "hvs": "rh",
+    "kgg": "rk", "kjo": "rk", "kst": "rk", "ksu": "rk",
+    "md": "md", "mig": "mig", "mmd": "mod", "mod": "mod",
+    "pbr": "pbr", "pmod": "pmod", "rhn": "rhn",
+}
+
 
 def _dv_court(r):
     parts = r.local.split("/")
     seg = parts[1] if len(parts) > 1 else ""
-    if seg.lower() in DV_COURTS:                     # 'dom/nja/…' -- a referat
-        return seg.lower()
+    s = seg.lower()
+    if s in REFERAT_SERIES:                          # 'dom/nja/…' -- a referat
+        return SERIES_ALIAS.get(s, s)
+    if s in VERDICT_BUCKET:                          # 'dom/hd/…' -- a verdict, no referat
+        return VERDICT_BUCKET[s]
     return RAW_COURT.get(seg.split("_")[0], "övriga")    # 'dom/HDO_…' -- raw
 
 
@@ -219,7 +245,12 @@ def _dv_year(r):
     the year-first courts."""
     parts = r.local.split("/")
     seg = parts[1] if len(parts) > 1 else ""
-    if seg.lower() in DV_COURTS:                     # referat
+    # a verdict URI ('dom/{slug}/{malnummer}/{YYYY-MM-DD}') carries its year in
+    # the trailing avgörandedatum -- unambiguous, so read it there for every
+    # court (the label is målnummer-laden and has no clean year) (R2)
+    if len(parts) == 4 and re.fullmatch(r"\d{4}-\d\d-\d\d", parts[3]):
+        return parts[3][:4]
+    if seg.lower() in REFERAT_SERIES:                # referat
         label = r.label or ""
         # a real year is followed by a space/':'/'ref' -- never '-'; that excludes
         # a HFD målnummer that happens to look like a year ('HFD 1673-25' -> 25)
@@ -380,9 +411,12 @@ SCHEMES = {
         Level("År", _fa_year, _by_year_desc),
     ],
     "eurlex": [
+        # Fördrag (the constitutional texts) lead, then the legislative acts,
+        # then case law -- the reader's mental order (E1). The internal Fördrag
+        # curation (TEU/TFEU/CFR pinned, change treaties nested) is still pending.
         Level("Typ", _catalog_kind,
-              _curated(["regulation", "directive", "decision", "judgment",
-                        "treaty", "act"]),
+              _curated(["treaty", "directive", "regulation", "decision",
+                        "judgment", "act"]),
               label=_map_label({"regulation": "Förordningar", "directive": "Direktiv",
                                 "decision": "Beslut", "judgment": "Avgöranden",
                                 "treaty": "Fördrag", "act": "Övriga rättsakter"})),
@@ -453,16 +487,36 @@ def browse_doc(source, row, repealed=frozenset()):
     return doc
 
 
+# an EU act reissued as corrected revisions carries a '(NN)' suffix on its CELEX
+# ('…/TXT', '…/TXT(01)', '…/TXT(02)'); only the highest revision is listed, the
+# base and the earlier revisions are dropped from the browse (E2). Still distinct
+# from the trailing-'R(NN)' corrigendum handled by _EU_CORRIGENDUM above.
+_EU_REVISION = re.compile(r"^(.*)\((\d+)\)$")
+
+
+def _keep_latest_eu_revision(rows):
+    """Collapse each base CELEX to its highest '(NN)' revision (E2)."""
+    by_base = {}
+    for r in rows:
+        m = _EU_REVISION.match(r.local)
+        base, rev = (m.group(1), int(m.group(2))) if m else (r.local, -1)
+        by_base.setdefault(base, []).append((rev, r))
+    return [max(items, key=lambda pair: pair[0])[1] for items in by_base.values()]
+
+
 def _rows(con, source):
     """The catalog rows of `source` that belong in the browse, as `Row`s. A
     repealed statute whose repeal date has passed is omitted (still reachable by
     direct link and search) -- the listing shows only law in force."""
     expired = catalog.expired_uris(con, date.today().isoformat())
-    for uri, _src, kind, label, title, _url, _path, display, doc_date in \
-            catalog.facet_documents(con, source):
-        local = catalog.local(uri)
-        if uri not in expired and is_browsable(source, local):
-            yield Row(uri, local, kind, label, title, display, doc_date)
+    rows = [Row(uri, local, kind, label, title, display, doc_date)
+            for uri, _src, kind, label, title, _url, _path, display, doc_date
+            in catalog.facet_documents(con, source)
+            for local in (catalog.local(uri),)          # bind once, reuse below
+            if uri not in expired and is_browsable(source, local)]
+    if source == "eurlex":
+        rows = _keep_latest_eu_revision(rows)
+    yield from rows
 
 
 def _path(levels, row):
@@ -481,8 +535,11 @@ def group(con, source):
     buckets = {}
     for row in _rows(con, source):
         buckets.setdefault(_path(levels, row), []).append(row)
+    # cases sort by their referat identity (NJA/HFD number), not the popular
+    # name -- the bucket is one court+year, so the number orders the list (R3)
+    sort_key = _dv_doc_sort if source == "dv" else _doc_sort
     for rows in buckets.values():
-        rows.sort(key=_doc_sort)
+        rows.sort(key=sort_key)
     return buckets
 
 
@@ -499,6 +556,14 @@ def _doc_sort(row):
     one year/court, so the number is what distinguishes the entries)."""
     primary = _sfs_sortname(row.title or "").lower() or row.label or row.local
     return (_natural(primary), _natural(row.local))
+
+
+def _dv_doc_sort(row):
+    """Within a court+year bucket, order cases by their referat identity
+    ('NJA 2019 s. 1021', 'HFD 2011 ref. 4') so a reader scans by number, not by
+    the editor's popular name (R3). Natural order puts s. 5 before s. 1021; the
+    uri breaks ties for raw avgöranden that share a bare label."""
+    return (_natural(row.label or row.display or row.local), _natural(row.local))
 
 
 def tree(con, source, buckets=None):

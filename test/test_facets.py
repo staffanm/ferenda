@@ -16,6 +16,51 @@ U = "https://lagen.nu/"
 # key extraction
 # --------------------------------------------------------------------------
 
+def test_ra_referat_files_under_the_hfd_bucket():
+    # Regeringsrätten (RÅ) is the pre-2011 Högsta förvaltningsdomstolen, one
+    # court renamed -- its referat share the HFD bucket (R1)
+    assert facets._dv_court(row(U + "dom/ra/2009/ref/90")) == "hfd"
+    assert facets._dv_court(row(U + "dom/hfd/2011/ref/4")) == "hfd"
+    assert facets._dv_year(row(U + "dom/ra/2009/ref/90",
+                               label="RÅ 2009 ref. 90")) == "2009"
+
+
+def test_hd_verdict_without_referat_files_under_nja_with_its_date_year():
+    # a not-yet-published HD verdict uses the 'dom/{slug}/{malnr}/{date}' shape;
+    # its slug 'hd' must land in the NJA bucket, not övriga, and its year comes
+    # from the trailing avgörandedatum (R2)
+    v = row(U + "dom/hd/Ö4337-25/2026-07-14")
+    assert facets._dv_court(v) == "nja"
+    assert facets._dv_year(v) == "2026"
+    # an HFD verdict keeps its own bucket but likewise dates from the segment
+    assert facets._dv_year(row(U + "dom/hfd/1889-24/2024-05-02")) == "2024"
+
+
+def test_every_verdict_slug_has_a_bucket():
+    # drift guard: every COURT_URI_SLUG the minter can emit must map to a bucket
+    from accommodanda.lib.casenaming import COURT_URI_SLUG
+    assert set(COURT_URI_SLUG.values()) <= set(facets.VERDICT_BUCKET)
+
+
+def test_dv_cases_sort_by_referat_number_not_popular_name():
+    # within a court+year bucket, order by the NJA number, not the editor's
+    # popular name (R3): s. 5 before s. 1021, regardless of the title
+    early = row(U + "dom/nja/2019s5", label="NJA 2019 s. 5", title="Zebran")
+    late = row(U + "dom/nja/2019s1021", label="NJA 2019 s. 1021",
+               title="Apan")
+    assert sorted([late, early], key=facets._dv_doc_sort) == [early, late]
+
+
+def test_eu_only_latest_corrected_revision_lists():
+    # base + (01) + (02) of the same CELEX collapse to the highest revision (E2)
+    base = row(U + "ext/celex/12019W/TXT")
+    r1 = row(U + "ext/celex/12019W/TXT(01)")
+    r2 = row(U + "ext/celex/12019W/TXT(02)")
+    other = row(U + "ext/celex/32016R0679")
+    kept = {r.local for r in facets._keep_latest_eu_revision([base, r1, r2, other])}
+    assert kept == {"ext/celex/12019W/TXT(02)", "ext/celex/32016R0679"}
+
+
 def test_sfs_initial_files_under_subject_not_designation():
     # the document-type word + SFS number + connector are stripped, so the law
     # files under its subject initial (lagen.nu's "börjar på A")
@@ -141,7 +186,7 @@ def test_tree_orders_buckets_and_picks_default(tmp_path):
     assert nja["count"] == 3
     assert [c["key"] for c in nja["children"]] == ["2025", "2024", "2011"]
     assert tree["default"] == ["nja", "2025"]
-    assert nja["label"] == "NJA – Högsta domstolen"
+    assert nja["label"] == "Högsta domstolen (NJA)"
 
 
 def test_documents_naturally_ordered_within_bucket(tmp_path):
