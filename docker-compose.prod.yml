@@ -113,6 +113,14 @@ services:
       # catalog_root: just catalog.sqlite (+ -wal/-shm), on the fast local disk.
       - /mnt/data/accommodanda:/app/catalog
       - /mnt/data/lagen-wiki:/wiki         # begrepp/kommentar markdown repo (git clone on the host)
+      # Secrets + editor registry (editor_secret, editors[].pwhash, ops_token, LLM
+      # key). config.py reads config.yml from the repo root (/app); without this
+      # mount the file is absent and everything falls back to defaults -- the inline
+      # editor 403s ("editing disabled -- set editor_secret"). Kept out of the image
+      # and out of git; mounted read-only from the host. Adding/removing this line
+      # needs `up -d accommodanda` (recreate) to attach; editing the file's contents
+      # afterwards only needs `restart accommodanda` (config.yml is read once at import).
+      - /home/staffan/wds/accommodanda/config.yml:/app/config.yml:ro
     depends_on:
       - opensearch   # start order only, not a health gate: serving + the CLI don't
                       # need a live OpenSearch (see api/app.py), only /search does
