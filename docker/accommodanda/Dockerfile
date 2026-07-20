@@ -11,7 +11,7 @@
 #
 # Build context is the repo root (docker-compose.yml sets `context: .`), so the
 # COPY paths below are repo-relative. .dockerignore trims the context.
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # System tools the rebuild pipeline shells out to (installed at build time):
 #   poppler-utils          pdftotext / pdftohtml -- forarbete, eurlex, DV namedcases
@@ -41,15 +41,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # uv provides dependency resolution + install; copy just its static binaries in.
 COPY --from=ghcr.io/astral-sh/uv:0.9.0 /uv /uvx /bin/
 
-# Build the venv against the image's own Python (python:3.12-slim), NOT a
-# uv-managed interpreter: left to itself uv downloads a standalone CPython under
-# /root/.local, which the unprivileged `app` user (uid 1000) can't traverse at
-# runtime -> "Failed to import encodings module" crash loop. Pin uv to the
-# system python3.12 (stdlib under /usr/local, world-readable) instead.
+# Build the venv against the image's own Python (python:3.14-slim, matching the
+# project's requires-python >=3.14), NOT a uv-managed interpreter: left to itself
+# uv downloads a standalone CPython under /root/.local, which the unprivileged
+# `app` user (uid 1000) can't traverse at runtime -> "Failed to import encodings
+# module" crash loop. Pin uv to the system python3.14 (stdlib under /usr/local,
+# world-readable) instead.
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
-    UV_PYTHON=python3.12
+    UV_PYTHON=python3.14
 
 # Run as an unprivileged user, not root: the pipeline shells out to a lot of
 # tools and serves the public internet, so drop root for the runtime process.
