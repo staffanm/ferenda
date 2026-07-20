@@ -1132,15 +1132,13 @@ to a future per-doc incremental generate.
   författning" watermark that stays visible at any scroll depth (`render._expired_banner`
   + the `body.expired` treatment). A *future* repeal date is still in force.
   `test/test_site.py`.
-- ✅ **Statute browse listing — visual hierarchy + filter.** An SFS entry is split
+- ✅ **Statute browse listing — visual hierarchy.** An SFS entry is split
   into its dropped designation/number prefix (shown subdued) and the subject it
   sorts under (emphasised), so the eye lands on the sort key (`facets._sfs_split`);
   parliamentary primary law (a *lag*, a *balk*, or a grundlag) is shown at full
   weight while secondary instruments (förordning, kungörelse, …) are dimmed
-  (`_sfs_is_statute`). The listing carries `pre`/`key`/`subdued`/`year` on each
-  `BrowseDoc`, and each statute page gets a client-side name/year filter over the
-  letter's entries (`render.BROWSE_FILTER`). `test/test_facets.py`,
-  `test/test_api.py`.
+  (`_sfs_is_statute`). The listing carries `pre`/`key`/`subdued` on each
+  `BrowseDoc`. `test/test_facets.py`, `test/test_api.py`.
 - ✅ **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
   retired Fuseki/RDF publishing). All three are **derived & rebuildable** from
   artifacts + catalog, never a source of truth, and slot in as **corpus-wide
