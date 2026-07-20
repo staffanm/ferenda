@@ -28,12 +28,15 @@ services:
   # compose network as http://opensearch:9200). On WSL2, if it won't boot,
   # raise vm.max_map_count: `sudo sysctl -w vm.max_map_count=262144`.
   opensearch:
-    # Pinned to 2.9.0, NOT "latest 2.x": 2.10.0+ images require the x86-64-v2
-    # CPU baseline (confirmed by bisection -- 2.9.0 boots clean, 2.10.0 fails
-    # with "Fatal glibc error: CPU does not support x86-64-v2") and the prod
-    # host's virtualized CPU doesn't expose it. Revisit once the host's
-    # hypervisor CPU model is fixed (out of our control -- pending host admins).
-    image: opensearchproject/opensearch:2.9.0
+    # Pinned to 3.7.0 (Lucene 10). Frozen at 2.9.0 for years because 2.10.0+
+    # images require the x86-64-v2 CPU baseline and the prod host's virtualized
+    # CPU didn't expose it -- 2.10.0 died with "Fatal glibc error: CPU does not
+    # support x86-64-v2". The hypervisor CPU model was upgraded to x86-64-v3 in
+    # 2026-07, lifting the block: 3.7.0 boots clean + green on the host (verified
+    # in an isolated throwaway container). The index is derived & rebuildable, so
+    # the 2.x->3.x major bump is a nuke-and-rebuild (delete the index, `lagen all
+    # index`), never an in-place migration. Pin a specific patch, not floating 3.
+    image: opensearchproject/opensearch:3.7.0
     container_name: lagen-opensearch
     environment:
       - discovery.type=single-node           # one node; relaxes the bootstrap checks

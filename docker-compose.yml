@@ -32,11 +32,14 @@ services:
   # accommodanda container reaches it over the compose network as
   # http://opensearch:9200 regardless.
   opensearch:
-    # Pinned to 2.9.0, NOT "latest 2.x": 2.10.0+ images require the x86-64-v2
-    # CPU baseline and the host's virtualized CPU may not expose it (2.9.0 boots
-    # clean, 2.10.0 dies with "Fatal glibc error: CPU does not support
-    # x86-64-v2"). Revisit once the hypervisor CPU model is confirmed.
-    image: opensearchproject/opensearch:2.9.0
+    # Pinned to 3.7.0 (Lucene 10). Was frozen at 2.9.0 because 2.10.0+ images
+    # require the x86-64-v2 CPU baseline the host's virtualized CPU didn't expose
+    # (2.10.0 died with "Fatal glibc error: CPU does not support x86-64-v2"). The
+    # hypervisor CPU model was upgraded to x86-64-v3 in 2026-07, lifting the block;
+    # 3.7.0 boots clean + green. The index is derived & rebuildable, so the
+    # 2.x->3.x major bump is a nuke-and-rebuild, not an in-place migration. Pin a
+    # specific patch, not floating 3.
+    image: opensearchproject/opensearch:3.7.0
     container_name: lagen-opensearch
     environment:
       - discovery.type=single-node           # one node; relaxes the bootstrap checks
