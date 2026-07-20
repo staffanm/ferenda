@@ -37,6 +37,19 @@ def test_drops_date_cross_reference_tail_and_eea_boilerplate():
           "nikotinamidribosidklorid som ett nytt livsmedel")
 
 
+def test_reviewer_example_and_konsolidering_boilerplate():
+    # the USAGE_REVIEW E3 example: body/date/repeal-tail/EEA all trimmed
+    assert short_label(
+        "Europaparlamentets och rådets förordning (EU) 2016/426 av den 9 mars "
+        "2016 om anordningar för förbränning av gasformiga bränslen och om "
+        "upphävande av direktiv 2009/142/EG (Text av betydelse för EES)"
+    ) == "(EU) 2016/426 Anordningar för förbränning av gasformiga bränslen"
+    # a "(Konsolidering)" marker is boilerplate too (E3)
+    assert short_label(
+        "Rådets förordning (EG) nr 1/2003 om tillämpning (Konsolidering)"
+    ) == "(EG) nr 1/2003 Tillämpning"
+
+
 def test_prefers_official_short_title_in_trailing_parenthesis():
     assert short_label(
         "Europaparlamentets och rådets förordning (EU) 2016/679 av den 27 april "

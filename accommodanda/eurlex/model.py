@@ -42,7 +42,8 @@ def doctype(celex):
 # recast / codification boilerplate), stripped before anything else is read
 _LABEL_BOILERPLATE = re.compile(
     r"\s*\((?:Text av betydelse för EES|Text with EEA relevance|EES-text|"
-    r"omarbetning|recast|kodifierad version|kodifiering|codification)\)",
+    r"omarbetning|recast|kodifierad version|kodifiering|codification|"
+    r"konsolidering|konsoliderad version|consolidation|consolidated version)\)",
     re.IGNORECASE)
 # the act's number designation: the parenthesised regulation form
 # "(EU) 2022/2523" / "(EG) nr 593/2008" / "(EC) No 593/2008", or the suffixed
