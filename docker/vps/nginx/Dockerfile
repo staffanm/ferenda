@@ -11,6 +11,9 @@
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY options-ssl-nginx.conf /etc/ssl-options/options-nginx-ssl.conf
 COPY ssl-dhparams.pem /etc/ssl-options/ssl-dhparams.pem
+# common response headers (X-Robots-Tag + security hygiene), included by both
+# the server block and brotli-headers.conf (see common-headers.conf)
+COPY common-headers.conf /etc/nginx/common-headers.conf
 # headers stamped on every directly-served precompressed response (see ferenda.conf)
 COPY brotli-headers.conf /etc/nginx/brotli-headers.conf
 # Replace the image's default vhost with ours (single site, port 8080/8443).
