@@ -177,16 +177,22 @@
       return;
     }
     var local = localHits(q);
-    render(local, [], null, q);          // instant, before the API answers
+    // Paint local pinpoints instantly when the query has any; otherwise KEEP the
+    // previous query's API hits on screen (dimmed) until the new ones arrive --
+    // wiping to empty on every keystroke makes the whole list flash away and
+    // reappear ~a search later ("arbets" -> blank -> "arbetsm").
+    if (local.length) render(local, [], null, q);
+    else if (results) results.classList.add('loading');
     if (andGo && local.length) { go(); return; }
     fetch('/api/v1/search?limit=8&q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (mine === seq) { render(local, d.results || [], d.total || 0, q); if (andGo) go(); } })
+      .then(function (d) { if (mine === seq) { results.classList.remove('loading'); render(local, d.results || [], d.total || 0, q); if (andGo) go(); } })
       .catch(function () {
         // local hits (already painted) survive, but the outage must show:
         // silently degrading to same-page pinpoints would hide that corpus
         // search is down
         if (mine === seq && results) {
+          results.classList.remove('loading');
           refine.hidden = true;
           results.insertAdjacentHTML('beforeend',
             '<div class="search-note">Sökningen kunde inte nås.</div>');

@@ -639,6 +639,9 @@ ol.ranked { padding-left: 1.4rem; } ol.ranked .c { color: var(--ink-3); font-siz
                            color: var(--ink-3); font-size: .9rem; }
 .search-results:not(:empty) { border-top: 1px solid var(--rule);
                               max-height: 60vh; overflow-y: auto; }
+/* keystroke in flight: the prior hits stay put but dim, so the list doesn't
+   flash empty between queries (search.js keeps them until the response lands) */
+.search-results.loading { opacity: .45; transition: opacity .12s ease; }
 .search-hit { display: block; padding: .7rem 1.25rem; border-bottom: 1px solid var(--rule);
               text-decoration: none; color: var(--ink); }
 .search-hit:last-child { border-bottom: 0; }
