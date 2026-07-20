@@ -55,6 +55,21 @@ KNOWN_HEADINGS = {
 
 # leading numbered-paragraph marker, e.g. "1.    text" (HD/HFD prejudikat)
 RE_NUMPARA = re.compile(r"^(\d+)\.\s+(.*)", re.S)
+
+# stray separator punctuation the frozen registers leave on keyword entries:
+# a truncated continuation's trailing dash ("Allmän handling -"), a list's
+# trailing ";"/","/":" and a continuation line's leading dash. Terminal
+# periods are deliberately NOT stripped ("Personlig integritet m.m.").
+RE_NYCKELORD_JUNK = re.compile(r"^[\s\-–—]+|[\s\-–—;,:]+$")
+
+
+def clean_nyckelord(values):
+    """Keyword strings normalized for concept minting: stray edge punctuation
+    stripped, entries that are nothing but punctuation dropped. Every keyword
+    becomes a /begrepp/ page, so 'Allmän handling -' must not mint a concept
+    beside 'Allmän handling'."""
+    cleaned = (RE_NYCKELORD_JUNK.sub("", v).strip() for v in values)
+    return [v for v in cleaned if v]
 RE_SEPARATOR = re.compile(r"^[\W_]+$")
 
 # an end-of-document footnote definition (HD's 2023+ format): "[N] text", the
@@ -281,7 +296,7 @@ def parse_api_record(d, basefile=None):
         publiceringsform=d.get("publiceringsform"),
         typ=d.get("typ"),
         rattsomrade=[r.strip() for r in d.get("rattsomradeLista", [])],
-        nyckelord=[n.strip() for n in d.get("nyckelordLista", []) if n.strip()],
+        nyckelord=clean_nyckelord(d.get("nyckelordLista", [])),
         lagrum=[Lagrum(referens=l.get("referens", "").strip(),
                        sfsnummer=l.get("sfsNummer"))
                 for l in d.get("lagrumLista", [])],

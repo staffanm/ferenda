@@ -38,7 +38,7 @@ from ..lib import layout, util
 from ..lib import poi as word
 from .identity import NOTIS_SERIES, canonical_court
 from .model import Avgorande, Hanvisning, Lagrum, Rubrik, Stycke
-from .parse import RE_NUMPARA, is_heading, to_artifact
+from .parse import RE_NUMPARA, clean_nyckelord, is_heading, to_artifact
 
 # Footer labels that end the body region.
 _FOOTER_LABELS = {"Sökord", "Litteratur"}
@@ -157,7 +157,8 @@ def build_avgorande(head, body, case=None, sources=None):
         malnummer = _split_malnummer(_first(head, "Målnummer")) if head.get("Målnummer") else []
     sokord = head.get("Sökord") or []
     if len(sokord) == 1:
-        sokord = [s.strip() for s in re.split(r"[;,]", sokord[0]) if s.strip()]
+        sokord = re.split(r"[;,]", sokord[0])
+    sokord = clean_nyckelord(sokord)
 
     return Avgorande(
         court=(case.get("courts") or [None])[0] or head.get("Domstol"),
@@ -322,8 +323,8 @@ def parse_notis(text, courtdir, filename, case=None, sources=None):
         parens = RE_PAREN_MALNR.search(" ".join(p.text for p in body[:1]))
         if parens:
             malnummer = [parens.group(1)]
-    uppslagsord = [w.strip() for line in head.get("Uppslagsord", [])
-                   for w in re.split(r";", line) if w.strip()]
+    uppslagsord = clean_nyckelord(
+        w for line in head.get("Uppslagsord", []) for w in line.split(";"))
     return Avgorande(
         court=court,
         court_namn=COURT_NAMN[court],

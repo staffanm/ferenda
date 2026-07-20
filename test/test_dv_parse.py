@@ -5,6 +5,7 @@ from datetime import date
 from accommodanda.dv.model import Fotnot, Rubrik, Stycke
 from accommodanda.dv.parse import (
     case_uri,
+    clean_nyckelord,
     decision_date_from_text,
     decision_dates_from_text,
     extract_footrefs,
@@ -552,3 +553,14 @@ def test_to_artifact_non_referat_case_gets_verdict_uri():
     dateless = Avgorande(court="HDO", court_namn="Högsta domstolen",
                          malnummer=["Ö 528-08"], body=[Stycke("Beslutet.")])
     assert to_artifact(dateless)["uri"] == "https://lagen.nu/dom/HDO_Ö_528_08"
+
+
+def test_clean_nyckelord_strips_register_junk():
+    # trailing continuation dash, list separators, leading continuation dash,
+    # pure-punctuation entries; terminal periods are kept (m.m.)
+    assert clean_nyckelord(["Allmän handling -", "Avskrivning;", "Avtalsbrott,",
+                            "- Återställande av försutten tid - avslag",
+                            "--", "  ", "Personlig integritet m.m."]) == [
+        "Allmän handling", "Avskrivning", "Avtalsbrott",
+        "Återställande av försutten tid - avslag",
+        "Personlig integritet m.m."]
