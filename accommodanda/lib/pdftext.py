@@ -179,7 +179,7 @@ def printed_pageno(lines, identifier):
     None. Looks at the outermost lines (running header at the top, folio at the
     bottom), strips the running-header identifier, and takes a line whose
     remainder is a bare number. The evidence for the PDF-page ↔ printed-page
-    mapping (`page_offset`): a document's printed numbering can start after
+    mapping (`printed_pages`): a document's printed numbering can start after
     unnumbered cover matter, or -- a multi-volume SOU -- continue from the
     previous volume."""
     header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
@@ -191,28 +191,72 @@ def printed_pageno(lines, identifier):
     return None
 
 
-def page_offset(detections):
-    """The document-wide printed-page offset from per-page evidence:
-    ``detections`` maps pdf page index -> detected printed number. The offset
-    must be *constant* to be trusted: the mode of the per-page differences
-    wins when it carries at least three pages and a clear majority (stray
-    bare numbers in margins -- years, annex numbering -- are tolerated as a
-    minority). Too little evidence -> 0, the PDF-index-equals-printed-page
-    assumption. Two well-supported competing offsets are a genuinely
-    ambiguous mapping and raise -- a wrong page anchor is a silent citation
-    corruption, so ambiguity must fail visibly, not guess."""
-    diffs = Counter(printed - pdfno for pdfno, printed in detections.items())
-    if not diffs:
-        return 0
-    (offset, support), *rest = diffs.most_common()
-    if support < 3 or support < 0.6 * sum(diffs.values()):
-        return 0                      # sparse/noisy evidence: keep the default
-    runner = rest[0][1] if rest else 0
-    if runner >= 3 and runner >= 0.3 * sum(diffs.values()):
-        raise ValueError(
-            "ambiguous printed-page mapping: competing offsets %s"
-            % dict(diffs.most_common(4)))
-    return offset
+# a printed-page offset shift within this many pages of the running offset is
+# adopted from a single detection (omitted blank leaves, inserted unnumbered
+# divider/plate pages); a larger shift needs corroboration
+PAGE_SHIFT_TOL = 10
+
+
+def printed_pages(detections, pagenos):
+    """pdf page number -> printed page number (or None), the old pipeline's
+    *running-offset* rule: a pdf page equals its printed page until a detected
+    marginal number proves otherwise, and the offset that detection implies
+    holds until the next trusted detection changes it. The offset is piecewise
+    by design -- PDFs omit blank printed leaves between chapters and bind in
+    unnumbered divider pages, so no single document-wide offset exists.
+
+    Detection trust: the first detection establishes the offset outright and
+    applies retroactively to the pages before it (unnumbered cover matter maps
+    below printed 1 -> no anchor, never a duplicate of the real page 1). A
+    later detection shifting the offset by at most PAGE_SHIFT_TOL pages is
+    adopted at once. A larger *forward* shift is adopted only when the next
+    detection agrees (one misread folio must not drag the rest of the
+    document). A larger *backward* shift is an appendix restarting its own
+    numbering: never adopted -- and when consecutive detections confirm the
+    restart, the remaining pages get no anchors at all, because minting
+    `#sid` anchors from either numbering would duplicate or lie."""
+    out = {}
+    offset = None          # None until the first detection
+    pending = None         # (implied offset,) awaiting corroboration
+    dead = False           # confirmed restart: no anchors from here on
+    first_offset = None
+    for pageno in pagenos:
+        if dead:
+            out[pageno] = None
+            continue
+        detected = detections.get(pageno)
+        if detected is not None:
+            implied = detected - pageno
+            if offset is None:
+                offset = first_offset = implied
+            elif implied != offset:
+                if abs(implied - offset) <= PAGE_SHIFT_TOL:
+                    offset = implied
+                elif pending == implied:        # corroborated large shift
+                    if implied > offset:
+                        offset = implied
+                    else:
+                        dead = True             # confirmed numbering restart
+                        out[pageno] = None
+                        continue
+                else:
+                    # lone outlier: wait for a peer. The page itself keeps the
+                    # running offset -- anchoring it to the outlier's own
+                    # number would mint a misread or restart-duplicate #sid
+                    pending = implied
+                    printed = pageno + offset
+                    out[pageno] = printed if printed >= 1 else None
+                    continue
+            pending = None
+        printed = pageno + (offset if offset is not None else 0)
+        out[pageno] = printed if printed >= 1 else None
+    if first_offset is not None:
+        for pageno in pagenos:                  # retroactive: pre-detection pages
+            if detections.get(pageno) is not None:
+                break
+            printed = pageno + first_offset
+            out[pageno] = printed if printed >= 1 else None
+    return out
 
 
 def dehyphenate(acc, line):

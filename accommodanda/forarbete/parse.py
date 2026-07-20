@@ -38,10 +38,10 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     line_body_size,
-    page_offset,
     page_paragraphs,
     pdf_pages,
     printed_pageno,
+    printed_pages,
 )
 from ..lib.util import basefile_slug
 from . import legacy_formats, lydelse, tabell
@@ -121,25 +121,28 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     """All body blocks of a förarbete PDF, page by page. The page a block
     carries is the *printed* page (the `#sid{N}` anchor citations resolve to):
     the marginal folio numbers are read off every page (`printed_pageno`) and
-    a constant PDF-index ↔ printed-page offset is derived (`page_offset`) --
-    zero for modern regeringen.se PDFs numbered from the title page, negative
-    where unnumbered cover matter precedes page 1 (SOU 1989:67: printed 1 is
-    PDF page 4), and failing visibly when the evidence is ambiguous.
+    a *running* PDF-index ↔ printed-page offset is carried between detections
+    (`printed_pages`) -- zero for modern regeringen.se PDFs numbered from the
+    title page, negative where unnumbered cover matter precedes page 1
+    (SOU 1989:67: printed 1 is PDF page 4), and shifting mid-document where
+    the PDF omits blank printed leaves or binds in unnumbered dividers.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction.
     Each page is first split around its nuvarande/föreslagen lydelse tables
     (lydelse.split_page); the normal segments reflow and classify as before,
     a table segment becomes one `tabell` block whose rows pair the aligned
     cell paragraphs (row 0 the column header pair)."""
     raw = list(pdf_pages(pdf_path, patch_key))
-    offset = page_offset({pageno: n for pageno, lines in raw
-                          if (n := printed_pageno(lines, identifier)) is not None})
+    printed_map = printed_pages(
+        {pageno: n for pageno, lines in raw
+         if (n := printed_pageno(lines, identifier)) is not None},
+        [pageno for pageno, _lines in raw])
     # (printed pageno, [("paras", [Para], None)
     #                   | ("tabell", header, rows)         (a lydelse table)
     #                   | ("gtabell", th, rows)])          (a generic table)
     pages = []
     for pageno, lines in raw:
         # unnumbered cover matter ahead of printed page 1 carries no anchor
-        printed = pageno + offset if pageno + offset >= 1 else None
+        printed = printed_map[pageno]
         lydelse_segs = lydelse.split_page(lines)
         # a page holding a lydelse table is a two-column statute page: its
         # leftover lines are statute text in columns, never a generic data

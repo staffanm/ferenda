@@ -434,20 +434,54 @@ def test_printed_pageno_reads_folio_and_strips_header():
     assert fa_parse.printed_pageno(lines, None) is None       # no header known
 
 
-def test_page_offset_constant_majority_wins():
-    # SOU 1989:67's shape: printed 1 starts on PDF page 4, with stray bare
-    # numbers (a year in a margin) tolerated as a minority
+def test_printed_pages_running_offset_and_retroactive_cover():
+    # SOU 1989:67's shape: printed 1 starts on PDF page 4. The offset applies
+    # retroactively: cover pages map below printed 1 -> no anchor (never a
+    # duplicate of the real page 1). A stray bare number (a year in a margin)
+    # is a lone outlier: ignored, its page keeps the running offset.
     detections = {pdf: pdf - 3 for pdf in range(4, 90)} | {17: 1920}
-    assert fa_parse.page_offset(detections) == -3
-    assert fa_parse.page_offset({}) == 0                      # no evidence
-    assert fa_parse.page_offset({5: 5, 9: 9}) == 0            # too sparse
+    pages = list(range(1, 90))
+    m = fa_parse.printed_pages(detections, pages)
+    assert m[1] is None and m[3] is None                 # unnumbered cover
+    assert m[4] == 1 and m[17] == 14 and m[89] == 86
 
 
-def test_page_offset_ambiguous_mapping_raises():
+def test_printed_pages_no_evidence_assumes_pdf_equals_printed():
+    m = fa_parse.printed_pages({}, [1, 2, 3])
+    assert m == {1: 1, 2: 2, 3: 3}
+
+
+def test_printed_pages_piecewise_shift_for_omitted_blanks():
+    # printed leaves omitted between chapters: the offset shifts mid-document
+    # (the exact shape that made a single document-wide offset impossible)
     detections = {pdf: pdf for pdf in range(1, 10)} \
-        | {pdf: pdf - 8 for pdf in range(10, 16)}
-    with pytest.raises(ValueError, match="ambiguous printed-page mapping"):
-        fa_parse.page_offset(detections)
+        | {pdf: pdf + 2 for pdf in range(12, 20)}
+    m = fa_parse.printed_pages(detections, list(range(1, 20)))
+    assert m[9] == 9                     # before the shift
+    assert m[10] == 10 and m[11] == 11   # between detections: old offset holds
+    assert m[12] == 14 and m[19] == 21   # after: the new offset
+
+def test_printed_pages_large_forward_shift_needs_corroboration():
+    # one misread folio (OCR reads "1835") must not drag the document; two
+    # consecutive detections agreeing on the jump are believed (a volume
+    # continuing far ahead)
+    base = {pdf: pdf for pdf in range(1, 10)}
+    m = fa_parse.printed_pages(base | {10: 1835}, list(range(1, 15)))
+    assert m[10] == 10 and m[14] == 14                   # outlier ignored
+    m = fa_parse.printed_pages(base | {10: 510, 11: 511}, list(range(1, 15)))
+    assert m[11] == 511 and m[14] == 514                 # corroborated jump
+
+
+def test_printed_pages_confirmed_restart_stops_anchoring():
+    # an appendix restarting its own numbering: the restart is never adopted,
+    # and once consecutive detections confirm it the remaining pages carry no
+    # anchors -- either numbering would mint duplicate #sid targets
+    detections = {pdf: pdf for pdf in range(1, 100)} \
+        | {pdf: pdf - 99 for pdf in range(100, 110)}
+    m = fa_parse.printed_pages(detections, list(range(1, 110)))
+    assert m[99] == 99
+    assert m[100] == 100                 # lone restart page: running offset
+    assert all(m[p] is None for p in range(101, 110))
 
 
 # --- generic tables (rewrite-parity finding 04) ------------------------------
