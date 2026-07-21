@@ -13,6 +13,7 @@ from pathlib import Path
 from ..lib import compress
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
+from ..lib.util import Reporter
 from .model import DETAIL, load_treaties
 
 
@@ -56,10 +57,11 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
         return 1, int(resolve(session, root, treaties[only], full=full))
 
     entries = list(treaties.values())[:limit] if limit else list(treaties.values())
-    changed = 0
+    rep = Reporter()
+    fetched = 0
     for index, entry in enumerate(entries, 1):
-        wrote = resolve(session, root, entry, full=full)
-        changed += int(wrote)
-        log("[%d/%d] untc %s %s" % (index, len(entries), entry["mtdsg_no"],
-                                    "fetched" if wrote else "cached"))
-    return len(entries), changed
+        if resolve(session, root, entry, full=full):
+            fetched += 1
+        rep.update(index, len(entries), scope="untc", fetched=fetched)
+    rep.done()
+    return len(entries), fetched

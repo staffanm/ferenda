@@ -26,7 +26,7 @@ from ..lib import compress
 from ..lib.harvest import HarvestWatermark, ItemKey, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import document_extension, normalize_space
+from ..lib.util import Reporter, document_extension, normalize_space
 from .model import RE_DOC_BASE, doc_basefile, load_types
 
 ICC = "https://www.icc-cpi.int"
@@ -66,11 +66,14 @@ def _row(row):
             "chamber": chamber}
 
 
-def enumerate_decisions(session, log=print):
+def enumerate_decisions(session):
     """Every curated substantive decision as {base, kind, ...fallback}, one row
-    per document base (the first facet that lists it wins its kind)."""
+    per document base (the first facet that lists it wins its kind). The facet
+    sweep is the discovery phase, shown on one live 'icc index' line."""
     seen = {}
-    for facet, entry in load_types().items():
+    types = load_types()
+    rep = Reporter()
+    for facet_no, (facet, entry) in enumerate(types.items(), 1):
         for page in range(PAGE_LIMIT):
             envelope = request(session, "GET", DECISIONS, timeout=120, params={
                 "f[0]": "decision_type_of_decision:" + facet, "page": str(page)})
@@ -86,7 +89,8 @@ def enumerate_decisions(session, log=print):
                 raise ValueError("icc: facet %s exceeds %d listing pages -- raise "
                                  "PAGE_LIMIT" % (facet, PAGE_LIMIT))
             time.sleep(0.2)
-        log("icc: %s -> %d cumulative" % (entry["kind"], len(seen)))
+        rep.update(facet_no, len(types), scope="icc index", found=len(seen))
+    rep.done()
     # an empty harvest means the .views-row markup or the facet ids drifted, not
     # that the ICC issued no substantive decisions -- fail loudly rather than
     # silently wipe the corpus on the next relate
@@ -159,7 +163,7 @@ def resolve(session, root, record, full=False, delay=0.3):
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
     session = make_session(USER_AGENT)
-    records = enumerate_decisions(session, log=log)
+    records = enumerate_decisions(session)
     if only:
         record = next((r for r in records if r["base"] == only.upper()), None)
         if record is None:

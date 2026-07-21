@@ -597,8 +597,14 @@ def sitemap_enumerate(session, agency):
 # per-agency wiring onto the shared download engine (lib.harvest.walk)
 # --------------------------------------------------------------------------
 
-def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=print):
+def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=print,
+            reporter=None):
     """Download one agency onto :func:`lib.harvest.walk`.
+
+    `reporter` overrides the live progress sink: the sequential path lets
+    :func:`walk` build its own live one-line Reporter, but the parallel harvest
+    passes a NullReporter (per-agency live lines would collide) and shows a single
+    aggregate line for the whole pool instead.
 
     Backfill (walk the whole index, download what is missing) on ``--full`` or
     when the agency has never cleanly completed (no watermark yet -- a first or
@@ -612,15 +618,18 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
             "%s browser transport cannot also configure an HTTP session" % agency.fs
         with DetachedChrome(Path(root) / agency.fs / ".browser-profile",
                             settle=agency.browser_settle) as session:
-            return _harvest_session(agency, root, session, full, only, limit, delay, log)
+            return _harvest_session(agency, root, session, full, only, limit, delay,
+                                    log, reporter)
     session = (make_http2_session if agency.http2 else make_session)(
         agency.user_agent or USER_AGENT)
     if agency.headers:
         session.headers.update(agency.headers)
-    return _harvest_session(agency, root, session, full, only, limit, delay, log)
+    return _harvest_session(agency, root, session, full, only, limit, delay, log,
+                            reporter)
 
 
-def _harvest_session(agency, root, session, full, only, limit, delay, log):
+def _harvest_session(agency, root, session, full, only, limit, delay, log,
+                     reporter=None):
     """Run the shared walk over an already-selected HTTP or browser transport."""
     marker = Path(root) / agency.fs / ".complete"
     watermark_path = Path(root) / agency.fs / ".watermark.json"
@@ -656,7 +665,7 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log):
 
     result = walk(agency.enumerate(session, agency), resolve=resolve,
                   item_key=item_key, watermark=watermark, full=full, only=only,
-                  limit=limit, scope=agency.fs, log=log)
+                  limit=limit, scope=agency.fs, log=log, reporter=reporter)
 
     if rejects:
         log("  %s: %d file(s) served a non-PDF body and were skipped"

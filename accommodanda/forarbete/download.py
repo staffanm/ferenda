@@ -64,6 +64,7 @@ from ..lib.util import (
     Reporter,
     basefile_slug,
     document_extension,
+    harvest_start,
     text_slug,
 )
 
@@ -421,6 +422,8 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
     totals = {}
     rep = Reporter()
     for typ in (types or list(TYPES)):
+        harvest_start("forarbete %s" % typ,
+                      "%s/rattsliga-dokument/%s/" % (BASE, TYPES[typ][0]))
         marker = Path(root) / typ / ".complete"
         watermark_path = Path(root) / typ / ".watermark.json"
 
@@ -502,5 +505,8 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
             log("  %s: %d download error(s) -- the store stays dirty, so the "
                 "next run re-walks down to the watermark boundary and retries "
                 "them (--only <basefile> forces one now)" % (typ, errors))
+        # summary right after this type's own start line + progress, so each
+        # subtype reads as one self-contained block (not all summaries at the end)
+        log("forarbete %s: %d seen, %d new" % (typ, seen, new))
         totals[typ] = (seen, new)
     return totals

@@ -159,6 +159,9 @@ class Source:
     stages: dict                          # name -> Stage
     harvest: Callable[[list], None] | None = None  # bulk download (discovery)
     origin: str | None = None             # human base URL, shown when harvesting
+    self_banner: bool = False             # source prints its own per-subtype
+                                          # "<src> <sub>: Starting at <url>" lines
+                                          # (forarbete); dispatcher stays silent
     actions: dict = field(default_factory=dict)  # name -> source-specific verb()
     scopes: frozenset = field(default_factory=frozenset)  # harvest sub-corpora
     notes: str = ""                       # extra `lagen <src> -h` help (flags etc.)
@@ -413,6 +416,7 @@ class RunOptions:
     rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
     rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
+    jobs: int = 1                # worker count for harvests that fan out (foreskrift)
 
 
 RUN = RunOptions()
@@ -1046,6 +1050,7 @@ def _sfs_mirror_pdf_run(targets, force):
     if RUN.dry_run:
         print("sfs mirror-pdf: would mirror %d SFS PDF(s)" % len(targets))
         return
+    util.harvest_start("sfs mirror-pdf", sfs_pdfmirror.SVENSK)
     session = _sfs_session()
     state = sfs_pdfmirror.MirrorState(layout.sfs_pdf_dir())
     fetched = no_pdf = print_only = 0
@@ -1059,7 +1064,7 @@ def _sfs_mirror_pdf_run(targets, force):
             print_only += 1        # predates every source -- never asked about
         elif not compress.exists(layout.sfs_pdf(beteckning)):
             no_pdf += 1            # a source covers the act; it has no PDF for it
-        reporter.update(seen, len(targets), scope="sfs pdf",
+        reporter.update(seen, len(targets), scope="sfs mirror-pdf",
                         fetched=fetched, no_pdf=no_pdf, print_only=print_only)
     reporter.done()
     print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d older than "
@@ -1295,7 +1300,7 @@ def dv_harvest(scopes):
               % NAMEDCASES_JSON)
         return
     seen, changed = dv_download.sync(DOM_DOWNLOADED, full=RUN.force)
-    print("dv download: %d records seen, %d new/changed" % (seen, changed))
+    print("dv download: %d seen, %d changed" % (seen, changed))
     if changed or not DV_INDEX.exists():
         dv_reindex()
     else:
@@ -1319,10 +1324,12 @@ def dv_reindex(args=()):
         print("dv reindex: would rebuild %s from %s + %s"
               % (DV_INDEX, DOM_DOWNLOADED, DV_LEGACY_DOWNLOADED))
         return
-    print("dv reindex: rebuilding identity index ...")
-    dv_identity.reindex(dvdir=str(DV_LEGACY_DOWNLOADED),
-                        domstoldir=str(DOM_DOWNLOADED),
-                        out=str(DV_INDEX))
+    _cases, summary, warnings = dv_identity.reindex(
+        dvdir=str(DV_LEGACY_DOWNLOADED), domstoldir=str(DOM_DOWNLOADED),
+        out=str(DV_INDEX))
+    print("dv reindex: %s" % summary)
+    for warning in warnings:
+        print("  !! %s" % warning)
     _dv_cases.cache_clear()
     _dv_grupps.cache_clear()
 
@@ -1446,11 +1453,12 @@ def fa_harvest(scopes):
                  layout.FA_DOWNLOADED))
         return
     if do_reg:
-        totals = fa_download.sync(str(layout.FA_DOWNLOADED), types=reg_scopes or None,
-                                  full=RUN.force, only=RUN.only)
-        for typ, (seen, new) in totals.items():
-            print("forarbete %s: %d seen, %d new" % (typ, seen, new))
+        # sync prints each type's own "forarbete <typ>: Starting at ..." banner and
+        # closing summary, so every regeringen subtype reads as one block
+        fa_download.sync(str(layout.FA_DOWNLOADED), types=reg_scopes or None,
+                         full=RUN.force, only=RUN.only)
     for typ in rd_scopes:
+        util.harvest_start("forarbete %s" % typ, fa_riksdagen.API)
         seen, new = riksdagen_syncs[typ](str(layout.FA_DOWNLOADED), full=RUN.force,
                                          riksmote=RUN.riksmote)
         print("forarbete %s: %d seen, %d new" % (typ, seen, new))
@@ -1542,7 +1550,7 @@ def fa_soukb_scans(args):
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
-}, harvest=fa_harvest, origin=_origin(fa_download.BASE),
+}, harvest=fa_harvest, origin=_origin(fa_download.BASE), self_banner=True,
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"propkb-scans": fa_propkb_scans,
             "soukb-scans": fa_soukb_scans,
@@ -1731,7 +1739,7 @@ def hudoc_harvest(_scopes):
     seen, changed = hudoc_download.sync(
         layout.HUDOC_DOWNLOADED, full=RUN.force, only=RUN.only,
         languages=languages, limit=RUN.limit, delay=POLITENESS)
-    print("hudoc: %d seen, %d changed" % (seen, changed))
+    print("hudoc download: %d seen, %d changed" % (seen, changed))
 
 
 SOURCES["hudoc"] = Source(
@@ -1767,7 +1775,7 @@ def coe_harvest(_scopes):
     seen, changed = coe_download.sync(
         layout.COE_DOWNLOADED, full=RUN.force, only=RUN.only,
         limit=RUN.limit, delay=POLITENESS)
-    print("coe: %d seen, %d changed" % (seen, changed))
+    print("coe download: %d seen, %d changed" % (seen, changed))
 
 
 SOURCES["coe"] = Source(
@@ -1804,7 +1812,7 @@ def icrc_harvest(_scopes):
     seen, changed = icrc_download.sync(
         layout.ICRC_DOWNLOADED, full=RUN.force, only=RUN.only,
         limit=RUN.limit, delay=POLITENESS)
-    print("icrc: %d seen, %d changed" % (seen, changed))
+    print("icrc download: %d seen, %d changed" % (seen, changed))
 
 
 SOURCES["icrc"] = Source(
@@ -1843,7 +1851,7 @@ def untc_harvest(_scopes):
     seen, changed = untc_download.sync(
         layout.UNTC_DOWNLOADED, full=RUN.force, only=RUN.only,
         limit=RUN.limit, delay=POLITENESS)
-    print("untc: %d seen, %d fetched" % (seen, changed))
+    print("untc download: %d seen, %d fetched" % (seen, changed))
 
 
 SOURCES["untc"] = Source(
@@ -1883,7 +1891,7 @@ def icc_harvest(_scopes):
     seen, changed = icc_download.sync(
         layout.ICC_DOWNLOADED, full=RUN.force, only=RUN.only,
         limit=RUN.limit, delay=POLITENESS)
-    print("icc: %d seen, %d stored" % (seen, changed))
+    print("icc download: %d seen, %d stored" % (seen, changed))
 
 
 SOURCES["icc"] = Source(
@@ -1910,21 +1918,49 @@ def foreskrift_list():
 
 def foreskrift_harvest(scopes):
     """Bulk harvest of the agency författningssamlingar (scopes = fs codes, e.g.
-    'fffs'; empty = all registered). `--full` re-walks and refreshes existing
-    base regulations; `--only fs/year:num` (one scope) fetches a single one."""
+    'fffs'; empty = all *non-browser* agencies). The browser-shielded ones
+    (skvfs, mtfs) are excluded from the default sweep -- they need the slow,
+    serial DetachedChrome transport, so they run on their own schedule via
+    `lagen foreskrift browser-download`. Naming one explicitly still harvests it.
+    `--full` re-walks and refreshes existing base regulations; `--only
+    fs/year:num` (one scope) fetches a single one."""
     if RUN.only and len(scopes) != 1:
         sys.exit("foreskrift --only needs exactly one fs scope, e.g. "
                  "`lagen foreskrift download fffs --only fffs/2013:10`")
+    if not scopes:
+        skipped = foreskrift_download.browser_scopes()
+        scopes = foreskrift_download.default_scopes()
+        if skipped:
+            print("foreskrift download: skipping %d browser-shielded agenc%s (%s) "
+                  "-- run `lagen foreskrift browser-download` on its own schedule"
+                  % (len(skipped), "y" if len(skipped) == 1 else "ies",
+                     ", ".join(skipped)))
     if RUN.dry_run:
         print("foreskrift download: would download %s into %s"
-              % (RUN.only or ", ".join(scopes) or "all agencies",
-                 layout.FORESKRIFT_DOWNLOADED))
+              % (RUN.only or ", ".join(scopes), layout.FORESKRIFT_DOWNLOADED))
         return
-    totals = foreskrift_download.sync(str(layout.FORESKRIFT_DOWNLOADED),
-                                      scopes=scopes or None, full=RUN.force,
-                                      only=RUN.only)
-    for fs, (seen, new) in totals.items():
-        print("foreskrift %s: %d seen, %d new" % (fs, seen, new))
+    # sync prints each agency's own summary as it finishes and, with jobs>1, fans
+    # the agencies out across a thread pool (each hits a different host)
+    foreskrift_download.sync(str(layout.FORESKRIFT_DOWNLOADED),
+                             scopes=scopes, full=RUN.force,
+                             only=RUN.only, jobs=RUN.jobs)
+
+
+def foreskrift_browser_download(_basefiles):
+    """`lagen foreskrift browser-download`: harvest only the browser-shielded
+    författningssamlingar (skvfs, mtfs), which need the slow headful-Chrome
+    transport and are kept off the default parallel sweep. Run sequentially (they
+    share the process-global DISPLAY and Playwright's single-thread sync API), on
+    its own, less frequent schedule."""
+    scopes = foreskrift_download.browser_scopes()
+    if RUN.dry_run:
+        print("foreskrift browser-download: would download %s into %s"
+              % (", ".join(scopes), layout.FORESKRIFT_DOWNLOADED))
+        return
+    util.harvest_start("foreskrift browser-download",
+                       "the headful-Chrome agency sites (%s)" % ", ".join(scopes))
+    foreskrift_download.sync(str(layout.FORESKRIFT_DOWNLOADED), scopes=scopes,
+                             full=RUN.force, only=RUN.only, jobs=1)
 
 
 # the parser is one shared engine over every fs (its own model/structure plus the
@@ -2009,13 +2045,17 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
+    actions={"browser-download": foreskrift_browser_download},
     # display label only, nothing is ever fetched from a central index: the
     # harvest engine drives each agency's own site from foreskrift/agencies.py
     origin="the %d agency sites in foreskrift/agencies.py"
            % len(FORESKRIFT_AGENCIES),
     scopes=frozenset(FORESKRIFT_AGENCIES),
     notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
-          "scopes are författningssamling codes (fffs, …); empty = all agencies")
+          "scopes are författningssamling codes (fffs, …); empty = all non-browser "
+          "agencies\n"
+          "browser-download: harvest just the headful-Chrome agencies (skvfs, "
+          "mtfs), kept off the default sweep for a separate schedule")
 
 
 # --------------------------------------------------------------------------
@@ -2700,6 +2740,9 @@ def cmd_index(names, jobs=1):
     # a dropped index invalidates every watermark -- skipping would leave the
     # source's docs unindexed, so nothing may be skipped until it's rebuilt
     index_present = index.exists()
+    # the corpus-wide inbound-count map is ~7s to build over a 10M-row link table
+    # and identical for every source -- build it once, not once per source
+    inbound_counts = catalog.document_inbound_counts(con)
     for name in names:
         if name not in ARTIFACTS:
             continue
@@ -2716,7 +2759,8 @@ def cmd_index(names, jobs=1):
             print("index %s: index code changed -- reindexing all" % name)
         t0 = time.perf_counter()
         docs, indexed, errors, missing, skipped, deleted = index.index_source(
-            con, name, progress=progress, jobs=jobs, force=RUN.force or recode)
+            con, name, progress=progress, jobs=jobs, force=RUN.force or recode,
+            inbound_counts=inbound_counts)
         _emit_segment("index", name, time.perf_counter() - t0, total=docs,
                       ran=indexed, errors=len(errors), skipped_fresh=skipped,
                       status="errors" if errors else "ok")
@@ -2783,8 +2827,8 @@ def cmd_download_all(names, jobs):
     for name in names:
         source = SOURCES[name]
         if source.harvest is not None:
-            if source.origin:
-                print("Downloading %s from %s" % (name, source.origin), flush=True)
+            if source.origin and not source.self_banner:
+                util.harvest_start("%s download" % name, source.origin)
             t0 = time.perf_counter()
             try:
                 source.harvest([])                       # [] = full discovery
@@ -3405,6 +3449,7 @@ def main(argv=None):
     RUN.rebuild_history = args.rebuild_history
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
+    RUN.jobs = jobs      # harvests that fan out (foreskrift's per-agency pool) read it
 
     # A pipeline invocation is wrapped in the run ledger: mint a run id, prune old
     # runs, emit run-start, and (try/finally, so a crash or Ctrl-C still lands it)
@@ -3616,10 +3661,9 @@ def _dispatch(args, p, jobs):
                 # (forarbete doctypes / eurlex sectors). The per-doc stage only
                 # refetches known ids; new docs come only from the bulk sweep,
                 # so this must NOT fall back to list_basefiles().
-                if source.origin:
+                if source.origin and not source.self_banner:
                     label = "%s %s" % (name, "/".join(scopes)) if scopes else name
-                    print("Downloading %s from %s" % (label, source.origin),
-                          flush=True)
+                    util.harvest_start("%s download" % label, source.origin)
                 t0 = time.perf_counter()
                 try:
                     source.harvest(scopes)

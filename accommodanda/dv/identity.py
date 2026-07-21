@@ -410,39 +410,36 @@ def canonical_id(courts, malnummer, referat):
     return "%s %s" % (court, malnummer[0]) if malnummer else court
 
 
-def report(cases, unrecognized):
+def summarize(cases, unrecognized):
+    """The reindex tally as one compact line, plus a list of anomaly warnings
+    (only when a canonical component spans >1 court -- likely over-linking, which
+    silently corrupts case identity, so it stays visible). No printing: the caller
+    decides where the line goes."""
     by_sources = Counter(tuple(c["sources"]) for c in cases)
-    linked = by_sources[("domstol", "dv")]
-    multi_court = [c for c in cases if len(c["courts"]) > 1]
     multi_file = sum(1 for c in cases if len(c["members"]) > 1)
-    print("%d canonical cases" % len(cases))
-    print("  both sources (linked): %d" % linked)
-    print("  domstol (API) only:    %d" % by_sources[("domstol",)])
-    print("  dv (legacy) only:      %d" % by_sources[("dv",)])
-    print("  multi-record cases:    %d" % multi_file)
-    print("  unrecognized legacy files: %d" % len(unrecognized))
-    if multi_court:
-        print("  !! %d components span >1 court (likely over-linked):"
-              % len(multi_court))
-        for c in multi_court[:10]:
-            print("     %s  courts=%s" % (c["canonical_id"], c["courts"]))
-    by_court = Counter(c["courts"][0] for c in cases if c["courts"])
-    print("  per court (canonical):",
-          dict(sorted(by_court.items(), key=lambda kv: -kv[1])))
+    multi_court = [c for c in cases if len(c["courts"]) > 1]
+    line = ("%d canonical cases (%d linked, %d domstol-only, %d dv-only, "
+            "%d multi-record; %d unrecognized legacy)"
+            % (len(cases), by_sources[("domstol", "dv")],
+               by_sources[("domstol",)], by_sources[("dv",)],
+               multi_file, len(unrecognized)))
+    warnings = ["%d components span >1 court (likely over-linked): %s"
+                % (len(multi_court), ", ".join(
+                    "%s courts=%s" % (c["canonical_id"], c["courts"])
+                    for c in multi_court[:10]))] if multi_court else []
+    return line, warnings
 
 
 def reindex(dvdir, domstoldir, out):
     """Rebuild the whole identity index from the two raw stores and write it to
     `out`. A full rebuild, not an incremental update: build_index is a global
     union-find over every record, so a single new record can merge components.
-    Reads only raw record metadata + legacy filenames -- no document parsing."""
+    Reads only raw record metadata + legacy filenames -- no document parsing.
+    Returns ``(cases, summary_line, warnings)``; the caller prints the one line."""
     api_records = scan_api(domstoldir)
     legacy_records, unrecognized = scan_legacy(dvdir)
-    print("scanned %d API records, %d legacy files (%d unrecognized)"
-          % (len(api_records), len(legacy_records), len(unrecognized)))
     cases = build_index(api_records, legacy_records)
     cases.sort(key=lambda c: (c["avgorandedatum"] or "", c["canonical_id"]))
     util.write_atomic(out, json.dumps(cases, ensure_ascii=False, indent=2))
-    report(cases, unrecognized)
-    print("index written to %s" % out)
-    return cases
+    line, warnings = summarize(cases, unrecognized)
+    return cases, line, warnings

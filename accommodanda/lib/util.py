@@ -181,7 +181,7 @@ def hms(seconds):
 
 
 def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
-             stamp=False, stream=sys.stderr, **counts):
+             stamp=False, note="", stream=sys.stderr, **counts):
     """One uniform, self-overwriting harvest line across the source downloaders:
 
         [HH:MM:SS] [scope ]page <p> (<seen>/<total>): <n> <label>, ... [+<dt>]
@@ -201,7 +201,7 @@ def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
     pg = "page %d " % page if page is not None else ""
     tally = ", ".join("%d %s" % (value, label) for label, value in counts.items())
     tail = " [+%s]" % hms(elapsed) if elapsed is not None else ""
-    status(seen, total, tally, prefix="%s%s%s" % (clock, head, pg), tail=tail,
+    status(seen, total, tally + note, prefix="%s%s%s" % (clock, head, pg), tail=tail,
            stream=stream)
 
 
@@ -210,6 +210,16 @@ def progress_break(stream=sys.stderr):
     finished segment (a harvest year / page sweep) persists above the live one."""
     stream.write("\n")
     stream.flush()
+
+
+def harvest_start(label, url):
+    """The uniform banner that opens a harvest segment: ``<label>: Starting at
+    <url>``. ``label`` is ``<source> <action>`` -- a source's ``download``, an
+    extra action (``mirror-pdf``), or a subtype (``forarbete prop``). Printed once
+    (to stdout, beside the segment's closing summary) before its live progress
+    lines, so start and summary bracket the stderr progress uniformly across every
+    source."""
+    print("%s: Starting at %s" % (label, url), flush=True)
 
 
 class Reporter:
@@ -228,19 +238,56 @@ class Reporter:
 
     def __init__(self):
         self._last = time.perf_counter()
+        self._shown = False        # a live line is on screen awaiting its newline
 
-    def update(self, seen, total, *, scope=None, page=None, **counts):
+    def update(self, seen, total, *, scope=None, page=None, note="", **counts):
         now = time.perf_counter()
         progress(seen, total, scope=scope, page=page, stamp=True,
-                 elapsed=now - self._last, **counts)
+                 elapsed=now - self._last, note=note, **counts)
         self._last = now
+        self._shown = True
 
     def reset(self):
         self._last = time.perf_counter()
 
+    def clear(self, stream=sys.stderr):
+        """Wipe the current live line in place (no newline), so a persistent line
+        can be printed cleanly above a still-running progress line -- the parallel
+        harvest coordinator prints each finished agency's summary this way while
+        its aggregate line keeps redrawing below."""
+        if self._shown:
+            stream.write("\r\033[K")
+            stream.flush()
+            self._shown = False
+
     def done(self):
-        progress_break()
+        # only break to a fresh line when a live line was actually drawn: a
+        # segment that showed nothing (an up-to-date source whose walk skipped
+        # every item before the first update) must not emit a bare newline --
+        # that is what littered `all download` with one blank line per idle source.
+        if self._shown:
+            progress_break()
+            self._shown = False
         self._last = time.perf_counter()
+
+
+class NullReporter:
+    """A Reporter that draws nothing -- for a parallel harvest where many agencies
+    run at once and their per-agency live lines would overwrite each other. Each
+    worker reports through one of these; the coordinator shows a single aggregate
+    line for the whole pool instead."""
+
+    def update(self, *args, **counts):
+        pass
+
+    def reset(self):
+        pass
+
+    def clear(self):
+        pass
+
+    def done(self):
+        pass
 
 
 ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
