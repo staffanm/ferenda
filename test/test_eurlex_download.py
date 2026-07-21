@@ -223,6 +223,23 @@ def test_enum_query_keeps_wdate_less_documents():
     assert "!BOUND" not in D._enum_query("62020CJ", None)
 
 
+def test_enum_query_language_filter_is_caselaw_only():
+    # caselaw (require_language_expression) restricts discovery to works that
+    # carry a swe/eng expression, so procedural-language-only judgments are never
+    # selected+discarded per run. A FILTER EXISTS keeps one row per CELEX.
+    q = D._enum_query("62020CJ", None, ("swe", "eng"))
+    assert "FILTER EXISTS" in q
+    assert "cdm:expression_uses_language" in q
+    # the full chain down to a downloadable item, not just an expression
+    assert "cdm:item_belongs_to_manifestation" in q
+    assert '"SWE", "ENG"' in q
+    # treaties/acts pass no languages -> no expression join, query unchanged
+    assert "expression_uses_language" not in D._enum_query("32020R", None)
+    # the caselaw sector is the one wired to ask for it
+    assert D.SECTORS["caselaw"].require_language_expression
+    assert not D.SECTORS["acts"].require_language_expression
+
+
 def test_pending_sidecar_round_trip(tmp_path):
     assert D.read_pending(tmp_path, "caselaw") == []
     D.write_pending(tmp_path, "caselaw", {"62020CJ0100", "61993CC0425"})
@@ -288,7 +305,7 @@ def test_sync_records_a_recent_no_content_work_from_the_walk(tmp_path, monkeypat
     # work date ages past the window
     _stub_session(monkeypatch)
     recent = (date.today() - timedelta(days=10)).isoformat()
-    monkeypatch.setattr(D, "enumerate_celex", lambda s, sec, since:
+    monkeypatch.setattr(D, "enumerate_celex", lambda s, sec, since, languages=None:
                         iter([(2025, [("62025CJ0009", recent)])]))
     monkeypatch.setattr(D, "fetch_selection", lambda s, c, l: {})    # no content
     monkeypatch.setattr(D, "fetch_metadata", lambda s, c: ({}, {}))

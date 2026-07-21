@@ -114,6 +114,16 @@ class Sector:
     # bounded lookback below the floor rather than tracking it exactly (see
     # enum_years).
     wdate_follows_celex_year: bool
+    # Enumerate only works that carry a downloadable item in one of the wanted
+    # languages? Sector 6 lists thousands of judgments available only in the
+    # procedural language(s); with no swe/eng content they can never be stored, yet
+    # each was re-selected (a wasted round trip) and logged "no manifestation"
+    # every run. A FILTER EXISTS on the full work->expression->manifestation->item
+    # chain (the one the content fetch walks) drops them at discovery. Safe: a work
+    # fetch_selection can pull content for is exactly one with such an item, so the
+    # filter never hides a case we could actually store. Off for treaties/acts,
+    # which carry every official language anyway (and would only pay the extra join).
+    require_language_expression: bool = False
 
 # The CELEX descriptor (the 2-letter code after the year) names the court and
 # document kind: first letter C/T/F = Court of Justice / General Court / Civil
@@ -135,7 +145,7 @@ SECTORS = {
                    re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952, True),
     "caselaw": Sector("caselaw", "6", CASELAW_TYPES,
                       re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
-                      1954, False),
+                      1954, False, require_language_expression=True),
 }
 
 
@@ -162,23 +172,46 @@ def sparql_select(session, query):
                    )["results"]["bindings"]
 
 
-def _enum_query(celex_prefix, since):
+def _enum_query(celex_prefix, since, languages=None):
     """A DISTINCT (CELEX, work-date) listing for one sector-year-descriptor
     prefix; the date feeds the watermark. `since` (a date) restricts to
     documents whose work date is on/after it -- but a document with no
     work_date_document (a modelled state: enumerate_celex stores None,
     notice_ttl handles it) must survive the filter, hence the !BOUND clause. A
     plain `?d >= ...` evaluates error->false for an unbound ?d and would drop
-    every wdate-less work from every incremental run."""
+    every wdate-less work from every incremental run.
+
+    `languages` (set for sectors with `require_language_expression`) adds a
+    FILTER EXISTS on the work->expression->language edge, so only works that
+    carry an expression in one of those languages are listed -- the discovery-time
+    filter that keeps sector 6's procedural-language-only judgments out of the
+    per-document selection entirely. EXISTS (not a join) keeps one row per CELEX."""
     datefilter = (' FILTER(!BOUND(?d) || ?d >= "%s"^^xsd:date)' % since.isoformat()
                   if since else "")
+    langfilter = ""
+    if languages:
+        langs = ", ".join('"%s"' % code.upper() for code in languages)
+        # the full work->expression->manifestation->item chain _selection_query
+        # walks, so a listed work is exactly one fetch_selection returns content
+        # for: a swe/eng *expression* alone is not enough (some works carry one
+        # with no downloadable item, which still logged "no manifestation" and got
+        # re-selected every run). Verified against the live endpoint: item-level is
+        # both more precise and no slower, and -- being the same chain the content
+        # fetch uses -- can never hide a work we could actually store. FILTER EXISTS
+        # (no owl:sameAs) short-circuits per work, so it dodges the whole-year
+        # manifestation-join blow-up the selection query is chunked to avoid.
+        langfilter = (" FILTER EXISTS { ?expr cdm:expression_belongs_to_work ?w ; "
+                      "cdm:expression_uses_language ?langc . "
+                      "?manif cdm:manifestation_manifests_expression ?expr . "
+                      "?item cdm:item_belongs_to_manifestation ?manif . "
+                      "FILTER(REPLACE(STR(?langc), '.*/', '') IN (%s)) }" % langs)
     return ("PREFIX cdm: <http://publications.europa.eu/ontology/cdm#> "
             "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> "
             "SELECT DISTINCT ?celex ?d WHERE { "
             "?w cdm:resource_legal_id_celex ?celex . "
             "OPTIONAL { ?w cdm:work_date_document ?d . } "
-            'FILTER(STRSTARTS(STR(?celex), "%s"))%s } ORDER BY ?celex'
-            % (celex_prefix, datefilter))
+            'FILTER(STRSTARTS(STR(?celex), "%s"))%s%s } ORDER BY ?celex'
+            % (celex_prefix, datefilter, langfilter))
 
 
 # How many years a caselaw CELEX (case-filing year) can lag behind its work
@@ -217,19 +250,22 @@ def enum_years(sector, since):
     return range(start, date.today().year + 1)
 
 
-def enumerate_celex(session, sector, since=None):
+def enumerate_celex(session, sector, since=None, languages=None):
     """Yield (year, [(CELEX, work_date), ...]) per year, oldest first. Each
     year's slice is fetched whole (one SPARQL query, or two for acts' R/L
     prefixes), so the caller knows the year's exact size up front. With `since`
     set, the walk is bounded by enum_years (which years) and the per-slice wdate
-    FILTER (which documents within a year)."""
+    FILTER (which documents within a year). `languages` is applied as a
+    has-an-expression-in-these-languages discovery filter only for sectors that
+    ask for it (`require_language_expression`)."""
+    langfilter = languages if sector.require_language_expression else None
     for year in enum_years(sector, since):
         print("  querying %s %d ..." % (sector.name, year),
               file=sys.stderr, flush=True)
         items, seen = [], set()
         for prefix in sector.prefixes:
             rows = sparql_select(session, _enum_query(
-                "%s%d%s" % (sector.digit, year, prefix), since))
+                "%s%d%s" % (sector.digit, year, prefix), since, langfilter))
             for row in rows:
                 celex = row["celex"]["value"]
                 if celex in seen or not sector.celex_re.match(celex):
@@ -278,11 +314,14 @@ def soap_search(session, expert_query, page):
         remove_comments=True, remove_pis=True))
 
 
-def enumerate_celex_soap(session, sector, since=None):
+def enumerate_celex_soap(session, sector, since=None, languages=None):
     """Same contract as enumerate_celex, over the SOAP service (which exposes no
     per-hit work date, so it pairs each CELEX with None -- a soap run does not
     advance the watermark). Slices the DN (CELEX) wildcard query by year to stay
-    under the per-search cap, walking the years enum_years selects."""
+    under the per-search cap, walking the years enum_years selects. `languages`
+    is accepted for a uniform enumerate signature but unused: the expert-search
+    service has no expression-language predicate to filter on (the swe/eng test
+    falls to store_document, as it did before the SPARQL discovery filter)."""
     for year in enum_years(sector, since):
         items, seen = [], set()
         for prefix in sector.prefixes:
@@ -799,7 +838,7 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             retry.discard(celex)                 # aged out, still empty: give up
         time.sleep(delay)
 
-    for year, items in enumerate_fn(session, sector, since):
+    for year, items in enumerate_fn(session, sector, since, languages=languages):
         scope = "%s %d" % (sector_name, year)
         total = len(items)                       # the year-slice's exact size
         # one batched selection (+ metadata) query for the whole year's pending
