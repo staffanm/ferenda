@@ -118,6 +118,13 @@ class DetachedChrome:
             "--lang=sv-SE",
             "--window-size=1440,900",
         ]
+        if os.environ.get("FERENDA_CHROME_NO_SANDBOX"):
+            # in a container Chrome's sandbox can't initialise as a non-root uid
+            # (no host userns/SUID sandbox); the container is the isolation
+            # boundary. Env-gated so dev keeps its real desktop sandbox.
+            # --disable-dev-shm-usage: Docker's default 64 MB /dev/shm is too small
+            # and crashes Chrome on big pages.
+            command += ["--no-sandbox", "--disable-dev-shm-usage"]
         process: subprocess.Popen[bytes] = subprocess.Popen(
             [*command, "about:blank"],
             stdout=subprocess.DEVNULL,

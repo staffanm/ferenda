@@ -38,6 +38,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Headful Chrome + Xvfb for the föreskrift browser transport: skvfs/mtfs sit
+# behind an F5/Shape WAF that rejects non-browser clients, so lib/browser.py drives
+# real google-chrome on a private Xvfb framebuffer (Playwright only connects over
+# CDP -- no `playwright install` browser download needed). google-chrome-stable
+# isn't in Debian, so add Google's apt repo (armored key via signed-by, no gnupg
+# needed). This is a large layer (~half a GB); it only serves `lagen foreskrift
+# browser-download`, which runs on its own weekly cron, not the nightly sweep.
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+        -o /usr/share/keyrings/google-chrome.asc \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        google-chrome-stable \
+        xvfb \
+        fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+# Chrome's sandbox can't initialise as the unprivileged `app` uid in a container
+# without host userns/SUID setup; the container is itself the isolation boundary,
+# so tell browser.py to pass --no-sandbox (env-gated so dev's desktop Chrome keeps
+# its sandbox).
+ENV FERENDA_CHROME_NO_SANDBOX=1
+
 # uv provides dependency resolution + install; copy just its static binaries in.
 COPY --from=ghcr.io/astral-sh/uv:0.9.0 /uv /uvx /bin/
 
