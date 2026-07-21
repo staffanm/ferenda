@@ -336,10 +336,13 @@ docker compose exec accommodanda lagen all all       # download too, then rebuil
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
 image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000`. The app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
-rules. TLS is issued once with `tools/vps/issue-cert.sh` and renewed by the
+rules. TLS is issued once with `tools/prod/issue-cert.sh` and renewed by the
 `certbot` sidecar.
 
 **Continuous deploy + nightly sync.** Pushes to `modernization` trigger
-`.github/workflows/deploy.yml` on a self-hosted runner on the VPS (update
-checkout → build → `up -d` → `lagen all rebuild`); a `ferenda` crontab runs
-`tools/vps/nightly.sh` (`lagen all all`) nightly.
+`.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
+checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab runs the
+pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
+now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
+`lagen foreskrift browser-download` (Sundays) for those — the headful-Chrome
+transport is too slow and serial for the nightly sweep.

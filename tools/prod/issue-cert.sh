@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# HISTORICAL: this belongs to the retired standalone-accommodanda `prod` profile
+# on the old Hetzner box. Current prod (ferenda.lagen.nu, LiU/Lysator) runs a
+# merged compose in ~/wds/ferenda whose nginx already fronts both sites and holds
+# their certs -- issuance there is handled by that config, not this script.
+#
 # One-off initial Let's Encrypt issuance for ferenda.lagen.nu, done with the
 # --standalone challenge BEFORE nginx runs (nginx won't start without the cert,
 # and can't answer the http-01 challenge without the cert -- so certbot binds

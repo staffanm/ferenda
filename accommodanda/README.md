@@ -862,10 +862,16 @@ carries the `data-source`/`data-basefile` identity). See
 
 ## Production deployment (Docker)
 
-Deployed to **ferenda-vps** as a standalone accommodanda-only stack — the legacy
-lagen.nu stack is not on this box. The authoritative runbook (host bootstrap,
-disk layout, secrets, CI, cron) is **[`../docs/deploy-vps.md`](../docs/deploy-vps.md)**;
-this section is just the shape of it.
+Deployed to **ferenda.lagen.nu** (= `lagen.nu` = 130.236.254.142, LiU/Lysator
+donated hosting — **not** the retired Hetzner `ferenda-vps`). The host runs **one**
+docker-compose project serving **both** sites behind a single nginx: legacy
+lagen.nu on `https://lagen.nu` and accommodanda on `https://ferenda.lagen.nu/`,
+plus the accommodanda container itself. The authoritative deploy config lives **on
+the host** in `~/wds/ferenda` (with the legacy source); the current source is
+`~/wds/accommodanda`. Corpus (data_root) is `/mnt/forstor/accommodanda`, the
+catalog `/mnt/data/accommodanda`, the wiki `/mnt/forstor/lagen-wiki`. The
+[`../docs/deploy-vps.md`](../docs/deploy-vps.md) runbook predates this merged
+layout and is being reconciled.
 
 The repo-root `docker-compose.yml` defines four services, selected by a Compose
 **profile**:
@@ -893,14 +899,16 @@ docker compose exec accommodanda lagen all all       # download too, then rebuil
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
 image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000` (the app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
-rules). TLS for `ferenda.lagen.nu` is issued once with `tools/vps/issue-cert.sh`
+rules). TLS for `ferenda.lagen.nu` is issued once with `tools/prod/issue-cert.sh`
 (certbot `--standalone`, before nginx exists) and renewed by the `certbot`
 sidecar thereafter.
 
 **Continuous deploy + nightly sync.** Pushes to `modernization` trigger
-`.github/workflows/deploy.yml` on a self-hosted runner on the VPS (update the
-on-box checkout → build → `up -d` → `lagen all rebuild`); a `ferenda` crontab
-runs `tools/vps/nightly.sh` (`lagen all all`) nightly. See the runbook.
+`.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
+the on-box checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab
+runs the pipeline as inlined `docker compose exec` lines: `lagen all all` nightly
+(skipping the browser-shielded föreskrift agencies skvfs/mtfs) plus a weekly
+`lagen foreskrift browser-download` for those.
 
 **Bootstrap by rsync (skip the from-scratch rebuild)**
 

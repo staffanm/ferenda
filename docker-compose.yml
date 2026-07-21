@@ -1,4 +1,4 @@
-# accommodanda on ferenda-vps -- one compose project, two invocations.
+# DEV compose for accommodanda -- the search backend the pipeline needs.
 #
 #   DEV  (workstation; just the search backend the pipeline needs):
 #       docker compose up -d
@@ -6,18 +6,13 @@
 #        itself straight from the working tree -- `lagen all serve` -- since in
 #        dev it is continuously re-edited and restarted; no point containerising.
 #
-#   PROD (ferenda-vps; the whole standalone site):
-#       docker compose --profile prod up -d
-#     -> opensearch + accommodanda (uvicorn + the in-container CLI) + an
-#        unprivileged nginx front + a certbot sidecar for ferenda.lagen.nu.
-#
-# This box runs ONLY the rebuilt (accommodanda) site -- the legacy lagen.nu
-# stack (ferenda/elasticsearch/fuseki/mediawiki/matomo/db) lives elsewhere and
-# is intentionally absent here. Everything except the certbot sidecar runs
-# unprivileged: accommodanda as uid 1000 (matching the host `ferenda` user that
-# owns the bind mounts), nginx as uid 101; certbot runs as root inside its own
-# container because it must write /etc/letsencrypt. See docs/deploy-vps.md for
-# the full bring-up.
+# PROD note: production is ferenda.lagen.nu (= lagen.nu = 130.236.254.142,
+# LiU/Lysator -- NOT the retired Hetzner `ferenda-vps`). There the host runs ONE
+# merged compose project that serves BOTH the legacy lagen.nu stack and
+# accommodanda behind a single nginx; that authoritative deploy config lives on
+# the host in ~/wds/ferenda, not here. The `prod` profile below dates from the
+# earlier standalone-accommodanda-only setup and is being reconciled with the
+# merged layout -- treat it as historical, not the current prod topology.
 #
 # Rule of thumb: a service with NO `profiles:` key starts in every invocation
 # (that's opensearch, shared by dev and prod); everything tagged

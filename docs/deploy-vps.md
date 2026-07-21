@@ -1,6 +1,22 @@
-# Deploying accommodanda to ferenda-vps
+# Deploying accommodanda (HISTORICAL — retired Hetzner setup)
 
-`ferenda-vps` (Hetzner, `ferenda.lagen.nu` / 46.62.219.41) runs the **standalone
+> ⚠️ **This runbook is out of date.** It describes the retired **Hetzner
+> `ferenda-vps`** box (46.62.219.41), a *standalone accommodanda-only* stack under
+> `/srv/ferenda` with a `/mnt/HC_Volume_106236756` data volume — none of which
+> exists any more.
+>
+> **Current production** is **ferenda.lagen.nu** (= `lagen.nu` =
+> **130.236.254.142**, LiU/Lysator donated hosting). There a **single merged
+> docker-compose serves BOTH sites** (legacy lagen.nu on `https://lagen.nu`,
+> accommodanda on `https://ferenda.lagen.nu/`) behind one nginx. Access is **ssh
+> as `staffan`** (docker access, **no root / no passwordless sudo** — privileged
+> ops go through containers). Sources live in `~/wds/{accommodanda,ferenda}`; the
+> authoritative deploy config is `~/wds/ferenda`. Corpus (data_root) is
+> `/mnt/forstor/accommodanda`, catalog `/mnt/data/accommodanda`, wiki
+> `/mnt/forstor/lagen-wiki`. This document needs a rewrite for that layout; treat
+> everything below as historical reference only.
+
+`ferenda-vps` (Hetzner, retired) ran the **standalone
 rebuilt site** — accommodanda only, none of the legacy lagen.nu stack. Three
 containers plus a cert sidecar, all defined in the repo-root `docker-compose.yml`
 under the `prod` profile:
@@ -95,7 +111,7 @@ nginx won't start without the cert, so issue it standalone first:
 
 ```sh
 cd /srv/ferenda/ferenda
-./tools/vps/issue-cert.sh                 # certbot --standalone on :80, one-off
+./tools/prod/issue-cert.sh                 # certbot --standalone on :80, one-off
 docker compose --profile prod up -d       # opensearch + app + nginx + certbot
 ```
 
@@ -150,7 +166,7 @@ code change reaches prod not through the deploy but through a rebuild on the
 fast dev box, synced up:
 
 ```sh
-tools/vps/download-data.sh     # pull the live corpus down to this checkout
+tools/prod/download-data.sh     # pull the live corpus down to this checkout
 lagen all rebuild              # reparse/regenerate with the new code (fast on dev)
 sync-data                      # push the rebuilt corpus back up to prod
 ```
@@ -159,7 +175,7 @@ sync-data                      # push the rebuilt corpus back up to prod
 split as the [corpus bootstrap](#corpus-bootstrap-rsync-from-dev): artifact tree
 + `catalog.sqlite` + `generated/` from the fixed disk, `downloaded/` from the
 mounted volume. It only adds/updates files locally (no `--delete`), and forwards
-extra rsync flags — `tools/vps/download-data.sh --dry-run` previews the pull.
+extra rsync flags — `tools/prod/download-data.sh --dry-run` previews the pull.
 
 `sync-data` (the dev→prod push) is currently an untracked script in `~/.bin` on
 the main dev box, not yet in this repo.
@@ -173,7 +189,7 @@ from the `ferenda` crontab:
 sudo -iu ferenda
 crontab -e
 # add:
-0 3 * * *  /srv/ferenda/ferenda/tools/vps/nightly.sh
+0 3 * * *  /srv/ferenda/ferenda/tools/prod/nightly.sh
 # pick up renewed certs weekly (harmless if nothing changed):
 30 4 * * 0 cd /srv/ferenda/ferenda && docker compose exec -T nginx nginx -s reload
 ```
