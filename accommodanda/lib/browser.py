@@ -105,6 +105,16 @@ class DetachedChrome:
 
     def _launch_chrome(self):
         self.profile.mkdir(parents=True, exist_ok=True)
+        # Chrome refuses to open a profile whose SingletonLock names another host
+        # or a live PID, exiting with "profile appears to be in use ... on another
+        # computer". Our profiles live under the corpus data_root, which is rsync'd
+        # between dev and prod, so a lock minted on one host (a dev pop-os PID)
+        # travels to the other and wedges every launch. We own each profile
+        # exclusively (one DetachedChrome per profile, serialised), so a lingering
+        # singleton is always stale -- clear it before launch. (Chrome auto-breaks
+        # a same-host dead-PID lock itself; the cross-host one it never does.)
+        for lock in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+            (self.profile / lock).unlink(missing_ok=True)
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
