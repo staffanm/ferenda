@@ -34,7 +34,7 @@ import time
 
 from opensearchpy import OpenSearch, helpers
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
-from opensearchpy.exceptions import ConnectionTimeout
+from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
 from . import catalog, compress, facets, text
@@ -49,29 +49,47 @@ INDEX_FORMAT = "4"        # bump when emitted units change without artifact chan
 REQUEST_TIMEOUT = 60      # per-request read timeout (opensearch-py's default is 10s)
 DELETE_TIMEOUT = 600      # delete_by_query over a large source can run minutes
 DELETE_BATCH = 1024       # doc_uris per terms-delete (well under max_terms_count)
+TASK_POLL_SECONDS = 2     # how often to poll a backgrounded delete_by_query task
 RETRIES = 6               # backoff attempts before surfacing a transient failure
 BACKOFF_CAP = 60          # seconds -- 2, 4, 8, 16, 32, 60, 60 …
 POOL_MAXSIZE = 16         # keep-alive connections per host (urllib3 defaults to 1);
                           # enough for the serving threadpool -- `lagen index` sizes
                           # it to its own --jobs
+PAUSE_EVERY_BYTES = 512 * 1024 * 1024   # body text shipped between GC-breather
+                          # pauses (0 = never). Bytes, not units: heap pressure
+                          # tracks the volume of text analysed/buffered, and a
+                          # source like sfs fans 11k documents into ~1M tiny §
+                          # units, so a unit count would pause every split second.
+PAUSE_SECONDS = 5         # how long to idle so the cluster's heap can be reclaimed
 _TRANSIENT = (ConnectionTimeout, OpenSearchConnectionError)
 
 
+def _is_circuit_breaker(exc):
+    """True for a parent circuit-breaker trip (HTTP 429): OpenSearch rejecting a
+    request because node heap is momentarily saturated -- typically by the very
+    reindex/merge we're driving. Unlike a 4xx client error it's transient (GC
+    frees heap within seconds), so it's safe to back off and retry."""
+    return isinstance(exc, TransportError) and exc.status_code == 429
+
+
 def _retry(fn, label):
-    """Run `fn`, retrying a transient OpenSearch connection failure (a read
-    timeout against a busy cluster) with exponential backoff; re-raise anything
-    else, and the transient error itself once the attempts are spent. Layered
-    under the client's own fast retry (`retry_on_timeout`): the client absorbs
-    blips, this absorbs sustained busyness (a long merge or delete)."""
+    """Run `fn`, retrying a transient OpenSearch failure -- a read timeout against
+    a busy cluster, or a 429 circuit-breaker trip while it's under heap pressure
+    -- with exponential backoff; re-raise anything else, and the transient error
+    itself once the attempts are spent. Layered under the client's own fast retry
+    (`retry_on_timeout`): the client absorbs blips, this absorbs sustained
+    busyness (a long merge, a delete, a heap-pressure breaker trip)."""
     for attempt in range(1, RETRIES + 1):
         try:
             return fn()
-        except _TRANSIENT:
+        except TransportError as e:
+            if not (isinstance(e, _TRANSIENT) or _is_circuit_breaker(e)):
+                raise
             if attempt == RETRIES:
                 raise
             delay = min(BACKOFF_CAP, 2 ** attempt)
             sys.stderr.write(
-                "\n  opensearch: %s timed out (attempt %d/%d) -- retrying in %ds\n"
+                "\n  opensearch: %s unavailable (attempt %d/%d) -- retrying in %ds\n"
                 % (label, attempt, RETRIES, delay))
             time.sleep(delay)
 
@@ -485,12 +503,44 @@ class SearchIndex:
         Drives index_source's diff; empty when the index doesn't exist yet."""
         if not self.client.indices.exists(index=self.index):
             return {}
-        scan = helpers.scan(
-            self.client, index=self.index, _source=["version"],
-            query={"query": {"bool": {"filter": [
-                {"term": {"source": source}},
-                {"term": {"is_doc": True}}]}}})
-        return {hit["_id"]: hit["_source"].get("version") for hit in scan}
+
+        def go():
+            scan = helpers.scan(
+                self.client, index=self.index, _source=["version"],
+                query={"query": {"bool": {"filter": [
+                    {"term": {"source": source}},
+                    {"term": {"is_doc": True}}]}}})
+            return {hit["_id"]: hit["_source"].get("version") for hit in scan}
+        # scan drives a scroll of its own -- a breaker trip mid-scroll must not
+        # abort the whole run, so retry it as one unit (the scroll restarts).
+        return _retry(go, "indexed_versions(%s)" % source)
+
+    def delete_source_async(self, source):
+        """Start a source-wide delete as a background task (returns its task id) --
+        the full-reindex path, where the diff-driven per-doc_uri batching in
+        `delete_doc_uris` is pure overhead: we're re-indexing everything anyway.
+        Backgrounded (`wait_for_completion=False`) so index_source can re-index
+        concurrently instead of blocking the first document behind a scan+delete of
+        millions of units. Overlapping is safe: bulk actions are unconditional
+        `index` (overwrite) ops, while this delete guards its own removals with
+        internal versioning + `conflicts=proceed` -- a unit we re-index is never
+        deleted (version conflict -> skipped) and a brand-new fragment is invisible
+        to the delete's point-in-time scroll. Only true orphans (units of shrunken
+        or vanished documents, never re-indexed) are removed. No `refresh`: the
+        re-index overwrites surviving _ids regardless, and index_source's trailing
+        refresh makes the removals visible."""
+        return _retry(lambda: self.client.delete_by_query(
+            index=self.index, body={"query": {"term": {"source": source}}},
+            conflicts="proceed", wait_for_completion=False,
+            request_timeout=REQUEST_TIMEOUT),
+            "delete_source_async(%s)" % source)["task"]
+
+    def wait_for_task(self, task_id, label="task"):
+        """Block until a backgrounded task (a delete_by_query) reports completed,
+        polling the tasks API. Surfaces the delete's own failures once done."""
+        while not _retry(lambda: self.client.tasks.get(task_id=task_id),
+                         "%s poll" % label)["completed"]:
+            time.sleep(TASK_POLL_SECONDS)
 
     def delete_doc_uris(self, doc_uris):
         """Remove every unit (document + fragments) of the given documents, in
@@ -531,14 +581,18 @@ class SearchIndex:
                             max_retries=RETRIES, initial_backoff=2,
                             max_backoff=BACKOFF_CAP, **common)  # ty: ignore[invalid-argument-type]  # **common widens kwargs to object
 
-    def index_source(self, con, source, progress=None, jobs=1, force=False):
+    def index_source(self, con, source, progress=None, jobs=1, force=False,
+                     inbound_counts=None):
         """Sync one source's units to its catalogued documents. Incremental by
         content hash: a document already indexed at its current `content_hash` is
         left untouched; new/changed ones are (re)indexed; units of documents that
         vanished from the catalog -- or whose artifact is gone from disk -- are
         dropped. `force` reindexes every document regardless of hash (a full
         rebuild without deleting the index by hand -- used when the index code
-        changed). `jobs>1` parallelises the bulk round-trips. Returns
+        changed). `jobs>1` parallelises the bulk round-trips. `inbound_counts` is
+        the whole-corpus {root_uri: count} map (~7s to build over a 10M-row link
+        table); pass it in to compute it once across a multi-source run rather
+        than per source. Returns
         (documents, indexed, errors, missing, skipped, deleted)."""
         self.ensure_index()
         rows = con.execute(
@@ -549,8 +603,11 @@ class SearchIndex:
         # artifact bytes) work in absolute paths. A stub's empty path stays empty.
         root = catalog.data_root(con)
         rows = [(*r[:5], str(root / r[5]) if r[5] else r[5], r[6], r[7]) for r in rows]
-        have = self.indexed_versions(source)
         present = {row[0] for row in rows}
+        # a full reindex ignores prior versions: skip the whole-source scan (which
+        # runs for minutes on a large source, all before the first doc is indexed)
+        # and, below, drop the source in one delete instead of diffing per doc.
+        have = {} if force else self.indexed_versions(source)
 
         todo, missing, skipped = [], [], 0
         for row in rows:
@@ -566,30 +623,58 @@ class SearchIndex:
             else:
                 todo.append(row)
 
-        # drop units for documents gone from the catalog, plus the prior units of
-        # the ones we're re-indexing (a changed doc may have shed fragments, whose
-        # stale units a same-_id overwrite wouldn't reach). New docs aren't indexed
-        # yet, so they need no pre-delete.
-        stale = (set(have) - present) | {r[0] for r in todo if r[0] in have}
-        self.delete_doc_uris(stale)
+        # drop stale units before (re)indexing. Full reindex: one source-wide
+        # delete (a single refresh) beats scan + per-doc_uri batches. Incremental:
+        # only docs gone from the catalog, plus prior units of the ones we're
+        # re-indexing (a changed doc may have shed fragments, whose stale units a
+        # same-_id overwrite wouldn't reach). New docs aren't indexed yet.
+        if force:
+            # background the delete and index concurrently -- see delete_source_async
+            delete_task = self.delete_source_async(source)
+            deleted = len(present)
+        else:
+            delete_task = None
+            stale = (set(have) - present) | {r[0] for r in todo if r[0] in have}
+            self.delete_doc_uris(stale)
+            deleted = len(stale)
 
         # everything the threaded bulk needs, read from the DB up front (the action
-        # generator must touch no DB handle -- see doc_actions / _bulk)
-        all_counts = catalog.document_inbound_counts(con)
-        counts = {r[0]: all_counts.get(r[0], 0) for r in todo}
+        # generator must touch no DB handle -- see doc_actions / _bulk). The caller
+        # may hand in the (expensive, corpus-wide) inbound-count map so a run over
+        # many sources builds it once instead of per source.
+        if inbound_counts is None:
+            inbound_counts = catalog.document_inbound_counts(con)
+        counts = {r[0]: inbound_counts.get(r[0], 0) for r in todo}
 
         def actions():
+            since_pause = 0
             for i, row in enumerate(todo):
-                yield from doc_actions(row[:6], counts[row[0]],
-                                       version=_index_version(row[6]),
-                                       expired=row[7])
+                for action in doc_actions(row[:6], counts[row[0]],
+                                          version=_index_version(row[6]),
+                                          expired=row[7]):
+                    yield action
+                    since_pause += len(action["_source"].get("text", ""))
+                    # a GC breather every PAUSE_EVERY_BYTES of body text: the bulk
+                    # workers all drain from this single generator (see _bulk), so
+                    # pausing it idles the whole pipeline and lets the cluster
+                    # reclaim heap -- cheap insurance against the parent breaker on
+                    # a big reindex. Gated on text volume, the heap-pressure proxy.
+                    # Silent: a printed line here would tear the live \r progress
+                    # counter; the pause just freezes it for PAUSE_SECONDS.
+                    if PAUSE_EVERY_BYTES and since_pause >= PAUSE_EVERY_BYTES:
+                        time.sleep(PAUSE_SECONDS)
+                        since_pause = 0
                 if progress:
                     progress(i + 1, len(todo), catalog.local(row[0]))
 
         indexed, errors = (self._bulk(actions(), jobs) if todo else (0, []))
-        if todo or stale:
+        # ensure the backgrounded full-source delete finished before we call the
+        # removals done and make them visible
+        if delete_task:
+            self.wait_for_task(delete_task, "delete_source(%s)" % source)
+        if todo or deleted:
             _retry(lambda: self.client.indices.refresh(index=self.index), "refresh")
-        return len(rows), indexed, errors, missing, skipped, len(stale)
+        return len(rows), indexed, errors, missing, skipped, deleted
 
     def search(self, q, source=None, kind=None, limit=10, offset=0, year=None,
                cursor=None):
