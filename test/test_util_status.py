@@ -1,7 +1,7 @@
 """The live progress counter (accommodanda.lib.util.status) and its one-row
 line clipping -- the fix for long sö/lr förarbete basefiles wrapping the
 terminal so the leading '\\r' could no longer overwrite them -- plus the
-sliding-window ETA."""
+whole-run ETA paced on the work actually performed."""
 
 import io
 
@@ -24,8 +24,7 @@ class FakeClock:
 def clock(monkeypatch):
     fake = FakeClock()
     monkeypatch.setattr(util.time, "monotonic", fake)
-    util._eta["samples"].clear()
-    util._eta["total"] = object()                 # no run in progress
+    util._eta.update(t0=0.0, actual0=0, total=object(), done=-1)  # no run in progress
     return fake
 
 
@@ -34,26 +33,47 @@ def _eta_seconds(suffix):
     return int(minutes) * 60 + int(seconds)
 
 
-def test_eta_ignores_the_skipped_prefix_of_a_run(clock):
-    # sfs mirror-pdf over a corpus that is 40k/75k mirrored: the skips cost ~0,
-    # and must not bill the real downloads that follow at their rate
+def test_eta_paces_on_actual_work_not_the_skipped_prefix(clock):
+    # sfs mirror-pdf over a corpus that is 40k/75k mirrored: the skips cost ~0 and
+    # don't advance `actual`, so the real downloads that follow set the pace -- not
+    # the near-zero a run-long average over every job seen would have produced
     total = 75_000
-    for done in range(1, 40_001):
-        clock.now += 0.0001                        # already on disk: skipped
-        util._eta_suffix(done, total)
+    for done in range(1, 40_001):                  # already on disk: skipped, no work
+        util._eta_suffix(done, total, actual=0)
     suffix = ""
-    for done in range(40_001, 40_001 + 2 * util._ETA_WINDOW):
+    for built, done in enumerate(range(40_001, 41_001), 1):
         clock.now += 0.5                           # a real download
-        suffix = util._eta_suffix(done, total)
-    # ~35k items left at ~0.5s each, not the near-zero the run-long average gave
+        suffix = util._eta_suffix(done, total, actual=built)
     assert _eta_seconds(suffix) == pytest.approx((total - done) * 0.5, rel=0.02)
 
 
-def test_eta_uses_the_run_pace_before_any_window_of_items(clock):
+def test_eta_stays_put_across_a_burst_of_skips(clock):
+    # a window ETA lurches when the last N items are all fast skips; the whole-run
+    # pace over `actual` does not -- the estimate holds at the real per-build rate
+    total = 10_000
+    suffix = ""
+    for built, done in enumerate(range(1, 201), 1):
+        clock.now += 1.0                           # 200 real builds at 1s each
+        suffix = util._eta_suffix(done, total, actual=built)
+    steady = _eta_seconds(suffix)
+    for done in range(201, 401):                   # then 200 instant skips in a row
+        suffix = util._eta_suffix(done, total, actual=200)
+    # remaining fell by 200 jobs; the per-build rate (1s) is unmoved by the skips
+    assert _eta_seconds(suffix) == pytest.approx(steady - 200, abs=2)
+
+
+def test_eta_uses_the_run_pace_when_every_job_is_real(clock):
     for done in range(1, 11):
         clock.now += 2.0
-        suffix = util._eta_suffix(done, 100)
+        suffix = util._eta_suffix(done, 100)       # no `actual`: every job counts
     assert _eta_seconds(suffix) == pytest.approx((100 - 10) * 2.0, rel=0.02)
+
+
+def test_eta_absent_until_the_first_real_job(clock):
+    # a run that opens with skips shows no ETA -- there is no measured pace yet
+    for done in range(1, 51):
+        clock.now += 0.1
+        assert util._eta_suffix(done, 100, actual=0) == ""
 
 
 def test_eta_rebases_on_a_new_run(clock):

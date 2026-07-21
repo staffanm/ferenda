@@ -882,9 +882,10 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             # they happen (with the elapsed since the last line, so the per-fetch
             # cost is visible), plus a periodic tick through long stretches of skips
             if fetched or y_seen % 50 == 0:
-                rep.update(y_seen, total, scope=scope,
+                rep.update(y_seen, total, scope=scope, actual=y_stored,
                            stored=y_stored, skipped=y_skipped)
-        rep.update(y_seen, total, scope=scope, stored=y_stored, skipped=y_skipped)
+        rep.update(y_seen, total, scope=scope, actual=y_stored,
+                   stored=y_stored, skipped=y_skipped)
         rep.done()                  # finish the year's overwriting line
         if truncated:
             break

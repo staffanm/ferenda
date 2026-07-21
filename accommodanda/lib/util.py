@@ -6,7 +6,6 @@ import shutil
 import sys
 import time
 import unicodedata
-from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -95,39 +94,52 @@ def sniff_extension(path):
         return document_extension(f.read(8))
 
 # ETA timing state for `status`, self-tracked so callers need not thread a start
-# time. A current/total run (sfs parse, then dv parse, …) is timed over a sliding
-# window of its most recent items; a new run is detected when `done` restarts or
-# `total` changes, which empties the window -- so each source is estimated on its
-# own pace. The window (rather than the whole-run average) is what keeps the
-# estimate honest when a run's pace changes partway: `sfs mirror-pdf` over a
-# corpus that is 40k/75k mirrored already skips those 40k at ~0s each, and a
-# run-long average would then bill the 35k real ~0.5s downloads at the skips'
-# rate and start the ETA near zero. Only the last `_ETA_WINDOW` items count, so
-# the work that was never performed drops out of the estimate.
-_ETA_WINDOW = 64
-_eta: dict[str, Any] = {"samples": deque(maxlen=_ETA_WINDOW), "total": object()}
+# time. A current/total run (sfs parse, then dv parse, …) is timed over its whole
+# span from the first line; a new run is detected when `done` restarts or `total`
+# changes, which rebases the clock -- so each source is estimated on its own pace.
+#
+# The estimate is (elapsed / actual) * (total - done): the measured cost of the
+# work actually performed so far, times every job still ahead. `actual` is the
+# running count of jobs that did real work, which the caller passes when it can
+# tell a genuine build from a skip -- an incremental step walks a whole corpus but
+# only rebuilds the documents whose inputs changed, skipping the rest near-
+# instantly (`sfs mirror-pdf` over a 40k/75k-mirrored corpus skips those 40k at
+# ~0s each). Dividing by `done` (every job seen) rather than `actual` would spread
+# the real per-document cost across thousands of ~0s skips and start the ETA near
+# zero, then have it climb as the skips ran out; dividing by `actual` bills each
+# remaining job at the true per-build rate. We deliberately do NOT try to predict
+# how many of the remaining jobs are real (that needs a second corpus walk); for a
+# run whose skips and real work interleave evenly this over-estimates, but for the
+# common skips-first / real-work-tail shape it is honest. A whole-run average (not
+# a sliding window) is what keeps the number from swinging on a long queue: a
+# window over the last N items lets a burst of fast skips or one slow document
+# yank the estimate around, which is what `lagen all generate` showed. Callers
+# that can't distinguish real work leave `actual` None, and every job counts.
+_eta: dict[str, Any] = {"t0": 0.0, "actual0": 0, "total": object(), "done": -1}
 
 
-def _eta_suffix(done, total):
-    """``ETA MM:SS`` for a current/total sequence, from the pace over the last
-    `_ETA_WINDOW` items, or '' when there is no usable estimate (the first line
-    of a run, an unknown total, or the final line)."""
+def _eta_suffix(done, total, actual=None):
+    """``ETA MM:SS`` for a current/total sequence, from the whole-run pace of the
+    work actually performed, or '' when there is no usable estimate (the first
+    line of a run, before any real work has happened, an unknown total, or the
+    final line). `actual` is the running count of jobs that did work rather than
+    being skipped as already up to date; when the caller can't tell, every job
+    counts."""
     now = time.monotonic()
-    samples = _eta["samples"]
-    if not samples or done <= 1 or done < samples[-1][1] or total != _eta["total"]:
-        samples.clear()                            # first line of the run: re-base
-        samples.append((now, done))
-        _eta["total"] = total
+    work = done if actual is None else actual
+    if done <= 1 or done < _eta["done"] or total != _eta["total"]:
+        _eta.update(t0=now, actual0=work, total=total, done=done)  # re-base the run
         return ""
-    samples.append((now, done))
-    elapsed, processed = now - samples[0][0], done - samples[0][1]
-    if total is None or done >= total or processed <= 0 or elapsed <= 0:
+    _eta["done"] = done
+    elapsed, performed = now - _eta["t0"], work - _eta["actual0"]
+    if total is None or done >= total or performed <= 0 or elapsed <= 0:
         return ""
-    remaining = (elapsed / processed) * (total - done)
+    remaining = (elapsed / performed) * (total - done)
     return "ETA %02d:%02d" % divmod(int(remaining + 0.5), 60)
 
 
-def status(done, total, message="", *, prefix="", tail="", stream=sys.stderr):
+def status(done, total, message="", *, actual=None, prefix="", tail="",
+           stream=sys.stderr):
     """The single live one-line progress counter, overwritten in place -- shared
     by the per-document build loops (parse, generate, index, dump, bulk unpack)
     *and* the source-downloader harvest reporter (`progress`). Renders
@@ -143,10 +155,15 @@ def status(done, total, message="", *, prefix="", tail="", stream=sys.stderr):
     row -- so the overflow of a long line (e.g. a sö/lr förarbete basefile) is
     left on screen instead of being overwritten. Any ETA stays right-aligned; the
     message is what gets clipped. Off a tty nothing wraps, so the full line is
-    kept (and an 80-col ETA fallback preserved for redirected logs)."""
+    kept (and an 80-col ETA fallback preserved for redirected logs).
+
+    `actual` is the running count of jobs that did real work (as opposed to being
+    skipped as already up to date); pass it on a step that skips fresh items so the
+    ETA is paced on the real builds and not diluted by the skips (see
+    `_eta_suffix`)."""
     line = "%s(%d/%s) %s%s" % (prefix, done, "?" if total is None else total,
                                message, tail)
-    eta = _eta_suffix(done, total)
+    eta = _eta_suffix(done, total, actual)
     if stream.isatty():
         line = _fit_line(line, eta, os.get_terminal_size(stream.fileno()).columns)
     elif eta:
@@ -181,7 +198,7 @@ def hms(seconds):
 
 
 def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
-             stamp=False, note="", stream=sys.stderr, **counts):
+             stamp=False, note="", actual=None, stream=sys.stderr, **counts):
     """One uniform, self-overwriting harvest line across the source downloaders:
 
         [HH:MM:SS] [scope ]page <p> (<seen>/<total>): <n> <label>, ... [+<dt>]
@@ -201,8 +218,8 @@ def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
     pg = "page %d " % page if page is not None else ""
     tally = ", ".join("%d %s" % (value, label) for label, value in counts.items())
     tail = " [+%s]" % hms(elapsed) if elapsed is not None else ""
-    status(seen, total, tally + note, prefix="%s%s%s" % (clock, head, pg), tail=tail,
-           stream=stream)
+    status(seen, total, tally + note, actual=actual,
+           prefix="%s%s%s" % (clock, head, pg), tail=tail, stream=stream)
 
 
 def progress_break(stream=sys.stderr):
@@ -230,7 +247,8 @@ class Reporter:
     wall clock, a scope/page label, the (seen/total) counter, the running
     tallies, and the time since the previous line.
 
-      update(seen, total, scope=, page=, **counts)  -- rewrite the live line
+      update(seen, total, scope=, page=, actual=, **counts)  -- rewrite the line
+              (actual: count of items that did real work, not skips -- paces the ETA)
       done()    -- end a segment (a year/sweep/doctype) with a newline so it stays
       reset()   -- rebase the elapsed clock, e.g. after a slow per-segment query
                    whose cost should not be billed to the segment's first item
@@ -240,10 +258,11 @@ class Reporter:
         self._last = time.perf_counter()
         self._shown = False        # a live line is on screen awaiting its newline
 
-    def update(self, seen, total, *, scope=None, page=None, note="", **counts):
+    def update(self, seen, total, *, scope=None, page=None, note="", actual=None,
+               **counts):
         now = time.perf_counter()
         progress(seen, total, scope=scope, page=page, stamp=True,
-                 elapsed=now - self._last, note=note, **counts)
+                 elapsed=now - self._last, note=note, actual=actual, **counts)
         self._last = now
         self._shown = True
 

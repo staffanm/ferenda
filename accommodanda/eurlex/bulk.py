@@ -290,7 +290,8 @@ def unpack_bulk(source, root, languages=("swe", "eng"), limit=None, log=print):
                                 compress.unlink(old)
                     written += 1
             status(i, total, "%d unpacked, %d skipped, %d filtered, %d empty  %s"
-                   % (written, skipped, filtered, empty, celex or "-"))
+                   % (written, skipped, filtered, empty, celex or "-"),
+                   actual=written)
             if limit and written >= limit:
                 break
     if total:

@@ -499,14 +499,17 @@ def _worker_init(run_options: RunOptions):
     faulthandler.enable()
 
 
-def _progress(source, action, done, total, merged, basefile):
+def _progress(source, action, done, total, actual, merged, basefile):
     """Live one-line counter on stderr (the shared util.status pattern), carrying
     the source/action, the running counts, and the most recently completed
-    basefile."""
+    basefile. `actual` is the count of basefiles that actually built (ran a recipe,
+    hit a SkipDocument, or errored) rather than being skipped as already fresh, so
+    the ETA is paced on real work and not diluted by a corpus of fresh skips."""
     verb = "planned" if RUN.dry_run else "ran"
     count = len(merged.planned) if RUN.dry_run else len(merged.done)
     util.status(done, total, "%s %s  %s %d  err %d  %s"
-                % (source, action, verb, count, len(merged.errors), basefile))
+                % (source, action, verb, count, len(merged.errors), basefile),
+                actual=actual)
 
 
 SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
@@ -562,7 +565,7 @@ def run_action(source, action, basefiles, jobs):
     manifest = load_manifest()
     merged = Result()
     total = len(basefiles)
-    done = 0
+    done = actual = 0
 
     def persist():
         if merged.updates and not RUN.dry_run:
@@ -570,10 +573,14 @@ def run_action(source, action, basefiles, jobs):
             save_manifest(manifest)
 
     def absorb(res, basefile):
-        nonlocal done
+        nonlocal done, actual
         _absorb(merged, res)
         done += 1
-        _progress(source.name, action, done, total, merged, basefile)
+        # a basefile that only refreshed fresh dependencies (no run/skip/error) is
+        # a near-instant skip; the rest are real work the ETA should be paced on
+        if res.done or res.skips or res.errors:
+            actual += 1
+        _progress(source.name, action, done, total, actual, merged, basefile)
         if done % SAVE_EVERY == 0:
             persist()       # checkpoint so a kill mid-run doesn't lose progress
 
@@ -1065,6 +1072,7 @@ def _sfs_mirror_pdf_run(targets, force):
         elif not compress.exists(layout.sfs_pdf(beteckning)):
             no_pdf += 1            # a source covers the act; it has no PDF for it
         reporter.update(seen, len(targets), scope="sfs mirror-pdf",
+                        actual=fetched + no_pdf,  # print_only/on-disk are ~0s skips
                         fetched=fetched, no_pdf=no_pdf, print_only=print_only)
     reporter.done()
     print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d older than "
@@ -2653,7 +2661,7 @@ def cmd_relate(names):
 
         def progress(seen, total, changed, current, name=name):
             util.status(seen, total, "relate %s  %d changed  %s"
-                        % (name, changed, current))
+                        % (name, changed, current), actual=changed)
 
         recode = code_changed(store, "relate", name, RELATE_CODE)
         if recode and not RUN.force:
@@ -3136,7 +3144,8 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
             "version": code_version}
 
     def progress(done, total, current="", rendered=0):
-        util.status(done, total, "generate  %d rendered  %s" % (rendered, current))
+        util.status(done, total, "generate  %d rendered  %s" % (rendered, current),
+                    actual=rendered)
 
     # the sfs historical-consolidation pages ride along whenever the run covers
     # sfs: the whole corpus, the sfs source, or specific sfs documents (whose
