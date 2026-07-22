@@ -37,6 +37,7 @@ sfst/, sfsr/ siblings of the download root):
 """
 
 import argparse
+import datetime
 import json
 import re
 import time
@@ -51,6 +52,7 @@ ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
 PAGE_SIZE = 100
 PAGE_DELAY = 1.0           # seconds between pages -- conservative vs. throttling
 WATERMARK = ".watermark"   # file under destdir: max uppdateradDateTime harvested
+FETCHED = ".fetched.json"  # file under destdir: {beteckning: "YYYY-MM-DD"} last fetch
 
 # fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
 RE_VERSION = re.compile(r"(\d+:\s?\d+)")
@@ -91,6 +93,17 @@ def read_watermark(destdir):
 
 def write_watermark(destdir, value):
     write_atomic(Path(destdir) / WATERMARK, value.encode())
+
+
+def read_fetched(destdir):
+    """The {beteckning: "YYYY-MM-DD"} last-fetch map, or {} on a first run."""
+    path = Path(destdir) / FETCHED
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def write_fetched(destdir, fetched):
+    write_atomic(Path(destdir) / FETCHED,
+                 json.dumps(fetched, ensure_ascii=False, sort_keys=True).encode())
 
 
 class MalformedBeteckning(ValueError):
@@ -219,6 +232,8 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
     seen = new = updated = skipped = page_no = 0
     high = watermark
     truncated = False
+    today = datetime.date.today().isoformat()
+    fetched = read_fetched(destdir)
     rep = Reporter()
     try:
         while True:
@@ -238,6 +253,9 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
                     continue
                 new += status == "new"
                 updated += status == "updated"
+                # record the fetch date even for an unchanged act -- it WAS
+                # fetched, the content just didn't move (drives "Senast hämtad")
+                fetched[hit["_source"]["beteckning"]] = today
                 ts = hit["_source"].get("uppdateradDateTime")
                 if ts and (high is None or ts > high):
                     high = ts
@@ -253,6 +271,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
             if not backfill and high and high != watermark:
                 write_watermark(destdir, high)
                 watermark = high
+            write_fetched(destdir, fetched)      # checkpoint the last-fetch map too
             if truncated:
                 break
             time.sleep(delay)
@@ -264,6 +283,7 @@ def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
     rep.done()
     if backfill and high and not truncated:
         write_watermark(destdir, high)
+    write_fetched(destdir, fetched)
     return seen, new, updated, skipped
 
 

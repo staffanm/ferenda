@@ -241,6 +241,13 @@ def sfs_source(basefile):               # new beta-API JSON (the primary form)
     return SFS_DOWNLOADED / year / (nr + ".json")
 
 
+def sfs_fetched():                      # {basefile: "YYYY-MM-DD"} last-fetch map
+    # the last date each act was fetched from the upstream ES passthrough, bumped
+    # on every fetch (incl. an unchanged one, which the content-hashed source file
+    # cannot record) -- the "Senast hämtad" the SFS page shows (C1)
+    return SFS_DOWNLOADED / ".fetched.json"
+
+
 def sfs_sfst(basefile):                 # legacy consolidated-text HTML
     year, nr = _sfs_parts(basefile)
     return SFS_DOWNLOADED / "sfst" / year / (nr + ".html")
