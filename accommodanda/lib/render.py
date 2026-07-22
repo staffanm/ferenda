@@ -28,6 +28,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import sys
 import textwrap
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -46,10 +47,10 @@ from . import (
     coe,
     compress,
     datasets,
-    eucasenaming,
     facets,
     feeds,
     history,
+    labels,
     lagrum,
     layout,
 )
@@ -473,17 +474,20 @@ def citer_pinpoint(source, anchor):
     return ""
 
 
-def citer_name(source, kind, label, title):
-    """The preferred display name for a citing/preparatory document. A förarbete
-    carries its full title on its number ("Prop. 2025/26:116: En ny funktion …")
-    -- a lagrådsremiss by title alone ("Lagrådsremiss: …"), it having no number;
-    every other source already stores a human title (the law name, the referat)."""
+def citer_name(source, kind, label, title, descriptive=None):
+    """The preferred display name for a citing/preparatory document in an inbound
+    panel. A förarbete carries its full title on its number ("Prop. 2025/26:116:
+    En ny funktion …") -- a lagrådsremiss by title alone ("Lagrådsremiss: …"), it
+    having no number. Every other source uses its short *descriptive* citing form
+    (`labels.descriptive_label`, stored in the catalog): "räntelagen" not
+    "Räntelag (1975:635)", "JO 2024 s. 246" not the decision's long title (I1). An
+    older catalog with no `descriptive` column falls back to the full title."""
     if source == "forarbete":
         if kind == "lr":
             return "Lagrådsremiss: %s" % title if title and title != label \
                 else "Lagrådsremiss"
         return "%s: %s" % (label, title) if title and title != label else label
-    return title or label
+    return descriptive or title or label
 
 
 def _swedish_join(parts):
@@ -499,9 +503,10 @@ def _citer_line(row):
     then " m.fl." if more. Förarbete pinpoints share a category word ("avsnitt
     3, 5 och 7" -- written once, each number linking its own anchor); other
     sources' pinpoints are each rendered whole as a single link."""
-    from_uri, label, title, source, kind, _date, anchors = row
-    name = '<a href="%s">%s</a>' % (escape(href(from_uri)),
-                                    escape(citer_name(source, kind, label, title)))
+    from_uri, label, title, source, kind, _date, anchors, descriptive = row
+    name = '<a href="%s">%s</a>' % (
+        escape(href(from_uri)),
+        escape(citer_name(source, kind, label, title, descriptive)))
     pins, seen = [], set()
     for anchor in (anchors.split(",") if anchors else []):
         pin = citer_pinpoint(source, anchor)
@@ -1008,13 +1013,12 @@ class Rail:
     ``data-rail`` attribute (see `_rail_attr`) iff it has an entry here, so the
     scrollspy knows which elements drive the rail."""
 
-    def __init__(self, site, doc_uri, source_url=None):
+    def __init__(self, site, doc_uri):
         self.site = site
         self.doc_uri = doc_uri
-        # the authoritative-source ("Källa") link lives in the document-level
-        # rail panel, not the frontmatter -- it keeps vertical space at the top
-        # for the text and guarantees the rail has content on load (C1)
-        self.source_url = source_url
+        # the document-level "Om dokumentet" panel holds only the curated layers
+        # (Externa länkar, Kommentar, …); the dl.meta facts and the "Källa" source
+        # link live under the h1 in the frontmatter (C1), not here.
         self.data = {}
 
     def add(self, nid, pinpoint="", extra=""):
@@ -1059,8 +1063,8 @@ class Rail:
                  + self._commentary(None)
                  + self._fk(None)
                  # the "most interesting feedback" for the whole SOU/Ds. v1
-                 # deliberately renders every overall stance as-is; a later pass can
-                 # rank by |sentiment| to surface only the strongest.
+                 # deliberately renders every overall stance as-is; a later pass
+                 # can rank by |sentiment| to surface only the strongest.
                  + self._remiss_html(self.site.remiss_overall.get(self.doc_uri)))
         if panel:
             self.data[""] = '<div class="rail-h">Om dokumentet</div>' + panel
@@ -1156,15 +1160,6 @@ class Rail:
         """The ``<script type=application/json>`` island, or '' if no paragraph
         has context. ``</`` is escaped so the payload can't break out of the
         surrounding HTML."""
-        if self.source_url:
-            host = urlsplit(self.source_url).netloc or "källan"
-            kalla = ('<div class="rail-sec rail-kalla"><div class="rail-sec-h">'
-                     'Källa</div><p><a class="ext" href="%s" rel="external">%s</a>'
-                     '</p></div>' % (escape(self.source_url), escape(host)))
-            if "" in self.data:
-                self.data[""] += kalla
-            else:
-                self.data[""] = '<div class="rail-h">Om dokumentet</div>' + kalla
         if not self.data:
             return ""
         payload = json.dumps(self.data, ensure_ascii=False).replace("</", "<\\/")
@@ -1950,6 +1945,15 @@ def _andringar(art, base_id, own_version, versions, site, toc, rail):
             % (escape(anchor), "".join(posts)))
 
 
+@functools.lru_cache(maxsize=1)
+def _sfs_fetched():
+    """The download's {basefile: "YYYY-MM-DD"} last-fetch map (layout.sfs_fetched),
+    read live at generate time -- an unchanged refetch bumps it without reparsing
+    the artifact, so it, not the artifact, is the source of truth for the date."""
+    path = layout.sfs_fetched()
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def render_sfs(art, site):
     props = art.get("metadata", {}).get("properties", {})
     local_id = catalog.local(art["uri"])
@@ -1958,20 +1962,30 @@ def render_sfs(art, site):
     # the inbound panel (citations always target the current consolidation)
     base_id, _, _ = local_id.partition("/konsolidering/")
     version = art.get("version")
-    title = props.get("dcterms:title") or ("SFS " + base_id)
+    lb = labels.document_labels("sfs", art)
+    # h1 is the friendly short name ("Säkerhetsskyddslagen"); the full official
+    # title ("Säkerhetsskyddslag (2018:585)") moves into dl.meta "Titel" (C2)
+    title = lb.short_title
     # a repeal that has taken effect (a future repeal date is still in force):
     # mark the whole page as upphävd
     upphavd = props.get("rpubl:upphavandedatum")
     expired = (bool(upphavd) and upphavd <= date.today().isoformat()
                and not version)
-    meta = _meta_dl([
-        ("Utfärdad", props.get("rpubl:utfardandedatum")),
+    # the latest amendment the consolidation carries, from the identifier
+    # ("SFS 2018:585 i lydelse enligt SFS 2026:764"); omitted when unamended
+    amended = re.search(r"i lydelse enligt SFS (\S+)",
+                        props.get("dcterms:identifier") or "")
+    meta = [
+        # the full official title ("Säkerhetsskyddslag (2018:585)"); the h1 is the
+        # short name, so it does not repeat here unless the two coincide
+        ("Titel", lb.official_title if lb.official_title != title else None),
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
         ("Upphävd", upphavd),
-        ("Källa", props.get("dcterms:identifier")),
-    ])
+        ("Ändring införd t.o.m.", "SFS %s" % amended.group(1) if amended else None),
+        ("Senast hämtad", _sfs_fetched().get(base_id)),
+    ]
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     parallel_appendix = any(
         child.get("type") == "konventionsbilaga"
         for node in art.get("structure", []) if node.get("type") == "bilaga"
@@ -2001,9 +2015,10 @@ def render_sfs(art, site):
         body_classes.append("expired")
     if parallel_appendix:
         body_classes.append("parallel-appendix")
-    return page(title, "Författning", meta, body, render_toc(toc),
-                eyebrow=("SFS %s · äldre lydelse" % base_id if version
-                         else "SFS " + base_id),
+    return page(title, "Författning", _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc),
+                eyebrow=("%s · äldre lydelse" % lb.short_id if version
+                         else lb.short_id),
                 island=rail.island(),
                 body_class="".join(" " + name for name in body_classes))
 
@@ -2029,25 +2044,52 @@ def _dv_ruling_word(art):
     return {"Ö": "beslut", "B": "dom", "T": "dom"}.get(pre, "avgörande")
 
 
-def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande"):
+def _dv_page_marker(doc_uri, pg):
+    """A förarbete-style facsimile page button: clicking loads that page of the
+    raw verdict's source PDF (faksimil.js + /api/v1/facsimile). Emitted at each PDF
+    page boundary of a verdict parsed from its PDF."""
+    fax = "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg)
+    return ('<span class="sid" id="sid%d"><button type="button" data-fax="%s" '
+            'title="Visa faksimil av sidan %d">%d</button></span>'
+            % (pg, escape(fax), pg, pg))
+
+
+def _dv_numbered_paragraph(node, site):
+    """A numbered domskäl paragraph: the number hangs in the gutter and is its own
+    permalink anchor (#P{n}), so "punkt 42" is linkable."""
+    n = escape(str(node["ordinal"]))
+    return ('<p class="dom-p" id="P%s"><a class="pnum" href="#P%s">%s</a>%s</p>'
+            % (n, n, n, render_runs(node.get("text", []), site)))
+
+
+def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
+             state=None):
     """Render a DV structure level: court instances and the betänkande/dom split
     become titled sections (the föredragande's proposal muted), domskäl/domslut
     are transparent wrappers whose own `<h2>` leaves carry the section titles,
-    and prose leaves render as ordinary paragraphs."""
+    and prose leaves render as ordinary paragraphs. `state` threads the running
+    facsimile page across the recursion (a verdict parsed from its PDF tags each
+    block with a page; a button is emitted at every page change)."""
+    if state is None:
+        state = {"page": None}
     sib = {n.get("type") for n in nodes}
     out = []
     for n in nodes:
         t = n.get("type")
+        pg = n.get("page")
+        if pg and pg != state["page"]:
+            state["page"] = pg
+            out.append(_dv_page_marker(doc_uri, pg))
         if t == "instans":
             c = n.get("court") or "Instans"
             anchor = toc.add(None, c, 1)
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=n.get("court"), ruling=ruling)
+                             court=n.get("court"), ruling=ruling, state=state)
             out.append('<section class="instans"><h2 id="%s" class="instans-rubrik">'
                        '%s</h2>%s</section>' % (escape(anchor), escape(c), inner))
         elif t == "delmal":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling)
+                             court=court, ruling=ruling, state=state)
             head = ('<h2 class="delmal-rubrik">%s</h2>' % escape(n["ordinal"])
                     if n.get("ordinal") else "")
             out.append('<section class="delmal">%s%s</section>' % (head, inner))
@@ -2055,12 +2097,12 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande"):
             label = DV_RULING_HEADING[t]
             anchor = toc.add(None, label, 2)
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling)
+                             court=court, ruling=ruling, state=state)
             out.append('<section class="%s"><h3 id="%s" class="instans-rubrik">%s'
                        '</h3>%s</section>' % (t, escape(anchor), escape(label), inner))
         elif t == "dom":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling)
+                             court=court, ruling=ruling, state=state)
             # title the court's own ruling only where a betänkande precedes it in
             # the same instance; otherwise the instans heading already names it
             head = ""
@@ -2072,7 +2114,9 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande"):
             out.append('<section class="dom">%s%s</section>' % (head, inner))
         elif t in ("domskal", "domslut"):                # transparent wrappers
             out.append(_dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                                court=court, ruling=ruling))
+                                court=court, ruling=ruling, state=state))
+        elif t == "stycke" and str(n.get("ordinal") or "").isdigit():
+            out.append(_dv_numbered_paragraph(n, site))   # hanging-indent, linkable
         else:
             out.append(render_node(n, site, doc_uri, toc, rail))
     return "".join(out)
@@ -2095,34 +2139,61 @@ def _dv_footnotes(footnotes, site):
 
 def render_dv(art, site):
     md = art.get("metadata", {})
-    # heading by canonical identity + HD's given name (the stamped artifact label;
-    # computed live for an artifact parsed before the field). The löpnummer
-    # ("NJA 2025:58") stays metadata, never part of the identity string.
-    title = art.get("label") or casenaming.case_label(art)
+    # a named case (incl. a pre-referat one) leads with its name in the h1 and its
+    # referat/id in the eyebrow ("NJA 2025 s. 897" · "Meteoriten"); an unnamed case
+    # has nothing to name, so the court fills the eyebrow and the id becomes the h1
+    # ("Högsta förvaltningsdomstolen" · "HFD 2011 ref. 4") (C2)
+    lb = labels.document_labels("dv", art)
+    if lb.short_title:
+        title, eyebrow = lb.short_title, lb.short_id
+    else:
+        title, eyebrow = lb.short_id, art.get("court_namn")
     summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
                if md.get("sammanfattning") else "")
-    meta = _meta_dl([
+    meta = [
         ("Domstol", art.get("court_namn")),
         ("Avgörandedatum", art.get("avgorandedatum")),
         ("Målnummer", ", ".join(art.get("malnummer") or [])),
         ("Löpnummer", ", ".join(casenaming.lopnummer(art))),
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
         ("Europarätt", ", ".join(md.get("europarattslig") or [])),
-    ])
+    ]
     sokord = _keywords(md.get("nyckelord") or [], site)
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     # a record with explicit instance structure (HD's modern <h1>-tagged form) is
     # walked as nested sections; a flat legacy record has no structural wrappers,
     # so the same walk renders it as a plain paragraph sequence
-    body = (document_inbound(site, art["uri"]) + sokord
+    body = (document_inbound(site, art["uri"]) + _dv_ursprunglig_dom(art) + sokord
             + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
                        ruling=_dv_ruling_word(art))
             + _dv_footnotes(art.get("footnotes", []), site)
-            + _dv_curated(md, site))
-    return page(title, "Rättsfall", meta, body, render_toc(toc),
-                eyebrow=art.get("court_namn"), summary=summary,
+            # the curated Lagrum/Förarbeten/Rättsfall/Litteratur lists are the
+            # referat editor's apparatus -- shown for a published referat, but not
+            # for a raw verdict, whose PDF carries no such section (R2)
+            + (_dv_curated(md, site) if art.get("referat") else ""))
+    return page(title, "Rättsfall", _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc),
+                eyebrow=eyebrow, summary=summary,
                 island=rail.island())
+
+
+def _dv_ursprunglig_dom(art):
+    """The "Ursprunglig dom" link(s): the court's own pre-referat verdict PDF that
+    this NJA referat later absorbed (R2). Present only on a referat that folded in
+    a separate raw verdict record; the PDF is served by `/api/v1/dv-verdict`."""
+    items = art.get("ursprunglig_dom") or []
+    if not items:
+        return ""
+    links = []
+    for it in items:
+        label = ", ".join(it.get("malnummer") or []) or "Dom (PDF)"
+        date = it.get("avgorandedatum")
+        links.append('<a href="%s" rel="external">%s%s</a>'
+                     % (escape(it["url"]), escape(label),
+                        escape(" (%s)" % date) if date else ""))
+    return ('<aside class="ursprunglig-dom"><span class="label">Ursprunglig dom</span> '
+            '%s</aside>' % " · ".join(links))
 
 
 def _dv_curated(md, site):
@@ -2190,14 +2261,15 @@ def render_implements(art, site):
 
 
 def render_forarbete(art, site):
-    title = art.get("title") or art.get("identifier") or art["uri"]
-    meta = _meta_dl([("Beteckning", art.get("identifier")),
-                     ("Typ", FA_TYPE_LABEL.get(art.get("type"), art.get("type"))),
-                     ("Datum", art.get("date"))])
+    lb = labels.document_labels("forarbete", art)
+    title = lb.short_title or art["uri"]
+    # the identifier is the eyebrow (below), so it needs no "Beteckning" dl row
+    meta = [("Typ", FA_TYPE_LABEL.get(art.get("type"), art.get("type"))),
+            ("Datum", art.get("date"))]
     parts = [document_inbound(site, art["uri"]), render_implements(art, site)]
     toc = Toc()
     doc_uri = art["uri"]
-    rail = Rail(site, doc_uri, art.get("source_url"))
+    rail = Rail(site, doc_uri)
     state = {"page": None}
 
     def emit_page(node):
@@ -2266,8 +2338,8 @@ def render_forarbete(art, site):
     walk(art.get("structure", []))
     close_komm()
     rail.add_document()        # document-level remiss "most interesting" overall panel
-    return page(title, "Förarbete", meta, "".join(parts), render_toc(toc),
-                eyebrow=FA_TYPE_LABEL.get(art.get("type"), "Förarbete"),
+    return page(title, "Förarbete", _doc_meta(meta, art.get("source_url")),
+                "".join(parts), render_toc(toc), eyebrow=lb.short_id,
                 island=rail.island())
 
 
@@ -2284,6 +2356,17 @@ def _meta_dl(pairs):
     return '<dl class="meta">%s</dl>' % rows if rows else ""
 
 
+def _doc_meta(pairs, source_url):
+    """The dl.meta block shown under a document's h1: the source's (label, value)
+    rows, then the authoritative-source "Källa" link as the last row (C1)."""
+    if source_url:
+        host = urlsplit(source_url).netloc or "källan"
+        pairs = list(pairs) + [("Källa", _RawHTML(
+            '<a class="ext" href="%s" rel="external">%s</a>'
+            % (escape(source_url), escape(host))))]
+    return _meta_dl(pairs)
+
+
 def _doc_title(site, uri):
     row = site.con.execute("SELECT title FROM documents WHERE uri = ?",
                            (uri,)).fetchone()
@@ -2294,9 +2377,9 @@ def render_begrepp(art, site):
     """A concept definition; its inbound panel shows everything (laws, cases,
     förarbeten, commentary, other concepts) that references the concept."""
     title = art.get("title") or catalog.local(art["uri"])
-    meta = _meta_dl([("Kategori", ", ".join(art.get("categories") or []))])
+    meta = [("Kategori", ", ".join(art.get("categories") or []))]
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     nodes = art.get("body", [])
     # a synthesized stub (a defined term / nyckelord with no wiki page) has no
     # description -- its value is the aggregated inbound below (what defines and
@@ -2306,8 +2389,8 @@ def render_begrepp(art, site):
             'Nedan visas var det definieras och används.</p>')
     body = note + document_inbound(site, art["uri"]) + "".join(
         render_node(b, site, art["uri"], toc, rail) for b in nodes)
-    return page(title, "Begrepp", meta, body, render_toc(toc),
-                eyebrow="Begrepp", island=rail.island())
+    return page(title, "Begrepp", _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc), eyebrow="Begrepp", island=rail.island())
 
 
 EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
@@ -2545,37 +2628,45 @@ def _emphasize_term(runs_html, term, site):
     return dfn + runs_html[len(lead):]
 
 
+def _eurlex_opinion_link(art, site):
+    """On a judgment, a link to its Advocate General's opinion (CELEX CJ -> CC)
+    when the corpus holds it -- the opinion is reached from the judgment, not the
+    index (E4). '' otherwise."""
+    celex = art.get("celex") or ""
+    if art.get("doctype") != "judgment" or celex[5:7] != "CJ":
+        return ""
+    opinion = catalog.BASE + "ext/celex/" + celex[:5] + "CC" + celex[7:]
+    if not site.has(opinion):
+        return ""
+    return ('<aside class="ag-opinion"><a href="%s">Generaladvokatens förslag '
+            'till avgörande</a></aside>' % escape(href(opinion)))
+
+
 def render_eurlex(art, site):
     # the heading is the act's short name (curated or extracted, stamped onto the
     # artifact at parse) plus its citing acronym -- "Cyberresiliensförordningen
     # (CRA)"; the full official title moves into the metadata list. With no short
     # name the heading is the full title, so it is not repeated in the metadata.
     # display_title is the single definition of this, shared with search/listings.
-    title = catalog.display_title(art, art.get("title") or catalog.local(art["uri"]))
-    # a named case shows its case number ("C-311/18") as its own row: the heading
-    # is the usual name, so the number would otherwise appear nowhere but the
-    # CELEX. An unnamed case's heading already is the case number -- don't repeat
-    # it. Read the stamped `shortname` (the artifact is the source of truth) to
-    # decide "named", rather than re-deriving the name live, so this row can never
-    # disagree with the heading if the name snapshot is refreshed before re-parse.
-    number = (eucasenaming.case_number(art["celex"])
-              if art.get("doctype") == "judgment" else None)
-    named_case = number is not None and art.get("shortname") not in (None, number)
-    meta = _meta_dl([
-        ("Titel", art.get("title") if art.get("shortname") else None),
-        ("Mål", number if named_case else None),
+    # eyebrow is the short id ("(EU) 2016/679" / "C-311/18"); h1 is the short name
+    # ("dataskyddsförordningen (GDPR)"), or the full title when there is no short
+    # name; the full official title moves into dl.meta "Titel" (C2). labels is the
+    # single definition of this trio, shared with search/listings.
+    lb = labels.document_labels("eurlex", art)
+    title = lb.short_title or lb.official_title
+    # the case number is the eyebrow, so it needs no dl row of its own
+    meta = [
+        # the full official title, shown only when the h1 is the short form (else
+        # it would just repeat it)
+        ("Titel", lb.official_title if lb.official_title != title else None),
         ("CELEX", art.get("celex")),
-        ("Typ", EURLEX_KIND.get(art.get("doctype"), art.get("doctype"))),
         ("Datum", art.get("date")),
-        # a bare series letter ("L"/"C") with no issue number locates nothing, so
-        # it is dropped rather than shown as "EUT: L" (C1)
-        ("EUT", art.get("oj") if re.search(r"\d", art.get("oj") or "") else None),
         ("ECLI", art.get("ecli")),
-    ])
+    ]
     editorial = _load_editorial(art["celex"])
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
-    parts = [document_inbound(site, art["uri"])]
+    rail = Rail(site, art["uri"])
+    parts = [document_inbound(site, art["uri"]), _eurlex_opinion_link(art, site)]
     cur_article = cur_parag = None       # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
     # the artifact is a nested structure (divisions > articles > paragraphs >
@@ -2601,8 +2692,8 @@ def render_eurlex(art, site):
     rail.add_document()        # external links + commentary, the rail's default panel
     body = "".join(parts)
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
-    return page(title, kind, meta, body, render_toc(toc),
-                eyebrow=kind, island=rail.island())
+    return page(title, kind, _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
 
 
 def _ref_link(site, uri):
@@ -2752,17 +2843,18 @@ def render_foreskrift(art, site):
     cons = None if grund else presented_consolidation(art)
     structure = cons["structure"] if cons else art.get("structure", [])
     ident = art.get("identifier") or catalog.local(base_uri)
-    title = md.get("title") or ident
-    meta = _meta_dl([
+    lb = labels.document_labels("foreskrift", art)
+    title = lb.short_title or ident
+    meta = [
+        ("Titel", lb.official_title if lb.official_title != title else None),
         ("Utgivare", md.get("publisher")),
         ("Beslutad", md.get("beslutsdatum")),
         ("Ikraftträdande", md.get("ikrafttradandedatum")),
-        ("Utkom från trycket", md.get("utkomFranTryck")),
         # the repeal target belongs in the header, not only the refs section:
         # what this regulation replaces is identity-level metadata
         ("Upphäver", _RawHTML(", ".join(
             _ref_link(site, u) for u in md.get("upphaver") or []))),
-    ])
+    ]
     # outbound typed relations: what this regulation amends and replaces, the
     # empowering statute paragrafer (whose inbound mirror is the SFS paragraf's
     # "Föreskrifter meddelade med stöd av …" margin) and the EU directives it
@@ -2774,7 +2866,7 @@ def render_foreskrift(art, site):
             + _ref_list(site, "Genomför EU-direktiv", md.get("genomfor"))
             + _upphavd_av(upphavd_rows))
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     banner = _foreskrift_repealed_banner(upphavd_rows) \
         + (_grund_banner(base_uri) if grund
            else _konsoliderad_banner(art, site, cons["konsolideradTom"])
@@ -2785,7 +2877,8 @@ def render_foreskrift(art, site):
         + "".join(render_node(n, site, art["uri"], toc, rail)
                   for n in structure) \
         + _foreskrift_amendments(art.get("amendments", []), toc)
-    return page(title, "Föreskrift", meta, body, render_toc(toc),
+    return page(title, "Föreskrift", _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc),
                 eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
                 island=rail.island(),
                 body_class=" inaktuell" if grund else "")
@@ -2795,53 +2888,52 @@ def render_avg(art, site):
     md = art.get("metadata", {})
     ident = art.get("identifier") or catalog.local(art["uri"])
     title = md.get("title") or ident
-    meta = _meta_dl([
+    meta = [
         ("Myndighet", md.get("publisher")),
         ("Beslutsdatum", md.get("beslutsdatum")),
         ("Diarienummer", ", ".join(md.get("diarienummer", []))),
         ("Avgjord av", md.get("avgjordAv")),
         ("Ämbetsberättelse", md.get("officialReport")),
         ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
-    ])
+    ]
     summary = ('<p class="sammanfattning">%s</p>'
                % escape(art["sammanfattning"])
                if art.get("sammanfattning") else "")
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     body = document_inbound(site, art["uri"]) + "".join(
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", []))
     section = {"jo": "JO-beslut", "jk": "JK-beslut",
                "arn": "ARN-beslut"}.get(art.get("org"), "Myndighetsavgörande")
-    return page(title, section, meta, body, render_toc(toc),
-                eyebrow=ident, summary=summary, island=rail.island())
+    return page(title, section, _doc_meta(meta, art.get("source_url")), body,
+                render_toc(toc), eyebrow=ident, summary=summary,
+                island=rail.island())
 
 
 def render_hudoc(art, site):
     md = art.get("metadata", {})
-    meta = _meta_dl([
+    lb = labels.document_labels("hudoc", art)
+    # the application number is the eyebrow now, so it needs no dl row of its own
+    meta = [
         ("Domstol", md.get("publisher")),
         ("Avgörandedatum", art.get("date")),
-        ("Ansökningsnummer", ", ".join(md.get("applicationNumber", [])) or None),
-        ("Dokumenttyp", art.get("doctype")),
-        ("Språk", md.get("language")),
         ("ECLI", art.get("ecli")),
-        ("Motpart", md.get("respondent")),
         ("Artiklar", ", ".join(md.get("articles", [])) or None),
-    ])
+    ]
     summary = ("<p class=\"sammanfattning\">%s</p>" % escape("; ".join(
         md.get("conclusions", []))) if md.get("conclusions") else "")
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     refs = _ref_list(site, "Berörda konventionsartiklar",
                      [ref["uri"] for ref in art.get("references", [])])
     body = document_inbound(site, art["uri"]) + refs + "".join(
         render_node(node, site, art["uri"], toc, rail)
         for node in art.get("structure", []))
     rail.add_document()
-    return page(art.get("title") or art.get("itemid"), "Europadomstolen",
-                meta, body, render_toc(toc), eyebrow=art.get("ecli") or art["itemid"],
-                summary=summary, island=rail.island())
+    return page(lb.short_title or art.get("itemid"), "Europadomstolen",
+                _doc_meta(meta, art.get("source_url")), body, render_toc(toc),
+                eyebrow=lb.short_id, summary=summary, island=rail.island())
 
 
 def _render_coe_provision(node, site, doc_uri, toc, rail):
@@ -2860,15 +2952,18 @@ def _render_coe_provision(node, site, doc_uri, toc, rail):
 def render_coe(art, site):
     md = art.get("metadata", {})
     implementation = md.get("swedishImplementation")
-    meta = _meta_dl([
+    lb = labels.document_labels("coe", art)
+    meta = [
+        # the treaty's authentic (English) title under the Swedish short-name h1
+        ("Titel", lb.official_title if lb.official_title != lb.short_title else None),
         ("Referens", md.get("reference")),
         ("Öppnad för undertecknande", md.get("openingDate")),
         ("Ort", md.get("openingPlace")),
         ("Ikraftträdande", md.get("entryIntoForce")),
         ("Svensk lag", "SFS 1994:1219" if implementation else None),
-    ])
+    ]
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     implementation_link = (_ref_list(site, "Svensk inkorporering", [implementation])
                            if implementation else "")
     parts = [document_inbound(site, art["uri"]), implementation_link]
@@ -2878,9 +2973,9 @@ def render_coe(art, site):
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
-    return page(art.get("title") or art.get("identifier"),
-                "Europarådets fördrag", meta, "".join(parts), render_toc(toc),
-                eyebrow=art.get("identifier"), island=rail.island())
+    return page(lb.short_title or lb.official_title, "Europarådets fördrag",
+                _doc_meta(meta, art.get("source_url")), "".join(parts),
+                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
 
 
 def _render_icrc_provision(node, site, doc_uri, toc, rail):
@@ -2897,7 +2992,9 @@ def _render_icrc_provision(node, site, doc_uri, toc, rail):
 
 def render_icrc(art, site):
     md = art.get("metadata", {})
-    meta = _meta_dl([
+    lb = labels.document_labels("icrc", art)
+    meta = [
+        ("Titel", lb.official_title if lb.official_title != lb.short_title else None),
         ("ICRC-nummer", art.get("number")),
         ("Antagen", md.get("adoptionDate")),
         ("Ikraftträdande", md.get("entryIntoForce")),
@@ -2906,9 +3003,9 @@ def render_icrc(art, site):
         ("Ämnen", ", ".join(md.get("topics") or []) or None),
         ("Autentiska språk", ", ".join(md.get("languages") or []) or None),
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
-    ])
+    ]
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     parts = [document_inbound(site, art["uri"])]
     if art.get("summary"):
         parts.append('<p class="lead">%s</p>' % escape(art["summary"]))
@@ -2918,10 +3015,10 @@ def render_icrc(art, site):
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
-    return page(art.get("title") or art.get("identifier"),
-                "Internationell humanitär rätt", meta, "".join(parts),
-                render_toc(toc), eyebrow=art.get("identifier"),
-                island=rail.island())
+    return page(lb.short_title or lb.official_title,
+                "Internationell humanitär rätt",
+                _doc_meta(meta, art.get("source_url")), "".join(parts),
+                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
 
 
 # the consent-to-be-bound forms an MTDSG participation records, in Swedish
@@ -2952,42 +3049,47 @@ def _untc_parties(parties):
 def render_untc(art, site):
     md = art.get("metadata", {})
     place, date = md.get("conclusionPlace"), md.get("conclusionDate")
-    meta = _meta_dl([
+    lb = labels.document_labels("untc", art)
+    meta = [
+        ("Titel", lb.official_title if lb.official_title != lb.short_title else None),
         ("Referens", md.get("reference")),
         ("Antagen", "%s, %s" % (place, date) if place and date else date),
         ("Ikraftträdande", md.get("entryIntoForce")),
         ("Registrering (UNTS)", md.get("registration")),
         ("Depositarie", md.get("depositary")),
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
-    ])
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    ]
+    rail = Rail(site, art["uri"])
     parts = [document_inbound(site, art["uri"])]
     if art.get("parties"):
         parts.append(_untc_parties(art["parties"]))
     rail.add_document()
-    return page(art.get("title"), "FN-fördrag", meta, "".join(parts), "",
-                eyebrow=md.get("reference"), island=rail.island())
+    return page(lb.short_title or lb.official_title, "FN-fördrag",
+                _doc_meta(meta, art.get("source_url")), "".join(parts), "",
+                eyebrow=lb.short_id, island=rail.island())
 
 
 def render_icc(art, site):
     md = art.get("metadata", {})
-    meta = _meta_dl([
+    meta = [
         ("Domstol", md.get("publisher")),
         ("Mål", md.get("caseNumber")),
         ("Dokumentnummer", md.get("documentNumber")),
         ("Avgörandedatum", art.get("date")),
         ("Kammare", md.get("chamber")),
         ("Dokumenttyp", md.get("title")),
-    ])
+    ]
     toc = Toc()
-    rail = Rail(site, art["uri"], art.get("source_url"))
+    rail = Rail(site, art["uri"])
     body = document_inbound(site, art["uri"]) + "".join(
         render_node(node, site, art["uri"], toc, rail)
         for node in art.get("structure", []))
     rail.add_document()
-    return page(art.get("title") or md.get("documentNumber"),
-                "Internationella brottmålsdomstolen", meta, body, render_toc(toc),
-                eyebrow=md.get("documentNumber"), island=rail.island())
+    lb = labels.document_labels("icc", art)
+    return page(lb.short_title or lb.short_id,
+                "Internationella brottmålsdomstolen",
+                _doc_meta(meta, art.get("source_url")), body, render_toc(toc),
+                eyebrow=lb.short_id, island=rail.island())
 
 
 # the sources whose pages carry inline-editable content. A logged-in user edits
@@ -3158,7 +3260,8 @@ def _treaty_rows(con, source):
     plus the artifact path for a listing that needs a field the catalog omits)."""
     return [{"uri": uri, "number": _ext_number(uri), "kind": kind,
              "title": title, "identifier": label, "date": doc_date, "path": path}
-            for uri, _src, kind, label, title, _url, path, _display, doc_date
+            for uri, _src, kind, label, title, _url, path, _display, doc_date,
+                _sid, _stitle, _desc
             in catalog.facet_documents(con, source)]
 
 
@@ -3491,20 +3594,48 @@ def _browse_url(source, slugs):
 
 
 def _browse_item(doc):
-    # a statute carries a split title: the designation/number prefix is shown
-    # subdued, the sort subject emphasised, so the eye lands on where it files.
-    # A non-statute (förordning, kungörelse, …) dims the whole entry.
-    if doc.get("key") is not None:
-        cls = ' class="subdued"' if doc.get("subdued") else ""
-        label = ('<span class="pre">%s</span>%s'
-                 % (escape(doc.get("pre") or ""), escape(doc["key"])))
-        return ('<li%s><a href="%s">%s</a></li>'
-                % (cls, escape(doc["url"]), label))
-    # a repealed föreskrift stays listed but dims (facets.browse_doc sets
-    # `subdued` from the catalog's inbound rpubl:upphaver edges)
+    """One listing entry as a `<dt>` (the bold linked id) + optional `<dd>` (its
+    name/description). A statute keeps its split title -- the designation/number
+    prefix subdued, the sort subject emphasised, so the eye lands on where it files
+    (a non-statute dims the whole entry). Every other source shows the bare id as
+    the term and its short name (a case: `namn: sammanfattning`) as the definition."""
     cls = ' class="subdued"' if doc.get("subdued") else ""
-    return ('<li%s><a href="%s">%s</a></li>'
-            % (cls, escape(doc["url"]), escape(doc["display"])))
+    url = escape(doc["url"])
+    if doc.get("key") is not None:                       # SFS split title (today's markup)
+        term = ('<span class="pre">%s</span>%s'
+                % (escape(doc.get("pre") or ""), escape(doc["key"])))
+        return '<dt%s><a href="%s">%s</a></dt>' % (cls, url, term)
+    term = ('<a href="%s"><strong>%s</strong></a>'
+            % (url, escape(doc.get("short_id") or doc["display"])))
+    # the definition: a case's `namn: sammanfattning` (name only when it has one),
+    # otherwise the short name alone. Always a <dd> (even empty) so the two-column
+    # dt/dd grid stays aligned row for row.
+    name, desc = doc.get("short_title"), doc.get("description")
+    text = "%s: %s" % (name, desc) if name and desc else (desc or name or "")
+    return "<dt%s>%s</dt><dd>%s</dd>" % (cls, term, escape(text))
+
+
+# the DV browse buckets group into these forms, in this reading order; a bucket
+# with only one present shows no headers (nothing to distinguish)
+_DV_VARIANTS = (("dom", "Domar"), ("referat", "Referat"), ("notis", "Notiser"))
+
+
+def _dv_listing(docs):
+    """A court+year bucket's cases, grouped Domar / Referat / Notiser (headed only
+    when more than one form is present). Referat and Notiser keep their referat-
+    number order (facets._dv_doc_sort); bare Domar are re-sorted by avgörandedatum,
+    newest first (R2)."""
+    groups = {k: [] for k, _ in _DV_VARIANTS}
+    for d in docs:
+        groups.get(d.get("variant") or "referat", groups["referat"]).append(d)
+    groups["dom"].sort(key=lambda d: d.get("date") or "", reverse=True)
+    present = [(k, label) for k, label in _DV_VARIANTS if groups[k]]
+    parts = []
+    for k, label in present:
+        items = "".join(_browse_item(d) for d in groups[k])
+        head = '<h2 class="dv-variant">%s</h2>' % escape(label) if len(present) > 1 else ""
+        parts.append('%s<dl class="browse-list def">%s</dl>' % (head, items))
+    return "".join(parts)
 
 
 def _facet_links(source, buckets, parent_slugs, active_keys, depth):
@@ -3531,18 +3662,29 @@ def _facet_nav(source, view, active_keys):
     if len(levels) > 1:
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
-            parts.append('<h2 class="facet-axis">%s</h2>' % escape(levels[1]))
+            parts.append('<h2 class="facet-axis">%s</h2>' % escape(
+                _secondary_axis(source, active_keys[0], levels[1])))
             parts.append(_facet_links(source, cur["children"], [cur["slug"]],
                                       active_keys, 1))
     return '<nav class="facets">%s</nav>' % "".join(parts)
 
 
+def _secondary_axis(source, primary_key, default):
+    """The heading for the second facet axis. Usually the level's own name ('År'),
+    but the eurlex Fördrag are grouped by treaty family, not year (E1), so that
+    branch is headed neutrally instead of mislabelled 'År'."""
+    return "Kategori" if source == "eurlex" and primary_key == "treaty" else default
+
+
 def _bucket_heading(source, levels, nodes):
     """The reading heading for a leaf bucket -- 'Författningar som börjar på A',
-    'NJA – Högsta domstolen 2024', 'Förordningar 2016'."""
+    'NJA – Högsta domstolen 2024', 'Förordningar 2016'. The eurlex Fördrag family
+    label is self-describing, so it stands alone rather than trailing 'Fördrag'."""
     if len(levels) == 1:
         return "%s som börjar på %s" % (SOURCE_LABEL.get(source, source), nodes[0]["key"])
-    return "%s %s" % (nodes[0]["label"], nodes[1]["key"])
+    if source == "eurlex" and nodes[0]["key"] == "treaty":
+        return nodes[1]["label"]
+    return "%s %s" % (nodes[0]["label"], nodes[1]["label"])
 
 
 def render_facet_page(source, view, nodes, banner=""):
@@ -3552,8 +3694,16 @@ def render_facet_page(source, view, nodes, banner=""):
     `documents` (from the API, already ordered and labelled)."""
     heading = _bucket_heading(source, view["levels"], nodes)
     docs = nodes[-1].get("documents") or []
-    listing = ('<ul class="browse-list">%s</ul>' % "".join(_browse_item(d) for d in docs)
-               if docs else '<p class="empty">Inga dokument.</p>')
+    if not docs:
+        listing = '<p class="empty">Inga dokument.</p>'
+    elif source == "dv":                                 # grouped Domar/Referat/Notiser
+        listing = _dv_listing(docs)
+    else:
+        # SFS is a dt-only split title (single column); every other source is a
+        # two-column dt/dd definition list (the bold id left, its name/desc right)
+        css = "browse-list" if source == "sfs" else "browse-list def"
+        listing = '<dl class="%s">%s</dl>' % (css, "".join(
+            _browse_item(d) for d in docs))
     # facets live in a left rail beside the list (X1); the cross-source folkrätt
     # selector, when present, stays a full-width banner above both
     body = ('%s<div class="browse-layout">'
@@ -3620,23 +3770,29 @@ def _render_init(catalog_path, out_root):
 
 
 def _write_page(uri, source, path, title, site, out_root):
-    """Render one document to its HTML file. A synthesized concept stub has no
-    artifact on disk (empty path) and renders a shell whose content is its
-    aggregated inbound (what defines/tags the concept); everything else loads its
-    artifact."""
-    art = (json.loads(compress.read_bytes(path)) if path
-           else {"uri": uri, "type": source, "title": title})
+    """Render one document to its HTML file, returning True; or False (skipped)
+    when its catalog row points at an artifact that has vanished -- a catalog that
+    is transiently ahead of the artifact tree (a source re-parsed, dropping a
+    document, but not yet re-related). A synthesized concept stub has no artifact
+    on disk (empty path) and renders a shell whose content is its aggregated
+    inbound; everything else loads its artifact."""
+    try:
+        art = (json.loads(compress.read_bytes(path)) if path
+               else {"uri": uri, "type": source, "title": title})
+    except FileNotFoundError:
+        return False               # stale catalog row; run `lagen <source> relate`
     out = Path(out_root) / doc_relpath(uri)
     out.parent.mkdir(parents=True, exist_ok=True)
     compress.write_text(out, render_document(art, source, site),
                         encodings=compress.PAGE_ENCODINGS)
+    return True
 
 
 def _render_one(job):
     """ProcessPool entry point: render `job` (uri, source, path, title) against
-    this worker's prebuilt Site, returning the uri rendered."""
-    _write_page(*job, _RENDER["site"], _RENDER["out_root"])  # ty: ignore[too-many-positional-arguments]  # job is a 4-tuple; ty cannot see arity through *
-    return job[0]
+    this worker's prebuilt Site, returning (uri, written)."""
+    written = _write_page(*job, _RENDER["site"], _RENDER["out_root"])  # ty: ignore[too-many-positional-arguments]  # job is a 4-tuple; ty cannot see arity through *
+    return job[0], written
 
 
 def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None,
@@ -3730,9 +3886,14 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
         else:
             plan.append((uri, src, path, title, dep, chash))
 
-    def finish(uri, path, dep, chash):
+    skipped = []                 # uris whose artifact vanished (stale catalog rows)
+
+    def finish(uri, path, dep, chash, written):
         nonlocal done, rendered
         done += 1
+        if not written:
+            skipped.append(uri)
+            return               # a vanished artifact records no fresh signature
         rendered += 1
         if record:
             record(uri, path, dep, chash)
@@ -3744,13 +3905,20 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
                                  initargs=(catalog_path, out_root)) as pool:
             futures = {pool.submit(_render_one, job[:4]): job for job in plan}
             for fut in as_completed(futures):
-                fut.result()                 # propagate a render error (abort)
+                _uri, written = fut.result()     # propagate a render error (abort)
                 uri, src, path, title, dep, chash = futures[fut]
-                finish(uri, path, dep, chash)
+                finish(uri, path, dep, chash, written)
     else:
         for (uri, src, path, title, dep, chash) in plan:
-            _write_page(uri, src, path, title, site, out_root)
-            finish(uri, path, dep, chash)
+            written = _write_page(uri, src, path, title, site, out_root)
+            finish(uri, path, dep, chash, written)
+
+    if skipped:
+        sys.stderr.write(
+            "\nwarning: skipped %d page(s) whose artifact has vanished -- the "
+            "catalog is ahead of the artifact tree; run the source's `relate` to "
+            "prune (e.g. %s)\n" % (len(skipped), ", ".join(
+                sorted(catalog.local(u) for u in skipped[:5]))))
 
     if only is None and source is None:          # corpus-wide pages on a full run
         render_aggregates(con, out_root, catalog_path, write_index=write_index)

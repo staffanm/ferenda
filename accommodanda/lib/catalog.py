@@ -23,7 +23,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import compress, concepts, text, util
+from . import compress, concepts, labels, text, util
 from .markdown import begrepp_uri
 
 BASE = "https://lagen.nu/"
@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS documents (
     kind         TEXT,             -- 'law' | 'case'
     label        TEXT,             -- short display id (SFS number / referat)
     title        TEXT,             -- full heading
+    descriptive  TEXT,             -- short descriptive citing form (labels, I1)
+    short_id     TEXT,             -- bare identifier (labels, I2 listings)
+    short_title  TEXT,             -- short human name (labels, I2 listings)
+    description  TEXT,             -- source's one-line description (case sammanfattning)
     path         TEXT NOT NULL,    -- artifact json on disk
     source_url   TEXT,             -- authoritative publisher url ("Källa"), if any
     content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
@@ -156,6 +160,11 @@ def connect(path, data_root=None, exclusive=False):
         con.execute("ALTER TABLE documents ADD COLUMN expired TEXT")
     if "display" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN display TEXT")
+    if "descriptive" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN descriptive TEXT")
+    for col in ("short_id", "short_title", "description"):
+        if col not in cols:
+            con.execute("ALTER TABLE documents ADD COLUMN %s TEXT" % col)
     # (size, mtime_ns) of the artifact bytes, stored so incremental relate can
     # skip an untouched artifact by stat alone -- never reading + hashing it just
     # to confirm it is unchanged (rebuild). NULL until that source is re-related.
@@ -487,14 +496,9 @@ def dv_document(art, path):
     # the canonical, name-prefixed title ("Meteoriten (NJA 2025 s. 897)") the
     # listings and every inbound citation read -- stamped onto the artifact at
     # parse time (build.dv_parse_run, via lib.casenaming.case_label), so the catalog
-    # stays a pure consumer. The generic fallback covers an artifact parsed before
-    # the field.
-    referat = art.get("referat") or []
-    malnr = art.get("malnummer") or []
-    label = art.get("label") or (
-        referat[0] if referat
-        else ("%s %s" % (art.get("court", ""), malnr[0])).strip()
-        if malnr else art.get("court") or local(art["uri"]))
+    # stays a pure consumer. labels.dv_fallback_label owns the pre-stamp fallback
+    # chain (shared with labels._dv so the two never drift).
+    label = labels.dv_fallback_label(art)
     return (art["uri"], "dv", "case", label, label, str(path))
 
 
@@ -607,6 +611,16 @@ def document_date(art):
             or props.get("rpubl:beslutsdatum"))
 
 
+def document_description(art, source):
+    """A source's own one-line description of a document, for the browse listing --
+    a court decision's sammanfattning (the referatrubrik that heads the entry after
+    its number). None where a source has no such abstract, so the listing shows the
+    short_title alone."""
+    if source == "dv":
+        return art.get("metadata", {}).get("sammanfattning")
+    return None
+
+
 def document_publisher(art):
     """The issuing organization, normalized only structurally (not renamed).
 
@@ -667,15 +681,28 @@ def _index_document(con, art, path, source):
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
     row = document_row(art, path, source)        # (uri, source, kind, label, title, path)
+    lb = labels.document_labels(source, art)
+    # a treaty's artifact title is the bare CELEX (no extractable heading); the
+    # curated name computed by labels is the reader-facing heading instead (E1),
+    # keeping the listing display in step with the page header
+    display = (lb.official_title if source == "eurlex" and art.get("doctype") == "treaty"
+               else display_title(art, row[4]))
     con.execute(
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
-        " expired, display, date, publisher) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        " expired, display, date, publisher, descriptive, "
+        " short_id, short_title, description) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          expired_date(art),
-         display_title(art, row[4]),              # the reader-facing heading (row[4]=title)
-         document_date(art), document_publisher(art)))
+         display,                                 # the reader-facing heading
+         document_date(art), document_publisher(art),
+         # the reader-facing name forms the listings + inbound panels use (labels;
+         # I1/I2): descriptive citing form, the bare id, the short name, and the
+         # source's own one-line description (a case's sammanfattning)
+         lb.descriptive_label, lb.short_id, lb.short_title,
+         document_description(art, source)))
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"))
             for anchor, run in (artifact_links(art) + subject_links(art)
@@ -1087,7 +1114,7 @@ def inbound_collapsed(con, uri, exclude_from=()):
         excl = " AND l.from_uri NOT IN (%s)" % ",".join("?" * len(exclude_from))
         params.extend(exclude_from)
     sql = ("SELECT l.from_uri, d.label, d.title, d.source, d.kind, d.date, "
-           "GROUP_CONCAT(DISTINCT l.from_anchor) "
+           "GROUP_CONCAT(DISTINCT l.from_anchor), d.descriptive "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
            "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_TYPED
            + " AND d.source <> 'kommentar'" + excl
@@ -1250,7 +1277,8 @@ def facet_documents(con, source):
     does not encode a year (HUDOC item ids and CETS numbers).
     """
     return con.execute(
-        "SELECT uri, source, kind, label, title, source_url, path, display, date "
+        "SELECT uri, source, kind, label, title, source_url, path, display, date, "
+        "short_id, short_title, description "
         "FROM documents WHERE source = ? ORDER BY uri", (source,)
     ).fetchall()
 

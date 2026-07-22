@@ -23,7 +23,9 @@ from . import catalog, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
-Row = namedtuple("Row", "uri local kind label title display date", defaults=[None])
+Row = namedtuple(
+    "Row", "uri local kind label title display date short_id short_title description",
+    defaults=[None, None, None, None])
 
 
 # --------------------------------------------------------------------------
@@ -290,9 +292,68 @@ def _catalog_kind(r):
     return r.kind
 
 
+def _eu_kind(r):
+    # a court order (CO) is a ruling, so it files with the judgments; an AG opinion
+    # (CC) that reaches the browse -- one with no judgment yet -- files on its own
+    return "judgment" if r.kind == "order" else r.kind
+
+
 def _eu_year(r):
     m = re.match(r"\d(\d{4})", _eu_celex(r))      # sector digit, then 4-digit year
     return m.group(1) if m else "okänt"
+
+
+# EU primary law groups by treaty family, not year (E1): the CELEX document-type
+# letter after the 4-digit year identifies the family. E = TEC/TFEU, M = TEU,
+# P = the Charter, A = Euratom; U/D/C/L are the amending treaties (Single European
+# Act, Amsterdam, Nice, Lisbon), V the never-ratified Constitution; W a withdrawal
+# agreement; the enlargement letters (B/H/I/N/T/S/J) are accession treaties; 'ME'
+# the combined consolidated publication. Anything unrecognised falls to 'other'.
+_TREATY_FAMILY = {"E": "tfeu", "M": "teu", "P": "charter", "A": "euratom",
+                  "U": "amending", "D": "amending", "C": "amending",
+                  "L": "amending", "V": "other", "W": "withdrawal", "G": "other",
+                  "B": "accession", "H": "accession", "I": "accession",
+                  "N": "accession", "T": "accession", "S": "accession",
+                  "J": "accession"}
+# the curated Fördrag reading order: the constitutional core first (Charter, then
+# the two consolidated core treaties), then the combined publication, then the
+# supporting/derived treaties
+_TREATY_ORDER = ["teu", "tfeu", "charter", "combined", "euratom", "amending",
+                 "accession", "withdrawal", "other"]
+_TREATY_LABEL = {
+    "teu": "Fördraget om Europeiska unionen (EU-fördraget)",
+    "tfeu": "Fördraget om Europeiska unionens funktionssätt (EUF-fördraget)",
+    "charter": "EU:s rättighetsstadga",
+    "combined": "Konsoliderade fördrag",
+    "euratom": "Euratomfördraget",
+    "amending": "Ändringsfördrag",
+    "accession": "Anslutningsfördrag",
+    "withdrawal": "Utträdesavtal",
+    "other": "Övriga fördrag",
+}
+
+
+def _treaty_family(celex):
+    """The treaty family bucket for a sector-1 CELEX (see _TREATY_FAMILY)."""
+    return "combined" if celex[5:7] == "ME" else _TREATY_FAMILY.get(celex[5:6], "other")
+
+
+def _eu_second(r):
+    """The eurlex second facet axis: a treaty groups by family (its year is not the
+    reader's handle on it), everything else by year."""
+    return _treaty_family(_eu_celex(r)) if r.kind == "treaty" else _eu_year(r)
+
+
+def _eu_second_order(keys):
+    # under a treaty parent the keys are families (curated order); under any other
+    # type they are years (newest first)
+    if all(k in _TREATY_LABEL for k in keys):
+        return [k for k in _TREATY_ORDER if k in keys]
+    return _by_year_desc(keys)
+
+
+def _eu_second_label(key):
+    return _TREATY_LABEL.get(key, key)
 
 
 # a CELEX corrigendum (…R(NN)) corrects an act rather than being one; it is left
@@ -412,15 +473,16 @@ SCHEMES = {
     ],
     "eurlex": [
         # Fördrag (the constitutional texts) lead, then the legislative acts,
-        # then case law -- the reader's mental order (E1). The internal Fördrag
-        # curation (TEU/TFEU/CFR pinned, change treaties nested) is still pending.
-        Level("Typ", _catalog_kind,
+        # then case law -- the reader's mental order (E1). Fördrag are grouped
+        # by treaty family (not year) at the second axis; see _eu_second.
+        Level("Typ", _eu_kind,
               _curated(["treaty", "directive", "regulation", "decision",
-                        "judgment", "act"]),
+                        "judgment", "opinion", "act"]),
               label=_map_label({"regulation": "Förordningar", "directive": "Direktiv",
                                 "decision": "Beslut", "judgment": "Avgöranden",
+                                "opinion": "Generaladvokatens förslag",
                                 "treaty": "Fördrag", "act": "Övriga rättsakter"})),
-        Level("År", _eu_year, _by_year_desc),
+        Level("År", _eu_second, _eu_second_order, label=_eu_second_label),
     ],
 }
 
@@ -443,6 +505,11 @@ def document_year(source, row):
     if source == "sfs":
         match = re.match(r"(\d{4}):", row.local)
         return match.group(1) if match else None
+    if source == "eurlex":
+        # the browse groups a treaty by family, not year, but the search facet
+        # still wants its real year (from the CELEX)
+        year = _eu_year(row)
+        return year if year != "okänt" else None
     for level in SCHEMES.get(source, ()):
         if level.name == "År":
             year = level.key(row)
@@ -476,15 +543,31 @@ def browse_doc(source, row, repealed=frozenset()):
     rpubl:upphaver targets) stays listed -- point-in-time law determination
     needs it findable -- but subdued, so it never reads as in force."""
     doc = {"uri": row.uri, "url": layout.page_url(row.uri),
-           "display": browse_label(row)}
+           "display": browse_label(row),
+           "short_id": row.short_id or row.label,
+           "short_title": row.short_title, "description": row.description}
     if source == "sfs":
         pre, key = _sfs_split(row.title or "")
         doc.update(pre=pre, key=key or doc["display"],
                    subdued=not sfs_is_statute(row.title or "", row.local),
                    year=row.local.split(":", 1)[0])
+    elif source == "dv":
+        doc.update(variant=_dv_variant(row.local), date=row.date)
     elif row.uri in repealed:
         doc["subdued"] = True
     return doc
+
+
+def _dv_variant(local):
+    """A case-law entry's form, from its uri path: a *notis* (`dom/nja/2022/not/8`),
+    a bare *dom* -- a verdict with no referat, minted at the date-suffixed
+    `dom/{slug}/{malnr}/{date}` -- else a *referat* (`dom/nja/2022s75`,
+    `dom/rh/2019:12`, …). Drives the Domar/Referat/Notiser grouping."""
+    if "/not/" in local:
+        return "notis"
+    if re.search(r"/\d{4}-\d{2}-\d{2}$", local):
+        return "dom"
+    return "referat"
 
 
 # an EU act reissued as corrected revisions carries a '(NN)' suffix on its CELEX
@@ -509,14 +592,27 @@ def _rows(con, source):
     repealed statute whose repeal date has passed is omitted (still reachable by
     direct link and search) -- the listing shows only law in force."""
     expired = catalog.expired_uris(con, date.today().isoformat())
-    rows = [Row(uri, local, kind, label, title, display, doc_date)
-            for uri, _src, kind, label, title, _url, _path, display, doc_date
+    rows = [Row(uri, local, kind, label, title, display, doc_date,
+                short_id, short_title, description)
+            for uri, _src, kind, label, title, _url, _path, display, doc_date,
+                short_id, short_title, description
             in catalog.facet_documents(con, source)
             for local in (catalog.local(uri),)          # bind once, reuse below
             if uri not in expired and is_browsable(source, local)]
     if source == "eurlex":
         rows = _keep_latest_eu_revision(rows)
+        rows = _drop_opinions_with_judgment(rows)
     yield from rows
+
+
+def _drop_opinions_with_judgment(rows):
+    """An Advocate General's opinion (CELEX ``…CC…``) is browsable only while its
+    case has no judgment: once the ``…CJ…`` judgment for the same case exists, the
+    opinion is reached from the judgment (and search), not the index (E4)."""
+    celex = {_eu_celex(r) for r in rows}
+    return [r for r in rows
+            if not (_eu_celex(r)[5:7] == "CC"
+                    and _eu_celex(r)[:5] + "CJ" + _eu_celex(r)[7:] in celex)]
 
 
 def _path(levels, row):
@@ -537,7 +633,7 @@ def group(con, source):
         buckets.setdefault(_path(levels, row), []).append(row)
     # cases sort by their referat identity (NJA/HFD number), not the popular
     # name -- the bucket is one court+year, so the number orders the list (R3)
-    sort_key = _dv_doc_sort if source == "dv" else _doc_sort
+    sort_key = {"dv": _dv_doc_sort, "eurlex": _eu_doc_sort}.get(source, _doc_sort)
     for rows in buckets.values():
         rows.sort(key=sort_key)
     return buckets
@@ -558,12 +654,23 @@ def _doc_sort(row):
     return (_natural(primary), _natural(row.local))
 
 
+def _eu_doc_sort(row):
+    """Within a bucket: a treaty reads newest-first (the current consolidated
+    version tops its family), so it sorts by CELEX year descending; an undated
+    entry falls last. Everything else keeps the shared identifier order."""
+    if row.kind == "treaty":
+        m = re.match(r"\d(\d{4})", _eu_celex(row))
+        return (-int(m.group(1)) if m else 0, _natural(row.local))
+    return _doc_sort(row)
+
+
 def _dv_doc_sort(row):
     """Within a court+year bucket, order cases by their referat identity
     ('NJA 2019 s. 1021', 'HFD 2011 ref. 4') so a reader scans by number, not by
-    the editor's popular name (R3). Natural order puts s. 5 before s. 1021; the
-    uri breaks ties for raw avgöranden that share a bare label."""
-    return (_natural(row.label or row.display or row.local), _natural(row.local))
+    the editor's popular name (R3). short_id is the bare referat (never name-
+    prefixed); natural order puts s. 5 before s. 1021; the uri breaks ties for raw
+    avgöranden that share a bare id. (Raw domar are re-sorted by date at render.)"""
+    return (_natural(row.short_id or row.label or row.local), _natural(row.local))
 
 
 def tree(con, source, buckets=None):

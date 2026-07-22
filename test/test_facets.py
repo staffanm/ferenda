@@ -120,6 +120,34 @@ def test_eurlex_kind_and_year():
     assert facets._catalog_kind(row(U + "ext/celex/32016R0679", kind="regulation")) == "regulation"
     assert facets._eu_year(row(U + "ext/celex/32016R0679")) == "2016"
     assert facets._eu_year(row(U + "ext/celex/61989CJ0074")) == "1989"
+    # an order files with the judgments; an opinion that surfaces stands on its own
+    assert facets._eu_kind(row(U + "x", kind="order")) == "judgment"
+    assert facets._eu_kind(row(U + "x", kind="opinion")) == "opinion"
+
+
+def test_eurlex_treaty_groups_by_family_not_year():
+    # a treaty's second facet axis is its family (from the CELEX letter), not the
+    # year; other types still bucket by year (E1)
+    assert facets._treaty_family("12016M/TXT") == "teu"
+    assert facets._treaty_family("12016E/TXT") == "tfeu"
+    assert facets._treaty_family("12016P/TXT") == "charter"
+    assert facets._treaty_family("12016ME/TXT") == "combined"
+    assert facets._treaty_family("11997D/TXT") == "amending"
+    assert facets._treaty_family("11994N/TXT") == "accession"
+    assert facets._treaty_family("12020W/TXT") == "withdrawal"
+    assert facets._eu_second(row(U + "ext/celex/12016M/TXT", kind="treaty")) == "teu"
+    assert facets._eu_second(row(U + "ext/celex/32016R0679", kind="regulation")) == "2016"
+    # families order by the curated reading order; years newest-first
+    assert facets._eu_second_order(["accession", "teu", "charter"]) == [
+        "teu", "charter", "accession"]
+    assert facets._eu_second_order(["2016", "2019", "2011"]) == ["2019", "2016", "2011"]
+
+
+def test_eurlex_treaty_bucket_sorts_newest_first():
+    # the current consolidated version tops its family (E1)
+    old = row(U + "ext/celex/11992M/TXT", kind="treaty")
+    new = row(U + "ext/celex/12016M/TXT", kind="treaty")
+    assert sorted([old, new], key=facets._eu_doc_sort) == [new, old]
 
 
 def test_foreskrift_series_and_year():

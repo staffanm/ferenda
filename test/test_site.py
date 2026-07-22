@@ -51,6 +51,27 @@ def build_catalog(tmp_path):
     return catalog.connect(db)
 
 
+def test_generate_skips_vanished_artifact(tmp_path, capsys):
+    # a catalog transiently ahead of the artifact tree (a source re-parsed, dropping
+    # a document, but not yet re-related) must not abort a source's generate: the
+    # vanished page is skipped with a warning rather than crashing the run
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    gone = tmp_path / "gone.json"
+    gone.write_text(json.dumps({
+        "uri": "https://lagen.nu/2099:1",
+        "metadata": {"properties": {"dcterms:title": "Spöklag (2099:1)"}},
+        "structure": []}))
+    catalog.rebuild(db, "sfs", [law, gone])
+    gone.unlink()                                 # its catalog row now dangles
+    out = tmp_path / "generated"
+    total, rendered = render.generate_site(db, out, source="sfs", write_index=False)
+    assert total == 2 and rendered == 1           # the vanished doc skipped, not fatal
+    assert compress.exists(str(out / render.doc_relpath(LAW["uri"])))  # live doc rendered
+    assert "vanished" in capsys.readouterr().err  # and the skip was warned
+
+
 # --- catalog --------------------------------------------------------------
 
 def test_collect_links_attributes_to_nearest_id():
@@ -373,6 +394,31 @@ def test_law_page_has_inbound_annotation(tmp_path):
     assert "NJA 1994 s. 1" in panel
 
 
+def test_sfs_header_and_meta_placement(tmp_path):
+    # C2: the eyebrow is the bare SFS id, the h1 the friendly short name; the full
+    # official title moves out of the h1 into dl.meta "Titel". C1: dl.meta sits under
+    # the h1 in the frontmatter (not the rail), Utfärdad is dropped and the source
+    # "Källa" link is its last row.
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = json.loads(json.dumps(LAW))
+    art["source_url"] = "https://beta.rkrattsbaser.gov.se/sfs/item?bet=1975:635"
+    art["metadata"]["properties"]["dcterms:identifier"] = \
+        "SFS 1975:635 i lydelse enligt SFS 2013:55"
+    html = render.render_sfs(art, site)
+    start = html.index('<header class="frontmatter">')   # not the masthead <header>
+    frontmatter = html[start:html.index("</header>", start)]
+    assert '<div class="eyebrow">SFS 1975:635</div>' in frontmatter
+    assert "<h1>Räntelagen</h1>" in frontmatter            # namedlaws short name
+    # the dl.meta is under the h1; the full official title is its "Titel" row
+    assert '<dl class="meta">' in frontmatter
+    assert "<dt>Titel</dt><dd>Räntelag (1975:635)</dd>" in frontmatter
+    assert "<dt>Ändring införd t.o.m.</dt><dd>SFS 2013:55</dd>" in frontmatter
+    assert "Utfärdad" not in frontmatter                   # dropped for SFS (C1)
+    # Källa is the source link, and it is the last dl row
+    assert frontmatter.rstrip().endswith("</dl>")
+    assert frontmatter.index("<dt>Källa</dt>") > frontmatter.index("<dt>Titel")
+
+
 def test_render_document_injects_edit_meta(tmp_path):
     # render_document (the dispatcher) grafts the inline-editor <meta> + editor.js
     # onto every page: a statute is commentary-editable (kind=kommentar, ref=the
@@ -405,12 +451,26 @@ def test_expired_statute_is_marked(tmp_path):
     assert 'class="gr-root expired"' in html       # drives the subdue + watermark
     assert "Upphävd författning" in html
     assert 'href="/2005:552"' in html              # link to the repealing act
-    assert "<dt>Upphävd</dt><dd>2006-01-01</dd>" in html
+    assert "<dt>Upphävd</dt><dd>2006-01-01</dd>" in html   # dl.meta under the h1 (C1)
     # a *future* repeal date is still in force -> not marked
     upcoming = json.loads(json.dumps(repealed))
     upcoming["metadata"]["properties"]["rpubl:upphavandedatum"] = "2099-01-01"
     out = render.render_sfs(upcoming, site)
     assert 'class="gr-root expired"' not in out and "expired-banner" not in out
+
+
+def test_dv_ursprunglig_dom_link():
+    # R2 part C: a referat that absorbed the court's pre-referat verdict links its
+    # PDF as "Ursprunglig dom" (served by /api/v1/dv-verdict); absent otherwise
+    art = {"ursprunglig_dom": [{
+        "malnummer": ["B 920-25"], "avgorandedatum": "2025-11-04",
+        "url": "/api/v1/dv-verdict?court=HDO&id=abc&file=B%20920-25.pdf"}]}
+    html = render._dv_ursprunglig_dom(art)
+    assert "Ursprunglig dom" in html
+    assert ('href="/api/v1/dv-verdict?court=HDO&amp;id=abc&amp;file=B%20920-25.pdf"'
+            in html)
+    assert "B 920-25 (2025-11-04)" in html
+    assert render._dv_ursprunglig_dom({}) == ""
 
 
 def test_case_page_links_into_law(tmp_path):
@@ -611,9 +671,42 @@ def test_foreskrift_page_renders_relation_groups(tmp_path):
     # read as in force, even though its own artifact carries no repeal field
     assert '<div class="expired-banner"><strong>Upphävd eller ersatt</strong>' in out
     assert "Upphävd eller ersatt" not in html          # the replacer itself: no banner
-    # the replacer's metadata header names its repeal target with a link (not
-    # only the refs section further down)
-    assert re.search(r'<dt>Upphäver</dt><dd><a href="/aafs/1999:1">', html)
+    # the replacer's metadata names its repeal target with a link (not only the
+    # refs section further down) -- in the dl.meta under the h1 (C1)
+    assert '<dt>Upphäver</dt><dd><a href="/aafs/1999:1">' in html
+
+
+def test_browse_item_basic_template():
+    # I2: the basic listing entry is a <dt> with the bold linked short_id + a <dd>
+    # with the short name
+    html = render._browse_item({"url": "/prop/2019/20:1", "display": "x",
+                                "short_id": "Prop. 2019/20:1",
+                                "short_title": "Budgetpropositionen för 2020"})
+    assert html == ('<dt><a href="/prop/2019/20:1"><strong>Prop. 2019/20:1</strong>'
+                    '</a></dt><dd>Budgetpropositionen för 2020</dd>')
+
+
+def test_dv_listing_groups_sorts_and_formats():
+    # I2/R2: Domar/Referat/Notiser headed (all three present); Domar by date desc;
+    # a named case reads "namn: sammanfattning", an unnamed one just the description
+    docs = [
+        {"url": "/dom/nja/2019s1021", "short_id": "NJA 2019 s. 1021",
+         "short_title": "Fotbollsmatchen", "description": "Om ansvar.", "variant": "referat"},
+        {"url": "/dom/nja/2022/not/8", "short_id": "NJA 2022 not 8",
+         "short_title": None, "description": "J.A. mot HSB.", "variant": "notis"},
+        {"url": "/dom/hd/a/2026-07-14", "short_id": "HD mål Ö 1-25",
+         "short_title": None, "description": None, "variant": "dom", "date": "2026-07-14"},
+        {"url": "/dom/hd/b/2026-01-01", "short_id": "HD mål B 2-25",
+         "short_title": None, "description": None, "variant": "dom", "date": "2026-01-01"},
+    ]
+    html = render._dv_listing(docs)
+    assert re.findall(r'dv-variant">([^<]+)<', html) == ["Domar", "Referat", "Notiser"]
+    assert html.index("Ö 1-25") < html.index("B 2-25")        # domar newest first
+    assert "<dd>Fotbollsmatchen: Om ansvar.</dd>" in html      # named -> namn: desc
+    assert "<dd>J.A. mot HSB.</dd>" in html                    # unnamed -> just desc
+    # a single-variant bucket shows no headers
+    solo = render._dv_listing([docs[0]])
+    assert "dv-variant" not in solo and solo.startswith('<dl class="browse-list def">')
 
 
 def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
@@ -632,7 +725,7 @@ def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
     # the repealed regulation stays listed (point-in-time law needs it
     # findable) but dims; its replacer reads normally
     assert by_uri[UPPHAVDFS["uri"]].get("subdued") is True
-    assert '<li class="subdued">' in render._browse_item(by_uri[UPPHAVDFS["uri"]])
+    assert '<dt class="subdued">' in render._browse_item(by_uri[UPPHAVDFS["uri"]])
     assert by_uri[ANDRINGSFS["uri"]].get("subdued") is None
     assert 'class="subdued"' not in render._browse_item(by_uri[ANDRINGSFS["uri"]])
 
@@ -650,7 +743,7 @@ def test_jo_page_shows_official_report(tmp_path):
                         "officialReport": "JO 1990/91 s. 70"},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Beslut."]}]}
     html = render.render_avg(art, site)
-    assert "<dt>Ämbetsberättelse</dt><dd>JO 1990/91 s. 70</dd>" in html
+    assert "<dt>Ämbetsberättelse</dt><dd>JO 1990/91 s. 70</dd>" in html  # dl.meta (C1)
     # a decision without one (every jk/arn, most live jo) shows no empty row
     del art["metadata"]["officialReport"]
     assert "Ämbetsberättelse" not in render.render_avg(art, site)
@@ -1198,6 +1291,34 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
     assert "NJA 2000 s. 1" in html
 
 
+def test_inbound_uses_descriptive_short_name(tmp_path):
+    # I1: a citing SFS appears in the inbound panel by its short descriptive name
+    # ("räntelagen"), not its full official title ("Räntelag (1975:635)").
+    db = str(tmp_path / "catalog.sqlite")
+    target = tmp_path / "target.json"
+    target.write_text(json.dumps({
+        "uri": "https://lagen.nu/2020:100",
+        "metadata": {"properties": {"dcterms:title": "Måltestlag (2020:100)"}},
+        "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1"}]}))
+    citer = tmp_path / "citer.json"     # 1975:635 == räntelagen in namedlaws.json
+    citer.write_text(json.dumps({
+        "uri": "https://lagen.nu/1975:635",
+        "metadata": {"properties": {"dcterms:title": "Räntelag (1975:635)"}},
+        "structure": [{"type": "paragraf", "id": "P9", "ordinal": "9", "children": [
+            {"type": "stycke", "id": "P9S1", "text": [
+                "jämför ", {"predicate": "dcterms:references", "text": "1 §",
+                            "uri": "https://lagen.nu/2020:100#P1"}, "."]}]}]}))
+    catalog.rebuild(db, "sfs", [target, citer])
+    con = catalog.connect(db)
+    assert con.execute("SELECT descriptive FROM documents WHERE uri = ?",
+                       ("https://lagen.nu/1975:635",)).fetchone()[0] == "räntelagen"
+    site = render.Site.from_catalog(con)
+    target_art = json.loads(target.read_text())
+    panel = _island(render.render_sfs(target_art, site))["P1"]
+    assert ">räntelagen<" in panel                      # the descriptive short name
+    assert "Räntelag (1975:635)" not in panel           # not the full official title
+
+
 # --- collapsed inbound panel + own-förarbeten section --------------------
 
 def test_forarbete_pinpoint_maps_anchor_to_human_form():
@@ -1223,7 +1344,8 @@ def test_citer_line_collapses_pinpoints_and_caps_at_five():
     # word written once, each number its own link), then " m.fl." beyond five
     row = ("https://lagen.nu/prop/2025/26:123", "Prop. 2025/26:123",
            "Explosiva varor", "forarbete", "prop", "2025-01-01",
-           "a18.4.1,a15.2,a16.7,a2,a9,a11")     # six avsnitt, out of order
+           "a18.4.1,a15.2,a16.7,a2,a9,a11",     # six avsnitt, out of order
+           "Prop. 2025/26:123")                 # descriptive (unused for forarbete)
     li = render._citer_line(row)
     assert 'href="/prop/2025/26:123">Prop. 2025/26:123: Explosiva varor</a>' in li
     assert "avsnitt <a" in li                             # category word once

@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import requests
 
@@ -59,7 +59,7 @@ from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
-from .dv.parse import api_member, parse_api_record, to_artifact
+from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
@@ -92,6 +92,7 @@ from .lib import (
     catalog,
     compress,
     dump,
+    labels,
     layout,
     markdown,
     patch,
@@ -1274,6 +1275,68 @@ def dv_record(basefile):
     return util.load_relpath(layout.DATA, dv_member(basefile)["path"])
 
 
+def dv_reconcile_artifacts():
+    """Reconcile the dv *artifact* tree to the current canonical set: delete the
+    derived `.json` artifact of any case that is no longer canonical. Two things
+    make a standalone artifact stale -- a pre-referat verdict folded into its NJA
+    referat (R2), and a record now filtered out (prövningstillstånd / excluded
+    typ). Their old `dom/{slug}/{malnr}/{date}.json` would otherwise be re-globbed
+    by `relate` and re-catalogued.
+
+    This removes only the derived artifact JSON. The downloaded record and its PDF
+    attachment are left untouched -- the folded verdict's PDF stays in the corpus,
+    so the referat's "Ursprunglig dom" link keeps working. Full-source parse only
+    (the whole canonical set must be present to know what is stale). Returns the
+    count removed."""
+    valid = {layout.artifact("dv", bf) for bf in _dv_cases()}
+    removed = 0
+    for path in layout.artifacts("dv"):     # logical .json paths, .br-resolved
+        if path not in valid:
+            compress.unlink(path)           # the artifact JSON only, never the PDF
+            removed += 1
+    if removed:
+        # relate drops the catalog rows for the removed artifacts; the stale
+        # generated HTML is cleared on the next generate of the affected pages
+        print("dv parse: reconciled %d superseded artifact(s)" % removed, flush=True)
+    return removed
+
+
+def dv_original_verdicts(basefile):
+    """The raw verdict(s) a referat case absorbed (R2): for each folded-in
+    no-referat member with a PDF attachment, its målnummer + a `/api/v1/dv-verdict`
+    download url the referat page links as "Ursprunglig dom". Empty when the case
+    published straight to a referat (nothing was folded in)."""
+    out = []
+    for m in _dv_cases()[basefile]["members"]:
+        if m["store"] != "domstol" or m.get("referat") or not m.get("bilagor"):
+            continue
+        record = json.loads(compress.read_text(
+            util.load_relpath(layout.DATA, m["path"])))
+        pdf = next((Path(b["filnamn"]).name for b in record.get("bilagaLista") or []
+                    if (b.get("filnamn") or "").lower().endswith(".pdf")), None)
+        if pdf:
+            out.append({
+                "malnummer": [x.strip() for x in record.get("malNummerLista", [])],
+                "avgorandedatum": record.get("avgorandedatum"),
+                "url": "/api/v1/dv-verdict?court=%s&id=%s&file=%s"
+                       % (quote(m["court"], safe=""), quote(m["uuid"], safe=""),
+                          quote(pdf, safe=""))})
+    return out
+
+
+def dv_verdict_pdf(basefile, record):
+    """The raw verdict's PDF attachment path (``{uuid}/{målnummer}.pdf``), or None
+    -- the body source when a not-yet-published HD/HFD decision carries no innehåll
+    HTML (R2). Stored plain (PDFs skip Brotli), so the path is resolved directly."""
+    for bilaga in record.get("bilagaLista") or []:
+        name = Path(bilaga.get("filnamn") or "").name
+        if name.lower().endswith(".pdf"):
+            pdf = dv_record(basefile).with_suffix("") / name
+            if pdf.exists():
+                return pdf
+    return None
+
+
 def dv_download_run(basefile):
     """Re-fetch one named case's API record (by the uuid the identity index
     already holds) and its attachments. New-case *discovery* is dv_harvest
@@ -1368,7 +1431,10 @@ def dv_parse_run(basefile):
         write_artifact("dv", basefile, art)
         return
     record = json.loads(compress.read_text(dv_record(basefile)))
-    av = parse_api_record(record, basefile)
+    # a not-yet-published HD/HFD verdict has no innehåll HTML -- only the court's
+    # own PDF attachment; parse its body from that instead (R2)
+    pdf = None if record.get("innehall") else dv_verdict_pdf(basefile, record)
+    av = parse_pdf_record(record, pdf) if pdf else parse_api_record(record, basefile)
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
@@ -1377,6 +1443,12 @@ def dv_parse_run(basefile):
     # the pure catalog reads it off the artifact without recomputing (the naming
     # grammar itself lives in lib.casenaming, read identically by page + catalog)
     art["label"] = casenaming.case_label(art)
+    if pdf:
+        # the raw verdict's own PDF, data_root-relative, so the /api/v1/facsimile
+        # resolver can rasterize its pages for the inline page-facsimile buttons
+        art["facsimile_pdf"] = str(util.store_relpath(pdf, layout.DATA))
+    if av.referat:
+        art["ursprunglig_dom"] = dv_original_verdicts(basefile)
     write_artifact("dv", basefile, art,
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
@@ -2591,7 +2663,8 @@ ARTIFACTS = {
 # (alias synthesis), text (run flattening) and markdown (begrepp uris); a
 # change to any re-stales relate.
 RELATE_CODE = (PKG / "lib" / "catalog.py", PKG / "lib" / "concepts.py",
-               PKG / "lib" / "text.py", PKG / "lib" / "markdown.py")
+               PKG / "lib" / "text.py", PKG / "lib" / "markdown.py",
+               PKG / "lib" / "labels.py")
 # index reads the catalog rows (source signature, inbound-count ranking) it
 # denormalises onto the search units, so a change to catalog.py re-stales it too.
 INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
@@ -2905,6 +2978,8 @@ def cmd_all(names, jobs, whole_corpus, download=False):
             errs, recorded = _run_stage_gated(source, step, jobs, store)
             had_errors |= errs
             parse_dirty |= recorded
+            if name == "dv" and step == "parse":
+                dv_reconcile_artifacts()      # R2: reconcile folded verdicts
     if parse_dirty:
         save_watermarks(store)
     cmd_relate(names)
@@ -2945,6 +3020,7 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
+                 PKG / "lib" / "labels.py",
                  PKG / "api" / "app.py", PKG / "site" / "render.py",
                  # the shipped static chrome: a stylesheet/script edit must
                  # re-stale generate exactly like a renderer edit
@@ -3256,6 +3332,42 @@ def cmd_status(source):
             "total": st["total"], "fresh": st["fresh"], "stale": st["stale"],
             "missing": st["missing"], "failed": len(st["failed"]),
             "empty": st["empty"], "run": RUN_ID})
+
+
+def cmd_status_document(source, basefile):
+    """`lagen status <source> <basefile>` -- the per-document troubleshooting view:
+    each stage's freshness (fresh/stale/missing/empty, and whether its last run is
+    recorded as failed) for this one basefile, plus, from the parsed artifact, its
+    identity (uri, source_url) and the four reader-facing name forms (lib.labels)
+    so a label surprise on the page can be diagnosed without opening the artifact."""
+    manifest = load_manifest()
+    errors = runlog.read_errors(ERRORS)
+    print("%s %s" % (source.name, basefile))
+    for name, stage in source.stages.items():
+        output = stage.output(basefile)
+        if not compress.exists(output):
+            state = "missing"
+        elif compress.stat(output).st_size == 0:
+            state = "empty"
+        elif is_fresh(manifest, source, stage, basefile):
+            state = "fresh"
+        else:
+            state = "stale"
+        failed = "  (last run FAILED)" \
+            if errors.get("%s/%s/%s" % (source.name, name, basefile)) else ""
+        print("  %-10s %-8s%s" % (name, state, failed))
+    art_path = layout.artifact(source.name, basefile)
+    if not compress.exists(art_path):
+        print("  (no artifact on disk -- not parsed yet)")
+        return
+    art = json.loads(compress.read_bytes(art_path))
+    lb = labels.document_labels(source.name, art)
+    print("  uri             %s" % art.get("uri"))
+    print("  source_url      %s" % (art.get("source_url") or "-"))
+    print("  short_id        %s" % lb.short_id)
+    print("  short_title     %s" % (lb.short_title or "-"))
+    print("  descriptive     %s" % lb.descriptive_label)
+    print("  official_title  %s" % lb.official_title)
 
 
 def cmd_ann_status():
@@ -3660,7 +3772,11 @@ def _dispatch(args, p, jobs):
     for name in names:
         source = SOURCES[name]
         if args.action == "status":
-            cmd_status(source)
+            if args.basefiles:
+                for basefile in args.basefiles:
+                    cmd_status_document(source, basefile)
+            else:
+                cmd_status(source)
             continue
         if args.action == "download":
             scopes = args.basefiles
@@ -3710,6 +3826,10 @@ def _dispatch(args, p, jobs):
             errs, recorded = _run_stage_gated(source, args.action, jobs, store)
             if recorded:
                 save_watermarks(store)
+            # a full-source dv parse reconciles the artifact tree to the canonical
+            # set, pruning verdicts folded into a referat (R2)
+            if name == "dv" and args.action == "parse":
+                dv_reconcile_artifacts()
             had_errors |= errs
             continue
         basefiles = args.basefiles or source.list_basefiles()

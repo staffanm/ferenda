@@ -241,6 +241,11 @@ def test_browse_returns_navigator_with_leaf_documents(client):
     assert f["documents"] == [{"uri": "https://lagen.nu/2018:585",
                                "url": "/2018:585",
                                "display": "Förvaltningslag (2018:585)",
+                               # the labels-derived listing forms (I2); short_title
+                               # is the namedlaws name for 2018:585
+                               "short_id": "SFS 2018:585",
+                               "short_title": "Säkerhetsskyddslagen",
+                               "description": None, "variant": None, "date": None,
                                "pre": "", "key": "Förvaltningslag (2018:585)",
                                "subdued": False, "year": "2018"}]
 

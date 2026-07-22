@@ -28,6 +28,7 @@ _PKG = Path(__file__).resolve().parent.parent
 
 NAMEDLAWS = _PKG / "sfs" / "data" / "namedlaws.json"
 NAMEDACTS = _PKG / "eurlex" / "data" / "namedacts.json"
+EU_TREATIES = _PKG / "eurlex" / "data" / "treaties.json"
 COE_NAMES = _PKG / "coe" / "data" / "names.json"
 ICRC_NAMES = _PKG / "icrc" / "data" / "names.json"
 UNTC_TREATIES = _PKG / "untc" / "data" / "treaties.json"

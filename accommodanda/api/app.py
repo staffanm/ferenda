@@ -219,6 +219,16 @@ class BrowseDoc(BaseModel):
     uri: str
     url: str                        # the hosted page path (/2018:585, /dom/nja/…)
     display: str                    # the listing handle (law name / short label / id)
+    # the listing name forms (labels): the bare id shown as the bold linked term,
+    # the short human name, and the source's one-line description (a case's
+    # sammanfattning) -- the per-type listing templates (I2)
+    short_id: str | None = None
+    short_title: str | None = None
+    description: str | None = None
+    # dv-only: the case-law form (dom/referat/notis) the listing groups under, and
+    # the avgörandedatum bare domar sort by
+    variant: str | None = None
+    date: str | None = None
     # statute-only listing extras: the title split into a subdued designation/number
     # prefix + the emphasised sort subject, whether it is primary law (else subdued),
     # and its year -- what the SFS listing renders and filters on (None elsewhere)
@@ -662,7 +672,28 @@ def _sfs_pdf(local):
     return ("sfs", local, pdf) if pdf.exists() else None
 
 
-_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf, _sfs_pdf)
+def _dv_pdf(local):
+    # a raw verdict's own source PDF, for the inline page-facsimile buttons. Unlike
+    # the other sources there is no layout rule from the uri to the PDF (it is a
+    # court attachment keyed by an opaque uuid), so the path is read from the
+    # artifact's stamped `facsimile_pdf`. Only raw verdicts carry it; a referat
+    # renders from HTML and has no facsimile.
+    if not local.startswith("dom/") or not CATALOG.exists():
+        return None
+    con = catalog.connect_ro(CATALOG)
+    try:
+        row = catalog.document(con, catalog.BASE + local)
+        art = catalog.load_artifact(catalog.data_root(con), row[5]) if row else {}
+    finally:
+        con.close()
+    ref = art.get("facsimile_pdf")
+    if not ref:
+        return None
+    pdf = layout.DATA / ref
+    return ("dv", basefile_slug(local), pdf) if pdf.exists() else None
+
+
+_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
 
 # immutable: the PDF a facsimile renders from never changes in place (a
 # re-download replaces the record wholesale), so clients may cache forever
@@ -704,6 +735,31 @@ def facsimile_endpoint(
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
     resolution (150 DPI) on first request and cached on disk."""
     return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid)
+
+
+_DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
+                         r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+_DV_COURT_RE = re.compile(r"[A-Za-zÅÄÖåäö0-9]+")
+
+
+@app.get("/api/v1/dv-verdict", response_class=FileResponse, tags=["document"],
+         responses={200: {"content": {"application/pdf": {}}}})
+def dv_verdict_endpoint(
+        court: str = Query(..., description="court code (domstolKod), e.g. HDO"),
+        id: str = Query(..., description="the record's UUID"),
+        file: str = Query(..., description="the PDF attachment filename")):
+    """The original verdict PDF a decision was first served as, before its NJA
+    referat was published ("Ursprunglig dom", R2). Served from the DV download
+    store. The path segments are validated so a crafted request can't escape it."""
+    name = Path(file).name
+    if not (_DV_COURT_RE.fullmatch(court) and _DV_UUID_RE.fullmatch(id)
+            and name.lower().endswith(".pdf")):
+        raise HTTPException(400, "bad dv-verdict request")
+    path = layout.DOM_DOWNLOADED / court / id / name
+    if not path.is_file():
+        raise HTTPException(404, "verdict pdf not found")
+    return FileResponse(path, media_type="application/pdf",
+                        headers={"Content-Disposition": 'inline; filename="%s"' % name})
 
 
 # the legacy path grammar in its two arities: riksmöte-numbered förarbeten and
