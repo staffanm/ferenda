@@ -1,10 +1,14 @@
 """Tests for the DV decision parser (API innehall path)."""
 
 from datetime import date
+from pathlib import Path
 
-from accommodanda.dv.model import Fotnot, Rubrik, Stycke
+from accommodanda.dv.model import Avgorande, Fotnot, Rubrik, Stycke
 from accommodanda.dv.parse import (
+    _body_lines,
+    _inject_numbers,
     case_uri,
+    classify_pdf,
     clean_nyckelord,
     decision_date_from_text,
     decision_dates_from_text,
@@ -12,10 +16,87 @@ from accommodanda.dv.parse import (
     parse_api_record,
     parse_body,
     parse_innehall,
+    parse_pdf_record,
     to_artifact,
 )
 from accommodanda.dv.structure import flatten
 from accommodanda.lib import catalog
+from accommodanda.lib.pdftext import Line, Para, Run, page_paragraphs, pdf_images
+
+FIXTURES = Path(__file__).parent / "files" / "dv"
+
+
+def test_body_lines_drops_sub_body_size_marginalia():
+    # R2: a verdict PDF's header/footer/vertical-doc-id run at a smaller font than
+    # the body (19). _body_lines keeps only body-size runs, rebuilding each line --
+    # so a doc-id fragment sharing a body line's baseline ("1 3 beslutet") loses the
+    # "1 3", and a whole sub-size line (running header) is dropped entirely.
+    def line(top, runs):
+        return Line(text=" ".join(r.text for r in runs), top=top,
+                    bold=False, lead_bold=False, italic=False,
+                    size=max(r.size for r in runs), runs=runs)
+    lines = [
+        line(90, [Run(146, 300, "HÖGSTA DOMSTOLEN BESLUT Ä 8213-25", False, False, 18)]),
+        line(200, [Run(213, 800, "Bakgrund till målet.", False, False, 19)]),
+        line(1131, [Run(46, 52, "1", False, False, 15),
+                    Run(60, 66, "3", False, False, 15),
+                    Run(213, 800, "beslutet ska verkställas.", False, False, 19)]),
+        line(1150, [Run(46, 52, "D", False, False, 15)]),   # a doc-id fragment alone
+    ]
+    kept = _body_lines(lines, 19)
+    texts = [l.text for l in kept]
+    assert texts == ["Bakgrund till målet.", "beslutet ska verkställas."]
+
+
+def test_inject_numbers_forces_paragraph_breaks():
+    # R2: HD prints domskäl numbers as margin bitmaps and packs the paragraphs with
+    # no extra vertical gap. _inject_numbers prepends "N. " to the line at each
+    # bitmap top and returns those tops, which page_paragraphs must treat as forced
+    # breaks -- else the gap heuristic merges the (unspaced) paragraphs and buries
+    # the number mid-text.
+    def line(top, text):
+        return Line(text=text, top=top, bold=False, lead_bold=False,
+                    italic=False, size=19,
+                    runs=[Run(213, 800, text, False, False, 19)])
+    # three consecutive paragraphs, evenly spaced (no paragraph gap the heuristic
+    # could see); bitmaps sit on the 1st, 3rd and 5th lines
+    lines = [line(100, "första stycket börjar"), line(133, "och fortsätter här"),
+             line(166, "andra stycket börjar"), line(199, "med en fortsättning"),
+             line(232, "tredje stycket börjar")]
+    numbers = [(100, 5), (166, 6), (232, 7)]      # a mid-document run, values 5-7
+    injected, breaks = _inject_numbers(lines, numbers)
+    assert breaks == {100, 166, 232}
+    assert injected[0].text == "5. första stycket börjar"
+    paras = page_paragraphs(injected, "", 1, force_break_tops=breaks)
+    assert len(paras) == 3                         # split despite no gap
+    assert paras[0].text.startswith("5. första stycket börjar och fortsätter")
+    assert paras[1].text.startswith("6. andra stycket")
+    assert paras[2].text.startswith("7. tredje stycket")
+
+
+def test_classify_pdf_drops_boilerplate_and_numbers_paragraphs():
+    # R2: (pageno, Para) pairs -> body blocks, tagged with their PDF page; the court
+    # header/footer/page markers dropped and HD/HFD numbered reasons kept as ordinal
+    # stycken (the number is injected upstream from the margin bitmap)
+    paged = [
+        (1, Para("Sida 1 (10) PROTOKOLL Aktbilaga 43 Mål nr B 3687-22")),
+        (1, Para("PARTER", bold=True)),
+        (1, Para("Dok.Id 287315 HÖGSTA DOMSTOLEN Postadress Telefon 08-561 Expeditionstid")),
+        (2, Para("HÖGSTA DOMSTOLEN B 3687-22 Sida 2 (10)")),
+        (2, Para("Bakgrund", bold=True)),
+        (2, Para("1. Under våren 2018 genomförde bolaget en upphandling.")),
+        (2, Para("2. Beslutet överklagades.")),
+    ]
+    blocks = classify_pdf(paged)
+    assert Rubrik(text="PARTER", page=1) in blocks    # level 0: heuristic heading
+    assert Rubrik(text="Bakgrund", page=2) in blocks
+    styckes = {b.ordinal: b for b in blocks if isinstance(b, Stycke)}
+    assert styckes["1"].text.startswith("Under våren")   # marker stripped, ordinal kept
+    assert styckes["1"].page == 2                        # tagged with its PDF page
+    assert styckes["2"].text.startswith("Beslutet")
+    # court boilerplate is gone
+    assert not any("Sida" in b.text and "(" in b.text for b in blocks)
+    assert not any("Dok.Id" in b.text or "Postadress" in b.text for b in blocks)
 
 
 def test_case_uri_mints_old_rinfo_scheme():
@@ -544,8 +625,6 @@ def test_curated_links_reach_the_catalog_graph():
 def test_to_artifact_non_referat_case_gets_verdict_uri():
     # a raw verdict (no referat) publishes at the old COIN scheme when court,
     # målnummer and date are all known; a fact-less stray keeps the slug URI
-    from accommodanda.dv.model import Avgorande, Stycke
-    from accommodanda.dv.parse import to_artifact
     av = Avgorande(court="HDO", court_namn="Högsta domstolen",
                    malnummer=["Ö 528-08"], avgorandedatum="2008-03-13",
                    body=[Stycke("Beslutet.")])
@@ -564,3 +643,46 @@ def test_clean_nyckelord_strips_register_junk():
         "Allmän handling", "Avskrivning", "Avtalsbrott",
         "Återställande av försutten tid - avslag",
         "Personlig integritet m.m."]
+
+
+# --------------------------------------------------------------------------
+# raw-verdict PDF pipeline (R2) -- golden fixture through real pdftohtml
+# --------------------------------------------------------------------------
+
+# test/files/dv/verdict_numbered.pdf is a hand-built minimal verdict (see the
+# adjacent make_verdict_numbered_pdf.py): a running header at a sub-body font,
+# a DOMSKÄL heading, and three domskäl paragraphs each preceded by a tiny
+# left-margin *image* -- the paragraph-number bitmap HD prints instead of
+# selectable text. It exercises pdf_images/_paragraph_numbers/parse_pdf_record
+# against a real poppler run, which the synthetic-Line unit tests cannot.
+
+def _pdf_record():
+    return {"domstol": {"domstolKod": "HDO", "domstolNamn": "Högsta domstolen"},
+            "malNummerLista": ["Ä 1-24"], "referatNummerLista": [],
+            "avgorandedatum": "2024-01-01"}
+
+
+def test_pdf_images_finds_the_margin_number_bitmaps():
+    # the recovery hinges on exactly the small left-margin images being detected:
+    # three of them, each passing _paragraph_numbers' size/left filter
+    imgs = pdf_images(str(FIXTURES / "verdict_numbered.pdf"))
+    margin = [(page, top, left, w, h) for page, top, left, w, h in imgs
+              if 0 < h < 30 and 0 < w < 100 and left < 260]
+    assert len(margin) == 3
+    assert all(page == 1 for page, *_ in margin)
+
+
+def test_parse_pdf_record_recovers_contiguous_domskal_numbers():
+    av = parse_pdf_record(_pdf_record(), FIXTURES / "verdict_numbered.pdf")
+    assert isinstance(av, Avgorande)
+    numbered = [b for b in av.body if isinstance(b, Stycke) and b.ordinal]
+    # the three margin bitmaps become contiguous ordinals 1, 2, 3 on their lines
+    assert [b.ordinal for b in numbered] == ["1", "2", "3"]
+    assert numbered[0].text.startswith("Fragan")
+    # every recovered block is page-tagged for the facsimile link
+    assert all(b.page == 1 for b in numbered)
+    # the DOMSKÄL heading survives as an unnumbered rubrik
+    assert any(isinstance(b, Rubrik) and b.text == "DOMSKAL" for b in av.body)
+    # the sub-body running header is dropped as marginalia, never a body line
+    body_text = " ".join(b.text for b in av.body)
+    assert "Mal nr" not in body_text

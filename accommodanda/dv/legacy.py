@@ -304,6 +304,22 @@ def parse_notis_head(paras, filename):
     return head, body
 
 
+# a notis's first paragraph is its summary line: an optional "Den N:e." day lead
+# (HD's month compilations), the notis number and the (målnummer), then the prose
+_RE_NOTIS_SUMMARY = re.compile(
+    r"^(?:Den\s+\d+\s*:e\.\s*)?(?:\d+\s*\.\s*)?(?:\([^)]*\)\s*)?")
+
+
+def notis_summary(body):
+    """A notis's one-line summary for the listing -- its first paragraph stripped
+    of the 'Den N:e. M. (målnr)' lead ('Överklagande av G.H. angående …') -- or
+    None for an empty notis. The frozen oracle carries this same string as its
+    referatrubrik where it has one; this recovers it for the notiser it does not."""
+    if not body:
+        return None
+    return _RE_NOTIS_SUMMARY.sub("", body[0].text.strip()).strip() or None
+
+
 def parse_notis(text, courtdir, filename, case=None, sources=None):
     """One notis intermediate XML -> Avgorande. Identity comes from the
     filename/index (the same YYYY_not_N rule the identity scan applies);
@@ -340,9 +356,10 @@ def parse_notis(text, courtdir, filename, case=None, sources=None):
                 for line in head.get("Lagrum", [])
                 for part in line.split(";") if part.strip()],
         forarbeten=[],
-        # the notis document itself has no rubrik; the frozen oracle's
-        # published one (from the identity index) is the authoritative summary
-        sammanfattning=case.get("referatrubrik"),
+        # the frozen oracle's published rubrik (from the identity index) is the
+        # authoritative summary; where it has none, the notis's own first-paragraph
+        # summary line stands in (so the listing still gets a description)
+        sammanfattning=case.get("referatrubrik") or notis_summary(body),
         related=[Hanvisning(fritext=r) for r in head.get("Rättsfall", [])],
         litteratur=[w.strip() for line in head.get("Litteratur", [])
                     for w in line.split(";") if w.strip()],

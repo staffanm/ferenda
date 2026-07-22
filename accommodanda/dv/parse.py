@@ -19,6 +19,7 @@ misclassified heading still keeps its text, so nothing is lost.
 import functools
 import html as htmllib
 import re
+from dataclasses import replace
 from datetime import date
 
 from bs4 import BeautifulSoup
@@ -37,6 +38,13 @@ from ..lib.lagrum import (
     load_namedacts,
     load_namedlaws,
 )
+from ..lib.pdftext import (
+    line_body_size,
+    page_paragraphs,
+    pdf_images,
+    pdf_pages,
+)
+from ..lib.util import normalize_space
 from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -275,6 +283,119 @@ def decision_date_from_text(body, court, court_namn, referat, metadata_date=None
     return candidates[0] if len(candidates) == 1 else None
 
 
+# court boilerplate on a raw verdict PDF: the running "HÖGSTA (FÖRVALTNINGS)?
+# DOMSTOLEN … Sida N (M)" header (also merged with the protokoll masthead on
+# page 1), a bare "Sida N (M)" page marker, and the address footer ("Dok.Id …
+# Postadress …" / "Postadress … Expeditionstid …"). Dropped before classification.
+RE_VERDICT_NOISE = re.compile(
+    r"^(?:HÖGSTA (?:FÖRVALTNINGS)?DOMSTOLEN\b.*)?Sida \d+\s*\(\d+\)"
+    r"|\bDok\.Id\b.*\bPostadress\b"
+    r"|\bPostadress\b.*\bExpeditionstid\b",
+    re.IGNORECASE)
+
+
+def classify_pdf(paged_paras):
+    """`(pageno, lib.pdftext.Para)` pairs (a raw verdict's PDF) -> body blocks,
+    each tagged with its source PDF page (for the facsimile links). Pure over the
+    stream so the rules are testable without poppler. A bold para is a heading; a
+    "N. text" para is a numbered domskäl stycke (the number injected from the
+    margin bitmap, see `parse_pdf_record`); every other para is a stycke. Court
+    running headers/footers and page markers are dropped (`RE_VERDICT_NOISE`)."""
+    blocks = []
+    for pageno, p in paged_paras:
+        text = collapse(p.text)
+        if not text or RE_SEPARATOR.match(text) or RE_VERDICT_NOISE.search(text):
+            continue
+        m = RE_NUMPARA.match(text)
+        if m:
+            blocks.append(Stycke(text=collapse(m.group(2)), ordinal=m.group(1),
+                                 page=pageno))
+        elif p.bold or is_heading(text):
+            blocks.append(Rubrik(text=text, page=pageno))
+        else:
+            blocks.append(Stycke(text=text, page=pageno))
+    return blocks
+
+
+def _body_lines(lines, body_size):
+    """Drop each line's sub-body-size runs, then any line left empty. A HD/HFD
+    verdict PDF sets its body at one dominant font size; everything smaller is
+    marginalia -- the "Sida N (M)" / "HÖGSTA DOMSTOLEN … {målnr}" running header
+    and the address footer, and critically the *vertical* "Dok.Id …" stamp whose
+    characters share a baseline with the last body line of each page (so they'd
+    otherwise splice a stray "1 3 " onto the text). Rebuilt from the surviving
+    runs in reading order."""
+    if not body_size:
+        return lines
+    out = []
+    for l in lines:
+        runs = [r for r in l.runs if r.size >= body_size]
+        text = normalize_space(" ".join(r.text for r in runs))
+        if text:
+            out.append(replace(l, text=text, runs=runs))
+    return out
+
+
+# the paragraph-number bitmap sits on its paragraph's first-line baseline; match
+# a number to the body line within this many page units of its top
+NUMBER_TOP_TOL = 6
+
+
+def _paragraph_numbers(pdf_path):
+    """`{page: [(top, n), …]}` for a raw verdict's domskäl paragraph numbers. HD/HFD
+    print these as tiny left-margin bitmaps (unselectable -- they never reach the
+    text layer), so the numbering vanished from the parse. They are the only small
+    images in the body (the one page-1 seal is large), and the numbering is
+    contiguous, so their reading order *is* the value: no OCR, just count. Returns
+    the assigned number keyed by page + vertical position, for `_inject_numbers`."""
+    small = sorted((page, top) for page, top, left, w, h in pdf_images(pdf_path)
+                   # a number bitmap: small, in the left margin -- not the page-1
+                   # seal (large) nor an inline figure (out in the text column)
+                   if 0 < h < 30 and 0 < w < 100 and left < 260)
+    by_page = {}
+    for n, (page, top) in enumerate(small, start=1):
+        by_page.setdefault(page, []).append((top, n))
+    return by_page
+
+
+def _inject_numbers(lines, numbers):
+    """Prepend "N. " to the body line each paragraph-number bitmap sits on, so
+    `RE_NUMPARA` recovers it as the stycke's ordinal. Returns `(lines, tops)` --
+    the tops are the injected lines' positions, handed to `page_paragraphs` as
+    forced paragraph breaks (HD numbers its paragraphs with no extra vertical gap,
+    so the reflow's gap heuristic would otherwise merge them and bury the number).
+    `numbers` is this page's `[(top, n), …]`."""
+    out, breaks = [], set()
+    for l in lines:
+        n = next((num for top, num in numbers
+                  if abs(l.top - top) <= NUMBER_TOP_TOL), None)
+        if n is not None:
+            l = replace(l, text="%d. %s" % (n, l.text))
+            breaks.add(l.top)
+        out.append(l)
+    return out, breaks
+
+
+def parse_pdf_record(d, pdf_path):
+    """A raw verdict whose text is only in a PDF attachment -> Avgorande. Before
+    the NJA referat is published a HD/HFD decision has no `innehall` HTML, only the
+    court's own PDF (`{målnummer}.pdf`); its body comes from `lib.pdftext` instead,
+    each block tagged with its PDF page (facsimile links) and the domskäl paragraph
+    numbers recovered from their margin bitmaps. Metadata (court, målnummer, date,
+    lagrum, …) is the record's, exactly as for the HTML path."""
+    court_namn = d["domstol"]["domstolNamn"]
+    pages = list(pdf_pages(str(pdf_path)))
+    body_size = line_body_size([l for _pageno, lines in pages for l in lines])
+    numbers = _paragraph_numbers(pdf_path)
+    paged = []
+    for pageno, lines in pages:
+        clean, breaks = _inject_numbers(_body_lines(lines, body_size),
+                                        numbers.get(pageno, []))
+        paged += [(pageno, p) for p in page_paragraphs(clean, court_namn, pageno,
+                                                       force_break_tops=breaks)]
+    return _avgorande(d, classify_pdf(paged), [])
+
+
 def parse_api_record(d, basefile=None):
     """API record dict -> Avgorande. The innehåll HTML is DV's intermediate
     format: when `basefile` is given, apply any curated patch to it (a
@@ -283,6 +404,13 @@ def parse_api_record(d, basefile=None):
     if basefile is not None and innehall is not None:
         innehall = patch.apply("dv", basefile, innehall)
     body, footnotes = parse_body(innehall)
+    return _avgorande(d, body, footnotes)
+
+
+def _avgorande(d, body, footnotes):
+    """Assemble the `Avgorande` from a record's metadata plus an already-parsed
+    body/footnotes -- shared by the innehåll-HTML path and the raw-verdict PDF
+    path, so both produce byte-identical metadata."""
     text_dates = decision_dates_from_text(
         body, d["domstol"]["domstolKod"], d["domstol"]["domstolNamn"],
         d.get("referatNummerLista", []), d.get("avgorandedatum"))
@@ -434,9 +562,12 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
     grupp_uris = grupp_uris or {}
     runs = scan_body(av.body)
     def block(b, text):
+        # `page` (the source PDF page) is carried only for a raw verdict parsed
+        # from its PDF -- it drives the facsimile links; the HTML path leaves it None
+        page = {"page": b.page} if b.page else {}
         if isinstance(b, Rubrik):
-            return {"type": "rubrik", "level": b.level, "text": text}
-        return {"type": "stycke", "ordinal": b.ordinal, "text": text}
+            return {"type": "rubrik", "level": b.level, "text": text, **page}
+        return {"type": "stycke", "ordinal": b.ordinal, "text": text, **page}
     cid = canonical_id or (av.referat[0] if av.referat
                            else "%s %s" % (av.court, av.malnummer[0])
                            if av.malnummer else av.court)
@@ -496,7 +627,9 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
 
 
 def api_member(case):
-    for member in case["members"]:
-        if member["store"] == "domstol":
-            return member
-    return None
+    """The API (domstol) record parse reads for a case. When a raw verdict is
+    folded into its published referat (R2) there are several domstol members;
+    prefer the referat member -- it carries the innehåll HTML -- over the raw
+    verdict, whose text is only a PDF attachment."""
+    api = [m for m in case["members"] if m["store"] == "domstol"]
+    return next((m for m in api if m.get("referat")), api[0] if api else None)

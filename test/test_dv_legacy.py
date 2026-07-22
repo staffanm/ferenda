@@ -7,12 +7,27 @@ paragraph streams, so they run without Java.
 
 from accommodanda.lib.poi import Para
 from accommodanda.dv.legacy import (
-    build_avgorande, parse_head_body, _classify, _split_malnummer)
+    build_avgorande, notis_summary, parse_head_body, _classify, _split_malnummer)
 from accommodanda.dv.model import Hanvisning, Rubrik, Stycke
 
 
 def P(text, bold=False, in_table=True):
     return Para(text, bold, in_table)
+
+
+def test_notis_summary_strips_the_lead():
+    # a notis's first paragraph is its summary line -- the 'Den N:e. M. (målnr)'
+    # lead is stripped so the listing gets a clean description
+    assert notis_summary([P("Den 4 :e. 1 . (Ö 1494-21) Överklagande av G.H. "
+                            "angående ansökan i hovrätt om återställande av "
+                            "försutten tid.")]) == \
+        ("Överklagande av G.H. angående ansökan i hovrätt om återställande av "
+         "försutten tid.")
+    # the day lead is optional (some notiser open straight with the målnummer)
+    assert notis_summary([P("(T 6483-21) G.M. mot Securitas Sverige AB angående "
+                            "rättegångskostnader.")]) == \
+        "G.M. mot Securitas Sverige AB angående rättegångskostnader."
+    assert notis_summary([]) is None
 
 
 # A minimal but representative referat stream: bold court, plain referat,

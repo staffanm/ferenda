@@ -43,6 +43,7 @@ backstop for both.
 import argparse
 import json
 import re
+import shutil
 import time
 from datetime import date
 from pathlib import Path
@@ -56,6 +57,13 @@ from ..lib.net import make_session, request
 API = "https://rattspraxis.etjanst.domstol.se/api/v1"
 PAGE_SIZE = 100
 COMPLETE = ".complete"   # legacy marker, superseded by (migrated into) the watermark
+
+# publication types that are not decisions and must never enter the corpus: a
+# PROVNINGSTILLSTAND is only a notice that HD granted leave to appeal (the verdict
+# comes later, separately), and a FORHANDSAVGORANDE is a request to the CJEU, not a
+# ruling. Neither is downloaded, made a case, or listed; an already-stored copy is
+# purged on the next download.
+EXCLUDE_TYP = frozenset({"PROVNINGSTILLSTAND", "FORHANDSAVGORANDE"})
 
 
 def is_dv_downloaded(destdir, record, check_bilagor=True):
@@ -101,6 +109,17 @@ def fetch_record(session, record_id):
     return request(session, "GET",
                    API + "/publiceringar/" + quote(record_id, safe=""),
                    parse_json=True)
+
+
+def remove_record(destdir, record):
+    """Delete an already-stored record and its attachments -- used to purge an
+    excluded-type publication (EXCLUDE_TYP) that a previous run saved before the
+    filter existed. No-op when nothing is on disk."""
+    dirpath = record_dir(destdir, record)
+    if compress.exists(dirpath.with_suffix(".json")):
+        compress.unlink(dirpath.with_suffix(".json"))
+    if dirpath.is_dir():
+        shutil.rmtree(dirpath)
 
 
 def save_record(destdir, record):
@@ -178,7 +197,11 @@ def sync(destdir, full=False, bilagor=True, limit=None, delay=0.3):
             page = search_page(session, index, asc=backfill)
             if not page["publiceringLista"]:
                 return           # exhausted the corpus, not an early stop
-            yield from page["publiceringLista"]
+            for record in page["publiceringLista"]:
+                if record.get("typ") in EXCLUDE_TYP:
+                    remove_record(destdir, record)   # purge any stored copy
+                    continue
+                yield record
             index += 1
             time.sleep(delay)
 

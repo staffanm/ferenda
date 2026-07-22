@@ -24,8 +24,10 @@ its own paragraph) and the classifiers reuse them.
 
 import re
 import subprocess
+import tempfile
 from collections import Counter
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
@@ -128,6 +130,25 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
                               left + int(t.get("width") or 0),
                               sizes.get(t.get("font"), 0)))
         yield int(page.get("number")), _lines(spans)
+
+
+def pdf_images(pdf_path):
+    """`(page, top, left, width, height)` for every embedded raster image, in
+    page coordinates. The text path (`pdf_pages`) runs `pdftohtml -i`, which drops
+    images; this runs it *without* `-i` to get their positions -- pdftohtml writes
+    the extracted PNGs beside its output, so it runs into a throwaway temp dir and
+    only the coordinates survive. Used to recover content encoded as bitmaps rather
+    than text (DV verdicts print their paragraph numbers as tiny margin images)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = str(Path(tmp) / "out")
+        subprocess.run(["pdftohtml", "-xml", "-nodrm", str(pdf_path), out],
+                       capture_output=True, check=True)
+        xml = (Path(tmp) / "out.xml").read_bytes()
+    root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
+                                                 no_network=True))
+    return [(int(page.get("number")), int(im.get("top")), int(im.get("left")),
+             int(im.get("width") or 0), int(im.get("height") or 0))
+            for page in root.findall("page") for im in page.findall("image")]
 
 
 def _lines(spans):
@@ -265,7 +286,7 @@ def dehyphenate(acc, line):
     return (acc + " " + line) if acc else line
 
 
-def page_paragraphs(lines, identifier, pageno):
+def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
     """Reflow a page's lines into paragraphs, dropping the running header (the
     identifier, when one is known -- pass ``None``/``""`` where the source has no
     fixed header to strip, e.g. a letter whose sender's name is prose, not a
@@ -300,7 +321,9 @@ def page_paragraphs(lines, identifier, pageno):
     for l in kept:
         marker = l.lead_bold and (RE_KAP_MARK.match(l.text)
                                   or RE_PARA_MARK.match(l.text))
-        starts = (cur is None or heading(l) or marker
+        # a caller-forced break (DV's bitmap paragraph numbers, whose paragraphs
+        # carry no extra vertical gap the heuristic below could see)
+        starts = (cur is None or heading(l) or marker or l.top in force_break_tops
                   or (prev and heading(prev))
                   or (body_gap and prev and l.top - prev.top > PARA_GAP * body_gap))
         if starts and _heading_wrap(prev, l, marker, heading):

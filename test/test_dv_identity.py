@@ -119,6 +119,48 @@ def test_genuinely_distinct_cases_not_merged():
     assert len(cases) == 2
 
 
+def _raw(uuid, court, mal, date):
+    r = api(uuid, court, mal)
+    r.update(referat=[], avgorandedatum=date, has_innehall=False, bilagor=1)
+    return r
+
+
+def test_raw_verdict_folds_into_its_referat():
+    # R2: a not-yet-published HD verdict (no referat, PDF only) is the same case as
+    # the NJA referat later published under its målnummer + same avgörandedatum
+    raw = _raw("u1", "HDO", ["B 920-25"], "2025-11-04")
+    ref = api("u2", "HDO", ["B 920-25"], ["NJA 2025 s. 1029"])
+    ref["avgorandedatum"] = "2025-11-04"
+    cases = build_index([raw, ref], [])
+    assert len(cases) == 1
+    assert cases[0]["referat"] == ["NJA 2025 s. 1029"]
+    assert len(cases[0]["members"]) == 2       # referat + folded-in raw verdict
+
+
+def test_earlier_decision_under_same_number_stays_separate():
+    # a målnummer is reused across a case's life: an earlier prövningstillstånd
+    # under B 367-24 (Jan) is a distinct decision from the Nov verdict/referat.
+    # The date guard folds only the same-date verdict, never the January one.
+    pt = _raw("u1", "HDO", ["B 367-24"], "2025-01-27")
+    verdict = _raw("u2", "HDO", ["B 367-24"], "2025-11-05")
+    ref = api("u3", "HDO", ["B 367-24"], ["NJA 2025 s. 1037"])
+    ref["avgorandedatum"] = "2025-11-05"
+    cases = build_index([pt, verdict, ref], [])
+    assert len(cases) == 2
+    referat_case = next(c for c in cases if c["referat"])
+    assert len(referat_case["members"]) == 2   # referat + Nov verdict only
+    other = next(c for c in cases if not c["referat"])
+    assert other["avgorandedatum"] == "2025-01-27"
+
+
+def test_raw_verdict_with_no_referat_stays_its_own_case():
+    # most HD/HFD decisions never get an NJA referat: a lone raw verdict remains a
+    # standalone case (rendered from its PDF), not suppressed
+    cases = build_index([_raw("u1", "HDO", ["Ö 5502-25"], "2026-06-05")], [])
+    assert len(cases) == 1
+    assert cases[0]["referat"] == []
+
+
 def test_same_malnummer_distinct_api_referat_stay_separate():
     # AD can publish two distinct decisions under one case number. M alone must
     # not fuse authoritative API records (the live example is A 112-92:

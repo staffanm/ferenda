@@ -46,6 +46,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..lib import compress, layout, util
+from .download import EXCLUDE_TYP
 
 # The withheld-originals adjudication ledger (salvaged from the parallel
 # closure commit): 57 legacy Word files whose målnummer alone cannot choose
@@ -129,6 +130,8 @@ def scan_api(domstoldir):
         if path.name.startswith("."):
             continue   # not a record: the .watermark.json harvest marker, junk
         d = json.loads(compress.read_text(path))
+        if d.get("typ") in EXCLUDE_TYP:
+            continue   # a prövningstillstånd / förhandsavgörande is not a case
         court = canonical_court(d["domstol"]["domstolKod"])
         records.append({
             "store": "domstol", "court": court,
@@ -335,6 +338,34 @@ def build_index(api_records, legacy_records):
             uf.union(api_root, legacy_root)
             component_referat[uf.find(api_root)] = (
                 component_referat[api_root] | component_referat[legacy_root])
+
+    # R2: fold a raw verdict -- an API record with no referat of its own -- into
+    # the referat component that publishes its målnummer. A HD/HFD decision is
+    # first served as a bare verdict (its text only in a PDF attachment) and, some
+    # months later, republished with an NJA referat; the two are the same case. A
+    # record with no referat cannot itself be a distinct publication, so this is
+    # the one safe API↔API merge by M -- guarded to exactly one referat component
+    # per målnummer and a *matching avgörandedatum*, so a målnummer reused by a
+    # later, distinct decision (or an earlier prövningstillstånd under the same
+    # number) differs in date and stays apart. Recompute component membership
+    # fresh (the bridges above moved roots).
+    comp_referat, comp_dates = defaultdict(set), defaultdict(set)
+    for i, rec in enumerate(records):
+        root = uf.find(i)
+        comp_referat[root].update(norm_referat(r) for r in rec["referat"]
+                                  if norm_referat(r))
+        if rec.get("avgorandedatum"):
+            comp_dates[root].add(rec["avgorandedatum"])
+    for indices in malnummer_records.values():
+        referat_roots = {uf.find(i) for i in indices if comp_referat[uf.find(i)]}
+        if len(referat_roots) != 1:
+            continue
+        root = next(iter(referat_roots))
+        for i in indices:
+            if (records[i]["store"] == "domstol" and not records[i]["referat"]
+                    and uf.find(i) != root
+                    and records[i].get("avgorandedatum") in comp_dates[root]):
+                uf.union(i, root)
 
     groups = defaultdict(list)
     for i, rec in enumerate(records):

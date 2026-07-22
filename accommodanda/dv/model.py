@@ -20,6 +20,7 @@ class Rubrik:
     by the heuristic (the legacy format carries no semantic heading tags)."""
     text: str
     level: int = 0
+    page: int | None = None      # source PDF page (raw-verdict facsimile), else None
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Stycke:
     ('1. ...', as used in HFD/HD prejudikat)."""
     text: str
     ordinal: str | None = None
+    page: int | None = None      # source PDF page (raw-verdict facsimile), else None
 
 
 @dataclass
