@@ -88,6 +88,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `lagrum.py` | Lark/Earley engine; `LagrumParser(parse_types=…)` composes a grammar from LAGRUM / KORTLAGRUM / EULAGSTIFTNING / RATTSFALL / FORARBETEN / … |
 | `casenaming.py` | court-decision identity — `case_uri` (mint a case's canonical URI via the RATTSFALL parser) + `case_label`/`lopnummer` (referat identity + HD's given names); read identically by dv's parse-time label stamp, the catalog row and the page heading |
 | `eucasenaming.py` | the EU mirror of `casenaming.py` — `case_number` (CELEX → court case number, "62018CJ0311" → "C-311/18", also T-/F- courts), `given_name`/`case_name`/`case_citation` (curated usual name, page heading, "C-311/18 (Schrems II)" inbound-citation label) from the shipped `eurlex/data/casenames.json` snapshot; read identically by eurlex's parse-time label stamp, the catalog row and the page heading |
+| `labels.py` | one place for every source's four reader-facing name forms — `short_id` (eyebrow), `short_title` (h1), `official_title` (dl.meta "Titel"), `descriptive_label` (compact citing form, I1) — dispatched per source (`_sfs`/`_eurlex`/`_dv`/`_forarbete`/`_foreskrift`/`_avg`/`_hudoc`/`_coe`/`_icrc`/`_untc`/`_icc`, else `_generic`) over the artifact dict's own parse-time stamps plus the curated datasets (`NAMEDLAWS`, `COE_NAMES`, `ICRC_NAMES`, `UNTC_TREATIES`, the new `eurlex/data/treaties.json` for EU primary law); read by both `render.py` (every per-document page) and `catalog.py` (the stamped `descriptive` column) so the two can't drift |
 | `coe.py` | shared Council of Europe identity grammar: ETS/CETS number → `ext/coe/{number}`, article/subarticle fragments, and HUDOC's `8` / `6-3-d` / `P7-4` facet codes → the same treaty provision URIs produced by the Treaty Office vertical |
 | `coe_ids.py` | dependency-free CoE article-fragment grammar (`article_fragment`) factored out of `coe.py` so `lib.lagrum` can use it without closing the `lagrum → coe → catalog → markdown → lagrum` import cycle; also used by `sfs/nf.py` |
 | `eu_structure.py` | the one EU-act sub-article anchor grammar (`anchored_blocks`/`subarticle_key`/`flatten`), shared by the eurlex parser, the renderer and the wiki guidance layer (`nest`, the parse-time tree builder, stays in `eurlex/structure.py`) |
@@ -127,13 +128,13 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 **DV vertical (court decisions)**
 | File | What |
 |---|---|
-| `download.py` | downloader for the rättspraxis API |
-| `identity.py` | entity-resolution index (one canonical case ← many source records) |
-| `model.py` | `Avgorande` model (metadata + ordered Rubrik/Stycke body + footnotes) |
-| `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields |
+| `download.py` | downloader for the rättspraxis API; excludes `PROVNINGSTILLSTAND`/`FORHANDSAVGORANDE` publications (leave-to-appeal notices and CJEU referral requests, neither a decision) and purges any already-stored copy of one |
+| `identity.py` | entity-resolution index (one canonical case ← many source records); R2 folds a raw pre-referat verdict (an API record with no referat of its own) into the later referat that publishes its målnummer, guarded to one referat component per målnummer + matching avgörandedatum |
+| `model.py` | `Avgorande` model (metadata + ordered Rubrik/Stycke body + footnotes); `Rubrik`/`Stycke` carry an optional source PDF `page` (raw-verdict facsimile links) |
+| `parse.py` | **API path** — body from `innehall` HTML, metadata from curated fields; **raw-verdict PDF path** (`parse_pdf_record`) — before a HD/HFD decision's NJA referat is published, its only text is the court's own PDF attachment; body comes from `lib/pdftext`, with domskäl paragraph numbers (printed as unselectable margin bitmaps) recovered by counting small left-margin images and injected back into the reflowed lines |
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
-| `legacy.py` | **legacy path** — Word referats via `lib/poi.py` (`from ..lib import poi as word`, flat `(text, bold, in_table)` stream → head/body split → `Avgorande`) and notis intermediate XML (TRIPS `<para>` / OOXML `<w:p>` flavors), for cases with no API record. Its `import_identities`/`import_notiser` one-time importers (the frozen notis bodies + the `legacy-identities.json` oracle sidecar) were deleted once run to completion (§7g teardown, 2026-07-19); only the parsers remain runtime code |
+| `legacy.py` | **legacy path** — Word referats via `lib/poi.py` (`from ..lib import poi as word`, flat `(text, bold, in_table)` stream → head/body split → `Avgorande`) and notis intermediate XML (TRIPS `<para>` / OOXML `<w:p>` flavors), for cases with no API record. Its `import_identities`/`import_notiser` one-time importers (the frozen notis bodies + the `legacy-identities.json` oracle sidecar) were deleted once run to completion (§7g teardown, 2026-07-19); only the parsers remain runtime code. `notis_summary` recovers a listing description from a notis's own first-paragraph summary line where the frozen oracle's `referatrubrik` has none |
 
 **forarbete vertical (preparatory works — prop/sou/ds/dir)**
 | File | What |
@@ -172,14 +173,15 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 |---|---|
 | `download.py` | harvester for the Publications Office CELLAR repository, keyed by CELEX (SPARQL discovery + SOAP/REST fetch; Formex/HTML/PDF manifestations) |
 | `bulk.py` | unpack a CELLAR bulk "legislation" dump into the per-CELEX layout the incremental harvester produces, so the whole corpus can be imported from official dumps |
-| `model.py` | typed `EurlexDoc` model parsed from Formex (legislation/treaties + judgments) |
-| `parse.py` | orchestrator: Formex (the structured XML manifestation) → `EurlexDoc` → JSON artifact |
+| `model.py` | typed `EurlexDoc` model parsed from Formex (legislation/treaties + judgments); `doctype` classifies a sector-6 CELEX by its two-letter document code — CJ/TJ/FJ judgment, CC/CV/CP an Advocate General opinion, CO/TO/FO an order — so an opinion is no longer misfiled as a judgment |
+| `parse.py` | orchestrator: Formex (the structured XML manifestation) → `EurlexDoc` → JSON artifact; `parse_opinion` reads an AG opinion's `CONCLUSION` structure (opening prose, numbered `NP` opinion paragraphs, `GR.SEQ` section groupings) the same shape a judgment's contents take |
 | `parse_html.py` / `parse_pdf.py` | fallback body parsers for the (many older) acts with no Formex — OJ HTML/XHTML, then PDF via `pdftohtml -xml` as last resort |
 | `structure.py` | group an act's flat block sequence into its containment hierarchy (`nest`, the parse-time tree builder; the anchor grammar itself lives in `lib/eu_structure.py`) |
 | `definitions.py` | extract an act's defined terms and interlink their in-act uses |
 | `lang.py` | localized structural vocabulary for the non-Formex (html/pdf) parsers (Formex is tag-marked, so its parser needs no language knowledge) |
 | `annotate.py` | `lagen eurlex ai-annotate <CELEX>` — author the editorial `.ann` layer for a sector-3 act with an LLM, written to the curated store (`lib/annstore.py`) |
 | `casenames.py` | `lagen eurlex casenames` — harvest CELEX → usual name for named EU cases ("Schrems II") from Wikidata (property P476) into `data/casenames.json`, read by `lib/eucasenaming.py` |
+| `data/treaties.json` | curated Swedish names for EU primary law (sector-1 CELEX, keyed by CELEX stem with the `(NN)`/`R(NN)` revision suffix stripped) — the founding/consolidated treaties carry no extractable short title on their own, so this stands in as both short and official title; read by `lib/labels._eurlex`. The Fördrag browse *family* grouping (`lib/facets._treaty_family`) is derived from the CELEX document-type letter, not from this file |
 
 **hudoc vertical (European Court of Human Rights case law)**
 | File | What |
