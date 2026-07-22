@@ -1,0 +1,53 @@
+{
+  "_comment": "Curated Swedish names for EU primary law (CELEX sector 1). The browse index and headers otherwise show the bare CELEX, because these founding/consolidated treaties carry no extractable short title. Keyed by the CELEX stem (revision '(NN)' and corrigendum 'R(NN)' suffixes stripped before lookup). The treaty *family* used to group the Fördrag index is derived from the CELEX document-type letter in lib/facets._treaty_family, not from this file. Feeds lib/labels._eurlex (E1).",
+
+  "11957A": "Fördraget om upprättandet av Europeiska atomenergigemenskapen (Euratom, 1957)",
+
+  "11992M/TXT": "Fördraget om Europeiska unionen (Maastrichtfördraget, 1992)",
+  "11997M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 1997)",
+  "12002M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 2002)",
+  "12006M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 2006)",
+  "12008M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 2008)",
+  "12010M": "Fördraget om Europeiska unionen (konsoliderad version 2010)",
+  "12012M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 2012)",
+  "12016M/TXT": "Fördraget om Europeiska unionen (konsoliderad version 2016)",
+
+  "11992E/TXT": "Fördraget om upprättandet av Europeiska gemenskapen (Maastricht, 1992)",
+  "11997E/TXT": "Fördraget om upprättandet av Europeiska gemenskapen (konsoliderad version 1997)",
+  "12002E/TXT": "Fördraget om upprättandet av Europeiska gemenskapen (konsoliderad version 2002)",
+  "12006E/TXT": "Fördraget om upprättandet av Europeiska gemenskapen (konsoliderad version 2006)",
+  "12008E/TXT": "Fördraget om Europeiska unionens funktionssätt (konsoliderad version 2008)",
+  "12010E": "Fördraget om Europeiska unionens funktionssätt (konsoliderad version 2010)",
+  "12012E/TXT": "Fördraget om Europeiska unionens funktionssätt (konsoliderad version 2012)",
+  "12016E/TXT": "Fördraget om Europeiska unionens funktionssätt (konsoliderad version 2016)",
+
+  "12007P/TXT": "Europeiska unionens stadga om de grundläggande rättigheterna (2007)",
+  "12010P/TXT": "Europeiska unionens stadga om de grundläggande rättigheterna (konsoliderad version 2010)",
+  "12012P/TXT": "Europeiska unionens stadga om de grundläggande rättigheterna (konsoliderad version 2012)",
+  "12016P/TXT": "Europeiska unionens stadga om de grundläggande rättigheterna (konsoliderad version 2016)",
+
+  "12016ME/TXT": "Konsoliderade versioner av EU-fördraget och EUF-fördraget (2016)",
+
+  "12010A/TXT": "Fördraget om upprättandet av Europeiska atomenergigemenskapen (konsoliderad version 2010)",
+  "12012A/TXT": "Fördraget om upprättandet av Europeiska atomenergigemenskapen (konsoliderad version 2012)",
+  "12016A/TXT": "Fördraget om upprättandet av Europeiska atomenergigemenskapen (konsoliderad version 2016)",
+
+  "11986U": "Europeiska enhetsakten (1986)",
+  "11997D/TXT": "Amsterdamfördraget (1997)",
+  "12001C/TXT": "Nicefördraget (2001)",
+  "12007L/TXT": "Lissabonfördraget (2007)",
+  "12004V": "Fördraget om upprättande av en konstitution för Europa (2004)",
+
+  "11972B": "Anslutningsfördraget 1972 (Danmark, Irland, Storbritannien)",
+  "11979H/TXT": "Anslutningsfördraget 1979 (Grekland)",
+  "11985I/TXT": "Anslutningsfördraget 1985 (Spanien, Portugal)",
+  "11994N/TXT": "Anslutningsfördraget 1994 (Österrike, Finland, Sverige)",
+  "12003T/TXT": "Anslutningsfördraget 2003 (tio nya medlemsstater)",
+  "12005S/TXT": "Anslutningsfördraget 2005 (Bulgarien, Rumänien)",
+  "12012J/TXT": "Anslutningsfördraget 2012 (Kroatien)",
+
+  "11985G": "Grönlandsfördraget (1985)",
+
+  "12019W/TXT": "Avtalet om Förenade kungarikets utträde ur EU (2019)",
+  "12020W/TXT": "Avtalet om Förenade kungarikets utträde ur EU (2020)"
+}

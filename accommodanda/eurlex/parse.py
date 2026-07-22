@@ -300,6 +300,38 @@ def parse_judgment(root, blocks):
     return title
 
 
+def parse_opinion(root, blocks):
+    """An Advocate General's opinion (Formex ``CONCLUSION``) -> body blocks. Its
+    ``CONTENTS.CONCLUSION`` holds the opening prose (``P``, "Mr President, …"), the
+    numbered opinion paragraphs (``NP`` = NO.P marker + TXT) and any section
+    groupings (``GR.SEQ`` with a TITLE heading) -- the same shape a judgment's
+    contents take. Previously unhandled (it fell through to the ACT branch, which
+    found no enacting terms), so an opinion rendered as its footnotes alone (E4)."""
+    contents = root.find("CONTENTS.CONCLUSION")
+    title = _text(contents.find("TITLE") if contents is not None else None, "HT") \
+        or _text(root, "CURR.TITLE")
+
+    def paragraphs(parent):
+        for el in parent:
+            if el.tag == "NP":
+                marker = _text(el, "NO.P").strip(". ") or None
+                blocks.append(Block("paragraph", _text(el, "TXT", "P"), num=marker))
+            elif el.tag == "P":
+                text = flatten(el)
+                if text:
+                    blocks.append(Block("paragraph", text))
+            elif el.tag == "GR.SEQ":
+                heading = _text(el, "TITLE")
+                if heading:
+                    blocks.append(Block("heading", heading, level=1))
+                paragraphs(el)
+    if contents is not None:
+        for el in contents:
+            if el.tag != "TITLE":            # the opinion's own title (= doc.title)
+                paragraphs([el])
+    return title
+
+
 def _parse_judgment_contents(contents, blocks):
     for seq in contents.iter("GR.SEQ"):
         title = _text(seq, "TITLE")
@@ -417,6 +449,9 @@ def parse_formex(root, celex, lang):
     if root.tag == "JUDGMENT":
         doc.date, doc.ecli = judgment_metadata(root)
         doc.title = parse_judgment(root, doc.body)
+    elif root.tag == "CONCLUSION":          # an Advocate General's opinion (E4)
+        doc.date, doc.ecli = judgment_metadata(root)
+        doc.title = parse_opinion(root, doc.body)
     elif root.tag == "ANNEX":
         # some older acts expose only an annex as their Formex manifestation;
         # render it rather than an empty page (a fuller manifestation, if any,

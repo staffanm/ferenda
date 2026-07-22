@@ -45,6 +45,10 @@ def test_doctype_from_celex():
     assert doctype("32016R0679") == "regulation"
     assert doctype("32014D0001") == "decision"
     assert doctype("62019CJ0311") == "judgment"
+    # sector-6 case law is split by the two-letter document code: an AG opinion
+    # (CC) is not a judgment, an order (CO/TO) files with judgments (E4)
+    assert doctype("61987CC0253") == "opinion"
+    assert doctype("62019CO0311") == "order"
     assert doctype("12012E/TXT") == "treaty"
 
 
@@ -159,6 +163,36 @@ JUDGMENT_XML = """<JUDGMENT>
   <JURISDICTION><INTRO>Domstolen beslutar:</INTRO>
     <NP><NO.P>1.</NO.P><TXT>Artikel 56 FEUF ska tolkas.</TXT></NP></JURISDICTION>
 </JUDGMENT>"""
+
+
+OPINION_XML = """<CONCLUSION>
+  <BIB.JUDGMENT><NO.ECLI ECLI="ECLI:EU:C:1988:431">EU:C:1988:431</NO.ECLI></BIB.JUDGMENT>
+  <TITLE><TI><P>Förslag till avgörande av generaladvokat Lenz</P>
+    <P>den <DATE ISO="19881005">5 oktober 1988</DATE></P></TI></TITLE>
+  <CONTENTS.CONCLUSION>
+    <TITLE><TI><HT TYPE="BOLD">Herr ordförande, mina damer och herrar domare,</HT></TI></TITLE>
+    <P>Detta mål gäller en tvist.</P>
+    <GR.SEQ LEVEL="1"><TITLE><TI>A - Bakgrund</TI></TITLE>
+      <NP><NO.P>1.</NO.P><TXT>Sökanden väckte talan.</TXT></NP>
+      <NP><NO.P>2.</NO.P><TXT>Kommissionen bestred.</TXT></NP>
+    </GR.SEQ>
+  </CONTENTS.CONCLUSION>
+</CONCLUSION>"""
+
+
+def test_parse_opinion():
+    # an AG opinion (Formex CONCLUSION) parses to prose + numbered paragraphs, not
+    # its footnotes alone; doctype comes from the CC CELEX code (E4)
+    doc = parse_formex(ET.fromstring(OPINION_XML), "61987CC0253", "swe")
+    assert doc.doctype == "opinion"
+    assert doc.ecli == "ECLI:EU:C:1988:431"
+    assert doc.date == "19881005"
+    assert doc.title == "Herr ordförande, mina damer och herrar domare,"
+    seen = [(b.kind, b.num, b.text) for b in doc.body]
+    assert ("paragraph", None, "Detta mål gäller en tvist.") in seen
+    assert ("heading", None, "A - Bakgrund") in seen
+    assert ("paragraph", "1", "Sökanden väckte talan.") in seen
+    assert ("paragraph", "2", "Kommissionen bestred.") in seen
 
 
 def test_parse_judgment():

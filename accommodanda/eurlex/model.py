@@ -23,9 +23,14 @@ BASE = "https://lagen.nu/ext/celex/%s"
 
 
 def doctype(celex):
-    """The document family from the CELEX sector digit (+ the act descriptor)."""
+    """The document family from the CELEX sector digit (+ the act/case descriptor).
+    Sector 6 (case law) is split by its two-letter document code -- CJ/TJ/FJ are
+    judgments, CC an Advocate General's opinion (förslag till avgörande), CO/TO an
+    order -- so an opinion is not listed as a judgment (E4)."""
     if celex.startswith("6"):
-        return "judgment"
+        return {"CC": "opinion", "CV": "opinion", "CP": "opinion",
+                "CO": "order", "TO": "order", "FO": "order"}.get(
+                    celex[5:7], "judgment")
     if celex.startswith("1"):
         return "treaty"
     if celex.startswith("3") and len(celex) > 5:
