@@ -9,6 +9,7 @@ corpus-wide parse/relate/generate."""
 
 import base64
 import os
+import time
 from urllib.parse import urlsplit
 
 import requests
@@ -22,6 +23,11 @@ TEMPERATURE = config.LLM_TEMPERATURE   # `llm_temperature` / $LLM_TEMPERATURE
 TOP_P = config.LLM_TOP_P               # `llm_top_p` / $LLM_TOP_P; None => unset
 TIMEOUT = 600          # the inputs are large and the model reasons over the whole
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+# running token tally over every call this process makes, read by the ai-*
+# actions'/benchmarks' cost reporting; the endpoint's `usage` object is the
+# only place the true (tokenizer-accurate) counts exist
+USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
 
 def vision_content(text, images):
@@ -82,10 +88,22 @@ def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=N
         payload["top_p"] = TOP_P
     if max_tokens:
         payload["max_tokens"] = max_tokens
-    resp = requests.post(
-        API_URL, headers=auth_headers(API_URL), json=payload, timeout=timeout)
+    # a 5xx from a hosted endpoint is a known-transient condition (momentary
+    # overload), not program state -- retry a bounded few times with backoff
+    # before letting it propagate, so one hiccup doesn't kill a corpus run
+    for attempt in range(3):
+        resp = requests.post(
+            API_URL, headers=auth_headers(API_URL), json=payload, timeout=timeout)
+        if resp.status_code < 500 or attempt == 2:
+            break
+        time.sleep(10 * (attempt + 1))
     resp.raise_for_status()
-    choice = resp.json()["choices"][0]
+    data = resp.json()
+    usage = data.get("usage") or {}
+    USAGE["calls"] += 1
+    USAGE["prompt_tokens"] += usage.get("prompt_tokens") or 0
+    USAGE["completion_tokens"] += usage.get("completion_tokens") or 0
+    choice = data["choices"][0]
     # a `length` finish means the model ran out of budget mid-answer -- the reply
     # is truncated and unparseable. raise (not assert, which -O strips): this is
     # load-bearing, driving the `author` retry loop / surfacing a too-small budget

@@ -78,6 +78,8 @@ def test_author_forwards_max_tokens(monkeypatch):
 class FakeOK:
     """A well-formed chat-completions reply, capturing what was posted."""
 
+    status_code = 200
+
     def __init__(self, seen):
         self.seen = seen
 
@@ -183,6 +185,8 @@ def test_complete_thread_raises_on_length_truncation(monkeypatch, tmp_path):
     monkeypatch.setenv("BERGET_API_KEY", "x")
 
     class FakeResp:
+        status_code = 200
+
         def raise_for_status(self):
             pass
 
@@ -193,3 +197,35 @@ def test_complete_thread_raises_on_length_truncation(monkeypatch, tmp_path):
     monkeypatch.setattr(llm.requests, "post", lambda *a, **kw: FakeResp())
     with pytest.raises(ValueError, match="truncated at max_tokens"):
         llm.complete_thread([{"role": "user", "content": "hi"}])
+
+
+class Fake500:
+    status_code = 500
+
+    def raise_for_status(self):
+        raise llm.requests.exceptions.HTTPError("500 Server Error")
+
+
+def test_transient_5xx_is_retried_then_succeeds(monkeypatch):
+    # one momentary 500 from a hosted endpoint must not kill a corpus run
+    monkeypatch.setenv("BERGET_API_KEY", "x")
+    replies = [Fake500(), FakeOK({})]
+    calls = []
+    monkeypatch.setattr(llm.time, "sleep", calls.append)
+    monkeypatch.setattr(llm.requests, "post",
+                        lambda *a, **kw: replies.pop(0))
+    assert llm.complete_thread([{"role": "user", "content": "hi"}]) == "R"
+    assert calls == [10]                      # backed off once
+
+
+def test_persistent_5xx_raises_after_bounded_retries(monkeypatch):
+    # bounded: three attempts, then the error propagates -- never an
+    # unbounded hammer against a down endpoint
+    monkeypatch.setenv("BERGET_API_KEY", "x")
+    n = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    monkeypatch.setattr(llm.requests, "post",
+                        lambda *a, **kw: n.append(1) or Fake500())
+    with pytest.raises(llm.requests.exceptions.HTTPError):
+        llm.complete_thread([{"role": "user", "content": "hi"}])
+    assert len(n) == 3
