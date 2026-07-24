@@ -1,0 +1,56 @@
+Du kartlägger vilka artiklar i ett eller flera EU-direktiv som paragraferna i en
+svensk lag genomför, utifrån lagens författningskommentar.
+
+DIREKTIV (varje direktiv har en tagg — A, B, …; under den listas direktivets
+artiklar som "nummer = rubrik". Endast dessa taggar och artikelnummer är
+giltiga svar):
+[[DIRECTIVES]]
+
+Nedan följer författningskommentaren, en paragraf i taget. Varje paragraf inleds
+med en id-rad "[E<n>] <kap> kap. <nr> §" (eller "[E<n>] <nr> §" i en lag utan
+kapitel), där E<n> är paragrafens id. För VARJE paragraf som genomför en eller
+flera direktivartiklar, lämna en post med just det id:t.
+
+REGLER:
+- Ange ENDAST artiklar som kommentartexten uttryckligen kopplar till den
+  paragrafen. Typiska formuleringar: "Paragrafen genomför artikel 21.1–21.3",
+  "Bestämmelsen motsvarar artikel 23.4", "Genom paragrafen genomförs artikel 8",
+  "Paragrafen genomför delvis artikel 16", "Paragraferna genomför artikel 63",
+  "Paragrafen har utformats i enlighet med artikel 5", "Paragrafen genomför
+  sedan tidigare artikel 368". En artikel som bara nämns som bakgrund,
+  jämförelse eller sammanhang, eller i en allmän beskrivning av direktivet,
+  ska INTE tas med.
+- I "articles" får du ange artikeln antingen som bara numret ("21", "23") eller
+  med den exakta punkten som texten anger ("21.1–21.3", "2.2 f", "23.4 a") —
+  skriv den som den står i kommentaren. Artikeln måste dock höra till ett av
+  direktivets numrerade artiklar i listan ovan.
+- Läs noga VILKET direktiv eller VILKEN rättsakt varje mening namnger, och ange
+  rätt tagg (A/B/…) för det direktiv artikeln tillhör. Blanda aldrig ihop
+  direktiven. Om kommentaren kopplar paragrafen till en artikel i ett direktiv,
+  en förordning eller någon annan EU-rättsakt som INTE finns i listan ovan ska
+  den kopplingen INTE tas med — tvinga ALDRIG in den under ett direktiv i
+  listan bara för att artikelnumret råkar finnas där.
+- Det finns INGEN garanti för en 1:1-koppling. En paragraf kan genomföra noll,
+  en eller flera artiklar, ur ett eller flera direktiv. Många paragrafer är
+  rent nationella (administration, överklagande, bemyndiganden, ikraftträdande)
+  och genomför INGEN artikel — ta då INTE med paragrafen alls. Försök ALDRIG
+  "täcka" en artikel som inte hör hit.
+- Om texten bara säger att lagen SOM HELHET genomför ett direktiv, utan att
+  peka ut en specifik artikel för en paragraf, ta inte med den paragrafen.
+- Använd bara de id:n (E<n>) och taggar (A/B/…) som står ovan. Hitta ALDRIG på
+  ett id eller en tagg.
+- Om en paragraf genomför artiklar ur två direktiv, lämna en post per direktiv,
+  båda med samma id.
+- "partial" = true om paragrafen bara delvis genomför de angivna artiklarna
+  (kommentaren säger "delvis", eller artiklarna genomförs även på andra
+  ställen).
+- "quote" ska vara den mening ur DEN paragrafens kommentar som motiverar
+  kopplingen, ordagrant kopierad (exakt teckenföljd, så att den går att
+  återfinna i texten).
+
+Svara ENDAST med ett JSON-objekt, inget annat:
+{"mappings": [{"entry": "E<n>", "dir": "<tagg>", "articles": ["<art>", ...],
+  "partial": true/false, "quote": "<mening>"}, ...]}
+
+FÖRFATTNINGSKOMMENTAR:
+[[FK]]

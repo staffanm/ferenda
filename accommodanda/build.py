@@ -65,6 +65,7 @@ from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
+from .forarbete import aigenomforande as fa_aigenomforande
 from .forarbete import download as fa_download
 from .forarbete import fk as fa_fk
 from .forarbete import genomforande as fa_genomforande
@@ -94,6 +95,7 @@ from .lib import (
     dump,
     labels,
     layout,
+    llm,
     markdown,
     patch,
     render,
@@ -1627,6 +1629,63 @@ def fa_soukb_scans(args):
     print("forarbete soukb-scans: %d seen, %d fetched" % (seen, fetched))
 
 
+def fa_ai_genomforande(basefiles):
+    """`lagen forarbete ai-genomforande <prop-basefile> [<CELEX> ...]` -- LLM-author
+    the directive->paragraf transposition map for the EU directive(s) a proposition
+    transposes, out of its författningskommentar, and write it as a `.ann` layer in
+    the curated store (lib.annstore). A richer superset of the artifact's mechanical
+    `implements` that `genomforande.resolve` prefers at relate time. With no CELEX,
+    the directives are detected from the prop's own `implements` (every directive it
+    mechanically names). One-shot per prop, like eurlex ai-annotate; the LLM is never
+    called from parse/relate/generate, and a verified layer refuses regeneration
+    without --force."""
+    if not basefiles:
+        sys.exit("usage: lagen forarbete ai-genomforande <prop-basefile> "
+                 "[<CELEX> ...]  (e.g. prop/2025-26-28 32022L2555; the CELEX "
+                 "defaults to the directives the prop's implements names)")
+    prop, celexes = basefiles[0], basefiles[1:]
+    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
+    if not celexes:
+        celexes = fa_aigenomforande.detect_directives(prop_art)
+    # a directive whose eurlex artifact is absent cannot be validated against;
+    # drop it with a warning rather than fail the whole prop (a repealed directive
+    # not held in the corpus -- rule:errors-drive-retry-use-raise applies to bad
+    # program state, not to a legitimately-missing optional target)
+    present = [c for c in celexes if compress.exists(layout.artifact("eurlex", c))]
+    for c in celexes:
+        if c not in present:
+            print("forarbete ai-genomforande %s: skipping directive %s "
+                  "(no parsed eurlex artifact)" % (prop, c), file=sys.stderr)
+    if not present:
+        sys.exit("forarbete ai-genomforande %s: no directive to map "
+                 "(none named/detected, or none parsed in eurlex)" % prop)
+    out = annstore.path("forarbete", prop, ".ann")
+    if RUN.dry_run:
+        print("forarbete ai-genomforande: would map %s onto %s -> %s"
+              % (",".join(present), prop, out))
+        return
+    annstore.guard(out, RUN.force)     # a verified layer refuses, pre-LLM-spend
+
+    def progress(i, n, label):
+        # live view on stderr (rule:one-line-progress); stdout keeps only the
+        # one-shot summary below. Persistent lines, not util.status -- a batch
+        # is minutes on a local endpoint.
+        print("  [batch %d/%d] %s" % (i + 1, n, label), file=sys.stderr,
+              flush=True)
+
+    payload, stats = fa_aigenomforande.annotate(prop_art, present, progress)
+    annstore.write(out, payload,
+                   {**annstore.artifact_input("forarbete", prop),
+                    **{k: v for c in present
+                       for k, v in annstore.artifact_input("eurlex", c).items()}},
+                   RUN.force)
+    print("forarbete ai-genomforande %s <- %s: %d edges over %d paragrafer "
+          "(%d batch, %d+%d tokens), %d direktivartiklar täckta, wrote %s"
+          % (prop, ",".join(present), stats["edges"], stats["mapped_paragrafer"],
+             stats["batches"], llm.USAGE["prompt_tokens"],
+             llm.USAGE["completion_tokens"], stats["articles_covered"], out))
+
+
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
     "parse": Stage("parse", fa_parse_run, fa_artifact,
                    inputs=fa_parse_inputs, code=FA_CODE),
@@ -1634,8 +1693,13 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"propkb-scans": fa_propkb_scans,
             "soukb-scans": fa_soukb_scans,
-            "refetch-bodies": fa_refetch_bodies},
-   notes="download flag: --only BASEFILE (fetch one document; needs one "
+            "refetch-bodies": fa_refetch_bodies,
+            "ai-genomforande": fa_ai_genomforande},
+   notes="ai-genomforande <prop-basefile> [<CELEX> ...]: LLM-author the "
+         "directive->paragraf transposition map from the prop's "
+         "författningskommentar (a .ann layer relate prefers over the mechanical "
+         "implements); the CELEX(es) default to the directives the prop names\n"
+         "download flag: --only BASEFILE (fetch one document; needs one "
          "regeringen scope)\n"
          "download flag: --riksmote YYYY/YY (narrow the bet or rskr download "
          "to one riksmöte; needs that single scope, never advances the "
@@ -2755,14 +2819,16 @@ def cmd_relate(names):
     # each förarbete genomför-direktiv statement to the SFS paragraf it transposes,
     # load the SFS correspondence (.corr) layers, and mint a stub begrepp node for
     # every defined term / nyckelord the corpus references. Their inputs are the
-    # catalog (changed only if a source was re-related above) and the .corr files,
-    # so a no-op run skips them too -- gated on a .corr watermark.
-    corr_wm = file_watermark(sorted(annstore.tree("sfs").glob("*/*.corr")))
+    # catalog (changed only if a source was re-related above) and the authored
+    # layers (the SFS .corr and förarbete genomförande .ann files), so a no-op run
+    # skips them too -- gated on a watermark over all of them.
+    corr_wm = file_watermark(sorted(annstore.tree("sfs").glob("*/*.corr"))
+                             + sorted(annstore.tree("forarbete").rglob("*.ann")))
     if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
         con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
-        pinned = fa_genomforande.resolve(con)
+        pinned = fa_genomforande.resolve(con, fa_genomforande.genomforande_layers())
         fk_rows = fa_fk.resolve(con)
         corr = [row for p in annstore.tree("sfs").glob("*/*.corr")
                 for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]

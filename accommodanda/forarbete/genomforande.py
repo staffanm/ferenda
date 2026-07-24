@@ -20,7 +20,7 @@ catalog (never the SFS vertical -- the statute corpus is read through the catalo
 
 import json
 
-from ..lib import catalog, compress
+from ..lib import annstore, catalog, compress
 from . import kommentar
 
 
@@ -60,10 +60,56 @@ def resolve_law(law, prop_date, title_idx, path_idx):
     return None
 
 
-def resolve(con):
+def genomforande_layers():
+    """prop-uri -> the LLM-authored genomförande edges for it, read from every
+    `.ann` layer in the förarbete annstore subtree (the opt-in `ai-genomforande`
+    output). Globbed once in `relate` and passed to `resolve`, exactly as the
+    `.corr` layers are -- the join is the prop uri the layer records, never a
+    catalog path, so it is independent of where the catalog's data_root points
+    (a portable catalog on another host, a test's tmp dir). A `.ann` without a
+    `genomforande` payload (a future forarbete editorial layer) is skipped."""
+    out = {}
+    for p in annstore.tree("forarbete").rglob("*.ann"):
+        layer = json.loads(p.read_text()).get("genomforande")
+        if layer:
+            out.setdefault(layer["proposition"], []).extend(layer["edges"])
+    return out
+
+
+def directive_base(uri):
+    """The fragment-free form of a directive uri. The mechanical extractor's
+    alias resolution yields a fragment-bearing `directive` for a minority of
+    edges (a pinpointed citation resolved as-is; measured 51/372 on the
+    2025/26 props), while an authored layer always records the base uri --
+    so any directive-identity join must reduce both sides through this."""
+    return uri.split("#")[0] if uri else uri
+
+
+def prop_implements(art, layer_edges):
+    """The genomför-direktiv edges to resolve for one proposition: `layer_edges`
+    (its authored `.ann` genomförande edges, from `genomforande_layers`) when it
+    has any, superseding the mechanical `implements` for every directive the
+    layer covers (compared fragment-free, `directive_base`), plus the mechanical
+    edges for any *other* directive the layer did not map (a prop transposing
+    two directives, only one run through ai-genomforande). Without an authored
+    layer, the mechanical `implements` alone -- the pass is opt-in."""
+    mech = art.get("implements", [])
+    if not layer_edges:
+        return mech
+    authored = {directive_base(e["directive"]) for e in layer_edges}
+    return layer_edges + [r for r in mech
+                          if directive_base(r.get("directive")) not in authored]
+
+
+def resolve(con, layers=None):
     """Re-derive every genomför-direktiv -> SFS-paragraf relation in the catalog
-    from the förarbete artifacts' `implements` sections (only the props that
-    carry such edges are read). Returns the number of relations pinned."""
+    from the förarbete props' genomför-direktiv edges (only the props that carry
+    such edges are read -- the authored `.ann` layer from `layers` where present,
+    else the mechanical `implements`; `prop_implements`). `layers` is the
+    prop-uri -> authored-edges map `genomforande_layers` globs at relate time;
+    None (the default, and how the pin tests drive it) means mechanical only.
+    Returns the number of relations pinned."""
+    layers = layers or {}
     title_idx, path_idx = law_index(con)
     root = catalog.data_root(con)              # stored paths are data_root-relative
     props = con.execute(
@@ -75,7 +121,7 @@ def resolve(con):
     for prop_uri, prop_path in props:
         art = json.loads(compress.read_bytes(root / prop_path))
         prop_date, prop_label = art.get("date"), art.get("identifier")
-        for rec in art.get("implements", []):
+        for rec in prop_implements(art, layers.get(prop_uri)):
             sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
             anchor = kommentar.paragraf_fragment(rec.get("chapter"),
                                                  rec.get("paragraf"))

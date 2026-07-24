@@ -836,7 +836,8 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     empty = tmp_path / "empty"
     empty.mkdir()
     monkeypatch.setattr(annstore, "tree", lambda s: empty)
-    monkeypatch.setattr(build.fa_genomforande, "resolve", lambda con: 0)
+    monkeypatch.setattr(build.fa_genomforande, "resolve",
+                        lambda con, layers=None: 0)
     monkeypatch.setattr(build.fa_fk, "resolve", lambda con: 0)
     monkeypatch.setattr(build.catalog, "set_correspondence", lambda con, rows: None)
     monkeypatch.setattr(build, "kommentar_anchor_warnings", lambda con: [])
