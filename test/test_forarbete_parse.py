@@ -13,7 +13,7 @@ from accommodanda.forarbete.parse import (
     tag_frontmatter,
 )
 from accommodanda.forarbete.structure import ingress, nest, signers
-from accommodanda.lib import compress, layout
+from accommodanda.lib import compress, layout, pdftext
 from accommodanda.lib.pdftext import Line, Para, line_body_size, page_paragraphs
 
 
@@ -280,6 +280,35 @@ def test_harvested_body_ocr_sidecar_wins_and_carries_patch_key(tmp_path, monkeyp
     assert seen["patch_key"] == ("forarbete", "prop/1999-2000-1")
 
 
+def test_harvested_body_concatenates_multi_volume_pdfs(tmp_path, monkeypatch):
+    """A multi-volume prop (2015/16:195 "del 1 av 4" ...) publishes its body as
+    several PDFs; the body is their concatenation in `files` order, and only
+    the first volume takes the patch hook -- patches were authored against
+    that volume's XML, so applying them to later volumes would fail."""
+    calls = []
+
+    def fake_pdf(path, identifier, patch_key=None):
+        calls.append((Path(path).name, patch_key))
+        return [Block("stycke", "text from " + Path(path).name, 1)], False
+
+    monkeypatch.setattr(fa_parse, "_legacy_pdf_body", fake_pdf)
+    # the staged bytes are not real PDFs; the volume rule's probe would rightly
+    # raise on them (pdfinfo runs with check=True), and this test is about the
+    # concatenation and the patch hook, not about reading a PDF's metadata
+    monkeypatch.setattr(fa_parse, "_pdf_probe",
+                        lambda path: (100, "", "Regeringens proposition"))
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1.pdf", b"%PDF-1.4 v1")
+    _stage(tmp_path, "prop", "1999/2000:1", "1999-2000-1-1.pdf", b"%PDF-1.4 v2")
+    doc = fa_parse.parse_record(
+        _harvested_rec(files=["1999-2000-1.pdf", "1999-2000-1-1.pdf"]), tmp_path)
+    assert [c[0] for c in calls] == ["1999-2000-1.pdf", "1999-2000-1-1.pdf"]
+    assert calls[0][1] == ("forarbete", "prop/1999-2000-1")
+    assert calls[1][1] is None                       # patch hook: volume 1 only
+    body_texts = " ".join(b.text for b in doc.body)
+    assert "text from 1999-2000-1.pdf" in body_texts
+    assert "text from 1999-2000-1-1.pdf" in body_texts
+
+
 def test_classify_font_size_gates_footnotes_and_fake_headings():
     # prop 2013/14:116: the lagtext provenance footnotes ("1 Senaste lydelse
     # 2008:1266.") and body-sized table rows ("22 år 25 000 …") match the
@@ -427,11 +456,58 @@ def test_dangling_rubrik_splits_a_glued_continuation():
 
 # --- printed-page offsets (rewrite-parity finding 04) ------------------------
 
-def test_printed_pageno_reads_folio_and_strips_header():
-    lines = [Line("Prop. 2003/04:154 7", 40, False, False, False, 9, []),
-             Line("Body text here.", 100, False, False, False, 11, [])]
-    assert fa_parse.printed_pageno(lines, "Prop. 2003/04:154") == 7
-    assert fa_parse.printed_pageno(lines, None) is None       # no header known
+def _margin(text):
+    """A margin line, as page_number_candidates sees it."""
+    return Line(text, 40, False, False, False, 9, [])
+
+
+def _marks(strong, weak=()):
+    """A page's folio readings, as printed_pages consumes them."""
+    return pdftext.PageNumbers(strong, weak)
+
+
+def test_page_number_candidates_reads_folio_and_strips_header():
+    lines = [_margin("Prop. 2003/04:154 7"), _margin("Body text here.")]
+    assert fa_parse.page_number_candidates(lines, "Prop. 2003/04:154").strong == (7,)
+    # with no identifier the header line is prose, so its trailing number is
+    # only weak evidence -- it can never establish the numbering on its own
+    weakly = fa_parse.page_number_candidates(lines, None)
+    assert weakly.strong == () and weakly.weak == (7,)
+
+
+def test_page_number_candidates_finds_a_folio_glued_to_a_footnote():
+    # prop. 2003/04:67 pdf page 115: the only digits-only line is a footnote
+    # marker, and the real folio is stuck to the last footnote. Taking the
+    # first bare number read that page as page 2.
+    lines = [_margin("Förslag till lag om ändring i lagen (1976:661) om "
+                   "immunitet Prop. 2003/04:67"),
+             _margin("Bilaga 7"),
+             _margin("Lagen omtryckt 1994:717."),
+             _margin("2"),
+             _margin("Senaste lydelse 2002:621. 115")]
+    got = fa_parse.page_number_candidates(lines, "Prop. 2003/04:67")
+    assert got.strong == (2,)                # only the footnote marker is firm
+    assert 115 in got.weak                   # the folio is offered as weak
+    assert 621 not in got.weak and 717 not in got.weak   # SFS numbers are not
+
+
+def test_page_number_candidates_strips_a_letterspaced_or_recased_header():
+    # budget propositions letter-space the running header, and many documents
+    # upper-case it; neither was stripped before, so the folio never surfaced
+    assert 37 in fa_parse.page_number_candidates(
+        [_margin("PROP. 2017/ 18: 100 Bila ga 2 37")], "Prop. 2017/18:100").weak
+    assert 14 in fa_parse.page_number_candidates(
+        [_margin("PROP. 2007/08:100 BILAGA 1 14")], "Prop. 2007/08:100").weak
+
+
+def test_printed_pages_prefers_the_candidate_the_numbering_expects():
+    # the footnote-marker page in context: with the numbering running at
+    # offset 0, page 115 must resolve to 115, not to the footnote marker 2
+    candidates = {pdf: _marks((pdf,)) for pdf in range(1, 115)} \
+        | {115: _marks((2,), (7, 115))}
+    m = fa_parse.printed_pages(candidates, list(range(1, 120)))
+    assert m[115].printed == 115
+    assert m[119].printed == 119   # and the rest of the document survives
 
 
 def test_printed_pages_running_offset_and_retroactive_cover():
@@ -439,49 +515,124 @@ def test_printed_pages_running_offset_and_retroactive_cover():
     # retroactively: cover pages map below printed 1 -> no anchor (never a
     # duplicate of the real page 1). A stray bare number (a year in a margin)
     # is a lone outlier: ignored, its page keeps the running offset.
-    detections = {pdf: pdf - 3 for pdf in range(4, 90)} | {17: 1920}
+    detections = {pdf: _marks((pdf - 3,)) for pdf in range(4, 90)} \
+        | {17: _marks((1920,))}
     pages = list(range(1, 90))
     m = fa_parse.printed_pages(detections, pages)
-    assert m[1] is None and m[3] is None                 # unnumbered cover
-    assert m[4] == 1 and m[17] == 14 and m[89] == 86
+    assert m[1].printed is None and m[3].printed is None   # unnumbered cover
+    assert (m[4].printed, m[17].printed, m[89].printed) == (1, 14, 86)
 
 
 def test_printed_pages_no_evidence_assumes_pdf_equals_printed():
     m = fa_parse.printed_pages({}, [1, 2, 3])
-    assert m == {1: 1, 2: 2, 3: 3}
+    assert {k: v.printed for k, v in m.items()} == {1: 1, 2: 2, 3: 3}
 
 
 def test_printed_pages_piecewise_shift_for_omitted_blanks():
     # printed leaves omitted between chapters: the offset shifts mid-document
     # (the exact shape that made a single document-wide offset impossible)
-    detections = {pdf: pdf for pdf in range(1, 10)} \
-        | {pdf: pdf + 2 for pdf in range(12, 20)}
+    detections = {pdf: _marks((pdf,)) for pdf in range(1, 10)} \
+        | {pdf: _marks((pdf + 2,)) for pdf in range(12, 20)}
     m = fa_parse.printed_pages(detections, list(range(1, 20)))
-    assert m[9] == 9                     # before the shift
-    assert m[10] == 10 and m[11] == 11   # between detections: old offset holds
-    assert m[12] == 14 and m[19] == 21   # after: the new offset
+    assert m[9].printed == 9                    # before the shift
+    assert m[10].printed == 10 and m[11].printed == 11   # old offset holds
+    assert m[12].printed == 14 and m[19].printed == 21   # the new offset
 
 def test_printed_pages_large_forward_shift_needs_corroboration():
     # one misread folio (OCR reads "1835") must not drag the document; two
     # consecutive detections agreeing on the jump are believed (a volume
     # continuing far ahead)
-    base = {pdf: pdf for pdf in range(1, 10)}
-    m = fa_parse.printed_pages(base | {10: 1835}, list(range(1, 15)))
-    assert m[10] == 10 and m[14] == 14                   # outlier ignored
-    m = fa_parse.printed_pages(base | {10: 510, 11: 511}, list(range(1, 15)))
-    assert m[11] == 511 and m[14] == 514                 # corroborated jump
+    base = {pdf: _marks((pdf,)) for pdf in range(1, 10)}
+    m = fa_parse.printed_pages(base | {10: _marks((1835,))}, list(range(1, 15)))
+    assert m[10].printed == 10 and m[14].printed == 14   # outlier ignored
+    m = fa_parse.printed_pages(base | {10: _marks((510,)), 11: _marks((511,))},
+                               list(range(1, 15)))
+    assert m[11].printed == 511 and m[14].printed == 514  # corroborated jump
+
+
+def test_bilaga_labels_need_the_header_to_actually_run():
+    # a bilaga's own title line and a table-of-contents entry look exactly like
+    # a running header; only a label repeated on an adjoining page is one
+    pages = [(1, [_margin("Bilaga 3 – Definitioner av vissa tekniska spec.")]),
+             (2, [_margin("Prop. 2015/16:195"), _margin("Bilaga 23")]),
+             (3, [_margin("Prop. 2015/16:195"), _margin("Bilaga 23")])]
+    assert fa_parse.bilaga_labels(pages, "Prop. 2015/16:195") == {2: "23", 3: "23"}
+
+
+def test_bilaga_labels_tolerate_letterspacing_and_case():
+    pages = [(1, [_margin("PROP. 2017/ 18: 100 Bila ga 2")]),
+             (2, [_margin("PROP. 2017/18:100 BILAGA 2")])]
+    assert fa_parse.bilaga_labels(pages, "Prop. 2017/18:100") == {1: "2", 2: "2"}
+
+
+def test_printed_pages_numbers_each_bilaga_as_its_own_section():
+    # prop. 2021/22:100's shape: the body runs 1..99, then bilaga 1 restarts at
+    # 1 and bilaga 2 restarts at 1 again. Both must stay addressable, and
+    # neither may collide with the body's page 1.
+    candidates = {pdf: _marks((pdf,)) for pdf in range(1, 100)} \
+        | {pdf: _marks((pdf - 99,)) for pdf in range(100, 110)} \
+        | {pdf: _marks((pdf - 109,)) for pdf in range(110, 120)}
+    bilagor = {pdf: "1" for pdf in range(100, 110)} \
+        | {pdf: "2" for pdf in range(110, 120)}
+    m = fa_parse.printed_pages(candidates, list(range(1, 120)), bilagor)
+    assert m[99] == (99, None)              # body, unchanged
+    assert m[101] == (2, "1")               # bilaga 1 counts from its own 1
+    assert m[109] == (10, "1")
+    assert m[110] == (1, "2")               # bilaga 2 starts over
+    assert m[119] == (10, "2")
+
+
+def test_printed_pages_restart_with_no_bilaga_still_stops_anchoring():
+    # prop. 2008/09:1: separately paginated utgiftsområden, no bilaga anywhere.
+    # Nothing identifies the new numbering, so it stays unaddressable.
+    candidates = {pdf: _marks((pdf,)) for pdf in range(1, 100)} \
+        | {pdf: _marks((pdf - 99,)) for pdf in range(100, 110)}
+    m = fa_parse.printed_pages(candidates, list(range(1, 110)), {})
+    assert all(m[p] == (None, None) for p in range(101, 110))
 
 
 def test_printed_pages_confirmed_restart_stops_anchoring():
-    # an appendix restarting its own numbering: the restart is never adopted,
-    # and once consecutive detections confirm it the remaining pages carry no
-    # anchors -- either numbering would mint duplicate #sid targets
-    detections = {pdf: pdf for pdf in range(1, 100)} \
-        | {pdf: pdf - 99 for pdf in range(100, 110)}
+    # an appendix restarting its own numbering, with nothing naming it: the
+    # restart is never adopted and the rest carries no anchors, because either
+    # numbering would mint duplicate #sid targets
+    detections = {pdf: _marks((pdf,)) for pdf in range(1, 100)} \
+        | {pdf: _marks((pdf - 99,)) for pdf in range(100, 110)}
     m = fa_parse.printed_pages(detections, list(range(1, 110)))
-    assert m[99] == 99
-    assert m[100] == 100                 # lone restart page: running offset
-    assert all(m[p] is None for p in range(101, 110))
+    assert m[99].printed == 99
+    # page 100 is where the new numbering *starts*, so it goes with the restart
+    # -- not with the body. The restart is only confirmed on page 101, and an
+    # earlier version left 100 behind holding the running body offset: that both
+    # fabricated a body "s. 100" and hid the new section's own first page.
+    assert all(m[p].printed is None for p in range(100, 110))
+    assert all(m[p].bilaga is None for p in range(100, 110))
+
+
+def test_printed_pages_treats_a_short_backward_step_as_a_restart_too():
+    # an 8-page body then a 4-page bilaga starting over: the step back is only
+    # two pages, well inside PAGE_SHIFT_TOL, and adopting it as an ordinary
+    # shift re-minted the body's own #sid1..#sid4. Direction is the signal, not
+    # size -- a forward shift is an omitted leaf, a backward one is a restart.
+    detections = {pdf: _marks((pdf,)) for pdf in range(1, 9)} \
+        | {pdf: _marks((pdf - 8,)) for pdf in range(9, 13)}
+    m = fa_parse.printed_pages(detections, list(range(1, 13)),
+                               {pdf: "1" for pdf in range(9, 13)})
+    assert m[8] == (8, None)
+    assert [m[p] for p in range(9, 13)] == [(1, "1"), (2, "1"), (3, "1"),
+                                            (4, "1")]
+
+
+def test_printed_pages_covers_every_page_when_a_bilaga_restarts_again():
+    # a bilaga volume holding several bilagor restarts once per bilaga. The
+    # per-section pass used to number the run once and drop the signal, leaving
+    # every page after the inner restart absent from the map -- and parse_pdf
+    # subscripts it per page, so the whole document died on a KeyError.
+    detections = {pdf: _marks((pdf,)) for pdf in range(1, 51)} \
+        | {pdf: _marks((pdf - 50,)) for pdf in range(51, 66)} \
+        | {pdf: _marks((pdf - 65,)) for pdf in range(66, 81)}
+    pages = list(range(1, 81))
+    m = fa_parse.printed_pages(detections, pages, {p: "1" for p in range(51, 81)})
+    assert all(p in m for p in pages)
+    assert m[50] == (50, None) and m[51] == (1, "1") and m[66] == (1, "1")
 
 
 # --- generic tables (rewrite-parity finding 04) ------------------------------

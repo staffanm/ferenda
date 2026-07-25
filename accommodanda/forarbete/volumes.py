@@ -1,0 +1,201 @@
+"""Which of a förarbete record's PDFs are its body, and in what order.
+
+A record's `files` is not a curated volume list -- it is every `/contentassets/`
+PDF the regeringen.se landing page happened to link (`download.find_content_links`).
+485 records carry more than one, and for about half of them the extras are not
+the document: a one-page *Rättelseblad*, an English `Summary`, a *kortversion*,
+the reprinted EU directive an act transposes, a *remisslista*. Reading all of
+them as one body ingests every one of those as the proposition's own text;
+reading only the first gets `sou/2016:77` wrong the other way, because there
+`files[0]` is the rättelseblad and the 861-page betänkande is `files[1]`.
+
+The discriminating evidence is already on disk and was being thrown away: the
+landing page is stored beside the record, and each link's *text* says what it
+is ("Nytt regelverk om upphandling, **del 3 av 4, bilaga 1-19**"). Where the
+link count matches the file count the texts index-align with `files`, which
+holds for 296 of the 306 records harvested from regeringen.se.
+
+Provenance splits the 485 into four populations that need different handling,
+and the record itself says which -- so 179 of them are decided without opening
+a single PDF:
+
+* **KB scan sets** (128, `orig_url` on urn.kb.se) -- the extra files are
+  *sibling* volumes catalogued under the same SOU number, not later parts of
+  one text: sou/1996:158's 22 files are Bilaga 15, 21, 14, 16 … of the
+  EMU-utredningen, in no order. Only the first is the work.
+* **Budget propositions** (11) -- 30-odd separately paginated volumes of
+  tables; prop. 2016/17:1 is nine one-page fragments. Not a legal source, and
+  skipped outright.
+* **Legacy `_N` records** (40) -- genuine consecutive parts, but the file names
+  do not give their order (ds/2001:15 runs pages 1, 14, 66, 72, 79, 19, 27 …),
+  so they are ordered by the numbering the parser reads off the pages.
+* **Everything else** (306) -- the link texts do the work.
+"""
+
+import re
+from html import unescape
+
+from ..lib import compress
+from ..lib.util import basefile_slug
+
+# a proposition's or SOU's own volumes: "del 2 av 4", "Del A", "volym 3",
+# "band 2", "kapitel 6-12", "huvuddokument", "Bilagedel"
+RE_PART = re.compile(r"\b(del(?:en)?|volym|band|kapitel|huvuddokument|"
+                     r"bilagedel)\b", re.I)
+# the whole thing in one file, published beside its own parts
+RE_WHOLE = re.compile(r"\bhela dokumentet\b", re.I)
+# never body, in link text or PDF title
+RE_ERRATA = re.compile(r"(?<!under)\brättelse", re.I)
+# definite and plural suffixes included: the link texts say "Remisslistan" and
+# "Remissinstanserna" as often as the bare noun
+RE_REMISS = re.compile(r"\bremiss(?:lista\w*|instans\w*|var\w*)|"
+                       r"\bpressmeddelande\w*", re.I)
+RE_POPULAR = re.compile(r"\bkortversion\b|\blättläst\b|\bkort presentation\b", re.I)
+RE_ENGLISH = re.compile(r"\bsummary\b|\bengelsk|\(eng\)|\bin english\b", re.I)
+RE_SUMMARY = re.compile(r"\bsammanfattning\b", re.I)
+RE_ANNEX_DOC = re.compile(r"\bunderlagsrapport\b|\brapport \d|\bfaktablad\b|"
+                          r"\bkonsekvensutredning\b", re.I)
+# a reprinted EU act keeps its own Official Journal running header
+RE_OJ = re.compile(r"Europeiska unionens officiella tidning|"
+                   r"Official Journal of the European", re.I)
+
+RE_BUDGET = re.compile(r"\d{4}/\d{2}:(1|100)$")
+RE_CONTENT_LINK = re.compile(
+    r'<a\b[^>]+href="[^"]*(?:contentassets|globalassets)[^"]*"[^>]*>(.*?)</a>',
+    re.I | re.S)
+RE_TAG = re.compile(r"<[^>]+>")
+
+
+def population(record):
+    """Which of the four populations a record belongs to: "kb", "budget",
+    "legacy" or "live". Read off the record alone -- no PDF is opened."""
+    if "urn.kb.se" in (record.get("orig_url") or ""):
+        return "kb"
+    if record.get("type") == "prop" and RE_BUDGET.search(record.get("basefile", "")):
+        return "budget"
+    if record.get("source"):
+        return "legacy"
+    return "live"
+
+
+def link_texts(docdir, record):
+    """The landing page's link text for each of the record's files, or None
+    when they cannot be trusted to line up.
+
+    The alignment is positional -- `download_document` names files in link
+    order -- so it only holds when the page offers exactly as many content
+    links as the record kept files. Ten live records link more than they kept
+    (prop. 2024/25:1's two trailing `.xlsx`), and a handful have gaps in
+    `files` that `download_document` cannot produce; both make the mapping
+    guesswork, so it is refused rather than guessed."""
+    page = docdir / (basefile_slug(record["basefile"]) + ".html")
+    if not compress.exists(page):
+        return None
+    # entity-decoded: the stored pages write å/ä/ö as numeric entities
+    # ("R&#xE4;ttelseblad"), and every pattern below that carries a diacritic
+    # would silently never match
+    texts = [re.sub(r"\s+", " ",
+                    unescape(RE_TAG.sub(" ", m.group(1)))).strip()
+             for m in RE_CONTENT_LINK.finditer(compress.read_text(page))]
+    return texts if len(texts) == len(record["files"]) else None
+
+
+def _role(label, title, first_page):
+    """What one file is, from its link text, its PDF title and its first page.
+    None means "could be body"."""
+    tag = "%s || %s" % (label or "", title or "")
+    if RE_ERRATA.search(tag) or RE_ERRATA.search(first_page[:400]):
+        return "rättelse"
+    for rx, role in ((RE_REMISS, "remisslista"), (RE_POPULAR, "kortversion"),
+                     (RE_ENGLISH, "engelsk"), (RE_SUMMARY, "sammanfattning"),
+                     (RE_ANNEX_DOC, "underlagsrapport")):
+        if rx.search(tag):
+            return role
+    if first_page.startswith(("Summary", "Government Communication")):
+        return "engelsk"
+    if RE_OJ.search(first_page[:200]):
+        return "eu-rättsakt"
+    return None
+
+
+def body_pdfs(record, probe):
+    """The record's body PDFs, in reading order, and why each other file was
+    dropped: `(names, {name: reason})`.
+
+    `probe(name) -> (pages, title, first_page_text)` is injected so the rule is
+    testable without poppler and so the caller controls how PDFs are opened.
+    It is called only for the populations that need it.
+    """
+    pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
+    if len(pdfs) < 2:
+        return pdfs, {}
+    kind = population(record)
+    if kind == "budget":
+        return [], {f: "budgetproposition" for f in pdfs}
+    if kind == "kb":
+        return pdfs[:1], {f: "syskonvolym i KB-skanningen" for f in pdfs[1:]}
+
+    # the link texts align with `files`, which may hold .doc/.docx/.rtf beside
+    # the PDFs, so a label is looked up by the file's position *there* -- not by
+    # its index among the PDFs, which would shift every label after a non-PDF
+    labels = record.get("_labels")     # link_texts(), threaded in by the caller
+    label_of = ({f: labels[i] for i, f in enumerate(record["files"])}
+                if labels else {})
+    probed = {f: probe(f) for f in pdfs}
+    dropped, keep = {}, []
+    for f in pdfs:
+        pages, title, first = probed[f]
+        role = _role(label_of.get(f), title, first)
+        if role:
+            dropped[f] = role
+        else:
+            keep.append(f)
+    if not keep:
+        # every file read as an extra. Returning pdfs[0] would hand back exactly
+        # the file this module exists to distrust -- sou/2016:77's files[0] is
+        # the rättelseblad -- and returning it with nothing in `dropped` would
+        # look like a clean single-volume decision. Say so instead.
+        return [], {f: "inget spår identifierades som brödtext" for f in pdfs}
+
+    # a "hela dokumentet" volume published beside its own parts: its page count
+    # is the sum of theirs (lr/2007 ny lag om värdepappersmarknaden: 1009 =
+    # 664 + 345), and keeping both would read the whole text twice
+    for f in keep:
+        rest = sum(probed[o][0] for o in keep if o != f)
+        if len(keep) >= 3 and rest and abs(probed[f][0] - rest) <= max(3, rest // 100):
+            for o in keep:
+                if o != f:
+                    dropped[o] = "ingår i hela dokumentet"
+            return [f], dropped
+    if labels:
+        whole = [f for f in keep if RE_WHOLE.search(label_of.get(f, ""))]
+        if len(whole) == 1:
+            for o in keep:
+                if o != whole[0]:
+                    dropped[o] = "ingår i hela dokumentet"
+            return whole, dropped
+
+    if labels is None:
+        # no landing page, so no link text: that is missing *evidence*, not
+        # evidence the extras are not body. The legacy `_N` records are in
+        # exactly this position and their files really are consecutive parts,
+        # so everything not positively ruled out above is kept. (Their file
+        # order is not always page order -- ds/2001:15 runs 1, 14, 66, 72, 79,
+        # 19 -- which misorders the prose; each volume's page numbers are still
+        # read from its own margins, so the page anchors stay right.)
+        return keep, dropped
+
+    # the primary is the volume that opens like the document type, not
+    # necessarily files[0]; the rest join it only on positive evidence that
+    # they are further parts of the same text
+    primary = keep[0]
+    body = [primary]
+    for f in keep:
+        if f == primary:
+            continue
+        same_title = probed[f][1] and probed[f][1] == probed[primary][1]
+        if RE_PART.search(label_of.get(f, "")) or same_title:
+            body.append(f)
+        else:
+            dropped[f] = "separat dokument"
+    return body, dropped

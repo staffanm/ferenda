@@ -30,6 +30,10 @@ class Block:
                                                # pair, or a generic table's
                                                # N-column tuples
     th: bool = False           # tabell: row 0 is the column header pair
+    bilaga: str | None = None  # the bilaga whose own numbering this page belongs
+                               # to, where it restarted its count ("23" -> the
+                               # #bilaga23-sid{N} anchor). Last, because callers
+                               # pass `level` positionally after `page`.
 
 
 @dataclass

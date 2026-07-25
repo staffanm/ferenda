@@ -23,6 +23,10 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, layout
 from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
+
+# font-aware extraction + paragraph reflow are shared across the PDF verticals
+# (re-exported here so this module's existing import sites keep working)
+from ..lib.errors import SkipDocument
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
     LagrumParser,
@@ -30,21 +34,21 @@ from ..lib.lagrum import (
     load_abbreviations,
     load_namedlaws,
 )
-
-# font-aware extraction + paragraph reflow are shared across the PDF verticals
-# (re-exported here so this module's existing import sites keep working)
 from ..lib.pdftext import (
     FOOTNOTE_DROP,
     RE_KAP_MARK,
     RE_PARA_MARK,
+    bilaga_labels,
     line_body_size,
+    page_number_candidates,
     page_paragraphs,
+    pdf_first_page_text,
+    pdf_info,
     pdf_pages,
-    printed_pageno,
     printed_pages,
 )
 from ..lib.util import basefile_slug
-from . import legacy_formats, lydelse, tabell
+from . import legacy_formats, lydelse, tabell, volumes
 from .model import Block, Forarbete
 from .structure import RE_TRAILING_PAREN, nest
 
@@ -117,10 +121,21 @@ def classify(paras, page, body=0):
     return blocks
 
 
+def _pdf_probe(pdf_path):
+    """`(pages, title, first page text)` for the volume rule -- the cheapest
+    read that tells a rättelseblad from a betänkande. `pdfinfo` plus one page of
+    `pdftotext` cost milliseconds; converting a 3000-page budget volume in full
+    would not, and this runs for every file of every multi-PDF record."""
+    info = pdf_info(pdf_path)
+    return (int(info.get("Pages", 0)), info.get("Title", ""),
+            pdf_first_page_text(pdf_path))
+
+
 def parse_pdf(pdf_path, identifier, patch_key=None):
     """All body blocks of a förarbete PDF, page by page. The page a block
     carries is the *printed* page (the `#sid{N}` anchor citations resolve to):
-    the marginal folio numbers are read off every page (`printed_pageno`) and
+    the marginal folio numbers are read off every page
+    (`page_number_candidates`, resolved against the running numbering) and
     a *running* PDF-index ↔ printed-page offset is carried between detections
     (`printed_pages`) -- zero for modern regeringen.se PDFs numbered from the
     title page, negative where unnumbered cover matter precedes page 1
@@ -133,16 +148,17 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     cell paragraphs (row 0 the column header pair)."""
     raw = list(pdf_pages(pdf_path, patch_key))
     printed_map = printed_pages(
-        {pageno: n for pageno, lines in raw
-         if (n := printed_pageno(lines, identifier)) is not None},
-        [pageno for pageno, _lines in raw])
+        {pageno: page_number_candidates(lines[:3] + lines[-3:], identifier)
+         for pageno, lines in raw},
+        [pageno for pageno, _lines in raw],
+        bilaga_labels(raw, identifier))
     # (printed pageno, [("paras", [Para], None)
     #                   | ("tabell", header, rows)         (a lydelse table)
     #                   | ("gtabell", th, rows)])          (a generic table)
     pages = []
     for pageno, lines in raw:
         # unnumbered cover matter ahead of printed page 1 carries no anchor
-        printed = printed_map[pageno]
+        printed, bilaga = printed_map[pageno]
         lydelse_segs = lydelse.split_page(lines)
         # a page holding a lydelse table is a two-column statute page: its
         # leftover lines are statute text in columns, never a generic data
@@ -167,24 +183,28 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
                                  None))
                 else:
                     segs.append(("gtabell", gdata, grows))
-        pages.append((printed, segs))
+        pages.append(((printed, bilaga), segs))
     body = line_body_size([p for _pg, segs in pages
                            for kind, data, _x in segs if kind == "paras"
                            for p in data])
     blocks = []
-    for pageno, segs in pages:
+    for (printed, bilaga), segs in pages:
+        on_page = []
         for kind, data, rows in segs:
             if kind == "paras":
-                blocks += classify(data, pageno, body)
+                on_page += classify(data, printed, body)
             elif kind == "gtabell":
-                blocks.append(Block("tabell", "", pageno, rows=list(rows or []),
-                                    th=bool(data)))
+                on_page.append(Block("tabell", "", printed, rows=list(rows or []),
+                                     th=bool(data)))
             else:
                 header, cells = data, list(rows or [])
                 if header is not None:      # the region's first chunk only
                     cells.insert(0, (header.runs[0].text, header.runs[1].text))
-                blocks.append(Block("tabell", "", pageno, rows=cells,
-                                    th=header is not None))
+                on_page.append(Block("tabell", "", printed, rows=cells,
+                                     th=header is not None))
+        for block in on_page:               # a bilaga numbering its own pages
+            block.bilaga = bilaga
+        blocks += on_page
     return tabell.merge_continued(blocks)
 
 
@@ -294,8 +314,33 @@ def _harvested_body(record, root):
     files = record.get("files", [])
     pdfs = [f for f in files if f.lower().endswith(".pdf")]
     if pdfs:
-        return _legacy_pdf_body(layout.fa_dir(root, typ, basefile) / pdfs[0],
-                                record["identifier"], patch_key)
+        # a multi-volume document (prop 2015/16:195 "del 1 av 4" ...) publishes
+        # its body as several PDFs -- but `files` is every PDF the landing page
+        # linked, errata and English summaries included, so `volumes.body_pdfs`
+        # decides which are body and in what order. Patches are authored
+        # against the first volume's XML (the only volume parsed before
+        # multi-volume support), so only that volume takes the patch hook.
+        docdir = layout.fa_dir(root, typ, basefile)
+        # the landing page is only consulted for a record that actually has
+        # several PDFs to choose between -- 485 of 97k, so reading and
+        # decompressing it for every document would be pure waste
+        labels = volumes.link_texts(docdir, record) if len(pdfs) > 1 else None
+        body, _dropped = volumes.body_pdfs(record | {"_labels": labels},
+                                           lambda name: _pdf_probe(docdir / name))
+        if not body:
+            # nothing in `files` is this document's text (a budget proposition,
+            # or a record holding only errata and translations) -- an empty
+            # artifact would look like a parsed document with no body
+            raise SkipDocument("%s/%s: no body PDF among %d file(s)"
+                               % (typ, basefile, len(pdfs)))
+        blocks, ocr = _legacy_pdf_body(docdir / body[0], record["identifier"],
+                                       patch_key)
+        for extra in body[1:]:
+            more, more_ocr = _legacy_pdf_body(docdir / extra,
+                                              record["identifier"])
+            blocks += more
+            ocr = ocr or more_ocr
+        return blocks, ocr
     xmls = [f for f in files if f.lower().endswith(".xml")]
     if xmls:
         return _paged_body(legacy_formats.abbyy_pages(
@@ -478,6 +523,7 @@ def to_artifact(fa):
     for b in fa.body:
         block = ({"type": b.kind, "text": _scan(b.text, parser)}
                  | ({"page": b.page} if b.page is not None else {})
+                 | ({"bilaga": b.bilaga} if b.bilaga else {})
                  | ({"level": b.level} if b.level else {})
                  | ({"num": b.num} if b.num else {}))
         if b.rows is not None:

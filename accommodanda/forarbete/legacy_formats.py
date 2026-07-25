@@ -49,7 +49,7 @@ from lxml import html as lxml_html
 
 # de-hyphenation is the same soft-hyphen rule the PDF verticals already use; the
 # ABBYY loader reuses it rather than replicating it (rule:second-use-goes-to-lib)
-from ..lib.pdftext import Para, dehyphenate
+from ..lib.pdftext import Para, dehyphenate, pdftotext_text
 from ..lib.util import normalize_space
 
 # the ABBYY export namespaces every element; Clark-notation prefix for lookups
@@ -259,8 +259,7 @@ def scanned_pdf_pages(pdf_path):
     recovers headings from numbering, as for a text-inferred body. OCR noise (the
     KB digitization banner, stray glyphs) rides along -- accepted against the
     alternative of an empty body for the whole 5,807-doc scanned corpus."""
-    text = subprocess.run(["pdftotext", str(pdf_path), "-"], capture_output=True,
-                          check=True).stdout.decode("utf-8", "replace")
+    text = pdftotext_text(pdf_path)
     return [(pageno, _reflow_plaintext(page))
             for pageno, page in enumerate(text.split("\f"), 1)]
 

@@ -11,9 +11,12 @@ eurlex/parse_pdf was folded into this module (it had forked the extractor,
 including the top-only span-grouping bug `_lines` documents as fixed), and the
 baseline span-grouping itself."""
 
+import os
 from types import SimpleNamespace
 
-from accommodanda.lib import pdftext
+import brotli
+
+from accommodanda.lib import layout, pdftext
 from accommodanda.lib.pdftext import (
     PAGE_STRIDE,
     Line,
@@ -146,3 +149,106 @@ def test_numbered_continuation_does_not_fold_into_previous_heading():
     out = page_paragraphs(lines, None, 30)
     assert [p.text for p in out][1:3] == [
         "6 Ikraftträdande- och övergångsbestämmelser", "7 Konsekvensanalys"]
+
+
+# --- the pdftohtml output cache ---------------------------------------------
+#
+# `pdftohtml` is the dominant cost of parsing a PDF-bodied document, and a
+# downloaded PDF never changes, so its output is cached brotli-compressed and
+# the converter is not run again.
+
+def _fake_pdftohtml(monkeypatch, xml=b"<pdf2xml><page number=\"1\"/></pdf2xml>"):
+    """Stand in for the converter, counting how often it actually runs."""
+    calls = []
+
+    class Done:
+        stdout = xml
+
+    def run(args, **kw):
+        calls.append(args)
+        return Done()
+
+    monkeypatch.setattr(pdftext.subprocess, "run", run)
+    return calls
+
+
+def test_pdftohtml_xml_converts_once_then_serves_the_cache(monkeypatch, tmp_path):
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    monkeypatch.setattr(layout, "PDFCONV", tmp_path / "cache" / "pdfconv")
+    pdf = tmp_path / "downloaded" / "x" / "a.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    calls = _fake_pdftohtml(monkeypatch)
+
+    first = pdftext.pdftohtml_xml(pdf)
+    second = pdftext.pdftohtml_xml(pdf)
+    assert first == second                      # byte-identical either way
+    assert len(calls) == 1                      # converted once only
+    cached = layout.pdf_conversion(pdf, "xml")
+    assert brotli.decompress(cached.read_bytes()) == first
+
+
+def test_pdftohtml_xml_reconverts_when_the_pdf_is_newer(monkeypatch, tmp_path):
+    # a re-downloaded PDF moves its mtime past the cache entry's, which is what
+    # makes the entry stale -- otherwise a refetched document would keep serving
+    # the old conversion forever
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    monkeypatch.setattr(layout, "PDFCONV", tmp_path / "cache" / "pdfconv")
+    pdf = tmp_path / "downloaded" / "x" / "a.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    calls = _fake_pdftohtml(monkeypatch)
+    pdftext.pdftohtml_xml(pdf)
+    cache_mtime = layout.pdf_conversion(pdf, "xml").stat().st_mtime_ns
+    os.utime(pdf, ns=(cache_mtime + 10**9, cache_mtime + 10**9))
+    pdftext.pdftohtml_xml(pdf)
+    assert len(calls) == 2
+
+
+def test_pdftohtml_xml_keys_the_hidden_variant_separately(monkeypatch, tmp_path):
+    # -hidden is a different conversion (it pulls in the invisible OCR layer),
+    # so it must not be served from the plain entry
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    monkeypatch.setattr(layout, "PDFCONV", tmp_path / "cache" / "pdfconv")
+    pdf = tmp_path / "downloaded" / "x" / "a.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    calls = _fake_pdftohtml(monkeypatch)
+    pdftext.pdftohtml_xml(pdf)
+    pdftext.pdftohtml_xml(pdf, hidden=True)
+    assert len(calls) == 2
+    assert "-hidden" in calls[1] and "-hidden" not in calls[0]
+    assert (layout.pdf_conversion(pdf, "xml")
+            != layout.pdf_conversion(pdf, "hidden.xml"))
+
+
+def test_a_pdf_outside_the_data_root_is_simply_not_cached(monkeypatch, tmp_path):
+    # an ad-hoc path has no stable place in the cache tree; it converts directly
+    monkeypatch.setattr(layout, "DATA", tmp_path / "data")
+    (tmp_path / "data").mkdir()
+    pdf = tmp_path / "loose.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    assert layout.pdf_conversion(pdf, "xml") is None
+    calls = _fake_pdftohtml(monkeypatch)
+    pdftext.pdftohtml_xml(pdf)
+    pdftext.pdftohtml_xml(pdf)
+    assert len(calls) == 2
+
+
+def test_pdftotext_text_is_cached_too(monkeypatch, tmp_path):
+    # a scanned document pays for BOTH converters -- the font path runs first and
+    # finds nothing -- and there are 5 807 of them, so the text route is cached
+    # on the same terms
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    monkeypatch.setattr(layout, "PDFCONV", tmp_path / "cache" / "pdfconv")
+    pdf = tmp_path / "downloaded" / "x" / "scan.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    calls = _fake_pdftohtml(monkeypatch, xml="sidan ett\x0csidan två".encode())
+
+    assert pdftext.pdftotext_text(pdf) == "sidan ett\x0csidan två"
+    assert pdftext.pdftotext_text(pdf) == "sidan ett\x0csidan två"
+    assert len(calls) == 1 and calls[0][0] == "pdftotext"
+    # and it does not collide with the xml entry for the same PDF
+    assert (layout.pdf_conversion(pdf, "txt")
+            != layout.pdf_conversion(pdf, "xml"))

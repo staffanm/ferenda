@@ -421,6 +421,31 @@ def fa_record(basefile):
 # by an external process (never by this codebase).
 FACSIMILE = DATA / "cache" / "facsimile"
 
+# poppler conversions of source PDFs (`pdftohtml -xml`, `pdftotext`), brotli-
+# compressed. Same contract as FACSIMILE -- a pure cache, rebuildable from the
+# PDF, safe to delete. It exists because those subprocesses are the dominant
+# cost of parsing a PDF-bodied document and their input never changes: a
+# downloaded PDF is immutable, so re-running the converters on every re-parse is
+# pure waste. The output is far *smaller* than the PDF (a 120 MB scan yields
+# 40 kB of XML, since a scan carries almost no text), so the whole cache costs
+# about 1% of the downloaded bytes.
+PDFCONV = DATA / "cache" / "pdfconv"
+
+
+def pdf_conversion(pdf_path, kind):
+    """The cache path for one conversion of one PDF, mirroring the file's own
+    location under `DATA` so it is obvious which PDF an entry belongs to.
+    `kind` names the conversion -- "xml" (`pdftohtml -xml`), "hidden.xml" (the
+    same with the invisible OCR layer) or "txt" (`pdftotext`) -- so the
+    conversions never share an entry."""
+    path = Path(pdf_path).resolve()
+    if not path.is_relative_to(DATA.resolve()):
+        # a PDF outside the data root (a test fixture, an ad-hoc path) has no
+        # stable place in the cache tree, so it is simply not cached
+        return None
+    rel = path.relative_to(DATA.resolve())
+    return PDFCONV / rel.with_suffix(".%s.br" % kind)
+
 
 def facsimile(source, basefile, page):
     """The cached facsimile PNG of one source-PDF page:
