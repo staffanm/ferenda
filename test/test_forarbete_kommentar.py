@@ -66,6 +66,38 @@ def test_directive_alias_binds_to_subject_not_repealed():
     assert aliases["default"] == CELEX + "32022L2555"
 
 
+def test_alias_listing_sentence_binds_each_alias_to_its_own_directive():
+    # prop 2015/16:195 defines all three procurement aliases in one listing
+    # sentence; each alias must bind to the directive of ITS list item, not
+    # the sentence's first directive (which mislabeled LUF and LUK as 2014/24
+    # and misattributed 163 genomför-references in the generated layer)
+    blocks = [{"text": [
+        "I februari 2014 antog Europaparlamentet och rådet tre direktiv: "
+        "direktiv 2014/24/EU av den 26 februari 2014 om offentlig upphandling "
+        "och om upphävande av direktiv 2004/18/EG (LOU-direktivet), direktiv "
+        "2014/25/EU av den 26 februari 2014 om upphandling av enheter och om "
+        "upphävande av direktiv 2004/17/EG (LUF-direktivet) samt direktiv "
+        "2014/23/EU av den 26 februari 2014 om tilldelning av koncessioner "
+        "(LUK-direktivet)."]}]
+    aliases = resolve_directives(blocks, _refparser(), "prop")
+    assert aliases["lou-direktivet"] == CELEX + "32014L0024"
+    assert aliases["luf-direktivet"] == CELEX + "32014L0025"
+    assert aliases["luk-direktivet"] == CELEX + "32014L0023"
+
+
+def test_alias_first_definition_wins_over_later_incidental_parenthesis():
+    # the definition comes early and once; a later "(LUF-direktivet)"
+    # parenthesis in running prose must not rebind the alias
+    blocks = [
+        {"text": ["Europaparlamentets och rådets direktiv 2014/25/EU av den "
+                  "26 februari 2014 om upphandling av enheter (LUF-direktivet)."]},
+        {"text": ["Beslutet får inte fattas för att förhindra att kontraktet "
+                  "omfattas av direktiv 2014/24/EU (LUF-direktivet)."]},
+    ]
+    aliases = resolve_directives(blocks, _refparser(), "prop")
+    assert aliases["luf-direktivet"] == CELEX + "32014L0025"
+
+
 def test_default_directive_from_law_level_subject_statement():
     # no parenthetical alias defines the directive; a repealed predecessor is
     # cited more often, but the law-level "lagen genomförs … direktiv X" names the
@@ -369,9 +401,10 @@ def test_extract_survives_in_fk_chapter_pseudo_rubrik():
         {"type": "paragraf", "num": "32", "text": ["8 kap. 32 §"]},
         {"type": "stycke", "page": 135, "text": [
             "Paragrafen genomför artikel 37.13 i AIFM-direktivet."]},
+        # the column merge stamps "Bilaga N" into every appendix block
         {"type": "stycke", "text": ["Sammanfattning av promemorian Bilaga 1"]},
         {"type": "stycke", "text": [
-            "Paragrafen genomför artikel 45 i AIFM-direktivet."]},  # in a bilaga
+            "Paragrafen genomför artikel 45 i AIFM-direktivet. Bilaga 1"]},  # in a bilaga
     ])}
     [rec] = extract(art)
     assert rec["pinpoints"] == ["37.13"]

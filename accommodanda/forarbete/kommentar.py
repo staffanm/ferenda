@@ -83,6 +83,10 @@ ARTICLE_RE = re.compile(r"(\d+(?:\.\d+)*)\s*([a-z])?", re.IGNORECASE)
 # a directive defined with an alias: "... direktiv (EU) 2022/2555 ... (NIS 2-
 # direktivet)". The alias binds to the subject (first) directive of the sentence.
 ALIAS_RE = re.compile(r"\(([^()]*?direktivet)\)")
+# the formal-citation opener an alias definition hangs off ("Europaparlamentets
+# och rådets direktiv (EU) 2019/944 av den …" / "rådets direktiv 92/43/EEG …")
+FORMULA_RE = re.compile(r"(?:europaparlamentets och )?rådets direktiv",
+                        re.IGNORECASE)
 
 # a document-level statement of what the enactment transposes: "(Genom) lag(en)/
 # lagförslaget genomför(s) [delvis] … direktiv (EU) 2015/2302 …" in a prop,
@@ -173,11 +177,32 @@ def resolve_directives(blocks, parser, typ):
     subjects = []
     for b in blocks:
         text = plain(b["text"])
+        prev_end = 0
         for m in ALIAS_RE.finditer(text):
-            uri = _first_directive(parser,
-                                   text[_sentence_start(text, m.start()):m.end()])
+            # the alias's span opens at the sentence start OR just after the
+            # previous alias definition, whichever is later: a listing sentence
+            # defining several directives in sequence ("… direktiv 2014/24/EU …
+            # (LOU-direktivet), direktiv 2014/25/EU … (LUF-direktivet) …",
+            # prop 2015/16:195) would otherwise bind every alias to the
+            # sentence's first directive.
+            start = max(_sentence_start(text, m.start()), prev_end)
+            span = text[start:m.end()]
+            # within the span, bind from the FIRST formal-citation formula when
+            # one is present: "Direktiv 2009/72/EG har ersatts av Europa-
+            # parlamentets och rådets direktiv (EU) 2019/944 … (elmarknads-
+            # direktivet)" (prop 2025/26:26) cites the *replaced* act first,
+            # but bare ("Direktiv 2009/72/EG"), so the first formula is the
+            # real subject. From that marker the first directive wins -- the
+            # acts a title amends/repeals and a trailing "senast ändrat genom
+            # …" list (Fm 2022:5) are all cited after the subject.
+            first = FORMULA_RE.search(span)
+            uri = _first_directive(parser, span[first.start():] if first else span)
+            prev_end = m.end()
             if uri:
-                aliases[m.group(1).lower()] = uri           # subject directive
+                # the first definition wins: aliases are defined once, up
+                # front; a later incidental "(<alias>direktivet)" parenthesis
+                # in running text must not overwrite the real definition
+                aliases.setdefault(m.group(1).lower(), uri)
         for m in subject_re.finditer(text):
             uri = _first_directive(parser, text[m.start():m.end() + 200])
             if uri:
@@ -249,13 +274,16 @@ RE_FK_STYCKE = re.compile(r"^författningskommentar(?:er)?(?: \d+)?$")
 # trailing matter that ends the FK chapter. The reliable signal is the bilaga
 # marginalia: the column merge stamps "Bilaga N" into the text of every
 # appendix block ("Sammanfattning av betänkandet En ny Bilaga 1
-# säkerhetsskyddslag …"), and FK prose never carries that capitalised token --
-# verified across the whole curated corpus. The protocol extract and a
-# rubrik-shaped bilaga heading ("1 Förslag till säkerhetsskyddslag", undotted
-# number unlike the FK's own "16.1 Förslaget till …") are backstops.
-RE_FK_END_ANY = re.compile(
-    r"\bBilaga \d+\b|^Utdrag ur protokoll\b"
-    r"|\bUtdrag ur protokoll vid regeringssammanträde\b")
+# säkerhetsskyddslag …"). FK prose *can* carry a one-off "Bilaga N" -- prop
+# 2015/16:195: LOU 1 kap. 1 §'s quoted lagtext lists the law's own bilagor --
+# so the marginalia only ends the chapter when it repeats on the next block
+# too (every appendix block is stamped; a quote never is twice in a row).
+# The protocol extract and a rubrik-shaped bilaga heading ("1 Förslag till
+# säkerhetsskyddslag", undotted number unlike the FK's own "16.1 Förslaget
+# till …") are single-block backstops.
+RE_FK_END_BILAGA = re.compile(r"\bBilaga \d+\b")
+RE_FK_END_PROTOKOLL = re.compile(
+    r"^Utdrag ur protokoll\b|\bUtdrag ur protokoll vid regeringssammanträde\b")
 RE_FK_END_RUBRIK = re.compile(
     r"^bilaga\b|^rättsdatablad\b|^\d+ förslag(?:et|en)? till ")
 
@@ -277,11 +305,17 @@ def fk_span(blocks):
         None)
     if start is None:
         return None
-    end = next((i for i in range(start + 1, len(blocks))
-                if RE_FK_END_ANY.search(plain(blocks[i]["text"]))
+    def ends(i):
+        text = plain(blocks[i]["text"])
+        if (RE_FK_END_PROTOKOLL.search(text)
                 or (blocks[i]["type"] == "rubrik"
-                    and RE_FK_END_RUBRIK.match(
-                        normalize_fold(plain(blocks[i]["text"]))))),
+                    and RE_FK_END_RUBRIK.match(normalize_fold(text)))):
+            return True
+        # the bilaga marginalia must repeat on the next block (see above)
+        return bool(RE_FK_END_BILAGA.search(text)
+                    and (i + 1 == len(blocks)
+                         or RE_FK_END_BILAGA.search(plain(blocks[i + 1]["text"]))))
+    end = next((i for i in range(start + 1, len(blocks)) if ends(i)),
                len(blocks))
     return start, end
 

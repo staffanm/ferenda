@@ -33,12 +33,37 @@ def test_span_survives_in_fk_chapter_headings_and_stops_at_bilaga():
         {"type": "stycke", "text": ["I paragrafen anges tillämpningsområdet."]},
         {"type": "stycke",
          "text": ["Sammanfattning av betänkandet Bilaga 1 (SOU 2000:1)"]},
-        {"type": "stycke", "text": ["Detta är bilagetext."]})
+        # the column merge stamps the marginalia into *every* appendix block
+        {"type": "stycke", "text": ["Detta är bilagetext. Bilaga 1"]})
     blocks = flatten(art["structure"])
     assert fk_span(blocks) == (0, 5)
     (entry,) = extract(art)
     assert entry["chapter"] == "1"
     assert "bilagetext" not in entry["kommentar"]
+
+
+def test_span_survives_one_off_bilaga_mention_in_fk_prose():
+    # prop 2015/16:195: LOU 1 kap. 1 §'s quoted lagtext lists the law's own
+    # bilagor ("Till lagen hör följande bilagor: Bilaga 1 – …") -- a one-off
+    # "Bilaga N" token inside the FK must not end the chapter; only the
+    # marginalia stamp repeating on the next block does
+    art = prop(
+        LAW,
+        {"type": "paragraf", "num": "1",
+         "text": ["1 § Innehållet i denna lag … Till lagen hör följande "
+                  "bilagor: Bilaga 1 – Förteckning över "
+                  "byggentreprenadkontrakt"]},
+        {"type": "stycke", "text": ["Paragrafen motsvarar 1 kap. 1 § LOU."]},
+        {"type": "paragraf", "num": "2", "text": ["2 § Denna lag gäller X."]},
+        {"type": "stycke", "text": ["Paragrafen genomför artikel 1.1."]},
+        {"type": "stycke",
+         "text": ["Sammanfattning av betänkandet Bilaga 1 (SOU 2014:51)"]},
+        {"type": "stycke", "text": ["Mer bilagetext. Bilaga 1"]})
+    blocks = flatten(art["structure"])
+    assert fk_span(blocks) == (0, 6)
+    entries = extract(art)
+    assert [e["paragrafer"] for e in entries] == [["1"], ["2"]]
+    assert "bilagetext" not in entries[-1]["kommentar"]
 
 
 def test_span_opens_from_stycke_reflowed_heading():
