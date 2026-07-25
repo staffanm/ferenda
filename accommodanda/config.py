@@ -36,6 +36,12 @@ DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
 DEFAULT_LLM_BASE_URL = "https://api.berget.ai/v1"
 DEFAULT_LLM_TEMPERATURE = 0
 DEFAULT_LLM_TOP_P = None                     # None => leave top_p out of the payload
+# the per-LLM-call input budget (chars) for the batching ai-* passes (forarbete
+# ai-genomforande). Sized so every real law's whole FK commentary is one call
+# (splitting costs precision, see aigenomforande.BATCH_CHARS); shrink it for a
+# deployment whose context window can't take batch + directive catalog + reply
+# (the local 64k llama.cpp server needs ~60000 for the giant FKs).
+DEFAULT_LLM_BATCH_CHARS = 150000
 # the multimodal model for the vision passes (sfs ai-includegraphics): localizing
 # a dropped graphic to a page+bbox. Kimi-K2.6 was the Phase-0 spike winner -- the
 # only Berget vision model robust on both accuracy and a generic prompt, and it
@@ -225,6 +231,16 @@ def resolve_llm_top_p(doc):
     return _resolve_float(doc, "llm_top_p", "LLM_TOP_P", DEFAULT_LLM_TOP_P, 0, 1)
 
 
+def resolve_llm_batch_chars(doc):
+    """The per-call input budget (chars) for the batching LLM passes.
+    Precedence mirrors every other scalar here: the ``LLM_BATCH_CHARS``
+    environment variable (the cmdline override: ``LLM_BATCH_CHARS=60000 lagen
+    forarbete ai-genomforande …``), then the ``llm_batch_chars`` key in
+    config.yml, else 150000."""
+    return int(_resolve_float(doc, "llm_batch_chars", "LLM_BATCH_CHARS",
+                              DEFAULT_LLM_BATCH_CHARS, 1000, 10_000_000))
+
+
 def resolve_vision_model(doc):
     """The multimodal model for the vision passes (sfs ai-includegraphics).
     Precedence mirrors `resolve_llm_model`: the ``BERGET_VISION_MODEL`` env
@@ -389,6 +405,7 @@ LLM_MODEL = resolve_llm_model(_doc)
 LLM_BASE_URL = resolve_llm_base_url(_doc)
 LLM_TEMPERATURE = resolve_llm_temperature(_doc)
 LLM_TOP_P = resolve_llm_top_p(_doc)
+LLM_BATCH_CHARS = resolve_llm_batch_chars(_doc)
 VISION_MODEL = resolve_vision_model(_doc)
 EDITOR_SECRET = resolve_editor_secret(_doc)
 EDITORS = resolve_editors(_doc)

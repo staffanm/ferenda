@@ -20,7 +20,7 @@ catalog (never the SFS vertical -- the statute corpus is read through the catalo
 
 import json
 
-from ..lib import annstore, catalog, compress
+from ..lib import annstore, catalog, compress, text
 from . import kommentar
 
 
@@ -117,7 +117,7 @@ def resolve(con, layers=None):
         "JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.predicate = 'rpubl:genomforDirektiv' AND d.source = 'forarbete'"
     ).fetchall()
-    rows = []
+    rows, sfs_ids = [], {}
     for prop_uri, prop_path in props:
         art = json.loads(compress.read_bytes(root / prop_path))
         prop_date, prop_label = art.get("date"), art.get("identifier")
@@ -127,11 +127,23 @@ def resolve(con, layers=None):
                                                  rec.get("paragraf"))
             if not (sfs_uri and anchor):
                 continue
+            # the reference's Swedish-side stycke/punkt pinpoint ("S1", "S3N2"),
+            # kept only when the published law actually mints that element id --
+            # forgiving: a pinpoint the paragraf doesn't have (the model said
+            # "S5" on a two-stycke paragraf, or the law changed since the prop)
+            # is disregarded and the paragraf-level reference stands
+            sfs_pin = rec.get("sfs") or ""
+            if sfs_pin:
+                if sfs_uri not in sfs_ids:
+                    sfs_ids[sfs_uri] = text.fragment_ids(
+                        json.loads(compress.read_bytes(path_idx[sfs_uri])))
+                if anchor + sfs_pin not in sfs_ids[sfs_uri]:
+                    sfs_pin = ""
             by_art = kommentar.pinpoints_by_article(rec.get("pinpoints") or [])
             partial = int(bool(rec.get("partial")))
             for article in rec.get("articles", []):
                 pin = ", ".join(by_art.get(article, []))
                 rows.append((sfs_uri, anchor, rec["directive"], article,
-                             prop_uri, prop_label, pin, partial))
+                             prop_uri, prop_label, pin, partial, sfs_pin))
     catalog.set_genomforande(con, rows)
     return len(rows)

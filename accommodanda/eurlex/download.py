@@ -71,6 +71,9 @@ LANGUAGES = ("swe", "eng")
 TEXT_PREFERENCE = ("fmx4", "xhtml", "html")
 SUFFIX = {"fmx4": ".fmx4", "xhtml": ".xhtml", "html": ".html"}
 ZIP_MAGIC = b"PK\x03\x04"
+# CELLAR serves a whole manifestation (all its items in one archive) to an
+# explicit zip Accept; a bare item URL is fetched with the session default.
+ZIP_ACCEPT = "application/zip"
 
 CDM = "http://publications.europa.eu/ontology/cdm#"
 OWL_SAMEAS = "http://www.w3.org/2002/07/owl#sameAs"
@@ -504,12 +507,38 @@ def _resolve_streams(session, items):
     return streams
 
 
+def manifestation_url(item_url):
+    """The manifestation an item belongs to: the item URL minus its `/DOC_n`
+    tail. Fetching *that* with a zip Accept yields every item at once, which is
+    how a multi-part act is taken whole (see fetch_selection).
+
+    The `/DOC_n` shape is CELLAR's item convention. A URL without it means the
+    convention changed, and the derived URL would silently address something
+    else -- so it raises: this runs inside the harvest walk, where a failure is
+    a recorded rejection and the run continues, and an `assert` would vanish
+    under `python -O` and fetch the wrong resource
+    (rule:errors-drive-retry-use-raise)."""
+    base, sep, doc = item_url.rpartition("/")
+    if not (sep and re.fullmatch(r"DOC_\d+", doc)):
+        raise ValueError("not a CELLAR item URL: %r" % item_url)
+    return base
+
+
 def fetch_selection(session, celexes, languages):
     """For each CELEX, the ranked content candidates per requested language: a
-    list `(code, [(filetype, item_url), ...])` ordered fmx4 > xhtml > html > pdf,
-    with the .doc.xml wrapper item dropped. store_document fetches down each
+    list `(code, [(filetype, url, accept), ...])` ordered fmx4 > xhtml > html >
+    pdf, with the .doc.xml wrapper item dropped. store_document fetches down each
     language's list until one item's bytes match its format -- the bulk
-    replacement for per-document tree-notice selection."""
+    replacement for per-document tree-notice selection.
+
+    `accept` is None for a plain item fetch, ZIP_ACCEPT for a *multi-part*
+    Formex manifestation: an act published across several OJ files (the main
+    text plus one file per annex -- 2004/18 has twelve) exposes one item per
+    part, and no single item is the document. Those are fetched as the whole
+    manifestation in one zip, which is exactly the `.fmx4.zip` bundle the bulk
+    importer produces and `parse.formex_members` already reads in order. Only
+    Formex takes this route: a zip is not readable as xhtml/html/pdf content,
+    so a multi-part manifestation of those types still yields its first part."""
     code_of = {code.upper(): code for code in languages}
     tree = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for row in _chunked(session, lambda c: _selection_query(c, languages),
@@ -536,12 +565,18 @@ def fetch_selection(session, celexes, languages):
             for filetype in _ranked_types(by_type):
                 real = [i for i in by_type[filetype]
                         if not _is_wrapper(streams.get(i, ()))]
-                # all items wrappers (a wrapper-only Formex work): skip the
-                # type so the document degrades to the next one -- shipping
-                # the .doc.xml manifest as content is worse than falling back
-                # to html/pdf (bulk.py's _select_content degrades the same way)
-                if real:
-                    candidates.append((filetype, real[0]))
+                if len(real) > 1 and filetype == "fmx4":
+                    # a multi-part act: no single item is the document, so take
+                    # the whole manifestation as one zip
+                    candidates.append((filetype, manifestation_url(real[0]),
+                                       ZIP_ACCEPT))
+                elif real:
+                    candidates.append((filetype, real[0], None))
+                # else: every item was a wrapper (a wrapper-only Formex work).
+                # The type is skipped entirely so the document degrades to the
+                # next one -- shipping the .doc.xml manifest as content is worse
+                # than falling back to html/pdf (bulk.py's _select_content
+                # degrades the same way)
             if candidates:
                 out[celex].append((code, candidates))
     return out
@@ -593,9 +628,9 @@ def content_filename(code, filetype, content):
 
 def store_document(session, target, celex, wdate, selection, eurovoc):
     """Write a CELEX's synthesized notice and fetch its selected content per
-    language. `selection` is the [(lang, [(filetype, item_url), ...])] candidate
-    list fetch_selection returns for this CELEX. Returns the languages stored.
-    Throttling is the caller's (one delay per document, not per content item).
+    language. `selection` is the [(lang, [(filetype, url, accept), ...])]
+    candidate list fetch_selection returns for this CELEX. Returns the languages
+    stored. Throttling is the caller's (one delay per document, not per item).
 
     Each language's candidates are tried richest-first; the first item whose bytes
     match its format wins. A CELLAR manifestation can promise `fmx4` but serve a
@@ -621,8 +656,9 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
         return []
     stored = []
     for code, candidates in selection:
-        for filetype, url in candidates:
-            response = request(session, "GET", url, timeout=180)
+        for filetype, url, accept in candidates:
+            response = request(session, "GET", url, timeout=180,
+                               headers={"Accept": accept} if accept else None)
             if not _content_ok(filetype, response.content):
                 continue                # placeholder for this type: try the next
             name = content_filename(code, filetype, response.content)

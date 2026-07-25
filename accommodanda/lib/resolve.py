@@ -31,15 +31,13 @@ import re
 
 from . import datasets
 from .lagrum import (
+    CELEX_BASE,
     LagrumParser,
     lagrum_uri,
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
 )
-
-CELEX_BASE = "https://lagen.nu/ext/celex/"
-
 
 # --------------------------------------------------------------------------
 # SFS -- nickname/abbr + chapter/§ pinpoint, in the order ⌘K users type

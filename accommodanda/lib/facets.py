@@ -19,7 +19,7 @@ import re
 from collections import namedtuple
 from datetime import date
 
-from . import catalog, layout
+from . import catalog, lagrum, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
@@ -282,7 +282,7 @@ def _fa_year(r):
 def _eu_celex(r):
     # 'ext/celex/32016R0679' -> '32016R0679'; a treaty carries a '/TXT' document
     # suffix ('ext/celex/11992M/TXT'), so take the segment after 'celex/', not the last
-    return r.local[len("ext/celex/"):].split("/")[0]
+    return r.local[len(lagrum.CELEX_LOCAL):].split("/")[0]
 
 
 def _catalog_kind(r):

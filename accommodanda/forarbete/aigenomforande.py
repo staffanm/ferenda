@@ -55,15 +55,22 @@ parse/relate/generate.
 """
 
 import json
+import re
 from pathlib import Path
 
-from ..lib import compress, layout, llm
+from .. import config
+from ..lib import compress, lagrum, layout, llm
 from ..lib.util import normalize_fold as _norm
 from . import kommentar
 from .structure import flatten
 
 PROMPT = Path(__file__).with_name("genomforande_prompt.txt")
-CELEX_BASE = "https://lagen.nu/ext/celex/"
+CELEX_BASE = lagrum.CELEX_BASE
+# the optional Swedish-side pinpoint within the commented paragraf, in the SFS
+# element-id syntax the statute artifacts mint ("S1" = första stycket,
+# "S3N2" = tredje stycket 2 p) -- shape-checked here, existence-checked against
+# the published law at resolve time
+RE_SFS_PINPOINT = re.compile(r"S\d+(?:N\d+[a-z]?)?")
 QUOTE_KEY = 30         # chars of a quote's normalised prefix that must occur in FK
 # the FK commentary budget per LLM call (chars). A law whose candidate entries
 # exceed it is split into several calls at entry boundaries. Sized so every
@@ -73,8 +80,12 @@ QUOTE_KEY = 30         # chars of a quote's normalised prefix that must occur in
 # produced 9 and 11 false positives where whole-law calls produced 0 and 6,
 # with recall unchanged. The cap exists only so a pathological FK still fits
 # the smallest deployment target (the local server's 64k context: ~43k prompt
-# tokens + directive catalog + reply).
-BATCH_CHARS = 150000
+# tokens + directive catalog + reply). Config knob `llm_batch_chars` /
+# $LLM_BATCH_CHARS: a giant FK plus a large directive catalog (momslagen
+# 2022/23:46, LOU/LUF/LUK 2015/16:195) overflows the local 64k context at the
+# default and truncates -- rerun those with a smaller budget
+# (LLM_BATCH_CHARS=60000) instead of losing the prop.
+BATCH_CHARS = config.LLM_BATCH_CHARS
 # the completion-token ceiling per call. A ceiling, not a target -- the model
 # stops when its answer is done and unused budget costs nothing, so this is
 # sized only to (a) fit the longest-reasoning model's chain (Kimi-K2.6
@@ -262,15 +273,20 @@ def validate(reply, by_id, catalog):
     that directive's inventory (`_articles`), and a supporting quote occurring in
     *that entry's* commentary (30-char normalised prefix). A mapping failing any
     check is dropped, never stored (the batch's one bad row must not poison the
-    rest). Raises ValueError only on a structurally unusable reply (not an
-    object, no `mappings` list, unparseable JSON -- a JSONDecodeError is a
-    ValueError) so `llm.author` retries the whole batch; per-item faults drop."""
+    rest). The reply is read via `llm.json_values`, so a model that appends a
+    second JSON object or trailing prose after a complete answer loses nothing
+    -- every parseable object's `mappings` are merged and the per-item checks
+    below guard correctness. Raises ValueError only on a structurally unusable
+    reply (no object with a `mappings` list, or no leading JSON at all -- a
+    JSONDecodeError is a ValueError) so `llm.author` retries the whole batch;
+    per-item faults drop."""
     by_tag = {d["tag"]: d for d in catalog}
-    layer = json.loads(llm.strip_fence(reply))
-    if not isinstance(layer, dict) or not isinstance(layer.get("mappings"), list):
+    payloads = [v for v in llm.json_values(reply)
+                if isinstance(v, dict) and isinstance(v.get("mappings"), list)]
+    if not payloads:
         raise ValueError("svaret saknar en 'mappings'-lista")
     items = []
-    for m in layer["mappings"]:
+    for m in (m for p in payloads for m in p["mappings"]):
         if not isinstance(m, dict):
             continue
         entry, tag = by_id.get(m.get("entry")), m.get("dir")
@@ -283,9 +299,18 @@ def validate(reply, by_id, catalog):
         if resolved is None or _norm(quote)[:QUOTE_KEY] not in _norm(entry["kommentar"]):
             continue
         pins, bases = resolved
-        items.append({"entry": m["entry"], "tag": tag, "articles": bases,
-                      "pinpoints": pins, "partial": bool(m.get("partial")),
-                      "quote": quote})
+        item = {"entry": m["entry"], "tag": tag, "articles": bases,
+                "pinpoints": pins, "partial": bool(m.get("partial")),
+                "quote": quote}
+        # the optional Swedish-side pinpoint (stycke/punkt within the paragraf,
+        # SFS element-id syntax: "S1", "S3N2"). Forgiving: a malformed value is
+        # disregarded, never a reason to drop the mapping -- the paragraf-level
+        # reference stands on its own. Whether the stycke exists in the
+        # *published* law is checked at resolve time (genomforande.resolve),
+        # not here: the FK describes a proposed text with no SFS artifact yet.
+        if RE_SFS_PINPOINT.fullmatch(str(m.get("sfs") or "")):
+            item["sfs"] = m["sfs"]
+        items.append(item)
     return items
 
 
@@ -307,6 +332,7 @@ def edges_for(item, by_id, catalog):
         "law": entry.get("law"),
         "chapter": entry.get("chapter"),
         "paragraf": para,
+        **({"sfs": item["sfs"]} if item.get("sfs") else {}),
         "sentence": item["quote"],
         "page": entry.get("page"),
     } for para in entry["paragrafer"]]

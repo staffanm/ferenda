@@ -25,7 +25,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
-from ..lib import compress, layout, util
+from ..lib import compress, lagrum, layout, util
 from ..lib.catalog import BASE
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
@@ -36,7 +36,7 @@ from ..lib.errors import SkipDocument
 # then a SKOS.altLabel pass over the graph, first subject per label winning
 RESOURCES_JSON = Path(__file__).parent / "data" / "resources.json"
 RINFO_PUBL = "http://rinfo.lagrummet.se/publ/sfs/"
-CELEX_BASE = "https://lagen.nu/ext/celex/"
+CELEX_BASE = lagrum.CELEX_BASE
 KONSOLIDERAD_TYPE = ("http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
                      "KonsolideradGrundforfattning")
 

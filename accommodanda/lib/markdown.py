@@ -26,7 +26,7 @@ grammar, so a full CommonMark engine would only add ambiguity and a dependency.
 
 import re
 
-from .lagrum import Ref, interleave
+from .lagrum import CELEX_BASE, Ref, interleave
 
 BEGREPP = "https://lagen.nu/begrepp/"
 
@@ -231,7 +231,7 @@ def target_uri(target):
         # it to the public /celex/<CELEX> URL, the same page the eurlex source
         # builds). Symmetric with `sfs:` -- the content names the source, not the
         # URL path, so `[GDPR](eurlex:32016R0679)` mirrors `[FB](sfs:1949:381)`.
-        return "https://lagen.nu/ext/celex/" + target[len("eurlex:"):]
+        return CELEX_BASE + target[len("eurlex:"):]
     if RE_URL.match(target):
         # `)` in an external url is %29-escaped the same way (the link grammar's
         # `)` terminator can't appear literally in the target)

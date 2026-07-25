@@ -780,6 +780,33 @@ def _directive_link(site, directive, target=None):
     return _ext_link(external_href(directive), label)
 
 
+_STYCKE_ORDINAL = {1: "första", 2: "andra", 3: "tredje", 4: "fjärde",
+                   5: "femte", 6: "sjätte", 7: "sjunde", 8: "åttonde",
+                   9: "nionde", 10: "tionde", 11: "elfte", 12: "tolfte",
+                   13: "trettonde", 14: "fjortonde", 15: "femtonde",
+                   16: "sextonde", 17: "sjuttonde", 18: "artonde",
+                   19: "nittonde", 20: "tjugonde"}
+
+
+def stycke_label(sfs_pin):
+    """A stycke/punkt element-id suffix ("S1", "S3N2") as citation prose
+    ("första stycket", "tredje stycket 2"). The resolver only stores pinpoints
+    it verified against the published law's minted ids, so the shape holds.
+
+    Returns None past the ordinal table. This is reader-facing citation prose
+    in a statute margin, and "21 stycket genomför artikel …" is not Swedish --
+    dropping the pinpoint (the claim survives, unnarrowed) beats shipping
+    something no lawyer would write. Twenty styckens is already far past any
+    real paragraf."""
+    m = re.fullmatch(r"S(\d+)(?:N(\d+[a-z]?))?", sfs_pin)
+    assert m, "malformed sfs_pinpoint %r in the genomforande table" % sfs_pin
+    ordinal = _STYCKE_ORDINAL.get(int(m.group(1)))
+    if not ordinal:
+        return None
+    label = "%s stycket" % ordinal
+    return "%s %s" % (label, m.group(2)) if m.group(2) else label
+
+
 def genomfor_margin(site, sfs_uri, anchor):
     """Statute-paragraf margin: the EU directive article(s) this paragraf
     transposes (genomför), with the proposition as provenance (§7d). The mirror
@@ -788,15 +815,90 @@ def genomfor_margin(site, sfs_uri, anchor):
     if not rows:
         return ""
     items = []
-    for directive, article, prop_uri, prop_label, pinpoint, partial in rows:
+    for directive, article, prop_uri, prop_label, pinpoint, partial, sfs_pin in rows:
         dlink = _directive_link(site, directive, directive + "#" + article)
         prov = ('<a href="%s">%s</a>' % (escape(href(prop_uri)), escape(prop_label))
                 if prop_label and site.has(prop_uri) else escape(prop_label or ""))
-        items.append('<li>genomför%s artikel %s i %s%s</li>'
-                     % (" delvis" if partial else "", escape(pinpoint or article),
+        stycke = stycke_label(sfs_pin) if sfs_pin else None
+        items.append('<li>%sgenomför%s artikel %s i %s%s</li>'
+                     % (escape(stycke + " ") if stycke else "",
+                        " delvis" if partial else "", escape(pinpoint or article),
                         dlink, ' <span class="prov">(%s)</span>' % prov if prov else ""))
     return ('<aside class="genomfor"><div class="inbound-h">Genomför EU-rätt</div>'
             '<ul>%s</ul></aside>' % "".join(items))
+
+
+EU_CASELAW_CAP = 5   # cases shown in the paragraf rail before the "+N till" tail
+
+
+def _act_short_id(site, uri):
+    """An EU act's citable short form for a lineage attribution -- "2004/18/EG"
+    from the catalog's stamped short id, the CELEX when the act is not in the
+    corpus (a predecessor named by a correlation table but never downloaded)."""
+    row = site.con.execute("SELECT short_id FROM documents WHERE uri = ?",
+                           (uri,)).fetchone()
+    return (row[0] if row and row[0] else catalog.local(uri))
+
+
+def _caselaw_provenance(site, arts):
+    """How the rail attributes a case to the article(s) it was found through.
+
+    A directly transposed article needs no explanation ("om artikel 57"); one
+    reached through the lineage layer does, because the reader is looking at a
+    paragraf that transposes 2014/24 and the case is about 92/50 -- so the hop
+    is named ("om artikel 18 i 92/50/EEG, motsvarar artikel 12"). `arts` is the
+    {(act uri, article, transposed article, hops)} the case was reached by.
+
+    Article numbers sort short-then-lexical, never by length alone: `key=len`
+    leaves ties in set-iteration order, which varies with the interpreter's
+    string hash seed, so two generate runs over an unchanged corpus would emit
+    "artikel 12, 57" and "artikel 57, 12" and churn the page."""
+    direct = sorted({a for _u, a, _t, hop in arts if not hop},
+                    key=lambda a: (len(a), a))
+    if direct:
+        return "om artikel %s" % ", ".join(direct)
+    act_uri, article, transposed, _hop = sorted(arts)[0]
+    return "om artikel %s i %s, motsvarar artikel %s" % (
+        article, _act_short_id(site, act_uri), transposed)
+
+
+def eu_caselaw_margin(site, sfs_uri, anchor):
+    """Statute-paragraf rail: the EU court judgments interpreting the directive
+    article(s) this paragraf transposes -- the join the genomförande layer
+    exists for (LOU 13 kap. 1 § -> artikel 57 i 2014/24 -> the cases citing
+    artikel 57). Targets come from `catalog.genomfor_targets`, which widens the
+    paragraf's own articles with the predecessor articles the directive-lineage
+    layer traces (so C-107/98 Teckal, which cites 93/36, reaches the LOU
+    paragrafs transposing 2014/24 article 12); cases from the generic inbound
+    links of each act-article uri, deduplicated across articles (one case often
+    cites several), newest first, capped."""
+    targets = catalog.genomfor_targets(site.con, sfs_uri, anchor)
+    if not targets:
+        return ""
+    cases = {}                                      # case uri -> (row, {target})
+    for target in targets:
+        directive, article = target[0], target[1]
+        for uri, label, descriptive, case_date in catalog.caselaw_citing(
+                site.con, directive + "#" + article):
+            row = cases.setdefault(uri,
+                                   ((uri, label, descriptive, case_date), set()))
+            row[1].add(target)
+    if not cases:
+        return ""
+    ordered = sorted(cases.values(), key=lambda r: (r[0][3] or "", r[0][0]),
+                     reverse=True)
+    items = []
+    for (uri, label, descriptive, _date), arts in ordered[:EU_CASELAW_CAP]:
+        name = descriptive or label or uri.rsplit("/", 1)[-1]
+        link = ('<a href="%s">%s</a>' % (escape(href(uri)), escape(name))
+                if site.has(uri) else escape(name))
+        items.append('<li>%s <span class="prov">(%s)</span></li>'
+                     % (link, escape(_caselaw_provenance(site, arts))))
+    more = len(ordered) - EU_CASELAW_CAP
+    tail = ('<li class="more">+ %d till</li>' % more) if more > 0 else ""
+    return ('<aside class="eu-caselaw"><div class="inbound-h">'
+            'EU-domstolens praxis</div><ul>%s%s</ul></aside>'
+            % ("".join(items), tail))
 
 
 def bemyndigande_margin(site, uri):
@@ -1038,12 +1140,13 @@ class Rail:
         groups = _inbound_groups(self.site, uri,
                                  exclude_before=_reassigned_before(self.site, uri))
         genomfor = genomfor_margin(self.site, self.doc_uri, nid)
+        eu_cases = eu_caselaw_margin(self.site, self.doc_uri, nid)  # via genomfor
         bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
         corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
         renumbered = renumbered_refs_margin(self.site, uri)       # earlier beteckning
         corresponds = corresponds_margin(self.site, uri)          # old-law side
         if not (commentary or fk or guidance or remiss or groups or genomfor
-                or bemyndigande or extra or corr_cases or renumbered
+                or eu_cases or bemyndigande or extra or corr_cases or renumbered
                 or corresponds):
             return
         head = ('<div class="rail-h">Kontext%s</div>'
@@ -1052,7 +1155,7 @@ class Rail:
                 '%s</div>' % groups) if groups else ""
         self.data[nid] = (head + commentary + fk + guidance + remiss + body
                           + renumbered + corr_cases + extra + genomfor
-                          + bemyndigande + corresponds)
+                          + eu_cases + bemyndigande + corresponds)
 
     def add_document(self):
         """The document-level rail panel (key ''), shown when no single paragraph
@@ -2274,15 +2377,29 @@ def render_forarbete(art, site):
 
     def emit_page(node):
         # page anchor (#sid{N} -- the förarbete citation target, unchanged by the
-        # hierarchy); the statute/case paragraphs citing this page drive the rail
-        pg = node.get("page")
-        if pg and pg != state["page"]:
-            state["page"] = pg
-            key = "sid%d" % pg
-            rail.add(key, "s. %d" % pg)
+        # hierarchy); the statute/case paragraphs citing this page drive the rail.
+        # A page belonging to a bilaga that restarted its own count is anchored
+        # #bilaga{B}-sid{N} instead: its printed numbers repeat the body's, so a
+        # plain #sid would be two different pages (prop. 2021/22:100 has four
+        # printed page 1s). Nothing cites that form -- "prop. … s. 42" always
+        # means the body -- but the page stays addressable and the body's own
+        # anchors stay unambiguous.
+        pg, bil = node.get("page"), node.get("bilaga")
+        if pg and (pg, bil) != state["page"]:
+            state["page"] = (pg, bil)
+            key = "bilaga%s-sid%d" % (bil, pg) if bil else "sid%d" % pg
+            rail.add(key, "bilaga %s s. %d" % (bil, pg) if bil else "s. %d" % pg)
             # the page number doubles as the facsimile button: a click loads
             # the source PDF page as a retina PNG (faksimil.js + the
-            # /api/v1/facsimile endpoint, rendered on demand and disk-cached)
+            # /api/v1/facsimile endpoint, rendered on demand and disk-cached).
+            # A bilaga page gets no button: the endpoint addresses a page by
+            # its *printed* number, which here repeats a body page's, so the
+            # button would confidently show the wrong image. The number still
+            # renders and the anchor still works.
+            if bil:
+                parts.append('<span class="sid" id="%s"%s>%d</span>'
+                             % (key, _rail_attr(rail, key), pg))
+                return
             fax = "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg)
             parts.append('<span class="sid" id="%s"%s><button type="button" '
                          'data-fax="%s" title="Visa faksimil av sidan %d">'

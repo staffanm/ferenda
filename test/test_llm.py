@@ -3,6 +3,8 @@ self-repair-retry loop `author`, the truncation guard, and the endpoint/sampling
 config (local vs remote auth, temperature/top_p on the payload). The network call
 is faked -- it is the one deliberately network-bound, on-demand step."""
 
+import json
+
 import pytest
 
 from accommodanda import config
@@ -41,16 +43,47 @@ def test_author_retries_as_a_real_follow_up_turn(monkeypatch):
     assert "reply was 'BAD'" in seen[1][2]["content"]              # failure fed back
 
 
-def test_author_raises_after_one_failed_retry(monkeypatch):
+def test_author_raises_after_one_failed_retry(monkeypatch, tmp_path):
     # a reply bad on both attempts must propagate the validator's ValueError -- the
     # caller must never persist an unvalidated payload
     monkeypatch.setattr(llm, "complete_thread", lambda messages, **kw: "BAD")
+    monkeypatch.setattr(llm, "DEBUG_DIR", tmp_path / "llm-debug")
 
     def validate(reply):
         raise ValueError("always bad")
 
     with pytest.raises(ValueError, match="always bad"):
         llm.author("PROMPT", validate)
+
+
+def test_author_dumps_the_twice_rejected_reply_for_diagnosis(monkeypatch, tmp_path):
+    # the rejected reply otherwise lives only in memory: on the second failure
+    # the full thread + reply is persisted so the bytes survive the raise
+    monkeypatch.setattr(llm, "complete_thread", lambda messages, **kw: "BAD BYTES")
+    monkeypatch.setattr(llm, "DEBUG_DIR", tmp_path / "llm-debug")
+    with pytest.raises(ValueError):
+        llm.author("PROMPT", lambda reply: (_ for _ in ()).throw(
+            ValueError("svaret saknar en 'mappings'-lista")))
+    (dump,) = sorted((tmp_path / "llm-debug").glob("rejected-*.json"))
+    saved = json.loads(dump.read_text())
+    assert saved["reply"] == "BAD BYTES"
+    assert "mappings" in saved["error"]
+    assert saved["messages"][0] == {"role": "user", "content": "PROMPT"}
+    assert saved["messages"][1] == {"role": "assistant", "content": "BAD BYTES"}
+
+
+def test_json_values_salvages_prefix_objects_from_extra_data():
+    # gemma on prop 2021/22:136 emitted a complete {"mappings": …} object and
+    # kept writing -- json.loads raises "Extra data" and the valid answer was
+    # lost. The parseable prefix values must survive; trailing prose is ignored.
+    two = '{"mappings": [1]}\n{"mappings": [2]}'
+    assert llm.json_values(two) == [{"mappings": [1]}, {"mappings": [2]}]
+    prose = '{"mappings": [1]} Här är dessutom en förklaring.'
+    assert llm.json_values(prose) == [{"mappings": [1]}]
+    fenced = '```json\n{"a": 1}\n```'
+    assert llm.json_values(fenced) == [{"a": 1}]
+    with pytest.raises(ValueError):               # no leading JSON at all
+        llm.json_values("not json at all")
 
 
 def test_author_stops_after_two_calls(monkeypatch):

@@ -115,9 +115,14 @@ def _emit_table(table, blocks, in_body, voc):
                                      blocks, in_body, voc)
             return
     for cells in rows:                       # real data table -> row blocks
-        text = " | ".join(c for c in (_flat(c) for c in cells) if c)
-        if text:
-            blocks.append(Block("row", text))
+        # interior empty cells are kept, trailing ones dropped -- in a
+        # correspondence table a value's column is what identifies which act it
+        # belongs to (see parse._emit_table)
+        fields = [_flat(c) for c in cells]
+        while fields and not fields[-1]:
+            fields.pop()
+        if fields:
+            blocks.append(Block("row", " | ".join(fields)))
 
 
 def parse_html(markup, celex, lang):

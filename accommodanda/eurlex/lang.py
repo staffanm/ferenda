@@ -35,7 +35,11 @@ VOCAB = {
 # language-neutral structural markers (parenthesised numbers/letters, numerals)
 RE_RECITAL = re.compile(r"^\(\s*(\d+)\s*\)$")
 RE_POINT = re.compile(r"^\(?\s*([a-z0-9]{1,4})\s*[.)]$", re.IGNORECASE)
-_RE_ARTNUM = re.compile(r"(\d+[a-z]?)\s*$")
+# the number right after the article keyword ("Artikel 1 Räckvidd" -- the
+# legacy txt_te HTML runs the heading into the marker line), or a bare trailing
+# number ("Artikel 5", a table-cell marker)
+_RE_ARTNUM = re.compile(r"^(?:artikel|article)\.?\s+(\d+[a-z]?)|(\d+[a-z]?)\s*$",
+                        re.IGNORECASE)
 _RE_ROMAN = re.compile(r"[IVXLC]+\.?")
 _RE_NUM = re.compile(r"\d+\.?")
 
@@ -43,7 +47,7 @@ _RE_NUM = re.compile(r"\d+\.?")
 def article_num(text):
     """The bare article number from a title ('Artikel 5' / 'Article 5' -> '5')."""
     match = _RE_ARTNUM.search(text)
-    return match.group(1) if match else None
+    return (match.group(1) or match.group(2)) if match else None
 
 
 class Vocab:

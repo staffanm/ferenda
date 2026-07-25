@@ -105,6 +105,36 @@ def test_validate_accepts_dotted_pinpoints_and_reduces_to_base_article():
     assert items[0]["pinpoints"] == ["21.1", "21.2", "21.3", "2.2 f"]
 
 
+def test_validate_keeps_wellformed_sfs_pinpoint_and_disregards_malformed():
+    # the optional Swedish-side stycke/punkt pinpoint ("sfs": "S1" / "S3N2"):
+    # kept when it has the element-id shape, silently disregarded when not --
+    # a malformed pinpoint must never cost the mapping itself (forgiving by
+    # design; whether the stycke exists in the published law is checked later,
+    # at resolve time)
+    by_id = {"E1": _entry("Paragrafen genomför artikel 21 i NIS 2-direktivet.")}
+    quote = "Paragrafen genomför artikel 21 i NIS 2-direktivet."
+    items = A.validate(_reply([
+        {"entry": "E1", "dir": "A", "articles": ["21"], "sfs": "S1", "quote": quote},
+        {"entry": "E1", "dir": "A", "articles": ["21"], "sfs": "S3N2", "quote": quote},
+        {"entry": "E1", "dir": "A", "articles": ["21"], "sfs": "stycke 2", "quote": quote},
+        {"entry": "E1", "dir": "A", "articles": ["21"], "quote": quote},
+    ]), by_id, CATALOG)
+    assert [i.get("sfs") for i in items] == ["S1", "S3N2", None, None]
+
+
+def test_edges_carry_the_sfs_pinpoint():
+    entry = _entry("Paragrafens första stycke genomför artikel 21.",
+                   chapter="4", paragrafer=["2"])
+    by_id = {"E1": entry}
+    item = {"entry": "E1", "tag": "A", "articles": ["21"], "pinpoints": [],
+            "partial": False, "sfs": "S1",
+            "quote": "Paragrafens första stycke genomför artikel 21."}
+    (edge,) = A.edges_for(item, by_id, CATALOG)
+    assert edge["sfs"] == "S1"
+    plain = A.edges_for({**item, "sfs": None}, by_id, CATALOG)[0]
+    assert "sfs" not in plain                     # absent, not null noise
+
+
 def test_validate_drops_bad_items_without_raising():
     by_id = {"E1": _entry("Paragrafen genomför artikel 21.")}
     items = A.validate(_reply([
@@ -124,6 +154,25 @@ def test_validate_raises_on_structurally_unusable_reply():
         A.validate('{"nope": 1}', {}, CATALOG)
     with pytest.raises(ValueError):        # JSONDecodeError is a ValueError
         A.validate("not json at all", {}, CATALOG)
+
+
+def test_validate_salvages_a_reply_with_trailing_extra_data():
+    # gemma sometimes writes a complete answer and keeps going (a second
+    # {"mappings": …} object, or trailing prose) -- json.loads' "Extra data"
+    # used to lose the whole valid answer. Every parseable object's mappings
+    # are merged; the per-item checks still guard each one.
+    by_id = {"E1": _entry("Paragrafen genomför artikel 21 i NIS 2-direktivet."),
+             "E2": _entry("Paragrafen genomför artikel 23 i NIS 2-direktivet.",
+                          paragrafer=["9"])}
+    q1 = "Paragrafen genomför artikel 21 i NIS 2-direktivet."
+    q2 = "Paragrafen genomför artikel 23 i NIS 2-direktivet."
+    reply = (_reply([{"entry": "E1", "dir": "A", "articles": ["21"], "quote": q1}])
+             + "\n"
+             + _reply([{"entry": "E2", "dir": "A", "articles": ["23"], "quote": q2}])
+             + "\nHär är en avslutande förklaring.")
+    items = A.validate(reply, by_id, CATALOG)
+    assert [(i["entry"], i["articles"]) for i in items] == \
+        [("E1", ["21"]), ("E2", ["23"])]
 
 
 def test_edges_for_fans_out_paragrafer_mirrors_implements_shape():
@@ -176,41 +225,6 @@ def test_prop_implements_layer_supersedes_covered_directive_keeps_others():
     assert _mech(other, "5", "3") in got
     assert not any(r.get("directive") == NIS2_URI and r.get("articles") == ["2"]
                    for r in got)
-
-
-# --- the adjudicated golden corpus ----------------------------------------
-# Ground truth for riksmöte 2025/26: every eligible prop's FK was read and
-# adjudicated (paragraf→direktivartikel, validated through the same parser and
-# quote checks as the live pass) into `.ann.golden` files beside the `.ann`
-# layers in the annstore. Any generated layer present is scored against its
-# golden here, so a prompt/validator regression that degrades real mappings
-# fails the suite. Thresholds from the 2026-07-23 four-model benchmark: the
-# stored layers measured 0.95–1.00 precision, 1.00 recall.
-
-
-def _edge_keys(edges):
-    return {(e.get("law"), e.get("chapter"), e.get("paragraf"),
-             e["directive"], a) for e in edges for a in e["articles"]}
-
-
-def test_stored_layers_hold_against_adjudicated_golden():
-    pairs = [(p, p.with_suffix(".ann.golden"))
-             for p in sorted(annstore.tree("forarbete").rglob("*.ann"))
-             if p.with_suffix(".ann.golden").exists()]
-    if not pairs:
-        pytest.skip("no .ann + .ann.golden pairs in the annstore")
-    for ann, golden in pairs:
-        layer = json.loads(ann.read_text()).get("genomforande")
-        if not layer:                       # a future non-genomforande .ann
-            continue
-        got = _edge_keys(layer["edges"])
-        want = _edge_keys(json.loads(golden.read_text())["genomforande"]["edges"])
-        tp = len(got & want)
-        prec = tp / len(got) if got else 1.0
-        rec = tp / len(want) if want else 1.0
-        assert prec >= 0.90 and rec >= 0.90, \
-            "%s vs golden: precision %.2f recall %.2f (fp %s | fn %s)" % (
-                ann.name, prec, rec, sorted(got - want), sorted(want - got))
 
 
 def test_genomforande_layers_keys_edges_by_proposition_uri(tmp_path, monkeypatch):

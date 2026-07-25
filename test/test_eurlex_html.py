@@ -117,6 +117,21 @@ def test_old_flavour_swedish_text_structure():
     assert [b.num for b in doc.body if b.kind == "article"] == ["1", "2"]
 
 
+def test_old_flavour_article_line_with_run_in_heading_gets_num():
+    # the legacy txt_te HTML runs the article heading into the marker line
+    # ("Artikel 1 Räckvidd") -- the num must still be extracted (31998L0070
+    # et al. produced article blocks with num=None, an empty inventory for
+    # forarbete's directive_articles)
+    html = """<body>
+      <p>RÅDET HAR UTFÄRDAT DETTA DIREKTIV</p>
+      <p>Artikel 1 Räckvidd </p>
+      <p>I detta direktiv fastställs krav.</p>
+      <p>Artikel 3 Ändring av direktiv 93/12/EEG</p>
+    </body>"""
+    doc = parse_html(html, "31998L0070", "swe")
+    assert [b.num for b in doc.body if b.kind == "article"] == ["1", "3"]
+
+
 def test_vocab_is_localized():
     eng, swe = L.vocab("eng"), L.vocab("swe")
     assert eng.article.match("Article 5") and not eng.article.match("Artikel 5")

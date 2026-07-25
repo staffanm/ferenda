@@ -33,6 +33,7 @@ from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.eu_structure import anchored_blocks
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
+    CELEX_BASE,
     LagrumParser,
     load_abbreviations,
     load_namedlaws,
@@ -140,7 +141,7 @@ def host_uri(annotates):
     serves any host (PRD Step 2)."""
     a = str(annotates)
     return "https://lagen.nu/" + a if ":" in a \
-        else "https://lagen.nu/ext/celex/" + a
+        else CELEX_BASE + a
 
 
 def kommentar_artifact(path):

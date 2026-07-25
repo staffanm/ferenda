@@ -5,6 +5,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
+from accommodanda.eurlex.correspond import correspondence
 from accommodanda.eurlex.parse import (
     _annex_anchor,
     content_file,
@@ -149,6 +150,75 @@ def test_definition_list_entries_are_paragraphs_with_nested_points():
     assert {"4.22", "4.22.a", "4.22.b"} <= anchors
 
 
+# CELLAR serves an act published across several OJ files under a GENERAL root
+# that wraps the act in CONTENTS -- 2004/18's divisions sit there directly,
+# while the Charter of Fundamental Rights nests them one further level down in
+# a GR.SEQ. Reading only ENACTING.TERMS left both with no articles at all.
+GENERAL_XML = """<GENERAL>
+  <BIB.INSTANCE><DATE ISO="20040331">20040331</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Direktiv 2004/18/EG</P></TI></TITLE>
+  <CONTENTS>
+    <PREAMBLE>
+      <GR.CONSID>
+        <CONSID><NP><NO.P>(1)</NO.P><TXT>Vid tilldelning av kontrakt.</TXT></NP></CONSID>
+      </GR.CONSID>
+    </PREAMBLE>
+    <TOC><TITLE><TI>INNEHÅLL</TI></TITLE></TOC>
+    <DIVISION>
+      <TITLE><TI>AVDELNING I</TI></TITLE>
+      <ARTICLE IDENTIFIER="001">
+        <TI.ART>Artikel 1</TI.ART><STI.ART>Definitioner</STI.ART>
+        <ALINEA>I detta direktiv används följande beteckningar.</ALINEA>
+      </ARTICLE>
+    </DIVISION>
+  </CONTENTS>
+</GENERAL>"""
+
+GR_SEQ_XML = """<GENERAL>
+  <BIB.INSTANCE><DATE ISO="20161207">20161207</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Europeiska unionens stadga om de grundläggande rättigheterna</P></TI></TITLE>
+  <CONTENTS>
+    <GR.SEQ LEVEL="1">
+      <TITLE><TI><P>EUROPEISKA UNIONENS STADGA</P></TI></TITLE>
+      <PREAMBLE.GEN>
+        <TITLE><TI><P>Ingress</P></TI></TITLE>
+        <P>Europas folk har skapat en allt fastare sammanslutning.</P>
+      </PREAMBLE.GEN>
+      <ENACTING.TERMS>
+        <ARTICLE IDENTIFIER="001">
+          <TI.ART>Artikel 1</TI.ART><STI.ART>Människans värdighet</STI.ART>
+          <ALINEA>Människans värdighet är okränkbar.</ALINEA>
+        </ARTICLE>
+      </ENACTING.TERMS>
+    </GR.SEQ>
+  </CONTENTS>
+</GENERAL>"""
+
+
+def test_general_root_act_body_sits_under_contents():
+    doc = parse_formex(ET.fromstring(GENERAL_XML), "32004L0018", "swe")
+    assert doc.title == "Direktiv 2004/18/EG"
+    assert doc.date == "20040331"
+    seen = [(b.kind, b.text) for b in doc.body]
+    assert ("recital", "Vid tilldelning av kontrakt.") in seen
+    assert ("heading", "AVDELNING I") in seen
+    article = next(b for b in doc.body if b.kind == "article")
+    assert article.num == "1" and article.text == "Artikel 1 – Definitioner"
+
+
+def test_general_root_act_body_nested_in_a_gr_seq():
+    doc = parse_formex(ET.fromstring(GR_SEQ_XML), "12016P/TXT", "swe")
+    seen = [(b.kind, b.text) for b in doc.body]
+    article = next(b for b in doc.body if b.kind == "article")
+    assert article.num == "1" and article.anchor == "1"
+    # the preamble prose is kept under its own heading ...
+    assert ("heading", "Ingress") in seen
+    assert ("paragraph",
+            "Europas folk har skapat en allt fastare sammanslutning.") in seen
+    # ... but the sequence's TITLE only restates the document title
+    assert ("heading", "EUROPEISKA UNIONENS STADGA") not in seen
+
+
 JUDGMENT_XML = """<JUDGMENT>
   <BIB.JUDGMENT><NO.ECLI ECLI="ECLI:EU:C:2020:981">EU:C:2020:981</NO.ECLI></BIB.JUDGMENT>
   <TITLE><TI><P>Domstolens dom</P>
@@ -265,6 +335,74 @@ def test_parse_document_embeds_annex_as_single_doc():
     assert head.kind == "heading" and head.level == 1 and head.anchor == "bilaga-3"
     # ... and the annex table flattened to row blocks
     assert any(b.kind == "row" and "Energi" in b.text for b in doc.body)
+
+
+# 2004/18's jämförelsetabell: a blank spacer column sits between the three
+# repealed directives and the "Ny/Ändrad" column, and every data row runs to a
+# trailing empty cell. Dropping empties wholesale slid "Ändrad" into the spacer's
+# place and broke the column->act mapping eurlex/correspond.py depends on.
+SPACER_TABLE_XML = """<ANNEX>
+  <TITLE><TI><P>BILAGA XII</P></TI></TITLE>
+  <CONTENTS>
+    <TBL COLS="6"><CORPUS>
+      <ROW TYPE="HEADER"><CELL>Detta direktiv</CELL><CELL>Direktiv 93/37/EEG</CELL>
+        <CELL>Direktiv 92/50/EEG</CELL><CELL>Andra rättsakter</CELL><CELL/></ROW>
+      <ROW><CELL>Artikel 1.2 a</CELL><CELL>Artikel 1 a</CELL><CELL>Artikel 1 a</CELL>
+        <CELL/><CELL>Ändrad</CELL></ROW>
+      <ROW><CELL>Artikel 1.2 b</CELL><CELL>Artikel 1 c</CELL><CELL>—</CELL>
+        <CELL/><CELL/></ROW>
+    </CORPUS></TBL>
+  </CONTENTS>
+</ANNEX>"""
+
+
+def _rows(doc):
+    return [b.text for b in doc.body if b.kind == "row"]
+
+
+def test_table_rows_keep_interior_empty_cells_and_drop_trailing_ones():
+    doc = parse_formex(ET.fromstring(SPACER_TABLE_XML), "32004L0018", "swe")
+    assert _rows(doc) == [
+        # header: the trailing empty cell goes, so the row ends at column 4
+        "Detta direktiv | Direktiv 93/37/EEG | Direktiv 92/50/EEG | "
+        "Andra rättsakter",
+        # data: the *interior* blank survives, so "Ändrad" stays in column 6
+        "Artikel 1.2 a | Artikel 1 a | Artikel 1 a |  | Ändrad",
+        # both trailing blanks go
+        "Artikel 1.2 b | Artikel 1 c | —"]
+
+
+def test_parse_dir_stores_the_lineage_on_the_artifact(tmp_path):
+    """The lineage is extracted by `parse`, not by a separate action: it is the
+    act's own jämförelsetabell, so it belongs in the act's artifact like the
+    förarbete parser's `implements` (rule:artifact-is-truth)."""
+    d = tmp_path / "2004" / "32004L0018"
+    d.mkdir(parents=True)
+    (d / "swe.fmx4").write_text(SPACER_TABLE_XML)
+    art = parse_dir(d, "32004L0018")
+    assert {(e["newArticle"], e["oldArticle"], e["oldLaw"].rsplit("/", 1)[1])
+            for e in art["correspondence"]} == {
+        ("1", "1", "31993L0037"), ("1", "1", "31992L0050")}
+
+
+def test_parse_dir_leaves_no_lineage_key_on_an_act_without_a_table(tmp_path):
+    # the overwhelmingly common case: no key at all rather than an empty list
+    d = tmp_path / "2022" / "32022L2555"
+    d.mkdir(parents=True)
+    (d / "swe.fmx4").write_text(ACT_XML)
+    assert "correspondence" not in parse_dir(d, "32022L2555")
+
+
+def test_correspond_reads_the_columns_the_parser_emits():
+    """The seam: eurlex/correspond.py claims a cell's index is its column. Assert
+    it end to end against the real parser rather than a hand-built run list --
+    that claim is only true because of the empty-cell rule above."""
+    doc = parse_formex(ET.fromstring(SPACER_TABLE_XML), "32004L0018", "swe")
+    edges, stats = correspondence(to_artifact(doc))
+    assert stats["columns"] == 2            # the two directive columns
+    assert {(e["oldLaw"].rsplit("/", 1)[1], e["newArticle"], e["oldArticle"])
+            for e in edges} == {("31993L0037", "1", "1"),
+                                ("31992L0050", "1", "1")}
 
 
 # an article whose text carries a footnote citing another act

@@ -101,6 +101,33 @@ def _collect_fragment_texts(node, doc_uri, out):
             _collect_fragment_texts(item, doc_uri, out)
 
 
+def _collect_fragment_ids(node, out):
+    if isinstance(node, dict):
+        if node.get("id"):
+            out.add(node["id"])
+        for value in node.values():
+            _collect_fragment_ids(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_fragment_ids(item, out)
+
+
+def fragment_ids(art):
+    """Every minted element id in the document's presented body (K1P2, K1P2S1,
+    K1P2S1N4, …) -- the id vocabulary an authored layer's pinpoint is checked
+    against (forarbete.genomforande.resolve).
+
+    Shares `body_sections` and the descend-every-value walk with
+    `fragment_texts` (rule:second-use-goes-to-lib): a walker that descended
+    only ``children`` would miss the ids the search index does find, and one
+    that read ``structure`` directly would read a consolidated statute's
+    superseded base text instead of the lydelse actually shown."""
+    out = set()
+    for nodes in body_sections(art):
+        _collect_fragment_ids(nodes, out)
+    return out
+
+
 def fragment_texts(art):
     """``(fragment-uri, full text)`` for every id-bearing node in the body --
     the per-fragment children of a parent search doc. A fragment's text includes

@@ -55,6 +55,14 @@ from .coe_ids import article_fragment as coe_article_fragment
 # reuse another type's productions); the formatter methods already
 # dispatch by node name.
 
+# the EU-act namespace, spelled once. An act's uri is CELEX_BASE + its CELEX;
+# CELEX_LOCAL is the prefix `catalog.local()` leaves in front of it. This module
+# owns it because `celex_uri` mints these uris, and it is low enough in the
+# import graph for every consumer to reach (rule:second-use-goes-to-lib -- it
+# had reached seven hand-written copies).
+CELEX_LOCAL = 'ext/celex/'
+CELEX_BASE = 'https://lagen.nu/' + CELEX_LOCAL
+
 LAGRUM = 'LAGRUM'                  # SFS references ("3 kap. 2 § lagen …")
 KORTLAGRUM = 'KORTLAGRUM'          # abbreviated SFS refs ("3 § MBL", "JB 22:2")
 EULAGSTIFTNING = 'EULAGSTIFTNING'  # EU treaties/regulations/directives

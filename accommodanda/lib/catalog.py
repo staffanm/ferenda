@@ -82,7 +82,9 @@ CREATE TABLE IF NOT EXISTS genomforande (
     prop_uri   TEXT NOT NULL,       -- the proposition stating the relation
     prop_label TEXT,                -- its identifier, for display
     pinpoint   TEXT,                -- the article pinpoint (e.g. "21.1")
-    partial    INTEGER NOT NULL     -- "genomför delvis"
+    partial    INTEGER NOT NULL,    -- "genomför delvis"
+    sfs_pinpoint TEXT               -- stycke/punkt within the paragraf ("S1",
+                                    -- "S3N2"); '' = the whole paragraf
 );
 CREATE TABLE IF NOT EXISTS fk_kommentar (
     sfs_uri    TEXT NOT NULL,       -- the commented statute
@@ -106,6 +108,16 @@ CREATE TABLE IF NOT EXISTS correspondence (
                                     -- ('betecknas' edges; references older than
                                     -- this mean the old beteckning)
 );
+CREATE TABLE IF NOT EXISTS directive_correspondence (
+    new_uri      TEXT NOT NULL,     -- the recast EU act (doc uri, no fragment)
+    new_article  TEXT NOT NULL,     -- its article number
+    old_uri      TEXT NOT NULL,     -- the act it replaced
+    old_article  TEXT NOT NULL,     -- the article that one had
+    new_pinpoint TEXT,              -- the table cell's finer new-side ref ("12.1")
+    old_pinpoint TEXT               -- ... and old-side ("18.3")
+);
+CREATE INDEX IF NOT EXISTS idx_dircorr_new
+    ON directive_correspondence(new_uri, new_article);
 CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
 CREATE INDEX IF NOT EXISTS idx_corr_old ON correspondence(old_uri);
 CREATE INDEX IF NOT EXISTS idx_genomf_sfs ON genomforande(sfs_uri, sfs_anchor);
@@ -179,6 +191,9 @@ def connect(path, data_root=None, exclusive=False):
     corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
     if "ikrafttrader" not in corr_cols:
         con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
+    genomf_cols = {row[1] for row in con.execute("PRAGMA table_info(genomforande)")}
+    if "sfs_pinpoint" not in genomf_cols:
+        con.execute("ALTER TABLE genomforande ADD COLUMN sfs_pinpoint TEXT")
     con.execute("CREATE INDEX IF NOT EXISTS idx_docs_publisher "
                 "ON documents(source, publisher)")
     return con
@@ -668,9 +683,10 @@ def content_hash(raw):
 
 
 def _drop_document(con, uri):
-    """Remove a document and everything keyed off it: its outbound links and
-    its concept redirects."""
+    """Remove a document and everything keyed off it: its outbound links, its
+    EU-act lineage and its concept redirects."""
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    con.execute("DELETE FROM directive_correspondence WHERE new_uri = ?", (uri,))
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
 
@@ -680,6 +696,18 @@ def _index_document(con, art, path, source):
     replacing any prior version keyed by the same uri."""
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    # the EU-act lineage the act's own jämförelsetabell states, extracted at
+    # parse time into the artifact (eurlex/correspond.py). Written here rather
+    # than in a cross-document post-pass because that would mean re-reading
+    # every one of the ~64k eurlex artifacts on every relate to find the ~2%
+    # that carry one; here the artifact is already open and the rows are
+    # incremental like the links beside them.
+    con.execute("DELETE FROM directive_correspondence WHERE new_uri = ?", (uri,))
+    con.executemany(
+        "INSERT INTO directive_correspondence VALUES (?,?,?,?,?,?)",
+        [(uri, e["newArticle"], e["oldLaw"], e["oldArticle"],
+          e.get("newPinpoint"), e.get("oldPinpoint"))
+         for e in art.get("correspondence") or []])
     row = document_row(art, path, source)        # (uri, source, kind, label, title, path)
     lb = labels.document_labels(source, art)
     # a treaty's artifact title is the bare CELEX (no extractable heading); the
@@ -981,19 +1009,27 @@ def synthesize_concepts(con):
 def set_genomforande(con, rows):
     """Replace the pinned genomför-direktiv relations. Each row is
     (sfs_uri, sfs_anchor, directive, article, prop_uri, prop_label, pinpoint,
-    partial). Stored twice: in `genomforande` (the statute paragraf's margin
-    display, with provenance) and as an sfs-paragraf -> directive-article edge in
-    `links` (so the directive article's inbound shows the implementing statute,
-    reusing the generic inbound machinery)."""
+    partial, sfs_pinpoint) -- sfs_pinpoint the stycke/punkt within the paragraf
+    ("S1", "S3N2"; '' = the whole paragraf), already existence-checked against
+    the published law by the resolver. Stored twice: in `genomforande` (the
+    statute paragraf's margin display, with provenance) and as an sfs-paragraf ->
+    directive-article edge in `links` (so the directive article's inbound shows
+    the implementing statute, reusing the generic inbound machinery). Column
+    names are spelled out because a migrated catalog has sfs_pinpoint appended
+    last while a fresh one follows the schema -- positional VALUES would
+    misalign on one of them."""
     con.execute("DELETE FROM genomforande")
     con.execute("DELETE FROM links WHERE predicate = 'rpubl:genomforDirektiv' "
                 "AND from_uri IN (SELECT uri FROM documents WHERE source='sfs')")
-    con.executemany("INSERT INTO genomforande VALUES (?,?,?,?,?,?,?,?)", rows)
+    con.executemany(
+        "INSERT INTO genomforande (sfs_uri, sfs_anchor, directive, article, "
+        "prop_uri, prop_label, pinpoint, partial, sfs_pinpoint) "
+        "VALUES (?,?,?,?,?,?,?,?,?)", rows)
     con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)",
                     [(sfs_uri, anchor, "rpubl:genomforDirektiv",
                       directive + "#" + article, directive, prop_label)
                      for (sfs_uri, anchor, directive, article, prop_uri,
-                          prop_label, pin, partial) in rows])
+                          prop_label, pin, partial, sfs_pin) in rows])
     con.commit()
 
 
@@ -1017,11 +1053,113 @@ def fk_kommentar_all(con):
         "FROM fk_kommentar ORDER BY prop_date DESC, prop_uri").fetchall()
 
 
+# how many generations back a paragraf's article set is carried. Two hops is
+# what the procurement chain needs (2014/24 -> 2004/18 -> 92/50 & 93/36-38) and
+# is where the relation stops being one a reader would accept unexplained: by
+# the third generation the article has usually been split and merged past
+# recognition, and art. 2 (definitions) in four generations would swamp the rail.
+LINEAGE_DEPTH = 2
+
+
+def predecessor_articles(con, directive, article, depth=LINEAGE_DEPTH):
+    """The `(act uri, article, hops)` an EU-act article traces back to through
+    the recasts' own correlation tables, breadth-first, `depth` generations deep.
+
+    Excludes the starting pair, so the caller can tell an inherited article from
+    a transposed one, and yields each ancestor once at its shallowest hop --
+    the same article reached by two routes is one ancestor, not two. Ordered
+    within a hop (the query's ORDER BY), because the rail renders the first
+    ancestor it is handed and an unordered walk would churn the page."""
+    seen, frontier, out = {(directive, article)}, [(directive, article)], []
+    for hop in range(1, depth + 1):
+        rows = [row for uri, art in frontier
+                for row in con.execute(
+                    "SELECT DISTINCT old_uri, old_article "
+                    "FROM directive_correspondence "
+                    "WHERE new_uri = ? AND new_article = ? "
+                    "ORDER BY old_uri, old_article", (uri, art))]
+        frontier = []
+        for old_uri, old_article in rows:
+            if (old_uri, old_article) in seen:
+                continue
+            seen.add((old_uri, old_article))
+            frontier.append((old_uri, old_article))
+            out.append((old_uri, old_article, hop))
+        if not frontier:
+            break
+    return out
+
+
+def genomfor_targets(con, sfs_uri, anchor):
+    """The EU-act articles a statute paragraf's case-law rail resolves cases
+    through: `(directive uri, article, transposed article, hops)`.
+
+    The paragraf's own genomförande statements come back at `hops` 0 with
+    `transposed` equal to `article`. Each is then carried back through the
+    directive-lineage layer (`predecessor_articles`), so a paragraf transposing
+    article 12 of 2014/24 also reaches article 18 of 92/50 -- and the judgments
+    citing *that* -- with `transposed` still naming the article the paragraf
+    actually transposes, which is what the rail attributes the hop to. An
+    ancestor already reached directly by another genomförande statement stays
+    at hop 0: a directly transposed article is not an inherited one."""
+    rows = con.execute(
+        "SELECT DISTINCT directive, article FROM genomforande "
+        "WHERE sfs_uri = ? AND sfs_anchor = ? "
+        "ORDER BY directive, article", (sfs_uri, anchor)).fetchall()
+    out = [(directive, article, article, 0) for directive, article in rows]
+    seen = {(directive, article) for directive, article in rows}
+    for directive, article in rows:
+        for old_uri, old_article, hop in predecessor_articles(
+                con, directive, article):
+            if (old_uri, old_article) in seen:
+                continue
+            seen.add((old_uri, old_article))
+            out.append((old_uri, old_article, article, hop))
+    return out
+
+
+def dangling_targets(con, prefix):
+    """Documents the corpus *cites* but does not *hold*: `(uri, links, citing
+    documents)` for every link target whose root uri starts with `prefix` and
+    has no row in `documents`, most-cited first (ties broken by uri, so a run
+    is reproducible).
+
+    The corpus knows its own gaps: it is the want-list for a targeted harvest,
+    computed from the citation graph rather than guessed. Its first use is the
+    repealed EU acts -- the sector-3 stock came from a CELLAR bulk dump, which
+    ships only acts in force, so every directive a judgment interprets and time
+    has since replaced is cited from thousands of places and held nowhere."""
+    return con.execute(
+        "SELECT l.to_root, COUNT(*), COUNT(DISTINCT l.from_uri) "
+        "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
+        "WHERE l.to_root LIKE ? AND d.uri IS NULL "
+        "GROUP BY l.to_root ORDER BY COUNT(*) DESC, l.to_root",
+        (prefix.replace("%", "") + "%",)).fetchall()
+
+
+def caselaw_citing(con, article_uri):
+    """The EU court judgments citing `article_uri` (a directive-article uri,
+    …/celex/32014L0024#12): (case uri, label, descriptive, date), newest
+    first. Judgments are the sector-6 CJ/TJ/FJ documents -- an AG opinion
+    (CC) or order (CO/TO) is not settled practice and stays out."""
+    return con.execute(
+        "SELECT DISTINCT d.uri, d.label, d.descriptive, d.date "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_uri = ? AND d.source = 'eurlex' "
+        "  AND substr(d.uri, instr(d.uri, '/celex/') + 7, 1) = '6' "
+        "  AND substr(d.uri, instr(d.uri, '/celex/') + 12, 2) IN "
+        "      ('CJ', 'TJ', 'FJ') "
+        "ORDER BY d.date DESC, d.uri", (article_uri,)).fetchall()
+
+
 def genomfor_for(con, sfs_uri, anchor):
     """The EU directive articles a statute paragraf transposes, for its margin:
-    (directive, article, prop_uri, prop_label, pinpoint, partial)."""
+    (directive, article, prop_uri, prop_label, pinpoint, partial, sfs_pinpoint).
+    sfs_pinpoint narrows the claim to a stycke/punkt of the paragraf ("S1",
+    "S3N2"); empty means the whole paragraf."""
     return con.execute(
-        "SELECT directive, article, prop_uri, prop_label, pinpoint, partial "
+        "SELECT directive, article, prop_uri, prop_label, pinpoint, partial, "
+        "COALESCE(sfs_pinpoint, '') "
         "FROM genomforande WHERE sfs_uri = ? AND sfs_anchor = ? "
         "ORDER BY directive, article", (sfs_uri, anchor)).fetchall()
 

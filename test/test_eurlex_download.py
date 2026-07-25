@@ -2,11 +2,16 @@
 with no Swedish/English manifestation (a pre-accession act never translated)
 must not be left on disk as a bare notice, and prune_empty cleans up any such
 dirs earlier runs created -- and its content-format fallback (a scanned TIFF
-served under an fmx4 manifestation is rejected for the next text type)."""
+served under an fmx4 manifestation is rejected for the next text type). Plus
+the want-list the citation-driven backfill harvests from
+(`catalog.dangling_targets`)."""
 
 from datetime import date, timedelta
 
+import pytest
+
 from accommodanda.eurlex import download as D
+from accommodanda.lib import catalog
 
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
 
@@ -59,7 +64,7 @@ def test_fetch_selection_degrades_a_wrapper_only_fmx4_to_html(monkeypatch):
         [{"item": {"value": "u-doc"},
           "stream": {"value": "http://x/L_2000001SV.doc.xml"}}]))
     out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
-    assert out["32000L0001"] == [("swe", [("html", "u-html")])]
+    assert out["32000L0001"] == [("swe", [("html", "u-html", None)])]
 
 
 def test_fetch_selection_keeps_the_real_item_beside_its_wrapper(monkeypatch):
@@ -73,7 +78,119 @@ def test_fetch_selection_keeps_the_real_item_beside_its_wrapper(monkeypatch):
          {"item": {"value": "u-xml"},
           "stream": {"value": "http://x/L_2000001SV.01.xml"}}]))
     out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
-    assert out["32000L0001"] == [("swe", [("fmx4", "u-xml")])]
+    assert out["32000L0001"] == [("swe", [("fmx4", "u-xml", None)])]
+
+
+def test_fetch_selection_takes_a_multipart_formex_as_the_whole_manifestation(
+        monkeypatch):
+    # 2004/18 is published as twelve OJ files (main text + one per annex), each
+    # its own Formex item beside its .doc.xml wrapper. Picking one item stores
+    # an annex *as the directive* (it did: the stored 32004L0018 was "BILAGA I",
+    # 0 articles). Multi-part Formex must be fetched as the whole manifestation
+    # in one zip -- the .fmx4.zip bundle parse.formex_members reads in order.
+    items = ["http://x/cellar/uuid.0011.04/DOC_%d" % n for n in (1, 2, 3)]
+    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+        [_row("32004L0018", "SWE", "fmx4", u) for u in items]
+        + [_row("32004L0018", "SWE", "fmx4", "u-doc")],
+        [{"item": {"value": "u-doc"},
+          "stream": {"value": "http://x/L_2004134SV.01011401.doc.xml"}}]
+        + [{"item": {"value": u},
+            "stream": {"value": "http://x/L_2004134SV.0101140%d.xml" % i}}
+           for i, u in enumerate(items)]))
+    out = D.fetch_selection(object(), ["32004L0018"], ["swe"])
+    assert out["32004L0018"] == [
+        ("swe", [("fmx4", "http://x/cellar/uuid.0011.04", D.ZIP_ACCEPT)])]
+
+
+def test_store_document_asks_for_zip_only_on_the_manifestation_candidate(
+        tmp_path, monkeypatch):
+    # the zip Accept travels with the candidate: a manifestation URL is fetched
+    # as an archive, a plain item URL with the session default
+    asked = []
+
+    class Resp:
+        content = D.ZIP_MAGIC + b"junk"
+
+    def fake_request(session, method, url, **kw):
+        asked.append((url, (kw.get("headers") or {}).get("Accept")))
+        return Resp()
+
+    monkeypatch.setattr(D, "request", fake_request)
+    target = tmp_path / "2004" / "32004L0018"
+    D.store_document(object(), target, "32004L0018", "2004-03-31",
+                     [("swe", [("fmx4", "http://x/cellar/uuid.0011.04",
+                                D.ZIP_ACCEPT)]),
+                      ("eng", [("html", "u-html", None)])], [])
+    assert asked == [("http://x/cellar/uuid.0011.04", D.ZIP_ACCEPT),
+                     ("u-html", None)]
+    assert (target / "swe.fmx4.zip").exists()   # zip-ness flagged in the name
+
+
+def test_manifestation_url_rejects_a_non_item_url():
+    assert (D.manifestation_url("http://x/cellar/uuid.0011.04/DOC_12")
+            == "http://x/cellar/uuid.0011.04")
+    # ValueError, not AssertionError: the check must survive `python -O`, or a
+    # changed CELLAR convention would silently fetch the wrong resource
+    with pytest.raises(ValueError, match="not a CELLAR item URL"):
+        D.manifestation_url("http://x/cellar/uuid.0011.04")
+
+
+# --- the backfill want-list ------------------------------------------------
+
+CELEX = "https://lagen.nu/ext/celex/"
+
+
+def _corpus(tmp_path):
+    """A catalog holding one act, citing three others it does not hold."""
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    con.execute(
+        "INSERT INTO documents (uri, source, kind, path) VALUES (?,?,?,?)",
+        (CELEX + "62018CJ0041", "eurlex", "case", "x.json"))
+    con.executemany(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root, "
+        "text) VALUES (?,?,?,?,?,?)",
+        [("https://lagen.nu/2016:1145", "K1P1", "dcterms:references",
+          CELEX + "32004L0018#45", CELEX + "32004L0018", "artikel 45"),
+         (CELEX + "62018CJ0041", None, "dcterms:references",
+          CELEX + "32004L0018#2", CELEX + "32004L0018", "artikel 2"),
+         (CELEX + "62018CJ0041", None, "dcterms:references",
+          CELEX + "31992L0050", CELEX + "31992L0050", "92/50"),
+         # a target the corpus *does* hold, and a non-sector-3 one
+         ("https://lagen.nu/2016:1145", None, "dcterms:references",
+          CELEX + "62018CJ0041", CELEX + "62018CJ0041", "C-41/18")])
+    con.commit()
+    return con
+
+
+def test_dangling_targets_ranks_what_the_corpus_cites_but_lacks(tmp_path):
+    con = _corpus(tmp_path)
+    got = catalog.dangling_targets(con, CELEX + "3")
+    # most-cited first, with the count of distinct citing documents
+    assert got == [(CELEX + "32004L0018", 2, 2), (CELEX + "31992L0050", 1, 1)]
+
+
+def test_dangling_targets_excludes_documents_the_corpus_holds(tmp_path):
+    # the judgment is cited once but IS in `documents`, so it is not a gap --
+    # this is the whole point of the query, and the reason a bulk-dump corpus
+    # can name its own missing repealed acts
+    con = _corpus(tmp_path)
+    assert not [row for row in catalog.dangling_targets(con, CELEX)
+                if row[0] == CELEX + "62018CJ0041"]
+
+
+def test_dangling_targets_ties_break_on_uri_so_a_run_is_reproducible(tmp_path):
+    # two targets cited once each: the order must come from the uri, not from
+    # whatever the group-by happened to emit -- a backfill run is resumable
+    con = _corpus(tmp_path)
+    con.execute(
+        "INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+        "VALUES (?,?,?,?)",
+        ("https://lagen.nu/2016:1145", "dcterms:references",
+         CELEX + "31993L0036", CELEX + "31993L0036"))
+    con.commit()
+    tail = [uri for uri, n, _d in catalog.dangling_targets(con, CELEX + "3")
+            if n == 1]
+    assert tail == [CELEX + "31992L0050", CELEX + "31993L0036"]
 
 
 def test_store_document_falls_back_when_fmx4_is_a_scanned_image(tmp_path,
@@ -93,7 +210,8 @@ def test_store_document_falls_back_when_fmx4_is_a_scanned_image(tmp_path,
 
     monkeypatch.setattr(D, "request", fake_request)
     target = tmp_path / "1993" / "61993CC0425"
-    selection = [("swe", [("fmx4", "u-fmx4"), ("xhtml", "u-xhtml")])]
+    selection = [("swe", [("fmx4", "u-fmx4", None),
+                          ("xhtml", "u-xhtml", None)])]
     stored = D.store_document(object(), target, "61993CC0425", "1993-01-01",
                               selection, [])
     assert stored == ["swe"]
@@ -114,8 +232,8 @@ def test_store_document_writes_no_notice_when_every_candidate_is_rejected(
 
     monkeypatch.setattr(D, "request", lambda *a, **kw: Resp())
     target = tmp_path / "1993" / "61993CC0425"
-    selection = [("swe", [("fmx4", "u1"), ("pdf", "u2")]),
-                 ("eng", [("fmx4", "u3")])]
+    selection = [("swe", [("fmx4", "u1", None), ("pdf", "u2", None)]),
+                 ("eng", [("fmx4", "u3", None)])]
     stored = D.store_document(object(), target, "61993CC0425", "1993-01-01",
                               selection, [])
     assert stored == []
@@ -267,7 +385,7 @@ def test_sync_retries_pending_no_content_work_and_clears_it(tmp_path, monkeypatc
     _stub_session(monkeypatch)
     monkeypatch.setattr(D, "enumerate_celex", lambda *a, **k: iter(()))
     monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs:
-                        {"62020CJ0100": [("swe", [("xhtml", "u")])]})
+                        {"62020CJ0100": [("swe", [("xhtml", "u", None)])]})
     monkeypatch.setattr(D, "fetch_metadata", lambda s, celexes:
                         ({"62020CJ0100": "2025-06-01"}, {}))
 

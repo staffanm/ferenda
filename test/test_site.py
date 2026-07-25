@@ -1601,7 +1601,7 @@ SFS_LAWS = [
 ]
 
 
-def build_pin_catalog(tmp_path):
+def build_pin_catalog(tmp_path, extra_eurlex=()):
     from accommodanda.forarbete import fk, genomforande
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
@@ -1611,11 +1611,14 @@ def build_pin_catalog(tmp_path):
         p = tmp_path / (catalog.local(art["uri"]).replace(":", "_") + ".json")
         p.write_text(json.dumps(art))
         sfs_paths.append(p)
-    direc = tmp_path / "dir.json"
-    direc.write_text(json.dumps(DIRECTIVE))
+    eu_paths = []
+    for i, art in enumerate((DIRECTIVE, *extra_eurlex)):
+        p = tmp_path / ("eu%d.json" % i)
+        p.write_text(json.dumps(art))
+        eu_paths.append(p)
     catalog.rebuild(db, "forarbete", [prop])
     catalog.rebuild(db, "sfs", sfs_paths)
-    catalog.rebuild(db, "eurlex", [direc])
+    catalog.rebuild(db, "eurlex", eu_paths)
     con = catalog.connect(db)
     genomforande.resolve(con)
     fk.resolve(con)
@@ -1644,6 +1647,37 @@ def test_genomfor_partial_flag_preserved(tmp_path):
     con = build_pin_catalog(tmp_path)
     rows = catalog.genomfor_for(con, "https://lagen.nu/2021:500", "K2P1")
     assert rows and rows[0][5] == 1   # partial
+
+
+def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
+    # the acid test for the EU information architecture: an ECJ judgment citing
+    # artikel 21 i direktivet appears in the rail of the statute paragraf that
+    # transposes artikel 21 (2 kap. 1 § cybersäkerhetslagen here) -- while an
+    # AG opinion citing the same article does not (an opinion is not practice)
+    judgment = {
+        "uri": "https://lagen.nu/ext/celex/62020CJ0001",
+        "celex": "62020CJ0001", "doctype": "judgment",
+        "title": "Domstolens dom i mål C-1/20", "date": "2021-05-06",
+        "structure": [{"type": "paragraph", "id": "p30", "text": [
+            "Enligt ", {"predicate": "dcterms:references",
+                        "text": "artikel 21", "uri": DIR + "#21"},
+            " i direktivet gäller följande."], "children": []}]}
+    opinion = {
+        "uri": "https://lagen.nu/ext/celex/62020CC0002",
+        "celex": "62020CC0002", "doctype": "opinion",
+        "title": "Förslag till avgörande i mål C-2/20", "date": "2021-01-01",
+        "structure": [{"type": "paragraph", "id": "p5", "text": [
+            {"predicate": "dcterms:references", "text": "artikel 21",
+             "uri": DIR + "#21"}], "children": []}]}
+    con = build_pin_catalog(tmp_path, extra_eurlex=(judgment, opinion))
+    site = render.Site.from_catalog(con)
+    margin = render.eu_caselaw_margin(site, "https://lagen.nu/2021:500", "K2P1")
+    assert "EU-domstolens praxis" in margin
+    assert "C-1/20" in margin or "62020CJ0001" in margin   # the judgment shows
+    assert "om artikel 21" in margin                       # with its article
+    assert "C-2/20" not in margin and "62020CC0002" not in margin  # no opinion
+    # a paragraf with no genomförande rows renders no case-law section
+    assert render.eu_caselaw_margin(site, "https://lagen.nu/2022:260", "P9") == ""
 
 
 def test_statute_page_shows_genomfor_margin(tmp_path):
@@ -1917,9 +1951,50 @@ def test_genomfor_pinpoints_split_per_article(tmp_path):
     catalog.rebuild(db, "eurlex", [direc])
     con = catalog.connect(db)
     genomforande.resolve(con)
-    pins = {a: pin for _d, a, _pu, _pl, pin, _pa
+    pins = {a: pin for _d, a, _pu, _pl, pin, _pa, _sp
             in catalog.genomfor_for(con, "https://lagen.nu/2025:1506", "K1P3")}
     assert pins == {"2": "2.1, 2.2 f", "26": "26.1 c"}
+
+
+def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
+    # a reference's Swedish-side stycke pinpoint ("sfs": "S1") survives into the
+    # genomforande table only when the published law mints that element id;
+    # a pinpoint the paragraf doesn't have (the model said "S5" on a two-stycke
+    # paragraf) is disregarded and the paragraf-level reference stands (the
+    # reference itself is never dropped -- forgiving by design)
+    from accommodanda.forarbete import genomforande
+    db = str(tmp_path / "catalog.sqlite")
+    prop = tmp_path / "prop.json"
+    law_rubrik = "15.1 Förslaget till lag om ändring i testlagen (1999:100)"
+    prop.write_text(json.dumps({
+        "uri": "https://lagen.nu/prop/2025/26:28", "type": "prop",
+        "identifier": "Prop. 2025/26:28", "date": "2025-10-14",
+        "body": [{"type": "rubrik", "level": 1, "page": 1,
+                  "text": ["Författningskommentar"]}],
+        "implements": [
+            {**_impl(law_rubrik, None, "3", "21.1"), "sfs": "S1"},
+            {**_impl(law_rubrik, None, "4", "21.2"), "sfs": "S5"}]}))
+    sfs = tmp_path / "sfs.json"
+    art = _sfs_art("https://lagen.nu/1999:100", "Testlag (1999:100)", "2000-01-01")
+    art["structure"][0]["children"] = [           # P3 has exactly two stycken
+        {"type": "stycke", "id": "P3S1", "children": []},
+        {"type": "stycke", "id": "P3S2", "children": []}]
+    sfs.write_text(json.dumps(art))
+    direc = tmp_path / "dir.json"
+    direc.write_text(json.dumps(DIRECTIVE))
+    catalog.rebuild(db, "forarbete", [prop])
+    catalog.rebuild(db, "sfs", [sfs])
+    catalog.rebuild(db, "eurlex", [direc])
+    con = catalog.connect(db)
+    genomforande.resolve(con)
+    by_anchor = {a: sp for _d, a, sp in con.execute(
+        "SELECT directive, sfs_anchor, sfs_pinpoint FROM genomforande")}
+    assert by_anchor == {"P3": "S1",              # minted -> kept
+                         "P4": ""}                # not minted -> disregarded
+    # and the margin spells the kept pinpoint out as citation prose
+    site = render.Site.from_catalog(con)
+    margin = render.genomfor_margin(site, "https://lagen.nu/1999:100", "P3")
+    assert "första stycket genomför artikel 21.1" in margin
 
 
 def test_commentary_shows_in_paragraph_rail_not_as_page(tmp_path):

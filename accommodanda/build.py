@@ -1233,7 +1233,7 @@ DV_INDEX = layout.DOM_INDEX
 DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
-           PKG / "lib" / "poi_worker.py",
+           PKG / "lib" / "poi_worker.py", PKG / "lib" / "pdftext.py",
            PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py")
 
 
@@ -1472,10 +1472,17 @@ SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
 # parse time (a text/tml body -> paragraphs), so editing it re-stales those docs.
 # legacy.py (the import verb) is NOT: it only produces records, which are parse's
 # per-doc inputs and already versioned via fa_record's inputs hash.
+# every module the parse output actually depends on -- including the shared PDF
+# machinery. `lib/pdftext.py` decides the printed page every block carries, and
+# `volumes.py` decides which PDFs are read at all, so an edit to either changes
+# the artifacts; leaving them out let a page-numbering fix ship without
+# re-parsing anything (foreskrift/avg/remisser/coe/icc already list pdftext).
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "structure.py", PKG / "forarbete" / "kommentar.py",
-           PKG / "forarbete" / "fk.py",
-           PKG / "forarbete" / "legacy_formats.py", PKG / "lib" / "lagrum.py")
+           PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
+           PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
+           PKG / "forarbete" / "legacy_formats.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
 
 
 def fa_record(basefile):
@@ -1717,6 +1724,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 # --------------------------------------------------------------------------
 
 EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
+               PKG / "eurlex" / "correspond.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
                PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",
                PKG / "lib" / "lagrum.py")
@@ -1819,6 +1827,62 @@ def eurlex_ai_annotate(basefiles):
         print("eurlex ai-annotate %s: wrote %s" % (celex, out))
 
 
+def eurlex_backfill(args):
+    """`lagen eurlex backfill [<sector-digit>] [--limit N]` -- download the acts
+    the corpus already cites but does not hold, most-cited first.
+
+    The sector-3 stock was imported from a CELLAR bulk dump, and a bulk dump
+    ships only the acts *in force*. Every act repealed since is therefore
+    missing while being cited from everywhere: 2004/18 alone is referenced 6 979
+    times by 790 documents we do hold. Re-running discovery over all of sector 3
+    would fetch a hundred thousand acts to reach them; the citation graph names
+    exactly the ones that matter, and ranks them
+    (`catalog.dangling_targets`) -- the top 500 carry 76% of all dangling
+    references. `--limit` bounds a run; re-run to go deeper.
+
+    A CELEX with no Swedish/English manifestation stores nothing (a
+    pre-accession act never translated), which is reported, not retried."""
+    sector = args[0] if args else "3"
+    if not (len(sector) == 1 and sector.isdigit()):
+        sys.exit("usage: lagen eurlex backfill [<sector-digit>] [--limit N]  "
+                 "(default sector 3, the legislation sector)")
+    con = catalog.connect_ro(CATALOG)
+    wanted = catalog.dangling_targets(
+        con, "%sext/celex/%s" % (layout.BASE, sector))
+    con.close()
+    if RUN.limit:
+        wanted = wanted[:RUN.limit]
+    if not wanted:
+        print("eurlex backfill: sector %s is complete -- every cited act is in "
+              "the corpus" % sector)
+        return
+    total = sum(n for _uri, n, _docs in wanted)
+    print("eurlex backfill: %d cited-but-absent act(s) in sector %s, %d "
+          "inbound reference(s)" % (len(wanted), sector, total))
+    if RUN.dry_run:
+        for uri, links, docs in wanted[:40]:
+            print("  %-18s %7d links from %5d documents"
+                  % (uri.rsplit("/", 1)[-1], links, docs))
+        return
+    session = _eurlex_session()
+    stored = empty = 0
+    reporter = util.Reporter()
+    for seen, (uri, _links, _docs) in enumerate(wanted, 1):
+        # the basefile is the bare CELEX; `catalog.local` would keep the whole
+        # "ext/celex/…" local path the uri grammar puts in front of it
+        if eurlex_download.download_document(
+                session, layout.EURLEX_DOWNLOADED, uri.rsplit("/", 1)[-1],
+                eurlex_download.LANGUAGES, POLITENESS):
+            stored += 1
+        else:
+            empty += 1
+        reporter.update(seen, len(wanted), scope="eurlex backfill",
+                        stored=stored, no_manifestation=empty)
+    reporter.done()
+    print("eurlex backfill: %d act(s) downloaded, %d with no swe/eng "
+          "manifestation; run `lagen eurlex parse` next" % (stored, empty))
+
+
 def eurlex_casenames(args=()):
     """Refresh the named-EU-cases snapshot (`lagen eurlex casenames`): query
     Wikidata for EU cases carrying a CELEX number and rewrite
@@ -1844,11 +1908,14 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
-            "prune-empty": eurlex_prune, "casenames": eurlex_casenames},
+            "prune-empty": eurlex_prune, "casenames": eurlex_casenames,
+            "backfill": eurlex_backfill},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
          "prune-empty: remove download dirs with only a notice.ttl (no swe/eng doc)\n"
          "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)\n"
+         "backfill [<sector>] [--limit N]: download the acts the corpus cites but\n"
+         "  does not hold, most-cited first (bulk dumps ship only acts in force)\n"
          "casenames: refresh the named-EU-cases snapshot from Wikidata")
 
 

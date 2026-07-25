@@ -36,6 +36,7 @@ from ..lib.lagrum import (
     yield_overlaps,
 )
 from ..lib.util import from_roman
+from .correspond import correspondence
 from .definitions import build_matcher, extract_definitions, term_refs
 from .model import BASE, Block, EurlexDoc, doctype, official_short_title, short_label
 from .parse_html import parse_html
@@ -241,18 +242,40 @@ def parse_preamble(preamble, blocks):
                                     num=marker or None))
 
 
+def parse_act_body(elem, blocks):
+    """An act's body blocks from `elem`'s children, descending through the
+    sequence wrappers Formex nests them in.
+
+    Formex holds the same act in three depths. An `ACT` root keeps the preamble
+    and `ENACTING.TERMS` as its own children; a `GENERAL` root (what CELLAR
+    serves for an act published across several OJ files) wraps them in
+    `CONTENTS`, either directly -- 2004/18's divisions sit there -- or inside a
+    further `GR.SEQ` sequence, as the Charter of Fundamental Rights does.
+    Descending keeps one walker for all three; reading `ENACTING.TERMS` alone
+    left 2004/18 and the Charter with no articles at all. A `TITLE` here always
+    restates the document title, so it is not emitted as a heading."""
+    for child in elem:
+        if child.tag == "DIVISION":
+            parse_division(child, 1, blocks)
+        elif child.tag == "ARTICLE":
+            parse_article(child, blocks)
+        elif child.tag == "PREAMBLE":
+            parse_preamble(child, blocks)
+        elif child.tag == "PREAMBLE.GEN":       # the Charter's "Ingress"
+            walk_content(child, blocks)
+        elif child.tag in ("ENACTING.TERMS", "GR.SEQ"):
+            parse_act_body(child, blocks)
+
+
 def parse_act(root, blocks):
     title = _text(root.find("TITLE"), "TI", "P") or _text(root, "TITLE")
-    preamble = root.find("PREAMBLE")
-    if preamble is not None:
-        parse_preamble(preamble, blocks)
-    enacting = root.find("ENACTING.TERMS")
-    if enacting is not None:
-        for child in enacting:
-            if child.tag == "DIVISION":
-                parse_division(child, 1, blocks)
-            elif child.tag == "ARTICLE":
-                parse_article(child, blocks)
+    body = root.find("CONTENTS") if root.tag == "GENERAL" else root
+    if body is None:
+        # a recorded per-document parse failure, not a broken program: raise so
+        # the message survives `python -O` instead of degrading into a TypeError
+        # on the walk below (rule:errors-drive-retry-use-raise)
+        raise ValueError("GENERAL act %r has no CONTENTS" % title)
+    parse_act_body(body, blocks)
     return title
 
 
@@ -368,12 +391,19 @@ def judgment_metadata(root):
 
 def _emit_table(tbl, blocks):
     """A TBL -> one `row` block per ROW (cells joined by ' | '); enough to keep
-    the text searchable and citation-scannable without a full table model."""
+    the text searchable and citation-scannable without a full table model.
+
+    An *interior* empty cell is kept as an empty field, because in a
+    correspondence table the column a value sits in is what it means: 2004/18's
+    jämförelsetabell has a blank spacer column between the three repealed
+    directives and the "Ny/Ändrad" column, and dropping it slides the latter
+    into the former's place. Trailing empties carry no such meaning and go."""
     for row in tbl.iter("ROW"):
         cells = [flatten(cell) for cell in row.findall("CELL")]
-        text = " | ".join(c for c in cells if c)
-        if text:
-            blocks.append(Block("row", text))
+        while cells and not cells[-1]:
+            cells.pop()
+        if cells:
+            blocks.append(Block("row", " | ".join(cells)))
 
 
 def walk_content(elem, blocks, level=2):
@@ -682,4 +712,12 @@ def parse_dir(doc_dir, celex):
     if (doc.date is None or not _plausible_date(doc.date)
             or RE_CORRIGENDUM.search(celex)):
         doc.date = notice_work_date(doc_dir) or doc.date
-    return to_artifact(doc)
+    art = to_artifact(doc)
+    # the act's own jämförelsetabell, read *after* to_artifact because the
+    # header's "Direktiv 2004/18/EG" is identified by the citation link minted
+    # there. Empty for all but ~2% of sector-3 acts and every judgment, so this
+    # costs nothing on the rest (correspond.correspondence).
+    edges, _stats = correspondence(art)
+    if edges:
+        art["correspondence"] = edges
+    return art

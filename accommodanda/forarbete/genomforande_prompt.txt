@@ -47,10 +47,17 @@ REGLER:
 - "quote" ska vara den mening ur DEN paragrafens kommentar som motiverar
   kopplingen, ordagrant kopierad (exakt teckenföljd, så att den går att
   återfinna i texten).
+- "sfs" (valfritt): om kommentaren pekar ut ett visst STYCKE eller en viss
+  PUNKT i paragrafen som det som genomför artikeln, ange det som "S<stycke>"
+  eller "S<stycke>N<punkt>" — t.ex. "Paragrafens första stycke genomför
+  artikel 4" ger "sfs": "S1"; "Tredje stycket 2 genomför artikel 9.2" ger
+  "sfs": "S3N2". Utelämna fältet när kommentaren avser hela paragrafen.
+  Lämna i så fall en post per stycke om olika stycken genomför olika artiklar.
 
 Svara ENDAST med ett JSON-objekt, inget annat:
 {"mappings": [{"entry": "E<n>", "dir": "<tagg>", "articles": ["<art>", ...],
-  "partial": true/false, "quote": "<mening>"}, ...]}
+  "partial": true/false, "sfs": "S<n>", "quote": "<mening>"}, ...]}
+("sfs" utelämnas när hela paragrafen avses)
 
 FÖRFATTNINGSKOMMENTAR:
 [[FK]]

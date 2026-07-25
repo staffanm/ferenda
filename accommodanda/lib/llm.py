@@ -8,14 +8,18 @@ is called only from those explicit ai-* actions on named ids -- never from a
 corpus-wide parse/relate/generate."""
 
 import base64
+import json
 import os
+import sys
 import time
+from datetime import datetime
 from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
 
 from .. import config
+from .util import write_atomic
 
 API_URL = config.LLM_BASE_URL + "/chat/completions"   # `llm_base_url` / $LLM_BASE_URL
 DEFAULT_MODEL = config.LLM_MODEL   # config.yml `llm_model` / $BERGET_MODEL override
@@ -51,6 +55,63 @@ def strip_fence(content):
         if s.rstrip().endswith("```"):
             s = s.rstrip()[:-3]
     return s.strip()
+
+
+def json_values(reply):
+    """Every consecutive top-level JSON value in `reply` (code fence stripped).
+    A model sometimes appends a second JSON object or trailing prose after a
+    complete answer -- a bare ``json.loads`` raises "Extra data" and the whole
+    (valid) answer is lost. This parses value after value and stops at the
+    first trailing non-JSON content, so the parseable prefix survives; the
+    caller decides what the values mean. Raises JSONDecodeError (a ValueError,
+    driving `author`'s retry) only when the reply doesn't start with a JSON
+    value at all."""
+    s = strip_fence(reply)
+    dec = json.JSONDecoder()
+    values, i = [], 0
+    while i < len(s):
+        try:
+            value, i = dec.raw_decode(s, i)
+        except json.JSONDecodeError:
+            if values:          # trailing prose after >=1 complete value: done
+                break
+            raise
+        values.append(value)
+        while i < len(s) and s[i] in " \t\r\n,":
+            i += 1
+    return values
+
+
+# where `author` persists a reply that failed validation twice, so the bytes
+# survive the raise for diagnosis (they otherwise live only in memory)
+DEBUG_DIR = config.DATA / "llm-debug"
+
+
+def _dump_rejected(messages, reply, exc):
+    """Write the full thread + final rejected reply to a timestamped file in
+    `DEBUG_DIR`, returning its path. Inline images are elided -- the point is
+    the text the validator rejected, not megabytes of base64.
+
+    The stamp carries microseconds because the case this exists for is a
+    batching pass against a misbehaving model, which rejects several replies a
+    second; a second-resolution name would have each overwrite the last, losing
+    exactly the evidence being collected. Written through `util.write_atomic`
+    like every other file lib/ produces, so a dump interrupted mid-write leaves
+    no half-file behind."""
+    def _texts(content):
+        if isinstance(content, list):
+            return [part if part.get("type") == "text"
+                    else {"type": part.get("type"), "elided": True}
+                    for part in content]
+        return content
+    DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    path = DEBUG_DIR / ("rejected-%s.json"
+                        % datetime.now().strftime("%Y%m%dT%H%M%S.%f"))
+    write_atomic(path, json.dumps(
+        {"error": str(exc),
+         "messages": [{**m, "content": _texts(m["content"])} for m in messages],
+         "reply": reply}, ensure_ascii=False, indent=1))
+    return path
 
 
 def auth_headers(url):
@@ -165,6 +226,8 @@ def author(prompt, validate, model=DEFAULT_MODEL, timeout=TIMEOUT,
             return validate(reply)
         except ValueError as exc:
             if attempt:
+                print("llm: twice-rejected reply saved to %s"
+                      % _dump_rejected(messages, reply, exc), file=sys.stderr)
                 raise
             messages.append({"role": "assistant", "content": reply})
             messages.append({"role": "user", "content": RETRY_MESSAGE % exc})
