@@ -188,9 +188,10 @@ over ~440 paragraf-mappings). Edges compared on (law, chapter, paragraf,
 directive, article); harness + full per-prop result table archived in
 `tools/aigenomforande-bench/` (`dump_fk.py` → subagent adjudication →
 `make_golden.py`; `bench_all.sh`/`bench_one.py`; `evaluate.py`;
-`final_eval.txt`). `test_forarbete_aigenomforande.py` now scores any stored
-`.ann` layer against its `.ann.golden` (precision/recall ≥ 0.90) so a
-prompt/validator regression fails the suite.
+`final_eval.txt`). The goldens are bench data only, scored on demand via
+`evaluate.py`; the test suite is self-contained and does not read them (a
+stored-layer gate test existed briefly but was removed — it made `pytest`
+depend on mutable state in `WIKI_ROOT`).
 
 | model | prec | recall | F1 | F0.5 | pinpoint agree | Σtime | cost |
 |---|---|---|---|---|---|---|---|
@@ -244,19 +245,20 @@ wrong genomför-claim is worse than a missing one.
   explicit mappings target a directive `detect_directives` never catalogued
   (e.g. 278 maps mervärdesskattedirektivet while `implements` only names
   32015L1535; 118 maps förnybartdirektivet, catalog has only the MKB
-  directive). Their goldens are legitimately empty w.r.t. the catalog. To
-  cover them, pass the right CELEX explicitly (and parse it into eurlex
-  first) — or broaden detection beyond the mechanical `implements`.
+  directive). Their goldens were empty w.r.t. that narrow catalog and have
+  been deleted (2026-07-24) — the SFSR-driven corpus run supplies the right
+  CELEX explicitly and produces real layers for them. Three surviving goldens
+  are themselves suspect against the wider catalog: 262 binds its edges to
+  massflyktsdirektivet where the FK means (nya) mottagandedirektivet
+  32024L1346, 202 has a habitat-vs-vattendirektiv adjudication question on
+  24 kap. 10 a § miljöbalken, 108 has small pinpoint diffs.
 
 ## Open items / caveats
 - **Local endpoint:** the committed batch-per-law design works and is stable on
   local Qwen (proven byte-identical across runs); it is just ~5× slower than
   Berget because it is serial. No need for a separate per-paragraf path.
-- **Not committed:** all changes are in the working tree
-  (`accommodanda/forarbete/aigenomforande.py`, `genomforande_prompt.txt`,
-  `genomforande.py`, `build.py`, `lib/llm.py` (USAGE tally, 5xx retry),
-  `test/test_forarbete_aigenomforande.py`, `test/test_llm.py`, REWRITE/README,
-  this file). Nothing has been committed. The `.ann.golden` ground-truth files
-  live in the lagen-wiki repo, also uncommitted.
+- **Committed 2026-07-24** (`6db397ca` lib, `1d16f07c` forarbete,
+  `cf4afebe` chore). The `.ann.golden` bench files and the generated `.ann`
+  layers live in the lagen-wiki repo, uncommitted there.
 - **Data leaves the machine:** the pass sends prop + directive text to Berget.
   These are public legal documents, so no sensitivity issue — just noting it.

@@ -156,8 +156,8 @@ accommodanda/
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
-  forarbete/ preparatory-works vertical — download·riksdagen·rskr·model·parse·structure·kommentar·genomforande·fk·jamforelse·lydelse·tabell·legacy_formats
-  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·definitions·parse·parse_html·parse_pdf·structure·lang·model
+  forarbete/ preparatory-works vertical — download·propkb·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
+  eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·correspond·definitions·parse·parse_html·parse_pdf·structure·lang·model
   hudoc/    ECHR case-law vertical — download·model·parse
   coe/      Council of Europe Treaty Office vertical — download·model·parse
   icrc/     ICRC international humanitarian law treaty vertical — download·model·parse
@@ -1642,6 +1642,15 @@ law, keyed by **CELEX** (the basefile throughout).
   to the next candidate type (`fmx4 → xhtml → html → pdf`, ranked by `_ranked_types`),
   so the real text manifestation is stored. Recovered 149 judgments that previously
   died in parse with `ParseError: line 1, column 0` (ElementTree on TIFF bytes).
+  **Multi-part Formex** (2026-07-24): an act published across several OJ files
+  (the main text plus one file per annex) exposes *one item per part*, and no
+  single item is the document — taking the first stored 2004/18 as its "BILAGA I"
+  (14 kB, 0 articles) and the Charter of Fundamental Rights as its table of
+  contents. Such a manifestation is now fetched **whole**, as one zip
+  (`ZIP_ACCEPT` on the manifestation URL, `manifestation_url`), which is exactly
+  the `.fmx4.zip` bundle the bulk importer produces and `parse.formex_members`
+  already reads in order. Only Formex takes this route — a zip is not readable
+  as xhtml/html/pdf content.
 - ✅ **Bulk import** `accommodanda/eurlex/bulk.py` — `lagen eurlex unpack-bulk
   <dir|zip>` unpacks an official CELLAR bulk legislation dump (per-format zips:
   MTD metadata + EN/SV × FMX/HTML/PDF) into the *exact* per-CELEX layout the
@@ -1661,6 +1670,13 @@ law, keyed by **CELEX** (the basefile throughout).
     (regs/dirs/decisions/treaties) + `JUDGMENT` (CJEU). Inline markup is
     flattened; footnotes become `note` blocks. A `.fmx4.zip` bundles annexes as
     separate files; they are embedded after the main act (lowest sequence).
+    A `GENERAL` root carries the same act one or two levels deeper — the
+    preamble and enacting terms wrapped in a `CONTENTS`, either directly
+    (2004/18) or inside a further `GR.SEQ` (the Charter) — so `parse_act_body`
+    descends through the wrappers; reading `ENACTING.TERMS` alone left both of
+    those with no articles at all. A table row keeps its *interior* empty cells
+    (trailing ones are dropped), because in a jämförelsetabell the column a
+    value sits in is what identifies which act it belongs to.
   - `parse_html.py` — **OJ HTML/XHTML** for the many older docs with no Formex;
     the stable OJ CSS classes (`ti-art`, `sti-art`, `normal`, `note`, …) map onto
     the same Block kinds. Pre-OJ loose `<txt_te>` HTML falls back to
@@ -1689,6 +1705,67 @@ law, keyed by **CELEX** (the basefile throughout).
   (`site/data/artifact/eurlex/`); manifestation mix ~73k Formex / ~11k HTML / 122
   PDF. `test/test_eurlex_parse.py` (Formex, 11 tests), `test/test_eurlex_html.py`
   (HTML/PDF fallback, 5).
+- ✅ **Directive lineage — the EU-act correspondence layer**
+  (`eurlex/correspond.py`, run by `eurlex parse`, 2026-07-24/25). The case law a Swedish paragraf needs is usually older than the
+  directive it transposes: LOU 13 kap. 1 § transposes article 57 of 2014/24, but
+  the practice on exclusion grounds is about 2004/18 art. 45 and, before that,
+  92/50 art. 29. A recast publishes the mapping itself, in its jämförelsetabell
+  annex, so this is **mechanical** — the eurlex counterpart of `sfs
+  table-correspond`, no LLM — and because it is the act's own structured data,
+  it is extracted **at parse time into the act's artifact** (`correspondence`
+  key, rule:artifact-is-truth) rather than authored into a layer: no action to
+  remember, nothing to fall out of step with a re-parse, and a no-op for ~98%
+  of sector-3 acts and every judgment. Three properties of the source shaped
+  the reader:
+  the table is located by its **header row**, not the annex heading (only ~20%
+  of these tables sit under a heading named *Jämförelsetabell*; 2014/24's is
+  `BILAGA XV`, and the word appears 2 600 nodes away in article 90);
+  **orientation varies** and reversed is the norm (424 of 456 tables put the
+  repealed act in column 1), so the self column is found by wording, admitting
+  all eight phrasings the corpus uses (`Detta direktiv`, `Den här
+  förordningen`, `Föreliggande direktiv`, …); and **the old side's links are
+  wrong** — the citation engine resolves "Artikel 12" in any cell against the
+  act being parsed — so article numbers come from cell *text* only. A header
+  column the engine left unresolved (Euratom acts, `(EU, Euratom)` numbering)
+  is read from its designation via `lagrum.celex_uri`, with the pre-2015 "nr"
+  settling number/year order. There is no authored layer and no `relate`-time
+  load: `catalog._index_document` writes the pairs straight from the artifact's
+  `correspondence` key into `directive_correspondence` as it indexes each act,
+  so the table stays incremental with the artifact tree rather than a post-pass
+  re-reading every file. `catalog.genomfor_targets` walks it transitively
+  (`LINEAGE_DEPTH = 2`, which
+  is the procurement chain 2014/24 → 2004/18 → 92/50 & 93/36-38) so the rail
+  needs no change — it just gets more articles, each carrying the hop it came
+  by, which `render.eu_caselaw_margin` names ("om artikel 15 i 92/50/EEG,
+  motsvarar artikel 79"). **Measured:** 238 of the 310 LOU paragrafs with a
+  genomförande statement now show older EU case law they did not have. Corpus
+  potential: 386 acts (122 directives, 264 regulations) carry a readable table,
+  ~27k article pairs. **Both figures are floors, measured against artifacts
+  parsed before the `_emit_table` alignment fix**: a corpus-wide `lagen eurlex
+  parse --force` has not run yet, so every multi-column table (2010/75,
+  2009/138, 2006/112 …) still has rows whose cells slid left, and those rows
+  are dropped rather than mismapped. Re-run the parse before treating the
+  numbers as final. The chain stops at 2004/18 for procurement — 93/36 and
+  93/37 do have jämförelsetabeller, but their only manifestation is pre-2003
+  HTML whose tables are a literal `>Plats för tabell<` placeholder (42 acts
+  corpus-wide are in that state), and 2004/17's likewise, so LUF gets one hop.
+  Codified case law is a genuine limit, not a gap: 2014/24 art. 12 (in-house)
+  maps to "—" because it had no predecessor article — Teckal was the source —
+  so *that* relation can never come from a correlation table.
+- ✅ **Citation-driven backfill** (`lagen eurlex backfill [<sector-digit>]
+  [--limit N]`, `catalog.dangling_targets`, 2026-07-24) — the want-list the
+  lineage layer above needs filled. The sector-3 stock came from a CELLAR bulk
+  dump, which ships only acts *in force*; every act repealed since is missing
+  while cited from everywhere (2004/18 alone: 6 979 references from 790
+  documents we do hold). Re-running discovery over all of sector 3 to reach
+  them would fetch a hundred thousand acts the corpus doesn't need; the
+  citation graph already names exactly the ones that matter, so
+  `dangling_targets` ranks every link target with no `documents` row by
+  inbound reference count (the top 500 carry 76% of all dangling references),
+  and `backfill` downloads down that list, most-cited first, through the same
+  `download.download_document` an ordinary harvest uses. A CELEX with no
+  Swedish/English manifestation (a pre-accession act never translated) is
+  reported, not retried.
 - ✅ **Defined-terms extraction + in-act interlinking** (`eurlex/definitions.py`).
   Modern EU acts gather their definitions in a dedicated "Definitions" article — an
   intro ("the following definitions apply") then a numbered list of `term:
@@ -1868,6 +1945,14 @@ law, keyed by **CELEX** (the basefile throughout).
   inventory, the pinpoints kept for the margin) and a non-empty supporting
   quote occurring in that entry's commentary; failing items are dropped, not
   stored — the mapping is many-to-many and partial by design, not 1:1.
+  A mapping may carry an optional Swedish-side pinpoint (`"sfs": "S1"` /
+  `"S3N2"`, the SFS element-id syntax, 2026-07-24) when the FK scopes the
+  claim to a stycke/punkt: shape-checked at authoring (malformed values
+  disregarded, never dropping the mapping), existence-checked at relate time
+  against the published law's minted element ids (a "S5" on a two-stycke
+  paragraf is disregarded, the paragraf-level reference stands), stored in the
+  `genomforande` table's `sfs_pinpoint` column and rendered as citation prose
+  ("första stycket genomför …") in the statute margin.
   Output is a `.ann`
   layer in the curated store (`lib/annstore.py`), a richer superset of the
   artifact's mechanical `implements`; `genomforande.resolve` now prefers an
@@ -1878,13 +1963,13 @@ law, keyed by **CELEX** (the basefile throughout).
   relate `__corr__` watermark now also covers these förarbete `.ann` layers).
   Own prompt file `genomforande_prompt.txt`; the LLM is called only from this
   action, never from parse/relate/generate — same discipline as `eurlex
-  ai-annotate`/`sfs ai-correspond`. Correctness is held by an adjudicated
-  golden corpus (every eligible 2025/26 prop has a `.ann.golden` layer beside
-  the `.ann` files in the annstore, built by the six-model benchmark archived
-  in `tools/aigenomforande-bench/`); `test/test_forarbete_aigenomforande.py`
-  covers the non-LLM core and scores any stored `.ann` layer against its
-  golden (precision/recall ≥ 0.90), so a prompt/validator regression fails
-  the suite.
+  ai-annotate`/`sfs ai-correspond`. Correctness was benchmarked against an
+  adjudicated golden corpus for the 2025/26 slice (`.ann.golden` layers
+  beside the `.ann` files in the annstore, built by the six-model benchmark
+  archived in `tools/aigenomforande-bench/`, scored on demand by its
+  `evaluate.py` — bench data, not a test gate);
+  `test/test_forarbete_aigenomforande.py` covers the non-LLM core and is
+  self-contained (no annstore/golden dependence).
 
 ### 7e. Myndighetsföreskrifter vertical (agency regulations) 🚧
 
@@ -2896,8 +2981,8 @@ rewrite work.
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `labels` (every source's four reader-facing name forms — eyebrow/h1/official-title/citing-form — dispatched per source over the parse-time-stamped artifact + the curated datasets, read identically by `render.py` and `catalog.py`), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
-| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
-| `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery), `bulk` (dump import), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
+| `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `volumes` (which of a multi-PDF record's `files` are the body and in what order, read from the record's provenance and the landing page's own link text — drops errata/summaries/kortversioner/reprinted-directive/remisslista siblings, collapses a "hela dokumentet" edition published beside its own parts), `jamforelse` (extracts a re-enacting prop's jämförelsetabell/paragrafnyckel bilaga tables into old↔new provision pairs from per-run coordinates; consumed by `sfs/correspond.table_correspond`), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
+| `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery; a multi-part Formex manifestation fetched whole, as one zip; `lagen eurlex backfill` downloads the acts the corpus cites but does not hold, ranked by `catalog.dangling_targets`), `bulk` (dump import), `correspond` (the EU-act **lineage**: a recast's own jämförelsetabell annex → article↔article pairs, mechanical, extracted by `parse` into the artifact's `correspondence` key; `catalog._index_document` writes them into `directive_correspondence` as it indexes each act, walked transitively by `catalog.genomfor_targets`), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_act_body` descends through Formex's `GENERAL`/`GR.SEQ` wrappers so a multi-file act (2004/18, the Charter) parses through the same walker as an ordinary `ACT` root; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
 | `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions |
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
@@ -3037,6 +3122,70 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **build/perf** (2026-07-25) — `pdftext.py`'s page-numbering rewritten:
+  `page_number_candidates` now splits what a margin line could be offering into
+  `strong` (digits-only, may establish or move the running offset) and `weak`
+  (a number at the edge of a line of prose, may only confirm an exact match) —
+  what finds the folio glued to a footnote without a copyright page or a
+  reprinted EU act's running header dragging the count. `printed_pages` numbers
+  a document in **sections**: the body, then — when a confirmed backward
+  restart happens and the running header names one (`bilaga_labels`, requiring
+  the label to repeat on an adjoining page) — each **bilaga** as its own
+  section, since where a document restarts at all every bilaga restarts at 1
+  (prop. 2021/22:100 has four printed page 1s). A bilaga page anchors
+  `bilaga{B}-sid{N}` instead of colliding with the body's `#sid{N}`; a restart
+  nothing identifies still yields no anchors, as before. Measured over 180
+  sampled PDFs: pages carrying a page number went from 51% to 99%, 0 lost.
+  Alongside it: `pdftohtml`'s **and** `pdftotext`'s output are now cached
+  brotli-compressed under `cache/pdfconv/` (`layout.PDFCONV`,
+  `layout.pdf_conversion`). Profiling a förarbete parse that had slowed to ~1
+  document/s across 32 workers showed the converter subprocess is 53-91% of a
+  PDF document's parse time (9.95 s of sou/2023:35's 10.9 s), while the
+  page-numbering rewrite above added 16 ms to a 714-page proposition. A
+  downloaded PDF never changes, so the conversion was pure repeat work on every
+  re-parse; the cache costs ~1% of the PDF bytes (~6 GB against 609 GB) and
+  turns an 11.89 s conversion into a 0.01 s read. The slowdown itself was
+  **not** a code regression: the förarbete download tree had grown to 597 GB /
+  57 587 PDFs (4 096 of them over 50 MB — the KB scanned SOU bodies from
+  `soukb-scans`), and 32 workers each holding a document's XML DOM exhausted
+  31 GB of RAM and drove the machine into swap (110 MB/s swap-out observed at
+  95% user CPU). Fewer workers, not more, is the answer there. `FA_CODE` had
+  never listed `lib/pdftext.py` or the new `forarbete/volumes.py`, so an edit to
+  either could ship without re-staling a single parsed document; both are now
+  in the recipe (foreskrift/avg/remisser/coe/icc already listed pdftext).
+  `test/test_pdftext.py`, `test/test_forarbete_parse.py`.
+- **eurlex** (2026-07-24) — directive lineage: `eurlex/correspond.py`
+  (run by `eurlex parse`) reads a recast's own
+  jämförelsetabell annex into article↔article pairs, mechanical like
+  `sfs table-correspond`, but stored under the act's own artifact `correspondence`
+  key rather than an authored layer; `catalog._index_document` writes them into
+  the new `catalog.directive_correspondence` table as it indexes each act
+  (no `relate`-time layer load), and the new
+  `catalog.genomfor_targets` (`(act, article, transposed article, hops)`)
+  walks it transitively (`LINEAGE_DEPTH = 2`) so a statute paragraf's
+  EU-case-law rail also finds judgments about the predecessor articles its own
+  genomförande statement never named — 238 of the 310 LOU paragrafs with a
+  genomförande statement gained older case law they lacked (a floor: the
+  corpus-wide re-parse the `_emit_table` fix needs has not run).
+  `catalog.dangling_targets` + `lagen eurlex backfill [<sector-digit>]
+  [--limit N]` fill the gap that made the lineage worth building: the
+  sector-3 bulk import ships only acts *in force*, so a repealed act a
+  judgment interprets is cited from everywhere and held nowhere (2004/18
+  alone: 6 979 references from 790
+  held documents); backfill downloads exactly those, ranked by inbound
+  citation count off the corpus's own link graph. Parser hardening alongside:
+  a multi-part Formex manifestation (an act published across several OJ
+  files) is now fetched whole as one zip instead of an arbitrary part;
+  `GENERAL`/`GR.SEQ` act roots (2004/18, the Charter) parse through the same
+  walker as an ordinary `ACT`; a table row keeps its interior empty cells
+  (only trailing ones drop), since in a jämförelsetabell the column a value
+  sits in is what it means (§7d, `test/test_eurlex_correspond.py`).
+  Alongside it, `forarbete/aigenomforande.py` mappings may now carry an
+  optional Swedish-side pinpoint (`"sfs": "S1"`/`"S3N2"`) when the FK scopes a
+  transposition claim to a stycke/punkt rather than the whole paragraf,
+  existence-checked at relate time against the published law's minted element
+  ids and rendered as citation prose ("första stycket genomför …") in the
+  statute margin.
 - **forarbete** (2026-07-23) — `ai-genomforande` opt-in LLM pass: authors the
   directive→paragraf transposition map for a prop's directive(s) out of its
   författningskommentar, one call per proposed law with a tagged
