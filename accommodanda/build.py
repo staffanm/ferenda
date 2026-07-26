@@ -3749,7 +3749,8 @@ def _cmd_runs(limit):
         secs = "%.1fs" % r["secs"] if r["secs"] is not None else "-"
         print("%s  %-8s %9s  %2d seg  %d err  %s"
               % (r["run"], r["status"], secs, r["segments"], r["errors"],
-                 " ".join(r["argv"])))
+                 " ".join(r["argv"]) if r["argv"] else
+                 "(command line lost -- pruned by a concurrent run)"))
 
 
 def cmd_patch_show(args, p):

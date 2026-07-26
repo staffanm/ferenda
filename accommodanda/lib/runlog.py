@@ -9,7 +9,10 @@ either importing the other:
   Written only by the parent build process; single-writer by assumption
   (the manifest already shares it) -- two concurrent invocations would
   interleave appends and race `prune`, which is accepted, not defended
-  against.
+  against. The *readers* do defend against its one visible consequence: a
+  run whose run-start a concurrent prune rewrote away is reported as
+  "damaged" rather than taking the whole ledger read down with it (see
+  `_run_start`).
 * ``errors.json`` -- a keyed latest-outcome store per document
   ("<source>/<stage>/<basefile>"), set on error and deleted on success, so
   "failed" is distinguishable from "never tried" and the store stays
@@ -132,12 +135,34 @@ def _classify(pid, has_end):
     return "running" if Path("/proc/%d" % pid).exists() else "aborted"
 
 
+def _run_start(run, events):
+    """The group's run-start event, synthesized when it is missing.
+
+    Missing is a state this module's own writer admits to (see the module
+    docstring: concurrent invocations race `prune`, which rewrites the whole
+    file from a snapshot taken before the other process appended its
+    run-start). It is rare -- it needs two `lagen` invocations within the same
+    prune -- but it happened, and a reducer that raised `StopIteration` on it
+    took down `lagen all runs` and the ops dashboard for every *other* run in
+    the ledger too. So a headless group is reported as the damaged record it
+    is rather than crashing the read: the run id still carries the timestamp
+    and pid it was minted from, and the surviving segments still carry their
+    step, source and error counts."""
+    start = next((ev for ev in events if ev["event"] == "run-start"), None)
+    if start is not None:
+        return start, False
+    return {"t": events[0]["t"], "argv": None,
+            "pid": int(run.rpartition("-")[2])}, True
+
+
 def _run_summary(run, events):
-    start = next(ev for ev in events if ev["event"] == "run-start")
+    start, headless = _run_start(run, events)
     end = next((ev for ev in events if ev["event"] == "run-end"), None)
     segments = [ev for ev in events if ev["event"] == "segment"]
     return {"run": run, "t": start["t"], "argv": start["argv"],
-            "pid": start["pid"], "status": _classify(start["pid"], end is not None),
+            "pid": start["pid"],
+            "status": ("damaged" if headless
+                       else _classify(start["pid"], end is not None)),
             "secs": end["secs"] if end else None,
             "ok": end["ok"] if end else None,
             "errors": end["errors"] if end else sum(s["errors"] for s in segments),
@@ -157,12 +182,13 @@ def run_detail(path, run_id):
     when the ledger has no such run."""
     for run, events in _group_runs(_iter_events(path)):
         if run == run_id:
-            start = next(ev for ev in events if ev["event"] == "run-start")
+            start, headless = _run_start(run, events)
             end = next((ev for ev in events if ev["event"] == "run-end"), None)
             return {"run": run, "start": start,
                     "segments": [ev for ev in events if ev["event"] == "segment"],
                     "end": end,
-                    "status": _classify(start["pid"], end is not None)}
+                    "status": ("damaged" if headless
+                               else _classify(start["pid"], end is not None))}
     return None
 
 

@@ -226,3 +226,27 @@ def test_last_success_ignores_skips_and_errors(tmp_path):
     ls = runlog.last_success(path)
     assert ls[("parse", "sfs")] == "2026-07-04T10:00:01Z"   # r1's segment, not r2's
     assert ("parse", "dv") not in ls
+
+
+def test_a_run_whose_start_a_concurrent_prune_ate_is_damaged_not_fatal(tmp_path):
+    # prune() rewrites the whole ledger from a snapshot, so a second `lagen`
+    # starting inside that window loses its run-start line (the module docstring
+    # accepts the race). Reading that group used to raise StopIteration, which
+    # took `lagen all runs` and the ops dashboard down for every *other* run in
+    # the ledger too.
+    path = tmp_path / "runs.ndjson"
+    _write_run(path, "r1", segments=[("parse", "sfs", 3.0, 0)])
+    runlog.emit_segment(path, "20260724T071444.323709Z-2206569", "parse", "dv",
+                        5.0, errors=2, status="errors", t="2026-07-24T07:14:49Z")
+    runlog.emit_run_end(path, "20260724T071444.323709Z-2206569", 5.4, ok=False,
+                        errors=2, t="2026-07-24T07:14:50Z")
+
+    runs = runlog.read_runs(path)
+    assert [r["status"] for r in runs] == ["damaged", "complete"]
+    headless = runs[0]
+    assert headless["argv"] is None                  # the command line is lost
+    assert headless["pid"] == 2206569                # but the run id still has it
+    assert headless["t"] == "2026-07-24T07:14:49Z"   # ... and the first event's time
+    assert headless["errors"] == 2 and headless["sources"] == ["dv"]
+    assert runlog.run_detail(path, "20260724T071444.323709Z-2206569")["status"] \
+        == "damaged"
