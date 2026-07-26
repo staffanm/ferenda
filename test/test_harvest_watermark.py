@@ -1,7 +1,10 @@
 import json
+import time
 from datetime import date, timedelta
-from pathlib import Path
 
+import pytest
+
+from accommodanda.lib import net
 from accommodanda.lib.harvest import HarvestWatermark, ItemKey, Skip, walk
 
 
@@ -130,7 +133,7 @@ def test_dirty_disables_consecutive_but_keeps_date_conclusive(tmp_path):
 # --- the shared download walk (lib.harvest.walk) ----------------------------
 
 def _run_walk(tmp_path, items, dates, on_disk, resolve, *, full=False,
-              limit=None, only=None, lookahead=3, safety_days=14):
+              limit=None, only=None, budget=None, lookahead=3, safety_days=14):
     """Drive walk() over an in-memory model. `items` is the enumeration (basefile
     strings, optionally with Skip records); `dates`/`on_disk` back item_key."""
     wm = HarvestWatermark(tmp_path / "wm.json", lookahead_limit=lookahead,
@@ -138,8 +141,8 @@ def _run_walk(tmp_path, items, dates, on_disk, resolve, *, full=False,
     return walk(items, resolve=resolve,
                 item_key=lambda bf: ItemKey(basefile=bf, is_downloaded=bf in on_disk,
                                             date=dates[bf]),
-                watermark=wm, full=full, only=only, limit=limit, scope="fs",
-                log=lambda *a: None)
+                watermark=wm, full=full, only=only, limit=limit, budget=budget,
+                scope="fs", log=lambda *a: None)
 
 
 def test_walk_backfill_fetches_all_and_completes_clean(tmp_path):
@@ -258,6 +261,72 @@ def test_walk_only_does_not_touch_watermark(tmp_path):
     assert fetched == ["fs/2026:1"] and result.new == 1
     wm = HarvestWatermark(tmp_path / "wm.json")
     assert wm.dirty is False and wm.last_harvest == "2026-01-01"
+
+
+# --- the sanity trip (walk budget + request deadline) -----------------------
+
+def test_walk_budget_trip_truncates_and_stays_dirty(tmp_path):
+    # an incremental walk past its budget stops like a --limit truncation: the
+    # store stays dirty and the watermark date does not advance past the
+    # un-walked backlog (the skolfs hung-register pathology)
+    HarvestWatermark(tmp_path / "wm.json").save("2026-01-01")  # incremental, clean
+    bfs = ["fs/2026:%d" % n for n in range(5, 0, -1)]
+    dates = {bf: "2026-06-30" for bf in bfs}
+    fetched = []
+
+    result = _run_walk(tmp_path, list(bfs), dates, set(), fetched.append,
+                       budget=0.0)
+    assert fetched == [] and result.seen == 0
+    wm = HarvestWatermark(tmp_path / "wm.json")
+    assert wm.dirty is True
+    assert wm.last_harvest == "2026-01-01"
+
+
+def test_walk_budget_exempts_backfill(tmp_path):
+    # a first harvest (no watermark date) is a backfill and must run to the end
+    # regardless of the budget
+    bfs = ["fs/2026:%d" % n for n in range(5, 0, -1)]
+    dates = {bf: "2026-06-30" for bf in bfs}
+    on_disk: set[str] = set()
+
+    def resolve(bf):
+        on_disk.add(bf)
+        return True
+
+    result = _run_walk(tmp_path, list(bfs), dates, on_disk, resolve, budget=0.0)
+    assert result.new == 5
+    assert HarvestWatermark(tmp_path / "wm.json").dirty is False
+
+
+def test_request_past_deadline_raises_without_an_attempt():
+    class Session:
+        deadline = 0.0                     # monotonic epoch, long past
+
+        def request(self, *args, **kwargs):
+            raise AssertionError("no attempt may start past the deadline")
+
+    with pytest.raises(net.BudgetExceeded):
+        net.request(Session(), "GET", "https://example.invalid/")
+
+
+def test_request_caps_timeout_to_remaining_budget():
+    seen_timeouts = []
+
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    class Session:
+        deadline = time.monotonic() + 5.0
+
+        def request(self, method, url, **kwargs):
+            seen_timeouts.append(kwargs["timeout"])
+            return Response()
+
+    net.request(Session(), "GET", "https://example.invalid/")
+    assert seen_timeouts and seen_timeouts[0] <= 5.0
 
 
 def test_walk_full_reresolves_downloaded(tmp_path):

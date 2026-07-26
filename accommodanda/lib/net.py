@@ -116,6 +116,14 @@ def _retry_after(response):
     return float(value) if value and value.isdigit() else None
 
 
+class BudgetExceeded(Exception):
+    """Raised by :func:`request` when the session's ``deadline`` (a monotonic
+    timestamp a budgeted harvest sets, see ``lib.harvest.walk``) has passed:
+    no further attempt or backoff sleep is worth its wall-clock cost. The
+    harvest loop treats it like any other per-item failure -- the store stays
+    dirty and the next run retries."""
+
+
 def is_not_found(exc):
     """Whether `exc` is a 404 raised by :func:`request`. A 404 is the one
     status a harvester routinely reads as *content* -- "the upstream holds no
@@ -132,10 +140,23 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
     timeouts. Backoff is exponential (capped at RETRY_MAX) but defers to
     Retry-After. A non-throttle 4xx is a genuine error and is raised at once.
     Every failed response is logged once. Returns the parsed JSON when
-    ``parse_json`` is set, else the Response (e.g. for binary downloads)."""
+    ``parse_json`` is set, else the Response (e.g. for binary downloads).
+
+    A session may carry a ``deadline`` attribute (a ``time.monotonic()``
+    timestamp, set by a budgeted incremental harvest): past it, no new attempt
+    starts (:class:`BudgetExceeded`), a running attempt's timeout is capped to
+    the time remaining, and a backoff sleep never outlives it -- so one sick
+    endpoint cannot stall a walk for hours of retry burn."""
     kwargs.setdefault("timeout", 60)
     diagnosed = False
     for attempt in range(retries):
+        deadline = getattr(session, "deadline", None)
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise BudgetExceeded("harvest budget spent before %s %s"
+                                     % (method, url))
+            kwargs["timeout"] = min(kwargs["timeout"], max(remaining, 1.0))
         response = None
         try:
             response = session.request(method, url, **kwargs)
@@ -157,6 +178,10 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
             if not transient or attempt == retries - 1:
                 raise
             wait = _retry_after(response) or min(RETRY_MAX, RETRY_BACKOFF * 2 ** attempt)
+            if deadline is not None:
+                # sleep at most to the deadline; the next attempt then raises
+                # BudgetExceeded rather than burning another timeout
+                wait = min(wait, max(deadline - time.monotonic(), 0))
             print("  retry %d/%d in %.0fs (HTTP %s)"
                   % (attempt + 1, retries - 1, wait, status or "-"),
                   file=sys.stderr, flush=True)

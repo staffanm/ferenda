@@ -28,6 +28,7 @@ parameters -- publication cadence differs, so each call site states its own.
 """
 
 import json
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -210,6 +211,7 @@ def guarded_enumerate(items: Iterable[Any], log: Callable[[str], Any] = print) -
 def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
          item_key: Callable[[Any], ItemKey | None], watermark: HarvestWatermark,
          full: bool = False, only: str | None = None, limit: int | None = None,
+         budget: float | None = None,
          scope: str = "", count_label: str = "new", total: int | None = None,
          log: Callable[[str], Any] = print, reporter: Reporter | None = None) -> WalkResult:
     """Run the shared newest-first download loop over ``items``.
@@ -222,6 +224,14 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     items already on disk; ``only`` fetches just the one matching basefile;
     ``limit`` caps the number of new fetches.
 
+    ``budget`` (seconds) is the sanity trip for the routine case: an
+    *incremental* run still walking past it stops as if ``--limit``-truncated
+    (loudly, store left dirty, next run resumes) instead of grinding for hours
+    against a sick upstream. Backfills (``--full`` or a first harvest) are
+    exempt -- they legitimately take long. The check runs between items; to
+    bound the time a single blocked fetch can burn, the caller also sets the
+    session ``deadline`` that ``lib.net.request`` honours.
+
     The watermark lifecycle is driven here: unless this is an ``--only`` run,
     :meth:`HarvestWatermark.begin` marks the store dirty up front and
     :meth:`HarvestWatermark.complete` clears it only on a clean, untruncated run
@@ -232,11 +242,20 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     rep = reporter or Reporter()
     seen = new = errors = skips = 0
     newest_date: str | None = None
+    start = time.monotonic()
+    tripped = False
 
     if only is None:
         watermark.begin()
 
     for item in guarded_enumerate(items, log):
+        if budget is not None and not backfill and only is None \
+                and time.monotonic() - start > budget:
+            tripped = True
+            log("  %s: sanity trip -- incremental walk still running after %.0fs "
+                "(%d seen, %d new); stopping, the store stays dirty and the next "
+                "run resumes" % (scope, budget, seen, new))
+            break
         if isinstance(item, Skip):
             skips += 1
             log("  %s enumerate: %s" % (scope, item.reason))
@@ -273,7 +292,9 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     rep.done()
 
     if only is None:
-        truncated = bool(limit) and new >= limit
+        # a budget trip is a truncation: the un-walked backlog below must not
+        # let complete() advance the date or clear begin()'s dirty flag
+        truncated = (bool(limit) and new >= limit) or tripped
         if not truncated:
             # a Skip (missed unknown docs), a per-doc error or a zero-item run
             # (a page that loaded but matched nothing, indistinguishable from

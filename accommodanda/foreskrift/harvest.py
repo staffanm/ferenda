@@ -628,6 +628,12 @@ def harvest(agency, root, full=False, only=None, limit=None, delay=0.5, log=prin
                             reporter)
 
 
+# sanity trip: a routine incremental agency harvest finishes in minutes; one
+# still running past this is upstream pathology (a hung register API, a WAF
+# tarpit), not work worth waiting on -- stop, leave the store dirty, move on
+INCREMENTAL_BUDGET = 300.0
+
+
 def _harvest_session(agency, root, session, full, only, limit, delay, log,
                      reporter=None):
     """Run the shared walk over an already-selected HTTP or browser transport."""
@@ -643,6 +649,13 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
     # ample -- an agency issues at most a few dozen numbers a year.
     watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
     rejects: list[str] = []
+
+    # arm the sanity trip on incremental runs only (walk exempts backfills
+    # itself, but the session deadline must not cut a legitimate first/--full
+    # harvest short); the deadline bounds a single blocked fetch, the walk
+    # budget stops the loop cleanly between items
+    if only is None and not full and watermark.last_harvest is not None:
+        session.deadline = time.monotonic() + INCREMENTAL_BUDGET
 
     def item_key(ref):
         # basefile is always "<fs>/<year>:<lopnummer>" (built by ref, above, off
@@ -665,7 +678,8 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
 
     result = walk(agency.enumerate(session, agency), resolve=resolve,
                   item_key=item_key, watermark=watermark, full=full, only=only,
-                  limit=limit, scope=agency.fs, log=log, reporter=reporter)
+                  limit=limit, budget=INCREMENTAL_BUDGET, scope=agency.fs,
+                  log=log, reporter=reporter)
 
     if rejects:
         log("  %s: %d file(s) served a non-PDF body and were skipped"
