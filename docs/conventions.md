@@ -256,7 +256,14 @@ Never run a state-changing git command (`commit`, `add`, `push`,
 `checkout`, `reset`, …) without an explicit instruction *for that
 operation*. "Fix X" is not permission to commit X. Make the changes,
 leave them in the working tree, let the user decide. The git-guard hook
-turns state-changing git into an explicit confirmation.
+enforces this structurally, in two tiers by what the command can destroy:
+irreversible or publishing git (`push`, `reset`, `rebase`, `checkout`,
+`clean`, …) is denied outright to everything but the `commit-planner`
+subagent, while recoverable git (`commit`, `add`, `stage`) returns "ask"
+so the *user* confirms at a prompt. A command mixing both tiers is
+denied — in `git add . && git push`, the push decides. The
+plan-then-approve sequence `commit-planner` follows is its own two-phase
+contract, not the hook's.
 
 ### rule:docs-follow-structure
 

@@ -58,11 +58,12 @@ preferences.
   reference corpora and hand-authored fixtures (see §6), and every bug fix is
   locked in with a regression fixture so it can't silently come back.
 
-Coding conventions worth internalising before your first PR:
+Coding conventions worth internalising:
 
 - **Fail fast.** Assert how the environment should be; a precondition `assert`
   with a message beats a defensive branch papering over a broken environment.
-- **Don't catch to log.** Only catch an exception you can fix and recover from.
+- **Don't catch just to log and continue.** Only catch an exception you can
+  fix and recover from.
 - **No in-function imports.** All imports at the top, grouped stdlib /
   third-party / local.
 - **Second use goes to `lib/`.** When a second vertical needs the same thing,
@@ -213,7 +214,7 @@ Driver flags:
 
 Per-doc resilience: a per-document exception is caught into the run's error
 list and the run continues (this is a *sanctioned* catch — the alternative is
-one bad doc aborting a 200K-doc run). A `SkipDocument` raised by an extractor
+one bad doc aborting a 300K-doc run). A `SkipDocument` raised by an extractor
 (expired/removed/empty doc) writes an empty artifact so the doc isn't retried
 forever.
 

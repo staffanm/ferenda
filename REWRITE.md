@@ -3066,7 +3066,7 @@ The judgment-level conventions live as a citable rule catalog in
 legacy-tree edit block, bare-suppression block, git-guard), the Stop hook
 (ruff + ty + `check-layers.py` layer-boundary AST check on edited files),
 review agents (`plan-reviewer`, `conventions-enforcer`, `docs-sync`,
-`commit-planner`) and the `/wrapup` skill.
+`commit-planner`) and the `/wrapup-session` skill.
 
 ---
 
