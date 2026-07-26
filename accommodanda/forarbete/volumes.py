@@ -15,9 +15,10 @@ is ("Nytt regelverk om upphandling, **del 3 av 4, bilaga 1-19**"). Where the
 link count matches the file count the texts index-align with `files`, which
 holds for 296 of the 306 records harvested from regeringen.se.
 
-Provenance splits the 485 into four populations that need different handling,
-and the record itself says which -- so 179 of them are decided without opening
-a single PDF:
+Provenance splits the 485 into five populations that need different handling
+(the curated skip list, then KB scan sets, budget propositions, legacy `_N`
+records and live records), and the record itself says which -- so 179 of them
+are decided without opening a single PDF:
 
 * **KB scan sets** (128, `orig_url` on urn.kb.se) -- the extra files are
   *sibling* volumes catalogued under the same SOU number, not later parts of
@@ -32,8 +33,11 @@ a single PDF:
 * **Everything else** (306) -- the link texts do the work.
 """
 
+import functools
+import json
 import re
 from html import unescape
+from pathlib import Path
 
 from ..lib import compress
 from ..lib.util import basefile_slug
@@ -59,6 +63,9 @@ RE_ANNEX_DOC = re.compile(r"\bunderlagsrapport\b|\brapport \d|\bfaktablad\b|"
 RE_OJ = re.compile(r"Europeiska unionens officiella tidning|"
                    r"Official Journal of the European", re.I)
 
+SKIPLIST = Path(__file__).with_name("data") / "skip.json"
+# the budget and vårproposition, skipped by rule rather than by list: they
+# recur every year, so enumerating them would need an entry each spring
 RE_BUDGET = re.compile(r"\d{4}/\d{2}:(1|100)$")
 RE_CONTENT_LINK = re.compile(
     r'<a\b[^>]+href="[^"]*(?:contentassets|globalassets)[^"]*"[^>]*>(.*?)</a>',
@@ -66,9 +73,25 @@ RE_CONTENT_LINK = re.compile(
 RE_TAG = re.compile(r"<[^>]+>")
 
 
+@functools.cache
+def _skiplist():
+    """The curated skip list (`data/skip.json`): '<type>/<basefile>' -> why.
+
+    Documents that sit in the förarbete listings without being förarbeten -- an
+    English-language summary published under a Ds number, a consultant's report
+    with no författningsförslag. Ported from the old codebase's per-document
+    options file; its far larger 'metadataonly' set is deliberately not ported
+    (see the note in skip.json)."""
+    return {k: v for k, v in
+            json.loads(SKIPLIST.read_text(encoding="utf-8")).items()
+            if not k.startswith("_")}
+
+
 def population(record):
-    """Which of the four populations a record belongs to: "kb", "budget",
-    "legacy" or "live". Read off the record alone -- no PDF is opened."""
+    """Which population a record belongs to: "skip", "kb", "budget", "legacy"
+    or "live". Read off the record alone -- no PDF is opened."""
+    if "%s/%s" % (record.get("type"), record.get("basefile")) in _skiplist():
+        return "skip"
     if "urn.kb.se" in (record.get("orig_url") or ""):
         return "kb"
     if record.get("type") == "prop" and RE_BUDGET.search(record.get("basefile", "")):
@@ -127,9 +150,16 @@ def body_pdfs(record, probe):
     It is called only for the populations that need it.
     """
     pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
+    kind = population(record)
+    # the curated skip list fires regardless of file count: a skip-listed
+    # document with a single PDF is still not a förarbete, and letting it
+    # through ships exactly the wrong-rather-than-thin page skip.json exists
+    # to prevent
+    if kind == "skip":
+        why = _skiplist()["%s/%s" % (record["type"], record["basefile"])]
+        return [], {f: why for f in pdfs}
     if len(pdfs) < 2:
         return pdfs, {}
-    kind = population(record)
     if kind == "budget":
         return [], {f: "budgetproposition" for f in pdfs}
     if kind == "kb":

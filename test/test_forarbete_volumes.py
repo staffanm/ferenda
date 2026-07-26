@@ -137,3 +137,37 @@ def test_labels_are_looked_up_by_position_in_files_not_among_the_pdfs():
                        "Betänkandet del 2 av 2"])
     body, _dropped = volumes.body_pdfs(rec, _probe({}))
     assert body == ["body.pdf", "part2.pdf"]
+
+
+def test_a_curated_skip_entry_takes_the_document_out_entirely():
+    # Ds 2001:15 is a consultant's report in 13 unsorted part-files with no
+    # page numbering and no författningsförslag -- parsing it produces a page
+    # that is wrong rather than thin
+    rec = _rec(["a.pdf", "b.pdf"], typ="ds", basefile="2001:15")
+    assert volumes.population(rec) == "skip"
+    body, dropped = volumes.body_pdfs(rec, _probe({}))
+    assert body == []
+    assert all("författningsförslag" in why for why in dropped.values())
+    # the gate must fire for a single-PDF record too -- the skip list is a
+    # judgement about the document, not about how many files it happens to hold
+    single = _rec(["a.pdf"], typ="ds", basefile="2001:15")
+    body, dropped = volumes.body_pdfs(single, _probe({}))
+    assert body == [] and set(dropped) == {"a.pdf"}
+
+
+def test_the_historical_corpus_is_not_skipped():
+    # the old codebase marked 19,571 propositions "metadataonly", nearly all of
+    # them the 1860s-1950s scans. That was a resource-constraint workaround, not
+    # a judgement about the documents, and is deliberately not ported -- the
+    # rewrite parses them in full.
+    for basefile in ("1867:1", "1912:52", "1949:100"):
+        assert volumes.population(_rec([], basefile=basefile)) == "live"
+
+
+def test_every_skiplist_entry_is_well_formed():
+    # the list is hand-edited data; a typo'd key would silently never match
+    for key, why in volumes._skiplist().items():
+        typ, _, basefile = key.partition("/")
+        assert typ in ("prop", "sou", "ds", "pm", "dir", "fm", "skr", "so", "lr"), key
+        assert ":" in basefile, key
+        assert why and isinstance(why, str), key
