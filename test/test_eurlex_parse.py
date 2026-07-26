@@ -280,6 +280,88 @@ def test_parse_judgment():
     assert ("ruling", "1", "Artikel 56 FEUF ska tolkas.") in seen
 
 
+# trimmed from the real C-513/99 (Concordia Bus) swe.fmx4: pre-2012 ECR Formex
+# numbers its paragraphs with plain NP (NO.P + TXT), not NP.ECR, and nests the
+# ruling's JURISDICTION inside CONTENTS.JUDGMENT rather than at the root
+OLD_JUDGMENT_XML = """<JUDGMENT>
+  <BIB.JUDGMENT><REF.CASE FILE="ECRCJ2002SVA.0800721301.case.xml"><NO.CASE>C-513/99</NO.CASE></REF.CASE><NO.CELEX>61999J0513</NO.CELEX></BIB.JUDGMENT>
+  <CURR.TITLE><LEFT>DOM AV DEN <DATE ISO="20020917">17.9.2002</DATE> — MÅL C-513/99</LEFT></CURR.TITLE>
+  <TITLE><TI><P><IE/></P></TI></TITLE>
+  <CONTENTS.JUDGMENT>
+    <GR.SEQ LEVEL="1"><TITLE><TI><P>Dom</P></TI></TITLE>
+      <NP><NO.P>1</NO.P><TXT>Högsta förvaltningsdomstolen har ställt tre frågor om
+        tolkningen av artikel 36.1 i rådets direktiv 92/50/EEG.</TXT></NP>
+      <NP><NO.P>3</NO.P><TXT>I artikel 1 i direktiv 92/50 föreskrivs följande:</TXT>
+        <P><QUOT.S LEVEL="1"><LIST TYPE="alpha"><ITEM>
+          <NP><NO.P>a)</NO.P><TXT>offentliga tjänsteavtal: skriftliga avtal med
+            ekonomiska villkor</TXT></NP>
+        </ITEM></LIST></QUOT.S></P></NP>
+    </GR.SEQ>
+    <JURISDICTION><INTRO><P>På dessa grunder beslutar</P><P>DOMSTOLEN</P></INTRO>
+      <LIST TYPE="ARAB"><ITEM><NP><NO.P>1)</NO.P><TXT>Artikel 36.1 a i direktiv
+        92/50/EEG skall tolkas så.</TXT></NP></ITEM></LIST>
+    </JURISDICTION>
+  </CONTENTS.JUDGMENT>
+</JUDGMENT>"""
+
+
+def test_parse_old_judgment_np_paragraphs_and_nested_ruling():
+    # two thirds of the judgment corpus (1965-ca 2012) uses NP, which the
+    # judgment path ignored -- every such judgment parsed to its header and
+    # preamble alone, so no article citations fed the EU case-law rail
+    doc = parse_formex(ET.fromstring(OLD_JUDGMENT_XML), "61999CJ0513", "swe")
+    assert doc.doctype == "judgment"
+    assert doc.date == "20020917"
+    seen = [(b.kind, b.num, b.text) for b in doc.body]
+    assert ("heading", None, "Dom") in seen
+    assert ("paragraph", "1", "Högsta förvaltningsdomstolen har ställt tre frågor"
+            " om tolkningen av artikel 36.1 i rådets direktiv 92/50/EEG.") in seen
+    assert ("paragraph", "3",
+            "I artikel 1 i direktiv 92/50 föreskrivs följande:") in seen
+    # a quoted act's own list items (NP inside NP) are not judgment paragraphs
+    assert not any(b.num == "a)" for b in doc.body)
+    # the ruling is found even though JURISDICTION sits inside CONTENTS.JUDGMENT
+    assert ("ruling", "1)",
+            "Artikel 36.1 a i direktiv 92/50/EEG skall tolkas så.") in seen
+
+
+# trimmed from the real 61987CJ0031 (Beentjes) eng.fmx4: for the oldest ECR
+# cases the report for the hearing is the only text CELLAR holds, and it is
+# English -- Swedish did not exist pre-accession
+HEARING_XML = """<REPORT.HEARING>
+  <BIB.REPORT.HEARING><REF.CASE FILE="ECRCJ1988ENA.0800463501.case.xml"><NO.CASE>31/87</NO.CASE></REF.CASE><NO.CELEX>61987J0031</NO.CELEX></BIB.REPORT.HEARING>
+  <CURR.TITLE><LEFT>REPORT FOR THE HEARING — CASE 31/87</LEFT><RIGHT>BEENTJES v NETHERLANDS STATE</RIGHT></CURR.TITLE>
+  <TITLE><TI><P><HT TYPE="UC">Report for the Hearing</HT></P><P>delivered in Case 31/87<NOTE NOTE.ID="E0001" NUMBERING="STAR"><P>Language of the Case: Dutch.</P></NOTE></P></TI></TITLE>
+  <CONTENTS>
+    <GR.SEQ LEVEL="1"><TITLE><TI><NP><NO.P>I —</NO.P><TXT>Relevant legislation</TXT></NP></TI></TITLE>
+      <P>Council Directive 71/305/EEC of 26 July 1971 is intended to secure
+freedom of establishment and freedom to provide services.</P>
+      <P>Article 29 (5) of Directive 71/305/EEC provides for an examination
+of abnormally low tenders.</P>
+    </GR.SEQ>
+  </CONTENTS>
+</REPORT.HEARING>"""
+
+
+def test_hearing_report_stands_in_for_the_oldest_judgments():
+    # Beentjes parsed to a single footnote: REPORT.HEARING fell through to the
+    # ACT branch, which found no enacting terms. The report's "Relevant
+    # legislation" prose is where the case's act citations live, so it parses
+    # through the opinion's prose walker -- and, being English, its citations
+    # are scanned with the English grammar (doc.lang drives _refparser)
+    doc = parse_formex(ET.fromstring(HEARING_XML), "61987CJ0031", "eng")
+    assert doc.doctype == "judgment"
+    texts = [(b.kind, b.text) for b in doc.body]
+    assert ("heading", "I — Relevant legislation") in texts
+    assert any(kind == "paragraph" and "71/305/EEC" in text
+               for kind, text in texts)
+    art = to_artifact(doc)
+    uris = [run["uri"] for block in flatten_structure(art["structure"])
+            for run in block.get("text", []) if isinstance(run, dict)]
+    assert "https://lagen.nu/ext/celex/31971L0305" in uris
+    assert "https://lagen.nu/ext/celex/31971L0305#29.5" in uris
+
+
 def test_judgment_without_title_date_has_none_not_the_referral_date():
     # old ECR Formex: empty TITLE, only referral/protocol dates in
     # JUDGMENT.INIT -- those must never stand in for the delivery date

@@ -312,7 +312,8 @@ def parse_judgment(root, blocks):
     contents = root.find("CONTENTS.JUDGMENT")
     if contents is not None:
         _parse_judgment_contents(contents, blocks)
-    jurisdiction = root.find("JURISDICTION")
+    # the ruling normally sits inside CONTENTS.JUDGMENT, not at the root
+    jurisdiction = root.find(".//JURISDICTION")
     if jurisdiction is not None:
         intro = _text(jurisdiction, "INTRO")
         if intro:
@@ -321,6 +322,24 @@ def parse_judgment(root, blocks):
             marker = _text(np, "NO.P").strip(". ") or None
             blocks.append(Block("ruling", _text(np, "TXT", "P"), num=marker))
     return title
+
+
+def _seq_paragraphs(parent, blocks):
+    """The free-prose contents shape opinions and hearing reports share:
+    opening prose (``P``), numbered paragraphs (``NP`` = NO.P marker + TXT)
+    and section groupings (``GR.SEQ`` with a TITLE heading)."""
+    for el in parent:
+        if el.tag == "NP":
+            blocks.append(_np_paragraph(el))
+        elif el.tag == "P":
+            text = flatten(el)
+            if text:
+                blocks.append(Block("paragraph", text))
+        elif el.tag == "GR.SEQ":
+            heading = _text(el, "TITLE")
+            if heading:
+                blocks.append(Block("heading", heading, level=1))
+            _seq_paragraphs(el, blocks)
 
 
 def parse_opinion(root, blocks):
@@ -333,26 +352,43 @@ def parse_opinion(root, blocks):
     contents = root.find("CONTENTS.CONCLUSION")
     title = _text(contents.find("TITLE") if contents is not None else None, "HT") \
         or _text(root, "CURR.TITLE")
-
-    def paragraphs(parent):
-        for el in parent:
-            if el.tag == "NP":
-                marker = _text(el, "NO.P").strip(". ") or None
-                blocks.append(Block("paragraph", _text(el, "TXT", "P"), num=marker))
-            elif el.tag == "P":
-                text = flatten(el)
-                if text:
-                    blocks.append(Block("paragraph", text))
-            elif el.tag == "GR.SEQ":
-                heading = _text(el, "TITLE")
-                if heading:
-                    blocks.append(Block("heading", heading, level=1))
-                paragraphs(el)
     if contents is not None:
         for el in contents:
             if el.tag != "TITLE":            # the opinion's own title (= doc.title)
-                paragraphs([el])
+                _seq_paragraphs([el], blocks)
     return title
+
+
+def parse_hearing_report(root, blocks):
+    """A report for the hearing (Formex ``REPORT.HEARING``) -> body blocks: a
+    plain ``CONTENTS`` in the opinion's prose shape. Kept because for the
+    oldest ECR cases it is the only body text CELLAR holds -- and its
+    "Relevant legislation" section is where the case's act citations live."""
+    title = _text(root.find("TITLE"), "TI") or _text(root, "CURR.TITLE")
+    contents = root.find("CONTENTS")
+    if contents is not None:
+        _seq_paragraphs(contents, blocks)
+    return title
+
+
+def _np_paragraph(np):
+    """A numbered paragraph (``NP``: ``NO.P`` marker + ``TXT``) -> a paragraph
+    Block. The shape opinions always use and judgments used until ca 2012,
+    when judgments switched to ``NP.ECR`` with an IDENTIFIER attribute."""
+    marker = _text(np, "NO.P").strip(". ") or None
+    return Block("paragraph", _text(np, "TXT", "P"), num=marker)
+
+
+def _judgment_nps(el):
+    """The judgment body's own ``NP`` paragraphs, in document order. Does not
+    descend into NP/NP.ECR (an inner NP is a quoted list item of a cited act,
+    not a numbered paragraph of the judgment) nor into JURISDICTION (the
+    ruling, which parse_judgment reads separately)."""
+    for child in el:
+        if child.tag == "NP":
+            yield child
+        elif child.tag not in ("NP.ECR", "JURISDICTION"):
+            yield from _judgment_nps(child)
 
 
 def _parse_judgment_contents(contents, blocks):
@@ -364,6 +400,10 @@ def _parse_judgment_contents(contents, blocks):
     for np in contents.findall(".//NP.ECR"):
         marker = (np.get("IDENTIFIER") or "").lstrip("NP0") or None
         blocks.append(Block("paragraph", _text(np, "TXT", "P"), num=marker))
+    # pre-2012 ECR Formex wraps the same paragraphs in plain NP instead;
+    # two thirds of the judgment corpus parsed to nothing without this
+    for np in _judgment_nps(contents):
+        blocks.append(_np_paragraph(np))
 
 
 def judgment_metadata(root):
@@ -482,6 +522,13 @@ def parse_formex(root, celex, lang):
     elif root.tag == "CONCLUSION":          # an Advocate General's opinion (E4)
         doc.date, doc.ecli = judgment_metadata(root)
         doc.title = parse_opinion(root, doc.body)
+    elif root.tag == "REPORT.HEARING":
+        # for the oldest cases (Beentjes) the report for the hearing is the
+        # only text CELLAR holds; its "Relevant legislation" section carries
+        # the act citations the rail joins on, so it stands in for the
+        # judgment body rather than rendering an empty page
+        doc.date, doc.ecli = judgment_metadata(root)
+        doc.title = parse_hearing_report(root, doc.body)
     elif root.tag == "ANNEX":
         # some older acts expose only an annex as their Formex manifestation;
         # render it rather than an empty page (a fuller manifestation, if any,
@@ -512,11 +559,14 @@ def parse_document(roots, celex, lang):
 
 
 @functools.cache
-def _refparser():
+def _refparser(lang="swe"):
     """Citation scanner for EU body text: EU legislation + CJEU case law. No
-    SFS vocabulary (EU references are absolute CELEX/case numbers)."""
+    SFS vocabulary (EU references are absolute CELEX/case numbers). `lang`
+    "eng" loads the English citation surface -- pre-accession case law exists
+    in no Swedish version, so those documents are parsed from their English
+    manifestation ("Article 29 (5) of Directive 71/305/EEC")."""
     return LagrumParser({}, basefile="celex",
-                        parse_types=[EULAGSTIFTNING, EURATTSFALL])
+                        parse_types=[EULAGSTIFTNING, EURATTSFALL], lang=lang)
 
 
 @functools.cache
@@ -546,7 +596,7 @@ def to_artifact(doc):
     inline-run list (plain runs + {predicate,uri,text} citation links). Defined
     terms are extracted first (anchoring the definition points), then every block
     is scanned both for citations and for in-act uses of those terms."""
-    parser = _refparser()
+    parser = _refparser("eng" if doc.lang == "eng" else "swe")
     parser.reset()                          # fresh per-document state
     # a legislative act's own body cites its own articles by a bare "artikel N";
     # tell the parser its identity so those self-refer to it rather than
