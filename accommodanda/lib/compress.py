@@ -229,10 +229,24 @@ def write_download(path, data):
     payloads and storing already-compressed ones (PDF, zip, ...) plain. `data` is
     bytes or str. The single write funnel for downloads, mirroring `write_bytes`
     for the artifact/page trees: callers pass the logical name (``foo.html``,
-    ``bar.pdf``) and read it back through the compress-aware readers."""
+    ``bar.pdf``) and read it back through the compress-aware readers.
+
+    A re-download that brings back the *same* bytes is not written: the file
+    keeps its existing mtime. Two things downstream key on that mtime and would
+    otherwise be thrown away for nothing -- the poppler conversion cache
+    (`lib/pdftext._converted`: an entry older than its PDF is stale, and
+    rebuilding one costs seconds per document) and the build's freshness
+    watermarks, which fingerprint size+mtime and would re-parse the whole
+    corpus. So `download --force` re-verifies every document over the network
+    but only disturbs the ones that actually changed.
+
+    Returns whether anything was written."""
     if isinstance(data, str):
         data = data.encode("utf-8")
+    if exists(path) and read_bytes(path) == data:
+        return False
     write_bytes(path, data, encodings=download_encodings(path))
+    return True
 
 
 def unlink(path):

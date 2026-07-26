@@ -96,3 +96,31 @@ def test_compress_off_stores_plain(tmp_path, monkeypatch):
     assert path.exists()
     assert not (tmp_path / "doc.html.br").exists()
     assert compress.read_text(path) == payload
+
+
+def test_write_download_leaves_unchanged_bytes_alone(tmp_path, monkeypatch):
+    # the poppler conversion cache (lib/pdftext._converted) and the build's
+    # freshness watermarks both key on the file's mtime, so a re-download that
+    # brings back identical bytes must not touch it
+    monkeypatch.setattr(config, "COMPRESS", True)
+    path = tmp_path / "prop.pdf"
+    assert compress.write_download(path, b"%PDF-1.4 body") is True
+    before = compress.stat(path).st_mtime_ns
+
+    assert compress.write_download(path, b"%PDF-1.4 body") is False
+    assert compress.stat(path).st_mtime_ns == before
+
+    assert compress.write_download(path, b"%PDF-1.4 revised") is True
+    assert compress.read_bytes(path) == b"%PDF-1.4 revised"
+
+
+def test_write_download_compares_the_logical_bytes_not_the_stored_ones(tmp_path,
+                                                                       monkeypatch):
+    # a compressible payload is stored as .br: the comparison has to happen on
+    # the decompressed content, or every re-download would look like a change
+    monkeypatch.setattr(config, "COMPRESS", True)
+    path = tmp_path / "landing.html"
+    payload = "<html>" + ("x" * 600) + "</html>"
+    assert compress.write_download(path, payload) is True
+    assert (tmp_path / "landing.html.br").exists()
+    assert compress.write_download(path, payload) is False
