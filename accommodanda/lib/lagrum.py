@@ -243,6 +243,45 @@ av_datum: AV _W DEN _W datum_ref_id
 datum_ref_id: DATUM
 """
 
+# The English-surface EU rules: same nonterminal names as EU_RULES, so
+# fmt_eu_ref and celex_uri need no dispatch -- only the word order and the
+# sub-article convention differ ("Article 29 (5) of Directive 71/305/EEC";
+# the parenthesised punkt is the pre-Interinstitutional-style-guide form the
+# old judgments use, alongside the modern "Article 5(2)"). The Swedish
+# treaty/named-act extensions are not loaded for English: a bare "Article 177
+# of the EEC Treaty" must simply refuse to anaphora-link (the of-guard in
+# fmt_eu_ref), which is correct-but-unlinked rather than mis-pinned.
+EU_RULES_ENG = r"""
+eu_ref: artikel_part _W OF _W rattsakt_part
+      | rattsakt_part
+      | artikel_part
+
+artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
+artikel_item: artikel_ref_id (DOT underartikel_ref_id
+                              | _W? LPAR underartikel_ref_id RPAR)?
+_asep: _W_AND_OR_EN | HYP | COMMA _W
+artikel_ref_id: NUMBER
+underartikel_ref_id: NUMBER
+
+rattsakt_part: institution _W akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
+             | akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
+             | direktiv_part
+             | forordning_part
+             | eu_generic
+institution: RADETS | EP_RADETS | KOMMISSIONENS
+akttyp: DIREKTIV | FORORDNING | REKOMMENDATION | BESLUT
+direktiv_part: ar_ref_id SLASH lopnummer_ref_id SLASH samarbete_ref_id
+forordning_part: LPAR samarbete_ref_id RPAR (_W NO_EN)? _W lopnummer_ref_id SLASH ar_ref_id
+ar_ref_id: NUMBER
+lopnummer_ref_id: NUMBER
+samarbete_ref_id: SAMARBETE
+av_datum: OF _W datum_ref_id
+datum_ref_id: DATUM_EN
+eu_generic: EU_DET _W EU_GENERIC
+EU_DET: "the"
+EU_GENERIC: "directive" | "regulation"
+"""
+
 TERMINALS = r"""
 // --- terminals ---
 
@@ -276,6 +315,19 @@ CHANGE_WORD.4: /Lag|Förordning|lag|förordning/
 LAW_SYNONYM.4: /lagens?|balkens?|förordningens?|formens?|ordningens?|kungörelsens?|stadgans?|lag|förordning/
 NAMED_LAW.5: /[\wåäö]+- (?:och|eller) [\wåäö]+-?(?:lagens?|förordningens?)(?![\wåäö])|[\wåäö-]*[\wåäö](?:lagens?|balkens?|förordningens?|formens?|(?<!för)ordningens?|kungörelsens?|stadgans?)(?![\wåäö])/
 SAME_LAW.5: /samma lag|nämnda lag|samma förordning|nämnda förordning/
+NR: /nr/
+DATUM: /\d{1,2} (?:januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december) \d{4}/
+COLON: ":"
+"""
+
+# The EU-legislation terminals are the one language-dependent piece of the
+# grammar: CELLAR holds no Swedish text for pre-accession case law, so those
+# documents are parsed from their English manifestation, where the same act
+# citation reads "Article 29 (5) of Directive 71/305/EEC". Both blocks define
+# the *same* terminal names, so every rule and formatter works unchanged; the
+# parser picks a block by the document's language.
+EU_TERMINALS = {
+    "swe": r"""
 ARTIKEL.3: /[Aa]rtikel/
 ARTIKLARNA.3: /[Aa]rtiklarna/
 RADETS: /rådets/
@@ -286,12 +338,26 @@ FORORDNING: /förordning/
 REKOMMENDATION: /rekommendation/
 BESLUT: /beslut/
 SAMARBETE: /EEG|EG|EU/
-NR: /nr/
 AV: /av/
 DEN: /den/
-DATUM: /\d{1,2} (?:januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december) \d{4}/
-COLON: ":"
-"""
+""",
+    "eng": r"""
+ARTIKEL.3: /[Aa]rticle/
+ARTIKLARNA.3: /[Aa]rticles/
+RADETS: /Council/
+EP_RADETS: /European Parliament and (?:of the )?Council/
+KOMMISSIONENS: /Commission/
+DIREKTIV: /[Dd]irective/
+FORORDNING: /[Rr]egulation/
+REKOMMENDATION: /[Rr]ecommendation/
+BESLUT: /[Dd]ecision/
+SAMARBETE: /EEC|EC|EU|Euratom/
+NO_EN: /No\.?/
+OF: "of"
+_W_AND_OR_EN: / (?:and|or) /
+DATUM_EN: /\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}/
+""",
+}
 
 # KORTLAGRUM (abbreviated lagrum: "3 § MBL", "TF 2:3", "10 kap. 1 § ÄB") --
 # the old kortlagrum.ebnf. Reuses generic_ref / piece_ref / NUMBER from
@@ -394,6 +460,11 @@ AVSNITTNR: /\d+(?:\.\d+){1,3}/
 # hyphen variants real EU texts use (incl. U+2011 non-breaking hyphen).
 EURATTSFALL_RULES = r"""
 ecj_ref: (CASE _W)? ecj_decision ECJHYP ecj_serial SLASH ecj_year
+       | CASE _W ecj_serial SLASH ecj_year
+
+// the second alternative is the pre-1989 numbering ("Case 31/87", "mål
+// 31/87"): no court letter existed before the Court of First Instance, so
+// the marker word is required and the court defaults to the ECJ (fmt_ecj_ref)
 ecj_decision: DECISION
 ecj_serial: NUMBER
 ecj_year: NUMBER
@@ -556,6 +627,17 @@ FORARBETEN_TRIGGER_SRC = r"""
 EURATTSFALL_TRIGGER_SRC = r"""
     \b(?:Case|[Mm]ål)\ [CTF][-‑‐–—]\d
   | \b[CTF][-‑‐–—]\d+/\d
+  | \b(?:Case|[Mm]ål)\ \d+/\d                  # pre-1989 numbering ("Case 31/87")
+"""
+
+# the English-surface EU trigger, mirroring EU_TRIGGER_SRC for the terminals
+# EU_TERMINALS["eng"] defines (no treaty/named-act forms: not loaded for eng)
+EU_TRIGGER_SRC_ENG = r"""
+    \b[Aa]rticles?\ \d                          # Article 29 (5) / Articles 20 and 26
+  | \b(?:Council|Commission|European\ Parliament)\b
+  | \b\d+/\d+/E(?:EC|C|U|uratom)\b              # 71/305/EEC
+  | \b[DdRr](?:irective|egulation)\ (?=\(E(?:EC|C|U)\))
+  | \(E(?:EC|C|U)\)\ (?:No\.?\ )?\d+/\d+        # (EEC) No 2092/91
 """
 
 # fires at each authority-decision marker (ARN/JO/JK)
@@ -583,9 +665,11 @@ def expand_types(types):
     return frozenset(out)
 
 
-def build_trigger(types):
-    parts = [TRIGGER_SRC[t].strip() for t in TYPE_ORDER
-             if t in types and t in TRIGGER_SRC]
+def build_trigger(types, lang="swe"):
+    src = dict(TRIGGER_SRC)
+    if lang == "eng":
+        src[EULAGSTIFTNING] = EU_TRIGGER_SRC_ENG
+    parts = [src[t].strip() for t in TYPE_ORDER if t in types and t in src]
     return re.compile("\n  | ".join(parts), re.X)
 
 # The old SwedishCitationParser.FILTER_LAW pre-filter, ported verbatim.
@@ -850,7 +934,9 @@ def celex_uri(attrs, base='https://lagen.nu/'):
     if year is None:
         raise NoLink()
     letter = {'direktiv': 'L', 'förordning': 'R',
-              'rekommendation': 'H', 'beslut': 'D'}[attrs['akttyp']]
+              'rekommendation': 'H', 'beslut': 'D',
+              'directive': 'L', 'regulation': 'R',
+              'recommendation': 'H', 'decision': 'D'}[attrs['akttyp'].lower()]
     uri = base + 'ext/celex/3%04d%s%04d' % (year, letter, number)
     if attrs.get('artikel'):
         uri += '#' + attrs['artikel']
@@ -912,27 +998,36 @@ SARSKILT: "särskilt"
 
 
 @functools.cache
-def parser(requested, expanded, abbrevs=(), eu_acts=()):
+def parser(requested, expanded, abbrevs=(), eu_acts=(), lang="swe"):
     """Earley parser compiled for a set of parse types. Root alternatives
     come only from the explicitly `requested` types; rule fragments and
     terminals from the dependency-`expanded` set -- so a dependency
     (KORTLAGRUM/ENKLALAGRUM both depend on LAGRUM) lends its productions
     without also contributing its own ?ref roots. `abbrevs` (sorted
     longest-first) supplies the KORTLAGRUM LAW_ABBREV terminal; `eu_acts`
-    (likewise) the EULAGSTIFTNING EU_NAMNAKT terminal of known EU-act names."""
+    (likewise) the EULAGSTIFTNING EU_NAMNAKT terminal of known EU-act names.
+    `lang` swaps the EU-legislation surface (EU_RULES_ENG + the eng terminal
+    block) for an English-language document; the Swedish-only treaty and
+    named-act extensions are then left out."""
+    rules = dict(RULES)
+    if lang == "eng":
+        rules[EULAGSTIFTNING] = EU_RULES_ENG
     roots = [r for t in TYPE_ORDER if t in requested for r in ROOTS[t]]
     grammar = "start: ref\n?ref: " + "\n    | ".join(roots) + "\n"
-    grammar += "".join(RULES.get(t, '') for t in TYPE_ORDER if t in expanded)
+    grammar += "".join(rules.get(t, '') for t in TYPE_ORDER if t in expanded)
     grammar += TERMINALS
+    if EULAGSTIFTNING in expanded:
+        grammar += EU_TERMINALS[lang]
     if KORTLAGRUM in expanded:
         grammar += "\nLAW_ABBREV: %s\n" % " | ".join('"%s"' % a for a in abbrevs)
-    if EULAGSTIFTNING in expanded:
+    if EULAGSTIFTNING in expanded and lang != "eng":
         grammar += EU_EXTRA_RULES
         grammar += "\nEU_TREATY: %s\n" % " | ".join(
             '"%s"i' % t for t in sorted(TREATIES, key=len, reverse=True))
-    if EULAGSTIFTNING in expanded and eu_acts:
-        grammar += EU_NAMNAKT_RULES
-        grammar += "\nEU_NAMNAKT: %s\n" % " | ".join('"%s"i' % a for a in eu_acts)
+        if eu_acts:
+            grammar += EU_NAMNAKT_RULES
+            grammar += "\nEU_NAMNAKT: %s\n" % " | ".join(
+                '"%s"i' % a for a in eu_acts)
     return Lark(grammar, parser='earley')
 
 
@@ -976,9 +1071,11 @@ def find_refids(tree):
     return d
 
 
-def subtree(tree, name):
-    """First subtree (self included) with the given rule name."""
-    return next(s for s in tree.iter_subtrees_topdown() if s.data == name)
+def subtree(tree, name, *default):
+    """First subtree (self included) with the given rule name. Raises
+    StopIteration when absent, unless a `default` is supplied."""
+    return next((s for s in tree.iter_subtrees_topdown() if s.data == name),
+                *default)
 
 
 def token_text(tree):
@@ -1026,10 +1123,12 @@ class LagrumParser:
     teaches the parser law names used later in the document)."""
 
     def __init__(self, namedlaws, basefile, base='https://lagen.nu/',
-                 abbreviations=None, parse_types=None, named_acts=None):
+                 abbreviations=None, parse_types=None, named_acts=None,
+                 lang="swe"):
         self.namedlaws = namedlaws
         self.basefile = basefile
         self.base = base
+        self.lang = lang
         self.named_acts = named_acts or {}
         # the document's own law URI -- the prefix every self-reference (a
         # relative "5 §" or an ändringshänvisning "#L<act>") is minted under,
@@ -1057,8 +1156,9 @@ class LagrumParser:
         eu_acts = tuple(sorted(self.named_acts, key=len, reverse=True))
         self.lark = parser(requested, self.parse_types,
                            abbrevs if KORTLAGRUM in self.parse_types else (),
-                           eu_acts if EULAGSTIFTNING in self.parse_types else ())
-        self.trigger = build_trigger(self.parse_types)
+                           eu_acts if EULAGSTIFTNING in self.parse_types else (),
+                           lang)
+        self.trigger = build_trigger(self.parse_types, lang)
 
     def reset(self):
         """Discard per-document state (learned law names, the "samma lag"
@@ -1536,7 +1636,9 @@ class LagrumParser:
             # förordning (EG) nr 45/2001. ... artikel N i förordningen").
             if bare:
                 tail = self._scan_text[self._scan_base + node_span(node)[1]:][:14]
-                if re.match(r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s", tail):
+                guard = (r"\s*(?:,|and|or)\s*\d|\s+of\s" if self.lang == "eng"
+                         else r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s")
+                if re.match(guard, tail):
                     raise NoLink()
             target = (self.state.self_eu_act if bare else None) \
                 or self.state.last_eu_act
@@ -1564,7 +1666,7 @@ class LagrumParser:
         # lopnummer, so for a year-first one (no "nr"/"No" token) move the year
         # into `ar` -- celex_uri range-checks and corrects either way.
         if ('forordning_part' in parts and 'ar' in attrs and 'lopnummer' in attrs
-                and not any(t.type == 'NR' for t in tokens)):
+                and not any(t.type in ('NR', 'NO_EN') for t in tokens)):
             attrs['ar'], attrs['lopnummer'] = attrs['lopnummer'], attrs['ar']
         if not specs:
             self.emit(attrs, match, out, context, span=node_span(node))
@@ -1697,7 +1799,10 @@ class LagrumParser:
     ECJ_DESCRIPTOR = {'C': 'J', 'T': 'A', 'F': 'W'}
 
     def fmt_ecj_ref(self, node, match, out, context):
-        decision = token_text(subtree(node, 'ecj_decision'))
+        # the pre-1989 numbering ("Case 31/87") has no court letter: only the
+        # ECJ existed, so its absence *means* the Court of Justice
+        decision_node = subtree(node, 'ecj_decision', None)
+        decision = token_text(decision_node) if decision_node is not None else 'C'
         serial = token_text(subtree(node, 'ecj_serial'))
         year = token_text(subtree(node, 'ecj_year'))
         if len(year) == 2:  # two-digit year: <54 -> 20xx else 19xx

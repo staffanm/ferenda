@@ -236,6 +236,66 @@ def test_eurattsfall(text, uri):
     assert [r.uri for r in parser.parse_text(text, context={})] == [uri]
 
 
+# pre-1989 case numbering ("Case 31/87", "mål 45/87"): no court letter existed
+# before the Court of First Instance, so the marker word is required (a bare
+# "31/87" must not link) and the court defaults to the ECJ
+EURATTSFALL_OLD_CASES = [
+    ("in Case 31/87, REFERENCE to the Court",
+     ["https://lagen.nu/ext/celex/61987CJ0031"]),
+    ("se mål 45/87, Dundalk", ["https://lagen.nu/ext/celex/61987CJ0045"]),
+    ("delivered on 31/87 items", []),
+]
+
+
+@pytest.mark.parametrize("text,uris", EURATTSFALL_OLD_CASES)
+def test_eurattsfall_old_numbering(text, uris):
+    parser = LagrumParser(NAMEDLAWS, basefile="x", parse_types=[EURATTSFALL])
+    assert [r.uri for r in parser.parse_text(text, context={})] == uris
+
+
+# The English citation surface (lang="eng"): CELLAR holds no Swedish text for
+# pre-accession case law, so those documents are scanned with the English EU
+# terminal block -- same rules and formatters, English words, and the
+# parenthesised sub-article convention the old judgments use ("Article 29 (5)").
+EULAGSTIFTNING_ENG_CASES = [
+    ("Council Directive 71/305/EEC of 26 July 1971 is intended to secure",
+     ["https://lagen.nu/ext/celex/31971L0305"]),
+    ("Article 29 (5) of Directive 71/305/EEC provides",
+     ["https://lagen.nu/ext/celex/31971L0305#29.5"]),
+    ("As stated in Article 1(2) of Directive 92/50/EEC.",
+     ["https://lagen.nu/ext/celex/31992L0050#1.2"]),
+    ("Regulation (EEC) No 2092/91 applies.",
+     ["https://lagen.nu/ext/celex/31991R2092"]),
+    ("Commission Recommendation 2003/361/EC",
+     ["https://lagen.nu/ext/celex/32003H0361"]),
+    # a Treaty article refuses to link (no English treaty grammar) -- correct-
+    # but-unlinked, never anaphora-pinned onto the last named act
+    ("Article 177 of the EEC Treaty by the Raad van State", []),
+]
+
+
+@pytest.mark.parametrize("text,uris", EULAGSTIFTNING_ENG_CASES)
+def test_eulagstiftning_english_surface(text, uris):
+    parser = LagrumParser({}, basefile="celex",
+                          parse_types=[EULAGSTIFTNING], lang="eng")
+    assert [r.uri for r in parser.parse_text(text, context={})] == uris
+
+
+def test_english_anaphora_links_the_directive_and_bare_articles():
+    parser = LagrumParser({}, basefile="celex",
+                          parse_types=[EULAGSTIFTNING], lang="eng")
+    parser.parse_text("Council Directive 71/305/EEC of 26 July 1971 concerns "
+                      "public works contracts.", context={})
+    got = parser.parse_text("Under Articles 20 and 26 of the directive, "
+                            "criteria are laid down.", context={})
+    assert [r.uri for r in got] == [
+        "https://lagen.nu/ext/celex/31971L0305#20",
+        "https://lagen.nu/ext/celex/31971L0305#26"]
+    bare = parser.parse_text("Article 29 provides for that examination.",
+                             context={})
+    assert [r.uri for r in bare] == ["https://lagen.nu/ext/celex/31971L0305#29"]
+
+
 # EU legislation CELEX minting. The act-number's year/number order differs by
 # act type and flipped for all types in the 2015 reform, so the only robust
 # rule is the invariant that a CELEX year is in 1950-2050 (celex_year). The
