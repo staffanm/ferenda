@@ -137,6 +137,26 @@ def test_header_celex_prefers_the_citation_engine_s_own_resolution():
     assert C._header_celex("Direktiv 2004/18/EG", ["32004L0018"]) == "32004L0018"
 
 
+def test_correspond_reads_an_english_table():
+    # an eng manifestation's correlation annex (e.g. the one 31993L0037's
+    # source patch restores -- the only text CELLAR holds for it is English)
+    # identifies its columns without the Swedish citation engine's help:
+    # SELF_COLUMN already admitted "This Directive", and the header act
+    # designation is read by HEADER_ACT alone since "Directive 71/305/EEC"
+    # never gets a link run
+    english = _act("31993L0037", [
+        _row("Directive 71/305/EEC | This Directive"),
+        _row("Article 10 | Article 10"),
+        _row("Article 29 ( 1 ) | Article 30 ( 1 )"),
+        _row("Article 31 | —"),
+    ])
+    edges, stats = C.correspondence(english)
+    assert [(e["newArticle"], e["oldArticle"]) for e in edges] == [
+        ("10", "10"), ("30", "29")]
+    assert edges[0]["oldLaw"] == BASE + "31971L0305"
+    assert stats["empty"] == 1
+
+
 def test_correspond_skips_a_column_naming_a_later_act():
     # a table can point forward, at the act that replaced this one; that copy of
     # the relation belongs to the successor's own layer, not to this one. The

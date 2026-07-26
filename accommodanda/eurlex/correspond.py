@@ -57,11 +57,20 @@ SELF_COLUMN = re.compile(
     re.I)                             # … or a compound: genomförandeförordning
 # an act designation in a header cell the citation engine did not resolve to a
 # link -- systematically the Euratom acts ("Direktiv 92/3/Euratom") and the
-# "(EU, Euratom)" numbering, whose names carry no uri run
+# "(EU, Euratom)" numbering, whose names carry no uri run. English names are
+# admitted alongside Swedish because the citation engine (Swedish grammar)
+# never links them, so an eng manifestation's table -- e.g. the correlation
+# annex restored by 31993L0037's source patch -- identifies its columns only
+# through this regex
 HEADER_ACT = re.compile(
-    r"\b(\w*(?:direktiv|förordning|beslut)\w*)\b"
+    r"\b(\w*(?:direktiv|förordning|beslut"
+    r"|directive|regulation|decision)\w*)\b"
     r"(?:\s*\([^)]*\))?\s*(nr|No)?\s*"
     r"(\d{1,4})/(\d{1,4})\b", re.I)
+# the English act-type words normalized to the Swedish akttyp lagrum.celex_uri
+# keys on
+ENGLISH_AKTTYP = {"directive": "direktiv", "regulation": "förordning",
+                  "decision": "beslut"}
 # an article citation opening a cell: "Artikel 5", "Artiklarna 1 och 2",
 # "Art 80.1", "Article 5"
 ARTICLE_LEAD = re.compile(r"\b(artiklarna|artikel|articles|article|art)\b\.?\s*",
@@ -148,7 +157,7 @@ def _header_celex(text, celexes):
     m = HEADER_ACT.search(text)
     if not m:
         return None
-    word = m.group(1).lower()
+    word = ENGLISH_AKTTYP.get(m.group(1).lower(), m.group(1).lower())
     akttyp = next((t for t in ("direktiv", "förordning", "beslut")
                    if t in word and not word.startswith("ram")), None)
     if not akttyp:
