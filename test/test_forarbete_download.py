@@ -14,7 +14,7 @@ from accommodanda.forarbete.download import (
     iter_listing,
     parse_listing,
 )
-from accommodanda.lib import layout
+from accommodanda.lib import compress, layout
 from accommodanda.lib.util import write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
@@ -230,7 +230,7 @@ def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
     ]
 
     # Mock iter_listing
-    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 2, 1)])
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay, log=None: [(items, 2, 1)])
 
     # Mock download_document
     downloads = []
@@ -267,7 +267,7 @@ def test_sync_error_advances_date_but_leaves_store_dirty_and_retries(tmp_path, m
         {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
     ]
 
-    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 1, 1)])
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay, log=None: [(items, 1, 1)])
 
     def mock_download_document_error(session, root, item, delay):
         raise requests.HTTPError("500 Server Error")
@@ -302,7 +302,7 @@ def test_sync_limit_truncation_leaves_store_dirty(tmp_path, monkeypatch):
         {"type": "prop", "basefile": "2025/26:279", "identifier": "Prop. 2025/26:279", "date": "2026-06-09", "url": "http://example.com/1"},
         {"type": "prop", "basefile": "2025/26:276", "identifier": "Prop. 2025/26:276", "date": "2026-05-20", "url": "http://example.com/2"},
     ]
-    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay: [(items, 2, 1)])
+    monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay, log=None: [(items, 2, 1)])
 
     def mock_download_document(session, root, item, delay):
         write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
@@ -399,6 +399,18 @@ def test_iter_listing_raw_empty_page_below_totalcount_is_an_error(monkeypatch):
         list(iter_listing(None, "ds", delay=0))
 
 
+def test_iter_listing_shortfall_under_one_page_is_upstream_bookkeeping(monkeypatch):
+    # prop's listing serves 4 349 items under a TotalCount of 4 352. Counting
+    # items the CMS then declines to serve is regeringen.se's business, and
+    # refusing to harvest over it would strand every doctype walked after prop
+    # in the same run. The discrepancy is reported, not raised.
+    monkeypatch.setattr(download, "fetch", _fake_fetch({1: LISTING_1325}, 5))
+    said = []
+    pages = list(iter_listing(None, "ds", delay=0, log=said.append))
+    assert [p for _, _, p in pages] == [1]
+    assert "2 counted but not served" in said[0]
+
+
 def test_sync_downloads_pm_doc_below_a_ds_only_page(tmp_path, monkeypatch):
     # end-to-end: a full pm sync whose first listing page is all-Ds still
     # reaches and downloads the promemoria on page 2
@@ -422,7 +434,6 @@ def test_refetch_bodies_recovers_from_the_stored_landing(tmp_path, monkeypatch):
     # a body-less record (finding 04's lr/SÖ gap): the stored landing carries
     # the content link, the asset now serves a real PDF -- the refetch stores
     # the body and updates the record; a record with a body is left alone
-    from accommodanda.lib import compress
     docdir = layout.fa_dir(tmp_path, "lr", "2000/ungdomsmal")
     docdir.mkdir(parents=True)
     compress.write_download(docdir / "2000-ungdomsmal.html",
@@ -451,3 +462,76 @@ def test_refetch_bodies_recovers_from_the_stored_landing(tmp_path, monkeypatch):
     # idempotent: the record now has a body, so a second run skips it
     assert download.refetch_bodies(tmp_path, types=("lr",), delay=0,
                                    log=lambda *a: None) == (0, 0, 0)
+
+
+# --------------------------------------------------------------------------
+# storing the documents: unchanged bytes must not become a new file
+# --------------------------------------------------------------------------
+
+def _store(tmp_path, monkeypatch, payloads):
+    """Run store_documents over `payloads` (href -> bytes) and return the names."""
+    monkeypatch.setattr(download, "fetch", lambda session, url, timeout=60:
+                        SimpleNamespace(content=payloads[url.rsplit("/", 1)[-1]]))
+    return download.store_documents(None, tmp_path, "2015-16-195",
+                                    ["/contentassets/x/" + k for k in payloads], 0)
+
+
+def test_unchanged_document_is_not_rewritten(tmp_path, monkeypatch):
+    # the poppler conversion cache and the parse watermarks both key on the
+    # PDF's mtime, so re-downloading identical bytes must leave the file alone
+    names = _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 one"})
+    assert names == ["2015-16-195.pdf"]
+    before = compress.stat(tmp_path / "2015-16-195.pdf").st_mtime_ns
+
+    assert _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 one"}) == names
+    assert compress.stat(tmp_path / "2015-16-195.pdf").st_mtime_ns == before
+
+
+def test_changed_document_is_written(tmp_path, monkeypatch):
+    _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 one"})
+    assert _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 two"}) == ["2015-16-195.pdf"]
+    assert compress.read_bytes(tmp_path / "2015-16-195.pdf") == b"%PDF-1.4 two"
+
+
+def test_reordered_links_keep_their_files(tmp_path, monkeypatch):
+    # the names are positional, so a landing page that merely swapped its two
+    # links would otherwise renumber both files -- and a renamed file is a new
+    # file, costing both documents their conversion cache for no reason
+    assert _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 one", "b": b"%PDF-1.4 two"}) \
+        == ["2015-16-195.pdf", "2015-16-195-1.pdf"]
+    mtimes = {n: compress.stat(tmp_path / n).st_mtime_ns
+              for n in ("2015-16-195.pdf", "2015-16-195-1.pdf")}
+
+    assert _store(tmp_path, monkeypatch, {"b": b"%PDF-1.4 two", "a": b"%PDF-1.4 one"}) \
+        == ["2015-16-195-1.pdf", "2015-16-195.pdf"]
+    assert {n: compress.stat(tmp_path / n).st_mtime_ns for n in mtimes} == mtimes
+
+
+def test_a_new_document_takes_the_first_name_left_free(tmp_path, monkeypatch):
+    _store(tmp_path, monkeypatch, {"a": b"%PDF-1.4 one", "b": b"%PDF-1.4 two"})
+    # 'a' is gone and a third document appears: 'b' keeps -1, the newcomer
+    # takes the freed base name rather than colliding with it
+    assert _store(tmp_path, monkeypatch, {"b": b"%PDF-1.4 two", "c": b"%PDF-1.4 three"}) \
+        == ["2015-16-195-1.pdf", "2015-16-195.pdf"]
+    assert compress.read_bytes(tmp_path / "2015-16-195.pdf") == b"%PDF-1.4 three"
+
+
+def test_a_link_that_is_not_a_document_is_skipped(tmp_path, monkeypatch):
+    assert _store(tmp_path, monkeypatch,
+                  {"a": b"<html>error</html>", "b": b"%PDF-1.4 one"}) \
+        == ["2015-16-195.pdf"]
+
+
+def test_a_word_bodied_record_is_not_a_live_record(tmp_path):
+    # 260 propositions came from data.riksdagen.se with a .doc body and no
+    # `source` key, so they read as live harvests and a --full walk passed over
+    # them -- while regeringen.se lists the same documents as PDFs, which is
+    # the only form the parser can recover chapter headings from
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "2006/07:128"),
+                 json.dumps({"type": "prop", "files": ["2006-07-128.doc"],
+                             "body_format": "doc"}).encode())
+    assert has_live_record(tmp_path, "prop", "2006/07:128") is False
+
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "2015/16:195"),
+                 json.dumps({"type": "prop", "files": ["2015-16-195.pdf"]}).encode())
+    assert has_live_record(tmp_path, "prop", "2015/16:195") is True

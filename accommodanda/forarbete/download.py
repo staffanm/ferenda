@@ -46,6 +46,8 @@ content file(s). Incremental by default (newest-first, stop at the first
 already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 """
 
+import hashlib
+import itertools
 import json
 import re
 import time
@@ -239,7 +241,7 @@ def listing_page(session, typ, page):
     return items, raw, envelope.get("TotalCount")
 
 
-def iter_listing(session, typ, delay):
+def iter_listing(session, typ, delay, log=print):
     """Yield (descriptors, total_count, page_number) per listing page until the
     listing is exhausted.
 
@@ -249,22 +251,35 @@ def iter_listing(session, typ, delay):
     listing continues below it -- reading that as "exhausted" would permanently
     skip everything deeper, --full included. (Same for any page whose items all
     lack the type's identifier in the link text.) A raw-empty page normally IS
-    the end; but when the envelope's TotalCount says more items should exist,
-    the listing is truncated or broken, and that is an error, not clean
-    exhaustion (rule:fail-fast) -- the raise lands inside sync's walk, after
-    begin(), so the watermark store stays dirty and the next run re-walks."""
+    the end; but when the envelope's TotalCount says a *page or more* is still
+    missing, the listing is truncated or broken, and that is an error, not
+    clean exhaustion (rule:fail-fast) -- the raise lands inside sync's walk,
+    after begin(), so the watermark store stays dirty and the next run re-walks.
+
+    A shortfall smaller than one page is regeringen.se's own bookkeeping, not a
+    broken walk: prop's listing serves 4 349 items under a TotalCount of 4 352
+    (fm's, small enough to check exactly, matches to the item). Counting items
+    the CMS then declines to serve is upstream's business -- we log the
+    discrepancy and take what the listing gave us, because refusing to harvest
+    over it would strand every type behind prop in the same run."""
     page = 1
     raw_seen = 0
+    page_size = 0
     while True:
         items, raw, total = listing_page(session, typ, page)
         if raw == 0:
-            if total and raw_seen < total:
+            if total and total - raw_seen >= max(page_size, 1):
                 raise ValueError(
                     "%s: listing page %d is empty but TotalCount=%d and only "
                     "%d items seen -- truncated or broken listing" %
                     (typ, page, total, raw_seen))
+            if total and raw_seen < total:
+                log("  %s: listing served %d of the %d items it counts (%d "
+                    "counted but not served -- upstream bookkeeping)"
+                    % (typ, raw_seen, total, total - raw_seen))
             return
         raw_seen += raw
+        page_size = max(page_size, raw)
         yield items, total, page
         page += 1
         time.sleep(delay)
@@ -288,6 +303,61 @@ def find_content_links(html):
     return out
 
 
+DOC_SUFFIXES = (".pdf", ".doc", ".docx", ".rtf", ".wpd")   # document_extension's
+
+
+def _stored_documents(docdir):
+    """``{sha256 of the bytes: stored name}`` for the documents already in
+    `docdir` -- what a re-download is matched against. Only document files are
+    read; the landing HTML beside them is not one."""
+    out = {}
+    if not docdir.is_dir():
+        return out
+    for name in sorted({compress.logical(entry).name for entry in docdir.iterdir()}):
+        if name.lower().endswith(DOC_SUFFIXES):
+            out.setdefault(
+                hashlib.sha256(compress.read_bytes(docdir / name)).hexdigest(), name)
+    return out
+
+
+def _free_name(slug, ext, taken):
+    """The next positional document name -- ``<slug>.pdf``, ``<slug>-1.pdf``, …
+    -- skipping any already claimed by an unchanged file that kept its name."""
+    for i in itertools.count():
+        name = "%s%s%s" % (slug, "-%d" % i if i else "", ext)
+        if name not in taken:
+            return name
+
+
+def store_documents(session, docdir, slug, hrefs, delay):
+    """Fetch every document linked from a landing page into `docdir`, returning
+    the stored names in link order. A link whose bytes are not a document we
+    recognize (an image, an error page) is skipped -- see `document_extension`.
+
+    Content-addressed against what is already stored: a payload whose bytes are
+    on disk keeps the name it already has. The names are positional, so without
+    this a landing page that merely reordered its links would renumber every
+    file -- and a renamed file is a new file, which costs the document its
+    poppler conversion cache and forces a re-parse of text that did not change
+    (`lib/compress.write_download` declines the write itself when the bytes
+    match, but only if the name still matches too)."""
+    by_digest = _stored_documents(docdir)
+    names, taken = [], set()
+    for href in hrefs:
+        data = fetch(session, (BASE + href) if href.startswith("/") else href).content
+        time.sleep(delay)
+        ext = document_extension(data)
+        if ext is None:
+            continue
+        name = by_digest.get(hashlib.sha256(data).hexdigest())
+        if name is None or name in taken:
+            name = _free_name(slug, ext, taken)
+        compress.write_download(docdir / name, data)
+        names.append(name)
+        taken.add(name)
+    return names
+
+
 def download_document(session, root, item, delay):
     """Fetch the landing page + its content file(s); store the record JSON,
     the landing HTML, and each file. Returns the stored record, or None when the
@@ -300,17 +370,8 @@ def download_document(session, root, item, delay):
         return None
     basefile, identifier = identity
     slug = basefile_slug(basefile)
-    files = []
-    for href in find_content_links(landing.text):
-        url = (BASE + href) if href.startswith("/") else href
-        data = fetch(session, url).content
-        ext = document_extension(data)
-        if ext is None:                    # not a document (image, error page)
-            continue
-        name = "%s%s%s" % (slug, ("-%d" % len(files) if files else ""), ext)
-        compress.write_download(layout.fa_dir(root, typ, basefile) / name, data)
-        files.append(name)
-        time.sleep(delay)
+    files = store_documents(session, layout.fa_dir(root, typ, basefile), slug,
+                            find_content_links(landing.text), delay)
     compress.write_download(layout.fa_dir(root, typ, basefile) / (slug + ".html"),
                             landing.text)
     record = {"type": typ, "basefile": basefile, "identifier": identifier,
@@ -319,6 +380,104 @@ def download_document(session, root, item, delay):
     compress.write_download(layout.fa_record_file(root, typ, basefile),
                             json.dumps(record, ensure_ascii=False, indent=2))
     return record
+
+
+def has_regeringen_url(record):
+    """Whether a stored record's `url` is a regeringen.se landing page -- the
+    precondition for `refetch_landings` to fetch it at all. Only a candidate
+    filter: whether the landing is actually *missing* on disk is checked by
+    `refetch_landings` itself (so a dry-run count is an upper bound, not the
+    number an interrupted run still has left).
+
+    The legacy `dsregeringen` import kept the record and the body files but not
+    the page they came from -- 1 260 records -- so `volumes.body_pdfs` has no
+    link text for them and has to keep every file it cannot positively rule
+    out."""
+    return bool(record.get("url")) and "regeringen.se" in record["url"]
+
+
+def word_bodied(record):
+    """Whether a record's stored body is a Word file. regeringen.se and
+    data.riksdagen.se both served `.doc` for propositions into the late 2000s;
+    the same documents are PDFs on regeringen.se today, and the PDF carries the
+    font signal the parser needs to recover chapter headings at all (the Word
+    route yields none, so prop. 2006/07:128 parsed with no
+    författningskommentar)."""
+    return any(f.lower().endswith((".doc", ".docx"))
+               for f in record.get("files", []))
+
+
+def refetch_landings(root, select, replace_bodies, types=("prop", "ds", "sou"),
+                     limit=None, delay=0.5, force=False, log=print):
+    """Re-fetch the regeringen.se landing page of every record `select` picks,
+    storing it beside the record so the volume rule can read its link texts.
+
+    Incremental: a record whose landing is already stored is passed over, so an
+    interrupted run resumes where it stopped. `force` re-reads them.
+
+    With `replace_bodies` the linked documents are downloaded too and become
+    the record's `files` -- what turns a Word-bodied record into the PDFs
+    regeringen.se serves now. Without it only the landing page is stored: the
+    legacy records already hold their bodies, and re-downloading identical
+    bytes would only move their mtimes and throw away their conversion cache.
+
+    Returns (checked, updated, errors)."""
+    root = Path(root)
+    session = make_session(USER_AGENT)
+    checked = updated = errors = 0
+    rep = Reporter()
+    for typ in types:
+        recs = sorted(compress.glob(root / typ, "*/*.json"))
+        for i, recpath in enumerate(recs):
+            record = json.loads(compress.read_text(recpath))
+            if not select(record):
+                continue
+            if limit and checked >= limit:
+                rep.done()
+                return checked, updated, errors
+            basefile = record["basefile"]
+            slug = basefile_slug(basefile)
+            docdir = layout.fa_dir(root, typ, basefile)
+            landing_path = docdir / (slug + ".html")
+            have_landing = compress.exists(landing_path)
+            if have_landing and not replace_bodies and not force:
+                continue          # the landing-only job already has this one
+            checked += 1
+            try:
+                if have_landing and not force:
+                    # already on disk, and current: the Word-bodied records'
+                    # stored landings link the PDFs (link text "(pdf 348 kB)",
+                    # and the asset serves %PDF) -- the record simply kept a
+                    # .doc from the legacy import. So no refetch is needed to
+                    # find them.
+                    html = compress.read_text(landing_path)
+                else:
+                    landing = fetch(session, record["url"])
+                    time.sleep(delay)
+                    compress.write_download(landing_path, landing.text)
+                    html = landing.text
+                hrefs = find_content_links(html)
+                if not replace_bodies:
+                    updated += 1
+                elif hrefs:
+                    stored = store_documents(session, docdir, slug, hrefs, delay)
+                    # replace the Word body only when a PDF actually came
+                    # back: if the landing yields nothing better, the .doc we
+                    # have is still the best body for this document
+                    if any(f.lower().endswith(".pdf") for f in stored):
+                        updated += 1
+                        record["files"] = stored
+                        record.pop("body_format", None)
+                        compress.write_download(
+                            layout.fa_record_file(root, typ, basefile),
+                            json.dumps(record, ensure_ascii=False, indent=2))
+            except requests.HTTPError as exc:
+                errors += 1
+                log("  %s %s: %s" % (typ, record.get("url"), exc))
+            rep.update(i + 1, len(recs), scope="landings " + typ,
+                       checked=checked, updated=updated, errors=errors)
+        rep.done()
+    return checked, updated, errors
 
 
 def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
@@ -357,18 +516,7 @@ def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
                     compress.write_download(landing_path, landing.text)
                     hrefs = find_content_links(landing.text)
                     time.sleep(delay)
-                stored = []
-                for href in hrefs:
-                    url = (BASE + href) if href.startswith("/") else href
-                    data = fetch(session, url).content
-                    time.sleep(delay)
-                    ext = document_extension(data)
-                    if ext is None:      # still not a document: leave for next run
-                        continue
-                    name = "%s%s%s" % (slug, ("-%d" % len(stored)
-                                              if stored else ""), ext)
-                    compress.write_download(docdir / name, data)
-                    stored.append(name)
+                stored = store_documents(session, docdir, slug, hrefs, delay)
                 if stored:
                     recovered += 1
                     record["files"] = stored
@@ -393,9 +541,21 @@ def has_live_record(root, typ, basefile):
     import record (§7g -- it carries a `source` key) is treated as absent, for two
     reasons: live always wins, so the downloader must fetch its better copy and
     overwrite the import; and a legacy record must not trip the newest-first
-    incremental stop (`done = True`) as if the corpus were already caught up."""
+    incremental stop (`done = True`) as if the corpus were already caught up.
+
+    A **Word-bodied** record is treated as absent for the first of those
+    reasons. 260 propositions were imported from data.riksdagen.se with a
+    `.doc` body and no `source` key, so they read as live harvests and a
+    `--full` walk passed straight over them -- while regeringen.se lists the
+    same documents as PDFs. The distinction is not cosmetic: the PDF carries
+    the font signal the parser needs to recover chapter headings, and the Word
+    route yields none, which is why prop. 2006/07:128 parsed with no
+    författningskommentar at all until its PDFs were fetched."""
     recpath = layout.fa_record_file(root, typ, basefile)
-    return compress.exists(recpath) and "source" not in json.loads(compress.read_text(recpath))
+    if not compress.exists(recpath):
+        return False
+    record = json.loads(compress.read_text(recpath))
+    return "source" not in record and not word_bodied(record)
 
 
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
@@ -445,7 +605,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
         newest_date = None
         if only is None:
             watermark.begin()
-        for items, total, page in iter_listing(session, typ, delay):
+        for items, total, page in iter_listing(session, typ, delay, log=log):
             for item in items:
                 seen += 1
                 if only is not None:

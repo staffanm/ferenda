@@ -1682,6 +1682,48 @@ def fa_soukb_scans(args):
     print("forarbete soukb-scans: %d seen, %d fetched" % (seen, fetched))
 
 
+def fa_refetch_landings(args):
+    """`lagen forarbete refetch-landings [landings|word]` -- re-fetch documents'
+    regeringen.se landing pages so the volume rule has their link texts.
+
+    Two populations need it, and they need different things:
+
+    * `landings` (default) -- the 1 260 legacy `dsregeringen` records, which
+      kept their body files but not the page they came from. Only the landing
+      is fetched: their bodies are already on disk, and re-downloading identical
+      bytes would move their mtimes and discard their conversion cache.
+    * `word` -- the records whose body is still a Word file (438 propositions).
+      regeringen.se serves those as PDF today, and the PDF carries the font
+      signal the parser needs: prop. 2006/07:128 read from `.doc` produced no
+      författningskommentar at all, and from PDF produces 29. Here the linked
+      documents are downloaded and become the record's files.
+
+    A Word-bodied record whose `url` is data.riksdagen.se has no regeringen.se
+    landing to fetch and is left for the listing walk (`download <typ> --only`).
+    """
+    which = args[0] if args else "landings"
+    if which not in ("landings", "word"):
+        sys.exit("usage: lagen forarbete refetch-landings [landings|word]")
+    word = which == "word"
+    select = ((lambda r: fa_download.word_bodied(r) and fa_download.has_regeringen_url(r))
+              if word else
+              (lambda r: r.get("source") and fa_download.has_regeringen_url(r)))
+    if RUN.dry_run:
+        n = sum(1 for typ in ("prop", "ds", "sou")
+                for p in compress.glob(layout.FA_DOWNLOADED / typ, "*/*.json")
+                if not p.name.startswith(".")
+                and select(json.loads(compress.read_text(p))))
+        print("forarbete refetch-landings %s: up to %d landing page(s) to "
+              "fetch%s (already-stored ones are passed over by the real run)"
+              % (which, n, " and their documents" if word else ""))
+        return
+    checked, updated, errors = fa_download.refetch_landings(
+        layout.FA_DOWNLOADED, select, replace_bodies=word,
+        limit=RUN.limit, delay=POLITENESS, force=RUN.force)
+    print("forarbete refetch-landings %s: %d checked, %d updated, %d errors"
+          % (which, checked, updated, errors))
+
+
 def fa_ai_genomforande(basefiles):
     """`lagen forarbete ai-genomforande <prop-basefile> [<CELEX> ...]` -- LLM-author
     the directive->paragraf transposition map for the EU directive(s) a proposition
@@ -1747,8 +1789,12 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
    actions={"propkb-scans": fa_propkb_scans,
             "soukb-scans": fa_soukb_scans,
             "refetch-bodies": fa_refetch_bodies,
+            "refetch-landings": fa_refetch_landings,
             "ai-genomforande": fa_ai_genomforande},
-   notes="ai-genomforande <prop-basefile> [<CELEX> ...]: LLM-author the "
+   notes="refetch-landings [landings|word]: re-fetch regeringen.se landing pages\n"
+         "  so the volume rule has their link texts; `word` also replaces a\n"
+         "  Word body with the PDFs regeringen.se serves today\n"
+         "ai-genomforande <prop-basefile> [<CELEX> ...]: LLM-author the "
          "directive->paragraf transposition map from the prop's "
          "författningskommentar (a .ann layer relate prefers over the mechanical "
          "implements); the CELEX(es) default to the directives the prop names\n"
