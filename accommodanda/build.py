@@ -132,7 +132,7 @@ from .wiki import parse as wiki_parse
 POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
 MANIFEST = DATA / ".build" / "manifest.json"
-WATERMARKS = DATA / ".build" / "watermarks.json"   # small per-(step,source) gates
+FINGERPRINTS = DATA / ".build" / "fingerprints.json"   # small per-(step,source) gates
 RUNS = DATA / ".build" / "runs.ndjson"             # append-only run ledger
 ERRORS = DATA / ".build" / "errors.json"           # per-doc latest-outcome store
 STATUS = DATA / ".build" / "status.json"           # rolling health snapshot
@@ -258,7 +258,7 @@ def is_fresh(manifest, source, stage, basefile, inputs_hash=None):
 
 def code_changed(store, kind, source, code):
     """Whether `source`'s extraction/index code changed since its last <kind> run
-    (relate/index/parse/generate -- the steps gated by the coarse watermark store,
+    (relate/index/parse/generate -- the steps gated by the coarse fingerprint store,
     not the per-doc manifest). True forces a full rebuild of that source, the same
     recipe-version rule parse/generate use per-doc, so editing catalog.py /
     search.py / text.py / render.py re-stales the step without a blanket --force;
@@ -275,7 +275,7 @@ def record_code_version(store, kind, source, code):
         "version": recipe_version(code)}
 
 
-def file_watermark(paths):
+def file_fingerprint(paths):
     """A cheap, content-insensitive fingerprint of a file set: each path with its
     size + mtime, no contents read. Detects any add / remove / rewrite (parse
     rewrites an artifact, bumping its mtime), so relate/dump can skip a source
@@ -288,7 +288,7 @@ def file_watermark(paths):
     return h.hexdigest()
 
 
-def stage_watermark(source, stage_name):
+def stage_fingerprint(source, stage_name):
     """A cheap fingerprint of a per-document stage's inputs (parse, versions):
     each basefile plus its input files' size+mtime (no content read). Unchanged
     ⟹ no document needs re-running and none appeared, so the whole per-document
@@ -308,27 +308,27 @@ def stage_watermark(source, stage_name):
     return h.hexdigest()
 
 
-def watermark_fresh(store, kind, source, wm):
-    """Whether `source`'s last <kind> run saw the same input watermark -- i.e. no
+def fingerprint_fresh(store, kind, source, wm):
+    """Whether `source`'s last <kind> run saw the same input fingerprint -- i.e. no
     input changed since, so the whole step can be skipped (combined with a code
     check and --force by the caller)."""
-    entry = store.get(manifest_key(kind, "__wm__", source))
+    entry = store.get(manifest_key(kind, "__fp__", source))
     return bool(entry) and entry["wm"] == wm
 
 
-def record_watermark(store, kind, source, wm):
-    store[manifest_key(kind, "__wm__", source)] = {"wm": wm}
+def record_fingerprint(store, kind, source, wm):
+    store[manifest_key(kind, "__fp__", source)] = {"wm": wm}
 
 
 def up_to_date(store, kind, source, wm, code):
     """A relate/index/dump/parse/generate step can be skipped for `source` when
-    neither its inputs (watermark) nor its code changed and --force isn't set."""
+    neither its inputs (fingerprint) nor its code changed and --force isn't set."""
     return (not RUN.force and not code_changed(store, kind, source, code)
-            and watermark_fresh(store, kind, source, wm))
+            and fingerprint_fresh(store, kind, source, wm))
 
 
 def record_step(store, kind, source, wm, code):
-    record_watermark(store, kind, source, wm)
+    record_fingerprint(store, kind, source, wm)
     record_code_version(store, kind, source, code)
 
 
@@ -527,6 +527,14 @@ SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 # the driver waited forever on futures no worker would ever take).
 MAX_DOCS_PER_WORKER = 1000
 
+# How long the parent waits for the next worker result before concluding one was
+# lost with a dead worker (see _run_parallel). It has to clear the slowest single
+# document by a wide margin: the worst on record is `sfs versions 1999:1229` at
+# 1 454 s, so an hour is ~2.5x the observed maximum -- long enough that a
+# legitimately slow document is never mistaken for a lost one, short enough that
+# a hang surfaces the same night instead of never.
+LOST_RESULT_TIMEOUT = 3600
+
 
 def _run_parallel(source, action, basefiles, jobs, absorb):
     """Fan the basefiles out across `jobs` worker processes, absorbing each
@@ -546,21 +554,42 @@ def _run_parallel(source, action, basefiles, jobs, absorb):
 
     jobs_list = [(source.name, action, bf)
                  for bf in sorted(basefiles, key=expected, reverse=True)]
-    # Known gap: a worker that dies hard (a C-extension segfault) before it hits
-    # maxtasksperchild hangs imap_unordered on the lost result rather than
-    # raising -- multiprocessing.Pool has no BrokenProcessPool equivalent to
-    # ProcessPoolExecutor's, whose respawn path we can't use (it deadlocked, see
-    # MAX_DOCS_PER_WORKER). Not silent: _worker_init's faulthandler dumps the
-    # crashing worker's stack (and the basefile in flight) to stderr first, and
-    # recycling every MAX_DOCS_PER_WORKER docs makes an early crash unlikely (the
-    # observed corruption surfaced ~90k docs into a worker's life). The serial
-    # `--jobs 1` path takes no pool at all and is the diagnostic fallback; a
-    # CI/cron job timeout is the outer backstop against the hang.
+    # A worker that dies hard (a C-extension segfault) before it hits
+    # maxtasksperchild loses its in-flight result, and imap_unordered then waits
+    # for it forever -- multiprocessing.Pool has no BrokenProcessPool equivalent
+    # to ProcessPoolExecutor's, whose respawn path we can't use (it deadlocked,
+    # see MAX_DOCS_PER_WORKER). Observed: a förarbete parse sat at
+    # "(97212/97213) ... ETA 00:00" with all 26 workers asleep, and would have
+    # sat there indefinitely. _worker_init's faulthandler dumps the crashing
+    # worker's stack first, so the crash itself is not silent -- but the hang
+    # that follows was, which is the part that costs a night.
+    #
+    # So: bound the wait between results. A gap this long with work outstanding
+    # means a result is never coming, and the parent knows exactly which
+    # basefiles never returned. Raising names them and unwinds into
+    # run_action's finally, which persists every result that did arrive
+    # (rule:fail-fast). The serial `--jobs 1` path takes no pool at all and
+    # remains the diagnostic fallback.
+    outstanding = {bf for _source, _action, bf in jobs_list}
     with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
                               initargs=(RUN,),
                               maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
-        for basefile, res in pool.imap_unordered(_worker, jobs_list,
-                                                 chunksize=1):
+        results = pool.imap_unordered(_worker, jobs_list, chunksize=1)
+        while True:
+            try:
+                basefile, res = results.next(timeout=LOST_RESULT_TIMEOUT)
+            except StopIteration:
+                break
+            except multiprocessing.TimeoutError:
+                raise RuntimeError(
+                    "%s %s: no worker result in %d s with %d document(s) "
+                    "outstanding -- a worker died without returning one. The "
+                    "results that did arrive are saved; re-run to finish. "
+                    "Outstanding: %s"
+                    % (source.name, action, LOST_RESULT_TIMEOUT,
+                       len(outstanding), ", ".join(sorted(outstanding)[:10])
+                       + (" ..." if len(outstanding) > 10 else ""))) from None
+            outstanding.discard(basefile)
             absorb(res, basefile)
 
 
@@ -639,26 +668,43 @@ def save_manifest(manifest):
                                            sort_keys=True))
 
 
-# The coarse per-(step, source) watermarks live in their own tiny file, NOT the
+# The coarse per-(step, source) fingerprints live in their own tiny file, NOT the
 # big per-doc manifest -- so a no-op run reads only this to decide every step can
 # be skipped, never parsing the ~57 MB manifest (which is loaded only when a
 # source actually changed and needs the per-document freshness scan).
-_WATERMARKS_CACHE = None
+_FINGERPRINTS_CACHE = None
 
 
-def load_watermarks():
-    global _WATERMARKS_CACHE
-    if _WATERMARKS_CACHE is None:
-        _WATERMARKS_CACHE = (json.loads(WATERMARKS.read_text())
-                             if WATERMARKS.exists() else {})
-    return _WATERMARKS_CACHE
+def _carried_over_gates():
+    """The gates from the store's former name and key shape
+    (``watermarks.json``, ``<step>/__wm__/<source>``), translated.
+
+    "Watermark" was the wrong word: these are sha256 digests of a file set's
+    names, sizes and mtimes, not high-water marks -- the harvest side's
+    `lib.harvest.HarvestWatermark`, which really is a position marker, keeps
+    the name. Renaming the file would otherwise have silently discarded every
+    gate and made the next run re-scan (and content-hash) every source for
+    nothing. Delete this once the old file is gone from every deployment."""
+    legacy = FINGERPRINTS.with_name("watermarks.json")
+    if not legacy.exists():
+        return {}
+    return {key.replace("/__wm__/", "/__fp__/"): value
+            for key, value in json.loads(legacy.read_text()).items()}
 
 
-def save_watermarks(store):
-    global _WATERMARKS_CACHE
-    _WATERMARKS_CACHE = store
-    util.write_atomic(WATERMARKS, json.dumps(store, ensure_ascii=False,
-                                             sort_keys=True, indent=0))
+def load_fingerprints():
+    global _FINGERPRINTS_CACHE
+    if _FINGERPRINTS_CACHE is None:
+        _FINGERPRINTS_CACHE = (json.loads(FINGERPRINTS.read_text())
+                               if FINGERPRINTS.exists() else _carried_over_gates())
+    return _FINGERPRINTS_CACHE
+
+
+def save_fingerprints(store):
+    global _FINGERPRINTS_CACHE
+    _FINGERPRINTS_CACHE = store
+    util.write_atomic(FINGERPRINTS, json.dumps(store, ensure_ascii=False,
+                                               sort_keys=True, indent=0))
 
 
 # --------------------------------------------------------------------------
@@ -2832,8 +2878,8 @@ def cmd_relate(names):
     Incremental on artifact content (unchanged artifacts are skipped); editing
     the extraction code (catalog.py) or passing --force re-extracts every
     artifact of the affected source."""
-    store = load_watermarks()
-    # a missing catalog invalidates every watermark -- the rows it claims are
+    store = load_fingerprints()
+    # a missing catalog invalidates every fingerprint -- the rows it claims are
     # current don't exist, so nothing may be skipped (matches stale_sources())
     catalog_missing = not CATALOG.exists()
     # a full rebuild rewrites every row anyway: a missing catalog, or --force over
@@ -2854,7 +2900,7 @@ def cmd_relate(names):
         if name not in ARTIFACTS:
             continue
         paths = ARTIFACTS[name]()
-        wm = file_watermark(paths)
+        wm = file_fingerprint(paths)
         if not catalog_missing and up_to_date(store, "relate", name, wm,
                                               RELATE_CODE):
             print("relate %s: up to date (%d artifacts unchanged) -- skipped"
@@ -2888,10 +2934,10 @@ def cmd_relate(names):
     # every defined term / nyckelord the corpus references. Their inputs are the
     # catalog (changed only if a source was re-related above) and the authored
     # layers (the SFS .corr and förarbete genomförande .ann files), so a no-op run
-    # skips them too -- gated on a watermark over all of them.
-    corr_wm = file_watermark(sorted(annstore.tree("sfs").glob("*/*.corr"))
+    # skips them too -- gated on a fingerprint over all of them.
+    corr_wm = file_fingerprint(sorted(annstore.tree("sfs").glob("*/*.corr"))
                              + sorted(annstore.tree("forarbete").rglob("*.ann")))
-    if dirty or RUN.force or not watermark_fresh(store, "relate", "__corr__",
+    if dirty or RUN.force or not fingerprint_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
         con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
@@ -2905,7 +2951,7 @@ def cmd_relate(names):
         anchor_warnings = kommentar_anchor_warnings(con)
         con.close()
         _emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
-        record_watermark(store, "relate", "__corr__", corr_wm)
+        record_fingerprint(store, "relate", "__corr__", corr_wm)
         dirty = True
         print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
               % pinned)
@@ -2931,7 +2977,7 @@ def cmd_relate(names):
     if full_rebuild and target.exists():
         _swap_catalog(target, CATALOG)
     if dirty:
-        save_watermarks(store)
+        save_fingerprints(store)
     print("catalog: %s" % CATALOG)
 
 
@@ -2945,13 +2991,13 @@ def cmd_index(names, jobs=1):
     `relate` is its prerequisite (run that first). `jobs>1` fans the bulk
     round-trips across threads. Needs a running OpenSearch (OPENSEARCH_URL,
     default http://localhost:9200)."""
-    store = load_watermarks()
+    store = load_fingerprints()
     dirty = False
     # one keep-alive connection per bulk thread, or the pool discards and
     # re-handshakes on every round-trip
     index = search.SearchIndex(pool_maxsize=jobs)
     con = catalog.connect(CATALOG)
-    # a dropped index invalidates every watermark -- skipping would leave the
+    # a dropped index invalidates every fingerprint -- skipping would leave the
     # source's docs unindexed, so nothing may be skipped until it's rebuilt
     index_present = index.exists()
     # the corpus-wide inbound-count map is ~7s to build over a 10M-row link table
@@ -2991,7 +3037,7 @@ def cmd_index(names, jobs=1):
                      + (" ..." if len(missing) > 5 else "")))
     con.close()
     if dirty:
-        save_watermarks(store)
+        save_fingerprints(store)
     print("search index '%s' on %s" % (search.INDEX, config.OPENSEARCH_URL))
 
 
@@ -3001,14 +3047,14 @@ def cmd_dump(names):
     graph is already inline, so each line is self-contained). The machine-
     readable corpus export that replaces the retired RDF/Fuseki dumps."""
     DUMPS.mkdir(parents=True, exist_ok=True)
-    store = load_watermarks()
+    store = load_fingerprints()
     dirty = False
     for name in names:
         if name not in ARTIFACTS:
             continue
         out = DUMPS / ("%s.ndjson.gz" % name)
         paths = ARTIFACTS[name]()
-        wm = file_watermark(paths)
+        wm = file_fingerprint(paths)
         if out.exists() and up_to_date(store, "dump", name, wm, DUMP_CODE):
             print("dump %s: up to date (%d artifacts unchanged) -- skipped"
                   % (name, len(paths)))
@@ -3027,7 +3073,7 @@ def cmd_dump(names):
         sys.stderr.write("\n")
         print("dump %s: %d documents -> %s" % (name, lines, out))
     if dirty:
-        save_watermarks(store)
+        save_fingerprints(store)
 
 
 def cmd_download_all(names, jobs):
@@ -3061,15 +3107,15 @@ def cmd_download_all(names, jobs):
 
 
 def _run_stage_gated(source, step, jobs, store):
-    """Run a watermark-gated per-document stage (parse/versions) over a whole
+    """Run a fingerprint-gated per-document stage (parse/versions) over a whole
     source. Coarse gate: if the stage's inputs + recipe are unchanged, skip the
     per-doc freshness scan (which content-hashes every input) wholesale -- "up to
-    date -- skipped"; else run it and, on a clean sweep, record the watermark in
+    date -- skipped"; else run it and, on a clean sweep, record the fingerprint in
     `store` so the next run can skip. Shared by `cmd_all` and the single-source
     dispatch so a direct `lagen <src> parse` gets the same shortcut. Returns
     (had_errors, recorded) -- `recorded` tells the caller to save `store`."""
     pcode = source.stages[step].code
-    wm = stage_watermark(source, step)
+    wm = stage_fingerprint(source, step)
     if up_to_date(store, step, source.name, wm, pcode):
         print("%s %s: up to date -- skipped" % (step, source.name))
         # bypasses report(); emit the skipped segment so the run detail still
@@ -3079,7 +3125,7 @@ def _run_stage_gated(source, step, jobs, store):
     basefiles = source.list_basefiles()
     result = run_action(source, step, basefiles, jobs)
     report(source, step, result, len(basefiles), full_source=True)
-    # only watermark a clean sweep: a failed doc leaves the source un-marked so
+    # only fingerprint a clean sweep: a failed doc leaves the source un-marked so
     # the next run retries it (and re-surfaces the error) rather than skipping
     if result.errors:
         return True, False
@@ -3101,8 +3147,7 @@ def cmd_all(names, jobs, whole_corpus, download=False):
     had_errors = False
     if download:
         had_errors = cmd_download_all(names, jobs)
-    store = load_watermarks()
-    parse_dirty = False
+    store = load_fingerprints()
     for step in ("parse", "versions"):
         for name in names:
             source = SOURCES[name]
@@ -3110,11 +3155,19 @@ def cmd_all(names, jobs, whole_corpus, download=False):
                 continue
             errs, recorded = _run_stage_gated(source, step, jobs, store)
             had_errors |= errs
-            parse_dirty |= recorded
+            # save as soon as a source records, not once the whole loop is
+            # through: a kill during a later source's parse used to discard the
+            # gate for every source that had already finished cleanly, so the
+            # next run re-scanned (and re-hashed the inputs of) all of them for
+            # nothing. The artifacts themselves were never at risk -- the
+            # per-document manifest checkpoints every SAVE_EVERY docs and
+            # flushes in a finally -- but the wasted scan is minutes on a
+            # 100k-document source. The store is a handful of keys per source,
+            # so writing it per source is free.
+            if recorded:
+                save_fingerprints(store)
             if name == "dv" and step == "parse":
                 dv_reconcile_artifacts()      # R2: reconcile folded verdicts
-    if parse_dirty:
-        save_watermarks(store)
     cmd_relate(names)
     cmd_index(names, jobs)
     cmd_dump(names)
@@ -3136,7 +3189,7 @@ def stale_sources():
     # artifacts are stored precompressed (.json.br); the listers yield logical
     # .json names, so stat the real backing file (compress.stat) -- a plain
     # p.stat() would raise FileNotFoundError on every compressed tree, exactly
-    # as file_watermark() already does when fingerprinting these same paths
+    # as file_fingerprint() already does when fingerprinting these same paths
     return [name for name, lister in ARTIFACTS.items()
             if any(compress.stat(p).st_mtime > cutoff for p in lister())]
 
@@ -3160,7 +3213,7 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  *sorted((PKG / "lib" / "assets").iterdir()))
 
 
-def generate_watermark():
+def generate_fingerprint():
     """The coarse gate for a full-corpus generate: the whole-catalog content
     signature plus the .corr/.ann LLM layers (lib.annstore) and .versions.json
     sidecars that relate doesn't fold into content_hash, plus the set of
@@ -3175,7 +3228,7 @@ def generate_watermark():
     expired = "\x1f".join(sorted(
         catalog.expired_uris(con, date.today().isoformat())))
     con.close()
-    sides = file_watermark(sorted(
+    sides = file_fingerprint(sorted(
         # the LLM layers live in the curated store (lib.annstore, WIKI_ROOT/ann),
         # not the artifact tree -- authoring, regenerating or hand-editing one
         # must reopen the coarse gate
@@ -3197,7 +3250,7 @@ def generate_watermark():
         # catalog signature above never sees them -- fold them in directly so a
         # re-parsed editorial edit reopens the generate gate (else a full generate
         # would skip and ship the stale site). layout.artifacts() yields logical
-        # paths across plain/compressed storage; file_watermark stats the variant.
+        # paths across plain/compressed storage; file_fingerprint stats the variant.
         + list(layout.artifacts("site"))))
     return hashlib.sha256(
         (sig + "\x1f" + sides + "\x1f" + expired).encode()).hexdigest()
@@ -3292,8 +3345,8 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
     # even loaded). A scoped render keeps the per-page path.
     site_wm = None
     if not scoped:
-        store = load_watermarks()
-        site_wm = generate_watermark()
+        store = load_fingerprints()
+        site_wm = generate_fingerprint()
         if up_to_date(store, "generate", "__site__", site_wm, GENERATE_CODE):
             print("generate: up to date -- skipped (%s)" % GENERATED)
             _emit_segment("generate", "__site__", 0.0, ran=0, status="skipped")
@@ -3386,9 +3439,9 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
     if updates:
         manifest.update(updates)
         save_manifest(manifest)
-    if not scoped:                       # record the site watermark for next time
+    if not scoped:                       # record the site fingerprint for next time
         record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
-        save_watermarks(store)
+        save_fingerprints(store)
     _emit_segment("generate", seg_source, time.perf_counter() - t0, total=total,
                   ran=rendered, status="ok")
     if only is not None and not total:
@@ -3952,14 +4005,14 @@ def _dispatch(args, p, jobs):
             p.error("source %r has no action %r (have: %s)"
                     % (name, args.action,
                        ", ".join([*source.stages, *source.actions])))
-        # a full-source run of a watermark-gated per-doc stage gets the same
+        # a full-source run of a fingerprint-gated per-doc stage gets the same
         # coarse "up to date -- skipped" shortcut cmd_all uses, so a direct
         # `lagen sfs parse` with nothing changed skips the per-doc scan too
         if not args.basefiles and args.action in ("parse", "versions"):
-            store = load_watermarks()
+            store = load_fingerprints()
             errs, recorded = _run_stage_gated(source, args.action, jobs, store)
             if recorded:
-                save_watermarks(store)
+                save_fingerprints(store)
             # a full-source dv parse reconciles the artifact tree to the canonical
             # set, pruning verdicts folded into a referat (R2)
             if name == "dv" and args.action == "parse":

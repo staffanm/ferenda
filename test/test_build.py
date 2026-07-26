@@ -96,21 +96,21 @@ def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
     assert "syn/parse/a" not in runlog.read_errors(build.ERRORS)
 
 
-def test_stage_gate_skips_when_watermark_unchanged(tmp_path, monkeypatch, capsys):
-    """The coarse watermark gate (shared by cmd_all and single-source `lagen sfs
-    parse`): once the source is watermarked, a re-run with unchanged inputs skips
+def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, capsys):
+    """The coarse fingerprint gate (shared by cmd_all and single-source `lagen sfs
+    parse`): once the source is fingerprinted, a re-run with unchanged inputs skips
     the per-doc scan wholesale ("up to date -- skipped"); an input change re-runs."""
     _, src = make_source(tmp_path)
     monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
     monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
     # settle downloads first (as `download` before `parse` does in real use), so a
-    # later parse touches no inputs and the recorded watermark stays valid
+    # later parse touches no inputs and the recorded fingerprint stays valid
     build.run_action(src, "parse", src.list_basefiles(), 1)
     capsys.readouterr()
     store = {}
 
     errs, recorded = build._run_stage_gated(src, "parse", 1, store)
-    assert (errs, recorded) == (False, True)                 # ran + watermarked
+    assert (errs, recorded) == (False, True)                 # ran + fingerprinted
     assert "up to date -- skipped" not in capsys.readouterr().out
 
     errs, recorded = build._run_stage_gated(src, "parse", 1, store)
@@ -272,16 +272,16 @@ def test_code_version_gate_for_relate_index(tmp_path):
     assert build.code_changed(manifest, "index", "sfs", code)
 
 
-def test_file_watermark_detects_add_remove_modify(tmp_path):
+def test_file_fingerprint_detects_add_remove_modify(tmp_path):
     a = tmp_path / "a.json"; a.write_text("1")
     b = tmp_path / "b.json"; b.write_text("2")
-    base = build.file_watermark([a, b])
-    assert build.file_watermark([a, b]) == base          # stable when untouched
+    base = build.file_fingerprint([a, b])
+    assert build.file_fingerprint([a, b]) == base          # stable when untouched
     b.write_text("22")                                   # modify -> new size/mtime
-    assert build.file_watermark([a, b]) != base
-    assert build.file_watermark([a]) != base             # remove one
+    assert build.file_fingerprint([a, b]) != base
+    assert build.file_fingerprint([a]) != base             # remove one
     c = tmp_path / "c.json"; c.write_text("3")
-    assert build.file_watermark([a, b, c]) != base       # add one
+    assert build.file_fingerprint([a, b, c]) != base       # add one
 
 
 def test_artifacts_excludes_index_sidecars(tmp_path, monkeypatch):
@@ -385,18 +385,18 @@ def test_layout_grammar_covers_every_registered_fs():
             == "%s/2020_1_grund.html" % fs, fs
 
 
-def test_stage_watermark_tracks_inputs(tmp_path):
+def test_stage_fingerprint_tracks_inputs(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}
     build_one(src, "download", "a", manifest)        # materialise the inputs
     build_one(src, "download", "b", manifest)
-    wm = build.stage_watermark(src, "parse")
-    assert build.stage_watermark(src, "parse") == wm   # stable while untouched
+    fp = build.stage_fingerprint(src, "parse")
+    assert build.stage_fingerprint(src, "parse") == fp   # stable while untouched
     (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
-    assert build.stage_watermark(src, "parse") != wm
+    assert build.stage_fingerprint(src, "parse") != fp
 
 
-def test_up_to_date_combines_watermark_code_and_force(tmp_path):
+def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):
     vfile = tmp_path / "code.py"; vfile.write_text("v1")
     code = (vfile,)
     manifest = {}
@@ -488,9 +488,9 @@ def wire(monkeypatch, tmp_path):
         monkeypatch.setattr(build, "ERRORS", bd / "errors.json")
         monkeypatch.setattr(build, "STATUS", bd / "status.json")
         monkeypatch.setattr(build, "MANIFEST", bd / "manifest.json")
-        monkeypatch.setattr(build, "WATERMARKS", bd / "watermarks.json")
+        monkeypatch.setattr(build, "FINGERPRINTS", bd / "fingerprints.json")
         monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
-        monkeypatch.setattr(build, "_WATERMARKS_CACHE", None)
+        monkeypatch.setattr(build, "_FINGERPRINTS_CACHE", None)
         monkeypatch.setattr(build, "RUN_ID", None)
     return _wire
 
@@ -610,15 +610,15 @@ def test_targeted_run_leaves_status_cell_untouched(wire, tmp_path):
     assert runs[0]["argv"] == ["lagen", "syn", "parse", "a", "-f", "-j1"]
 
 
-def test_watermark_skipped_step_emits_skipped_segment(wire, tmp_path, monkeypatch):
+def test_fingerprint_skipped_step_emits_skipped_segment(wire, tmp_path, monkeypatch):
     src = build_source(tmp_path)
     wire(src)
     _materialise_downloads(src)                    # stable parse inputs across runs
     # rebuild's derived steps need the real catalog/layout; stub them out so the
-    # test isolates the parse watermark gate
+    # test isolates the parse fingerprint gate
     for fn in ("cmd_relate", "cmd_index", "cmd_dump", "cmd_generate"):
         monkeypatch.setattr(build, fn, lambda *a, **k: None)
-    build.main(["syn", "rebuild", "-j1"])          # parse runs, records watermark
+    build.main(["syn", "rebuild", "-j1"])          # parse runs, records fingerprint
     build.main(["syn", "rebuild", "-j1"])          # unchanged -> parse skipped
 
     skipped = [e for e in _events(build.RUNS) if e["event"] == "segment"
@@ -714,7 +714,7 @@ def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     # Setup build context (CATALOG, watermarks, etc. mapped to tmp_path)
     monkeypatch.setattr(build, "SOURCES", {})
     monkeypatch.setattr(build, "CATALOG", tmp_path / "catalog.sqlite")
-    monkeypatch.setattr(build, "WATERMARKS", tmp_path / "watermarks.json")
+    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "fingerprints.json")
     monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
     monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
@@ -826,7 +826,7 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
 
     monkeypatch.setattr(build, "DATA", data_root)
     monkeypatch.setattr(build, "CATALOG", cat)
-    monkeypatch.setattr(build, "WATERMARKS", tmp_path / "wm.json")
+    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "wm.json")
     monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
     monkeypatch.setattr(build, "ERRORS", tmp_path / "err.json")
     monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
@@ -924,3 +924,55 @@ def test_fa_soukb_scans_passes_politeness(monkeypatch):
     build.fa_soukb_scans([])
     assert called.get("delay") == build.POLITENESS
 
+
+
+def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
+    """A worker that dies hard loses its in-flight result and imap_unordered
+    then waits for it forever -- observed as a förarbete parse frozen at
+    "(97212/97213) ... ETA 00:00" with every worker asleep. The parent knows
+    which basefiles never came back, so the wait is bounded and names them."""
+    class LosesOneResult:
+        """imap_unordered's iterator when a worker died: yields what arrived,
+        then blocks on a result that is never coming."""
+        def __init__(self, arrived):
+            self._arrived = list(arrived)
+
+        def next(self, timeout=None):
+            if self._arrived:
+                return self._arrived.pop(0)
+            raise build.multiprocessing.TimeoutError()
+
+    class FakePool:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def imap_unordered(self, _fn, _jobs, chunksize=1):
+            return LosesOneResult([("a", build.Result())])
+
+    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(build, "load_manifest", lambda: {})
+    source = build.Source("syn", lambda: ["a", "b"], {})
+
+    with pytest.raises(RuntimeError, match=r"no worker result.*outstanding"):
+        build._run_parallel(source, "parse", ["a", "b"], 2, lambda res, bf: None)
+
+
+def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch):
+    class Blocks:
+        def next(self, timeout=None):
+            raise build.multiprocessing.TimeoutError()
+
+    class FakePool:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def imap_unordered(self, _fn, _jobs, chunksize=1): return Blocks()
+
+    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(build, "load_manifest", lambda: {})
+    source = build.Source("syn", lambda: ["ds/2010-47"], {})
+
+    with pytest.raises(RuntimeError, match="ds/2010-47"):
+        build._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)

@@ -490,7 +490,7 @@ in the annotated node's rail exactly like a hand-authored one. A sub-article
 synthesises its `2.21` citation anchor + rail entry when *something* targets it —
 the editorial recital layer **or** a guidance/commentary link — otherwise it stays
 an anchorless leaf. A full/forced `generate` folds the layer in (the coarse
-`generate_watermark` includes the kommentar `.ann` files, so the corpus-wide
+`generate_fingerprint` includes the kommentar `.ann` files, so the corpus-wide
 generate sees them).
 
 **Storage.** The kommentar artifact is filed under its host source, reusing that
