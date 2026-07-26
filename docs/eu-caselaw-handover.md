@@ -102,16 +102,19 @@ LOU 13 kap. 1 §  ──genomforande-tabellen──▶  32014L0024#57
    "artikel 12 i direktiv 2014/24" är redan en typad referens till
    `…/celex/32014L0024#12` i links-tabellen (2 769 artikelnivålänkar in i
    2014/24 från 107 domar).
-3. **Sammanfogningen:** `catalog.genomfor_targets(con, sfs_uri, anchor)` ger
-   paragrafens (direktiv, artikel)-par; `catalog.caselaw_citing(con,
-   artikel-uri)` ger domarna som citerar artikeln (sektor 6, dokumentkod
-   CJ/TJ/FJ — förslag till avgörande och beslut räknas inte som praxis).
+3. **Sammanfogningen:** `catalog.caselaw_anchored(con, sfs_uri)` tilldelar
+   hela lagens praxis i ett svep: varje doms citering (t.ex. `#57.4`) hamnar
+   hos den paragraf vars genomförande-pinpoint täcker den djupast; vid lika
+   djup vinner direkt genomförande före ärvt, sedan första paragrafen i
+   lagens ordning; en citering utan täckande anspråk faller tillbaka på
+   artikelfamiljens första paragraf. Domar är sektor 6, dokumentkod CJ/TJ/FJ
+   — förslag till avgörande och beslut räknas inte som praxis.
 4. **Visningen:** `render.eu_caselaw_margin` i paragrafens kontextpanel —
-   "EU-domstolens praxis", nyast först, max 5 med "+N till", dedup när en
-   dom citerar flera artiklar, "(om artikel N)" som attribution.
+   "EU-domstolens praxis", nyast först, max 5 uppfällda med "+N till", dedup
+   när en dom citerar flera artiklar, "(om artikel N)" som attribution.
 
-**Det avgörande designvalet:** praxisrutan hämtar sina artiklar via
-`genomfor_targets`, aldrig direkt ur genomforande-tabellen. Det är sömmen
+**Det avgörande designvalet:** praxisrutan hämtar sin tilldelning via
+`caselaw_anchored`, aldrig direkt ur genomforande-tabellen. Det är sömmen
 där direktivsläktskapet (uppgift 3) kopplas in utan att röra visningssidan.
 
 ## Uppgift 3 — direktivsläktskapet: klart (2026-07-24)
@@ -159,16 +162,19 @@ ett genomförandepåstående visar nu äldre EU-praxis de inte hade.
    ordval, med alla åtta formuleringar korpusen använder. **Gamla sidans
    länkar är fel**: citeringsmotorn löser "Artikel 12" i vilken cell som helst
    mot den akt som parsas, så artikelnummer läses ur celltexten.
-4. **Sömmen** `catalog.directive_correspondence` + `predecessor_articles`;
-   `genomfor_targets` returnerar nu `(akt, artikel, transponerad artikel,
+4. **Sömmen** `catalog.directive_correspondence` + `predecessor_atoms`
+   (pinpoint-medveten där tabellen är det, annars artikelnivå);
+   `caselaw_anchored` bär `(akt, citerad pinpoint, transponerad artikel,
    hopp)` och praxisrutan sätter ut släktskapshoppet: "(om artikel 15 i
    92/50/EEG, motsvarar artikel 79)".
 
 ### De öppna frågorna, besvarade
 
-- **Transitivitetens djup:** `catalog.LINEAGE_DEPTH = 2`. Det är precis vad
-  upphandlingskedjan kräver (2014/24 → 2004/18 → 92/50 & 93/36–38) och där
-  relationen slutar vara en läsaren accepterar oförklarad.
+- **Transitivitetens djup:** `catalog.LINEAGE_DEPTH = 3` (höjt från 2 den
+  2026-07-26, efter denna handover): upphandlingskedjan går 2014/24 →
+  2004/18 → 92/50 & 93/36–38 → 71/305 & 77/62 — tredje generationen är den
+  Dundalk och SIAC Construction citerar, och vandringen följer bara de
+  jämförelsetabeller omarbetningarna själva publicerat.
 - **Volymen:** reell men hanterbar. Art. 2 (definitionerna) i 2014/24 når 13
   förfäder i två hopp; rutans tak på 5 domar plus "+N till" bär det.
 - **Splittrade/sammanslagna artiklar:** tabellen anger dem som flera mål i
@@ -243,7 +249,7 @@ ett genomförandepåstående visar nu äldre EU-praxis de inte hade.
     `lagen sfs ai-correspond 2016:1145 prop/2015-16-195 2007:1091` har ovanligt
     bra indata, eftersom varje FK-post uttryckligen säger vilken gammal
     paragraf den motsvarar.
-  - Steg 3 återstår som kod: `genomfor_targets` läser bara
+  - Steg 3 återstår som kod: `caselaw_anchored` läser bara
     `genomforande`-tabellen. SFS-korrespondenslagret matar den *svenska*
     rättsfallsrälsen (`corresponding_cases_margin`), aldrig EU-rälsen — så
     påståendena skulle bli kvar på `2007:1091#K16P17`. Samma sömvidgning som
