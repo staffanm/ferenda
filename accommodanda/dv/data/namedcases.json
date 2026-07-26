@@ -1341,6 +1341,12 @@
    "uri": "https://lagen.nu/dom/nja/1987s394"
   },
   {
+   "namn": "Personaly System",
+   "referat": "NJA 1987 s. 407",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/1987s407"
+  },
+  {
    "namn": "Tjänstemannens straff",
    "referat": "NJA 1987 s. 459",
    "malnr": null,
@@ -2067,6 +2073,12 @@
    "uri": "https://lagen.nu/dom/nja/1996s293"
   },
   {
+   "namn": "Herberts Musik",
+   "referat": "NJA 1996 s. 333",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/1996s333"
+  },
+  {
    "namn": "Stadens löjtnant",
    "referat": "NJA 1996 s. 354",
    "malnr": null,
@@ -2563,6 +2575,12 @@
    "referat": "NJA 2001 s. 464",
    "malnr": null,
    "uri": "https://lagen.nu/dom/nja/2001s464"
+  },
+  {
+   "namn": "Elektrounion",
+   "referat": "NJA 2001 s. 474",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/2001s474"
   },
   {
    "namn": "Utvisning och Schengensamarbetet",
@@ -4515,6 +4533,12 @@
    "uri": "https://lagen.nu/dom/nja/2015s298"
   },
   {
+   "namn": "Bunkeflo strandängar",
+   "referat": "NJA 2015 s. 323",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/2015s323"
+  },
+  {
    "namn": "Layer Cake",
    "referat": "NJA 2015 s. 346",
    "malnr": null,
@@ -5353,6 +5377,12 @@
    "referat": "NJA 2017 s. 1129",
    "malnr": null,
    "uri": "https://lagen.nu/dom/nja/2017s1129"
+  },
+  {
+   "namn": "Göinge Montage",
+   "referat": "NJA 2017 s. 1140 I",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/2017s1140"
   },
   {
    "namn": "Musikmobilen",
@@ -9591,16 +9621,16 @@
    "uri": "https://lagen.nu/dom/nja/2026s57"
   },
   {
-   "namn": "Ballongfararen",
-   "referat": "NJA 2026 s. 77",
-   "malnr": null,
-   "uri": "https://lagen.nu/dom/nja/2026s77"
-  },
-  {
    "namn": "Häktning och recidivfara",
    "referat": "NJA 2026 s. 72",
    "malnr": null,
    "uri": "https://lagen.nu/dom/nja/2026s72"
+  },
+  {
+   "namn": "Ballongfararen",
+   "referat": "NJA 2026 s. 77",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/2026s77"
   },
   {
    "namn": "Narkotikaannonsen",
