@@ -179,11 +179,13 @@ def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
     assert compress.exists(out / render.doc_relpath(LAW["uri"]))   # page stored precompressed
 
 
-def test_generate_refuses_output_path_collision(tmp_path):
+def test_generate_drops_a_colliding_page_and_carries_on(tmp_path, capsys):
     # page_relpath flattens every non-alphanumeric character to "_", so two
     # distinct begrepp uris ("Första-hjälpen-tavlor" / "Första_hjälpen-tavlor")
     # collide on one HTML file: last write wins, and under jobs>1 the twin jobs
-    # race on the deterministic .tmp name. The planner must refuse such a plan.
+    # race on the deterministic .tmp name. The first uri keeps the path and the
+    # other is dropped -- a duplicate concept on the wiki is a data-quality
+    # problem in one page, and must not cost a 300k-page generate.
     a = tmp_path / "a.json"
     a.write_text(json.dumps({"uri": "https://lagen.nu/begrepp/Första_hjälpen-tavlor",
                              "type": "begrepp", "title": "Första hjälpen-tavlor",
@@ -194,8 +196,16 @@ def test_generate_refuses_output_path_collision(tmp_path):
                              "body": []}))
     db = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(db, "begrepp", [a, b])
-    with pytest.raises(ValueError, match="output path collision"):
-        render.generate_site(db, str(tmp_path / "generated"))
+    out = tmp_path / "generated"
+
+    total, rendered = render.generate_site(db, str(out))
+
+    assert total == 2 and rendered == 1        # both counted, one page written
+    assert compress.exists(out / render.doc_relpath(
+        "https://lagen.nu/begrepp/Första-hjälpen-tavlor"))
+    warning = capsys.readouterr().err
+    assert "output path collision" in warning
+    assert "Första" in warning                 # names what to fold
 
 
 def test_relate_migrates_legacy_absolute_paths(tmp_path):

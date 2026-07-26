@@ -576,7 +576,8 @@ def render_toc(toc):
 # inline runs + inbound annotation
 # --------------------------------------------------------------------------
 
-INBOUND_CAP = 40   # max citing docs listed before "+N fler"
+INBOUND_CAP = 40   # citing docs shown expanded in the predecessor-case
+                   # rail; the rest are rendered too, collapsed
 
 
 def render_runs(runs, site):
@@ -659,14 +660,23 @@ def _inbound_groups(site, uri, exclude_from=(), exclude_before=None):
     return html
 
 
-def _capped_list(lines):
-    """A panel's "<li>" lines as a list showing PANEL_CAP items, the rest
-    behind a "+N fler" disclosure -- the one home for the panel-cap idiom."""
-    inner = "<ul>%s</ul>" % "".join(lines[:PANEL_CAP])
-    if len(lines) > PANEL_CAP:
-        inner += ('<details class="more"><summary>+%d fler</summary>'
+def _capped_list(lines, cap=None, word="fler"):
+    """A panel's "<li>" lines as a list showing `cap` items, the rest behind a
+    "+N <word>" disclosure -- the one home for the cap idiom.
+
+    A cap decides what is *collapsed*, never what is published: every line is
+    written into the page. A rail that drops items outright hides exactly the
+    ones a reader is least likely to find elsewhere -- the EU case-law rail
+    sorts newest-first, so its old hard cap silently withheld the foundational
+    judgments (LOU 17 kap. had 41 cases per paragraf and published 5)."""
+    # resolved at call time, not bound as a default: the module constant is
+    # monkeypatched in tests, and a default argument would freeze it
+    cap = PANEL_CAP if cap is None else cap
+    inner = "<ul>%s</ul>" % "".join(lines[:cap])
+    if len(lines) > cap:
+        inner += ('<details class="more"><summary>+%d %s</summary>'
                   '<ul>%s</ul></details>'
-                  % (len(lines) - PANEL_CAP, "".join(lines[PANEL_CAP:])))
+                  % (len(lines) - cap, word, "".join(lines[cap:])))
     return inner
 
 
@@ -828,7 +838,8 @@ def genomfor_margin(site, sfs_uri, anchor):
             '<ul>%s</ul></aside>' % "".join(items))
 
 
-EU_CASELAW_CAP = 5   # cases shown in the paragraf rail before the "+N till" tail
+EU_CASELAW_CAP = 5   # cases shown expanded in the paragraf rail; the rest
+                     # are rendered too, collapsed behind "+N till"
 
 
 def _act_short_id(site, uri):
@@ -996,8 +1007,10 @@ def corresponding_cases_margin(site, uri):
                     continue
                 seen.add(old_uri)
                 nxt.append(old_uri)
-                rows = [r for r in catalog.inbound(site.con, old_uri,
-                                                   limit=INBOUND_CAP + 1)
+                # unlimited: the LIMIT used to be applied before the dv filter,
+                # so a paragraf whose first 41 citers were förarbete rendered no
+                # cases at all even with hundreds in the catalog
+                rows = [r for r in catalog.inbound(site.con, old_uri)
                         if r[4] == "dv"]
                 if not rows:
                     continue
@@ -1008,14 +1021,15 @@ def corresponding_cases_margin(site, uri):
                 cite = ('<a href="%s">%s</a>'
                         % (escape(href(old_uri)), escape(old_label))
                         if site.has(base) else escape(old_label))
-                links = "".join(
-                    '<li><a href="%s">%s</a></li>'
-                    % (escape(href(from_uri + ("#" + a if a else ""))),
-                       escape(describe_citer(from_uri, a, label, title, source)))
-                    for from_uri, a, label, title, source in rows[:INBOUND_CAP])
+                links = ['<li><a href="%s">%s</a></li>'
+                         % (escape(href(from_uri + ("#" + a if a else ""))),
+                            escape(describe_citer(from_uri, a, label, title,
+                                                  source)))
+                         for from_uri, a, label, title, source in rows]
                 out.append('<div class="rail-sec"><div class="rail-sec-h">'
                            'Äldre rättsfall för motsvarande bestämmelse (%s)'
-                           '</div><ul>%s</ul></div>' % (cite, links))
+                           '</div>%s</div>'
+                           % (cite, _capped_list(links, INBOUND_CAP)))
         frontier = nxt
         if not frontier:
             break
@@ -3977,18 +3991,25 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     total = len(rows)
     done = rendered = 0
     plan = []                # (uri, source, path, title, dep, chash) needing render
-    # doc_relpath is not injective (begrepp/Första-hjälpen-tavlor and
-    # begrepp/Första_hjälpen-tavlor both slug to one file), so two catalogued
-    # uris colliding here would clobber each other's page -- and race on the
-    # deterministic .tmp name under jobs>1. Refuse the plan instead.
+    # doc_relpath is not injective (begrepp/Fartyg_från_en_icke-avtalsslutande_part
+    # and begrepp/Fartyg_från_en_icke_avtalsslutande_part slug to one file -- the
+    # hyphen and the underscore both become '_'), so two catalogued uris landing
+    # on one path would clobber each other's page and race on the deterministic
+    # .tmp name under jobs>1. The first uri wins the path and the rest are
+    # dropped from the plan, which removes both hazards.
+    #
+    # A duplicate concept on the wiki is a data-quality problem in one page; it
+    # must not cost a 300k-page generate, so this warns and carries on rather
+    # than raising (the deliberate exception to rule:fail-fast here -- the run
+    # can continue correctly, and the warning names what to fold).
     outs: dict = {}          # output relpath -> uri
+    collisions = []          # (winner uri, dropped uri, shared relpath)
     for (uri, src, path, title, chash) in rows:
         rel = doc_relpath(uri)
         if outs.setdefault(rel, uri) != uri:
-            raise ValueError(
-                "output path collision: %s and %s both render to %s -- fold the "
-                "duplicate concept (an aliases: redirect on the wiki page) before "
-                "generating" % (outs[rel], uri, rel))
+            collisions.append((outs[rel], uri, rel))
+            done += 1        # counted as handled, so the progress total still adds up
+            continue
         out = out_root / rel
         dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
         if uri in cross or uri in expired:
@@ -4036,6 +4057,18 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
             "catalog is ahead of the artifact tree; run the source's `relate` to "
             "prune (e.g. %s)\n" % (len(skipped), ", ".join(
                 sorted(catalog.local(u) for u in skipped[:5]))))
+
+    if collisions:
+        sys.stderr.write(
+            "\nwarning: %d output path collision(s) -- these documents share a "
+            "rendered filename with another, so only the first was written. Fold "
+            "each duplicate (an `aliases:` redirect on the wiki page) and "
+            "re-generate:\n" % len(collisions))
+        for winner, dropped, rel in collisions[:20]:
+            sys.stderr.write("  %s\n    dropped in favour of %s (both -> %s)\n"
+                             % (catalog.local(dropped), catalog.local(winner), rel))
+        if len(collisions) > 20:
+            sys.stderr.write("  ... and %d more\n" % (len(collisions) - 20))
 
     if only is None and source is None:          # corpus-wide pages on a full run
         render_aggregates(con, out_root, catalog_path, write_index=write_index)
