@@ -89,10 +89,12 @@ BATCH_CHARS = config.LLM_BATCH_CHARS
 # the completion-token ceiling per call. A ceiling, not a target -- the model
 # stops when its answer is done and unused budget costs nothing, so this is
 # sized only to (a) fit the longest-reasoning model's chain (Kimi-K2.6
-# truncated a full BATCH_CHARS batch at 16k where gpt-oss used ~5k) and
-# (b) still cut off a runaway reasoning loop. Too low and the reply truncates
-# (finish "length") and the whole batch is lost.
-MAX_TOKENS = 32000
+# truncated a full BATCH_CHARS batch at 16k where gpt-oss used ~5k; local
+# Qwen3.6 thinking at temp 1.0 blew 32k on a 123-§ LUF batch of prop
+# 2015/16:195 even with LLM_BATCH_CHARS=60000) and (b) still cut off a
+# runaway reasoning loop. Too low and the reply truncates (finish "length")
+# and the whole batch is lost.
+MAX_TOKENS = 64000
 
 
 def detect_directives(prop_art):
