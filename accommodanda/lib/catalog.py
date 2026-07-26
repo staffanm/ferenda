@@ -830,7 +830,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
         prev = have.get(key)
         # stat fast path: an artifact whose (size, mtime) match the ones recorded
         # at the last relate is untouched (parse rewrites bump the mtime), so trust
-        # them like file_watermark does and skip the read + hash entirely. size 0
+        # them like file_fingerprint does and skip the read + hash entirely. size 0
         # is an artifact-backed doc's row that never happens (a SkipDocument
         # placeholder carries no row, so prev is None), so it always falls through.
         if (not force and prev and prev[2] == st.st_size
@@ -1058,64 +1058,179 @@ def fk_kommentar_all(con):
 # is where the relation stops being one a reader would accept unexplained: by
 # the third generation the article has usually been split and merged past
 # recognition, and art. 2 (definitions) in four generations would swamp the rail.
-LINEAGE_DEPTH = 2
+# three generations: a LOU paragraf's 2014/24 article reaches 2004/18 (1),
+# the 1992-93 codifications (2) and the original 1971/1977 directives (3) --
+# the generation Dundalk and SIAC Construction cite. The walk is BFS over
+# explicit correlation-table pairs, so depth only follows tables the recasts
+# themselves published.
+LINEAGE_DEPTH = 3
 
 
-def predecessor_articles(con, directive, article, depth=LINEAGE_DEPTH):
-    """The `(act uri, article, hops)` an EU-act article traces back to through
-    the recasts' own correlation tables, breadth-first, `depth` generations deep.
+def _covers(atom, pinpoint):
+    """Whether article atom `atom` covers `pinpoint`: "57" covers "57.4" and
+    itself; "57.4" covers "57.4.a"; "57" does not cover "570" (the dot bound)."""
+    return pinpoint == atom or pinpoint.startswith(atom + ".")
 
-    Excludes the starting pair, so the caller can tell an inherited article from
-    a transposed one, and yields each ancestor once at its shallowest hop --
-    the same article reached by two routes is one ancestor, not two. Ordered
-    within a hop (the query's ORDER BY), because the rail renders the first
-    ancestor it is handed and an unordered walk would churn the page."""
-    seen, frontier, out = {(directive, article)}, [(directive, article)], []
+
+def _deepest_cover(pairs, pinpoint):
+    """Of the `(atom, payload)` pairs whose atom covers `pinpoint`, the
+    payloads at the deepest cover level; empty when nothing covers. The one
+    place the "most precise claim wins" rule is spelled out -- shared by the
+    lineage walk (`predecessor_atoms`) and the rail assignment
+    (`caselaw_anchored`), which must agree on it."""
+    covering = [(atom, payload) for atom, payload in pairs
+                if _covers(atom, pinpoint)]
+    if not covering:
+        return []
+    deepest = max(atom.count(".") for atom, _payload in covering)
+    return [payload for atom, payload in covering
+            if atom.count(".") == deepest]
+
+
+def _atomize(pinpoint, article):
+    """The article atoms a genomförande pinpoint claims, dot-normalized:
+    "57.2, 57.4 a" -> ["57.2", "57.4.a"]. An empty pinpoint claims the whole
+    article."""
+    atoms = [p.strip().replace(" ", ".")
+             for p in (pinpoint or "").split(",") if p.strip()]
+    return atoms or [article]
+
+
+def predecessor_atoms(con, act, atom, depth=LINEAGE_DEPTH):
+    """The `(act uri, atom, hops)` an EU-act article atom (a dotted pinpoint,
+    "57.4", or a bare article) traces back to through the recasts' own
+    correlation tables, breadth-first, `depth` generations deep.
+
+    Each hop keeps as much precision as the table offers, per predecessor act:
+    the rows *inside* the atom's claim if there are any (57 -> the 45.1 the
+    table itemizes), else the deepest rows *covering* it (57.1 through the bare
+    57-row when nothing finer exists), else -- the atom is finer than every row
+    for its article, like 57.4 against a table that only lists 57.1 -- the
+    plain old-article numbers, precision the table simply does not have.
+    Excludes the starting pair; yields each ancestor atom once at its
+    shallowest hop, deterministically ordered (the query's ORDER BY), because
+    the rail renders what it is handed and an unordered walk would churn the
+    page."""
+    seen, frontier, out = {(act, atom)}, [(act, atom)], []
     for hop in range(1, depth + 1):
-        rows = [row for uri, art in frontier
-                for row in con.execute(
-                    "SELECT DISTINCT old_uri, old_article "
+        found = []
+        for uri, a in frontier:
+            per_act = {}
+            for old_uri, old_article, new_pin, old_pin in con.execute(
+                    "SELECT old_uri, old_article, "
+                    "  COALESCE(NULLIF(new_pinpoint, ''), new_article), "
+                    "  COALESCE(NULLIF(old_pinpoint, ''), old_article) "
                     "FROM directive_correspondence "
                     "WHERE new_uri = ? AND new_article = ? "
-                    "ORDER BY old_uri, old_article", (uri, art))]
+                    "ORDER BY old_uri, old_pinpoint", (uri, a.split(".", 1)[0])):
+                per_act.setdefault(old_uri, []).append(
+                    (old_article, new_pin.replace(" ", "."),
+                     old_pin.replace(" ", ".")))
+            for old_uri, rows in per_act.items():
+                inside = [op for _oa, np, op in rows if _covers(a, np)]
+                if not inside:
+                    inside = (_deepest_cover([(np, op) for _oa, np, op in rows],
+                                             a)
+                              or sorted({oa for oa, _np, _op in rows}))
+                found.extend((old_uri, anc) for anc in inside)
         frontier = []
-        for old_uri, old_article in rows:
-            if (old_uri, old_article) in seen:
+        for pair in found:
+            if pair in seen:
                 continue
-            seen.add((old_uri, old_article))
-            frontier.append((old_uri, old_article))
-            out.append((old_uri, old_article, hop))
+            seen.add(pair)
+            frontier.append(pair)
+            out.append((*pair, hop))
         if not frontier:
             break
     return out
 
 
-def genomfor_targets(con, sfs_uri, anchor):
-    """The EU-act articles a statute paragraf's case-law rail resolves cases
-    through: `(directive uri, article, transposed article, hops)`.
+# a statute anchor's position in the act (K2aP7b -> kapitel (2, "a"),
+# paragraf (7, "b")); what "the first paragraf" means when a citation must
+# choose between several matching genomförande claims
+_ANCHOR_ORD = re.compile(r"(?:K(\d+)([a-z]*))?P(\d+)([a-z]*)$")
 
-    The paragraf's own genomförande statements come back at `hops` 0 with
-    `transposed` equal to `article`. Each is then carried back through the
-    directive-lineage layer (`predecessor_articles`), so a paragraf transposing
-    article 12 of 2014/24 also reaches article 18 of 92/50 -- and the judgments
-    citing *that* -- with `transposed` still naming the article the paragraf
-    actually transposes, which is what the rail attributes the hop to. An
-    ancestor already reached directly by another genomförande statement stays
-    at hop 0: a directly transposed article is not an inherited one."""
-    rows = con.execute(
-        "SELECT DISTINCT directive, article FROM genomforande "
-        "WHERE sfs_uri = ? AND sfs_anchor = ? "
-        "ORDER BY directive, article", (sfs_uri, anchor)).fetchall()
-    out = [(directive, article, article, 0) for directive, article in rows]
-    seen = {(directive, article) for directive, article in rows}
-    for directive, article in rows:
-        for old_uri, old_article, hop in predecessor_articles(
-                con, directive, article):
-            if (old_uri, old_article) in seen:
+
+def _anchor_order(anchor):
+    m = _ANCHOR_ORD.fullmatch(anchor)
+    assert m, f"unorderable genomförande anchor {anchor!r}"
+    return (int(m[1] or 0), m[2] or "", int(m[3]), m[4] or "")
+
+
+def caselaw_anchored(con, sfs_uri, live=None):
+    """The statute's whole EU case-law rail, assigned in one pass:
+    `{sfs_anchor: [((case uri, label, descriptive, date), {(act uri, cited
+    pinpoint, transposed atom, hops), ...}), ...]}`, cases newest first.
+
+    `live`, when given, is the set of anchors the rendered consolidation
+    actually has; genomförande claims outside it are skipped, so a claim
+    following the proposition's original numbering (LOU's 22 kap. tillsyn,
+    renumbered away in 2021) cannot swallow a case into a paragraf that no
+    longer exists -- the citation cascades to the article family's first
+    live claimant instead.
+
+    A judgment attaches to the paragraf whose genomförande pinpoint matches
+    its citation most precisely: a case on artikel 57.4 belongs next to the
+    paragraf transposing 57.4, not next to all seven transposing some part of
+    artikel 57. Concretely, per cited act-fragment: the deepest claim covering
+    the citation wins; with no covering claim (the citation is coarser than
+    every claim, or names a punkt nobody claims) it falls back to the claims
+    on the same article; ties -- several paragrafer claiming the same
+    pinpoint -- go to a direct claim over an inherited one, then to the first
+    paragraf in statute order. Claims are widened through the directive
+    lineage (`predecessor_atoms`), so a Teckal citing 93/36 still reaches the
+    paragraf transposing 2014/24 artikel 12. Judgments are the sector-6
+    CJ/TJ/FJ documents -- an AG opinion (CC) or order (CO/TO) is not settled
+    practice and stays out."""
+    entries = []               # (act, atom, anchor, transposed atom, hops)
+    for anchor, act, article, pinpoint in con.execute(
+            "SELECT DISTINCT sfs_anchor, directive, article, "
+            "  COALESCE(pinpoint, '') FROM genomforande "
+            "WHERE sfs_uri = ? ORDER BY sfs_anchor, directive, article",
+            (sfs_uri,)):
+        if live is not None and anchor not in live:
+            continue
+        entries.extend((act, atom, anchor, atom, 0)
+                       for atom in _atomize(pinpoint, article))
+    seen = {(act, atom, anchor) for act, atom, anchor, _t, _h in entries}
+    for act, atom, anchor, _t, _h in list(entries):
+        for old_uri, old_atom, hop in predecessor_atoms(con, act, atom):
+            if (old_uri, old_atom, anchor) in seen:
                 continue
-            seen.add((old_uri, old_article))
-            out.append((old_uri, old_article, article, hop))
-    return out
+            seen.add((old_uri, old_atom, anchor))
+            entries.append((old_uri, old_atom, anchor, atom, hop))
+    by_act = {}
+    for entry in entries:
+        by_act.setdefault(entry[0], []).append(entry)
+    assigned = {}              # anchor -> {case uri: (row, {provenance})}
+    for act, ents in sorted(by_act.items()):
+        cited = {}             # fragment -> {case row}
+        for to_uri, uri, label, descriptive, case_date in con.execute(
+                "SELECT l.to_uri, d.uri, d.label, d.descriptive, d.date "
+                "FROM links l JOIN documents d ON d.uri = l.from_uri "
+                "WHERE l.to_uri > ? || '#' AND l.to_uri < ? || '$' "
+                "  AND d.source = 'eurlex' "
+                "  AND substr(d.uri, instr(d.uri, '/celex/') + 7, 1) = '6' "
+                "  AND substr(d.uri, instr(d.uri, '/celex/') + 12, 2) IN "
+                "      ('CJ', 'TJ', 'FJ')", (act, act)):
+            cited.setdefault(to_uri.partition("#")[2], set()).add(
+                (uri, label, descriptive, case_date))
+        for fragment, cases in sorted(cited.items()):
+            candidates = _deepest_cover([(e[1], e) for e in ents], fragment)
+            if not candidates:
+                candidates = [e for e in ents if e[1].split(".", 1)[0]
+                              == fragment.split(".", 1)[0]]
+                if not candidates:
+                    continue
+            _act, _atom, anchor, transposed, hop = min(
+                candidates, key=lambda e: (e[4], _anchor_order(e[2])))
+            slot = assigned.setdefault(anchor, {})
+            for row in cases:
+                slot.setdefault(row[0], (row, set()))[1].add(
+                    (act, fragment, transposed, hop))
+    return {anchor: sorted(cases.values(),
+                           key=lambda r: (r[0][3] or "", r[0][0]), reverse=True)
+            for anchor, cases in assigned.items()}
 
 
 def dangling_targets(con, prefix):
@@ -1135,21 +1250,6 @@ def dangling_targets(con, prefix):
         "WHERE l.to_root LIKE ? AND d.uri IS NULL "
         "GROUP BY l.to_root ORDER BY COUNT(*) DESC, l.to_root",
         (prefix.replace("%", "") + "%",)).fetchall()
-
-
-def caselaw_citing(con, article_uri):
-    """The EU court judgments citing `article_uri` (a directive-article uri,
-    …/celex/32014L0024#12): (case uri, label, descriptive, date), newest
-    first. Judgments are the sector-6 CJ/TJ/FJ documents -- an AG opinion
-    (CC) or order (CO/TO) is not settled practice and stays out."""
-    return con.execute(
-        "SELECT DISTINCT d.uri, d.label, d.descriptive, d.date "
-        "FROM links l JOIN documents d ON d.uri = l.from_uri "
-        "WHERE l.to_uri = ? AND d.source = 'eurlex' "
-        "  AND substr(d.uri, instr(d.uri, '/celex/') + 7, 1) = '6' "
-        "  AND substr(d.uri, instr(d.uri, '/celex/') + 12, 2) IN "
-        "      ('CJ', 'TJ', 'FJ') "
-        "ORDER BY d.date DESC, d.uri", (article_uri,)).fetchall()
 
 
 def genomfor_for(con, sfs_uri, anchor):

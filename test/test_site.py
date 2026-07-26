@@ -1611,6 +1611,13 @@ SFS_LAWS = [
 ]
 
 
+def _primed_margin(site, sfs_uri, anchor):
+    # the renderer primes the memo in render_sfs (with the consolidation's
+    # live anchors); a direct margin call primes it the same way
+    site.caselaw_memo[sfs_uri] = catalog.caselaw_anchored(site.con, sfs_uri)
+    return render.eu_caselaw_margin(site, sfs_uri, anchor)
+
+
 def build_pin_catalog(tmp_path, extra_eurlex=()):
     from accommodanda.forarbete import fk, genomforande
     db = str(tmp_path / "catalog.sqlite")
@@ -1681,13 +1688,68 @@ def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
              "uri": DIR + "#21"}], "children": []}]}
     con = build_pin_catalog(tmp_path, extra_eurlex=(judgment, opinion))
     site = render.Site.from_catalog(con)
-    margin = render.eu_caselaw_margin(site, "https://lagen.nu/2021:500", "K2P1")
+    margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
     assert "EU-domstolens praxis" in margin
     assert "C-1/20" in margin or "62020CJ0001" in margin   # the judgment shows
     assert "om artikel 21" in margin                       # with its article
     assert "C-2/20" not in margin and "62020CC0002" not in margin  # no opinion
     # a paragraf with no genomförande rows renders no case-law section
-    assert render.eu_caselaw_margin(site, "https://lagen.nu/2022:260", "P9") == ""
+    assert _primed_margin(site, "https://lagen.nu/2022:260", "P9") == ""
+
+
+def test_paragraf_rail_joins_subarticle_pinpoints_not_prefixes(tmp_path):
+    # a judgment on artikel 21.4 is practice on artikel 21: no paragraf claims
+    # punkt 4, so it attaches to the article family's first claimant (K2P1,
+    # the only one here; `catalog.caselaw_anchored` routes a claimed punkt to
+    # its claiming paragraf -- see test_eurlex_correspond) -- while #210 is a
+    # different article and must not leak in
+    subarticle = {
+        "uri": "https://lagen.nu/ext/celex/62020CJ0003",
+        "celex": "62020CJ0003", "doctype": "judgment",
+        "title": "Domstolens dom i mål C-3/20", "date": "2021-05-06",
+        "structure": [{"type": "paragraph", "id": "p12", "text": [
+            {"predicate": "dcterms:references", "text": "artikel 21.4",
+             "uri": DIR + "#21.4"}], "children": []}]}
+    other_article = {
+        "uri": "https://lagen.nu/ext/celex/62020CJ0004",
+        "celex": "62020CJ0004", "doctype": "judgment",
+        "title": "Domstolens dom i mål C-4/20", "date": "2021-06-01",
+        "structure": [{"type": "paragraph", "id": "p9", "text": [
+            {"predicate": "dcterms:references", "text": "artikel 210",
+             "uri": DIR + "#210"}], "children": []}]}
+    con = build_pin_catalog(tmp_path, extra_eurlex=(subarticle, other_article))
+    site = render.Site.from_catalog(con)
+    margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
+    assert "62020CJ0003" in margin
+    assert "62020CJ0004" not in margin
+
+
+def test_paragraf_rail_renders_every_case_overflow_collapsed(tmp_path):
+    # the rail used to publish only the first EU_CASELAW_CAP cases and drop the
+    # rest behind a dead "+N till" line. Since the order is newest-first, that
+    # silently omitted precisely the foundational judgments -- LOU 17 kap. has
+    # 41 cases per paragraf and showed 5. Every case must be on the page; the
+    # overflow only starts collapsed.
+    judgments = tuple(
+        {"uri": "https://lagen.nu/ext/celex/62020CJ%04d" % n,
+         "celex": "62020CJ%04d" % n, "doctype": "judgment",
+         "title": "Domstolens dom i mål C-%d/20" % n,
+         "date": "20%02d-05-06" % (10 + n),
+         "structure": [{"type": "paragraph", "id": "p30", "text": [
+             {"predicate": "dcterms:references", "text": "artikel 21",
+              "uri": DIR + "#21"}], "children": []}]}
+        for n in range(1, 9))                     # 8 cases, cap is 5
+    con = build_pin_catalog(tmp_path, extra_eurlex=judgments)
+    site = render.Site.from_catalog(con)
+    margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
+
+    for n in range(1, 9):                         # every one is in the HTML
+        assert "62020CJ%04d" % n in margin
+    assert "<details class=\"more\">" in margin
+    assert "+3 till" in margin                    # 8 - 5 collapsed
+    # the oldest (C-1/20, 2011) sorts last, so it is inside the disclosure --
+    # present rather than dropped, which is the whole point
+    assert "62020CJ0001" in margin.split("<details")[1]
 
 
 def test_statute_page_shows_genomfor_margin(tmp_path):

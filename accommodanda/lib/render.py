@@ -90,6 +90,12 @@ class Site:
     # uris whose repeal date has passed -- dropped from inbound-link panels (I3);
     # a future (not-yet-in-force) repeal date is *not* here, so it still shows
     expired: set[str] = field(default_factory=set)
+    # one-document memo for `catalog.caselaw_anchored` -- the statute-wide
+    # case assignment is computed once per rendered statute (render_sfs primes
+    # it with the consolidation's live anchor set), then read per anchor as
+    # its rail panel is built; holds only the current document
+    caselaw_memo: dict[str, dict[str, list[tuple[tuple, set]]]] = \
+        field(default_factory=dict)
 
     @classmethod
     def from_catalog(cls, con):
@@ -852,64 +858,53 @@ def _act_short_id(site, uri):
 
 
 def _caselaw_provenance(site, arts):
-    """How the rail attributes a case to the article(s) it was found through.
+    """How the rail attributes a case to the citation(s) it was found through.
 
-    A directly transposed article needs no explanation ("om artikel 57"); one
-    reached through the lineage layer does, because the reader is looking at a
-    paragraf that transposes 2014/24 and the case is about 92/50 -- so the hop
-    is named ("om artikel 18 i 92/50/EEG, motsvarar artikel 12"). `arts` is the
-    {(act uri, article, transposed article, hops)} the case was reached by.
+    A citation of a directly transposed pinpoint needs no explanation ("om
+    artikel 57.4"); one reached through the lineage layer does, because the
+    reader is looking at a paragraf that transposes 2014/24 and the case is
+    about 92/50 -- so the hop is named ("om artikel 18 i 92/50/EEG, motsvarar
+    artikel 12"). `arts` is the {(act uri, cited pinpoint, transposed atom,
+    hops)} the case was assigned by (`catalog.caselaw_anchored`).
 
     Article numbers sort short-then-lexical, never by length alone: `key=len`
     leaves ties in set-iteration order, which varies with the interpreter's
     string hash seed, so two generate runs over an unchanged corpus would emit
     "artikel 12, 57" and "artikel 57, 12" and churn the page."""
-    direct = sorted({a for _u, a, _t, hop in arts if not hop},
+    direct = sorted({cited for _u, cited, _t, hop in arts if not hop},
                     key=lambda a: (len(a), a))
     if direct:
         return "om artikel %s" % ", ".join(direct)
-    act_uri, article, transposed, _hop = sorted(arts)[0]
+    act_uri, cited, transposed, _hop = sorted(arts)[0]
     return "om artikel %s i %s, motsvarar artikel %s" % (
-        article, _act_short_id(site, act_uri), transposed)
+        cited, _act_short_id(site, act_uri), transposed)
 
 
 def eu_caselaw_margin(site, sfs_uri, anchor):
-    """Statute-paragraf rail: the EU court judgments interpreting the directive
-    article(s) this paragraf transposes -- the join the genomförande layer
-    exists for (LOU 13 kap. 1 § -> artikel 57 i 2014/24 -> the cases citing
-    artikel 57). Targets come from `catalog.genomfor_targets`, which widens the
-    paragraf's own articles with the predecessor articles the directive-lineage
-    layer traces (so C-107/98 Teckal, which cites 93/36, reaches the LOU
-    paragrafs transposing 2014/24 article 12); cases from the generic inbound
-    links of each act-article uri, deduplicated across articles (one case often
-    cites several), newest first, capped."""
-    targets = catalog.genomfor_targets(site.con, sfs_uri, anchor)
-    if not targets:
+    """Statute-paragraf rail: the EU court judgments interpreting what this
+    paragraf transposes -- the join the genomförande layer exists for (LOU
+    13 kap. 3 § -> artikel 57.4 i 2014/24 -> the cases citing artikel 57.4).
+    The whole statute is assigned in one `catalog.caselaw_anchored` pass so
+    each citation lands on exactly the paragraf whose genomförande pinpoint
+    matches it best; cases newest first. The memo is primed by `render_sfs`
+    with the consolidation's live anchor set -- an unprimed document has no
+    statute rail (only statutes have genomförande claims), and recomputing
+    here without the anchor set would quietly reintroduce the dead-anchor
+    case-swallowing the priming exists to prevent. Every case is rendered;
+    those past EU_CASELAW_CAP start collapsed behind a disclosure."""
+    ordered = site.caselaw_memo.get(sfs_uri, {}).get(anchor)
+    if not ordered:
         return ""
-    cases = {}                                      # case uri -> (row, {target})
-    for target in targets:
-        directive, article = target[0], target[1]
-        for uri, label, descriptive, case_date in catalog.caselaw_citing(
-                site.con, directive + "#" + article):
-            row = cases.setdefault(uri,
-                                   ((uri, label, descriptive, case_date), set()))
-            row[1].add(target)
-    if not cases:
-        return ""
-    ordered = sorted(cases.values(), key=lambda r: (r[0][3] or "", r[0][0]),
-                     reverse=True)
     items = []
-    for (uri, label, descriptive, _date), arts in ordered[:EU_CASELAW_CAP]:
+    for (uri, label, descriptive, _date), arts in ordered:
         name = descriptive or label or uri.rsplit("/", 1)[-1]
         link = ('<a href="%s">%s</a>' % (escape(href(uri)), escape(name))
                 if site.has(uri) else escape(name))
         items.append('<li>%s <span class="prov">(%s)</span></li>'
                      % (link, escape(_caselaw_provenance(site, arts))))
-    more = len(ordered) - EU_CASELAW_CAP
-    tail = ('<li class="more">+ %d till</li>' % more) if more > 0 else ""
     return ('<aside class="eu-caselaw"><div class="inbound-h">'
-            'EU-domstolens praxis</div><ul>%s%s</ul></aside>'
-            % ("".join(items), tail))
+            'EU-domstolens praxis</div>%s</aside>'
+            % _capped_list(items, EU_CASELAW_CAP, "till"))
 
 
 def bemyndigande_margin(site, uri):
@@ -2071,6 +2066,20 @@ def _sfs_fetched():
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def _node_id_set(nodes):
+    """Every node id in an artifact structure -- the anchors the rendered page
+    will actually carry, which is what `catalog.caselaw_anchored` needs to
+    keep a case out of a paragraf that no longer exists."""
+    ids = set()
+    stack = list(nodes)
+    while stack:
+        node = stack.pop()
+        if node.get("id"):
+            ids.add(node["id"])
+        stack.extend(node.get("children", []))
+    return ids
+
+
 def render_sfs(art, site):
     props = art.get("metadata", {}).get("properties", {})
     local_id = catalog.local(art["uri"])
@@ -2103,6 +2112,13 @@ def render_sfs(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
+    # assign the statute's EU case-law rail up front, telling the join which
+    # anchors this consolidation actually has -- a genomförande claim following
+    # the proposition's original numbering (a since-renumbered kapitel) must
+    # cascade to a live paragraf, not swallow its cases into a dead anchor
+    site.caselaw_memo.clear()
+    site.caselaw_memo[art["uri"]] = catalog.caselaw_anchored(
+        site.con, art["uri"], live=_node_id_set(art.get("structure", [])))
     parallel_appendix = any(
         child.get("type") == "konventionsbilaga"
         for node in art.get("structure", []) if node.get("type") == "bilaga"

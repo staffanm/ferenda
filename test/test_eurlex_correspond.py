@@ -175,51 +175,139 @@ def _lineage_catalog(tmp_path):
     return con
 
 
-def test_predecessor_articles_walks_two_generations_by_default(tmp_path):
+def test_predecessor_atoms_walks_three_generations_by_default(tmp_path):
+    # three hops reaches the original 1971/1977 directives from a 2014 recast
+    # (2014/24 -> 2004/18 -> 93/37 -> 71/305) -- the generation Dundalk and
+    # SIAC Construction cite, which depth 2 silently cut off
     con = _lineage_catalog(tmp_path)
-    got = catalog.predecessor_articles(con, BASE + "32014L0024", "57")
-    # ordered within a hop by (old_uri, old_article), so the walk is repeatable
+    got = catalog.predecessor_atoms(con, BASE + "32014L0024", "57")
+    # ordered within a hop by (old_uri, old_pinpoint), so the walk is repeatable
     assert [(u.rsplit("/", 1)[1], a, hop) for u, a, hop in got] == [
         ("32004L0018", "45", 1), ("31992L0050", "29", 2),
-        ("31993L0037", "24", 2)]
-    # the third generation is reachable, just not by default
-    deep = catalog.predecessor_articles(con, BASE + "32014L0024", "57", depth=3)
-    assert (BASE + "31971L0305", "23", 3) in deep
+        ("31993L0037", "24", 2), ("31971L0305", "23", 3)]
+    # a narrower caller can still bound the walk
+    shallow = catalog.predecessor_atoms(con, BASE + "32014L0024", "57",
+                                        depth=2)
+    assert (BASE + "31971L0305", "23", 3) not in shallow
 
 
-def test_genomfor_targets_carries_the_transposed_article_along(tmp_path):
-    con = _lineage_catalog(tmp_path)
-    con.execute("INSERT INTO genomforande VALUES (?,?,?,?,?,?,?,?,?)",
-                ("https://lagen.nu/2016:1145", "K13P1", BASE + "32014L0024",
-                 "57", "https://lagen.nu/prop/2015-16-195", "Prop. 2015/16:195",
-                 "57", 0, ""))
+def test_predecessor_atoms_keeps_the_table_s_pinpoint_precision(tmp_path):
+    # 2014/24 annex XV itemizes artikel 58 punkt by punkt (58.1 -> 44.1,
+    # 58.2 -> 46, 58.3 -> 47); the walk keeps whatever precision the table
+    # offers per atom, and only falls back to bare article numbers when the
+    # atom is finer than every row (58.4 here)
+    con = catalog.connect(str(tmp_path / "c.sqlite"))
+    con.executemany("INSERT INTO directive_correspondence VALUES (?,?,?,?,?,?)", [
+        (BASE + "32014L0024", "58", BASE + "32004L0018", "44", "58.1", "44.1"),
+        (BASE + "32014L0024", "58", BASE + "32004L0018", "46", "58.2", "46"),
+        (BASE + "32014L0024", "58", BASE + "32004L0018", "47", "58.3", "47"),
+    ])
     con.commit()
-    got = catalog.genomfor_targets(con, "https://lagen.nu/2016:1145", "K13P1")
-    assert [(u.rsplit("/", 1)[1], a, via, hop) for u, a, via, hop in got] == [
-        ("32014L0024", "57", "57", 0),      # the paragraf's own statement
-        ("32004L0018", "45", "57", 1),      # ... and what it inherits from
-        ("31992L0050", "29", "57", 2),
-        ("31993L0037", "24", "57", 2)]
+    new = BASE + "32014L0024"
+    # a pinpointed atom takes exactly the row inside its claim
+    assert catalog.predecessor_atoms(con, new, "58.3") == [
+        (BASE + "32004L0018", "47", 1)]
+    # the bare article takes every itemized row (they are all inside "58")
+    assert catalog.predecessor_atoms(con, new, "58") == [
+        (BASE + "32004L0018", "44.1", 1), (BASE + "32004L0018", "46", 1),
+        (BASE + "32004L0018", "47", 1)]
+    # an atom the table never itemizes degrades to the article numbers
+    assert catalog.predecessor_atoms(con, new, "58.4") == [
+        (BASE + "32004L0018", "44", 1), (BASE + "32004L0018", "46", 1),
+        (BASE + "32004L0018", "47", 1)]
 
 
-def test_genomfor_targets_keeps_a_directly_transposed_article_at_hop_zero(
+LOU, PROP = "https://lagen.nu/2016:1145", "https://lagen.nu/prop/2015-16-195"
+
+
+def _genomfor(con, anchor, directive, article, pinpoint):
+    con.execute("INSERT INTO genomforande VALUES (?,?,?,?,?,?,?,?,?)",
+                (LOU, anchor, directive, article, PROP, "Prop. 2015/16:195",
+                 pinpoint, 0, ""))
+
+
+def _judgment(con, celex, to_fragment, act=None, date="2021-05-06"):
+    uri = BASE + celex
+    con.execute("INSERT INTO documents (uri, source, path, label, date) "
+                "VALUES (?, 'eurlex', 'x.json', ?, ?)",
+                (uri, "C-1/20", date))
+    con.execute("INSERT INTO links VALUES (?,?,?,?,?,?)",
+                (uri, "p12", "dcterms:references",
+                 (act or BASE + "32014L0024") + "#" + to_fragment,
+                 act or BASE + "32014L0024", "artikel " + to_fragment))
+
+
+def test_caselaw_anchored_attributes_a_lineage_case_to_its_hop(tmp_path):
+    con = _lineage_catalog(tmp_path)
+    _genomfor(con, "K13P1", BASE + "32014L0024", "57", "57")
+    _judgment(con, "61987CJ0045", "23", act=BASE + "31971L0305")
+    con.commit()
+    got = catalog.caselaw_anchored(con, LOU)
+    (row, provenance), = got["K13P1"]
+    assert row[0] == BASE + "61987CJ0045"
+    # the rail can say "om artikel 23 i 71/305/EEG, motsvarar artikel 57"
+    assert provenance == {(BASE + "31971L0305", "23", "57", 3)}
+
+
+def test_caselaw_anchored_keeps_a_directly_transposed_article_at_hop_zero(
         tmp_path):
     # a paragraf that transposes both a recast article and (via another
     # statement) the very article that recast replaced: the direct statement
     # wins, so the rail explains nothing it does not have to
     con = _lineage_catalog(tmp_path)
-    for directive, article in ((BASE + "32014L0024", "57"),
-                               (BASE + "32004L0018", "45")):
-        con.execute("INSERT INTO genomforande VALUES (?,?,?,?,?,?,?,?,?)",
-                    ("https://lagen.nu/2016:1145", "K13P1", directive, article,
-                     "https://lagen.nu/prop/2015-16-195", "Prop. 2015/16:195",
-                     article, 0, ""))
+    _genomfor(con, "K13P1", BASE + "32014L0024", "57", "57")
+    _genomfor(con, "K13P1", BASE + "32004L0018", "45", "45")
+    _judgment(con, "62004CJ0226", "45", act=BASE + "32004L0018")
     con.commit()
-    got = catalog.genomfor_targets(con, "https://lagen.nu/2016:1145", "K13P1")
-    # 57 and 45 are stated, not inherited. Depth is counted per transposed
-    # article, so naming 2004/18 art 45 directly also opens *its* two
-    # generations -- 71/305 art 23, which art 57 alone would not reach. 24 and
-    # 29 are one hop from 45 and two from 57; the genomförande query is ordered,
-    # so 45's walk always runs first and the shallower hop is the one recorded.
-    assert {(a, hop) for _u, a, _via, hop in got} == {
-        ("57", 0), ("45", 0), ("24", 1), ("29", 1), ("23", 2)}
+    (_row, provenance), = catalog.caselaw_anchored(con, LOU)["K13P1"]
+    assert provenance == {(BASE + "32004L0018", "45", "45", 0)}
+
+
+def test_caselaw_anchored_routes_a_pinpoint_to_the_claiming_paragraf(tmp_path):
+    # the LOU 13 kap. shape: seven paragrafer transpose punkter of artikel 57.
+    # A case on 57.4 belongs next to 13 kap. 3 § (the deepest covering claim;
+    # 13 kap. 5 § also claims 57.4 but 3 § comes first in statute order), a
+    # case on 57.6 next to 13 kap. 5 § (its only claimant here), and a case
+    # citing bare artikel 57 -- or a punkt nobody claims -- next to the first
+    # paragraf of the article family, not next to all of them
+    con = _lineage_catalog(tmp_path)
+    _genomfor(con, "K13P1", BASE + "32014L0024", "57", "57.1")
+    _genomfor(con, "K13P3", BASE + "32014L0024", "57", "57.4")
+    _genomfor(con, "K13P5", BASE + "32014L0024", "57", "57.2, 57.4, 57.6")
+    _judgment(con, "62018CJ0267", "57.4", date="2019-10-03")   # Delta Antrepriză
+    _judgment(con, "62020CJ0210", "57.6", date="2021-06-03")   # Rad Service
+    _judgment(con, "62016CJ0387", "57", date="2017-06-20")
+    _judgment(con, "62016CJ0388", "57.9", date="2017-06-21")
+    con.commit()
+    got = catalog.caselaw_anchored(con, LOU)
+    by_anchor = {anchor: {row[0].rsplit("/", 1)[1] for row, _p in cases}
+                 for anchor, cases in got.items()}
+    assert by_anchor == {
+        "K13P1": {"62016CJ0387", "62016CJ0388"},
+        "K13P3": {"62018CJ0267"},
+        "K13P5": {"62020CJ0210"},
+    }
+    # the pinpoint the case actually cited survives into the provenance
+    (_row, provenance), = got["K13P3"]
+    assert provenance == {(BASE + "32014L0024", "57.4", "57.4", 0)}
+
+
+def test_caselaw_anchored_cascades_past_an_anchor_the_law_no_longer_has(
+        tmp_path):
+    # LOU's genomförande layer follows prop 2015/16:195's numbering, where
+    # tillsyn was 22 kap.; the 2021 restructuring renumbered it away, so the
+    # rendered consolidation has no K22P1 to hang a rail on. Given the live
+    # anchor set, the claim is skipped and the case lands on the article
+    # family's first paragraf that still exists -- not in a dead anchor whose
+    # rail no reader can ever see
+    con = _lineage_catalog(tmp_path)
+    _genomfor(con, "K22P1", BASE + "32014L0024", "83", "83")
+    _genomfor(con, "K12P17", BASE + "32014L0024", "83", "83.6")
+    _judgment(con, "62018CJ0496", "83.1")
+    con.commit()
+    unrestricted = catalog.caselaw_anchored(con, LOU)
+    assert set(unrestricted) == {"K22P1"}
+    got = catalog.caselaw_anchored(con, LOU, live={"K12P17", "K13P1"})
+    assert set(got) == {"K12P17"}
+    (_row, provenance), = got["K12P17"]
+    assert provenance == {(BASE + "32014L0024", "83.1", "83.6", 0)}
