@@ -57,7 +57,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import compress, layout
+from ..lib import compress, layout, net
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
@@ -159,7 +159,7 @@ def fetch(session, url, timeout=60):
     if response.status_code == 400:
         time.sleep(2)
         response = session.get(url, timeout=timeout)
-    response.raise_for_status()
+    net.raise_for_status(response)
     return response
 
 

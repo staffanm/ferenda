@@ -37,7 +37,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
-from ..lib import layout
+from ..lib import layout, net
 from ..lib.net import BROWSER_UA as UA
 from ..lib.util import write_atomic
 
@@ -94,7 +94,7 @@ def _session():
 
 def fetch(session, url):
     resp = session.get(url, timeout=60)
-    resp.raise_for_status()
+    net.raise_for_status(resp)
     return lxml.html.fromstring(resp.content)
 
 
@@ -210,7 +210,7 @@ def sitemap_locs(session, sitemap_url):
     """Every `<loc>` in a site's sitemap.xml (a flat urlset on the DG sites -- no
     sitemap-index to recurse), as absolute URL strings."""
     resp = session.get(sitemap_url, timeout=60)
-    resp.raise_for_status()
+    net.raise_for_status(resp)
     root = lxml.html.fromstring(resp.content)
     return [loc.text.strip() for loc in root.xpath("//*[local-name()='loc']")
             if loc.text and loc.text.strip()]
@@ -233,7 +233,7 @@ def page_celexes(url):
     join that keys the index. A fresh retrying session per call (not shared) so the
     crawl can fan out across threads safely and each page rides out a 429."""
     resp = _session().get(url, timeout=60)
-    resp.raise_for_status()
+    net.raise_for_status(resp)
     tree = lxml.html.fromstring(resp.content)
     return {c for href in tree.xpath("//a/@href")
             if "eur-lex" in href if (c := celex_from_href(href))}

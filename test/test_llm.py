@@ -233,6 +233,7 @@ class Fake500:
     ok = False
     reason = "Server Error"
     url = "https://api.example/v1/chat/completions"
+    headers = {}
     text = '{"error": "upstream overloaded"}'
 
 
@@ -246,6 +247,7 @@ def test_http_error_carries_the_response_body(monkeypatch):
         ok = False
         reason = "Bad Request"
         url = "http://127.0.0.1:8123/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
         text = ('{"error":{"code":400,"message":"request (98435 tokens) exceeds '
                 'the available context size (65536 tokens), try increasing it",'
                 '"type":"exceed_context_size_error"}}')
@@ -270,6 +272,7 @@ def test_http_error_body_is_truncated(monkeypatch):
         ok = False
         reason = "Bad Gateway"
         url = "https://gateway.example/v1/chat/completions"
+        headers = {"Retry-After": "120", "CF-Ray": "deadbeef"}
         text = "<html>" + "x" * 9000 + "</html>"
 
     monkeypatch.setenv("BERGET_API_KEY", "x")
@@ -277,8 +280,12 @@ def test_http_error_body_is_truncated(monkeypatch):
     monkeypatch.setattr(llm.requests, "post", lambda *a, **kw: FakeHTML())
     with pytest.raises(llm.requests.exceptions.HTTPError) as exc:
         llm.complete_thread([{"role": "user", "content": "hi"}])
-    assert len(str(exc.value)) < llm.ERROR_BODY_CHARS + 200
+    assert len(str(exc.value)) < 2200
     assert "more chars]" in str(exc.value)
+    # the diagnostic headers ride along: a throttle states itself in Retry-After,
+    # not in the body, and that is exactly the case a bare 502 hides
+    assert "Retry-After: 120" in str(exc.value)
+    assert "CF-Ray: deadbeef" in str(exc.value)
 
 
 def test_transient_5xx_is_retried_then_succeeds(monkeypatch):

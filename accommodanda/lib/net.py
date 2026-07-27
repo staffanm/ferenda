@@ -88,25 +88,90 @@ def mount_legacy_tls(session, prefix):
     session.mount(prefix, _LegacyTLSAdapter(max_retries=_RETRY))
 
 
+# response headers worth quoting when a request fails: they are what tells a
+# throttle or a WAF block apart from a genuine error
+DIAGNOSTIC_HEADERS = ("Retry-After", "RateLimit-Reset", "X-RateLimit-Remaining",
+                      "X-RateLimit-Limit", "Server", "Via", "CF-Ray", "X-Cache",
+                      "X-Amzn-Trace-Id", "Content-Type", "Set-Cookie")
+
+# a header whose *value* must never be reproduced: this description now travels
+# into a raised exception, which `runlog` persists and the ops dashboard renders,
+# so a session cookie would leave stderr for a file and a served page. That a
+# cookie was set is the diagnostic signal (a WAF challenge sets one); its value
+# is not, so only the names are kept.
+REDACTED_HEADERS = {"set-cookie"}
+
+
+def _header_value(name, value):
+    if name.lower() not in REDACTED_HEADERS:
+        return value
+    return "<%s redacted>" % ", ".join(
+        sorted({part.split("=", 1)[0].strip() for part in value.split(",")
+                if part.strip()}) or ["value"])
+
+
+def describe_response(response, body_chars=2000):
+    """What the server actually returned, as diagnostic lines: status, reason,
+    url, the `DIAGNOSTIC_HEADERS` it sent, and its body truncated to
+    `body_chars`.
+
+    The single description of a failed HTTP response (rule:second-use-goes-to-lib):
+    `_log_failure` prints it while a retry is still coming, `raise_for_status`
+    raises it, and every direct caller in the package reaches it through the
+    latter. Both want the same facts -- the headers are what distinguish a 429
+    throttle from a real error, and the body is where an endpoint states its own
+    diagnosis ("exceeds the available context size").
+
+    Reads only what both transports this package speaks expose: `status_code`
+    rather than requests' `ok`, and `reason_phrase` where httpx has no `reason`,
+    because `request()` retries over either one.
+    """
+    reason = getattr(response, "reason", None) or getattr(
+        response, "reason_phrase", "")
+    lines = ["HTTP %d%s for %s" % (response.status_code,
+                                   " " + reason if reason else "", response.url)]
+    lines += ["  %s: %s" % (h, _header_value(h, response.headers[h]))
+              for h in DIAGNOSTIC_HEADERS if h in response.headers]
+    body = " ".join((response.text or "").split())
+    if body:
+        lines.append("  body[:%d]: %s%s" % (
+            body_chars, body[:body_chars],
+            "... [%d more chars]" % (len(body) - body_chars)
+            if len(body) > body_chars else ""))
+    return "\n".join(lines)
+
+
+def raise_for_status(response):
+    """`response.raise_for_status()` with what the server actually returned in
+    the message -- `describe_response`: status, url, the diagnostic headers and
+    the body. The single way this package turns a failed HTTP response into an
+    exception (rule:second-use-goes-to-lib).
+
+    The bare requests version reports only "400 Client Error: Bad Request for
+    url: ..." and discards the rest, which is where the diagnosis lives: an LLM
+    endpoint states its own fault in the body ("request (98435 tokens) exceeds
+    the available context size"), while a throttle or WAF states it in
+    `Retry-After`/`CF-Ray` and may send no useful body at all. Without them the
+    caller sees a generic 4xx and has to reproduce the request by hand.
+
+    """
+    if response.status_code < 400:
+        return
+    raise requests.HTTPError(describe_response(response), response=response)
+
+
 def _log_failure(exc, response):
     """Write what the server actually returned to stderr, so a throttle/WAF
     block (a 403/429 with Retry-After or an HTML body) can be told apart from a
-    genuine error or a one-off empty body."""
+    genuine error or a one-off empty body. Keeps a shorter body than the raising
+    caller: a harvest logs this on every retry of every document, where the
+    raise happens once."""
     if response is None:
         print("download request failed: %s: %s" % (type(exc).__name__, exc),
               file=sys.stderr, flush=True)
         return
-    lines = ["download request failed: HTTP %d for %s"
-             % (response.status_code, response.url)]
-    for header in ("Retry-After", "RateLimit-Reset", "X-RateLimit-Remaining",
-                   "X-RateLimit-Limit", "Server", "Via", "CF-Ray", "X-Cache",
-                   "X-Amzn-Trace-Id", "Content-Type", "Set-Cookie"):
-        if header in response.headers:
-            lines.append("  %s: %s" % (header, response.headers[header]))
-    body = " ".join((response.text or "").split())
-    if body:
-        lines.append("  body[:600]: %s" % body[:600])
-    print("\n".join(lines), file=sys.stderr, flush=True)
+    print("download request failed: " + describe_response(response, 600),
+          file=sys.stderr, flush=True)
 
 
 def _retry_after(response):
@@ -160,7 +225,7 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
         response = None
         try:
             response = session.request(method, url, **kwargs)
-            response.raise_for_status()
+            raise_for_status(response)
             return response.json() if parse_json else response
         # both transports: requests raises RequestException (its JSONDecodeError
         # included, a subclass); the httpx HTTP/2 client raises httpx.HTTPError for
@@ -170,13 +235,17 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
                 json.JSONDecodeError) as exc:
             response = getattr(exc, "response", None) or response
             status = getattr(response, "status_code", None)
-            if not diagnosed:
-                _log_failure(exc, response)
-                diagnosed = True
             transient = (isinstance(exc, json.JSONDecodeError)
                          or status is None or status in RETRY_STATUS)
             if not transient or attempt == retries - 1:
+                # the raise carries the full description already (raise_for_status);
+                # logging it here too would print headers and body twice
+                if response is None:
+                    _log_failure(exc, response)
                 raise
+            if not diagnosed:
+                _log_failure(exc, response)
+                diagnosed = True
             wait = _retry_after(response) or min(RETRY_MAX, RETRY_BACKOFF * 2 ** attempt)
             if deadline is not None:
                 # sleep at most to the deadline; the next attempt then raises

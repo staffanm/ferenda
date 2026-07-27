@@ -41,7 +41,7 @@ from pathlib import Path
 import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import annstore, compress, layout, llm, markdown, util
+from ..lib import annstore, compress, layout, llm, markdown, net, util
 from ..lib.eu_structure import anchored_blocks
 from ..lib.text import runs_text
 from ..lib.util import normalize_space
@@ -74,7 +74,7 @@ def fetch_pdf(url):
     if cached.exists():
         return cached
     resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=120)
-    resp.raise_for_status()
+    net.raise_for_status(resp)
     # untrusted remote content: a WAF challenge / error page comes back 200 with
     # HTML, not a PDF. raise (not assert, which -O strips) so a non-PDF is rejected
     # loudly, and write atomically only after the check passes -- a poisoned body
