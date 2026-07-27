@@ -1069,8 +1069,9 @@ to a future per-doc incremental generate.
   generic node renderer (keyed on artifact `type`) handles both the SFS
   structure tree and the DV body; **outbound** links are live `<a>`s to the
   cited doc's exact paragraph. **Inbound** links at two granularities: a
-  per-paragraph margin annotation (id-bearing nodes) *and* a per-document
-  panel (`document_inbound`) for citations to the law/case as a whole — the
+  per-paragraph margin annotation (id-bearing nodes) *and* document-level rail
+  sections (`document_inbound`, folded into the "Om dokumentet" panel) for
+  citations to the law/case as a whole — the
   **27% of citations that carry no `#fragment`** (and all case inbound) that
   no paragraph annotation surfaces. A `Site` holds the set of known document
   URIs, so a citation to a doc we don't have **renders as muted text, not a
@@ -1094,10 +1095,13 @@ to a future per-doc incremental generate.
   bemyndigande panels) into a single JSON island, and the client
   (`lib/assets/scrollspy.js`, `window.lagenScrollspy(root, island)` — one
   instance per reading surface, returning a destroy function; the page's own
-  `.gr-body` gets one at load, each split-view pane gets its own, below) swaps
-  the right-hand rail to the paragraph at the
-  top of the viewport as you scroll (the "Kontext för …" panel; nodes that
-  drive it carry `data-rail`). All
+  `.gr-body` gets one at load, each split-view pane gets its own, below) builds
+  the rail as a column of one-line entries, each absolutely positioned beside
+  the location it annotates (nodes that carry context carry `data-rail`); the
+  entry at the top of the viewport expands in place into its full "Kontext
+  för …" panel as you scroll, the rest staying collapsed to a summary line
+  ("Rättsfall (5) + 2 ytterligare") — only the expanded panel's HTML is ever
+  mounted, since a large statute's island is megabytes. All
   href/link logic stays in Python — the client only moves pre-rendered HTML. A
   ⌘K command palette closes the search loop (below) and grew local quick-jump
   + hover-popover navigation (below). The
@@ -1799,8 +1803,11 @@ law, keyed by **CELEX** (the basefile throughout).
   judgment artifact at parse time as its page heading — replacing the useless
   Formex "Domstolens dom (…) den …" title, which moves to a "Titel" metadata row
   — and `case_citation` ("C-311/18 (Schrems II)") labels it wherever it is cited
-  from elsewhere, feeding a new "EU-rätt" inbound-panel group
-  (`render.INBOUND_GROUPS`). Refreshed via `lagen eurlex casenames`.
+  from elsewhere, feeding the inbound panel (`render.INBOUND_GROUPS`) —
+  since 2026-07-27 its own "EU-domstolens praxis"/"Generaladvokatens förslag
+  till avgörande" groups (`render.INBOUND_KIND_GROUPS`, split off from the
+  legislation-citing "EU-rätt" group by doctype). Refreshed via `lagen eurlex
+  casenames`.
   `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py`.
 - ✅ **Advocate General opinions and orders classified apart from judgments.**
   `model.doctype` splits a sector-6 CELEX by its two-letter document code —
@@ -2158,7 +2165,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   page grows a margin **"Föreskrifter meddelade med stöd av denna paragraf"**
   (`render.bemyndigande_margin`) listing them — the headline value-add (a statute now lists
   the regulations issued under it). The edge is a *typed* relation, kept out of the generic
-  "Hänvisat till av" panel (its own `_NOT_BEMYNDIGANDE` filter), and the föreskrift page
+  "Lagrumshänvisningar hit" panel (its own `_NOT_BEMYNDIGANDE` filter), and the föreskrift page
   shows the mirror outbound "Bemyndigande". Föreskrift is now a first-class rendered source
   (`render_foreskrift`, lagen.nu's `/{fs}/{år}:{nr}` route, browse + frontpage), its
   `structure` reshaped to the shared statute node convention (`id`/`ordinal`, paragraf body
@@ -3124,6 +3131,27 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **eurlex/lib** (2026-07-27) — four independent fixes landed together:
+  `eurlex/annotate.py` gained `_annex_cut`, which trims trailing annexes from
+  the ai-annotate prompt only (the artifact keeps them) — CLP (32008R1272)
+  went from 1,132,799 to 40,913 prompt tokens, making it annotatable at all.
+  `eurlex/parse_html.py` now recognises recitals in the pre-2000 "Avis
+  juridique important" HTML (flat `<p>` paragraphs, no marker table, the
+  sequence trusted only while a leading number keeps counting up) and skips
+  `<p>` elements that merely wrap block-level content instead of emitting
+  them twice (the legacy whole-document wrapper; a judgment `<p>` wrapping a
+  `<table>`) — roughly 8,000 previously recital-less acts gain recitals on
+  reparse, and the legacy acts' own outbound citation counts fall to their
+  true values (the wrapper duplication had been double-counting them).
+  `lib/render.py`'s inbound rail now splits the eurlex citer group by
+  document kind (`INBOUND_KIND_GROUPS`/`inbound_group`) into
+  "EU-domstolens praxis" and "Generaladvokatens förslag till avgörande",
+  pulled out of the undifferentiated "EU-rätt" pile the VAT directive's 581
+  judgments and 232 AG opinions used to sit in alongside its 138 citing acts.
+  `lib/lagrum.py` gained a lettered-point level (`punkt_ref_id`, pinning "6.1
+  c" of an EU sub-article) and `with_indefinite_aliases` (derives "EU:s
+  dataskyddsförordning" from the registered definite
+  "dataskyddsförordningen", so the genitive form resolves too).
 - **build/perf** (2026-07-25) — `pdftext.py`'s page-numbering rewritten:
   `page_number_candidates` now splits what a margin line could be offering into
   `strong` (digits-only, may establish or move the running offset) and `weak`
