@@ -42,6 +42,7 @@ from accommodanda.lib.lagrum import (
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
+    with_indefinite_aliases,
     yield_overlaps,
 )
 from accommodanda.lib.util import normalize_space
@@ -499,7 +500,11 @@ EU_NAMEDACT_SEQUENCE = [
     # anaphora: a bare standalone article and the definite generic noun both
     # pinpoint the act just named
     ("behandlingen är nödvändig enligt artikel 6.1. e). Den", ["%s#6.1" % GDPR]),
-    ("artikel 5.1 c i förordningen, som", ["%s#5.1" % GDPR]),
+    # the lettered point pins the anaphoric reference too. this expectation used
+    # to be "#5.1": the grammar had no letter level, so "c" was left in the text
+    # and the citation landed a level short of what it said. deliberately
+    # retightened when the letter level was added, not loosened to pass.
+    ("artikel 5.1 c i förordningen, som", ["%s#5.1.c" % GDPR]),
     # a treaty / the Charter / the ECHR links onto its OWN consolidated text --
     # never mis-pinned onto the act in focus (the "i" before the instrument is
     # optional). The ECHR is a Council-of-Europe treaty (coe/005), the others CELEX.
@@ -520,6 +525,114 @@ def test_eu_namedact_articles_and_anaphora():
     parser.state = type(parser.state)()       # one threaded document
     for text, want in EU_NAMEDACT_SEQUENCE:
         assert [r.uri for r in parser.parse_text(text, context={})] == want, text
+
+
+def _eu_parser():
+    parser = LagrumParser(NAMEDLAWS, basefile="dom", parse_types=[EULAGSTIFTNING],
+                          named_acts=NAMEDACTS_MAP)
+    parser.reset()
+    return parser
+
+
+# dataskyddslagen (2018:218) cites the GDPR as "artikel 6.1 c och e i EU:s
+# dataskyddsförordning" -- the two forms that used to defeat the engine at once:
+# a genitive determiner with the noun in its indefinite form, and a lettered
+# point. The renderer already mints the matching #6.1.c anchor.
+EU_LETTERED_POINTS = [
+    ("artikel 6.1 c i dataskyddsförordningen", ["%s#6.1.c" % GDPR]),
+    # a letter coordination is one link per letter, not one link losing the rest
+    ("artikel 6.1 c och e i dataskyddsförordningen",
+     ["%s#6.1.c" % GDPR, "%s#6.1.e" % GDPR]),
+    ("artikel 5.1 a, b och c i dataskyddsförordningen",
+     ["%s#5.1.a" % GDPR, "%s#5.1.b" % GDPR, "%s#5.1.c" % GDPR]),
+    ("artikel 9.2 b i dataskyddsförordningen", ["%s#9.2.b" % GDPR]),
+]
+
+
+def test_named_law_with_pinpoint_is_one_link_over_the_whole_phrase():
+    # "35 § i förordningen (2014:1101)" is ONE pinpointed link spanning the whole
+    # phrase -- not a #P35 link on the section plus a second, unpinpointed link on
+    # the SFS number, which is what the engine used to emit. Locked in here
+    # because no test covered it: the behaviour was corrected without one.
+    parser = LagrumParser(NAMEDLAWS, basefile="x", named_acts=NAMEDACTS_MAP)
+    parser.reset()
+    text = ("Av 35 § i förordningen (2014:1101) om EU:s direktstöd för "
+            "jordbrukare framgår att")
+    refs = parser.parse_text(text, context={})
+    assert [r.uri for r in refs] == ["https://lagen.nu/2014:1101#P35"]
+    assert text[refs[0].start:refs[0].end] == "35 § i förordningen (2014:1101)"
+
+
+@pytest.mark.parametrize("text,want", EU_LETTERED_POINTS)
+def test_eu_lettered_point_pinpoints(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
+@pytest.mark.parametrize("text,want", [
+    # a Council-of-Europe treaty fragments its own way (A6P3Lc, not 6.3.c), and
+    # the ECHR artifact really does mint A6P3La..A6P3Le -- the letter must reach
+    # coe_ids.article_fragment, which has always taken one. Without this the
+    # grammar swallows "c" into the link span and still lands on A6P3, so the
+    # citation reads as pinpointed while pointing a level short.
+    ("artikel 6.3 c i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6P3Lc"]),
+    ("artikel 5.1 d i Europakonventionen", ["https://lagen.nu/ext/coe/005#A5P1Ld"]),
+    ("artikel 6.1 i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6P1"]),
+])
+def test_coe_lettered_point_uses_the_treaty_fragment_grammar(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
+def test_eu_letter_coordination_links_each_letter_on_its_own_span():
+    # a coordinated letter list follows the same idiom as a coordinated article
+    # list ("artiklarna 101 och 102"): one link per member, each on its own
+    # tokens -- a shared phrase span would make every link overlap the others
+    text = "artikel 6.1 c och e i dataskyddsförordningen"
+    refs = _eu_parser().parse_text(text, context={})
+    assert [text[r.start:r.end] for r in refs] == ["c", "e"]
+    assert [r.uri for r in refs] == ["%s#6.1.c" % GDPR, "%s#6.1.e" % GDPR]
+
+
+def test_eu_single_lettered_point_spans_the_whole_phrase():
+    # a lone point keeps the eu_ref span, exactly as a lone article does
+    text = "artikel 6.1 c i dataskyddsförordningen"
+    (ref,) = _eu_parser().parse_text(text, context={})
+    assert text[ref.start:ref.end] == text
+
+
+@pytest.mark.parametrize("text,want", [
+    # the genitive form, which drops the noun's definite suffix
+    ("artikel 6.1 i EU:s dataskyddsförordning", ["%s#6.1" % GDPR]),
+    ("artikel 6.1 c i EU:s dataskyddsförordning", ["%s#6.1.c" % GDPR]),
+    # the registered definite alias keeps working unchanged
+    ("artikel 6.1 i dataskyddsförordningen", ["%s#6.1" % GDPR]),
+])
+def test_eu_genitive_indefinite_act_name(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
+def test_eu_letter_terminal_never_eats_the_preposition():
+    # "i" introduces the act ("artikel 6.1 i dataskyddsförordningen") AND is a
+    # possible point letter, and the named-act rule admits the instrument with no
+    # preposition at all -- so a letter terminal accepting "i" would read this as
+    # point (i) of 6.1 and pin a level too deep. It must stay the preposition.
+    assert [r.uri for r in _eu_parser().parse_text(
+        "artikel 6.1 i dataskyddsförordningen", context={})] == ["%s#6.1" % GDPR]
+
+
+def test_with_indefinite_aliases_never_overwrites_hand_edited_data():
+    # a derived indefinite form must not displace an alias someone registered by
+    # hand for a different act (namedacts.json is curated data)
+    got = with_indefinite_aliases({"xdirektivet": "31111L1111",
+                                   "xdirektiv": "32222L2222"})
+    assert got["xdirektiv"] == "32222L2222"       # explicit entry wins
+    assert got["xdirektivet"] == "31111L1111"
+
+
+def test_with_indefinite_aliases_leaves_acronyms_alone():
+    # only the listed noun heads are stripped, so an acronym keeps its final
+    # syllable ("gdpr" must not become "gdp")
+    got = with_indefinite_aliases({"gdpr": "32016R0679", "nis2": "32022L2555"})
+    assert sorted(got) == ["gdpr", "nis2"]
 
 
 def test_eu_self_act_bare_article():

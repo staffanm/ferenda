@@ -223,10 +223,11 @@ eu_ref: artikel_part _W IN _W rattsakt_part
 // ("artiklarna 101 och 102", "artiklarna 12, 13 och 14") or a range
 // ("artiklarna 12–15", whose endpoints each link). Each item is its own link.
 artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
-artikel_item: artikel_ref_id (DOT underartikel_ref_id)?
+artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W punkt_ref_id (_asep punkt_ref_id)*)?
 _asep: _W_AND_OR_W | HYP | COMMA _W
 artikel_ref_id: NUMBER
 underartikel_ref_id: NUMBER
+punkt_ref_id: PUNKT_LETTER
 
 rattsakt_part: institution _W akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
              | akttyp _W (direktiv_part | forordning_part) (_W av_datum)?
@@ -340,6 +341,14 @@ BESLUT: /beslut/
 SAMARBETE: /EEG|EG|EU/
 AV: /av/
 DEN: /den/
+// the lettered point of a sub-article ("artikel 6.1 c"). "i" is excluded, and
+// that exclusion is load-bearing: it is also the preposition that introduces
+// the act ("artikel 6.1 i dataskyddsförordningen"), and the named-act rule
+// admits the instrument with no preposition at all, so a letter terminal that
+// accepted "i" would parse that reference as point (i) of article 6.1 and pin
+// the citation one level too deep. Point (i) in a list that long is rare; a
+// silently mis-pinned everyday citation is not.
+PUNKT_LETTER: /(?!i\b)[a-z]\b/
 """,
     "eng": r"""
 ARTIKEL.3: /[Aa]rticle/
@@ -702,7 +711,7 @@ EU_KEYS = ('ar', 'artikel', 'akttyp')
 # (no treaty/act/generic noun). It self-refers inside an EU act, else anaphora-
 # links the last named act (fmt_eu_ref).
 BARE_PARTS = frozenset(('eu_ref', 'artikel_part', 'artikel_item',
-                        'artikel_ref_id', 'underartikel_ref_id'))
+                        'artikel_ref_id', 'underartikel_ref_id', 'punkt_ref_id'))
 
 
 @dataclass
@@ -842,6 +851,32 @@ def _act_aliases(entry):
             yield alias.lower()
 
 
+# Swedish drops a noun's definite suffix after a genitive determiner, so a
+# statute writes "EU:s dataskyddsförordning" where namedacts.json registers only
+# the definite "dataskyddsförordningen" -- and the alias then never matched, so
+# the whole reference went unlinked (dataskyddslagen 2018:218 cites the GDPR
+# exactly this way). The determiner itself was never missing: EU_DET has carried
+# "EU:s" all along. Only the noun heads an EU act's short name actually ends in
+# are listed, so this cannot strip a real final syllable off an acronym.
+INDEFINITE_HEADS = {"direktivet": "direktiv", "förordningen": "förordning",
+                    "beslutet": "beslut", "rättsakten": "rättsakt",
+                    "konventionen": "konvention", "fördraget": "fördrag"}
+
+
+def with_indefinite_aliases(named_acts):
+    """`named_acts` plus the indefinite form of every alias that ends in a
+    definite EU-act noun ("dataskyddsförordningen" -> "dataskyddsförordning"),
+    so the genitive "EU:s <akt>" resolves. An explicitly registered alias always
+    wins -- a derived form never overwrites hand-edited data."""
+    out = dict(named_acts)
+    for alias, celex in named_acts.items():
+        for definite, indefinite in INDEFINITE_HEADS.items():
+            if alias.endswith(definite):
+                out.setdefault(alias[:-len(definite)] + indefinite, celex)
+                break
+    return out
+
+
 def load_namedacts(path):
     """Map each EU-act short name or acronym (lower-cased) to its CELEX, from the
     hand-edited EU named-act dataset (CELEX -> {label?, abbr?}, each a str or a
@@ -942,6 +977,10 @@ def celex_uri(attrs, base='https://lagen.nu/'):
         uri += '#' + attrs['artikel']
         if attrs.get('underartikel'):
             uri += '.' + attrs['underartikel']
+        # the lettered point, for an act cited by number as well as by name
+        # ("artikel 125.4 a i förordning (EU) nr 1303/2013")
+        if attrs.get('punkt'):
+            uri += '.' + attrs['punkt']
     return uri
 
 
@@ -1129,7 +1168,11 @@ class LagrumParser:
         self.basefile = basefile
         self.base = base
         self.lang = lang
-        self.named_acts = named_acts or {}
+        # expanded here rather than in `load_namedacts` so the derived forms stay
+        # inside the citation engine: `eu_acts` below builds the EU_NAMNAKT
+        # terminal from this same mapping, so the grammar and the CELEX lookup
+        # cannot disagree, while the ⌘K resolver keeps the hand-edited names only
+        self.named_acts = with_indefinite_aliases(named_acts or {})
         # the document's own law URI -- the prefix every self-reference (a
         # relative "5 §" or an ändringshänvisning "#L<act>") is minted under,
         # used to recognise self-links from id-suppressed provisions.
@@ -1560,18 +1603,23 @@ class LagrumParser:
 
     # --- EU ---
 
-    def _eu_celex_uri(self, celex, artikel=None, underartikel=None, remember=True):
-        """ext/celex/<CELEX> deep-linked to the cited article (and sub-article).
-        Names the act as the document's current EU act (for later anaphora) unless
-        `remember` is false (an anaphoric ref must not refresh what it points at)."""
+    def _eu_celex_uri(self, celex, artikel=None, underartikel=None, punkt=None,
+                      remember=True):
+        """ext/celex/<CELEX> deep-linked to the cited article, sub-article and
+        lettered point. Names the act as the document's current EU act (for later
+        anaphora) unless `remember` is false (an anaphoric ref must not refresh
+        what it points at). The fragment is the dotted grammar the eurlex renderer
+        mints for the target anchor (#6.1.c)."""
         if remember:
             self.state.last_eu_act = celex
         uri = self.base + 'ext/celex/' + celex
         if artikel:
             uri += '#' + artikel + ('.' + underartikel if underartikel else '')
+            if punkt:
+                uri += '.' + punkt
         return uri
 
-    def _treaty_uri(self, path, artikel=None, underartikel=None):
+    def _treaty_uri(self, path, artikel=None, underartikel=None, punkt=None):
         """ext/<path> (celex/12016E/TXT, coe/005) deep-linked to the cited article
         and sub-article, like _eu_celex_uri but for a primary-law instrument keyed
         by name. A treaty is never remembered as the anaphora act in focus. An EU
@@ -1583,36 +1631,64 @@ class LagrumParser:
                 # a Council-of-Europe treaty uses the CoE article grammar its own
                 # artifact mints (#A8, #A6P1), shared via the dependency-free
                 # lib.coe_ids leaf (importing lib.coe here would cycle)
-                uri += '#' + coe_article_fragment(artikel, underartikel)
+                uri += '#' + coe_article_fragment(artikel, underartikel, punkt)
             else:
                 uri += '#' + artikel + ('.' + underartikel if underartikel else '')
+                if punkt:
+                    uri += '.' + punkt
         return uri
 
     def _article_specs(self, node):
-        """Per-article ``(artikel, underartikel, span)``. A single article keeps
-        the whole eu_ref span (so "artikel 47 i stadgan" links as one phrase); a
-        coordinated list or a range ("artiklarna 101 och 102", "12–15") links each
-        number on its own span."""
+        """Per-article ``(artikel, underartikel, punkt, span)``. A single article
+        keeps the whole eu_ref span (so "artikel 47 i stadgan" links as one
+        phrase); a coordinated list or a range ("artiklarna 101 och 102", "12–15")
+        links each number on its own span.
+
+        A lettered point coordinates *within* one article ("artikel 6.1 c och e"
+        -- the form dataskyddslagen uses), so an item carrying several letters
+        expands to one link per letter, each on its own span. `find_refids`
+        collapses same-named subtrees into one dict entry and so cannot see the
+        second letter; the letters are read off the item's own subtrees."""
         items = [s for s in node.iter_subtrees_topdown() if s.data == 'artikel_item']
-        if len(items) == 1:
-            d = find_refids(items[0])
-            # from "artikel" to the node end -- the whole "artikel N i <instrument>"
-            # for the article-first order, just "artikel N" when the instrument was
-            # named first ("<treaty>, särskilt artikel N")
-            span = (node_span(subtree(node, 'artikel_part'))[0], node_span(node)[1])
-            return [(d.get('artikel'), d.get('underartikel'), span)]
-        return [(d.get('artikel'), d.get('underartikel'), node_span(it))
-                for it in items for d in (find_refids(it),)]
+
+        def letters(item):
+            return [s for s in item.iter_subtrees_topdown()
+                    if s.data == 'punkt_ref_id']
+
+        def spec(d, span, punkt):
+            return (d.get('artikel'), d.get('underartikel'), punkt, span)
+
+        out = []
+        for it in items:
+            d = find_refids(it)
+            if len(items) == 1:
+                # from "artikel" to the node end -- the whole "artikel N i
+                # <instrument>" for the article-first order, just "artikel N" when
+                # the instrument was named first ("<treaty>, särskilt artikel N")
+                span = (node_span(subtree(node, 'artikel_part'))[0],
+                        node_span(node)[1])
+            else:
+                span = node_span(it)
+            ls = letters(it)
+            if len(ls) <= 1:
+                out.append(spec(d, span, token_text(ls[0]) if ls else None))
+            else:
+                # each letter is its own link, on the letter's own span -- the
+                # phrase span would make every one of them cover the whole
+                # coordination and overlap
+                out.extend(spec(d, node_span(l), token_text(l)) for l in ls)
+        return out
 
     @staticmethod
     def _emit_uris(out, specs, node, build):
         """Emit one ``{_uri, _span}`` per article spec via ``build(artikel,
-        underartikel)``; an instrument named with no article links itself once."""
+        underartikel, punkt)``; an instrument named with no article links itself
+        once."""
         if not specs:
-            out.append({'_uri': build(None, None), '_span': node_span(node)})
+            out.append({'_uri': build(None, None, None), '_span': node_span(node)})
             return
-        for artikel, underartikel, span in specs:
-            out.append({'_uri': build(artikel, underartikel), '_span': span})
+        for artikel, underartikel, punkt, span in specs:
+            out.append({'_uri': build(artikel, underartikel, punkt), '_span': span})
 
     def fmt_eu_ref(self, node, match, out, context):
         parts = {sub.data for sub in node.iter_subtrees()}
@@ -1622,7 +1698,7 @@ class LagrumParser:
         if 'eu_treaty' in parts:
             path = TREATIES[token_text(subtree(node, 'eu_treaty')).lower()]
             self._emit_uris(out, specs, node,
-                            lambda a, u: self._treaty_uri(path, a, u))
+                            lambda a, u, p: self._treaty_uri(path, a, u, p))
             return
         # a known EU act named by short name ("artikel N i dataskyddsförordningen")
         if 'eu_namnakt' in parts:
@@ -1631,7 +1707,7 @@ class LagrumParser:
             if celex is None:
                 raise NoLink()
             self._emit_uris(out, specs, node,
-                            lambda a, u: self._eu_celex_uri(celex, a, u))
+                            lambda a, u, p: self._eu_celex_uri(celex, a, u, p))
             return
         # the definite generic noun ("artikel N i (det) förordningen/direktivet")
         # pinpoints the act in focus; a bare "artikel N" self-refers inside an EU
@@ -1655,8 +1731,8 @@ class LagrumParser:
             if not target:
                 raise NoLink()
             self._emit_uris(out, specs, node,
-                            lambda a, u: self._eu_celex_uri(target, a, u,
-                                                            remember=False))
+                            lambda a, u, p: self._eu_celex_uri(target, a, u, p,
+                                                               remember=False))
             return
         # an act cited by number ("(artikel N i) direktiv 2000/31/EG"): celex_uri
         # mints the act, and each cited article pinpoints that same act
@@ -1681,11 +1757,14 @@ class LagrumParser:
         if not specs:
             self.emit(attrs, match, out, context, span=node_span(node))
             return
-        for artikel, underartikel, span in specs:
-            d = {k: v for k, v in attrs.items() if k not in ('artikel', 'underartikel')}
+        for artikel, underartikel, punkt, span in specs:
+            d = {k: v for k, v in attrs.items()
+                 if k not in ('artikel', 'underartikel', 'punkt')}
             d['artikel'] = artikel
             if underartikel:
                 d['underartikel'] = underartikel
+            if punkt:
+                d['punkt'] = punkt
             self.emit(d, match, out, context, span=span)
 
     # --- RATTSFALL (Swedish case law) ---
