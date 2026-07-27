@@ -10,7 +10,7 @@ from accommodanda.eurlex import annotate
 from accommodanda.lib import annstore, compress, layout, llm
 
 ART = {
-    "celex": "32099R0001", "title": "Testförordning",
+    "celex": "32099R0001", "title": "Testförordning", "lang": "swe",
     "structure": [
         {"type": "citation", "text": ["med beaktande av fördraget"]},
         {"type": "recital", "num": "1", "text": ["Bakgrund."]},
@@ -21,6 +21,15 @@ ART = {
 }
 
 
+def _act(*blocks, lang="swe"):
+    return {**ART, "lang": lang, "structure": list(blocks)}
+
+
+ARTICLE = {"type": "article", "id": "4", "num": "4",
+           "text": ["Artikel 4 – Skyldigheter"]}
+BODY = {"type": "paragraph", "num": "1", "text": ["Datahållaren ska dela data."]}
+
+
 def test_act_markdown_preserves_numbering():
     md = annotate.act_markdown(ART)
     assert "# Testförordning" in md
@@ -28,6 +37,85 @@ def test_act_markdown_preserves_numbering():
     assert "## Artikel 4 – Skyldigheter" in md    # article heading, no doubled num
     assert "1. Datahållaren ska dela data." in md  # numbered paragraph
     assert "(a) på ett säkert sätt." in md        # lettered point
+
+
+def test_act_markdown_drops_the_trailing_annex():
+    # annexes contribute nothing to the recital groups / article<->recital layer
+    # but dominate the prompt (83% of CLP is annex VI's classification table), so
+    # the tail from the annex heading on is left out of the *prompt* only
+    md = annotate.act_markdown(_act(
+        ARTICLE, BODY,
+        {"type": "heading", "level": 1, "text": ["BILAGA I"]},
+        {"type": "row", "text": ["H200 | Instabilt explosivt | GHS01"]},
+        {"type": "paragraph", "text": ["Kriterier för klassificering."]}))
+    assert "Artikel 4" in md and "Datahållaren ska dela data." in md
+    assert "BILAGA" not in md
+    assert "H200" not in md
+    assert "Kriterier" not in md
+
+
+def test_act_markdown_drops_annex_by_parse_anchor_alone():
+    # the anchor `eurlex.parse.append_annex` mints is the explicit, language-neutral
+    # signal: an annex whose title reads nothing like "BILAGA" still goes
+    md = annotate.act_markdown(_act(
+        ARTICLE, BODY,
+        {"type": "heading", "level": 1, "id": "bilaga-3",
+         "text": ["Förteckning över de ämnen som avses i artikel 4"]},
+        {"type": "row", "text": ["Bly | 7439-92-1"]}))
+    assert "Artikel 4" in md
+    assert "Förteckning" not in md and "7439-92-1" not in md
+
+
+def test_act_markdown_keeps_an_annex_heading_before_the_last_article():
+    # a table of contents (REACH) and an amending act quoting a replacement annex
+    # mid-body (2001/18) both put an annex heading *before* enacting terms. Only a
+    # heading after the last article may cut, so no article can ever be dropped.
+    md = annotate.act_markdown(_act(
+        {"type": "heading", "level": 1, "text": ["BILAGA I ALLMÄNNA BESTÄMMELSER"]},
+        {"type": "paragraph", "text": ["Bilaga I ska ersättas med följande."]},
+        ARTICLE, BODY,
+        {"type": "heading", "level": 1, "text": ["BILAGA II"]},
+        {"type": "row", "text": ["ballast | ballast"]}))
+    assert "Artikel 4" in md and "Datahållaren ska dela data." in md
+    assert "BILAGA I ALLMÄNNA BESTÄMMELSER" in md      # kept: it precedes the article
+    assert "ballast" not in md                         # dropped: the real annex
+
+
+def test_act_markdown_annex_words_are_language_aware():
+    # the corpus holds Swedish and English manifestations; the annex vocabulary
+    # comes from `lang.VOCAB[art["lang"]]`, never from one hardcoded list
+    eng = annotate.act_markdown(_act(
+        {"type": "article", "id": "4", "num": "4", "text": ["Article 4"]},
+        {"type": "heading", "level": 1, "text": ["ANNEX I"]},
+        {"type": "row", "text": ["ballast"]},
+        {"type": "heading", "level": 1, "text": ["APPENDIX"]}, lang="eng"))
+    assert "Article 4" in eng
+    assert "ANNEX" not in eng and "ballast" not in eng
+    # "BILAGA" is not English vocabulary -- an English act is not cut by it
+    assert "BILAGA" in annotate.act_markdown(_act(
+        {"type": "article", "id": "4", "num": "4", "text": ["Article 4"]},
+        {"type": "heading", "level": 1, "text": ["BILAGA I"]}, lang="eng"))
+
+
+def test_act_markdown_never_trims_an_act_without_articles():
+    # an annex-only manifestation has no enacting terms to protect *and* nothing
+    # to cross-reference; leave it whole rather than guess where its body starts
+    md = annotate.act_markdown(_act(
+        {"type": "heading", "level": 1, "text": ["BILAGA"]},
+        {"type": "paragraph", "text": ["Hela texten."]}))
+    assert "BILAGA" in md and "Hela texten." in md
+
+
+def test_act_markdown_leaves_an_annexless_act_untouched():
+    # an act with no annex (GDPR) must come through whole -- every block, and the
+    # trailing signature/footnote matter that follows the last article
+    act = _act(ARTICLE, BODY,
+               {"type": "heading", "level": 2, "text": ["KAPITEL XI"]},
+               {"type": "signature", "text": ["Utfärdad i Bryssel den 27 april 2016."]},
+               {"type": "note", "num": "1", "text": ["EUT L 119, 4.5.2016, s. 1."]})
+    md = annotate.act_markdown(act)
+    for block in act["structure"]:
+        assert block["text"][0] in md
 
 
 def test_validate_accepts_well_formed_layer():

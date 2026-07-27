@@ -485,14 +485,20 @@ def append_annex(doc, root):
         walk_content(contents, doc.body)
 
 
+# the anchor prefix an annex heading gets, in one place: `annotate` keys the
+# ai-annotate prompt's annex cut off it, so a change to the scheme here must not
+# silently stop the trimming there (rule:second-use-goes-to-lib)
+ANNEX_ANCHOR = "bilaga-"
+
+
 def _annex_anchor(title):
     """Anchor for an annex heading from its number ('BILAGA III' -> 'bilaga-3',
     'ANNEX II' -> 'bilaga-2'); roman or arabic."""
     token = title.split()[-1] if title else ""
     if token.isdigit():
-        return "bilaga-" + token
+        return ANNEX_ANCHOR + token
     try:
-        return "bilaga-%d" % from_roman(token)
+        return ANNEX_ANCHOR + "%d" % from_roman(token)
     except (KeyError, ValueError):
         return None
 

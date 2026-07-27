@@ -18,8 +18,10 @@ import json
 from pathlib import Path
 
 from ..lib import annstore, compress, layout, llm
-from ..lib.eu_structure import flatten
+from ..lib.eu_structure import ARTICLE, flatten
 from ..lib.text import runs_text
+from .lang import vocab
+from .parse import ANNEX_ANCHOR
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
@@ -28,15 +30,57 @@ PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"
 MAX_RECITAL_GROUPS = 16
 
 
+def _annex_cut(blocks, lang):
+    """Index of the first block of the act's *trailing* annex region in the
+    document-order block list -- or `len(blocks)` when it has none.
+
+    The editorial layer this module authors is thematic recital groups plus an
+    article<->recital cross-reference, so annexes contribute nothing to it while
+    dominating the prompt: 83% of 32008R1272 (CLP) is annex VI's harmonised
+    classification table, which alone puts the act past every context window we
+    have. They are dropped from the *prompt only* -- the artifact keeps them
+    (`rule:artifact-is-truth`), as do the renderer and every other consumer.
+
+    An annex opens at a `heading` block that either carries the parse's own
+    `bilaga-N` anchor (explicit, language-neutral) or *reads* as an annex title.
+    The text test is a fallback, not the first choice, because that anchor
+    exists only for a multi-file Formex manifestation whose annex title ends in
+    a numeral: of 17,305 annex-bearing sector-3 acts, 12,770 carry no such
+    anchor anywhere. It is therefore language-aware -- the corpus holds Swedish
+    (BILAGA, TILLÄGG) and English (ANNEX, APPENDIX) manifestations, so the words
+    come from `lang.VOCAB[art["lang"]]`, never from one hardcoded list.
+
+    Only a heading *after the last `article` block* can cut, which is what makes
+    the trim safe: whatever the text test thinks, no article (nor anything in an
+    article's subtree) can be dropped. That guard is load-bearing, not
+    belt-and-braces -- an annex heading legitimately precedes enacting terms in a
+    table of contents (32006R1907, REACH) and in an amending act quoting a
+    replacement annex mid-body (32001L0018), 247 of those acts. An act with no
+    article at all (274 of them) is never cut."""
+    articles = [i for i, b in enumerate(blocks) if b["type"] == ARTICLE]
+    if not articles:
+        return len(blocks)
+    annex = vocab(lang).annex
+    for i in range(articles[-1] + 1, len(blocks)):
+        b = blocks[i]
+        if b["type"] == "heading" and (
+                (b.get("id") or "").startswith(ANNEX_ANCHOR)
+                or annex.match(runs_text(b["text"]).strip())):
+            return i
+    return len(blocks)
+
+
 def act_markdown(art):
     """The parsed artifact flattened to a plain-text/markdown rendering of the
-    act -- the analyzer's input. Keeps exactly the structure the prompt keys on:
-    numbered recitals, article headings, numbered paragraphs and lettered points,
+    act's enacting terms -- the analyzer's input, annexes trimmed off the tail
+    (`_annex_cut`). Keeps exactly the structure the prompt keys on: numbered
+    recitals, article headings, numbered paragraphs and lettered points,
     so the model can mint the dotted "4.5" / "6.2.a" provision keys it is asked for."""
     # the parsed artifact always carries a `title` key; it can be None for an act
     # whose title never got extracted, in which case the CELEX is the heading
     lines = ["# %s" % (art["title"] or art["celex"]), ""]
-    for b in flatten(art["structure"]):
+    blocks = flatten(art["structure"])
+    for b in blocks[:_annex_cut(blocks, art["lang"])]:
         text = runs_text(b["text"]).strip()
         t, num = b["type"], b.get("num")
         if t == "recital":
