@@ -112,12 +112,10 @@ class FakeOK:
     """A well-formed chat-completions reply, capturing what was posted."""
 
     status_code = 200
+    ok = True
 
     def __init__(self, seen):
         self.seen = seen
-
-    def raise_for_status(self):
-        pass
 
     def json(self):
         return {"choices": [{"finish_reason": "stop", "message": {"content": "R"}}]}
@@ -219,9 +217,7 @@ def test_complete_thread_raises_on_length_truncation(monkeypatch, tmp_path):
 
     class FakeResp:
         status_code = 200
-
-        def raise_for_status(self):
-            pass
+        ok = True
 
         def json(self):
             return {"choices": [{"finish_reason": "length",
@@ -234,9 +230,55 @@ def test_complete_thread_raises_on_length_truncation(monkeypatch, tmp_path):
 
 class Fake500:
     status_code = 500
+    ok = False
+    reason = "Server Error"
+    url = "https://api.example/v1/chat/completions"
+    text = '{"error": "upstream overloaded"}'
 
-    def raise_for_status(self):
-        raise llm.requests.exceptions.HTTPError("500 Server Error")
+
+def test_http_error_carries_the_response_body(monkeypatch):
+    # the endpoint's own diagnosis lives in the body; requests' bare
+    # raise_for_status reports only "400 Client Error: Bad Request for url: ..."
+    # and throws it away, leaving a too-long prompt indistinguishable from a bad
+    # key. this is the llama.cpp over-context reply that prompted the fix
+    class Fake400:
+        status_code = 400
+        ok = False
+        reason = "Bad Request"
+        url = "http://127.0.0.1:8123/v1/chat/completions"
+        text = ('{"error":{"code":400,"message":"request (98435 tokens) exceeds '
+                'the available context size (65536 tokens), try increasing it",'
+                '"type":"exceed_context_size_error"}}')
+
+    monkeypatch.setenv("BERGET_API_KEY", "x")
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **kw: Fake400())
+    with pytest.raises(llm.requests.exceptions.HTTPError) as exc:
+        llm.complete_thread([{"role": "user", "content": "hi"}])
+    assert "exceeds the available context size" in str(exc.value)
+    # the response's own url, not the module-level API_URL -- the message must
+    # point at the endpoint that actually answered
+    assert "127.0.0.1:8123" in str(exc.value)
+    assert "exceed_context_size_error" in str(exc.value)
+    assert "400 Bad Request" in str(exc.value)
+
+
+def test_http_error_body_is_truncated(monkeypatch):
+    # a gateway in front of the endpoint can answer with a whole HTML page --
+    # quoted in full it swamps the traceback the message exists to clarify
+    class FakeHTML:
+        status_code = 502
+        ok = False
+        reason = "Bad Gateway"
+        url = "https://gateway.example/v1/chat/completions"
+        text = "<html>" + "x" * 9000 + "</html>"
+
+    monkeypatch.setenv("BERGET_API_KEY", "x")
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    monkeypatch.setattr(llm.requests, "post", lambda *a, **kw: FakeHTML())
+    with pytest.raises(llm.requests.exceptions.HTTPError) as exc:
+        llm.complete_thread([{"role": "user", "content": "hi"}])
+    assert len(str(exc.value)) < llm.ERROR_BODY_CHARS + 200
+    assert "more chars]" in str(exc.value)
 
 
 def test_transient_5xx_is_retried_then_succeeds(monkeypatch):

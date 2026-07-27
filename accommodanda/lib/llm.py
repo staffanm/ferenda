@@ -128,6 +128,36 @@ def auth_headers(url):
     return {"Authorization": "Bearer %s" % api_key}
 
 
+# how much of an error response body to quote -- the endpoint's own diagnosis is
+# a short JSON object, but a proxy or gateway in front of it can answer with a
+# full HTML page, which must not swamp the traceback
+ERROR_BODY_CHARS = 2000
+
+
+def raise_for_status(resp):
+    """`resp.raise_for_status()` with the response *body* in the message.
+
+    The bare requests version reports only "400 Client Error: Bad Request for
+    url: ..." and discards what the endpoint actually said -- which is where the
+    entire diagnosis lives. llama.cpp answers an over-long prompt with
+    ``{"error": {"message": "request (98435 tokens) exceeds the available
+    context size (65536 tokens), try increasing it", ...}}``; Berget names an
+    unknown model or a rejected key the same way. Without the body the caller
+    sees a generic 400 and has to reproduce the request by hand to learn why."""
+    if resp.ok:
+        return
+    body = resp.text.strip()
+    raise requests.HTTPError(
+        # `resp.url`, not the module-level API_URL: this takes any response, and
+        # naming the wrong endpoint in the one message written to be diagnostic
+        # would send the reader to the wrong place
+        "%s %s from %s: %s" % (resp.status_code, resp.reason, resp.url,
+                               body[:ERROR_BODY_CHARS] +
+                               ("... [%d more chars]" % (len(body) - ERROR_BODY_CHARS)
+                                if len(body) > ERROR_BODY_CHARS else "")),
+        response=resp)
+
+
 def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=None):
     """The model's reply to a full `messages` thread
     (`[{"role": "user"|"assistant", "content": ...}, ...]`), code-fence stripped.
@@ -158,7 +188,7 @@ def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=N
         if resp.status_code < 500 or attempt == 2:
             break
         time.sleep(10 * (attempt + 1))
-    resp.raise_for_status()
+    raise_for_status(resp)
     data = resp.json()
     usage = data.get("usage") or {}
     USAGE["calls"] += 1
