@@ -582,6 +582,25 @@ def test_coe_lettered_point_uses_the_treaty_fragment_grammar(text, want):
     assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
 
 
+@pytest.mark.parametrize("text,want", [
+    # a letter pinpoints with no sub-article in front of it: article 143 of the
+    # VAT directive really is a list of points a-l, and articles built that way
+    # (Reg. 469/2009 art. 3, the skyddsgrund directive's art. 2) are what the
+    # corpus mostly cites this way
+    ("artikel 143 b i direktiv 2006/112/EG",
+     ["https://lagen.nu/ext/celex/32006L0112#143.b"]),
+    ("artikel 143 b och c i direktiv 2006/112/EG",
+     ["https://lagen.nu/ext/celex/32006L0112#143.b",
+      "https://lagen.nu/ext/celex/32006L0112#143.c"]),
+    # the same on the named-act and treaty paths, which is where gating the
+    # letter on a sub-article cost the entire citation rather than the pinpoint
+    ("artikel 6 c i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6Lc"]),
+    ("artikel 3 a i dataskyddsförordningen", ["%s#3.a" % GDPR]),
+])
+def test_letter_without_a_subarticle_is_read_as_a_point(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
 def test_eu_letter_coordination_links_each_letter_on_its_own_span():
     # a coordinated letter list follows the same idiom as a coordinated article
     # list ("artiklarna 101 och 102"): one link per member, each on its own

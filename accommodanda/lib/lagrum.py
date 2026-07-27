@@ -223,6 +223,12 @@ eu_ref: artikel_part _W IN _W rattsakt_part
 // ("artiklarna 101 och 102", "artiklarna 12, 13 och 14") or a range
 // ("artiklarna 12–15", whose endpoints each link). Each item is its own link.
 artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
+// The letter is part of the item, with or without a sub-article ("6.1 c",
+// "3 a"). Gating it on a preceding sub-article was tried and reverted: refusing
+// the token made the whole reference fail to match on the named-act and treaty
+// paths -- "artikel 6 c i Europakonventionen" returned nothing at all, losing
+// the treaty link rather than merely the pinpoint. See `_article_specs` for why
+// the sub-article-less form is read as a point.
 artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W punkt_ref_id (_asep punkt_ref_id)*)?
 _asep: _W_AND_OR_W | HYP | COMMA _W
 artikel_ref_id: NUMBER
@@ -1669,6 +1675,17 @@ class LagrumParser:
                         node_span(node)[1])
             else:
                 span = node_span(it)
+            # A letter pinpoints whether or not a sub-article precedes it, so
+            # "artikel 3 a" is point (a) of article 3. Swedish also renders an
+            # *inserted* article with a space ("artikel 168 a" = 168a), and the
+            # two are indistinguishable from the text alone -- but the corpus
+            # settles which is worth optimising for: of the sub-article-less
+            # hits in a 3,000-document scan of the case-law corpus, nearly all
+            # are points (Reg. 469/2009 art. 3 a-d and the skyddsgrund
+            # directive's art. 2 a-n have no numbered paragraphs at all, and a
+            # förordningsmotiv citing the birds directive's "artikel 5 a" says
+            # *punkten* in the same sentence). One inserted article, 168 a of
+            # the VAT directive, is the exception that pays for the rest.
             ls = letters(it)
             if len(ls) <= 1:
                 out.append(spec(d, span, token_text(ls[0]) if ls else None))
