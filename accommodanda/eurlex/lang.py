@@ -1,10 +1,19 @@
-"""Localized structural vocabulary for the non-Formex EU parsers (html, pdf).
+"""Localized structural vocabulary for the EU parsers, and for the one consumer
+that must read structure back out of the text (annotate's annex trim).
 
 Formex marks structure with tags, so its parser needs no language knowledge. The
 HTML fallback and the PDF parser instead infer structure from text -- "Article N"
 / "Artikel N", "TITLE I" / "AVDELNING I", the enacting formula, the visa/recital
 framing -- and every one of those is language-specific. Add a language by adding
 a VOCAB entry; an unknown language falls back to English.
+
+`enacting` is the formula that *closes* the preamble and opens the enacting
+terms, which is not the same sentence in every language: English closes with
+"HAS ADOPTED THIS DIRECTIVE:", while a Swedish act opens with "… HAR ANTAGIT
+DETTA DIREKTIV" (before the visas, as Formex's PREAMBLE.INIT) and closes with
+"HÄRIGENOM FÖRESKRIVS FÖLJANDE.". Keying Swedish on the opener ended the
+preamble at its first line, so every visa and recital of every non-Formex
+Swedish act was parsed as ordinary body text.
 
 Out of scope here: reference *syntax* ("article 3(4)" vs "artikel 3.4"). That is
 the citation engine's concern (lib.lagrum) -- the parsers only emit text, which
@@ -18,22 +27,32 @@ VOCAB = {
         "article": "Article",
         "headings": ("TITLE", "CHAPTER", "PART", "SECTION", "SUBSECTION",
                      "ANNEX", "APPENDIX"),
+        "annex": ("ANNEX", "APPENDIX"),
         "enacting": r"HA(?:S|VE) (?:ADOPTED|DECIDED|DRAWN UP|AGREED)",
         "visa": ("having regard", "having seen"),
         "recital": ("whereas",),
+        "recital_intro": ("whereas",),
     },
     "swe": {
         "article": "Artikel",
         "headings": ("AVDELNING", "KAPITEL", "DEL", "AVSNITT", "UNDERAVSNITT",
                      "BILAGA", "TILLÄGG"),
-        "enacting": r"HAR (?:ANTAGIT|UTFÄRDAT|BESLUTAT|FÖRESKRIVIT|FATTAT)",
+        "annex": ("BILAGA", "TILLÄGG"),
+        "enacting": r"HÄR(?:IGENOM|MED) (?:FÖRESKRIVS|BESLUTAS|FATTAS|ANTAS)",
         "visa": ("med beaktande av",),
         "recital": ("av följande skäl", "med hänsyn till"),
+        "recital_intro": ("med beaktande av följande", "av följande skäl"),
     },
 }
 
 # language-neutral structural markers (parenthesised numbers/letters, numerals)
 RE_RECITAL = re.compile(r"^\(\s*(\d+)\s*\)$")
+# a recital marker run into the start of its own text, as the pre-2000 "Avis
+# juridique important" HTML writes it -- no marker cell to separate them. All
+# three forms occur in the corpus: "(1) ", "1) " (31995L0046) and "1. "
+# (31999L0037). Numbering is only trusted in sequence (see parse_html), so a
+# recital that merely opens with a number is not mistaken for a marked one.
+RE_RECITAL_MARKER = re.compile(r"^\(?(\d{1,3})\s*[).]\s+(\S.*)$")
 RE_POINT = re.compile(r"^\(?\s*([a-z0-9]{1,4})\s*[.)]$", re.IGNORECASE)
 # the number right after the article keyword ("Artikel 1 Räckvidd" -- the
 # legacy txt_te HTML runs the heading into the marker line), or a bare trailing
@@ -57,7 +76,13 @@ class Vocab:
         spec = VOCAB.get(lang, VOCAB["eng"])
         self.article = re.compile(r"^%s\.?\s+(\d+\w*)" % spec["article"], re.I)
         self.heading = re.compile(r"^(?:%s)\b" % "|".join(spec["headings"]), re.I)
+        self.annex = re.compile(r"^(?:%s)\b" % "|".join(spec["annex"]), re.I)
         self.enacting = re.compile(spec["enacting"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; enacting is always str
+        # the framing line that opens the recital list ("… och med beaktande av
+        # följande:" / "Whereas:"); it is the *tail* of its line, because a
+        # Swedish act runs it onto the last visa
+        self.recital_intro = re.compile(
+            r"(?:%s)\s*[:.,]?$" % "|".join(spec["recital_intro"]), re.I)
         self._visa = tuple(spec["visa"])
         self._recital = tuple(spec["recital"])
 

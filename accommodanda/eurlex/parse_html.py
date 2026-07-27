@@ -11,6 +11,10 @@ sub-lists (recitals, points, section headings) render as 2-column tables
 Older CELLAR HTML (pre-OJ-reformatting) is loosely-formatted text in a `<txt_te>`
 wrapper with no semantic classes; there structure is inferred from the text via
 the localized vocabulary in `lang` (Article/Artikel, TITLE/AVDELNING, ...).
+Its preamble has no tables either: the recitals are flat paragraphs, so the list
+is bounded by its framing line (`voc.recital_intro`) and the enacting formula
+(`voc.enacting`), and each recital's marker -- "(1) ", "1) " or "1. " -- is run
+into its own text and split back off in sequence.
 """
 
 import re
@@ -19,7 +23,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.util import normalize_space
 from . import lang as L
-from .model import BASE, Block, EurlexDoc, doctype, looks_like_act_title
+from .model import BASE, CASELAW, Block, EurlexDoc, doctype, looks_like_act_title
 
 # CSS classes (language-neutral) whose text is bibliographic, not body
 HEADER = {"hd-date", "hd-lg", "hd-ti", "hd-oj", "hd-coll", "hd-modifier", "hd-2"}
@@ -125,6 +129,11 @@ def _emit_table(table, blocks, in_body, voc):
             blocks.append(Block("row", " | ".join(fields)))
 
 
+# a `<p>` containing any of these is a wrapper produced by the parser, not a
+# real paragraph -- see the skip in the body loop
+BLOCK_WRAPPED = ("txt_te", "table", "p")
+
+
 def parse_html(markup, celex, lang):
     """An OJ HTML/XHTML manifestation (bytes/str/BeautifulSoup) -> EurlexDoc."""
     voc = L.vocab(lang)
@@ -159,7 +168,11 @@ def parse_html(markup, celex, lang):
     if hd_oj is not None:
         doc.oj = _oj(_flat(hd_oj))
 
-    in_body = False
+    # a case has no preamble at all -- its text is body prose from the first
+    # line, the same `paragraph` blocks the Formex judgment parser emits
+    in_body = doc.doctype in CASELAW
+    in_recitals = False                      # the recital list has been opened
+    expected = 1                             # the next recital marker in sequence
     for el in body.find_all(["p", "table"]):
         if el.find_parent("table") is not None:
             continue                         # cell content handled with the table
@@ -167,6 +180,21 @@ def parse_html(markup, celex, lang):
             if el.find(class_=re.compile(r"^(oj-)?hd-")) is not None:
                 continue                     # the OJ header strip (metadata)
             _emit_table(el, doc.body, in_body, voc)
+            continue
+        if el.find(BLOCK_WRAPPED) is not None:
+            # a `<p>` that turns out to *contain* block-level content is a
+            # parse artefact, not a paragraph, and emitting it duplicates
+            # everything inside it. Two shapes produce one:
+            #   * the legacy act HTML wraps the whole document in `<p><TXT_TE>…`
+            #     -- `TXT_TE` is not an element html.parser knows, so the act's
+            #     own paragraphs parse as *children* of that opening `<p>`. The
+            #     wrapper block duplicated the entire document and, carrying the
+            #     enacting formula, closed the preamble on its first line, so no
+            #     visa or recital was ever classified.
+            #   * a judgment's `<p class="C06Alinea">` wraps a `<table>`, whose
+            #     text would then be emitted once flattened here and again as
+            #     `row` blocks (62011TJ0366's domslut, ~187 documents).
+            # The children are walked next either way, so nothing is lost.
             continue
         role = _role(el)
         if role in HEADER or role in TITLE:
@@ -196,8 +224,31 @@ def parse_html(markup, celex, lang):
             doc.body.append(Block("signature", text))
         elif in_body:
             doc.body.append(Block("paragraph", text))
-        else:
+        elif voc.enacting.search(text):
             doc.body.append(Block(voc.preamble_kind(text), text))
-            if voc.enacting.search(text):
-                in_body = True               # enacting formula ends the preamble
+            in_body = True                   # enacting formula ends the preamble
+        elif voc.recital_intro.search(text):
+            # the framing line itself ("… och med beaktande av följande:") is
+            # not a recital -- Formex keeps it out of GR.CONSID too
+            doc.body.append(Block("preamble", text))
+            in_recitals = True
+        else:
+            # a flat-paragraph recital (no marker cell to hold its number):
+            # trust a leading number only while the sequence holds, so a recital
+            # opening with a year ("1993 antog rådet …") or a footnote line that
+            # strayed into the list cannot claim one. The list runs from its
+            # framing line (or, with no framing line, from the first paragraph
+            # that names itself a recital -- English writes "Whereas …" on every
+            # one) to the enacting formula.
+            match = L.RE_RECITAL_MARKER.match(text)
+            numbered = match is not None and int(match.group(1)) == expected
+            rest = match.group(2) if numbered else text
+            if in_recitals or voc.preamble_kind(rest) == "recital":
+                in_recitals = True
+                doc.body.append(Block("recital", rest,
+                                      num=match.group(1) if numbered else None))
+                if numbered:
+                    expected += 1
+            else:
+                doc.body.append(Block(voc.preamble_kind(text), text))
     return doc

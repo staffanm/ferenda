@@ -39,6 +39,14 @@ def doctype(celex):
     return "act"
 
 
+# the `doctype` values that `doctype` mints for sector 6. A case has no preamble
+# (no visas, no recitals, no enacting terms), so the text-inferring parsers must
+# not look for one -- a judgment quotes an act's "av följande skäl:" in passing,
+# and reading that as the start of a recital list turns its whole reasoning into
+# recitals.
+CASELAW = ("judgment", "opinion", "order")
+
+
 # --------------------------------------------------------------------------
 # short label -- a distinctive human handle derived from the official title
 # --------------------------------------------------------------------------
