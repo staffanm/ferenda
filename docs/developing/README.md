@@ -9,21 +9,25 @@ references are [`../../accommodanda/README.md`](../../accommodanda/README.md)
 
 ## 0. What accommodanda is
 
-accommodanda is a pipeline that **downloads, parses and interlinks large
-repositories of Swedish legal documents** — statutes, court decisions,
-preparatory works, EU law, agency regulations, and more — and publishes them as
-a static, cross-linked website plus a REST API and bulk data. It powers
-lagen.nu.
+accommodanda is a pipeline that **downloads, parses and finds
+references between documents in large repositories of Swedish legal
+documents** — statutes, court decisions, preparatory works, EU law,
+agency regulations, and more — and publishes them as a static,
+cross-linked website plus a REST API and bulk data. It powers
+https://lagen.nu/.
 
-The value the system adds is **connection**: a statute paragraph shows which
-court cases and preparatory works cite it, a court case links to the exact
-paragraph it invokes, an EU directive links to the national law that implements
-it. Producing those links reliably across ~200K documents from a dozen
-inconsistent public sources is the whole job.
+The value the system adds is **connection**: any link from document A
+to document B is clickable, but can also be shown as an **inbound
+link** when displaying document B. A statute paragraph shows
+which court cases and preparatory works cite it, an EU directive links
+to the national law that implements it. Producing those links reliably
+across ~300K documents from a dozen inconsistent public sources, with
+varying citation patterns, is a large part of the job.
 
-The code is organised around one idea: **each legal source is an independent
-program that produces a JSON file per document, and everything else is derived
-from those JSON files.** The sections below make that concrete.
+The code is organised around one idea: **each legal source,
+representing a type of document, is an independent program that
+produces a JSON file per document, and everything else is derived from
+those JSON files.** The sections below make that concrete.
 
 ## 1. Principles
 
