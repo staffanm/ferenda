@@ -1459,17 +1459,27 @@ class LagrumParser:
         inner = []
         self.dispatch(node.children[0], match, inner, context)
         out.extend(inner)
-        # one combined link covers the whole expression only for a
-        # single section-bearing reference to a named/same law (the old
-        # format_ExternalRefs single-GenericRefs/single-SectionRefID
-        # check); otherwise the law expression gets its own link, with
-        # the chapter cleared first (format_ExternalLaw). "samma lag"
-        # never links itself -- it has no law-name or SFS-number tokens
-        # ENKLALAGRUM also folds a lone chapter-only ref into the law link
-        # (the old simplified grammar's combine rule); plain LAGRUM keeps
-        # the separate law link unless the single inner ref bears a section
-        combined = (not anonymous and len(inner) == 1
-                    and (self.enkla or 'section' in inner[0]))
+        # One combined link covers the whole expression for a single
+        # section-bearing reference (the old format_ExternalRefs
+        # single-GenericRefs/single-SectionRefID check); otherwise the law
+        # expression gets its own link, with the chapter cleared first
+        # (format_ExternalLaw). "samma lag" never links itself -- it has no
+        # law-name or SFS-number tokens. ENKLALAGRUM also folds a lone
+        # chapter-only ref into the law link (the old simplified grammar's
+        # combine rule); plain LAGRUM keeps the separate law link unless the
+        # single inner ref bears a section.
+        #
+        # An *anonymous* law ("lagen (2016:1145) om offentlig upphandling")
+        # combines too. The old engine split it (format_ExternalRef's
+        # AnonymousExternalLaw branch) because it could not tell where the law's
+        # name ended and the sentence resumed -- but that is only an argument
+        # against extending the link *past* the SFS number, which this does not
+        # do: the span still ends at the closing paren, and the trailing "om …"
+        # stays plain text. What the split actually produced was a second,
+        # pinpointless edge to the act as a whole from every pinpointed
+        # citation, which read as "half the corpus cites this law as such" in
+        # the whole-document panel (S2).
+        combined = len(inner) == 1 and (self.enkla or 'section' in inner[0])
         same_law = isinstance(law_node, Tree) and law_node.data == 'same_law'
         if combined and '_span' in inner[0]:
             # the single link swallows the trailing law expression, so its

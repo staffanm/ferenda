@@ -151,10 +151,8 @@
         </Tabellrad><Tabellrad>
           <Tabellcell>
             <str>5. Markägare som avses i </str>
-            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1984:318#P2S2">2 § andra stycket</LinkSubject>
-            <str> lagen (</str>
-            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1984:318">1984:318</LinkSubject>
-            <str>) om kontrollavgift vid olovlig parkering</str>
+            <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/1984:318#P2S2">2 § andra stycket lagen (1984:318)</LinkSubject>
+            <str> om kontrollavgift vid olovlig parkering</str>
           </Tabellcell><Tabellcell>
             <str>Inom område där markägaren förbjuder eller ställer upp villkor för parkering och tillkännager förbuden eller villkoren enligt lagen om kontrollavgift vid olovlig parkering</str>
           </Tabellcell><Tabellcell>

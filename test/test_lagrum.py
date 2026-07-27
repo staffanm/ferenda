@@ -202,6 +202,39 @@ def test_avg_multi_dnr_spans(text, links):
     assert runs == links
 
 
+def test_anonymous_law_ref_is_one_pinpointed_link():
+    """S2: "1 kap. 18 § lagen (2016:1145) om offentlig upphandling" is one link.
+
+    The old engine split it — a pinpoint link plus a bare link to the act as a
+    whole — because it could not tell where the law's name ended and the
+    sentence resumed. That is only an argument against extending the link past
+    the SFS number, and this does not: the span ends at the closing paren and
+    the trailing "om …" stays plain text. The second edge was pure noise, and it
+    made every pinpointed citation also count as a whole-act citation.
+    """
+    parser = LagrumParser(NAMEDLAWS, basefile="9999:999", parse_types=[LAGRUM])
+
+    def refs(text):
+        parser.reset()
+        return [(r.uri, r.text) for r in parser.parse_text(text, context={})]
+
+    assert refs("organ som avses i 1 kap. 18 § lagen (2016:1145) om offentlig "
+                "upphandling,") == [
+        ("https://lagen.nu/2016:1145#K1P18", "1 kap. 18 § lagen (2016:1145)")]
+    # a named law already combined, and still does
+    assert refs("enligt 12 § delgivningslagen (1970:428) gäller") == [
+        ("https://lagen.nu/1970:428#P12", "12 § delgivningslagen (1970:428)")]
+    # several sections cannot fold into one link, so the law keeps its own --
+    # which is why the whole-document panel still filters these (catalog.
+    # _SUPERSEDED_BY_PINPOINT), source fix or not
+    assert [uri for uri, _ in refs("17-29 och 32 §§ i lagen (2004:575) om x")] == [
+        "https://lagen.nu/2004:575#P17", "https://lagen.nu/2004:575#P29",
+        "https://lagen.nu/2004:575#P32", "https://lagen.nu/2004:575"]
+    # nor can a chapter-only reference: there is no section to pin
+    assert [uri for uri, _ in refs("1 kap. lagen (2016:1145) om x")] == [
+        "https://lagen.nu/2016:1145#K1", "https://lagen.nu/2016:1145"]
+
+
 def test_yield_overlaps_term_yields_to_citation():
     # a defined term ("upphovsrättslagen") is often also a named-law reference
     # on the same span; the term-use link must yield so interleave sees no
