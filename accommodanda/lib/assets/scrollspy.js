@@ -1,6 +1,20 @@
 /* A throttled scroll handler that (1) highlights the TOC entry for the
-   section at the top of the viewport, and (2) swaps the context rail to the
-   active paragraph's panel, read from the JSON island the renderer emitted.
+   section at the top of the viewport, and (2) drives the context rail, read
+   from the JSON island the renderer emitted.
+
+   The rail is a column of *entries*, one per context-bearing location, each
+   absolutely positioned beside the location it belongs to. An entry that is not
+   in focus shows a single summary line naming its largest kind of context and
+   how much else it has ("Rättsfall (5) + 2 ytterligare", C4); the entry in
+   focus expands, in place, into the full panel (C5). A location with no context
+   has no entry, and a document with no context at all leaves the column empty --
+   the column draws no surface of its own, so there is nothing there to read as a
+   rail, and no "nothing here yet" placeholder either (C1).
+
+   Only the focused panel's HTML is ever in the DOM: a large statute's island is
+   megabytes, and mounting every panel at once would double the page's node
+   count for content that is one line away anyway.
+
    Instantiable per reading surface: the page's own .gr-body at load, and each
    imported split-view pane (popover.js) gets its own instance over its own
    TOC/rail -- window.lagenScrollspy(root, island) returns a destroy function.
@@ -50,48 +64,127 @@
         links[j].classList.toggle('toc-collapsed', !show);
       }
     }
+
+    /* ---------------- context rail ---------------- */
+
     var rail = root.querySelector('aside.rail');
-    var marks = Array.prototype.slice.call(root.querySelectorAll('[data-rail]'));
-    var EMPTY = '<div class="rail-empty">Ingen rättspraxis, förarbeten eller annan ' +
-                'kontext har ännu knutits till denna del.</div>';
-    // the document-level panel (commentary on the statute as a whole), keyed '' --
-    // shown when no single paragraph is in focus (at the top of the document)
-    var DEFAULT = island[''] || EMPTY;
-    if (rail) rail.innerHTML = DEFAULT;
+    var entries = [], activeEntry = null, panelBox = null, panel = null;
 
-    var activeLink = -1, activeRail = '', activeMark = null, ticking = false;
-
-    // swap the rail to a unit's panel and mark it active (idempotent per unit)
-    function applyRail(best) {
-      if (best === activeMark) return;
-      var key = best ? best.getAttribute('data-rail') : '';
-      activeRail = key;
-      if (rail) rail.innerHTML = (key && island[key]) ? island[key] : DEFAULT;
-      if (activeMark) activeMark.classList.remove('rail-active');
-      activeMark = best;
-      if (best) best.classList.add('rail-active');
+    // The summary line for a collapsed entry, composed from the panel's own
+    // sections: the first (highest-priority) one by name and size, then how many
+    // other kinds wait behind it. Read from data-label/data-n rather than from
+    // the rendered text, so the line cannot drift from the panel it stands for.
+    function stubLine(html) {
+      var probe = document.createElement('div');
+      probe.innerHTML = html;
+      var secs = probe.querySelectorAll('details.rail-sec');
+      if (!secs.length) return null;
+      var line = document.createElement('button');
+      line.type = 'button';
+      line.className = 'rail-stub';
+      var label = document.createElement('span');
+      label.className = 'rail-stub-label';
+      label.textContent = secs[0].getAttribute('data-label') || '';
+      line.appendChild(label);
+      var n = +secs[0].getAttribute('data-n') || 0;
+      if (n > 1) {
+        var count = document.createElement('span');
+        count.className = 'rail-stub-n';
+        count.textContent = '(' + n + ')';
+        line.appendChild(count);
+      }
+      if (secs.length > 1) {
+        var more = document.createElement('span');
+        more.className = 'rail-stub-more';
+        more.textContent = '+ ' + (secs.length - 1) + ' ytterligare';
+        line.appendChild(more);
+      }
+      line.setAttribute('aria-label', 'Visa kontext för denna del');
+      return line;
     }
 
-    // a clickable 💬 in the right gutter of every context-bearing unit -- a
-    // discoverable affordance that pulls that unit's panel into the rail and
-    // brings the unit into focus. Built here (not in the artifact) so it is global
-    // across every source without touching the per-source renderers.
-    if (rail) marks.forEach(function (el) {
-      // skip a container whose own context-bearing descendant carries the marker,
-      // so nested units (SFS paragraf > stycke) show one dot, not two stacked
-      if (el.querySelector('[data-rail]')) return;
-      var dot = document.createElement('button');
-      dot.type = 'button';
-      dot.className = 'rail-dot';
-      dot.textContent = '💬';
-      dot.setAttribute('aria-label', 'Visa kontext för denna del');
-      dot.addEventListener('click', function (e) {
+    function addEntry(el, html) {
+      var stub = stubLine(html);
+      if (!stub) return;             // a panel with no sections says nothing
+      var box = document.createElement('div');
+      box.className = 'rail-entry';
+      box.appendChild(stub);
+      rail.appendChild(box);
+      var entry = { el: el, box: box, html: html, top: 0 };
+      stub.addEventListener('click', function (e) {
         e.preventDefault();
-        applyRail(el);
+        setActive(entry);
         el.scrollIntoView({ block: 'start', behavior: 'smooth' });
       });
-      el.appendChild(dot);
-    });
+      entries.push(entry);
+    }
+
+    if (rail) {
+      rail.innerHTML = '';
+      // one panel serves every entry: a large statute's island is megabytes, and
+      // mounting a panel per location would cost more DOM than the statute
+      panelBox = document.createElement('div');
+      panelBox.className = 'rail-panelbox';
+      panel = document.createElement('div');
+      panel.className = 'rail-panel';
+      panelBox.appendChild(panel);
+      rail.appendChild(panelBox);
+      // the document-level panel ('') belongs to the page's own head matter, so
+      // it rides the frontmatter and is what shows before the first § scrolls up
+      var front = root.querySelector('header.frontmatter');
+      if (front && island['']) addEntry(front, island['']);
+      Array.prototype.slice.call(root.querySelectorAll('[data-rail]'))
+        .forEach(function (el) {
+          // skip a container whose own context-bearing descendant carries the
+          // marker, so nested units show one entry, not two stacked
+          if (el.querySelector('[data-rail]')) return;
+          var html = island[el.getAttribute('data-rail')];
+          if (html) addEntry(el, html);
+        });
+    }
+
+    // Absolute placement: each entry's line sits beside the location it
+    // annotates. Both rects are read in the same frame, so their difference is
+    // the offset inside the rail regardless of scroll position or which element
+    // scrolls (a pane in the split view, the window otherwise).
+    function place() {
+      if (!rail || !entries.length) return;
+      var base = rail.getBoundingClientRect().top;
+      entries.forEach(function (e) {
+        e.top = e.el.getBoundingClientRect().top - base;
+        e.box.style.top = e.top + 'px';
+      });
+      if (activeEntry) panelBox.style.top = activeEntry.top + 'px';
+    }
+
+    // The open panel starts where its location does and runs to the foot of the
+    // column, with the panel sticky inside it. Anchoring it to the location is
+    // what makes the expansion read as the summary line growing (C5); giving it
+    // the rest of the column is what keeps a tall panel readable -- bounded by
+    // the provision alone, a panel taller than its § would slide straight back
+    // off it, which is the whole reason the rail used to be one fixed panel.
+    function setActive(entry) {
+      if (entry === activeEntry) return;
+      if (activeEntry) {
+        activeEntry.box.classList.remove('rail-on');
+        if (activeEntry.el) activeEntry.el.classList.remove('rail-active');
+      }
+      activeEntry = entry;
+      panelBox.classList.toggle('rail-open', !!entry);
+      panel.innerHTML = entry ? entry.html : '';
+      if (entry) {
+        panelBox.style.top = entry.top + 'px';
+        // restart the expand animation: swapping innerHTML alone would not
+        // re-run it, so the class is dropped and re-applied across a reflow
+        panel.classList.remove('rail-grow');
+        void panel.offsetWidth;
+        panel.classList.add('rail-grow');
+        entry.box.classList.add('rail-on');     // its own line steps aside
+        if (entry.el) entry.el.classList.add('rail-active');
+      }
+    }
+
+    var activeLink = -1, ticking = false;
 
     function update() {
       ticking = false;
@@ -123,12 +216,12 @@
           }
         }
       }
-      if (rail && marks.length) {
-        var best = null;
-        for (var j = 0; j < marks.length; j++) {
-          if (marks[j].getBoundingClientRect().top <= LINE) best = marks[j];
+      if (entries.length) {
+        var best = entries[0];
+        for (var j = 0; j < entries.length; j++) {
+          if (entries[j].el.getBoundingClientRect().top <= LINE) best = entries[j];
         }
-        applyRail(best);
+        setActive(best);
       }
     }
     function onScroll() {
@@ -139,9 +232,19 @@
     // capture sees both those and normal window scrolling, and the tracking
     // logic is viewport-relative either way
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    // the reading column's height moves with the viewport, with late-arriving
+    // web fonts, and whenever a <details> in the text opens -- each invalidates
+    // every entry's offset, so re-place rather than trust the first measurement
+    var main = root.querySelector('main.gr-main');
+    var ro = window.ResizeObserver && main ? new ResizeObserver(place) : null;
+    if (ro) ro.observe(main);
+    window.addEventListener('resize', place);
+    place();
     update();
     return function destroy() {
       document.removeEventListener('scroll', onScroll, { capture: true });
+      window.removeEventListener('resize', place);
+      if (ro) ro.disconnect();
     };
   }
 

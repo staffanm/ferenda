@@ -433,13 +433,44 @@ def describe_citer(from_uri, anchor, label, title, source):
     return name + (" " + pin if pin else "")
 
 
-# inbound panel section order + heading; commentary first (it's the closest
-# reading aid to a paragraph), then the machine-extracted sources, then concepts
-INBOUND_GROUPS = [("sfs", "Författningar"), ("forarbete", "Förarbeten"),
+# What each inbound group is called in the rail. These are *inbound* --
+# documents pointing here -- so the statute group keeps lagen.nu's long-standing
+# "Lagrumshänvisningar hit", which says the direction out loud; the others are
+# unambiguous under a heading that reads "Kontext för 18 §". Ranking lives in
+# RAIL_SECTION_ORDER, keyed by these same slugs.
+INBOUND_GROUPS = [("sfs", "Lagrumshänvisningar hit"), ("forarbete", "Förarbeten"),
                   ("foreskrift", "Myndighetsföreskrifter"),
-                  ("dv", "Rättsfall"), ("hudoc", "Europadomstolens praxis"),
+                  ("dv", "Rättsfall"), ("avg", "Myndighetsavgöranden"),
+                  ("hudoc", "Europadomstolens praxis"),
+                  ("icc", "Internationella brottmålsdomstolen"),
+                  ("eu-caselaw", "EU-domstolens praxis"),
+                  ("eu-forslag", "Generaladvokatens förslag till avgörande"),
                   ("eurlex", "EU-rätt"), ("coe", "Europarådets fördrag"),
-                  ("begrepp", "Begrepp")]
+                  ("icrc", "Humanitärrättsliga fördrag"),
+                  ("untc", "FN-fördrag"), ("begrepp", "Begrepp")]
+
+# One source is normally one group, but the eurlex corpus holds two kinds of
+# citing document that a reader keeps apart: the acts, and the Court's own case
+# law. Folded together they read as one undifferentiated "EU-rätt" pile -- the
+# VAT directive is cited by 581 judgments and 232 generaladvokat opinions
+# against 138 acts, and it is the judgments a reader opening artikel 132 came
+# for. So the eurlex group splits by the catalogued document *kind*, and the
+# case-law half inherits `eu-caselaw`'s rank, above the citation graph. Keying
+# on catalog metadata (a kind value in the data) is what keeps this
+# source-agnostic -- lib imports no vertical (rule:lib-never-imports-vertical).
+# A generaladvokat's förslag is not a ruling, so it stays its own group rather
+# than lending judgment-strength authority to an opinion.
+INBOUND_KIND_GROUPS = {("eurlex", "judgment"): "eu-caselaw",
+                       ("eurlex", "opinion"): "eu-forslag"}
+
+# the groups whose members are case law, ordered newest-first below
+CASELAW_GROUPS = frozenset(INBOUND_KIND_GROUPS.values())
+
+
+def inbound_group(source, kind):
+    """The rail accordion slug a citing document belongs to -- its source,
+    except where the source's kinds split (see `INBOUND_KIND_GROUPS`)."""
+    return INBOUND_KIND_GROUPS.get((source, kind), source)
 
 # förarbete precedence in the inbound panel and the "Förarbeten" section:
 # propositions first, then SOU, Ds/PM, lagrådsremiss, betänkanden -- each block
@@ -457,27 +488,36 @@ def forarb_sort_key(kind, date, label):
     return (FORARB_KIND_PRIORITY.get(kind, 9), date or "9999-99-99", label)
 
 
-def forarbete_pinpoint(anchor):
-    """A förarbete node id -> a human pinpoint: "a14.3" -> "avsnitt 14.3",
-    "sid39" -> "s. 39". A generated "sec7" (a heading carrying no section
-    number) has no pinpoint; a "-N" clash suffix on the avsnitt id is dropped."""
+def forarbete_pinpoint(anchor, page=None):
+    """A förarbete node id -> (human pinpoint, the anchor to link): "a14.3" ->
+    "avsnitt 14.3", "sid39" -> "s. 39". A "-N" clash suffix on the avsnitt id is
+    dropped.
+
+    A generated "sec7" -- a heading that carries no section number, so there is
+    no avsnitt to name -- falls back to the printed page the citation sits on,
+    which is how a reader would cite it anyway. The page is a real anchor of its
+    own: `render_forarbete` emits `id="sid{N}"` at every page break, so the
+    link goes to `#sid39` rather than to the unnameable heading (S4). Without a
+    page there is nothing citable to say, so the line names the document
+    alone."""
     if anchor.startswith("sid"):
-        return "s. " + anchor[3:]
+        return "s. " + anchor[3:], anchor
     if re.match(r"a\d", anchor):
-        return "avsnitt " + re.sub(r"-\d+$", "", anchor[1:])
-    return ""
+        return "avsnitt " + re.sub(r"-\d+$", "", anchor[1:]), anchor
+    return ("s. %d" % page, "sid%d" % page) if page else ("", anchor)
 
 
-def citer_pinpoint(source, anchor):
-    """The human pinpoint for a citing document's source anchor: an avsnitt/page
-    for a förarbete, a chapter/§ for a statute; other sources cite whole-doc."""
+def citer_pinpoint(source, anchor, page=None):
+    """The human pinpoint for a citing document's source anchor, with the anchor
+    the pinpoint should link to: an avsnitt/page for a förarbete, a chapter/§ for
+    a statute; other sources cite whole-doc."""
     if not anchor:
-        return ""
+        return "", anchor
     if source == "forarbete":
-        return forarbete_pinpoint(anchor)
+        return forarbete_pinpoint(anchor, page)
     if source == "sfs":
-        return human_fragment(anchor)
-    return ""
+        return human_fragment(anchor), anchor
+    return "", anchor
 
 
 def citer_name(source, kind, label, title, descriptive=None):
@@ -508,17 +548,24 @@ def _citer_line(row):
     to the document) followed by up to PINPOINT_CAP distinct source pinpoints,
     then " m.fl." if more. Förarbete pinpoints share a category word ("avsnitt
     3, 5 och 7" -- written once, each number linking its own anchor); other
-    sources' pinpoints are each rendered whole as a single link."""
+    sources' pinpoints are each rendered whole as a single link.
+
+    A citer with exactly one pinpoint is written as one link naming the place it
+    cites from -- "Förordning med instruktion för Statens jordbruksverk 22 § 2
+    st" -> `/2009:1464#P22S2` -- not a link to the regulation beside a link to
+    the stycke (S3). Two adjacent links to the same document offer the reader a
+    choice they have no basis to make, and the pinpoint is the better landing."""
     from_uri, label, title, source, kind, _date, anchors, descriptive = row
-    name = '<a href="%s">%s</a>' % (
-        escape(href(from_uri)),
-        escape(citer_name(source, kind, label, title, descriptive)))
+    display = citer_name(source, kind, label, title, descriptive)
+    name = '<a href="%s">%s</a>' % (escape(href(from_uri)), escape(display))
     pins, seen = [], set()
-    for anchor in (anchors.split(",") if anchors else []):
-        pin = citer_pinpoint(source, anchor)
+    for entry in (anchors.split(",") if anchors else []):
+        anchor, _, page = entry.rpartition("@")   # "sec17@39"; page may be empty
+        pin, target = citer_pinpoint(source, anchor,
+                                     int(page) if page else None)
         if pin and pin not in seen:        # dedupe on the human pinpoint
             seen.add(pin)
-            pins.append((pin, anchor))
+            pins.append((pin, target))
     if not pins:
         return "<li>%s</li>" % name
     pins.sort(key=lambda p: split_numalpha(p[0]))
@@ -528,6 +575,11 @@ def _citer_line(row):
         return '<a href="%s">%s</a>' % (
             escape(href(from_uri + "#" + anchor)), escape(text))
 
+    if len(pins) == 1:
+        # a statute pinpoint completes the citation ("… 22 § 2 st"); a förarbete
+        # locator is an aside on where in the document it sits (", avsnitt 6.7")
+        sep = ", " if source == "forarbete" else " "
+        return "<li>%s</li>" % link(pins[0][1], display + sep + pins[0][0])
     words = {pin.split(" ")[0] for pin, _ in shown}
     if source == "forarbete" and len(words) == 1 and " " in shown[0][0]:
         word = escape(shown[0][0].split(" ", 1)[0])       # "avsnitt" / "s."
@@ -628,42 +680,55 @@ def render_runs(runs, site):
     return "".join(out)
 
 
-def _inbound_groups(site, uri, exclude_from=(), exclude_before=None):
-    """Inbound entries grouped into per-source sections (Författningar /
-    Förarbeten / Rättsfall), one collapsed line per citing document (its
-    pinpoints listed inline). Förarbeten are ordered prop→sou→ds→lagrådsremiss→
-    bet, oldest-first; each group shows PANEL_CAP docs, the rest behind a "+N
-    fler" disclosure. `exclude_from` drops citers already shown elsewhere (a
+def _inbound_groups(site, uris, exclude_from=(), exclude_before=None,
+                    whole_document=False):
+    """Inbound entries grouped into accordion sections by what kind of document
+    cites (Lagrumshänvisningar / Förarbeten / Rättsfall / EU-domstolens praxis),
+    one collapsed line per citing document (its pinpoints listed inline). `uris`
+    is the one target -- or the several sharing one panel (a paragraf and its
+    first stycke) -- whose citers collapse together. The grouping is
+    `inbound_group`: the citer's source, split by kind where one source carries
+    several. Förarbeten are ordered prop→sou→ds→lagrådsremiss→bet,
+    oldest-first, case law newest-first, everything else by name; each group
+    shows PANEL_CAP docs, the rest behind a "+N fler" disclosure.
+    `exclude_from` drops citers already shown elsewhere (a
     statute's own preparatory works); `exclude_before` drops citers dated
     before the anchor's beteckning last changed meaning (they refer to the
     provision that carried the label then, and surface on its successor's
-    renumbered_refs_margin instead -- undated citers stay). Returns the inner
-    HTML, or None when nothing (left) cites `uri`."""
-    rows = catalog.inbound_collapsed(site.con, uri, exclude_from)
+    renumbered_refs_margin instead -- undated citers stay); `whole_document`
+    additionally drops the citing spots that pinpoint into the document, whose
+    citation the target paragraf's own rail already shows (S2). Returns one
+    `RailSection` per group -- one accordion row for Rättsfall, one for
+    Förarbeten -- empty when nothing (left) cites `uri`."""
+    rows = catalog.inbound_collapsed(site.con, uris, exclude_from,
+                                     whole_document=whole_document)
     # a citer that is itself a repealed act (repeal date passed) no longer
     # states law, so it drops out of the inbound panel (I3); a not-yet-in-force
     # repeal is not in site.expired and so stays
     rows = [r for r in rows if r[0] not in site.expired]
     if exclude_before:
         rows = [r for r in rows if not (r[5] and r[5] < exclude_before)]
-    if not rows:
-        return None
     bucket = {}
     for row in rows:
-        bucket.setdefault(row[3], []).append(row)   # row[3] = source
-    for source, items in bucket.items():
-        if source == "forarbete":
+        bucket.setdefault(inbound_group(row[3], row[4]), []).append(row)
+    for slug, items in bucket.items():
+        if slug == "forarbete":
             items.sort(key=lambda r: forarb_sort_key(r[4], r[5], r[1]))
+        elif slug in CASELAW_GROUPS:
+            # case law reads newest-first, the order eu_caselaw_margin already
+            # uses: these citers are named by case number ("C-136/17"), which
+            # sorts alphabetically into an order that means nothing. Undated
+            # citers trail their dated peers; the label breaks ties so two runs
+            # over an unchanged corpus emit the same page.
+            items.sort(key=lambda r: (r[5] or "", r[1]), reverse=True)
         else:
             items.sort(key=lambda r: (r[2] or r[1] or "").lower())
-    groups = [(src, heading) for src, heading in INBOUND_GROUPS if src in bucket]
+    groups = [(slug, heading) for slug, heading in INBOUND_GROUPS
+              if slug in bucket]
     groups += [(s, s) for s in bucket if s not in dict(INBOUND_GROUPS)]
-    html = ""
-    for src, heading in groups:
-        inner = _capped_list([_citer_line(row) for row in bucket[src]])
-        html += ('<div class="ingroup %s"><div class="ingroup-h">%s</div>%s</div>'
-                 % (src, escape(heading), inner))
-    return html
+    return [RailSection(slug, heading, len(bucket[slug]),
+                        _capped_list([_citer_line(row) for row in bucket[slug]]))
+            for slug, heading in groups]
 
 
 def _capped_list(lines, cap=None, word="fler"):
@@ -690,10 +755,13 @@ def document_inbound(site, uri, exclude_from=()):
     """Document-level inbound: who cites the law/case/förarbete as a whole
     (the bare uri). Surfaces the citations no paragraph annotation shows.
     `exclude_from` omits citers listed elsewhere (a statute's own förarbeten,
-    which get their own preparatory-works section above)."""
-    groups = _inbound_groups(site, uri, exclude_from)
-    return ('<section class="inbound-doc"><h2>Hänvisat till av</h2>%s</section>'
-            % groups) if groups else ""
+    which get their own preparatory-works section above).
+
+    Rail sections, not a panel in the reading column: this is context on the
+    document, exactly like a paragraf's citations are context on the paragraf,
+    and a full-width box of a few hundred citations sat between the reader and
+    the statute's first § (S5)."""
+    return _inbound_groups(site, [uri], exclude_from, whole_document=True)
 
 
 # a shared FORARBETEN recognizer, built lazily per process, to turn a förarbete
@@ -829,7 +897,7 @@ def genomfor_margin(site, sfs_uri, anchor):
     of the directive article's inbound, which shows this statute paragraf."""
     rows = catalog.genomfor_for(site.con, sfs_uri, anchor)
     if not rows:
-        return ""
+        return []
     items = []
     for directive, article, prop_uri, prop_label, pinpoint, partial, sfs_pin in rows:
         dlink = _directive_link(site, directive, directive + "#" + article)
@@ -840,8 +908,8 @@ def genomfor_margin(site, sfs_uri, anchor):
                      % (escape(stycke + " ") if stycke else "",
                         " delvis" if partial else "", escape(pinpoint or article),
                         dlink, ' <span class="prov">(%s)</span>' % prov if prov else ""))
-    return ('<aside class="genomfor"><div class="inbound-h">Genomför EU-rätt</div>'
-            '<ul>%s</ul></aside>' % "".join(items))
+    return [RailSection("genomfor", "Genomför EU-rätt", len(items),
+                        "<ul>%s</ul>" % "".join(items))]
 
 
 EU_CASELAW_CAP = 5   # cases shown expanded in the paragraf rail; the rest
@@ -894,7 +962,7 @@ def eu_caselaw_margin(site, sfs_uri, anchor):
     those past EU_CASELAW_CAP start collapsed behind a disclosure."""
     ordered = site.caselaw_memo.get(sfs_uri, {}).get(anchor)
     if not ordered:
-        return ""
+        return []
     items = []
     for (uri, label, descriptive, _date), arts in ordered:
         name = descriptive or label or uri.rsplit("/", 1)[-1]
@@ -902,9 +970,8 @@ def eu_caselaw_margin(site, sfs_uri, anchor):
                 if site.has(uri) else escape(name))
         items.append('<li>%s <span class="prov">(%s)</span></li>'
                      % (link, escape(_caselaw_provenance(site, arts))))
-    return ('<aside class="eu-caselaw"><div class="inbound-h">'
-            'EU-domstolens praxis</div>%s</aside>'
-            % _capped_list(items, EU_CASELAW_CAP, "till"))
+    return [RailSection("eu-caselaw", "EU-domstolens praxis", len(items),
+                        _capped_list(items, EU_CASELAW_CAP, "till"))]
 
 
 def bemyndigande_margin(site, uri):
@@ -915,7 +982,7 @@ def bemyndigande_margin(site, uri):
     its own page where present, else shows as text (an fs we have not parsed)."""
     rows = catalog.bemyndigande_inbound(site.con, uri)
     if not rows:
-        return ""
+        return []
     items = []
     for from_uri, label, title in rows:
         name = label or catalog.local(from_uri)
@@ -925,9 +992,9 @@ def bemyndigande_margin(site, uri):
         sub = (' <span class="prov">%s</span>' % escape(title)
                if title and title != name else "")
         items.append("<li>%s%s</li>" % (link, sub))
-    return ('<aside class="bemyndigande"><div class="inbound-h">Föreskrifter '
-            'meddelade med stöd av denna paragraf</div><ul>%s</ul></aside>'
-            % "".join(items))
+    return [RailSection("bemyndigande",
+                        "Föreskrifter meddelade med stöd av denna paragraf",
+                        len(items), "<ul>%s</ul>" % "".join(items))]
 
 
 def _law_title(site, base):
@@ -957,7 +1024,7 @@ def corresponds_margin(site, uri):
     rows = [r for r in catalog.correspondence_for_old(site.con, uri)
             if r[1] != "betecknas"]
     if not rows:
-        return ""
+        return []
     items, seen = [], set()
     for new_uri, relation, scope, _prop, _ikraft in rows:
         if new_uri in seen:        # one line per successor paragraf, not per stycke
@@ -970,8 +1037,8 @@ def corresponds_margin(site, uri):
                 if site.has(base) else escape(label))
         items.append('<li>Denna paragraf %s %s</li>'
                      % (_corr_phrase(relation, scope), link))
-    return ('<aside class="motsvarighet"><div class="inbound-h">Motsvarighet'
-            '</div><ul>%s</ul></aside>' % "".join(items))
+    return [RailSection("motsvarighet", "Motsvarighet", len(items),
+                        "<ul>%s</ul>" % "".join(items))]
 
 
 CORR_DEPTH = 3      # how many re-enactments back the case-law margin reaches
@@ -1021,14 +1088,15 @@ def corresponding_cases_margin(site, uri):
                             escape(describe_citer(from_uri, a, label, title,
                                                   source)))
                          for from_uri, a, label, title, source in rows]
-                out.append('<div class="rail-sec"><div class="rail-sec-h">'
-                           'Äldre rättsfall för motsvarande bestämmelse (%s)'
-                           '</div>%s</div>'
-                           % (cite, _capped_list(links, INBOUND_CAP)))
+                out.append(RailSection(
+                    "aldre-rattsfall",
+                    "Äldre rättsfall för motsvarande bestämmelse (%s)" % old_label,
+                    len(links), '<div class="rail-prov">%s</div>%s'
+                    % (cite, _capped_list(links, INBOUND_CAP))))
         frontier = nxt
         if not frontier:
             break
-    return "".join(out)
+    return out
 
 
 def _reassigned_before(site, uri):
@@ -1084,21 +1152,21 @@ def renumbered_refs_margin(site, uri):
                              if r2 == "betecknas" and ik and ik < arrival),
                             default=None)
                 nxt.append((old_uri, arrival))
-                rows = [r for r in catalog.inbound_collapsed(site.con, old_uri)
+                rows = [r for r in catalog.inbound_collapsed(site.con, [old_uri])
                         if r[5] and r[5] < arrival
                         and (not lower or r[5] >= lower)]
                 if not rows:
                     continue
                 label = human_fragment(old_uri.partition("#")[2])
-                out.append('<div class="rail-sec"><div class="rail-sec-h">'
-                           'Hänvisningar till tidigare beteckning %s '
-                           '(före %s)</div>%s</div>'
-                           % (escape(label), escape(arrival),
-                              _capped_list([_citer_line(r) for r in rows])))
+                out.append(RailSection(
+                    "tidigare-beteckning",
+                    "Hänvisningar till tidigare beteckning %s (före %s)"
+                    % (label, arrival), len(rows),
+                    _capped_list([_citer_line(r) for r in rows])))
         frontier = nxt
         if not frontier:
             break
-    return "".join(out)
+    return out
 
 
 def _sentiment_span(sentiment):
@@ -1113,6 +1181,76 @@ def _sentiment_span(sentiment):
     else:
         cls, glyph = "sentiment-neutral", "±"
     return '<span class="sentiment %s">%s</span>' % (cls, glyph)
+
+
+# --------------------------------------------------------------------------
+# rail sections (one accordion row per kind of context)
+# --------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class RailSection:
+    """One kind of context attached to one node. The rail renders it as an
+    accordion row; the client's collapsed one-line stub is built from the same
+    label and count, so the two can never disagree (C3/C4)."""
+
+    key: str        # stable type slug -- ordering, css hook, client grouping
+    label: str      # what the accordion row is called
+    count: int      # items in it, shown beside the label and in the stub line
+    html: str       # the body; headingless, the <summary> carries the label
+
+
+# Which context a reader wants first when a node carries several kinds. The
+# ordering is editorial and follows the shape lagen.nu has always used: our own
+# commentary, then the lagstiftare's own, then case law, then the citation
+# graph, then the machinery (transposition, delegation, renumbering). Exactly
+# the first section present opens; the rest stay one click away (C3). A key not
+# listed here (a source with no assigned rank) sorts last, by label.
+RAIL_SECTION_ORDER = (
+    "kommentar", "fk", "dv", "avg", "hudoc", "icc", "eu-caselaw", "eu-forslag",
+    "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
+    "eurlex", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
+    "vagledning", "grupp", "skal", "tidigare-beteckning", "motsvarighet")
+
+
+def _rail_rank(section):
+    order = RAIL_SECTION_ORDER
+    return (order.index(section.key) if section.key in order else len(order),
+            section.label)
+
+
+def merge_rail_sections(sections):
+    """Fold sections of the same kind into one accordion row, in first-seen
+    order. Two arise only where a panel covers several nodes (a paragraf and its
+    folded first stycke, C2) and both carry, say, commentary -- two rows with the
+    same heading would read as a rendering bug. Rows that differ by label (one
+    "Äldre rättsfall …" per predecessor provision) stay separate."""
+    merged = {}
+    for sec in sections:
+        prev = merged.get((sec.key, sec.label))
+        merged[(sec.key, sec.label)] = RailSection(
+            sec.key, sec.label,
+            (prev.count if prev else 0) + sec.count,
+            (prev.html if prev else "") + sec.html)
+    return list(merged.values())
+
+
+def render_rail_sections(sections):
+    """A panel body: every section as an accordion row, highest-priority first
+    and open, the rest collapsed. The `data-label`/`data-n` attributes are what
+    the client reads to compose a location's collapsed stub line, so the summary
+    never drifts from the panel it summarises."""
+    out = []
+    for i, sec in enumerate(sorted(merge_rail_sections(sections), key=_rail_rank)):
+        out.append(
+            '<details class="rail-sec %s" data-sec="%s" data-label="%s" '
+            'data-n="%d"%s><summary><span class="rail-sec-h">%s</span>%s'
+            '</summary>%s</details>'
+            % (escape(sec.key), escape(sec.key), escape(sec.label), sec.count,
+               " open" if i == 0 else "", escape(sec.label),
+               # a lone item counts itself; the number would only add noise
+               '<span class="rail-sec-n">%d</span>' % sec.count
+               if sec.count > 1 else "", sec.html))
+    return "".join(out)
 
 
 class Rail:
@@ -1131,67 +1269,96 @@ class Rail:
         # (Externa länkar, Kommentar, …); the dl.meta facts and the "Källa" source
         # link live under the h1 in the frontmatter (C1), not here.
         self.data = {}
+        # panel id -> (heading, [node ids it covers]) -- more than one only where
+        # a first stycke folded into its paragraf (see `add`)
+        self.covers = {}
 
-    def add(self, nid, pinpoint="", extra=""):
+    def add(self, nid, pinpoint="", extra=()):
         """Record node `nid`'s rail panel if it has commentary, anything cites it,
-        it transposes an EU article, or it carries an editorial `extra` section
+        it transposes an EU article, or it carries editorial `extra` sections
         (the EU article<->recital links). Idempotent per id; no-op for
-        context-less nodes."""
+        context-less nodes.
+
+        A *first stycke* whose paragraf already has a panel folds into it rather
+        than opening a second one (C2): the two describe the same provision, and
+        two rail targets one line apart could not both be read -- scrolling
+        between them just swapped the rail back and forth. The walk always
+        reaches the paragraf first, so the fold is a rebuild of its panel over
+        both anchors, and the citers of each collapse into one line per document.
+        A first stycke whose paragraf carries nothing keeps its own panel."""
         if not nid or nid in self.data:
             return
-        uri = self.doc_uri + "#" + nid
-        commentary = self._commentary(nid)
-        fk = self._fk(nid)
-        guidance = self._guidance_html(
-            self.site.article_guidance.get((self.doc_uri, nid)))
-        remiss = self._remiss_html(
-            self.site.remiss_feedback.get((self.doc_uri, nid)))
-        groups = _inbound_groups(self.site, uri,
-                                 exclude_before=_reassigned_before(self.site, uri))
-        genomfor = genomfor_margin(self.site, self.doc_uri, nid)
-        eu_cases = eu_caselaw_margin(self.site, self.doc_uri, nid)  # via genomfor
-        bemyndigande = bemyndigande_margin(self.site, uri)        # föreskrifter under it
-        corr_cases = corresponding_cases_margin(self.site, uri)   # new-law side
-        renumbered = renumbered_refs_margin(self.site, uri)       # earlier beteckning
-        corresponds = corresponds_margin(self.site, uri)          # old-law side
-        if not (commentary or fk or guidance or remiss or groups or genomfor
-                or eu_cases or bemyndigande or extra or corr_cases or renumbered
-                or corresponds):
+        host, heading = nid, "Kontext%s" % (
+            ' för <b>%s</b>' % escape(pinpoint) if pinpoint else "")
+        anchors = [nid]
+        if nid.endswith("S1") and nid[:-2] in self.data:
+            host = nid[:-2]
+            heading, covered = self.covers[host]
+            anchors = covered + [nid]
+        uris = [self.doc_uri + "#" + a for a in anchors]
+        # everything keyed on a single node is collected per folded anchor (a
+        # stycke can carry its own commentary); the citation graph is queried
+        # over all of them at once, so a document citing both is one line
+        sections = [s for anchor, uri in zip(anchors, uris, strict=True)
+                    for s in (
+                        self._commentary(anchor)
+                        + self._fk(anchor)
+                        + self._guidance(
+                            self.site.article_guidance.get((self.doc_uri, anchor)))
+                        + self._remiss(
+                            self.site.remiss_feedback.get((self.doc_uri, anchor)))
+                        + genomfor_margin(self.site, self.doc_uri, anchor)
+                        + eu_caselaw_margin(self.site, self.doc_uri, anchor)
+                        + bemyndigande_margin(self.site, uri)
+                        + corresponding_cases_margin(self.site, uri)
+                        + renumbered_refs_margin(self.site, uri)
+                        + corresponds_margin(self.site, uri))]
+        sections += list(extra) + _inbound_groups(
+            self.site, uris,
+            exclude_before=_reassigned_before(self.site, uris[0]))
+        if not sections:
             return
-        head = ('<div class="rail-h">Kontext%s</div>'
-                % (' för <b>%s</b>' % escape(pinpoint) if pinpoint else ""))
-        body = ('<div class="rail-sec"><div class="rail-sec-h">Hänvisat till av</div>'
-                '%s</div>' % groups) if groups else ""
-        self.data[nid] = (head + commentary + fk + guidance + remiss + body
-                          + renumbered + corr_cases + extra + genomfor
-                          + eu_cases + bemyndigande + corresponds)
+        self.data[host] = self._panel(heading, sections)
+        self.covers[host] = (heading, anchors)
 
-    def add_document(self):
+    def add_document(self, exclude_from=(), inbound=True):
         """The document-level rail panel (key ''), shown when no single paragraph
         is in focus (at the top of the document): the act's curated external links
-        (Externa länkar) plus any commentary on the document as a whole. Replaces
-        the client's empty-rail placeholder."""
-        panel = (self._guidance_html(self.site.guidance.get(self.doc_uri))
-                 + self._commentary(None)
-                 + self._fk(None)
-                 # the "most interesting feedback" for the whole SOU/Ds. v1
-                 # deliberately renders every overall stance as-is; a later pass
-                 # can rank by |sentiment| to surface only the strongest.
-                 + self._remiss_html(self.site.remiss_overall.get(self.doc_uri)))
-        if panel:
-            self.data[""] = '<div class="rail-h">Om dokumentet</div>' + panel
+        (Externa länkar), any commentary on the document as a whole, and who cites
+        the document as such (S5 -- context on the document, exactly as a
+        paragraf's citations are context on the paragraf). `exclude_from` omits
+        citers the page shows in another role (a statute's own preparatory works);
+        `inbound=False` suppresses the citation sections on a page that is not the
+        citable document -- a historical consolidation, since citations always
+        target the current one."""
+        sections = (
+            self._guidance(self.site.guidance.get(self.doc_uri))
+            + self._commentary(None)
+            + self._fk(None)
+            # the "most interesting feedback" for the whole SOU/Ds. v1
+            # deliberately renders every overall stance as-is; a later pass
+            # can rank by |sentiment| to surface only the strongest.
+            + self._remiss(self.site.remiss_overall.get(self.doc_uri)))
+        if inbound:
+            sections += document_inbound(self.site, self.doc_uri, exclude_from)
+        if sections:
+            self.data[""] = self._panel("Om dokumentet", sections)
 
-    def _remiss_html(self, items):
+    @staticmethod
+    def _panel(heading, sections):
+        return ('<div class="rail-h">%s</div>%s'
+                % (heading, render_rail_sections(sections)))
+
+    def _remiss(self, items):
         """Remiss (referral) feedback on a node -- what each answering organisation
         said about this section (or, in `add_document`, the SOU/Ds as a whole),
-        from the `.ann` sentiment layer -- as a rail section; '' for no items.
-        Render-only: the remiss corpus has no page of its own, so each item links
-        out to the organisation's own answer PDF (`source_url`, a "Källa" link,
-        always `rel="external"` -- a remiss PDF is never a BASE-prefixed internal
-        url). Everything shown (organisation, quote) is PDF/LLM-derived and
-        `html.escape`d, exactly like `_guidance_html`."""
+        from the `.ann` sentiment layer. Render-only: the remiss corpus has no page
+        of its own, so each item links out to the organisation's own answer PDF
+        (`source_url`, a "Källa" link, always `rel="external"` -- a remiss PDF is
+        never a BASE-prefixed internal url). Everything shown (organisation, quote)
+        is PDF/LLM-derived and `html.escape`d, exactly like `_guidance`."""
         if not items:
-            return ""
+            return []
         out = []
         for it in items:
             out.append(
@@ -1200,18 +1367,18 @@ class Rail:
                 '<a href="%s" rel="external">Läs remissvaret</a></li>'
                 % (escape(it["organisation"]), _sentiment_span(it["sentiment"]),
                    escape(it["quote"]), escape(it["source_url"])))
-        return ('<div class="rail-sec remiss"><div class="rail-sec-h">Remissvar'
-                '</div><ul>%s</ul></div>' % "".join(out))
+        return [RailSection("remiss", "Remissvar", len(out),
+                            "<ul>%s</ul>" % "".join(out))]
 
-    def _guidance_html(self, items):
+    def _guidance(self, items):
         """A list of curated external links -- the wiki annotation's `## Externa
         länkar` block (Commission FAQs, guidance PDFs, call-for-evidence pages, …) --
-        as a rail section, used both for the act's document-level panel (Step 2) and
-        for a single article's context panel (Step 3); '' for no items. Render-only:
-        these resources live outside the corpus, so they carry no inbound edge. A
-        lagen.nu-absolute href renders internal, any other an external link."""
+        used both for the act's document-level panel (Step 2) and for a single
+        article's context panel (Step 3). Render-only: these resources live outside
+        the corpus, so they carry no inbound edge. A lagen.nu-absolute href renders
+        internal, any other an external link."""
         if not items:
-            return ""
+            return []
         out = []
         for g in items:
             ext = "" if g["href"].startswith(BASE) else ' rel="external"'
@@ -1226,19 +1393,19 @@ class Rail:
                 tail = ""
             out.append('<li><a href="%s"%s>%s</a>%s</li>'
                        % (escape(href(g["href"])), ext, escape(g["label"]), tail))
-        return ('<div class="rail-sec vagledning"><div class="rail-sec-h">Externa '
-                'länkar</div><ul>%s</ul></div>' % "".join(out))
+        return [RailSection("vagledning", "Externa länkar", len(out),
+                            "<ul>%s</ul>" % "".join(out))]
 
     def _fk(self, nid):
         """The författningskommentar prose propositioner wrote for the paragraph
-        `nid` (or None for the law as a whole), as a rail section: each prop's
-        comment opens the section (initial text, ellipsized on a word boundary),
-        with the proposition as a provenance link pinpointing the FK page. The
-        official sibling of the wiki `_commentary` -- authored by the
-        lagstiftare, not our editors -- so it renders as its own section."""
+        `nid` (or None for the law as a whole): each prop's comment opens the
+        section (initial text, ellipsized on a word boundary), with the
+        proposition as a provenance link pinpointing the FK page. The official
+        sibling of the wiki `_commentary` -- authored by the lagstiftare, not our
+        editors -- so it stays its own section."""
         entries = self.site.fk.get((self.doc_uri, nid))
         if not entries:
-            return ""
+            return []
         out = []
         for prop_uri, label, page, text in entries:
             lead = textwrap.shorten(text.split("\n")[0], 300, placeholder=" …")
@@ -1248,8 +1415,8 @@ class Rail:
                    else escape(label or ""))
             out.append('<p>%s <span class="prov">— %s</span></p>'
                        % (escape(lead), src))
-        return ('<div class="rail-sec rail-fk"><div class="rail-sec-h">'
-                'Författningskommentar</div>%s</div>' % "".join(out))
+        return [RailSection("fk", "Författningskommentar", len(out),
+                            "".join(out))]
 
     def _commentary(self, nid):
         """The wiki commentary for the paragraph `nid` (or `None` for the law as a
@@ -1258,15 +1425,14 @@ class Rail:
         page."""
         entries = self.site.commentary.get((self.doc_uri, nid))
         if not entries:
-            return ""
+            return []
         out = []
         for author, blocks in entries:
             prose = "".join("<p>%s</p>" % render_runs(c["text"], self.site)
                             for c in blocks if c.get("text"))
             by = '<div class="komm-by">— %s</div>' % escape(author) if author else ""
             out.append(prose + by)
-        return ('<div class="rail-sec rail-komm"><div class="rail-sec-h">Kommentar'
-                '</div>%s</div>' % "".join(out))
+        return [RailSection("kommentar", "Kommentar", len(out), "".join(out))]
 
     def island(self):
         """The ``<script type=application/json>`` island, or '' if no paragraph
@@ -1908,6 +2074,15 @@ def _version_notes(art):
             for v, (ikraft, forarbeten) in history.amendment_info(art).items()}
 
 
+# the compare status line (populated by versions.js the instant a lydelse is
+# picked): it names what is being compared, so the reader sees the page change
+# even when the diff fetch returns near-instantly (T1). It heads the text it
+# annotates, so it stays in the reading column while the <select> that drives it
+# sits up in dl.meta (S1); the server-composed diff-note inside #dokument still
+# carries the detail.
+LYDELSER_STATUS = '<h2 class="lydelser-status" hidden></h2>'
+
+
 def _versions_panel(art, base_id, own_version, versions):
     """The compare panel (the old pipeline's docversions dropdown): the
     <select> that versions.js turns into the on-demand diff view
@@ -1915,7 +2090,12 @@ def _versions_panel(art, base_id, own_version, versions):
     consolidation's ikraft date + proposition where the register knows them.
     Point-in-time links live in the andringar view (see _andringar); here is
     only the comparison affordance. Empty when this very consolidation is the
-    only one known."""
+    only one known.
+
+    Rendered as a `dl.meta` value, not a banner of its own: it belongs beside
+    the consolidation cutoff it compares against ("Ändring införd t.o.m. SFS
+    2026:880 · Jämför lydelser"), and a full-width box above the text pushed the
+    statute itself below the fold for no gain (S1)."""
     versions = [(v, u) for v, u in versions if v != own_version]
     if not versions:
         return ""
@@ -1926,16 +2106,11 @@ def _versions_panel(art, base_id, own_version, versions):
         options.append('<option value="%s">SFS %s%s</option>'
                        % (escape(v), escape(v),
                           escape(" (%s)" % note) if note else ""))
-    # the status line (populated by versions.js the instant a lydelse is picked)
-    # names what is being compared, so the reader sees the page change even when
-    # the diff fetch returns near-instantly (T1); the server-composed diff-note
-    # inside #dokument still carries the detail.
     return ('<details class="lydelser">'
             '<summary>Jämför lydelser <span class="count">%d</span></summary>'
             '<label>Jämför %s lydelse med <select data-diff data-uri="%s" '
             'data-to="%s"><option value="">– välj lydelse –</option>%s'
             '</select></label></details>'
-            '<h2 class="lydelser-status" hidden></h2>'
             % (len(options), "denna" if own_version else "aktuell",
                escape(BASE + base_id), escape(own_version or ""),
                "".join(options)))
@@ -2101,13 +2276,21 @@ def render_sfs(art, site):
     # ("SFS 2018:585 i lydelse enligt SFS 2026:764"); omitted when unamended
     amended = re.search(r"i lydelse enligt SFS (\S+)",
                         props.get("dcterms:identifier") or "")
+    versions = history.versions(base_id)
+    # the compare affordance rides the cutoff row it compares against (S1); with
+    # no cutoff to hang it on (an unamended act that still has consolidations)
+    # it earns a row of its own
+    lydelser = _versions_panel(art, base_id, version, versions)
     meta = [
         # the full official title ("Säkerhetsskyddslag (2018:585)"); the h1 is the
         # short name, so it does not repeat here unless the two coincide
         ("Titel", lb.official_title if lb.official_title != title else None),
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
         ("Upphävd", upphavd),
-        ("Ändring införd t.o.m.", "SFS %s" % amended.group(1) if amended else None),
+        ("Ändring införd t.o.m.",
+         _RawHTML("SFS %s%s" % (escape(amended.group(1)), lydelser))
+         if amended else None),
+        ("Lydelser", _RawHTML(lydelser) if lydelser and not amended else None),
         ("Senast hämtad", _sfs_fetched().get(base_id)),
     ]
     toc = Toc()
@@ -2123,7 +2306,6 @@ def render_sfs(art, site):
         child.get("type") == "konventionsbilaga"
         for node in art.get("structure", []) if node.get("type") == "bilaga"
         for child in node.get("children", []))
-    versions = history.versions(base_id)
     structure = '<div id="dokument">' + "".join(
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", [])) + "</div>"
@@ -2136,11 +2318,12 @@ def render_sfs(art, site):
         else forarbeten_section(site, art)
     body = (_version_banner(base_id, version) if version
             else (_expired_banner(props) if expired else "")) \
-        + _versions_panel(art, base_id, version, versions) \
         + forarbeten \
-        + ("" if version else document_inbound(site, art["uri"], own_forarbeten)) \
-        + structure + andringar
-    rail.add_document()        # external links + law-level commentary, default panel
+        + (LYDELSER_STATUS if lydelser else "") + structure + andringar
+    # external links, law-level commentary and who cites the act as a whole --
+    # the rail's default panel. A lydelse page is not the citable document
+    # (citations always target the current consolidation), so it shows none.
+    rail.add_document(own_forarbeten, inbound=not version)
     body_classes = []
     if version:
         body_classes.append("inaktuell")
@@ -2297,7 +2480,7 @@ def render_dv(art, site):
     # a record with explicit instance structure (HD's modern <h1>-tagged form) is
     # walked as nested sections; a flat legacy record has no structural wrappers,
     # so the same walk renders it as a plain paragraph sequence
-    body = (document_inbound(site, art["uri"]) + _dv_ursprunglig_dom(art) + sokord
+    body = (_dv_ursprunglig_dom(art) + sokord
             + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
                        ruling=_dv_ruling_word(art))
             + _dv_footnotes(art.get("footnotes", []), site)
@@ -2305,6 +2488,7 @@ def render_dv(art, site):
             # referat editor's apparatus -- shown for a published referat, but not
             # for a raw verdict, whose PDF carries no such section (R2)
             + (_dv_curated(md, site) if art.get("referat") else ""))
+    rail.add_document()
     return page(title, "Rättsfall", _doc_meta(meta, art.get("source_url")), body,
                 render_toc(toc),
                 eyebrow=eyebrow, summary=summary,
@@ -2399,7 +2583,7 @@ def render_forarbete(art, site):
     # the identifier is the eyebrow (below), so it needs no "Beteckning" dl row
     meta = [("Typ", FA_TYPE_LABEL.get(art.get("type"), art.get("type"))),
             ("Datum", art.get("date"))]
-    parts = [document_inbound(site, art["uri"]), render_implements(art, site)]
+    parts = [render_implements(art, site)]
     toc = Toc()
     doc_uri = art["uri"]
     rail = Rail(site, doc_uri)
@@ -2534,8 +2718,9 @@ def render_begrepp(art, site):
     note = ("" if nodes else
             '<p class="stub-note">Det här begreppet har ännu ingen beskrivning. '
             'Nedan visas var det definieras och används.</p>')
-    body = note + document_inbound(site, art["uri"]) + "".join(
+    body = note + "".join(
         render_node(b, site, art["uri"], toc, rail) for b in nodes)
+    rail.add_document()
     return page(title, "Begrepp", _doc_meta(meta, art.get("source_url")), body,
                 render_toc(toc), eyebrow="Begrepp", island=rail.island())
 
@@ -2636,28 +2821,28 @@ def _recital_group_heading(g):
                                  escape(g["label"]), jfr))
 
 
-def _recital_links_html(recitals):
+def _recital_links_sections(recitals):
     """Rail section for an article/sub-article: links to its relevant recitals."""
     links = "".join('<a href="#recital-%d">skäl %d</a>' % (n, n) for n in recitals)
-    return ('<div class="rail-sec skal"><div class="rail-sec-h">Relevanta skäl'
-            '</div><div class="skal-links">%s</div></div>' % links)
+    return [RailSection("skal", "Relevanta skäl", len(recitals),
+                        '<div class="skal-links">%s</div>' % links)]
 
 
-def _recital_context_html(editorial, n):
+def _recital_context_sections(editorial, n):
     """Rail panel for a recital: its thematic group and the articles it underpins
     (the back half of the article<->recital round-trip)."""
     parts = []
     g = editorial.group_of.get(n)
     if g:
-        parts.append('<div class="rail-sec"><div class="rail-sec-h">Tematisk grupp'
-                     '</div>%s</div>' % escape(g["label"]))
+        parts.append(RailSection("grupp", "Tematisk grupp", 1,
+                                 escape(g["label"])))
     articles = editorial.recital_articles.get(n)
     if articles:
         links = "".join('<a href="#%s">artikel %s</a>' % (escape(a), escape(a))
                         for a in articles)
-        parts.append('<div class="rail-sec skal"><div class="rail-sec-h">Förklarar'
-                     '</div><div class="skal-links">%s</div></div>' % links)
-    return "".join(parts)
+        parts.append(RailSection("skal", "Förklarar", len(articles),
+                                 '<div class="skal-links">%s</div>' % links))
+    return parts
 
 
 def _eurlex_marker(t, num):
@@ -2708,10 +2893,10 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     # A recital gets a back-link panel (its articles + group); an article/
     # sub-article (paragraph/point, keyed like the .ann's "4.5") gets a forward
     # panel of its relevant recitals. Both ride the scroll-driven rail.
-    extra = ""
+    extra = []
     if t == "recital" and num and num.isdigit():
         if editorial:
-            extra = _recital_context_html(editorial, int(num))
+            extra = _recital_context_sections(editorial, int(num))
     else:
         # an article's key is its own id; a sub-article's is the dotted form. Every
         # numbered sub-article (paragraph/point) gets that id, so a reader can link
@@ -2726,7 +2911,7 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
             if t != "article":
                 bid = bid or key       # synthesise the sub-article citation id
             if recitals:
-                extra = _recital_links_html(recitals)
+                extra = _recital_links_sections(recitals)
     # the article is a citation target (id == its number); its inbound (incl.
     # implementing förarbeten) drives the rail, like an SFS paragraph
     pin = _eurlex_pin(t, num, bid)
@@ -2813,7 +2998,7 @@ def render_eurlex(art, site):
     editorial = _load_editorial(art["celex"])
     toc = Toc()
     rail = Rail(site, art["uri"])
-    parts = [document_inbound(site, art["uri"]), _eurlex_opinion_link(art, site)]
+    parts = [_eurlex_opinion_link(art, site)]
     cur_article = cur_parag = None       # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
     # the artifact is a nested structure (divisions > articles > paragraphs >
@@ -3019,11 +3204,13 @@ def render_foreskrift(art, site):
            else _konsoliderad_banner(art, site, cons["konsolideradTom"])
            if cons
            else _unparsed_konsoliderad_note(art.get("consolidations", [])))
-    body = banner \
-        + ("" if grund else document_inbound(site, art["uri"])) + refs \
+    body = banner + refs \
         + "".join(render_node(n, site, art["uri"], toc, rail)
                   for n in structure) \
         + _foreskrift_amendments(art.get("amendments", []), toc)
+    # a grundföreskrift page shows the original wording, not the regulation as it
+    # now reads, so citations to the regulation belong on the consolidation
+    rail.add_document(inbound=not grund)
     return page(title, "Föreskrift", _doc_meta(meta, art.get("source_url")), body,
                 render_toc(toc),
                 eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
@@ -3048,9 +3235,10 @@ def render_avg(art, site):
                if art.get("sammanfattning") else "")
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + "".join(
+    body = "".join(
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", []))
+    rail.add_document()
     section = {"jo": "JO-beslut", "jk": "JK-beslut",
                "arn": "ARN-beslut"}.get(art.get("org"), "Myndighetsavgörande")
     return page(title, section, _doc_meta(meta, art.get("source_url")), body,
@@ -3074,7 +3262,7 @@ def render_hudoc(art, site):
     rail = Rail(site, art["uri"])
     refs = _ref_list(site, "Berörda konventionsartiklar",
                      [ref["uri"] for ref in art.get("references", [])])
-    body = document_inbound(site, art["uri"]) + refs + "".join(
+    body = refs + "".join(
         render_node(node, site, art["uri"], toc, rail)
         for node in art.get("structure", []))
     rail.add_document()
@@ -3113,7 +3301,7 @@ def render_coe(art, site):
     rail = Rail(site, art["uri"])
     implementation_link = (_ref_list(site, "Svensk inkorporering", [implementation])
                            if implementation else "")
-    parts = [document_inbound(site, art["uri"]), implementation_link]
+    parts = [implementation_link]
     for node in art.get("structure", []):
         if node.get("type") in ("artikel", "sektion"):
             parts.append(_render_coe_provision(node, site, art["uri"], toc, rail))
@@ -3153,7 +3341,7 @@ def render_icrc(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
-    parts = [document_inbound(site, art["uri"])]
+    parts = []
     if art.get("summary"):
         parts.append('<p class="lead">%s</p>' % escape(art["summary"]))
     for node in art.get("structure", []):
@@ -3207,7 +3395,7 @@ def render_untc(art, site):
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
     ]
     rail = Rail(site, art["uri"])
-    parts = [document_inbound(site, art["uri"])]
+    parts = []
     if art.get("parties"):
         parts.append(_untc_parties(art["parties"]))
     rail.add_document()
@@ -3228,7 +3416,7 @@ def render_icc(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = document_inbound(site, art["uri"]) + "".join(
+    body = "".join(
         render_node(node, site, art["uri"], toc, rail)
         for node in art.get("structure", []))
     rail.add_document()

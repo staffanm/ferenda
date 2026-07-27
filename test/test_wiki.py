@@ -453,7 +453,7 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
         re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1))
     panel = island["5"]                         # article 5's context rail
     # the commentary prose
-    assert 'class="rail-sec rail-komm"' in panel
+    assert 'class="rail-sec kommentar"' in panel
     assert "väsentliga kraven" in panel
     # and the per-article external links, the same shape as the act-level block
     assert 'class="rail-sec vagledning"' in panel
@@ -462,7 +462,7 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
     assert "Kommissionen" in panel
     # a recital is commentable too -- the comment lands in recital 12's rail, and
     # the recital gets its `#recital-12` anchor even with no editorial .ann present
-    assert 'class="rail-sec rail-komm"' in island["recital-12"]
+    assert 'class="rail-sec kommentar"' in island["recital-12"]
     assert "webbplatser i regel inte" in island["recital-12"]
     assert 'id="recital-12"' in html and 'data-rail="recital-12"' in html
     # article 6 has no annotation -> no rail panel of its own

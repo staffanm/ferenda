@@ -84,9 +84,10 @@ def test_remiss_indexes_skips_unanalyzed_answer(tmp_path, monkeypatch):
 
 def test_remiss_html_escapes_org_and_quote():
     rail = render.Rail(render.Site(None, set()), "https://lagen.nu/sou/2020:1")
-    html = rail._remiss_html([{"organisation": "A & B <Org>", "sentiment": -0.8,
-                               "quote": "de <säger> \"nej\"",
-                               "source_url": "https://x/svar.pdf"}])
+    html = render.render_rail_sections(
+        rail._remiss([{"organisation": "A & B <Org>", "sentiment": -0.8,
+                       "quote": "de <säger> \"nej\"",
+                       "source_url": "https://x/svar.pdf"}]))
     assert "Remissvar" in html
     assert "A &amp; B &lt;Org&gt;" in html          # organisation escaped
     assert "de &lt;säger&gt;" in html               # quote escaped

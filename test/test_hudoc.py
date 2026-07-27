@@ -118,8 +118,11 @@ def test_metadata_references_join_generic_graph():
     art = {"uri": "https://lagen.nu/dom/echr/001-123456",
            "references": [{"uri": target, "predicate": "dcterms:references",
                            "text": "8"}]}
+    # (anchor, page, run) -- a metadata reference belongs to the document, so
+    # it carries neither an anchor nor a printed page
     assert catalog.artifact_links(art) == [
-        (None, {"uri": target, "predicate": "dcterms:references", "text": "8"})]
+        (None, None,
+         {"uri": target, "predicate": "dcterms:references", "text": "8"})]
 
 
 def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):

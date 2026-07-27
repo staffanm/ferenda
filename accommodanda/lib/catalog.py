@@ -64,7 +64,11 @@ CREATE TABLE IF NOT EXISTS links (
     predicate   TEXT NOT NULL,
     to_uri      TEXT NOT NULL,   -- full target incl. #fragment
     to_root     TEXT NOT NULL,   -- target document uri, fragment stripped
-    text        TEXT             -- citation surface text
+    text        TEXT,            -- citation surface text
+    from_page   INTEGER          -- printed page the citation sits on, where the
+                                 -- citing doc has pages (förarbete/DV PDFs), so
+                                 -- an inbound line can say "s. 45" for an anchor
+                                 -- with no citable designator of its own (S4)
 );
 CREATE TABLE IF NOT EXISTS concept_alias (
     variant   TEXT PRIMARY KEY,     -- an inflected/variant begrepp uri
@@ -191,6 +195,9 @@ def connect(path, data_root=None, exclusive=False):
     corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
     if "ikrafttrader" not in corr_cols:
         con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
+    link_cols = {row[1] for row in con.execute("PRAGMA table_info(links)")}
+    if "from_page" not in link_cols:
+        con.execute("ALTER TABLE links ADD COLUMN from_page INTEGER")
     genomf_cols = {row[1] for row in con.execute("PRAGMA table_info(genomforande)")}
     if "sfs_pinpoint" not in genomf_cols:
         con.execute("ALTER TABLE genomforande ADD COLUMN sfs_pinpoint TEXT")
@@ -340,26 +347,29 @@ def artifact_updated(root, stored):
 # edge extraction -- one generic walk over any artifact node tree
 # --------------------------------------------------------------------------
 
-def collect_links(node, anchor, out):
-    """Walk an artifact node tree, appending (anchor, run) for every inline
-    link, attributed to the nearest enclosing node `id`. Handles the two
-    leaf carriers of runs: a node's `text` list and a table `rad`'s `cells`
-    (a list of cells, each itself a runs list)."""
+def collect_links(node, anchor, page, out):
+    """Walk an artifact node tree, appending (anchor, page, run) for every
+    inline link, attributed to the nearest enclosing node `id` and the printed
+    page it sits on (sources parsed from a PDF tag their blocks with one; the
+    rest carry None throughout). Handles the two leaf carriers of runs: a node's
+    `text` list and a table `rad`'s `cells` (a list of cells, each itself a runs
+    list)."""
     if isinstance(node, dict):
         anchor = node.get("id") or anchor
+        page = node.get("page") or page
         for key, value in node.items():
             if key == "text" and isinstance(value, list):
-                out += [(anchor, run) for run in value
+                out += [(anchor, page, run) for run in value
                         if isinstance(run, dict) and "uri" in run]
             elif key == "cells":
                 for cell in value:
-                    out += [(anchor, run) for run in cell
+                    out += [(anchor, page, run) for run in cell
                             if isinstance(run, dict) and "uri" in run]
             else:
-                collect_links(value, anchor, out)
+                collect_links(value, anchor, page, out)
     elif isinstance(node, list):
         for item in node:
-            collect_links(item, anchor, out)
+            collect_links(item, anchor, page, out)
 
 
 def implements_links(art):
@@ -373,8 +383,9 @@ def implements_links(art):
     for rec in art.get("implements", []):
         anchor = "sid%d" % rec["page"] if rec.get("page") else None
         for uri in rec.get("uris", []):
-            out.append((anchor, {"uri": uri, "predicate": rec["predicate"],
-                                 "text": rec.get("sentence")}))
+            out.append((anchor, rec.get("page"),
+                        {"uri": uri, "predicate": rec["predicate"],
+                         "text": rec.get("sentence")}))
     return out
 
 
@@ -386,17 +397,19 @@ def artifact_links(art):
     exactly the citations the rendered page shows), plus a förarbete's
     `implements` (genomför-direktiv) edges and generic top-level `references`
     for relations expressed by source metadata rather than a literal body
-    span (HUDOC's article facet, treaty crosswalks)."""
+    span (HUDOC's article facet, treaty crosswalks). Entries are
+    (anchor, page, run) -- the body walk is the only producer that knows a
+    printed page, so the metadata edges below carry None."""
     out = []
     for nodes in text.body_sections(art):
-        collect_links(nodes, None, out)
+        collect_links(nodes, None, None, out)
     for amendment in art.get("amendments", []):
-        collect_links(amendment.get("content"), None, out)
+        collect_links(amendment.get("content"), None, None, out)
     out += implements_links(art)
     # Source metadata can carry legal relations that have no literal span in
     # the body (HUDOC's article facet, a treaty's Swedish implementation).
     # Keep the contract generic: every producer emits ordinary link-run dicts.
-    out += [(None, run) for run in art.get("references", [])]
+    out += [(None, None, run) for run in art.get("references", [])]
     return out
 
 
@@ -731,14 +744,19 @@ def _index_document(con, art, path, source):
          # source's own one-line description (a case's sammanfattning)
          lb.descriptive_label, lb.short_id, lb.short_title,
          document_description(art, source)))
+    # the metadata producers describe the document, not a place in it, so they
+    # pad the body walk's (anchor, page, run) shape with a pageless entry
+    edges = artifact_links(art) + [
+        (anchor, None, run)
+        for anchor, run in (subject_links(art) + definition_links(art)
+                            + bemyndigande_links(art) + relation_links(art)
+                            + curated_links(art))]
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
-             run["uri"], strip_fragment(run["uri"]), run.get("text"))
-            for anchor, run in (artifact_links(art) + subject_links(art)
-                                + definition_links(art)
-                                + bemyndigande_links(art)
-                                + relation_links(art)
-                                + curated_links(art))]
-    con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)", rows)
+             run["uri"], strip_fragment(run["uri"]), run.get("text"), page)
+            for anchor, page, run in edges]
+    con.executemany(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root, "
+        "text, from_page) VALUES (?,?,?,?,?,?,?)", rows)
     # a begrepp's `aliases` (old names from MediaWiki redirects) -> resolve to it
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
     con.executemany("INSERT OR REPLACE INTO concept_redirect VALUES (?, ?)",
@@ -1025,11 +1043,13 @@ def set_genomforande(con, rows):
         "INSERT INTO genomforande (sfs_uri, sfs_anchor, directive, article, "
         "prop_uri, prop_label, pinpoint, partial, sfs_pinpoint) "
         "VALUES (?,?,?,?,?,?,?,?,?)", rows)
-    con.executemany("INSERT INTO links VALUES (?,?,?,?,?,?)",
-                    [(sfs_uri, anchor, "rpubl:genomforDirektiv",
-                      directive + "#" + article, directive, prop_label)
-                     for (sfs_uri, anchor, directive, article, prop_uri,
-                          prop_label, pin, partial, sfs_pin) in rows])
+    con.executemany(
+        "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root, "
+        "text) VALUES (?,?,?,?,?,?)",
+        [(sfs_uri, anchor, "rpubl:genomforDirektiv",
+          directive + "#" + article, directive, prop_label)
+         for (sfs_uri, anchor, directive, article, prop_uri,
+              prop_label, pin, partial, sfs_pin) in rows])
     con.commit()
 
 
@@ -1338,24 +1358,48 @@ def inbound(con, uri, limit=None):
     return con.execute(sql, (uri,)).fetchall()
 
 
-def inbound_collapsed(con, uri, exclude_from=()):
-    """Documents citing exactly `uri`, one row per citing *document* (not per
-    pinpoint) as (from_uri, label, title, source, kind, date, anchors) -- the
+# A pinpointed citation ("1 kap. 18 § lagen (2016:1145) om offentlig upphandling")
+# yields two link rows from the same spot: the pinpoint (…#K1P18) and the bare SFS
+# number (…/2016:1145). The bare half says nothing the pinpoint does not, and it
+# made the act's whole-document panel read as if half the corpus cited the law as
+# such (S2). Drop a whole-document row whenever the same citing spot also reaches
+# into the document -- that citation is already shown in the target paragraf's rail.
+_SUPERSEDED_BY_PINPOINT = (
+    " AND NOT EXISTS (SELECT 1 FROM links p WHERE p.from_uri = l.from_uri"
+    " AND p.from_anchor IS l.from_anchor AND p.to_root = l.to_root"
+    " AND p.to_uri <> l.to_uri)")
+
+
+def inbound_collapsed(con, uris, exclude_from=(), whole_document=False):
+    """Documents citing exactly `uris` -- one target, or the several that share
+    one rail panel (a paragraf and its first stycke, C2), collapsed together so
+    a document citing both is still one line. One row per citing *document* (not
+    per pinpoint) as (from_uri, label, title, source, kind, date, anchors) -- the
     grain the "Hänvisat till av" panel renders, so a förarbete citing from a
     dozen avsnitt is one line whose `anchors` (comma-joined, NULL pinpoints
-    dropped) the renderer turns into a pinpoint list. Self-citations, kommentar
-    and bemyndigande excluded, plus any `exclude_from` uris (a statute's own
-    förarbeten, shown once in their preparatory-works role instead)."""
+    dropped) the renderer turns into a pinpoint list. Each anchor is written
+    `id@page`, the page empty where the citing document has none: the two travel
+    as one field because two GROUP_CONCATs of the same group are not promised to
+    agree on order. Self-citations, kommentar and bemyndigande excluded, plus any
+    `exclude_from` uris (a statute's own förarbeten, shown once in their
+    preparatory-works role instead).
+
+    `whole_document` says `uris` are documents, not nodes inside one, and drops
+    the citing spots that also pinpoint into them (`_SUPERSEDED_BY_PINPOINT`)."""
+    assert not isinstance(uris, str), "inbound_collapsed takes a sequence of uris"
+    params = list(uris)
     excl = ""
-    params = [uri]
     if exclude_from:
         excl = " AND l.from_uri NOT IN (%s)" % ",".join("?" * len(exclude_from))
         params.extend(exclude_from)
+    targets = " AND l.to_uri IN (%s)" % ",".join("?" * len(uris))
     sql = ("SELECT l.from_uri, d.label, d.title, d.source, d.kind, d.date, "
-           "GROUP_CONCAT(DISTINCT l.from_anchor), d.descriptive "
+           "GROUP_CONCAT(DISTINCT l.from_anchor || '@' || "
+           "IFNULL(l.from_page, '')), d.descriptive "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
-           "WHERE l.to_uri = ?" + _NOT_SELF + _NOT_TYPED
+           "WHERE 1" + targets + _NOT_SELF + _NOT_TYPED
            + " AND d.source <> 'kommentar'" + excl
+           + (_SUPERSEDED_BY_PINPOINT if whole_document else "")
            + " GROUP BY l.from_uri "
            "ORDER BY d.source, d.date, d.label")
     return con.execute(sql, params).fetchall()

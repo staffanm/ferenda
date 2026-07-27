@@ -76,9 +76,11 @@ def test_generate_skips_vanished_artifact(tmp_path, capsys):
 
 def test_collect_links_attributes_to_nearest_id():
     out = []
-    catalog.collect_links(LAW["structure"], None, out)
-    assert out == [("P6S1", {"predicate": "dcterms:references", "text": "5 §",
-                             "uri": "https://lagen.nu/1975:635#P5"})]
+    catalog.collect_links(LAW["structure"], None, None, out)
+    # (anchor, page, run) -- a statute artifact carries no printed page
+    assert out == [("P6S1", None,
+                    {"predicate": "dcterms:references", "text": "5 §",
+                     "uri": "https://lagen.nu/1975:635#P5"})]
 
 
 def test_rebuild_counts(tmp_path):
@@ -336,7 +338,7 @@ def test_inbound_excludes_self_citation(tmp_path):
     rows = catalog.inbound(con, "https://lagen.nu/1975:635#P5")
     assert rows == []
     # the collapsed query the "Hänvisat till av" panel reads likewise excludes it
-    assert catalog.inbound_collapsed(con, "https://lagen.nu/1975:635#P5") == []
+    assert catalog.inbound_collapsed(con, ["https://lagen.nu/1975:635#P5"]) == []
 
 
 def test_rebuild_is_idempotent(tmp_path):
@@ -399,7 +401,7 @@ def test_law_page_has_inbound_annotation(tmp_path):
     html = render.render_sfs(LAW, site)
     # the citing case is in §6's context-rail panel, linking back to the case
     panel = _island(html)["P6"]
-    assert "Hänvisat till av" in panel
+    assert 'data-sec="dv" data-label="Rättsfall"' in panel
     assert 'href="/dom/NJA_1994_s_1"' in panel
     assert "NJA 1994 s. 1" in panel
 
@@ -422,7 +424,8 @@ def test_sfs_header_and_meta_placement(tmp_path):
     # the dl.meta is under the h1; the full official title is its "Titel" row
     assert '<dl class="meta">' in frontmatter
     assert "<dt>Titel</dt><dd>Räntelag (1975:635)</dd>" in frontmatter
-    assert "<dt>Ändring införd t.o.m.</dt><dd>SFS 2013:55</dd>" in frontmatter
+    # the cutoff row also carries the compare affordance (S1)
+    assert "<dt>Ändring införd t.o.m.</dt><dd>SFS 2013:55" in frontmatter
     assert "Utfärdad" not in frontmatter                   # dropped for SFS (C1)
     # Källa is the source link, and it is the last dl row
     assert frontmatter.rstrip().endswith("</dl>")
@@ -544,7 +547,7 @@ def test_foreskrift_links_come_from_presented_consolidation():
     # citations -- not the superseded base text's, and never both (same §§
     # would double every edge)
     out = catalog.artifact_links(FORESKRIFT)
-    assert [run["uri"] for _, run in out] == ["https://lagen.nu/1975:635#P6"]
+    assert [run["uri"] for _, _, run in out] == ["https://lagen.nu/1975:635#P6"]
 
 
 def test_foreskrift_page_presents_consolidation(tmp_path):
@@ -907,7 +910,7 @@ def test_inbound_grouped_by_source(tmp_path):
     site = render.Site.from_catalog(con)
     html = render.render_sfs(LAW, site)   # §6 is cited by the case
     panel = _island(html)["P6"]
-    assert 'class="ingroup dv"' in panel
+    assert 'class="rail-sec dv"' in panel
     assert "Rättsfall" in panel           # the source-group heading
 
 
@@ -1276,7 +1279,7 @@ def test_inbound_excludes_kommentar_annotation(tmp_path):
     con = catalog.connect(db)
     rows = catalog.inbound(con, "https://lagen.nu/1975:635#P6")
     assert [r[4] for r in rows] == ["dv"]            # the case, not the kommentar
-    collapsed = catalog.inbound_collapsed(con, "https://lagen.nu/1975:635#P6")
+    collapsed = catalog.inbound_collapsed(con, ["https://lagen.nu/1975:635#P6"])
     assert [r[3] for r in collapsed] == ["dv"]       # one doc line, kommentar excluded
 
 
@@ -1297,8 +1300,113 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
     catalog.rebuild(db, "dv", [bare])
     site = render.Site.from_catalog(catalog.connect(db))
     html = render.render_sfs(LAW, site)
-    assert '<section class="inbound-doc">' in html
-    assert "NJA 2000 s. 1" in html
+    # it is context on the document, so it heads the rail's "Om dokumentet"
+    # panel rather than sitting between the reader and the statute (S5)
+    panel = _island(html)[""]
+    assert "Om dokumentet" in panel
+    assert "NJA 2000 s. 1" in panel
+
+
+def test_document_panel_drops_the_sfs_number_half_of_a_pinpointed_citation(tmp_path):
+    # S2: "6 § räntelagen (1975:635)" is two link runs from one spot -- the
+    # pinpoint and the bare SFS number. The bare half says nothing the pinpoint
+    # does not, so it must not make the citer look like a whole-act reference;
+    # a genuine whole-act citation from another spot still shows.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2000_s_1", "court": "HDO",
+        "referat": ["NJA 2000 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            "enligt ", {"predicate": "dcterms:references", "text": "6 §",
+                        "uri": "https://lagen.nu/1975:635#P6"},
+            " ", {"predicate": "dcterms:references", "text": "1975:635",
+                  "uri": "https://lagen.nu/1975:635"}, "."]}]}))
+    whole = tmp_path / "whole.json"
+    whole.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2001_s_1", "court": "HDO",
+        "referat": ["NJA 2001 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            "enligt ", {"predicate": "dcterms:references", "text": "1975:635",
+                        "uri": "https://lagen.nu/1975:635"}, "."]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [case, whole])
+    con = catalog.connect(db)
+    kept = [r[0] for r in catalog.inbound_collapsed(
+        con, ["https://lagen.nu/1975:635"], whole_document=True)]
+    assert kept == ["https://lagen.nu/dom/NJA_2001_s_1"]
+    # dropped from the whole-act panel, but not lost: it is in §6's own rail
+    site = render.Site.from_catalog(con)
+    assert "NJA 2000 s. 1" in _island(render.render_sfs(LAW, site))["P6"]
+
+
+def test_rail_sections_open_the_highest_priority_one_only():
+    # C3: one accordion row per kind of context, ranked by RAIL_SECTION_ORDER,
+    # and exactly the first present opens -- a rail with a hundred citations
+    # still reads at a glance
+    html = render.render_rail_sections([
+        render.RailSection("sfs", "Lagrumshänvisningar hit", 4, "<ul></ul>"),
+        render.RailSection("kommentar", "Kommentar", 1, "<p>x</p>"),
+        render.RailSection("dv", "Rättsfall", 7, "<ul></ul>")])
+    order = [html.index('data-sec="kommentar"'), html.index('data-sec="dv"'),
+             html.index('data-sec="sfs"')]
+    assert order == sorted(order)
+    assert html.count(" open>") == 1
+    assert 'data-sec="kommentar" data-label="Kommentar" data-n="1" open>' in html
+    # the count rides the row for the client's collapsed summary line (C4);
+    # a lone item counts itself, so no number is printed for it
+    assert '<span class="rail-sec-n">7</span>' in html
+    assert '<span class="rail-sec-n">1</span>' not in html
+
+
+def test_rail_sections_of_the_same_kind_merge():
+    # a panel covering a paragraf *and* its folded first stycke can be handed
+    # two of a kind; two rows with one heading would read as a rendering bug
+    merged = render.merge_rail_sections([
+        render.RailSection("kommentar", "Kommentar", 1, "<p>a</p>"),
+        render.RailSection("kommentar", "Kommentar", 2, "<p>b</p>"),
+        render.RailSection("aldre-rattsfall", "Äldre rättsfall (4 §)", 1, "<p>c</p>"),
+        render.RailSection("aldre-rattsfall", "Äldre rättsfall (5 §)", 1, "<p>d</p>")])
+    assert [(s.key, s.count, s.html) for s in merged] == [
+        ("kommentar", 3, "<p>a</p><p>b</p>"),
+        # distinct labels name distinct provisions, so they stay apart
+        ("aldre-rattsfall", 1, "<p>c</p>"),
+        ("aldre-rattsfall", 1, "<p>d</p>")]
+
+
+def test_first_stycke_context_folds_into_its_paragrafs_panel(tmp_path):
+    # C2: a paragraf and its first stycke are the same provision. Two rail
+    # targets a line apart cannot both be read, so the stycke's citers join the
+    # paragraf's panel -- collapsed to one line per citing document, and the
+    # stycke keeps no data-rail of its own.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/2020:100",
+        "metadata": {"properties": {"dcterms:title": "Testlag (2020:100)"}},
+        "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1", "children": [
+            {"type": "stycke", "id": "P1S1", "text": ["Ett."]},
+            {"type": "stycke", "id": "P1S2", "text": ["Två."]}]}]}))
+    citer = tmp_path / "citer.json"
+    citer.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2000_s_1", "court": "HDO",
+        "referat": ["NJA 2000 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            {"predicate": "dcterms:references", "text": "1 §",
+             "uri": "https://lagen.nu/2020:100#P1"}, " och ",
+            {"predicate": "dcterms:references", "text": "1 § 1 st",
+             "uri": "https://lagen.nu/2020:100#P1S1"}, "."]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [citer])
+    site = render.Site.from_catalog(catalog.connect(db))
+    html = render.render_sfs(json.loads(law.read_text()), site)
+    island = _island(html)
+    assert "P1" in island and "P1S1" not in island
+    assert 'data-rail="P1"' in html and 'data-rail="P1S1"' not in html
+    # one line for the citing case, not one per anchor it cites
+    assert island["P1"].count("NJA 2000 s. 1") == 1
 
 
 def test_inbound_uses_descriptive_short_name(tmp_path):
@@ -1325,17 +1433,19 @@ def test_inbound_uses_descriptive_short_name(tmp_path):
     site = render.Site.from_catalog(con)
     target_art = json.loads(target.read_text())
     panel = _island(render.render_sfs(target_art, site))["P1"]
-    assert ">räntelagen<" in panel                      # the descriptive short name
+    # a single pinpoint makes the citer one link, name and place together (S3)
+    assert ">räntelagen 9 § 1 st<" in panel             # the descriptive short name
     assert "Räntelag (1975:635)" not in panel           # not the full official title
 
 
 # --- collapsed inbound panel + own-förarbeten section --------------------
 
 def test_forarbete_pinpoint_maps_anchor_to_human_form():
-    assert render.forarbete_pinpoint("a14.3") == "avsnitt 14.3"
-    assert render.forarbete_pinpoint("a1-17") == "avsnitt 1"   # clash suffix dropped
-    assert render.forarbete_pinpoint("sid39") == "s. 39"
-    assert render.forarbete_pinpoint("sec7") == ""             # generated, no number
+    # (pinpoint, the anchor it links to)
+    assert render.forarbete_pinpoint("a14.3") == ("avsnitt 14.3", "a14.3")
+    assert render.forarbete_pinpoint("a1-17") == ("avsnitt 1", "a1-17")  # clash dropped
+    assert render.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
+    assert render.forarbete_pinpoint("sec7") == ("", "sec7")   # generated, no number
 
 
 def test_citer_name_prefers_full_title_by_kind():
@@ -1354,7 +1464,7 @@ def test_citer_line_collapses_pinpoints_and_caps_at_five():
     # word written once, each number its own link), then " m.fl." beyond five
     row = ("https://lagen.nu/prop/2025/26:123", "Prop. 2025/26:123",
            "Explosiva varor", "forarbete", "prop", "2025-01-01",
-           "a18.4.1,a15.2,a16.7,a2,a9,a11",     # six avsnitt, out of order
+           "a18.4.1@,a15.2@,a16.7@,a2@,a9@,a11@",  # six avsnitt, out of order
            "Prop. 2025/26:123")                 # descriptive (unused for forarbete)
     li = render._citer_line(row)
     assert 'href="/prop/2025/26:123">Prop. 2025/26:123: Explosiva varor</a>' in li
@@ -1362,6 +1472,57 @@ def test_citer_line_collapses_pinpoints_and_caps_at_five():
     assert li.index("2</a>") < li.index("9</a>") < li.index("15.2</a>")  # natural sort
     assert li.endswith(" m.fl.</li>")                     # >5 -> m.fl.
     assert 'href="/prop/2025/26:123#a15.2">15.2</a>' in li
+
+
+def test_citer_line_with_one_pinpoint_is_a_single_link():
+    # S3: a lone pinpoint completes the citation, so name and place are one
+    # anchor landing on the pinpoint -- not a link to the document beside a link
+    # to the stycke, which offers a choice the reader has no basis to make
+    li = render._citer_line(
+        ("https://lagen.nu/2009:1464", "SFS 2009:1464",
+         "Förordning med instruktion för Statens jordbruksverk", "sfs",
+         "forordning", "2009-12-01", "P22S2@",
+         "Förordning med instruktion för Statens jordbruksverk"))
+    assert li == ('<li><a href="/2009:1464#P22S2">Förordning med instruktion '
+                  'för Statens jordbruksverk 22 § 2 st</a></li>')
+    # a förarbete locator is an aside on where in the document it sits, so it
+    # takes a comma where a statute designator reads on without one
+    li = render._citer_line(
+        ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
+         "En skyldighet att erbjuda lovskola", "forarbete", "prop",
+         "2017-01-01", "a6.7@39", "Prop. 2016/17:156"))
+    assert "En skyldighet att erbjuda lovskola, avsnitt 6.7</a>" in li
+
+
+def test_forarbete_pinpoint_falls_back_to_the_printed_page():
+    # S4: a generated "secN" anchor is a heading with no section number, so
+    # there is no avsnitt to name -- the page the citation sits on is how a
+    # reader would cite it anyway. Nothing citable at all names the doc alone.
+    assert render.forarbete_pinpoint("a14.3", 39) == ("avsnitt 14.3", "a14.3")
+    assert render.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
+    # the page is a real anchor on the rendered page, so it is also the target
+    assert render.forarbete_pinpoint("sec17", 39) == ("s. 39", "sid39")
+    assert render.forarbete_pinpoint("sec17") == ("", "sec17")
+    li = render._citer_line(
+        ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
+         "En skyldighet att erbjuda lovskola", "forarbete", "prop",
+         "2017-01-01", "sec17@39", "Prop. 2016/17:156"))
+    assert 'href="/prop/2016/17:156#sid39">' in li     # the page's own anchor
+    assert "En skyldighet att erbjuda lovskola, s. 39</a>" in li
+
+
+def test_collect_links_carries_the_enclosing_page(tmp_path):
+    # S4: the page travels with the edge, so an inbound line can say "s. 45" for
+    # an anchor with no citable designator of its own
+    out = []
+    catalog.collect_links(
+        [{"type": "avsnitt", "id": "a6", "page": 37, "children": [
+            {"type": "avsnitt", "id": "sec17", "children": [
+                {"type": "stycke", "page": 39, "text": [
+                    {"predicate": "dcterms:references", "text": "6 §",
+                     "uri": "https://lagen.nu/1975:635#P6"}]}]}]}],
+        None, None, out)
+    assert out[0][0] == "sec17" and out[0][1] == 39
 
 
 FORARB_LAW = {
@@ -1411,13 +1572,15 @@ def build_forarb_catalog(tmp_path):
 def test_inbound_collapsed_aggregates_pinpoints_and_excludes(tmp_path):
     con = build_forarb_catalog(tmp_path)
     uri = "https://lagen.nu/2020:100"
-    rows = catalog.inbound_collapsed(con, uri)
+    rows = catalog.inbound_collapsed(con, [uri])
     # one row per citing document (the two-avsnitt prop is a single row)
     by_uri = {r[0]: r for r in rows}
+    # each anchor travels as "id@page"; these props carry no page
     assert set(anchor for anchor in by_uri
-               ["https://lagen.nu/prop/2019/20:5"][6].split(",")) == {"a5.2", "a5.3"}
+               ["https://lagen.nu/prop/2019/20:5"][6].split(",")) == {"a5.2@",
+                                                                     "a5.3@"}
     # excluding the law's own förarbeten drops them, keeps the unrelated prop
-    kept = catalog.inbound_collapsed(con, uri, exclude_from={
+    kept = catalog.inbound_collapsed(con, [uri], exclude_from={
         "https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"})
     assert [r[0] for r in kept] == ["https://lagen.nu/prop/2023/24:9"]
 
@@ -1433,7 +1596,8 @@ def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
     assert "Bet. 2019/20:XX1" not in section
     assert own == {"https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"}
     # the citation panel below excludes them; only the unrelated prop remains
-    panel = render.document_inbound(site, "https://lagen.nu/2020:100", own)
+    panel = render.render_rail_sections(
+        render.document_inbound(site, "https://lagen.nu/2020:100", own))
     assert "Prop. 2023/24:9: Senare proposition" in panel
     assert "Prop. 2019/20:5" not in panel and "SOU 2018:9" not in panel
 
@@ -1441,15 +1605,18 @@ def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
 def test_forarbeten_section_top_billed_above_citation_panel(tmp_path):
     site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
     html = render.render_sfs(FORARB_LAW, site)
-    assert html.index('<section class="forarbeten">') \
-        < html.index('<section class="inbound-doc">')
+    # the act's own preparatory works read in the column; everything that merely
+    # cites the act is rail context, so the column carries no citation panel (S5)
+    assert '<section class="forarbeten">' in html
+    assert "Prop. 2023/24:9" not in html[:html.index('id="lagen-context"')]
 
 
 def test_inbound_panel_overflow_is_expandable(tmp_path, monkeypatch):
     # citers past PANEL_CAP go behind a <details> "+N fler" disclosure (no JS)
     monkeypatch.setattr(render, "PANEL_CAP", 1)
     site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    panel = render.document_inbound(site, "https://lagen.nu/2020:100")
+    panel = render.render_rail_sections(
+        render.document_inbound(site, "https://lagen.nu/2020:100"))
     # three förarbete citers, one shown, the other two disclosed
     assert '<details class="more"><summary>+2 fler</summary>' in panel
 
@@ -1458,7 +1625,8 @@ def test_forarbete_inbound_sorted_by_kind_then_date(tmp_path):
     # in the citation panel förarbeten order prop→sou, each block oldest-first:
     # the document_date column (populated at relate) drives the chronology
     site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    panel = render.document_inbound(site, "https://lagen.nu/2020:100")
+    panel = render.render_rail_sections(
+        render.document_inbound(site, "https://lagen.nu/2020:100"))
     order = [panel.index("Prop. 2019/20:5"),   # prop, 2020-02
              panel.index("Prop. 2023/24:9"),   # prop, 2024-03 (later)
              panel.index("SOU 2018:9")]         # sou after every prop, despite 2018
@@ -1508,10 +1676,12 @@ def build_eu_catalog(tmp_path):
 
 def test_implements_links_emits_genomfor_edges():
     # one edge per transposed article, anchored to the förarbete page (#sid{N})
+    # and carrying that printed page as the citation's own (S4)
     assert catalog.implements_links(PROP) == [
-        ("sid100", {"uri": "https://lagen.nu/ext/celex/32022L2555#21",
-                    "predicate": "rpubl:genomforDirektiv",
-                    "text": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"})]
+        ("sid100", 100,
+         {"uri": "https://lagen.nu/ext/celex/32022L2555#21",
+          "predicate": "rpubl:genomforDirektiv",
+          "text": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"})]
 
 
 def test_genomfor_edge_is_inbound_on_directive_article(tmp_path):
@@ -1537,11 +1707,11 @@ def test_directive_article_shows_implementing_forarbete(tmp_path):
     html = render.render_eurlex(DIRECTIVE, site)
     # article 21's rail panel shows the implementing förarbete
     panel = _island(html)["21"]
-    assert "Hänvisat till av" in panel
-    # the collapsed citer line carries the förarbete's full-title label and links
-    # the page pinpoint ("s. 100") to its own anchor
-    assert "Prop. 2023/24:1: Cybersäkerhetslag" in panel
-    assert 'href="/prop/2023/24:1#sid100">100</a>' in panel
+    assert 'data-sec="forarbete" data-label="Förarbeten"' in panel
+    # the collapsed citer line carries the förarbete's full-title label and, being
+    # the only pinpoint, links name and page ("s. 100") as one anchor (S3)
+    assert 'href="/prop/2023/24:1#sid100">'
+    assert "Prop. 2023/24:1: Cybersäkerhetslag, s. 100</a>" in panel
 
 
 def test_genomforande_panel_absent_without_implements(tmp_path):
@@ -1615,7 +1785,8 @@ def _primed_margin(site, sfs_uri, anchor):
     # the renderer primes the memo in render_sfs (with the consolidation's
     # live anchors); a direct margin call primes it the same way
     site.caselaw_memo[sfs_uri] = catalog.caselaw_anchored(site.con, sfs_uri)
-    return render.eu_caselaw_margin(site, sfs_uri, anchor)
+    return render.render_rail_sections(
+        render.eu_caselaw_margin(site, sfs_uri, anchor))
 
 
 def build_pin_catalog(tmp_path, extra_eurlex=()):
@@ -1749,7 +1920,7 @@ def test_paragraf_rail_renders_every_case_overflow_collapsed(tmp_path):
     assert "+3 till" in margin                    # 8 - 5 collapsed
     # the oldest (C-1/20, 2011) sorts last, so it is inside the disclosure --
     # present rather than dropped, which is the whole point
-    assert "62020CJ0001" in margin.split("<details")[1]
+    assert "62020CJ0001" in margin.split('<details class="more"')[1]
 
 
 def test_statute_page_shows_genomfor_margin(tmp_path):
@@ -1960,6 +2131,135 @@ def test_act_structural_markers_and_hanging_indent(monkeypatch, tmp_path):
     assert '<a class="num" href="#4.1.a">a)</a>' in html        # lettered point
 
 
+# --- EU act inbound rail: one accordion per kind of citing document -------
+
+# an act shaped like the GDPR's artikel 6.1 (a numbered paragraph with lettered
+# points), and the six kinds of document that cite an EU act in the real corpus
+CITED_ACT = {
+    "uri": "https://lagen.nu/ext/celex/32099R0003", "celex": "32099R0003",
+    "doctype": "regulation", "title": "Testförordning om behandling",
+    "date": "2099-04-27",
+    "structure": [
+        {"type": "article", "id": "6", "num": "6", "text": ["Artikel 6 – Laglighet"],
+         "children": [
+             {"type": "paragraph", "num": "1", "text": ["Behandling är laglig om"],
+              "children": [
+                  {"type": "point", "num": "c", "text": ["rättslig förpliktelse."]},
+                  {"type": "point", "num": "e", "text": ["allmänt intresse."]}]}]}]}
+ACT_URI = CITED_ACT["uri"]
+
+
+def _eu_citer(uri, doctype, label, date, targets, **extra):
+    """A eurlex-shaped citing artifact whose single block cites `targets`."""
+    return {"uri": uri, "celex": uri.rsplit("/", 1)[-1], "doctype": doctype,
+            "label": label, "title": label, "date": date,
+            "structure": [{"type": "paragraph", "id": "p1", "num": "1", "text": [
+                "se ", *[{"predicate": "dcterms:references", "text": t.rsplit("#", 1)[-1],
+                          "uri": t} for t in targets], "."]}], **extra}
+
+
+def _build_eu_inbound_catalog(tmp_path):
+    db = str(tmp_path / "catalog.sqlite")
+
+    def w(name, art):
+        p = tmp_path / name
+        p.write_text(json.dumps(art))
+        return p
+
+    catalog.rebuild(db, "eurlex", [
+        w("act.json", CITED_ACT),
+        # two judgments, the older one first on disk -- the panel must still read
+        # newest-first (a case number sorts alphabetically into nonsense)
+        w("j20.json", _eu_citer("https://lagen.nu/ext/celex/62099CJ0002", "judgment",
+                                "C-2/20", "2020-06-01", [ACT_URI + "#6.1"])),
+        w("j24.json", _eu_citer("https://lagen.nu/ext/celex/62099CJ0001", "judgment",
+                                "C-1/24", "2024-06-01", [ACT_URI + "#6.1"])),
+        w("ag.json", _eu_citer("https://lagen.nu/ext/celex/62099CC0001", "opinion",
+                               "", "2024-01-15", [ACT_URI + "#6.1"],
+                               shortname="Generaladvokatens förslag i C-1/24")),
+        w("reg.json", _eu_citer("https://lagen.nu/ext/celex/32099R0004", "regulation",
+                                "(EU) 2099/4 om ändring", "2099-01-01",
+                                [ACT_URI + "#6.1"])),
+    ])
+    # a Swedish statute citing artikel 6.1 c *and* the regulation as such from the
+    # same stycke -- the SFS 2018:218 shape (dataskyddslagen 3 kap. 2 §)
+    catalog.rebuild(db, "sfs", [w("sfs.json", {
+        "uri": "https://lagen.nu/2099:218",
+        "metadata": {"properties": {"dcterms:title": "Kompletteringslag (2099:218)"}},
+        "structure": [{"type": "paragraf", "id": "K2P1", "ordinal": "1", "children": [
+            {"type": "stycke", "id": "K2P1S1", "text": [
+                "Personuppgifter får behandlas med stöd av ",
+                {"predicate": "dcterms:references", "text": "artikel 6.1 c",
+                 "uri": ACT_URI + "#6.1.c"}, " i ",
+                {"predicate": "dcterms:references", "text": "testförordningen",
+                 "uri": ACT_URI}, "."]}]}]})])
+    catalog.rebuild(db, "forarbete", [w("prop.json", {
+        "uri": "https://lagen.nu/prop/2099/00:1", "type": "prop",
+        "identifier": "Prop. 2099/00:1", "title": "En kompletteringslag",
+        "date": "2099-03-01",
+        "body": [{"type": "stycke", "id": "a1", "text": [
+            "jfr ", {"predicate": "dcterms:references", "text": "artikel 6.1",
+                     "uri": ACT_URI + "#6.1"}, "."]}]})])
+    catalog.rebuild(db, "dv", [w("dom.json", {
+        "uri": "https://lagen.nu/dom/HFD_2099_ref_1", "court": "HFD",
+        "referat": ["HFD 2099 ref. 1"], "avgorandedatum": "2099-05-05",
+        "structure": [{"type": "stycke", "text": [
+            "enligt ", {"predicate": "dcterms:references", "text": "artikel 6.1",
+                        "uri": ACT_URI + "#6.1"}, "."]}]})])
+    return catalog.connect(db)
+
+
+def _act_island(tmp_path):
+    con = _build_eu_inbound_catalog(tmp_path)
+    return _island(render.render_eurlex(CITED_ACT, render.Site.from_catalog(con)))
+
+
+def test_inbound_group_splits_eurlex_by_kind():
+    # a source is normally one group; eurlex splits, because its corpus holds
+    # both the acts and the Court's own case law
+    assert render.inbound_group("eurlex", "judgment") == "eu-caselaw"
+    assert render.inbound_group("eurlex", "opinion") == "eu-forslag"
+    assert render.inbound_group("eurlex", "regulation") == "eurlex"
+    assert render.inbound_group("dv", "case") == "dv"
+
+
+def test_act_article_rail_groups_citers_by_document_kind(tmp_path):
+    # the EU article's rail is one accordion row per kind of citing document --
+    # the judgments interpreting it kept apart from the acts that merely cite it
+    panel = _act_island(tmp_path)["6.1"]
+    rows = dict(re.findall(r'data-label="([^"]+)" data-n="(\d+)"', panel))
+    assert rows == {"Rättsfall": "1", "EU-domstolens praxis": "2",
+                    "Generaladvokatens förslag till avgörande": "1",
+                    "Förarbeten": "1", "EU-rätt": "1"}
+    # each is a real accordion row keyed by its slug, so the client's collapsed
+    # stub and the CSS find it
+    assert 'class="rail-sec eu-caselaw" data-sec="eu-caselaw"' in panel
+    # a judgment never falls back into the generic EU-rätt pile
+    eurattt = panel.split('data-sec="eurlex"')[1]
+    assert "C-1/24" not in eurattt and "2099/4" in eurattt
+
+
+def test_act_article_caselaw_reads_newest_first(tmp_path):
+    # case law is ordered by date, newest first (the order eu_caselaw_margin
+    # already uses); the case numbers would sort alphabetically into nonsense
+    section = _act_island(tmp_path)["6.1"].split('data-sec="eu-caselaw"')[1]
+    section = section.split("</details>")[0]
+    assert section.index("C-1/24") < section.index("C-2/20")
+
+
+def test_act_subarticle_citation_lands_on_the_point_not_the_document(tmp_path):
+    # pinpoint-aware placement: a statute citing "artikel 6.1 c" (and the
+    # regulation as such from the same stycke) shows at the point it cites, and
+    # its whole-document half is dropped there rather than repeated (S2)
+    island = _act_island(tmp_path)
+    assert "Lagrumshänvisningar hit" in island["6.1.c"]
+    assert "Kompletteringslag" in island["6.1.c"]
+    # that whole-document half was this act's only document-level citer, so no
+    # "Om dokumentet" panel is written at all -- rather than one repeating a
+    # citation the point's own panel already shows
+    assert "" not in island
+
+
 def test_defined_term_links_to_begrepp_page(tmp_path):
     # a definition's lead term links to the corpus begrepp page for that concept,
     # folding the inflected form onto its canonical page via the alias graph
@@ -2065,7 +2365,8 @@ def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
                          "P4": ""}                # not minted -> disregarded
     # and the margin spells the kept pinpoint out as citation prose
     site = render.Site.from_catalog(con)
-    margin = render.genomfor_margin(site, "https://lagen.nu/1999:100", "P3")
+    margin = render.render_rail_sections(
+        render.genomfor_margin(site, "https://lagen.nu/1999:100", "P3"))
     assert "första stycket genomför artikel 21.1" in margin
 
 
@@ -2096,7 +2397,7 @@ def test_commentary_shows_in_paragraph_rail_not_as_page(tmp_path):
 
     html = render.render_sfs(json.loads(law.read_text()), site)
     island = re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1)
-    assert "rail-komm" in island                       # rail section emitted
+    assert "rail-sec kommentar" in island               # rail section emitted
     assert "Bestämmelsen kräver uppsåt." in island     # the prose, side-by-side
     assert "Foo Bar" in island                         # author byline
 

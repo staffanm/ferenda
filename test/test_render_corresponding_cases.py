@@ -13,6 +13,7 @@ from accommodanda.lib.render import (
     _reassigned_before,
     corresponding_cases_margin,
     corresponds_margin,
+    render_rail_sections,
     renumbered_refs_margin,
 )
 
@@ -57,10 +58,10 @@ def _site():
 
 
 def test_margin_walks_chain_and_links_predecessor_citation():
-    html = corresponding_cases_margin(_site(), L + "2025:400#K19P3")
+    html = render_rail_sections(corresponding_cases_margin(_site(), L + "2025:400#K19P3"))
     # one section per predecessor generation, nearest first
     assert html.index("2001:453") < html.index("1980:620")
-    assert html.count("Äldre rättsfall för motsvarande bestämmelse") == 2
+    assert html.count('data-sec="aldre-rattsfall"') == 2
     # the heading's citation is linked and human-readable
     assert '<a href="/2001:453#K4P1">4 kap. 1 § Socialtjänstlag (2001:453)</a>' in html
     assert '<a href="/1980:620#P6">6 § Socialtjänstlag (1980:620)</a>' in html
@@ -71,13 +72,13 @@ def test_margin_walks_chain_and_links_predecessor_citation():
 
 def test_margin_direct_predecessor_only_for_middle_law():
     # the middle law's own paragraf reaches one generation back
-    html = corresponding_cases_margin(_site(), L + "2001:453#K4P1")
-    assert html.count("Äldre rättsfall för motsvarande bestämmelse") == 1
+    html = render_rail_sections(corresponding_cases_margin(_site(), L + "2001:453#K4P1"))
+    assert html.count('data-sec="aldre-rattsfall"') == 1
     assert "1980:620" in html and "NJA 1993 s. 679" in html
 
 
 def test_margin_empty_without_correspondence():
-    assert corresponding_cases_margin(_site(), L + "2025:400#K1P1") == ""
+    assert corresponding_cases_margin(_site(), L + "2025:400#K1P1") == []
 
 
 def _rf_site():
@@ -115,18 +116,19 @@ def test_renumbered_refs_margin_splits_by_date():
     site = _rf_site()
     # under the new beteckning: only the pre-renumbering citer, under the
     # user-facing heading, with the old beteckning named
-    html = renumbered_refs_margin(site, L + "1974:152#K4P6")
+    html = render_rail_sections(renumbered_refs_margin(site, L + "1974:152#K4P6"))
     assert "Hänvisningar till tidigare beteckning 4 kap. 4 §" in html
     assert "före 2011-01-01" in html
     assert "NJA 2005 s. 33" in html and "HFD 2015 ref. 79" not in html
     # the old anchor's own panel keeps only the post-renumbering citer
     cutoff = _reassigned_before(site, L + "1974:152#K4P4")
     assert cutoff == "2011-01-01"
-    groups = _inbound_groups(site, L + "1974:152#K4P4", exclude_before=cutoff)
+    groups = render_rail_sections(
+        _inbound_groups(site, [L + "1974:152#K4P4"], exclude_before=cutoff))
     assert "HFD 2015 ref. 79" in groups and "NJA 2005 s. 33" not in groups
     # a renumbering never feeds the repealed-law margins
-    assert corresponds_margin(site, L + "1974:152#K4P4") == ""
-    assert corresponding_cases_margin(site, L + "1974:152#K4P6") == ""
+    assert corresponds_margin(site, L + "1974:152#K4P4") == []
+    assert corresponding_cases_margin(site, L + "1974:152#K4P6") == []
 
 
 def _chain_site():
@@ -168,12 +170,12 @@ def test_renumbered_chain_stays_on_lineage():
     # 15 kap. 2 §'s lineage: 13 kap. 2 § (until 2011), which was 13 kap. 1 §
     # (until 1995). The same-date 12->13 edge is the label's NEXT occupant's
     # arrival and must not leak 12 kap. citers onto the 15 kap. page.
-    html = renumbered_refs_margin(site, L + "1974:152#K15P2")
+    html = render_rail_sections(renumbered_refs_margin(site, L + "1974:152#K15P2"))
     assert "2005:1" in html
     assert "1990:1" in html                       # two hops back, pre-1995
     assert "2005:2" not in html                   # 12 kap. lineage, excluded
     assert "tidigare beteckning 13 kap. 2 §" in html
     assert "tidigare beteckning 13 kap. 1 §" in html
     # today's 13 kap. 2 § (the moved 12 kap. 2 §) gets the 12 kap. citer
-    html13 = renumbered_refs_margin(site, L + "1974:152#K13P2")
+    html13 = render_rail_sections(renumbered_refs_margin(site, L + "1974:152#K13P2"))
     assert "2005:2" in html13 and "2005:1" not in html13

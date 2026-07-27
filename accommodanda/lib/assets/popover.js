@@ -85,7 +85,7 @@
     var wrap = doc.createElement('div');
     // the frontmatter and the pre-text furniture (banners, förarbeten list,
     // version compare, the inbound-citation panel) are not the document's prose
-    var SKIP = 'header.frontmatter, .forarbeten, .inbound-doc, details, ' +
+    var SKIP = 'header.frontmatter, .forarbeten, details, ' +
       '.version-banner, .expired-banner, .diff-note';
     for (var i = 0; i < ps.length && wrap.childNodes.length < 2; i++) {
       if (ps[i].closest(SKIP)) continue;
@@ -123,12 +123,11 @@
     return n ? n.textContent.trim() : (el.id || '');
   }
 
-  // a display clone of the target: live-page furniture (scrollspy's 💬 dots,
-  // permalink pilcrows) stripped, ids dropped so the clone can never shadow
-  // the page's own anchors
+  // a display clone of the target: live-page furniture (permalink pilcrows)
+  // stripped, ids dropped so the clone can never shadow the page's own anchors
   function excerpt(el) {
     var c = el.cloneNode(true);
-    var junk = c.querySelectorAll('.rail-dot, .pilcrow');
+    var junk = c.querySelectorAll('.pilcrow');
     for (var i = 0; i < junk.length; i++) junk[i].remove();
     var ids = c.querySelectorAll('[id]');
     for (var j = 0; j < ids.length; j++) ids[j].removeAttribute('id');
@@ -329,13 +328,11 @@
       scroll.className = 'pane-scroll';
       // the whole reading grid rides along -- TOC, reading column *and*
       // context rail -- so the pane is a full surface with its own scrollspy.
-      // Strip what must not duplicate: the rail's global id and the live
-      // page's scrollspy furniture (a same-document import carries 💬 dots;
-      // this pane's own spy instance rebuilds them bound to its own rail)
+      // The rail's global id must not duplicate; its contents need no cleaning,
+      // since this pane's own spy instance empties and rebuilds the column
+      // against its own copy of the document.
       var body = document.importNode(ownBody(doc), true);
       body.setAttribute('data-pane', path);
-      var junk = body.querySelectorAll('.rail-dot');
-      for (var i = 0; i < junk.length; i++) junk[i].remove();
       var rail = body.querySelector('aside.rail');
       if (rail) rail.removeAttribute('id');
       scroll.appendChild(body);

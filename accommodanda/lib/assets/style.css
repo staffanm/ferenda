@@ -236,18 +236,27 @@ body.inaktuell::before { content: "Inaktuell författning"; position: fixed;
 .version-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
                          text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
 .version-banner a { color: var(--accent); }
-details.lydelser { margin: 0 0 .6rem; padding: .45rem .9rem; border: 1px solid var(--rule);
-                   border-radius: 5px; background: var(--surf); font-size: .9rem; }
-details.lydelser:not([open]) { display: inline-block; }
+/* the compare affordance rides the "Ändring införd t.o.m." row of dl.meta, so it
+   inherits that row's small serif voice and adds no box of its own -- a full-width
+   panel above the text pushed the statute below the fold (S1). Closed it is an
+   inline continuation of the cutoff ("SFS 2026:880 · Jämför lydelser 14"); open it
+   drops the <select> under the row. */
+details.lydelser { display: inline; margin: 0; padding: 0; border: 0;
+                   background: none; font: inherit; }
+details.lydelser summary::before { content: " · "; color: var(--ink-4); }
 /* the compare status: a small heading that names what is being diffed, shown
    the instant a lydelse is picked (versions.js) so the change is visible (T1) */
 .lydelser-status { font-family: var(--serif); font-style: italic; font-weight: 400;
                    font-size: 1.05rem; color: var(--ink-2); margin: 0 0 1.25rem;
                    padding: 0; border: 0; }
-details.lydelser summary { cursor: pointer; font-weight: 500; color: var(--ink-2); }
-details.lydelser summary .count { color: var(--ink-4); font-weight: 400; }
-details.lydelser label { display: block; margin: .8rem 0 .3rem; color: var(--ink-3); }
-details.lydelser select { max-width: 100%; font: inherit; margin-left: .4rem; }
+details.lydelser summary { display: inline; cursor: pointer; font-style: normal;
+                           color: var(--accent); list-style: none; }
+details.lydelser summary::-webkit-details-marker { display: none; }
+details.lydelser summary:hover { text-decoration: underline; }
+details.lydelser summary .count { color: var(--ink-4); }
+details.lydelser label { display: block; margin: .35rem 0 .1rem; color: var(--ink-3); }
+details.lydelser select { max-width: 100%; font-family: var(--sans);
+                          font-size: .8rem; margin-left: .4rem; }
 details.lydelser ol { margin: .5rem 0 .3rem; padding-left: 1.4rem; }
 details.lydelser li { margin: .2rem 0; }
 details.lydelser .note { color: var(--ink-4); font-size: .85rem; }
@@ -429,23 +438,92 @@ td.grafik-saknas { white-space: nowrap; color: var(--ink-3); }
 .temporal-status-rad td { border: 0; padding-bottom: 0; }
 .temporal-status-rad .temporal-status { margin: .25rem 0 0; }
 
-/* -- Context rail (populated by the client from the JSON island) -- */
-.rail { position: sticky; top: 4rem; max-height: calc(100vh - 4rem);
-        overflow-y: auto; padding: 1.75rem 1.5rem 5rem;
-        background: var(--surf); border-left: 1px solid var(--rule); font-size: .82rem; }
+/* -- Context rail --------------------------------------------------------
+   The client (scrollspy.js) fills the column with one .rail-entry per
+   context-bearing location, absolutely positioned beside it. Out of focus an
+   entry is a single summary line at the reading column's own type size; in
+   focus it expands, in place, into the full panel (C4/C5).
+
+   The *column* carries no surface of its own -- the page ground shows through,
+   and only the panel and the summary lines are drawn on it. A column-wide
+   surface made the whole right-hand side read as one widget, so a line six
+   screens from the open panel looked like part of it (C4). The column is still
+   the positioning context, so it stretches the whole grid row rather than
+   sticking; the panel sticks within its own box instead. -- */
+.rail { position: relative; align-self: stretch; padding: 0;
+        font-size: .82rem; }
+/* a collapsed line sits at its location and stays there, drawn as its own
+   small card so it reads as a peer of the panel, not a piece of it */
+.rail-entry { position: absolute; left: 1rem; right: .75rem;
+              padding: .3rem .75rem; border-radius: 5px;
+              background: var(--surf); border: 1px solid var(--rule-soft); }
+/* the open panel starts at its location and owns the rest of the column, so a
+   panel taller than its § stays readable instead of sliding off with it */
+.rail-panelbox { position: absolute; left: 1rem; right: .75rem; bottom: 0;
+                 z-index: 2; }
+.rail-panelbox:not(.rail-open) { display: none; }
+.rail-panel { position: sticky; top: 4rem; max-height: calc(100vh - 5rem);
+              overflow-y: auto; padding: 1rem 1.1rem 1.25rem;
+              border-radius: 6px; background: var(--surf);
+              border: 1px solid var(--rule); }
+/* the collapsed line: reading-column type size, so it registers as a peer of
+   the text beside it rather than as marginalia (C4). One line, always -- the
+   *label* gives way when the column is too narrow ("Författningskommen… (6) + 2
+   ytterligare"), because the counts are what say whether it is worth a look. */
+.rail-stub { display: flex; align-items: baseline; width: 100%; border: 0;
+             background: none; padding: 0; cursor: pointer; text-align: left;
+             font: inherit; font-size: .95rem; line-height: 1.4;
+             color: var(--ink-3); white-space: nowrap; }
+.rail-stub:hover .rail-stub-label { color: var(--accent); }
+.rail-stub-label { font-family: var(--serif); color: var(--ink-2);
+                   min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rail-stub-n { flex: none; color: var(--ink-3);
+               font-variant-numeric: oldstyle-nums; margin-left: .3rem; }
+.rail-stub-more { flex: none; color: var(--ink-4); font-size: .85em;
+                  margin-left: .4rem; }
+/* the focused entry's own line steps aside -- the panel grows out of where it
+   stood, so the swap reads as that line expanding rather than as two things (C5) */
+.rail-entry.rail-on { visibility: hidden; }
+.rail-panel.rail-grow { animation: rail-expand .18s ease both; }
+@keyframes rail-expand {
+  from { opacity: 0; transform: translateY(-.3rem); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-panel.rail-grow { animation: none; }
+}
 .rail-h { font-family: var(--serif); font-style: italic; font-size: .85rem;
           color: var(--ink-3); padding-bottom: .6rem; margin-bottom: .75rem;
           border-bottom: 1px solid var(--rule); }
 .rail-h b { font-style: normal; font-weight: 500; color: var(--ink);
             font-variant-numeric: oldstyle-nums; }
-.rail-empty { font-family: var(--serif); font-style: italic; color: var(--ink-3);
-              line-height: 1.55; padding: 1rem .25rem; }
+/* -- Rail accordion: one <details> per kind of context, the highest-priority
+   one open (C3). Only the open row costs vertical space, so a paragraf with
+   commentary, case law and a hundred citations still reads at a glance. -- */
+details.rail-sec { border-top: 1px solid var(--rule-soft); }
+details.rail-sec:first-of-type { border-top: 0; }
+details.rail-sec > summary { display: flex; align-items: baseline; gap: .4rem;
+                             cursor: pointer; list-style: none;
+                             padding: .45rem 0; }
+details.rail-sec > summary::-webkit-details-marker { display: none; }
+details.rail-sec > summary:hover .rail-sec-h { color: var(--accent); }
+details.rail-sec[open] > summary { padding-bottom: .25rem; }
 .rail-sec-h { font-family: var(--serif); font-style: italic; font-size: .78rem;
-              color: var(--ink-3); margin-bottom: .35rem; }
+              color: var(--ink-3); }
+.rail-sec-n { margin-left: auto; font-size: .72rem; color: var(--ink-4);
+              font-variant-numeric: oldstyle-nums; }
+details.rail-sec > ul { list-style: none; margin: 0 0 .5rem; padding: 0; }
+details.rail-sec > ul > li { margin: .15rem 0; line-height: 1.4; }
+/* every case-law group reads in the case colour, wherever the court sits */
+.rail-sec.dv a, .rail-sec.aldre-rattsfall a,
+.rail-sec.eu-caselaw a, .rail-sec.eu-forslag a { color: var(--case); }
+.rail-sec.forarbete a { color: var(--forarbete); }
+.rail-sec.begrepp a { color: var(--accent); }
+.rail-sec .rail-prov { color: var(--ink-3); font-style: italic;
+                       font-size: .78rem; margin-bottom: .25rem; }
 /* commentary shown side-by-side in the rail (in place of a kommentar page) */
-.rail-komm { margin-bottom: 1rem; }
-.rail-komm p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
-               margin: 0 0 .5rem; color: var(--ink); }
+.rail-sec.kommentar p { font-family: var(--serif); font-size: .9rem;
+               line-height: 1.5; margin: 0 0 .5rem; color: var(--ink); }
 .komm-by { font-family: var(--serif); font-style: italic; font-size: .78rem;
            color: var(--ink-3); }
 /* a förarbete's small-print footnotes ("Senaste lydelse 2008:1266.") */
@@ -470,21 +548,11 @@ table.lydelse td + td, table.lydelse th + th
 .fk-komm p:last-child { margin-bottom: 0; }
 
 /* the lagstiftare's own författningskommentar, from the proposition's FK */
-.rail-fk { margin-bottom: 1rem; }
-.rail-fk p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
+.rail-sec.fk p { font-family: var(--serif); font-size: .9rem; line-height: 1.5;
              margin: 0 0 .5rem; color: var(--ink); }
-.rail-fk .prov { font-style: italic; font-size: .78rem; color: var(--ink-3);
+.rail-sec.fk .prov { font-style: italic; font-size: .78rem; color: var(--ink-3);
                  white-space: nowrap; }
-.rail-fk .prov a { color: var(--forarbete); }
-.ingroup { margin-bottom: 1rem; }
-.ingroup-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
-             color: var(--accent); font-weight: 500; margin: .35rem 0 .25rem; }
-.ingroup ul { list-style: none; margin: 0; padding: 0; }
-.ingroup li { margin: .15rem 0; line-height: 1.4; }
-.ingroup.dv a { color: var(--case); }
-.ingroup.forarbete a { color: var(--forarbete); }
-.ingroup.kommentar a { color: var(--kommentar); font-weight: 500; }
-.ingroup.begrepp a { color: var(--accent); }
+.rail-sec.fk .prov a { color: var(--forarbete); }
 .more { color: var(--ink-3); font-style: italic; font-size: .78rem; margin-top: .25rem; }
 details.more { margin-top: .3rem; }
 details.more > summary { color: var(--ink-3); font-style: italic; font-size: .78rem;
@@ -492,12 +560,7 @@ details.more > summary { color: var(--ink-3); font-style: italic; font-size: .78
 details.more > summary::-webkit-details-marker { display: none; }
 details.more[open] > summary { margin-bottom: .25rem; }
 details.more > ul { list-style: none; margin: 0; padding: 0; }
-aside.genomfor, aside.motsvarighet { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
-aside.genomfor ul, aside.motsvarighet ul { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
-aside.genomfor li, aside.motsvarighet li { margin: .2rem 0; line-height: 1.4; }
-aside.genomfor .prov { color: var(--ink-3); }
-.inbound-h { font-family: var(--serif); font-style: italic; font-size: .8rem;
-             color: var(--accent); font-weight: 500; margin-bottom: .35rem; }
+.rail-sec.genomfor .prov, .rail-sec.bemyndigande .prov { color: var(--ink-3); }
 
 /* -- Preparatory works ("Förarbeten"), top-billed above the citation panel -- */
 section.forarbeten { margin: 1.25rem 0; font-size: .85rem; }
@@ -518,15 +581,6 @@ section.curated h2 { font-family: var(--serif); font-style: italic; font-size: .
                      color: var(--ink-3); font-weight: 400; margin: 0 0 .4rem; border: 0; }
 section.curated ul { list-style: none; margin: 0; padding: 0; }
 section.curated li { margin: .15rem 0; line-height: 1.4; }
-
-/* -- Document-level inbound panel (whole-doc citations) -- */
-.inbound-doc { background: var(--surf); border: 1px solid var(--rule); border-radius: 6px;
-               padding: .9rem 1.25rem; margin: 1.5rem 0 2.5rem; font-size: .85rem; }
-.inbound-doc h2 { font-family: var(--serif); font-style: italic; font-size: .85rem;
-                  color: var(--ink-3); font-weight: 400; margin: 0 0 .5rem; border: 0; }
-.inbound-doc .ingroup { columns: 2; column-gap: 2rem; margin-bottom: .25rem; }
-.inbound-doc .ingroup-h { column-span: all; }
-.inbound-doc li { break-inside: avoid; }
 
 /* -- Inline bits -- */
 ol.punkter { list-style: none; margin: .4rem 0; padding-left: 0; }
@@ -578,21 +632,11 @@ p.hang { scroll-margin-top: var(--scroll-clear); }
 .rail-sec.vagledning li { margin: .3rem 0; line-height: 1.4; }
 .rail-sec.vagledning .prov { color: var(--ink-3); font-style: italic; }
 
-/* -- Context markers: every addressable unit that carries rail context wears a
-   clickable 💬 in the right gutter (toward the rail), so context-bearing
-   paragraphs are discoverable at a glance; clicking pulls that unit's panel into
-   the rail and brings it into focus, and the unit in focus brightens its marker.
-   The button is built client-side (scrollspy), so it stays global -- every
-   source. Absolutely positioned, so it never disrupts the paragraf grid. -- */
+/* A unit carrying rail context needs no marker of its own: its context
+   announces itself as a summary line beside it in the rail (C4), and the unit in
+   focus is tinted (section.paragraf.rail-active). position:relative stays --
+   the rail measures its entries against these boxes. */
 [data-rail] { position: relative; }
-.rail-dot { position: absolute; right: -1.7rem; top: .05rem; z-index: 2;
-            border: 0; background: transparent; padding: .15rem; margin: 0;
-            font-size: .95rem; line-height: 1; cursor: pointer; opacity: .5;
-            filter: grayscale(.4);
-            transition: opacity .15s, filter .15s, transform .1s; }
-.rail-dot:hover, .rail-dot:focus-visible { opacity: 1; filter: none;
-            transform: scale(1.2); outline: none; }
-[data-rail].rail-active > .rail-dot { opacity: 1; filter: none; }
 a.ext { color: var(--accent); }
 a.ext::after { content: " \2197"; font-size: .8em; color: var(--ink-4); }
 table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: .92rem; }
@@ -864,7 +908,8 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   /* context rail: a bottom sheet -- scrollspy keeps it synced to the
      reading position, so opening it shows the context for where you are */
   .rail { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; top: auto;
-          max-height: 70vh; border-left: 0; border-top: 1px solid var(--rule);
+          max-height: 70vh; background: var(--surf);
+          border-top: 1px solid var(--rule);
           border-radius: 12px 12px 0 0;
           box-shadow: 0 -12px 40px var(--shadow-modal);
           padding: 1.25rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
@@ -887,8 +932,12 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .mobile-bar button[aria-expanded="true"] { color: var(--accent); }
   body.split .mobile-bar { display: none; }
 
-  /* the rail sits behind its sheet; gutter markers would point at nothing */
-  .rail-dot { display: none; }
+  /* the sheet shows only the context for where you are, so the summary lines
+     have nothing left to summarise -- the panel itself is what the sheet is for */
+  .rail-entry { display: none; }
+  .rail-panelbox { position: static; }
+  .rail-panel { position: static; max-height: none; overflow: visible;
+                padding: 0; background: none; border: 0; border-radius: 0; }
   .recital-group { margin-left: 0; }
 
   /* search palette: top-anchored and full width, clear of the on-screen

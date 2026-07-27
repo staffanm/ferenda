@@ -251,7 +251,8 @@ def _judgment(con, celex, to_fragment, act=None, date="2021-05-06"):
     con.execute("INSERT INTO documents (uri, source, path, label, date) "
                 "VALUES (?, 'eurlex', 'x.json', ?, ?)",
                 (uri, "C-1/20", date))
-    con.execute("INSERT INTO links VALUES (?,?,?,?,?,?)",
+    con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root, text) VALUES (?,?,?,?,?,?)",
                 (uri, "p12", "dcterms:references",
                  (act or BASE + "32014L0024") + "#" + to_fragment,
                  act or BASE + "32014L0024", "artikel " + to_fragment))
