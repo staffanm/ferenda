@@ -168,7 +168,13 @@ def parse_register(path):
     if soup.find(string="Sökningen gav ingen träff!"):
         raise SkipDocument("no register page at %s" % path)
     content = soup.find("div", class_="search-results-content")
-    assert isinstance(content, Tag)
+    if not isinstance(content, Tag):
+        # the page is neither a register nor the "no hits" page handled above,
+        # so rkrattsbaser changed shape. A raise, not an assert: `-O` would
+        # strip it and the next line would be None.find_all
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError("%s has no div.search-results-content -- register "
+                         "page structure changed?" % path)
     boxes = content.find_all("div", class_="result-inner-box")
     header = {"SFS-nummer": util.normalize_space(boxes[0].text.split("\xb7")[1]),
               "Rubrik": util.normalize_space(boxes[1].text)}
@@ -179,7 +185,10 @@ def parse_register(path):
     changes = []
     for container in content.find_all("div", class_="result-inner-sub-box-container"):
         hdr = container.find("div", class_="result-inner-sub-box-header")
-        assert hdr
+        if hdr is None:
+            raise ValueError("%s: a change container has no "
+                             "result-inner-sub-box-header -- register page "
+                             "structure changed?" % path)
         sfsnr = hdr.text.split("SFS ")[1].strip()
         if basefile == "1993:1637" and sfsnr == "1993:1446":
             sfsnr = "1993:1646"  # uncorrectable error in the register page

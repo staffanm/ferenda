@@ -120,12 +120,19 @@ def auth_headers(url):
     llama.cpp server on the workstation takes no key, so demanding one there would
     be a fabricated precondition; against a remote host a missing key *is* a real
     misconfiguration and must fail before the pass starts rather than 401 halfway
-    through a corpus."""
+    through a corpus.
+
+    That last sentence is why this raises rather than asserts: an `assert` is
+    stripped under `python -O`, the header would go out empty, and the run would
+    reach exactly the mid-corpus 401 the check exists to prevent
+    (rule:errors-drive-retry-use-raise)."""
     if urlsplit(url).hostname in LOCAL_HOSTS:
         return {}
     load_dotenv()
     api_key = os.environ.get("BERGET_API_KEY")
-    assert api_key, "BERGET_API_KEY is not set (add it to .env)"
+    if not api_key:
+        raise RuntimeError("BERGET_API_KEY is not set (add it to .env) -- "
+                           "required for the remote endpoint %s" % url)
     return {"Authorization": "Bearer %s" % api_key}
 
 

@@ -140,11 +140,14 @@ def test_local_endpoint_needs_no_api_key(monkeypatch):
 
 def test_remote_endpoint_still_demands_an_api_key(monkeypatch):
     # against Berget a missing key is a real misconfiguration: fail before the pass
-    # runs, not with a 401 halfway through a corpus
+    # runs, not with a 401 halfway through a corpus. A RuntimeError, not an
+    # AssertionError: `python -O` strips an assert, and a stripped check would
+    # send an empty header and reach exactly that mid-corpus 401
+    # (rule:errors-drive-retry-use-raise)
     monkeypatch.delenv("BERGET_API_KEY", raising=False)
     monkeypatch.setattr(llm, "API_URL", "https://api.berget.ai/v1/chat/completions")
     monkeypatch.setattr(llm, "load_dotenv", lambda: None)   # don't read a real .env
-    with pytest.raises(AssertionError, match="BERGET_API_KEY"):
+    with pytest.raises(RuntimeError, match="BERGET_API_KEY"):
         llm.complete_thread([{"role": "user", "content": "hi"}])
 
 

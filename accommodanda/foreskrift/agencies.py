@@ -46,7 +46,7 @@ from urllib.parse import quote, unquote
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import compress, util
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
@@ -85,8 +85,7 @@ def fi_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_FI_BASE.search(href)
         if not m:
             continue
@@ -487,8 +486,7 @@ def skogs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href$=".pdf"][href*="/foreskrifter-efter-amne/"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         name = href.rsplit("/", 1)[-1].lower()
         if "-bilaga" in name:                     # a separately-published annex
             continue
@@ -808,8 +806,7 @@ def prvfs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href*="/prvfs/"][href$=".pdf"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_PRV_TEXT.search(a.get_text(" ", strip=True))
         if m:
             year, lop = m.group(1), str(int(m.group(2)))
@@ -1012,8 +1009,7 @@ def bfnar_enumerate(session, agency):
     families: dict = {}
     order = []
     for a in soup.select('a[href*="bfnar" i][href$=".pdf" i]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         name = href.rsplit("/", 1)[-1].lower()
         number = _bfnar_number(name)
         if number is None:
@@ -1096,8 +1092,9 @@ def bolfs_enumerate(session, agency):
                     families[cur] = {"regulation": None, "consolidation": [], "amendment": []}
                     order.append(cur)
             continue
-        href = el.get("href") or ""
-        assert isinstance(href, str)
+        if not el.has_attr("href"):
+            continue                    # the walk crosses non-link elements
+        href = util.href(el)
         if cur is None or "/download/" not in href or ".pdf" not in href.lower():
             continue
         url = harvest.absolute(agency.base_url, href)
@@ -1146,8 +1143,7 @@ def csnfs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href*="/download/"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         head = a.find_previous(["h2", "h3", "h4"])
         if ".pdf" not in href.lower() or head is None \
                 or not head.get_text(" ", strip=True).lower().startswith("fulltext"):
@@ -1203,8 +1199,7 @@ def iaf_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_IAF_BASE.search(href)
         if not m:
             continue
@@ -1269,8 +1264,7 @@ def kam_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         if not href.split("?")[0].lower().endswith(".pdf"):
             continue
         text = a.get_text(" ", strip=True)
@@ -1493,8 +1487,7 @@ def memy_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href$=".pdf"], a[href$=".PDF"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         if "/Recycle-Bin/" in href:              # trashed duplicates, often 404
             continue
         # the designation lives in the visible text ("(MEMYFS 2025:3)"); the
@@ -1555,8 +1548,7 @@ def mdffs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     groups = defaultdict(list)
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_MDFFS_SEG.match(href)
         if m and a.get_text(strip=True):
             groups[m.group(1)].append(a)
@@ -1618,8 +1610,7 @@ def myh_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href*="assets.myh.se"][href$=".pdf"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_MYHFS_FILE.search(href.rsplit("/", 1)[-1])
         if not m:                                # title-only filename, no number
             continue
@@ -1744,8 +1735,7 @@ def uhrfs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.select('a[href*="uhrfs"][href$=".pdf"]'):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         text = a.get_text(" ", strip=True)
         if RE_UHRFS_SKIP.search(text):
             continue
@@ -1916,8 +1906,7 @@ def afs_enumerate(session, agency):
     soup = BeautifulSoup(request(session, "GET", agency.index_url).text, "html.parser")
     seen = set()
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_AFS_BASE.search(href)
         if not m:
             continue
@@ -1992,8 +1981,7 @@ def ts_enumerate(session, agency):
             a = li.find("a", href=True)
             if not a:
                 continue
-            href = a["href"]
-            assert isinstance(href, str)
+            href = util.href(a)
             m = RE_TS_ROW.search(href)
             if not m or "om ändring" in a.get_text(" ", strip=True).lower():
                 continue
@@ -2053,8 +2041,7 @@ def trv_enumerate(session, agency):
         tr = a.find_parent("tr")
         if not tr or "Grundföreskrift" not in tr.get_text():
             continue
-        href = a["href"]
-        assert isinstance(href, str)
+        href = util.href(a)
         m = RE_TRV_ID.search(href)
         if not m:
             continue

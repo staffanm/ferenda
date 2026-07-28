@@ -29,7 +29,11 @@ def extract_body(path):
             if errnode and "Ett fel har inträffat" in errnode.text:
                 raise SkipDocument("removed: %s" % errnode.text.strip())
             raise SkipDocument("no div.search-results-content")
-        assert isinstance(content, Tag)
+        if not isinstance(content, Tag):
+            # truthy but not a Tag -- a bare NavigableString where the document
+            # body should be, i.e. a changed page, not an absent one
+            # (rule:errors-drive-retry-use-raise: `-O` strips an assert)
+            raise ValueError("div.search-results-content is not an element")
         body = content.find("div", class_="body-text")
         if not body:
             raise SkipDocument("no div.body-text")

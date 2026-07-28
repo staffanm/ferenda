@@ -62,6 +62,24 @@ def basefile_slug(basefile):
     return basefile.replace("/", "-").replace(":", "-").replace(" ", "_")
 
 
+def href(anchor):
+    """The single-valued ``href`` of a bs4 anchor.
+
+    bs4 types an attribute as ``str | list[str]`` because HTML permits
+    multi-valued ones, so every scrape that follows a link has to narrow it.
+    Fifteen sites in `foreskrift/agencies.py` did that with a message-less
+    ``assert isinstance(href, str)``, which `-O` strips -- letting a list reach
+    the url join and the download (rule:errors-drive-retry-use-raise). `href` is
+    never multi-valued in practice, so a list here means the parser handed back
+    something that is not the anchor the selector promised: a changed page,
+    which must stop the harvest rather than be skipped past."""
+    value = anchor["href"]
+    if not isinstance(value, str):
+        raise ValueError("<a> href is %r, not a string -- page structure changed"
+                         % (value,))
+    return value
+
+
 def record_path(root, subdir, basefile):
     """The harvest-record JSON path for `basefile` under `root/subdir`."""
     return Path(root) / subdir / (basefile_slug(basefile) + ".json")
