@@ -63,6 +63,28 @@ RE_ANNEX_DOC = re.compile(r"\bunderlagsrapport\b|\brapport \d|\bfaktablad\b|"
 RE_OJ = re.compile(r"Europeiska unionens officiella tidning|"
                    r"Official Journal of the European", re.I)
 
+# Source PDFs regeringen.se serves as 200/application/pdf but which no reader
+# can open: the bytes are permanently corrupt *upstream*, not truncated by our
+# fetch (verified by re-downloading -- the delivered file is byte-identical).
+# Every other file in the record is unaffected, so this drops the one file
+# rather than the document; a record left with no body then takes the ordinary
+# no-body path and `parse` raises SkipDocument, as for a record of pure errata.
+#
+# Distinct from `skip.json`, which is about documents that are not förarbeten,
+# and from `lib.regeringen.is_misleading`, which is about pages we decline to
+# harvest. Here we *want* the document and the publisher cannot deliver it.
+# Keyed "<type>/<basefile>/<filename>", one entry per file with the evidence.
+BROKEN_PDFS = {
+    # Skr. 2000/01:38's Swedish volume. Exactly 65 536 bytes, no %%EOF, xref
+    # entries 750 and 767 unresolvable, so poppler cannot even count its pages
+    # ("Top-level pages object is wrong type (null)") -- pdfinfo exits 99 and
+    # pdftotext yields zero bytes. regeringen.se has always held this copy: the
+    # landing page's own link text advertises it as "(pdf 64 kB)". Its sibling
+    # 2000-01-38-1.pdf is intact but is the English translation, dropped as
+    # "engelsk" on its own evidence, so the skrivelse ends up metadata-only.
+    "skr/2000/01:38/2000-01-38.pdf": "trasig hos källan",
+}
+
 SKIPLIST = Path(__file__).with_name("data") / "skip.json"
 # the budget and vårproposition, skipped by rule rather than by list: they
 # recur every year, so enumerating them would need an entry each spring
@@ -147,7 +169,8 @@ def body_pdfs(record, probe):
 
     `probe(name) -> (pages, title, first_page_text)` is injected so the rule is
     testable without poppler and so the caller controls how PDFs are opened.
-    It is called only for the populations that need it.
+    It is called only for the populations that need it, and never for a file
+    listed in `BROKEN_PDFS` -- those are dropped unread.
     """
     pdfs = [f for f in record.get("files", []) if f.lower().endswith(".pdf")]
     kind = population(record)
@@ -158,12 +181,25 @@ def body_pdfs(record, probe):
     if kind == "skip":
         why = _skiplist()["%s/%s" % (record["type"], record["basefile"])]
         return [], {f: why for f in pdfs}
-    if len(pdfs) < 2:
-        return pdfs, {}
+    # the unopenable files come out before anything counts or probes them: a
+    # count-based rule must not weigh a file no reader can read, and `probe`
+    # (poppler) raises on one rather than reporting it (see BROKEN_PDFS)
+    key = "%s/%s/" % (record["type"], record["basefile"])
+    dropped = {f: BROKEN_PDFS[key + f] for f in pdfs if key + f in BROKEN_PDFS}
+    pdfs = [f for f in pdfs if f not in dropped]
+    # "one PDF is the body" holds only for a record that *published* one: it is
+    # the reason not to probe 97k single-file documents, not a judgement. A
+    # record left with one file because the other is unreadable is still a
+    # record whose publisher offered a choice, so it keeps being judged --
+    # otherwise skr. 2000/01:38 silently ships its English translation as the
+    # skrivelse's text, which is the exact failure this module exists to stop.
+    if len(pdfs) < 2 and not dropped:
+        return pdfs, dropped
     if kind == "budget":
-        return [], {f: "budgetproposition" for f in pdfs}
+        return [], dropped | {f: "budgetproposition" for f in pdfs}
     if kind == "kb":
-        return pdfs[:1], {f: "syskonvolym i KB-skanningen" for f in pdfs[1:]}
+        return pdfs[:1], dropped | {f: "syskonvolym i KB-skanningen"
+                                    for f in pdfs[1:]}
 
     # the link texts align with `files`, which may hold .doc/.docx/.rtf beside
     # the PDFs, so a label is looked up by the file's position *there* -- not by
@@ -172,7 +208,7 @@ def body_pdfs(record, probe):
     label_of = ({f: labels[i] for i, f in enumerate(record["files"])}
                 if labels else {})
     probed = {f: probe(f) for f in pdfs}
-    dropped, keep = {}, []
+    keep = []
     for f in pdfs:
         pages, title, first = probed[f]
         role = _role(label_of.get(f), title, first)
@@ -183,9 +219,10 @@ def body_pdfs(record, probe):
     if not keep:
         # every file read as an extra. Returning pdfs[0] would hand back exactly
         # the file this module exists to distrust -- sou/2016:77's files[0] is
-        # the rättelseblad -- and returning it with nothing in `dropped` would
-        # look like a clean single-volume decision. Say so instead.
-        return [], {f: "inget spår identifierades som brödtext" for f in pdfs}
+        # the rättelseblad -- so return no body at all. `dropped` already names
+        # every file and why (an empty `keep` means each one got a role), which
+        # is what keeps this from reading as a clean single-volume decision.
+        return [], dropped
 
     # a "hela dokumentet" volume published beside its own parts: its page count
     # is the sum of theirs (lr/2007 ny lag om värdepappersmarknaden: 1009 =

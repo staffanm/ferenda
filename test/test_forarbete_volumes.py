@@ -171,3 +171,45 @@ def test_every_skiplist_entry_is_well_formed():
         assert typ in ("prop", "sou", "ds", "pm", "dir", "fm", "skr", "so", "lr"), key
         assert ":" in basefile, key
         assert why and isinstance(why, str), key
+
+
+def test_a_pdf_broken_at_the_source_is_dropped_without_being_probed():
+    # skr. 2000/01:38's Swedish volume is 65 536 truncated bytes on
+    # regeringen.se's own server, so poppler cannot open it at all -- `probe`
+    # raises rather than answering. The file must be gone before anything
+    # counts or reads it, leaving the intact English sibling to be judged on
+    # its own evidence (and dropped as "engelsk").
+    def exploding_probe(name):
+        if name == "2000-01-38.pdf":
+            raise AssertionError("a BROKEN_PDFS file must never be probed")
+        return (67, "", "Government Communication")
+
+    rec = _rec(["2000-01-38.pdf", "2000-01-38-1.pdf"],
+               typ="skr", basefile="2000/01:38",
+               labels=["Hållbara Sverige - uppföljning av åtgärder",
+                       "Sustainable Sweden a Progress Report on Measures"])
+    body, dropped = volumes.body_pdfs(rec, exploding_probe)
+    assert body == []
+    assert dropped["2000-01-38.pdf"] == "trasig hos källan"
+    assert dropped["2000-01-38-1.pdf"] == "engelsk"
+
+
+def test_a_record_whose_only_other_file_is_broken_falls_back_to_one_volume():
+    # dropping the broken file must not leave a two-file record being weighed
+    # by the multi-volume rules on one real file
+    rec = _rec(["2000-01-38.pdf", "good.pdf"], typ="skr", basefile="2000/01:38")
+    body, dropped = volumes.body_pdfs(rec, _probe({}))
+    assert body == ["good.pdf"]
+    assert dropped == {"2000-01-38.pdf": "trasig hos källan"}
+
+
+def test_every_broken_pdf_entry_is_well_formed():
+    # hand-edited data keyed "<type>/<basefile>/<filename>"; a typo'd key would
+    # silently never match and the document would keep failing every build
+    for key, why in volumes.BROKEN_PDFS.items():
+        typ, _, rest = key.partition("/")
+        assert typ in ("prop", "sou", "ds", "pm", "dir", "fm", "skr", "so", "lr"), key
+        basefile, _, name = rest.rpartition("/")
+        assert ":" in basefile, key
+        assert name.lower().endswith(".pdf"), key
+        assert why and isinstance(why, str), key

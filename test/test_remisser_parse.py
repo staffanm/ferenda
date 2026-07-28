@@ -13,8 +13,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from accommodanda.remisser.model import Remiss, Remissinstans, Remissvar
+from accommodanda.lib.errors import SkipDocument
 from accommodanda.remisser import parse
+from accommodanda.remisser.model import Remiss, Remissinstans, Remissvar, org_slug
 from accommodanda.remisser.parse import parse_record
 
 FIXTURE_PDF = Path(__file__).parent / "files" / "remisser" / "instance.pdf"
@@ -128,3 +129,24 @@ def test_parse_record_not_yet_downloaded_asserts(corpus):
         json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
     with pytest.raises(AssertionError, match="has not been downloaded"):
         parse_record("sou/2025:99/kammarkollegiet", root)
+
+
+def test_a_broken_answer_pdf_is_skipped_not_errored(corpus, monkeypatch):
+    # El-Kretsen's real answer is corrupt on regeringen.se and always will be:
+    # parse must refuse it as a SkipDocument (an empty artifact, built once) and
+    # not raise the per-document error the driver reports on every build.
+    monkeypatch.setitem(parse.BROKEN_PDFS, "sou/2025:99/kammarkollegiet",
+                        "trasig PDF hos regeringen.se")
+    with pytest.raises(SkipDocument):
+        parse_record("sou/2025:99/kammarkollegiet", corpus)
+
+
+def test_every_broken_pdf_entry_is_well_formed():
+    # keys are answer basefiles "<typ>/<document id>/<org-slug>"; a typo'd key
+    # would silently never match and the document would keep failing
+    for key, why in parse.BROKEN_PDFS.items():
+        typ, _, rest = key.partition("/")
+        assert typ in ("sou", "ds", "pm", "lr"), key
+        arende, _, slug = rest.rpartition("/")
+        assert arende and slug and slug == org_slug("x/" + slug + ".pdf"), key
+        assert why and isinstance(why, str), key

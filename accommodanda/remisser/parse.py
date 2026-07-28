@@ -26,10 +26,33 @@ import json
 from pathlib import Path
 
 from ..lib import compress, layout
+from ..lib.errors import SkipDocument
 from ..lib.pdftext import ocr_pdf, page_paragraphs, pdf_pages
 from .model import Remiss, Remissvar, org_slug
 
 OCR_LANG = "swe"        # remissvar are Swedish; tesseract+swe is a hard dependency
+
+# Answer PDFs that arrived whole (`Content-Length` bytes and all) but are
+# permanently corrupt: no reader opens them, so there is no body to parse and
+# never will be. Verified by re-downloading -- regeringen.se hands back the same
+# broken bytes, so this is their stored copy, not our fetch, and the OCR
+# fallback in `_pages` cannot rescue it either (ocrmypdf fails on the same
+# malformed page tree poppler does).
+#
+# The sibling list `download.BROKEN_ANSWERS` covers the url that serves *no*
+# usable response at all and so is never requested; these do respond, which is
+# why they end up on disk and have to be refused here instead. One entry per
+# answer basefile with the evidence.
+BROKEN_PDFS = {
+    # El-Kretsen's answer on the SOU 2021:26 (producentansvar) remiss. 67 492
+    # bytes with an intact trailer whose xref points at offsets 80 585, 81 130
+    # and 83 629 -- some 16 kB of object data is simply missing from the middle,
+    # so every font and all but the first page object are unresolvable.
+    # pdftotext yields 3 bytes of whitespace across the 4 pages poppler claims,
+    # and ocrmypdf exits 15 on a null page ("'NoneType' object has no attribute
+    # 'MediaBox'").
+    "sou/2021:26/el-kretsen": "trasig PDF hos regeringen.se",
+}
 
 
 def _pages(pdf_path, patch_key):
@@ -61,7 +84,13 @@ def parse_record(basefile, root):
 
     The org slug is the *last* segment, not the second: a document id may itself
     contain a slash (``pm/LI2026/01339``). Paths come from `layout.relpath`, the
-    one rule the download tree and the artifact tree share, rebased onto `root`."""
+    one rule the download tree and the artifact tree share, rebased onto `root`.
+
+    A `BROKEN_PDFS` answer raises SkipDocument: the PDF is on disk and will never
+    be readable, so the driver's empty-artifact marker is the honest outcome --
+    the alternative is a per-document error every single build, forever."""
+    if basefile in BROKEN_PDFS:
+        raise SkipDocument("%s: %s" % (basefile, BROKEN_PDFS[basefile]))
     arende_basefile, slug = basefile.rsplit("/", 1)
     rel = layout.relpath("remisser", basefile)          # <typ>/<id-slug>/<org>
     remiss = Remiss.from_dict(json.loads(compress.read_text(
