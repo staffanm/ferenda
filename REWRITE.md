@@ -3254,10 +3254,13 @@ in `git log`. This document is the forest-level status; section markers
   "EU-domstolens praxis" and "Generaladvokatens förslag till avgörande",
   pulled out of the undifferentiated "EU-rätt" pile the VAT directive's 581
   judgments and 232 AG opinions used to sit in alongside its 138 citing acts.
-  `lib/lagrum.py` gained a lettered-point level (`punkt_ref_id`, pinning "6.1
-  c" of an EU sub-article) and `with_indefinite_aliases` (derives "EU:s
-  dataskyddsförordning" from the registered definite
-  "dataskyddsförordningen", so the genitive form resolves too).
+  `lib/lagrum.py` gained a lettered-point level (`punkt_ref_id`), pinning
+  "artikel 6.1 c" and the sub-article-less "artikel 3 a" alike — the corpus
+  mostly cites articles that are bare point lists, so gating the letter on a
+  preceding sub-article was tried and reverted (it also cost the whole citation
+  on the named-act and treaty paths, not just the pinpoint) — and
+  `with_indefinite_aliases`, which derives "EU:s dataskyddsförordning" from the
+  registered definite "dataskyddsförordningen" so the genitive form resolves too.
 - **build/perf** (2026-07-25) — `pdftext.py`'s page-numbering rewritten:
   `page_number_candidates` now splits what a margin line could be offering into
   `strong` (digits-only, may establish or move the running offset) and `weak`
