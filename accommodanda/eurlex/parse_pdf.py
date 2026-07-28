@@ -97,7 +97,7 @@ def parse_pdf(path, celex, lang):
 
     in_body = False
     for text, _bold in paras:
-        if voc.article.match(text) and len(text) <= 60:
+        if voc.article_heading.match(text) and len(text) <= 60:
             num = L.article_num(text)
             doc.body.append(Block("article", text, num=num, anchor=num))
             in_body = True

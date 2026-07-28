@@ -306,3 +306,59 @@ def test_paragraph_wrapping_a_table_is_not_emitted_twice():
     assert sum("ogiltigförklaras" in t for t in texts) == 1
     assert [b.kind for b in doc.body] == [
         "paragraph", "row", "paragraph", "point", "point"]
+
+
+def test_amending_prose_is_not_an_article_heading():
+    # an amending act's body opens sentences with an article reference
+    # ("Artikel 9.2 skall ersättas med följande:", "Artikel 8 skall utgå.").
+    # The class-less legacy path used to take those for headings, minting a
+    # phantom article numbered after the *amended* act -- which then stole the
+    # body of the real article it interrupted, leaving that one empty
+    # (31969L0060 emitted articles 1,2,3,4,5,9,6,10,7,15,8, with 5/6/7 empty).
+    html = """<body>
+      <p>RÅDET HAR UTFÄRDAT DETTA DIREKTIV</p>
+      <p>Artikel 5</p>
+      <p>Artikel 9.2 skall ersättas med följande:</p>
+      <p>"2. Officiellt plomberade förpackningar får inte omplomberas."</p>
+      <p>Artikel 6</p>
+      <p>Artikel 10.1. b skall ersättas med följande:</p>
+      <p>Artikel 7</p>
+      <p>Artikel 8 skall utgå.</p>
+    </body>"""
+    doc = parse_html(html, "31969L0060", "swe")
+    assert [b.num for b in doc.body if b.kind == "article"] == ["5", "6", "7"]
+    assert kinds(doc) == ["preamble",
+                          "article", "paragraph", "paragraph",
+                          "article", "paragraph",
+                          "article", "paragraph"]
+
+
+def test_article_heading_shape_across_languages():
+    for voc, line in ((L.vocab("swe"), "Artikel 5"),
+                      (L.vocab("swe"), "Artikel 5a"),
+                      (L.vocab("swe"), "Artikel 1 Räckvidd"),
+                      (L.vocab("swe"), "Artikel 6ter"),
+                      (L.vocab("swe"), "Artikel 6sexies"),
+                      (L.vocab("swe"), 'Artikel 5 "Definitioner"'),
+                      (L.vocab("eng"), "Article 1 – Objective"),
+                      (L.vocab("eng"), "ARTICLE 12")):
+        assert voc.article_heading.match(line), line
+    for voc, line in ((L.vocab("swe"), "Artikel 9.2 skall ersättas med följande:"),
+                      (L.vocab("swe"), "Artikel 10.1. b skall ersättas"),
+                      (L.vocab("swe"), "Artikel 8 skall utgå."),
+                      (L.vocab("swe"), "Artikel 4 och 5 skall utgå"),
+                      (L.vocab("swe"), "Artikel 3 i direktiv 64/54/EEG ändras"),
+                      (L.vocab("eng"), "Article 103 the dependent child allowance")):
+        assert not voc.article_heading.match(line), line
+        # `article` still matches -- it is the looser table-marker test
+        assert voc.article.match(line), line
+
+
+def test_latin_ordinal_article_keeps_its_whole_suffix():
+    # inserted articles carry Latin ordinals, not just single letters. A
+    # one-letter suffix truncated "Artikel 6ter" to num "6t" -- an anchor
+    # pointing at no article at all (62006TJ0215 quotes the Paris Convention).
+    assert L.article_num("Artikel 6ter") == "6ter"
+    assert L.article_num("Article 6sexies") == "6sexies"
+    assert L.article_num("Artikel 5a") == "5a"
+    assert L.article_num("Artikel 1 Räckvidd") == "1"

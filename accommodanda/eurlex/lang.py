@@ -56,11 +56,18 @@ RE_RECITAL_MARKER = re.compile(r"^\(?(\d{1,3})\s*[).]\s+(\S.*)$")
 RE_POINT = re.compile(r"^\(?\s*([a-z0-9]{1,4})\s*[.)]$", re.IGNORECASE)
 # the number right after the article keyword ("Artikel 1 Räckvidd" -- the
 # legacy txt_te HTML runs the heading into the marker line), or a bare trailing
-# number ("Artikel 5", a table-cell marker)
-_RE_ARTNUM = re.compile(r"^(?:artikel|article)\.?\s+(\d+[a-z]?)|(\d+[a-z]?)\s*$",
+# number ("Artikel 5", a table-cell marker). The suffix is `[a-z]*`, not `[a-z]?`:
+# inserted articles carry Latin ordinals as well as single letters ("Artikel
+# 6ter", "Artikel 6sexies" of the Paris Convention), and a one-letter suffix
+# truncated those to "6t"/"6s" -- a wrong anchor pointing at no article at all.
+_RE_ARTNUM = re.compile(r"^(?:artikel|article)\.?\s+(\d+[a-z]*)|(\d+[a-z]*)\s*$",
                         re.IGNORECASE)
 _RE_ROMAN = re.compile(r"[IVXLC]+\.?")
 _RE_NUM = re.compile(r"\d+\.?")
+# how a rubric run onto an article heading line may open (`Vocab.article_heading`):
+# an upper-case letter, a digit, a quote or a separating dash. Deliberately *not*
+# a lower-case letter -- that is prose continuing an article reference.
+_RUBRIC_OPEN = r"(?:[^\Wa-zà-ÿ\d_]|[\d\"'“«(–—-])"
 
 
 def article_num(text):
@@ -75,6 +82,21 @@ class Vocab:
     def __init__(self, lang):
         spec = VOCAB.get(lang, VOCAB["eng"])
         self.article = re.compile(r"^%s\.?\s+(\d+\w*)" % spec["article"], re.I)
+        # `article` only asks that a line *opens* with an article designation,
+        # which is what a table marker cell needs. A class-less body line needs
+        # more: an amending act's prose opens the same way ("Artikel 9.2 skall
+        # ersättas med följande:", "Artikel 8 skall utgå.") and, taken for a
+        # heading, mints a phantom article whose number is the *amended* act's --
+        # stealing the body of the real article it interrupts, which is then left
+        # empty. A heading is the designation alone, or with its rubric run onto
+        # the same line ("Artikel 1 Räckvidd"), so the discriminator is what
+        # follows the number: a pinpoint ("9.2") or a lower-case continuation is
+        # prose, never a rubric. The keyword and the bis/ter letter are matched
+        # case-insensitively; the rubric test must not be, so the flag is scoped
+        # rather than global.
+        self.article_heading = re.compile(
+            r"^(?i:%s)\.?\s+\d+(?i:[a-z])*(?:\s+%s.*)?$"
+            % (spec["article"], _RUBRIC_OPEN))
         self.heading = re.compile(r"^(?:%s)\b" % "|".join(spec["headings"]), re.I)
         self.annex = re.compile(r"^(?:%s)\b" % "|".join(spec["annex"]), re.I)
         self.enacting = re.compile(spec["enacting"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; enacting is always str

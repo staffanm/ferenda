@@ -204,8 +204,11 @@ def parse_html(markup, celex, lang):
             continue
         # `ti-art` marks an article; with no semantic class (old txt_te HTML) a
         # short line that is itself "Article N" / "Artikel N" is one too -- but a
-        # long paragraph merely citing "Article 5 of ..." is not, hence the cap.
-        if role == "ti-art" or (not role and voc.article.match(text) and len(text) <= 60):
+        # paragraph merely citing "Article 5 of ..." is not, hence the shape test
+        # (`article_heading`, which rejects prose opening with a reference) and
+        # the length cap on top of it.
+        if role == "ti-art" or (not role and voc.article_heading.match(text)
+                                and len(text) <= 60):
             num = L.article_num(text)
             doc.body.append(Block("article", text, num=num, anchor=num))
             in_body = True
