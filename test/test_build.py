@@ -956,6 +956,7 @@ def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
     monkeypatch.setattr(build, "load_manifest", lambda: {})
     source = build.Source("syn", lambda: ["a", "b"], {})
 
@@ -981,8 +982,103 @@ def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch
 
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
     monkeypatch.setattr(build, "load_manifest", lambda: {})
     source = build.Source("syn", lambda: ["ds/2010-47"], {})
 
     with pytest.raises(RuntimeError, match="ds/2010-47"):
         build._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)
+
+
+def test_a_dead_workers_doc_is_rebuilt_serially(tmp_path, monkeypatch):
+    """The recovery path: a slot file (see _worker) whose pid is not among the
+    pool's live workers attributes the crashed worker's in-flight doc; once
+    everything still outstanding is attributed, the parent stops waiting and
+    rebuilds those docs in-parent instead of raising -- the run completes."""
+    inflight = tmp_path / "inflight"
+
+    class LosesOneResult:
+        """One result arrives; then silence. The corpse's slot -- written by
+        the worker before it died -- appears alongside the delivery, naming
+        the doc ("b") whose result is never coming."""
+        def __init__(self):
+            self._arrived = [("a", build.Result())]
+
+        def next(self, timeout=None):
+            if self._arrived:
+                (inflight / "99999").write_text("b")
+                return self._arrived.pop(0)
+            raise build.multiprocessing.TimeoutError()
+
+    class FakePool:
+        _pool = ()                  # the crashed worker is gone
+
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def imap_unordered(self, _fn, _jobs, chunksize=1):
+            return LosesOneResult()
+
+    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(build, "INFLIGHT", inflight)
+    monkeypatch.setattr(build, "load_manifest", lambda: {})
+    rebuilt = []
+
+    def fake_build_one(source, action, bf, manifest):
+        rebuilt.append(bf)
+        return build.Result()
+
+    monkeypatch.setattr(build, "build_one", fake_build_one)
+    source = build.Source("syn", lambda: ["a", "b"], {})
+    absorbed = []
+
+    build._run_parallel(source, "parse", ["a", "b"], 2,
+                        lambda res, bf: absorbed.append(bf))
+
+    assert rebuilt == ["b"]
+    assert sorted(absorbed) == ["a", "b"]
+
+
+def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
+        tmp_path, monkeypatch):
+    """A worker can die *after* queueing its result (the observed lxml heap
+    corruption strikes at frame teardown): the sweep attributes its slot, but
+    when the queued result then arrives the attribution is withdrawn and
+    nothing is rebuilt twice."""
+    inflight = tmp_path / "inflight"
+
+    class DeliversLate:
+        """Tick 1: silence, with the corpse's slot naming "a". Then "a"'s
+        already-queued result arrives anyway, followed by the rest."""
+        def __init__(self):
+            self._script = ["timeout", ("a", build.Result()),
+                            ("b", build.Result())]
+
+        def next(self, timeout=None):
+            step = self._script.pop(0)
+            if step == "timeout":
+                (inflight / "99999").write_text("a")
+                raise build.multiprocessing.TimeoutError()
+            return step
+
+    class FakePool:
+        _pool = ()
+
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def imap_unordered(self, _fn, _jobs, chunksize=1):
+            return DeliversLate()
+
+    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(build, "INFLIGHT", inflight)
+    monkeypatch.setattr(build, "load_manifest", lambda: {})
+    monkeypatch.setattr(build, "build_one",
+                        lambda *a: pytest.fail("nothing should be rebuilt"))
+    source = build.Source("syn", lambda: ["a", "b"], {})
+    absorbed = []
+
+    build._run_parallel(source, "parse", ["a", "b"], 2,
+                        lambda res, bf: absorbed.append(bf))
+
+    assert sorted(absorbed) == ["a", "b"]

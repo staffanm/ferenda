@@ -618,8 +618,8 @@ def _run_parallel(source, action, basefiles, jobs, absorb):
                     slot.unlink()          # attribute a corpse only once
                     if bf in outstanding and bf not in lost:
                         lost.add(bf)
-                        print("\n%s %s: worker died building %s; will "
-                              "rebuild it serially after the pool drains"
+                        print("\n%s %s: worker died building %s; queued "
+                              "for serial rebuild once the pool drains"
                               % (source.name, action, bf), file=sys.stderr)
                 if quiet >= LOST_RESULT_TIMEOUT:
                     raise RuntimeError(
@@ -636,6 +636,10 @@ def _run_parallel(source, action, basefiles, jobs, absorb):
             outstanding.discard(basefile)
             lost.discard(basefile)   # delivered after all: nothing was lost
             absorb(res, basefile)
+    # the loop exits only with every un-lost result absorbed; any other state
+    # (an imap accounting anomaly delivering StopIteration with residue) must
+    # crash with a diagnosis here, not be papered over by the rebuild below
+    assert outstanding == lost, (outstanding, lost)
     for bf in sorted(outstanding):
         # every doc still outstanding lost its worker; one serial in-parent
         # rebuild completes the run (a second crash here kills the run --
