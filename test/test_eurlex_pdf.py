@@ -1,12 +1,9 @@
 """eurlex/parse_pdf: the thin consumer of lib/pdftext.
 
 Locks in the 2026-07 consolidation (parse_pdf had forked lib/pdftext's
-extractor wholesale) and its two behavioural fixes: a missing ocrmypdf binary
-is an environment failure that propagates instead of silently publishing an
-empty artifact, and the OJ header date goes through parse_html's shared
-`eu_date` rather than a duplicate regex."""
-
-import subprocess
+extractor wholesale) and its behavioural fix: the OJ header date goes through
+parse_html's shared `eu_date` rather than a duplicate regex. The OCR fallback
+itself now lives in lib/pdftext (`ocr_pdf`) and is tested there."""
 
 import pytest
 
@@ -17,40 +14,6 @@ from accommodanda.lib.pdftext import Line
 
 def _line(text, top, bold=False):
     return Line(text, top, bold, bold, False)
-
-
-def test_ocr_missing_binary_raises(tmp_path, monkeypatch):
-    """A missing ocrmypdf is a broken environment, not a bad document: it must
-    propagate (rule:fail-fast), never turn into an empty artifact."""
-    def no_binary(cmd, check, capture_output):
-        raise FileNotFoundError("ocrmypdf")
-    monkeypatch.setattr(pp.subprocess, "run", no_binary)
-    pdf = tmp_path / "scan.pdf"
-    pdf.write_bytes(b"%PDF-1.4")
-    with pytest.raises(FileNotFoundError):
-        pp._ocr(pdf, "swe")
-
-
-def test_ocr_per_document_failure_propagates(tmp_path, monkeypatch):
-    """A per-document OCR failure raises CalledProcessError for the build
-    driver's per-document boundary to record -- not swallowed here."""
-    def fails(cmd, check, capture_output):
-        raise subprocess.CalledProcessError(1, cmd)
-    monkeypatch.setattr(pp.subprocess, "run", fails)
-    pdf = tmp_path / "scan.pdf"
-    pdf.write_bytes(b"%PDF-1.4")
-    with pytest.raises(subprocess.CalledProcessError):
-        pp._ocr(pdf, "swe")
-
-
-def test_ocr_cached_sidecar_skips_subprocess(tmp_path, monkeypatch):
-    monkeypatch.setattr(pp.subprocess, "run",
-                        lambda *a, **kw: pytest.fail("subprocess ran"))
-    pdf = tmp_path / "scan.pdf"
-    pdf.write_bytes(b"%PDF-1.4")
-    cached = tmp_path / ".scan.ocr.pdf"
-    cached.write_bytes(b"%PDF-1.4")
-    assert pp._ocr(pdf, "swe") == cached
 
 
 def test_pdf_lines_uses_shared_extractor_with_hidden(monkeypatch):

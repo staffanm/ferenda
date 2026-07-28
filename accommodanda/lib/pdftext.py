@@ -123,6 +123,30 @@ def pdftohtml_xml(pdf_path, hidden=False):
                        "-nodrm", "-stdout", str(pdf_path)])
 
 
+def ocr_pdf(path, lang):
+    """OCR a scanned PDF (no recoverable text layer) into a cached hidden
+    sidecar, returning its path. Cached beside the source as
+    ``.<stem>.ocr.pdf`` so a re-parse is free.
+
+    A missing ocrmypdf binary is a broken environment and propagates
+    (rule:fail-fast); a per-document OCR failure (a corrupt scan, a missing
+    language pack) raises CalledProcessError, caught at the build driver's
+    per-document boundary and recorded there -- never swallowed into an empty
+    artifact.
+
+    Extract text from the result with ``hidden=True``: what ocrmypdf adds is an
+    invisible text layer behind the page image, which pdftohtml drops otherwise."""
+    cached = Path(path).with_name("." + Path(path).stem + ".ocr.pdf")
+    if cached.exists():
+        return cached
+    # --force-ocr: rasterize and OCR every page, replacing the unrecoverable
+    # (Identity-H, no ToUnicode) text layer these scans carry -- --skip-text
+    # would see that broken layer as "already text" and skip the page.
+    subprocess.run(["ocrmypdf", "--quiet", "--force-ocr", "-l", lang,
+                    str(path), str(cached)], check=True, capture_output=True)
+    return cached
+
+
 def pdftotext_text(pdf_path):
     """A PDF's text as ``pdftotext`` reads it, with the U+000C page breaks it
     emits left in place.

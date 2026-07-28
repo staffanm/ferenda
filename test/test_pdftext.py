@@ -12,9 +12,11 @@ including the top-only span-grouping bug `_lines` documents as fixed), and the
 baseline span-grouping itself."""
 
 import os
+import subprocess
 from types import SimpleNamespace
 
 import brotli
+import pytest
 
 from accommodanda.lib import layout, pdftext
 from accommodanda.lib.pdftext import (
@@ -252,3 +254,39 @@ def test_pdftotext_text_is_cached_too(monkeypatch, tmp_path):
     # and it does not collide with the xml entry for the same PDF
     assert (layout.pdf_conversion(pdf, "txt")
             != layout.pdf_conversion(pdf, "xml"))
+
+
+# ---- OCR fallback (shared by eurlex/parse_pdf and remisser/parse) ----------
+
+def test_ocr_missing_binary_raises(tmp_path, monkeypatch):
+    """A missing ocrmypdf is a broken environment, not a bad document: it must
+    propagate (rule:fail-fast), never turn into an empty artifact."""
+    def no_binary(cmd, check, capture_output):
+        raise FileNotFoundError("ocrmypdf")
+    monkeypatch.setattr(pdftext.subprocess, "run", no_binary)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    with pytest.raises(FileNotFoundError):
+        pdftext.ocr_pdf(pdf, "swe")
+
+
+def test_ocr_per_document_failure_propagates(tmp_path, monkeypatch):
+    """A per-document OCR failure raises CalledProcessError for the build
+    driver's per-document boundary to record -- not swallowed here."""
+    def fails(cmd, check, capture_output):
+        raise subprocess.CalledProcessError(1, cmd)
+    monkeypatch.setattr(pdftext.subprocess, "run", fails)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    with pytest.raises(subprocess.CalledProcessError):
+        pdftext.ocr_pdf(pdf, "swe")
+
+
+def test_ocr_cached_sidecar_skips_subprocess(tmp_path, monkeypatch):
+    monkeypatch.setattr(pdftext.subprocess, "run",
+                        lambda *a, **kw: pytest.fail("subprocess ran"))
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    cached = tmp_path / ".scan.ocr.pdf"
+    cached.write_bytes(b"%PDF-1.4")
+    assert pdftext.ocr_pdf(pdf, "swe") == cached
