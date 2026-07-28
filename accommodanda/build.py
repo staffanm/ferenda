@@ -133,6 +133,7 @@ from .wiki import parse as wiki_parse
 POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
 MANIFEST = DATA / ".build" / "manifest.json"
+INFLIGHT = DATA / ".build" / "inflight"    # per-pid last-started slot files (_run_parallel)
 FINGERPRINTS = DATA / ".build" / "fingerprints.json"   # small per-(step,source) gates
 RUNS = DATA / ".build" / "runs.ndjson"             # append-only run ledger
 ERRORS = DATA / ".build" / "errors.json"           # per-doc latest-outcome store
@@ -485,6 +486,12 @@ def build_one(source, action, basefile, manifest):
 
 def _worker(job):
     source_name, action, basefile = job
+    # overwrite this worker's last-started slot before building: if the process
+    # dies hard mid-document (the C-extension heap corruption chronicled at
+    # MAX_DOCS_PER_WORKER), the parent reads the slot to attribute the lost
+    # document (see _run_parallel). Overwritten, never cleared -- a slot naming
+    # an already-absorbed doc attributes nothing, so no per-doc unlink needed.
+    (INFLIGHT / str(os.getpid())).write_text(basefile)
     return basefile, build_one(SOURCES[source_name], action, basefile,
                                load_manifest())
 
@@ -528,13 +535,21 @@ SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
 # the driver waited forever on futures no worker would ever take).
 MAX_DOCS_PER_WORKER = 1000
 
-# How long the parent waits for the next worker result before concluding one was
-# lost with a dead worker (see _run_parallel). It has to clear the slowest single
-# document by a wide margin: the worst on record is `sfs versions 1999:1229` at
-# 1 454 s, so an hour is ~2.5x the observed maximum -- long enough that a
-# legitimately slow document is never mistaken for a lost one, short enough that
-# a hang surfaces the same night instead of never.
+# How long the parent tolerates total result silence before declaring a hang.
+# Worker *crashes* no longer wait this out -- a dead worker is spotted by the
+# WORKER_POLL sweep and its in-flight document rebuilt (see _run_parallel) --
+# so this backstop only fires for a wedged-but-alive worker, where there is no
+# corpse to find. It has to clear the slowest single document by a wide margin:
+# the worst on record is `sfs versions 1999:1229` at 1 454 s, so an hour is
+# ~2.5x the observed maximum -- long enough that a legitimately slow document
+# is never mistaken for a hang, short enough that a real hang surfaces the
+# same night instead of never.
 LOST_RESULT_TIMEOUT = 3600
+
+# Between-results poll interval: with no result arriving for this long, the
+# parent sweeps the pool's workers for corpses. Bounds crash-detection latency
+# without waking a busy parent (a tick only happens when results have paused).
+WORKER_POLL = 60
 
 
 def _run_parallel(source, action, basefiles, jobs, absorb):
@@ -565,33 +580,67 @@ def _run_parallel(source, action, basefiles, jobs, absorb):
     # worker's stack first, so the crash itself is not silent -- but the hang
     # that follows was, which is the part that costs a night.
     #
-    # So: bound the wait between results. A gap this long with work outstanding
-    # means a result is never coming, and the parent knows exactly which
-    # basefiles never returned. Raising names them and unwinds into
-    # run_action's finally, which persists every result that did arrive
-    # (rule:fail-fast). The serial `--jobs 1` path takes no pool at all and
-    # remains the diagnostic fallback.
+    # So: whenever results pause for WORKER_POLL seconds, sweep for corpses.
+    # A timeout tick guarantees the result queue is empty (a queued result
+    # returns instantly, no timeout), so an inflight slot (see _worker) whose
+    # pid is not among the pool's live workers is a worker that died without
+    # delivering -- if its slot names a doc still outstanding, that doc's
+    # result is never coming. pool._pool is private but has been the worker
+    # list since 2.6; there is no public liveness API. Once everything still
+    # outstanding is attributed to a corpse, stop waiting and rebuild those
+    # documents serially in-parent below -- the crashes are rare and not
+    # document-deterministic (the same doc rebuilds fine), so the run
+    # completes instead of aborting at 99.99% after an hour-long stall.
+    # LOST_RESULT_TIMEOUT stays as the hang backstop (rule:fail-fast); the
+    # serial `--jobs 1` path takes no pool and remains the diagnostic fallback.
+    INFLIGHT.mkdir(parents=True, exist_ok=True)
+    for slot in INFLIGHT.iterdir():        # stale slots from an earlier run
+        slot.unlink()
     outstanding = {bf for _source, _action, bf in jobs_list}
+    lost = set()                           # attributed to a dead worker
+    quiet = 0.0                            # seconds since the last result
     with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
                               initargs=(RUN,),
                               maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
         results = pool.imap_unordered(_worker, jobs_list, chunksize=1)
-        while True:
+        while len(outstanding) > len(lost):
             try:
-                basefile, res = results.next(timeout=LOST_RESULT_TIMEOUT)
+                basefile, res = results.next(timeout=WORKER_POLL)
             except StopIteration:
                 break
             except multiprocessing.TimeoutError:
-                raise RuntimeError(
-                    "%s %s: no worker result in %d s with %d document(s) "
-                    "outstanding -- a worker died without returning one. The "
-                    "results that did arrive are saved; re-run to finish. "
-                    "Outstanding: %s"
-                    % (source.name, action, LOST_RESULT_TIMEOUT,
-                       len(outstanding), ", ".join(sorted(outstanding)[:10])
-                       + (" ..." if len(outstanding) > 10 else ""))) from None
+                quiet += WORKER_POLL
+                alive = {p.pid for p in pool._pool}  # ty: ignore[unresolved-attribute]  # no public liveness API; _pool stable since 2.6
+                for slot in INFLIGHT.iterdir():
+                    if int(slot.name) in alive:
+                        continue           # current worker, doc in flight
+                    bf = slot.read_text()
+                    slot.unlink()          # attribute a corpse only once
+                    if bf in outstanding and bf not in lost:
+                        lost.add(bf)
+                        print("\n%s %s: worker died building %s; will "
+                              "rebuild it serially after the pool drains"
+                              % (source.name, action, bf), file=sys.stderr)
+                if quiet >= LOST_RESULT_TIMEOUT:
+                    raise RuntimeError(
+                        "%s %s: no worker result in %d s with %d document(s) "
+                        "outstanding (%d attributed to dead workers) -- a "
+                        "worker is hung. The results that did arrive are "
+                        "saved; re-run to finish. Outstanding: %s"
+                        % (source.name, action, int(quiet), len(outstanding),
+                           len(lost), ", ".join(sorted(outstanding)[:10])
+                           + (" ..." if len(outstanding) > 10 else ""))) \
+                        from None
+                continue
+            quiet = 0.0
             outstanding.discard(basefile)
+            lost.discard(basefile)   # delivered after all: nothing was lost
             absorb(res, basefile)
+    for bf in sorted(outstanding):
+        # every doc still outstanding lost its worker; one serial in-parent
+        # rebuild completes the run (a second crash here kills the run --
+        # rare^2, and then genuinely a case for the --jobs 1 fallback)
+        absorb(build_one(source, action, bf, manifest), bf)
 
 
 def run_action(source, action, basefiles, jobs):

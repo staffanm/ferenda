@@ -943,6 +943,11 @@ def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
             raise build.multiprocessing.TimeoutError()
 
     class FakePool:
+        # the dead-worker sweep reads `pool._pool` for the live workers' pids;
+        # empty models the case these tests exercise -- the worker is gone, so
+        # its in-flight slot is a corpse to attribute
+        _pool = ()
+
         def __init__(self, *a, **kw): pass
         def __enter__(self): return self
         def __exit__(self, *a): return False
@@ -964,6 +969,11 @@ def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch
             raise build.multiprocessing.TimeoutError()
 
     class FakePool:
+        # the dead-worker sweep reads `pool._pool` for the live workers' pids;
+        # empty models the case these tests exercise -- the worker is gone, so
+        # its in-flight slot is a corpse to attribute
+        _pool = ()
+
         def __init__(self, *a, **kw): pass
         def __enter__(self): return self
         def __exit__(self, *a): return False
