@@ -32,6 +32,7 @@ VOCAB = {
         "visa": ("having regard", "having seen"),
         "recital": ("whereas",),
         "recital_intro": ("whereas",),
+        "signature": r"^Done at\b",
     },
     "swe": {
         "article": "Artikel",
@@ -42,6 +43,7 @@ VOCAB = {
         "visa": ("med beaktande av",),
         "recital": ("av följande skäl", "med hänsyn till"),
         "recital_intro": ("med beaktande av följande", "av följande skäl"),
+        "signature": r"^Utfärdat i\b",
     },
 }
 
@@ -64,6 +66,60 @@ _RE_ARTNUM = re.compile(r"^(?:artikel|article)\.?\s+(\d+[a-z]*)|(\d+[a-z]*)\s*$"
                         re.IGNORECASE)
 _RE_ROMAN = re.compile(r"[IVXLC]+\.?")
 _RE_NUM = re.compile(r"\d+\.?")
+# The pre-2000 OJ printed an annex heading once for *every* language edition, on
+# one line: "ANEXO I - BILAG I - ANHANG I - ΠΑΡΑΡΤΗΜΑ I - ANNEX I - ANNEXE I -
+# ALLEGATO I - BIJLAGE I - ANEXO I - LIITE I - BILAGA I". `Vocab.heading` anchors
+# on the *document's* language, so a Swedish act whose strip opens in Spanish
+# matched nothing -- the annex stayed body text and the act's last article
+# swallowed the signature block and every annex after it (31996L0054's article 4
+# ran to 201 452 characters over 4 762 paragraphs).
+#
+# One segment of the strip is enough to name it, so the test is the shape of the
+# whole line: three or more ' - '-joined segments, each of them an annex word
+# with an optional numeral. Requiring *every* segment to qualify is what keeps
+# ordinary prose out -- a sentence mentioning "bilaga" three times has only one
+# segment and never matches (a looser word-count test flagged 1 418 such
+# sentences against 244 genuine headings).
+_ANNEX_WORDS = ("BILAGA", "BILAG", "ANNEX", "ANNEXE", "ANEXO", "ANEXA", "ANHANG",
+                "ALLEGATO", "BIJLAGE", "LIITE", "TILLÄGG", "APPENDIX", "LISA",
+                "PIELIKUMS", "PRIEDAS", "PRÍLOHA", "PŘÍLOHA", "PRILOGA",
+                "MELLÉKLET", "ZAŁĄCZNIK", "ANNESS")
+# The Greek segment is matched by shape, not by word: the pre-2000 pages store
+# ΠΑΡΑΡΤΗΜΑ in a legacy encoding that decodes to mojibake, and to more than one
+# spelling of it ("ÐÁÑÁÑÔÇÌÁ", "ÐAPAPTHMA"). So: a 6-12 letter run carrying at
+# least one non-ASCII letter. The lookahead is what keeps a plain upper-case
+# Latin word out, which matters because every segment must qualify -- without it
+# a line like "FÖRSTA - ANDRA - TREDJE" would read as an annex heading.
+_MOJIBAKE = r"(?=\w*[^\x00-\x7f])[^\W\d_]{6,12}"
+_ANNEX_SEG = re.compile(
+    r"^(?:%s|%s)(?:\s*[IVXLC]+|\s*\d+|\s*[A-ZÉ])?\.?$"
+    % ("|".join(_ANNEX_WORDS), _MOJIBAKE), re.I)
+_ANNEX_SPLIT = re.compile(r"\s+-\s+")
+# The same strip also occurs with the separators lost, the words run straight
+# together ("ANEXOBILAGANHANGΜΠΑΠΤΗΜΑANNEXANNEXEALLEGATOBIJLAGEANEXO",
+# 31986L0465). There is no reliable way back to one language's segment -- Danish
+# "BILAG" and German "ANHANG" abut as "BILAGANHANG", which also reads as Swedish
+# "BILAGA" -- so the run stands as its own heading text. Recognising it is what
+# matters: it closes the last article, which is otherwise left swallowing every
+# annex in the act.
+_ANNEX_RUN = re.compile(
+    r"^(?:(?:%s|%s)(?:\s*[IVXLC]+|\s*\d+)?){3,}$"
+    % ("|".join(_ANNEX_WORDS), _MOJIBAKE), re.I)
+
+
+def annex_strip(text, annex_words):
+    """The document's own annex heading out of a multilingual OJ strip, or None
+    if `text` is not one. `annex_words` is the reading language's own words
+    (`Vocab.annex_words`); a strip printed before that language joined the Union
+    carries no segment for it, and then the whole strip stands as the heading --
+    that is what the source itself says."""
+    segs = [s.strip() for s in _ANNEX_SPLIT.split(text)]
+    if len(segs) >= 3 and all(_ANNEX_SEG.match(s) for s in segs):
+        own = [s for s in segs if s.upper().startswith(annex_words)]
+        return own[0] if own else text
+    return text if len(segs) == 1 and _ANNEX_RUN.match(text) else None
+
+
 # how a rubric run onto an article heading line may open (`Vocab.article_heading`):
 # an upper-case letter, a digit, a quote or a separating dash. Deliberately *not*
 # a lower-case letter -- that is prose continuing an article reference.
@@ -99,7 +155,19 @@ class Vocab:
             % (spec["article"], _RUBRIC_OPEN))
         self.heading = re.compile(r"^(?:%s)\b" % "|".join(spec["headings"]), re.I)
         self.annex = re.compile(r"^(?:%s)\b" % "|".join(spec["annex"]), re.I)
+        # the bare words, for `annex_strip`'s segment pick (a prefix test, not a
+        # pattern match -- the strip's segments are already isolated)
+        self.annex_words = tuple(spec["annex"])
         self.enacting = re.compile(spec["enacting"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; enacting is always str
+        # the closing formula of the enacting terms ("Done at Brussels, 14 July
+        # 1986." / "Utfärdat i Bryssel den 30 juli 1996."). The class-ful OJ HTML
+        # marks it `signatory`; the class-less legacy HTML marks nothing, so the
+        # signature stayed an ordinary paragraph -- and since `structure.nest`
+        # closes the open article on a `signature` block and on nothing else
+        # here, the act's last article went on swallowing the signature, the
+        # footnotes and every annex after them (31986L0465's article 3 ran to
+        # 193 710 characters over 6 143 paragraphs).
+        self.signature = re.compile(spec["signature"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; signature is always str
         # the framing line that opens the recital list ("… och med beaktande av
         # följande:" / "Whereas:"); it is the *tail* of its line, because a
         # Swedish act runs it onto the last visa

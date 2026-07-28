@@ -169,8 +169,12 @@ def parse_html(markup, celex, lang):
         doc.oj = _oj(_flat(hd_oj))
 
     # a case has no preamble at all -- its text is body prose from the first
-    # line, the same `paragraph` blocks the Formex judgment parser emits
-    in_body = doc.doctype in CASELAW
+    # line, the same `paragraph` blocks the Formex judgment parser emits. It has
+    # no *articles* either: a judgment reproduces the contested act's operative
+    # articles, and inferring an article container from a quoted "Artikel 4"
+    # heading left it swallowing the rest of the judgment (61989TJ0068's
+    # "article 4" ran to 280 353 characters).
+    in_body = in_caselaw = doc.doctype in CASELAW
     in_recitals = False                      # the recital list has been opened
     expected = 1                             # the next recital marker in sequence
     for el in body.find_all(["p", "table"]):
@@ -207,7 +211,8 @@ def parse_html(markup, celex, lang):
         # paragraph merely citing "Article 5 of ..." is not, hence the shape test
         # (`article_heading`, which rejects prose opening with a reference) and
         # the length cap on top of it.
-        if role == "ti-art" or (not role and voc.article_heading.match(text)
+        if role == "ti-art" or (not role and not in_caselaw
+                                and voc.article_heading.match(text)
                                 and len(text) <= 60):
             num = L.article_num(text)
             doc.body.append(Block("article", text, num=num, anchor=num))
@@ -221,9 +226,14 @@ def parse_html(markup, celex, lang):
             doc.body.append(Block("heading", text, level=_heading_level(role)))
         elif not role and voc.heading.match(text) and (text.isupper() or len(text) <= 40):
             doc.body.append(Block("heading", text, level=1))
+        elif not role and (annex := L.annex_strip(text, voc.annex_words)):
+            # the pre-2000 multilingual annex strip: one line naming the annex in
+            # every language edition, so `voc.heading` (anchored on this
+            # document's language) never sees its own word at the front
+            doc.body.append(Block("heading", annex, level=1))
         elif role == "note":
             doc.body.append(Block("note", text))
-        elif role == "signatory":
+        elif role == "signatory" or (not role and voc.signature.match(text)):
             doc.body.append(Block("signature", text))
         elif in_body:
             doc.body.append(Block("paragraph", text))

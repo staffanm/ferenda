@@ -362,3 +362,77 @@ def test_latin_ordinal_article_keeps_its_whole_suffix():
     assert L.article_num("Article 6sexies") == "6sexies"
     assert L.article_num("Artikel 5a") == "5a"
     assert L.article_num("Artikel 1 Räckvidd") == "1"
+
+
+def test_multilingual_annex_strip_becomes_a_heading():
+    # the pre-2000 OJ printed the annex heading once per language edition on one
+    # line, so `voc.heading` -- anchored on this document's language -- never saw
+    # its own word at the front. The annex stayed body text and the act's last
+    # article swallowed it (31996L0054's article 4: 4 762 paragraphs).
+    strip = ("ANEXO I - BILAG I - ANHANG I - ÐÁÑÁÑÔÇÌÁ É - ANNEX I - ANNEXE I"
+             " - ALLEGATO I - BIJLAGE I - ANEXO I - LIITE I - BILAGA I")
+    html = """<body>
+      <p>HÄRIGENOM FÖRESKRIVS FÖLJANDE.</p>
+      <p>Artikel 1</p>
+      <p>Denna förordning skall ändras.</p>
+      <p>%s</p>
+      <p>Tabellrad som hör till bilagan.</p>
+    </body>""" % strip
+    doc = parse_html(html, "31996L0054", "swe")
+    assert kinds(doc) == ["preamble", "article", "paragraph", "heading", "paragraph"]
+    # the reading language's own segment names it, not the whole strip
+    assert [b.text for b in doc.body if b.kind == "heading"] == ["BILAGA I"]
+    assert parse_html(html, "31996L0054", "eng").body[3].text == "ANNEX I"
+
+
+def test_annex_strip_variants_and_non_matches():
+    swe = L.vocab("swe").annex_words
+    # separators lost, the words run together (31986L0465) -- no way back to one
+    # language's segment, so the run stands as its own heading
+    run = "ANEXOBILAGANHANGANNEXANNEXEALLEGATOBIJLAGEANEXO"
+    assert L.annex_strip(run, swe) == run
+    # printed before Swedish was an OJ language: no BILAGA segment to pick
+    older = "ANNEXE - ANNEX - ANHANG - BIJLAGE - ALLEGATO"
+    assert L.annex_strip(older, swe) == older
+    # prose that merely mentions annexes, and an ordinary heading, are not strips
+    assert L.annex_strip("Före 2000 skall bilaga II del B ändras", swe) is None
+    assert L.annex_strip("BILAGA I", swe) is None
+    assert L.annex_strip("FÖRSTA - ANDRA - TREDJE", swe) is None
+
+
+def test_signature_closes_the_last_article():
+    # the class-less legacy HTML marks no `signatory`, so the closing formula
+    # stayed a paragraph -- and `structure.nest` closes an open article on a
+    # `signature` block and nothing else, so the last article went on swallowing
+    # the signature, the footnotes and every annex (31986L0465: 6 143 paragraphs)
+    html = """<body>
+      <p>HÄRIGENOM FÖRESKRIVS FÖLJANDE.</p>
+      <p>Artikel 3</p>
+      <p>Detta direktiv riktar sig till medlemsstaterna.</p>
+      <p>Utfärdat i Bryssel den 14 juli 1986.</p>
+      <p>På rådets vägnar</p>
+    </body>"""
+    assert kinds(parse_html(html, "31986L0465", "swe")) == [
+        "preamble", "article", "paragraph", "signature", "paragraph"]
+    eng = """<body>
+      <p>HAS ADOPTED THIS DIRECTIVE:</p>
+      <p>Article 3</p>
+      <p>Done at Brussels, 14 July 1986.</p>
+    </body>"""
+    assert kinds(parse_html(eng, "31986L0465", "eng")) == [
+        "preamble", "article", "signature"]
+
+
+def test_a_judgment_has_no_inferred_articles():
+    # a judgment reproduces the contested act's operative articles; taking a
+    # quoted "Artikel 4" for a heading left it swallowing the rest of the
+    # judgment (61989TJ0068's "article 4": 280 353 characters)
+    html = """<body>
+      <p>Artikel 2</p>
+      <p>Företagen skall omedelbart upphöra med överträdelsen.</p>
+      <p>Artikel 4</p>
+      <p>Följande böter skall åläggas de företag som beslutet riktar sig till.</p>
+    </body>"""
+    doc = parse_html(html, "61989TJ0068", "swe")
+    assert "article" not in kinds(doc)
+    assert kinds(doc) == ["paragraph"] * 4
