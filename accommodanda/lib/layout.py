@@ -180,6 +180,23 @@ def artifact(source, basefile):
     return artifact_dir(source) / rel.with_name(rel.name + ".json")
 
 
+def stats_snapshot(generated):
+    """Where one day's corpus measurement is archived beside the current one:
+    ``artifact/stats/archive/statistik-<YYYY-MM-DD>.json``.
+
+    `compute` overwrites the live artifact every run, which answers "what does
+    the corpus look like now" and destroys "what did it look like then" -- and
+    the series is the interesting part of a measurement that only ever runs on
+    the whole corpus. Keyed on the report's own `generated` date, so several
+    computes in one day settle on that day's figure rather than accumulating.
+
+    The `archive/` subdirectory is safe here only because nothing walks the
+    stats artifact tree: `stats` is absent from ARTIFACTS and its source lists
+    the single basefile `statistik` verbatim, so relate/dump never glob it. Do
+    not copy this layout into a source whose artifacts *are* walked."""
+    return artifact_dir("stats") / "archive" / ("statistik-%s.json" % generated)
+
+
 def resolve_basefile(source, basefile, *alternates):
     """`basefile` respelled the way the artifact tree actually spells it;
     `basefile` unchanged when nothing matches.

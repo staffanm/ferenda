@@ -1082,3 +1082,30 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
                         lambda res, bf: absorbed.append(bf))
 
     assert sorted(absorbed) == ["a", "b"]
+
+
+def test_an_always_stage_is_never_fresh(tmp_path):
+    # a stage whose real inputs are the whole corpus cannot be freshness-gated:
+    # judged on its recipe hash alone it would run once, record a manifest
+    # entry, and be skipped for ever after -- silently freezing its output.
+    # `stats compute` is the one such stage (see its Source registration).
+    out = tmp_path / "measured.json"
+    out.write_text("{}")
+    code = tmp_path / "recipe.py"
+    code.write_text("# recipe")
+    gated = Stage("compute", lambda bf: None, lambda bf: out, code=(code,))
+    always = Stage("compute", lambda bf: None, lambda bf: out, code=(code,),
+                   always=True)
+    source = Source("stats", lambda: ["statistik"], {"compute": always})
+    # the manifest entry a completed run leaves behind
+    manifest = {build.manifest_key("stats", "compute", "statistik"): {
+        "inputs": build.hash_files([]),
+        "version": build.recipe_version((code,))}}
+    assert is_fresh(manifest, source, gated, "statistik") is True
+    assert is_fresh(manifest, source, always, "statistik") is False
+
+
+def test_the_real_stats_compute_stage_is_marked_always():
+    # the mark is what keeps `lagen all rebuild` re-measuring the corpus rather
+    # than publishing one day's figures for ever
+    assert build.SOURCES["stats"].stages["compute"].always is True

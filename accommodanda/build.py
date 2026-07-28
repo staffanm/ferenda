@@ -157,6 +157,12 @@ class Stage:
     inputs: Callable[[str], list[Path]] = lambda bf: []   # dependency files
     depends: str | None = None            # upstream stage name
     code: tuple = ()                      # impl files; their hash = version
+    # never fresh: the stage's real inputs are the whole corpus, too large to
+    # hash, so the driver cannot answer "has anything changed" and must not
+    # pretend it can. Without this a no-inputs stage is judged on its recipe
+    # hash alone -- constant between edits -- so it runs once and is skipped
+    # for ever after, silently freezing its output (see `stats compute`).
+    always: bool = False
 
 
 @dataclass
@@ -209,9 +215,18 @@ def write_artifact(source, basefile, art, source_url=None):
            or layout.source_url(source, basefile))
     if url:
         art["source_url"] = url
+    write_artifact_to(layout.artifact(source, basefile), art)
+
+
+def write_artifact_to(path, art):
+    """Write an artifact dict to an explicit path, in the artifact tree's one
+    serialization (stable key order and indentation, so two builds diff
+    readably; the tree's compression). Split out of `write_artifact` so a copy
+    written somewhere other than the document's own path -- the dated stats
+    snapshot -- is the same bytes by construction rather than by two call sites
+    keeping the same four json.dumps flags in step."""
     compress.write_text(
-        layout.artifact(source, basefile),
-        json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True),
+        path, json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True),
         encodings=compress.ARTIFACT_ENCODINGS)
 
 
@@ -245,6 +260,8 @@ def manifest_key(source, stage, basefile):
 def is_fresh(manifest, source, stage, basefile, inputs_hash=None):
     out = stage.output(basefile)
     if not compress.exists(out):        # the output may be stored precompressed
+        return False
+    if stage.always:                    # unhashable inputs -- never fresh
         return False
     if not stage.inputs(basefile) and not stage.code:
         # nothing to version the output against (e.g. download: the "input" is
@@ -2879,22 +2896,40 @@ def stats_artifact(basefile):
 def stats_compute_run(basefile):
     """Measure the corpus and write the artifact. Deliberately not incremental:
     every measurement is a fact about the *whole* corpus, so there is no subset
-    of it that could be refreshed on its own -- the freshness question is
-    "has anything anywhere changed", which only the operator can answer. The
-    stage therefore declares no `inputs`, and so carries no freshness gate at
-    all: every invocation re-measures, with or without `--force`."""
+    of it that could be refreshed on its own -- the freshness question is "has
+    anything anywhere changed", and the inputs that would answer it are the
+    entire artifact tree, far too large to hash per run.
+
+    The stage therefore declares no `inputs` and is marked `always=True`, so
+    every invocation re-measures with or without `--force`. The mark is
+    load-bearing, not decoration: a no-inputs stage is otherwise judged fresh on
+    its recipe hash alone, which is constant between edits to stats/ -- so
+    compute would run once, record a manifest entry, and be skipped for ever
+    after, freezing /statistik at whatever the corpus looked like that day.
+
+    Each run also archives the measurement under its own date
+    (`layout.stats_snapshot`): the live artifact answers "how big is the corpus
+    now", and only the archive can answer "how has it changed" -- which is the
+    question a corpus measurement is really for. The same bytes are written to
+    both, so a snapshot needs no separate reader."""
     report = stats_compute.compute(
         CATALOG,
         progress=lambda stage: sys.stderr.write("stats: scanning %s\n" % stage))
-    write_artifact("stats", basefile, report.to_artifact())
+    art = report.to_artifact()
+    write_artifact("stats", basefile, art)
+    snapshot = layout.stats_snapshot(report.generated)
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
+    write_artifact_to(snapshot, art)
 
 
 SOURCES["stats"] = Source(
     "stats", lambda: [stats_render.ARTIFACT_BASEFILE],
     {"compute": Stage("compute", stats_compute_run, stats_artifact,
-                      code=STATS_CODE)},
+                      code=STATS_CODE, always=True)},
     notes="compute: measure the whole corpus (catalog + artifact trees) into "
-          "artifact/stats/statistik.json -- minutes, not incremental\n"
+          "artifact/stats/statistik.json -- minutes, not incremental. Runs as "
+          "part of `lagen all rebuild` (after dump, before generate); a "
+          "single-source rebuild does not pay for it\n"
           "generate: render that artifact to /statistik")
 
 
@@ -3310,9 +3345,11 @@ def _run_stage_gated(source, step, jobs, store):
 
 def cmd_all(names, jobs, whole_corpus, download=False):
     """Run the build pipeline for the named sources. The offline core (action
-    `rebuild`) is parse -> relate -> index -> dump -> generate; action `all`
-    prepends the network-bound download. Each step is independently incremental,
-    so a re-run with nothing changed is cheap.
+    `rebuild`) is parse -> relate -> index -> dump -> [stats compute] ->
+    generate; action `all` prepends the network-bound download. Each step is
+    independently incremental, so a re-run with nothing changed is cheap --
+    except the stats measurement, which is whole-corpus by nature and runs only
+    when the run targets every source (see below).
 
     parse runs over each source's already-downloaded basefiles (bringing only
     missing/stale parses up to date; with `download=False` it discovers nothing
@@ -3346,6 +3383,23 @@ def cmd_all(names, jobs, whole_corpus, download=False):
     cmd_relate(names)
     cmd_index(names, jobs)
     cmd_dump(names)
+    # the corpus measurements read the catalog `relate` just rebuilt *and* the
+    # artifact trees `parse` just wrote, so compute belongs here -- after both,
+    # and before the generate that renders /statistik from what it writes. It
+    # cannot join the parse/versions loop above (the obvious place, and where a
+    # stage merely *named* "parse" would land it): that loop runs before
+    # cmd_relate, so the measurements would be taken against the previous run's
+    # catalog and /statistik would publish figures one rebuild out of date.
+    #
+    # Whole-corpus runs only. Every measurement is a fact about the entire
+    # corpus, so it is not a `lagen sfs rebuild` sort of thing to do -- and it
+    # is minutes of scanning, which a targeted single-source rebuild should not
+    # have to pay. Same boundary the whole-corpus generate below draws.
+    if whole_corpus and "stats" in names:
+        stats = SOURCES["stats"]
+        result = run_action(stats, "compute", stats.list_basefiles(), jobs)
+        report(stats, "compute", result, 1, full_source=True)
+        had_errors |= bool(result.errors)
     if whole_corpus:
         cmd_generate(jobs=jobs)
     else:
