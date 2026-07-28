@@ -133,31 +133,73 @@ def sniff_extension(path):
 # window over the last N items lets a burst of fast skips or one slow document
 # yank the estimate around, which is what `lagen all generate` showed. Callers
 # that can't distinguish real work leave `actual` None, and every job counts.
-_eta: dict[str, Any] = {"t0": 0.0, "actual0": 0, "total": object(), "done": -1}
+_eta: dict[str, Any] = {"t0": 0.0, "actual0": 0, "total": object(), "done": -1,
+                        "work0": 0.0}
 
 
-def _eta_suffix(done, total, actual=None):
+def _eta_suffix(done, total, actual=None, work=None):
     """``ETA MM:SS`` for a current/total sequence, from the whole-run pace of the
     work actually performed, or '' when there is no usable estimate (the first
     line of a run, before any real work has happened, an unknown total, or the
     final line). `actual` is the running count of jobs that did work rather than
     being skipped as already up to date; when the caller can't tell, every job
-    counts."""
+    counts.
+
+    `work` is ``(done, total)`` in *expected seconds* -- the per-document
+    durations the manifest recorded, which the build driver already has because
+    it dispatches on them. Given it, the estimate is paced on work rather than
+    on job count, which is the difference between a useful number and a useless
+    one whenever the two are not proportional. The driver dispatches longest-
+    expected first (so the slow tail starts earliest and the last straggler is a
+    fast document), so the jobs finished at any point are the most expensive in
+    the corpus: a count-based rate is the worst-case rate, and applying it to
+    every remaining job overestimated a full förarbete reparse by around an
+    order of magnitude at the start. Dividing wall-clock by expected-seconds
+    absorbs the parallelism too -- the ratio is what it is regardless of worker
+    count -- so no separate concurrency factor is needed.
+
+    Fresh skips are counted in *both* halves of the ratio, which is what makes a
+    half-stale corpus come out right: a skip costs no wall-clock but carries its
+    expected seconds, so it dilutes the measured rate and the remaining work by
+    the same factor and the dilution cancels. The count-based estimate could not
+    do this -- it measured the rate over real builds only and then applied it to
+    every remaining job, skips included, which is why it overestimated a mixed
+    run as well as a full one.
+
+    The one assumption is that freshness is uncorrelated with document size. It
+    usually is -- whether a document changed has nothing to do with how long it
+    takes to parse. Where it does not hold, notably resuming a run that was
+    killed partway (which leaves exactly the slowest documents fresh, since they
+    were dispatched first), the estimate reads low until the run reaches the
+    stale tail. Correcting that needs a freshness pre-scan of the whole corpus,
+    which costs more at startup than the estimate is worth."""
     now = time.monotonic()
-    work = done if actual is None else actual
+    performed_count = done if actual is None else actual
     if done <= 1 or done < _eta["done"] or total != _eta["total"]:
-        _eta.update(t0=now, actual0=work, total=total, done=done)  # re-base the run
+        _eta.update(t0=now, actual0=performed_count, total=total, done=done,
+                    work0=(work[0] if work else 0.0))     # re-base the run
         return ""
     _eta["done"] = done
-    elapsed, performed = now - _eta["t0"], work - _eta["actual0"]
-    if total is None or done >= total or performed <= 0 or elapsed <= 0:
+    elapsed = now - _eta["t0"]
+    if total is None or done >= total or elapsed <= 0:
         return ""
-    remaining = (elapsed / performed) * (total - done)
+    if work is not None:
+        done_work, total_work = work
+        performed = done_work - _eta["work0"]
+        remaining_work = total_work - done_work
+        if performed <= 0 or remaining_work <= 0:
+            return ""
+        remaining = (elapsed / performed) * remaining_work
+    else:
+        performed = performed_count - _eta["actual0"]
+        if performed <= 0:
+            return ""
+        remaining = (elapsed / performed) * (total - done)
     return "ETA %02d:%02d" % divmod(int(remaining + 0.5), 60)
 
 
-def status(done, total, message="", *, actual=None, prefix="", tail="",
-           stream=sys.stderr):
+def status(done, total, message="", *, actual=None, work=None, prefix="",
+           tail="", stream=sys.stderr):
     """The single live one-line progress counter, overwritten in place -- shared
     by the per-document build loops (parse, generate, index, dump, bulk unpack)
     *and* the source-downloader harvest reporter (`progress`). Renders
@@ -177,11 +219,14 @@ def status(done, total, message="", *, actual=None, prefix="", tail="",
 
     `actual` is the running count of jobs that did real work (as opposed to being
     skipped as already up to date); pass it on a step that skips fresh items so the
-    ETA is paced on the real builds and not diluted by the skips (see
-    `_eta_suffix`)."""
+    ETA is paced on the real builds and not diluted by the skips. `work` is
+    ``(done, total)`` in expected seconds, which paces the ETA on work rather
+    than on job count -- pass it wherever per-item cost estimates exist, since
+    the two are wildly disproportionate on a corpus dispatched slowest-first
+    (see `_eta_suffix`)."""
     line = "%s(%d/%s) %s%s" % (prefix, done, "?" if total is None else total,
                                message, tail)
-    eta = _eta_suffix(done, total, actual)
+    eta = _eta_suffix(done, total, actual, work)
     if stream.isatty():
         line = _fit_line(line, eta, os.get_terminal_size(stream.fileno()).columns)
     elif eta:

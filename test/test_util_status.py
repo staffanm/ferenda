@@ -24,7 +24,8 @@ class FakeClock:
 def clock(monkeypatch):
     fake = FakeClock()
     monkeypatch.setattr(util.time, "monotonic", fake)
-    util._eta.update(t0=0.0, actual0=0, total=object(), done=-1)  # no run in progress
+    util._eta.update(t0=0.0, actual0=0, total=object(), done=-1,
+                 work0=0.0)                     # no run in progress
     return fake
 
 
@@ -131,3 +132,49 @@ def test_status_off_tty_keeps_full_line():
     written = buf.getvalue()
     assert written.startswith("\r") and written.endswith("\033[K")
     assert long_bf in written                    # not clipped off a tty
+
+
+def test_eta_paces_on_work_not_job_count_when_costs_are_given(clock):
+    # the driver dispatches longest-expected first, so the jobs finished at any
+    # point are the most expensive in the corpus. Pacing on job count then
+    # applies the worst-case per-job rate to every job left -- the reason a full
+    # förarbete reparse opened at ~57 h. Here: 100 jobs, the first 10 costing 10s
+    # each and the remaining 90 costing 1s, one worker.
+    costs = [10.0] * 10 + [1.0] * 90
+    total_work, done_work = sum(costs), 0.0
+    suffix = ""
+    for done, cost in enumerate(costs[:10], 1):
+        clock.now += cost
+        done_work += cost
+        suffix = util._eta_suffix(done, len(costs), actual=done,
+                                  work=(done_work, total_work))
+    # truth after the expensive head: 90 jobs x 1s = 90s
+    assert _eta_seconds(suffix) == pytest.approx(90, rel=0.02)
+    # the count-based estimate would have said 90 jobs x 10s/job
+    assert _eta_seconds(util._eta_suffix(10, len(costs), actual=10)) > 800
+
+
+def test_eta_survives_a_half_fresh_corpus(clock):
+    # a fresh skip costs no wall-clock but carries its expected seconds, so it
+    # dilutes the measured rate and the remaining work by the same factor and
+    # the dilution cancels -- which is what keeps a half-stale run honest
+    costs = [2.0] * 200
+    total_work, done_work, real = sum(costs), 0.0, 0
+    suffix = ""
+    for done, cost in enumerate(costs[:100], 1):
+        if done % 2:                       # every other job is a real build
+            clock.now += cost
+            real += 1
+        done_work += cost
+        suffix = util._eta_suffix(done, len(costs), actual=real,
+                                  work=(done_work, total_work))
+    # 100 jobs left, half of them real, 2s each => 100s
+    assert _eta_seconds(suffix) == pytest.approx(100, rel=0.05)
+
+
+def test_eta_without_costs_still_paces_on_job_count(clock):
+    # callers with no per-item estimate (harvests) keep the old behaviour
+    for done in range(1, 11):
+        clock.now += 1.0
+        suffix = util._eta_suffix(done, 100, actual=done)
+    assert _eta_seconds(suffix) == pytest.approx(90, rel=0.05)

@@ -529,17 +529,20 @@ def _worker_init(run_options: RunOptions):
     faulthandler.enable()
 
 
-def _progress(source, action, done, total, actual, merged, basefile):
+def _progress(source, action, done, total, actual, merged, basefile, work=None):
     """Live one-line counter on stderr (the shared util.status pattern), carrying
     the source/action, the running counts, and the most recently completed
     basefile. `actual` is the count of basefiles that actually built (ran a recipe,
     hit a SkipDocument, or errored) rather than being skipped as already fresh, so
-    the ETA is paced on real work and not diluted by a corpus of fresh skips."""
+    the ETA is paced on real work and not diluted by a corpus of fresh skips.
+    `work` is ``(done, total)`` expected seconds, which paces the ETA on cost
+    instead of on job count -- the two diverge sharply because the driver
+    dispatches the slowest documents first (see `util._eta_suffix`)."""
     verb = "planned" if RUN.dry_run else "ran"
     count = len(merged.planned) if RUN.dry_run else len(merged.done)
     util.status(done, total, "%s %s  %s %d  err %d  %s"
                 % (source, action, verb, count, len(merged.errors), basefile),
-                actual=actual)
+                actual=actual, work=work)
 
 
 SAVE_EVERY = 1000      # checkpoint the manifest mid-run, every this many docs
@@ -571,24 +574,17 @@ LOST_RESULT_TIMEOUT = 3600
 WORKER_POLL = 60
 
 
-def _run_parallel(source, action, basefiles, jobs, absorb):
+def _run_parallel(source, action, order, jobs, absorb):
     """Fan the basefiles out across `jobs` worker processes, absorbing each
     result as it completes (imap_unordered: continuous feeding, no barriers,
     a slow doc stalls nothing but itself).
 
-    Dispatch order is descending expected duration (the last real build
-    duration the manifest recorded; a basefile without one -- new, or never
-    built by this recipe -- counts as slowest and goes first). This is the
-    old pipeline's scheduling rule: the slow tail starts earliest and the
-    run's final straggler is a fast doc, not a forty-minute scan."""
+    `order` is already in dispatch order -- descending expected duration, with
+    the never-built document first (`expected_secs`). This is the old pipeline's
+    scheduling rule: the slow tail starts earliest and the run's final straggler
+    is a fast doc, not a forty-minute scan."""
     manifest = load_manifest()
-
-    def expected(bf):
-        entry = manifest.get(manifest_key(source.name, action, bf))
-        return entry.get("secs", float("inf")) if entry else float("inf")
-
-    jobs_list = [(source.name, action, bf)
-                 for bf in sorted(basefiles, key=expected, reverse=True)]
+    jobs_list = [(source.name, action, bf) for bf in order]
     # A worker that dies hard (a C-extension segfault) before it hits
     # maxtasksperchild loses its in-flight result, and imap_unordered then waits
     # for it forever -- multiprocessing.Pool has no BrokenProcessPool equivalent
@@ -666,11 +662,44 @@ def _run_parallel(source, action, basefiles, jobs, absorb):
         absorb(build_one(source, action, bf, manifest), bf)
 
 
+def expected_secs(source_name, action, basefiles, manifest):
+    """`(weights, order)` -- the expected seconds per basefile, and the basefiles
+    in dispatch order.
+
+    Two consumers, one pass over the manifest: `_run_parallel` dispatches
+    longest-first, and the ETA paces on the same numbers. They need the unknown
+    basefile (new, or never built by this recipe) treated differently, which is
+    why both come from here rather than from one dict:
+
+    * for *ordering* an unknown document is assumed slowest and goes first, so a
+      new forty-minute scan cannot land at the end of the run;
+    * for *summing* it cannot be infinite, so it weighs the corpus mean.
+
+    Costs one dict lookup per basefile -- what the dispatch sort was already
+    paying on its own."""
+    secs = {}
+    for bf in basefiles:
+        entry = manifest.get(manifest_key(source_name, action, bf))
+        secs[bf] = entry.get("secs") if entry else None
+    known = [v for v in secs.values() if v is not None]
+    mean = (sum(known) / len(known)) if known else 1.0
+    weights = {bf: (mean if v is None else v) for bf, v in secs.items()}
+    # unknown first (True > False), then by expected duration, longest first
+    order = sorted(basefiles,
+                   key=lambda bf: (secs[bf] is None, weights[bf]), reverse=True)
+    return weights, order
+
+
 def run_action(source, action, basefiles, jobs):
     manifest = load_manifest()
     merged = Result()
     total = len(basefiles)
     done = actual = 0
+    # expected cost per basefile: the dispatch order and the ETA read the same
+    # numbers, so they are computed once here and threaded down
+    weights, order = expected_secs(source.name, action, basefiles, manifest)
+    total_work = sum(weights.values())
+    done_work = 0.0
 
     def persist():
         if merged.updates and not RUN.dry_run:
@@ -678,14 +707,16 @@ def run_action(source, action, basefiles, jobs):
             save_manifest(manifest)
 
     def absorb(res, basefile):
-        nonlocal done, actual
+        nonlocal done, actual, done_work
         _absorb(merged, res)
         done += 1
+        done_work += weights.get(basefile, 0.0)
         # a basefile that only refreshed fresh dependencies (no run/skip/error) is
         # a near-instant skip; the rest are real work the ETA should be paced on
         if res.done or res.skips or res.errors:
             actual += 1
-        _progress(source.name, action, done, total, actual, merged, basefile)
+        _progress(source.name, action, done, total, actual, merged, basefile,
+                  (done_work, total_work))
         if done % SAVE_EVERY == 0:
             persist()       # checkpoint so a kill mid-run doesn't lose progress
 
@@ -695,7 +726,7 @@ def run_action(source, action, basefiles, jobs):
         # daemonic, and a recipe that parallelises internally (stats compute fans
         # its corpus scan over a ProcessPoolExecutor) cannot spawn children there.
         if jobs > 1 and len(basefiles) > 1 and not RUN.dry_run:
-            _run_parallel(source, action, basefiles, jobs, absorb)
+            _run_parallel(source, action, order, jobs, absorb)
         else:
             for bf in basefiles:
                 absorb(build_one(source, action, bf, manifest), bf)
