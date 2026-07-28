@@ -154,7 +154,7 @@ Current code layout (this three-layer split is now realized in the package):
 accommodanda/
   lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
-  sfs/      acts vertical — download·graphics·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
+  sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
   forarbete/ preparatory-works vertical — download·propkb·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·correspond·definitions·parse·parse_html·parse_pdf·structure·lang·model
@@ -420,6 +420,25 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   `grafik-node-replaces-marker` adjudication family accepts the new grafik
   nodes as new-is-right against the old pipeline's dropped-graphics golden.
   `test/test_sfs_graphics.py`, `test/test_sfs_pdfmirror.py`.
+- ✅ **Editorial notes typed, not read as statute text** (`sfs/redaktionell.py`)
+  — a projection-time overlay in the same family as `graphics.py`'s gaps: the
+  consolidated SFST text database stores a publisher's editorial note as
+  ordinary prose, one `<p>` like any other, so nothing downstream could tell it
+  from the law's own wording (it showed up as a measurement bug — every one of
+  the corpus statistics' "shortest laws" was an editorial note, not a short
+  law). Two sorts, kept apart because they say opposite things about the
+  corpus: `endast-tryckt` (`/Författningens text finns bara i tryckt
+  version/` — *we* are missing the text, a couple of dozen acts) and `upphavd`
+  (`Har upphävts genom lag (1982:1101)` — *nothing* is missing, the act is
+  repealed and this notice is all the publisher still carries; ~300 stycken, a
+  handful of them a base act's whole body and the rest single repealed
+  paragrafer inside a live act). `nf.py`'s `retype_editorial` retypes the
+  already-projected stycke node as a `redaktionell` node — id, inline runs and
+  beteckning carried over untouched, only `type` and the note's own
+  `sort`/`satt_av` change, so an existing anchor still resolves and a repeal
+  notice keeps its link to the repealing SFS. The renderer gives it the same
+  subdued treatment as a grafik placeholder (`p.redaktionell`).
+  `test/test_sfs_redaktionell.py`.
 - ✅ **Version history / time travel / diff** (`sfs/versions.py`, `lib/diff.py`,
   the `versions` Stage) — the old archive machinery's user-facing features,
   rebuilt over artifacts. The `versions` stage parses every archived
@@ -952,7 +971,13 @@ below is not optional polish, it's the only way they enter the corpus.
   protocol, not a base class. **Content-hash freshness** (manifest at
   `site/data/.build/manifest.json`) keyed on input hash **+ recipe version**
   (a hash of the stage's own impl files, so editing the parser re-stales
-  every doc without a blanket `--force`). **Implicit deps** (a downstream
+  every doc without a blanket `--force`). A stage with no `inputs` and no
+  `code` is judged fresh by default (nothing to version an existing output
+  against — e.g. `download`, whose "input" is a remote service). `Stage.always`
+  opts a stage *out* of that default for the opposite reason: its real inputs
+  are the whole corpus, too large to hash, so the driver cannot answer "has
+  anything changed" and must not pretend it can — every invocation runs,
+  `--force` or not (`stats compute`, §7k). **Implicit deps** (a downstream
   action builds stale upstream first; `--no-deps` scopes). `--force`, `-j`
   (process pool), `-n`/`--dry-run`, `status`. `test/test_build.py`.
   - ✅ **`parse` stage wired for SFS + DV** — finally *persists* artifacts:
@@ -3055,20 +3080,37 @@ catalog — each number with its provenance and its status — is
 - **Not incremental, on purpose.** Every measurement is a fact about the whole
   corpus, so there is no subset of it that could be refreshed on its own; the
   freshness question is "has anything anywhere changed", which only the operator
-  can answer. The stage accordingly declares no per-document `inputs`, so it has
-  no freshness gate at all — every invocation re-measures, with or without
-  `--force`. `run_action` now runs a single-basefile action
-  in-process rather than through the worker pool — not just an optimisation: a
-  pool worker is daemonic and cannot spawn the children `stats compute` fans its
-  scan over.
+  can answer. The stage accordingly declares no per-document `inputs` and is
+  marked `Stage(..., always=True)` (§5), so it carries no freshness gate at
+  all — every invocation re-measures, with or without `--force`. Plain
+  no-`inputs` freshness (fresh-by-default) would have been wrong here in the
+  other direction: it exists for a stage like `download`, where an existing
+  output already answers the only question there is; `stats compute`'s
+  question is never settled, so it needed the opposite default. `run_action`
+  now runs a single-basefile action in-process rather than through the worker
+  pool — not just an optimisation: a pool worker is daemonic and cannot spawn
+  the children `stats compute` fans its scan over. Each run also archives the
+  artifact under its own date (`layout.stats_snapshot`,
+  `artifact/stats/archive/statistik-<date>.json`, same bytes as the live
+  artifact) — the only way to answer "how has the corpus changed" rather than
+  just "how big is it now" — kept indefinitely (~15 KB/day). `stats` is absent
+  from `ARTIFACTS` and its source lists a single basefile verbatim, which is
+  what makes an `archive/` subdirectory safe under `artifact/stats/`: nothing
+  globs that tree. `compute` is now wired into `lagen all rebuild` itself
+  (`build.cmd_all`), between `dump` and `generate` — it needs the catalog
+  `relate` just rebuilt and the artifact trees `parse` just wrote, so it
+  cannot join the parse loop, which runs before `relate`. Gated on
+  whole-corpus runs only, so a single-source rebuild does not pay for it.
 - **`model.py`** — `Measure`, whose `kind` (`scalar`/`toplist`/`series`/
   `histogram`/`bars`/`matrix`/`table`) is the on-disk discriminator the renderer
   dispatches on, chosen by *what the data's job is* so the renderer never guesses
   a chart form. `Report.to_artifact()` prunes a measure's empty fields — writing
   all twelve keys on all 51 triples the artifact and makes a diff unreadable, and
-  the diff is the point of storing it. `note` is where a measure admits its
-  population and exclusions, and it renders *on* the figure: a caveat nobody sees
-  is a measure that misleads.
+  the diff is the point of storing it. `note` is where a measure could admit a
+  population caveat beyond its `lede`, rendered *on* the figure; every use
+  was pulled at the user's request in favour of folding the same information
+  into each measure's `lede`, so the field is currently unused rather than
+  retired.
 - **`scan.py`** — the expensive half, kept separate so the artifact walk is one
   place and one shape (pure, process-safe, plain tuples out). It owns the two
   measurement rules that silently poison whole families of numbers: **table cells
@@ -3087,7 +3129,16 @@ catalog — each number with its provenance and its status — is
   and `bill_lag` — each extracted as a pure helper so its population rule is
   testable rather than buried in a builder. Two of the PRD's posts remain
   unbuilt: 45 (share of decisions carrying a curated name) and 48 (which statute
-  authorized the most agency regulations).
+  authorized the most agency regulations). **The default population is gällande
+  rätt**: `_in_force` narrows the scan's `laws` to statutes actually in force
+  once, before any measure runs, and keeps the unnarrowed list as `laws_all`
+  for the four that need the whole history by name — when ikraftträdande has
+  fallen historically (27), how much notice a new law has given (28), and the
+  proposition/bill lineage measures (42, 43) — where counting only survivors
+  would describe which laws happened to last rather than the lawmaking itself.
+  Narrowing once here rather than at each call site means reaching for the
+  whole history is always a visible, named decision in the measure that makes
+  it.
 - **Where a measure's population had to shrink, it says so on the figure.**
   Notice period is a measure of *base statutes* only: the amendment register
   carries `rpubl:utfardandedatum` on 11 of 50,948 entries and the download tree
@@ -3131,7 +3182,7 @@ rewrite work.
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `labels` (every source's four reader-facing name forms — eyebrow/h1/official-title/citing-form — dispatched per source over the parse-time-stamped artifact + the curated datasets, read identically by `render.py` and `catalog.py`), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
-| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
+| `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `redaktionell` (typed publisher-editorial-note detection, retyped in place at projection time) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `volumes` (which of a multi-PDF record's `files` are the body and in what order, read from the record's provenance and the landing page's own link text — drops errata/summaries/kortversioner/reprinted-directive/remisslista siblings, collapses a "hela dokumentet" edition published beside its own parts), `jamforelse` (extracts a re-enacting prop's jämförelsetabell/paragrafnyckel bilaga tables into old↔new provision pairs from per-run coordinates; consumed by `sfs/correspond.table_correspond`), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery; a multi-part Formex manifestation fetched whole, as one zip; `lagen eurlex backfill` downloads the acts the corpus cites but does not hold, ranked by `catalog.dangling_targets`), `bulk` (dump import), `correspond` (the EU-act **lineage**: a recast's own jämförelsetabell annex → article↔article pairs, mechanical, extracted by `parse` into the artifact's `correspondence` key; `catalog._index_document` writes them into `directive_correspondence` as it indexes each act, walked transitively by `catalog.predecessor_atoms` under `catalog.caselaw_anchored`, the statute-wide pinpoint-precise case-law rail assignment), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_act_body` descends through Formex's `GENERAL`/`GR.SEQ` wrappers so a multi-file act (2004/18, the Charter) parses through the same walker as an ordinary `ACT` root; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure, `parse.parse_hearing_report` a `REPORT.HEARING` -- for the oldest ECR cases the hearing report is the only text CELLAR holds; judgment paragraphs are read from both the pre-2012 plain `NP` and the later `NP.ECR` shapes; citation scanning is per-language -- `_refparser(lang)` loads the English EULAGSTIFTNING surface for the pre-accession case law that exists in no Swedish version), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
@@ -3191,6 +3242,7 @@ rewrite work.
 | `accommodanda/sfs/download.py` | SFS harvester (beta raw-ES) + consolidation archiving |
 | `test/test_sfs_download.py` | SFS downloader version/archiving suite |
 | `test/test_sfs_graphics.py`, `test/test_sfs_pdfmirror.py` | SFS typed graphic-gap detection + vision-localization + official-PDF URL/worklist mirror suite |
+| `accommodanda/sfs/redaktionell.py`, `test/test_sfs_redaktionell.py` | detects a stycke that is a publisher's editorial note (`endast-tryckt`/`upphavd`) rather than statute text; `nf.py`'s `retype_editorial` retypes the projected node in place |
 | `accommodanda/sfs/asgit.py` | `history-as-git` export (one commit per amendment event, `git fast-import`) |
 | `test/test_sfs_asgit.py` | golden fast-import stream + git round-trip suite |
 | `test/files/` | hand-authored fixture corpora (oracle) |
@@ -3274,6 +3326,23 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **sfs/stats** (2026-07-28) — `sfs/redaktionell.py` lands: a publisher's
+  editorial note (`endast-tryckt`, `upphavd`) stops reading as statute text,
+  retyped in place at NF projection time by `nf.retype_editorial` — the same
+  overlay pattern as `graphics.py`'s omitted-content gaps. Found by the corpus
+  statistics themselves, whose "shortest laws" toplist was entirely editorial
+  notes. `stats compute` is now wired into `lagen all rebuild` (whole-corpus
+  runs only, between `dump` and `generate`, since it reads what both just
+  wrote); the new `Stage.always` field makes a no-`inputs` stage never fresh
+  instead of fresh-by-default, which is what a stage whose real inputs are the
+  whole corpus needs. Each `compute` run now also archives a dated copy
+  (`layout.stats_snapshot`, `artifact/stats/archive/statistik-<date>.json`) so
+  the series, not just the latest figure, survives. In `stats/compute.py`,
+  every measure now defaults to gällande rätt (`_in_force` narrows `laws`
+  once; `laws_all` is named explicitly by the four measures — 27, 28, 42, 43 —
+  that need the whole history), and the per-measure `note` fields were
+  removed at the user's request in favour of folding the same caveats into
+  each measure's `lede`.
 - **remisser** (2026-07-27) — re-keyed the whole vertical on the document a
   case remits, on top of same-day fixes to the listing walk and cross-refs.
   The listing walk was paging `/remisser/?p=N`, which regeringen.se answers

@@ -77,6 +77,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
 | `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links |
 | `graphics.py` | recovers content omitted by the text-only SFST source. Detection is deterministic and runs at parse time: the slash-delimited and plain `... är inte med här` corpus forms plus otherwise unmarked road-sign cells in 2007:90 become typed `grafik` nodes. Each node carries a stable semantic `key`, hashed from structural path + kind/code + normalized anchor + occurrence within its container; transient `G1` ids remain diagnostic only. Localization resolves provenance (variant-aware: a pending, not-yet-in-force copy of a bilaga gets its own keys and its own source PDF), deduplicates content duplicates by key, strictly validates complete vision output and writes `.graphics` entries keyed by that semantic key with the unhashed identity alongside; wired as `lagen sfs ai-includegraphics` |
+| `redaktionell.py` | detects a stycke that is the publisher's *editorial note* rather than statute text, another projection-time overlay in `nf.py`'s NF pass like `graphics.py`'s gaps — `retype_editorial` retypes the finished stycke node as a `redaktionell` node, keeping its id, inline runs and beteckning. Two sorts: `endast-tryckt` (`/Författningens text finns bara i tryckt version/`, a corpus gap — a couple of dozen acts) and `upphavd` (`Har upphävts genom lag (1982:1101)`, a genuine repeal notice carrying the repealing SFS as `satt_av` — ~300 stycken, a handful of them a base act's whole body and the rest single repealed paragrafer inside a live act). The renderer gives the node the same subdued treatment as the grafik placeholder (`p.redaktionell`) |
 | `pdfmirror.py` | official published-SFS PDF mirror, the crop source for graphic localization. Each act's source follows from its SFS number: `1998:306`–`2018:159` from direct rkrattsdb URLs, `2018:160`– from svenskforfattningssamling.se document pages, and nothing before `1998:306` (print only). Fetched bytes must be PDFs. `.mirror.json` records the acts an upstream answered it has no PDF for, which is the only thing telling those apart from "not fetched yet" and so the only thing keeping a rerun free. Runs as part of `lagen sfs download` and as `lagen sfs mirror-pdf`, not as a parse stage |
 | `correspond.py` | the old-law → new-law paragraf correspondence map for a restructured statute, three routes into the same `.corr` payload: an LLM pass over the proposition's författningskommentar (`lagen sfs ai-correspond`), and the mechanical `table_correspond` over the prop's own jämförelsetabell bilagor (`lagen sfs table-correspond <new> <prop> [<old>[=TAG] ...]`, rows extracted by `forarbete/jamforelse.py`; several old laws — SFB's 23, SFL's 3 — merge into one layer, `=TAG` names an old law's prop-local shorthand so tagged cell references resolve against the right law) — every edge validated against both laws' paragraf inventories either way; plus the *same-law* renumbering route (`lagen sfs renumber-correspond <sfs>`), reading the register's "nuvarande … betecknas …" omfattning clauses into `betecknas` edges carrying the amendment's ikrafttradandedatum, which generate uses to split inbound references temporally ("Hänvisningar till tidigare beteckning 4 kap. 4 §" on RF 4 kap. 6 §) |
 | `asgit.py` | `lagen sfs history-as-git <repodir> [basefile...]` — export the corpus as a git repo (one file per statute, one commit per amendment event grouped by proposition, authored by the prop's signers/committed by the rskr's, ingress as commit body); a per-transition hash ledger admits only strict append-only updates, while `--rebuild-history` atomically recreates corrected/backfilled history; implements `docs/prd-sfs-history-as-git.md` |
@@ -288,9 +289,9 @@ gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
 **stats vertical (corpus-wide measurements — `/statistik`)**
 | File | What |
 |---|---|
-| `model.py` | `Measure` (the on-disk `kind` discriminator the renderer dispatches on: `scalar`/`toplist`/`series`/`histogram`/`bars`/`matrix`/`table`) + `Row`/`Point`/`Cell`, and `Report.to_artifact()` which prunes a measure's empty fields so two builds' artifacts diff readably. `note` is where a measure states its population and exclusions — it renders *on* the figure, not as a footnote |
+| `model.py` | `Measure` (the on-disk `kind` discriminator the renderer dispatches on: `scalar`/`toplist`/`series`/`histogram`/`bars`/`matrix`/`table`) + `Row`/`Point`/`Cell`, and `Report.to_artifact()` which prunes a measure's empty fields so two builds' artifacts diff readably. `note` renders *on* the figure, not as a footnote, for a measure whose population needs a caveat beyond its `lede`; currently unused — the ledes carry it, and notes come back case by case |
 | `scan.py` | the expensive half: walks the sfs/eurlex/forarbete/dv artifact trees (and `downloaded/sfs/` for change-act titles, which the artifact does not carry) reducing each document to a compact fact row, mapped over a `ProcessPoolExecutor`. Pure and process-safe. Owns the two measurement rules that silently poison whole families of numbers when wrong: **table cells count as text** (a `rad`'s `cells` are a list of *run lists*, two levels deep) and **provenance markers/renumbering stubs do not** |
-| `compute.py` | the 54 measurements as seven groups (A–G), preferring catalog SQL over `scan` wherever the data is in the catalog; `compute(catalog_path)` → `Report`. The measures whose population rule is load-bearing are pure helpers rather than inline code — `text_age` (mean year of the paragrafer actually in force, returning `None` where the register is too silent to answer), `notice_days` (utfärdande → ikraftträdande, base statutes only) and `bill_lag` (proposition → ikraftträdande) |
+| `compute.py` | the 54 measurements as seven groups (A–G), preferring catalog SQL over `scan` wherever the data is in the catalog; `compute(catalog_path)` → `Report`. `_in_force` narrows `scan`'s `laws` to gällande rätt once for every measure, keeping the unnarrowed list as `laws_all` for the few (churn, lifespan, repeal counts) that need the whole history by name. The measures whose population rule is load-bearing are pure helpers rather than inline code — `text_age` (mean year of the paragrafer actually in force, returning `None` where the register is too silent to answer), `notice_days` (utfärdande → ikraftträdande, base statutes only) and `bill_lag` (proposition → ikraftträdande) |
 | `charts.py` | one `Measure` → its figure. Form follows `kind`: bar *tables* for ranked things (Swedish statute titles are 90 characters and SVG text cannot wrap), SVG lines/columns for series and distributions, a log-scaled heat table for the matrix. Single-series throughout, so no categorical palette and no legend; plotted forms also emit the table view |
 | `render.py` | the artifact → `/statistik`, a pure projection (the page cannot say anything `compute` did not measure); raises if the artifact is absent |
 
@@ -300,9 +301,17 @@ reads the catalog), and `lagen stats generate` renders that artifact to the page
 The split is what makes the numbers diffable between builds, and keeps the
 artifact the source of truth. `compute` is deliberately **not incremental**:
 every measurement is a fact about the whole corpus, so there is no subset of it
-that could be refreshed alone. Like `site`, `stats` is absent from `ARTIFACTS`
-and is never `relate`d/indexed/dumped. The measurement catalog, with each
-number's provenance, is [`../docs/prd-stats.md`](../docs/prd-stats.md).
+that could be refreshed alone; its `Stage` is marked `always=True` (`build.py`)
+so it is never judged fresh on its recipe hash and re-measures on every
+invocation, `--force` or not. Each run also archives the artifact under its own
+date (`layout.stats_snapshot`, `artifact/stats/archive/statistik-<date>.json`),
+since the live artifact alone cannot answer "how has the corpus changed". Like
+`site`, `stats` is absent from `ARTIFACTS` and is never `relate`d/indexed/
+dumped. `compute` is now part of the standard whole-corpus `lagen all rebuild`
+(after `dump`, before `generate` — it needs both the catalog `relate` just
+rebuilt and the artifact trees `parse` just wrote); a single-source rebuild
+does not pay for it. The measurement catalog, with each number's provenance,
+is [`../docs/prd-stats.md`](../docs/prd-stats.md).
 
 The catalog-backed document feeds retain the legacy public contract too:
 `/dataset/{sfs,dv,forarbeten,myndfs,myndprax,keyword,eurlex}/feed.atom` and their
@@ -717,10 +726,12 @@ uv run python -m accommodanda.build stats generate  # render /statistik
 `compute` reads the catalog and the sfs/eurlex/forarbete/dv artifact trees, so
 it must run **after `relate`**. It is not incremental — every measurement is a
 fact about the whole corpus, so there is no subset to refresh — and its stage
-declares no per-document `inputs`, so there is no freshness gate either: every
-invocation re-measures, `--force` or not. `generate` raises if no artifact has
-been computed; a statistics page without measurements would publish an empty
-claim.
+declares no per-document `inputs` and is marked `always=True`, so there is no
+freshness gate: every invocation re-measures, `--force` or not, and archives a
+dated copy under `artifact/stats/archive/`. `generate` raises if no artifact
+has been computed; a statistics page without measurements would publish an
+empty claim. `lagen all rebuild` runs `compute` automatically on a whole-corpus
+run, between `dump` and `generate` (not on a single-source rebuild).
 
 ## Data layout
 
@@ -748,6 +759,7 @@ site/data/ocr/forarbete/<type>/<year>/        # optional re-OCR sidecar PDFs (wi
 site/data/downloaded/remisser/<typ>/<id-slug>.json  # regeringen.se remiss ärende record (Remiss json), keyed on the referred document, not the ärende-page slug
 site/data/downloaded/remisser/<typ>/<id-slug>/       # its per-organisation answer PDFs (beside the record)
 site/data/artifact/stats/statistik.json       # the 54 corpus measurements (no downloaded/ half — the corpus is the input)
+site/data/artifact/stats/archive/statistik-<date>.json  # one dated snapshot per compute run, kept indefinitely
 ```
 
 The frozen legacy corpora (REWRITE.md §7g) were one-time imported and are now
@@ -934,7 +946,7 @@ tesseract+swe, ocrmypdf, raptor2-utils, a JRE + the POI jars, antiword), so
 **download + rebuild run in the container** against the read-write corpus mount:
 
 ```sh
-docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→generate
+docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→stats compute→generate
 docker compose exec accommodanda lagen all all       # download too, then rebuild
 ```
 
