@@ -1,15 +1,27 @@
 """Shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib).
 
 Two verticals harvest regeringen.se -- forarbete (/rattsliga-dokument/) and
-remisser (/remisser/) -- and both need the same two facts about the site: the
+remisser (/remisser/) -- and both need the same facts about the site: the
 doctype table behind /rattsliga-dokument/ (`TYPES`, which remisser uses to
-resolve a case's "Genvägar" link or title back to the referred förarbete's
-canonical basefile) and the listing DOM (`ul.list--block > li` items, walked
-by `listing_items`). Each vertical keeps its own pagination mechanism and
-record semantics; only the site knowledge lives here.
+resolve a case's remitted-document link back to the referred förarbete's
+canonical basefile), the listing DOM (`ul.list--block > li` items, walked by
+`listing_items`), and the **identity rules** for the two doctypes regeringen.se
+publishes without a series number (`pm_identity`, `lr_identity`). Each vertical
+keeps its own pagination mechanism and record semantics; only the site knowledge
+lives here.
+
+The identity rules are shared because both verticals must land on the *same*
+basefile for the same document, from different pages: forarbete names it off the
+/rattsliga-dokument/ listing, remisser off the link a remiss case page makes to
+it. Any divergence would silently split one document into two
+(rule:second-use-goes-to-lib).
 """
 
+import re
+
 from bs4 import BeautifulSoup
+
+from .util import text_slug
 
 BASE = "https://www.regeringen.se"
 
@@ -59,6 +71,47 @@ TYPES = {
     "so": ("sveriges-internationella-overenskommelser", 1332, None),
     "lr": ("lagradsremiss", 2085, None),
 }
+
+
+# the trailing ", Lagrådsremiss" a lagrådsremiss title carries is stripped
+# before slugging
+_LR_SUFFIX = re.compile(r",?\s*Lagrådsremiss\s*$", re.IGNORECASE)
+
+LR_SLUG_LEN = 60           # 30 collapsed distinct docs sharing a title prefix
+                           # ("Behandling av personuppgifter …"); 60 leaves only
+                           # genuine duplicates, which the caller dedups.
+
+
+def lr_identity(date, title):
+    """A lagrådsremiss's (basefile, identifier). Lagrådsremisser carry no unique
+    number (the landing vignette is the bare word "Lagrådsremiss"), only a title
+    that may recur across years -- so the basefile is ``<year>/<title-slug>`` and
+    the identifier is the cleaned title. Raises when either is missing
+    (rule:fail-fast) rather than minting a colliding stub.
+
+    `title` is the text of the link that named the document, which both callers
+    read off a listing/case page verbatim -- so an "Utkast till lagrådsremiss:
+    …" prefix is part of the identity, exactly as regeringen.se prints it, and
+    the draft keeps a basefile of its own separate from the final remiss."""
+    year = (date or "")[:4]
+    clean = _LR_SUFFIX.sub("", title).strip()
+    slug = text_slug(clean, maxlen=LR_SLUG_LEN)
+    if not (year.isdigit() and slug):
+        raise ValueError("lagrådsremiss without a year+title: date=%r title=%r"
+                         % (date, title))
+    return "%s/%s" % (year, slug), clean
+
+
+def pm_identity(dnr, slug):
+    """A departementspromemoria's basefile: its diarienummer when regeringen.se
+    names one, else the landing page's own URL slug.
+
+    Promemorior outside the Ds series carry no series number; the dnr
+    (``Ju2026/01691``) is the closest thing to an identifier, and a handful of
+    pages print none at all -- for those the landing slug is all there is. Both
+    verticals must agree on the fallback, or a dnr-less promemoria would be one
+    document to forarbete and another to remisser."""
+    return dnr or slug
 
 
 def listing_items(html, hrefpat):

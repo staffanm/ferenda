@@ -61,13 +61,20 @@ from ..lib import compress, layout, net
 from ..lib.harvest import HarvestWatermark
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
-from ..lib.regeringen import BASE, TYPES, is_misleading, landing_vignette, listing_items
+from ..lib.regeringen import (
+    BASE,
+    TYPES,
+    is_misleading,
+    landing_vignette,
+    listing_items,
+    lr_identity,
+    pm_identity,
+)
 from ..lib.util import (
     Reporter,
     basefile_slug,
     document_extension,
     harvest_start,
-    text_slug,
 )
 
 # BASE and the doctype table (TYPES: url segment, taxonomy category id,
@@ -108,29 +115,6 @@ SO_OWN = re.compile(r"SÖ\s*(\d{4}:\d+)\s*$")
 # -- regeringen.se prints it bare ("1993:80"), prefixed ("Diarienummer: SÖ …"),
 # or suffixed ("… m.fl."); all yield the document's own number.
 SO_VIGNETTE = re.compile(r"(\d{4}:\d+)")
-# the trailing ", Lagrådsremiss" a title carries is stripped before slugging
-_LR_SUFFIX = re.compile(r",?\s*Lagrådsremiss\s*$", re.IGNORECASE)
-
-LR_SLUG_LEN = 60           # 30 collapsed distinct docs sharing a title prefix
-                           # ("Behandling av personuppgifter …"); 60 leaves only
-                           # genuine duplicates, which the caller dedups.
-
-
-def lr_identity(date, title):
-    """A lagrådsremiss's (basefile, identifier). Lagrådsremisser carry no unique
-    number (the landing vignette is the bare word "Lagrådsremiss"), only a title
-    that may recur across years -- so the basefile is ``<year>/<title-slug>`` and
-    the identifier is the cleaned title. Raises when either is missing
-    (rule:fail-fast) rather than minting a colliding stub."""
-    year = (date or "")[:4]
-    clean = _LR_SUFFIX.sub("", title).strip()
-    slug = text_slug(clean, maxlen=LR_SLUG_LEN)
-    if not (year.isdigit() and slug):
-        raise ValueError("lagrådsremiss without a year+title: date=%r title=%r"
-                         % (date, title))
-    return "%s/%s" % (year, slug), clean
-
-
 def resolve_identity(typ, item, landing_html):
     """The authoritative (basefile, identifier) for a document, resolved once its
     landing page is in hand. Only `so` needs the landing (its number lives in the
@@ -204,12 +188,15 @@ def parse_listing(html, typ):
         elif sibling:
             # pm: a diarienummer keys the record; a promemoria with only a
             # title falls back to the landing-page slug (identifier = title).
+            # The rule itself lives in lib.regeringen so remisser resolves the
+            # same promemoria to the same basefile from its own page.
             m = DNR_RE.search(text)
+            basefile = pm_identity(m.group(1) if m else None, slug)
             if m:
-                basefile = identifier = m.group(1)
+                identifier = m.group(1)
                 title = text[:m.start()].rstrip(", ").strip() or text
             else:
-                basefile, identifier, title = slug, text, text
+                identifier = title = text
         elif typ == "lr":
             # lagrådsremiss: no number, but the title is in the listing text, so
             # the <year>/<title-slug> basefile is settled here.
