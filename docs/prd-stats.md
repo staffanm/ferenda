@@ -115,7 +115,7 @@ fullt av fantomartiklar och löpska artiklar. Se avsnittet sist.
 
 ---
 
-## A. Statutbokens storlek och form (1–9)
+## A. Lagbokens storlek och form (1–9)
 
 **1. De längsta lagarna** ✔
 Kroppstext i tecken, per konsoliderad lag.
@@ -204,7 +204,7 @@ listan över dem. Roligt som "vilka lagar är kända nog att ha ett smeknamn".
 > Socialdepartementet 1 254 · Utbildningsdepartementet 824 ·
 > Landsbygds- och infrastrukturdepartementet 556
 
-**9. Hela statutboken i siffror** ○
+**9. Hela svensk författningssamling i siffror** ○
 Totalt antal tecken, ord, paragrafer och kapitel i allt som gäller — och
 den oundvikliga följdfrågan: *hur lång tid tar det att läsa hela svensk
 författningssamling högt?* (~200 ord/minut ger ett tal man kan sätta på en

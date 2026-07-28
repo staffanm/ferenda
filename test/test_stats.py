@@ -8,6 +8,7 @@ page looks exactly like a right one.
 
 import json
 
+from accommodanda.lib import layout
 from accommodanda.stats import charts, compute, render, scan
 from accommodanda.stats.model import Cell, Measure, Point, Report, Row
 
@@ -74,7 +75,32 @@ def test_provenance_and_renumbering_are_not_rules(tmp_path):
     ])
     scanned = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))
     # the stub contributes no length row at all; the other keeps only its rule
-    assert [(c, o) for c, _, o in scanned["paragraf_lengths"]] == [(17, "1")]
+    assert [(c, o) for c, _, o in scanned["paragraf_lengths"]] == [(17, "1 §")]
+
+
+def test_a_paragrafs_beteckning_carries_its_chapter(tmp_path):
+    # "62 §" of a chaptered statute names nothing -- the reference has to be
+    # "9 kap. 62 §", and the anchor is the only place the chapter survives
+    art = law([paragraf("62", [{"type": "stycke", "text": "Stöd lämnas löpande."}],
+                        pid="K9P62")])
+    scanned = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))
+    assert [(a, o) for _, a, o in scanned["paragraf_lengths"]] \
+        == [("K9P62", "9 kap. 62 §")]
+
+
+def test_an_editorial_note_is_not_statute_text(tmp_path):
+    # a repealed paragraf's body is the publisher's notice, typed `redaktionell`
+    # by sfs/nf.py. Counted as text it wins "kortaste paragrafen" outright and
+    # its statute wins "kortaste lagen" -- neither is a fact about the law.
+    art = law([
+        paragraf("1", [{"type": "stycke", "text": "Denna lag gäller."}]),
+        paragraf("2", [{"type": "redaktionell", "sort": "upphavd",
+                        "satt_av": "1982:1101",
+                        "text": "Har upphävts genom lag (1982:1101)."}]),
+    ])
+    scanned = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))
+    assert [(c, o) for c, _, o in scanned["paragraf_lengths"]] == [(17, "1 §")]
+    assert scanned["chars"] == len("Denna lag gäller.")
 
 
 def test_clean_title_drops_beteckning_and_temporal_markers():
@@ -207,3 +233,14 @@ def test_the_page_shows_only_the_groups_that_were_measured():
     assert "Antal &amp; mått" in html                     # titles are escaped
     assert "Bara gällande rätt." in html                  # the caveat is on the page
     assert "</p>'" not in html
+
+
+def test_the_snapshot_path_is_keyed_on_the_report_date():
+    # one file per day: a second compute the same day settles on that day's
+    # figure rather than accumulating a run-per-file series
+    p = layout.stats_snapshot("2026-07-28")
+    assert p.name == "statistik-2026-07-28.json"
+    assert p.parent.name == "archive"
+    # it sits beside the live artifact, not on top of it
+    assert p.parent.parent == layout.artifact("stats", "statistik").parent
+    assert p != layout.artifact("stats", "statistik")

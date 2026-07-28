@@ -26,6 +26,7 @@ import re
 
 from ..eurlex.model import CASELAW, doctype
 from ..lib import compress, layout
+from ..lib.render import human_fragment
 
 # a trailing "Lag (2011:590)." / "Förordning (2019:12)." provenance marker: the
 # amendment that last touched the node, not part of its rule
@@ -74,6 +75,18 @@ def _runs_text(node):
 
 
 def _subtree_text(node):
+    """A node's text with its subtree, minus the publisher's editorial notes --
+    the text of the law itself.
+
+    A ``redaktionell`` node (sfs/nf.py) is a repeal notice or a "text finns bara
+    i tryckt version" gap standing where statute text would be. Counting it is
+    what made every row of "de kortaste lagarna" an editorial note rather than a
+    short law, and what let a repealed paragraf's stub compete for "kortaste
+    paragrafen". The exclusion lives here rather than in a second walker beside
+    this one: the other caller (`scan_eurlex`) can never see the type, so one
+    function serves both and there is no pair to keep in lockstep."""
+    if node.get("type") == "redaktionell":
+        return ""
     parts = [_runs_text(node)]
     for child in node.get("children") or []:
         parts.append(_subtree_text(child))
@@ -110,6 +123,8 @@ def scan_sfs(path):
     def walk(node):
         nonlocal chars, paragrafer, kapitel, stycken
         kind = node.get("type")
+        if kind == "redaktionell":
+            return          # the publisher's note, not the statute's text
         chars += len(_runs_text(node))
         if kind == "kapitel":
             kapitel += 1
@@ -118,8 +133,20 @@ def scan_sfs(path):
         elif kind == "paragraf":
             paragrafer += 1
             body = RE_PROVENANCE.sub("", _subtree_text(node)).strip()
-            if not RE_RENUMBERED.match(body):
-                lengths.append((len(body), node.get("id"), node.get("ordinal")))
+            # a paragraf left with nothing (its whole body was an editorial
+            # note) states no rule, so it contributes no length measurement --
+            # the same treatment the renumbering stub beside it gets. Counted,
+            # its zero would both drag the median down and stand as "the
+            # shortest paragraf"
+            if body and not RE_RENUMBERED.match(body):
+                # the beteckning has to carry the chapter: "62 §" of a chaptered
+                # statute is not a citable reference, and the anchor is the one
+                # place the chapter survives (K9P62 -> "9 kap. 62 §"). No
+                # fallback to the bare ordinal: that is the unciteable form this
+                # line exists to avoid, and an unnamed row is worse than none.
+                where = human_fragment(node.get("id"))
+                if where:
+                    lengths.append((len(body), node["id"], where))
         for child in node.get("children") or []:
             walk(child)
 

@@ -16,7 +16,7 @@ from . import charts
 from .model import Cell, Measure, Point, Row
 
 GROUPS = (
-    ("A", "Statutbokens storlek och form"),
+    ("A", "Lagbokens storlek och form"),
     ("B", "Förändring och omsättning"),
     ("C", "Tid och livslängd"),
     ("D", "Hänvisningsgrafen"),
