@@ -39,6 +39,7 @@ class FakeNet:
     def __init__(self):
         self.fetched = []
         self.bad_fil = set()   # fil urls served as a non-PDF (HTML error page, 200)
+        self.html_body = "<html><body>Utskottets betankande</body></html>"
         page1_url = riksdagen.LISTING
         page2_url = riksdagen._https(PAGE1["dokumentlista"]["@nasta_sida"])
         self.pages = {page1_url: PAGE1, page2_url: PAGE2}
@@ -48,6 +49,10 @@ class FakeNet:
         if parse_json:
             assert url in self.pages, "unexpected listing url: %r" % url
             return self.pages[url]
+        if url.endswith(".html"):
+            # the API's HTML body, riksdagen's only format for a document it
+            # never attached a printed PDF to (status "saknas")
+            return SimpleNamespace(text=self.html_body)
         assert "/fil/" in url, "unexpected binary fetch: %r" % url
         if url in self.bad_fil:
             return SimpleNamespace(content=b"<html>tillfalligt fel</html>")
@@ -142,6 +147,77 @@ def test_download_metadata_only_for_null_filbilaga(monkeypatch, tmp_path):
     assert net.fetched == []                           # no PDF, no body fetched
     assert layout.fa_record_file(tmp_path, "bet", "2026/27:FiU8").exists()
     assert not (layout.fa_dir(tmp_path, "bet", "2026/27:FiU8") / "2026-27-FiU8.pdf").exists()
+
+
+def _saknas(page, beteckning):
+    """A filbilaga-less entry riksdagen has *published* -- status "saknas", the
+    state of nearly every betänkande before ~2005 (rm=1990/91: 97 of 100)."""
+    return dict(_entry(page, beteckning), status="saknas", beslutad="1")
+
+
+def test_download_stores_the_html_body_when_no_pdf_was_ever_attached(
+        monkeypatch, tmp_path):
+    """A published betänkande with no filbilaga still has a body: the HTML the
+    API serves at dokument_url_html, the same route rskr.py takes for all of
+    its documents. Taking only the PDF left 7 736 betankanden metadata-only
+    with a full body one request away."""
+    net = FakeNet()
+    _patch(monkeypatch, net)
+    record = riksdagen.download_document(None, tmp_path, _saknas(PAGE1, "FiU8"),
+                                         delay=0)
+    assert record["files"] == ["2026-27-FiU8.html"]
+    body = layout.fa_dir(tmp_path, "bet", "2026/27:FiU8") / "2026-27-FiU8.html"
+    assert body.read_text() == net.html_body
+    assert net.fetched == [record["url"]]      # the HTML, and nothing else
+
+
+def test_download_refuses_an_empty_html_body(monkeypatch, tmp_path):
+    """A "saknas" entry never changes again, so it is never re-downloaded --
+    storing an empty body would freeze the document body-less forever
+    (rule:errors-drive-retry-use-raise)."""
+    net = FakeNet()
+    net.html_body = "   \n  "
+    _patch(monkeypatch, net)
+    with pytest.raises(ValueError, match="empty bet body"):
+        riksdagen.download_document(None, tmp_path, _saknas(PAGE1, "FiU8"), delay=0)
+
+
+def test_planned_betankande_stays_metadata_only(monkeypatch, tmp_path):
+    """A planned entry (status "planerat", beslutad=0) has no body of any kind
+    yet. Storing one would fill `files` and flip `_currency` to "final", so the
+    record would never be upgraded when the printed PDF lands."""
+    net = FakeNet()
+    _patch(monkeypatch, net)
+    entry = _entry(PAGE1, "FiU8")
+    assert entry["status"] == riksdagen.PLANNED
+    record = riksdagen.download_document(None, tmp_path, entry, delay=0)
+    assert record["files"] == []
+    assert net.fetched == []
+    assert riksdagen._currency(tmp_path, "2026/27:FiU8", entry) == "provisional"
+
+
+def test_currency_marks_a_body_less_published_betankande_stale(monkeypatch,
+                                                              tmp_path):
+    """A published betänkande with no filbilaga now *has* a body to fetch (the
+    API's HTML), so a record written before that is stale, not current. Without
+    this the 7 736 body-less betänkanden stay unreachable: the walk skips a
+    current record, so no run would ever re-download one.
+
+    A *planned* entry is the opposite -- no body exists yet, and it must stay
+    provisional so it is not fetched and then frozen as "final"."""
+    net = FakeNet()
+    _patch(monkeypatch, net)
+    saknas = _saknas(PAGE1, "FiU8")
+    riksdagen.download_document(None, tmp_path, _entry(PAGE1, "FiU8"), delay=0)
+    stored = layout.fa_record_file(tmp_path, "bet", "2026/27:FiU8")
+    assert json.loads(stored.read_text())["files"] == []      # planned: no body
+    assert riksdagen._currency(tmp_path, "2026/27:FiU8",
+                               _entry(PAGE1, "FiU8")) == "provisional"
+    # the same body-less record, seen as a published "saknas" entry, is stale
+    assert riksdagen._currency(tmp_path, "2026/27:FiU8", saknas) is None
+    # and once it has its HTML body it is final, never fetched again
+    riksdagen.download_document(None, tmp_path, saknas, delay=0)
+    assert riksdagen._currency(tmp_path, "2026/27:FiU8", saknas) == "final"
 
 
 def test_basefile_slug_round_trips_record_path():

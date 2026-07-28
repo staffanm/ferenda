@@ -172,6 +172,46 @@ def riksdagen_html_paras(html_text):
     return paras
 
 
+# --- Adapter 2c: Riksdagen betänkande HTML (dokument_url_html) -------------
+
+def riksdagen_bet_paras(html_text):
+    """A betänkande body as data.riksdagen.se serves it at ``dokument_url_html``
+    -> a Para stream. This is the only body riksdagen has for the ~7 700
+    betänkanden it never attached a printed PDF to (``status="saknas"``).
+
+    The feed serves two generations, and the split is roughly even (47/33 over
+    an 80-document sample):
+
+      * **preformatted** -- the body sits in ``<pre>`` blocks of hard-wrapped
+        CRLF text, and the feed is inconsistent about how much it puts in one:
+        bet 1990/91:JuU4 uses 82 blocks of one paragraph each with no blank
+        line inside, while 2001/02:UU11 uses 8 blocks holding 108 kB between
+        them, paragraphs separated by blank lines. So each block is reflowed
+        *on its own* -- blank lines split it where there are any, and a block
+        without them is one paragraph. Neither existing plaintext route does
+        this: `text/tml` flattens CRLF before turning ``<br>`` into newlines,
+        and reflowing the blocks joined together loses the block boundary that
+        is the only paragraph mark JuU4 has.
+      * **element-wrapped** -- one ``<p>`` per paragraph carrying
+        ``<span class="fs080">`` font runs, with ``<h1>``/``<h2>`` headings.
+        The font classes are presentational (size, not weight) and no bold
+        survives either generation, so the förarbete classify recovers headings
+        from numbering rather than weight, as it does for every text-inferred
+        body.
+
+    Not an OCR format: unlike the 2007 scanning export these carry no
+    "inskannat" notice (0 of 80 sampled), so they are keyed text and the
+    chronology check does not apply."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    pres = soup.find_all("pre")
+    if pres:
+        return [para for block in pres
+                for para in _reflow_plaintext(block.get_text())]
+    return [para for para in (Para(normalize_space(el.get_text(" ", strip=True)))
+                              for el in soup.find_all(["h1", "h2", "p"]))
+            if para.text]
+
+
 # --- Adapter 2b: Riksdagen skanning2007 Word-export HTML -------------------
 
 def riksdagen_mso_paras(html_text):

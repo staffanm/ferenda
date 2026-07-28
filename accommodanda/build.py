@@ -73,6 +73,7 @@ from .forarbete import jamforelse as fa_jamforelse
 from .forarbete import kommentar as fa_kommentar
 from .forarbete import parse as fa_parse
 from .forarbete import propkb as fa_propkb
+from .forarbete import propriksdagen as fa_propriksdagen
 from .forarbete import riksdagen as fa_riksdagen
 from .forarbete import rskr as fa_rskr
 from .forarbete import soukb as fa_soukb
@@ -1662,6 +1663,29 @@ def fa_propkb_scans(args):
     print("forarbete propkb-scans: %d seen, %d fetched" % (seen, fetched))
 
 
+def fa_prop_riksdagen_bodies(args):
+    """`lagen forarbete prop-riksdagen-bodies` -- one-time repair of the 1 756
+    propositions that carry `files: []` and a data.riksdagen.se url. That url is
+    riksdagen's body endpoint; the legacy import took the sibling
+    `dokumentstatus` XML (a metadata envelope, not a body) and so wrote no body
+    file. Fetches the OCR'd HTML and points each record at it under the existing
+    `skanning2007` body_format -- no new parser (see forarbete/propriksdagen.py).
+
+    Its own verb, never part of `harvest`: the records exist, so no listing walk
+    can reach them. Resumable -- a record that gained a body drops out of the
+    work list, so a killed run is just rerun. `--limit N` caps the fetch."""
+    if args:
+        sys.exit("usage: lagen forarbete prop-riksdagen-bodies")
+    if RUN.dry_run:
+        print("forarbete prop-riksdagen-bodies: would fetch %d missing bodies"
+              % len(fa_propriksdagen.pending(layout.FA_DOWNLOADED)))
+        return
+    seen, fetched, empty = fa_propriksdagen.sync(
+        layout.FA_DOWNLOADED, limit=RUN.limit, delay=POLITENESS)
+    print("forarbete prop-riksdagen-bodies: %d seen, %d fetched, %d served empty"
+          % (seen, fetched, empty))
+
+
 def fa_soukb_scans(args):
     """`lagen forarbete soukb-scans` -- one-time bulk re-download of the
     KB-digitised SOUs (1922-1999), the scanned OCR'd PDFs that *are* the body (no
@@ -1787,6 +1811,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE), self_banner=True,
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
    actions={"propkb-scans": fa_propkb_scans,
+            "prop-riksdagen-bodies": fa_prop_riksdagen_bodies,
             "soukb-scans": fa_soukb_scans,
             "refetch-bodies": fa_refetch_bodies,
             "refetch-landings": fa_refetch_landings,
@@ -1806,6 +1831,8 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
          "propkb-scans: one-time ~79 GB fetch of the KB proposition page-image "
          "scans for the facsimile view (--limit N caps it; adds no documents, "
          "re-stales no parse)\n"
+         "prop-riksdagen-bodies: one-time fetch of the 1756 proposition bodies "
+         "riksdagen serves but the legacy import never stored\n"
          "soukb-scans: one-time hundreds-of-GB re-download of the KB SOU bodies "
          "(1922-1999) from sou.kb.se as the source of truth (--limit N caps it; "
          "the scanned PDF is the body)")

@@ -210,7 +210,8 @@ def test_basefile_slug():
 
 
 def test_has_live_record_treats_import_as_absent(tmp_path):
-    # a genuine live-harvest record (no `source`) blocks re-download / stops the walk
+    # a genuine live-harvest record (no `source`, with a body) blocks
+    # re-download / stops the walk
     write_atomic(layout.fa_record_file(tmp_path, "prop", "2020/21:1"),
                  json.dumps({"type": "prop", "files": []}))
     assert has_live_record(tmp_path, "prop", "2020/21:1") is True
@@ -220,6 +221,27 @@ def test_has_live_record_treats_import_as_absent(tmp_path):
                  json.dumps({"type": "prop", "source": "proptrips", "legacy_files": []}))
     assert has_live_record(tmp_path, "prop", "1997/98:45") is False
     assert has_live_record(tmp_path, "prop", "1867:23") is False   # truly absent
+
+
+def test_needs_harvest_for_a_body_less_record(tmp_path):
+    """14 038 of 97 213 records carry `files: []`, and their stored landing
+    pages mostly do link a document -- they are missed downloads. Counting them
+    as harvested is what put them out of reach: the incremental walk stopped
+    above them and `--full` skipped them, so no run of the downloader could
+    repair one.
+
+    `has_live_record` still reports them present: it is shared with the
+    riksdagen walk, where a body-less record is a modelled state (a planned
+    betänkande) rather than a gap."""
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "2019/20:7"),
+                 json.dumps({"type": "prop", "files": []}))
+    assert has_live_record(tmp_path, "prop", "2019/20:7") is True
+    assert download.needs_harvest(tmp_path, "prop", "2019/20:7") is True
+    # a record with a body needs nothing; an absent one always does
+    write_atomic(layout.fa_record_file(tmp_path, "prop", "2019/20:8"),
+                 json.dumps({"type": "prop", "files": ["2019-20-8.pdf"]}))
+    assert download.needs_harvest(tmp_path, "prop", "2019/20:8") is False
+    assert download.needs_harvest(tmp_path, "prop", "1867:23") is True
 
 
 def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
@@ -234,11 +256,12 @@ def test_sync_incremental_skips_downloaded(tmp_path, monkeypatch):
 
     # Mock download_document
     downloads = []
-    def mock_download_document(session, root, item, delay):
+    def mock_download_document(session, root, item, delay, log=print):
         downloads.append(item["basefile"])
         # Create the live record so has_live_record is True next time
         write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
-                     json.dumps({"type": "prop", "files": []}))
+                     json.dumps({"type": "prop",
+                                 "files": [basefile_slug(item["basefile"]) + ".pdf"]}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
 
@@ -269,7 +292,7 @@ def test_sync_error_advances_date_but_leaves_store_dirty_and_retries(tmp_path, m
 
     monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay, log=None: [(items, 1, 1)])
 
-    def mock_download_document_error(session, root, item, delay):
+    def mock_download_document_error(session, root, item, delay, log=print):
         raise requests.HTTPError("500 Server Error")
 
     monkeypatch.setattr(download, "download_document", mock_download_document_error)
@@ -284,10 +307,11 @@ def test_sync_error_advances_date_but_leaves_store_dirty_and_retries(tmp_path, m
 
     # the next run (transient failure gone) retries the stranded doc and heals
     downloads = []
-    def mock_download_document(session, root, item, delay):
+    def mock_download_document(session, root, item, delay, log=print):
         downloads.append(item["basefile"])
         write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
-                     json.dumps({"type": "prop", "files": []}))
+                     json.dumps({"type": "prop",
+                                 "files": [basefile_slug(item["basefile"]) + ".pdf"]}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
     totals2 = download.sync(tmp_path, types=["prop"], delay=0, log=lambda msg: None)
@@ -304,9 +328,10 @@ def test_sync_limit_truncation_leaves_store_dirty(tmp_path, monkeypatch):
     ]
     monkeypatch.setattr(download, "iter_listing", lambda session, typ, delay, log=None: [(items, 2, 1)])
 
-    def mock_download_document(session, root, item, delay):
+    def mock_download_document(session, root, item, delay, log=print):
         write_atomic(layout.fa_record_file(root, "prop", item["basefile"]),
-                     json.dumps({"type": "prop", "files": []}))
+                     json.dumps({"type": "prop",
+                                 "files": [basefile_slug(item["basefile"]) + ".pdf"]}))
         return {"basefile": item["basefile"]}
     monkeypatch.setattr(download, "download_document", mock_download_document)
 
@@ -417,7 +442,7 @@ def test_sync_downloads_pm_doc_below_a_ds_only_page(tmp_path, monkeypatch):
     monkeypatch.setattr(download, "fetch",
                         _fake_fetch({1: DS_ONLY_PAGE, 2: PM_ONLY_PAGE}, 3))
     downloads = []
-    def mock_download_document(session, root, item, delay):
+    def mock_download_document(session, root, item, delay, log=print):
         downloads.append(item["basefile"])
         write_atomic(layout.fa_record_file(root, "pm", item["basefile"]),
                      json.dumps({"type": "pm", "files": []}))
@@ -535,3 +560,82 @@ def test_a_word_bodied_record_is_not_a_live_record(tmp_path):
     write_atomic(layout.fa_record_file(tmp_path, "prop", "2015/16:195"),
                  json.dumps({"type": "prop", "files": ["2015-16-195.pdf"]}).encode())
     assert has_live_record(tmp_path, "prop", "2015/16:195") is True
+
+
+# --------------------------------------------------------------------------
+# the no-downgrade guard: a re-download must never trade a body for no body
+# --------------------------------------------------------------------------
+
+LANDING_NO_DOC = """<html><body><h1 id="h1id">Prop. 2001/02:82</h1>
+  <p>Ingen bilaga har publicerats.</p></body></html>"""
+
+
+def _item(basefile="2001/02:82"):
+    return {"type": "prop", "basefile": basefile, "identifier": "Prop. " + basefile,
+            "title": "En proposition", "date": "2002-03-14",
+            "url": "https://www.regeringen.se/rattsliga-dokument/proposition/x/"}
+
+
+def _stored(root, basefile, files, **extra):
+    record = {"type": "prop", "basefile": basefile, "identifier": "Prop. " + basefile,
+              "title": "En proposition", "date": "2002-03-14", "files": files, **extra}
+    path = layout.fa_record_file(root, "prop", basefile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(path, json.dumps(record, ensure_ascii=False))
+    return record
+
+
+def _no_doc_landing(monkeypatch):
+    monkeypatch.setattr(download, "fetch",
+                        lambda session, url, timeout=60: SimpleNamespace(
+                            text=LANDING_NO_DOC, content=LANDING_NO_DOC.encode()))
+    monkeypatch.setattr(download.time, "sleep", lambda *_: None)
+
+
+def test_download_keeps_a_stored_body_when_the_landing_links_none(monkeypatch,
+                                                                  tmp_path):
+    """A regeringen landing page that links no document must not overwrite a
+    record whose body came from elsewhere -- `files` is assigned, not merged, so
+    the write would empty it and orphan bytes that stay on disk. This already
+    happened to sou/1995:60 and sou/1999:78."""
+    _no_doc_landing(monkeypatch)
+    before = _stored(tmp_path, "2001/02:82", ["2001-02-82.doc"],
+                     orig_url="http://193.188.157.111/prop?dok=P&post_id=1",
+                     body_format="trips")
+    logged = []
+    record = download.download_document(None, tmp_path, _item(), delay=0,
+                                        log=logged.append)
+    assert record == before                       # returned untouched
+    on_disk = json.loads(compress.read_text(
+        layout.fa_record_file(tmp_path, "prop", "2001/02:82")))
+    assert on_disk == before                      # and never rewritten
+    assert on_disk["orig_url"].startswith("http://193.188.157.111")
+    assert any("keeping the stored record" in m for m in logged)
+
+
+def test_download_still_writes_a_record_that_had_no_body_either(monkeypatch,
+                                                               tmp_path):
+    """The guard is about losing a body, not about never rewriting: a stored
+    record with `files: []` carries nothing to lose, so fresh metadata wins."""
+    _no_doc_landing(monkeypatch)
+    _stored(tmp_path, "2001/02:82", [], title="Stale title")
+    record = download.download_document(None, tmp_path, _item(), delay=0)
+    assert record["files"] == []
+    assert record["title"] == "En proposition"    # refreshed from the listing
+    assert record["url"].startswith("https://www.regeringen.se")
+
+
+def test_download_writes_normally_when_the_landing_links_a_document(monkeypatch,
+                                                                   tmp_path):
+    """The guard must not block the ordinary upgrade path -- a landing that does
+    link a document replaces a body-less record as before."""
+    monkeypatch.setattr(download, "fetch",
+                        lambda session, url, timeout=60: SimpleNamespace(
+                            text='<a href="/contentassets/aa/prop">Prop (pdf)</a>',
+                            content=b""))
+    monkeypatch.setattr(download, "store_documents",
+                        lambda *a, **kw: ["2001-02-82.pdf"])
+    monkeypatch.setattr(download.time, "sleep", lambda *_: None)
+    _stored(tmp_path, "2001/02:82", [])
+    record = download.download_document(None, tmp_path, _item(), delay=0)
+    assert record["files"] == ["2001-02-82.pdf"]

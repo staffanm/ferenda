@@ -86,6 +86,14 @@ LISTING = (API + "/dokumentlista/?doktyp=bet&utformat=json"
            "&sort=datum&sortorder=desc&sz=200")
 TYPE = "bet"
 WATERMARK = ".watermark.json"   # under bet/: HarvestWatermark state
+# the feed's `status` for a betänkande riksdagen has scheduled but not yet
+# debated (beslutad=0): no body of any kind exists for it yet. The other
+# filbilaga-less state is "saknas" -- published, but no printed PDF was ever
+# attached; that one does have an HTML body (see `download_document`).
+PLANNED = "planerat"
+# the parse route for an HTML body (parse.LEGACY_HTML_PARAS): riksdagen's own
+# rendering at dokument_url_html, in either of its two generations
+BODY_FORMAT = "bet-html"
 
 
 def _https(url):
@@ -180,9 +188,20 @@ def _docs(page):
 
 
 def download_document(session, root, entry, delay):
-    """Store one betänkande: the record JSON and, when the entry has a PDF
-    filbilaga, that PDF under `root/bet/<slug>.pdf`. A document without a
-    filbilaga gets a metadata-only record (files: []). Returns the record."""
+    """Store one betänkande: the record JSON and its body -- the PDF filbilaga
+    when riksdagen has attached one, else the HTML the API serves at the
+    record's own url. Returns the record.
+
+    Only a *planned* betänkande is legitimately body-less. riksdagen attaches a
+    printed PDF to recent documents, but for the older ones (rm=1990/91: 97 of
+    100 entries) it never will -- those carry ``status="saknas"`` and their body
+    is the HTML at ``dokument_url_html``, the same route `rskr.py` takes for
+    every one of its documents. Taking the PDF alone left 7 736 betänkanden
+    metadata-only with a full body one request away, so the HTML is fetched
+    whenever there is no filbilaga and the document is not merely planned
+    (``status="planerat"``, beslutad=0 -- no body exists yet, and storing one
+    would flip the record to "final" and stop `_currency` ever upgrading it to
+    the printed PDF)."""
     record = descriptor(entry)
     slug = basefile_slug(record["basefile"])
     fil = pdf_fil(entry)
@@ -198,6 +217,22 @@ def download_document(session, root, entry, delay):
         compress.write_download(
             layout.fa_dir(root, TYPE, record["basefile"]) / name, data)
         record["files"] = [name]
+        time.sleep(delay)
+    elif entry.get("status") != PLANNED:
+        html = request(session, "GET", record["url"]).text
+        # same load-bearing check as rskr's: an empty body would freeze the
+        # document body-less forever, since a "saknas" entry never changes
+        # again and so is never re-downloaded (rule:errors-drive-retry-use-raise)
+        if not html.strip():
+            raise ValueError("%s: empty bet body at %s"
+                             % (record["basefile"], record["url"]))
+        name = slug + ".html"
+        compress.write_download(
+            layout.fa_dir(root, TYPE, record["basefile"]) / name, html)
+        record["files"] = [name]
+        # the parse route for this body -- `_harvested_body` dispatches an html
+        # body on `body_format` and KeyErrors without one
+        record["body_format"] = BODY_FORMAT
         time.sleep(delay)
     compress.write_download(layout.fa_record_file(root, TYPE, record["basefile"]),
                             json.dumps(record, ensure_ascii=False, indent=2))
@@ -232,7 +267,14 @@ def _currency(root, basefile, entry):
         layout.fa_record_file(root, TYPE, basefile)))
     if record["files"]:
         return "final"
-    return "provisional" if pdf_fil(entry) is None else None
+    if pdf_fil(entry) is not None:
+        return None                 # a filbilaga appeared -- upgrade in place
+    # Body-less with no filbilaga: only a *planned* entry is legitimately so.
+    # A published one ("saknas") has an HTML body `download_document` now
+    # fetches, so a record written before that is stale, not current -- without
+    # this the 7 736 body-less betänkanden stay unreachable, since a current
+    # record is skipped and they would never be re-downloaded.
+    return "provisional" if entry.get("status") == PLANNED else None
 
 
 def _published(entry):

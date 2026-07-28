@@ -251,6 +251,7 @@ def tag_frontmatter(blocks):
 # which probed the bytes -- parse never re-probes); each -> a Para stream
 LEGACY_HTML_PARAS = {"text/tml": legacy_formats.riksdagen_html_paras,
                      "skanning2007": legacy_formats.riksdagen_mso_paras,
+                     "bet-html": legacy_formats.riksdagen_bet_paras,
                      "trips": legacy_formats.trips_paras}
 # the html bodies whose text came off print (riksdagen's 2007 OCR Word export,
 # the keyed-in TRIPS databases) -- the chronology check applies to them like

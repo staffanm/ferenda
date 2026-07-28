@@ -14,6 +14,7 @@ import pytest
 from accommodanda.forarbete.legacy_formats import (
     abbyy_pages,
     dokumentstatus_meta,
+    riksdagen_bet_paras,
     riksdagen_html_paras,
     riksdagen_mso_paras,
     trips_paras,
@@ -85,6 +86,51 @@ def test_riksdagen_html_paras_ej_utgiven_sentinel():
     body = (FIXTURES / "riksdagen_ej_utgiven.html").read_text(encoding="utf-8")
     with pytest.raises(ValueError, match="Propositionen ej utgiven"):
         riksdagen_html_paras(body)
+
+
+# --- Adapter 2c: riksdagen betänkande HTML (dokument_url_html) ------------
+
+def test_riksdagen_bet_paras_pre_blocks():
+    """The <pre> generation. riksdagen is inconsistent about how much it puts in
+    one block -- bet 1990/91:JuU4 uses one block per paragraph with no blank
+    line inside, 2001/02:UU11 puts several paragraphs in one block separated by
+    blank lines. The fixture holds both shapes, and each block is reflowed on
+    its own so both come out as paragraphs."""
+    paras = riksdagen_bet_paras(
+        (FIXTURES / "riksdagen_bet_pre.html").read_text(encoding="utf-8"))
+    texts = [p.text for p in paras]
+    # a one-paragraph block: its CRLF hard wrapping collapses to one line
+    assert texts[1].startswith("I detta betänkande behandlas ett regeringsförslag")
+    assert "\n" not in texts[1] and "\r" not in texts[1]
+    # the multi-paragraph block splits on its blank lines rather than staying
+    # one 100 kB blob (which is what reflowing the blocks joined together gives)
+    assert "Sammanfattning" in texts
+    assert len(texts) == 6
+    # the sidhuvud chrome and <h1> are not <pre>, so they never leak in
+    assert not any("Justitieutskottets betänkande" in t for t in texts)
+    assert all(not p.bold and not p.lead_bold for p in paras)   # no bold signal
+
+
+def test_riksdagen_bet_paras_element_generation():
+    """The other generation: one <p> per paragraph carrying <span class="fs0NN">
+    font runs. The font classes are presentational (size, not weight), so no
+    bold signal survives here either -- headings are recovered from numbering
+    downstream, as for every text-inferred body."""
+    paras = riksdagen_bet_paras(
+        (FIXTURES / "riksdagen_bet_elements.html").read_text(encoding="utf-8"))
+    texts = [p.text for p in paras]
+    assert texts[1] == "Utbildningsutskottets betänkande 1979/80:10"
+    # the font runs inside one <p> join into a single collapsed paragraph
+    assert texts[2] == "med anledning av motioner om invandrarundervisning m. m."
+    assert all(not p.bold and not p.lead_bold for p in paras)
+
+
+def test_riksdagen_bet_paras_prefers_pre_over_elements():
+    """A document with both shapes is the <pre> generation: the sidhuvud chrome
+    is <div>/<h1> and would otherwise contribute stray paragraphs."""
+    html = ('<h1>Rubrik</h1><p>chrome</p>'
+            '<pre>Ett stycke\r\nsom radbryts.</pre>')
+    assert [p.text for p in riksdagen_bet_paras(html)] == ["Ett stycke som radbryts."]
 
 
 # --- Adapter 2b: riksdagen skanning2007 Word-export HTML ------------------

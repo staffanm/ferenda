@@ -345,7 +345,7 @@ def store_documents(session, docdir, slug, hrefs, delay):
     return names
 
 
-def download_document(session, root, item, delay):
+def download_document(session, root, item, delay, log=print):
     """Fetch the landing page + its content file(s); store the record JSON,
     the landing HTML, and each file. Returns the stored record, or None when the
     document is rejected on inspection of its landing page (a non-SÖ item under
@@ -361,11 +361,28 @@ def download_document(session, root, item, delay):
                             find_content_links(landing.text), delay)
     compress.write_download(layout.fa_dir(root, typ, basefile) / (slug + ".html"),
                             landing.text)
+    stored = layout.fa_record_file(root, typ, basefile)
+    if not files and compress.exists(stored):
+        previous = json.loads(compress.read_text(stored))
+        if previous.get("files"):
+            # This landing page links no document, but the document already has
+            # a body -- from KB, riksdagen or the Trips import, whose provenance
+            # lives in the stored record's `url`/`orig_url`/`body_format`.
+            # Writing this record would replace `files` (it is assigned, never
+            # merged) with [] and overwrite that provenance, orphaning bytes
+            # that stay on disk and demoting the document to metadata-only. It
+            # already happened to sou/1995:60 and sou/1999:78. A re-download
+            # must be monotonic: never trade a body for no body
+            # (rule:fail-fast -- refuse and say so rather than quietly lose it).
+            log("  %s/%s: landing links no document but %d file(s) are stored "
+                "(%s) -- keeping the stored record"
+                % (typ, basefile, len(previous["files"]),
+                   previous.get("orig_url") or previous.get("url") or "no url"))
+            return previous
     record = {"type": typ, "basefile": basefile, "identifier": identifier,
               "title": item["title"], "date": item["date"], "url": item["url"],
               "files": files}
-    compress.write_download(layout.fa_record_file(root, typ, basefile),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    compress.write_download(stored, json.dumps(record, ensure_ascii=False, indent=2))
     return record
 
 
@@ -537,12 +554,42 @@ def has_live_record(root, typ, basefile):
     same documents as PDFs. The distinction is not cosmetic: the PDF carries
     the font signal the parser needs to recover chapter headings, and the Word
     route yields none, which is why prop. 2006/07:128 parsed with no
-    författningskommentar at all until its PDFs were fetched."""
+    författningskommentar at all until its PDFs were fetched.
+
+    Note this is only "a live record exists", shared with the riksdagen
+    harvesters, where a body-less record is a *modelled* state (a planned
+    betänkande has no body yet and must stay provisional). Whether the document
+    still needs fetching from regeringen.se is `needs_harvest`."""
     recpath = layout.fa_record_file(root, typ, basefile)
     if not compress.exists(recpath):
         return False
     record = json.loads(compress.read_text(recpath))
     return "source" not in record and not word_bodied(record)
+
+
+def needs_harvest(root, typ, basefile):
+    """Whether this document still needs fetching from regeringen.se: no live
+    record, or one with no body.
+
+    A regeringen landing page links its document, so a stored record with
+    ``files: []`` is a download that was *missed*, not a document without a
+    body -- 14 038 of 97 213 records carry one, and sampling their stored
+    landings shows the great majority do link a document (sou 30/30, dir 30/30,
+    fm 30/30, skr 29/30, ds 27/30). Reading them as harvested is what put them
+    out of reach: the incremental walk stopped above them and `--full` skipped
+    them, so no invocation of this downloader could repair one.
+
+    The handful that genuinely have no body (so/lr/pm, ~31) cost one landing
+    fetch per `--full` run and are then rewritten identically --
+    `download_document` refuses to replace a stored body with none, so a
+    re-fetch can only ever add. This lives here rather than in
+    `has_live_record` because it is knowledge about *regeringen.se* pages; the
+    riksdagen walk has its own currency rule (`riksdagen._currency`)."""
+    if not has_live_record(root, typ, basefile):
+        return True
+    record = json.loads(compress.read_text(
+        layout.fa_record_file(root, typ, basefile)))
+    return not record.get("files")
 
 
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
@@ -598,7 +645,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 if only is not None:
                     if item["basefile"] != only:
                         continue
-                    new, done = (1 if download_document(session, root, item, delay)
+                    new, done = (1 if download_document(session, root, item, delay, log)
                                  else 0), True
                     break
 
@@ -610,7 +657,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                 # on-disk record, so they're never skipped -- the landing check in
                 # download_document dedups/rejects them instead.
                 is_downloaded = (item["basefile"] is not None
-                                 and has_live_record(root, typ, item["basefile"]))
+                                 and not needs_harvest(root, typ, item["basefile"]))
                 if not backfill:
                     if watermark.should_stop(is_downloaded, item.get("date")):
                         done = True
@@ -619,7 +666,7 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
                     continue
 
                 try:
-                    if download_document(session, root, item, delay):
+                    if download_document(session, root, item, delay, log):
                         new += 1
                 except requests.HTTPError as exc:
                     errors += 1
