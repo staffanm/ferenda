@@ -1,9 +1,10 @@
 # accommodanda — developer setup
 
 The rebuilt ferenda pipeline: vertical source pipelines (sfs, dv, hudoc, coe,
-icrc, untc, icc, eurlex, forarbete, foreskrift, avg, remisser, wiki, site) that go from downloaded (or,
+icrc, untc, icc, eurlex, forarbete, foreskrift, avg, remisser, wiki, site, stats) that go from downloaded (or,
 for wiki/site, hand-authored) source files to a typed document model and a JSON
-artifact, with the citation engine as a shared library. For *why* it's
+artifact, with the citation engine as a shared library. (`stats` inverts that
+direction — it *reads* the finished corpus and measures it.) For *why* it's
 shaped this way and what's done vs. pending, read
 [`../REWRITE.md`](../REWRITE.md); this file is just how to get it running.
 
@@ -283,6 +284,25 @@ folded into `generate_fingerprint()` so an editorial edit reopens the generate
 gate. Served at `/` (frontpage), `/om/<slug>` + `/om/` hub, and
 `/dataset/sitenews/feed` (+ `/dataset/sitenews/feed.atom`); masthead entries
 "Om"/"Nyheter" in `lib/render.py`'s `MAST_NAV`.
+
+**stats vertical (corpus-wide measurements — `/statistik`)**
+| File | What |
+|---|---|
+| `model.py` | `Measure` (the on-disk `kind` discriminator the renderer dispatches on: `scalar`/`toplist`/`series`/`histogram`/`bars`/`matrix`/`table`) + `Row`/`Point`/`Cell`, and `Report.to_artifact()` which prunes a measure's empty fields so two builds' artifacts diff readably. `note` is where a measure states its population and exclusions — it renders *on* the figure, not as a footnote |
+| `scan.py` | the expensive half: walks the sfs/eurlex/forarbete/dv artifact trees (and `downloaded/sfs/` for change-act titles, which the artifact does not carry) reducing each document to a compact fact row, mapped over a `ProcessPoolExecutor`. Pure and process-safe. Owns the two measurement rules that silently poison whole families of numbers when wrong: **table cells count as text** (a `rad`'s `cells` are a list of *run lists*, two levels deep) and **provenance markers/renumbering stubs do not** |
+| `compute.py` | the 54 measurements as seven groups (A–G), preferring catalog SQL over `scan` wherever the data is in the catalog; `compute(catalog_path)` → `Report`. The measures whose population rule is load-bearing are pure helpers rather than inline code — `text_age` (mean year of the paragrafer actually in force, returning `None` where the register is too silent to answer), `notice_days` (utfärdande → ikraftträdande, base statutes only) and `bill_lag` (proposition → ikraftträdande) |
+| `charts.py` | one `Measure` → its figure. Form follows `kind`: bar *tables* for ranked things (Swedish statute titles are 90 characters and SVG text cannot wrap), SVG lines/columns for series and distributions, a log-scaled heat table for the matrix. Single-series throughout, so no categorical palette and no legend; plotted forms also emit the table view |
+| `render.py` | the artifact → `/statistik`, a pure projection (the page cannot say anything `compute` did not measure); raises if the artifact is absent |
+
+Two verbs, deliberately split: `lagen stats compute` measures the corpus into
+`artifact/stats/statistik.json` (minutes — it must run after `relate`, since it
+reads the catalog), and `lagen stats generate` renders that artifact to the page.
+The split is what makes the numbers diffable between builds, and keeps the
+artifact the source of truth. `compute` is deliberately **not incremental**:
+every measurement is a fact about the whole corpus, so there is no subset of it
+that could be refreshed alone. Like `site`, `stats` is absent from `ARTIFACTS`
+and is never `relate`d/indexed/dumped. The measurement catalog, with each
+number's provenance, is [`../docs/prd-stats.md`](../docs/prd-stats.md).
 
 The catalog-backed document feeds retain the legacy public contract too:
 `/dataset/{sfs,dv,forarbeten,myndfs,myndprax,keyword,eurlex}/feed.atom` and their
@@ -687,6 +707,21 @@ uv run python -m accommodanda.build site parse    # markdown -> artifacts, incre
 uv run python -m accommodanda.build site generate # rewrite the editorial pages
 ```
 
+### Corpus statistics (`/statistik`)
+
+```sh
+uv run python -m accommodanda.build stats compute   # measure the corpus (minutes)
+uv run python -m accommodanda.build stats generate  # render /statistik
+```
+
+`compute` reads the catalog and the sfs/eurlex/forarbete/dv artifact trees, so
+it must run **after `relate`**. It is not incremental — every measurement is a
+fact about the whole corpus, so there is no subset to refresh — and its stage
+declares no per-document `inputs`, so there is no freshness gate either: every
+invocation re-measures, `--force` or not. `generate` raises if no artifact has
+been computed; a statistics page without measurements would publish an empty
+claim.
+
 ## Data layout
 
 The pipelines read large data trees that live under `site/data/` (not all
@@ -712,6 +747,7 @@ site/data/downloaded/forarbete/rskr/<year>/   # data.riksdagen.se harvest (riksd
 site/data/ocr/forarbete/<type>/<year>/        # optional re-OCR sidecar PDFs (win over frozen scans)
 site/data/downloaded/remisser/<typ>/<id-slug>.json  # regeringen.se remiss ärende record (Remiss json), keyed on the referred document, not the ärende-page slug
 site/data/downloaded/remisser/<typ>/<id-slug>/       # its per-organisation answer PDFs (beside the record)
+site/data/artifact/stats/statistik.json       # the 54 corpus measurements (no downloaded/ half — the corpus is the input)
 ```
 
 The frozen legacy corpora (REWRITE.md §7g) were one-time imported and are now

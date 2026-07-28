@@ -167,6 +167,7 @@ accommodanda/
   avg/      JO/JK/ARN-decisions vertical — download·model·parse
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
+  stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
   wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
   api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), patch (source-fix editor)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
@@ -3033,6 +3034,83 @@ synthetic trimmed MTDSG fixture (`test/files/untc/XXIII-1.html`) — both no
 network. `untc` has run a real download+parse+relate+generate harvest: all 14
 curated treaties are live on `/folkratt/` and `/untc/{mtdsg_no}`. `icc` is
 wired the same way; see its own bullet above for its test/harvest status.
+
+### 7k. stats vertical — 54 measurements of the corpus ✅ (first cut)
+
+`accommodanda/stats/` inverts every other vertical's direction: there is
+nothing to download and no document to parse, because the corpus *is* the
+input. It reads the finished catalog and artifact trees, writes one artifact
+holding 54 measurements, and renders that to `/statistik`. The measurement
+catalog — each number with its provenance and its status — is
+[`docs/prd-stats.md`](docs/prd-stats.md).
+
+- **Two verbs, deliberately split.** `lagen stats compute` measures (minutes;
+  it walks the sfs, eurlex, förarbete and dv artifact trees over a
+  `ProcessPoolExecutor`, so it must run after `relate`, which the catalog half
+  reads); `lagen stats generate` renders the artifact to the page. The split is
+  what makes the numbers *diffable* between builds — two artifacts compared say
+  what actually moved in the corpus — and it keeps the architecture's rule
+  intact: the artifact on disk is the source of truth, the page is a pure
+  projection that cannot say anything `compute` did not measure.
+- **Not incremental, on purpose.** Every measurement is a fact about the whole
+  corpus, so there is no subset of it that could be refreshed on its own; the
+  freshness question is "has anything anywhere changed", which only the operator
+  can answer. The stage accordingly declares no per-document `inputs`, so it has
+  no freshness gate at all — every invocation re-measures, with or without
+  `--force`. `run_action` now runs a single-basefile action
+  in-process rather than through the worker pool — not just an optimisation: a
+  pool worker is daemonic and cannot spawn the children `stats compute` fans its
+  scan over.
+- **`model.py`** — `Measure`, whose `kind` (`scalar`/`toplist`/`series`/
+  `histogram`/`bars`/`matrix`/`table`) is the on-disk discriminator the renderer
+  dispatches on, chosen by *what the data's job is* so the renderer never guesses
+  a chart form. `Report.to_artifact()` prunes a measure's empty fields — writing
+  all twelve keys on all 51 triples the artifact and makes a diff unreadable, and
+  the diff is the point of storing it. `note` is where a measure admits its
+  population and exclusions, and it renders *on* the figure: a caveat nobody sees
+  is a measure that misleads.
+- **`scan.py`** — the expensive half, kept separate so the artifact walk is one
+  place and one shape (pure, process-safe, plain tuples out). It owns the two
+  measurement rules that silently poison whole families of numbers: **table cells
+  count as text** (a `rad`'s `cells` are a list of *run lists* — two levels deep,
+  which is exactly what makes a naive read of them come back empty, leaving a
+  definition paragraf measuring only its "I denna lag betyder" stem) and
+  **provenance markers and renumbering stubs do not** (counted naively, "*Lag
+  (2011:590).*" is the shortest rule in Swedish law). It also reads
+  `downloaded/sfs/` for change-act titles, which the artifact does not carry.
+- **`compute.py`** — the 54 measures in seven groups (A–G), preferring catalog
+  SQL over the scan wherever the data is in the catalog. That preference is also
+  the roadmap: every measure reaching for `scan` today is one `relate` could
+  serve from SQL tomorrow (the PRD's R1–R3). Three measures the first cut left
+  out are now in — `text_age` (a statute is a mosaic of paragrafer of different
+  ages; the register says which amendment last touched each one), `notice_days`
+  and `bill_lag` — each extracted as a pure helper so its population rule is
+  testable rather than buried in a builder. Two of the PRD's posts remain
+  unbuilt: 45 (share of decisions carrying a curated name) and 48 (which statute
+  authorized the most agency regulations).
+- **Where a measure's population had to shrink, it says so on the figure.**
+  Notice period is a measure of *base statutes* only: the amendment register
+  carries `rpubl:utfardandedatum` on 11 of 50,948 entries and the download tree
+  has none at all, so the same curve drawn over changes would describe
+  registration practice rather than lawmaking. Bill-to-law lag excludes the
+  5,106 of 8,822 dated propositions stamped 12-31 or 01-01 — a year written as a
+  date, which would put a spurious ±6 months on every old bill. Text age
+  excludes laws whose register dates its amendments but does not name what they
+  touched, since every paragraf would otherwise fall back to the law's own year
+  and the law would read as wholly original.
+- **`charts.py`** — form follows `kind`. Ranked things become bar *tables*, not
+  SVG: the labels are Swedish statute titles running to 90 characters of
+  "Kungörelse om tillämpning av …", and SVG text can neither wrap nor ellipsize,
+  so the label wraps like prose and the bar is a CSS width on the value cell —
+  which makes the accessible table view *be* the chart rather than an alternative
+  to it. Series and distributions are SVG; the matrix is a log-scaled heat table
+  (its largest cell is four orders of magnitude above its smallest, and on a
+  linear ramp every cell but one reads as empty). Every chart is single-series —
+  the corpus has one value per year, per bin, per law — so nothing encodes
+  identity by colour and there is no categorical palette or legend.
+- Absent from `ARTIFACTS` like `site` and `remisser`: no citation graph, so never
+  `relate`d, indexed or dumped. `test/test_stats.py` locks in the scan rules, the
+  artifact pruning and the page projection.
 
 ### 7b. Vertical scope closed ✅
 

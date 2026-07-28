@@ -124,6 +124,8 @@ from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
 from .site import parse as site_parse
 from .site import render as site_render
+from .stats import compute as stats_compute
+from .stats import render as stats_render
 from .untc import download as untc_download
 from .untc import parse as untc_parse
 from .wiki import annotate as wiki_annotate
@@ -671,7 +673,11 @@ def run_action(source, action, basefiles, jobs):
             persist()       # checkpoint so a kill mid-run doesn't lose progress
 
     try:
-        if jobs > 1 and not RUN.dry_run:
+        # a single basefile can never use more than one worker, so run it here
+        # rather than through the pool. Not just an optimisation: a pool worker is
+        # daemonic, and a recipe that parallelises internally (stats compute fans
+        # its corpus scan over a ProcessPoolExecutor) cannot spawn children there.
+        if jobs > 1 and len(basefiles) > 1 and not RUN.dry_run:
             _run_parallel(source, action, basefiles, jobs, absorb)
         else:
             for bf in basefiles:
@@ -2858,6 +2864,40 @@ SOURCES["site"] = Source(
                     inputs=lambda bf: [site_record(bf)], code=SITE_CODE)})
 
 
+# the stats vertical: corpus-wide measurements. It has nothing to download and
+# no document to parse -- it reads the finished corpus (catalog + artifact trees)
+# and writes one artifact, which `generate` renders to /statistik. Like site it
+# carries no citation graph and is absent from ARTIFACTS.
+STATS_CODE = (PKG / "stats" / "compute.py", PKG / "stats" / "scan.py",
+              PKG / "stats" / "model.py")
+
+
+def stats_artifact(basefile):
+    return layout.artifact("stats", basefile)
+
+
+def stats_compute_run(basefile):
+    """Measure the corpus and write the artifact. Deliberately not incremental:
+    every measurement is a fact about the *whole* corpus, so there is no subset
+    of it that could be refreshed on its own -- the freshness question is
+    "has anything anywhere changed", which only the operator can answer. The
+    stage therefore declares no `inputs`, and so carries no freshness gate at
+    all: every invocation re-measures, with or without `--force`."""
+    report = stats_compute.compute(
+        CATALOG,
+        progress=lambda stage: sys.stderr.write("stats: scanning %s\n" % stage))
+    write_artifact("stats", basefile, report.to_artifact())
+
+
+SOURCES["stats"] = Source(
+    "stats", lambda: [stats_render.ARTIFACT_BASEFILE],
+    {"compute": Stage("compute", stats_compute_run, stats_artifact,
+                      code=STATS_CODE)},
+    notes="compute: measure the whole corpus (catalog + artifact trees) into "
+          "artifact/stats/statistik.json -- minutes, not incremental\n"
+          "generate: render that artifact to /statistik")
+
+
 def rebuild_after_commit(changes):
     """Regenerate the static pages an inline-editor commit touched, in dependency
     order: re-parse the changed markdown -> relate the affected wiki source(s) so
@@ -3343,6 +3383,7 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
                  PKG / "lib" / "labels.py",
                  PKG / "api" / "app.py", PKG / "site" / "render.py",
+                 PKG / "stats" / "render.py", PKG / "stats" / "charts.py",
                  # the shipped static chrome: a stylesheet/script edit must
                  # re-stale generate exactly like a renderer edit
                  *sorted((PKG / "lib" / "assets").iterdir()))
@@ -3449,6 +3490,13 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         site_render.write_site(GENERATED)
         print("generate: rebuilt site pages (frontpage, /om, sitenews) -> %s" % GENERATED)
         _emit_segment("generate", "site", time.perf_counter() - t0, status="ok")
+        return
+    if source == "stats":
+        # `lagen stats generate`: render /statistik from the computed artifact.
+        # Same shape as `site` -- one artifact, one page, no catalog rows.
+        dest = stats_render.write_stats(GENERATED)
+        print("generate: rebuilt %s" % dest)
+        _emit_segment("generate", "stats", time.perf_counter() - t0, status="ok")
         return
     if RUN.assets_only:
         render.write_assets(GENERATED)

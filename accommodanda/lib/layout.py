@@ -57,7 +57,7 @@ SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
               "icc": "icc",
               "remisser": "remisser", "kommentar": "kommentar",
-              "begrepp": "begrepp", "site": "site"}
+              "begrepp": "begrepp", "site": "site", "stats": "stats"}
 
 
 def artifact_dir(source):
@@ -166,9 +166,10 @@ def relpath(source, basefile):
     if source == "begrepp":
         # concept names are their own namespace (no host); keep the flat slug
         return Path(_alnum_slug(basefile))
-    if source == "site":
+    if source in ("site", "stats"):
         # editorial pages under fixed basefiles (`frontpage`, `sitenews`,
-        # `om/<slug>`); the basefile is already filesystem-safe, used verbatim
+        # `om/<slug>`) and the single corpus-measurement artifact (`statistik`);
+        # the basefile is already filesystem-safe, used verbatim
         return Path(basefile)
     raise ValueError("unknown source %r" % source)
 
