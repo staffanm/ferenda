@@ -164,6 +164,34 @@ def test_analyze_writes_ann_layer(corpus, monkeypatch):
     assert annstore.drifted(data["meta"]["inputs"]) == []
 
 
+def test_resolve_basefile_prefers_the_primary_over_an_alternate(tmp_path, monkeypatch):
+    """The alternate is a second candidate, not a replacement: when the tree
+    holds the dnr-keyed document, that is the one the join must land on."""
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    for bf in ("pm/KN2026-01597", "pm/nationellt-forbud-mot-pfas"):
+        p = layout.artifact("forarbete", bf)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("{}")
+    assert layout.resolve_basefile(
+        "forarbete", "pm/KN2026-01597", "pm/nationellt-forbud-mot-pfas"
+    ) == "pm/KN2026-01597"
+
+
+def test_resolve_basefile_leaves_an_unresolvable_name_alone(tmp_path, monkeypatch):
+    """Case is the only licence: a basefile matching nothing on disk comes back
+    untouched, so the caller's own missing-artifact error names what it looked
+    for instead of a silently substituted neighbour."""
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    fa_path = layout.artifact("forarbete", "pm/Ju2026-01595")
+    fa_path.parent.mkdir(parents=True, exist_ok=True)
+    fa_path.write_text("{}")
+
+    assert layout.resolve_basefile("forarbete", "pm/JU2026-01595") == "pm/Ju2026-01595"
+    assert layout.resolve_basefile("forarbete", "pm/Ju2026-01595") == "pm/Ju2026-01595"
+    # a different document entirely -- not a respelling of anything present
+    assert layout.resolve_basefile("forarbete", "pm/Fi2026-00001") == "pm/Fi2026-00001"
+
+
 def test_analyze_refuses_to_overwrite_verified(corpus, monkeypatch):
     # a hand-verified analysis is curation: refuse before the LLM spend
     ann = annstore.path("remisser", corpus)

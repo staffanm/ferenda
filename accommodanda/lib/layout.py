@@ -175,6 +175,59 @@ def artifact(source, basefile):
     return artifact_dir(source) / rel.with_name(rel.name + ".json")
 
 
+def resolve_basefile(source, basefile, *alternates):
+    """`basefile` respelled the way the artifact tree actually spells it;
+    `basefile` unchanged when nothing matches.
+
+    `alternates` are further basefiles the same document may be filed under,
+    tried in order after `basefile` itself. A source that mints identity from
+    one page cannot always tell which spelling another source minted from a
+    different page: regeringen.se keys a departementspromemoria on its
+    diarienummer when its /rattsliga-dokument/ listing states one and on the
+    landing-page slug when it doesn't, and a remiss page states neither -- it
+    carries its *own* dnr, which usually but not always coincides. Passing both
+    candidates lets the tree settle it, instead of either source guessing.
+
+    A cross-source join keys on an identifier one source copied out of another's
+    page, and a publisher need not render it the same way twice: regeringen.se
+    prints a diarienummer's department prefix as "JU2026/01595" on the remiss
+    that sends a promemoria out and "Ju2026/01595" on the promemoria's own
+    listing -- one document, two spellings, and the remisser -> forarbete join
+    lands on whichever the remiss page happened to use. Case is the *only*
+    licence granted: a name matching nothing on disk, or matching two files at
+    once, comes back untouched so the caller's own missing-artifact error still
+    names exactly what it looked for (rule:fail-fast).
+
+    Returns a basefile rather than a path because callers need both -- the
+    artifact to read and the ``artifact:<source>/<basefile>`` key that records
+    having read it (lib.annstore) -- and those must agree."""
+    for candidate in (basefile, *alternates):
+        resolved = _respell(source, candidate)
+        if resolved is not None:
+            return resolved
+    return basefile
+
+
+def _respell(source, basefile):
+    """`basefile` as the artifact tree spells it, or None when the tree holds no
+    such document. Case is the only licence granted (see `resolve_basefile`)."""
+    path = artifact(source, basefile)
+    if compress.exists(path):
+        return basefile
+    matches = [p for p in compress.glob(path.parent, "*.json")
+               if p.name.lower() == path.name.lower()]
+    if len(matches) != 1:
+        return None
+    head, _, tail = basefile.rpartition("/")
+    stem = matches[0].name.removesuffix(".json")
+    if stem.lower() != tail.lower():
+        # the tree names this document by something other than the basefile's
+        # own last segment (the per-source `relpath` rule rewrote it), so the
+        # on-disk spelling can't be spliced back
+        return None
+    return "%s/%s" % (head, stem) if head else stem
+
+
 # --------------------------------------------------------------------------
 # patch files -- curated, version-controlled fixes to a document's raw/
 # intermediate source, applied at parse time (see lib/patch.py). Unlike the
