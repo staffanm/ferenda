@@ -132,14 +132,14 @@ def corpus(tmp_path, monkeypatch):
     fa_path.write_text(json.dumps(
         {"basefile": "sou/2026-14", "structure": STRUCTURE}, ensure_ascii=False))
 
-    basefile = "en-remiss-2026/kammarkollegiet"
+    basefile = "sou/2026:14/kammarkollegiet"
     art_path = layout.artifact("remisser", basefile)
     art_path.parent.mkdir(parents=True, exist_ok=True)
     art_path.write_text(json.dumps({
         "basefile": basefile,
-        "case_basefile": "en-remiss-2026",
+        "arende_basefile": "sou/2026:14",
         "organisation": "Kammarkollegiet",
-        "case_titel": "En utredning",
+        "arende_titel": "En utredning",
         # colon identifier as harvested -- analyze() slugs it for the join
         "remitterat": [{"typ": "sou", "basefile": "2026:14"}],
         "source_url": "https://example.org/svar.pdf",
@@ -160,7 +160,75 @@ def test_analyze_writes_ann_layer(corpus, monkeypatch):
     assert data["meta"]["status"] == "generated"
     assert sorted(data["meta"]["inputs"]) == [
         "artifact:forarbete/sou/2026-14",
-        "artifact:remisser/en-remiss-2026/kammarkollegiet"]
+        "artifact:remisser/sou/2026:14/kammarkollegiet"]
+    assert annstore.drifted(data["meta"]["inputs"]) == []
+
+
+def test_analyze_joins_a_promemoria_across_a_case_mismatch(tmp_path, monkeypatch):
+    """A promemoria is keyed on its diarienummer, and regeringen.se prints the
+    department prefix with either case -- the remiss page says "JU2026/01595"
+    where the promemoria's own listing says "Ju2026/01595". The tree's spelling
+    settles the join, and the recorded input key uses that same spelling so
+    drift detection keeps working."""
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+
+    fa_path = layout.artifact("forarbete", "pm/Ju2026-01595")   # as forarbete has it
+    fa_path.parent.mkdir(parents=True, exist_ok=True)
+    fa_path.write_text(json.dumps(
+        {"basefile": "pm/Ju2026/01595", "structure": STRUCTURE}, ensure_ascii=False))
+
+    # the ärende is keyed on the promemoria, in the spelling its own remiss page
+    # used -- the one that does *not* match the forarbete tree
+    basefile = "pm/JU2026/01595/kammarkollegiet"
+    art_path = layout.artifact("remisser", basefile)
+    art_path.parent.mkdir(parents=True, exist_ok=True)
+    art_path.write_text(json.dumps({
+        "basefile": basefile, "arende_basefile": "pm/JU2026/01595",
+        "organisation": "Kammarkollegiet", "arende_titel": "En promemoria",
+        "remitterat": [{"typ": "pm", "basefile": "JU2026/01595"}],   # remiss casing
+        "source_url": "https://example.org/svar.pdf", "full_text": FULL_TEXT,
+    }, ensure_ascii=False))
+
+    monkeypatch.setattr(ai_analyze.llm, "complete_thread",
+                        lambda messages, **kw: VALID_REPLY)
+    data = json.loads(ai_analyze.analyze(basefile).read_text())
+    assert sorted(data["meta"]["inputs"]) == [
+        "artifact:forarbete/pm/Ju2026-01595",
+        "artifact:remisser/pm/JU2026/01595/kammarkollegiet"]
+    assert annstore.drifted(data["meta"]["inputs"]) == []
+
+
+def test_analyze_joins_a_promemoria_on_its_landing_slug(tmp_path, monkeypatch):
+    """forarbete keys a promemoria on its diarienummer only when its own listing
+    text stated one -- otherwise on the landing-page slug. The remiss page states
+    neither (it carries its *own* dnr, which usually but not always coincides),
+    so it hands the join both candidates and the tree settles it. ~30% of the
+    promemoria ärenden harvested resolve this way, not by dnr."""
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+
+    # the tree knows it only by slug; nothing is filed under the remiss's dnr
+    fa_path = layout.artifact("forarbete", "pm/en-veterangard-for-vila")
+    fa_path.parent.mkdir(parents=True, exist_ok=True)
+    fa_path.write_text(json.dumps({"basefile": "pm/en-veterangard-for-vila",
+                                   "structure": STRUCTURE}, ensure_ascii=False))
+
+    basefile = "pm/Fö2024/01914/kammarkollegiet"
+    art_path = layout.artifact("remisser", basefile)
+    art_path.parent.mkdir(parents=True, exist_ok=True)
+    art_path.write_text(json.dumps({
+        "basefile": basefile, "arende_basefile": "pm/Fö2024/01914",
+        "organisation": "Kammarkollegiet", "arende_titel": "En promemoria",
+        "remitterat": [{"typ": "pm", "basefile": "Fö2024/01914",
+                        "slug": "en-veterangard-for-vila"}],
+        "source_url": "https://example.org/svar.pdf", "full_text": FULL_TEXT,
+    }, ensure_ascii=False))
+
+    monkeypatch.setattr(ai_analyze.llm, "complete_thread",
+                        lambda messages, **kw: VALID_REPLY)
+    data = json.loads(ai_analyze.analyze(basefile).read_text())
+    assert "artifact:forarbete/pm/en-veterangard-for-vila" in data["meta"]["inputs"]
     assert annstore.drifted(data["meta"]["inputs"]) == []
 
 

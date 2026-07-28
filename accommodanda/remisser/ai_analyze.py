@@ -120,7 +120,7 @@ def _validate(content, valid_ids, haystack):
 
 def analyze(basefile, force=False):
     """Author and write the `.ann` sentiment layer for one remissvar basefile
-    ("<case-slug>/<org-slug>"); returns the written path. Refuses (before the
+    ("<typ>/<document id>/<org-slug>"); returns the written path. Refuses (before the
     LLM spend) to regenerate a verified layer unless `force`."""
     out = annstore.path("remisser", basefile)
     annstore.guard(out, force)
@@ -132,10 +132,17 @@ def analyze(basefile, force=False):
     # v1 handles only the first cross-ref: a remiss almost always sends out exactly
     # one SOU/Ds, and the rare multi-document referral is deferred rather than
     # guessed at (each would need its own outline + a merged sidecar shape).
-    typ, fa_basefile = svar.remitterat[0]["typ"], svar.remitterat[0]["basefile"]
+    ref = svar.remitterat[0]
+    typ, fa_basefile = ref["typ"], ref["basefile"]
     # remitterat carries the colon identifier ("2019:61"); the förarbete artifact
-    # tree is keyed by the filesystem slug ("2019-61"), so slug it for the join
-    fa_slug = "%s/%s" % (typ, basefile_slug(fa_basefile))
+    # tree is keyed by the filesystem slug ("2019-61"), so slug it for the join.
+    # A promemoria is the awkward one: regeringen.se spells its diarienummer with
+    # either case ("JU2026/01595" here, "Ju2026/01595" there), and forarbete keys
+    # it on the *landing slug* whenever its own listing stated no dnr at all. The
+    # remiss page can't tell which, so it carries both and the tree settles it.
+    fa_slug = layout.resolve_basefile(
+        "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)),
+        *(["%s/%s" % (typ, ref["slug"])] if ref.get("slug") else []))
     host_path = layout.artifact("forarbete", fa_slug)
     assert compress.exists(host_path), (
         "%s: no parsed förarbete artifact at %s -- run "

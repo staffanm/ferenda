@@ -80,7 +80,7 @@ ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:A
 UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <mtdsg_no>.html (MTDSG status page)
 ICC_DOWNLOADED = DOWNLOADED / "icc"                 # <doc-number>.{json,pdf} (Legal Tools record + PDF)
 
-# remisser's case records + answer PDFs share one download tree (see remisser_case)
+# remisser's ärende records + answer PDFs share one download tree (see remisser_arende)
 REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
 
 # index sidecars that live inside a source's artifact dir but are NOT corpus
@@ -151,8 +151,12 @@ def relpath(source, basefile):
     if source in ("hudoc", "coe", "icrc", "untc", "icc"):
         return Path(basefile)
     if source == "remisser":
-        case, org = basefile.split("/", 1)        # "<case-slug>/<org-slug>"
-        return Path(case) / org
+        # "<typ>/<referred document id>/<org-slug>" -- the ärende is keyed on the
+        # document it sends out ("sou/2026:14", "pm/LI2026/01339"), so the id
+        # itself may contain a slash; the org is always the last segment.
+        typ, rest = basefile.split("/", 1)
+        ident, _, org = rest.rpartition("/")
+        return Path(typ) / basefile_slug(ident) / org
     if source == "kommentar":
         # file the annotation under its host source, reusing that source's
         # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
@@ -553,21 +557,37 @@ def eurlex_dir(basefile):
 
 
 # --------------------------------------------------------------------------
-# remisser -- case records and answer PDFs share one download tree (a case's
+# remisser -- ärende records and answer PDFs share one download tree (an ärende's
 # open/closed state is downloader-only, so the record is plain download-stage
 # data, not a stage of its own). The filename grammar lives here so both the
 # harvester (writer) and build.py (reader) derive the same paths.
 # --------------------------------------------------------------------------
 
-def remisser_case(basefile):
-    """One stored case record: ``downloaded/remisser/<case-slug>.json`` -- the
-    Remiss source of truth, beside its answer PDFs (the sibling <case-slug>/ dir)."""
-    return REMISSER_DOWNLOADED / (basefile + ".json")
+def remisser_arende(basefile):
+    """One stored ärende record: ``downloaded/remisser/<typ>/<id-slug>.json`` --
+    the Remiss source of truth, beside its answer PDFs (the sibling
+    ``<id-slug>/`` dir). `basefile` is the referred document's own identity,
+    ``"<typ>/<identifier>"`` (``"sou/2026:14"``, ``"pm/LI2026/01339"``)."""
+    typ, ident = basefile.split("/", 1)
+    return REMISSER_DOWNLOADED / typ / (basefile_slug(ident) + ".json")
 
 
-def remisser_answer(case_basefile, org_slug):
-    """One downloaded answer PDF: ``downloaded/remisser/<case-slug>/<org-slug>.pdf``."""
-    return REMISSER_DOWNLOADED / case_basefile / (org_slug + ".pdf")
+def remisser_answer(arende_basefile, org_slug):
+    """One downloaded answer PDF:
+    ``downloaded/remisser/<typ>/<id-slug>/<org-slug>.pdf`` -- the same relpath
+    rule the artifact tree uses (`relpath`), so record, PDF and artifact all
+    agree on where a given answer lives."""
+    typ, ident = arende_basefile.split("/", 1)
+    return REMISSER_DOWNLOADED / typ / basefile_slug(ident) / (org_slug + ".pdf")
+
+
+# the bookkeeping of which regeringen.se remiss *ärende pages* have been examined,
+# keyed by their URL slug -> the basefile minted for them (null when the ärende was
+# passed over, e.g. an externally authored document). The listing names ärenden by
+# URL slug while the corpus keys them by referred document, so this is what lets
+# an incremental walk stop without re-fetching every ärende page. Derived state:
+# delete it to force a full re-examination of the archive.
+REMISSER_SEEN = REMISSER_DOWNLOADED / ".seen.json"
 
 
 # --------------------------------------------------------------------------

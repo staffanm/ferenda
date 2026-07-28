@@ -32,16 +32,16 @@ def _scenario(tmp_path, monkeypatch):
              "children": [{"type": "stycke", "page": 42,
                            "text": ["Utredningen föreslår ett delat ansvar."]}]}]}))
 
-    svar_path = layout.artifact("remisser", "en-utredning/kammarkollegiet")
+    svar_path = layout.artifact("remisser", "sou/2020:1/kammarkollegiet")
     svar_path.parent.mkdir(parents=True, exist_ok=True)
     svar_path.write_text(json.dumps({
-        "basefile": "en-utredning/kammarkollegiet",
-        "case_basefile": "en-utredning", "organisation": "Kammarkollegiet",
-        "case_titel": "Remiss av SOU 2020:1",
+        "basefile": "sou/2020:1/kammarkollegiet",
+        "arende_basefile": "sou/2020:1", "organisation": "Kammarkollegiet",
+        "arende_titel": "Remiss av SOU 2020:1",
         "remitterat": [{"typ": "sou", "basefile": "2020:1"}],
         "source_url": "https://regeringen.se/svar/kammarkollegiet.pdf",
         "full_text": ["Kammarkollegiet tillstyrker förslaget om delat ansvar."]}))
-    ann = annstore.path("remisser", "en-utredning/kammarkollegiet")
+    ann = annstore.path("remisser", "sou/2020:1/kammarkollegiet")
     ann.parent.mkdir(parents=True, exist_ok=True)
     ann.write_text(json.dumps({
         "meta": {"status": "generated", "inputs": {}},
@@ -70,11 +70,11 @@ def test_remiss_indexes_keys_feedback_on_forarbete_uri(tmp_path, monkeypatch):
 def test_remiss_indexes_skips_unanalyzed_answer(tmp_path, monkeypatch):
     fa_uri, _ = _scenario(tmp_path, monkeypatch)
     # a second answer with no .ann yet is unanalyzed -- silently skipped
-    other = layout.artifact("remisser", "en-utredning/domstolsverket")
+    other = layout.artifact("remisser", "sou/2020:1/domstolsverket")
     other.write_text(json.dumps({
-        "basefile": "en-utredning/domstolsverket",
-        "case_basefile": "en-utredning", "organisation": "Domstolsverket",
-        "case_titel": "Remiss av SOU 2020:1",
+        "basefile": "sou/2020:1/domstolsverket",
+        "arende_basefile": "sou/2020:1", "organisation": "Domstolsverket",
+        "arende_titel": "Remiss av SOU 2020:1",
         "remitterat": [{"typ": "sou", "basefile": "2020:1"}],
         "source_url": "https://regeringen.se/svar/domstolsverket.pdf",
         "full_text": ["Domstolsverket avstyrker."]}))

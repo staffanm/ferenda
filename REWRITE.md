@@ -2691,34 +2691,69 @@ fact-less stray keeps the slug fallback.
 
 ### 7h. remisser vertical — regeringen.se referral responses ✅ (first cut)
 
-`accommodanda/remisser/` — remiss (public referral) cases from
+`accommodanda/remisser/` — remiss (public referral) ärenden from
 regeringen.se/remisser/: a remiss sends a SOU/Ds out for consultation, and over
 the referral period answers ("remissvar") accumulate from courts, agencies and
 organisations. This corpus is **never published as its own pages** — it only
 feeds an opt-in LLM pass whose output surfaces on the *referred* förarbete's
 context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
 
-- **`model.py`**: `Remiss` (the case: title, dnr, deadline, cross-ref to the
-  referred förarbete via `remitterat`, and `svar` — the `Remissinstans` list of
-  organisations that have answered), `Remissvar` (one organisation's parsed
-  answer). `org_slug` derives the filed-under-basename identity that
-  `download.py`/`parse.py`/`build.py` all key on.
-- **`download.py`**: harvests the paginated `/remisser/` listing plus each case
-  page's metadata, "Remissinstanser" PDF and "Remissvar" list; a Genvägar
-  shortcut (or, failing that, the case title) is matched against
-  `lib.regeringen.TYPES` to recover the referred förarbete's canonical
-  basefile. `sync` runs two passes — discover new cases newest-first (stopping
-  at the first already-known slug; `--full` re-walks everything), then
-  re-poll every still-open case (deadline unknown, or within a 21-day grace
-  period of it) for newly-arrived answers and fetch any answer PDF not yet
-  cached. Any per-case fetch or parse failure — an HTTP error, or a 200
-  response whose DOM doesn't match what `parse_case` expects (a bot-challenge
-  interstitial, a truncated response) — is written as a *stub* record from the
-  listing facts alone — the on-disk slug is the incremental stop condition, so
-  a silently-skipped failure would otherwise hide that case from every later
-  incremental run; the stub has no deadline, so it stays "open" and gets
-  re-polled until a real fetch succeeds. `sync_one`/`--only <url>` fetches one
-  already-known case directly, bypassing the listing walk.
+- **`model.py`**: `Remiss` — keyed on **the document it remits**, not the
+  regeringen.se case-page slug: `basefile` is `"<typ>/<identifier>"` of the
+  referred document (`sou/2026:14`, `pm/LI2026/01339`, `ds/2026:9`,
+  `lr/2026/<title-slug>`), the case page's own URL kept separately in `url`.
+  Title, dnr, deadline, cross-ref to the referred förarbete via `remitterat`,
+  `externt_dokument` flagging an ärende whose remitted document regeringen itself
+  never published, and `svar` — the `Remissinstans` list of organisations that
+  have answered. `Remissvar` (one organisation's parsed answer) is basefiled
+  `"<typ>/<document id>/<org-slug>"`. `org_slug` derives the filed-under-basename
+  identity that `download.py`/`parse.py`/`build.py` all key on.
+- **`download.py`**: harvests the `/remisser/` listing via the same AJAX
+  filter endpoint the forarbete listings use (`?p=N` on the plain listing page
+  always answers page one; an empty page mid-walk raises unless `TotalCount`
+  confirms the archive is exhausted) plus each case page's metadata,
+  "Remissinstanser" PDF and "Remissvar" list. The listing's own identity (a
+  URL slug) is never the basefile — only the case page names the document
+  remitted — so a separate **examined-ärende index**
+  (`layout.REMISSER_SEEN`, `downloaded/remisser/.seen.json`:
+  `{"dirty": bool, "arenden": {url-slug: {"basefile": str|null, "until":
+  iso-date|null}}}`) is what the sweep's bookkeeping runs on in place of "is
+  there a record on disk". `until` is the case's deadline plus `GRACE_PERIOD`
+  — because answers accumulate for the whole remissperiod, "already examined"
+  is *not* a reason to skip an ärende, only its closing date is; a `null`
+  `basefile` marks an externally authored ärende, examined once and never
+  fetched again. The "Dokument(et) som remitteras"/"Genvägar" island is
+  matched (`_match_forarbete`) against `lib.regeringen.TYPES` to recover the
+  referred förarbete's canonical basefile (falling back to the case title if
+  the island is absent); the two doctypes regeringen.se publishes without a
+  series number are resolved by the identity rules `lib.regeringen` shares with
+  `forarbete/download.py` — a departementspromemoria (`pm_identity`) on the
+  remiss's own diarienummer, minus any sub-ärende `–N` suffix
+  (`SUBARENDE`), else the landing page's own slug; a lagrådsremiss
+  (`lr_identity`) on `<year>/<title-slug>`. Whether the island links a
+  `/rattsliga-dokument/` page decides `externt_dokument`: no such link means
+  the remitted document was authored by an agency, an external party or the
+  EU, not published by regeringen, so its answers are never fetched. `parse_arende`
+  **raises** when an ärende remits a regeringen-published document but no
+  basefile can be derived from it (an unrecognised doctype) — no stub identity
+  is minted, since filing it under one would make the document unfindable by
+  any later join. `sync` shares one `_poll` step (fetch the case page →
+  classify its origin → merge onto any stored record → fetch pending answer
+  PDFs → update the index entry) across two passes: the **listing walk**
+  (newest-first, polling every case the index says still needs it, stopping
+  after `STOP_AFTER` consecutive cases that need nothing — not the first one,
+  so a case that failed last run leaves a gap the next walk falls into; a
+  failed run leaves the index dirty, so the next run walks the whole archive)
+  and a **catch-up pass** over index entries the walk stopped short of (an old
+  ärende with a long remissperiod still open far below the frontier), re-polled
+  from the url its own record carries. `_is_open` is gone, replaced by
+  `_until`/`_needs_poll` reading the index entry alone. `sync_one`/`--only
+  <url>` fetches one known ärende directly through the same `_poll` logic,
+  subject to the same origin gate. `sync` returns `{"new", "failed",
+  "externt", "repolled", "open", "fetched"}`. Verified live: of the current
+  top 20 listing hits, 13 are stored (keyed sou/ds/pm) and 7 skipped as
+  external; a second run re-polls the 12 still-open cases and does not
+  re-fetch the closed one.
 - **`parse.py`**: one answer PDF → `Remissvar`, via the shared
   `lib/pdftext` (`pdf_pages` + `page_paragraphs`) flattened to plain paragraph
   text — no structural classification, since the only downstream consumer is
@@ -2726,17 +2761,32 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   header to strip (each organisation's PDF carries its own letterhead), so
   `page_paragraphs` now accepts `identifier=None`/`""` and skips
   header-stripping outright rather than matching on a bad substitute.
-- **`ai_analyze.py`** — `lagen remisser ai-analyze <case-slug>/<org-slug>`, the
-  sole LLM pass over this corpus (never called from parse/relate/generate, the
-  same doctrine as `kommentar ai-annotate`): maps one answer onto the specific
-  sections of the referred SOU/Ds it discusses, with a per-section sentiment
-  score and a verbatim quote plus an overall stance, validated strictly
-  (every cited section id real, every quote a verbatim substring of the
-  answer) and written as a `.ann` layer in the curated store (`lib/annstore.py`,
-  `WIKI_ROOT/ann/remisser/…`, mirroring the answer artifact's relpath). Retries
-  once as a real assistant/user follow-up turn on a malformed reply — since
-  generalized into `lib.llm.author` (§5/§6/api, 2026-07-06), the shared
-  validate/self-repair-retry loop eurlex/wiki annotate now use too.
+- **Origin test** — an ärende whose page carries no remitted-document island is
+  read as *external* unless its title names a series identifier; checked against
+  every island-less page among the first 460 ärenden (agency rapport/framställan/
+  hemställan, EU proposal, letter of questions). A `/rattsliga-dokument/` link
+  with no derivable basefile stays a loud `parse_arende` raise — that is a
+  missing identity rule, not an external document. `MARKUP_FIXES` corrects
+  individual pages whose own markup defeats the parser (a heading misspelled
+  "Gevägar"), curated per document rather than by loosening the rule.
+- **`pm` cross-refs carry the landing `slug`** beside the dnr: forarbete keys a
+  promemoria on its diarienummer only when its own listing text stated one, else
+  on the landing slug, and the remiss page states neither — it has its *own* dnr,
+  which usually but not always coincides (~30% of pm ärenden are slug-keyed).
+  `layout.resolve_basefile` now takes `*alternates` and lets the tree settle it.
+- **`ai_analyze.py`** — `lagen remisser ai-analyze <typ>/<document id>/<org-slug>`,
+  the sole LLM pass over this corpus (never called from parse/relate/generate,
+  the same doctrine as `kommentar ai-annotate`): maps one answer onto the
+  specific sections of the referred SOU/Ds it discusses, with a per-section
+  sentiment score and a verbatim quote plus an overall stance, validated
+  strictly (every cited section id real, every quote a verbatim substring of
+  the answer) and written as a `.ann` layer in the curated store
+  (`lib/annstore.py`, `WIKI_ROOT/ann/remisser/…`, mirroring the answer
+  artifact's relpath); joins to the forarbete tree through
+  `layout.resolve_basefile` (below). Retries once as a real assistant/user
+  follow-up turn on a malformed reply — since generalized into `lib.llm.author`
+  (§5/§6/api, 2026-07-06), the shared validate/self-repair-retry loop
+  eurlex/wiki annotate now use too.
 - **Wired into `render.py`**: `_remiss_indexes` walks the remisser artifact
   tree directly (`layout.artifacts("remisser")`, not the catalog — this source
   is never `relate`d), picking up each answer's mirrored `.ann` layer from the
@@ -2745,16 +2795,31 @@ context rail, so it has no `relate`/`index`/`dump`/`generate` stage at all.
   them as a "Remissvar" section — per-section on the cited `avsnitt`, and a
   document-level "most interesting feedback" panel via `Rail.add_document`,
   now wired into `render_forarbete`.
-- **`lib/regeringen.py`** (new, rule:second-use-goes-to-lib): the doctype table
-  (`TYPES`) and listing-DOM walk (`listing_items`) both `forarbete/download.py`
-  and `remisser/download.py` need, extracted once remisser became the second
-  regeringen.se harvester (remisser no longer imports from `forarbete`).
+- **`lib/regeringen.py`** (rule:second-use-goes-to-lib): the doctype table
+  (`TYPES`), the listing-DOM walk (`listing_items`), and now also the
+  **identity rules** for the two doctypes regeringen.se publishes without a
+  series number — `pm_identity(dnr, slug)` (new) and `lr_identity` (moved out
+  of `forarbete/download.py`, which now imports it). Both verticals must mint
+  the same basefile for the same document from different pages, so the rules
+  live in one place rather than each vertical guessing independently.
+- **`lib/layout.py`**: `relpath`/`remisser_arende`/`remisser_answer` updated to
+  the document-keyed grammar — `relpath("remisser", …)` splits the leading
+  `<typ>` off the front of the basefile and the trailing `<org>` off the
+  *back* (a document id may itself contain a slash, e.g. `pm/LI2026/01339`),
+  landing an ärende record at `downloaded/remisser/<typ>/<id-slug>.json` beside
+  its `<typ>/<id-slug>/<org>.pdf` answers and an artifact at
+  `artifact/remisser/<typ>/<id-slug>/<org>.json`. New `resolve_basefile(source,
+  basefile)` respells a cross-source basefile case-insensitively against the
+  artifact tree when the two differ only in case — regeringen.se renders a
+  diarienummer's department prefix inconsistently ("JU2026/01595" on the
+  remiss vs "Ju2026/01595" on the promemoria's own listing) — used by
+  `remisser/ai_analyze.py` and `render.py`'s `_remiss_indexes`.
 - Wired end-to-end: `lagen remisser download [--only <url>] [--full]`
   (harvest) + `parse` Stage (recipe includes `lib/pdftext.py`); no
   `relate`/`index`/`dump`/`generate` — this source publishes nothing of its
   own. `test/test_remisser.py`, `test/test_remisser_parse.py`,
   `test/test_remisser_render.py`, `test/test_remisser_ai_analyze.py`,
-  `test/test_pdftext.py` (32 tests, hermetic).
+  `test/test_pdftext.py` (59 tests, hermetic).
 
 ### 7i. site vertical — lagen.nu's editorial chrome ✅ (first cut)
 
@@ -3000,9 +3065,9 @@ rewrite work.
 | `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
-| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss`/`Remissinstans`/`Remissvar`, `org_slug`), `download` (regeringen.se `/remisser/` two-pass sync + `sync_one`/`--only`, stub records for any per-case fetch/parse failure), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
+| `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss` keyed on the *referred document's* own identity, `basefile = "<typ>/<identifier>"` — not the regeringen.se ärende-page slug, kept in `url` — plus `Remissinstans`/`Remissvar`, `org_slug`, `Remiss.externt_dokument`), `download` (regeringen.se `/remisser/` sync over the AJAX filter listing (`REMISS_CATEGORY`, not the decorative `?p=N`); `parse_arende` raises rather than minting a stub identity when an ärende remits a regeringen-published document of an unrecognised doctype; `pm`/`lr` cross-refs resolved via `lib.regeringen`'s shared identity rules; the examined-ärende index `layout.REMISSER_SEEN` — keyed by URL slug, since only the ärende page names the remitted document — drives the sweep, `until` = deadline + grace period; `sync`'s shared `_poll` step + `sync_one`/`--only`, both gated by `externt_dokument` for ärenden whose remitted document regeringen didn't publish), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`, joined to forarbete via `layout.resolve_basefile`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar/forarbete (`ai-genomforande`) `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
-| `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`) and `ul.list--block` listing walk (`listing_items`), used by both `forarbete/download.py` and `remisser/download.py` |
+| `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`), `ul.list--block` listing walk (`listing_items`), and the identity rules for the two series-numberless doctypes (`pm_identity`, `lr_identity`) so `forarbete/download.py` and `remisser/download.py` mint the same basefile for the same document from different pages |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`/`catalog_root` — the latter decoupling `catalog.sqlite`'s location from the bulk corpus, env `CATALOG_ROOT`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
@@ -3131,6 +3196,47 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **remisser** (2026-07-27) — re-keyed the whole vertical on the document a
+  case remits, on top of same-day fixes to the listing walk and cross-refs.
+  The listing walk was paging `/remisser/?p=N`, which regeringen.se answers
+  with page one regardless of `N`, so incremental sync never saw past the
+  newest 20 of 3,291 archived cases — it now uses the same AJAX filter
+  endpoint forarbete's listings use (`REMISS_CATEGORY = 2099`), and an empty
+  page whose `TotalCount` says cases remain now raises rather than reading as
+  a completed sweep. `Remiss.basefile` is no longer the regeringen.se ärende-page
+  URL slug; it is `"<typ>/<identifier>"` of the referred document (`sou/2026:14`,
+  `pm/LI2026/01339`, `ds/2026:9`, `lr/2026/<title-slug>`), with `Remissvar`
+  basefiled `"<typ>/<document id>/<org-slug>"` — keying the corpus on the document
+  makes the join to forarbete the basefile itself, not a separate lookup.
+  `_match_forarbete` resolves `pm` (departementspromemoria — the modern,
+  unnumbered replacement for a Ds) and `lr` (lagrådsremiss) via new shared
+  identity rules in `lib/regeringen.py` (`pm_identity`, moved out of
+  `forarbete/download.py`; `lr_identity`) — a promemoria on its diarienummer
+  (minus any sub-ärende `–N` suffix) or, failing that, its landing slug; a
+  lagrådsremiss on `<year>/<title-slug>`. Both verticals now mint identical
+  basefiles for the same document reached from different pages. `parse_arende`
+  raises, rather than minting a stub identity, when an ärende remits a
+  regeringen-published document of an unrecognised doctype. `Remiss.externt_dokument`
+  flags a case whose "Dokument(et) som remitteras"/"Genvägar" island links no
+  `/rattsliga-dokument/` page — the remitted document was authored by an
+  agency, an external party or the EU — and such a case is examined once and
+  never fetched again. Because the listing names a case by URL slug while the
+  corpus keys it by referred document, a new **examined-ärende index**
+  (`layout.REMISSER_SEEN`) is now what drives the sweep in place of "is there
+  a record on disk": `{slug: {"basefile": str|null, "until": iso-date|null}}`,
+  `until` being the deadline plus `GRACE_PERIOD` (answers accumulate for the
+  whole remissperiod, so having examined an ärende is not a reason to skip it —
+  only its closing date is). `sync` was restructured around one shared
+  `_poll` step used by both the listing walk and a catch-up pass over index
+  entries the walk stopped short of; `_is_open` is gone, replaced by
+  `_until`/`_needs_poll`. New `layout.resolve_basefile` respells a
+  cross-source basefile case-insensitively (regeringen.se prints a
+  diarienummer's department prefix inconsistently across its own pages),
+  used by `remisser/ai_analyze.py` and `render.py`'s `_remiss_indexes`. Before
+  any of this, only 5 documents in the whole corpus carried a förarbete
+  cross-ref; verified live, of the current top 20 listing hits 13 are now
+  stored (keyed sou/ds/pm) and 7 correctly skipped as external, and a second
+  run re-polls the 12 still-open cases without re-fetching the closed one.
 - **eurlex/lib** (2026-07-27) — four independent fixes landed together:
   `eurlex/annotate.py` gained `_annex_cut`, which trims trailing annexes from
   the ai-annotate prompt only (the artifact keeps them) — CLP (32008R1272)

@@ -239,11 +239,16 @@ def _remiss_indexes():
         # v1 maps only the first cross-ref, matching ai_analyze.analyze (a remiss
         # almost always sends out exactly one SOU/Ds); cache the referred
         # förarbete's uri so N answers to the same document reopen it once.
-        typ, fa_basefile = svar["remitterat"][0]["typ"], svar["remitterat"][0]["basefile"]
+        ref = svar["remitterat"][0]
+        typ, fa_basefile = ref["typ"], ref["basefile"]
         key = (typ, fa_basefile)
         if key not in host_uri:
-            fa_path = layout.artifact(
-                "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)))
+            # resolve_basefile settles the spelling against the tree: a
+            # promemoria's identity is a diarienummer the publisher renders with
+            # either case, or the landing slug it carries as an alternate
+            fa_path = layout.artifact("forarbete", layout.resolve_basefile(
+                "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)),
+                *(["%s/%s" % (typ, ref["slug"])] if ref.get("slug") else [])))
             host_uri[key] = json.loads(compress.read_bytes(fa_path))["uri"]
         fa_uri = host_uri[key]
 
