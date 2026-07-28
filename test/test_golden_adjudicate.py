@@ -759,3 +759,64 @@ def test_grafik_heading_real_text_change_stays():
                "  old: 'Bilaga 1 om avgifter'\n  new: 'Bilaga 1 om kostnader'")
     unexplained, accepted = golden_sfs.adjudicate([changed], GRAFIK_GOLDEN)
     assert unexplained == [changed] and accepted == []
+
+
+# --- redaktionell-retype: a publisher's editorial note carried as an ordinary
+# stycke by the old pipeline, retyped in place as a typed redaktionell node --
+
+REDAKTIONELL_GOLDEN = {
+    "uri": "https://lagen.nu/1919:878", "amendments": [],
+    "structure": [{"type": "paragraf", "id": "P4", "ordinal": "4", "children": [
+        {"type": "stycke", "id": "P4S1", "beteckning": "4 §",
+         "text": "4 § har upphävts genom lag (1982:1101)"},
+    ]}]}
+# the new pipeline: same id, same text, only `type` changed
+REDAKTIONELL_NEW = {
+    "structure": [{"type": "paragraf", "id": "P4", "ordinal": "4", "children": [
+        {"type": "redaktionell", "id": "P4S1", "beteckning": "4 §",
+         "sort": "upphavd", "satt_av": "1982:1101",
+         "text": "4 § har upphävts genom lag (1982:1101)"},
+    ]}]}
+
+
+def test_redaktionell_retype_forgiven():
+    # the retype keeps the id, so both sides of the mismatch print the same label
+    problem = "structure/P4: node mismatch: P4S1 != P4S1"
+    unexplained, accepted = golden_sfs.adjudicate(
+        [problem], REDAKTIONELL_GOLDEN, REDAKTIONELL_NEW)
+    assert unexplained == []
+    assert [r for r, _ in accepted] == ["redaktionell-retype"]
+
+
+def test_redaktionell_retype_needs_the_detector_to_agree():
+    # a stycke that is ordinary statute text must not be forgiven just because
+    # it changed type -- that is a real regression
+    golden = {**REDAKTIONELL_GOLDEN,
+              "structure": [{"type": "paragraf", "id": "P4", "children": [
+                  {"type": "stycke", "id": "P4S1",
+                   "text": "Denna lag gäller yrkesmässig trafik."}]}]}
+    new = {"structure": [{"type": "paragraf", "id": "P4", "children": [
+        {"type": "redaktionell", "id": "P4S1", "sort": "upphavd",
+         "text": "Denna lag gäller yrkesmässig trafik."}]}]}
+    unexplained, _accepted = golden_sfs.adjudicate(
+        ["structure/P4: node mismatch: P4S1 != P4S1"], golden, new)
+    assert unexplained == ["structure/P4: node mismatch: P4S1 != P4S1"]
+
+
+def test_redaktionell_retype_does_not_forgive_changed_text():
+    # only `type` may change; text that moved is a real diff
+    new = {"structure": [{"type": "paragraf", "id": "P4", "children": [
+        {"type": "redaktionell", "id": "P4S1", "sort": "upphavd",
+         "text": "Har upphävts genom lag (2020:1)"}]}]}
+    unexplained, _accepted = golden_sfs.adjudicate(
+        ["structure/P4: node mismatch: P4S1 != P4S1"],
+        REDAKTIONELL_GOLDEN, new)
+    assert unexplained == ["structure/P4: node mismatch: P4S1 != P4S1"]
+
+
+def test_a_genuine_identity_change_is_never_a_retype():
+    # different ids on the two sides is a real node mismatch, not a retype
+    unexplained, _accepted = golden_sfs.adjudicate(
+        ["structure/P4: node mismatch: P4S1 != P5S1"],
+        REDAKTIONELL_GOLDEN, REDAKTIONELL_NEW)
+    assert unexplained == ["structure/P4: node mismatch: P4S1 != P5S1"]

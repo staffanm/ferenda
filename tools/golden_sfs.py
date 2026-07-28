@@ -30,7 +30,9 @@ from pathlib import Path
 
 from lxml import etree
 
+from accommodanda.lib.util import normalize_space
 from accommodanda.sfs import graphics as sfs_graphics
+from accommodanda.sfs import redaktionell as sfs_redaktionell
 
 XHTML = "http://www.w3.org/1999/xhtml"
 
@@ -812,6 +814,9 @@ re_amendment_note = re.compile(
 re_structure_extra = re.compile(r"^structure(?:/.*)?: extra node (\S+)$")
 re_structure_missing = re.compile(r"^structure(?:/.*)?: missing node (\S+)$")
 re_structure_changed = re.compile(r"^structure(?:/(.*))?: \w+ changed:")
+# a node whose type changed but whose id did not: `node_label` prefers the id,
+# so both sides print the same label (see `_redaktionell_retype`)
+re_node_mismatch = re.compile(r"^structure(?:/.*)?: node mismatch: (\S+) != (\S+)$")
 
 def is_marker_only(text):
     """Whether `text` is *only* an omission marker (+ an optional trailing
@@ -951,6 +956,36 @@ def _is_grafik_heading(problem):
         return False
     clean, sort = sfs_graphics.heading_gap(old)
     return sort is not None and clean.strip() == (new or "").strip()
+
+
+# --- redaktionell-retype -------------------------------------------------
+#
+# The publisher writes a repeal notice ("4 § har upphävts genom lag
+# (1982:1101)") or a corpus gap ("/Författningens text finns bara i tryckt
+# version/") as an ordinary stycke, indistinguishable from statute text. The
+# new pipeline retypes it as a typed `redaktionell` node (sfs.redaktionell +
+# nf.retype_editorial), keeping the id, the inline runs and the beteckning --
+# only `type` changes. Against a golden built from the old output that surfaces
+# as one "node mismatch" per retyped node, with the *same* label on both sides
+# because `node_label` prefers the unchanged id.
+#
+# The gate is narrow in both directions: the golden node must be the stycke the
+# detector actually recognises, the new node must be the `redaktionell` it was
+# retyped to, and their text must be unchanged. A stycke that changed type for
+# any other reason, or whose text moved, stays a review item.
+
+def _redaktionell_retype(problem, ctx):
+    m = re_node_mismatch.match(problem)
+    if not m or m.group(1) != m.group(2):
+        return False               # a real identity change, not a pure retype
+    old = ctx["golden_nodes"].get(m.group(1))
+    new = ctx["new_nodes"].get(m.group(2))
+    if old is None or new is None:
+        return False
+    return (old.get("type") == "stycke" and new.get("type") == "redaktionell"
+            and node_text(old).strip() == node_text(new).strip()
+            and sfs_redaktionell.editorial(
+                normalize_space(node_text(old))) is not None)
 
 
 def grafik_paired_problems(problems, ctx):
@@ -1151,6 +1186,8 @@ PREDICATES = (
     ("grafik-node-replaces-marker", _grafik_extra_node),
     ("grafik-node-replaces-marker", _grafik_missing_marker),
     ("grafik-node-replaces-marker", _grafik_heading_marker),
+    # a publisher's editorial note stycke -> a typed redaktionell node, same id
+    ("redaktionell-retype", _redaktionell_retype),
     # broadest last: a post-freeze-rewritten paragraf forgives any of its
     # references not already claimed by a more specific (new-is-right) family.
     ("post-freeze-source-amendment", _post_freeze_source_amendment),

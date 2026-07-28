@@ -40,7 +40,7 @@ from pathlib import Path
 from ..lib import lagrum, util
 from ..lib.catalog import BASE
 from ..lib.coe_ids import article_fragment
-from . import begrepp, graphics
+from . import begrepp, graphics, redaktionell
 from . import register as register_mod
 from .model import (
     Avdelning,
@@ -128,7 +128,10 @@ def inline_references(nodes, frag=""):
         if kind in ("rubrik", "upphavd", "tabell"):
             continue
         eff = node.get("id") or frag
-        if kind == "stycke":
+        # `redaktionell` is a retyped stycke and carries the same inline links
+        # (a repeal notice links the repealing SFS); scanned as a container its
+        # own runs would never be read and that link would be dropped
+        if kind in ("stycke", "redaktionell"):
             refs += inline_links(node.get("text", []), eff)
             for child in node.get("children", []):
                 if child["type"] == "punkt":
@@ -430,6 +433,21 @@ def grafik_node(proj, sort, satt_av, **extra):
             "satt_av": satt_av, **extra}
 
 
+def retype_editorial(nf, stycke):
+    """Retype a projected stycke as ``redaktionell`` when its whole text is a
+    publisher's editorial note rather than statute text (`redaktionell.py`).
+
+    Retypes the finished node instead of building a fresh one so the id, the
+    inline runs and the paragraf beteckning are carried over untouched -- a
+    repeal notice keeps its link to the repealing SFS, and any anchor already
+    pointing at the stycke still resolves. Only `type` changes, plus the two
+    fields that say which note it is."""
+    ed = redaktionell.editorial(util.normalize_space(stycke.text))
+    if not ed:
+        return nf
+    return {**nf, "type": "redaktionell", "sort": ed[0], "satt_av": ed[1]}
+
+
 def project_children(children, pairs, proj, frag, live=True, satt_av=None):
     gov = graphics.governing_sfs(children) or satt_av
     out = []
@@ -498,7 +516,9 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                     out.append(grafik_node(proj, gap[0], gap[1] or gov))
                 else:
                     sub = extend(pairs, "S", position_ordinal(node, children))
-                    out.append(stycke_nf(node, sub, proj, frag, live, satt_av=gov))
+                    out.append(retype_editorial(
+                        stycke_nf(node, sub, proj, frag, live, satt_av=gov),
+                        node))
             case Lista():
                 out.append({"type": "lista", "id": None,
                             "children": flatten_list(node, pairs, proj, frag, live)})
@@ -632,7 +652,7 @@ def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None):
         nf = stycke_nf(node, sub, proj, frag, live, mode=mode, satt_av=gov)
         if node is paragraf.children[0]:
             nf["beteckning"] = beteckning(paragraf)
-        out.append(nf)
+        out.append(retype_editorial(nf, node))
     return out
 
 

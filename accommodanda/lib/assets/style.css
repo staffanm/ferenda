@@ -428,6 +428,13 @@ td.grafik .grafik-img { max-height: 3.5rem; width: auto; border: 0;
 .grafik-saknas { font-family: var(--serif); font-style: italic;
                font-size: .85rem; color: var(--ink-3); }
 td.grafik-saknas { white-space: nowrap; color: var(--ink-3); }
+/* a publisher's editorial note standing where statute text would be: a repeal
+   notice ("Har upphävts genom förordning (2024:1330).") or the corpus gap
+   "/Författningens text finns bara i tryckt version/". Same subdued treatment
+   as the markers above -- it is the publisher speaking, not the statute -- but
+   never hidden, and it keeps its links (sfs/redaktionell.py) */
+p.redaktionell { font-family: var(--serif); font-style: italic;
+               color: var(--ink-3); }
 /* a temporal variant's entry-into-force state ("/Träder i kraft: den dag
    regeringen bestämmer/"), printed beside its in-force sibling. Subdued:
    the slash delimiters already mark it as editorial, like the source */

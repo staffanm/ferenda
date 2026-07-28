@@ -19,8 +19,11 @@ from html import escape
 
 from .text import runs_text
 
-# node types rendered as one text block; containers are recursed into
-_LEAF = ("stycke", "punkt", "listelement", "upphavd", "moment")
+# node types rendered as one text block; containers are recursed into.
+# `redaktionell` is a retyped stycke (sfs/nf.py) and diffs exactly like one:
+# left out, a repealed paragraf's notice — and with it the paragraf's whole
+# visible content — vanishes from "jämför med tidigare lydelser"
+_LEAF = ("stycke", "punkt", "listelement", "upphavd", "moment", "redaktionell")
 
 
 def blocks(nodes):

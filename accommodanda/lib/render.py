@@ -1719,8 +1719,13 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                % (escape(str(marker)), "" if is_listitem else " ")
                if marker else "")
         tag = "li" if is_listitem else "p"
-        open_html = "<%s%s%s>%s%s" % (tag, _id_attr(nid), ra, num,
-                                      render_runs(node["text"], site))
+        # a publisher's editorial note (a repeal notice, "text finns bara i
+        # tryckt version") renders like the stycke it replaced -- same marker,
+        # same links -- but subdued, so the reader sees at a glance that it is
+        # the publisher speaking and not the statute (sfs/redaktionell.py)
+        cls = ' class="redaktionell"' if t == "redaktionell" else ""
+        open_html = "<%s%s%s%s>%s%s" % (tag, _id_attr(nid), cls, ra, num,
+                                        render_runs(node["text"], site))
         # a stycke/punkt often introduces a list -- render its punkt/lista children
         # (previously dropped, so numbered lists vanished from the page). The NF
         # flattens nested lists into document order (nf.flatten_list); rebuild the
@@ -1776,7 +1781,8 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         kids = node.get("children", [])
         children = "".join(
             render_node(c, site, doc_uri, toc, rail,
-                        drop_marker=(i == 0 and c.get("type") == "stycke"))
+                        drop_marker=(i == 0 and c.get("type")
+                                     in ("stycke", "redaktionell")))
             for i, c in enumerate(kids))
         # the §-symbol belongs with the numeral ("1 §") in the gutter; the
         # permalink anchor keeps its own (pilcrow) glyph
