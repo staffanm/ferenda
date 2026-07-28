@@ -29,6 +29,7 @@ the corpus as an ordinary eurlex document, not as an external `.ann` link.
 
 import json
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
 
@@ -68,24 +69,29 @@ GUIDANCE_SITES = [
 # read by `propose-guidance <CELEX>` to auto-find the page(s) for an act. The path
 # is owned by layout (which excludes it from `artifacts()` as a non-document).
 INDEX_PATH = layout.GUIDANCE_INDEX
-# a full crawl is a few hundred page fetches; fan out modestly. Concurrency does
-# NOT change the DG site's 429 rate (measured: same ~half-fail at 1/3/6 workers),
-# so parallelism only finishes the pages that *do* succeed sooner
-CRAWL_WORKERS = 8
+# a full crawl is a few hundred page fetches. Concurrency does NOT change the DG
+# site's 429 rate (measured: same ~half-fail at 1/3/6 workers), so extra workers
+# only buy wall-clock on the pages that *do* succeed -- which is not a reason to
+# skip the delay every other source honours (rule:respect-politeness). Two
+# workers, each pausing `delay` between its own fetches.
+CRAWL_WORKERS = 2
 
 
 def _session():
-    """A requests session that retries a couple of times *immediately* on the
-    transient statuses the Commission WAF throws -- it 429s a large random fraction
-    of requests with a `Retry-After: 0.000` (i.e. retry now) and enforces a rate
-    budget that no client-side backoff defeats. So we retry fast (a genuine
-    transient clears) and rely on the index *merging across runs* for the pages a
-    given run's budget can't reach -- not on grinding one run to completion (that
-    turns a 2-minute crawl into hours). One session per thread (not shareable
-    across concurrent GETs)."""
+    """A requests session that retries a couple of times on the transient statuses
+    the Commission WAF throws -- it 429s a large random fraction of requests and
+    enforces a rate budget that no client-side backoff defeats, so we rely on the
+    index *merging across runs* for the pages a given run's budget cannot reach
+    rather than grinding one run to completion. One session per thread (not
+    shareable across concurrent GETs).
+
+    The server's own `Retry-After` is honoured: it usually says `0.000` (retry
+    now), which costs nothing, but when it asks for a real pause that is exactly
+    the signal a client has no business overriding. A small backoff rides along
+    for the 5xx statuses, which carry no Retry-After."""
     s = requests.Session()
     s.headers["User-Agent"] = UA
-    retry = Retry(total=2, backoff_factor=0, respect_retry_after_header=False,
+    retry = Retry(total=2, backoff_factor=0.5, respect_retry_after_header=True,
                   status_forcelist=(429, 500, 502, 503, 504),
                   allowed_methods=frozenset(["GET"]))
     s.mount("https://", HTTPAdapter(max_retries=retry))
@@ -239,14 +245,25 @@ def page_celexes(url):
             if "eur-lex" in href if (c := celex_from_href(href))}
 
 
-def build_index(sites=GUIDANCE_SITES, progress=None, limit=None, force=False):
+def _polite_page_celexes(url, delay):
+    """`page_celexes` with the inter-fetch pause. Each worker sleeps on its own
+    thread, so `CRAWL_WORKERS` threads make at most one request per `delay`
+    each -- the same per-connection rate every other harvester keeps."""
+    time.sleep(delay)
+    return page_celexes(url)
+
+
+def build_index(sites=GUIDANCE_SITES, progress=None, limit=None, force=False,
+                delay=0.3):
     """Crawl the configured guidance sites and return `(index, stats)`. `index`
     maps each act CELEX to the sorted guidance-page URLs that reference it; unless
     `force`, it is **merged onto the existing on-disk index** -- the site 429s a
     random slice of every run, so successive runs fill each other's gaps and the
     index converges (a `force` run starts clean, authoritative when the rate budget
     is fresh). `stats` is `{fetched, total, failed:[(url, err)]}`. `progress(done,
-    total, url)` is called as pages resolve; `limit` caps pages (a quick check)."""
+    total, url)` is called as pages resolve; `limit` caps pages (a quick check).
+    `delay` is the pause each worker takes between its own fetches, defaulting to
+    `build.POLITENESS` (rule:respect-politeness)."""
     sess = _session()
     pages = []
     for sitemap_url, pattern in sites:
@@ -256,7 +273,8 @@ def build_index(sites=GUIDANCE_SITES, progress=None, limit=None, force=False):
     index = {} if force else {c: set(v) for c, v in load_index().items()}
     failed, done, fetched = [], 0, 0
     with ThreadPoolExecutor(max_workers=CRAWL_WORKERS) as pool:
-        futures = {pool.submit(page_celexes, url): url for url in pages}
+        futures = {pool.submit(_polite_page_celexes, url, delay): url
+                   for url in pages}
         for fut in as_completed(futures):
             url = futures[fut]
             done += 1

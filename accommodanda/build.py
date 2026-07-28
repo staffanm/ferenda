@@ -2752,7 +2752,7 @@ def kommentar_discover_guidance(args):
         util.status(done, total, "discover-guidance  %s" % url)
 
     index, stats = guidance_discover.build_index(
-        progress=progress, limit=limit, force=RUN.force)
+        progress=progress, limit=limit, force=RUN.force, delay=POLITENESS)
     sys.stderr.write("\n")
     path = guidance_discover.write_index(index)
     missed = stats["total"] - stats["fetched"]
