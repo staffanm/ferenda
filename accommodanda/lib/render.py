@@ -38,6 +38,7 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 from fastapi.testclient import TestClient
+from markupsafe import Markup
 
 from ..api import app as api_service
 from . import (
@@ -59,6 +60,7 @@ from .eu_structure import flatten as eurlex_flatten
 from .eu_structure import subarticle_key
 from .markdown import begrepp_uri
 from .text import presented_consolidation, runs_text
+from .tpl import ENV
 from .util import basefile_slug, split_numalpha
 
 # the browser-facing static chrome (stylesheet, client scripts, robots.txt),
@@ -628,11 +630,7 @@ MIN_TOC = 3   # below this many headings a TOC adds clutter, not navigation
 def render_toc(toc):
     if len(toc.entries) < MIN_TOC:
         return ""
-    items = "".join('<a href="#%s" class="lvl%d">%s</a>'
-                    % (escape(anchor), min(level, 3), escape(text))
-                    for anchor, text, level in toc.entries)
-    return ('<nav class="toc"><div class="toc-h">Innehåll</div>'
-            '<div class="toc-list">%s</div></nav>' % items)
+    return _META.toc(toc.entries)
 
 
 # --------------------------------------------------------------------------
@@ -748,12 +746,7 @@ def _capped_list(lines, cap=None, word="fler"):
     # resolved at call time, not bound as a default: the module constant is
     # monkeypatched in tests, and a default argument would freeze it
     cap = PANEL_CAP if cap is None else cap
-    inner = "<ul>%s</ul>" % "".join(lines[:cap])
-    if len(lines) > cap:
-        inner += ('<details class="more"><summary>+%d %s</summary>'
-                  '<ul>%s</ul></details>'
-                  % (len(lines) - cap, word, "".join(lines[cap:])))
-    return inner
+    return _RAIL.capped_list([Markup(line) for line in lines], cap, word)
 
 
 def document_inbound(site, uri, exclude_from=()):
@@ -831,22 +824,16 @@ def forarbeten_section(site, art):
     shown = [html for _, html, kind in entries if kind not in ("bet", "rskr")]
     if not shown:
         return "", own_uris
-    # collapse a long list: first five always visible, the rest behind a
+    # a long list collapses: first five always visible, the rest behind a
     # "+N fler" disclosure (no extra JS -- a native <details>)
-    head = "".join("<li>%s</li>" % html for html in shown[:5])
-    rest = shown[5:]
-    more = ('<details class="forarbeten-mer"><summary>+ %d fler</summary>'
-            '<ul>%s</ul></details>'
-            % (len(rest), "".join("<li>%s</li>" % html for html in rest))) \
-        if rest else ""
-    return ('<section class="forarbeten"><h2>Förarbeten</h2><ul>%s</ul>%s</section>'
-            % (head, more)), own_uris
+    return _PANELS.forarbeten_section([Markup(h) for h in shown], 5), own_uris
 
 
 def _ext_link(url, label):
     """The `.ext` external-reference anchor markup, shared by every
     out-of-corpus link (EUR-Lex CELEX pages, guidance links, …)."""
-    return '<a class="ext" href="%s" rel="external">%s</a>' % (escape(url), escape(label))
+    return Markup('<a class="ext" href="%s" rel="external">%s</a>') % (url,
+                                                                       label)
 
 
 def _directive_link(site, directive, target=None):
@@ -1241,21 +1228,14 @@ def merge_rail_sections(sections):
 
 def render_rail_sections(sections):
     """A panel body: every section as an accordion row, highest-priority first
-    and open, the rest collapsed. The `data-label`/`data-n` attributes are what
-    the client reads to compose a location's collapsed stub line, so the summary
-    never drifts from the panel it summarises."""
-    out = []
-    for i, sec in enumerate(sorted(merge_rail_sections(sections), key=_rail_rank)):
-        out.append(
-            '<details class="rail-sec %s" data-sec="%s" data-label="%s" '
-            'data-n="%d"%s><summary><span class="rail-sec-h">%s</span>%s'
-            '</summary>%s</details>'
-            % (escape(sec.key), escape(sec.key), escape(sec.label), sec.count,
-               " open" if i == 0 else "", escape(sec.label),
-               # a lone item counts itself; the number would only add noise
-               '<span class="rail-sec-n">%d</span>' % sec.count
-               if sec.count > 1 else "", sec.html))
-    return "".join(out)
+    and open, the rest collapsed (partials/rail.html). The `data-label`/
+    `data-n` attributes are what the client reads to compose a location's
+    collapsed stub line, so the summary never drifts from the panel it
+    summarises."""
+    return _RAIL.rail_sections(
+        [{"key": sec.key, "label": sec.label, "count": sec.count,
+          "html": Markup(sec.html)}
+         for sec in sorted(merge_rail_sections(sections), key=_rail_rank)])
 
 
 class Rail:
@@ -1264,8 +1244,8 @@ class Rail:
     id. Serialized to a JSON island the client swaps into the right rail as the
     reader scrolls -- the Gravitas "Kontext för …" rail. The link/href logic
     stays in Python; the client only moves pre-rendered HTML. A node carries a
-    ``data-rail`` attribute (see `_rail_attr`) iff it has an entry here, so the
-    scrollspy knows which elements drive the rail."""
+    ``data-rail`` attribute (nodes.html `rail_attr`) iff it has an entry here,
+    so the scrollspy knows which elements drive the rail."""
 
     def __init__(self, site, doc_uri):
         self.site = site
@@ -1364,16 +1344,14 @@ class Rail:
         is PDF/LLM-derived and `html.escape`d, exactly like `_guidance`."""
         if not items:
             return []
-        out = []
-        for it in items:
-            out.append(
-                '<li><span class="remiss-org">%s</span> %s '
-                '<span class="q">”%s”</span> '
-                '<a href="%s" rel="external">Läs remissvaret</a></li>'
-                % (escape(it["organisation"]), _sentiment_span(it["sentiment"]),
-                   escape(it["quote"]), escape(it["source_url"])))
-        return [RailSection("remiss", "Remissvar", len(out),
-                            "<ul>%s</ul>" % "".join(out))]
+        return [RailSection("remiss", "Remissvar", len(items),
+                            _RAIL.remiss_list(
+                                [{"organisation": it["organisation"],
+                                  "sentiment": Markup(
+                                      _sentiment_span(it["sentiment"])),
+                                  "quote": it["quote"],
+                                  "source_url": it["source_url"]}
+                                 for it in items]))]
 
     def _guidance(self, items):
         """A list of curated external links -- the wiki annotation's `## Externa
@@ -1384,22 +1362,16 @@ class Rail:
         internal, any other an external link."""
         if not items:
             return []
-        out = []
-        for g in items:
-            ext = "" if g["href"].startswith(BASE) else ' rel="external"'
-            # a guidance link carries either a `desc` (the guidance section's own
-            # text, e.g. the FAQ question -- shown after the link as ": ...") or a
-            # `note` (provenance for a hand-curated link -- shown as "— ...")
-            if g.get("desc"):
-                tail = ': <span class="q">%s</span>' % escape(g["desc"])
-            elif g.get("note"):
-                tail = ' <span class="prov">— %s</span>' % escape(g["note"])
-            else:
-                tail = ""
-            out.append('<li><a href="%s"%s>%s</a>%s</li>'
-                       % (escape(href(g["href"])), ext, escape(g["label"]), tail))
-        return [RailSection("vagledning", "Externa länkar", len(out),
-                            "<ul>%s</ul>" % "".join(out))]
+        # a guidance link carries either a `desc` (the guidance section's own
+        # text, e.g. the FAQ question -- shown after the link as ": ...") or a
+        # `note` (provenance for a hand-curated link -- shown as "— ...")
+        return [RailSection("vagledning", "Externa länkar", len(items),
+                            _RAIL.guidance_list(
+                                [{"href": href(g["href"]),
+                                  "external": not g["href"].startswith(BASE),
+                                  "label": g["label"], "desc": g.get("desc"),
+                                  "note": g.get("note")}
+                                 for g in items]))]
 
     def _fk(self, nid):
         """The författningskommentar prose propositioner wrote for the paragraph
@@ -1413,15 +1385,15 @@ class Rail:
             return []
         out = []
         for prop_uri, label, page, text in entries:
-            lead = textwrap.shorten(text.split("\n")[0], 300, placeholder=" …")
             target = prop_uri + ("#sid%d" % page if page else "")
-            src = ('<a href="%s">%s</a>' % (escape(href(target)), escape(label))
+            src = (Markup('<a href="%s">%s</a>') % (href(target), label)
                    if label and self.site.has(prop_uri)
-                   else escape(label or ""))
-            out.append('<p>%s <span class="prov">— %s</span></p>'
-                       % (escape(lead), src))
+                   else Markup(escape(label or "")))
+            out.append({"lead": textwrap.shorten(text.split("\n")[0], 300,
+                                                 placeholder=" …"),
+                        "src": src})
         return [RailSection("fk", "Författningskommentar", len(out),
-                            "".join(out))]
+                            _RAIL.fk_list(out))]
 
     def _commentary(self, nid):
         """The wiki commentary for the paragraph `nid` (or `None` for the law as a
@@ -1431,13 +1403,13 @@ class Rail:
         entries = self.site.commentary.get((self.doc_uri, nid))
         if not entries:
             return []
-        out = []
-        for author, blocks in entries:
-            prose = "".join("<p>%s</p>" % render_runs(c["text"], self.site)
-                            for c in blocks if c.get("text"))
-            by = '<div class="komm-by">— %s</div>' % escape(author) if author else ""
-            out.append(prose + by)
-        return [RailSection("kommentar", "Kommentar", len(out), "".join(out))]
+        items = [{"prose": Markup("".join(
+                      "<p>%s</p>" % render_runs(c["text"], self.site)
+                      for c in blocks if c.get("text"))),
+                  "author": author}
+                 for author, blocks in entries]
+        return [RailSection("kommentar", "Kommentar", len(items),
+                            _RAIL.commentary_list(items))]
 
     def island(self):
         """The ``<script type=application/json>`` island, or '' if no paragraph
@@ -1450,18 +1422,9 @@ class Rail:
                 % payload)
 
 
-def _rail_attr(rail, nid):
-    """`data-rail="id"` for a node the rail has context for, else ''."""
-    return ' data-rail="%s"' % escape(nid) if nid and nid in rail.data else ""
-
-
 # --------------------------------------------------------------------------
 # generic node renderer (artifact type -> HTML)
 # --------------------------------------------------------------------------
-
-def _id_attr(nid):
-    return ' id="%s"' % escape(nid) if nid else ""
-
 
 def _strip_self_ref(runs, nid):
     """A container's title ("1 kap. Lagens tillämpningsområde") carries its own
@@ -1527,8 +1490,7 @@ def _grafik_crop(entry, doc_uri, gap_key, alt):
     src = "/api/v1/sfs-graphic?uri=%s&node=%s&v=%s" % (
         quote(doc_uri, safe=""), quote(gap_key, safe=""),
         quote(ver, safe=""))
-    return '<img class="grafik-img" src="%s" alt="%s" loading="lazy">' % (
-        escape(src), escape(alt))
+    return _NODES.grafik_img(src, alt)
 
 
 def render_grafik(node, site, doc_uri):
@@ -1543,17 +1505,11 @@ def render_grafik(node, site, doc_uri):
     if not entry:
         sfs = node.get("satt_av")
         where = ("SFS %s" % sfs) if sfs else "den tryckta författningen"
-        return ('<p class="grafik-saknas" data-grafik="%s">%s saknas i den '
-                'konsoliderade texten — se %s</p>'
-                % (escape(nid), escape(label), escape(where)))
+        return _NODES.grafik_saknas(nid, label, where)
     alt = entry.get("alt") or ("%s ur SFS %s" % (label, entry["sfs"]))
-    # the attribution links to the amending act's entry in this document's own
-    # amendment register (#L{nr}), not the amendment's standalone page
-    return ('<figure class="grafik" data-grafik="%s">%s<figcaption>%s ur '
-            '<a href="#%s">SFS %s</a></figcaption></figure>'
-            % (escape(nid), _grafik_crop(entry, doc_uri, nid, alt),
-               escape(label), escape(register_anchor(entry["sfs"])),
-               escape(entry["sfs"])))
+    return _NODES.grafik_figure(nid, _grafik_crop(entry, doc_uri, nid, alt),
+                                label, register_anchor(entry["sfs"]),
+                                entry["sfs"])
 
 
 LANGUAGE_LABELS = {
@@ -1570,17 +1526,16 @@ def _parallel_versions(node):
 
 
 def _convention_cell(version, site, tag):
-    content = render_runs(version.get("text", []), site)
-    content = "<%s>%s</%s>" % (tag, content, tag)
-    return '<div class="konvention-cell" lang="%s">%s</div>' % (
-        escape(version["language"]), content)
+    return _NODES.konvention_cell(version["language"], tag,
+                                  Markup(render_runs(version.get("text", []),
+                                                     site)))
 
 
 def _convention_row(node, site, css, tag, languages):
     versions = _parallel_versions(node)
-    return '<div class="konvention-row %s">%s</div>' % (
-        css, "".join(_convention_cell(versions[language], site, tag)
-                      for language in languages))
+    return _NODES.konvention_row(css, Markup("").join(
+        _convention_cell(versions[language], site, tag)
+        for language in languages))
 
 
 def _convention_paragraphs(node, site, languages):
@@ -1615,23 +1570,23 @@ def _render_konventionsinstrument(node, site, toc, languages):
             else "konvention-article"
         heading = _convention_row(child, site, css + "-heading", "h4", languages)
         paragraphs = _convention_paragraphs(child, site, languages)
-        provisions.append('<section class="%s"%s>%s%s</section>' % (
-            css, _id_attr(child.get("id")), heading, paragraphs))
-    return '<section class="konvention-instrument"%s>%s%s</section>' % (
-        _id_attr(node.get("id")), title + ingress, "".join(provisions))
+        provisions.append(_NODES.konvention_section(
+            css, child.get("id"), heading, Markup(paragraphs)))
+    return _NODES.konvention_instrument(node.get("id"), title, Markup(ingress),
+                                        Markup("").join(provisions))
 
 
 def render_konventionsbilaga(node, site, doc_uri, toc, rail):
     languages = node.get("languages")
     assert languages, "convention appendix must declare its languages"
-    language_head = '<div class="konvention-languages">%s</div>' % "".join(
-        '<div lang="%s">%s</div>' % (language, LANGUAGE_LABELS.get(language, language))
-        for language in languages)
-    instruments = "".join(
+    instruments = Markup("").join(
         _render_konventionsinstrument(child, site, toc, languages)
         for child in node.get("children", []))
-    return '<div class="konventionsbilaga" style="--n-languages: %d">%s%s</div>' % (
-        len(languages), language_head, instruments)
+    return _NODES.konventionsbilaga(
+        len(languages),
+        [(language, LANGUAGE_LABELS.get(language, language))
+         for language in languages],
+        instruments)
 
 
 def _temporal_notice(node):
@@ -1645,9 +1600,7 @@ def _temporal_notice(node):
              if node.get(key)]
     if not parts:
         return ""
-    # slash-delimited like the source's editorial markers, so it reads as an
-    # annotation about the text rather than as legal text
-    return '<p class="temporal-status">/%s/</p>' % escape(" — ".join(parts))
+    return _NODES.temporal_notice(" — ".join(parts))
 
 
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
@@ -1658,33 +1611,28 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return render_konventionsbilaga(node, site, doc_uri, toc, rail)
 
     if t == "tabell":
-        rows = "".join(render_node(c, site, doc_uri, toc, rail)
-                       for c in node.get("children", []))
-        return "<table>%s</table>" % rows
+        return _NODES.tabell(Markup("".join(
+            render_node(c, site, doc_uri, toc, rail)
+            for c in node.get("children", []))))
     if t == "rad":
-        cells = "".join("<td>%s</td>" % render_runs(c, site)
-                        for c in node.get("cells", []))
+        cells = [Markup(render_runs(c, site)) for c in node.get("cells", [])]
         g = node.get("grafik")
+        grafik_cell = ""
         if g:  # a dropped road-sign image (2007:90): the sign beside its code
             gid = g.get("key") or g.get("id", "")
             entry = site.graphics.get((doc_uri, gid))
             if entry:
                 alt = entry.get("alt") or ("Vägmärke %s" % g.get("code", ""))
-                cells = ('<td class="grafik" data-grafik="%s">%s</td>'
-                         % (escape(gid),
-                            _grafik_crop(entry, doc_uri, gid, alt)) + cells)
+                grafik_cell = _NODES.grafik_cell(
+                    gid, _grafik_crop(entry, doc_uri, gid, alt))
             else:  # unlocalized: the honest gap beside the code
-                cells = ('<td class="grafik-saknas" data-grafik="%s">[%s]</td>'
-                         % (escape(gid), escape(g.get("code", ""))) + cells)
+                grafik_cell = _NODES.grafik_saknas_cell(gid, g.get("code", ""))
         # a pending/expiring row variant carries the temporal marker itself
         # (a 2007:90 road-sign row amended with deferred entry into force);
-        # print it as a marker row above, spanning the full width
-        notice = _temporal_notice(node)
-        if notice:
-            width = len(node.get("cells", [])) + (1 if g else 0)
-            notice = ('<tr class="temporal-status-rad"><td colspan="%d">%s'
-                      "</td></tr>" % (width, notice))
-        return "%s<tr>%s</tr>" % (notice, cells)
+        # printed as a marker row above, spanning the full width
+        return _NODES.rad(_temporal_notice(node),
+                          len(node.get("cells", [])) + (1 if g else 0),
+                          grafik_cell, cells)
     if t == "grafik":
         return render_grafik(node, site, doc_uri)
     if t == "lista":
@@ -1695,15 +1643,13 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         text = node.get("text", [])
         anchor = toc.add(nid, plain(text), node.get("level") or 1)
         lvl = min(node.get("level") or 2, 5) + 1
-        return '<h%d id="%s" class="rubrik">%s</h%d>' % (
-            lvl, escape(anchor), render_runs(text, site), lvl)
+        return _NODES.rubrik(lvl, anchor, Markup(render_runs(text, site)))
 
     # the node's context (who cites it + which EU article it transposes) is
     # routed to the scroll-driven rail, not floated inline; the element is tagged
     # data-rail so the client knows it drives the rail. Leaf rubrik/tabell/rad/
     # lista nodes above carry no context.
     rail.add(nid, human_fragment(nid))
-    ra = _rail_attr(rail, nid)
 
     if "text" in node:  # stycke/punkt/listelement/upphavd/moment (may nest)
         # the paragraf's own number now hangs in the gutter (drop_marker), so the
@@ -1715,17 +1661,6 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         # separator space; an inline stycke/moment marker keeps its trailing space
         if marker and is_listitem and str(marker).isdigit():
             marker = "%s." % marker
-        num = ('<span class="num">%s</span>%s'
-               % (escape(str(marker)), "" if is_listitem else " ")
-               if marker else "")
-        tag = "li" if is_listitem else "p"
-        # a publisher's editorial note (a repeal notice, "text finns bara i
-        # tryckt version") renders like the stycke it replaced -- same marker,
-        # same links -- but subdued, so the reader sees at a glance that it is
-        # the publisher speaking and not the statute (sfs/redaktionell.py)
-        cls = ' class="redaktionell"' if t == "redaktionell" else ""
-        open_html = "<%s%s%s%s>%s%s" % (tag, _id_attr(nid), cls, ra, num,
-                                        render_runs(node["text"], site))
         # a stycke/punkt often introduces a list -- render its punkt/lista children
         # (previously dropped, so numbered lists vanished from the page). The NF
         # flattens nested lists into document order (nf.flatten_list); rebuild the
@@ -1737,10 +1672,20 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             inner = "".join(render_node(c, site, doc_uri, toc, rail) for c in kids)
             if any(c.get("type") == "punkt" for c in kids):
                 inner = '<ol class="punkter">%s</ol>' % inner
-        # a sub-list nests inside its list item (<li>…<ol>…</ol></li>); a stycke's
-        # list follows the closed paragraph (<p>…</p><ol>…</ol>)
-        return ("%s%s</%s>" % (open_html, inner, tag) if is_listitem
-                else "%s</%s>%s" % (open_html, tag, inner))
+        # a `redaktionell` node is a publisher's editorial note (a repeal
+        # notice, "text finns bara i tryckt version"): rendered like the stycke
+        # it replaced -- same marker, same links -- but subdued, so the reader
+        # sees at a glance that it is the publisher speaking and not the
+        # statute (sfs/redaktionell.py). A sub-list nests inside its list item
+        # (<li>…<ol>…</ol></li>); a stycke's list follows the closed paragraph
+        # (<p>…</p><ol>…</ol>) -- the macro keys that on the tag.
+        return _NODES.block("li" if is_listitem else "p", nid,
+                            t == "redaktionell",
+                            nid if nid in rail.data else None,
+                            str(marker) if marker else None,
+                            "" if is_listitem else " ",
+                            Markup(render_runs(node["text"], site)),
+                            Markup(inner))
 
     # container: paragraf, kapitel, avdelning, bilaga, overgangsbestammelse, ...
     if t in ("kapitel", "avdelning", "underavdelning"):
@@ -1755,26 +1700,25 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         kids = node.get("children", [])
         title = (kids[0] if kids and kids[0].get("type") == "rubrik"
                  and (kids[0].get("level") or 1) == 1 else None)
+        rail_id = nid if nid and nid in rail.data else None
         if title is not None and plain(title.get("text", [])):
             # anchor the heading at the container's id (or a minted secN when the
             # container is id-less) and point the TOC there; capturing toc.add's
             # return keeps the heading id and the TOC anchor in lockstep, as the
-            # rubrik branch does -- _id_attr(nid) alone would emit no id for an
-            # id-less container while the TOC still linked its minted secN anchor
+            # rubrik branch does -- an id-less container would otherwise emit no
+            # heading id while the TOC still linked its minted secN anchor
             anchor = toc.add(nid, plain(title.get("text", [])), 1)
-            head = '<h2 id="%s" class="kaprubrik">%s</h2>' % (
-                escape(anchor),
-                render_runs(_strip_self_ref(title.get("text", []), nid), site))
+            head = _NODES.kaprubrik(anchor, Markup(render_runs(
+                _strip_self_ref(title.get("text", []), nid), site)))
             body = kids[1:]
         else:
             # no usable title (empty rubrik) -- keep the bare designator heading
-            head = '<h2%s class="kaprubrik">%s</h2>' % (
-                _id_attr(nid),
-                escape(("%s %s" % (node.get("ordinal", ""), label)).strip()))
+            head = _NODES.kaprubrik_bare(
+                nid, ("%s %s" % (node.get("ordinal", ""), label)).strip())
             body = kids[1:] if title is not None else kids
         children = "".join(render_node(c, site, doc_uri, toc, rail) for c in body)
-        return '<section class="%s"%s>%s%s%s</section>' % (
-            t, ra, head, _temporal_notice(node), children)
+        return _NODES.kapitel(t, rail_id, head, _temporal_notice(node),
+                              Markup(children))
 
     if t == "paragraf":
         # hanging §-numeral in the gutter; the first stycke drops its inline number
@@ -1787,12 +1731,10 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         # the §-symbol belongs with the numeral ("1 §") in the gutter; the
         # permalink anchor keeps its own (pilcrow) glyph
         ordinal = node.get("ordinal", "")
-        gutter = ('<div class="paragraf-gutter"><span class="n">%s</span>'
-                  '<a class="pilcrow" href="#%s" aria-label="Permalänk">¶</a></div>'
-                  % (escape("%s §" % ordinal if ordinal else "§"), escape(nid or "")))
-        return ('<section class="paragraf"%s%s>%s<div class="paragraf-body">%s%s</div>'
-                '</section>' % (_id_attr(nid), ra, gutter,
-                                _temporal_notice(node), children))
+        return _NODES.paragraf(nid or "",
+                               nid if nid and nid in rail.data else None,
+                               "%s §" % ordinal if ordinal else "§",
+                               _temporal_notice(node), Markup(children))
 
     # a bilaga's notice follows its heading (first child rubrik), matching the
     # source's "Bilaga 1 /Träder i kraft I:.../" heading line
@@ -1803,31 +1745,14 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         rendered.insert(1, notice)
     else:
         rendered.insert(0, notice)
-    return '<section class="%s"%s%s>%s</section>' % (t or "node", _id_attr(nid),
-                                                     ra, "".join(rendered))
+    return _NODES.generic_section(t or "node", nid,
+                                  nid if nid and nid in rail.data else None,
+                                  Markup("".join(rendered)))
 
 
 # --------------------------------------------------------------------------
 # page shells
 # --------------------------------------------------------------------------
-
-PAGE = """<!doctype html>
-<html lang="sv"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%(title)s</title>
-%(head)s
-<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="/style.css">
-</head><body class="gr-root%(body_class)s">
-%(masthead)s
-%(grid)s
-%(island)s<script src="/script.js" defer></script>
-<script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
-</body></html>
-"""
 
 # masthead nav: label, browse route, the page kinds that mark it current
 MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
@@ -1846,78 +1771,41 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
             ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
 
 
-# the magnifier icon, shared by the masthead search button and the mobile
-# bar's Sök button (different sizes) so the glyph can't drift between them
-def _search_icon(size):
-    return ('<svg width="%d" height="%d" viewBox="0 0 16 16" fill="none" '
-            'stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
-            '<circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path>'
-            '</svg>' % (size, size))
+# page.html's masthead reads MAST_NAV to mark the current section; set once
+# on the shared environment (lib.tpl)
+ENV.globals.update(MAST_NAV=MAST_NAV)
+
+# the partial macro libraries, exposed as template modules so Python-side
+# helpers can render a fragment (a banner, a panel, a rail row) exactly as an
+# extending template would
+_META = ENV.get_template("partials/meta.html").module
+_BANNERS = ENV.get_template("partials/banners.html").module
+_PANELS = ENV.get_template("partials/panels.html").module
+_RAIL = ENV.get_template("partials/rail.html").module
+_NODES = ENV.get_template("nodes.html").module
+_LISTS = ENV.get_template("listings.html").module
 
 
-def _masthead(kind):
-    links = "".join('<a href="%s"%s>%s</a>'
-                    % (route, ' class="on"' if kind in act else "", label)
-                    for label, route, act in MAST_NAV)
-    return ('<header class="masthead"><div class="mast-inner">'
-            '<a class="brand" href="/">lagen<em>.nu</em></a>'
-            '<button class="search" type="button" data-search>'
-            + _search_icon(15) +
-            '<span>Sök lag, paragraf, rättsfall…</span>'
-            '<span class="k">⌘K</span></button>'
-            '<nav class="mast-nav">%s</nav>'
-            '<button class="theme-toggle" type="button" data-theme-toggle '
-            'aria-label="Växla mellan ljust och mörkt tema" '
-            'title="Växla ljust / mörkt tema">'
-            '<svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" '
-            'fill="none" stroke="currentColor" stroke-width="1.8" '
-            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-            '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>'
-            '<svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" '
-            'fill="none" stroke="currentColor" stroke-width="1.8" '
-            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-            '<circle cx="12" cy="12" r="4"></circle>'
-            '<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4'
-            'M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>'
-            '</button></div></header>' % links)
-
-
-# the mobile bottom toolbar (document pages only): thumb-reach access to the
-# TOC drawer, the search palette and the context-rail sheet. A sibling of
-# .gr-body, not a child -- popover.js imports .gr-body into split-view panes,
-# and the toolbar must not ride along. display:none on desktop (style.css).
-# The TOC button (MOBILE_BAR_TOC) only appears when the page has TOC entries;
-# an "Innehåll" that opens an empty drawer is worse than no button.
-MOBILE_BAR_TOC = (
-    '<button type="button" data-drawer="toc" aria-expanded="false">'
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
-    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
-    'aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>'
-    'Innehåll</button>')
-MOBILE_BAR = (
-    '<nav class="mobile-bar" aria-label="Verktyg">'
-    '%s'
-    '<button type="button" data-search>' + _search_icon(18) + 'Sök</button>'
-    '<button type="button" data-drawer="rail" aria-expanded="false">'
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" '
-    'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
-    'stroke-linejoin="round" aria-hidden="true">'
-    '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z">'
-    '</path></svg>'
-    'Kontext</button></nav>')
-
-
-def _frontmatter(eyebrow, title, subtitle, summary, meta):
-    eb = '<div class="eyebrow">%s</div>' % escape(eyebrow) if eyebrow else ""
-    sub = '<p class="subtitle">%s</p>' % escape(subtitle) if subtitle else ""
-    return ('<header class="frontmatter">%s<h1>%s</h1>%s%s%s</header>'
-            % (eb, escape(title), sub, summary, meta))
+def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
+                 summary="", summary_text=None, island="", solo=False,
+                 body_class="", head="", **extra):
+    """The page-shell context every render goes through (page.html and the
+    sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
+    `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
+    `eyebrow`/`subtitle`/`summary_text` are plain text the template escapes.
+    `extra` carries a source template's own variables (pre-rendered fragments
+    should already be Markup)."""
+    return dict(title=title, kind=kind, meta=Markup(meta), toc=Markup(toc),
+                eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
+                summary_text=summary_text, island=Markup(island), solo=solo,
+                body_class=body_class, head=Markup(head), **extra)
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
          summary="", island="", solo=False, body_class="",
          head=""):
-    """Assemble a page. Document pages use the 3-column grid (TOC · reading
+    """Assemble a page (templates/page.html: masthead, frontmatter, grid,
+    mobile toolbar). Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
     side columns for a single centered column. `body_class` adds a modifier to
     the <body> (e.g. " expired" for a repealed statute -- subdued reading column
@@ -1925,35 +1813,16 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
     `<p class="sammanfattning">`) sits in the frontmatter between the title and
     `meta`, not in the reading column -- pass it instead of prepending to `body`
     when a source wants its abstract to read before the metadata block."""
-    front = _frontmatter(eyebrow, title, subtitle, summary, meta)
-    if solo:
-        grid = ('<div class="gr-body solo"><main class="gr-main">%s%s</main></div>'
-                % (front, body))
-    else:
-        grid = ('<div class="gr-body"><aside class="toc-col">%s</aside>'
-                '<main class="gr-main">%s%s</main>'
-                '<aside class="rail" id="rail" aria-live="polite"></aside></div>'
-                % (toc, front, body)) + MOBILE_BAR % (MOBILE_BAR_TOC if toc else "")
-    return PAGE % {"title": escape(title), "masthead": _masthead(kind),
-                   "grid": grid, "island": island, "body_class": body_class,
-                   "head": head}
+    return ENV.get_template("page.html").render(page_context(
+        title, kind, meta, toc=toc, eyebrow=eyebrow, subtitle=subtitle,
+        summary=summary, island=island, solo=solo, body_class=body_class,
+        head=head, body=Markup(body)))
 
 
 def render_search_page():
     """Static shell for the complete, API-backed result list at ``/sok/``."""
-    body = (
-        '<div class="search-page">'
-        '<form class="full-search-form" role="search">'
-        '<input type="search" name="q" autocomplete="off" '
-        'placeholder="Sök lag, paragraf, rättsfall…" aria-label="Sökord">'
-        '<button type="submit">Sök</button></form>'
-        '<div class="full-search-status" role="status" aria-live="polite"></div>'
-        '<div class="full-search-layout">'
-        '<aside class="full-search-facets" aria-label="Avgränsa sökningen"></aside>'
-        '<section><div class="full-search-results" aria-live="polite"></div>'
-        '<nav class="search-pagination" aria-label="Sökresultatsidor"></nav>'
-        '</section></div></div>')
-    return page("Sök", "Sök", "", body, solo=True)
+    return ENV.get_template("sok.html").render(page_context(
+        "Sök", "Sök", "", solo=True))
 
 
 def render_admin_page():
@@ -1961,25 +1830,19 @@ def render_admin_page():
     lives here, not in the masthead -- editor.js mounts the credential form (or,
     when a session is already live, the logout control) into ``[data-admin-login]``,
     so an anonymous reader's chrome carries no login link."""
-    body = ('<div class="admin-panel" data-admin-login>'
-            '<p class="empty">Läser in…</p></div>')
-    return page("Logga in", "Admin", "", body, solo=True,
-                eyebrow="Redaktörsinloggning")
+    return ENV.get_template("admin.html").render(page_context(
+        "Logga in", "Admin", "", solo=True, eyebrow="Redaktörsinloggning"))
 
 
 def render_feed_page(item, entries, params=None):
     """Human-readable twin of an Atom document at the legacy ``/feed`` URL."""
     atom = feeds.feed_url(item.alias, atom=True, params=params)
-    listing = "".join(
-        '<article class="news-item"><p class="news-date">%s</p>'
-        '<h2><a href="%s">%s</a></h2><p>%s</p></article>'
-        % (escape(entry.published[:10]), escape(entry.url), escape(entry.title),
-           escape(entry.summary))
-        for entry in entries)
-    body = ('<p class="feed-link"><a href="%s">Atom-flöde</a></p>%s'
-            % (escape(atom), listing or '<p class="empty">Inga dokument.</p>'))
-    discovery = '<link rel="alternate" type="application/atom+xml" href="%s">' \
-        % escape(atom)
+    body = _LISTS.feed_page_body(atom, [
+        {"date": entry.published[:10], "url": entry.url,
+         "title": entry.title, "summary": entry.summary}
+        for entry in entries])
+    discovery = Markup('<link rel="alternate" type="application/atom+xml" '
+                       'href="%s">') % atom
     return page(item.title, "Nyheter", "", body, solo=True, head=discovery)
 
 
@@ -2034,19 +1897,17 @@ def _feed_index_groups(con):
 
 
 def render_feed_index(con):
-    groups = []
-    for heading, items in _feed_index_groups(con):
-        links = []
-        for label, alias, params in items:
-            atom = feeds.feed_url(alias, atom=True, params=params).removeprefix(feeds.BASE)
-            html = feeds.feed_url(alias, params=params).removeprefix(feeds.BASE)
-            links.append('<li><a class="feed-atom" href="%s" '
-                         'aria-label="Atom-flöde: %s">Atom</a> '
-                         '<a href="%s">%s</a></li>'
-                         % (escape(atom), escape(label), escape(html), escape(label)))
-        groups.append('<section class="browse-group"><h2>%s</h2><ul>%s</ul></section>'
-                      % (escape(heading), "".join(links)))
-    return page("Alla nyhetsflöden", "Nyheter", "", "".join(groups), solo=True)
+    groups = [
+        {"heading": heading,
+         "links": [{"atom": feeds.feed_url(alias, atom=True,
+                                           params=params).removeprefix(feeds.BASE),
+                    "html": feeds.feed_url(alias,
+                                           params=params).removeprefix(feeds.BASE),
+                    "label": label}
+                   for label, alias, params in items]}
+        for heading, items in _feed_index_groups(con)]
+    return page("Alla nyhetsflöden", "Nyheter", "",
+                _LISTS.feed_index_body(groups), solo=True)
 
 
 def _expired_banner(props):
@@ -2055,23 +1916,17 @@ def _expired_banner(props):
     `body.expired` treatment (subdued reading column + a fixed 'Upphävd
     författning' watermark) so the status stays visible even when an anchor link
     jumps deep past the heading."""
-    when = props.get("rpubl:upphavandedatum")
     av = props.get("rinfoex:upphavdAv")
-    detail = ("Upphörde att gälla %s" % escape(when)) if when else "Upphävd"
-    if av:
-        detail += ' genom <a href="%s">SFS %s</a>' % (
-            escape(layout.page_url(av)), escape(catalog.local(av)))
-    return ('<div class="expired-banner"><strong>Upphävd författning</strong>'
-            '<span>%s.</span></div>' % detail)
+    return _BANNERS.expired_banner(
+        props.get("rpubl:upphavandedatum"),
+        {"url": layout.page_url(av), "label": catalog.local(av)} if av
+        else None)
 
 
 def _version_banner(base_id, version):
     """The callout on a historical-consolidation ("lydelse") page: which
     cutoff it shows, and the way back to the law as it reads today."""
-    return ('<div class="version-banner"><strong>Äldre lydelse</strong>'
-            '<span>Författningen i dess lydelse t.o.m. ändringar genom '
-            'SFS %s. <a href="%s">Visa gällande lydelse</a>.</span></div>'
-            % (escape(version), escape(layout.page_url(BASE + base_id))))
+    return _BANNERS.version_banner(version, layout.page_url(BASE + base_id))
 
 
 def _version_notes(art):
@@ -2085,15 +1940,13 @@ def _version_notes(art):
             for v, (ikraft, forarbeten) in history.amendment_info(art).items()}
 
 
-# the compare status line (populated by versions.js the instant a lydelse is
-# picked): it names what is being compared, so the reader sees the page change
-# even when the diff fetch returns near-instantly (T1). It heads the text it
-# annotates, so it stays in the reading column while the <select> that drives it
-# sits up in dl.meta (S1); the server-composed diff-note inside #dokument still
-# carries the detail.
-LYDELSER_STATUS = '<h2 class="lydelser-status" hidden></h2>'
-
-
+# the compare status line (the h2.lydelser-status in sources/sfs.html,
+# populated by versions.js the instant a lydelse is picked) names what is
+# being compared, so the reader sees the page change even when the diff fetch
+# returns near-instantly (T1). It heads the text it annotates, so it stays in
+# the reading column while the <select> that drives it sits up in dl.meta
+# (S1); the server-composed diff-note inside #dokument still carries the
+# detail.
 def _versions_panel(art, base_id, own_version, versions):
     """The compare panel (the old pipeline's docversions dropdown): the
     <select> that versions.js turns into the on-demand diff view
@@ -2111,20 +1964,11 @@ def _versions_panel(art, base_id, own_version, versions):
     if not versions:
         return ""
     notes = _version_notes(art)
-    options = []
-    for v, _vuri in reversed(versions):               # newest first
-        note = notes.get(v, "")
-        options.append('<option value="%s">SFS %s%s</option>'
-                       % (escape(v), escape(v),
-                          escape(" (%s)" % note) if note else ""))
-    return ('<details class="lydelser">'
-            '<summary>Jämför lydelser <span class="count">%d</span></summary>'
-            '<label>Jämför %s lydelse med <select data-diff data-uri="%s" '
-            'data-to="%s"><option value="">– välj lydelse –</option>%s'
-            '</select></label></details>'
-            % (len(options), "denna" if own_version else "aktuell",
-               escape(BASE + base_id), escape(own_version or ""),
-               "".join(options)))
+    return _PANELS.versions_panel(
+        [{"value": v, "note": notes.get(v, "")}
+         for v, _vuri in reversed(versions)],          # newest first
+        "denna" if own_version else "aktuell",
+        BASE + base_id, own_version or "")
 
 
 def _act_source_links(nr):
@@ -2154,9 +1998,9 @@ def _prop_link(site, ident):
     if m:
         uri = BASE + "prop/%s:%s" % (m.group(1), m.group(2))
         if site.has(uri):
-            return '<a href="%s">%s</a>' % (escape(layout.page_url(uri)),
-                                            escape(ident))
-    return escape(ident)
+            return Markup('<a href="%s">%s</a>') % (layout.page_url(uri),
+                                                    ident)
+    return Markup(escape(ident))
 
 
 def _andringar(art, base_id, own_version, versions, site, toc, rail):
@@ -2203,44 +2047,34 @@ def _andringar(art, base_id, own_version, versions, site, toc, rail):
                 view_url = layout.page_url(BASE + base_id)
                 prev = order[-1]
         if prev and view_url:
-            links.append('<li><a href="%s?diff=%s">Visa ändringarna (jämfört '
-                         'med lydelsen enligt SFS %s)</a></li>'
-                         % (escape(view_url), escape(prev), escape(prev)))
+            links.append(Markup('<li><a href="%s?diff=%s">Visa ändringarna '
+                                '(jämfört med lydelsen enligt SFS %s)</a></li>')
+                         % (view_url, prev, prev))
         content = "".join(render_node(c, site, doc_uri, toc, rail)
                           for c in am.get("content", []))
-        if content:
-            content = "<h3>Övergångsbestämmelse</h3>" + content
         celex = p.get("rpubl:celexNummer", [])
         rows = [
-            ("Förarbeten", ", ".join(_prop_link(site, f)
-                                     for f in am.get("forarbeten", []))),
-            ("Omfattning", escape(p["rpubl:andrar"])
-             if p.get("rpubl:andrar") else ""),
-            ("CELEX-nr", " ".join(
+            ("Förarbeten", Markup(", ").join(_prop_link(site, f)
+                                             for f in am.get("forarbeten", []))),
+            ("Omfattning", p.get("rpubl:andrar", "")),
+            ("CELEX-nr", Markup(" ").join(
                 _ext_link(EURLEX % c, c)
                 for c in ([celex] if isinstance(celex, str) else celex))),
-            ("Ikraftträder", escape(p["rpubl:ikrafttradandedatum"])
-             if p.get("rpubl:ikrafttradandedatum") else ""),
+            ("Ikraftträder", p.get("rpubl:ikrafttradandedatum", "")),
         ]
-        # values above are already escaped/markup, so not _meta_dl (which
-        # escapes wholesale)
-        details = "".join("<dt>%s</dt><dd>%s</dd>" % (k, v)
-                          for k, v in rows if v)
-        details = '<dl class="meta">%s</dl>' % details if details else ""
         # the anchor: the övergångsbestämmelse node already mints L{nr}; the
         # wrapper carries it only when no child does (no duplicate DOM ids)
         child_ids = {c.get("id") for c in am.get("content", [])}
         wrapper_id = register_anchor(nr) if nr else None
-        ida = (' id="%s"' % escape(wrapper_id)
-               if wrapper_id and wrapper_id not in child_ids else "")
-        posts.append('<div class="andring"%s><h2>%s</h2>%s%s%s</div>'
-                     % (ida, escape(heading),
-                        "<ul>%s</ul>" % "".join(links) if any(links) else "",
-                        content, details))
+        posts.append({
+            "id": (wrapper_id if wrapper_id and wrapper_id not in child_ids
+                   else None),
+            "heading": heading,
+            "links": [Markup(link) for link in links if link],
+            "content": Markup(content),
+            "details": [(k, v) for k, v in rows if v]})
     anchor = toc.add("L", "Ändringar och övergångsbestämmelser", 1)
-    return ('<section class="andringar" id="%s"><h2 class="kaprubrik">'
-            'Ändringar och övergångsbestämmelser</h2>%s</section>'
-            % (escape(anchor), "".join(posts)))
+    return _PANELS.andringar(anchor, posts)
 
 
 @functools.lru_cache(maxsize=1)
@@ -2299,9 +2133,9 @@ def render_sfs(art, site):
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
         ("Upphävd", upphavd),
         ("Ändring införd t.o.m.",
-         _RawHTML("SFS %s%s" % (escape(amended.group(1)), lydelser))
+         Markup("SFS %s") % amended.group(1) + lydelser
          if amended else None),
-        ("Lydelser", _RawHTML(lydelser) if lydelser and not amended else None),
+        ("Lydelser", lydelser if lydelser and not amended else None),
         ("Senast hämtad", _sfs_fetched().get(base_id)),
     ]
     toc = Toc()
@@ -2317,20 +2151,19 @@ def render_sfs(art, site):
         child.get("type") == "konventionsbilaga"
         for node in art.get("structure", []) if node.get("type") == "bilaga"
         for child in node.get("children", []))
-    structure = '<div id="dokument">' + "".join(
+    structure = Markup("".join(
         render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", [])) + "</div>"
+        for n in art.get("structure", [])))
     # the register view renders after the structure so its TOC entry and
     # rail hooks come last, but the OB anchors (#L{nr}) sit inside it
-    andringar = _andringar(art, base_id, version, versions, site, toc, rail)
+    andringar = Markup(_andringar(art, base_id, version, versions, site, toc,
+                                  rail))
     # the statute's own preparatory works get top billing; their hosted uris are
     # then excluded from the generic citation panel below
     forarbeten, own_forarbeten = ("", set()) if version \
         else forarbeten_section(site, art)
-    body = (_version_banner(base_id, version) if version
-            else (_expired_banner(props) if expired else "")) \
-        + forarbeten \
-        + (LYDELSER_STATUS if lydelser else "") + structure + andringar
+    banner = (_version_banner(base_id, version) if version
+              else (_expired_banner(props) if expired else ""))
     # external links, law-level commentary and who cites the act as a whole --
     # the rail's default panel. A lydelse page is not the citable document
     # (citations always target the current consolidation), so it shows none.
@@ -2342,12 +2175,16 @@ def render_sfs(art, site):
         body_classes.append("expired")
     if parallel_appendix:
         body_classes.append("parallel-appendix")
-    return page(title, "Författning", _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc),
-                eyebrow=("%s · äldre lydelse" % lb.short_id if version
-                         else lb.short_id),
-                island=rail.island(),
-                body_class="".join(" " + name for name in body_classes))
+    return ENV.get_template("sources/sfs.html").render(page_context(
+        title, "Författning", _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc),
+        eyebrow=("%s · äldre lydelse" % lb.short_id if version
+                 else lb.short_id),
+        island=rail.island(),
+        body_class="".join(" " + name for name in body_classes),
+        banner=Markup(banner), forarbeten=Markup(forarbeten),
+        has_lydelser=bool(lydelser), structure=structure,
+        andringar=andringar))
 
 
 DV_SHORT_COURT = {"Högsta domstolen": "HD",
@@ -2375,18 +2212,15 @@ def _dv_page_marker(doc_uri, pg):
     """A förarbete-style facsimile page button: clicking loads that page of the
     raw verdict's source PDF (faksimil.js + /api/v1/facsimile). Emitted at each PDF
     page boundary of a verdict parsed from its PDF."""
-    fax = "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg)
-    return ('<span class="sid" id="sid%d"><button type="button" data-fax="%s" '
-            'title="Visa faksimil av sidan %d">%d</button></span>'
-            % (pg, escape(fax), pg, pg))
+    return _NODES.dv_page_marker(
+        pg, "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg))
 
 
 def _dv_numbered_paragraph(node, site):
     """A numbered domskäl paragraph: the number hangs in the gutter and is its own
     permalink anchor (#P{n}), so "punkt 42" is linkable."""
-    n = escape(str(node["ordinal"]))
-    return ('<p class="dom-p" id="P%s"><a class="pnum" href="#P%s">%s</a>%s</p>'
-            % (n, n, n, render_runs(node.get("text", []), site)))
+    return _NODES.dv_numbered_paragraph(
+        str(node["ordinal"]), Markup(render_runs(node.get("text", []), site)))
 
 
 def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
@@ -2412,33 +2246,27 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
             anchor = toc.add(None, c, 1)
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
                              court=n.get("court"), ruling=ruling, state=state)
-            out.append('<section class="instans"><h2 id="%s" class="instans-rubrik">'
-                       '%s</h2>%s</section>' % (escape(anchor), escape(c), inner))
+            out.append(_NODES.dv_instans(anchor, c, Markup(inner)))
         elif t == "delmal":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
                              court=court, ruling=ruling, state=state)
-            head = ('<h2 class="delmal-rubrik">%s</h2>' % escape(n["ordinal"])
-                    if n.get("ordinal") else "")
-            out.append('<section class="delmal">%s%s</section>' % (head, inner))
+            out.append(_NODES.dv_delmal(n.get("ordinal"), Markup(inner)))
         elif t in ("betankande", "skiljaktig", "tillagg"):
             label = DV_RULING_HEADING[t]
             anchor = toc.add(None, label, 2)
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
                              court=court, ruling=ruling, state=state)
-            out.append('<section class="%s"><h3 id="%s" class="instans-rubrik">%s'
-                       '</h3>%s</section>' % (t, escape(anchor), escape(label), inner))
+            out.append(_NODES.dv_ruling(t, anchor, label, Markup(inner)))
         elif t == "dom":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
                              court=court, ruling=ruling, state=state)
             # title the court's own ruling only where a betänkande precedes it in
             # the same instance; otherwise the instans heading already names it
-            head = ""
+            label = anchor = None
             if "betankande" in sib and court:
                 label = "%s %s" % (_dv_genitive(court), ruling)
                 anchor = toc.add(None, label, 2)
-                head = ('<h3 id="%s" class="instans-rubrik">%s</h3>'
-                        % (escape(anchor), escape(label)))
-            out.append('<section class="dom">%s%s</section>' % (head, inner))
+            out.append(_NODES.dv_dom(anchor or "", label, Markup(inner)))
         elif t in ("domskal", "domslut"):                # transparent wrappers
             out.append(_dv_walk(n.get("children", []), site, doc_uri, toc, rail,
                                 court=court, ruling=ruling, state=state))
@@ -2450,18 +2278,10 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
 
 
 def _dv_footnotes(footnotes, site):
-    """The end-of-document footnotes as an endnote list, each with a ↩ link back
-    to its inline marker (#fnref-N)."""
-    if not footnotes:
-        return ""
-    items = []
-    for fn in footnotes:
-        n = escape(str(fn["num"]))
-        items.append('<li id="fn-%s">%s <a class="fn-back" href="#fnref-%s" '
-                     'aria-label="Tillbaka till texten">↩</a></li>'
-                     % (n, render_runs(fn["text"], site), n))
-    return ('<section class="fotnoter"><h2>Fotnoter</h2><ol>%s</ol></section>'
-            % "".join(items))
+    """The end-of-document footnotes as template items for the endnote list,
+    each linking back to its inline marker (#fnref-N)."""
+    return [{"n": str(fn["num"]), "html": Markup(render_runs(fn["text"], site))}
+            for fn in footnotes]
 
 
 def render_dv(art, site):
@@ -2475,8 +2295,6 @@ def render_dv(art, site):
         title, eyebrow = lb.short_title, lb.short_id
     else:
         title, eyebrow = lb.short_id, art.get("court_namn")
-    summary = ('<p class="sammanfattning">%s</p>' % escape(md["sammanfattning"])
-               if md.get("sammanfattning") else "")
     meta = [
         ("Domstol", art.get("court_namn")),
         ("Avgörandedatum", art.get("avgorandedatum")),
@@ -2485,43 +2303,38 @@ def render_dv(art, site):
         ("Rättsområde", ", ".join(md.get("rattsomrade") or [])),
         ("Europarätt", ", ".join(md.get("europarattslig") or [])),
     ]
-    sokord = _keywords(md.get("nyckelord") or [], site)
     toc = Toc()
     rail = Rail(site, art["uri"])
     # a record with explicit instance structure (HD's modern <h1>-tagged form) is
     # walked as nested sections; a flat legacy record has no structural wrappers,
     # so the same walk renders it as a plain paragraph sequence
-    body = (_dv_ursprunglig_dom(art) + sokord
-            + _dv_walk(art.get("structure", []), site, art["uri"], toc, rail,
-                       ruling=_dv_ruling_word(art))
-            + _dv_footnotes(art.get("footnotes", []), site)
-            # the curated Lagrum/Förarbeten/Rättsfall/Litteratur lists are the
-            # referat editor's apparatus -- shown for a published referat, but not
-            # for a raw verdict, whose PDF carries no such section (R2)
-            + (_dv_curated(md, site) if art.get("referat") else ""))
+    structure = Markup(_dv_walk(art.get("structure", []), site, art["uri"],
+                                toc, rail, ruling=_dv_ruling_word(art)))
     rail.add_document()
-    return page(title, "Rättsfall", _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc),
-                eyebrow=eyebrow, summary=summary,
-                island=rail.island())
+    return ENV.get_template("sources/dv.html").render(page_context(
+        title, "Rättsfall", _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=eyebrow,
+        summary_text=md.get("sammanfattning"),
+        island=rail.island(),
+        ursprunglig=_dv_ursprunglig_dom(art),
+        sokord=_keywords(md.get("nyckelord") or [], site),
+        structure=structure,
+        footnotes=_dv_footnotes(art.get("footnotes", []), site),
+        # the curated Lagrum/Förarbeten/Rättsfall/Litteratur lists are the
+        # referat editor's apparatus -- shown for a published referat, but not
+        # for a raw verdict, whose PDF carries no such section (R2)
+        curated=_dv_curated(md, site) if art.get("referat") else []))
 
 
 def _dv_ursprunglig_dom(art):
-    """The "Ursprunglig dom" link(s): the court's own pre-referat verdict PDF that
-    this NJA referat later absorbed (R2). Present only on a referat that folded in
-    a separate raw verdict record; the PDF is served by `/api/v1/dv-verdict`."""
-    items = art.get("ursprunglig_dom") or []
-    if not items:
-        return ""
-    links = []
-    for it in items:
-        label = ", ".join(it.get("malnummer") or []) or "Dom (PDF)"
-        date = it.get("avgorandedatum")
-        links.append('<a href="%s" rel="external">%s%s</a>'
-                     % (escape(it["url"]), escape(label),
-                        escape(" (%s)" % date) if date else ""))
-    return ('<aside class="ursprunglig-dom"><span class="label">Ursprunglig dom</span> '
-            '%s</aside>' % " · ".join(links))
+    """The "Ursprunglig dom" link items: the court's own pre-referat verdict PDF
+    that this NJA referat later absorbed (R2). Present only on a referat that
+    folded in a separate raw verdict record; the PDF is served by
+    `/api/v1/dv-verdict`."""
+    return [{"url": it["url"],
+             "label": ", ".join(it.get("malnummer") or []) or "Dom (PDF)",
+             "date": it.get("avgorandedatum")}
+            for it in art.get("ursprunglig_dom") or []]
 
 
 def _dv_curated(md, site):
@@ -2536,25 +2349,20 @@ def _dv_curated(md, site):
         entries = [e for e in md.get(key) or []
                    if isinstance(e, dict) and e.get("runs")]
         if entries:
-            sections.append(
-                '<section class="curated %s"><h2>%s</h2><ul>%s</ul></section>'
-                % (key, label,
-                   "".join("<li>%s</li>" % render_runs(e["runs"], site)
-                           for e in entries)))
-    return "".join(sections)
+            sections.append({"key": key, "label": label,
+                             "lines": [Markup(render_runs(e["runs"], site))
+                                       for e in entries]})
+    return sections
 
 
 def _keywords(nyckelord, site):
-    """Case keywords as links to their concept (begrepp) page where one
-    exists -- the case→concept half of the keyword graph."""
-    if not nyckelord:
-        return ""
-    items = []
+    """Case keywords as sökord items linking to their concept (begrepp) page
+    where one exists -- the case→concept half of the keyword graph."""
+    out = []
     for n in nyckelord:
         uri = site.resolve(begrepp_uri(n))      # fold onto the canonical concept
-        items.append('<a href="%s">%s</a>' % (escape(href(uri)), escape(n))
-                     if site.has(uri) else escape(n))
-    return '<p class="sokord"><span>Sökord</span> %s</p>' % " · ".join(items)
+        out.append({"href": href(uri) if site.has(uri) else None, "text": n})
+    return out
 
 
 FA_TYPE_LABEL = {"prop": "Proposition", "sou": "SOU", "ds": "Ds",
@@ -2564,28 +2372,22 @@ FA_TYPE_LABEL = {"prop": "Proposition", "sou": "SOU", "ds": "Ds",
                  "so": "Sveriges internationella överenskommelser"}
 
 
-def render_implements(art, site):
+def _implements_items(art, site):
     """The genomför-direktiv statements pulled from a proposition's
-    författningskommentar (§7d): which EU directive article each provision
-    transposes. Each links to the directive -- its article on our EU page when we
-    host it, else out to EUR-Lex."""
-    recs = art.get("implements")
-    if not recs:
-        return ""
+    författningskommentar (§7d) as template items: which EU directive article
+    each provision transposes. Each links to the directive -- its article on
+    our EU page when we host it, else out to EUR-Lex."""
     items = []
-    for r in recs:
+    for r in art.get("implements") or []:
         directive = r["directive"]
         target = r["uris"][0] if r.get("uris") else directive
-        link = _directive_link(site, directive, target)
         where = (("%s kap. %s § " % (r["chapter"], r["paragraf"]))
                  if r.get("chapter") and r.get("paragraf")
                  else ("%s § " % r["paragraf"]) if r.get("paragraf") else "")
-        ref = ", ".join(r["pinpoints"] or r["articles"])
-        items.append('<li>%sgenomför%s artikel %s i %s</li>'
-                     % (escape(where), " delvis" if r.get("partial") else "",
-                        escape(ref), link))
-    return ('<section class="genomforande"><h2>Genomför EU-direktiv</h2>'
-            '<ul>%s</ul></section>' % "".join(items))
+        items.append({"where": where, "partial": bool(r.get("partial")),
+                      "ref": ", ".join(r["pinpoints"] or r["articles"]),
+                      "link": Markup(_directive_link(site, directive, target))})
+    return items
 
 
 def render_forarbete(art, site):
@@ -2594,7 +2396,7 @@ def render_forarbete(art, site):
     # the identifier is the eyebrow (below), so it needs no "Beteckning" dl row
     meta = [("Typ", FA_TYPE_LABEL.get(art.get("type"), art.get("type"))),
             ("Datum", art.get("date"))]
-    parts = [render_implements(art, site)]
+    parts = []
     toc = Toc()
     doc_uri = art["uri"]
     rail = Rail(site, doc_uri)
@@ -2621,15 +2423,10 @@ def render_forarbete(art, site):
             # its *printed* number, which here repeats a body page's, so the
             # button would confidently show the wrong image. The number still
             # renders and the anchor still works.
-            if bil:
-                parts.append('<span class="sid" id="%s"%s>%d</span>'
-                             % (key, _rail_attr(rail, key), pg))
-                return
-            fax = "/api/v1/facsimile?uri=%s&sid=%d" % (quote(doc_uri, safe=""), pg)
-            parts.append('<span class="sid" id="%s"%s><button type="button" '
-                         'data-fax="%s" title="Visa faksimil av sidan %d">'
-                         '%d</button></span>'
-                         % (key, _rail_attr(rail, key), escape(fax), pg, pg))
+            rail_id = key if key in rail.data else None
+            fax = (None if bil else "/api/v1/facsimile?uri=%s&sid=%d"
+                   % (quote(doc_uri, safe=""), pg))
+            parts.append(_NODES.fa_sid(key, rail_id, pg, fax))
 
     def close_komm():
         if state["komm"] is not None:
@@ -2646,22 +2443,21 @@ def render_forarbete(art, site):
                 # wire the section to the scroll-driven rail (remiss feedback on
                 # this avsnitt); a section with no context gets no data-rail
                 rail.add(n.get("id"), plain(n["text"]))
-                ra = _rail_attr(rail, n.get("id"))
-                parts.append('<h%d id="%s"%s class="rubrik">%s</h%d>'
-                             % (min(level + 1, 5), escape(anchor), ra,
-                                render_runs(n["text"], site), min(level + 1, 5)))
+                nid = n.get("id")
+                parts.append(_NODES.fa_avsnitt(
+                    min(level + 1, 5), anchor,
+                    nid if nid and nid in rail.data else None,
+                    Markup(render_runs(n["text"], site))))
                 walk(n.get("children", []))
             elif n.get("type") == "tabell":
                 # a nuvarande/föreslagen lydelse comparison: two columns of
                 # aligned cells, the `th` row the italic column header
                 close_komm()
-                rows = []
-                for r in n.get("children", []):
-                    tag = "th" if r.get("th") else "td"
-                    rows.append("<tr>%s</tr>" % "".join(
-                        "<%s>%s</%s>" % (tag, render_runs(c, site), tag)
-                        for c in r.get("cells", [])))
-                parts.append('<table class="lydelse">%s</table>' % "".join(rows))
+                parts.append(_NODES.fa_lydelse_tabell(
+                    [{"tag": "th" if r.get("th") else "td",
+                      "cells": [Markup(render_runs(c, site))
+                                for c in r.get("cells", [])]}
+                     for r in n.get("children", [])]))
             else:
                 # författningskommentar blocks (`fk`, stamped per entry by
                 # forarbete's extractor at parse time): one highlight box per
@@ -2673,29 +2469,25 @@ def render_forarbete(art, site):
                         state["komm"] = n["fk"]
                 else:
                     close_komm()
-                cls = ' class="fotnot"' if n.get("type") == "fotnot" else ""
-                parts.append("<p%s>%s</p>" % (cls, render_runs(n["text"], site)))
+                parts.append(_NODES.fa_p(n.get("type") == "fotnot",
+                                         Markup(render_runs(n["text"], site))))
 
     state["komm"] = None
     walk(art.get("structure", []))
     close_komm()
     rail.add_document()        # document-level remiss "most interesting" overall panel
-    return page(title, "Förarbete", _doc_meta(meta, art.get("source_url")),
-                "".join(parts), render_toc(toc), eyebrow=lb.short_id,
-                island=rail.island())
-
-
-class _RawHTML(str):
-    """A `_meta_dl` value that is already rendered HTML (a linked identifier
-    row) -- spliced in as-is instead of being escaped."""
+    return ENV.get_template("sources/forarbete.html").render(page_context(
+        title, "Förarbete", _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=lb.short_id, island=rail.island(),
+        implements=_implements_items(art, site),
+        structure=Markup("".join(parts))))
 
 
 def _meta_dl(pairs):
-    rows = "".join("<dt>%s</dt><dd>%s</dd>"
-                   % (escape(k), v if isinstance(v, _RawHTML)
-                      else escape(str(v)))
-                   for k, v in pairs if v)
-    return '<dl class="meta">%s</dl>' % rows if rows else ""
+    """The dl.meta rows (partials/meta.html): a plain value is escaped by the
+    macro, an already-rendered one (a linked identifier row) arrives as
+    Markup and passes through."""
+    return _META.meta_dl([(k, v) for k, v in pairs if v])
 
 
 def _doc_meta(pairs, source_url):
@@ -2703,9 +2495,9 @@ def _doc_meta(pairs, source_url):
     rows, then the authoritative-source "Källa" link as the last row (C1)."""
     if source_url:
         host = urlsplit(source_url).netloc or "källan"
-        pairs = list(pairs) + [("Källa", _RawHTML(
-            '<a class="ext" href="%s" rel="external">%s</a>'
-            % (escape(source_url), escape(host))))]
+        pairs = list(pairs) + [("Källa", Markup(
+            '<a class="ext" href="%s" rel="external">%s</a>')
+            % (source_url, host))]
     return _meta_dl(pairs)
 
 
@@ -2723,17 +2515,16 @@ def render_begrepp(art, site):
     toc = Toc()
     rail = Rail(site, art["uri"])
     nodes = art.get("body", [])
+    structure = Markup("".join(
+        render_node(b, site, art["uri"], toc, rail) for b in nodes))
+    rail.add_document()
     # a synthesized stub (a defined term / nyckelord with no wiki page) has no
     # description -- its value is the aggregated inbound below (what defines and
-    # tags it), so say so instead of showing a blank page
-    note = ("" if nodes else
-            '<p class="stub-note">Det här begreppet har ännu ingen beskrivning. '
-            'Nedan visas var det definieras och används.</p>')
-    body = note + "".join(
-        render_node(b, site, art["uri"], toc, rail) for b in nodes)
-    rail.add_document()
-    return page(title, "Begrepp", _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc), eyebrow="Begrepp", island=rail.island())
+    # tags it), so the template says so instead of showing a blank page
+    return ENV.get_template("sources/begrepp.html").render(page_context(
+        title, "Begrepp", _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow="Begrepp", island=rail.island(),
+        structure=structure, has_description=bool(nodes)))
 
 
 EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
@@ -2826,10 +2617,8 @@ def _recital_group_heading(g):
     lo, hi = g["range"]
     rng = "Skäl %d" % lo if lo == hi else "Skäl %d–%d" % (lo, hi)
     refs = g.get("articleRefs") or []
-    jfr = ' <span class="jfr">(jfr art %s)</span>' % _artlist(refs) if refs else ""
-    return ('<p id="%s" class="recital-group"><span class="rg-range">%s:</span> '
-            '<b>%s</b>%s</p>' % (escape(_group_anchor(g)), escape(rng),
-                                 escape(g["label"]), jfr))
+    return _NODES.eu_recital_group(_group_anchor(g), rng, g["label"],
+                                   Markup(_artlist(refs)) if refs else None)
 
 
 def _recital_links_sections(recitals):
@@ -2891,11 +2680,9 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     if t == "heading":
         level = b.get("level") or 1
         anchor = toc.add(bid, plain(b["text"]), level)
-        lvl = min(level + 1, 5)
-        return '<h%d id="%s" class="rubrik">%s</h%d>' % (lvl, escape(anchor),
-                                                         runs, lvl)
+        return _NODES.eu_heading(min(level + 1, 5), anchor, Markup(runs))
     if t == "keyword":
-        return '<span class="sokord">%s</span>' % runs
+        return _NODES.eu_keyword(Markup(runs))
     # a numbered recital is a citation target in its own right (`#recital-N`), so
     # it can be cited, commented on and ride the rail even with no editorial layer.
     if t == "recital" and num and num.isdigit():
@@ -2912,8 +2699,8 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
         # an article's key is its own id; a sub-article's is the dotted form. Every
         # numbered sub-article (paragraph/point) gets that id, so a reader can link
         # to it directly (`#4.22.a`) -- but it only *rides* the rail when it has
-        # context to show (rail.add is a no-op otherwise, and _rail_attr then omits
-        # the data-rail marker), so ubiquitous ids don't clutter the margin. The
+        # context to show (rail.add is a no-op otherwise, and the data-rail
+        # marker is then omitted), so ubiquitous ids don't clutter the margin. The
         # editorial layer additionally gives a block a forward panel of its recitals.
         key = (cur_article if t == "article"
                else subarticle_key(t, num, cur_article, cur_parag))
@@ -2927,19 +2714,10 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     # implementing förarbeten) drives the rail, like an SFS paragraph
     pin = _eurlex_pin(t, num, bid)
     rail.add(bid, pin, extra)
-    ra = _rail_attr(rail, bid)
+    rail_id = bid if bid and bid in rail.data else None
     if t == "article":
         anchor = toc.add(bid, plain(b["text"]), 2)
-        return '<h3 id="%s" class="artikel"%s>%s</h3>' % (escape(anchor), ra, runs)
-    # the marker doubles as the block's permalink when the block is addressable,
-    # so a reader can grab the link to a specific recital/paragraph/point by its
-    # number; an unaddressable block (no id) keeps a plain span
-    if num:
-        label = escape(_eurlex_marker(t, num))
-        marker = ('<a class="num" href="#%s">%s</a> ' % (escape(bid), label)
-                  if bid else '<span class="num">%s</span> ' % label)
-    else:
-        marker = ""
+        return _NODES.eu_article(anchor, rail_id, Markup(runs))
     classes = [EURLEX_CLASS.get(t, "")]
     # a marked recital/paragraph/point hangs its marker in the left margin
     if num and t in ("recital", "paragraph", "point"):
@@ -2950,9 +2728,11 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     if defines:
         classes.append("definition")
         runs = _emphasize_term(runs, defines, site)
-    cls = " ".join(c for c in classes if c)
-    return '<p%s%s%s>%s%s</p>' % (_id_attr(bid), ' class="%s"' % cls if cls else "",
-                                  ra, marker, runs)
+    return _NODES.eu_block(bid, " ".join(c for c in classes if c) or None,
+                           rail_id,
+                           bid if num and bid else None,
+                           _eurlex_marker(t, num) if num else None,
+                           Markup(runs))
 
 
 def _emphasize_term(runs_html, term, site):
@@ -2971,18 +2751,15 @@ def _emphasize_term(runs_html, term, site):
     return dfn + runs_html[len(lead):]
 
 
-def _eurlex_opinion_link(art, site):
-    """On a judgment, a link to its Advocate General's opinion (CELEX CJ -> CC)
-    when the corpus holds it -- the opinion is reached from the judgment, not the
-    index (E4). '' otherwise."""
+def _eurlex_opinion_href(art, site):
+    """On a judgment, the href of its Advocate General's opinion (CELEX CJ ->
+    CC) when the corpus holds it -- the opinion is reached from the judgment,
+    not the index (E4). None otherwise."""
     celex = art.get("celex") or ""
     if art.get("doctype") != "judgment" or celex[5:7] != "CJ":
-        return ""
+        return None
     opinion = catalog.BASE + "ext/celex/" + celex[:5] + "CC" + celex[7:]
-    if not site.has(opinion):
-        return ""
-    return ('<aside class="ag-opinion"><a href="%s">Generaladvokatens förslag '
-            'till avgörande</a></aside>' % escape(href(opinion)))
+    return href(opinion) if site.has(opinion) else None
 
 
 def render_eurlex(art, site):
@@ -3009,7 +2786,7 @@ def render_eurlex(art, site):
     editorial = _load_editorial(art["celex"])
     toc = Toc()
     rail = Rail(site, art["uri"])
-    parts = [_eurlex_opinion_link(art, site)]
+    parts = []
     cur_article = cur_parag = None       # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
     # the artifact is a nested structure (divisions > articles > paragraphs >
@@ -3033,10 +2810,12 @@ def render_eurlex(art, site):
         parts.append(_render_eurlex_block(b, site, art["uri"], toc, rail,
                                           editorial, cur_article, cur_parag))
     rail.add_document()        # external links + commentary, the rail's default panel
-    body = "".join(parts)
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
-    return page(title, kind, _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
+    return ENV.get_template("sources/eurlex.html").render(page_context(
+        title, kind, _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=lb.short_id, island=rail.island(),
+        opinion_href=_eurlex_opinion_href(art, site),
+        structure=Markup("".join(parts))))
 
 
 def _ref_link(site, uri):
@@ -3045,23 +2824,19 @@ def _ref_link(site, uri):
     paragraf pinpointed and named, or the CELEX out to EUR-Lex; a plain span
     for an SFS we have not parsed."""
     if is_external(uri):
-        return ('<a class="ext" href="%s" rel="external">%s</a>'
-                % (escape(external_href(uri)),
-                   escape(catalog.local(uri).rsplit("/", 1)[-1])))
+        return Markup('<a class="ext" href="%s" rel="external">%s</a>') % (
+            external_href(uri), catalog.local(uri).rsplit("/", 1)[-1])
     base, _, frag = uri.partition("#")
     pin = human_fragment(frag)
     name = _law_title(site, base)
     label = ("%s %s" % (pin, name)).strip() if pin else name
-    return ('<a href="%s">%s</a>' % (escape(href(uri)), escape(label))
-            if site.has(base) else '<span class="noref">%s</span>' % escape(label))
+    return (Markup('<a href="%s">%s</a>') % (href(uri), label)
+            if site.has(base)
+            else Markup('<span class="noref">%s</span>') % label)
 
 
 def _ref_list(site, heading, uris):
-    if not uris:
-        return ""
-    items = "".join("<li>%s</li>" % _ref_link(site, u) for u in uris)
-    return ('<section class="refs"><h2>%s</h2><ul>%s</ul></section>'
-            % (escape(heading), items))
+    return _PANELS.ref_list(heading, [_ref_link(site, u) for u in uris or []])
 
 
 def _upphavd_av(rows):
@@ -3070,16 +2845,11 @@ def _upphavd_av(rows):
     rpubl:upphaver edges. Worded 'Upphävs eller ersätts av' because the source
     clause conflates the two; the claim comes from the *replacing* document's
     text, so this page's own status is not asserted beyond it."""
-    if not rows:
-        return ""
-    items = "".join(
-        '<li><a href="%s">%s</a></li>'
-        % (escape(layout.page_url(from_uri)),
-           escape("%s — %s" % (label, title) if title and title != label
-                  else label))
-        for from_uri, label, title in rows)
-    return ('<section class="refs"><h2>Upphävs eller ersätts av</h2>'
-            '<ul>%s</ul></section>' % items)
+    return _PANELS.ref_list("Upphävs eller ersätts av", [
+        Markup('<a href="%s">%s</a>') % (
+            layout.page_url(from_uri),
+            "%s — %s" % (label, title) if title and title != label else label)
+        for from_uri, label, title in rows])
 
 
 def _foreskrift_repealed_banner(rows):
@@ -3090,12 +2860,9 @@ def _foreskrift_repealed_banner(rows):
     them rather than asserting a repeal date of its own."""
     if not rows:
         return ""
-    links = ", ".join('<a href="%s">%s</a>'
-                      % (escape(layout.page_url(from_uri)), escape(label))
-                      for from_uri, label, _title in rows)
-    return ('<div class="expired-banner"><strong>Upphävd eller ersatt</strong>'
-            '<span>Denna föreskrift anges som upphävd eller ersatt av %s.'
-            '</span></div>' % links)
+    return _BANNERS.foreskrift_repealed_banner(
+        [{"url": layout.page_url(from_uri), "label": label}
+         for from_uri, label, _title in rows])
 
 
 def _amendment_label(am):
@@ -3104,12 +2871,12 @@ def _amendment_label(am):
     deliberately not minted here: an amendment that is also harvested as its
     own record gets its page linked wherever its uri occurs in body text; this
     register lists the *source* documents."""
-    ident = escape(am.get("identifier") or "ändringsförfattning utan läsbar "
-                   "beteckning")
+    ident = am.get("identifier") or ("ändringsförfattning utan läsbar "
+                                     "beteckning")
     if am.get("url"):
-        return '<a class="ext" href="%s" rel="external">%s</a>' % (
-            escape(am["url"]), ident)
-    return ident
+        return Markup('<a class="ext" href="%s" rel="external">%s</a>') % (
+            am["url"], ident)
+    return Markup(escape(ident))
 
 
 def _foreskrift_amendments(amendments, toc):
@@ -3119,11 +2886,8 @@ def _foreskrift_amendments(amendments, toc):
     if not amendments:
         return ""
     anchor = toc.add("L", "Ändringsförfattningar", 1)
-    return ('<section class="andringar" id="%s"><h2 class="kaprubrik">'
-            'Ändringsförfattningar</h2><ul>%s</ul></section>'
-            % (escape(anchor),
-               "".join("<li>%s</li>" % _amendment_label(am)
-                       for am in amendments)))
+    return _PANELS.foreskrift_amendments(
+        anchor, [_amendment_label(am) for am in amendments])
 
 
 def _konsoliderad_banner(art, site, tom):
@@ -3135,19 +2899,13 @@ def _konsoliderad_banner(art, site, tom):
         ident = next((a["identifier"] for a in art.get("amendments", [])
                       if a.get("uri") == tom and a.get("identifier")),
                      catalog.local(tom).replace("/", " ").upper())
-        cutoff = ("med ändringar införda till och med "
-                  + ('<a href="%s">%s</a>' % (escape(layout.page_url(tom)),
-                                              escape(ident))
-                     if site.has(tom) else escape(ident)))
+        cutoff = {"url": layout.page_url(tom) if site.has(tom) else None,
+                  "label": ident}
     else:
-        cutoff = "med senare ändringar införda"
-    grund = (' <a href="%s">Visa grundförfattningen i ursprunglig lydelse</a>.'
-             % escape(layout.page_url(art["uri"] + "/grund"))
-             if art.get("structure") else "")
-    return ('<div class="version-banner"><strong>Konsoliderad version</strong>'
-            '<span>Texten nedan är en inofficiell sammanställning %s. '
-            'Grundförfattningen och ändringsförfattningarna är de officiella '
-            'texterna.%s</span></div>' % (cutoff, grund))
+        cutoff = None
+    grund_url = (layout.page_url(art["uri"] + "/grund")
+                 if art.get("structure") else None)
+    return _BANNERS.konsoliderad_banner(cutoff, grund_url)
 
 
 def _unparsed_konsoliderad_note(consolidations):
@@ -3159,20 +2917,13 @@ def _unparsed_konsoliderad_note(consolidations):
             if not c.get("structure") and c.get("url")]
     if not urls:
         return ""
-    return ('<div class="version-banner"><strong>Konsoliderad version</strong>'
-            '<span>Myndigheten tillhandahåller en konsoliderad version som '
-            'inte kunnat läsas in här: <a class="ext" href="%s" '
-            'rel="external">PDF hos myndigheten</a>.</span></div>'
-            % escape(urls[0]))
+    return _BANNERS.unparsed_konsoliderad_note(urls[0])
 
 
 def _grund_banner(base_uri):
     """The callout on a föreskrift ``/grund`` page: the as-enacted base text,
     without later amendments, and the way back to the presented version."""
-    return ('<div class="version-banner"><strong>Ursprunglig lydelse</strong>'
-            '<span>Grundförfattningen som beslutad, utan senare ändringar. '
-            '<a href="%s">Visa konsoliderad version</a>.</span></div>'
-            % escape(layout.page_url(base_uri)))
+    return _BANNERS.grund_banner(layout.page_url(base_uri))
 
 
 def render_foreskrift(art, site):
@@ -3195,8 +2946,8 @@ def render_foreskrift(art, site):
         ("Ikraftträdande", md.get("ikrafttradandedatum")),
         # the repeal target belongs in the header, not only the refs section:
         # what this regulation replaces is identity-level metadata
-        ("Upphäver", _RawHTML(", ".join(
-            _ref_link(site, u) for u in md.get("upphaver") or []))),
+        ("Upphäver", Markup(", ").join(
+            _ref_link(site, u) for u in md.get("upphaver") or [])),
     ]
     # outbound typed relations: what this regulation amends and replaces, the
     # empowering statute paragrafer (whose inbound mirror is the SFS paragraf's
@@ -3215,18 +2966,21 @@ def render_foreskrift(art, site):
            else _konsoliderad_banner(art, site, cons["konsolideradTom"])
            if cons
            else _unparsed_konsoliderad_note(art.get("consolidations", [])))
-    body = banner + refs \
-        + "".join(render_node(n, site, art["uri"], toc, rail)
-                  for n in structure) \
-        + _foreskrift_amendments(art.get("amendments", []), toc)
+    body = Markup("".join(render_node(n, site, art["uri"], toc, rail)
+                          for n in structure))
+    # rendered before render_toc below: the amendment register adds its own
+    # TOC entry as it renders
+    amendments = Markup(_foreskrift_amendments(art.get("amendments", []), toc))
     # a grundföreskrift page shows the original wording, not the regulation as it
     # now reads, so citations to the regulation belong on the consolidation
     rail.add_document(inbound=not grund)
-    return page(title, "Föreskrift", _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc),
-                eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
-                island=rail.island(),
-                body_class=" inaktuell" if grund else "")
+    return ENV.get_template("sources/foreskrift.html").render(page_context(
+        title, "Föreskrift", _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc),
+        eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
+        island=rail.island(), body_class=" inaktuell" if grund else "",
+        banner=Markup(banner), refs=Markup(refs), structure=body,
+        amendments=amendments))
 
 
 def render_avg(art, site):
@@ -3241,20 +2995,19 @@ def render_avg(art, site):
         ("Ämbetsberättelse", md.get("officialReport")),
         ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
     ]
-    summary = ('<p class="sammanfattning">%s</p>'
-               % escape(art["sammanfattning"])
-               if art.get("sammanfattning") else "")
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = "".join(
+    structure = Markup("".join(
         render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", []))
+        for n in art.get("structure", [])))
     rail.add_document()
     section = {"jo": "JO-beslut", "jk": "JK-beslut",
                "arn": "ARN-beslut"}.get(art.get("org"), "Myndighetsavgörande")
-    return page(title, section, _doc_meta(meta, art.get("source_url")), body,
-                render_toc(toc), eyebrow=ident, summary=summary,
-                island=rail.island())
+    return ENV.get_template("sources/avg.html").render(page_context(
+        title, section, _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=ident,
+        summary_text=art.get("sammanfattning"),
+        island=rail.island(), structure=structure))
 
 
 def render_hudoc(art, site):
@@ -3267,19 +3020,22 @@ def render_hudoc(art, site):
         ("ECLI", art.get("ecli")),
         ("Artiklar", ", ".join(md.get("articles", [])) or None),
     ]
-    summary = ("<p class=\"sammanfattning\">%s</p>" % escape("; ".join(
-        md.get("conclusions", []))) if md.get("conclusions") else "")
     toc = Toc()
     rail = Rail(site, art["uri"])
-    refs = _ref_list(site, "Berörda konventionsartiklar",
-                     [ref["uri"] for ref in art.get("references", [])])
-    body = refs + "".join(
+    structure = Markup("".join(
         render_node(node, site, art["uri"], toc, rail)
-        for node in art.get("structure", []))
+        for node in art.get("structure", [])))
     rail.add_document()
-    return page(lb.short_title or art.get("itemid"), "Europadomstolen",
-                _doc_meta(meta, art.get("source_url")), body, render_toc(toc),
-                eyebrow=lb.short_id, summary=summary, island=rail.island())
+    return ENV.get_template("sources/hudoc.html").render(page_context(
+        lb.short_title or art.get("itemid"), "Europadomstolen",
+        _doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        eyebrow=lb.short_id,
+        summary_text=("; ".join(md["conclusions"])
+                      if md.get("conclusions") else None),
+        island=rail.island(),
+        refs=Markup(_ref_list(site, "Berörda konventionsartiklar",
+                              [ref["uri"] for ref in art.get("references", [])])),
+        structure=structure))
 
 
 def _render_coe_provision(node, site, doc_uri, toc, rail):
@@ -3291,8 +3047,8 @@ def _render_coe_provision(node, site, doc_uri, toc, rail):
     rail.add(aid, "%s %s" % (label, number))
     children = "".join(render_node(child, site, doc_uri, toc, rail)
                        for child in node.get("children", []))
-    return ('<section class="artikel"%s%s><h2 id="%s">%s</h2>%s</section>'
-            % (_id_attr(None), _rail_attr(rail, aid), escape(anchor), title, children))
+    return _NODES.artikel_section(aid if aid and aid in rail.data else None,
+                                  anchor, Markup(title), Markup(children))
 
 
 def render_coe(art, site):
@@ -3310,18 +3066,21 @@ def render_coe(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
-    implementation_link = (_ref_list(site, "Svensk inkorporering", [implementation])
-                           if implementation else "")
-    parts = [implementation_link]
+    parts = []
     for node in art.get("structure", []):
         if node.get("type") in ("artikel", "sektion"):
             parts.append(_render_coe_provision(node, site, art["uri"], toc, rail))
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
-    return page(lb.short_title or lb.official_title, "Europarådets fördrag",
-                _doc_meta(meta, art.get("source_url")), "".join(parts),
-                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
+    return ENV.get_template("sources/coe.html").render(page_context(
+        lb.short_title or lb.official_title, "Europarådets fördrag",
+        _doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        eyebrow=lb.short_id, island=rail.island(),
+        implementation_link=Markup(
+            _ref_list(site, "Svensk inkorporering", [implementation])
+            if implementation else ""),
+        structure=Markup("".join(parts))))
 
 
 def _render_icrc_provision(node, site, doc_uri, toc, rail):
@@ -3332,8 +3091,8 @@ def _render_icrc_provision(node, site, doc_uri, toc, rail):
     rail.add(aid, "Artikel %s" % ordinal if ordinal else plain(node.get("text", [])))
     children = "".join(render_node(child, site, doc_uri, toc, rail)
                        for child in node.get("children", []))
-    return ('<section class="artikel"%s%s><h2 id="%s">%s</h2>%s</section>'
-            % (_id_attr(None), _rail_attr(rail, aid), escape(anchor), title, children))
+    return _NODES.artikel_section(aid if aid and aid in rail.data else None,
+                                  anchor, Markup(title), Markup(children))
 
 
 def render_icrc(art, site):
@@ -3353,18 +3112,17 @@ def render_icrc(art, site):
     toc = Toc()
     rail = Rail(site, art["uri"])
     parts = []
-    if art.get("summary"):
-        parts.append('<p class="lead">%s</p>' % escape(art["summary"]))
     for node in art.get("structure", []):
         if node.get("type") == "artikel":
             parts.append(_render_icrc_provision(node, site, art["uri"], toc, rail))
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
-    return page(lb.short_title or lb.official_title,
-                "Internationell humanitär rätt",
-                _doc_meta(meta, art.get("source_url")), "".join(parts),
-                render_toc(toc), eyebrow=lb.short_id, island=rail.island())
+    return ENV.get_template("sources/icrc.html").render(page_context(
+        lb.short_title or lb.official_title, "Internationell humanitär rätt",
+        _doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        eyebrow=lb.short_id, island=rail.island(),
+        lead=art.get("summary"), structure=Markup("".join(parts))))
 
 
 # the consent-to-be-bound forms an MTDSG participation records, in Swedish
@@ -3376,20 +3134,16 @@ UNTC_ACTIONS_SV = {
 
 
 def _untc_parties(parties):
-    """The participation table -- each state's signature and its binding consent
-    (form + date). The MTDSG carries no treaty text, so this is the page's body."""
-    rows = []
-    for party in parties:
-        consent = ("%s (%s)" % (party.get("actionDate") or "",
-                                UNTC_ACTIONS_SV.get(party["action"], party["action"]))
-                   if party.get("action") else "")
-        rows.append("<tr><td>%s</td><td>%s</td><td>%s</td></tr>"
-                    % (escape(party["country"]), escape(party.get("signature") or ""),
-                       escape(consent)))
-    return ('<h2 id="parter">Parter</h2>'
-            '<table class="untc-parties"><thead><tr><th>Stat</th>'
-            '<th>Undertecknande</th><th>Bindande samtycke</th></tr></thead>'
-            '<tbody>%s</tbody></table>' % "".join(rows))
+    """The participation-table rows -- each state's signature and its binding
+    consent (form + date), display-ready for the untc template. The MTDSG
+    carries no treaty text, so this table is the page's body."""
+    return [{"country": party["country"],
+             "signature": party.get("signature") or "",
+             "consent": ("%s (%s)" % (party.get("actionDate") or "",
+                                      UNTC_ACTIONS_SV.get(party["action"],
+                                                          party["action"]))
+                         if party.get("action") else "")}
+            for party in parties]
 
 
 def render_untc(art, site):
@@ -3406,13 +3160,11 @@ def render_untc(art, site):
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
     ]
     rail = Rail(site, art["uri"])
-    parts = []
-    if art.get("parties"):
-        parts.append(_untc_parties(art["parties"]))
     rail.add_document()
-    return page(lb.short_title or lb.official_title, "FN-fördrag",
-                _doc_meta(meta, art.get("source_url")), "".join(parts), "",
-                eyebrow=lb.short_id, island=rail.island())
+    return ENV.get_template("sources/untc.html").render(page_context(
+        lb.short_title or lb.official_title, "FN-fördrag",
+        _doc_meta(meta, art.get("source_url")), eyebrow=lb.short_id,
+        island=rail.island(), parties=_untc_parties(art.get("parties") or [])))
 
 
 def render_icc(art, site):
@@ -3427,15 +3179,15 @@ def render_icc(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
-    body = "".join(
+    structure = Markup("".join(
         render_node(node, site, art["uri"], toc, rail)
-        for node in art.get("structure", []))
+        for node in art.get("structure", [])))
     rail.add_document()
     lb = labels.document_labels("icc", art)
-    return page(lb.short_title or lb.short_id,
-                "Internationella brottmålsdomstolen",
-                _doc_meta(meta, art.get("source_url")), body, render_toc(toc),
-                eyebrow=lb.short_id, island=rail.island())
+    return ENV.get_template("sources/icc.html").render(page_context(
+        lb.short_title or lb.short_id, "Internationella brottmålsdomstolen",
+        _doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        eyebrow=lb.short_id, island=rail.island(), structure=structure))
 
 
 # the sources whose pages carry inline-editable content. A logged-in user edits
@@ -3531,8 +3283,7 @@ def _most_cited(con, source):
         "FROM links l JOIN documents d ON d.uri = l.to_root "
         "WHERE d.source = ? AND l.from_uri <> l.to_root "
         "GROUP BY l.to_root ORDER BY c DESC LIMIT 25", (source,)).fetchall()
-    return "".join('<li><a href="%s">%s</a> <span class="c">%d</span></li>'
-                   % (escape(href(u)), escape(t), c) for u, t, c in rows)
+    return [{"href": href(u), "label": t, "count": c} for u, t, c in rows]
 
 
 def _index_rows(n):
@@ -3555,22 +3306,14 @@ def _index_rows(n):
 
 def render_index(con):
     n = {s: c for s, c in catalog.counts(con).items() if s != "kommentar"}
-    nav = "".join(
-        '<li><a href="%s">%s</a> <span class="c">%d</span></li>'
-        % (route, escape(label), count)
-        for route, label, count in _index_rows(n))
-    cols = []
-    for source, heading in (("sfs", "Mest hänvisade författningar"),
-                            ("dv", "Mest hänvisade rättsfall")):
-        items = _most_cited(con, source)
-        if items:
-            cols.append('<section><h2>%s</h2><ol class="ranked">%s</ol></section>'
-                        % (heading, items))
-    body = ('<p class="lead">%d sammanlänkade dokument fördelade på %d '
-            'dokumenttyper.</p>'
-            '<nav class="browse counts"><ul>%s</ul></nav>'
-            '<div class="cols">%s</div>'
-            % (sum(n.values()), sum(1 for s in n if n[s]), nav, "".join(cols)))
+    # key "entries", not "items": on a dict, Jinja's attribute lookup finds
+    # dict.items (the method) before the key
+    cols = [{"heading": heading, "entries": entries}
+            for source, heading in (("sfs", "Mest hänvisade författningar"),
+                                    ("dv", "Mest hänvisade rättsfall"))
+            if (entries := _most_cited(con, source))]
+    body = _LISTS.index_body(sum(n.values()), sum(1 for s in n if n[s]),
+                             list(_index_rows(n)), cols)
     return page("lagen.nu", "Start", "", body,
                 eyebrow="Sveriges lagar, med kontext", solo=True)
 
@@ -3665,15 +3408,13 @@ def _coe_nest(rows):
 
 
 def _coe_entry(row, named, children):
+    """One COE instrument as the nested dict listings.coe_entry renders
+    (recursively -- the protocols under their convention)."""
     pre, key = coe.significant_title(row["title"])
-    name = ('<a href="%s"><span class="pre">%s</span>%s</a> '
-            '<span class="ref">(%s)</span>'
-            % (escape(href(row["uri"])), escape(pre), escape(key or row["title"]),
-               escape(_treaty_parenthetical(row, named, row["identifier"]))))
-    kids = children.get(row["number"], [])
-    inner = ('<ul class="folkratt-protocols">%s</ul>'
-             % "".join(_coe_entry(k, named, children) for k in kids)) if kids else ""
-    return "<li>%s%s</li>" % (name, inner)
+    return {"url": href(row["uri"]), "pre": pre, "key": key or row["title"],
+            "ref": _treaty_parenthetical(row, named, row["identifier"]),
+            "children": [_coe_entry(k, named, children)
+                         for k in children.get(row["number"], [])]}
 
 
 def _coe_listing(con):
@@ -3684,24 +3425,22 @@ def _coe_listing(con):
         return ""
     named = _treaty_named(datasets.COE_NAMES)
     top, children = _coe_nest(rows)
-    groups = []
-    for heading, members in (
+    groups = Markup("").join(
+        _LISTS.folkratt_group(heading, Markup("").join(
+            _LISTS.coe_entry(_coe_entry(r, named, children)) for r in members))
+        for heading, members in (
             ("Centrala fördrag", [r for r in top if r["number"] in named]),
-            ("Övriga fördrag", [r for r in top if r["number"] not in named])):
-        if members:
-            groups.append('<h3>%s</h3><ul class="browse-list folkratt-treaties">%s</ul>'
-                          % (heading, "".join(_coe_entry(r, named, children)
-                                              for r in members)))
-    return ('<section class="folkratt-group"><h2>Europarådet</h2>%s</section>'
-            % "".join(groups))
+            ("Övriga fördrag", [r for r in top if r["number"] not in named]))
+        if members)
+    return _LISTS.folkratt_section("Europarådet", groups)
 
 
 def _icrc_entry(row, named):
     # a flat entry (icrc has no protocol nesting): the full title, then the gloss
     # closing on the ICRC treaty number rather than an ETS/CETS reference
-    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
-            % (escape(href(row["uri"])), escape(row["title"]),
-               escape(_treaty_parenthetical(row, named, "ICRC %s" % row["number"]))))
+    return _LISTS.treaty_li(
+        href(row["uri"]), row["title"],
+        _treaty_parenthetical(row, named, "ICRC %s" % row["number"]))
 
 
 # the ICRC's own field_treaty_topics taxonomy, in display order, mapped to the
@@ -3730,14 +3469,13 @@ def _icrc_topic(root, path):
 # a source <section>), so the HTML lives here once and each listing supplies only
 # its bucketing and its per-row `entry` renderer.
 def _folkratt_group(heading, members, entry):
-    return ('<h3>%s</h3><ul class="browse-list folkratt-treaties">%s</ul>'
-            % (escape(heading), "".join(entry(r) for r in members)))
+    return _LISTS.folkratt_group(heading,
+                                 Markup("").join(entry(r) for r in members))
 
 
 def _folkratt_section(title, groups):
-    body = "".join(group for group in groups if group)
-    return ('<section class="folkratt-group"><h2>%s</h2>%s</section>'
-            % (escape(title), body)) if body else ""
+    body = Markup("").join(group for group in groups if group)
+    return _LISTS.folkratt_section(title, body) if body else ""
 
 
 def _grouped_listing(title, rows, group_of, labels, entry, reverse=False):
@@ -3812,9 +3550,9 @@ UNTC_GROUP_ORDER = ("Traktaträtt och havsrätt", "Mänskliga rättigheter",
 def _untc_entry(row, curated):
     entry = curated.get(row["number"]) or {}
     named = {row["number"]: {"label": entry.get("sv"), "abbr": entry.get("abbr")}}
-    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
-            % (escape(href(row["uri"])), escape(row["title"]),
-               escape(_treaty_parenthetical(row, named, "MTDSG %s" % row["number"]))))
+    return _LISTS.treaty_li(
+        href(row["uri"]), row["title"],
+        _treaty_parenthetical(row, named, "MTDSG %s" % row["number"]))
 
 
 def _untc_listing(con):
@@ -3837,10 +3575,9 @@ def _icc_types():
 
 
 def _icc_entry(row):
-    gloss = ", ".join(part for part in (row["identifier"], row["date"]) if part)
-    return ('<li><a href="%s">%s</a> <span class="ref">(%s)</span></li>'
-            % (escape(href(row["uri"])), escape(row["title"] or row["identifier"]),
-               escape(gloss)))
+    return _LISTS.treaty_li(
+        href(row["uri"]), row["title"] or row["identifier"],
+        ", ".join(part for part in (row["identifier"], row["date"]) if part))
 
 
 def _icc_listing(con):
@@ -3857,12 +3594,7 @@ def _hudoc_section(con):
     top-level selector, so this no longer repeats the facet links. '' when empty."""
     if not catalog.document_count(con, "hudoc"):
         return ""
-    cited = _most_cited(con, "hudoc")
-    reel = ('<h3>Mest hänvisade avgöranden</h3><ol class="ranked">%s</ol>' % cited
-            if cited else "")
-    return ('<section class="folkratt-group"><h2>Europadomstolen</h2>%s'
-            '<p><a href="/folkratt/hudoc/">Bläddra bland avgöranden →</a></p>'
-            '</section>' % reel)
+    return _LISTS.hudoc_section(_most_cited(con, "hudoc"))
 
 
 # the shared top-level "Dokumenttyp" selector carried by every folkrätt aggregate
@@ -3890,22 +3622,17 @@ def _folkratt_axis(con):
 
 
 def _folkratt_nav(entries, active_id):
-    items = "".join(
-        '<li><a href="%s"%s>%s <span class="c">%d</span></a></li>'
-        % (escape(url), ' aria-current="page"' if key == active_id else "",
-           escape(label), count)
-        for key, label, url, count in entries)
-    return ('<nav class="facets"><h2 class="facet-axis">Dokumenttyp</h2>'
-            '<ul class="facet-list">%s</ul></nav>' % items)
+    return _LISTS.folkratt_nav(entries, active_id)
 
 
 def render_folkratt(con):
-    body = (_coe_listing(con) + _icrc_listing(con) + _untc_listing(con)
-            + _icc_listing(con) + _hudoc_section(con))
+    body = Markup("").join(
+        part for part in (_coe_listing(con), _icrc_listing(con),
+                          _untc_listing(con), _icc_listing(con),
+                          _hudoc_section(con)) if part)
     if body:
         body = _folkratt_nav(_folkratt_axis(con), "coe") + body
-    return page("Folkrätt", "Folkrätt", "",
-                body or '<p class="empty">Inga dokument.</p>',
+    return page("Folkrätt", "Folkrätt", "", body or _LISTS.empty(),
                 eyebrow="Internationell rätt och mänskliga rättigheter", solo=True)
 
 
@@ -3945,20 +3672,16 @@ def _browse_item(doc):
     prefix subdued, the sort subject emphasised, so the eye lands on where it files
     (a non-statute dims the whole entry). Every other source shows the bare id as
     the term and its short name (a case: `namn: sammanfattning`) as the definition."""
-    cls = ' class="subdued"' if doc.get("subdued") else ""
-    url = escape(doc["url"])
-    if doc.get("key") is not None:                       # SFS split title (today's markup)
-        term = ('<span class="pre">%s</span>%s'
-                % (escape(doc.get("pre") or ""), escape(doc["key"])))
-        return '<dt%s><a href="%s">%s</a></dt>' % (cls, url, term)
-    term = ('<a href="%s"><strong>%s</strong></a>'
-            % (url, escape(doc.get("short_id") or doc["display"])))
-    # the definition: a case's `namn: sammanfattning` (name only when it has one),
-    # otherwise the short name alone. Always a <dd> (even empty) so the two-column
-    # dt/dd grid stays aligned row for row.
     name, desc = doc.get("short_title"), doc.get("description")
-    text = "%s: %s" % (name, desc) if name and desc else (desc or name or "")
-    return "<dt%s>%s</dt><dd>%s</dd>" % (cls, term, escape(text))
+    return _LISTS.browse_item({
+        "subdued": doc.get("subdued"), "url": doc["url"],
+        "key": doc.get("key"), "pre": doc.get("pre"),
+        "short_id": doc.get("short_id"), "display": doc.get("display"),
+        # the definition: a case's `namn: sammanfattning` (name only when it
+        # has one), otherwise the short name alone. Always a <dd> (even empty)
+        # so the two-column dt/dd grid stays aligned row for row.
+        "text": "%s: %s" % (name, desc) if name and desc
+                else (desc or name or "")})
 
 
 # the DV browse buckets group into these forms, in this reading order; a bucket
@@ -3976,23 +3699,18 @@ def _dv_listing(docs):
         groups.get(d.get("variant") or "referat", groups["referat"]).append(d)
     groups["dom"].sort(key=lambda d: d.get("date") or "", reverse=True)
     present = [(k, label) for k, label in _DV_VARIANTS if groups[k]]
-    parts = []
-    for k, label in present:
-        items = "".join(_browse_item(d) for d in groups[k])
-        head = '<h2 class="dv-variant">%s</h2>' % escape(label) if len(present) > 1 else ""
-        parts.append('%s<dl class="browse-list def">%s</dl>' % (head, items))
-    return "".join(parts)
+    return Markup("").join(
+        _LISTS.dv_group(label if len(present) > 1 else None,
+                        Markup("").join(_browse_item(d) for d in groups[k]))
+        for k, label in present)
 
 
 def _facet_links(source, buckets, parent_slugs, active_keys, depth):
-    items = []
-    for b in buckets:
-        url = _browse_url(source, parent_slugs + [b["slug"]])
-        cur = (' aria-current="page"' if depth < len(active_keys)
-               and active_keys[depth] == b["key"] else "")
-        items.append('<li><a href="%s"%s>%s <span class="c">%d</span></a></li>'
-                     % (escape(url), cur, escape(b["label"]), b["count"]))
-    return '<ul class="facet-list">%s</ul>' % "".join(items)
+    return [{"url": _browse_url(source, parent_slugs + [b["slug"]]),
+             "current": (depth < len(active_keys)
+                         and active_keys[depth] == b["key"]),
+             "label": b["label"], "count": b["count"]}
+            for b in buckets]
 
 
 def _facet_nav(source, view, active_keys):
@@ -4002,17 +3720,19 @@ def _facet_nav(source, view, active_keys):
     omitted -- e.g. HUDOC's lone 'Domar' type, whose selector lives in the shared
     folkrätt axis above instead."""
     levels, buckets = view["levels"], view["buckets"]
-    parts = (['<h2 class="facet-axis">%s</h2>' % escape(levels[0]),
-              _facet_links(source, buckets, [], active_keys, 0)]
+    parts = ([{"axis": levels[0]},
+              {"axis": None,
+               "links": _facet_links(source, buckets, [], active_keys, 0)}]
              if len(buckets) > 1 else [])
     if len(levels) > 1:
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
-            parts.append('<h2 class="facet-axis">%s</h2>' % escape(
-                _secondary_axis(source, active_keys[0], levels[1])))
-            parts.append(_facet_links(source, cur["children"], [cur["slug"]],
-                                      active_keys, 1))
-    return '<nav class="facets">%s</nav>' % "".join(parts)
+            parts.append({"axis": _secondary_axis(source, active_keys[0],
+                                                  levels[1])})
+            parts.append({"axis": None,
+                          "links": _facet_links(source, cur["children"],
+                                                [cur["slug"]], active_keys, 1)})
+    return _LISTS.facet_nav(parts)
 
 
 def _secondary_axis(source, primary_key, default):
@@ -4041,26 +3761,21 @@ def render_facet_page(source, view, nodes, banner=""):
     heading = _bucket_heading(source, view["levels"], nodes)
     docs = nodes[-1].get("documents") or []
     if not docs:
-        listing = '<p class="empty">Inga dokument.</p>'
+        listing = _LISTS.empty()
     elif source == "dv":                                 # grouped Domar/Referat/Notiser
         listing = _dv_listing(docs)
     else:
         # SFS is a dt-only split title (single column); every other source is a
         # two-column dt/dd definition list (the bold id left, its name/desc right)
         css = "browse-list" if source == "sfs" else "browse-list def"
-        listing = '<dl class="%s">%s</dl>' % (css, "".join(
-            _browse_item(d) for d in docs))
-    # facets live in a left rail beside the list (X1); the cross-source folkrätt
-    # selector, when present, stays a full-width banner above both
-    body = ('%s<div class="browse-layout">'
-            '<aside class="browse-facets">%s</aside>'
-            '<section class="browse-main browse-group"><h1>%s '
-            '<span class="c">%d</span></h1>%s</section></div>'
-            % (banner, _facet_nav(source, view, [n["key"] for n in nodes]),
-               escape(heading), len(docs), listing))
+        listing = Markup('<dl class="%s">%s</dl>') % (
+            css, Markup("").join(_browse_item(d) for d in docs))
+    body = _LISTS.facet_page_body(
+        Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes]),
+        heading, len(docs), listing)
     alias = feeds.alias_for_source(source)
-    discovery = ('<link rel="alternate" type="application/atom+xml" '
-                 'href="/dataset/%s/feed.atom">' % alias) if alias else ""
+    discovery = (Markup('<link rel="alternate" type="application/atom+xml" '
+                        'href="/dataset/%s/feed.atom">') % alias) if alias else ""
     return page(heading, "Bläddra", "", body, solo=True, head=discovery,
                 body_class=" browse")
 

@@ -1,0 +1,171 @@
+{#- Leaf emissions of the document-tree walks (render_node, the DV/förarbete/
+    eurlex walks and the konventionsbilaga family). The walks themselves --
+    dispatch, TOC/rail registration, marker logic, list re-nesting -- stay in
+    Python; each branch computes its values and hands them here. Macros take
+    raw values (a node id, a rail id), never pre-built attribute strings.
+
+    Whitespace: every macro body is glued with `-` control at inline seams;
+    a stray newline inside a <p> renders as a space the source markup does
+    not have. -#}
+{%- macro id_attr(nid) -%}
+{%- if nid %} id="{{ nid }}"{% endif -%}
+{%- endmacro -%}
+{%- macro rail_attr(rail_id) -%}
+{%- if rail_id %} data-rail="{{ rail_id }}"{% endif -%}
+{%- endmacro -%}
+{#- ============================== render_node ============================ -#}
+{%- macro tabell(rows) -%}
+<table>{{ rows }}</table>
+{%- endmacro -%}
+{%- macro rad(notice, width, grafik_cell, cells) -%}
+{#- a pending/expiring row variant prints its temporal marker as a full-width
+    row above the row itself -#}
+{%- if notice %}<tr class="temporal-status-rad"><td colspan="{{ width }}">{{ notice }}</td></tr>{% endif -%}
+<tr>{{ grafik_cell }}{% for c in cells %}<td>{{ c }}</td>{% endfor %}</tr>
+{%- endmacro -%}
+{%- macro grafik_cell(gid, img) -%}
+<td class="grafik" data-grafik="{{ gid }}">{{ img }}</td>
+{%- endmacro -%}
+{%- macro grafik_saknas_cell(gid, code) -%}
+{#- unlocalized road-sign image: the honest gap beside the code -#}
+<td class="grafik-saknas" data-grafik="{{ gid }}">[{{ code }}]</td>
+{%- endmacro -%}
+{%- macro grafik_img(src, alt) -%}
+<img class="grafik-img" src="{{ src }}" alt="{{ alt }}" loading="lazy">
+{%- endmacro -%}
+{%- macro grafik_figure(nid, img, label, anchor, sfs) -%}
+{#- the attribution links to the amending act's entry in this document's own
+    amendment register (#L{nr}), not the amendment's standalone page -#}
+<figure class="grafik" data-grafik="{{ nid }}">{{ img }}<figcaption>{{ label }} ur <a href="#{{ anchor }}">SFS {{ sfs }}</a></figcaption></figure>
+{%- endmacro -%}
+{%- macro grafik_saknas(nid, label, where) -%}
+<p class="grafik-saknas" data-grafik="{{ nid }}">{{ label }} saknas i den konsoliderade texten — se {{ where }}</p>
+{%- endmacro -%}
+{%- macro rubrik(lvl, anchor, body) -%}
+<h{{ lvl }} id="{{ anchor }}" class="rubrik">{{ body }}</h{{ lvl }}>
+{%- endmacro -%}
+{%- macro temporal_notice(text) -%}
+{#- slash-delimited like the source's editorial markers, so it reads as an
+    annotation about the text rather than as legal text -#}
+<p class="temporal-status">/{{ text }}/</p>
+{%- endmacro -%}
+{%- macro block(tag, nid, redaktionell, rail_id, marker, sep, body, inner) -%}
+{#- a stycke/punkt/listelement/moment/redaktionell text node; a list item
+    nests its sub-list inside the </li>, a stycke's list follows the </p> -#}
+<{{ tag }}{{ id_attr(nid) }}{% if redaktionell %} class="redaktionell"{% endif %}{{ rail_attr(rail_id) }}>
+{%- if marker %}<span class="num">{{ marker }}</span>{{ sep }}{% endif -%}
+{{ body }}
+{%- if tag == "li" %}{{ inner }}</{{ tag }}>{% else %}</{{ tag }}>{{ inner }}{% endif -%}
+{%- endmacro -%}
+{%- macro kaprubrik(anchor, body) -%}
+<h2 id="{{ anchor }}" class="kaprubrik">{{ body }}</h2>
+{%- endmacro -%}
+{%- macro kaprubrik_bare(nid, text) -%}
+<h2{{ id_attr(nid) }} class="kaprubrik">{{ text }}</h2>
+{%- endmacro -%}
+{%- macro kapitel(t, rail_id, head, notice, children) -%}
+<section class="{{ t }}"{{ rail_attr(rail_id) }}>{{ head }}{{ notice }}{{ children }}</section>
+{%- endmacro -%}
+{%- macro paragraf(nid, rail_id, gutter_label, notice, children) -%}
+{#- hanging §-numeral in the gutter; the permalink anchor keeps its own
+    pilcrow glyph -#}
+<section class="paragraf"{{ id_attr(nid) }}{{ rail_attr(rail_id) }}><div class="paragraf-gutter"><span class="n">{{ gutter_label }}</span><a class="pilcrow" href="#{{ nid }}" aria-label="Permalänk">¶</a></div><div class="paragraf-body">{{ notice }}{{ children }}</div></section>
+{%- endmacro -%}
+{%- macro generic_section(t, nid, rail_id, inner) -%}
+<section class="{{ t }}"{{ id_attr(nid) }}{{ rail_attr(rail_id) }}>{{ inner }}</section>
+{%- endmacro -%}
+{#- ========================= konventionsbilaga =========================== -#}
+{%- macro konvention_cell(lang, tag, content) -%}
+<div class="konvention-cell" lang="{{ lang }}"><{{ tag }}>{{ content }}</{{ tag }}></div>
+{%- endmacro -%}
+{%- macro konvention_row(css, cells) -%}
+<div class="konvention-row {{ css }}">{{ cells }}</div>
+{%- endmacro -%}
+{%- macro konvention_section(css, nid, heading, paragraphs) -%}
+<section class="{{ css }}"{{ id_attr(nid) }}>{{ heading }}{{ paragraphs }}</section>
+{%- endmacro -%}
+{%- macro konvention_instrument(nid, title, ingress, provisions) -%}
+<section class="konvention-instrument"{{ id_attr(nid) }}>{{ title }}{{ ingress }}{{ provisions }}</section>
+{%- endmacro -%}
+{%- macro konventionsbilaga(n_languages, language_labels, instruments) -%}
+<div class="konventionsbilaga" style="--n-languages: {{ n_languages }}"><div class="konvention-languages">
+{%- for lang, label in language_labels -%}
+<div lang="{{ lang }}">{{ label }}</div>
+{%- endfor -%}
+</div>{{ instruments }}</div>
+{%- endmacro -%}
+{#- ========================= treaty provisions =========================== -#}
+{%- macro artikel_section(rail_id, anchor, title, children) -%}
+{#- a COE/ICRC treaty article: heading + its rendered children -#}
+<section class="artikel"{{ rail_attr(rail_id) }}><h2 id="{{ anchor }}">{{ title }}</h2>{{ children }}</section>
+{%- endmacro -%}
+{#- ============================== DV walk ================================ -#}
+{%- macro dv_page_marker(pg, fax) -%}
+{#- a facsimile page button at each PDF page boundary of a parsed verdict -#}
+<span class="sid" id="sid{{ pg }}"><button type="button" data-fax="{{ fax }}" title="Visa faksimil av sidan {{ pg }}">{{ pg }}</button></span>
+{%- endmacro -%}
+{%- macro dv_numbered_paragraph(n, body) -%}
+{#- a numbered domskäl paragraph: the number hangs in the gutter and is its
+    own permalink anchor (#P{n}), so "punkt 42" is linkable -#}
+<p class="dom-p" id="P{{ n }}"><a class="pnum" href="#P{{ n }}">{{ n }}</a>{{ body }}</p>
+{%- endmacro -%}
+{%- macro dv_instans(anchor, court, inner) -%}
+<section class="instans"><h2 id="{{ anchor }}" class="instans-rubrik">{{ court }}</h2>{{ inner }}</section>
+{%- endmacro -%}
+{%- macro dv_delmal(ordinal, inner) -%}
+<section class="delmal">{% if ordinal %}<h2 class="delmal-rubrik">{{ ordinal }}</h2>{% endif %}{{ inner }}</section>
+{%- endmacro -%}
+{%- macro dv_ruling(t, anchor, label, inner) -%}
+{#- betänkande / skiljaktig mening / tillägg -#}
+<section class="{{ t }}"><h3 id="{{ anchor }}" class="instans-rubrik">{{ label }}</h3>{{ inner }}</section>
+{%- endmacro -%}
+{%- macro dv_dom(anchor, label, inner) -%}
+{#- the court's own ruling, titled only where a betänkande precedes it -#}
+<section class="dom">{% if label %}<h3 id="{{ anchor }}" class="instans-rubrik">{{ label }}</h3>{% endif %}{{ inner }}</section>
+{%- endmacro -%}
+{#- =========================== förarbete walk ============================ -#}
+{%- macro fa_sid(key, rail_id, pg, fax) -%}
+{#- the page-number anchor; with `fax` it doubles as the facsimile button
+    (a bilaga page repeats a printed body number, so it gets no button) -#}
+<span class="sid" id="{{ key }}"{{ rail_attr(rail_id) }}>
+{%- if fax %}<button type="button" data-fax="{{ fax }}" title="Visa faksimil av sidan {{ pg }}">{{ pg }}</button>{% else %}{{ pg }}{% endif -%}
+</span>
+{%- endmacro -%}
+{%- macro fa_avsnitt(lvl, anchor, rail_id, body) -%}
+<h{{ lvl }} id="{{ anchor }}"{{ rail_attr(rail_id) }} class="rubrik">{{ body }}</h{{ lvl }}>
+{%- endmacro -%}
+{%- macro fa_lydelse_tabell(rows) -%}
+{#- a nuvarande/föreslagen lydelse comparison: aligned cells, th rows the
+    italic column headers -#}
+<table class="lydelse">
+{%- for row in rows -%}
+<tr>{% for c in row.cells %}<{{ row.tag }}>{{ c }}</{{ row.tag }}>{% endfor %}</tr>
+{%- endfor -%}
+</table>
+{%- endmacro -%}
+{%- macro fa_p(fotnot, body) -%}
+<p{% if fotnot %} class="fotnot"{% endif %}>{{ body }}</p>
+{%- endmacro -%}
+{#- ============================ eurlex blocks ============================ -#}
+{%- macro eu_heading(lvl, anchor, body) -%}
+<h{{ lvl }} id="{{ anchor }}" class="rubrik">{{ body }}</h{{ lvl }}>
+{%- endmacro -%}
+{%- macro eu_keyword(body) -%}
+<span class="sokord">{{ body }}</span>
+{%- endmacro -%}
+{%- macro eu_article(anchor, rail_id, body) -%}
+<h3 id="{{ anchor }}" class="artikel"{{ rail_attr(rail_id) }}>{{ body }}</h3>
+{%- endmacro -%}
+{%- macro eu_block(nid, cls, rail_id, marker_target, marker_label, body) -%}
+{#- the marker doubles as the block's permalink when the block is
+    addressable; an unaddressable block keeps a plain span -#}
+<p{{ id_attr(nid) }}{% if cls %} class="{{ cls }}"{% endif %}{{ rail_attr(rail_id) }}>
+{%- if marker_label -%}
+{%- if marker_target %}<a class="num" href="#{{ marker_target }}">{{ marker_label }}</a> {% else %}<span class="num">{{ marker_label }}</span> {% endif -%}
+{%- endif -%}
+{{ body }}</p>
+{%- endmacro -%}
+{%- macro eu_recital_group(anchor, range_label, label, refs) -%}
+{#- the thematic recital-group lead: a subdued outdented editorial line -#}
+<p id="{{ anchor }}" class="recital-group"><span class="rg-range">{{ range_label }}:</span> <b>{{ label }}</b>{% if refs %} <span class="jfr">(jfr art {{ refs }})</span>{% endif %}</p>
+{%- endmacro -%}

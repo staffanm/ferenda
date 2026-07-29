@@ -1,0 +1,116 @@
+{#- Aggregate-page building blocks: the frontpage, the folkrätt landing's
+    treaty listings, the legacy feed directory pages and the faceted browse.
+    Bucketing, sorting and grouping stay in Python; the markup of every
+    listing row lives here. -#}
+{%- macro ranked(items) -%}
+{#- a most-cited reel: ranked <li>s with citation counts -#}
+{%- for it in items -%}
+<li><a href="{{ it.href }}">{{ it.label }}</a> <span class="c">{{ it.count }}</span></li>
+{%- endfor -%}
+{%- endmacro -%}
+{%- macro index_body(total, ntypes, rows, cols) -%}
+{#- the generic corpus frontpage (only when no curated editorial frontpage
+    exists): document counts per browsable source + two most-cited reels -#}
+<p class="lead">{{ total }} sammanlänkade dokument fördelade på {{ ntypes }} dokumenttyper.</p>
+<nav class="browse counts"><ul>
+{%- for route, label, count in rows -%}
+<li><a href="{{ route }}">{{ label }}</a> <span class="c">{{ count }}</span></li>
+{%- endfor -%}
+</ul></nav>
+<div class="cols">
+{%- for col in cols -%}
+<section><h2>{{ col.heading }}</h2><ol class="ranked">{{ ranked(col.entries) }}</ol></section>
+{%- endfor -%}
+</div>
+{%- endmacro -%}
+{%- macro coe_entry(e) -%}
+{#- a Council-of-Europe instrument: split significant-title link, the gloss,
+    and its amending protocols nested beneath (recursive) -#}
+<li><a href="{{ e.url }}"><span class="pre">{{ e.pre }}</span>{{ e.key }}</a> <span class="ref">({{ e.ref }})</span>
+{%- if e.children %}<ul class="folkratt-protocols">{% for c in e.children %}{{ coe_entry(c) }}{% endfor %}</ul>{% endif -%}
+</li>
+{%- endmacro -%}
+{%- macro treaty_li(url, title, ref) -%}
+{#- a flat treaty/decision entry (icrc/untc/icc): title link + gloss -#}
+<li><a href="{{ url }}">{{ title }}</a> <span class="ref">({{ ref }})</span></li>
+{%- endmacro -%}
+{%- macro folkratt_group(heading, entries) -%}
+<h3>{{ heading }}</h3><ul class="browse-list folkratt-treaties">{{ entries }}</ul>
+{%- endmacro -%}
+{%- macro folkratt_section(title, groups) -%}
+<section class="folkratt-group"><h2>{{ title }}</h2>{{ groups }}</section>
+{%- endmacro -%}
+{%- macro hudoc_section(reel) -%}
+<section class="folkratt-group"><h2>Europadomstolen</h2>
+{%- if reel %}<h3>Mest hänvisade avgöranden</h3><ol class="ranked">{{ ranked(reel) }}</ol>{% endif -%}
+<p><a href="/folkratt/hudoc/">Bläddra bland avgöranden →</a></p></section>
+{%- endmacro -%}
+{%- macro folkratt_nav(entries, active_id) -%}
+{#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
+<nav class="facets"><h2 class="facet-axis">Dokumenttyp</h2><ul class="facet-list">
+{%- for key, label, url, count in entries -%}
+<li><a href="{{ url }}"{% if key == active_id %} aria-current="page"{% endif %}>{{ label }} <span class="c">{{ count }}</span></a></li>
+{%- endfor -%}
+</ul></nav>
+{%- endmacro -%}
+{%- macro feed_page_body(atom, entries) -%}
+{#- the human-readable twin of an Atom document -#}
+<p class="feed-link"><a href="{{ atom }}">Atom-flöde</a></p>
+{%- if entries -%}
+{%- for e in entries -%}
+<article class="news-item"><p class="news-date">{{ e.date }}</p><h2><a href="{{ e.url }}">{{ e.title }}</a></h2><p>{{ e.summary }}</p></article>
+{%- endfor -%}
+{%- else -%}
+<p class="empty">Inga dokument.</p>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro feed_index_body(groups) -%}
+{#- the legacy all-feeds directory -#}
+{%- for g in groups -%}
+<section class="browse-group"><h2>{{ g.heading }}</h2><ul>
+{%- for l in g.links -%}
+<li><a class="feed-atom" href="{{ l.atom }}" aria-label="Atom-flöde: {{ l.label }}">Atom</a> <a href="{{ l.html }}">{{ l.label }}</a></li>
+{%- endfor -%}
+</ul></section>
+{%- endfor -%}
+{%- endmacro -%}
+{%- macro browse_item(doc) -%}
+{#- one listing entry: a <dt> (the bold linked id) + <dd> (name/description).
+    A statute keeps its split title (designation subdued, sort subject
+    emphasised); every other source shows the id as the term and always
+    emits the <dd> (even empty) so the two-column grid stays aligned -#}
+{%- if doc.key is not none -%}
+<dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><span class="pre">{{ doc.pre or "" }}</span>{{ doc.key }}</a></dt>
+{%- else -%}
+<dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><strong>{{ doc.short_id or doc.display }}</strong></a></dt><dd>{{ doc.text }}</dd>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro browse_items(docs) -%}
+{%- for d in docs %}{{ browse_item(d) }}{% endfor -%}
+{%- endmacro -%}
+{%- macro dv_group(head, items) -%}
+{%- if head %}<h2 class="dv-variant">{{ head }}</h2>{% endif -%}
+<dl class="browse-list def">{{ items }}</dl>
+{%- endmacro -%}
+{%- macro facet_links(items) -%}
+<ul class="facet-list">
+{%- for it in items -%}
+<li><a href="{{ it.url }}"{% if it.current %} aria-current="page"{% endif %}>{{ it.label }} <span class="c">{{ it.count }}</span></a></li>
+{%- endfor -%}
+</ul>
+{%- endmacro -%}
+{%- macro facet_nav(parts) -%}
+<nav class="facets">
+{%- for p in parts -%}
+{%- if p.axis %}<h2 class="facet-axis">{{ p.axis }}</h2>{% else %}{{ facet_links(p.links) }}{% endif -%}
+{%- endfor -%}
+</nav>
+{%- endmacro -%}
+{%- macro facet_page_body(banner, nav, heading, count, listing) -%}
+{#- facets in a left rail beside the list; the cross-source folkrätt
+    selector, when present, stays a full-width banner above both -#}
+{{ banner }}<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>{{ listing }}</section></div>
+{%- endmacro -%}
+{%- macro empty() -%}
+<p class="empty">Inga dokument.</p>
+{%- endmacro -%}

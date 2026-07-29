@@ -1,0 +1,21 @@
+{#- The dl.meta block under a document's h1, and the TOC nav. Called from
+    Python through this template's module (render._META), so the fragments
+    can feed page_context the same way they always have. -#}
+{#- `pairs` arrives pre-filtered (no empty values) -- the caller decides
+    what "empty" means, this macro just lays out what it is given -#}
+{%- macro meta_dl(pairs) -%}
+{%- if pairs -%}
+<dl class="meta">
+{%- for k, v in pairs -%}
+<dt>{{ k }}</dt><dd>{{ v }}</dd>
+{%- endfor -%}
+</dl>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro toc(entries) -%}
+<nav class="toc"><div class="toc-h">Innehåll</div><div class="toc-list">
+{%- for anchor, text, level in entries -%}
+<a href="#{{ anchor }}" class="lvl{{ [level, 3] | min }}">{{ text }}</a>
+{%- endfor -%}
+</div></nav>
+{%- endmacro -%}

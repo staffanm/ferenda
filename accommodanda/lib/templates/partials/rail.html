@@ -1,0 +1,63 @@
+{#- Context-rail building blocks: the accordion rows every panel is made of,
+    the capped list idiom, and the item markup of the curated layers
+    (kommentar, författningskommentar, externa länkar, remissvar). Citation
+    prose lines (_citer_line and the margins) are algorithmic sentence
+    building and stay in Python; they arrive here as Markup <li> lines. -#}
+{%- macro rail_sections(sections) -%}
+{#- one <details> per section, highest-priority first and open; data-label/
+    data-n feed the client's collapsed stub line -#}
+{%- for sec in sections -%}
+<details class="rail-sec {{ sec.key }}" data-sec="{{ sec.key }}" data-label="{{ sec.label }}" data-n="{{ sec.count }}"{% if loop.first %} open{% endif %}><summary><span class="rail-sec-h">{{ sec.label }}</span>
+{#- a lone item counts itself; the number would only add noise -#}
+{%- if sec.count > 1 %}<span class="rail-sec-n">{{ sec.count }}</span>{% endif -%}
+</summary>{{ sec.html }}</details>
+{%- endfor -%}
+{%- endmacro -%}
+{%- macro capped_list(lines, cap, word) -%}
+{#- `cap` decides what is collapsed, never what is published: every line is
+    in the page, the tail behind a native <details> -#}
+<ul>
+{%- for line in lines[:cap] -%}
+{{ line }}
+{%- endfor -%}
+</ul>
+{%- if lines | length > cap -%}
+<details class="more"><summary>+{{ lines | length - cap }} {{ word }}</summary><ul>
+{%- for line in lines[cap:] -%}
+{{ line }}
+{%- endfor -%}
+</ul></details>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro guidance_list(items) -%}
+{#- curated external links; `desc` is the guidance's own text (": ..."),
+    `note` provenance for a hand-curated link ("— ...") -#}
+<ul>
+{%- for g in items -%}
+<li><a href="{{ g.href }}"{% if g.external %} rel="external"{% endif %}>{{ g.label }}</a>
+{%- if g.desc %}: <span class="q">{{ g.desc }}</span>
+{%- elif g.note %} <span class="prov">— {{ g.note }}</span>
+{%- endif -%}
+</li>
+{%- endfor -%}
+</ul>
+{%- endmacro -%}
+{%- macro remiss_list(items) -%}
+<ul>
+{%- for it in items -%}
+<li><span class="remiss-org">{{ it.organisation }}</span> {{ it.sentiment }} <span class="q">”{{ it.quote }}”</span> <a href="{{ it.source_url }}" rel="external">Läs remissvaret</a></li>
+{%- endfor -%}
+</ul>
+{%- endmacro -%}
+{%- macro fk_list(items) -%}
+{#- each proposition's FK comment: the ellipsized lead + a provenance link -#}
+{%- for it in items -%}
+<p>{{ it.lead }} <span class="prov">— {{ it.src }}</span></p>
+{%- endfor -%}
+{%- endmacro -%}
+{%- macro commentary_list(items) -%}
+{#- wiki commentary prose (Markup) with an optional author byline -#}
+{%- for it in items -%}
+{{ it.prose }}{% if it.author %}<div class="komm-by">— {{ it.author }}</div>{% endif %}
+{%- endfor -%}
+{%- endmacro -%}

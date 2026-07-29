@@ -1,0 +1,11 @@
+{#- A statute (SFS) page: status banner (äldre lydelse / upphävd), the
+    statute's own preparatory works, the compare status line the client
+    populates, the consolidated text under #dokument, and the amendment
+    register (Ändringar och övergångsbestämmelser). -#}
+{% extends "page.html" %}
+{% block body %}
+{{ banner }}{{ forarbeten }}
+{%- if has_lydelser %}<h2 class="lydelser-status" hidden></h2>{% endif -%}
+<div id="dokument">{{ structure }}</div>
+{{ andringar }}
+{% endblock %}

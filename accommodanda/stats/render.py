@@ -10,8 +10,10 @@ because the reader's task here is browsing, not following a document.
 
 import json
 
+from markupsafe import Markup
+
 from ..lib import compress, layout
-from ..lib.render import escape, page
+from ..lib.render import page
 from . import charts
 from .model import Cell, Measure, Point, Row
 
@@ -29,16 +31,8 @@ ARTIFACT_BASEFILE = "statistik"
 
 
 def _measure_html(m):
-    parts = ['<section class="stat" id="m%d">' % m["id"]]
-    parts.append('<h3><span class="stat-no">%d</span> %s</h3>'
-                 % (m["id"], escape(m["title"])))
-    if m.get("lede"):
-        parts.append('<p class="stat-lede">%s</p>' % escape(m["lede"]))
-    parts.append(charts.figure(_as_measure(m)))
-    if m.get("note"):
-        parts.append('<p class="stat-note">%s</p>' % escape(m["note"]))
-    parts.append("</section>")
-    return "".join(parts)
+    return charts.TPL.measure(m["id"], m["title"], m.get("lede"),
+                              charts.figure(_as_measure(m)), m.get("note"))
 
 
 def _as_measure(d):
@@ -59,26 +53,16 @@ def render_stats(art):
     by_group = {}
     for m in art["measures"]:
         by_group.setdefault(m["group"], []).append(m)
-
-    nav = ['<nav class="stat-nav" aria-label="Avsnitt"><ol>']
-    for key, title in GROUPS:
-        if by_group.get(key):
-            nav.append('<li><a href="#g%s">%s</a></li>' % (key, escape(title)))
-    nav.append("</ol></nav>")
-
-    body = ["".join(nav)]
+    tpl = charts.TPL
+    body = tpl.nav([{"key": key, "title": title} for key, title in GROUPS
+                    if by_group.get(key)])
     for key, title in GROUPS:
         measures = by_group.get(key)
-        if not measures:
-            continue
-        body.append('<section class="stat-group" id="g%s"><h2>%s</h2>%s</section>'
-                    % (key, escape(title),
-                       "".join(_measure_html(m) for m in measures)))
-    body.append('<p class="stat-foot">Mätt %s mot korpusen som den såg ut då. '
-                "Varje siffra är räknad ur artefakterna och katalogen — inga "
-                "uppskattningar utom där noten säger det.</p>"
-                % escape(art["generated"]))
-    return page("Statistik om korpuset", "Statistik", "", "".join(body),
+        if measures:
+            body += tpl.group(key, title, Markup("").join(
+                _measure_html(m) for m in measures))
+    body += tpl.foot(art["generated"])
+    return page("Statistik om korpuset", "Statistik", "", body,
                 eyebrow="Siffror om svensk rätt", solo=True,
                 body_class=" site stats")
 

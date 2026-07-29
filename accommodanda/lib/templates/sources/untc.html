@@ -1,0 +1,15 @@
+{#- A UN Treaty Collection (MTDSG) treaty page. The MTDSG carries no treaty
+    text, so the participation table -- each state's signature and binding
+    consent -- is the page's body. -#}
+{% extends "page.html" %}
+{% block body %}
+{%- if parties -%}
+<h2 id="parter">Parter</h2>
+<table class="untc-parties"><thead><tr><th>Stat</th><th>Undertecknande</th><th>Bindande samtycke</th></tr></thead>
+<tbody>
+{%- for party in parties -%}
+<tr><td>{{ party.country }}</td><td>{{ party.signature }}</td><td>{{ party.consent }}</td></tr>
+{%- endfor -%}
+</tbody></table>
+{%- endif -%}
+{% endblock %}

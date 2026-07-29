@@ -472,18 +472,20 @@ def test_expired_statute_is_marked(tmp_path):
     assert 'class="gr-root expired"' not in out and "expired-banner" not in out
 
 
-def test_dv_ursprunglig_dom_link():
+def test_dv_ursprunglig_dom_link(tmp_path):
     # R2 part C: a referat that absorbed the court's pre-referat verdict links its
     # PDF as "Ursprunglig dom" (served by /api/v1/dv-verdict); absent otherwise
-    art = {"ursprunglig_dom": [{
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    case = json.loads(json.dumps(CASE))
+    case["ursprunglig_dom"] = [{
         "malnummer": ["B 920-25"], "avgorandedatum": "2025-11-04",
-        "url": "/api/v1/dv-verdict?court=HDO&id=abc&file=B%20920-25.pdf"}]}
-    html = render._dv_ursprunglig_dom(art)
+        "url": "/api/v1/dv-verdict?court=HDO&id=abc&file=B%20920-25.pdf"}]
+    html = render.render_dv(case, site)
     assert "Ursprunglig dom" in html
     assert ('href="/api/v1/dv-verdict?court=HDO&amp;id=abc&amp;file=B%20920-25.pdf"'
             in html)
     assert "B 920-25 (2025-11-04)" in html
-    assert render._dv_ursprunglig_dom({}) == ""
+    assert "Ursprunglig dom" not in render.render_dv(CASE, site)
 
 
 def test_case_page_links_into_law(tmp_path):

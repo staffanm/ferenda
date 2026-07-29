@@ -1,0 +1,8 @@
+{#- The editor login shell at /admin/. The sign-in affordance lives here,
+    not in the masthead -- editor.js mounts the credential form (or the
+    logout control) into [data-admin-login], so an anonymous reader's
+    chrome carries no login link. -#}
+{% extends "page.html" %}
+{% block body %}
+<div class="admin-panel" data-admin-login><p class="empty">Läser in…</p></div>
+{% endblock %}

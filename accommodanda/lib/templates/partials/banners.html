@@ -1,0 +1,31 @@
+{#- Status banners: the callouts above a document's text that say what the
+    reader is looking at (a repealed statute, a historical lydelse, an
+    inofficial consolidation, an as-enacted base text). Data arrives
+    display-ready; the grammar lives here. -#}
+{%- macro expired_banner(when, av) -%}
+<div class="expired-banner"><strong>Upphävd författning</strong><span>
+{%- if when %}Upphörde att gälla {{ when }}{% else %}Upphävd{% endif -%}
+{%- if av %} genom <a href="{{ av.url }}">SFS {{ av.label }}</a>{% endif -%}
+.</span></div>
+{%- endmacro -%}
+{%- macro version_banner(version, current_url) -%}
+<div class="version-banner"><strong>Äldre lydelse</strong><span>Författningen i dess lydelse t.o.m. ändringar genom SFS {{ version }}. <a href="{{ current_url }}">Visa gällande lydelse</a>.</span></div>
+{%- endmacro -%}
+{%- macro grund_banner(consolidation_url) -%}
+<div class="version-banner"><strong>Ursprunglig lydelse</strong><span>Grundförfattningen som beslutad, utan senare ändringar. <a href="{{ consolidation_url }}">Visa konsoliderad version</a>.</span></div>
+{%- endmacro -%}
+{%- macro konsoliderad_banner(cutoff, grund_url) -%}
+{#- `cutoff` is None (unknown cutoff) or {url?, label}: the amendment the
+    consolidation folds in, linked where that amendment has a page -#}
+<div class="version-banner"><strong>Konsoliderad version</strong><span>Texten nedan är en inofficiell sammanställning
+{%- if cutoff %} med ändringar införda till och med {% if cutoff.url %}<a href="{{ cutoff.url }}">{{ cutoff.label }}</a>{% else %}{{ cutoff.label }}{% endif %}
+{%- else %} med senare ändringar införda{% endif %}. Grundförfattningen och ändringsförfattningarna är de officiella texterna.
+{%- if grund_url %} <a href="{{ grund_url }}">Visa grundförfattningen i ursprunglig lydelse</a>.{% endif -%}
+</span></div>
+{%- endmacro -%}
+{%- macro unparsed_konsoliderad_note(url) -%}
+<div class="version-banner"><strong>Konsoliderad version</strong><span>Myndigheten tillhandahåller en konsoliderad version som inte kunnat läsas in här: <a class="ext" href="{{ url }}" rel="external">PDF hos myndigheten</a>.</span></div>
+{%- endmacro -%}
+{%- macro foreskrift_repealed_banner(links) -%}
+<div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
+{%- endmacro -%}

@@ -15,17 +15,17 @@ answer. This is an HTML view for humans; a curl/monitoring integration should
 target a JSON API endpoint, not this page.
 """
 
-import html
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from markupsafe import Markup
 from opensearchpy.exceptions import OpenSearchException
 
 from .. import config
-from ..lib import catalog, git, runlog, search
+from ..lib import catalog, git, runlog, search, tpl
 from .auth import require_editor
 
 RUNS = config.DATA / ".build" / "runs.ndjson"
@@ -50,58 +50,18 @@ _index = search.SearchIndex()
 
 
 # --------------------------------------------------------------------------
-# rendering helpers -- no template engine, no site shell, one CSS constant
+# rendering helpers -- the dashboard's whole markup lives in templates/ops.html
+# (its own minimal shell, deliberately not the site chrome)
 # --------------------------------------------------------------------------
 
-CSS = """
-:root { color-scheme: light dark; }
-body { font: 14px/1.5 system-ui, sans-serif; margin: 1.5rem; }
-h1, h2 { font-weight: 600; }
-h1 { font-size: 1.4rem; }
-h2 { font-size: 1.1rem; margin-top: 2rem; }
-nav a { margin-right: 1rem; }
-a { color: #06c; }
-table { border-collapse: collapse; margin: .5rem 0; }
-th, td { border: 1px solid #8884; padding: .25rem .5rem; text-align: left;
-         vertical-align: top; }
-th { background: #8881; }
-.matrix td { text-align: center; }
-.ok { background: #2ecc7133; }
-.stale { background: #f39c1233; }
-.fail { background: #e74c3c55; font-weight: 600; }
-.empty { color: #8888; }
-.banner { background: #e74c3c22; border: 1px solid #e74c3c88;
-          padding: .5rem .75rem; border-radius: 4px; margin: .5rem 0; }
-.strip { display: flex; gap: .35rem; flex-wrap: wrap; margin: .5rem 0; }
-.chip { padding: .15rem .5rem; border-radius: 3px; border: 1px solid #8884;
-        text-decoration: none; }
-.chip.ok { background: #2ecc7133; }
-.chip.errors { background: #e74c3c33; }
-.chip.aborted { background: #f39c1233; }
-.chip.running { background: #3498db33; }
-.bars { display: flex; align-items: center; gap: 2px; min-height: 1.4rem; }
-.bar { height: 1.1rem; min-width: 2px; border-radius: 2px; }
-.regress { color: #e74c3c; font-weight: 600; }
-code, pre { font-family: ui-monospace, monospace; }
-pre { white-space: pre-wrap; background: #8881; padding: .5rem;
-      border-radius: 4px; overflow-x: auto; }
-.small { color: #888; font-size: .85rem; }
-"""
+TPL = tpl.environment("accommodanda.api").get_template("ops.html").module
 
 
 def _page(title, body, *, refresh=None):
-    """The whole HTML document: escaped title, one inline stylesheet, a shared
-    nav, and the pre-built (already-escaped) `body`. `refresh` adds a meta
+    """The whole HTML document (ops.html `shell`): one inline stylesheet, a
+    shared nav, and the pre-rendered `body`. `refresh` adds a meta
     auto-refresh (seconds) for the live health overview."""
-    meta = ('<meta http-equiv="refresh" content="%d">' % refresh) if refresh else ""
-    return (
-        "<!doctype html><html><head><meta charset=utf-8>"
-        '<meta name=viewport content="width=device-width,initial-scale=1">'
-        "%s<title>%s</title><style>%s</style></head><body>"
-        '<nav><a href="/ops">health</a><a href="/ops/runs">runs</a>'
-        '<a href="/ops/failures">failures</a></nav>'
-        "<h1>%s</h1>%s</body></html>"
-        % (meta, html.escape(title), CSS, html.escape(title), body))
+    return TPL.shell(title, body, refresh)
 
 
 def _stage_columns(status):
@@ -216,119 +176,69 @@ def ops_overview():
     updated = status.get("_updated")
     if updated and (datetime.now(timezone.utc) - _parse_iso(updated)
                     > timedelta(hours=STALE_AFTER_H)):
-        parts.append('<div class="banner">No completed run since %s (%s) -- '
-                     "the health snapshot is stale.</div>"
-                     % (html.escape(updated), _age(updated)))
-    parts.append('<p class="small">snapshot updated %s. %d docs failing overall.</p>'
-                 % (html.escape(_age(updated)) if updated else "never", len(errors)))
+        parts.append(TPL.stale_banner(updated, _age(updated)))
+    parts.append(TPL.snapshot_line(_age(updated) if updated else "never",
+                                   len(errors)))
 
     # system: running revision, wiki push state, search-index size
     ahead, dirty = git.push_state(config.WIKI_ROOT)
-    dirty_html = '<span class="regress">uncommitted changes</span>'
-    if ahead is None:
-        wiki = "no upstream" + (", " + dirty_html if dirty else "")
-    elif ahead or dirty:
-        wiki = ", ".join(
-            (['<span class="regress">%d unpushed commit%s</span>'
-              % (ahead, "" if ahead == 1 else "s")] if ahead else [])
-            + ([dirty_html] if dirty else []))
-    else:
-        wiki = "up to date"
-    parts.append('<h2>system</h2><table>'
-                 '<tr><th>accommodanda</th><td><code>%s</code></td></tr>'
-                 '<tr><th>lagen-wiki</th><td>%s</td></tr>'
-                 '<tr><th>opensearch index</th><td>%s</td></tr></table>'
-                 % (html.escape(_version()), wiki, html.escape(_index_size())))
+    parts.append(TPL.system_table(
+        _version(),
+        {"no_upstream": ahead is None, "ahead": ahead, "dirty": dirty},
+        _index_size()))
 
     # corpus: document count + artifact size per source, from the catalog
     stats = _source_stats()
-    parts.append("<h2>corpus</h2>")
-    if not stats:
-        parts.append('<p class="empty">catalog not built -- run `lagen all relate`.</p>')
-    else:
-        crows, tot_docs, tot_bytes = [], 0, 0
+    crows = []
+    if stats:
         for src in sorted(stats):
             docs, nbytes = stats[src]
-            tot_docs += docs
-            tot_bytes += nbytes
-            crows.append("<tr><th>%s</th><td>%d</td><td>%s</td></tr>"
-                         % (html.escape(src), docs, _human_bytes(nbytes)))
-        crows.append("<tr><th>total</th><td>%d</td><td>%s</td></tr>"
-                     % (tot_docs, _human_bytes(tot_bytes)))
-        parts.append("<table><tr><th>source</th><th>docs</th><th>size</th></tr>"
-                     "%s</table>" % "".join(crows))
+            crows.append({"source": src, "docs": docs,
+                          "size": _human_bytes(nbytes)})
+        crows.append({"source": "total",
+                      "docs": sum(d for d, _ in stats.values()),
+                      "size": _human_bytes(sum(b for _, b in stats.values()))})
+    parts.append(TPL.corpus_table(crows))
 
     # last-5-runs strip
-    if runs:
-        chips = "".join(
-            '<a class="chip %s" href="/ops/runs/%s" title="%s">%s</a>'
-            % (r["status"] if r["ok"] is not False else "errors",
-               html.escape(r["run"]),
-               html.escape("%s  %s" % (r["t"], " ".join(r["argv"]))),
-               html.escape(r["run"]))
-            for r in runs[:5])
-        parts.append('<h2>recent runs</h2><div class="strip">%s</div>' % chips)
-    else:
-        parts.append('<h2>recent runs</h2><p class="empty">no runs recorded yet.</p>')
+    parts.append(TPL.runs_strip([
+        {"outcome": r["status"] if r["ok"] is not False else "errors",
+         "run": r["run"], "tip": "%s  %s" % (r["t"], " ".join(r["argv"]))}
+        for r in runs[:5]]))
 
     # per-source x per-stage matrix
     sources = sorted(k for k in status if k != "_updated")
-    if sources:
-        columns = _stage_columns(status)
-        head = "".join("<th>%s</th>" % s for s in columns)
-        rows = []
-        for src in sources:
-            cells = []
-            for stage in columns:
-                cell = status[src].get(stage)
-                if cell is None:
-                    cells.append('<td class="empty">&middot;</td>')
-                    continue
-                failed = cell.get("failed", 0)
-                stale = cell.get("stale", 0)
-                cls = "fail" if failed else ("stale" if stale else "ok")
-                key = (stage, src)
-                regress = history.get(key, {}).get("regression")
-                bits = ["%d/%d" % (cell.get("fresh", 0), cell.get("total", 0))]
-                if failed:
-                    bits.append('<span class="fail">%d failed</span>' % failed)
-                if stale:
-                    bits.append("%d stale" % stale)
-                tip = "last ok %s" % _age(successes.get(key))
-                if regress:
-                    bits.append('<span class="regress">slow</span>')
-                cells.append('<td class="%s" title="%s">%s</td>'
-                             % (cls, html.escape(tip), "<br>".join(bits)))
-            rows.append("<tr><th>%s</th>%s</tr>"
-                        % (html.escape(src), "".join(cells)))
-        parts.append('<h2>pipeline health</h2>'
-                     '<table class="matrix"><tr><th>source</th>%s</tr>%s</table>'
-                     % (head, "".join(rows)))
-    else:
-        parts.append('<h2>pipeline health</h2>'
-                     '<p class="empty">no status snapshot yet -- run a full-source '
-                     "step or `lagen &lt;source&gt; status`.</p>")
+    columns = _stage_columns(status) if sources else []
+
+    def matrix_cell(src, stage):
+        cell = status[src].get(stage)
+        if cell is None:
+            return None
+        failed = cell.get("failed", 0)
+        stale = cell.get("stale", 0)
+        key = (stage, src)
+        return {"cls": "fail" if failed else ("stale" if stale else "ok"),
+                "tip": "last ok %s" % _age(successes.get(key)),
+                "counts": "%d/%d" % (cell.get("fresh", 0),
+                                     cell.get("total", 0)),
+                "failed": failed, "stale": stale,
+                "regress": history.get(key, {}).get("regression")}
+
+    parts.append(TPL.matrix(columns, [
+        {"source": src, "cells": [matrix_cell(src, stage) for stage in columns]}
+        for src in sources]))
 
     # catalog delta: parsed-but-not-catalogued per source
-    parts.append("<h2>catalog delta</h2>")
-    if counts is None:
-        parts.append('<p class="empty">catalog not built -- run `lagen all relate`.</p>')
-    else:
-        drows = []
-        for src in sources:
-            parse_cell = status[src].get("parse", {})
-            fresh = parse_cell.get("fresh", 0)
-            catn = counts.get(src, 0)
-            drows.append("<tr><th>%s</th><td>%d</td><td>%d</td><td%s>%d</td></tr>"
-                         % (html.escape(src), fresh, catn,
-                            ' class="fail"' if fresh - catn > 0 else "",
-                            fresh - catn))
-        parts.append("<table><tr><th>source</th><th>parsed fresh</th>"
-                     "<th>in catalog</th><th>delta</th></tr>%s</table>"
-                     % "".join(drows) if drows
-                     else '<p class="empty">no sources to compare.</p>')
+    delta = None
+    if counts is not None:
+        delta = [{"source": src,
+                  "fresh": (fresh := status[src].get("parse", {}).get("fresh", 0)),
+                  "catn": (catn := counts.get(src, 0)),
+                  "delta": fresh - catn}
+                 for src in sources]
+    parts.append(TPL.delta_table(delta))
 
-    return _page("ops health", "".join(parts), refresh=60)
+    return _page("ops health", Markup("").join(parts), refresh=60)
 
 
 @router.get("/ops/runs", response_class=HTMLResponse,
@@ -338,21 +248,18 @@ def ops_runs():
     ok/errors/aborted/running outcome, and the segment count."""
     runs = runlog.read_runs(RUNS)
     if not runs:
-        return _page("runs", '<p class="empty">no runs recorded yet.</p>')
+        return _page("runs", TPL.empty("no runs recorded yet."))
     rows = []
     for r in runs:
         outcome = r["status"] if r["ok"] is not False else "errors"
-        wall = "%.1fs" % r["secs"] if r["secs"] is not None else "&mdash;"
-        rows.append(
-            '<tr><td><a href="/ops/runs/%s">%s</a></td><td>%s</td><td>%s</td>'
-            '<td><code>%s</code></td><td class="%s">%s</td><td>%d</td></tr>'
-            % (html.escape(r["run"]), html.escape(r["run"]), html.escape(r["t"]),
-               wall, html.escape(" ".join(r["argv"])), outcome,
-               html.escape("%s (%d err)" % (outcome, r["errors"] or 0)),
-               r["segments"]))
-    return _page("runs",
-                 "<table><tr><th>run</th><th>started</th><th>wall</th><th>argv</th>"
-                 "<th>outcome</th><th>segments</th></tr>%s</table>" % "".join(rows))
+        rows.append({"run": r["run"], "t": r["t"],
+                     "wall": ("%.1fs" % r["secs"]
+                              if r["secs"] is not None else "—"),
+                     "argv": " ".join(r["argv"]), "outcome": outcome,
+                     "outcome_text": "%s (%d err)" % (outcome,
+                                                      r["errors"] or 0),
+                     "segments": r["segments"]})
+    return _page("runs", TPL.runs_table(rows))
 
 
 @router.get("/ops/runs/{run_id}", response_class=HTMLResponse,
@@ -367,64 +274,52 @@ def ops_run_detail(run_id: str):
     segments = detail["segments"]
     start = detail["start"]
 
-    parts = ['<p class="small">%s &mdash; <code>%s</code> &mdash; %s</p>'
-             % (html.escape(start["t"]),
-                html.escape(" ".join(start["argv"])),
-                html.escape(detail["status"]))]
+    parts = [TPL.run_header(start["t"], " ".join(start["argv"]),
+                            detail["status"])]
 
     # per-step timing bars: one row per step, one block per source width ∝ secs
     by_step = {}
     for seg in segments:
         by_step.setdefault(seg["step"], []).append(seg)
-    parts.append("<h2>timings</h2>")
-    for step in sorted(by_step):
-        segs = by_step[step]
+    def step_bars(step, segs):
         widest = max((s["secs"] for s in segs), default=0) or 1
-        blocks = "".join(
-            '<div class="bar" style="width:%dpx;background:%s" title="%s"></div>'
-            % (max(2, int(240 * s["secs"] / widest)), _color(s["source"]),
-               html.escape("%s %s: %.1fs (%s)"
-                           % (step, s["source"], s["secs"], s["status"])))
-            for s in sorted(segs, key=lambda s: -s["secs"]))
-        parts.append('<div class="bars"><b style="width:6rem">%s</b>%s</div>'
-                     % (html.escape(step), blocks))
+        return {"step": step,
+                "blocks": [{"width": max(2, int(240 * s["secs"] / widest)),
+                            "color": _color(s["source"]),
+                            "tip": "%s %s: %.1fs (%s)" % (step, s["source"],
+                                                          s["secs"],
+                                                          s["status"])}
+                           for s in sorted(segs, key=lambda s: -s["secs"])]}
+
+    parts.append(TPL.timings([step_bars(step, segs)
+                              for step, segs in sorted(by_step.items())]))
 
     # segment table
-    rows = []
-    for seg in segments:
-        slowest = ", ".join("%s %.1fs" % (bf, sc)
-                            for bf, sc in seg.get("slowest") or [])
-        rows.append(
-            "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>"
-            '<td>%s</td><td class="%s">%s</td><td>%.1f</td><td class="small">%s</td></tr>'
-            % (html.escape(seg["step"]), html.escape(seg["source"]),
-               _n(seg.get("total")), _n(seg.get("ran")),
-               _n(seg.get("skipped_fresh")), _n(seg.get("skipdoc")),
-               "fail" if seg["errors"] else "", seg["errors"],
-               seg["secs"], html.escape(slowest)))
-    parts.append("<h2>segments</h2><table><tr><th>step</th><th>source</th>"
-                 "<th>total</th><th>ran</th><th>skipped</th><th>skipdoc</th>"
-                 "<th>errors</th><th>secs</th><th>slowest docs</th></tr>%s</table>"
-                 % "".join(rows))
+    parts.append(TPL.segments_table([
+        {"step": seg["step"], "source": seg["source"],
+         "total": _n(seg.get("total")), "ran": _n(seg.get("ran")),
+         "skipped": _n(seg.get("skipped_fresh")),
+         "skipdoc": _n(seg.get("skipdoc")), "errors": seg["errors"],
+         "secs": "%.1f" % seg["secs"],
+         "slowest": ", ".join("%s %.1fs" % (bf, sc)
+                              for bf, sc in seg.get("slowest") or [])}
+        for seg in segments]))
 
     # this run's errors grouped by (source, stage)
     errors = runlog.read_errors(ERRORS)
-    here = {k: v for k, v in errors.items() if v.get("run") == run_id}
-    parts.append("<h2>errors in this run</h2>")
-    if not here:
-        parts.append('<p class="empty">none recorded for this run.</p>')
-    else:
-        grouped = {}
-        for key, ent in here.items():
-            source, stage, basefile = key.split("/", 2)
-            grouped.setdefault((source, stage), []).append((basefile, ent))
-        for (source, stage), items in sorted(grouped.items()):
-            parts.append("<h3>%s / %s (%d)</h3>"
-                         % (html.escape(source), html.escape(stage), len(items)))
-            for basefile, ent in items:
-                parts.append(_error_block(basefile, ent))
+    grouped = {}
+    for key, ent in errors.items():
+        if ent.get("run") != run_id:
+            continue
+        source, stage, basefile = key.split("/", 2)
+        grouped.setdefault((source, stage), []).append(
+            {"label": "%s: %s" % (basefile, ent["error"]),
+             "tb": ent.get("traceback")})
+    parts.append(TPL.run_errors([
+        {"source": source, "stage": stage, "entries": entries}
+        for (source, stage), entries in sorted(grouped.items())]))
 
-    return _page("run %s" % run_id, "".join(parts))
+    return _page("run %s" % run_id, Markup("").join(parts))
 
 
 @router.get("/ops/failures", response_class=HTMLResponse,
@@ -441,41 +336,19 @@ def ops_failures(source: str | None = Query(None), stage: str | None = Query(Non
             continue
         if stage and stg != stage:
             continue
-        rows.append((src, stg, basefile, errors[key]))
+        ent = errors[key]
+        rows.append({"source": src, "stage": stg, "basefile": basefile,
+                     "label": ent["error"], "tb": ent.get("traceback")})
 
     filt = []
     if source:
-        filt.append("source=%s" % html.escape(source))
+        filt.append("source=%s" % source)
     if stage:
-        filt.append("stage=%s" % html.escape(stage))
-    head = '<p class="small">%d failing docs%s</p>' % (
-        len(rows), (" (" + ", ".join(filt) + ")") if filt else "")
-
-    if not rows:
-        return _page("failures", head + '<p class="empty">no matching failures.</p>')
-
-    body = ["<table><tr><th>source</th><th>stage</th><th>basefile</th>"
-            "<th>error</th></tr>"]
-    for src, stg, basefile, ent in rows:
-        body.append("<tr><td>%s</td><td>%s</td><td><code>%s</code></td><td>%s</td></tr>"
-                    % (html.escape(src), html.escape(stg), html.escape(basefile),
-                       _error_block("", ent)))
-    body.append("</table>")
-    return _page("failures", head + "".join(body))
+        filt.append("stage=%s" % stage)
+    return _page("failures",
+                 TPL.failures_page(len(rows), ", ".join(filt), rows))
 
 
 def _n(v):
     """A cell value where None (a step with no doc counts) shows as a dash."""
-    return "&mdash;" if v is None else str(v)
-
-
-def _error_block(basefile, ent):
-    """The one-line error plus its (possibly sampled) traceback in a
-    <details>; every stored value is escaped."""
-    label = html.escape("%s: %s" % (basefile, ent["error"])) if basefile \
-        else html.escape(ent["error"])
-    tb = ent.get("traceback")
-    if not tb:
-        return "<code>%s</code>" % label
-    return ("<details><summary><code>%s</code></summary><pre>%s</pre></details>"
-            % (label, html.escape(tb)))
+    return "—" if v is None else str(v)

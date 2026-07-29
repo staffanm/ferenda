@@ -3466,12 +3466,17 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
-                 PKG / "lib" / "labels.py",
+                 PKG / "lib" / "labels.py", PKG / "lib" / "tpl.py",
                  PKG / "api" / "app.py", PKG / "site" / "render.py",
                  PKG / "stats" / "render.py", PKG / "stats" / "charts.py",
                  # the shipped static chrome: a stylesheet/script edit must
                  # re-stale generate exactly like a renderer edit
-                 *sorted((PKG / "lib" / "assets").iterdir()))
+                 *sorted((PKG / "lib" / "assets").iterdir()),
+                 # the Jinja templates every page renders through: a template
+                 # edit is a renderer edit (rule:artifact-is-truth for pages)
+                 *sorted((PKG / "lib" / "templates").rglob("*.html")),
+                 *sorted((PKG / "site" / "templates").rglob("*.html")),
+                 *sorted((PKG / "stats" / "templates").rglob("*.html")))
 
 
 def generate_fingerprint():

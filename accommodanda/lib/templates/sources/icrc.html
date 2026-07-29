@@ -1,0 +1,8 @@
+{#- An IHL (ICRC) treaty page: an editorial summary lead where the source
+    provides one, then the treaty text (articles pre-rendered through the
+    node walk, which wires the TOC and the context rail). -#}
+{% extends "page.html" %}
+{% block body %}
+{%- if lead %}<p class="lead">{{ lead }}</p>{% endif -%}
+{{ structure }}
+{% endblock %}

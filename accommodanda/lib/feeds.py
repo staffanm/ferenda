@@ -14,6 +14,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from . import catalog, facets, layout, util
+from .tpl import ENV
 
 BASE = catalog.BASE.rstrip("/")
 LIMIT = 200                    # legacy main feeds held up to 2 * archivesize(100)
@@ -177,21 +178,10 @@ def render_atom(item, rows, params=None):
 
 
 def render_html(item, rows, params=None):
-    """Dependency-free HTML twin used for live filtered feed requests."""
-    atom = feed_url(item.alias, atom=True, params=params)
-    articles = "".join(
-        '<article><p><time datetime="%s">%s</time></p>'
-        '<h2><a href="%s">%s</a></h2><p>%s</p></article>'
-        % (entry.published, entry.published[:10], escape(entry.url),
-           escape(entry.title), escape(entry.summary))
-        for entry in rows)
-    return ('<!doctype html><html lang="sv"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>%s</title><link rel="alternate" type="application/atom+xml" '
-            'href="%s"></head><body><main><h1>%s</h1>'
-            '<p><a href="%s">Atom-flöde</a></p>%s</main></body></html>'
-            % (escape(item.title), escape(atom), escape(item.title), escape(atom),
-               articles or "<p>Inga dokument.</p>"))
+    """Chrome-free HTML twin used for live filtered feed requests."""
+    return ENV.get_template("dataset_feed.html").render(
+        title=item.title, atom=feed_url(item.alias, atom=True, params=params),
+        rows=rows)
 
 
 def publisher_options(con):

@@ -1,0 +1,62 @@
+{#- The site-wide page shell: chrome (masthead, theme machinery, mobile
+    toolbar), the frontmatter header and the reading grid. Every generated
+    page renders through this template via render.page().
+
+    Pre-rendered HTML arrives as Markup (meta, body, toc, summary, island,
+    head); plain text (title, eyebrow, subtitle) is escaped here. `solo`
+    pages (frontpage, browse indexes) drop the side columns.
+
+    Whitespace: newlines at block boundaries are fine (the browser collapses
+    them), but a newline between adjacent inline elements renders as a
+    visible space the original chrome does not have -- so inline runs (the
+    masthead inner, the toolbar buttons and their svg glyphs) stay on one
+    line each, glued with `-` control where they meet template logic. -#}
+{%- macro search_icon(size) -%}
+{#- the magnifier glyph, shared by the masthead search button and the mobile
+    bar's Sök button (different sizes) so the two can't drift apart -#}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path></svg>
+{%- endmacro -%}
+{%- macro frontmatter() -%}
+<header class="frontmatter">
+  {%- if eyebrow %}<div class="eyebrow">{{ eyebrow }}</div>{% endif -%}
+  <h1>{{ title }}</h1>
+  {%- if subtitle %}<p class="subtitle">{{ subtitle }}</p>{% endif -%}
+  {%- if summary_text %}<p class="sammanfattning">{{ summary_text }}</p>{% endif -%}
+  {{ summary }}{{ meta }}</header>
+{%- endmacro -%}
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+{{ head }}
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head><body class="gr-root{{ body_class }}">
+<header class="masthead"><div class="mast-inner"><a class="brand" href="/">lagen<em>.nu</em></a><button class="search" type="button" data-search>
+  {{- search_icon(15) -}}
+  <span>Sök lag, paragraf, rättsfall…</span><span class="k">⌘K</span></button><nav class="mast-nav">
+  {%- for label, route, act in MAST_NAV -%}
+  <a href="{{ route }}"{% if kind in act %} class="on"{% endif %}>{{ label }}</a>
+  {%- endfor -%}
+  </nav><button class="theme-toggle" type="button" data-theme-toggle aria-label="Växla mellan ljust och mörkt tema" title="Växla ljust / mörkt tema"><svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg><svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></button></div></header>
+<div class="gr-body{% if solo %} solo{% endif %}">
+{%- if not solo %}<aside class="toc-col">{{ toc }}</aside>{% endif -%}
+<main class="gr-main">
+{{ frontmatter() }}
+{% block body %}{{ body }}{% endblock %}
+</main>
+{%- if not solo %}<aside class="rail" id="rail" aria-live="polite"></aside>{% endif -%}
+</div>
+{%- if not solo %}
+<nav class="mobile-bar" aria-label="Verktyg">
+  {%- if toc -%}
+  <button type="button" data-drawer="toc" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>Innehåll</button>
+  {%- endif -%}
+  <button type="button" data-search>{{ search_icon(18) }}Sök</button><button type="button" data-drawer="rail" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Kontext</button></nav>
+{%- endif %}
+{{ island }}<script src="/script.js" defer></script>
+<script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
+</body></html>

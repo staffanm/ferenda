@@ -1,0 +1,17 @@
+{#- Body macros for the editorial pages (frontpage, /om, sitenews). The
+    inline-run and block renderers stay in site/render.py (algorithmic
+    emission over authored markdown); the page-level markup lives here.
+    Chrome comes from lib.render.page() around these bodies. -#}
+{%- macro frontpage_body(blocks) -%}
+{#- .frontpage drives the multi-column CSS: cluster `## ` headings span all
+    columns, the category+law lists flow into columns -#}
+<div class="frontpage">{{ blocks }}</div>
+{%- endmacro -%}
+{%- macro sitenews_body(items) -%}
+{#- every news item in full, anchored by its id so the Atom feed's
+    per-entry links resolve to it -#}
+<p class="feed-link"><a class="ext" rel="external" href="/dataset/sitenews/feed.atom">Atom-flöde</a></p>
+{%- for it in items -%}
+<article class="news-item" id="{{ it.id }}"><p class="news-date">{{ it.date }}</p><h2>{{ it.title }}</h2>{{ it.blocks }}</article>
+{%- endfor -%}
+{%- endmacro -%}

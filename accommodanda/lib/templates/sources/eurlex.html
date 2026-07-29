@@ -1,0 +1,11 @@
+{#- An EU act / EU court decision page: on a judgment, the link to its
+    Advocate General's opinion where the corpus holds it, then the flattened
+    block sequence (headings, recitals with thematic group leads, articles,
+    paragraphs/points -- rendered by the eurlex block walk). -#}
+{% extends "page.html" %}
+{% block body %}
+{%- if opinion_href -%}
+<aside class="ag-opinion"><a href="{{ opinion_href }}">Generaladvokatens förslag till avgörande</a></aside>
+{%- endif -%}
+{{ structure }}
+{% endblock %}

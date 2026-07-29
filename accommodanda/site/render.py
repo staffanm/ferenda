@@ -14,10 +14,16 @@ write-then-clobber). The sitenews listing lives at ``/dataset/sitenews/feed``
 import json
 from pathlib import Path
 
-from ..lib import compress, layout
+from markupsafe import Markup
+
+from ..lib import compress, layout, tpl
 from ..lib.render import edit_meta, escape, href, page
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
+
+# the vertical's own body markup (site/templates/site.html); the shared page
+# chrome still comes from lib.render.page()
+_TPL = tpl.environment("accommodanda.site").get_template("site.html").module
 
 
 # --------------------------------------------------------------------------
@@ -78,7 +84,7 @@ def render_frontpage(art):
     drives the multi-column CSS (cluster `## ` headings span all columns, the
     `### category` + law lists flow into columns) so the dense index stays
     scannable in two levels."""
-    body = '<div class="frontpage">%s</div>' % _blocks_html(art["blocks"])
+    body = _TPL.frontpage_body(Markup(_blocks_html(art["blocks"])))
     return page(art["title"], "Start", "", body,
                 eyebrow="Sveriges lagar, med kontext", solo=True,
                 body_class=" site")
@@ -94,16 +100,9 @@ def render_sitenews(art):
     """The news listing: every item in full, each an ``<article>`` anchored by
     its id so the Atom feed's per-entry links resolve to it."""
     items = sorted(art["items"], key=lambda it: it["published"], reverse=True)
-    articles = []
-    for it in items:
-        articles.append(
-            '<article class="news-item" id="%s"><p class="news-date">%s</p>'
-            '<h2>%s</h2>%s</article>'
-            % (escape(it["id"]), escape(it["published"][:10]),
-               escape(it["title"]), _blocks_html(it["blocks"])))
-    body = ('<p class="feed-link"><a class="ext" rel="external" '
-            'href="/dataset/sitenews/feed.atom">Atom-flöde</a></p>%s'
-            % "".join(articles))
+    body = _TPL.sitenews_body(
+        [{"id": it["id"], "date": it["published"][:10], "title": it["title"],
+          "blocks": Markup(_blocks_html(it["blocks"]))} for it in items])
     return page(art["title"], "Nyheter", "", body, eyebrow="Nyheter", solo=True,
                 body_class=" site",
                 head='<link rel="alternate" type="application/atom+xml" '

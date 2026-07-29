@@ -23,17 +23,19 @@ flow:
 
 import hashlib
 import os
-from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from .. import config, patchsource
-from ..lib import git, layout
+from ..lib import git, layout, tpl
 from ..lib import patch as patchlib
 from ..lib.errors import SkipDocument
 from .auth import Editor, require_editor
+
+_EDITOR_PAGE = tpl.environment("accommodanda.api").get_template(
+    "patch_edit.html")
 
 router = APIRouter(prefix="/api/v1/patch", tags=["patch"])
 
@@ -151,65 +153,9 @@ def _commit(source, basefile, editor, removed, rot13):
 
 
 # --------------------------------------------------------------------------
-# a small self-contained editor page (no build-time asset; served on demand)
+# a small self-contained editor page (templates/patch_edit.html; no
+# build-time asset -- served on demand)
 # --------------------------------------------------------------------------
-
-_EDITOR_HTML = """<!doctype html>
-<html lang="sv"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Patch %(source)s %(basefile)s</title>
-<style>
- body{font:14px/1.5 system-ui,sans-serif;margin:0;padding:1.5rem;max-width:70rem}
- h1{font-size:1.1rem} .fmt{color:#666;font-weight:normal}
- textarea{width:100%%;height:60vh;font:13px/1.4 ui-monospace,monospace;
-   box-sizing:border-box;padding:.5rem;white-space:pre}
- .row{margin:.6rem 0;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
- input[type=text]{flex:1;min-width:12rem;padding:.35rem}
- button{padding:.45rem 1rem;font-size:1rem;cursor:pointer}
- #msg{margin-left:auto} .ok{color:#137333} .err{color:#c5221f}
- .hint{color:#666;font-size:.85rem}
-</style></head><body>
-<h1>Patch <code>%(source)s</code> <code>%(basefile)s</code>
- <span class="fmt">— intermediate format: %(format)s</span></h1>
-<p class="hint">Edit the source text below to the desired final text; saving stores
- the <em>minimal</em> diff. An edit identical to the original removes the patch.
- Use <b>rot13</b> to obfuscate a redaction of personal data.</p>
-<textarea id="text" spellcheck="false"></textarea>
-<div class="row">
- <input type="text" id="desc" placeholder="Short description (e.g. 'Rättad OCR-felaktighet')">
- <label><input type="checkbox" id="rot13"> rot13 (redaction)</label>
- <button id="save">Save patch</button>
- <span id="msg"></span>
-</div>
-<script>
-const q=new URLSearchParams(location.search), source=q.get("source"), basefile=q.get("basefile");
-let base_sha="";
-const msg=document.getElementById("msg");
-function show(t,ok){msg.textContent=t;msg.className=ok?"ok":"err";}
-async function load(){
- const r=await fetch("/api/v1/patch/document?source="+encodeURIComponent(source)+
-   "&basefile="+encodeURIComponent(basefile),{credentials:"same-origin"});
- if(!r.ok){show("Load failed: "+r.status+" "+await r.text(),false);return;}
- const d=await r.json(); base_sha=d.base_sha;
- document.getElementById("text").value=d.text;
- if(d.description) document.getElementById("desc").value=d.description;
- document.getElementById("rot13").checked=d.is_rot13;
- show(d.has_patch?"Existing patch applied.":"No patch yet.",true);
-}
-document.getElementById("save").onclick=async()=>{
- const body={source,basefile,edited_text:document.getElementById("text").value,
-   description:document.getElementById("desc").value,
-   rot13:document.getElementById("rot13").checked,base_sha};
- const r=await fetch("/api/v1/patch/save",{method:"POST",credentials:"same-origin",
-   headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
- if(!r.ok){show("Save failed: "+r.status+" "+await r.text(),false);return;}
- const d=await r.json();
- show(d.removed?"Patch removed and reparsed.":("Saved "+d.path+" ("+d.sha.slice(0,8)+"), reparsed."),true);
- load();
-};
-load();
-</script></body></html>"""
-
 
 @router.get("/edit", response_class=HTMLResponse)
 def edit_page(source: str = Query(...), basefile: str = Query(...),
@@ -218,5 +164,6 @@ def edit_page(source: str = Query(...), basefile: str = Query(...),
     every write route; the page's fetches carry the session cookie."""
     if source not in patchsource._INTERMEDIATE:
         raise HTTPException(400, "source %r is not patchable" % source)
-    return _EDITOR_HTML % {"source": escape(source), "basefile": escape(basefile),
-                           "format": escape(patchsource.format_label(source) or "")}
+    return _EDITOR_PAGE.render(
+        source=source, basefile=basefile,
+        format=patchsource.format_label(source) or "")

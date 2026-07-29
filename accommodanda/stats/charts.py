@@ -27,8 +27,15 @@ relief the light-mode contrast check requires.
 
 import math
 
+from markupsafe import Markup
+
+from ..lib import tpl
 from ..lib.render import escape
 from .model import Measure, Row
+
+# the vertical's own body markup (stats/templates/stats.html); shared with
+# stats.render, which assembles the page from the same macro set
+TPL = tpl.environment("accommodanda.stats").get_template("stats.html").module
 
 # a sequential blue ramp, light -> dark, for the heat table's magnitude. Steps
 # 250-700 of the validated ramp: the lightest step still clears 2:1 on the light
@@ -63,48 +70,38 @@ def _nice_max(value):
 # --------------------------------------------------------------------------
 
 def toplist_html(measure):
-    """Ranked rows as a bar table: label, bar, value. The bar is a background
-    width on the value cell, so it never fights the text for space."""
+    """Ranked rows as a bar table: label, bar, value (stats.html `toplist`).
+    The bar scale is per group, so a measure showing both ends of a range
+    does not draw its short end as an invisible sliver against the long
+    end's maximum."""
     rows = measure.rows
     if not rows:
-        return '<p class="viz-empty">Inga värden.</p>'
-    # one bar scale per group, so a measure showing both ends of a range does not
-    # draw its short end as an invisible sliver against the long end's maximum
+        return TPL.empty()
     tops = {}
     for r in rows:
         tops[r.group] = max(tops.get(r.group, 0), abs(r.value))
-    out = ['<table class="viz-bars"><thead><tr><th scope="col">Vad</th>'
-           '<th scope="col" class="num">%s</th></tr></thead><tbody>'
-           % escape(measure.unit or "värde")]
-    seen = None
+    items, seen = [], None
     for r in rows:
         if r.group != seen:
             seen = r.group
             if seen:
-                out.append('<tr class="viz-split"><th scope="rowgroup" colspan="2">'
-                           "%s</th></tr>" % escape(seen))
-        top = tops[r.group] or 1
-        label = escape(r.label)
-        if r.uri:
-            label = '<a href="%s">%s</a>' % (escape(_href(r.uri)), label)
-        if r.detail:
-            label += ' <span class="viz-detail">%s</span>' % escape(r.detail)
-        out.append(
-            '<tr><th scope="row">%s</th>'
-            '<td class="num"><span class="viz-bar" style="--w:%.2f%%"></span>'
-            '<span class="viz-val">%s</span></td></tr>'
-            % (label, 100.0 * abs(r.value) / top, _fmt(r.value, measure.unit)))
-    out.append("</tbody></table>")
-    return "".join(out)
+                items.append({"split": seen})
+        items.append({"split": None,
+                      "href": _href(r.uri) if r.uri else None,
+                      "label": r.label, "detail": r.detail,
+                      "width": "%.2f" % (100.0 * abs(r.value)
+                                         / (tops[r.group] or 1)),
+                      "val": _fmt(r.value, measure.unit)})
+    return TPL.toplist(measure.unit or "värde", items)
 
 
 def matrix_html(measure):
-    """A heat table. The scale is logarithmic and says so: the largest cell here
-    is four orders of magnitude above the smallest, and on a linear ramp every
-    cell but one reads as empty."""
+    """A heat table (stats.html `heat`). The scale is logarithmic and says
+    so: the largest cell here is four orders of magnitude above the
+    smallest, and on a linear ramp every cell but one reads as empty."""
     cells = measure.cells
     if not cells:
-        return '<p class="viz-empty">Inga värden.</p>'
+        return TPL.empty()
     rows = sorted({c.row for c in cells})
     cols = sorted({c.col for c in cells})
     index = {(c.row, c.col): c.value for c in cells}
@@ -112,33 +109,22 @@ def matrix_html(measure):
     lo = math.log10(min(c.value for c in cells))
     span = (hi - lo) or 1
 
-    out = ['<div class="viz-scroll"><table class="viz-heat">'
-           '<thead><tr><th scope="col"><span class="vh">Från ↓ till →</span></th>']
-    for col in cols:
-        out.append('<th scope="col">%s</th>' % escape(col))
-    out.append("</tr></thead><tbody>")
-    for row in rows:
-        out.append('<tr><th scope="row">%s</th>' % escape(row))
-        for col in cols:
-            value = index.get((row, col))
-            if value is None:
-                out.append('<td class="viz-nil"><span class="vh">—</span></td>')
-                continue
-            step = min(len(HEAT) - 1,
-                       int(round((math.log10(value) - lo) / span * (len(HEAT) - 1))))
-            out.append(
-                '<td class="viz-cell%s" style="--c:%s" title="%s → %s: %s">'
-                "<span>%s</span></td>"
-                % (" on-dark" if step >= HEAT_INK_FLIP else "", HEAT[step],
-                   escape(row), escape(col), _fmt(value), _fmt(value)))
-        out.append("</tr>")
-    out.append("</tbody></table></div>")
-    return "".join(out)
+    def cell(row, col):
+        value = index.get((row, col))
+        if value is None:
+            return {"nil": True}
+        step = min(len(HEAT) - 1,
+                   int(round((math.log10(value) - lo) / span * (len(HEAT) - 1))))
+        return {"nil": False, "col": col, "color": HEAT[step],
+                "on_dark": step >= HEAT_INK_FLIP, "val": _fmt(value)}
+
+    return TPL.heat(cols, [{"label": row,
+                            "cells": [cell(row, col) for col in cols]}
+                           for row in rows])
 
 
 def hero_html(measure):
-    display = measure.display or _fmt(measure.value or 0, measure.unit)
-    return '<p class="viz-hero">%s</p>' % escape(display)
+    return TPL.hero(measure.display or _fmt(measure.value or 0, measure.unit))
 
 
 # --------------------------------------------------------------------------
@@ -265,17 +251,12 @@ _FORMS = {"toplist": toplist_html, "table": toplist_html, "matrix": matrix_html,
 def figure(measure):
     """The measure's figure, plus -- for the plotted forms -- the table view the
     accessibility pass requires and the low-contrast marks oblige."""
-    html = _FORMS[measure.kind](measure)
+    html = Markup(_FORMS[measure.kind](measure))
     if measure.kind in ("series", "histogram", "bars") and measure.points:
-        rows = "".join("<tr><th scope=\"row\">%s</th><td class=\"num\">%s</td></tr>"
-                       % (escape(p.x), _fmt(p.y, measure.unit))
-                       for p in measure.points)
-        html += ('<details class="viz-data"><summary>Visa som tabell</summary>'
-                 '<div class="viz-scroll"><table class="viz-plain"><thead><tr>'
-                 '<th scope="col">%s</th><th scope="col" class="num">%s</th></tr>'
-                 "</thead><tbody>%s</tbody></table></div></details>"
-                 % (escape(measure.xlabel or "kategori"),
-                    escape(measure.unit or "värde"), rows))
+        html += TPL.data_table(measure.xlabel or "kategori",
+                               measure.unit or "värde",
+                               [{"x": p.x, "y": _fmt(p.y, measure.unit)}
+                                for p in measure.points])
     # a scalar may carry a supporting list; render it under the hero number
     if measure.kind == "scalar" and measure.rows:
         html += toplist_html(measure)

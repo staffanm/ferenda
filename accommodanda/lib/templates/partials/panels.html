@@ -1,0 +1,71 @@
+{#- Reading-column panels: the compare-lydelser affordance, the statute's
+    preparatory-works section, the typed reference lists and the amendment
+    registers (SFS and föreskrift). Values that are already links arrive as
+    Markup; plain values are escaped here. -#}
+{%- macro versions_panel(options, compare_word, base_uri, own_version) -%}
+{#- the <select> versions.js turns into the on-demand diff view; `options`
+    newest first as {value, text} -#}
+<details class="lydelser"><summary>Jämför lydelser <span class="count">{{ options | length }}</span></summary><label>Jämför {{ compare_word }} lydelse med <select data-diff data-uri="{{ base_uri }}" data-to="{{ own_version }}"><option value="">– välj lydelse –</option>
+{%- for o in options -%}
+<option value="{{ o.value }}">SFS {{ o.value }}{% if o.note %} ({{ o.note }}){% endif %}</option>
+{%- endfor -%}
+</select></label></details>
+{%- endmacro -%}
+{%- macro forarbeten_section(shown, cap) -%}
+{#- first `cap` always visible, the rest behind a native <details> -#}
+<section class="forarbeten"><h2>Förarbeten</h2><ul>
+{%- for html in shown[:cap] -%}
+<li>{{ html }}</li>
+{%- endfor -%}
+</ul>
+{%- if shown | length > cap -%}
+<details class="forarbeten-mer"><summary>+ {{ shown | length - cap }} fler</summary><ul>
+{%- for html in shown[cap:] -%}
+<li>{{ html }}</li>
+{%- endfor -%}
+</ul></details>
+{%- endif -%}
+</section>
+{%- endmacro -%}
+{%- macro ref_list(heading, items) -%}
+{%- if items -%}
+<section class="refs"><h2>{{ heading }}</h2><ul>
+{%- for it in items -%}
+<li>{{ it }}</li>
+{%- endfor -%}
+</ul></section>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro foreskrift_amendments(anchor, items) -%}
+<section class="andringar" id="{{ anchor }}"><h2 class="kaprubrik">Ändringsförfattningar</h2><ul>
+{%- for it in items -%}
+<li>{{ it }}</li>
+{%- endfor -%}
+</ul></section>
+{%- endmacro -%}
+{%- macro andringar(anchor, posts) -%}
+{#- the SFS bottom-of-page register: one .andring per register post, with
+    the act's publication links, point-in-time/diff links, its rendered
+    övergångsbestämmelser (Markup) and the register detail rows -#}
+<section class="andringar" id="{{ anchor }}"><h2 class="kaprubrik">Ändringar och övergångsbestämmelser</h2>
+{%- for post in posts -%}
+<div class="andring"{% if post.id %} id="{{ post.id }}"{% endif %}><h2>{{ post.heading }}</h2>
+{%- if post.links -%}
+<ul>
+{%- for link in post.links -%}
+{{ link }}
+{%- endfor -%}
+</ul>
+{%- endif -%}
+{%- if post.content %}<h3>Övergångsbestämmelse</h3>{{ post.content }}{% endif -%}
+{%- if post.details -%}
+<dl class="meta">
+{%- for k, v in post.details -%}
+<dt>{{ k }}</dt><dd>{{ v }}</dd>
+{%- endfor -%}
+</dl>
+{%- endif -%}
+</div>
+{%- endfor -%}
+</section>
+{%- endmacro -%}

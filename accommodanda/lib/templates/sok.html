@@ -1,0 +1,13 @@
+{#- The static shell for the complete, API-backed result list at /sok/;
+    fullsearch.js fills the status, facets, results and pagination. -#}
+{% extends "page.html" %}
+{% block body %}
+<div class="search-page">
+<form class="full-search-form" role="search"><input type="search" name="q" autocomplete="off" placeholder="Sök lag, paragraf, rättsfall…" aria-label="Sökord"><button type="submit">Sök</button></form>
+<div class="full-search-status" role="status" aria-live="polite"></div>
+<div class="full-search-layout">
+<aside class="full-search-facets" aria-label="Avgränsa sökningen"></aside>
+<section><div class="full-search-results" aria-live="polite"></div>
+<nav class="search-pagination" aria-label="Sökresultatsidor"></nav>
+</section></div></div>
+{% endblock %}

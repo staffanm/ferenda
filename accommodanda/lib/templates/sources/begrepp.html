@@ -1,0 +1,10 @@
+{#- A concept (begrepp) page: the wiki description, or -- for a synthesized
+    stub with no wiki page yet -- an honest note that the value is the
+    aggregated inbound below it. -#}
+{% extends "page.html" %}
+{% block body %}
+{%- if not has_description -%}
+<p class="stub-note">Det här begreppet har ännu ingen beskrivning. Nedan visas var det definieras och används.</p>
+{%- endif -%}
+{{ structure }}
+{% endblock %}

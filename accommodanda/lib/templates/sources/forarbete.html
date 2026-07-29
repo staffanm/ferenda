@@ -1,0 +1,15 @@
+{#- A preparatory-work (förarbete) page: the genomför-direktiv statements
+    pulled from a proposition's författningskommentar (§7d), then the walked
+    document body (sections, page/facsimile buttons, FK highlight boxes --
+    built by render_forarbete's walk). -#}
+{% extends "page.html" %}
+{% block body %}
+{%- if implements -%}
+<section class="genomforande"><h2>Genomför EU-direktiv</h2><ul>
+{%- for it in implements -%}
+<li>{{ it.where }}genomför{% if it.partial %} delvis{% endif %} artikel {{ it.ref }} i {{ it.link }}</li>
+{%- endfor -%}
+</ul></section>
+{%- endif -%}
+{{ structure }}
+{% endblock %}
