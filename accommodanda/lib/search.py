@@ -40,7 +40,10 @@ from .. import config
 from . import catalog, compress, facets, text
 
 INDEX = "lagen"
-INDEX_FORMAT = "4"        # bump when emitted units change without artifact changes
+# bump when emitted units change without artifact changes. 5: dropped the `all`
+# copy_to catch-all (see SEARCH_FIELDS) -- a mapping change, so the index has to
+# be recreated rather than migrated, and every unit re-emitted into it.
+INDEX_FORMAT = "5"
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -106,9 +109,25 @@ def _index_version(content_hash):
 
 # Query-time field boosts (index-time boost was deprecated in ES5; query-time is
 # version-safe and identical in effect): the identifier dominates, then title,
-# then body. `all` is the copy_to catch-all. Ranking authority comes from
-# inbound_count (function_score).
-SEARCH_FIELDS = ["identifier^16", "title^4", "label^3", "text", "all"]
+# then body. Ranking authority comes from inbound_count (function_score).
+#
+# No `all` catch-all. It came across from the legacy schema
+# (`ferenda/fulltextindex.py`), where every field was `copy_to: ["all"]` *with
+# index-time boosts* -- pre-ES5 that was the way to get per-field weighting: you
+# queried the one concatenated field and the baked-in boosts did the ranking.
+# Moving to query-time boosts made it redundant, but it was carried over and
+# then listed here beside the very fields it duplicates. It cost ~8 GB of the
+# 52 GB index (a second copy of every body token, positions and all) and
+# *diluted* the boosts above, since a body hit scored once as `text` and again
+# as `all` -- a title hit led 5:2 rather than the intended 4:1.
+#
+# Nothing needs it: `simple_query_string` with default_operator AND already
+# matches each term against any field independently, so a query split across
+# title and body still matches without a concatenated field (which is what a
+# catch-all buys under `multi_match: best_fields`, a query shape we do not use).
+# Highlighting reads `text`/`title` only. The one thing lost is a quoted phrase
+# spanning a field boundary, which is a concatenation artefact, not a phrase.
+SEARCH_FIELDS = ["identifier^16", "title^4", "label^3", "text"]
 
 # repealed acts whose repeal is in force are excluded from results; a future,
 # not-yet-in-force repeal date (and a null expired) is kept (S6/S7). Evaluated at
@@ -151,10 +170,10 @@ MAPPING = {
             # content_hash); index_source diffs it to skip unchanged documents
             "version":       {"type": "keyword", "index": False},
             "uri":           {"type": "keyword"},   # this unit (document or fragment)
-            "identifier":    {"type": "text", "copy_to": "all"},
-            "title":         {"type": "text", "copy_to": "all"},
-            "label":         {"type": "keyword", "copy_to": "all"},
-            "text":          {"type": "text", "copy_to": "all"},
+            "identifier":    {"type": "text"},
+            "title":         {"type": "text"},
+            "label":         {"type": "keyword"},
+            "text":          {"type": "text"},
             "source":        {"type": "keyword"},
             "kind":          {"type": "keyword"},
             "year":          {"type": "keyword"},
@@ -177,7 +196,6 @@ MAPPING = {
             "doc_title":     {"type": "keyword", "index": False},
             "doc_label":     {"type": "keyword", "index": False},
             "doc_display":   {"type": "keyword", "index": False},
-            "all":           {"type": "text"},
         }
     }
 }
