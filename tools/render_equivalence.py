@@ -272,8 +272,8 @@ def snapshot_aggregates(con, out):
             if logical in seen:
                 continue
             seen.add(logical)
-            if logical.name.endswith((".css", ".js", ".txt")):
-                continue               # static assets: not part of the port
+            if logical.name.endswith((".css", ".js", ".txt", ".woff2")):
+                continue               # static assets (incl. font binaries)
             rel = logical.relative_to(tmp)
             target = out / "agg" / rel
             target.parent.mkdir(parents=True, exist_ok=True)

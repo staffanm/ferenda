@@ -4045,12 +4045,23 @@ def write_assets(out_root):
     compress.write_text(out_root / "robots.txt",
                         (ASSETS / "robots.txt").read_text(encoding="utf-8"),
                         encodings=compress.PAGE_ENCODINGS)
-    # style.css ships the reader stylesheet with the editor layer appended -- one
-    # request, and the editor rules are inert without a logged-in session.
+    # style.css ships the self-hosted @font-face set first (assets/fonts/,
+    # replacing the fonts.googleapis.com stylesheet -- no visitor request
+    # leaves the site for a font), then the reader stylesheet, then the editor
+    # layer -- one request, and the editor rules are inert without a logged-in
+    # session.
     compress.write_text(out_root / "style.css",
-                        (ASSETS / "style.css").read_text(encoding="utf-8")
+                        (ASSETS / "fonts" / "fonts.css").read_text(encoding="utf-8")
+                        + (ASSETS / "style.css").read_text(encoding="utf-8")
                         + (ASSETS / "editor.css").read_text(encoding="utf-8"),
                         encodings=compress.PAGE_ENCODINGS)
+    # the font binaries themselves: woff2 is already compressed, so they are
+    # stored plain (no .br sibling), under the /fonts/ urls fonts.css names
+    fonts_dir = out_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    for font in sorted((ASSETS / "fonts").glob("*.woff2")):
+        compress.write_bytes(fonts_dir / font.name, font.read_bytes(),
+                             encodings=())
 
 
 def render_aggregates(con, out_root, catalog_path, write_index=True):

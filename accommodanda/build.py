@@ -3469,9 +3469,11 @@ GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "labels.py", PKG / "lib" / "tpl.py",
                  PKG / "api" / "app.py", PKG / "site" / "render.py",
                  PKG / "stats" / "render.py", PKG / "stats" / "charts.py",
-                 # the shipped static chrome: a stylesheet/script edit must
-                 # re-stale generate exactly like a renderer edit
-                 *sorted((PKG / "lib" / "assets").iterdir()),
+                 # the shipped static chrome (incl. the self-hosted fonts):
+                 # a stylesheet/script/font edit must re-stale generate
+                 # exactly like a renderer edit
+                 *sorted(p for p in (PKG / "lib" / "assets").rglob("*")
+                         if p.is_file()),
                  # the Jinja templates every page renders through: a template
                  # edit is a renderer edit (rule:artifact-is-truth for pages)
                  *sorted((PKG / "lib" / "templates").rglob("*.html")),
