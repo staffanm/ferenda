@@ -3708,6 +3708,17 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
                                            write_index=not site_render.has_frontpage())
     if not scoped:                       # editorial pages ride a full-corpus run
         site_render.write_site(GENERATED)
+        # so does /statistik, for the same reason: it is one artifact-backed page
+        # with no catalog rows, so `generate_site` above never reaches it. Without
+        # this a rebuild recomputed the measurements and then published the
+        # previous run's page -- fresh numbers on disk, stale numbers on screen.
+        #
+        # Conditional on the artifact existing, not defensively: a corpus that
+        # has never had `stats compute` run simply has no such page, and
+        # `write_stats` rightly raises rather than inventing one. A whole-corpus
+        # `lagen all rebuild` always computes first, so there it always renders.
+        if compress.exists(layout.artifact("stats", stats_render.ARTIFACT_BASEFILE)):
+            stats_render.write_stats(GENERATED)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)

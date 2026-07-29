@@ -312,7 +312,11 @@ since the live artifact alone cannot answer "how has the corpus changed". Like
 dumped. `compute` is now part of the standard whole-corpus `lagen all rebuild`
 (after `dump`, before `generate` — it needs both the catalog `relate` just
 rebuilt and the artifact trees `parse` just wrote); a single-source rebuild
-does not pay for it. The measurement catalog, with each number's provenance,
+does not pay for it. The page rides that run too: `/statistik` is one
+artifact-backed page with no catalog rows, so `render.generate_site` never
+reaches it and a full-corpus `generate` writes it explicitly, next to the
+editorial pages — without which a rebuild recomputes the measurements and then
+republishes the previous run's page. The measurement catalog, with each number's provenance,
 is [`../docs/prd-stats.md`](../docs/prd-stats.md).
 
 The catalog-backed document feeds retain the legacy public contract too:

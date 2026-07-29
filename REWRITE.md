@@ -3089,7 +3089,12 @@ catalog — each number with its provenance and its status — is
   what makes the numbers *diffable* between builds — two artifacts compared say
   what actually moved in the corpus — and it keeps the architecture's rule
   intact: the artifact on disk is the source of truth, the page is a pure
-  projection that cannot say anything `compute` did not measure.
+  projection that cannot say anything `compute` did not measure. Split verbs,
+  but both ride a whole-corpus `lagen all rebuild`: `/statistik` has no catalog
+  rows, so `render.generate_site` never reaches it and the full-corpus generate
+  writes it explicitly beside the editorial pages. Wiring only `compute` into
+  the rebuild recomputed the measurements and then republished the previous
+  run's page.
 - **Not incremental, on purpose.** Every measurement is a fact about the whole
   corpus, so there is no subset of it that could be refreshed on its own; the
   freshness question is "has anything anywhere changed", which only the operator
