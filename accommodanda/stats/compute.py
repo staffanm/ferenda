@@ -54,6 +54,26 @@ def _pct(part, whole):
     return round(100.0 * part / whole, 1) if whole else 0.0
 
 
+def in_force(col="expired"):
+    """SQL for "not repealed *yet*" -- a repeal date that has not arrived does
+    not make an act repealed.
+
+    Ellag (1997:857) carries an upphävandedatum of 2027-01-01 and is law until
+    then; `expired IS NULL` alone reads it, and 16 other live statutes among them
+    Konsumentkreditlagen and Lag om mottagande av asylsökande, as already gone.
+    The distinction is the same one the search layer draws at query time
+    (`search.REPEALED_IN_FORCE`), evaluated against `now` so it stays right
+    between builds rather than being frozen at compute time."""
+    return "(%s IS NULL OR %s > date('now'))" % (col, col)
+
+
+def repealed(col="expired"):
+    """SQL for "repealed, and the repeal has taken effect" -- the complement of
+    `in_force`. An act repealed as of next year has not lived its life yet, so it
+    belongs in neither the lifespan measures nor this year's repeal count."""
+    return "(%s IS NOT NULL AND %s <= date('now'))" % (col, col)
+
+
 def _paragraf_label(t):
     """The citing form for a paragraf extreme: ``9 kap. 62 § Förordning om EU:s
     gemensamma jordbrukspolitik``.
@@ -429,7 +449,8 @@ def _group_c(con, s):
         lede="Regelmassans äldsta lager, fortfarande i kraft.",
         rows=[Row(t, int(today[:4]) - int(d[:4]), u, d) for u, t, d in
               _q(con, "SELECT uri, title, date FROM documents WHERE source='sfs' "
-                      "AND expired IS NULL AND date > '1500' ORDER BY date LIMIT 12")])
+                      "AND " + in_force() + " AND date > '1500' "
+                      "ORDER BY date LIMIT 12")])
 
     yield Measure(
         23, "C", "Längst levande upphävda lagar", "toplist", unit="år",
@@ -437,7 +458,7 @@ def _group_c(con, s):
         rows=[Row(t, y, u, "%s → %s" % (d, e)) for u, t, d, e, y in
               _q(con, "SELECT uri, title, date, expired, "
                       "CAST((julianday(expired)-julianday(date))/365.25 AS INT) y "
-                      "FROM documents WHERE source='sfs' AND expired IS NOT NULL "
+                      "FROM documents WHERE source='sfs' AND " + repealed() + " "
                       "AND date > '1500' ORDER BY y DESC LIMIT 12")])
 
     yield Measure(
@@ -446,7 +467,7 @@ def _group_c(con, s):
         rows=[Row(t[:90], d, u, "%s → %s" % (a, e)) for u, t, a, e, d in
               _q(con, "SELECT uri, title, date, expired, "
                       "CAST(julianday(expired)-julianday(date) AS INT) d "
-                      "FROM documents WHERE source='sfs' AND expired IS NOT NULL "
+                      "FROM documents WHERE source='sfs' AND " + repealed() + " "
                       "AND d >= 0 ORDER BY d ASC LIMIT 12")])
 
     yield Measure(
@@ -455,7 +476,7 @@ def _group_c(con, s):
         xlabel="år", ylabel="upphävda författningar",
         points=_series(_q(con, "SELECT substr(expired,1,4) y, count(*) "
                                "FROM documents WHERE source='sfs' "
-                               "AND expired IS NOT NULL AND y BETWEEN '1900' AND ? "
+                               "AND " + repealed() + " AND y BETWEEN '1900' AND ? "
                                "GROUP BY 1 ORDER BY 1", (today[:4],))))
 
     # 25 -- the survival curve: the single most informative series here
@@ -463,7 +484,7 @@ def _group_c(con, s):
                           "WHERE source='sfs' AND date BETWEEN '1900' AND ? "
                           "GROUP BY 1", (today,)))
     alive = dict(_q(con, "SELECT substr(date,1,4), count(*) FROM documents "
-                         "WHERE source='sfs' AND expired IS NULL "
+                         "WHERE source='sfs' AND " + in_force() + " "
                          "AND date BETWEEN '1900' AND ? GROUP BY 1", (today,)))
     yield Measure(
         26, "C", "Överlevnadskurva", "series", unit="procent",
@@ -522,7 +543,7 @@ def _group_c(con, s):
 
     dec = collections.Counter()
     for (date,) in _q(con, "SELECT date FROM documents WHERE source='sfs' "
-                           "AND expired IS NULL AND date > '1800'"):
+                           "AND " + in_force() + " AND date > '1800'"):
         dec[date[:3] + "0"] += 1
     yield Measure(
         30, "C", "Nya författningar per decennium", "bars", unit="författningar",
@@ -661,7 +682,7 @@ def _group_d(con, s):
     refs = dict(_q(con, "SELECT n, count(*) FROM (SELECT d.uri, "
                         "(SELECT count(*) FROM links l WHERE l.to_root = d.uri) n "
                         "FROM documents d WHERE d.source='sfs' "
-                        "AND d.expired IS NULL) GROUP BY n"))
+                        "AND " + in_force("d.expired") + ") GROUP BY n"))
     bins = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 11), (11, 26),
             (26, 101), (101, 10**9)]
     labels = ["0", "1", "2", "3", "4", "5", "6–10", "11–25", "26–100", ">100"]
@@ -898,7 +919,7 @@ def _group_g(con, s):
 _GROUPS = (_group_a, _group_b, _group_c, _group_d, _group_e, _group_f, _group_g)
 
 
-LIVE_SQL = "SELECT uri FROM documents WHERE source='sfs' AND expired IS NULL"
+LIVE_SQL = ("SELECT uri FROM documents WHERE source='sfs' AND " + in_force())
 
 
 def _in_force(con, scans):

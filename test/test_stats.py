@@ -7,6 +7,7 @@ page looks exactly like a right one.
 """
 
 import json
+import sqlite3
 
 from accommodanda.lib import layout
 from accommodanda.stats import charts, compute, render, scan
@@ -244,3 +245,27 @@ def test_the_snapshot_path_is_keyed_on_the_report_date():
     # it sits beside the live artifact, not on top of it
     assert p.parent.parent == layout.artifact("stats", "statistik").parent
     assert p != layout.artifact("stats", "statistik")
+
+
+def test_a_future_repeal_is_still_in_force():
+    # Ellag (1997:857) is repealed as of 2027-01-01 and is law until then. A bare
+    # `expired IS NULL` read it -- and 16 other live statutes, Konsumentkreditlagen
+    # among them -- as already gone, dropping them out of every gällande-rätt
+    # measure including "de kortaste lagarna". Same rule the search layer applies
+    # at query time (search.REPEALED_IN_FORCE).
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE documents (uri TEXT, expired TEXT)")
+    con.executemany("INSERT INTO documents VALUES (?, ?)", [
+        ("never", None),                 # never repealed
+        ("future", "2099-01-01"),        # repeal not yet in force -> still law
+        ("past", "2001-01-01"),          # repeal taken effect -> gone
+    ])
+    live = {u for (u,) in con.execute(
+        "SELECT uri FROM documents WHERE " + compute.in_force())}
+    dead = {u for (u,) in con.execute(
+        "SELECT uri FROM documents WHERE " + compute.repealed())}
+    assert live == {"never", "future"}
+    assert dead == {"past"}
+    # the two are complements: every row lands in exactly one
+    assert not live & dead
+    assert len(live | dead) == 3
