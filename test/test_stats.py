@@ -226,13 +226,20 @@ def test_bill_lag_joins_amendments_to_the_bills_they_cite():
 
 
 def test_the_page_shows_only_the_groups_that_were_measured():
+    # stats.html is 1:1 with the page: it names every measure explicitly and
+    # owns each one's title/lede/note; the artifact supplies only the numbers,
+    # by id. A subset artifact renders only the measures it carries, and a
+    # group with none measured disappears whole -- heading and nav entry alike.
     html = render.render_stats({
         "generated": "2026-07-28",
-        "measures": [{"id": 1, "group": "A", "title": "Antal & mått",
-                      "kind": "scalar", "value": 42, "note": "Bara gällande rätt."}]})
-    assert 'id="gA"' in html and 'id="gB"' not in html    # B measured nothing
-    assert "Antal &amp; mått" in html                     # titles are escaped
-    assert "Bara gällande rätt." in html                  # the caveat is on the page
+        "measures": [{"id": 22, "group": "C", "title": "Artefaktens egen titel",
+                      "kind": "scalar", "value": 42}]})
+    assert 'id="gC"' in html and 'id="gA"' not in html    # A measured nothing
+    assert 'href="#gC"' in html and 'href="#gA"' not in html   # nav follows suit
+    assert 'id="m22"' in html and 'id="m23"' not in html  # only measured ids
+    # the template's prose renders, not the artifact's presentation stamps
+    assert "Äldsta lagar som fortfarande gäller" in html
+    assert "Artefaktens egen titel" not in html
     assert "</p>'" not in html
 
 

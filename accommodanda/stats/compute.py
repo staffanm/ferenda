@@ -14,7 +14,11 @@ The population is gällande rätt unless a measure says otherwise: `_in_force`
 narrows ``laws`` once, and a measure that needs the whole history (churn,
 lifespan, how many acts have been repealed) asks for ``laws_all`` by name.
 
-Each measure's `lede` is its standing explanation and belongs to the measure.
+Each measure still stamps its `title`/`lede`/`note` into the artifact, which
+keeps the dated snapshots self-describing -- but the *page* takes its prose
+from stats.html (1:1 with what renders), except the ledes whose sentences
+embed measured values: those the template pulls from the artifact
+(``computed_lede``), so the words can never outrun the figures beside them.
 The `note` field -- a per-figure caveat about population -- is deliberately
 empty for now; the ledes carry what the reader needs, and notes are re-added
 case by case where a figure genuinely needs one.

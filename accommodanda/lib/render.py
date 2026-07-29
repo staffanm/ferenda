@@ -1754,27 +1754,6 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
 # page shells
 # --------------------------------------------------------------------------
 
-# masthead nav: label, browse route, the page kinds that mark it current
-MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
-            ("Rättsfall", "/dom/", ("Rättsfall",)),
-            ("Förarbeten", "/forarbete/", ("Proposition", "SOU", "Ds",
-             "Kommittédirektiv", "Förordningsmotiv", "Skrivelse", "Lagrådsremiss",
-             "Sveriges internationella överenskommelser", "Förarbete")),
-            ("Föreskrifter", "/foreskrift/", ("Föreskrift",)),
-            ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
-             "EU-domstolen", "Fördrag", "EU-rättsakt")),
-            ("Folkrätt", "/folkratt/", ("Folkrätt", "Europarådets fördrag",
-             "Internationell humanitär rätt", "FN-fördrag", "Europadomstolen",
-             "Internationella brottmålsdomstolen")),
-            ("Begrepp", "/begrepp/", ("Begrepp",)),
-            ("Om", "/om/", ("Om",)),
-            ("Nyheter", "/dataset/sitenews/feed/", ("Nyheter",)))
-
-
-# page.html's masthead reads MAST_NAV to mark the current section; set once
-# on the shared environment (lib.tpl)
-ENV.globals.update(MAST_NAV=MAST_NAV)
-
 # the partial macro libraries, exposed as template modules so Python-side
 # helpers can render a fragment (a banner, a panel, a rail row) exactly as an
 # extending template would

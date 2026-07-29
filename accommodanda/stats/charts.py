@@ -33,9 +33,10 @@ from ..lib import tpl
 from ..lib.render import escape
 from .model import Measure, Row
 
-# the vertical's own body markup (stats/templates/stats.html); shared with
-# stats.render, which assembles the page from the same macro set
-TPL = tpl.environment("accommodanda.stats").get_template("stats.html").module
+# the vertical's one template environment: the figure forms here
+# (figures.html), the page around them in stats.render (stats.html)
+ENV = tpl.environment("accommodanda.stats")
+TPL = ENV.get_template("figures.html").module
 
 # a sequential blue ramp, light -> dark, for the heat table's magnitude. Steps
 # 250-700 of the validated ramp: the lightest step still clears 2:1 on the light

@@ -1,74 +1,223 @@
-{#- Body markup for /statistik: the section nav, each measure's section, and
-    the HTML figure forms (bar table, heat table, hero number, the plotted
-    forms' accessibility table). The SVG figures stay in charts.py -- their
-    markup is coordinate math, not page structure. Chrome comes from
-    lib.render.page(). -#}
-{%- macro nav(entries) -%}
-<nav class="stat-nav" aria-label="Avsnitt"><ol>
-{%- for e in entries -%}
-<li><a href="#g{{ e.key }}">{{ e.title }}</a></li>
-{%- endfor -%}
-</ol></nav>
-{%- endmacro -%}
-{%- macro group(key, title, measures) -%}
-<section class="stat-group" id="g{{ key }}"><h2>{{ title }}</h2>{{ measures }}</section>
-{%- endmacro -%}
-{%- macro measure(id, title, lede, figure, note) -%}
+{#- The /statistik page, 1:1 with what renders: every measure is an
+    explicit stat() call below, in display order, carrying its title, lede
+    and note -- comment one out (or a whole group block) to drop it from
+    the page while tinkering, reorder freely. The numbers come from the
+    stats artifact; a measure the artifact has not computed is skipped
+    whole. The converse holds too: a measure computed but not named here
+    renders nowhere, so a new measure in compute.py needs a stat() call
+    added. A lede whose sentence embeds measured numbers is not frozen
+    prose -- those measures say computed_lede=true and take the lede the
+    artifact carries, so the figures on the page can never outrun the
+    words beside them. The nav and the section list are derived from the
+    group blocks that actually produced content, so an emptied group
+    disappears nav and all. -#}
+{% extends "page.html" %}
+{#- per-measure chrome: numbered heading, lede, figure, note. The visible
+    title is also handed to the figure renderer, so an SVG's accessible
+    name can never drift from the heading above it. -#}
+{%- macro stat(id, title, lede=None, note=None, computed_lede=False) -%}
+{%- if id in measures -%}
+{%- set lede_text = measures[id].get("lede") if computed_lede else lede -%}
 <section class="stat" id="m{{ id }}"><h3><span class="stat-no">{{ id }}</span> {{ title }}</h3>
-{%- if lede %}<p class="stat-lede">{{ lede }}</p>{% endif -%}
-{{ figure }}
+{%- if lede_text %}<p class="stat-lede">{{ lede_text }}</p>{% endif -%}
+{{ figure(measures[id], title) }}
 {%- if note %}<p class="stat-note">{{ note }}</p>{% endif -%}
 </section>
+{%- endif -%}
 {%- endmacro -%}
-{%- macro foot(generated) -%}
+{% block body %}
+{% set group_A %}
+{{ stat(1,
+        "De längsta lagarna",
+        lede="Kroppstext i tecken, per konsoliderad författning.") }}
+{{ stat(2,
+        "De kortaste lagarna",
+        lede="Samma mått, andra änden.") }}
+{{ stat(3,
+        "Flest paragrafer",
+        lede="Antal § per författning; kapitelantalet står som detalj.") }}
+{{ stat(4,
+        "Längsta och kortaste paragrafen",
+        computed_lede=true) }}
+{{ stat(5,
+        "Längsta och kortaste EU-artikeln",
+        computed_lede=true) }}
+{{ stat(6,
+        "Fördelningen av lagars längd",
+        lede="Formen är poängen: några få jättar och en mycket lång svans av tvåparagrafsförordningar.") }}
+{{ stat(7,
+        "Längsta och kortaste rubriken",
+        lede="Beteckningen räknas inte med — ”Ellag (1997:857)” är en rubrik på fem tecken, inte sexton.") }}
+{{ stat(8,
+        "Lagar med eget namn",
+        lede="Författningar som bär en etablerad förkortning (BrB, RB, ABL, IL) — kända nog att ha ett smeknamn.") }}
+{{ stat(9,
+        "Författningar per departement",
+        lede="Vem som äger regelmassan.") }}
+{{ stat(10,
+        "Hela svensk författningssamling i siffror",
+        computed_lede=true) }}
+{% endset %}
+{% set group_B %}
+{{ stat(11,
+        "De mest ändrade lagarna",
+        lede="Antal ändringsförfattningar i registret.") }}
+{{ stat(12,
+        "”Lag om ändring i lagen om ändring i lagen om…”",
+        lede="En ändringsförfattning kan ändra en ändringsförfattning som ändrar en annan. De längsta kedjorna i registret, räknat i led.") }}
+{{ stat(13,
+        "Ändringsförfattningen som rör flest lagar samtidigt",
+        lede="En enda författning kan skriva om hela regelmassan på en gång.") }}
+{{ stat(14,
+        "Lagar som aldrig har ändrats",
+        lede="Aldrig en enda ändring sedan de utfärdades.") }}
+{{ stat(15,
+        "Ändringar per år",
+        lede="Takten har legat stadigt kring tusen till tvåtusen ikraftträdda ändringar om året sedan 1970-talet.") }}
+{{ stat(16,
+        "Snabbast ändrade lag",
+        lede="Tiden från att lagen trädde i kraft till att den första ändringen gjorde det.") }}
+{{ stat(17,
+        "Lagar med äldst kvarvarande text",
+        lede="Gällande författningar vars senaste ändring ligger längst tillbaka — regelmassans orörda botten.") }}
+{{ stat(18,
+        "Lagtextens medelålder",
+        computed_lede=true) }}
+{{ stat(19,
+        "Den mest omskrivna enskilda paragrafen",
+        lede="Hur många gånger en och samma paragraf har fått ny lydelse.") }}
+{{ stat(20,
+        "Vad ändringar faktiskt gör",
+        lede="Fördelningen av registrets omfattningstext i kategorier. En ändringsförfattning kan göra flera saker och räknas då i flera.") }}
+{{ stat(21,
+        "Tidsmaskinens djup",
+        computed_lede=true) }}
+{% endset %}
+{% set group_C %}
+{{ stat(22,
+        "Äldsta lagar som fortfarande gäller",
+        lede="Regelmassans äldsta lager, fortfarande i kraft.") }}
+{{ stat(23,
+        "Längst levande upphävda lagar",
+        lede="Från utfärdande till upphävande.") }}
+{{ stat(24,
+        "Kortast levande lagar",
+        lede="Författningar som knappt hann träda i kraft.") }}
+{{ stat(25,
+        "Upphävanden per år",
+        lede="Hur mycket regelmassa som avvecklas varje år.") }}
+{{ stat(26,
+        "Överlevnadskurva",
+        lede="Av alla författningar utfärdade år X — hur stor andel gäller fortfarande idag? Kurvan är svensk lagstiftnings halveringstid.") }}
+{{ stat(27,
+        "Vilken dag träder svensk lag i kraft?",
+        lede="Ikraftträdandedatumen samlade på månad. Svensk lagstiftning har två hjärtslag om året — 1 januari och 1 juli — och nästan ingenting däremellan.") }}
+{{ stat(28,
+        "Hur långt varsel får en ny lag?",
+        computed_lede=true) }}
+{{ stat(29,
+        "Framtiden som redan är skriven",
+        lede="Ändringar som är beslutade men ännu inte i kraft — lagstiftning som redan finns men inte gäller.") }}
+{{ stat(30,
+        "Nya författningar per decennium",
+        lede="Bland dem som fortfarande gäller — vilket visar hur snabbt äldre lager tunnas ut snarare än hur mycket som skrevs.") }}
+{% endset %}
+{% set group_D %}
+{{ stat(31,
+        "Korpuset i siffror",
+        computed_lede=true) }}
+{{ stat(32,
+        "Mest hänvisade dokument",
+        lede="Inkommande länkar från hela korpuset.") }}
+{{ stat(33,
+        "Mest hänvisade enskilda paragraf",
+        lede="Ner på paragrafnivå — vilken enskild regel korpuset faktiskt talar om.") }}
+{{ stat(34,
+        "Dokument med flest utgående hänvisningar",
+        lede="Vilka dokument som citerar mest — utredningar, i praktiken.") }}
+{{ stat(35,
+        "Vem citerar vem",
+        lede="Hänvisningsmatrisen mellan källor. Förarbetenas hänvisningar till SFS dominerar allt annat.") }}
+{{ stat(36,
+        "Hur många hänvisar till en lag?",
+        computed_lede=true) }}
+{{ stat(37,
+        "Den mest självrefererande texten",
+        lede="Hänvisningar från ett dokument till sig självt.") }}
+{{ stat(38,
+        "Mest omtalade begrepp",
+        lede="Begreppen rankade på inkommande länkar — vad korpuset bråkar om.") }}
+{% endset %}
+{% set group_E %}
+{{ stat(39,
+        "Förarbeten per typ",
+        computed_lede=true) }}
+{{ stat(40,
+        "Förarbeten per år",
+        lede="Utgivningstakten, alla typer sammanslagna.") }}
+{{ stat(41,
+        "Tjockaste utredningen",
+        lede="Teckenantal per SOU.") }}
+{{ stat(42,
+        "Propositionen som ändrade flest lagar",
+        lede="En proposition kan skriva om hundratals lagar på en gång.") }}
+{{ stat(43,
+        "Från förslag till lag",
+        computed_lede=true) }}
+{{ stat(44,
+        "Volymen författningskommentar",
+        computed_lede=true) }}
+{{ stat(45,
+        "Paragrafmotsvarigheter",
+        lede="De spårade ”motsvarar / överförd från”-relationerna mellan gammal och ny lagtext — hur mycket av en ny lag som egentligen är gammal.") }}
+{% endset %}
+{% set group_F %}
+{{ stat(46,
+        "Avgöranden per domstol",
+        lede="Fördelningen över domstolar, avläst på referatbeteckningen.") }}
+{{ stat(47,
+        "Avgöranden per år",
+        lede="Publiceringstakten för refererad praxis.") }}
+{{ stat(48,
+        "Mest hänvisade rättsfall",
+        lede="Prejudikaten som faktiskt bär praxis.") }}
+{{ stat(49,
+        "Vilka lagrum domstolarna citerar mest",
+        lede="Bara hänvisningar som går från en dom till en författning.") }}
+{{ stat(50,
+        "Längsta och kortaste avgörandet",
+        computed_lede=true) }}
+{% endset %}
+{% set group_G %}
+{{ stat(51,
+        "Föreskrifter per myndighet",
+        computed_lede=true) }}
+{{ stat(52,
+        "Direktiven som satt djupast spår i svensk rätt",
+        lede="Antal svenska paragrafer som genomför direktivets artiklar.") }}
+{{ stat(53,
+        "Europakonventionen i svensk rätt",
+        lede="Vilka konventionsartiklar som faktiskt används.") }}
+{{ stat(54,
+        "Remissvaren",
+        computed_lede=true) }}
+{% endset %}
+{%- set groups = [
+    ("A", "Lagbokens storlek och form", group_A),
+    ("B", "Förändring och omsättning", group_B),
+    ("C", "Tid och livslängd", group_C),
+    ("D", "Hänvisningsgrafen", group_D),
+    ("E", "Förarbeten", group_E),
+    ("F", "Rättspraxis", group_F),
+    ("G", "Föreskrifter, remisser och omvärlden", group_G),
+] -%}
+<nav class="stat-nav" aria-label="Avsnitt"><ol>
+{%- for key, heading, body in groups if body | trim -%}
+<li><a href="#g{{ key }}">{{ heading }}</a></li>
+{%- endfor -%}
+</ol></nav>
+{% for key, heading, body in groups if body | trim %}
+<section class="stat-group" id="g{{ key }}"><h2>{{ heading }}</h2>{{ body }}</section>
+{% endfor %}
 <p class="stat-foot">Mätt {{ generated }} mot korpusen som den såg ut då. Varje siffra är räknad ur artefakterna och katalogen — inga uppskattningar utom där noten säger det.</p>
-{%- endmacro -%}
-{%- macro empty() -%}
-<p class="viz-empty">Inga värden.</p>
-{%- endmacro -%}
-{%- macro hero(display) -%}
-<p class="viz-hero">{{ display }}</p>
-{%- endmacro -%}
-{%- macro toplist(unit, items) -%}
-{#- ranked rows as a bar table; a `split` item is a group divider. The bar
-    is a background width on the value cell (--w). -#}
-<table class="viz-bars"><thead><tr><th scope="col">Vad</th><th scope="col" class="num">{{ unit }}</th></tr></thead><tbody>
-{%- for it in items -%}
-{%- if it.split -%}
-<tr class="viz-split"><th scope="rowgroup" colspan="2">{{ it.split }}</th></tr>
-{%- else -%}
-<tr><th scope="row">{% if it.href %}<a href="{{ it.href }}">{{ it.label }}</a>{% else %}{{ it.label }}{% endif %}
-{%- if it.detail %} <span class="viz-detail">{{ it.detail }}</span>{% endif -%}
-</th><td class="num"><span class="viz-bar" style="--w:{{ it.width }}%"></span><span class="viz-val">{{ it.val }}</span></td></tr>
-{%- endif -%}
-{%- endfor -%}
-</tbody></table>
-{%- endmacro -%}
-{%- macro heat(cols, rows) -%}
-{#- the heat table; each cell carries its precomputed log-ramp colour -#}
-<div class="viz-scroll"><table class="viz-heat"><thead><tr><th scope="col"><span class="vh">Från ↓ till →</span></th>
-{%- for col in cols -%}
-<th scope="col">{{ col }}</th>
-{%- endfor -%}
-</tr></thead><tbody>
-{%- for row in rows -%}
-<tr><th scope="row">{{ row.label }}</th>
-{%- for c in row.cells -%}
-{%- if c.nil -%}
-<td class="viz-nil"><span class="vh">—</span></td>
-{%- else -%}
-<td class="viz-cell{% if c.on_dark %} on-dark{% endif %}" style="--c:{{ c.color }}" title="{{ row.label }} → {{ c.col }}: {{ c.val }}"><span>{{ c.val }}</span></td>
-{%- endif -%}
-{%- endfor -%}
-</tr>
-{%- endfor -%}
-</tbody></table></div>
-{%- endmacro -%}
-{%- macro data_table(xlabel, unit, rows) -%}
-{#- the table view the accessibility pass requires beside a plotted form -#}
-<details class="viz-data"><summary>Visa som tabell</summary><div class="viz-scroll"><table class="viz-plain"><thead><tr><th scope="col">{{ xlabel }}</th><th scope="col" class="num">{{ unit }}</th></tr></thead><tbody>
-{%- for r in rows -%}
-<tr><th scope="row">{{ r.x }}</th><td class="num">{{ r.y }}</td></tr>
-{%- endfor -%}
-</tbody></table></div></details>
-{%- endmacro -%}
+{% endblock %}

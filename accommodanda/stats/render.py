@@ -1,38 +1,29 @@
 """Render the statistik artifact to ``/statistik``.
 
-A pure projection: everything on the page is in the artifact, and the only thing
-this module decides is presentation order and grouping. That is what makes the
-numbers auditable -- the page cannot say anything `compute` did not measure.
+The numbers are the artifact's: every figure, and every lede whose sentence
+embeds a measured value (``computed_lede`` in the template), comes from what
+`compute` measured -- that is what keeps the page auditable. The *page* is
+the template's: stats.html names each measure explicitly, in order, with its
+title and static prose, so presentation is edited there, 1:1 with what
+renders.
 
-The page is `solo` (single column, no TOC rail) with its own in-page navigation,
-because the reader's task here is browsing, not following a document.
+The page is `solo` (single column, no TOC rail) with its own in-page
+navigation, because the reader's task here is browsing, not following a
+document.
 """
 
 import json
 
-from markupsafe import Markup
-
 from ..lib import compress, layout
-from ..lib.render import page
+from ..lib.render import page_context
 from . import charts
 from .model import Cell, Measure, Point, Row
 
-GROUPS = (
-    ("A", "Lagbokens storlek och form"),
-    ("B", "Förändring och omsättning"),
-    ("C", "Tid och livslängd"),
-    ("D", "Hänvisningsgrafen"),
-    ("E", "Förarbeten"),
-    ("F", "Rättspraxis"),
-    ("G", "Föreskrifter, remisser och omvärlden"),
-)
-
 ARTIFACT_BASEFILE = "statistik"
 
-
-def _measure_html(m):
-    return charts.TPL.measure(m["id"], m["title"], m.get("lede"),
-                              charts.figure(_as_measure(m)), m.get("note"))
+# the page template (stats/templates/stats.html, extending lib's page.html);
+# it owns the measure catalog, order, prose and section layout
+_PAGE = charts.ENV.get_template("stats.html")
 
 
 def _as_measure(d):
@@ -50,21 +41,22 @@ def _as_measure(d):
 
 
 def render_stats(art):
-    by_group = {}
-    for m in art["measures"]:
-        by_group.setdefault(m["group"], []).append(m)
-    tpl = charts.TPL
-    body = tpl.nav([{"key": key, "title": title} for key, title in GROUPS
-                    if by_group.get(key)])
-    for key, title in GROUPS:
-        measures = by_group.get(key)
-        if measures:
-            body += tpl.group(key, title, Markup("").join(
-                _measure_html(m) for m in measures))
-    body += tpl.foot(art["generated"])
-    return page("Statistik om korpuset", "Statistik", "", body,
-                eyebrow="Siffror om svensk rätt", solo=True,
-                body_class=" site stats")
+    """The page template (stats.html) is 1:1 with the rendered page: it names
+    every measure explicitly, in order, with its title/lede/note -- this
+    function only hands it the measured numbers (by id) and the figure
+    renderer. A measure the artifact does not carry is skipped by the
+    template, so a subset artifact renders only what it measured."""
+    return _PAGE.render(page_context(
+        "Statistik över innehållet på lagen.nu", "Statistik", "",
+        eyebrow="Siffror om svensk rätt", solo=True,
+        body_class=" site stats",
+        measures={m["id"]: m for m in art["measures"]},
+        generated=art["generated"],
+        # the template hands its visible title along, so a figure's SVG
+        # accessible name follows the heading above it, not the artifact's
+        # own (now presentation-inert) title stamp
+        figure=lambda m, title: charts.figure(
+            _as_measure(dict(m, title=title)))))
 
 
 def write_stats(out_root):
