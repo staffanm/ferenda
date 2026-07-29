@@ -152,7 +152,7 @@ Current code layout (this three-layer split is now realized in the package):
 
 ```
 accommodanda/
-  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, render (+ tpl and the Jinja templates/ its markup lives in), layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
@@ -1037,6 +1037,18 @@ below is not optional polish, it's the only way they enter the corpus.
 
 ## 6. Derived layer + publishing ✅
 
+- ✅ **Render markup lives in Jinja templates** (2026-07-29). The whole
+  generate-phase markup — page chrome, per-source page bodies, the node
+  walk's leaf emissions, rail/panel/banner partials, every listing, plus the
+  site/stats verticals' bodies and the api ops/patch pages — moved from
+  `%`-format strings into templates (`lib/templates/`, per-vertical
+  `templates/`, `lib/tpl.py` environment; autoescape retired ~166 manual
+  `escape()` calls). Algorithmic emission stays Python by rule
+  (`rule:markup-in-templates`): `render_runs`, citation prose, `diff`,
+  charts SVG, Atom XML. Every phase was gated browser-equivalent against
+  the pre-port output by `tools/render_equivalence.py` (HTML5-normalizing
+  snapshot diff; 3,644-page sample, zero differences).
+
 The reborn `relate` + `generate` phases. Corpus-wide verbs in `build.py`'s
 CLI, special-cased outside the per-document `Stage` machinery — not because
 the deps are unbounded but because they don't fit the static per-doc protocol:
@@ -1110,8 +1122,9 @@ to a future per-doc incremental generate.
   three-column grid (TOC · reading column · context rail) that under 64rem
   becomes a single reading column with the side columns as drawers — the TOC an
   off-canvas left drawer, the rail a bottom sheet, opened from a fixed bottom
-  toolbar (Innehåll · Sök · Kontext, `render.MOBILE_BAR` + `lib/assets/
-  drawers.js`) while the masthead wraps (icon-only search, horizontally
+  toolbar (Innehåll · Sök · Kontext, the mobile bar in `lib/templates/
+  page.html` + `lib/assets/drawers.js`) while the masthead wraps (icon-only
+  search, horizontally
   scrollable nav) and scrolls away — a serif/sans type system on warm paper, and SFS §-numerals
   hung in a gutter with a permalink pilcrow. The big structural change is that
   **inbound is no longer floated inline next to each paragraph** — a `Rail`

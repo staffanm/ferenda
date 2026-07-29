@@ -200,6 +200,22 @@ Unused code is a maintenance tax and a false signal to the next reader
 the second caller exists — and delete dead code on sight rather than
 around it.
 
+### rule:markup-in-templates
+
+HTML that describes page or node *structure* lives in Jinja templates
+(`lib/templates/`, or a vertical's own `templates/` built via
+`lib.tpl.environment`); Python prepares display-ready values and never
+formats tags. The exception is *algorithmic emission* — markup whose
+repetition is driven per token or per data point by an algorithm:
+`render_runs` (one link per inline run, the hottest loop in the system),
+`diff._worddiff` (`<ins>/<del>` per word), the SVG geometry in
+`stats/charts.py`, the förarbete walk's fk-komm open/close pair. Those
+stay `%`-format Python and return `Markup`. Macros take raw values (a
+node id, a label), never pre-built attribute strings — piecemeal
+attribute assembly is where escaping bugs sneak past autoescape. Template
+edits re-stale generate via `GENERATE_CODE`; browser-level output
+equivalence is checked with `tools/render_equivalence.py`.
+
 ### rule:chain-dont-hold
 
 Temporary holding variables only where the benefit is obvious; chaining
