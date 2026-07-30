@@ -3812,7 +3812,15 @@ def _secondary_axis(source, primary_key, default):
 def _bucket_heading(source, levels, nodes):
     """The reading heading for a leaf bucket -- 'Författningar som börjar på A',
     'NJA – Högsta domstolen 2024', 'Förordningar 2016'. The eurlex Fördrag family
-    label is self-describing, so it stands alone rather than trailing 'Fördrag'."""
+    label is self-describing, so it stands alone rather than trailing 'Fördrag'.
+    A författningssamling heads by its official name + designation --
+    'Åklagarmyndighetens författningssamling (ÅFS)' (F2) -- with the year
+    appended only where the samling is year-partitioned."""
+    if source == "foreskrift":
+        info = facets.fs_series_info(nodes[0]["key"])
+        series = ("%s (%s)" % (info["title"], info["designation"]) if info
+                  else nodes[0]["label"])
+        return "%s %s" % (series, nodes[1]["label"]) if len(nodes) > 1 else series
     if len(levels) == 1:
         return "%s som börjar på %s" % (SOURCE_LABEL.get(source, source), nodes[0]["key"])
     if source == "eurlex" and nodes[0]["key"] == "treaty":
