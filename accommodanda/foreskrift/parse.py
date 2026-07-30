@@ -240,8 +240,9 @@ def extract_metadata(text, parser):
     meta["genomfor"] = sorted(genomfor)
     # upphäver: regulations an "ersätter/upphäver(s) …" clause replaces --
     # every clause, since the first "upphävs" in a document is often a bare
-    # provision repeal ("5 § upphävs") that names no regulation at all
-    meta["upphaver"] = sorted({regulation_uri(fs.lower(), y, str(int(n)))
+    # provision repeal ("5 § upphävs") that names no regulation at all.
+    # _fs_key, not lower(): 'ÅFS' must mint aafs/…, never a dangling åfs/…
+    meta["upphaver"] = sorted({regulation_uri(_fs_key(fs), y, str(int(n)))
                                for m in RE_ERSATTER.finditer(text)
                                for fs, y, n in RE_FS_REF.findall(m.group(1))})
     return meta
@@ -283,6 +284,49 @@ def _full_text(blocks):
     return "\n".join(text for _, text, _, _ in blocks)
 
 
+# the rubric a föreskrift opens its operative body with: '<Agency>s
+# föreskrifter om …; beslutade den …' (or 'Föreskrifter om ändring i …').
+# Everything up to the beslutade clause is the document's own title.
+RE_TITLE_BLOCK = re.compile(
+    r"^(.{5,400}?(?:föreskrifter|allmänna råd|kungörelse)[^;]{0,300}?)"
+    r"\s*;?\s*beslutade?\b", re.IGNORECASE | re.DOTALL)
+# link chrome a harvest title trails off into ('(pdf, 63 kB)', 'Pdf, 278.1 kB,
+# öppnas i nytt fönster.', a bare '.pdf') -- from the pdf token to the end
+RE_TITLE_CHROME = re.compile(r"\s*[,(]?\s*(?:pdf|\.pdf)\b.*$",
+                             re.IGNORECASE | re.DOTALL)
+# words that make a harvest "title" a role label, not a title
+RE_TITLE_BOILERPLATE = re.compile(
+    r"\b(?:grundförfattning|ändringsförfattning|konsoliderad(?:\s+version)?|"
+    r"öppnas|nytt\s+fönster)\b", re.IGNORECASE)
+
+
+def clean_title(raw, identifier):
+    """A harvest title stripped of link chrome and its own-designation prefix,
+    or None when nothing title-like remains ('.pdf', 'KKVFS 2025:1',
+    'Grundförfattning (MDFFS 2019:1)') -- many harvests hand us the PDF link's
+    text, which is file chrome rather than a title (F7). None sends the
+    caller to the PDF's own rubric (title_from_body)."""
+    t = RE_TITLE_CHROME.sub("", raw or "").strip()
+    if identifier:
+        t = re.sub(r"^%s\s*[-–—:]*\s*" % re.escape(identifier), "", t).strip()
+    # what remains once designations, numbers and role words go: a title has
+    # prose left, chrome does not
+    probe = re.sub(r"[\d\s:/().,–—-]+", "",
+                   RE_TITLE_BOILERPLATE.sub("", RE_FS_REF.sub("", t)))
+    return t if len(probe) >= 8 else None
+
+
+def title_from_body(blocks, start):
+    """The opening rubric of the operative body as the document title --
+    '<Agency>s föreskrifter om …' up to the 'beslutade den' clause -- or None
+    when the first blocks carry no such phrase."""
+    for _, text, _, _ in blocks[start:start + 3]:
+        m = RE_TITLE_BLOCK.match(" ".join(text.split()))
+        if m:
+            return m.group(1).rstrip(" ;,")
+    return None
+
+
 def parse_pdf(path, identifier, parser, patch_key=None):
     """One föreskrift PDF -> (structure tree, its metadata dict). Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
@@ -294,6 +338,8 @@ def parse_pdf(path, identifier, parser, patch_key=None):
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(_full_text(blocks[:start]) or _full_text(blocks))
+    # the body's own rubric, for records whose harvest title is link chrome (F7)
+    meta["title"] = title_from_body(blocks, start)
     return _structure(blocks[start:], parser), meta
 
 
@@ -461,14 +507,20 @@ def parse_record(record, root):
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none
     publisher = meta.pop("publisher", None) or record.get("publisher")
+    # a real harvest title wins (cleaned of link chrome); a chrome-only or
+    # missing one falls back to the PDF body's own rubric (F7)
+    body_title = meta.pop("title", None)
+    title = clean_title(record.get("title"), record["identifier"]) or body_title
     reg = Regulation(
         uri=regulation_uri(fs, arsutgava, lopnummer),
         identifier=record["identifier"], fs=fs,
         arsutgava=arsutgava, lopnummer=lopnummer,
-        title=record.get("title"), publisher=publisher,
+        title=title, publisher=publisher,
         source_url=record.get("url"),
         structure=structure, **meta)
-    if target := andrar_target(record.get("title") or "", fs, reg.uri):
+    # the resolved title, not the raw harvest one: for a chrome-titled record
+    # the ändring declaration lives in the body rubric just adopted above
+    if target := andrar_target(title or "", fs, reg.uri):
         reg.andrar = [target]
     # an "ersätter/upphäver …" clause restating the document's own designation
     # must not claim the regulation replaces itself (LIVSFS 2022:4 does this)

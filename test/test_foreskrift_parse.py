@@ -14,7 +14,8 @@ from accommodanda.foreskrift.parse import (classify, extract_metadata, _iso,
                                            _body_start, _dedupe_bemyndigande,
                                            konsoliderad_tom, _fresh_parser,
                                            amendment_uri, andrar_target,
-                                           masthead_amendments, parse_record)
+                                           masthead_amendments, parse_record,
+                                           clean_title, title_from_body)
 
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
@@ -175,6 +176,87 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
             "om säkerhetsskydd (PMFS 2019:2).")
     meta = extract_metadata(text, _fresh_parser())
     assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
+
+
+def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
+    # 'ÅFS' must mint aafs/… (the registered slug), never a dangling åfs/… --
+    # a naive lower() broke the repeal-subduing for every ÅFS/RÅFS document
+    text = ("Åklagarmyndighetens föreskrifter om expediering; "
+            "Föreskrifterna ersätter Åklagarmyndighetens föreskrifter "
+            "(ÅFS 2005:6) om expediering.")
+    meta = extract_metadata(text, _fresh_parser())
+    assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
+
+
+# --- titles: harvest link chrome vs the PDF's own rubric (F7) ----------------
+
+def test_clean_title_keeps_a_real_title_and_strips_link_chrome():
+    assert clean_title("Totalförsvarets rekryteringsmyndighets föreskrifter "
+                       "om totalförsvarsplikt (TRMFS 2017:1) pdf, 281 kB.",
+                       "TRMFS 2017:1") == \
+        ("Totalförsvarets rekryteringsmyndighets föreskrifter "
+         "om totalförsvarsplikt (TRMFS 2017:1)")
+    # a leading restatement of the record's own designation goes too
+    assert clean_title("SiSUVFS 2024:1 - Statens institutionsstyrelses "
+                       "föreskrifter om anvisning av plats",
+                       "SiSUVFS 2024:1") == \
+        "Statens institutionsstyrelses föreskrifter om anvisning av plats"
+
+
+def test_clean_title_rejects_chrome_only_titles():
+    # observed harvest "titles" that are file chrome or role labels, not titles
+    for raw, ident in [("DIFS 2018:1     (pdf, 63 kB)", "DIFS 2018:1"),
+                       ("TFS 2004:35 Pdf, 278.1 kB, öppnas i nytt fönster.",
+                        "TFS 2004:35"),
+                       (".pdf", "MRTVFS 2011:1"),
+                       ("2016:4", "SJÖFS 2016:4"),
+                       ("KKVFS 2025:1", "KKVFS 2025:1"),
+                       ("2023:1, M:11", "PRVFS 2023:1"),
+                       ("Grundförfattning (MDFFS 2019:1)", "MDFFS 2019:1"),
+                       (None, "EIFS 2011:1")]:
+        assert clean_title(raw, ident) is None, raw
+
+
+def test_title_from_body_reads_the_opening_rubric():
+    blocks = [("rubrik", "Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
+                         "lokalisering och verksamhetsområden; beslutade den "
+                         "1 december 2006.", 1, None),
+              ("stycke", "Åklagarmyndigheten föreskriver följande.", 1, None)]
+    assert title_from_body(blocks, 0) == \
+        ("Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
+         "lokalisering och verksamhetsområden")
+    assert title_from_body([("stycke", "1 § Denna föreskrift.", 1, None)], 0) is None
+
+
+def test_parse_record_mints_andrar_from_the_pdf_rubric(tmp_path, monkeypatch):
+    # a chrome-titled record whose body rubric declares the ändring: the
+    # andrar edge is minted from the resolved title, not the discarded chrome
+    monkeypatch.setattr(fp, "parse_pdf", lambda *a, **kw: ([], {
+        "title": "Föreskrifter om ändring i Konkurrensverkets föreskrifter "
+                 "(KKVFS 2021:1) om kartellbekämpning",
+        "upphaver": [], "bemyndigande": [], "genomfor": [], "andrar": [],
+        "beslutsdatum": None, "utkomFranTryck": None,
+        "ikrafttradandedatum": None, "publisher": None}))
+    record = {"fs": "kkvfs", "basefile": "kkvfs/2025:2",
+              "identifier": "KKVFS 2025:2",
+              "title": "KKVFS 2025:2 (pdf, 90 kB)",
+              "files": {"regulation": {"name": "r.pdf"}}}
+    reg = parse_record(record, tmp_path)
+    assert reg.title.startswith("Föreskrifter om ändring")
+    assert reg.andrar == ["https://lagen.nu/kkvfs/2021:1"]
+
+
+def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch):
+    monkeypatch.setattr(fp, "parse_pdf", lambda *a, **kw: ([], {
+        "title": "Konkurrensverkets föreskrifter om kartellbekämpning",
+        "upphaver": [], "bemyndigande": [], "genomfor": [], "andrar": [],
+        "beslutsdatum": None, "utkomFranTryck": None,
+        "ikrafttradandedatum": None, "publisher": None}))
+    record = {"fs": "kkvfs", "basefile": "kkvfs/2025:1",
+              "identifier": "KKVFS 2025:1", "title": "KKVFS 2025:1",
+              "files": {"regulation": {"name": "r.pdf"}}}
+    reg = parse_record(record, tmp_path)
+    assert reg.title == "Konkurrensverkets föreskrifter om kartellbekämpning"
 
 
 # --- amendments: minted uris + preserved source urls (review C3) -------------
