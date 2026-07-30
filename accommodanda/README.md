@@ -109,7 +109,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `pins.py` | citation-shaped query → search-hit-shaped resolved targets (`resolved_results`/`merge_pinned`), shared by the REST `/search` endpoint and the MCP `search`/`resolve_citation` tools |
 | `resolve.py` | turns a ⌘K query into a precise, fragment-deep resource target — three resolvers (SFS/EU-act/case nicknames + citation-engine pinpoints) over `lib.datasets` |
 | `layout.py` | single source of truth for where a `(source, basefile)` document lives, on disk and on the web (`downloaded`/`artifact`/`page_relpath`/`page_url`); `resolve_basefile(source, basefile, *alternates)` settles a cross-source basefile against the artifact tree: case-insensitive respelling (regeringen.se prints a diarienummer's department prefix inconsistently across its own pages — "JU2026/01595" vs "Ju2026/01595"), plus further candidates tried in order, since a remiss page cannot tell whether forarbete keyed a promemoria on its dnr or on the landing slug (~30% are slug-keyed), used by `remisser/ai_analyze.py` and `render.py`'s `_remiss_indexes` |
-| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`) that ship in the package tree |
+| `datasets.py` | canonical filesystem paths of the curated named-resource datasets (`NAMEDLAWS`/`NAMEDACTS`/`NAMEDCASES`/`NAMEDEUCASES`/`COE_NAMES`/`ICRC_NAMES`/`UNTC_TREATIES`/`ICC_DECISION_TYPES`/`FS_SERIES`) that ship in the package tree |
 | `concepts.py` | begrepp (concept) normalization — a hand-rolled, corpus-aware Swedish de-inflector collapsing inflected term forms onto one canonical `begrepp/<Name>`, plus the hand-edited override file `data/begrepp_aliases.json` |
 | `diff.py` | the "jämför lydelser" version-diff view — block-align + word-level `<ins>`/`<del>` over two parsed artifact versions, computed on demand |
 | `history.py` | read layer over the SFS version-history sidecar + amendment-register join, shared by the renderer's compare panel and `/api/v1/document/versions` |
@@ -163,7 +163,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 |---|---|
 | `model.py` | `Beslut` model; URI = `avg/{org}/{dnr}`, byte-identical to what MYNDIGHETSBESLUT citations mint |
 | `download.py` | JO harvester (jo.se WordPress admin-ajax search API + decision PDFs), JK harvester (jk.se listing → per-decision landing pages; `jk_canonical` dnr normalization) and ARN harvester (arn.se one-page vägledande-beslut listing → decision PDFs; a live record overwrites a frozen-import one); also owns the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`jo_officialreport_path` and `RE_ARN_DNR` (moved here from the deleted `legacy.py`, §7g teardown 2026-07-19) — `jo_officialreport_path` is the JO ämbetsberättelse citation map (`jo/.officialreport.json`) re-housed beside the JO records, since jo.se itself never published it |
-| `parse.py` | JO/ARN: PDF body via `lib/pdftext` (bold rubriker; JO's "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); all citation-scanned with the DV parse-type set |
+| `parse.py` | JO/ARN: PDF body via `lib/pdftext` (bold rubriker; JO's "Beslutet i korthet" abstract); JK: landing-page `div.content` (strong→section, em→subsection); all citation-scanned with the DV parse-type set. An ARN referat's "title" is really its preamble paragraph, so the page heads on its first sentence (`lib/labels.first_sentence`, Swedish-abbreviation-aware — "s.k.", "kap.", a bare number don't end it) while the whole preamble still renders as the summary (`render.render_avg`) |
 
 **foreskrift vertical (agency regulations)**
 | File | What |
@@ -172,7 +172,19 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `harvest.py` | per-agency enumerate/resolve architectures (indexed/paginated/json/sitemap enumerators; landing/direct resolvers + file classifiers) wired onto `lib/harvest.py`'s shared `walk`/`HarvestWatermark` loop; `Agency.browser` selects `lib/browser.py` without changing the loop |
 | `skvfs.py` / `mtfs.py` | pure catalogue/identity rules plus protected resolvers for the two F5/Shape sources; SKVFS resolves a detail page then its exact PDF and also emits the RSFS predecessor, while MTFS headings point directly to PDFs |
 | `download.py` | the `lagen foreskrift download` front over the engine (`--full`, `--only`; closed-series fs are a logged no-op) |
-| `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (the closed series' bodies are ordinary corpus PDFs, `parse.body_path` resolves them under the download tree like any harvested source); a record's konsoliderad PDFs parse into the artifact's `consolidations` (deduped, cutoff pinned by `konsolideradTom`, the agency's PDF url retained) — the latest parsed one becomes the presented reading text (`lib/text.presented_consolidation`), and when the base text is also parsed the parse run emits a `.grund.json` sidecar that generate renders as the uncatalogued as-enacted page at `{uri}/grund` (`layout.foreskrift_grund_pages`, the SFS `.versions.json` pattern) |
+| `model.py` / `structure.py` / `parse.py` | as-published `Foreskrift` model, PDF → statute-shaped structure → artifact (the closed series' bodies are ordinary corpus PDFs, `parse.body_path` resolves them under the download tree like any harvested source); a record's konsoliderad PDFs parse into the artifact's `consolidations` (deduped, cutoff pinned by `konsolideradTom`, the agency's PDF url retained) — the latest parsed one becomes the presented reading text (`lib/text.presented_consolidation`), and when the base text is also parsed the parse run emits a `.grund.json` sidecar that generate renders as the uncatalogued as-enacted page at `{uri}/grund` (`layout.foreskrift_grund_pages`, the SFS `.versions.json` pattern); `parse.clean_title`/`title_from_body` fall back to the PDF body's own opening rubric ("…s föreskrifter om …; beslutade den …") when the harvest title is link chrome ("pdf, 63 kB") rather than prose; `_fs_key`, not a bare `.lower()`, mints an `upphaver` target's slug, so a designation printed with an accent (ÅFS) folds to its registry slug (`aafs`) instead of a dangling literal one |
+| `data/series.json` | the hand-edited författningssamling registry (`lib/datasets.FS_SERIES`/`load_fs_series`): printed designation, official title and, for a series whose agency was renamed or absorbed, the `successor` slug (DIFS → IMYFS). Drives the browse (`lib/facets.py`): a samling heads by official name + designation rather than its internal slug, orders Swedish-alphabetically (ÅFS after Z, `_fs_order`), and a succeeded series folds its documents under the successor with a note naming the predecessor(s) (`fs_predecessors`) |
+
+`foreskrift` and `avg` share one masthead entry, **Myndigheter**
+(`/myndigheter/`, `render.render_myndigheter`) — a landing introducing
+föreskrifter and avgöranden side by side, each linking into its own browse
+tree (`lib/tpl.py`'s `MAST_NAV`, replacing the old "Föreskrifter" entry, which
+left avgöranden unreachable from the chrome). A föreskrift samling under 200
+documents (amendments included) lists on one page; at or above it keeps
+per-year pages with the year selector as a banner atop the list, not the left
+nav (`build.generate_browse`'s `FS_YEAR_SPLIT_MIN`); an ändringsförfattning
+nests under its base regulation instead of listing separately
+(`catalog.andrar_edges`, `facets._fold_fs_amendments`).
 
 **eurlex vertical (EU law — EUR-Lex / CELLAR)**
 | File | What |

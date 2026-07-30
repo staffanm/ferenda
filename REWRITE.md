@@ -576,6 +576,14 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
 - 💤 **Bold/italic runs — N/A for SFS** (investigated): no emphasis markup in the JSON
   source or any of the 11,056 golden XHTMLs. A formatting-bearing-source concern (the
   DV/POI `bold` flag, §4), already supported by `Ref.kind` where it occurs.
+- ✅ **Context rail — Ändringar restored (2026-07-30).** The legacy pipeline's
+  per-provision "Ändringar" accordion is back: each paragraf's rail lists the
+  SFSR register posts whose Omfattning names it — "Ändrad: SFS 2011:864 (Prop.
+  2010/11:158)" — link into the bottom-of-page register and, where hosted, the
+  proposition (`render.amendment_index` over the artifact's register,
+  `Rail._andringar`). Unlike the legacy accordion it does not silently drop an
+  amendment with no registered proposition. `test/test_site.py`
+  (`test_paragraf_rail_shows_amendment_history`).
 
 ---
 
@@ -2259,6 +2267,30 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `rafs`); and layout's föreskrift slug grammar gained the two non-`-fs`
   series (`bfnar`, `rams`), which had been silently falling through to the
   SFS page branch (locked by a registry↔grammar test).
+- ✅ **Browse polish (2026-07-30).** A new hand-edited registry,
+  `foreskrift/data/series.json` (`lib/datasets.FS_SERIES`/`load_fs_series`:
+  designation, official title, an optional `successor` slug), drives what the
+  browse shows instead of the raw fs slug: a samling heads by its official
+  name + printed designation ("Åklagarmyndighetens författningssamling
+  (ÅFS)") and orders Swedish-alphabetically (ÅFS after Z, `facets._fs_order`)
+  rather than ASCII; a series whose agency was renamed or absorbed (DIFS →
+  IMYFS, SRVFS → MSBFS → MCFFS, …) folds its documents under the successor,
+  with a note naming the predecessor(s) (`facets.fs_predecessors`,
+  `_fs_live_map` fails fast on a cyclic entry). Every ändringsförfattning now
+  nests under its base regulation instead of listing separately
+  (`catalog.andrar_edges`, `facets._fold_fs_amendments`); a samling under 200
+  documents (amendments included) lists on one page, at or above it keeps
+  per-year pages with the year selector as a banner atop the list rather than
+  in the left nav (`lib/render.generate_browse`'s `FS_YEAR_SPLIT_MIN`). Separately,
+  `parse.clean_title`/`title_from_body` fall back to the PDF body's own
+  opening rubric as the title when the harvest title is link chrome ("pdf, 63
+  kB") rather than prose, and `upphaver` targets now fold a designation
+  through `_fs_key` instead of a bare `.lower()` (ÅFS mints `aafs/…`, not a
+  dangling `åfs/…`). `test/test_foreskrift_parse.py`,
+  `test/test_site.py` (`test_foreskrift_browse_nests_amendments_under_base`,
+  `test_foreskrift_succeeded_series_folds_into_successor`,
+  `test_foreskrift_small_series_gets_one_index_page`,
+  `test_foreskrift_large_series_partitions_by_year_with_top_axis`).
 
 ### 7f. avg vertical — JO + JK + ARN myndighetsavgöranden ✅ (first cut)
 
@@ -2372,6 +2404,25 @@ now have internal targets.
   froze the pre-2016 ASP.NET skin, so `jk_body` gained a
   `beslutmetadatacontainer`-anchored skin reader. All 37 parse clean;
   ARN needed nothing (0 missing after the join).
+- ✅ **ARN preamble-as-title (2026-07-30).** An ARN referat's "title" is in
+  fact its preamble paragraph, not a heading — the page now heads on its
+  first sentence (`lib/labels.first_sentence`, Swedish-abbreviation-aware:
+  "s.k.", "kap.", a bare number don't end the sentence) while the whole
+  preamble still renders as the summary above the referat text
+  (`render.render_avg`). En route, `lib/pdftext.page_paragraphs`' running-header
+  strip was over-matching: a body line that merely *contains* the referat's
+  own identifier ("Allmänna reklamationsnämnden gjorde följande bedömning")
+  was losing "Allmänna reklamationsnämnden" to the header pattern; it now
+  strips only a line that *is* the header (identifier + at most a page
+  number/date). `test/test_pdftext.py`, `test/test_site.py`
+  (`test_arn_page_heads_with_first_sentence_and_keeps_preamble`,
+  `test_avg_meta_drops_avgjord_av`).
+- ✅ **`/myndigheter/` landing (2026-07-30, T1).** avgöranden had no path in
+  from the chrome at all; the masthead's "Föreskrifter" entry is now
+  "Myndigheter" (`lib/tpl.py`'s `MAST_NAV`) and lands on a new page
+  (`render.render_myndigheter`) introducing föreskrifter and avgöranden side
+  by side, each linking into its own browse tree. `test/test_site.py`
+  (`test_myndigheter_landing_links_both_collections`).
 
 ### 7g. Frozen legacy corpora — imported, scaffolding torn down ✅ (plan 2026-07-01; teardown 2026-07-19)
 
@@ -3209,14 +3260,14 @@ rewrite work.
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
-| `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan) |
-| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
+| `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary) |
+| `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine; `clean_title`/`title_from_body` fall back to the PDF's own opening rubric when the harvest title is link chrome), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors), `data/series.json` (hand-edited designation/official-title/successor registry, `lib/datasets.FS_SERIES` — drives the browse's headings, Swedish ordering and succession folding, `lib/facets.py`). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss` keyed on the *referred document's* own identity, `basefile = "<typ>/<identifier>"` — not the regeringen.se ärende-page slug, kept in `url` — plus `Remissinstans`/`Remissvar`, `org_slug`, `Remiss.externt_dokument`), `download` (regeringen.se `/remisser/` sync over the AJAX filter listing (`REMISS_CATEGORY`, not the decorative `?p=N`); `parse_arende` raises rather than minting a stub identity when an ärende remits a regeringen-published document of an unrecognised doctype; `pm`/`lr` cross-refs resolved via `lib.regeringen`'s shared identity rules; the examined-ärende index `layout.REMISSER_SEEN` — keyed by URL slug, since only the ärende page names the remitted document — drives the sweep, `until` = deadline + grace period; `sync`'s shared `_poll` step + `sync_one`/`--only`, both gated by `externt_dokument` for ärenden whose remitted document regeringen didn't publish), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`, joined to forarbete via `layout.resolve_basefile`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
 | `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar/forarbete (`ai-genomforande`) `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`), `ul.list--block` listing walk (`listing_items`), and the identity rules for the two series-numberless doctypes (`pm_identity`, `lr_identity`) so `forarbete/download.py` and `remisser/download.py` mint the same basefile for the same document from different pages |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
-| `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
+| `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — a line is stripped only when it *is* the header (identifier + at most a page number/date), not merely when it contains the identifier; `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify` |
 | `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`/`catalog_root` — the latter decoupling `catalog.sqlite`'s location from the bulk corpus, env `CATALOG_ROOT`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
 | `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py`, `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py` | EU parser, defined-terms and case-naming suites |
