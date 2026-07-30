@@ -4,13 +4,19 @@
     prose lines (_citer_line and the margins) are algorithmic sentence
     building and stay in Python; they arrive here as Markup <li> lines. -#}
 {%- macro rail_sections(sections) -%}
-{#- one <details> per section, highest-priority first and open; data-label/
-    data-n feed the client's collapsed stub line -#}
+{#- one <details> per foldable section (the first one open; scrollspy keeps
+    at most one open thereafter); a flat section shows its body inline under
+    its label, no fold. data-label/data-n feed the client's collapsed stub
+    line either way. -#}
 {%- for sec in sections -%}
-<details class="rail-sec {{ sec.key }}" data-sec="{{ sec.key }}" data-label="{{ sec.label }}" data-n="{{ sec.count }}"{% if loop.first %} open{% endif %}><summary><span class="rail-sec-h">{{ sec.label }}</span>
+{%- if sec.flat -%}
+<div class="rail-sec rail-sec-flat {{ sec.key }}" data-sec="{{ sec.key }}" data-label="{{ sec.label }}" data-n="{{ sec.count }}"><span class="rail-sec-h">{{ sec.label }}</span>{{ sec.html }}</div>
+{%- else -%}
+<details class="rail-sec {{ sec.key }}" data-sec="{{ sec.key }}" data-label="{{ sec.label }}" data-n="{{ sec.count }}"{% if sec.open %} open{% endif %}><summary><span class="rail-sec-h">{{ sec.label }}</span>
 {#- a lone item counts itself; the number would only add noise -#}
 {%- if sec.count > 1 %}<span class="rail-sec-n">{{ sec.count }}</span>{% endif -%}
-</summary>{{ sec.html }}</details>
+<span class="rail-sec-chevron" aria-hidden="true"></span></summary>{{ sec.html }}</details>
+{%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}
 {%- macro capped_list(lines, cap, word) -%}

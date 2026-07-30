@@ -2080,9 +2080,14 @@ def test_act_rail_links_articles_and_subarticles_to_recitals(monkeypatch, tmp_pa
     # (dotted node ids -- the "4.1"/"4.1.a" grammar the renderer mints)
     assert island["4.1"] and 'href="#recital-1"' in island["4.1"]
     assert island["4.1.a"] and 'href="#recital-2"' in island["4.1.a"]
-    # recital -> back to the articles it underpins, plus its thematic group
+    # recital -> back to the articles it underpins, shown inline (no fold) as
+    # a flat section; the thematic group is NOT repeated in the rail -- the
+    # group heading inserted in the recital text already says it
     assert 'href="#4"' in island["recital-1"]
-    assert "Bakgrund och syfte" in island["recital-1"]
+    assert "rail-sec-flat" in island["recital-1"]
+    assert "Relevant artikel" in island["recital-1"]
+    assert "Bakgrund och syfte" not in island["recital-1"]
+    assert "<details" not in island["recital-1"]
 
 
 def test_act_toc_has_preamble_section_with_group_titles(monkeypatch, tmp_path):

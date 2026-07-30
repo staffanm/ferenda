@@ -507,8 +507,8 @@ p.redaktionell { font-family: var(--serif); font-style: italic;
 /* -- Rail accordion: one <details> per kind of context, the highest-priority
    one open (C3). Only the open row costs vertical space, so a paragraf with
    commentary, case law and a hundred citations still reads at a glance. -- */
-details.rail-sec { border-top: 1px solid var(--rule-soft); }
-details.rail-sec:first-of-type { border-top: 0; }
+.rail-sec { border-top: 1px solid var(--rule-soft); }
+.rail-h + .rail-sec { border-top: 0; }
 details.rail-sec > summary { display: flex; align-items: baseline; gap: .4rem;
                              cursor: pointer; list-style: none;
                              padding: .45rem 0; }
@@ -519,6 +519,18 @@ details.rail-sec[open] > summary { padding-bottom: .25rem; }
               color: var(--ink-3); }
 .rail-sec-n { margin-left: auto; font-size: .72rem; color: var(--ink-4);
               font-variant-numeric: oldstyle-nums; }
+/* the fold affordance: a chevron that points down when the row is open --
+   without it nothing said the rows were accordions at all */
+.rail-sec-chevron { flex: none; align-self: center; width: .5em; height: .5em;
+                    border-right: 1.5px solid var(--ink-4);
+                    border-bottom: 1.5px solid var(--ink-4);
+                    transform: rotate(-45deg); transition: transform .15s ease; }
+.rail-sec-chevron { margin-left: auto; }       /* right-aligned when no count */
+.rail-sec-n + .rail-sec-chevron { margin-left: .1rem; }
+details.rail-sec[open] > summary .rail-sec-chevron { transform: rotate(45deg); }
+/* a flat section: its body inline under the label, no fold */
+.rail-sec-flat { padding: .45rem 0 .4rem; }
+.rail-sec-flat > .rail-sec-h { display: block; margin-bottom: .2rem; }
 details.rail-sec > ul { list-style: none; margin: 0 0 .5rem; padding: 0; }
 details.rail-sec > ul > li { margin: .15rem 0; line-height: 1.4; }
 /* every case-law group reads in the case colour, wherever the court sits */
@@ -913,9 +925,15 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
                            transition: transform .25s ease; }
 
   /* context rail: a bottom sheet -- scrollspy keeps it synced to the
-     reading position, so opening it shows the context for where you are */
+     reading position, so opening it shows the context for where you are.
+     The sheet scrolls its own content (a panel taller than 70vh was simply
+     cut off before), and overscroll-behavior keeps a swipe inside it from
+     scrolling the document underneath -- while a swipe on the visible page
+     above the sheet still scrolls the document, as before */
   .rail { position: fixed; z-index: 60; left: 0; right: 0; bottom: 0; top: auto;
-          max-height: 70vh; background: var(--surf);
+          max-height: 70vh; overflow-y: auto; overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          background: var(--surf);
           border-top: 1px solid var(--rule);
           border-radius: 12px 12px 0 0;
           box-shadow: 0 -12px 40px var(--shadow-modal);

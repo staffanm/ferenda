@@ -1189,6 +1189,10 @@ class RailSection:
     label: str      # what the accordion row is called
     count: int      # items in it, shown beside the label and in the stub line
     html: str       # the body; headingless, the <summary> carries the label
+    # a flat section renders its body inline under its label, no accordion --
+    # for context light enough that a fold would cost more than it saves
+    # (a recital's one relevant-article link)
+    flat: bool = False
 
 
 # Which context a reader wants first when a node carries several kinds. The
@@ -1201,7 +1205,7 @@ RAIL_SECTION_ORDER = (
     "kommentar", "fk", "dv", "avg", "hudoc", "icc", "eu-caselaw", "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
-    "vagledning", "grupp", "skal", "tidigare-beteckning", "motsvarighet")
+    "vagledning", "skal", "tidigare-beteckning", "motsvarighet")
 
 
 def _rail_rank(section):
@@ -1222,20 +1226,25 @@ def merge_rail_sections(sections):
         merged[(sec.key, sec.label)] = RailSection(
             sec.key, sec.label,
             (prev.count if prev else 0) + sec.count,
-            (prev.html if prev else "") + sec.html)
+            (prev.html if prev else "") + sec.html,
+            flat=sec.flat)
     return list(merged.values())
 
 
 def render_rail_sections(sections):
-    """A panel body: every section as an accordion row, highest-priority first
-    and open, the rest collapsed (partials/rail.html). The `data-label`/
-    `data-n` attributes are what the client reads to compose a location's
-    collapsed stub line, so the summary never drifts from the panel it
-    summarises."""
+    """A panel body: every section as an accordion row -- except the flat
+    ones, shown inline -- with the highest-priority foldable row open and the
+    rest collapsed (partials/rail.html; scrollspy keeps at most one open
+    thereafter). The `data-label`/`data-n` attributes are what the client
+    reads to compose a location's collapsed stub line, so the summary never
+    drifts from the panel it summarises."""
+    ordered = sorted(merge_rail_sections(sections), key=_rail_rank)
+    first_foldable = next((s for s in ordered if not s.flat), None)
     return _RAIL.rail_sections(
         [{"key": sec.key, "label": sec.label, "count": sec.count,
-          "html": Markup(sec.html)}
-         for sec in sorted(merge_rail_sections(sections), key=_rail_rank)])
+          "html": Markup(sec.html), "flat": sec.flat,
+          "open": sec is first_foldable}
+         for sec in ordered])
 
 
 class Rail:
@@ -2608,20 +2617,22 @@ def _recital_links_sections(recitals):
 
 
 def _recital_context_sections(editorial, n):
-    """Rail panel for a recital: its thematic group and the articles it underpins
-    (the back half of the article<->recital round-trip)."""
-    parts = []
-    g = editorial.group_of.get(n)
-    if g:
-        parts.append(RailSection("grupp", "Tematisk grupp", 1,
-                                 escape(g["label"])))
+    """Rail panel for a recital: the articles it underpins (the back half of
+    the article<->recital round-trip), inline rather than behind a fold --
+    one or two links carry their own weight. The thematic group is *not*
+    repeated here: the group heading inserted in the recital text already
+    says it."""
     articles = editorial.recital_articles.get(n)
-    if articles:
-        links = "".join('<a href="#%s">artikel %s</a>' % (escape(a), escape(a))
-                        for a in articles)
-        parts.append(RailSection("skal", "Förklarar", len(articles),
-                                 '<div class="skal-links">%s</div>' % links))
-    return parts
+    if not articles:
+        return []
+    links = "".join('<a href="#%s">artikel %s</a>' % (escape(a), escape(a))
+                    for a in articles)
+    return [RailSection("skal",
+                        "Relevanta artiklar" if len(articles) > 1
+                        else "Relevant artikel",
+                        len(articles),
+                        '<div class="skal-links">%s</div>' % links,
+                        flat=True)]
 
 
 def _eurlex_marker(t, num):

@@ -77,7 +77,7 @@
     function stubLine(html) {
       var probe = document.createElement('div');
       probe.innerHTML = html;
-      var secs = probe.querySelectorAll('details.rail-sec');
+      var secs = probe.querySelectorAll('.rail-sec');
       if (!secs.length) return null;
       var line = document.createElement('button');
       line.type = 'button';
@@ -249,6 +249,18 @@
   }
 
   window.lagenScrollspy = spy;
+
+  // one rail section open at a time: opening an accordion row closes its
+  // sibling rows in the same panel. Scoped to siblings, so the nested "+N
+  // fler" disclosures inside a section are untouched and split-view panes
+  // stay independent of each other. `toggle` does not bubble -- capture.
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d.matches || !d.matches('details.rail-sec') || !d.open) return;
+    Array.prototype.forEach.call(d.parentElement.children, function (sib) {
+      if (sib !== d && sib.matches('details.rail-sec[open]')) sib.open = false;
+    });
+  }, true);
 
   var body = document.querySelector('.gr-body');
   if (body) spy(body, lagenDom.island(document));
