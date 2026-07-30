@@ -875,6 +875,20 @@ def test_foreskrift_small_series_gets_one_index_page(tmp_path):
     assert re.search(r'fs-andringar">Ändringar: <a href="/aafs/2006:11"', html)
 
 
+def test_myndigheter_landing_links_both_collections(tmp_path):
+    # T1: /myndigheter/ introduces föreskrifter and avgöranden side by side,
+    # and the masthead's Myndigheter entry points at it
+    con = _fs_browse_catalog(tmp_path)
+    out = tmp_path / "site"
+    render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
+    html = compress.read_text(out / "myndigheter" / "index.html")
+    assert "<h2>Föreskrifter</h2>" in html
+    assert '<a href="/foreskrift/">' in html
+    assert "<h2>Myndighetsavgöranden</h2>" in html
+    assert '<a href="/avg/">' in html
+    assert re.search(r'<a href="/myndigheter/"[^>]*>Myndigheter</a>', html)
+
+
 def test_foreskrift_large_series_partitions_by_year_with_top_axis(tmp_path):
     # F4: at/over the threshold the years split into pages, selected from a
     # banner above the list (like the folkrätt Dokumenttyp axis), not the left nav

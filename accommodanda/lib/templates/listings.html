@@ -58,6 +58,21 @@
 {#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
 {{ top_axis_nav("Dokumenttyp", entries, active_id) }}
 {%- endmacro -%}
+{%- macro myndigheter_body(fs, organs) -%}
+{#- the /myndigheter/ landing (T1): what förvaltningsmyndigheterna produce --
+    föreskrifter and avgöranden -- introduced side by side, each linking into
+    its own browse tree -#}
+<section class="folkratt-group"><h2>Föreskrifter</h2>
+<p>{{ fs.count }} föreskrifter ur {{ fs.series }} författningssamlingar.</p>
+<p><a href="/foreskrift/">Bläddra bland föreskrifterna →</a></p></section>
+<section class="folkratt-group"><h2>Myndighetsavgöranden</h2>
+<ul class="facet-list">
+{%- for label, url, count in organs -%}
+<li><a href="{{ url }}">{{ label }} <span class="c">{{ count }}</span></a></li>
+{%- endfor -%}
+</ul>
+<p><a href="/avg/">Bläddra bland avgörandena →</a></p></section>
+{%- endmacro -%}
 {%- macro feed_page_body(atom, entries) -%}
 {#- the human-readable twin of an Atom document -#}
 <p class="feed-link"><a href="{{ atom }}">Atom-flöde</a></p>

@@ -3284,6 +3284,21 @@ def _document_edit_meta(source, art):
     return ""                            # dv / avg pages host no editable content
 
 
+def render_myndigheter(con):
+    """The /myndigheter/ landing (T1): what förvaltningsmyndigheterna produce
+    -- föreskrifter and avgöranden -- introduced side by side, each linking
+    into its own browse tree. The masthead's Myndigheter entry lands here."""
+    fs = facets.tree(con, "foreskrift")
+    avg = facets.tree(con, "avg")
+    body = _LISTS.myndigheter_body(
+        {"count": sum(b["count"] for b in fs["buckets"]),
+         "series": len(fs["buckets"])},
+        [(b["label"], _browse_url("avg", [b["slug"]]), b["count"])
+         for b in avg["buckets"]])
+    return page("Myndigheter", "Myndigheter", "", body, solo=True,
+                eyebrow="Föreskrifter och avgöranden")
+
+
 def render_document(art, source, site):
     # kommentar is not here -- it is an annotation rendered into statute rails
     # (generate_site skips it), not a page of its own
@@ -4221,6 +4236,10 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
     folkratt_dir = out_root / "folkratt"
     folkratt_dir.mkdir(parents=True, exist_ok=True)
     compress.write_text(folkratt_dir / "index.html", render_folkratt(con),
+                        encodings=compress.PAGE_ENCODINGS)
+    myndigheter_dir = out_root / "myndigheter"
+    myndigheter_dir.mkdir(parents=True, exist_ok=True)
+    compress.write_text(myndigheter_dir / "index.html", render_myndigheter(con),
                         encodings=compress.PAGE_ENCODINGS)
     search_dir = out_root / "sok"
     search_dir.mkdir(parents=True, exist_ok=True)
