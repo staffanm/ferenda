@@ -977,7 +977,9 @@ below is not optional polish, it's the only way they enter the corpus.
   Source-first verbs; sources register per-document `Stage`s, so the driver
   knows nothing source-specific — uniformity lives in the driver + a tiny
   protocol, not a base class. **Content-hash freshness** (manifest at
-  `site/data/.build/manifest.json`) keyed on input hash **+ recipe version**
+  `site/data/.build/manifest.sqlite` — per-entry rows, so a scoped run reads
+  and writes single entries instead of a 133 MB JSON) keyed on input hash
+  **+ recipe version**
   (a hash of the stage's own impl files, so editing the parser re-stales
   every doc without a blanket `--force`). A stage with no `inputs` and no
   `code` is judged fresh by default (nothing to version an existing output
@@ -3300,7 +3302,7 @@ rewrite work.
 | `test/test_site.py` | derived-layer suite |
 | `site/data/downloaded/sfs/sfsr/` | downloaded SFSR register pages (11,231) |
 | `site/data/downloaded/sfs/pdf/` | official published-SFS PDF mirror (1998 onward), keyed by SFS number; the crop source for the `.graphics` layer and `/api/v1/sfs-graphic` |
-| `site/data/.build/manifest.json` | build freshness state (input + recipe hashes) |
+| `site/data/.build/manifest.sqlite` | build freshness state (input + recipe hashes) |
 | `site/data/artifact/{sfs,dom}/` | persisted parse artifacts (the source of truth) |
 | `python -m accommodanda.sfs` | `parse` / `validate` / `refs` diagnostic CLI |
 | `site/data/artifact/dom/identity-index.json` | canonical case → source records |

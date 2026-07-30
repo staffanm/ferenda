@@ -60,6 +60,27 @@ def apply(manifest, res):
     manifest.update(res.updates)
 
 
+def test_manifest_get_update_and_json_migration(tmp_path, monkeypatch):
+    # the SQLite manifest mirrors the dict the JSON manifest loaded into:
+    # get/update roundtrip, upsert on re-update, None for an absent key
+    m = build.Manifest(tmp_path / "m.sqlite")
+    assert m.get("syn/parse/a") is None
+    m.update({"syn/parse/a": {"inputs": "x", "version": "1", "secs": 2.5}})
+    assert m.get("syn/parse/a") == {"inputs": "x", "version": "1", "secs": 2.5}
+    m.update({"syn/parse/a": {"inputs": "y", "version": "2"}})
+    assert m.get("syn/parse/a") == {"inputs": "y", "version": "2"}
+
+    # first load_manifest with only the legacy JSON present migrates it into
+    # the DB -- entries preserved verbatim -- and removes the JSON so it
+    # cannot rot beside the live store
+    legacy = {"syn/parse/b": {"inputs": "z", "version": "3"}}
+    _isolate_manifest(tmp_path, monkeypatch)
+    build.MANIFEST.write_text(json.dumps(legacy))
+    migrated = build.load_manifest()
+    assert migrated.get("syn/parse/b") == legacy["syn/parse/b"]
+    assert not build.MANIFEST.exists()
+
+
 def test_build_then_skip(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}
@@ -101,8 +122,7 @@ def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, caps
     parse`): once the source is fingerprinted, a re-run with unchanged inputs skips
     the per-doc scan wholesale ("up to date -- skipped"); an input change re-runs."""
     _, src = make_source(tmp_path)
-    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
-    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    _isolate_manifest(tmp_path, monkeypatch)
     # settle downloads first (as `download` before `parse` does in real use), so a
     # later parse touches no inputs and the recorded fingerprint stays valid
     build.run_action(src, "parse", src.list_basefiles(), 1)
@@ -218,11 +238,19 @@ def test_sfs_conventions_are_part_of_parse_recipe():
     assert "parallelappendix.py" in {path.name for path in build.SFS_CODE}
 
 
+def _isolate_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(build, "MANIFEST_DB", tmp_path / "manifest.sqlite")
+    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+
+
 def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     _, src = make_source(tmp_path)
     src.name = "sfs"
-    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
-    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    _isolate_manifest(tmp_path, monkeypatch)
+    # no catalog in this synthetic world: the targeted gate
+    # (_catalog_current_for) must report stale, so relate still runs
+    monkeypatch.setattr(build, "CATALOG", tmp_path / "catalog.sqlite")
     related = []
     monkeypatch.setattr(build, "cmd_relate", lambda names: related.append(names))
 
@@ -231,11 +259,57 @@ def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     assert related == [["sfs"]]
 
 
+def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypatch):
+    # the headline of the targeted gate: with the requested documents' rows
+    # current, _prepare_targeted_generate runs the parse prerequisites but
+    # never falls back to the whole-source relate
+    _, src = make_source(tmp_path)
+    src.name = "sfs"
+    _isolate_manifest(tmp_path, monkeypatch)
+    monkeypatch.setattr(build, "_catalog_current_for", lambda name, bfs: True)
+    monkeypatch.setattr(build, "cmd_relate",
+                        lambda names: pytest.fail("must not relate when current"))
+
+    assert not build._prepare_targeted_generate(src, ["a"], 1)
+    assert src.stages["parse"].output("a").read_text() == "HELLO"
+
+
+def test_catalog_current_for_matches_rows_against_artifacts(tmp_path, monkeypatch):
+    # the targeted relate gate: a document whose catalog row content_hash equals
+    # its artifact bytes is current (relate skipped); changed bytes, a missing
+    # row, or an edited cross-pass layer make it stale. The relate-code check is
+    # stubbed current (it has its own test, test_code_version_gate_for_relate_
+    # index) and the fingerprint machinery is stubbed so nothing reads the real
+    # dev store or annstore tree -- the module promises no real corpus.
+    art = tmp_path / "doc.json"
+    art.write_text(json.dumps({"uri": "https://lagen.nu/1999:1",
+                               "metadata": {"properties": {}}, "structure": []}))
+    db = tmp_path / "catalog.sqlite"
+    catalog.rebuild(str(db), "sfs", [art])
+    monkeypatch.setattr(build, "CATALOG", db)
+    monkeypatch.setattr(build.layout, "artifact", lambda source, bf: art)
+    monkeypatch.setattr(build, "load_fingerprints", lambda: {})
+    monkeypatch.setattr(build, "code_changed", lambda *a: False)
+    monkeypatch.setattr(build, "_corr_watermark", lambda: "wm")
+    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: True)
+
+    assert build._catalog_current_for("sfs", ["1999:1"])
+    # an authored .corr/.ann layer (stale __corr__ fingerprint) stales the gate
+    # even though the row still matches -- the cross-passes must run
+    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: False)
+    assert not build._catalog_current_for("sfs", ["1999:1"])
+    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: True)
+
+    art.write_text(art.read_text() + " ")        # bytes drift from the row
+    assert not build._catalog_current_for("sfs", ["1999:1"])
+    art.unlink()                                 # unparsed -> stale
+    assert not build._catalog_current_for("sfs", ["1999:1"])
+
+
 def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch):
     _, src = make_source(tmp_path)
     src.name = "sfs"
-    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
-    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "cmd_relate",
                         lambda names: pytest.fail("must not relate with --no-deps"))
     monkeypatch.setattr(build.RUN, "no_deps", True)
@@ -488,6 +562,7 @@ def wire(monkeypatch, tmp_path):
         monkeypatch.setattr(build, "ERRORS", bd / "errors.json")
         monkeypatch.setattr(build, "STATUS", bd / "status.json")
         monkeypatch.setattr(build, "MANIFEST", bd / "manifest.json")
+        monkeypatch.setattr(build, "MANIFEST_DB", bd / "manifest.sqlite")
         monkeypatch.setattr(build, "FINGERPRINTS", bd / "fingerprints.json")
         monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
         monkeypatch.setattr(build, "_FINGERPRINTS_CACHE", None)

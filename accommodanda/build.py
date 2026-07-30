@@ -36,6 +36,7 @@ import hashlib
 import json
 import multiprocessing
 import os
+import sqlite3
 import sys
 import time
 import traceback
@@ -134,7 +135,8 @@ from .wiki import parse as wiki_parse
 
 POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
-MANIFEST = DATA / ".build" / "manifest.json"
+MANIFEST = DATA / ".build" / "manifest.json"     # legacy; migrated into the DB
+MANIFEST_DB = DATA / ".build" / "manifest.sqlite"
 INFLIGHT = DATA / ".build" / "inflight"    # per-pid last-started slot files (_run_parallel)
 FINGERPRINTS = DATA / ".build" / "fingerprints.json"   # small per-(step,source) gates
 RUNS = DATA / ".build" / "runs.ndjson"             # append-only run ledger
@@ -518,9 +520,8 @@ def _worker(job):
 def _worker_init(run_options: RunOptions):
     # child processes re-import this module fresh -- carry the run options
     # across the process boundary. The manifest is NOT shipped through
-    # initargs: it can exceed 100 MB, and worker recycling would re-pickle it
-    # per generation -- each worker reads the checkpointed manifest file once
-    # (load_manifest caches; a later generation just sees a fresher snapshot).
+    # initargs: each worker re-imports the module fresh and load_manifest opens
+    # its own read connection there, seeing the parent's checkpointed commits.
     global RUN
     RUN = run_options
     # a worker that dies hard in a C extension leaves the parent little to go
@@ -704,7 +705,6 @@ def run_action(source, action, basefiles, jobs):
     def persist():
         if merged.updates and not RUN.dry_run:
             manifest.update(merged.updates)
-            save_manifest(manifest)
 
     def absorb(res, basefile):
         nonlocal done, actual, done_work
@@ -750,13 +750,56 @@ def _absorb(into, res):
 
 
 # --------------------------------------------------------------------------
-# manifest persistence. The manifest is one ~hundreds-of-MB JSON (an entry per
-# (source, stage, basefile)); parsing it costs ~2s, so a single `all` run that
-# loaded it once per step paid that many times over. Cache the parsed dict for
-# the life of the process -- every load_manifest() in one invocation shares (and
-# mutates) the same dict, and save just rewrites it. Workers get an explicit
-# snapshot via the pool initializer, so the cache never crosses a process.
+# manifest persistence. An entry per (source, stage, basefile), in SQLite keyed
+# on the manifest_key -- because the former single ~133 MB JSON had no random
+# access: any run, even a one-page scoped generate, paid a full parse to read
+# one entry and a full rewrite to record one. Entries stay schemaless (one JSON
+# value per key: inputs/version/secs/...), so callers see the same dict-shaped
+# get/update the JSON manifest offered; update() commits immediately, which IS
+# the mid-run checkpoint (SAVE_EVERY), so there is no separate save step.
 # --------------------------------------------------------------------------
+
+class Manifest:
+    """The per-document build manifest over SQLite. Only two operations exist
+    (`get` one entry, `update`/upsert a batch), mirroring the dict the JSON
+    manifest used to load into -- test fixtures still pass a plain dict.
+    Pool workers each build their own instance: under the forkserver start
+    method (the 3.14 Linux default) the module re-imports fresh per worker and
+    load_manifest opens a new connection there. The pid guard on `con` is
+    insurance for the one path that could still carry the object across a
+    process boundary (a future fork-context pool) -- a SQLite connection must
+    never be used across one. Workers only ever read; the parent is the sole
+    writer (persist()/cmd_generate), exactly as before."""
+
+    def __init__(self, path):
+        self.path = path
+        self._con = None
+        self._pid = None
+
+    @property
+    def con(self):
+        if self._con is None or self._pid != os.getpid():
+            self._con = sqlite3.connect(self.path, timeout=30)
+            self._con.execute("CREATE TABLE IF NOT EXISTS manifest "
+                              "(key TEXT PRIMARY KEY, entry TEXT NOT NULL)")
+            self._pid = os.getpid()
+        return self._con
+
+    def get(self, key):
+        row = self.con.execute("SELECT entry FROM manifest WHERE key = ?",
+                               (key,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def update(self, entries):
+        if not entries:
+            return
+        self.con.executemany(
+            "INSERT INTO manifest (key, entry) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET entry = excluded.entry",
+            [(k, json.dumps(v, ensure_ascii=False, sort_keys=True))
+             for k, v in entries.items()])
+        self.con.commit()
+
 
 _MANIFEST_CACHE = None
 
@@ -764,21 +807,25 @@ _MANIFEST_CACHE = None
 def load_manifest():
     global _MANIFEST_CACHE
     if _MANIFEST_CACHE is None:
-        _MANIFEST_CACHE = (json.loads(MANIFEST.read_text())
-                           if MANIFEST.exists() else {})
+        MANIFEST_DB.parent.mkdir(parents=True, exist_ok=True)
+        m = Manifest(MANIFEST_DB)
+        if MANIFEST.exists():
+            # one-time migration from the retired JSON manifest. The JSON's
+            # presence IS the migration-incomplete flag: it is removed only
+            # after its content is committed, so an interrupted migration
+            # (connect() creates the DB file before the rows land) simply
+            # re-runs -- update() upserts, so a partial first pass is harmless.
+            # Workers never race this: the parent loads (and thus migrates)
+            # before any pool is spawned.
+            m.update(json.loads(MANIFEST.read_text()))
+            MANIFEST.unlink()
+        _MANIFEST_CACHE = m
     return _MANIFEST_CACHE
-
-
-def save_manifest(manifest):
-    global _MANIFEST_CACHE
-    _MANIFEST_CACHE = manifest
-    util.write_atomic(MANIFEST, json.dumps(manifest, ensure_ascii=False,
-                                           sort_keys=True))
 
 
 # The coarse per-(step, source) fingerprints live in their own tiny file, NOT the
 # big per-doc manifest -- so a no-op run reads only this to decide every step can
-# be skipped, never parsing the ~57 MB manifest (which is loaded only when a
+# be skipped, never opening the per-doc manifest DB (consulted only when a
 # source actually changed and needs the per-document freshness scan).
 _FINGERPRINTS_CACHE = None
 
@@ -3113,6 +3160,15 @@ def _swap_catalog(scratch, dest):
     os.close(dfd)
 
 
+def _corr_watermark():
+    """The fingerprint over the authored layers the relate cross-passes read
+    (SFS .corr correspondence + förarbete genomförande/fk .ann) -- the gate for
+    re-running them, shared by cmd_relate and the targeted relate check
+    (_catalog_current_for), so both notice the same layer edits."""
+    return file_fingerprint(sorted(annstore.tree("sfs").glob("*/*.corr"))
+                            + sorted(annstore.tree("forarbete").rglob("*.ann")))
+
+
 def cmd_relate(names):
     """(Re)build each named source's rows in the shared catalog from its
     artifacts on disk -- documents + the citation edges they carry inline.
@@ -3176,8 +3232,7 @@ def cmd_relate(names):
     # catalog (changed only if a source was re-related above) and the authored
     # layers (the SFS .corr and förarbete genomförande .ann files), so a no-op run
     # skips them too -- gated on a fingerprint over all of them.
-    corr_wm = file_fingerprint(sorted(annstore.tree("sfs").glob("*/*.corr"))
-                             + sorted(annstore.tree("forarbete").rglob("*.ann")))
+    corr_wm = _corr_watermark()
     if dirty or RUN.force or not fingerprint_fresh(store, "relate", "__corr__",
                                                  corr_wm):
         t0 = time.perf_counter()
@@ -3724,7 +3779,6 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)
-        save_manifest(manifest)
     if not scoped:                       # record the site fingerprint for next time
         record_step(store, "generate", "__site__", site_wm, GENERATE_CODE)
         save_fingerprints(store)
@@ -4143,6 +4197,43 @@ def cmd_mkpatch(args, p):
                  path, label))
 
 
+def _catalog_current_for(name, basefiles):
+    """The targeted make-check behind `lagen <source> generate <ids>`: are the
+    requested documents' catalog rows current? The row's `content_hash` is
+    relate's receipt for the artifact's exact bytes, so re-hashing the named
+    artifacts and comparing settles it from the catalog alone -- no whole-source
+    stat pass over 60k+ files (cmd_relate's per-source gate). Any mismatch --
+    missing catalog, unparsed artifact, missing row, changed bytes, changed
+    relate code, edited cross-pass layers -- returns False and the caller falls
+    back to the full (incremental) per-source relate. The cross-pass check
+    matters because a page's freshness signature folds its own .corr/.ann bytes
+    in: without it, authoring a layer and then rendering the page targeted
+    would re-render from the catalog that never loaded the layer -- and stamp
+    the wrong page fresh."""
+    store = load_fingerprints()
+    if not CATALOG.exists():
+        return False
+    if code_changed(store, "relate", name, RELATE_CODE):
+        return False           # rows exist but were extracted by older code
+    if not fingerprint_fresh(store, "relate", "__corr__", _corr_watermark()):
+        return False           # an authored layer awaits the cross-passes
+    con = catalog.connect(CATALOG)
+    root = catalog.data_root(con)
+    try:
+        for bf in basefiles:
+            art = layout.artifact(name, bf)
+            if not compress.exists(art):
+                return False
+            row = con.execute("SELECT content_hash FROM documents WHERE path = ?",
+                              (str(art.relative_to(root)),)).fetchone()
+            if row is None or row[0] != catalog.content_hash(
+                    compress.read_bytes(art)):
+                return False
+    finally:
+        con.close()
+    return True
+
+
 def _prepare_targeted_generate(source, basefiles, jobs):
     """Bring the artifacts behind a document-scoped generate up to date.
 
@@ -4150,9 +4241,12 @@ def _prepare_targeted_generate(source, basefiles, jobs):
     freshness also depends on catalog relationships.  That must not make
     ``lagen sfs generate 1994:1219`` an exception to the driver's make semantics:
     refresh the requested documents' parse/versions stages, then relate the
-    resulting artifacts before rendering them.  ``--force`` belongs to the named
-    generate action, not these prerequisites, so upstream stages remain
-    freshness-checked.
+    resulting artifacts before rendering them.  The relate check is targeted
+    (`_catalog_current_for`): the full per-source relate runs only when a
+    requested document's catalog row disagrees with its artifact, or an
+    authored cross-pass layer changed.
+    ``--force`` belongs to the named generate action, not these prerequisites,
+    so upstream stages remain freshness-checked.
     """
     if RUN.no_deps:
         return False
@@ -4166,7 +4260,8 @@ def _prepare_targeted_generate(source, basefiles, jobs):
             result = run_action(source, stage, basefiles, jobs)
             report(source, stage, result, len(basefiles), full_source=False)
             had_errors |= bool(result.errors)
-        if not had_errors and not RUN.dry_run and source.name in ARTIFACTS:
+        if not had_errors and not RUN.dry_run and source.name in ARTIFACTS \
+                and not _catalog_current_for(source.name, basefiles):
             cmd_relate([source.name])
     finally:
         RUN.force = generate_force
