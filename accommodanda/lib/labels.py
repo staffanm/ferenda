@@ -285,13 +285,40 @@ def _untc(art):
 # avg (JO / JK / ARN decisions)
 # --------------------------------------------------------------------------
 
+# tokens a Swedish sentence never ends on -- abbreviations whose trailing dot
+# is not a full stop
+_NON_TERMINAL = {"bl.a", "ca", "dnr", "dvs", "e.d", "etc", "fr.o.m", "jfr",
+                 "kap", "kr", "m.fl", "m.m", "milj", "nr", "p.g.a", "s.k",
+                 "t.ex", "t.o.m"}
+
+
+def first_sentence(text):
+    """The first sentence of a prose passage, Swedish-abbreviation-aware: a
+    full stop after 's.k.', an initial ('J.A.'), 'kap.' or a bare number does
+    not end the sentence. The whole text when no boundary is found. Used
+    where a preamble must stand in for a title (an ARN referat, A4)."""
+    for m in re.finditer(r"[.!?](?=\s|$)", text):
+        tail = ((text[:m.start()].rsplit(None, 1) or [""])[-1]
+                .lower().lstrip("(\"'”„"))
+        if (tail in _NON_TERMINAL or len(tail) <= 1 or "." in tail
+                or tail.isdigit()):
+            continue
+        return text[:m.end()]
+    return text
+
+
 def _avg(art):
     # short_id is the citation id ("JO dnr 4849-2006"); the inbound/descriptive
     # form prefers the ämbetsberättelse reference ("JO 2024 s. 246") when there is
-    # one, per I1. The long decision title is the official/heading form.
+    # one, per I1. The long decision title is the official/heading form. An ARN
+    # "title" is really the referat's preamble paragraph, so its first sentence
+    # stands in as the short/heading form (A4) -- listings included (A2).
     md = art.get("metadata", {})
     ident = art.get("identifier") or _local(art["uri"])
-    return Labels(ident, "", md.get("title") or ident,
+    title = md.get("title") or ""
+    if art.get("org") == "arn" and title:
+        title = first_sentence(title)
+    return Labels(ident, title, md.get("title") or ident,
                   md.get("officialReport") or ident)
 
 

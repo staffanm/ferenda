@@ -3039,12 +3039,19 @@ def render_foreskrift(art, site):
 def render_avg(art, site):
     md = art.get("metadata", {})
     ident = art.get("identifier") or catalog.local(art["uri"])
-    title = md.get("title") or ident
+    lb = labels.document_labels("avg", art)
+    # an ARN referat's "title" is its preamble paragraph: the first sentence
+    # heads the page (A4, via labels._avg) and the whole preamble reads in
+    # full between the metadata and the referat text
+    title = lb.short_title or ident
+    summary = art.get("sammanfattning")
+    if (art.get("org") == "arn" and md.get("title")
+            and md["title"] != title):
+        summary = md["title"]
     meta = [
         ("Myndighet", md.get("publisher")),
         ("Beslutsdatum", md.get("beslutsdatum")),
         ("Diarienummer", ", ".join(md.get("diarienummer", []))),
-        ("Avgjord av", md.get("avgjordAv")),
         ("Ämbetsberättelse", md.get("officialReport")),
         ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
     ]
@@ -3059,7 +3066,7 @@ def render_avg(art, site):
     return ENV.get_template("sources/avg.html").render(page_context(
         title, section, _doc_meta(meta, art.get("source_url")),
         toc=render_toc(toc), eyebrow=ident,
-        summary_text=art.get("sammanfattning"),
+        summary_text=summary,
         island=rail.island(), structure=structure))
 
 
@@ -3308,7 +3315,7 @@ SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg",
                 "eurlex", "coe", "icrc", "untc", "icc", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
-                "avg": "JO- och JK-beslut", "eurlex": "EU-rättsakter",
+                "avg": "Myndighetsavgöranden", "eurlex": "EU-rättsakter",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
                 "icrc": "Internationell humanitär rätt",

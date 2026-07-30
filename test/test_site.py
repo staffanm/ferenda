@@ -920,6 +920,50 @@ def test_jo_page_shows_official_report(tmp_path):
     assert "Ämbetsberättelse" not in render.render_avg(art, site)
 
 
+def test_avg_meta_drops_avgjord_av(tmp_path):
+    # A3: who signed a JO decision is neither meta the reader needs nor
+    # correctly labelled -- the row goes
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = {"uri": "https://lagen.nu/avg/jo/9993-2023", "type": "avgorande",
+           "org": "jo", "identifier": "JO dnr 9993-2023",
+           "metadata": {"title": "Kritik mot en myndighet",
+                        "publisher": "Justitieombudsmannen",
+                        "diarienummer": ["9993-2023"],
+                        "avgjordAv": "Chefsjustitieombudsmannen Erik Nymansson"},
+           "structure": [{"type": "stycke", "id": "S1", "text": ["Beslut."]}]}
+    html = render.render_avg(art, site)
+    assert "Avgjord av" not in html and "Nymansson" not in html
+
+
+def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
+    # A4: the ARN "title" is the referat's preamble -- the h1 takes its first
+    # sentence (abbreviation-aware: not cut at "s.k."), the whole preamble
+    # reads in the sammanfattning slot above the referat text
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    preamble = ("Frågan gällde vilken lag som skulle tillämpas på ett s.k. "
+                "blandat avtal. Nämnden fann att konsumentköplagen gällde.")
+    art = {"uri": "https://lagen.nu/avg/arn/2026-01631", "type": "avgorande",
+           "org": "arn", "identifier": "ARN 2026-01631",
+           "metadata": {"title": preamble,
+                        "publisher": "Allmänna reklamationsnämnden",
+                        "diarienummer": ["2026-01631"]},
+           "structure": [{"type": "stycke", "id": "S1", "text": ["Referatet."]}]}
+    html = render.render_avg(art, site)
+    assert ("<h1>Frågan gällde vilken lag som skulle tillämpas på ett s.k. "
+            "blandat avtal.</h1>") in html
+    assert re.search(r'class="sammanfattning">Frågan gällde.*'
+                     r'konsumentköplagen gällde\.', html)
+    # the listing name form is the same first sentence (A2)
+    from accommodanda.lib import labels
+    lb = labels.document_labels("avg", art)
+    assert lb.short_title.endswith("blandat avtal.")
+    jo = {"uri": "https://lagen.nu/avg/jo/1-23", "org": "jo",
+          "identifier": "JO dnr 1-23",
+          "metadata": {"title": "Kritik mot en myndighet"}}
+    assert labels.document_labels("avg", jo).short_title == \
+        "Kritik mot en myndighet"
+
+
 # --- authoritative source url ---------------------------------------------
 
 def test_eurlex_source_url_derives_eli():

@@ -14,7 +14,8 @@ from accommodanda.forarbete.parse import (
 )
 from accommodanda.forarbete.structure import ingress, nest, signers
 from accommodanda.lib import compress, layout, pdftext
-from accommodanda.lib.pdftext import Line, Para, line_body_size, page_paragraphs
+from accommodanda.lib.pdftext import (Line, Para, Run, line_body_size,
+                                      page_paragraphs)
 
 
 def _stage(tmp_path, typ, basefile, name, data):
@@ -184,6 +185,48 @@ def test_page_paragraphs_strips_header_pagenumber_and_reflows():
         "en mening som bryts mitt i ett ord förfogar över resten. "
         "och fortsätter på nästa rad.",
         "Ett nytt stycke börjar längre ned."]
+
+
+def test_page_paragraphs_keeps_identifier_inside_body_text():
+    # A5: the running header is stripped only where the line *is* the header
+    # (plus at most a page number) -- a body line containing the identifier
+    # ("Allmänna reklamationsnämnden gjorde följande bedömning.") keeps it
+    lines = [_line("Allmänna reklamationsnämnden 3", 40),    # header + page nr
+             _line("Allmänna reklamationsnämnden gjorde följande bedömning.",
+                   90, bold=True)]
+    paras = page_paragraphs(lines, "Allmänna reklamationsnämnden", 3)
+    assert [p.text for p in paras] == [
+        "Allmänna reklamationsnämnden gjorde följande bedömning."]
+
+
+def _runline(top, *texts, bold=False):
+    left, runs = 100, []
+    for t in texts:
+        runs.append(Run(left, left + 6 * len(t), t, bold, False))
+        left += 6 * len(t) + 8
+    return Line(" ".join(texts), top, bold, bold, False, 0, runs)
+
+
+def test_page_paragraphs_strips_margin_header_runs_keeps_prose_mentions():
+    # run geometry decides (A5 follow-up, measured on the prop corpus): the
+    # margin id merged onto a body baseline is its own run and goes -- split
+    # "Prop." + "2007/08:138" fragments included -- while a longer run that
+    # merely *mentions* the identifier ("… (Prop. 2025/26:161). Vidare …")
+    # is prose and stays whole
+    ident = "Prop. 2025/26:161"
+    lines = [_runline(70, "Skälen för regeringens förslag är följande.",
+                      "Prop. 2025/26:161"),
+             _runline(90, "Detta har utretts i flera omgångar."),
+             _runline(110, "Frågan behandlas närmare nedan."),
+             _runline(130, "Prop.", "2025/26:161"),         # split header line
+             _runline(260, "Detta följer av propositionen (Prop. 2025/26:161)."
+                           " Vidare gäller att beslutet står fast.")]
+    paras = page_paragraphs(lines, ident, 5)
+    assert [p.text for p in paras] == [
+        "Skälen för regeringens förslag är följande. "
+        "Detta har utretts i flera omgångar. Frågan behandlas närmare nedan.",
+        "Detta följer av propositionen (Prop. 2025/26:161). "
+        "Vidare gäller att beslutet står fast."]
 
 
 def test_page_paragraphs_breaks_at_bold_marker():

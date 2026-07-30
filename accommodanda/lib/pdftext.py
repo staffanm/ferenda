@@ -581,6 +581,30 @@ def dehyphenate(acc, line):
     return (acc + " " + line) if acc else line
 
 
+def _strip_header_runs(runs, header_re):
+    """The line's text with its running-header fragments removed: a
+    `header_re` match whose boundaries coincide with run boundaries is a
+    margin header (the id alone, or split "Prop." + "2007/08:138" across
+    fragments) and its runs go; a match inside a longer run is prose naming
+    the identifier and stays whole."""
+    starts, ends, pos = set(), set(), 0
+    for r in runs:
+        starts.add(pos)
+        pos += len(r.text)
+        ends.add(pos)
+        pos += 1                                # the joining space
+    joined = " ".join(r.text for r in runs)
+    drop = [(m.start(), m.end()) for m in header_re.finditer(joined)
+            if m.start() in starts and m.end() in ends]
+    kept, pos = [], 0
+    for r in runs:
+        span = (pos, pos + len(r.text))
+        pos += len(r.text) + 1
+        if not any(s <= span[0] and span[1] <= e for s, e in drop):
+            kept.append(r.text)
+    return " ".join(kept)
+
+
 def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
     """Reflow a page's lines into paragraphs, dropping the running header (the
     identifier, when one is known -- pass ``None``/``""`` where the source has no
@@ -598,7 +622,24 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
                  if identifier else None)
     kept = []
     for l in lines:
-        raw = header_re.sub(" ", l.text) if header_re else l.text
+        raw = l.text
+        if header_re and header_re.search(raw):
+            # A running header is its own text fragment(s) -- a standalone
+            # margin line, or a margin id the baseline assembly merged onto a
+            # body line -- so a match that covers whole runs is stripped. A
+            # match *inside* a longer run is body text naming the identifier
+            # ("Allmänna reklamationsnämnden gjorde följande bedömning",
+            # "… (SOU 2008:97). I betänkandet …") and keeps it, which is what
+            # the docstring always promised. Strictly conservative vs the old
+            # strip-everywhere: everything dropped here was dropped before.
+            if l.runs:
+                raw = _strip_header_runs(l.runs, header_re)
+            else:
+                # no run geometry (OCR/legacy routes): strip only a line that
+                # is nothing but the header and a page number/date
+                residue = header_re.sub(" ", raw)
+                if not re.search(r"[A-Za-zÅÄÖåäö]", residue):
+                    raw = residue
         text = normalize_space(raw)
         if text and text != str(pageno) and not RE_DOTS.search(text):
             kept.append(replace(l, text=text))

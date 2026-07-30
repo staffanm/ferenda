@@ -45,18 +45,19 @@ def test_empty_string_identifier_does_not_touch_body_text():
     assert paras[0].text == "Ale kommun välkomnar utredningens ambition"
 
 
-def test_a_real_identifier_still_strips_every_occurrence():
-    """An identifier is still honoured when one is actually known (the DV/JO/ARN
-    case) -- this must keep working exactly as before, including its existing
-    (out of scope for this fix) behaviour of stripping a mid-sentence
-    recurrence, not just a standalone header line; only the None/"" path
-    changed."""
+def test_a_real_identifier_strips_headers_but_not_body_text():
+    """An identifier is honoured when one is actually known (the DV/JO/ARN
+    case): a running-header line -- the identifier plus at most a page
+    number/date -- is stripped, but a body line that merely *contains* the
+    identifier keeps it (A5: 'Allmänna reklamationsnämnden gjorde följande
+    bedömning' must not lose its subject)."""
     lines = [_line("Riksdagens ombudsmän 2026-01-01", 100),
              _line("Klagomålet rör Riksdagens ombudsmän i ett tidigare ärende", 120)]
     paras = page_paragraphs(lines, "Riksdagens ombudsmän", 1)
     joined = " ".join(p.text for p in paras)
-    assert "Riksdagens ombudsmän" not in joined
-    assert "2026-01-01" in joined and "tidigare ärende" in joined
+    assert "2026-01-01" in joined                          # header residue kept
+    assert not joined.startswith("Riksdagens")             # header itself gone
+    assert "Klagomålet rör Riksdagens ombudsmän i ett tidigare ärende" in joined
 
 
 PAGE_XML = (b"<pdf2xml>"

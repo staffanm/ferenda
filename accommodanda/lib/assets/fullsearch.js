@@ -33,7 +33,7 @@
     load(true);
   }
   var SOURCE = {sfs:'Författningar', dv:'Rättsfall', forarbete:'Förarbeten',
-    foreskrift:'Myndighetsföreskrifter', eurlex:'EU-rätt', avg:'JO, JK och ARN',
+    foreskrift:'Myndighetsföreskrifter', eurlex:'EU-rätt', avg:'Myndighetsavgöranden',
     kommentar:'Lagkommentarer', begrepp:'Begrepp'};
   var KIND = {law:'Författning', case:'Rättsfall', prop:'Proposition', sou:'SOU',
     ds:'Ds', dir:'Kommittédirektiv', regulation:'Förordning', directive:'Direktiv',
