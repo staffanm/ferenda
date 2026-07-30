@@ -45,13 +45,18 @@
 {%- if reel %}<h3>Mest hänvisade avgöranden</h3><ol class="ranked">{{ ranked(reel) }}</ol>{% endif -%}
 <p><a href="/folkratt/hudoc/">Bläddra bland avgöranden →</a></p></section>
 {%- endmacro -%}
-{%- macro folkratt_nav(entries, active_id) -%}
-{#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
-<nav class="facets"><h2 class="facet-axis">Dokumenttyp</h2><ul class="facet-list">
+{%- macro top_axis_nav(axis, entries, active_id) -%}
+{#- a full-width selector above a listing: the folkrätt Dokumenttyp axis, the
+    year axis of a large författningssamling (F4) -#}
+<nav class="facets"><h2 class="facet-axis">{{ axis }}</h2><ul class="facet-list">
 {%- for key, label, url, count in entries -%}
 <li><a href="{{ url }}"{% if key == active_id %} aria-current="page"{% endif %}>{{ label }} <span class="c">{{ count }}</span></a></li>
 {%- endfor -%}
 </ul></nav>
+{%- endmacro -%}
+{%- macro folkratt_nav(entries, active_id) -%}
+{#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
+{{ top_axis_nav("Dokumenttyp", entries, active_id) }}
 {%- endmacro -%}
 {%- macro feed_page_body(atom, entries) -%}
 {#- the human-readable twin of an Atom document -#}
@@ -82,7 +87,12 @@
 {%- if doc.key is not none -%}
 <dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><span class="pre">{{ doc.pre or "" }}</span>{{ doc.key }}</a></dt>
 {%- else -%}
-<dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><strong>{{ doc.short_id or doc.display }}</strong></a></dt><dd>{{ doc.text }}</dd>
+<dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><strong>{{ doc.short_id or doc.display }}</strong></a></dt><dd>{{ doc.text }}
+{#- the ändringsförfattningar nested under their base föreskrift (F5) -#}
+{%- if doc.amendments %}<div class="fs-andringar">Ändringar: {% for a in doc.amendments -%}
+<a href="{{ a.url }}"{% if a.subdued %} class="subdued"{% endif %}>{{ a.short_id or a.display }}</a>{% if not loop.last %}, {% endif %}
+{%- endfor %}</div>{% endif -%}
+</dd>
 {%- endif -%}
 {%- endmacro -%}
 {%- macro browse_items(docs) -%}
@@ -106,10 +116,13 @@
 {%- endfor -%}
 </nav>
 {%- endmacro -%}
-{%- macro facet_page_body(banner, nav, heading, count, listing) -%}
-{#- facets in a left rail beside the list; the cross-source folkrätt
-    selector, when present, stays a full-width banner above both -#}
-{{ banner }}<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>{{ listing }}</section></div>
+{%- macro facet_page_body(banner, nav, heading, count, listing, note="") -%}
+{#- facets in a left rail beside the list; a full-width selector banner (the
+    folkrätt Dokumenttyp axis, a large samling's year axis) above both; the
+    `note` names what else lists here (a succeeded series' documents, F8) -#}
+{{ banner }}<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>
+{%- if note %}<p class="browse-note">{{ note }}</p>{% endif -%}
+{{ listing }}</section></div>
 {%- endmacro -%}
 {%- macro empty() -%}
 <p class="empty">Inga dokument.</p>

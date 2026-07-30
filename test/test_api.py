@@ -247,7 +247,9 @@ def test_browse_returns_navigator_with_leaf_documents(client):
                                "short_title": "Säkerhetsskyddslagen",
                                "description": None, "variant": None, "date": None,
                                "pre": "", "key": "Förvaltningslag (2018:585)",
-                               "subdued": False, "year": "2018"}]
+                               "subdued": False, "year": "2018",
+                               # föreskrift-only nesting (F5); None elsewhere
+                               "amendments": None}]
 
 
 def test_sources(client):

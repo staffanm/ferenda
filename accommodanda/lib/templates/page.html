@@ -19,7 +19,9 @@
 {%- macro frontmatter() -%}
 <header class="frontmatter">
   {%- if eyebrow %}<div class="eyebrow">{{ eyebrow }}</div>{% endif -%}
-  <h1>{{ title }}</h1>
+  {#- a page whose body carries its own heading (the browse listing) gets no
+      second h1 here -#}
+  {%- if not own_h1 %}<h1>{{ title }}</h1>{% endif -%}
   {%- if subtitle %}<p class="subtitle">{{ subtitle }}</p>{% endif -%}
   {%- if summary_text %}<p class="sammanfattning">{{ summary_text }}</p>{% endif -%}
   {{ summary }}{{ meta }}</header>

@@ -1801,22 +1801,25 @@ _LISTS = ENV.get_template("listings.html").module
 
 def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                  summary="", summary_text=None, island="", solo=False,
-                 body_class="", head="", **extra):
+                 body_class="", head="", own_h1=False, **extra):
     """The page-shell context every render goes through (page.html and the
     sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
     `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
     `eyebrow`/`subtitle`/`summary_text` are plain text the template escapes.
-    `extra` carries a source template's own variables (pre-rendered fragments
-    should already be Markup)."""
+    `own_h1` says the body brings its own <h1> (the browse pages' listing
+    heading), so the frontmatter must not emit a second one. `extra` carries a
+    source template's own variables (pre-rendered fragments should already be
+    Markup)."""
     return dict(title=title, kind=kind, meta=Markup(meta), toc=Markup(toc),
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
-                body_class=body_class, head=Markup(head), **extra)
+                body_class=body_class, head=Markup(head), own_h1=own_h1,
+                **extra)
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
          summary="", island="", solo=False, body_class="",
-         head=""):
+         head="", own_h1=False):
     """Assemble a page (templates/page.html: masthead, frontmatter, grid,
     mobile toolbar). Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
@@ -1829,7 +1832,7 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
     return ENV.get_template("page.html").render(page_context(
         title, kind, meta, toc=toc, eyebrow=eyebrow, subtitle=subtitle,
         summary=summary, island=island, solo=solo, body_class=body_class,
-        head=head, body=Markup(body)))
+        head=head, own_h1=own_h1, body=Markup(body)))
 
 
 def render_search_page():
@@ -3731,7 +3734,12 @@ def _browse_item(doc):
         # has one), otherwise the short name alone. Always a <dd> (even empty)
         # so the two-column dt/dd grid stays aligned row for row.
         "text": "%s: %s" % (name, desc) if name and desc
-                else (desc or name or "")})
+                else (desc or name or ""),
+        # a föreskrift's ändringsförfattningar, nested under it (F5)
+        "amendments": [{"url": a["url"], "subdued": a.get("subdued"),
+                        "short_id": a.get("short_id"),
+                        "display": a.get("display")}
+                       for a in doc.get("amendments") or []]})
 
 
 # the DV browse buckets group into these forms, in this reading order; a bucket
@@ -3768,13 +3776,15 @@ def _facet_nav(source, view, active_keys):
     primary -- its secondary buckets (the year/… within a court/type). A primary
     axis with a single bucket is not navigable (nothing to choose), so it is
     omitted -- e.g. HUDOC's lone 'Domar' type, whose selector lives in the shared
-    folkrätt axis above instead."""
+    folkrätt axis above instead. The föreskrift years never list here either:
+    a large samling's year axis rides on top of the list (F4), a small one has
+    no year split at all (F3)."""
     levels, buckets = view["levels"], view["buckets"]
     parts = ([{"axis": levels[0]},
               {"axis": None,
                "links": _facet_links(source, buckets, [], active_keys, 0)}]
              if len(buckets) > 1 else [])
-    if len(levels) > 1:
+    if len(levels) > 1 and source != "foreskrift":
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
             parts.append({"axis": _secondary_axis(source, active_keys[0],
@@ -3803,10 +3813,38 @@ def _bucket_heading(source, levels, nodes):
     return "%s %s" % (nodes[0]["label"], nodes[1]["label"])
 
 
+def _fs_bucket_slugs(prim):
+    """The fs slugs actually contributing documents to a series bucket --
+    nested amendments included -- from the bucket's own rows, so the
+    succession note can never claim more than the listing shows."""
+    docs = prim.get("documents") or [d for sec in prim.get("children") or []
+                                     for d in sec.get("documents") or []]
+    return {catalog.local(d["uri"]).split("/")[0]
+            for doc in docs for d in (doc, *(doc.get("amendments") or []))}
+
+
+def _fs_series_note(prim):
+    """The succession note on a samling that carries a predecessor's documents
+    (F8): 'Här listas även äldre föreskrifter ur Datainspektionens
+    författningssamling (DIFS).' -- or '' where nothing folded in. Only
+    predecessors whose documents are actually in the bucket are named: the
+    registry knows RÅFS preceded ÅFS, but with no RÅFS document in the corpus
+    the page must not say it lists any."""
+    names = ["%s (%s)" % (entry["title"], entry["designation"])
+             for slug, entry in facets.fs_predecessors(prim["key"])
+             if slug in _fs_bucket_slugs(prim)]
+    if not names:
+        return ""
+    listed = (" och ".join([", ".join(names[:-1]), names[-1]])
+              if len(names) > 1 else names[0])
+    return "Här listas även äldre föreskrifter ur %s." % listed
+
+
 def render_facet_page(source, view, nodes, banner=""):
     """A single browse bucket page: an optional cross-source `banner` (the shared
-    folkrätt selector), the navigator, and this leaf bucket's document list.
-    `nodes` is the bucket-node path (one per level); the leaf carries its
+    folkrätt selector, a large samling's year axis), the navigator, and this leaf
+    bucket's document list. `nodes` is the bucket-node path (one per level, or
+    the single merged node of an unpartitioned samling); the leaf carries its
     `documents` (from the API, already ordered and labelled)."""
     heading = _bucket_heading(source, view["levels"], nodes)
     docs = nodes[-1].get("documents") or []
@@ -3822,12 +3860,13 @@ def render_facet_page(source, view, nodes, banner=""):
             css, Markup("").join(_browse_item(d) for d in docs))
     body = _LISTS.facet_page_body(
         Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes]),
-        heading, len(docs), listing)
+        heading, len(docs), listing,
+        note=(_fs_series_note(nodes[0]) if source == "foreskrift" else ""))
     alias = feeds.alias_for_source(source)
     discovery = (Markup('<link rel="alternate" type="application/atom+xml" '
                         'href="/dataset/%s/feed.atom">') % alias) if alias else ""
     return page(heading, "Bläddra", "", body, solo=True, head=discovery,
-                body_class=" browse")
+                body_class=" browse", own_h1=True)
 
 
 def _write_browse(out_root, source, slugs, html):
@@ -3835,6 +3874,26 @@ def _write_browse(out_root, source, slugs, html):
     target.mkdir(parents=True, exist_ok=True)
     compress.write_text(target / "index.html", html,
                         encodings=compress.PAGE_ENCODINGS)
+
+
+# a författningssamling with fewer documents than this (amendments included)
+# lists on one page (F3); at or above it, one page per year with the year axis
+# on top of the list (F4)
+FS_YEAR_SPLIT_MIN = 200
+
+
+def _fs_docs(sec):
+    """A year bucket's total listing size: its entries plus their nested
+    ändringsförfattningar -- what decides whether a samling needs year pages."""
+    docs = sec.get("documents") or []
+    return len(docs) + sum(len(d.get("amendments") or []) for d in docs)
+
+
+def _fs_year_axis(source, prim):
+    """The year selector entries of one samling, `_folkratt_nav`-shaped."""
+    return [(sec["key"], sec["label"],
+             _browse_url(source, [prim["slug"], sec["slug"]]), sec["count"])
+            for sec in prim["children"]]
 
 
 def generate_browse(client, source, out_root, folk_axis=None):
@@ -3845,17 +3904,31 @@ def generate_browse(client, source, out_root, folk_axis=None):
     The caller (render_aggregates) already skips the one source the API does
     not facet (kommentar), so every `source` here is faceted. `folk_axis` (the
     shared folkrätt selector entries) prepends that selector to each page,
-    marking this source's primary bucket current -- passed only for hudoc."""
+    marking this source's primary bucket current -- passed only for hudoc.
+
+    A small författningssamling collapses its year buckets into one listing
+    (F3); a large one keeps year pages, with the year selector as a top banner
+    on each (F4)."""
     resp = client.get("/api/v1/browse", params={"source": source})
     view = resp.json()
     root_html = None
     for prim in view["buckets"]:
         banner = (_folkratt_nav(folk_axis, "%s:%s" % (source, prim["slug"]))
                   if folk_axis else "")
+        year_axis = None
+        if source == "foreskrift" and prim["children"]:
+            if sum(_fs_docs(sec) for sec in prim["children"]) < FS_YEAR_SPLIT_MIN:
+                prim = dict(prim, children=None,
+                            documents=[d for sec in prim["children"]
+                                       for d in sec.get("documents") or []])
+            else:
+                year_axis = _fs_year_axis(source, prim)
         leaves = [[prim, sec] for sec in prim["children"]] if prim["children"] \
             else [[prim]]
         for i, nodes in enumerate(leaves):
             slugs = [n["slug"] for n in nodes]
+            if year_axis:
+                banner = _LISTS.top_axis_nav("År", year_axis, nodes[1]["key"])
             html = render_facet_page(source, view, nodes, banner=banner)
             _write_browse(out_root, source, slugs, html)
             if len(nodes) > 1 and i == 0:        # primary landing = first child

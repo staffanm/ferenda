@@ -16,6 +16,11 @@ these). Each dataset is co-located with the vertical that owns and curates it:
   * ``NAMEDEUCASES`` -- EU cases by usual name ("Schrems II" -> CELEX). The Court
     assigns no such name as data, so it is auto-harvested from Wikidata
     (eurlex.casenames), with the harvested JSON committed as the shipped snapshot.
+  * ``FS_SERIES``   -- the författningssamlingar by fs slug: printed designation
+    ("aafs" -> "ÅFS"), official name ("Åklagarmyndighetens författningssamling")
+    and, for a series whose agency was renamed or disbanded, the ``successor``
+    slug that carries it on (difs -> imyfs). Hand-edited, against bilaga 1 to
+    författningssamlingsförordningen (1976:725) and its historical lydelser.
 
 A single source of truth for these paths, so the ~7 parse-time callers and the
 ⌘K resolver agree without each re-deriving the location.
@@ -35,6 +40,14 @@ UNTC_TREATIES = _PKG / "untc" / "data" / "treaties.json"
 ICC_DECISION_TYPES = _PKG / "icc" / "data" / "decision_types.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
 NAMEDEUCASES = _PKG / "eurlex" / "data" / "casenames.json"
+FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
+
+
+def load_fs_series(path=FS_SERIES):
+    """The hand-edited författningssamling registry: {fs slug: {designation,
+    title, successor?}}. A pure JSON load with no source dependency, so the
+    facet scheme and the browse renderer read it straight from here."""
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_namedcases(path=NAMEDCASES):

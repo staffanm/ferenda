@@ -769,6 +769,138 @@ def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
     assert 'class="subdued"' not in render._browse_item(by_uri[ANDRINGSFS["uri"]])
 
 
+BASFS = {
+    "uri": "https://lagen.nu/aafs/2005:5", "type": "foreskrift",
+    "identifier": "ÅFS 2005:5", "fs": "aafs",
+    "metadata": {"title": "Föreskrifter om åklagarkamrarnas lokalisering"},
+    "structure": [],
+}
+
+DIFSFS = {
+    "uri": "https://lagen.nu/difs/1998:2", "type": "foreskrift",
+    "identifier": "DIFS 1998:2", "fs": "difs",
+    "metadata": {"title": "Föreskrifter om personregister"},
+    "structure": [],
+}
+
+
+def _fs_browse_catalog(tmp_path):
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for art in (BASFS, ANDRINGSFS, UPPHAVDFS, DIFSFS):
+        p = tmp_path / (art["uri"].rsplit("/", 2)[-2] + "-"
+                        + art["uri"].rsplit("/", 1)[-1].replace(":", "-")
+                        + ".json")
+        p.write_text(json.dumps(art))
+        paths.append(p)
+    catalog.rebuild(db, "foreskrift", paths)
+    return catalog.connect(db)
+
+
+def test_foreskrift_browse_nests_amendments_under_base(tmp_path):
+    # F5: an ändringsförfattning lists under its base regulation, on the
+    # base's year -- its own year bucket disappears
+    from accommodanda.lib import facets
+    view = facets.browse_view(_fs_browse_catalog(tmp_path), "foreskrift")
+    serie = next(b for b in view["buckets"] if b["key"] == "AAFS")
+    assert serie["label"] == "ÅFS"                       # F1: designation, not key
+    years = {y["key"]: y for y in serie["children"]}
+    assert "2006" not in years                           # folded into the base's year
+    base = next(d for d in years["2005"]["documents"]
+                if d["uri"] == BASFS["uri"])
+    assert [a["uri"] for a in base["amendments"]] == [ANDRINGSFS["uri"]]
+
+
+def test_foreskrift_amendment_chain_folds_to_the_top_level_base(tmp_path):
+    # an amendment amending another amendment ("… om ändring i … (ÅFS
+    # 2006:11)") follows the chain to the regulation that stays listed --
+    # nothing nests under a row that itself folded away, and no document
+    # silently vanishes from the browse
+    from accommodanda.lib import facets
+    chain = {"uri": "https://lagen.nu/aafs/2007:1", "type": "foreskrift",
+             "identifier": "ÅFS 2007:1", "fs": "aafs",
+             "metadata": {"title": "Föreskrifter om ändring i föreskrifterna "
+                                   "(ÅFS 2006:11) om expediering",
+                          "andrar": ["https://lagen.nu/aafs/2006:11"]},
+             "structure": []}
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for art in (BASFS, ANDRINGSFS, chain):
+        p = tmp_path / (art["uri"].rsplit("/", 1)[-1].replace(":", "-") + ".json")
+        p.write_text(json.dumps(art))
+        paths.append(p)
+    catalog.rebuild(db, "foreskrift", paths)
+    view = facets.browse_view(catalog.connect(db), "foreskrift")
+    serie = next(b for b in view["buckets"] if b["key"] == "AAFS")
+    years = {y["key"]: y for y in serie["children"]}
+    assert set(years) == {"2005"}            # both amendment years folded away
+    base = next(d for d in years["2005"]["documents"]
+                if d["uri"] == BASFS["uri"])
+    assert {a["uri"] for a in base["amendments"]} == \
+        {ANDRINGSFS["uri"], chain["uri"]}
+
+
+def test_foreskrift_succeeded_series_folds_into_successor(tmp_path):
+    # F8: DIFS documents list under IMYFS, and the IMYFS page says so
+    from accommodanda.lib import facets
+    view = facets.browse_view(_fs_browse_catalog(tmp_path), "foreskrift")
+    keys = [b["key"] for b in view["buckets"]]
+    assert "DIFS" not in keys and "IMYFS" in keys
+    imyfs = next(b for b in view["buckets"] if b["key"] == "IMYFS")
+    assert any(d["uri"] == DIFSFS["uri"]
+               for y in imyfs["children"] for d in y["documents"])
+    # I before Å in the primary axis (F1: Swedish order, ÅFS after Z)
+    assert keys.index("IMYFS") < keys.index("AAFS")
+    note = render._fs_series_note(imyfs)
+    assert "Datainspektionens författningssamling (DIFS)" in note
+    # the registry knows RÅFS preceded ÅFS, but no RÅFS document is in the
+    # bucket -- the page must not claim to list any
+    aafs = next(b for b in view["buckets"] if b["key"] == "AAFS")
+    assert render._fs_series_note(aafs) == ""
+
+
+def test_foreskrift_small_series_gets_one_index_page(tmp_path):
+    # F2 + F3: a samling under the year-split threshold lists on one page,
+    # headed by its official name (once -- the frontmatter h1 stands down)
+    con = _fs_browse_catalog(tmp_path)
+    out = tmp_path / "site"
+    render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
+    html = compress.read_text(out / "foreskrift" / "aafs" / "index.html")
+    assert "Åklagarmyndighetens författningssamling (ÅFS)" in html
+    assert len(re.findall(r"<h1>", html)) == 1
+    assert 'href="/aafs/2005:5"' in html                 # both years, one page
+    assert 'href="/aafs/1999:1"' in html
+    assert not compress.exists(out / "foreskrift" / "aafs" / "2005" / "index.html")
+    # the amendment reads inside its base's row, not as its own entry
+    assert re.search(r'fs-andringar">Ändringar: <a href="/aafs/2006:11"', html)
+
+
+def test_foreskrift_large_series_partitions_by_year_with_top_axis(tmp_path):
+    # F4: at/over the threshold the years split into pages, selected from a
+    # banner above the list (like the folkrätt Dokumenttyp axis), not the left nav
+    arts = [{"uri": "https://lagen.nu/tsfs/%d:%d" % (y, i),
+             "type": "foreskrift", "identifier": "TSFS %d:%d" % (y, i),
+             "fs": "tsfs", "metadata": {"title": "Föreskrift nr %d" % i},
+             "structure": []}
+            for y in (2020, 2021) for i in range(1, 106)]          # 210 docs
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for art in arts:
+        p = tmp_path / (art["uri"].rsplit("/", 1)[-1].replace(":", "-") + ".json")
+        p.write_text(json.dumps(art))
+        paths.append(p)
+    catalog.rebuild(db, "foreskrift", paths)
+    out = tmp_path / "site"
+    render.render_aggregates(catalog.connect(db), out, db)
+    html = compress.read_text(out / "foreskrift" / "tsfs" / "2020" / "index.html")
+    assert "Transportstyrelsens författningssamling (TSFS) 2020" in html
+    # the year axis is the top banner, current year marked; no year list in
+    # the left facet nav (the banner is the only "År" axis on the page)
+    assert len(re.findall(r'facet-axis">År<', html)) == 1
+    assert html.index('facet-axis">År<') < html.index("browse-layout")
+    assert re.search(r'aria-current="page">2020', html)
+
+
 # --- avg: JO official_report (ämbetsberättelse) ------------------------------
 
 def test_jo_page_shows_official_report(tmp_path):

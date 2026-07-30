@@ -1439,6 +1439,19 @@ def upphaver_targets(con):
         "SELECT DISTINCT to_uri FROM links WHERE predicate = 'rpubl:upphaver'")}
 
 
+def andrar_edges(con):
+    """amending uri -> amended uri for every rpubl:andrar edge -- what the
+    föreskrift browse uses to nest each ändringsförfattning under its base
+    regulation. A document amending several picks the first (the browse nests
+    it once; the others still carry the typed edge on their own pages)."""
+    edges = {}
+    for from_uri, to_uri in con.execute(
+            "SELECT from_uri, to_uri FROM links "
+            "WHERE predicate = 'rpubl:andrar' ORDER BY from_uri, to_uri"):
+        edges.setdefault(from_uri, to_uri)
+    return edges
+
+
 def document_inbound_count(con, root_uri):
     """How many (citing document, pinpoint) entries cite a document *as a whole*
     -- any of its fragments or its bare uri. The 'most-hänvisade' authority

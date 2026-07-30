@@ -236,6 +236,9 @@ class BrowseDoc(BaseModel):
     key: str | None = None
     subdued: bool | None = None
     year: str | None = None
+    # föreskrift-only: the ändringsförfattningar nested under their base
+    # regulation in the listing (F5)
+    amendments: list["BrowseDoc"] | None = None
 
 
 class FacetBucket(BaseModel):

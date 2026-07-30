@@ -19,7 +19,7 @@ import re
 from collections import namedtuple
 from datetime import date
 
-from . import catalog, lagrum, layout
+from . import catalog, datasets, lagrum, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
@@ -122,8 +122,62 @@ def _begrepp_initial(r):
     return _initial(r.title or r.label or "")
 
 
+# the hand-edited författningssamling registry (designation, official name,
+# succession) -- foreskrift/data/series.json via lib/datasets
+FS_SERIES = datasets.load_fs_series()
+
+
+def _fs_live_map(series):
+    """slug -> the slug that carries its documents today, following the
+    succession chain (F8): difs -> imyfs, säifs -> srvfs -> msbfs -> mcffs.
+    A cycle in the hand-edited data is a curation error, caught here."""
+    live = {}
+    for slug in series:
+        chain = [slug]
+        while series.get(chain[-1], {}).get("successor"):
+            nxt = series[chain[-1]]["successor"]
+            if nxt in chain:
+                raise ValueError("fs succession cycle: %s"
+                                 % " -> ".join(chain + [nxt]))
+            chain.append(nxt)
+        live[slug] = chain[-1]
+    return live
+
+
+_FS_LIVE = _fs_live_map(FS_SERIES)
+
+
+def fs_series_info(key):
+    """The registry entry for a series bucket key ('AAFS'), or {} for a series
+    the registry does not know (its raw code then stands in everywhere)."""
+    return FS_SERIES.get(key.lower(), {})
+
+
+def fs_predecessors(key):
+    """(slug, registry entry) of the series whose documents now list under
+    `key`'s ('IMYFS' -> the DIFS row), ordered by designation. The slug rides
+    along so the browse page's succession note can name only predecessors the
+    bucket actually holds documents from."""
+    return sorted(((slug, FS_SERIES[slug]) for slug in FS_SERIES
+                   if slug != key.lower() and _FS_LIVE[slug] == key.lower()),
+                  key=lambda p: p[1]["designation"])
+
+
 def _fs_series(r):
-    return r.local.split("/")[0].upper()         # 'fffs/2013:10' -> 'FFFS'
+    slug = r.local.split("/")[0]                 # 'fffs/2013:10' -> 'fffs'
+    return _FS_LIVE.get(slug, slug).upper()      # a succeeded series folds in
+
+
+def _fs_label(key):
+    return fs_series_info(key).get("designation", key)
+
+
+def _fs_order(keys):
+    """Alphabetical by printed designation (ÅFS under Å, after Z), so the nav
+    reads in the order a Swedish reader scans."""
+    return sorted(keys, key=lambda k: ([(_ALPHABET.find(c), c)
+                                        for c in _fs_label(k).upper()],
+                                       _fs_label(k)))
 
 
 def _fs_year(r):
@@ -398,7 +452,7 @@ SCHEMES = {
     "sfs": [Level("Bokstav", _sfs_initial, _by_letter)],
     "begrepp": [Level("Bokstav", _begrepp_initial, _by_letter)],
     "foreskrift": [
-        Level("Serie", _fs_series, _by_alpha),
+        Level("Serie", _fs_series, _fs_order, label=_fs_label),
         Level("År", _fs_year, _by_year_desc),
     ],
     "avg": [
@@ -715,15 +769,65 @@ def _level_nodes(levels, counts, prefix):
     return nodes
 
 
+def _fold_fs_amendments(con, grouped):
+    """Move every ändringsförfattning out of its own year bucket and under its
+    base regulation (F5): the base's entry carries its amendments, listed on
+    the base's year. An amendment amending another amendment ("… (ÅFS 2006:3)
+    om ändring i … (ÅFS 2005:5)") follows the chain to the regulation that
+    stays a top-level entry, so nothing nests under a row that itself folded
+    away. An amendment whose base is not in the browse (never parsed, or
+    expired out) -- or whose chain is cyclic (corrupt data) -- stays a
+    top-level entry. Returns the refolded buckets -- so the year counts
+    reflect the nested placement -- plus {base uri: [amendment Row]} for
+    `browse_view` to attach."""
+    edges = catalog.andrar_edges(con)
+    paths = {r.uri: path for path, rows in grouped.items() for r in rows}
+
+    def base_of(uri):
+        seen, at = {uri}, uri
+        while True:
+            nxt = edges.get(at)
+            if not nxt or nxt not in paths:
+                return at if at != uri else None
+            if nxt in seen:
+                return None
+            seen.add(nxt)
+            at = nxt
+
+    nested = {}
+    for path in list(grouped):
+        kept = []
+        for r in grouped[path]:
+            base = base_of(r.uri)
+            if base:
+                nested.setdefault(base, []).append(r)
+            else:
+                kept.append(r)
+        grouped[path] = kept
+    for rows in nested.values():
+        rows.sort(key=_doc_sort)
+    return {path: rows for path, rows in grouped.items() if rows}, nested
+
+
 def browse_view(con, source):
     """The full browse model for a source: the navigator (`tree`) with each leaf
     bucket's ordered, display-labelled documents attached. One catalog scan; this
     is the single payload the static-site generator consumes per source (it has
     no other access to the data store)."""
     grouped = group(con, source)
+    nested = {}
+    repealed = frozenset()
+    if source == "foreskrift":
+        grouped, nested = _fold_fs_amendments(con, grouped)
+        repealed = catalog.upphaver_targets(con)
     view = tree(con, source, grouped)
-    repealed = (catalog.upphaver_targets(con) if source == "foreskrift"
-                else frozenset())
+
+    def entry(r):
+        doc = browse_doc(source, r, repealed)
+        if r.uri in nested:
+            doc["amendments"] = [browse_doc(source, a, repealed)
+                                 for a in nested[r.uri]]
+        return doc
 
     def attach(nodes, prefix):
         for n in nodes:
@@ -731,8 +835,7 @@ def browse_view(con, source):
             if n["children"] is not None:
                 attach(n["children"], keypath)
             else:
-                n["documents"] = [browse_doc(source, r, repealed)
-                                  for r in grouped.get(keypath, [])]
+                n["documents"] = [entry(r) for r in grouped.get(keypath, [])]
 
     attach(view["buckets"], ())
     return view

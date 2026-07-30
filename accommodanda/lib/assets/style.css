@@ -714,6 +714,14 @@ dl.browse-list.def dd { align-self: baseline; }
 .browse-list .pre { color: var(--ink-4); }
 .browse-list dt.subdued a { color: var(--ink-3); }
 .browse-list dt.subdued .pre { color: var(--ink-4); }
+/* a föreskrift's ändringsförfattningar, nested inside its own row (F5) */
+.browse-list .fs-andringar { font-size: .85em; color: var(--ink-3);
+                             margin-top: .1rem; }
+.browse-list .fs-andringar a { color: var(--ink-2); }
+.browse-list .fs-andringar a.subdued { color: var(--ink-3); }
+/* the succession note under a samling's heading (F8) */
+.browse-note { margin: -0.5rem 0 1rem; color: var(--ink-3);
+               font-family: var(--serif); font-style: italic; font-size: .9rem; }
 .empty { color: var(--ink-3); font-style: italic; }
 
 /* -- folkrätt landing: the CoE treaty listing (alphabetical, protocols nested)
