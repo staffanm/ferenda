@@ -100,13 +100,28 @@ class Site:
         field(default_factory=dict)
 
     @classmethod
-    def from_catalog(cls, con):
+    def from_catalog(cls, con, target_uris=None):
+        """`target_uris` scopes the expensive cross-content indexes to the pages
+        actually in the plan (the `only`-scoped generate): the FK rail rows are
+        queried per host statute and the remisser tree is walked only when a
+        förarbete page is among the targets (remiss analyses render nowhere
+        else). Everything these indexes feed is per-host (site_cross_digests,
+        the rails), so a scoped Site renders its target pages -- and signs
+        them -- byte-identically to the full build. None = the whole corpus."""
         commentary, guidance, article_guidance = _kommentar_indexes(con)
-        remiss_feedback, remiss_overall = _remiss_indexes()
+        if target_uris is None:
+            remiss_feedback, remiss_overall = _remiss_indexes()
+        else:
+            sources = {s for (s,) in con.execute(
+                "SELECT DISTINCT source FROM documents WHERE uri IN (%s)"
+                % ",".join("?" * len(target_uris)), list(target_uris))
+            } if target_uris else set()
+            remiss_feedback, remiss_overall = (
+                _remiss_indexes() if "forarbete" in sources else ({}, {}))
         return cls(con, {u for (u,) in con.execute("SELECT uri FROM documents")},
                    catalog.concept_aliases(con),
                    commentary, guidance, article_guidance,
-                   remiss_feedback, remiss_overall, _fk_index(con),
+                   remiss_feedback, remiss_overall, _fk_index(con, target_uris),
                    _graphics_index(),
                    catalog.expired_uris(con, date.today().isoformat()))
 
@@ -190,14 +205,16 @@ def _kommentar_indexes(con):
     return commentary, guidance, article_guidance
 
 
-def _fk_index(con):
+def _fk_index(con, uris=None):
     """The per-paragraf författningskommentar rail index, from the catalog
     layer forarbete.fk resolved at relate time: {(sfs_uri, anchor):
     [(prop_uri, prop_label, page, text)]}, newest proposition first (the row
-    order of `fk_kommentar_all`); anchor None keys a law-level comment."""
+    order of `fk_kommentar_all`); anchor None keys a law-level comment.
+    `uris` scopes the read to those host statutes (Site.from_catalog's
+    targeted build)."""
     fk = {}
     for sfs_uri, anchor, prop_uri, label, _date, page, text in \
-            catalog.fk_kommentar_all(con):
+            catalog.fk_kommentar_all(con, uris):
         fk.setdefault((sfs_uri, anchor or None), []).append(
             (prop_uri, label, page, text))
     return fk
@@ -4028,7 +4045,6 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     skipped."""
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
-    site = Site.from_catalog(con)
     rows = con.execute(
         "SELECT uri, source, path, title, content_hash FROM documents "
         "ORDER BY source, uri").fetchall()
@@ -4054,10 +4070,20 @@ def generate_site(catalog_path, out_root, progress=None, fresh=None, record=None
     rows += [(uri, src, path, title, None) for (uri, src, path, title)
              in (extra or ())]
 
+    # the Site is built after scoping so an `only`-run's build is targeted too:
+    # its cross-content indexes are queried for just the plan's uris (Site.
+    # from_catalog) -- per-host data, so the scoped build renders and signs those
+    # pages identically to the full one
+    site = Site.from_catalog(
+        con, target_uris=[r[0] for r in rows] if only is not None else None)
     # the whole-corpus dependency digests in one batched pass (not one pair of
-    # subqueries per document -- the 124k-page planning loop); a link-less uri is
-    # absent and takes the empty default
-    deps = catalog.page_dependency_digests(con)
+    # subqueries per document -- the 124k-page planning loop). An `only`-scoped
+    # run (a handful of pages: the targeted CLI render, the editor's post-commit
+    # rebuild) instead looks up just its own uris -- the batched pass streams the
+    # whole 10M-row links table (~30 s), which dwarfs rendering one page. A
+    # link-less uri is absent either way and takes the empty default.
+    deps = (catalog.page_dependency_digests_for(con, [r[0] for r in rows])
+            if only is not None else catalog.page_dependency_digests(con))
     # cross-document content (kommentar prose/.ann, remiss .ann, .corr rows)
     # renders onto OTHER documents' pages -- fold a per-host content digest into
     # the dependency digest so editing it re-renders the host page

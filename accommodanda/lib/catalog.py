@@ -1065,12 +1065,19 @@ def set_fk_kommentar(con, rows):
     con.commit()
 
 
-def fk_kommentar_all(con):
+def fk_kommentar_all(con, uris=None):
     """Every FK commentary row, newest proposition first -- the renderer builds
-    its per-(statute, anchor) rail index from this in one pass."""
+    its per-(statute, anchor) rail index from this in one pass. `uris` scopes
+    the rows to those host statutes (the targeted generate renders a handful of
+    pages, not the corpus); None keeps the full-corpus read."""
+    if uris is not None and not uris:
+        return []
+    where = ("" if uris is None
+             else " WHERE sfs_uri IN (%s)" % ",".join("?" * len(uris)))
     return con.execute(
         "SELECT sfs_uri, sfs_anchor, prop_uri, prop_label, prop_date, page, text "
-        "FROM fk_kommentar ORDER BY prop_date DESC, prop_uri").fetchall()
+        "FROM fk_kommentar%s ORDER BY prop_date DESC, prop_uri" % where,
+        list(uris or ())).fetchall()
 
 
 # how many generations back a paragraf's article set is carried. Two hops is
@@ -1664,3 +1671,38 @@ def page_dependency_digests(con):
         outbound[cur] = h.hexdigest()
     return {uri: _combine_dep(inbound.get(uri), outbound.get(uri))
             for uri in inbound.keys() | outbound.keys()}
+
+
+def page_dependency_digests_for(con, uris):
+    """`page_dependency_digests` scoped to the given uris: the same per-uri
+    digest via two indexed lookups per document instead of the corpus-wide
+    streamed pass (~30 s over a 10M-row links table). For the scoped generate
+    (`lagen <source> generate <id>`, the editor's post-commit rebuild) where the
+    plan is a handful of pages, not 124k. Must stay byte-identical to the
+    batched variant -- the digest enters the page signature stored in the
+    manifest, so a divergence would flip every scoped page's freshness."""
+    out = {}
+    for uri in uris:
+        h, rows = hashlib.sha256(), 0
+        for fields in con.execute(
+                "SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
+                "FROM links l JOIN documents d ON d.uri = l.from_uri "
+                "WHERE l.to_root = ? AND l.from_uri <> l.to_root "
+                "ORDER BY l.from_uri, l.from_anchor", (uri,)):
+            h.update(("\x1f".join("" if c is None else c for c in fields)).encode())
+            h.update(b"\x1e")
+            rows += 1
+        inbound = h.hexdigest() if rows else None
+        h, rows = hashlib.sha256(), 0
+        for (target,) in con.execute(
+                "SELECT DISTINCT l.to_root FROM links l "
+                "JOIN documents d ON d.uri = l.to_root "
+                "WHERE l.from_uri = ? AND l.to_root <> l.from_uri "
+                "ORDER BY l.to_root", (uri,)):
+            h.update(target.encode())
+            h.update(b"\x1e")
+            rows += 1
+        outbound = h.hexdigest() if rows else None
+        if inbound is not None or outbound is not None:
+            out[uri] = _combine_dep(inbound, outbound)
+    return out

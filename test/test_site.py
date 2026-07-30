@@ -126,6 +126,22 @@ def test_relate_is_incremental(tmp_path):
                        (LAW["uri"],)).fetchone()[0] == 0
 
 
+def test_scoped_dep_digests_match_batched(tmp_path):
+    # page_dependency_digests_for (the `only`-scoped generate's per-uri lookup)
+    # must produce byte-identical digests to the corpus-wide batched pass: the
+    # digest enters the page signature stored in the manifest, so a divergence
+    # would flip every scoped page's freshness. Covers all three shapes --
+    # inbound-only (the law, cited by the case; its own P6S1->#P5
+    # self-citation is excluded either way), outbound-only (the case), and
+    # link-less (absent from both results, falling to EMPTY_DEP_DIGEST).
+    con = build_catalog(tmp_path)
+    batched = catalog.page_dependency_digests(con)
+    uris = [LAW["uri"], CASE["uri"], "https://lagen.nu/9999:1"]
+    scoped = catalog.page_dependency_digests_for(con, uris)
+    assert set(batched) == {LAW["uri"], CASE["uri"]}
+    assert scoped == batched
+
+
 def test_relate_survives_artifact_path_move(tmp_path):
     # a document's identity is its uri, not its on-disk path: when an artifact
     # moves to a new path (a storage-layout change) but keeps its uri, relate must
@@ -2051,6 +2067,23 @@ def test_genomfor_partial_flag_preserved(tmp_path):
     con = build_pin_catalog(tmp_path)
     rows = catalog.genomfor_for(con, "https://lagen.nu/2021:500", "K2P1")
     assert rows and rows[0][5] == 1   # partial
+
+
+def test_scoped_site_matches_full_for_target(tmp_path):
+    # a Site built for specific target uris (the `only`-scoped generate) must
+    # carry exactly the full build's cross-content for those hosts -- the rails
+    # render from it AND site_cross_digests signs the page from it, so any
+    # divergence would either drop rail content or flip the page's freshness.
+    # The scoping itself must also be real: the other statute's FK rows stay out.
+    uri = "https://lagen.nu/2021:500"
+    con = build_pin_catalog(tmp_path)
+    full = render.Site.from_catalog(con)
+    scoped = render.Site.from_catalog(con, target_uris=[uri])
+    assert {k: v for k, v in full.fk.items() if k[0] == uri} \
+        == {k: v for k, v in scoped.fk.items()}     # this statute: identical
+    assert any(k[0] != uri for k in full.fk)        # the fixture has other hosts
+    assert render.site_cross_digests(scoped).get(uri) \
+        == render.site_cross_digests(full).get(uri)
 
 
 def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
