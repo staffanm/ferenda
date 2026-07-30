@@ -406,6 +406,30 @@ def test_law_page_has_inbound_annotation(tmp_path):
     assert "NJA 1994 s. 1" in panel
 
 
+def test_paragraf_rail_shows_amendment_history(tmp_path):
+    # S1: the SFSR register's per-provision change records surface in the
+    # provision's own rail panel -- "Ändrad: SFS … (Prop. …)", the SFS number
+    # linking its post in the bottom-of-page register -- while other
+    # provisions' changes and non-proposition förarbeten stay out
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = json.loads(json.dumps(LAW))
+    art["amendments"] = [
+        {"properties": {"dcterms:identifier": "SFS 1975:635"}},
+        {"properties": {"dcterms:identifier": "SFS 2013:55",
+                        "rpubl:andrar": "ändr. 6 §",
+                        "rpubl:ersatter": ["https://lagen.nu/1975:635#P6"]},
+         "forarbeten": ["Bet. 2012/13:CU6", "Prop. 2012/13:36"]},
+        {"properties": {"dcterms:identifier": "SFS 2018:1",
+                        "rpubl:inforsI": ["https://lagen.nu/1975:635#P4A"]}},
+    ]
+    panel = _island(render.render_sfs(art, site))["P6"]
+    assert 'data-sec="andringar" data-label="Ändringar"' in panel
+    assert 'Ändrad: <a href="#L2013:55">SFS 2013:55</a>' in panel
+    assert "Prop. 2012/13:36" in panel
+    assert "Bet. 2012/13:CU6" not in panel      # the register shows those; the
+    assert "SFS 2018:1" not in panel            # rail line names props alone
+
+
 def test_sfs_header_and_meta_placement(tmp_path):
     # C2: the eyebrow is the bare SFS id, the h1 the friendly short name; the full
     # official title moves out of the h1 into dl.meta "Titel". C1: dl.meta sits under

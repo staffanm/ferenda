@@ -589,7 +589,9 @@ details.more > summary { color: var(--ink-3); font-style: italic; font-size: .78
 details.more > summary::-webkit-details-marker { display: none; }
 details.more[open] > summary { margin-bottom: .25rem; }
 details.more > ul { list-style: none; margin: 0; padding: 0; }
-.rail-sec.genomfor .prov, .rail-sec.bemyndigande .prov { color: var(--ink-3); }
+.rail-sec.genomfor .prov, .rail-sec.bemyndigande .prov,
+.rail-sec.andringar .prov { color: var(--ink-3); }
+.rail-sec.andringar .prov a { color: var(--forarbete); }
 
 /* -- Preparatory works ("Förarbeten"), top-billed above the citation panel -- */
 section.forarbeten { margin: 1.25rem 0; font-size: .85rem; }

@@ -1205,7 +1205,7 @@ RAIL_SECTION_ORDER = (
     "kommentar", "fk", "dv", "avg", "hudoc", "icc", "eu-caselaw", "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
-    "vagledning", "skal", "tidigare-beteckning", "motsvarighet")
+    "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
 
 
 def _rail_rank(section):
@@ -1266,6 +1266,10 @@ class Rail:
         # panel id -> (heading, [node ids it covers]) -- more than one only where
         # a first stycke folded into its paragraf (see `add`)
         self.covers = {}
+        # anchor -> [(verb, nr, prop identifiers)]: the provision's own change
+        # history from the SFSR register (amendment_index; render_sfs primes
+        # it, every other vertical leaves it empty)
+        self.amendment_index = {}
 
     def add(self, nid, pinpoint="", extra=()):
         """Record node `nid`'s rail panel if it has commentary, anything cites it,
@@ -1306,7 +1310,8 @@ class Rail:
                         + bemyndigande_margin(self.site, uri)
                         + corresponding_cases_margin(self.site, uri)
                         + renumbered_refs_margin(self.site, uri)
-                        + corresponds_margin(self.site, uri))]
+                        + corresponds_margin(self.site, uri)
+                        + self._andringar(anchor))]
         sections += list(extra) + _inbound_groups(
             self.site, uris,
             exclude_before=_reassigned_before(self.site, uris[0]))
@@ -1419,6 +1424,26 @@ class Rail:
                  for author, blocks in entries]
         return [RailSection("kommentar", "Kommentar", len(items),
                             _RAIL.commentary_list(items))]
+
+    def _andringar(self, anchor):
+        """The provision's own change history (S1): the register posts whose
+        Omfattning names this anchor -- "Ändrad: SFS 2011:864 (Prop.
+        2010/11:158)" -- each linking the amending act's entry in the
+        bottom-of-page register and, where we host it, the proposition. The
+        legacy Ändringar accordion, minus its silent drop of amendments
+        without a registered proposition."""
+        entries = self.amendment_index.get(anchor)
+        if not entries:
+            return []
+        items = []
+        for verb, nr, props in entries:
+            prov = (' <span class="prov">(%s)</span>'
+                    % Markup(", ").join(_prop_link(self.site, f) for f in props)
+                    if props else "")
+            items.append('<li>%s: <a href="#%s">SFS %s</a>%s</li>'
+                         % (verb, escape(register_anchor(nr)), escape(nr), prov))
+        return [RailSection("andringar", "Ändringar", len(items),
+                            _capped_list(items, ANDRINGAR_CAP, "till"))]
 
     def island(self):
         """The ``<script type=application/json>`` island, or '' if no paragraph
@@ -1991,6 +2016,38 @@ def _prop_link(site, ident):
     return Markup(escape(ident))
 
 
+ANDRINGAR_CAP = 5    # register rows shown expanded in a provision's rail
+# how a rail line names what the register's Omfattning predicate did to the
+# provision, keyed by the artifact's amendment property
+AMENDMENT_VERB = {"rpubl:inforsI": "Införd", "rpubl:ersatter": "Ändrad",
+                  "rpubl:upphaver": "Upphävd"}
+
+
+def amendment_index(art):
+    """anchor -> [(verb, SFS nr, prop identifiers)] over the artifact's SFSR
+    register, in register (chronological) order: which change acts introduced,
+    changed or repealed each provision. The per-provision inverse of the
+    register's per-act Omfattning parse, feeding the rail's Ändringar section
+    (Rail._andringar). Rows whose Omfattning names no fragment (a whole-act
+    repeal, an omtryck) stay out -- they are the whole register's story, not
+    one provision's."""
+    index = {}
+    for am in art.get("amendments") or []:
+        p = am.get("properties", {})
+        ident = p.get("dcterms:identifier", "")
+        if not ident.startswith("SFS "):
+            continue
+        props = [f for f in am.get("forarbeten", [])
+                 if f.startswith("Prop. ")]
+        for key, verb in AMENDMENT_VERB.items():
+            # always lists in the artifact (sfs/register.py ALWAYS_LIST)
+            for uri in p.get(key, []):
+                if "#" in uri:
+                    index.setdefault(uri.partition("#")[2], []).append(
+                        (verb, ident[4:], props))
+    return index
+
+
 def _andringar(art, base_id, own_version, versions, site, toc, rail):
     """The bottom-of-page register view (the old pipeline's div.andringar):
     one section per register post -- the base act first, then every change
@@ -2128,6 +2185,9 @@ def render_sfs(art, site):
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
+    # each provision's own change history, shown beside it (S1); the anchors
+    # link into the register section _andringar renders further down
+    rail.amendment_index = amendment_index(art)
     # assign the statute's EU case-law rail up front, telling the join which
     # anchors this consolidation actually has -- a genomförande claim following
     # the proposition's original numbering (a since-renumbered kapitel) must
