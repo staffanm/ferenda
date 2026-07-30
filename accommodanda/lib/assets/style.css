@@ -465,29 +465,39 @@ p.redaktionell { font-family: var(--serif); font-style: italic;
               padding: .3rem .75rem; border-radius: 5px;
               background: var(--surf); border: 1px solid var(--rule-soft); }
 /* the open panel starts at its location and owns the rest of the column, so a
-   panel taller than its § stays readable instead of sliding off with it */
+   panel taller than its § stays readable instead of sliding off with it. The
+   box itself must not eat clicks: it spans down to the column's foot, and the
+   collapsed lines beneath it stay clickable through its empty part (C1) */
 .rail-panelbox { position: absolute; left: 1rem; right: .75rem; bottom: 0;
-                 z-index: 2; }
+                 z-index: 2; pointer-events: none; }
 .rail-panelbox:not(.rail-open) { display: none; }
 .rail-panel { position: sticky; top: 4rem; max-height: calc(100vh - 5rem);
               overflow-y: auto; padding: 1rem 1.1rem 1.25rem;
               border-radius: 6px; background: var(--surf);
-              border: 1px solid var(--rule); }
-/* the collapsed line: reading-column type size, so it registers as a peer of
-   the text beside it rather than as marginalia (C4). One line, always -- the
-   *label* gives way when the column is too narrow ("Författningskommen… (6) + 2
-   ytterligare"), because the counts are what say whether it is worth a look. */
-.rail-stub { display: flex; align-items: baseline; width: 100%; border: 0;
-             background: none; padding: 0; cursor: pointer; text-align: left;
-             font: inherit; font-size: .95rem; line-height: 1.4;
-             color: var(--ink-3); white-space: nowrap; }
+              border: 1px solid var(--rule); pointer-events: auto; }
+/* the sticky panel slides over the collapsed lines below it as you scroll;
+   letting them show through as a faint blur says "there is more underneath"
+   without competing with the panel's own text (C4) */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .rail-panel { background: color-mix(in srgb, var(--surf) 88%, transparent);
+                -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
+}
+/* the collapsed line: the section-heading voice of the panel it stands for
+   (.rail-h/.rail-sec-h -- serif italic, C2), so stub and panel read as the
+   same thing at two sizes. The label keeps one line and ellipsizes; the
+   "+ N ytterligare" tail drops to its own line instead of crowding it (C3). */
+.rail-stub { display: flex; flex-wrap: wrap; align-items: baseline; width: 100%;
+             border: 0; background: none; padding: 0; cursor: pointer;
+             text-align: left; font: inherit; font-size: .85rem;
+             line-height: 1.4; color: var(--ink-3); white-space: nowrap; }
 .rail-stub:hover .rail-stub-label { color: var(--accent); }
-.rail-stub-label { font-family: var(--serif); color: var(--ink-2);
+.rail-stub-label { font-family: var(--serif); font-style: italic;
+                   color: var(--ink-3);
                    min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rail-stub-n { flex: none; color: var(--ink-3);
                font-variant-numeric: oldstyle-nums; margin-left: .3rem; }
-.rail-stub-more { flex: none; color: var(--ink-4); font-size: .85em;
-                  margin-left: .4rem; }
+.rail-stub-more { flex: none; flex-basis: 100%; color: var(--ink-4);
+                  font-size: .85em; }
 /* the focused entry's own line steps aside -- the panel grows out of where it
    stood, so the swap reads as that line expanding rather than as two things (C5) */
 .rail-entry.rail-on { visibility: hidden; }
