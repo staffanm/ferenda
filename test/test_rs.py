@@ -7,6 +7,7 @@ Hermetic: the fixtures under ``test/files/rs/`` are trimmed captures of the live
 exercised against what the agencies actually publish without network or poppler.
 """
 
+import inspect
 import json
 from pathlib import Path
 
@@ -514,6 +515,29 @@ def test_a_failed_document_fetch_leaves_no_record(tmp_path, capsys):
     assert (seen, new) == (1, 0)
     assert not compress.exists(record_path(tmp_path, "fi", "fi/2026:1"))
     assert "could not be fetched" in capsys.readouterr().out
+
+
+def test_migr_records_are_walked_with_fetching_on(monkeypatch):
+    """Regression: `migr_sync` used to end in `_walk(..., fetch=False)`, the
+    flag that means "every document was already fetched by
+    `self_named_document`". That holds for Försäkringskassan, which routes
+    *every* item through it, but Migrationsverket routes only the two entries
+    whose index row states no RS/RK number. The other ~100 were therefore never
+    fetched while their records were written anyway -- so 98 of 100 stored
+    records asserted a PDF that was not on disk, and parse failed all of them.
+
+    Behavioural, not a source grep: `_walk`'s own default is `fetch=True`, so
+    asserting on the call is what still catches the bug if that default ever
+    flips."""
+    captured = {}
+    monkeypatch.setattr(rs_download, "migr_session", lambda: object())
+    monkeypatch.setattr(rs_download, "migr_listing", lambda session, delay: [])
+    monkeypatch.setattr(rs_download, "_walk",
+                        lambda *a, **kw: captured.update(kw) or (0, 0))
+    rs_download.migr_sync("/nonexistent")
+    assert captured.get("fetch", True) is not False, (
+        "migr_sync must not disable fetching -- only 2 of its ~104 documents "
+        "are fetched by self_named_document")
 
 
 def test_a_record_naming_no_document_is_still_written(tmp_path):

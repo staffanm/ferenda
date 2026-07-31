@@ -220,9 +220,14 @@ def _walk(root, records, session, delay, full, limit, scope, fetch=True):
     entry) rather than "the fetch broke". A failure therefore leaves the
     previous good record in place and the next run retries it.
 
-    ``fetch=False`` is Försäkringskassans and Migrationsverkets route, where the
-    document had to be fetched earlier -- the number that names it is printed
-    inside it (`self_named_document`) -- and is already on disk."""
+    ``fetch=False`` is Försäkringskassans route, where *every* document had to be
+    fetched earlier -- the number that names it is printed inside it
+    (`self_named_document`) -- and is already on disk. Migrationsverket looks
+    like that route but is not: only the two entries whose index row states no
+    RS/RK number go through `self_named_document`, so the other ~100 have never
+    been fetched when they arrive here and must be fetched like anyone else.
+    `fetch_document` returns an already-stored PDF untouched, so the two that
+    were fetched early are not refetched."""
     seen = new = failed = 0
     rep = Reporter()
     for record in records:
@@ -743,7 +748,7 @@ def migr_sync(root, full=False, only=None, limit=None, delay=0.5):
         print("migr: %d document(s) name no RS/RK number and cannot be filed: %s"
               % (len(orphans), ", ".join(orphans)), flush=True)
     return _walk(root, _select(migr_current(records), only), session, delay,
-                 full, None, "migr", fetch=False)
+                 full, None, "migr")
 
 
 # --------------------------------------------------------------------------
