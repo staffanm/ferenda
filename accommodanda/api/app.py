@@ -34,7 +34,9 @@ from pydantic import BaseModel
 
 # StaticFiles.get_response raises Starlette's HTTPException (FastAPI's is a
 # subclass, so it would not catch the parent) -- the SiteFiles rewrite catches this
+from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.staticfiles import NotModifiedResponse
 
 from .. import config
 from ..lib import (
@@ -924,6 +926,13 @@ class SiteFiles(StaticFiles):
                     resp = FileResponse(full, stat_result=st, media_type=media_type)
                     resp.headers["Content-Encoding"] = enc
                     resp.headers["Vary"] = "Accept-Encoding"
+                    # FileResponse stamps ETag/Last-Modified but never reads the
+                    # request's conditional headers -- that check lives in
+                    # StaticFiles.get_response, which this precompressed branch
+                    # bypasses. Replicate it, or every revalidation resends the
+                    # full body as a 200.
+                    if self.is_not_modified(resp.headers, Headers(scope=scope)):
+                        return NotModifiedResponse(resp.headers)
                     return resp
             # client accepts no stored encoding: decode one and serve identity
             enc, (full, _st) = next(iter(variants.items()))

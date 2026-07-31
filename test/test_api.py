@@ -9,8 +9,9 @@ import pytest
 from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 
+from accommodanda import config
 from accommodanda.api import app as api
-from accommodanda.lib import catalog
+from accommodanda.lib import catalog, compress
 
 
 @pytest.fixture
@@ -268,6 +269,28 @@ def test_serve_mounts_static_site_alongside_api(client, tmp_path):
         assert client.get("/api/v1/sources").status_code == 200   # API wins
         root = client.get("/")
         assert root.status_code == 200 and "frontpage" in root.text
+    finally:
+        api.app.router.routes.pop()                               # unmount
+
+
+def test_site_asset_revalidation_304(client, tmp_path, monkeypatch):
+    # SiteFiles' precompressed branch builds its FileResponse directly, outside
+    # StaticFiles.get_response's not-modified check -- a browser revalidating
+    # style.css/script.js with If-None-Match must get a 304, not the body again
+    monkeypatch.setattr(config, "COMPRESS", True)
+    site = tmp_path / "site"
+    site.mkdir()
+    compress.write_text(site / "style.css", "body { color: red }\n" * 100)
+    api.app.mount("/", api.SiteFiles(directory=str(site), html=True), name="site")
+    try:
+        first = client.get("/style.css", headers={"Accept-Encoding": "br"})
+        assert first.status_code == 200
+        assert first.headers["content-encoding"] == "br"
+        etag = first.headers["etag"]
+        again = client.get("/style.css", headers={"Accept-Encoding": "br",
+                                                  "If-None-Match": etag})
+        assert again.status_code == 304
+        assert not again.content
     finally:
         api.app.router.routes.pop()                               # unmount
 
