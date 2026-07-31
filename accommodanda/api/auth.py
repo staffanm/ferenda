@@ -43,6 +43,11 @@ from .. import config
 router = APIRouter()
 
 COOKIE = "lagen_editor"
+# The session cookie is HttpOnly, so page scripts can't tell whether a session
+# exists. This companion cookie is a readable, non-secret hint ("a login
+# happened here") that lets editor.js skip the /auth/me roundtrip on every
+# anonymous page load; the session cookie alone remains the credential.
+COOKIE_HINT = "lagen_editor_hint"
 SESSION_TTL = 14 * 24 * 3600          # two weeks; re-login after that
 PBKDF2_ROUNDS = 260_000               # OWASP-ish floor for pbkdf2-sha256
 
@@ -326,6 +331,9 @@ def login(body: LoginBody, request: Request, response: Response):
     response.set_cookie(COOKIE, issue(body.username, entry["pwhash"]), max_age=SESSION_TTL,
                         httponly=True, samesite="lax",
                         secure=config.COOKIE_SECURE, path="/")
+    response.set_cookie(COOKIE_HINT, "1", max_age=SESSION_TTL,
+                        httponly=False, samesite="lax",
+                        secure=config.COOKIE_SECURE, path="/")
     return Me(username=body.username, name=entry["name"])
 
 
@@ -333,6 +341,7 @@ def login(body: LoginBody, request: Request, response: Response):
 def logout(response: Response):
     """Clear the session cookie. Idempotent -- safe to call when not logged in."""
     response.delete_cookie(COOKIE, path="/")
+    response.delete_cookie(COOKIE_HINT, path="/")
     return {"ok": True}
 
 

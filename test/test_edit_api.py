@@ -78,8 +78,12 @@ def test_login_bad_password(env):
 def test_login_me_logout(env):
     c = TestClient(api.app)
     assert _login(c).json() == {"username": "anna", "name": "Anna Ek"}
+    # the JS-readable hint cookie rides along with the HttpOnly session cookie
+    # -- editor.js keys the "should I even call /auth/me" decision on it
+    assert c.cookies.get(auth.COOKIE_HINT) == "1"
     assert c.get("/api/v1/auth/me").json()["username"] == "anna"
     c.post("/api/v1/auth/logout")
+    assert c.cookies.get(auth.COOKIE_HINT) is None
     assert c.get("/api/v1/auth/me").status_code == 401
 
 

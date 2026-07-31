@@ -1,5 +1,7 @@
 /* The inline editor. Loaded on every page but inert until a logged-in session
-   is confirmed (GET /auth/me); the static HTML stays identical and cacheable
+   is confirmed (GET /auth/me -- only attempted when the login-time hint cookie
+   is present, so an anonymous reader costs no API roundtrip at all); the
+   static HTML stays identical and cacheable
    for anonymous readers, the edit affordances are grafted on client-side --
    the same approach scrollspy.js uses to inject the rail dots. It reads the
    page's identity from the <meta name="lagen-doc"> injected by
@@ -28,14 +30,26 @@
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 
-  // the login check that decides whether any edit UI appears. A 401/403 (anon or
-  // editing disabled) leaves the page exactly as a reader sees it.
-  j(API + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (u) {
-      me = u;
-      account();
-      if (me) { mountCart(); refreshCart(); enableEditing(); }
-    });
+  // the login check that decides whether any edit UI appears. The session
+  // cookie is HttpOnly, so the readable lagen_editor_hint cookie (set/cleared
+  // by /auth/login and /auth/logout) stands in for "a session may exist": no
+  // hint means an anonymous reader, and the page loads without touching the
+  // API. With the hint, a 401/403 (expired session or editing disabled)
+  // leaves the page exactly as a reader sees it -- and drops the stale hint.
+  function boot(u) {
+    me = u;
+    account();
+    if (me) { mountCart(); refreshCart(); enableEditing(); }
+  }
+  if (/(?:^|;\s*)lagen_editor_hint=/.test(document.cookie)) {
+    j(API + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (u) {
+        if (!u) document.cookie = 'lagen_editor_hint=; Max-Age=0; path=/';
+        boot(u);
+      });
+  } else {
+    boot(null);
+  }
 
   // A logged-in editor keeps a header indicator (who they are · Logga ut). An
   // anonymous reader gets no sign-in affordance in the masthead -- login lives on
