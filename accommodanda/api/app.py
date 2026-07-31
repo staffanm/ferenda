@@ -54,7 +54,7 @@ from ..lib import (
     search,
 )
 from ..lib.util import basefile_slug
-from . import auth, edit, ops, patch
+from . import auth, edit, errors, ops, patch
 from . import mcp as mcp_server
 
 CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
@@ -90,6 +90,10 @@ app.include_router(patch.router)   # the patch-file (source-fix) editor
 # the public MCP server at /mcp (Streamable HTTP) -- the corpus reshaped as tools
 # for AI hosts. Added before serve()'s static "/" catch-all so its routes win.
 mcp_server.mount(app)
+
+# rendered 404/500 pages for the site, JSON (plus an error_id) for the API, and
+# a ledger entry behind both -- see api/errors.py and `lagen all errors`
+errors.install(app)
 
 # one search client for the process; constructing it does not open a connection,
 # so importing/serving the API never requires a running OpenSearch -- only an

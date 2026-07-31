@@ -1,0 +1,46 @@
+{#- The 404 / 500 page. Extends the site shell so a reader who lands here is
+    still on lagen.nu -- same masthead, same theme toggle, same search.
+
+    The status code goes in page.html's `eyebrow` slot and the message in its
+    `title`, so the heading block is the site's own frontmatter rather than a
+    second, slightly-different one: an error page is the last place that should
+    look like a different site. Only what the shell has no slot for -- the
+    suggestions and the error reference -- is styled here.
+
+    That styling is inline rather than in style.css on purpose: this page is
+    what renders when something is wrong, and one of the things that can be
+    wrong is the generated tree the stylesheet is served from (a faulted storage
+    mount answers /style.css with an error too). An error page that depends on
+    the machinery whose failure it is reporting is no error page, so what it
+    needs to stay readable travels with it.
+
+    `error_id` is the ledger key (lib/errorlog); it is shown as the one thing
+    worth quoting in a report, and is `user-select:all` so a click selects the
+    whole id rather than half of it. -#}
+{% extends "page.html" %}
+{% block body %}
+<ul class="errdo">
+  {%- for label, href in suggestions %}
+  <li><a href="{{ href }}">{{ label }}</a></li>
+  {%- endfor %}
+</ul>
+<p class="errid">Felreferens <code>{{ error_id }}</code></p>
+<p class="errfoot">Uppge den om du rapporterar felet — den pekar ut exakt den
+  här förfrågan i loggen.</p>
+<style>
+.frontmatter .eyebrow{font:600 .8rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.14em;text-transform:uppercase}
+{#- no border-top here: the frontmatter block above already closes with a rule,
+    and a second one right under it reads as an empty band -#}
+.errdo{list-style:none;padding:0;margin:.5rem 0 0;max-width:34rem}
+.errdo li{border-bottom:1px solid var(--rule,rgba(128,128,128,.28))}
+.errdo a{display:block;padding:.7rem .2rem;text-decoration:none;font-weight:500}
+.errdo a:hover{text-decoration:underline}
+.errdo a::after{content:"→";float:right;opacity:.45}
+.errid{margin-top:2.5rem;font-size:.95rem}
+.errid code{user-select:all;font-size:1.05em;padding:.15em .45em;border-radius:.3em;
+  background:var(--surf,rgba(128,128,128,.14));
+  border:1px solid var(--rule,rgba(128,128,128,.28))}
+.errfoot{font-size:.9rem;opacity:.7;max-width:34rem}
+</style>
+{% endblock %}

@@ -30,16 +30,11 @@ import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .util import write_atomic
+from .util import append_json_line, now_iso, read_json_lines, write_atomic
 
 SLOWEST_CAP = 20          # slowest-docs samples kept per segment event
 TB_CAP = 4096             # chars of traceback kept per errors.json entry (the tail)
 SAMPLE_LIMIT = 200        # full tracebacks per (source, stage) per apply_outcomes call
-
-
-def now_iso(dt=None):
-    """ISO-8601 UTC second-resolution timestamp; `dt` injectable for tests."""
-    return (dt or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def make_run_id(pid, dt=None):
@@ -56,13 +51,9 @@ def make_run_id(pid, dt=None):
 # --------------------------------------------------------------------------
 
 def append_event(path, obj):
-    """Append one JSON line to the ledger, flushed so a crash right after the
-    write still leaves the event on disk."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        f.flush()
+    """Append one JSON line to the run ledger. The mechanics are
+    `util.append_json_line`, shared with the served-site error ledger."""
+    append_json_line(path, obj)
 
 
 def emit_run_start(path, run, argv, pid, t=None):
@@ -92,26 +83,10 @@ def emit_run_end(path, run, secs, ok, errors, t=None):
 # --------------------------------------------------------------------------
 
 def _iter_events(path):
-    """Every ledger event, in file order; a missing ledger is just empty. A
-    torn final line -- a crash mid-append leaves a partial JSON line -- is
-    dropped so one interrupted write does not brick every subsequent read (and,
-    via prune(), every subsequent build). The catch is deliberately narrowed to
-    the *last* line only: corruption anywhere earlier is a real integrity
-    failure and must still raise (rule:narrow-what-you-catch)."""
-    path = Path(path)
-    if not path.exists():
-        return []
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines()
-             if line.strip()]
-    events = []
-    for i, line in enumerate(lines):
-        try:
-            events.append(json.loads(line))
-        except json.JSONDecodeError:
-            if i == len(lines) - 1:
-                break
-            raise
-    return events
+    """Every ledger event, in file order -- `util.read_json_lines`, shared with
+    the served-site error ledger, which meets the same torn-final-line case (a
+    crash mid-append) and narrows the tolerance the same way."""
+    return read_json_lines(path)
 
 
 def _group_runs(events):

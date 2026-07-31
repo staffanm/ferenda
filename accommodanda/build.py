@@ -51,6 +51,7 @@ import requests
 from . import config, patchsource
 from .api import app as api_app
 from .api import edit as api_edit
+from .api import errors as api_errors
 from .api import patch as api_patch
 from .avg import download as avg_download
 from .avg import model as avg_model
@@ -96,6 +97,7 @@ from .lib import (
     catalog,
     compress,
     dump,
+    errorlog,
     labels,
     layout,
     llm,
@@ -4119,8 +4121,13 @@ def main(argv=None):
                    % ", ".join(SOURCES))
     p.add_argument("action",
                    help="download | parse | relate | generate | index | dump "
-                        "| rebuild | all | serve | status | patch-show | mkpatch "
-                        "| a source action (e.g. dv reindex). `rebuild` runs the "
+                        "| rebuild | all | serve | status | errors | patch-show "
+                        "| mkpatch "
+                        "| a source action (e.g. dv reindex). `errors` prints "
+                        "the served site's error ledger, newest first (the "
+                        "newest 50, or N with `lagen all errors 200`), or one "
+                        "entry in full when given the 8-hex id an error page "
+                        "showed (`lagen all errors 3f9a1c07`). `rebuild` runs the "
                         "offline pipeline (parse -> relate -> index -> dump -> "
                         "generate) over already-downloaded data; `all` is "
                         "download followed by rebuild. Every step is incremental, "
@@ -4222,7 +4229,8 @@ def main(argv=None):
     # or error tally
     RUN_ID = None
     RUN_ERRORS = 0
-    if args.action not in ("serve", "status", "runs") and not RUN.dry_run:
+    if args.action not in ("serve", "status", "runs", "errors") \
+            and not RUN.dry_run:
         RUN_ID = runlog.make_run_id(os.getpid())
         runlog.prune(RUNS)
         runlog.emit_run_start(RUNS, RUN_ID, ["lagen", *argv], os.getpid())
@@ -4257,6 +4265,57 @@ def _cmd_runs(limit):
               % (r["run"], r["status"], secs, r["segments"], r["errors"],
                  " ".join(r["argv"]) if r["argv"] else
                  "(command line lost -- pruned by a concurrent run)"))
+
+
+ERRORS_DEFAULT_LIMIT = 50       # `lagen all errors` with no argument
+
+
+def _cmd_errors(arg=None):
+    """`lagen all errors [<id> | <N>]`: the served site's error ledger.
+
+    Bare, it lists the newest `ERRORS_DEFAULT_LIMIT` errors, one line each --
+    capped because a bot storm (or a storage fault turning every request into a
+    404) can fill both ledger generations, and dumping 16 MB at a terminal
+    helps nobody. `<N>` asks for a different count, the way `runs [N]` does;
+    `<id>` -- the eight hex characters the error page showed the reader --
+    prints that one request in full, traceback included.
+
+    Like `runs`, neither a stage nor a source action, so it is intercepted
+    before the dispatch loop and writes no run-ledger entry of its own."""
+    # an id is matched on *shape*, not on being non-numeric: ids are
+    # secrets.token_hex(4), and about 1 in 43 of those is all digits -- so
+    # `arg.isdigit()` would read a reader's quoted "20260731" as a count and
+    # silently print 20 million ledger lines instead of their one record
+    error_id = arg if arg and errorlog.RE_ID.fullmatch(arg) else None
+    limit = None if error_id else (int(arg) if arg else ERRORS_DEFAULT_LIMIT)
+    if arg and error_id is None and not arg.isdigit():
+        raise ValueError("%r is neither an 8-hex error id nor a count" % arg)
+    records = errorlog.entries(api_errors.LEDGER, error_id=error_id, limit=limit)
+    if not records:
+        print("no error %r in the ledger (%s)" % (error_id, api_errors.LEDGER)
+              if error_id
+              else "no errors recorded yet (%s)" % api_errors.LEDGER)
+        return
+    if not error_id:
+        for r in records:
+            print("%s  %s  %3s  %-4s %s%s"
+                  % (r["id"], r["time"], r["status"], r["method"] or "-",
+                     r["url"] or "-",
+                     "  <- %s" % r["referer"] if r["referer"] else ""))
+        return
+    for r in records:
+        # every record carries every FIELDS key (errorlog.record writes them
+        # all, absent ones as None), so index rather than .get -- a missing key
+        # would be a schema drift worth crashing on, not worth papering over
+        for key in errorlog.FIELDS:
+            if r[key] in (None, ""):
+                continue
+            # the traceback is the only multi-line field; give it its own block
+            # rather than crushing it onto a label line
+            if key == "traceback":
+                print("\ntraceback:\n%s" % r[key].rstrip())
+            else:
+                print("%-12s %s" % (key + ":", r[key]))
 
 
 def cmd_patch_show(args, p):
@@ -4427,6 +4486,9 @@ def _dispatch(args, p, jobs):
         return
     if args.action == "runs":
         _cmd_runs(int(args.basefiles[0]) if args.basefiles else None)
+        return
+    if args.action == "errors":
+        _cmd_errors(args.basefiles[0] if args.basefiles else None)
         return
 
     names = list(SOURCES) if args.source == "all" else [args.source]

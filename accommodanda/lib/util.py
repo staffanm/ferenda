@@ -1,11 +1,13 @@
 """Small shared utilities (ported from ferenda.util)."""
 
+import json
 import os
 import re
 import shutil
 import sys
 import time
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -453,3 +455,50 @@ def swedish_date(text):
     m = SV_DATE.search(text or "")
     return ("%s-%02d-%02d" % (m.group(3), MONTHS[m.group(2).lower()], int(m.group(1)))
             if m else None)
+
+
+# --------------------------------------------------------------------------
+# ndjson ledgers -- shared by the run ledger (lib/runlog) and the served-site
+# error ledger (lib/errorlog), which are append-only files with the same
+# durability requirement and had identical copies of both of these
+# --------------------------------------------------------------------------
+
+def now_iso(dt=None):
+    """ISO-8601 UTC second-resolution timestamp; `dt` injectable for tests."""
+    return (dt or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def append_json_line(path, obj):
+    """Append one JSON object as a line to an ndjson ledger, flushed so a crash
+    right after the write still leaves the record on disk."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+        f.flush()
+
+
+def read_json_lines(path, *, errors="strict"):
+    """Every record in an ndjson ledger, in file order; a missing file is just
+    empty.
+
+    A torn *final* line -- a crash caught mid-append, the one corruption an
+    append-only file produces in normal operation -- is dropped, so one
+    interrupted write does not brick every subsequent read. The tolerance is
+    deliberately narrowed to the last line: a malformed line anywhere earlier is
+    a real integrity failure and still raises (rule:narrow-what-you-catch)."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    lines = [line for line in
+             path.read_text(encoding="utf-8", errors=errors).splitlines()
+             if line.strip()]
+    out = []
+    for i, line in enumerate(lines):
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i == len(lines) - 1:
+                break
+            raise
+    return out
