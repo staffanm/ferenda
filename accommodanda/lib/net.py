@@ -13,13 +13,24 @@ logs every failed response (status, headers, body) to stderr so a WAF/rate-limit
 block is distinguishable from a genuine error.
 """
 
+import atexit
+import functools
 import json
+import os
+import socket
 import ssl
 import sys
+import tempfile
 import time
+from pathlib import Path
 
+import certifi
 import httpx
 import requests
+from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.x509.oid import AuthorityInformationAccessOID
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -86,6 +97,139 @@ def mount_legacy_tls(session, prefix):
     policy. The security level is lowered for that host alone, never
     session-wide."""
     session.mount(prefix, _LegacyTLSAdapter(max_retries=_RETRY))
+
+
+class _BundleTLSAdapter(HTTPAdapter):
+    """An HTTPS adapter verifying against a caller-supplied trust bundle."""
+
+    def __init__(self, cafile, **kwargs):
+        self._cafile = cafile
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = ssl.create_default_context(cafile=self._cafile)
+        return super().init_poolmanager(*args, **kwargs)
+
+
+def _leaf_certificate(host, port, timeout):
+    """The leaf certificate a host presents, read without verifying it -- which
+    is all this step is for: the certificate's own AIA extension is what names
+    the issuer to go and fetch, and until that issuer is in hand no chain can be
+    built to verify anything against. Verification happens on the real requests,
+    against the completed bundle."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with socket.create_connection((host, port), timeout) as raw:
+        with context.wrap_socket(raw, server_hostname=host) as tls:
+            der = tls.getpeercert(binary_form=True)
+    # typed Optional because a socket that never handshook has no peer cert;
+    # this one has (the `with` completed), and a None here is a broken TLS stack
+    assert der is not None, "%s completed a TLS handshake with no certificate" % host
+    return x509.load_der_x509_certificate(der)
+
+
+def _ca_issuers_url(certificate):
+    """The caIssuers URL a certificate's Authority Information Access extension
+    names -- where the issuer that signed it can be downloaded."""
+    access = certificate.extensions.get_extension_for_class(
+        x509.AuthorityInformationAccess).value
+    urls = [d.access_location.value for d in access
+            if d.access_method == AuthorityInformationAccessOID.CA_ISSUERS]
+    if not urls:
+        raise ValueError("certificate %s names no caIssuers URL, so the chain "
+                         "its server omitted cannot be completed"
+                         % certificate.subject.rfc4514_string())
+    return urls[0]
+
+
+# how far up an omitted chain to walk before giving up. Two is the real depth
+# today (lifos omits both its intermediate and the cross-signed root above it);
+# the bound is what stops a malicious or looping AIA graph from being followed
+# forever.
+AIA_CHAIN_MAX = 4
+
+
+@functools.cache
+def _trusted_roots():
+    """The system trust anchors (certifi), grouped by subject -- the terminator
+    every completed chain has to reach."""
+    roots = {}
+    for root in x509.load_pem_x509_certificates(Path(certifi.where()).read_bytes()):
+        roots.setdefault(root.subject, []).append(root)
+    return roots
+
+
+def _anchored(certificate):
+    """Whether `certificate` was issued by a trust anchor -- i.e. the chain
+    above it is already complete. Verified cryptographically, not by name: a
+    subject match alone proves nothing."""
+    for root in _trusted_roots().get(certificate.issuer, ()):
+        try:
+            certificate.verify_directly_issued_by(root)
+            return True
+        except (ValueError, TypeError, InvalidSignature):
+            continue
+    return False
+
+
+def _omitted_chain(leaf, session, timeout):
+    """The intermediates a server left out, fetched by walking its leaf's AIA
+    pointers upward until one of them is issued by a trust anchor.
+
+    **Every link is verified before it is used.** `verify_directly_issued_by`
+    checks that the fetched certificate actually signed the one below it, and
+    the walk only stops on a certificate a certifi root demonstrably signed. So
+    the bytes an attacker could substitute at the (plain-HTTP, by convention)
+    caIssuers URL cannot enter the trust store: a forged or self-signed
+    certificate fails the signature check, and a real certificate that chains
+    nowhere trusted fails the terminator check. That is what makes this
+    different from turning verification off, which is what the shape of this
+    failure -- "unable to get local issuer certificate" -- usually tempts."""
+    chain, certificate = [], leaf
+    while not _anchored(certificate):
+        if len(chain) == AIA_CHAIN_MAX:
+            raise ValueError(
+                "the chain above %s does not reach a trusted root within %d "
+                "AIA hops" % (leaf.subject.rfc4514_string(), AIA_CHAIN_MAX))
+        issuer = x509.load_der_x509_certificate(
+            request(session, "GET", _ca_issuers_url(certificate),
+                    timeout=timeout).content)
+        # raises if `issuer` did not sign `certificate` -- the check the whole
+        # helper's safety rests on
+        certificate.verify_directly_issued_by(issuer)
+        chain.append(issuer)
+        certificate = issuer
+    return chain
+
+
+def mount_aia_chain(session, prefix, host, port=443, timeout=30):
+    """Verify one host's TLS against a trust bundle completed by AIA chasing,
+    for that host prefix alone.
+
+    Some servers send only their leaf certificate and leave the client to find
+    the intermediates above it -- ``lifos.migrationsverket.se`` is one, and omits
+    two (Let's Encrypt's YR2 and the ISRG "Root YR" cross-signed into ISRG Root
+    X1) -- so every requests/curl fetch of it fails with "unable to get local
+    issuer certificate" while browsers, which chase the certificate's Authority
+    Information Access pointers, load it fine. This does the same, and verifies
+    each fetched certificate against the one below it and the top of the walk
+    against a certifi root (see :func:`_omitted_chain`) before any of it is
+    trusted.
+
+    The intermediates then go into the bundle an ``SSLContext`` verifies
+    against, which is the only trust material it takes and which it takes only
+    from disk -- hence the temporary file, one per mounted host, removed when
+    the process exits."""
+    chain = _omitted_chain(_leaf_certificate(host, port, timeout), session, timeout)
+    handle, path = tempfile.mkstemp(prefix="aia-", suffix=".pem")
+    with os.fdopen(handle, "wb") as bundle:
+        bundle.write(Path(certifi.where()).read_bytes())
+        for certificate in chain:
+            bundle.write(b"\n")
+            bundle.write(certificate.public_bytes(Encoding.PEM))
+    atexit.register(lambda: Path(path).unlink(missing_ok=True))
+    session.mount(prefix, _BundleTLSAdapter(path, max_retries=_RETRY))
 
 
 # response headers worth quoting when a request fails: they are what tells a

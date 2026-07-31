@@ -7,9 +7,17 @@ expose, and a hand-rolled stand-in with the convenient attributes would assert
 that claim without testing it -- a real `httpx.Response` has neither `ok` nor
 `reason`, and reaches `url` through its bound request."""
 
+import datetime
+from unittest import mock
+
 import httpx
 import pytest
 import requests
+from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 from accommodanda.lib import net
 
@@ -99,3 +107,112 @@ def test_describe_response_truncates_a_gateway_html_page():
     described = net.describe_response(resp, body_chars=600)
     assert len(described) < 600 + 300
     assert "more chars]" in described
+
+
+# --------------------------------------------------------------------------
+# AIA chain completion (`mount_aia_chain`) -- what makes it safe
+# --------------------------------------------------------------------------
+
+def selfsigned(common_name):
+    """A self-signed CA -- what an attacker who controls the plain-HTTP
+    caIssuers fetch would substitute for the real intermediate."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    now = datetime.datetime.now(datetime.UTC)
+    return key, (x509.CertificateBuilder()
+                 .subject_name(name).issuer_name(name)
+                 .public_key(key.public_key()).serial_number(1)
+                 .not_valid_before(now)
+                 .not_valid_after(now + datetime.timedelta(days=1))
+                 .add_extension(x509.BasicConstraints(ca=True, path_length=None),
+                                critical=True)
+                 .sign(key, hashes.SHA256()))
+
+
+def issued_by(issuer_key, issuer_cert, common_name):
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.datetime.now(datetime.UTC)
+    return key, (x509.CertificateBuilder()
+                 .subject_name(x509.Name(
+                     [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]))
+                 .issuer_name(issuer_cert.subject)
+                 .public_key(key.public_key()).serial_number(2)
+                 .not_valid_before(now)
+                 .not_valid_after(now + datetime.timedelta(days=1))
+                 .sign(issuer_key, hashes.SHA256()))
+
+
+def test_anchored_rejects_a_certificate_no_trusted_root_signed():
+    """The terminator check. A `cafile` entry is a *trust anchor*, so appending
+    an unverified AIA-fetched certificate to certifi's bundle would trust it
+    outright -- an attacker's self-signed CA included. `_anchored` is what stops
+    the walk only on a certificate a real root demonstrably signed."""
+    _key, evil = selfsigned("EVIL-CA")
+    assert net._anchored(evil) is False
+
+
+def serves(certificate):
+    """A session answering every request with `certificate` -- the plain-HTTP
+    caIssuers fetch, with the bytes an attacker on that path would choose."""
+    class _Session:
+        def request(self, _method, _url, **_kwargs):
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = certificate.public_bytes(serialization.Encoding.DER)
+            resp.url = "http://evil.example/ca"
+            return resp
+    return _Session()
+
+
+def test_omitted_chain_refuses_an_issuer_naming_itself_the_real_one():
+    """The signature check, which is the one that matters.
+
+    The caIssuers URL is named by a certificate read over a deliberately
+    unverified connection and is fetched over plain HTTP, so an attacker on that
+    path chooses the bytes -- and chooses the *name* on them too. A forgery
+    carrying the real issuer's DN gets past every name comparison and is stopped
+    only by the signature not verifying against its key."""
+    real_key, real = selfsigned("Real Intermediate")
+    _leaf_key, leaf = issued_by(real_key, real, "victim.example")
+    # same subject name as the issuer the leaf really has, a different key
+    _evil_key, evil = selfsigned("Real Intermediate")
+    assert evil.subject == leaf.issuer          # the name check would pass ...
+    with mock.patch.object(net, "_ca_issuers_url",
+                           return_value="http://evil.example/ca"), \
+            pytest.raises(InvalidSignature):    # ... the signature does not
+        net._omitted_chain(leaf, serves(evil), 5)
+
+
+def test_omitted_chain_refuses_an_issuer_for_another_certificate_entirely():
+    """The cheaper half of the same check: a substituted certificate that does
+    not even claim to be the leaf's issuer."""
+    _evil_key, evil = selfsigned("EVIL-CA")
+    _leaf_key, leaf = selfsigned("victim.example")
+    with mock.patch.object(net, "_ca_issuers_url",
+                           return_value="http://evil.example/ca"), \
+            pytest.raises(ValueError):
+        net._omitted_chain(leaf, serves(evil), 5)
+
+
+def test_omitted_chain_gives_up_rather_than_following_a_loop():
+    """A self-issued certificate served at its own caIssuers URL would otherwise
+    be walked forever; the bound is what stops a malicious or looping AIA
+    graph."""
+    key, ca = selfsigned("LOOP-CA")
+    _leaf_key, leaf = issued_by(key, ca, "victim.example")
+    with mock.patch.object(net, "_ca_issuers_url",
+                           return_value="http://loop.example/ca"), \
+            pytest.raises(ValueError, match="does not reach a trusted root"):
+        net._omitted_chain(leaf, serves(ca), 5)
+
+
+def test_omitted_chain_stops_at_an_anchored_certificate():
+    """A leaf whose issuer is already a trust anchor needs no completion at all,
+    and must not send a request to find that out."""
+    class _Refuses:
+        def request(self, *_a, **_kw):
+            raise AssertionError("fetched an issuer for an anchored leaf")
+
+    _key, leaf = selfsigned("anchored.example")
+    with mock.patch.object(net, "_anchored", return_value=True):
+        assert net._omitted_chain(leaf, _Refuses(), 5) == []

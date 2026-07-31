@@ -36,6 +36,11 @@ dependencies = [
     # (lib/compress): ~3x smaller than gzip on the JSON/HTML payload and a
     # faster decompress; the served .br bytes are what nginx hands out as-is.
     "brotli",
+    # x509 parsing for the AIA-completed trust bundle lib/net.mount_aia_chain
+    # builds: lifos.migrationsverket.se serves only its leaf certificate, so the
+    # intermediate has to be fetched from the AIA pointer the leaf carries
+    "certifi",
+    "cryptography",
     "fastapi",
     # starlette's TestClient (used in-process for static browse-page generation)
     # requires httpx2; without it starlette falls back to httpx with a deprecation
