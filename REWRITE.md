@@ -164,7 +164,8 @@ accommodanda/
   untc/     UN Treaty Collection (MTDSG status) vertical — download·model·parse
   icc/      International Criminal Court case-law vertical — download·model·parse
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
-  avg/      JO/JK/ARN-decisions vertical — download·model·parse
+  avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
+  rs/       rättsliga-ställningstaganden vertical (6 myndigheter) — agencies·download·model·parse
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
@@ -2294,7 +2295,7 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `test_foreskrift_small_series_gets_one_index_page`,
   `test_foreskrift_large_series_partitions_by_year_with_top_axis`).
 
-### 7f. avg vertical — JO + JK + ARN myndighetsavgöranden ✅ (first cut)
+### 7f. avg vertical — JO + JK + ARN + IMY + KKV myndighetsavgöranden ✅ (first cut)
 
 `accommodanda/avg/` — vägledande avgöranden from Riksdagens ombudsmän (JO) and
 Justitiekanslern (JK), ported from the legacy `jo.py`/`jk.py`. One vertical,
@@ -2425,6 +2426,257 @@ now have internal targets.
   (`render.render_myndigheter`) introducing föreskrifter and avgöranden side
   by side, each linking into its own browse tree. `test/test_site.py`
   (`test_myndigheter_landing_links_both_collections`).
+- ✅ **IMY as the fourth organ (2026-07-30).** Integritetsskyddsmyndighetens
+  tillsynsbeslut — the GDPR practice, which nothing in the corpus had — from
+  `imy.se/tillsyner/` (~130 tillsyn pages, 2018–; the listing is a Vue app but
+  the server still renders `?page=N`, so no API contract is reverse-engineered).
+  - **The published unit is not the document.** A tillsyn page carries a
+    heading, an ingress, the tillsyn's current step and IMY's own summary of
+    the outcome, and *attaches* the decisions as PDFs — and the diarienummer
+    that names each decision is printed only inside those PDFs. So the
+    harvester reads them (`imy_diarienummer`, page-1 header, two template
+    generations: the prefixed `IMY-2024-2904`/`DI-2019-3375`, and the pre-2018
+    bare `2248-2017` that only its position after the "Diarienr" column head
+    tells from a date or the form number printed left of it) and regroups the
+    documents by the number. That regrouping (`imy_records`) is what resolves
+    all three of the corpus's shapes at once: one page deciding several ärenden
+    (seven "Grannbevakning" beslut, seven brottsbekämpande myndigheter — each
+    becomes its own decision, its title disambiguated by the document heading),
+    one ärende published as several documents (a beslut plus the
+    tillsynsskrivelse that opened it, plus an English translation — one
+    decision, several `delar`), and one document hanging off several tillsyner
+    (the vårdgivar-vägledning off eight pages, the 1177-rapport off six — one
+    decision, several `tillsyner`, one stored asset).
+    **138 decisions from 172 document links on 129 pages.**
+  - **Anonymously published decisions have no identity.** 13 documents print no
+    readable number — redacted to `DI-2018-XXXX` (the seven Grannbevakning
+    beslut), an "Avidentifierad version" with the number dropped, or a scan
+    with no text layer. They are reported by name at the end of the run, not
+    filed under an invented key.
+  - **The two curated pages are an overlay, not a second corpus.** Every entry
+    on `praxisbeslut` and `beslut-om-sanktionsavgift` points at a tillsyn the
+    `/tillsyner/` listing already carries (checked exhaustively: 56 unique
+    `/link/<guid>.aspx` targets, 0 additions), but both add metadata that
+    exists nowhere else — praxis marks the decisions IMY considers precedential
+    and states lagrum, nyckelord, korrigerande åtgärd, överklagan and laga
+    kraft; sanktionsavgift states the fine. The GUID redirects resolve through
+    the `/tillsyner/rss` feed's GUID↔url pairs in **one** request instead of 56.
+  - **Parse** (`classify_imy`): font-driven over the two-column layout —
+    smaller than the body size is a footnote or masthead, a "N (M)" page mark
+    is a running header, a bold paragraph is a heading whose level is the rank
+    of its font size (IMY sets four, down to bold-at-body-size). The masthead
+    is stripped *in place* (the `classify_arn` idiom) because the margin column
+    glues it onto body lines wherever a baseline coincides. A heading broken
+    across lines is rejoined keeping its hyphen — in this corpus a trailing
+    hyphen is always part of the term (`VIS-förordningen`, `Trygg-Hansa`),
+    never a line-break hyphen, and the one other shape is the suspended hyphen
+    of a coordinated list (`VIS-, SIS- samt …`), recognised by the comma the
+    earlier member leaves behind. **138/138 parse clean, 12,649 nodes, 2,263
+    headings, 0 empty bodies**, and the whole corpus scanned clean of masthead
+    and header residue.
+  - **Wired end-to-end**: `lagen avg download imy` (`--only` names a dnr and
+    needs the decision already harvested — a decision has no page of its own,
+    so the tillsyn page to refetch is looked up in the record), `avg_inputs`
+    depends on each decision's parts (shared assets, so several decisions can
+    depend on one PDF), facets (Organ → År, keyed on the decision date because
+    an IMY number carries the year the *ärende* was opened), "IMY-beslut" page
+    label, and the sanktionsavgift + praxis rows in `render_avg`'s meta block.
+    `test/test_avg.py` (+17 hermetic tests, fixtures under
+    `test/files/avg/imy/`, including real page-1 headers of both
+    diarienummer generations).
+- ✅ **KKV as the fifth organ (2026-07-30).** Konkurrensverkets tillsynsbeslut —
+  competition and public-procurement practice, joined from **two** of the
+  agency's own sources on the diarienummer, because neither alone is the corpus.
+  - **The status filter is not a scope filter.** The diarium's own
+    "Avslutade ärenden" + "Publicerade beslut" is 10,097 cases, but status says
+    nothing about what *kind* of ärende a case is: 3,675 of those are
+    remissyttranden and much of the rest routine korrespondens — neither a
+    förvaltningsbeslut mot enskild. So the harvest also applies the agency's own
+    ärendetyp groups (`KKV_CASETYPES`): konkurrensbegränsande samarbete (346),
+    missbruk av dominerande ställning (675), KOS (64), upphandlingsskadeavgift
+    och domstolsärenden (706), otillbörliga handelsmetoder (39) — **1,830 cases,
+    1998–**, both code generations (the pre-2018 "11 Missbruk dominerande
+    ställning" and the current "3.2.2 Misstänkt missbruk…" both answer to 46).
+    Företagskoncentrationer (49) are deliberately out: 2,068 largely one-page
+    clearances that lämnas utan åtgärd, closer in character to the remisser.
+  - **The curated ärendelista is the other half.**
+    `/konkurrens/tillsyn-arenden-och-beslut/arendelista/` carries, for 329
+    cases, what the diarium has no equivalent of: Konkurrensverkets own account
+    of what the case was about, why it was prioritized, what it decided and
+    **what the courts then did with the decision** — sectioned under the page's
+    own headings ("Vad ärendet rör", "Konkurrensverkets beslut",
+    "Tingsrätten", "Marknadsdomstolen") — plus the branch, the parties and the
+    kinds of beslut (Avskrivning, Gryningsräd, Åtagande, Konkurrensskadeavgift,
+    Förbud mot förvärv…). A fifth of the entries name several diarienummer (an
+    ärende that became more than one case), so 329 cases resolve to **413
+    diarienummer**, and the account belongs to each — the same
+    one-entry-annotates-several shape as IMY's praxisbeslut. Only 67 of those
+    413 fall inside the narrowed diarium set; the other **346 are stored from
+    the account alone** — cases from 1993–97 that predate the diarium, and the
+    hand-picked företagsförvärv that the bulk exclusion of ärendetyp 49 drops.
+    That combination is the point: the notable mergers (including the two
+    "Förbud mot förvärv") come in through the curated door while the 2,068
+    routine clearances stay out. The corpus is **2,176 documents**.
+    The account *heads* the parsed body and its case name is the title, because
+    the decision document predates the courts that reviewed it and the diarium's
+    ärendemening is bureaucratic ("Anmälan om företagskoncentration —
+    fjärrvärmerör") where the curated name is how the case is known.
+  - **Identity comes free.** Unlike IMY, the diarium *is* a register: the
+    diarienummer is a listing field, so nothing has to be read out of a document
+    to mint it. Its shape (`558/2026`) is JK's new-era shape, so it rides the
+    storage and page grammar that already handles a slash in a dnr
+    (`avg/kkv/558/2026` → `avg/kkv_558_2026.html`).
+  - **Three transport facts** decided the harvester. konkurrensverket.se is
+    behind the same Cloudflare front that made `foreskrift`'s KKVFS set
+    `http2=True`, so this rides `lib/net.make_http2_session` too. The search
+    page is server-rendered React, but `X-Requested-With` turns it into the bare
+    result JSON — 500 bytes per case instead of 4 kB — and `Accept:
+    application/json` does the same for the ärendedata and case pages. And the
+    diarium's paging is *cumulative* (`page=2` re-sends page 1), so a group is
+    taken whole with `take` rather than paged; the ärendelista's `page` is a
+    true offset and is walked normally. The listing is authoritative for the
+    case, so the per-case ärendedata request — which is what carries the
+    *beslutsdatum*, as against the registration date the listing carries — is
+    made only for a case that is new or has moved.
+  - **Three body formats behind one parameter.** The file endpoint calls every
+    format `pdf`: most are (read by the same `_classify_font_driven` core as
+    IMY, extracted from `classify_imy` on this second use, but starting at the
+    bold subject line — KKV sets the recipient block at the body size, so unlike
+    IMY's margin column the fonts cannot separate the letterhead, and dropping
+    it first also keeps it out of the body-size measurement); the pre-2006 ones
+    are the **FrontPage-era HTML** the diarium published then, in three template
+    generations whose anchors and field labels all differ, so the body is found
+    by *shape* — the letterhead is the run of short lines above the first real
+    paragraph — and the oldest generation's `ÄRENDE:`/`SAMMANF:` table is lifted
+    out as the diarium's own abstract rather than read as body; two are Word,
+    via the shared `lib/poi`. Every HTML document declares (and needs)
+    windows-1252, so the encoding is asserted from that declaration rather than
+    sniffed, and HTML under a `.pdf` name is an error page and is rejected. A
+    handful of the PDFs are scans whose OCR layer poppler renders invisible —
+    the third corpus to meet that, so `remisser.parse._pages` was promoted to
+    `lib.pdftext.pages_with_ocr` and both now share it.
+  - **Wired end-to-end**: `lagen avg download kkv`, facets (Organ → År, keyed on
+    the decision date because a case number carries the year the case was
+    *registered* — a long investigation is decided years later), "KKV-beslut"
+    page label, and Motpart/Bransch/Typ av beslut in `render_avg`'s meta
+    block. Adding two organs also meant teaching `patchsource` their document
+    routes -- an IMY decision assembled from several parts has no single
+    patchable intermediate and is refused, as is a KKV case published as Word.
+    `test/test_avg.py` (+21 hermetic tests, fixtures under
+    `test/files/avg/kkv/`).
+
+### 7l. rs vertical — myndigheternas rättsliga ställningstaganden ✅ (first cut)
+
+`accommodanda/rs/` — the **third** kind of document a förvaltningsmyndighet
+publishes about the law it administers, and the one lagen.nu has never carried.
+A föreskrift is binding law issued under a bemyndigande; a beslut decides one
+ärende; a *rättsligt ställningstagande* binds nobody outside the agency and
+decides no case. It states, in advance and in general, how the agency reads a
+rule it administers where the courts have not yet answered — and every one of
+the six agencies says so in nearly the same words ("styrande för vår
+verksamhet", "inte bindande för till exempel domstolar"). That is exactly why
+they are worth carrying: they are the published interpretation a reader of the
+statute will actually meet, and the citation scan puts each of them on the rail
+of the paragraf it interprets.
+
+Six agencies in the first cut — **Försäkringskassan** (108, 2005–),
+**Migrationsverket** (104, via Lifos), **Kronofogden** (22),
+**Integritetsskyddsmyndigheten** (5), **Finansinspektionen** (7),
+**Konkurrensverket** (13).
+
+- **Identity is the agency's own number**, not a diarienummer — the one
+  deliberate departure from `avg/model.py`, whose organs number nothing and
+  where the dnr is all the identity there is. A ställningstagande is published
+  *as* a numbered item in a series ("IMYRS 2024:1", "FKRS 2025:01",
+  "RS/028/2021"), which is how the agency and everyone citing it names it. URI
+  = `rs/{org}/{nummer}`, the avg grammar. Only FK and IMY have published a short
+  designation for their series, so the other four are cited the way their own
+  page names them; nothing is invented for an agency that has coined nothing.
+- **Currency is first-class.** Unlike a beslut, which is a fixed historical
+  artifact, a ställningstagande is in force *until the agency withdraws it* —
+  and three of the six say so in the listing itself (FI's Status column,
+  Konkurrensverkets "(upphävt 20 oktober 2025)", Migrationsverkets version
+  numbering). So `status`/`upphavd`/`ersatt_av`/`ersatter` are modelled rather
+  than dropped: a withdrawn statement still has to be readable — it governed
+  what the agency did while it stood — but must not read as current law, so it
+  renders subdued under a banner and is named "(upphävt)" wherever it is cited.
+- **The document naming itself beats the listing retyping it.**
+  Försäkringskassan is the one agency whose *identity* comes out of the
+  document: its listing retypes the Serienummer, and at least once retypes it
+  wrong (the 2026:01 PDF is listed as 2026:03). So the fetch happens in the
+  sync and the number is read from the PDF; `stored_numbers` remembers which
+  number a record was filed under, so a later run costs one listing request
+  rather than 108 downloads (Lifos reuses the same memo).
+- **One body reader, six configurations.** All six publish the statement as a
+  letterhead PDF, which is the shape `avg`'s IMY/KKV reading already knew. Its
+  rules were promoted to `lib.pdftext.classify_letterhead` on this second
+  reader (rule:second-use-goes-to-lib), emitting source-agnostic
+  `(kind, text, level)` triples each vertical maps onto its own Block; `avg`
+  now delegates to it. The one thing the shared reader had to learn is that
+  **not every template marks a heading by weight** — Finansinspektionen and
+  Migrationsverket set no bold section headings at all, only larger type
+  (`heading_levels(..., by_size=True)`), and it is opt-in because in a
+  bold-marking template a paragraph that merely runs large is not a heading.
+  Everything else is per-agency data on a `Reader`: the margin column's labels
+  and values, the footer masthead (removed *in place* — the column glues it
+  onto body lines), and the page-1 fields the listing does not carry.
+- **A stored record asserts that its document is on disk.** The harvest writes
+  a record only once the PDF behind it is stored, and refuses to write one whose
+  fetch failed; parse asserts the same invariant from the other side. That pair
+  is what lets an absent PDF be read as "the agency published no document" — a
+  repealed Konkurrensverket entry that kept only its förteckning row — instead
+  of a broken fetch quietly publishing an empty page under a real identifier.
+- **Currency is never inferred.** Finansinspektionens Status column is the only
+  place in the vertical where a remote string decides whether a document reads
+  as the agency's current position, so it is mapped onto the model's own two
+  words and an unrecognised one stops the harvest (`fi_status`). Defaulting to
+  "gällande" is the one mistake the field exists to prevent.
+- **Nothing the listing states is re-derived from the PDF** (the avg rule). The
+  PDF is read only where a field exists nowhere else — IMY's and Kronofogdens
+  dates, four agencies' diarienummer, and Migrationsverkets own Beslutsdatum,
+  which parts company with Lifos's Upphovsdat whenever a statement is revised
+  in place. These headers are column tables that poppler flattens as either
+  "label label value value" or "label value label value", so no label is
+  reliably adjacent to its value: `labelled_value` anchors on the label and
+  matches on the value's own shape, within a window that keeps the search
+  inside the header.
+- **A site that serves no intermediate certificates.** Lifos
+  (lifos.migrationsverket.se) sends only its leaf and omits *both* certificates
+  above it (Let's Encrypt's YR2 and the ISRG "Root YR" cross-signed into ISRG
+  Root X1, which certifi does ship), so every requests/curl fetch fails with
+  "unable to get local issuer certificate" while browsers, which chase the
+  certificate's AIA pointers, load it fine. `lib/net.mount_aia_chain` does the
+  same, for that host prefix alone.
+
+  The care is in *what makes it safe*, because everything fetched here arrives
+  over plain HTTP from a URL named by a certificate read on an unverified
+  connection — so a first cut that simply appended the fetched bytes to
+  certifi's bundle would have been no better than `verify=False`, and worse for
+  hiding it: a `cafile` entry is a **trust anchor**, so an attacker's
+  self-signed CA would have been trusted outright (this was caught in review
+  and demonstrated before it was fixed). What the code does instead is verify
+  every link before using it — `verify_directly_issued_by` proves each fetched
+  certificate signed the one below it, and the walk stops only on a certificate
+  a certifi root demonstrably signed. A forged certificate fails the signature
+  check; a real one that chains nowhere trusted fails the terminator check.
+- **Wired end-to-end**: `lagen rs download [org] [--only org/nummer]` + `parse`
+  Stage (recipe-versioned); `layout` (`rs/{org}/{nummer}` page grammar, storage
+  relpath), `catalog.rs_document`, `labels._rs`, `render_rs` (with the
+  withdrawal banner), facets (Myndighet → År, the year taken from the
+  beslutsdatum where the document states one and from the agency's own number
+  otherwise — a Migrationsverket RS/028/2021 currently in version 3.0 belongs
+  under the year that version was fastställd), the `myndrs` legacy feed alias,
+  the MCP source enum, `patchsource` (pdftohtml XML), frontpage entry and the
+  `rs` inbound rail group. `/myndigheter/` now introduces all three — the rules
+  a myndighet issues, the cases it decides and how it says it reads them.
+  `test/test_rs.py` (66 hermetic tests, fixtures under `test/files/rs/`), plus
+  the AIA-chain safety cases in `test/test_net.py` and the feed-index wiring
+  guard in `test/test_feeds.py`.
+- **Not done, deliberately**: there is no citation *grammar* for a
+  ställningstagande yet — the outbound direction works (an rs body's lagrum
+  citations put it on the statute's rail, which is the value), but a
+  "FKRS 2025:01" written in another document does not yet resolve to its page.
+  That belongs with the `MYNDIGHETSBESLUT` grammar in `lib/lagrum.py`.
 
 ### 7g. Frozen legacy corpora — imported, scaffolding torn down ✅ (plan 2026-07-01; teardown 2026-07-19)
 
@@ -3262,7 +3514,7 @@ rewrite work.
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
-| `accommodanda/avg/` | **JO/JK/ARN-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN PDF via `lib/pdftext`, JK landing HTML; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary) |
+| `accommodanda/avg/` | **JO/JK/ARN/IMY/KKV-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; IMY tillsyn pages, whose diarienummer is read out of the attached PDFs and the documents regrouped by it, plus the praxisbeslut/sanktionsavgift overlay; KKV the diarium narrowed by `KKV_CASETYPES` joined with the curated ärendelista on the dnr; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`imy_pdf_path`/`kkv_body_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN/IMY/KKV PDF via `lib/pdftext`, JK landing HTML, KKV also FrontPage-era windows-1252 HTML and Word; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary) |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine; `clean_title`/`title_from_body` fall back to the PDF's own opening rubric when the harvest title is link chrome), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors), `data/series.json` (hand-edited designation/official-title/successor registry, `lib/datasets.FS_SERIES` — drives the browse's headings, Swedish ordering and succession folding, `lib/facets.py`). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss` keyed on the *referred document's* own identity, `basefile = "<typ>/<identifier>"` — not the regeringen.se ärende-page slug, kept in `url` — plus `Remissinstans`/`Remissvar`, `org_slug`, `Remiss.externt_dokument`), `download` (regeringen.se `/remisser/` sync over the AJAX filter listing (`REMISS_CATEGORY`, not the decorative `?p=N`); `parse_arende` raises rather than minting a stub identity when an ärende remits a regeringen-published document of an unrecognised doctype; `pm`/`lr` cross-refs resolved via `lib.regeringen`'s shared identity rules; the examined-ärende index `layout.REMISSER_SEEN` — keyed by URL slug, since only the ärende page names the remitted document — drives the sweep, `until` = deadline + grace period; `sync`'s shared `_poll` step + `sync_one`/`--only`, both gated by `externt_dokument` for ärenden whose remitted document regeringen didn't publish), `parse` (answer PDF → `Remissvar` via `lib/pdftext` with no fixed header), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`, joined to forarbete via `layout.resolve_basefile`). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `render._remiss_indexes` |
@@ -3281,7 +3533,7 @@ rewrite work.
 | `test/test_forarbete_download.py` | förarbete downloader parsing suite (incl. `pm`) |
 | `test/test_forarbete_riksdagen.py` | `bet`/utskottsbetänkanden downloader suite (data.riksdagen.se); the shared dokumentlista `harvest()` engine also drives `rskr.py` |
 | `test/test_forarbete_legacy.py`, `test/test_forarbete_legacy_formats.py` | parse-route tests for re-housed frozen-corpus förarbete records (trips/text-tml, skanning2007 HTML, ABBYY XML, scanned-PDF OCR, re-OCR sidecar) + the shared body-adapter suite (the one-time import machinery is gone; these exercise `parse_record`'s harvested-form route) |
-| `test/test_avg.py` | avg (JO/JK/ARN) parser + citation-grammar suite |
+| `test/test_avg.py` | avg (JO/JK/ARN/IMY/KKV) parser + citation-grammar suite |
 | `tools/aigenomforande-bench/` | the 2026-07-23 ai-genomforande benchmark harness: FK-candidate dumper, subagent-adjudicated `.ann.golden` builder, per-model runner/evaluator, and the archived six-model result table (`final_eval.txt`) |
 | `tools/golden_dv.py` | DV golden cross-check (references vs old distilled RDF) |
 | `tools/golden_dv_structure.py` | DV structural golden (instance/ruling skeleton vs old parsed XHTML) |
