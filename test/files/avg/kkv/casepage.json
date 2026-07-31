@@ -1,0 +1,136 @@
+{
+ "content": {
+  "preamble": "Här kan du ta del av ärende med dnr 756/2025, misstänkt konkurrensbegränsande samarbete – fordonsbesiktningstjänster.",
+  "text": {
+   "modelType": "Html",
+   "fragments": [
+    {
+     "id": "Vad_arendet_ror",
+     "level": 2,
+     "modelType": "HeadingFragment",
+     "raw": "Vad &auml;rendet r&ouml;r"
+    },
+    {
+     "modelType": "RawFragment",
+     "raw": "<p>Misst&auml;nkt konkurrensbegr&auml;nsande avtal mellan konkurrenter.</p>"
+    },
+    {
+     "id": "Varfor_arendet_prioriterats",
+     "level": 2,
+     "modelType": "HeadingFragment",
+     "raw": "Varf&ouml;r &auml;rendet prioriterats"
+    },
+    {
+     "modelType": "RawFragment",
+     "raw": "<p>Misstanken r&ouml;r horisontellt samarbete som kan utg&ouml;ra &ouml;vertr&auml;delse av 2 kap. 1 &sect; konkurrenslagen. Den misst&auml;nkta &ouml;vertr&auml;delsen r&ouml;r en konsumentn&auml;ra och samh&auml;llsviktig marknad och det finns risk f&ouml;r skada f&ouml;r konkurrensen och konsumenterna.</p>"
+    },
+    {
+     "id": "Konkurrensverkets_beslut",
+     "level": 2,
+     "modelType": "HeadingFragment",
+     "raw": "Konkurrensverkets beslut"
+    },
+    {
+     "modelType": "RawFragment",
+     "raw": "<p>2026-02-16<br>(Dnr 756/2025)</p><p>Konkurrensverket har utrett om en best&auml;mmelse om s&ouml;kordsannonsering i riktlinjer fr&aring;n en branschorganisation f&ouml;r fordonsbesiktning skulle kunna strida mot f&ouml;rbudet mot konkurrensbegr&auml;nsande samarbete i konkurrensreglerna. &Auml;rendet har nu avslutats.</p><p>Konkurrensverkets utredning har omfattat en misst&auml;nkt &ouml;vertr&auml;delse av f&ouml;rbudet mot konkurrensbegr&auml;nsande samarbete genom en &ouml;verenskommelse mellan konkurrerande f&ouml;retag i en branschorganisation om att inte anv&auml;nda varandras varum&auml;rken eller f&ouml;retagsnamn vid s&ouml;kordsannonsering. En s&aring;dan &ouml;verenskommelse och agerande kan begr&auml;nsa konsumentens m&ouml;jlighet att vid s&ouml;ktillf&auml;llet f&aring; k&auml;nnedom om konkurrerande alternativ till det f&ouml;retag som konsumenten s&ouml;ker p&aring; och kan utg&ouml;ra en &ouml;vertr&auml;delse av f&ouml;rbudet mot konkurrensbegr&auml;nsande samarbete i konkurrenslagen och i EUF-f&ouml;rdraget.</p><p>Medlemsf&ouml;retagen i branschorganisationen svarar tillsammans f&ouml;r ca 99 procent av marknaden. Av utredningen framg&aring;r att det har f&ouml;rekommit kontakter om s&ouml;kordsannonsering mellan vissa av f&ouml;retagen. Vid dessa kontakter har f&ouml;retag f&ouml;rm&aring;tt eller f&ouml;rs&ouml;kt f&ouml;rm&aring; andra f&ouml;retag att inte anv&auml;nda konkurrerande varum&auml;rken eller f&ouml;retagsnamn vid s&ouml;kordsannonsering, med h&auml;nvisning till vad som kommits &ouml;verens om i riktlinjerna.</p><p>Riktlinjerna togs fram 2015 av en f&ouml;reg&aring;ngare till dagens branschorganisation Fordonsbesiktningsbranschen. Fordonsbesiktningsbranschen har under utredningen uppgett att de inte har till&auml;mpat riktlinjerna och har &auml;ven tagit avst&aring;nd fr&aring;n riktlinjerna genom att tydligg&ouml;ra att de inte g&auml;ller f&ouml;r vare sig Fordonsbesiktningsbranschen eller dess medlemsf&ouml;retag. I och med detta &auml;r den &ouml;verenskomna begr&auml;nsningen av anv&auml;ndning av konkurrerande f&ouml;retags varum&auml;rke eller f&ouml;retagsnamn vid s&ouml;kordsannonsering inte l&auml;ngre till&auml;mplig mellan n&aring;gra f&ouml;retag.</p><p>Mot denna bakgrund finns det inte l&auml;ngre sk&auml;l f&ouml;r Konkurrensverket att forts&auml;tta att utreda om f&ouml;rfarandet strider mot f&ouml;rbudet om konkurrensbegr&auml;nsande samarbete. V&aring;rt beslut att avsluta utredningen inneb&auml;r inte ett st&auml;llningstagande till om f&ouml;rfarandet &auml;r i &ouml;verensst&auml;mmelse med konkurrensreglerna.</p><p><a href=\"/globalassets/dokument/konkurrens/beslut/avskrivningsbeslut/25-0756.pdf\" target=\"_blank\" rel=\"noopener\">Ta del av Konkurrensverkets beslut, dnr 756/2025</a></p>"
+    }
+   ]
+  },
+  "contentArea": [],
+  "toc": [
+   {
+    "link": "#Vad_arendet_ror",
+    "text": "Vad ärendet rör",
+    "active": false,
+    "selected": false,
+    "id": -1,
+    "isLink": true
+   },
+   {
+    "link": "#Varfor_arendet_prioriterats",
+    "text": "Varför ärendet prioriterats",
+    "active": false,
+    "selected": false,
+    "id": -1,
+    "isLink": true
+   },
+   {
+    "link": "#Konkurrensverkets_beslut",
+    "text": "Konkurrensverkets beslut",
+    "active": false,
+    "selected": false,
+    "id": -1,
+    "isLink": true
+   }
+  ],
+  "hideToC": false,
+  "caseBoxContents": [
+   {
+    "contentName": "Purchaser",
+    "value": [
+     "Aktiebolaget Svensk Bilprovning",
+     "Besikta Bilprovning i Sverige AB",
+     "Carspect AB",
+     "Dekra Automotive AB",
+     "Fordonsbesiktningsbranschen",
+     "Opus Bilprovning AB",
+     "Swedish association for testing, inspection and certification",
+     "YBB Ystad Bilbesiktning AB"
+    ],
+    "order": 0
+   },
+   {
+    "contentName": "Type",
+    "value": [
+     "Konkurrensbegränsande samarbeten"
+    ],
+    "label": "Typ av ärende",
+    "order": 1
+   },
+   {
+    "contentName": "Branch",
+    "value": [
+     "Fordon, färdmedel, resande"
+    ],
+    "label": "Bransch",
+    "order": 2
+   },
+   {
+    "contentName": "PartOfProcess",
+    "value": [
+     "Avskrivning"
+    ],
+    "label": "Typ av beslut",
+    "order": 3
+   },
+   {
+    "contentName": "Status",
+    "value": [
+     "Avslutat"
+    ],
+    "label": "Status",
+    "order": 4
+   },
+   {
+    "contentName": "DiaryNumber",
+    "value": [
+     "dnr 756/2025"
+    ],
+    "label": "Diarienummer",
+    "order": 5
+   },
+   {
+    "contentName": "Year",
+    "value": [
+     "2025-2026"
+    ],
+    "label": "Årtal",
+    "order": 6
+   }
+  ],
+  "id": "11711",
+  "heading": "Aktiebolaget Svensk Bilprovning m.fl.",
+  "url": "/konkurrens/tillsyn-arenden-och-beslut/arendelista/fordonsbesiktningstjanster/",
+  "modelType": "CasePage"
+ }
+}

@@ -186,7 +186,7 @@ def _fs_year(r):
 
 
 def _avg_org(r):
-    return r.kind                                # 'jo' | 'jk' (the organ)
+    return r.kind                    # 'jo' | 'jk' | 'arn' | 'imy' | 'kkv'
 
 
 def _avg_year(r):
@@ -194,8 +194,22 @@ def _avg_year(r):
     JO '2340-2025' last; JK's new form '2024/8082' first; JK's old form
     '3497-06-40' as a two-digit year (century cutoff >50 -> 19xx, the legacy
     JKStore rule). ARN and JO share the 4-4 shape but order it oppositely, so
-    ARN is keyed on the organ rather than the dnr shape."""
+    ARN is keyed on the organ rather than the dnr shape. An IMY number
+    ('IMY-2024-2904') carries the year the *ärende* was opened, which is often
+    not the year it was decided, and a KKV number ('558/2026') the year the case
+    was registered, which for a long investigation is years before its decision;
+    both are therefore keyed on the decision date."""
     dnr = r.local.split("/", 2)[-1]              # 'avg/jo/2340-2025' -> dnr
+    if r.kind == "imy":
+        return _dated_year(r)
+    if r.kind == "kkv":
+        # decided-in year where the case has a decision date; where it has none
+        # -- the curated-only cases, whose account dates them by a span rather
+        # than a day -- the case number's own year, which is when the case was
+        # registered. Approximate, but it files them near their neighbours
+        # instead of stranding several hundred documents in "okänt"
+        dated = _dated_year(r)
+        return dated if dated != "okänt" else dnr.rsplit("/", 1)[-1]
     if r.kind == "arn":                          # 'avg/arn/1992-3657' -> 1992
         return dnr[:4]
     m = re.search(r"-(\d{4})$", dnr)
@@ -456,10 +470,12 @@ SCHEMES = {
         Level("År", _fs_year, _by_year_desc),
     ],
     "avg": [
-        Level("Organ", _avg_org, _curated(["jo", "jk", "arn"]),
+        Level("Organ", _avg_org, _curated(["jo", "jk", "arn", "imy", "kkv"]),
               label=_map_label({"jo": "Justitieombudsmannen (JO)",
                                 "jk": "Justitiekanslern (JK)",
-                                "arn": "Allmänna reklamationsnämnden (ARN)"})),
+                                "arn": "Allmänna reklamationsnämnden (ARN)",
+                                "imy": "Integritetsskyddsmyndigheten (IMY)",
+                                "kkv": "Konkurrensverket (KKV)"})),
         Level("År", _avg_year, _by_year_desc),
     ],
     "hudoc": [

@@ -1,0 +1,173 @@
+{
+ "pagination": {
+  "total": 3,
+  "display": 3,
+  "totalDisplay": 3,
+  "currentPage": 1,
+  "pageCount": 1
+ },
+ "items": [
+  {
+   "link": "/konkurrens/tillsyn-arenden-och-beslut/arendelista/lotteriverksamhet/",
+   "caseBoxContents": [
+    {
+     "contentName": "Purchaser",
+     "value": [
+      "Lotteriverksamhet"
+     ],
+     "order": 0
+    },
+    {
+     "contentName": "Type",
+     "value": [
+      "Missbruk av dominerande ställning"
+     ],
+     "label": "Typ av ärende",
+     "order": 1
+    },
+    {
+     "contentName": "Branch",
+     "value": [
+      "Fritid, hälsa och sport"
+     ],
+     "label": "Bransch",
+     "order": 2
+    },
+    {
+     "contentName": "PartOfProcess",
+     "label": "Typ av beslut",
+     "order": 3
+    },
+    {
+     "contentName": "Status",
+     "value": [
+      "Pågående"
+     ],
+     "label": "Status",
+     "order": 4
+    },
+    {
+     "contentName": "DiaryNumber",
+     "value": [
+      "dnr 50/2026"
+     ],
+     "label": "Diarienummer",
+     "order": 5
+    }
+   ],
+   "id": "12272"
+  },
+  {
+   "link": "/konkurrens/tillsyn-arenden-och-beslut/arendelista/livsmedelsupphandling-m.m/",
+   "caseBoxContents": [
+    {
+     "contentName": "Purchaser",
+     "value": [
+      "Martin & Servera Restauranghandel AB",
+      "Menigo Foodservice AB"
+     ],
+     "order": 0
+    },
+    {
+     "contentName": "Type",
+     "value": [
+      "Konkurrensbegränsande samarbeten"
+     ],
+     "label": "Typ av ärende",
+     "order": 1
+    },
+    {
+     "contentName": "Branch",
+     "value": [
+      "Detalj- och dagligvaruhandel"
+     ],
+     "label": "Bransch",
+     "order": 2
+    },
+    {
+     "contentName": "PartOfProcess",
+     "value": [
+      "Gryningsräd"
+     ],
+     "label": "Typ av beslut",
+     "order": 3
+    },
+    {
+     "contentName": "Status",
+     "value": [
+      "Pågående"
+     ],
+     "label": "Status",
+     "order": 4
+    },
+    {
+     "contentName": "DiaryNumber",
+     "value": [
+      "dnr 765/2025",
+      "dnr 404/2026"
+     ],
+     "label": "Diarienummer",
+     "order": 5
+    }
+   ],
+   "id": "12197"
+  },
+  {
+   "link": "/konkurrens/tillsyn-arenden-och-beslut/arendelista/agronod-ab-m.fl/",
+   "caseBoxContents": [
+    {
+     "contentName": "Purchaser",
+     "value": [
+      "Agronod AB",
+      "Dataväxt AB",
+      "Lantmännen ek. för."
+     ],
+     "order": 0
+    },
+    {
+     "contentName": "Type",
+     "value": [
+      "Missbruk av dominerande ställning",
+      "Konkurrensbegränsande samarbeten"
+     ],
+     "label": "Typ av ärende",
+     "order": 1
+    },
+    {
+     "contentName": "Branch",
+     "value": [
+      "Jordbruk, skogsbruk och fiske",
+      "Teknik, IT och telekom"
+     ],
+     "label": "Bransch",
+     "order": 2
+    },
+    {
+     "contentName": "PartOfProcess",
+     "value": [
+      "Avskrivning"
+     ],
+     "label": "Typ av beslut",
+     "order": 3
+    },
+    {
+     "contentName": "Status",
+     "value": [
+      "Avslutat"
+     ],
+     "label": "Status",
+     "order": 4
+    },
+    {
+     "contentName": "DiaryNumber",
+     "value": [
+      "dnr 169/2025"
+     ],
+     "label": "Diarienummer",
+     "order": 5
+    }
+   ],
+   "id": "11966"
+  }
+ ]
+}

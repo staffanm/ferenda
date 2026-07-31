@@ -1915,7 +1915,9 @@ def _feed_index_groups(con):
     groups.append(("Föreskrifter", publishers))
 
     avg_labels = {"arn": "Allmänna reklamationsnämnden",
-                  "jk": "Justitiekanslern", "jo": "Riksdagens ombudsmän"}
+                  "jk": "Justitiekanslern", "jo": "Riksdagens ombudsmän",
+                  "imy": "Integritetsskyddsmyndigheten",
+                  "kkv": "Konkurrensverket"}
     organs = [row[0] for row in con.execute(
         "SELECT DISTINCT kind FROM documents WHERE source = 'avg' ORDER BY kind")]
     praxis = [("Dokument publicerade av %s" % avg_labels.get(kind, kind),
@@ -3071,6 +3073,19 @@ def render_avg(art, site):
         ("Diarienummer", ", ".join(md.get("diarienummer", []))),
         ("Ämbetsberättelse", md.get("officialReport")),
         ("Sakområde", ", ".join(md.get("nyckelord", [])) or None),
+        # KKV only: the diarium's counterparty -- a competition case is known by
+        # who it was against as much as by what it was called -- and the curated
+        # ärendelista's branch and kinds of beslut
+        ("Motpart", md.get("motpart")),
+        ("Bransch", ", ".join(md.get("bransch", [])) or None),
+        ("Typ av beslut", ", ".join(md.get("beslutstyp", [])) or None),
+        # IMY only: the fine, and the praxisbeslut page's curated fields --
+        # which lagrum the decision turns on, and whether it still stands
+        ("Sanktionsavgift", md.get("sanktionsavgift")),
+        ("Lagrum", (md.get("praxis") or {}).get("lagrum")),
+        ("Korrigerande åtgärd", (md.get("praxis") or {}).get("korrigerandeAtgard")),
+        ("Överklagat", (md.get("praxis") or {}).get("overklagan")),
+        ("Vunnit laga kraft", (md.get("praxis") or {}).get("lagakraft")),
     ]
     toc = Toc()
     rail = Rail(site, art["uri"])
@@ -3078,8 +3093,9 @@ def render_avg(art, site):
         render_node(n, site, art["uri"], toc, rail)
         for n in art.get("structure", [])))
     rail.add_document()
-    section = {"jo": "JO-beslut", "jk": "JK-beslut",
-               "arn": "ARN-beslut"}.get(art.get("org"), "Myndighetsavgörande")
+    section = {"jo": "JO-beslut", "jk": "JK-beslut", "arn": "ARN-beslut",
+               "imy": "IMY-beslut",
+               "kkv": "KKV-beslut"}.get(art.get("org"), "Myndighetsavgörande")
     return ENV.get_template("sources/avg.html").render(page_context(
         title, section, _doc_meta(meta, art.get("source_url")),
         toc=render_toc(toc), eyebrow=ident,

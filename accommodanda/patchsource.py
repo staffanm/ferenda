@@ -19,12 +19,20 @@ successive edits compound rather than fight an applied patch)."""
 import json
 from pathlib import Path
 
-from .avg.download import arn_pdf_path, jk_html_path, jo_dnrs, jo_pdf_path
+from .avg.download import (
+    arn_pdf_path,
+    imy_pdf_path,
+    jk_html_path,
+    jo_dnrs,
+    jo_pdf_path,
+    kkv_body_path,
+)
+from .avg.parse import kkv_html_text
 from .eurlex.parse import content_file, formex_members
 from .foreskrift.parse import body_path as fs_body_path
 from .lib import compress, layout, patch, pdftext
 from .lib.errors import SkipDocument
-from .lib.util import record_path
+from .lib.util import document_extension, record_path
 from .sfs.extract import extract_body
 
 
@@ -101,8 +109,16 @@ def _foreskrift_intermediate(basefile):
 
 
 def _avg_intermediate(basefile):
-    """A JO/ARN decision's PDF as pdftohtml XML; a JK decision's landing-page
-    HTML (its own intermediate) -- dispatched on the org, like the parser."""
+    """The intermediate an avg decision's parse actually reads, dispatched on
+    the org exactly as the parser does: pdftohtml XML for the PDF-bodied organs,
+    a JK decision's landing-page HTML, and for KKV whichever of the two its
+    document happens to be (the diarium published a third of the corpus as
+    windows-1252 HTML).
+
+    An IMY decision assembled from several documents has no single intermediate
+    -- parse threads one patch through every part, so a patch authored against
+    one part would be attempted against the next and fail the document. Those
+    are refused here rather than offered a patch that cannot hold."""
     org = basefile.split("/", 1)[0]
     record = json.loads(compress.read_text(record_path(layout.AVG_DOWNLOADED, org, basefile)))
     if org == "jk":
@@ -112,6 +128,27 @@ def _avg_intermediate(basefile):
         if not dnrs:
             raise SkipDocument("%s: jo record carries no diarienummer" % basefile)
         return _pdf_xml(jo_pdf_path(layout.AVG_DOWNLOADED, "jo/" + dnrs[0]))
+    if org == "imy":
+        parts = [d for d in record["delar"] if d["sprak"] == "sv"]
+        if len(parts) != 1:
+            raise SkipDocument(
+                "%s: assembled from %d documents, which one patch cannot span"
+                % (basefile, len(parts)))
+        return _pdf_xml(imy_pdf_path(layout.AVG_DOWNLOADED, parts[0]["fil"]))
+    if org == "kkv":
+        if "dokument" not in record:
+            raise SkipDocument("%s: the diarium published no document for it"
+                               % basefile)
+        path = kkv_body_path(layout.AVG_DOWNLOADED, record["dokument"]["fil"])
+        data = compress.read_bytes(path)
+        if document_extension(data) == ".pdf":
+            return _pdf_xml(path)
+        if document_extension(data) in (".doc", ".docx"):
+            # read through POI, which has no editable text intermediate the way
+            # pdftohtml XML and HTML do (the two Word cases in the corpus)
+            raise SkipDocument("%s: a Word document has no patchable "
+                               "intermediate" % basefile)
+        return kkv_html_text(data)
     return _pdf_xml(arn_pdf_path(layout.AVG_DOWNLOADED, "arn/" + record["diarienummer"]))
 
 
@@ -130,7 +167,8 @@ _INTERMEDIATE = {
     "eurlex": (_eurlex_intermediate, "Formex XML"),
     "forarbete": (_forarbete_intermediate, "pdftohtml XML"),
     "foreskrift": (_foreskrift_intermediate, "pdftohtml XML"),
-    "avg": (_avg_intermediate, "pdftohtml XML (jk: landing HTML)"),
+    "avg": (_avg_intermediate,
+            "pdftohtml XML (jk, and kkv's pre-2006 documents: HTML)"),
     "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }
 

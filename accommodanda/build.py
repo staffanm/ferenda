@@ -53,6 +53,7 @@ from .api import app as api_app
 from .api import edit as api_edit
 from .api import patch as api_patch
 from .avg import download as avg_download
+from .avg import model as avg_model
 from .avg import parse as avg_parse
 from .coe import download as coe_download
 from .coe import parse as coe_parse
@@ -2543,7 +2544,7 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 
 
 # --------------------------------------------------------------------------
-# avg source (JO + JK vägledande myndighetsavgöranden)
+# avg source (JO/JK/ARN/IMY/KKV vägledande myndighetsavgöranden)
 # --------------------------------------------------------------------------
 
 AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
@@ -2552,7 +2553,7 @@ AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
 
 
 def avg_list():
-    return sorted(bf for org in ("jo", "jk", "arn")
+    return sorted(bf for org in avg_model.ORGS
                   for bf in compress.list_basefiles(layout.AVG_DOWNLOADED, org))
 
 
@@ -2576,6 +2577,20 @@ def avg_inputs(basefile):
             paths.append(report)
     elif basefile.startswith("arn/"):
         paths.append(avg_download.arn_pdf_path(layout.AVG_DOWNLOADED, basefile))
+    elif basefile.startswith("imy/"):
+        # an IMY decision is assembled from the documents its record names --
+        # shared assets, so several decisions can depend on the same PDF
+        paths.extend(avg_download.imy_pdf_path(layout.AVG_DOWNLOADED, part["fil"])
+                     for part in json.loads(compress.read_text(
+                         avg_record(basefile)))["delar"])
+    elif basefile.startswith("kkv/"):
+        # a KKV case publishes at most one decision document (a few publish
+        # none) and, for the long ones, a separate sammanfattning beside it
+        record = json.loads(compress.read_text(avg_record(basefile)))
+        paths.extend(avg_download.kkv_body_path(layout.AVG_DOWNLOADED,
+                                                record[key]["fil"])
+                     for key in ("dokument", "sammanfattning_dokument")
+                     if key in record)
     else:
         paths.append(avg_download.jk_html_path(layout.AVG_DOWNLOADED, basefile))
     return paths + _patch_input("avg", basefile)
@@ -2591,16 +2606,16 @@ def avg_parse_run(basefile):
 
 
 def avg_harvest(scopes):
-    """Bulk harvest of the JO/JK/ARN decisions (scopes = organ codes; empty =
-    all three). `--force` re-walks the whole corpus (JO) / refetches landings
-    (JK) / refetches every PDF (ARN); `--only jo/2340-2025` fetches a single
-    decision (needs its organ scope)."""
+    """Bulk harvest of the JO/JK/ARN/IMY/KKV decisions (scopes = organ codes;
+    empty = all five). `--force` re-walks the whole corpus (JO) / refetches
+    landings (JK) / refetches every document (ARN, IMY, KKV); `--only
+    jo/2340-2025` fetches a single decision (needs its organ scope)."""
     if RUN.only and len(scopes) != 1:
         sys.exit("avg --only needs exactly one organ scope, e.g. "
                  "`lagen avg download jo --only jo/2340-2025`")
     if RUN.dry_run:
         print("avg download: would download %s into %s"
-              % (RUN.only or ", ".join(scopes) or "jo + jk + arn",
+              % (RUN.only or ", ".join(scopes) or "jo + jk + arn + imy + kkv",
                  layout.AVG_DOWNLOADED))
         return
     totals = avg_download.sync(layout.AVG_DOWNLOADED, scopes=scopes or None,
@@ -2618,12 +2633,22 @@ SOURCES["avg"] = Source("avg", avg_list, {
 },
     harvest=avg_harvest,
     origin="https://www.jo.se/",
-    scopes=frozenset({"jo", "jk", "arn"}),
+    scopes=frozenset(avg_model.ORGS),
     notes="download flag: --only org/dnr (fetch one; needs its organ scope)\n"
           "scopes are the organs: jo (Riksdagens ombudsmän), jk "
-          "(Justitiekanslern), arn (Allmänna reklamationsnämnden); empty = all\n"
+          "(Justitiekanslern), arn (Allmänna reklamationsnämnden), imy "
+          "(Integritetsskyddsmyndigheten), kkv (Konkurrensverket); empty = all\n"
           "the arn scope downloads the live vägledande-beslut listing (2017-); it "
-          "overwrites any frozen import of the same dnr (live wins)")
+          "overwrites any frozen import of the same dnr (live wins)\n"
+          "the imy scope reads each decision's diarienummer out of its PDF (the "
+          "tillsyn pages never state it), so --only needs the decision already "
+          "harvested\n"
+          "the kkv scope joins two sources on the diarienummer: the diarium's "
+          "published decisions in closed cases, narrowed to Konkurrensverkets "
+          "own supervisory ärendetyp groups (1,830 since 1998 -- the status "
+          "filter alone is 10k, a third of it remissyttranden), plus the "
+          "curated ärendelista's account of the 329 cases (413 dnr) it "
+          "covers, 346 of which the narrowed set does not carry -- 2,176 in all")
 
 
 # --------------------------------------------------------------------------

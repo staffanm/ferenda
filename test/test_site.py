@@ -965,6 +965,62 @@ def test_avg_meta_drops_avgjord_av(tmp_path):
     assert "Avgjord av" not in html and "Nymansson" not in html
 
 
+def test_imy_page_shows_the_fine_and_the_praxis_fields(tmp_path):
+    # the sanktionsavgift and the praxisbeslut page's curated fields exist
+    # nowhere else on imy.se, so the decision page is where a reader meets them
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = {"uri": "https://lagen.nu/avg/imy/DI-2021-5774", "type": "avgorande",
+           "org": "imy", "identifier": "IMY dnr DI-2021-5774",
+           "metadata": {"title": "Utbildningsnämnden – Aspuddens skola",
+                        "publisher": "Integritetsskyddsmyndigheten",
+                        "diarienummer": ["DI-2021-5774"],
+                        "beslutsdatum": "2023-10-03",
+                        "nyckelord": ["Dataskydd", "Kamerabevakning"],
+                        "sanktionsavgift": "800 000 kronor",
+                        "praxis": {"lagrum": "Artiklarna 6.1 c och 13.1",
+                                   "overklagan": "Nej", "lagakraft": "Ja"}},
+           "structure": [{"type": "stycke", "id": "S1", "text": ["Beslutet."]}]}
+    html = render.render_avg(art, site)
+    assert 'eyebrow">IMY dnr DI-2021-5774' in html
+    assert "<dt>Sanktionsavgift</dt><dd>800 000 kronor</dd>" in html
+    assert "<dt>Lagrum</dt><dd>Artiklarna 6.1 c och 13.1</dd>" in html
+    assert "<dt>Vunnit laga kraft</dt><dd>Ja</dd>" in html
+    # the same rows must not appear as empty ones on the organs that have none
+    del art["metadata"]["sanktionsavgift"], art["metadata"]["praxis"]
+    bare = render.render_avg(art, site)
+    assert "Sanktionsavgift" not in bare and "Vunnit laga kraft" not in bare
+
+
+def test_kkv_page_shows_the_registers_own_fields(tmp_path):
+    # a competition case is known by who it was against and what kind of case it
+    # was -- both are the diarium's fields, and nothing else in avg has them
+    site = render.Site.from_catalog(build_catalog(tmp_path))
+    art = {"uri": "https://lagen.nu/avg/kkv/558/2026", "type": "avgorande",
+           "org": "kkv", "identifier": "KKV dnr 558/2026",
+           "metadata": {"title": "Anmälan om företagskoncentration",
+                        "publisher": "Konkurrensverket",
+                        "diarienummer": ["558/2026"],
+                        "beslutsdatum": "2026-07-29",
+                        "motpart": "HV NEF2 Invest Ascona II AS",
+                        "arendetyp": "3.2.3.2 Prövning av företagskoncentration",
+                        "bransch": ["Vård och omsorg"],
+                        "beslutstyp": ["Avskrivning", "Dom"],
+                        "nyckelord": ["3.2.3.2 Prövning av företagskoncentration"]},
+           "structure": [{"type": "stycke", "id": "S1", "text": ["Beslutet."]}]}
+    html = render.render_avg(art, site)
+    assert "<dt>Motpart</dt><dd>HV NEF2 Invest Ascona II AS</dd>" in html
+    assert "<dt>Myndighet</dt><dd>Konkurrensverket</dd>" in html
+    # the curated ärendelista's own navigation fields
+    assert "<dt>Bransch</dt><dd>Vård och omsorg</dd>" in html
+    assert "<dt>Typ av beslut</dt><dd>Avskrivning, Dom</dd>" in html
+    # the organs that have none of these show no empty rows
+    for key in ("motpart", "bransch", "beslutstyp"):
+        del art["metadata"][key]
+    bare = render.render_avg(art, site)
+    assert "Motpart" not in bare and "Bransch" not in bare
+    assert "Typ av beslut" not in bare
+
+
 def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
     # A4: the ARN "title" is the referat's preamble -- the h1 takes its first
     # sentence (abbreviation-aware: not cut at "s.k."), the whole preamble

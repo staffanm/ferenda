@@ -1,0 +1,43 @@
+{
+ "pagination": {
+  "total": 3,
+  "display": 3,
+  "totalDisplay": 3,
+  "currentPage": 1,
+  "pageCount": 1
+ },
+ "items": [
+  {
+   "caseNumber": "558/2026",
+   "status": "Avslutat",
+   "decision": "NOT IMPLEMENTED",
+   "decisionLink": "/diarium/sok-i-Konkurrensverkets-diarium/arendedata/file?pdf=26-0558.pdf",
+   "subject": "Anmälan om företagskoncentration - bioraffinaderiverksamhet",
+   "type": "3.2.3.2 Prövning av företagskoncentration",
+   "registrationDate": "2026-07-22T09:24:00",
+   "counterpart": "HV NEF2 Invest Ascona II AS",
+   "url": "/diarium/sok-i-Konkurrensverkets-diarium/arendedata/?caseNumber=558/2026"
+  },
+  {
+   "caseNumber": "974/1998",
+   "status": "Avslutat",
+   "decision": "NOT IMPLEMENTED",
+   "decisionLink": "/diarium/sok-i-Konkurrensverkets-diarium/arendedata/file?pdf=98-0974.htm",
+   "subject": "Hearing om Rikstrafiken - vissa principfrågor (SOU 1998:148)",
+   "type": "50 Remisser; regeringen",
+   "registrationDate": "1998-12-30T00:00:00",
+   "counterpart": "Kommunikationsdepartementet",
+   "url": "/diarium/sok-i-Konkurrensverkets-diarium/arendedata/?caseNumber=974/1998"
+  },
+  {
+   "caseNumber": "578/2015",
+   "status": "Avslutat",
+   "decision": "NOT IMPLEMENTED",
+   "subject": "Anmälan om företagskoncentration - fjärrvärmerör",
+   "type": "3.2.3.2 Prövning av företagskoncentration",
+   "registrationDate": "2015-09-09T00:00:00",
+   "counterpart": "Logstor A/S",
+   "url": "/diarium/sok-i-Konkurrensverkets-diarium/arendedata/?caseNumber=578/2015"
+  }
+ ]
+}
