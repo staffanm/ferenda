@@ -1,6 +1,10 @@
 {
-  "_comment": "Hand-edited concept normalization overrides (see lib/concepts.py).",
+  "_comment": "Hand-edited concept normalization overrides (see lib/concepts.py). `alias` maps a variant onto the canonical display form, which wins the group's name; `keep_distinct` blocks a wrong auto-merge.",
+  "_comment_punctuation": "The three aliases below fold punctuation variants of one term onto the hyphen as the normalized form. `normalize_fold` folds case and whitespace only, so an en dash (U+2013) or a space where the other form has a hyphen makes a second concept -- which then renders to the SAME filename (both the dash and the space become `_` in the slug), so one silently dropped the other with an output path collision. The hyphen form is the correct Swedish typography in all three.",
   "alias": {
+    "Fartyg från en icke avtalsslutande part": "Fartyg från en icke-avtalsslutande part",
+    "Kapitel och HS–nummer eller nummer": "Kapitel och HS-nummer eller nummer",
+    "Värdepappers– eller råvarulån": "Värdepappers- eller råvarulån"
   },
   "keep_distinct": [
   ]

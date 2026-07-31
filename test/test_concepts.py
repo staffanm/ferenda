@@ -80,3 +80,29 @@ def test_keep_distinct_blocks_a_wrong_merge():
     # were they to share a key, keep_distinct splits them back apart
     g = concepts.cluster({"Talan", "Talerätt"})
     assert set(g) == {"Talan", "Talerätt"}
+
+
+def test_shipped_punctuation_aliases_fold_onto_the_hyphen():
+    """The shipped `begrepp_aliases.json`, not a stub: three real corpus pairs
+    differ only in punctuation (an en dash or a space where the other has a
+    hyphen). `normalize_fold` folds case and whitespace but not punctuation, so
+    they stayed two concepts -- and then rendered to ONE filename, because the
+    artifact slug turns every non-alnum character into `_`, so one silently
+    dropped the other. The aliases fold them; this asserts the shipped data
+    does it, since every other test here stubs `_OVERRIDES` out."""
+    concepts._OVERRIDES = None          # force a real load of the data file
+    try:
+        groups = concepts.cluster([
+            "Fartyg från en icke-avtalsslutande part",
+            "Fartyg från en icke avtalsslutande part",
+            "Kapitel och HS-nummer eller nummer",
+            "Kapitel och HS\u2013nummer eller nummer",
+            "Värdepappers- eller råvarulån",
+            "Värdepappers\u2013 eller råvarulån"])
+    finally:
+        concepts._OVERRIDES = None
+    assert len(groups) == 3, groups
+    for canonical, members in groups.items():
+        assert len(members) == 2, (canonical, members)
+        # the hyphen form is the canonical one in every pair
+        assert "-" in canonical and "\u2013" not in canonical, canonical
