@@ -7,6 +7,7 @@ poppler (pdftohtml) is a local binary dependency shared with the other
 PDF-bodied verticals."""
 
 import json
+import re
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
@@ -151,3 +152,54 @@ def test_every_broken_pdf_entry_is_well_formed():
         arende, _, slug = rest.rpartition("/")
         assert arende and slug and slug == org_slug("x/" + slug + ".pdf"), key
         assert why and isinstance(why, str), key
+
+
+# --------------------------------------------------------------------------
+# what the stored file actually IS -- answers arrive as whatever a registrator
+# uploaded, and the `.pdf` name on disk is the tree's convention, not evidence
+# --------------------------------------------------------------------------
+
+WORD_FIXTURE = Path(__file__).parent / "files" / "remisser" / "word-answer.docx"
+
+
+def test_a_word_answer_stored_as_pdf_is_read_as_word(corpus):
+    """Four of the 79 980 answers are Word documents saved under a `.pdf` name
+    (regeringen.se serves the registrator's upload unchanged, and the org slug
+    keeps the original extension: `transportstyrelsen.docx`). Handing those to
+    poppler is what produced five per-build `pdftohtml` failures; `_body_text`
+    dispatches on the magic bytes instead and reads them through lib.poi."""
+    shutil.copy(WORD_FIXTURE, corpus / "sou" / "2025-99" / "kammarkollegiet.pdf")
+    result = parse_record("sou/2025:99/kammarkollegiet", corpus)
+    assert "REMISSVAR" in result.full_text
+    assert any("tillstyrker de remitterade förslagen" in p
+               for p in result.full_text)
+
+
+def test_an_answer_that_is_neither_pdf_nor_word_raises(corpus):
+    """An HTML error page stored under a document name must fail, not be filed
+    as the organisation's prose (rule:fail-fast).
+
+    ValueError, not AssertionError: this is a recorded rejection of untrusted
+    remote bytes, so it must survive -O (rule:errors-drive-retry-use-raise)."""
+    (corpus / "sou" / "2025-99" / "kammarkollegiet.pdf").write_bytes(
+        b"<!doctype html><title>502 Bad Gateway</title>")
+    with pytest.raises(ValueError, match="its bytes are"):
+        parse_record("sou/2025:99/kammarkollegiet", corpus)
+
+
+def test_a_pdf_with_an_unreadable_xref_is_repaired_not_lost(corpus):
+    """Stockholms universitets answer on SOU 2020:58 carries `%PDF` magic and
+    intact objects, but its `startxref` points at a blank linearizer
+    placeholder and no trailer dictionary survives -- poppler refuses the whole
+    file and `pdftohtml` exits non-zero. Ghostscript rebuilds the xref by
+    scanning for objects, which recovers the text intact, so the answer is
+    repaired rather than written off as broken.
+
+    The fixture is the good PDF broken the same way, so the test does not
+    depend on shipping a second corrupt binary."""
+    answer = corpus / "sou" / "2025-99" / "kammarkollegiet.pdf"
+    broken = re.sub(rb"startxref\s+\d+", b"startxref\r\n116",
+                    answer.read_bytes()).replace(b"trailer", b"traiier")
+    answer.write_bytes(broken)
+    result = parse_record("sou/2025:99/kammarkollegiet", corpus)
+    assert any("remitterade förslagen" in p for p in result.full_text)

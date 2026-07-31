@@ -9,9 +9,12 @@ flattens it to plain paragraph text -- no structural classification, since the
 only downstream consumer is an LLM analysis reading prose, not a rendered page.
 
 Answers arrive as whatever each organisation's registrator produced, so the
-extraction cannot assume a text layer: some are scans, and some carry text
-poppler treats as invisible. `_pages` handles both -- hidden text always
-included, ocrmypdf when a PDF still yields nothing.
+extraction can assume neither a text layer nor even a PDF: some are scans, some
+carry text poppler treats as invisible, some have an unreadable cross-reference
+table, and four are Word documents stored under a `.pdf` name. `_body_text`
+dispatches on the file's magic bytes and `_pages` covers the rest -- hidden text
+always included, ghostscript repair when poppler refuses the file, ocrmypdf when
+a PDF still yields nothing.
 
 Unlike JO/ARN, there is no fixed running-header string to strip: each
 organisation's PDF carries its own letterhead, so no `page_paragraphs`
@@ -25,9 +28,10 @@ identifier silently deleted the organisation's name out of real sentences)."""
 import json
 from pathlib import Path
 
-from ..lib import compress, layout
+from ..lib import compress, layout, poi
 from ..lib.errors import SkipDocument
 from ..lib.pdftext import page_paragraphs, pages_with_ocr
+from ..lib.util import sniff_extension
 from .model import Remiss, Remissvar, org_slug
 
 OCR_LANG = "swe"        # remissvar are Swedish; tesseract+swe is a hard dependency
@@ -62,6 +66,39 @@ def _pages(pdf_path, patch_key):
     return pages_with_ocr(pdf_path, patch_key, OCR_LANG)
 
 
+def _body_text(path, patch_key):
+    """An answer's paragraph texts, read by what the file *is* rather than what
+    it is stored as.
+
+    Every answer is stored under a ``.pdf`` name because that is the shape the
+    tree assumes, but a handful of registrators uploaded the Word document
+    itself: 4 of the 79 980 answers carry OLE2 (.doc) or OOXML (.docx) magic,
+    all from 2019-2020 (`dataspelsbranschen`, `transportstyrelsen`,
+    `forvaltningsratten-i-stockholm`, `hela-sverige-ska-leva`). Handing those to
+    poppler is what produced the five per-build `pdftohtml` failures.
+
+    Word bodies go through `lib.poi`, the same HWPF/XWPF reader DV and förarbete
+    use for their legacy Word corpora -- extraction, not a conversion to PDF,
+    because the only thing downstream (an LLM reading prose) wants is the text,
+    and a Word->PDF round trip would add a dependency to lose fidelity.
+
+    Bytes that are neither raise: `sniff_extension` returns None for an HTML
+    error page stored under a document name, and filing that as an answer's
+    prose would be worse than failing (rule:fail-fast). This is a recorded
+    per-document rejection of untrusted remote bytes, so it raises ValueError
+    rather than asserting -- under -O an assert would vanish and the HTML would
+    be handed to poppler, then to the xref repair, then to ocrmypdf, failing
+    three subprocesses deep instead of here (rule:errors-drive-retry-use-raise)."""
+    kind = sniff_extension(path)
+    if kind in (".doc", ".docx"):
+        return [p.text for p in poi.read(path) if p.text]
+    if kind != ".pdf":
+        raise ValueError("%s: stored as a document but its bytes are %s"
+                         % (path, kind or "not a document format we read"))
+    return [p.text for pageno, lines in _pages(path, patch_key)
+            for p in page_paragraphs(lines, None, pageno) if p.text]
+
+
 def parse_record(basefile, root):
     """A remiss-answer basefile ("<typ>/<document id>/<org-slug>", e.g.
     ``sou/2026:14/kammarkollegiet``) -> Remissvar. Reads the ärende record for its
@@ -94,9 +131,7 @@ def parse_record(basefile, root):
     pdf_path = Path(root) / rel.parent / (slug + ".pdf")
     assert pdf_path.exists(), "no answer PDF at %s" % pdf_path
 
-    paras = [p for pageno, lines in _pages(pdf_path, ("remisser", basefile))
-             for p in page_paragraphs(lines, None, pageno)]
-    full_text = [p.text for p in paras if p.text]
+    full_text = _body_text(pdf_path, ("remisser", basefile))
 
     return Remissvar(
         basefile=basefile,
