@@ -25,6 +25,7 @@ The Swedish-legal markers a chapter/§ begins with (``RE_KAP_MARK`` /
 its own paragraph) and the classifiers reuse them.
 """
 
+import os
 import re
 import subprocess
 import tempfile
@@ -150,6 +151,49 @@ def ocr_pdf(path, lang):
     return cached
 
 
+# poppler's own words when a PDF's cross-reference table is unusable -- the one
+# `pdftohtml` failure `repair_pdf` can do anything about. Matched against stderr
+# so every other non-zero exit keeps propagating.
+_XREF_FAILURE = re.compile(rb"Couldn't (find trailer dictionary|read xref table)")
+
+
+def repair_pdf(path):
+    """A PDF whose cross-reference table poppler cannot read, rewritten by
+    ghostscript's object scan into a readable one. Cached beside the source as
+    ``.<stem>.repaired.pdf``, the same shape as `ocr_pdf`.
+
+    Some registrators serve a PDF whose ``startxref`` points at the blank
+    placeholder a linearizer never filled in: the objects are all present, but
+    with no trailer dictionary poppler refuses the whole file ("Couldn't find
+    trailer dictionary") and `pdftohtml` exits non-zero. Ghostscript ignores the
+    xref and reconstructs it by scanning for ``obj`` markers, which recovers the
+    text layer intact -- this is a repairable file, not a lost one, so it is
+    worth the extra process before giving up on it.
+
+    ghostscript is not a new dependency: ocrmypdf already requires it. A missing
+    binary is a broken environment and propagates (rule:fail-fast).
+
+    gs writes to a temporary sibling that is renamed into place only on a clean
+    exit. Writing straight to the cache path would leave a truncated PDF behind
+    when the child dies mid-write -- and the `cached.exists()` short-circuit
+    above would then trust that fragment forever, silently. That child dying is
+    not hypothetical: `avg/KNOWN-GAPS.md` records ghostscript/tesseract being
+    killed under a 32-way parallel parse."""
+    cached = Path(path).with_name("." + Path(path).stem + ".repaired.pdf")
+    # an entry older than its source is stale, the same contract `_converted`
+    # keeps: a re-download rewrites the PDF and moves its mtime past the
+    # sidecar's, and serving the previous document's text forever would be
+    # silent and permanent
+    if cached.exists() and \
+            cached.stat().st_mtime_ns >= Path(path).stat().st_mtime_ns:
+        return cached
+    staged = cached.with_suffix(".pdf.part")
+    subprocess.run(["gs", "-q", "-o", str(staged), "-sDEVICE=pdfwrite",
+                    str(path)], check=True, capture_output=True)
+    os.replace(staged, cached)
+    return cached
+
+
 def pdftotext_text(pdf_path):
     """A PDF's text as ``pdftotext`` reads it, with the U+000C page breaks it
     emits left in place.
@@ -240,8 +284,27 @@ def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
     `eurlex.parse_pdf` meets them too but keeps its own copy -- it
     flattens across pages (`flat_lines`) rather than reading page by page, so
     it consumes a different shape and there is nothing here for it to reuse.
+
+    A third failure joins them here because it arrives from the same
+    registrators: a PDF poppler refuses outright over an unreadable
+    cross-reference table, which `repair_pdf` rebuilds. Everything after the
+    repair -- the emptiness test, the OCR route -- runs against the repaired
+    copy, since that is the readable document from then on.
+
+    Only *that* failure is repaired. `pdftohtml` exits non-zero for other
+    reasons too -- an encrypted document, a child killed under a parallel parse
+    -- and those must keep surfacing as the per-document error the build driver
+    records, not be silently rerouted through ghostscript (rule:no-catch-log-
+    continue). The xref failure identifies itself in poppler's stderr, so that
+    string is the gate.
     """
-    pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
+    try:
+        pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
+    except subprocess.CalledProcessError as exc:
+        if not _XREF_FAILURE.search(exc.stderr or b""):
+            raise
+        pdf_path = repair_pdf(pdf_path)
+        pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
     if any(lines for _pageno, lines in pages):
         return pages
     return list(pdf_pages(str(ocr_pdf(pdf_path, lang)), patch_key, hidden=True))
