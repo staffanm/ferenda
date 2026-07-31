@@ -469,18 +469,30 @@ def classify_kkv_pdf(paras):
 
 def kkv_html_text(data):
     """The decoded text of a diarium HTML decision. The pre-2006 documents are
-    FrontPage output and every one of them declares -- and needs -- windows-1252;
+    FrontPage output and nearly every one declares -- and needs -- windows-1252;
     decoding them as UTF-8 would fail outright, so the encoding is asserted from
-    the document's own declaration rather than sniffed."""
+    the document's own declaration rather than sniffed.
+
+    One document (04-0468) declares ``us-ascii`` instead. That is accepted, but
+    only after confirming the bytes really are ASCII: ASCII is a strict subset
+    of cp1252, so such a document decodes identically either way and there is
+    nothing to mojibake -- while a us-ascii declaration over high bytes would be
+    a document lying about itself, which is exactly what this guard is for."""
     declared = RE_KKV_CHARSET.search(data[:2048])
     # load-bearing: under -O an assert would vanish and the cp1252 decode below
     # would silently mojibake a document that had changed encoding, rather than
     # refusing it (rule:errors-drive-retry-use-raise)
     if not declared or declared.group(1).lower() not in (b"windows-1252",
-                                                         b"iso-8859-1"):
+                                                         b"iso-8859-1",
+                                                         b"us-ascii"):
         raise ValueError(
             "kkv html body declares %r, not the windows-1252 the diarium "
             "publishes" % (declared and declared.group(1)))
+    if declared.group(1).lower() == b"us-ascii" and not data.isascii():
+        raise ValueError(
+            "kkv html body declares us-ascii but carries %d non-ASCII byte(s), "
+            "so its real encoding is unknown"
+            % sum(1 for b in data if b > 127))
     return data.decode("cp1252")
 
 

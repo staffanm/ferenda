@@ -1150,6 +1150,25 @@ def test_kkv_html_text_rejects_an_undeclared_encoding():
         avg_parse.kkv_html_text(b"<html><head><meta charset=utf-8></head></html>")
 
 
+def test_kkv_html_text_accepts_a_truthful_us_ascii_declaration():
+    # 04-0468 is the one diarium document declaring us-ascii, and it carries
+    # zero bytes over 0x7F -- ASCII is a strict subset of cp1252, so it decodes
+    # identically either way and there was never anything to mojibake
+    assert avg_parse.kkv_html_text(
+        b"<html><head><meta charset=us-ascii></head><body>Beslut</body></html>"
+    ).endswith("</html>")
+
+
+def test_kkv_html_text_rejects_a_lying_us_ascii_declaration():
+    # a document that declares us-ascii while carrying high bytes is lying about
+    # itself, and its real encoding is unknown -- that is exactly what the
+    # charset guard exists for, so widening it to us-ascii must not open this
+    with pytest.raises(ValueError, match="non-ASCII"):
+        avg_parse.kkv_html_text(
+            "<html><head><meta charset=us-ascii></head>"
+            "<body>N\u00e4ringsdepartementet</body></html>".encode("cp1252"))
+
+
 def test_kkv_html_lifts_the_diariums_own_abstract():
     # the oldest generation opens with an ÄRENDE:/SAMMANF: table -- the diarium's
     # abstract *about* the letter, so it is the sammanfattning and not body
