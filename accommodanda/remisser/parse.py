@@ -27,7 +27,7 @@ from pathlib import Path
 
 from ..lib import compress, layout
 from ..lib.errors import SkipDocument
-from ..lib.pdftext import ocr_pdf, page_paragraphs, pdf_pages
+from ..lib.pdftext import page_paragraphs, pages_with_ocr
 from .model import Remiss, Remissvar, org_slug
 
 OCR_LANG = "swe"        # remissvar are Swedish; tesseract+swe is a hard dependency
@@ -56,22 +56,10 @@ BROKEN_PDFS = {
 
 
 def _pages(pdf_path, patch_key):
-    """(pageno, [Line]) per page, OCR'ing first when the PDF has no readable text.
-
-    Two distinct failures look identical from here, and one fallback covers both
-    (the same one `eurlex.parse_pdf.pdf_lines` uses): a scanned answer with no
-    text layer at all, and one whose text layer poppler renders invisible --
-    real among remissvar, and dropped entirely without ``hidden=True``. So every
-    extraction asks for hidden text, and a PDF that still yields nothing goes
-    through ocrmypdf.
-
-    Emptiness is judged on *lines*, before `page_paragraphs`: a PDF that
-    genuinely holds only a letterhead would OCR pointlessly if judged on the
-    paragraphs left after stripping, and OCR is the expensive path."""
-    pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
-    if any(lines for _pageno, lines in pages):
-        return pages
-    return list(pdf_pages(str(ocr_pdf(pdf_path, OCR_LANG)), patch_key, hidden=True))
+    """(pageno, [Line]) per page, OCR'ing first when the PDF has no readable
+    text -- `lib.pdftext.pages_with_ocr`, which this was extracted into when the
+    avg vertical's KKV scans needed the same handling."""
+    return pages_with_ocr(pdf_path, patch_key, OCR_LANG)
 
 
 def parse_record(basefile, root):

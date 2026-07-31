@@ -13,9 +13,12 @@ can stop at whichever layer it needs:
      dropping the running header (the document identifier), the page-number line
      and table-of-contents dotted-leader lines.
   3. the vertical's own ``classify`` -- :class:`Para`s to typed blocks. This part
-     is *not* shared: a förarbete's outline (numbered 14 -> 14.3) and a
+     is mostly *not* shared: a förarbete's outline (numbered 14 -> 14.3) and a
      föreskrift's body (``N kap.`` / ``N §``) read different signals, so each
-     vertical keeps its own classifier over the same :class:`Para` stream.
+     vertical keeps its own classifier over the same :class:`Para` stream. The
+     one reading several verticals do share -- the *letterhead* document, set as
+     a narrow margin column beside a wide body and marking its structure by font
+     alone -- is :func:`classify_letterhead` here.
 
 The Swedish-legal markers a chapter/§ begins with (``RE_KAP_MARK`` /
 ``RE_PARA_MARK``) live here because step 2 needs them (a bold marker always opens
@@ -214,6 +217,34 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
                               left + int(t.get("width") or 0),
                               sizes.get(t.get("font"), 0)))
         yield int(page.get("number")), _lines(spans)
+
+
+def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
+    """(pageno, [Line]) per page, OCR'ing first when the PDF has no readable
+    text.
+
+    Two distinct failures look identical from here and one route covers both: a
+    scan with no text layer at all, and one whose text layer poppler renders
+    *invisible* -- which is what an already-OCR'd scan looks like, and what
+    `pdf_pages` drops without ``hidden=True``. So every extraction asks for
+    hidden text, and a PDF that still yields nothing goes through ocrmypdf.
+
+    Emptiness is judged on *lines*, before `page_paragraphs`: a PDF that
+    genuinely holds only a letterhead would OCR pointlessly if judged on the
+    paragraphs left after stripping, and OCR is the expensive path.
+
+    Shared by the three corpora that read pages this way and meet the same pair
+    of failures: remissvar, the Konkurrensverket diarium's scanned decisions,
+    and the handful of scanned rättsliga ställningstaganden (Försäkringskassans
+    2018:05 has no text layer at all, Kronofogdens 5/14/TSM an invisible one).
+    `eurlex.parse_pdf` meets them too but keeps its own copy -- it
+    flattens across pages (`flat_lines`) rather than reading page by page, so
+    it consumes a different shape and there is nothing here for it to reuse.
+    """
+    pages = list(pdf_pages(str(pdf_path), patch_key, hidden=True))
+    if any(lines for _pageno, lines in pages):
+        return pages
+    return list(pdf_pages(str(ocr_pdf(pdf_path, lang)), patch_key, hidden=True))
 
 
 def pdf_images(pdf_path):
@@ -689,6 +720,108 @@ def line_body_size(lines):
 # a line opening its own numbered heading ("5.1 Offentligfinansiella …") is
 # never the wrapped continuation of the heading above it
 RE_NUM_LEAD = re.compile(r"^\d+(?:\.\d+)*\s")
+
+
+# --------------------------------------------------------------------------
+# the letterhead reading, shared by every vertical whose documents are agency
+# letters rather than författningar (avg's IMY/KKV decisions, rs's rättsliga
+# ställningstaganden). Extracted here on its second vertical
+# (rule:second-use-goes-to-lib); it stays source-agnostic by emitting plain
+# (kind, text, level) triples that each vertical maps onto its own Block type.
+# --------------------------------------------------------------------------
+
+# The running header every one of these letterhead templates sets: a "N (M)"
+# page mark (plus the "Page N of M" the Word-authored ones carry). A page mark
+# inside a long paragraph is prose, not a header, so the rule is length-bounded.
+RE_PAGEMARK = re.compile(r"\d+\s*\(\s*\d+\s*\)|^Page \d+ of \d+$")
+PAGEMARK_MAX = 150
+MAX_HEADING_LEVEL = 4
+# A heading broken across lines never breaks *at* a hyphen in these corpora -- a
+# trailing hyphen is always part of the term ("VIS-förordningen", "Trygg-Hansa"),
+# so `dehyphenate`'s soft-hyphen rule would corrupt it. The one other shape is
+# the suspended hyphen of a coordinated list ("VIS-, SIS- samt
+# dataskyddsförordningen"), which Swedish writes with a space after it and which
+# this pattern recognises by the comma the earlier member left behind.
+RE_SUSPENDED_HYPHEN = re.compile(r"-\s*,.*-$")
+
+
+def modal_size(paras):
+    """The running-text font size: the commonest size among the non-bold
+    paragraphs. It is the yardstick everything else in a letterhead document is
+    read against -- smaller is a footnote or the masthead, bold-and-larger is a
+    heading -- and it has to be measured per document, because the agencies'
+    templates set the body at different sizes (14 and 17 in pdftohtml's units
+    for IMY and Datainspektionen respectively)."""
+    sizes = Counter(p.size for p in paras
+                    if not p.bold and p.size and p.text.strip())
+    return sizes.most_common(1)[0][0] if sizes else 0
+
+
+def heading_levels(paras, body, by_size=False):
+    """The font sizes that mark headings, largest first -- their *rank* is the
+    heading level, which is how a template's own nesting survives without anyone
+    having to name its point sizes.
+
+    Most letterhead templates set a heading bold and at or above the running
+    size. A few mark it by *size alone*, leaving the weight regular
+    (Finansinspektionens ställningstaganden: body 18, headings 24, title 30, not
+    a bold run in the document); for those, ``by_size`` reads a size strictly
+    larger than the body as the heading signal instead. It has to be asked for
+    rather than always allowed, because in a bold-marking template a paragraph
+    that merely runs large is not a heading."""
+    if by_size:
+        return sorted({p.size for p in paras if p.size > body}, reverse=True)
+    return sorted({p.size for p in paras if p.bold and p.size >= body},
+                  reverse=True)
+
+
+def join_heading(head, tail):
+    """Rejoin the next line of a heading broken across lines. A trailing hyphen
+    is kept -- see :data:`RE_SUSPENDED_HYPHEN` -- and closes up against the line
+    that continues the term, except where it is the suspended hyphen of a
+    coordinated list, which takes the space Swedish writes after it."""
+    if head.endswith("-"):
+        return head + (" " if RE_SUSPENDED_HYPHEN.search(head) else "") + tail
+    return head + " " + tail
+
+
+def classify_letterhead(paras, margin, masthead, by_size=False):
+    """:class:`Para`s -> ``[(kind, text, level)]``, ``kind`` being ``"rubrik"``
+    or ``"stycke"``, read by font rather than position -- the reading an agency
+    *letter* wants, since it is set as a narrow margin column beside a wide body
+    and marks its structure no other way. Pure over the Para stream so the rules
+    are testable without poppler.
+
+    A paragraph set smaller than the running text is a footnote or the masthead
+    and goes; one carrying a "N (M)" page mark is the running header and goes;
+    the `margin` pattern names the margin column's own labels and bare values,
+    and `masthead` the footer tokens that have to be removed *in place* because
+    the column glues them onto body lines. A bold paragraph is a heading whose
+    level is the rank of its size (or, under ``by_size``, any paragraph set
+    larger than the body -- see :func:`heading_levels`), and consecutive headings
+    of one level are one heading, which is how a title set across three lines
+    arrives."""
+    body = modal_size(paras)
+    levels = heading_levels(paras, body, by_size)
+    blocks = []
+    for p in paras:
+        text = normalize_space(p.text)
+        if not text or (body and p.size and p.size < body):
+            continue
+        if RE_PAGEMARK.search(text) and len(text) < PAGEMARK_MAX:
+            continue
+        text = normalize_space(masthead.sub(" ", text))
+        if not text or margin.search(text):
+            continue
+        if not ((p.bold or by_size) and p.size in levels):
+            blocks.append(("stycke", text, 0))
+            continue
+        level = min(levels.index(p.size) + 1, MAX_HEADING_LEVEL)
+        if blocks and blocks[-1][0] == "rubrik" and blocks[-1][2] == level:
+            blocks[-1] = ("rubrik", join_heading(blocks[-1][1], text), level)
+        else:
+            blocks.append(("rubrik", text, level))
+    return blocks
 
 
 def _heading_wrap(prev, l, marker, heading):
