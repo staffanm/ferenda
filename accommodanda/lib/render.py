@@ -465,6 +465,7 @@ def describe_citer(from_uri, anchor, label, title, source):
 INBOUND_GROUPS = [("sfs", "Lagrumshänvisningar hit"), ("forarbete", "Förarbeten"),
                   ("foreskrift", "Myndighetsföreskrifter"),
                   ("dv", "Rättsfall"), ("avg", "Myndighetsavgöranden"),
+                  ("rs", "Rättsliga ställningstaganden"),
                   ("hudoc", "Europadomstolens praxis"),
                   ("icc", "Internationella brottmålsdomstolen"),
                   ("eu-caselaw", "EU-domstolens praxis"),
@@ -1219,7 +1220,7 @@ class RailSection:
 # the first section present opens; the rest stay one click away (C3). A key not
 # listed here (a source with no assigned rank) sorts last, by label.
 RAIL_SECTION_ORDER = (
-    "kommentar", "fk", "dv", "avg", "hudoc", "icc", "eu-caselaw", "eu-forslag",
+    "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "eu-caselaw", "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
@@ -1925,6 +1926,19 @@ def _feed_index_groups(con):
               for kind in organs]
     praxis.append(("Samtliga dokument", "myndprax", {}))
     groups.append(("Praxis", praxis))
+
+    rs_labels = {"fk": "Försäkringskassan", "migr": "Migrationsverket",
+                 "kfm": "Kronofogdemyndigheten", "fi": "Finansinspektionen",
+                 "imy": "Integritetsskyddsmyndigheten",
+                 "kkv": "Konkurrensverket"}
+    stallningstaganden = [
+        ("Ställningstaganden publicerade av %s" % rs_labels.get(kind, kind),
+         "myndrs", {"dcterms_publisher": "publisher/" + kind})
+        for kind in (row[0] for row in con.execute(
+            "SELECT DISTINCT kind FROM documents WHERE source = 'rs' ORDER BY kind"))]
+    stallningstaganden.append(
+        ("Samtliga rättsliga ställningstaganden", "myndrs", {}))
+    groups.append(("Rättsliga ställningstaganden", stallningstaganden))
 
     groups.append(("EU-rätt", [("Samtliga EU-rättsakter", "eurlex", {})]))
     groups.append(("Begrepp", [("Alla nya och ändrade begrepp", "keyword", {})]))
@@ -3103,6 +3117,63 @@ def render_avg(art, site):
         island=rail.island(), structure=structure))
 
 
+def render_rs(art, site):
+    """A myndighets rättsligt ställningstagande. The metadata carries the one
+    thing that separates it from every other document on the site -- whether the
+    agency still stands by it -- so a withdrawn one says so in a banner as well
+    as in the dl, and reads as the historical statement it is."""
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or catalog.local(art["uri"])
+    lb = labels.document_labels("rs", art)
+    upphavd = md.get("status") == "upphävt"
+    meta = [
+        ("Myndighet", md.get("publisher")),
+        ("Beslutsdatum", md.get("beslutsdatum")),
+        ("Diarienummer", md.get("diarienummer")),
+        ("Version", md.get("version")),
+        ("Föregående version", md.get("foregaendeVersion")),
+        ("Upphävt", md.get("upphavd")),
+        ("Ersatt av", md.get("ersattAv")),
+        ("Ersätter", md.get("ersatter")),
+        ("Ämnesord", ", ".join(md.get("nyckelord", [])) or None),
+    ]
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    structure = Markup("".join(
+        render_node(n, site, art["uri"], toc, rail)
+        for n in art.get("structure", [])))
+    rail.add_document()
+    banner = _BANNERS.rs_upphavd_banner(
+        md.get("upphavd"),
+        _sibling_rs(site, md.get("ersattAv"), art["uri"])) if upphavd else ""
+    # deliberately *not* the `inaktuell` body class the historical lydelser use:
+    # its watermark reads "Inaktuell författning", and a ställningstagande is
+    # precisely not a författning -- that distinction is the whole reason this
+    # vertical exists. The banner says the withdrawal; a styling of its own is
+    # an open question rather than a wrong label.
+    return ENV.get_template("sources/rs.html").render(page_context(
+        lb.short_title or ident, "Rättsligt ställningstagande",
+        _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=ident,
+        summary_text=art.get("sammanfattning"),
+        banner=Markup(banner),
+        island=rail.island(), structure=structure))
+
+
+def _sibling_rs(site, nummer, own_uri):
+    """A ställningstagande an agency names by bare number ("upphävt genom
+    2022:2"), as {label, url?}. The sibling is *the same agency's*: a number is
+    unique only within one agency's series, so the number is resolved against
+    this document's own URI prefix. The url is dropped when the corpus does not
+    hold that document -- a förteckning names statements from before the harvest
+    reaches -- and the label alone still says what replaced this one."""
+    if not nummer:
+        return None
+    uri = own_uri.rsplit("/", 1)[0] + "/" + nummer
+    return {"label": nummer,
+            "url": layout.page_url(uri) if uri in site.known else None}
+
+
 def render_hudoc(art, site):
     md = art.get("metadata", {})
     lb = labels.document_labels("hudoc", art)
@@ -3319,17 +3390,23 @@ def _document_edit_meta(source, art):
 
 def render_myndigheter(con):
     """The /myndigheter/ landing (T1): what förvaltningsmyndigheterna produce
-    -- föreskrifter and avgöranden -- introduced side by side, each linking
-    into its own browse tree. The masthead's Myndigheter entry lands here."""
+    -- föreskrifter, avgöranden and rättsliga ställningstaganden -- introduced
+    side by side, each linking into its own browse tree. The masthead's
+    Myndigheter entry lands here."""
     fs = facets.tree(con, "foreskrift")
-    avg = facets.tree(con, "avg")
     body = _LISTS.myndigheter_body(
         {"count": sum(b["count"] for b in fs["buckets"]),
          "series": len(fs["buckets"])},
-        [(b["label"], _browse_url("avg", [b["slug"]]), b["count"])
-         for b in avg["buckets"]])
+        _myndighet_buckets(con, "avg"), _myndighet_buckets(con, "rs"))
     return page("Myndigheter", "Myndigheter", "", body, solo=True,
-                eyebrow="Föreskrifter och avgöranden")
+                eyebrow="Föreskrifter, avgöranden och ställningstaganden")
+
+
+def _myndighet_buckets(con, source):
+    """A source's top-level buckets as (label, browse url, count) -- the organ
+    for avg, the myndighet for rs."""
+    return [(b["label"], _browse_url(source, [b["slug"]]), b["count"])
+            for b in facets.tree(con, source)["buckets"]]
 
 
 def render_document(art, source, site):
@@ -3337,7 +3414,7 @@ def render_document(art, source, site):
     # (generate_site skips it), not a page of its own
     html = {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
-            "foreskrift": render_foreskrift, "avg": render_avg,
+            "foreskrift": render_foreskrift, "avg": render_avg, "rs": render_rs,
             "hudoc": render_hudoc, "coe": render_coe,
             "icrc": render_icrc, "untc": render_untc,
             "icc": render_icc}[source](art, site)
@@ -3359,11 +3436,12 @@ def render_document(art, source, site):
 # /dom/, lagen.nu's grammar; every other source browses under its own name.
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
-SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg",
+SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
                 "eurlex", "coe", "icrc", "untc", "icc", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
-                "avg": "Myndighetsavgöranden", "eurlex": "EU-rättsakter",
+                "avg": "Myndighetsavgöranden",
+                "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
                 "icrc": "Internationell humanitär rätt",

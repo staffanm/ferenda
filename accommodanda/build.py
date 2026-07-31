@@ -116,6 +116,9 @@ from .remisser import ai_analyze as remisser_analyze
 from .remisser import download as remisser_download
 from .remisser import model as remisser_model
 from .remisser import parse as remisser_parse
+from .rs import agencies as rs_agencies
+from .rs import download as rs_download
+from .rs import parse as rs_parse
 from .sfs import asgit as sfs_asgit
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
@@ -2652,6 +2655,90 @@ SOURCES["avg"] = Source("avg", avg_list, {
 
 
 # --------------------------------------------------------------------------
+# rs source (myndigheternas rättsliga ställningstaganden)
+# --------------------------------------------------------------------------
+
+RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
+           PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+
+
+def rs_list():
+    return sorted(bf for org in rs_agencies.ORGS
+                  for bf in compress.list_basefiles(layout.RS_DOWNLOADED, org))
+
+
+def rs_record(basefile):
+    return util.record_path(layout.RS_DOWNLOADED, basefile.split("/", 1)[0],
+                            basefile)
+
+
+def rs_inputs(basefile):
+    """The record JSON plus the document PDF -- re-downloading either re-stales
+    the parse. A repealed Konkurrensverket entry publishes no document, so the
+    PDF is an input only where there is one."""
+    paths = [rs_record(basefile)]
+    pdf = rs_download.pdf_path(layout.RS_DOWNLOADED, basefile)
+    if compress.exists(pdf):
+        paths.append(pdf)
+    return paths + _patch_input("rs", basefile)
+
+
+def rs_artifact(basefile):
+    return layout.artifact("rs", basefile)
+
+
+def rs_parse_run(basefile):
+    write_artifact("rs", basefile,
+                   rs_parse.parse_record(basefile, layout.RS_DOWNLOADED))
+
+
+def rs_harvest(scopes):
+    """Bulk harvest of the six agencies' rättsliga ställningstaganden (scopes =
+    agency codes; empty = all six). `--force` refetches every document; `--only
+    fk/2025:01` fetches a single ställningstagande (needs its agency scope)."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("rs --only needs exactly one agency scope, e.g. "
+                 "`lagen rs download fk --only fk/2025:01`")
+    if RUN.dry_run:
+        print("rs download: would download %s into %s"
+              % (RUN.only or ", ".join(scopes) or " + ".join(rs_agencies.ORGS),
+                 layout.RS_DOWNLOADED))
+        return
+    totals = rs_download.sync(layout.RS_DOWNLOADED, scopes=scopes or None,
+                              full=RUN.force, only=RUN.only)
+    for org, (seen, new) in totals.items():
+        print("rs %s: %d seen, %d new" % (org, seen, new))
+
+
+# No per-document download stage (the foreskrift/avg rule): ställningstaganden
+# arrive only through the bulk `rs_harvest` sweep, so parse runs over whatever is
+# on disk; relate/index/dump/generate act on the artifacts by source name.
+SOURCES["rs"] = Source("rs", rs_list, {
+    "parse": Stage("parse", rs_parse_run, rs_artifact,
+                   inputs=rs_inputs, code=RS_CODE),
+},
+    harvest=rs_harvest,
+    origin=rs_agencies.BY_ORG["fk"].listing,
+    scopes=frozenset(rs_agencies.ORGS),
+    notes="download flag: --only org/nummer (fetch one; needs its agency scope)\n"
+          "scopes are the myndigheter: " + ", ".join(
+              "%s (%s)" % (a.org, a.name) for a in rs_agencies.REGISTRY)
+          + "; empty = all\n"
+          "identity is the agency's own number, not a diarienummer -- a "
+          "ställningstagande is published as a numbered item in the agency's "
+          "series (IMYRS 2024:1, FKRS 2025:01, RS/028/2021)\n"
+          "the fk scope reads each document's Serienummer out of its PDF (the "
+          "listing retypes it, and once wrongly), so a first run fetches every "
+          "PDF and later runs reuse the number the record was filed under\n"
+          "the migr scope harvests through the Lifos database over an "
+          "AIA-completed TLS chain (the site sends no intermediate); its series "
+          "also holds rättsliga kommentarer (RK/…)\n"
+          "the fi and kkv listings keep upphävda ställningstaganden, which are "
+          "stored and rendered as withdrawn rather than dropped")
+
+
+# --------------------------------------------------------------------------
 # remisser source (regeringen.se remiss ärenden + referral responses -- never rendered
 # as its own pages; parsed answers feed the sole LLM pass, ai-analyze, whose
 # .ann sidecars a later render pass surfaces on the referred förarbete's rail)
@@ -3134,6 +3221,7 @@ ARTIFACTS = {
     "foreskrift": lambda: sorted(
         compress.glob(layout.artifact_dir("foreskrift"), "*/*.json")),
     "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
+    "rs": lambda: sorted(compress.glob(layout.artifact_dir("rs"), "*/*.json")),
     "hudoc": lambda: layout.artifacts("hudoc"),
     "coe": lambda: layout.artifacts("coe"),
     "icrc": lambda: layout.artifacts("icrc"),
@@ -4084,9 +4172,9 @@ def main(argv=None):
     p.add_argument("--only", metavar="BASEFILE",
                    help="fetch just this one document, bypassing the listing "
                         "walk (hudoc/coe accept an item id/treaty number; "
-                        "forarbete/foreskrift/avg need exactly "
-                        "one doctype/fs/organ scope; remisser download: one "
-                        "case URL)")
+                        "forarbete/foreskrift/avg/rs need exactly "
+                        "one doctype/fs/organ/agency scope; remisser download: "
+                        "one case URL)")
     p.add_argument("--riksmote", metavar="YYYY/YY",
                    help="forarbete download bet: narrow the download to one "
                         "riksmöte, e.g. 2025/26 (bet scope only)")

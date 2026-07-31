@@ -58,10 +58,12 @@
 {#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
 {{ top_axis_nav("Dokumenttyp", entries, active_id) }}
 {%- endmacro -%}
-{%- macro myndigheter_body(fs, organs) -%}
+{%- macro myndigheter_body(fs, organs, agencies) -%}
 {#- the /myndigheter/ landing (T1): what förvaltningsmyndigheterna produce --
-    föreskrifter and avgöranden -- introduced side by side, each linking into
-    its own browse tree -#}
+    föreskrifter, avgöranden and rättsliga ställningstaganden -- introduced side
+    by side, each linking into its own browse tree. The three are what a
+    myndighet publishes about the law it administers: the rules it issues, the
+    cases it decides, and how it says it reads them -#}
 <section class="folkratt-group"><h2>Föreskrifter</h2>
 <p>{{ fs.count }} föreskrifter ur {{ fs.series }} författningssamlingar.</p>
 <p><a href="/foreskrift/">Bläddra bland föreskrifterna →</a></p></section>
@@ -72,6 +74,14 @@
 {%- endfor -%}
 </ul>
 <p><a href="/avg/">Bläddra bland avgörandena →</a></p></section>
+<section class="folkratt-group"><h2>Rättsliga ställningstaganden</h2>
+<p>Myndigheternas egna uttalanden om hur de tolkar och tillämpar de regler de har att följa. De är styrande för myndighetens egen verksamhet men binder inte domstolarna.</p>
+<ul class="facet-list">
+{%- for label, url, count in agencies -%}
+<li><a href="{{ url }}">{{ label }} <span class="c">{{ count }}</span></a></li>
+{%- endfor -%}
+</ul>
+<p><a href="/rs/">Bläddra bland ställningstagandena →</a></p></section>
 {%- endmacro -%}
 {%- macro feed_page_body(atom, entries) -%}
 {#- the human-readable twin of an Atom document -#}

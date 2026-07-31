@@ -612,6 +612,9 @@ _RE_FA_BASEFILE = re.compile(
 _RE_FS_BASEFILE = re.compile(r"^([a-zåäö]+)/(\d{4}:\d+)$")
 # an avgörande: "avg/<org>/<dnr>" ("avg/jo/2340-2025", "avg/jk/2024/8082")
 _RE_AVG_BASEFILE = re.compile(r"^avg/([a-z]+)/([A-Za-z0-9/-]+)$")
+# a rättsligt ställningstagande, the same {source}/{org}/{nummer} grammar; the
+# number keeps the colon four of the six agencies write it with ("fk/2025:01")
+_RE_RS_BASEFILE = re.compile(r"^rs/([a-z]+)/([A-Za-z0-9:/-]+)$")
 
 
 def _fa_pdf(local):
@@ -664,6 +667,16 @@ def _avg_pdf(local):
     return ("avg", basefile, pdf) if pdf.exists() else None
 
 
+def _rs_pdf(local):
+    m = _RE_RS_BASEFILE.match(local)
+    if not m:
+        return None
+    basefile = local[len("rs/"):]
+    pdf = (layout.RS_DOWNLOADED / m.group(1)
+           / (basefile_slug(basefile) + ".pdf"))
+    return ("rs", basefile, pdf) if pdf.exists() else None
+
+
 # an SFS: a bare "<year>:<löpnr>" ("2002:780"), no source prefix -- the
 # officially published PDF the mirror fetched (pdfmirror), facsimile source for
 # both a full published page and a sfs-graphic crop
@@ -698,7 +711,7 @@ def _dv_pdf(local):
     return ("dv", basefile_slug(local), pdf) if pdf.exists() else None
 
 
-_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
+_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _rs_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
 
 # immutable: the PDF a facsimile renders from never changes in place (a
 # re-download replaces the record wholesale), so clients may cache forever

@@ -26,6 +26,16 @@
 {%- macro unparsed_konsoliderad_note(url) -%}
 <div class="version-banner"><strong>Konsoliderad version</strong><span>Myndigheten tillhandahåller en konsoliderad version som inte kunnat läsas in här: <a class="ext" href="{{ url }}" rel="external">PDF hos myndigheten</a>.</span></div>
 {%- endmacro -%}
+{%- macro rs_upphavd_banner(when, ersatt_av) -%}
+{#- a withdrawn rättsligt ställningstagande: it governed what the agency did
+    while it stood, so it stays readable, but it is not the agency's current
+    reading. `when` is the agency's own wording ("20 oktober 2025", "2022-07-01,
+    se HFD 2021 ref. 35"); `ersatt_av` is None or {label, url?} -#}
+<div class="expired-banner"><strong>Upphävt ställningstagande</strong><span>Myndigheten står inte längre bakom detta ställningstagande
+{%- if when %}. Upphävt {{ when }}{% endif -%}
+{%- if ersatt_av %}. Ersatt av {% if ersatt_av.url %}<a href="{{ ersatt_av.url }}">{{ ersatt_av.label }}</a>{% else %}{{ ersatt_av.label }}{% endif %}{% endif -%}
+.</span></div>
+{%- endmacro -%}
 {%- macro foreskrift_repealed_banner(links) -%}
 <div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
 {%- endmacro -%}

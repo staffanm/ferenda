@@ -54,6 +54,7 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
+              "rs": "rs",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
               "icc": "icc",
               "remisser": "remisser", "kommentar": "kommentar",
@@ -74,6 +75,7 @@ FA_DOWNLOADED = DOWNLOADED / "forarbete"
 EURLEX_DOWNLOADED = DOWNLOADED / "eurlex"
 FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
+RS_DOWNLOADED = DOWNLOADED / "rs"                   # <org>/<slug>.{json,pdf}
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html}
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
@@ -145,9 +147,11 @@ def relpath(source, basefile):
     if source == "foreskrift":
         fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
         return Path(fs) / rest.replace(":", "-").replace(" ", "_")
-    if source == "avg":
-        org, rest = basefile.split("/", 1)       # "jo/2340-2025", "jk/2024/8082"
-        return Path(org) / rest.replace("/", "-")
+    if source in ("avg", "rs"):
+        # "jo/2340-2025", "jk/2024/8082" -- and, for rs, the agency's own
+        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"
+        org, rest = basefile.split("/", 1)
+        return Path(org) / rest.replace("/", "-").replace(":", "-")
     if source in ("hudoc", "coe", "icrc", "untc", "icc"):
         return Path(basefile)
     if source == "remisser":
@@ -705,6 +709,11 @@ def page_relpath(uri):
         # MYNDIGHETSBESLUT citations mint): avg/jo/2340-2025 -> avg/jo_2340-2025.html
         _, _, rest = loc.partition("/")
         return "avg/%s.html" % rest.replace("/", "_")
+    elif loc.startswith("rs/"):
+        # a rättsligt ställningstagande, the same /{source}/{org}/{nummer}
+        # grammar as a decision: rs/fk/2025:01 -> rs/fk_2025:01.html
+        _, _, rest = loc.partition("/")
+        return "rs/%s.html" % rest.replace("/", "_")
     elif loc.startswith("om/"):
         # an editorial about page: /om/english -> om/english.html (the slug is
         # already filesystem-safe). Explicit rather than leaning on the SFS

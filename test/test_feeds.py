@@ -4,7 +4,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-from accommodanda.lib import catalog, feeds
+from accommodanda.lib import catalog, feeds, render
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 
@@ -93,7 +93,21 @@ def test_legacy_aliases_map_to_rebuilt_sources():
     assert feeds.dataset("forarbeten").source == "forarbete"
     assert feeds.dataset("myndfs").source == "foreskrift"
     assert feeds.dataset("myndprax").source == "avg"
+    assert feeds.dataset("myndrs").source == "rs"
     assert feeds.dataset("keyword").source == "begrepp"
+
+
+def test_every_dataset_is_reachable_from_the_feed_index(tmp_path):
+    """A `Dataset` the feed index does not list is a feed written to disk that
+    nothing on the site links -- which is how the rs feed shipped unreachable.
+    The index is hand-built per source, so this is the guard that adding a
+    dataset and forgetting its group cannot pass silently."""
+    # an empty catalog is enough: the per-publisher rows vary with the corpus,
+    # but every dataset's own "Samtliga …" entry is unconditional
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    listed = {alias for _group, links in render._feed_index_groups(con)
+              for _label, alias, _params in links}
+    assert {d.alias for d in feeds.DATASETS} <= listed
 
 
 def test_document_date_covers_every_source_field_with_stable_precedence():

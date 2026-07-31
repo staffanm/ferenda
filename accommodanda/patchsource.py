@@ -33,6 +33,7 @@ from .foreskrift.parse import body_path as fs_body_path
 from .lib import compress, layout, patch, pdftext
 from .lib.errors import SkipDocument
 from .lib.util import document_extension, record_path
+from .rs.download import pdf_path as rs_pdf_path
 from .sfs.extract import extract_body
 
 
@@ -152,6 +153,17 @@ def _avg_intermediate(basefile):
     return _pdf_xml(arn_pdf_path(layout.AVG_DOWNLOADED, "arn/" + record["diarienummer"]))
 
 
+def _rs_intermediate(basefile):
+    """A rättsligt ställningstagande's PDF as pdftohtml XML. Every agency
+    publishes one, except for the repealed Konkurrensverket entries that keep
+    only their förteckning row -- and those have no text to patch."""
+    pdf = rs_pdf_path(layout.RS_DOWNLOADED, basefile)
+    if not compress.exists(pdf):
+        raise SkipDocument("%s: the agency published no document for it"
+                           % basefile)
+    return _pdf_xml(pdf)
+
+
 def _remisser_intermediate(basefile):
     """A remissvar's answer PDF as pdftohtml XML."""
     case, org = basefile.split("/", 1)
@@ -169,6 +181,7 @@ _INTERMEDIATE = {
     "foreskrift": (_foreskrift_intermediate, "pdftohtml XML"),
     "avg": (_avg_intermediate,
             "pdftohtml XML (jk, and kkv's pre-2006 documents: HTML)"),
+    "rs": (_rs_intermediate, "pdftohtml XML"),
     "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }
 

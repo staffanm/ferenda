@@ -225,6 +225,29 @@ def _avg_year(r):
     return "okänt"
 
 
+def _rs_year(r):
+    """The year a rättsligt ställningstagande browses under: its beslutsdatum
+    where the document states one, else the year its own number carries.
+
+    The number is the fallback rather than the rule because half these series
+    number by the year the statement was *decided* and half revise in place --
+    a Migrationsverket RS/028/2021 currently in version 3.0 belongs under the
+    year that version was fastställd, not under 2021. The two number shapes are
+    'år:löpnummer' (four agencies) and Kronofogdens 'löpnummer/tvåsiffrigt år'
+    ('1/23'), which is why the year is not simply the leading digits."""
+    if r.date and re.match(r"\d{4}", r.date):
+        return r.date[:4]
+    number = r.local.split("/", 2)[-1]              # 'rs/fk/2025-01' -> '2025-01'
+    m = re.match(r"(\d{4})[-:]", number)
+    if m:
+        return m.group(1)
+    m = re.match(r"\d{1,3}-(\d{2})\b", number)      # Kronofogdens '1-23-VER'
+    if m:
+        return str(2000 + int(m.group(1)))
+    m = re.search(r"-(\d{4})$", number)             # Migrationsverkets 'RS-028-2021'
+    return m.group(1) if m else "okänt"
+
+
 def _dated_year(r):
     return r.date[:4] if r.date and re.match(r"\d{4}", r.date) else "okänt"
 
@@ -477,6 +500,17 @@ SCHEMES = {
                                 "imy": "Integritetsskyddsmyndigheten (IMY)",
                                 "kkv": "Konkurrensverket (KKV)"})),
         Level("År", _avg_year, _by_year_desc),
+    ],
+    "rs": [
+        Level("Myndighet", _catalog_kind,
+              _curated(["fk", "migr", "kfm", "imy", "fi", "kkv"]),
+              label=_map_label({"fk": "Försäkringskassan (FKRS)",
+                                "migr": "Migrationsverket (RS/RK)",
+                                "kfm": "Kronofogdemyndigheten",
+                                "imy": "Integritetsskyddsmyndigheten (IMYRS)",
+                                "fi": "Finansinspektionen",
+                                "kkv": "Konkurrensverket"})),
+        Level("År", _rs_year, _by_year_desc),
     ],
     "hudoc": [
         Level("Dokumenttyp", _catalog_kind,

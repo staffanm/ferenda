@@ -33,6 +33,7 @@ DATASETS = (
     Dataset("forarbeten", "forarbete", "Samtliga förarbeten"),
     Dataset("myndfs", "foreskrift", "Samtliga föreskrifter"),
     Dataset("myndprax", "avg", "Samtliga dokument"),
+    Dataset("myndrs", "rs", "Samtliga rättsliga ställningstaganden"),
     Dataset("keyword", "begrepp", "Alla nya och ändrade begrepp"),
     Dataset("eurlex", "eurlex", "Samtliga EU-rättsakter"),
 )
@@ -115,7 +116,11 @@ def _matches(item, row, rdf_type=None,
             return False
     if dcterms_publisher:
         wanted = dcterms_publisher.rsplit("/", 1)[-1]
-        actual = kind if item.source == "avg" else _slug(publisher or "")
+        # avg and rs are catalogued with the agency's short code as their kind
+        # (jo, kkv, fk, migr…), which is the publisher a feed filters on; every
+        # other source has to slug its publisher's spelled-out name
+        actual = (kind if item.source in ("avg", "rs")
+                  else _slug(publisher or ""))
         if actual != wanted:
             return False
     return True

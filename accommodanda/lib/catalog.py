@@ -576,6 +576,14 @@ def avg_document(art, path):
     return (art["uri"], "avg", art.get("org", "avg"), label, title, str(path))
 
 
+def rs_document(art, path):
+    # a myndighets rättsliga ställningstagande; kind is the agency (fk/imy/…),
+    # label the citation form ("FKRS 2025:01", "RS/028/2021")
+    label = art.get("identifier") or local(art["uri"])
+    title = art.get("metadata", {}).get("title") or label
+    return (art["uri"], "rs", art.get("org", "rs"), label, title, str(path))
+
+
 def hudoc_document(art, path):
     label = art.get("ecli") or art.get("itemid") or local(art["uri"])
     title = art.get("title") or label
@@ -679,7 +687,7 @@ def document_row(art, path, source):
             "forarbete": forarbete_document, "kommentar": kommentar_document,
             "begrepp": begrepp_document, "eurlex": eurlex_document,
             "foreskrift": foreskrift_document,
-            "avg": avg_document, "hudoc": hudoc_document,
+            "avg": avg_document, "rs": rs_document, "hudoc": hudoc_document,
             "coe": coe_document, "icrc": icrc_document,
             "untc": untc_document, "icc": icc_document}[source](art, path)
 

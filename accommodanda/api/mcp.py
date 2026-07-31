@@ -129,7 +129,7 @@ def _con():
 # doctype, …), so it stays a guided free string -- a strict enum there would
 # reject valid kinds the host sees in results.
 Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
-                 "coe", "avg", "kommentar", "begrepp"]
+                 "coe", "avg", "rs", "kommentar", "begrepp"]
 SourceArg = Annotated[Source | None, Field(
     description="restrict to one corpus source; omit to search all")]
 KindArg = Annotated[str | None, Field(
@@ -137,7 +137,8 @@ KindArg = Annotated[str | None, Field(
     "law (sfs), case (dv), prop/sou/ds/dir (forarbete), a doctype like "
     "regulation/directive/judgment (eurlex), an FS code like fffs/nfs "
     "(foreskrift), judgment/decision (hudoc), treaty/protocol (coe), "
-    "jo/jk/arn (avg), kommentar, begrepp. Omit unless you know the "
+    "jo/jk/arn (avg), an agency code like fk/migr/imy (rs), kommentar, "
+    "begrepp. Omit unless you know the "
     "exact kind (it appears as `kind` on every result).")]
 
 # every tool is a pure read of public data: readOnlyHint lets a host auto-run them

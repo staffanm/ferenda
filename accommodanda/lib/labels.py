@@ -323,6 +323,23 @@ def _avg(art):
 
 
 # --------------------------------------------------------------------------
+# rs (myndigheternas rättsliga ställningstaganden)
+# --------------------------------------------------------------------------
+
+def _rs(art):
+    # short_id is the citation form the agency itself uses ("FKRS 2025:01",
+    # "Konkurrensverkets ställningstagande 2025:1"); the title is the subject.
+    # A withdrawn ställningstagande says so wherever it is named in prose --
+    # it still governed what the agency did while it stood, but a reader must
+    # not take it for the agency's current reading.
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or _local(art["uri"])
+    title = md.get("title") or ident
+    described = ident if md.get("status") != "upphävt" else "%s (upphävt)" % ident
+    return Labels(ident, title, title, described)
+
+
+# --------------------------------------------------------------------------
 # icc (International Criminal Court)
 # --------------------------------------------------------------------------
 
@@ -337,7 +354,7 @@ def _icc(art):
 
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
-             "avg": _avg, "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
+             "avg": _avg, "rs": _rs, "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc}
 
 
