@@ -1,14 +1,15 @@
 """The public MCP server (accommodanda/api/mcp.py) over a fixture catalog + a
-faked search backend -- the tool functions directly (fast, no network) plus one
-end-to-end Streamable HTTP round-trip through a real MCP client to prove the
-mounted /mcp endpoint and the transport wiring."""
+faked search backend -- the tool functions directly (fast, no network) plus
+end-to-end Streamable HTTP round-trips through real MCP clients of *both*
+protocol eras, to prove the mounted /mcp endpoint and the transport wiring."""
 
+import contextlib
 import json
 
 import anyio
 import pytest
 import uvicorn
-from mcp import ClientSession
+from mcp.client import Client, ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
@@ -81,7 +82,7 @@ def test_search_degrades_without_opensearch(corpus):
     mcpmod._index = Down()
     res = mcpmod.search("mord")
     # the call still succeeds (no exception), just with a note and no full-text
-    assert "note" in res and res["results"] == []
+    assert res["note"] and res["results"] == []
 
 
 def test_resolve_citation_to_fragment(corpus):
@@ -155,9 +156,9 @@ def test_tool_schemas_steer_the_model():
                           "get_outgoing_citations", "list_sources"}
     # read-only annotation on every tool (lets a host auto-run them)
     for t in tools.values():
-        assert t.annotations and t.annotations.readOnlyHint is True
+        assert t.annotations and t.annotations.read_only_hint is True
 
-    props = tools["search"].inputSchema["properties"]
+    props = tools["search"].input_schema["properties"]
     # source is an optional enum of exactly the corpus sources
     source_enum = next(b["enum"] for b in props["source"]["anyOf"] if "enum" in b)
     assert set(source_enum) == {"sfs", "dv", "hudoc", "forarbete", "foreskrift",
@@ -168,40 +169,138 @@ def test_tool_schemas_steer_the_model():
     assert "fffs" in props["kind"]["description"]
 
 
+def test_search_and_fetch_satisfy_the_openai_contract(corpus):
+    """`search` and `fetch` carry the field names OpenAI's hosts require of a
+    knowledge server. Those fields are a subset of what the corpus already
+    answers with, so meeting the contract narrows nothing: the hit keeps its
+    citation-graph payload, and `id` pinpoints the matching provision rather
+    than costing a whole-statute read."""
+    hit = mcpmod.search("mord", source="sfs")["results"][0]
+    assert {"id", "title", "url"} <= set(hit)
+    assert hit["id"] == "https://lagen.nu/1962:700#K3P1"
+    assert hit["inbound_count"] == 1 and hit["fragments"]   # no slot in the contract
+
+    doc = mcpmod.fetch(hit["id"])
+    assert set(doc) == {"id", "title", "text", "url", "metadata"}
+    assert doc["id"] == hit["id"] and doc["url"] == "/1962:700#K3P1"
+    assert "berövar annan livet" in doc["text"]
+    assert doc["metadata"]["source"] == "sfs"
+    assert doc["metadata"]["pinpoint"] == "K3P1"
+
+    # a bare document URI is an equally valid id -- then it is the whole document
+    whole = mcpmod.fetch("https://lagen.nu/1962:700")
+    assert whole["metadata"]["pinpoint"] is None and whole["url"] == "/1962:700"
+
+    # resolve_citation hands back the same handle, so its hits are fetchable too
+    assert mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")[0]["id"] == hit["id"]
+
+
+def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
+    """A match that isn't paragraph-deep (a title hit, an `is_doc` hit) carries
+    `fragments: []`, and its id is then the document URI -- the branch every
+    non-pinpointed search result takes, and the one that decides whether a host
+    fetching that id gets a document or a KeyError."""
+    class DocLevel:
+        def search(self, q, source=None, kind=None, limit=10, offset=0):
+            return {"total": 1, "results": [{
+                "uri": "https://lagen.nu/2018:585", "identifier": "SFS 2018:585",
+                "title": "Förvaltningslag (2018:585)", "source": "sfs",
+                "kind": "law", "score": 4.2, "inbound_count": 0,
+                "highlight": [], "fragments": []}]}
+    mcpmod._index = DocLevel()
+
+    hit = mcpmod.search("förvaltning")["results"][0]
+    assert hit["id"] == "https://lagen.nu/2018:585"
+    assert mcpmod.fetch(hit["id"])["metadata"]["pinpoint"] is None
+
+
+def test_contract_tools_emit_structured_content(corpus):
+    """The contract wants `structuredContent` *and* a JSON duplicate in
+    `content`. The SDK only emits the former for a tool whose return type it can
+    build a schema from -- a bare `-> dict` yields neither schema nor structure,
+    which is why these two tools declare TypedDict returns."""
+    tools = {t.name: t for t in anyio.run(mcpmod.mcp.list_tools)}
+    assert set(tools["fetch"].output_schema["required"]) == {
+        "id", "title", "text", "url", "metadata"}
+    assert "results" in tools["search"].output_schema["required"]
+
+    for name, args in (("search", {"query": "mord"}),
+                       ("fetch", {"id": "https://lagen.nu/1962:700"})):
+        res = anyio.run(lambda n=name, a=args: mcpmod.mcp.call_tool(n, a))
+        assert res.structured_content == json.loads(res.content[0].text), name
+
+    # `note` rides along as an explicit null rather than being omitted: the SDK
+    # dumps the validated model without exclude_unset, so declaring it optional
+    # would put a null in structuredContent that the text duplicate lacks
+    assert anyio.run(lambda: mcpmod.mcp.call_tool("search", {"query": "mord"})) \
+        .structured_content["note"] is None
+
+
+@contextlib.asynccontextmanager
+async def _served(port):
+    """The whole api app on a real port, lifespan on (so mcp.lifespan runs the
+    transport's session manager -- without it every /mcp request 500s).
+
+    Once per *process*: the session manager refuses a second run(), and the
+    `mcp` server object is module-level, so a second uvicorn boot would hang
+    forever on a lifespan that can never start. Drive every client from the one
+    instance below rather than adding a second _served() test.
+    """
+    server = uvicorn.Server(uvicorn.Config(
+        api.app, host="127.0.0.1", port=port, log_level="error", lifespan="on"))
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(server.serve)
+        while not server.started:
+            await anyio.sleep(0.05)
+        try:
+            yield
+        finally:
+            server.should_exit = True
+
+
 def test_end_to_end_streamable_http(corpus, caplog):
-    """A real MCP client over the mounted /mcp endpoint: initialize, list the
-    tools, call one -- proving the transport + mount + lifespan are wired."""
+    """Real MCP clients of both protocol eras against the one mounted /mcp
+    endpoint, proving the transport + mount + lifespan are wired.
+
+    A 2026-07-28 client discovers the server, lists the tools and calls one with
+    no initialize handshake and no session id -- each POST stands alone, so any
+    request could have landed on any process. A pre-2026 client still opens with
+    `initialize` and negotiates down; hosts upgrade on their own schedule, so
+    dropping them would silently unpublish the corpus.
+    """
     caplog.set_level("INFO", logger="accommodanda.api.mcp")
+
     async def scenario():
-        config = uvicorn.Config(api.app, host="127.0.0.1", port=8791,
-                                log_level="error", lifespan="on")
-        server = uvicorn.Server(config)
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(server.serve)
-            while not server.started:
-                await anyio.sleep(0.05)
-            try:
-                # the tidy public URL (no trailing slash) must work too
-                async with streamable_http_client("http://127.0.0.1:8791/mcp") \
-                        as (r, w, _):
-                    async with ClientSession(r, w) as session:
-                        await session.initialize()
-                        names = {t.name for t in (await session.list_tools()).tools}
-                        assert {"search", "get_document", "resolve_citation",
-                                "get_incoming_citations"} <= names
-                        out = await session.call_tool(
-                            "get_document",
-                            {"uri": "https://lagen.nu/1962:700"})
-                        payload = json.loads(out.content[0].text)
-                        assert payload["title"] == "Brottsbalk (1962:700)"
-            finally:
-                server.should_exit = True
+        async with _served(8791):
+            # the tidy public URL (no trailing slash) must work too
+            async with Client("http://127.0.0.1:8791/mcp") as client:
+                listed = await client.list_tools()
+                assert {"search", "get_document", "resolve_citation",
+                        "get_incoming_citations"} <= {t.name for t in listed.tools}
+                # the tool table is fixed at import over public data, so it is
+                # advertised as cacheable for an hour and shareable (CACHE_HINTS)
+                assert listed.ttl_ms == 3_600_000
+                assert listed.cache_scope == "public"
+                out = await client.call_tool("get_document",
+                                             {"uri": "https://lagen.nu/1962:700"})
+                assert json.loads(out.content[0].text)["title"] == \
+                    "Brottsbalk (1962:700)"
+
+            async with streamable_http_client("http://127.0.0.1:8791/mcp") as (r, w):
+                async with ClientSession(r, w) as session:
+                    assert (await session.initialize()).protocol_version == \
+                        "2025-11-25"
+                    out = await session.call_tool(
+                        "get_document", {"uri": "https://lagen.nu/1962:700"})
+                    assert json.loads(out.content[0].text)["title"] == \
+                        "Brottsbalk (1962:700)"
 
     anyio.run(scenario)
     # every JSON-RPC request logs one line (the access log only shows POST
     # /mcp/); a tools/call line carries the tool name + its arguments
     logged = [r.message for r in caplog.records
               if r.name == "accommodanda.api.mcp"]
-    assert any(m.endswith("initialize") for m in logged)
+    assert any(m.endswith("server/discover") for m in logged)   # the 2026 opener
+    assert any(m.endswith("initialize") for m in logged)        # the 2025 opener
     assert any("tools/call get_document" in m
                and '"uri": "https://lagen.nu/1962:700"' in m for m in logged)

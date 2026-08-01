@@ -59,9 +59,11 @@ dependencies = [
     "langdetect",
     "lark",
     "lxml",
-    # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- FastMCP +
-    # the Streamable HTTP transport
-    "mcp>=1.13",
+    # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- MCPServer +
+    # the Streamable HTTP transport. >=2.0 is what speaks the 2026-07-28 protocol
+    # revision (no initialize handshake, no Mcp-Session-Id); the 1.x line stops at
+    # 2025-11-25 and is maintenance-only. One server still serves both eras.
+    "mcp>=2.0",
     "opensearch-py",
     "pillow>=12.3.0",  # 12.2.0 carries PYSEC-2026-2253..2257
     # Headful, detached-CDP transport for the F5-protected SKVFS/MTFS registers.

@@ -20,13 +20,15 @@ one code path.
 import contextlib
 import json
 import logging
-from typing import Annotated, Literal
+from collections.abc import Mapping
+from typing import Annotated, Literal, TypedDict
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
+from mcp.server.caching import CacheableMethod, CacheHint
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from opensearchpy.exceptions import OpenSearchException
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from starlette.responses import RedirectResponse
 from starlette.routing import Route
 
@@ -35,6 +37,11 @@ from ..lib import catalog, layout, pins, text
 from ..lib.search import SearchIndex
 
 CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
+
+# the ceiling on a single document body, shared by `get_document`'s clamp and
+# `fetch`, which deliberately reads at it -- one number so raising it can't
+# leave the other reader on the old bound.
+MAX_CHARS = 200_000
 
 log = logging.getLogger(__name__)
 
@@ -73,10 +80,10 @@ All data is read-only and public; nothing here mutates anything.\
 def _root_logging_preserved():
     """Undo any reconfiguration of the *root* logger done inside the block.
 
-    FastMCP's constructor calls logging.basicConfig() -- a library claiming the
+    MCPServer's constructor calls logging.basicConfig() -- a library claiming the
     root logger, which belongs to whoever owns the process. Since `mcp` is built
     at module scope (the @mcp.tool decorators below need it), merely importing
-    this module would otherwise install FastMCP's RichHandler at INFO on every
+    this module would otherwise install the SDK's handler at INFO on every
     process that reaches api/app.py -- including the `lagen` CLI, where it made
     opensearch-py narrate every bulk round-trip into the build output. Snapshot
     and restore, so importing us configures nothing: the app decides (uvicorn's
@@ -91,16 +98,19 @@ def _root_logging_preserved():
         root.setLevel(level)
 
 
-# DNS-rebinding protection guards localhost-bound servers from hostile web
-# pages; this server is public, unauthenticated and read-only, served behind
-# nginx which already routes by vhost. Left on (FastMCP's default), it would
-# 421 every request whose Host isn't localhost -- i.e. all production traffic.
+# `tools/list` and `server/discover` are the two cacheable methods a host calls
+# on every connect. Ours answer from a tool table fixed at import and public
+# read-only data, so a client may hold them for an hour and share them across
+# authorization contexts -- the corpus grows nightly, but the *tool surface* and
+# the instructions only change when this file is deployed. (SEP-2549; the hints
+# ride along as ttlMs/cacheScope at 2026-07-28 and are ignored by older clients.)
+CACHE_HINTS: Mapping[CacheableMethod, CacheHint] = {
+    "tools/list": CacheHint(ttl_ms=3_600_000, scope="public"),
+    "server/discover": CacheHint(ttl_ms=3_600_000, scope="public")}
+
 with _root_logging_preserved():
-    mcp = FastMCP("lagen.nu", instructions=INSTRUCTIONS,
-                  stateless_http=True, json_response=True,
-                  streamable_http_path="/",
-                  transport_security=TransportSecuritySettings(
-                      enable_dns_rebinding_protection=False))
+    mcp = MCPServer("lagen.nu", instructions=INSTRUCTIONS,
+                    website_url="https://lagen.nu/", cache_hints=CACHE_HINTS)
 
 # one search client for the process; constructing it opens no connection, so
 # importing/mounting never needs a running OpenSearch -- only a `search` call
@@ -111,7 +121,7 @@ _index = SearchIndex()
 @contextlib.contextmanager
 def _con():
     """A read-only catalog connection, opened per tool call (SQLite connections
-    are not shared across threads, and FastMCP runs sync tools in a threadpool);
+    are not shared across threads, and the SDK runs sync tools in a threadpool);
     `catalog.connect_ro` applies the additive schema migrations once per
     process first."""
     if not CATALOG.exists():
@@ -145,7 +155,86 @@ KindArg = Annotated[str | None, Field(
 # without a per-call approval prompt (so the multi-step grounding flow isn't
 # interrupted); openWorldHint marks results as drawn from a large external corpus,
 # not a fixed enumerable set.
-READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
+READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=True)
+
+
+# --------------------------------------------------------------------------
+# the search/fetch result shapes
+#
+# `search` and `fetch` are the two tools OpenAI's hosts expect a knowledge
+# server to expose, with a fixed result shape: search returns `{results: [{id,
+# title, url}]}` and fetch returns `{id, title, text, url, metadata}`, both as
+# `structuredContent` (which the SDK only emits for a tool whose return type it
+# can build a schema from -- a bare `-> dict` yields none). Declaring these
+# shapes is the whole of the adaptation: their required fields are a *subset* of
+# what the corpus already answers with, so the contract is met by naming the
+# fields rather than by narrowing any tool. Everything the contract doesn't
+# mention -- fragments, inbound_count, source/kind, the citation-graph tools --
+# stays exactly as it is for every other host.
+#
+# The hit allows extra keys so lib/search.py can grow fields without them being
+# silently dropped from structuredContent. The envelope can't: the SDK builds
+# the top-level model itself and drops that config, so every key `search`
+# returns is declared here.
+# --------------------------------------------------------------------------
+
+class SearchHit(TypedDict):
+    """One search result. `id` is what `fetch` takes -- the *most precise*
+    target for this hit, so a paragraph-deep match ids the fragment
+    (`https://lagen.nu/1962:700#K3P1`), not the whole statute."""
+
+    # pydantic's documented way to configure a TypedDict-derived model; PEP 589
+    # allows only annotated declarations in the body, hence the ignore. Verified
+    # to reach the wire as `additionalProperties: true` on this hit's schema.
+    __pydantic_config__ = ConfigDict(extra="allow")  # ty: ignore[invalid-typed-dict-statement]
+
+    id: str
+    title: str
+    url: str
+
+
+class SearchResults(TypedDict):
+    """`results` is the contract; `query`/`total`/`note` are ours, and are
+    declared so they survive into structuredContent.
+
+    `note` is always present and null when nothing is degraded, rather than
+    omitted: the SDK dumps the validated model without `exclude_unset`, so an
+    absent optional key still reaches the wire as an explicit null. Declaring it
+    nullable keeps structuredContent and the JSON in `content` carrying the same
+    keys and values (their key *order* differs -- one is insertion order, the
+    other the model's), which is what the search/fetch contract asks for.
+    """
+
+    results: list[SearchHit]
+    query: str
+    total: int
+    note: str | None
+
+
+class FetchedDocument(TypedDict):
+    """A document (or one provision of it) in the fetch contract's shape.
+    `metadata` is the free-form slot, and is where the corpus facts the contract
+    has no field for -- source, kind, publisher page, citation count -- ride."""
+
+    id: str
+    title: str
+    text: str
+    url: str
+    metadata: dict[str, str | int | bool | None]
+
+
+def _hit_id(hit):
+    """A search hit's `fetch` id: its best fragment URI when the match was
+    paragraph-deep, else the document URI. Both are already-valid ids, since a
+    fragment URI is just the document URI plus its `#`-pinpoint.
+
+    Indexes `fragments` rather than `.get`-ing it: both producers always set the
+    key (`search.parse_hit`, `pins.resolved_results` -- `[]` for a
+    document-level match), so a missing one means a hit shape changed under us.
+    Raising then beats defaulting, which would silently collapse every id to the
+    document URI and have hosts fetch whole statutes instead of the provision.
+    """
+    return hit["fragments"][0]["uri"] if hit["fragments"] else hit["uri"]
 
 
 # --------------------------------------------------------------------------
@@ -154,7 +243,7 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
 @mcp.tool(title="Search the Swedish legal corpus", annotations=READ_ONLY)
 def search(query: str, source: SourceArg = None, kind: KindArg = None,
-           limit: int = 10) -> dict:
+           limit: int = 10) -> SearchResults:
     """Full-text search across the whole corpus, ranked by relevance combined
     with how often a document is cited, down to the matching paragraph/article
     (each hit carries the matching `fragments` with highlighted text).
@@ -165,9 +254,11 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
     first result, which plain full-text can't do (the name appears nowhere in the
     text). `source`/`kind` narrow the hits; `limit` is 1-50.
 
-    Each result: uri, url (the public page path -- append `#<pinpoint>` to deep
-    link), identifier, title, source, kind, inbound_count (how often cited), and
-    the matching fragments. Follow up with `get_document` for the full text.
+    Each result: id (pass it to `fetch`; it pinpoints the matching provision
+    where the match was paragraph-deep), uri, url (the public page path --
+    append `#<pinpoint>` to deep link), identifier, title, source, kind,
+    inbound_count (how often cited), and the matching fragments. Follow up with
+    `get_document` (or `fetch`) for the full text.
     """
     limit = max(1, min(limit, 50))
     results, total, note = [], 0, None
@@ -189,10 +280,8 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
         with _con() as con:
             pinned = pins.resolved_results(con, query, source, kind)
         results, total = pins.merge_pinned(pinned, results, total, limit)
-    out = {"query": query, "total": total, "results": results}
-    if note:
-        out["note"] = note
-    return out
+    return SearchResults(query=query, total=total, note=note,
+                         results=[{**r, "id": _hit_id(r)} for r in results])
 
 
 @mcp.tool(title="Resolve a legal citation to its URI", annotations=READ_ONLY)
@@ -204,12 +293,13 @@ def resolve_citation(citation: str) -> list[dict]:
     Handles a statute nickname/abbreviation + pinpoint ("avtalslagen 36 §",
     "BrB 3:1"), an EU act + article ("GDPR artikel 32", "dataskyddsförordningen
     art. 6") and a case nickname ("NJA 2015 s. 899", "Instagrambilden"). Returns a
-    list (usually one entry, or empty if nothing resolves) of {uri, url,
+    list (usually one entry, or empty if nothing resolves) of {id, uri, url,
     identifier, title, source, kind, inbound_count, fragments}; when the citation
-    named a paragraph/article, `fragments[0].uri` is the pinpointed fragment URI.
+    named a paragraph/article, `fragments[0].uri` is the pinpointed fragment URI
+    and `id` (what `fetch` takes) is that same pinpointed URI.
     """
     with _con() as con:
-        return pins.resolved_results(con, citation)
+        return [{**r, "id": _hit_id(r)} for r in pins.resolved_results(con, citation)]
 
 
 @mcp.tool(title="Get a document's metadata and text", annotations=READ_ONLY)
@@ -229,7 +319,7 @@ def get_document(uri: str, pinpoint: str | None = None,
     authoritative page), inbound_count (how often the document is cited), the
     requested `pinpoint`, and `text`.
     """
-    max_chars = max(1, min(max_chars, 200000))
+    max_chars = max(1, min(max_chars, MAX_CHARS))
     with _con() as con:
         row = catalog.document(con, uri)
         if not row:
@@ -251,6 +341,36 @@ def get_document(uri: str, pinpoint: str | None = None,
             "title": title, "source_url": art.get("source_url"),
             "inbound_count": inbound, "pinpoint": pinpoint,
             "truncated": len(body) > max_chars, "text": body[:max_chars]}
+
+
+@mcp.tool(title="Fetch a document by search-result id", annotations=READ_ONLY)
+def fetch(id: str) -> FetchedDocument:
+    """Retrieve the full text behind an `id` returned by `search`.
+
+    `id` is a lagen.nu URI. A `#`-fragment in it (`https://lagen.nu/1962:700#K3P1`
+    -- what `search` ids a paragraph-deep hit with) fetches just that provision;
+    a bare document URI fetches the whole document. Equivalent to
+    `get_document`, which takes the URI and the pinpoint separately and can cap
+    the length -- prefer that one when you already know both.
+
+    Returns id, title, url, text and a `metadata` map carrying source, kind,
+    label, the publisher's authoritative page, how often the document is cited,
+    the `pinpoint` read (null for a whole document) and `truncated`. The body
+    caps at 200000 characters: when `metadata.truncated` is true you have a
+    prefix, not the whole provision, so don't cite past it -- fetch a
+    `#`-pinpointed id instead.
+    """
+    # the contract asks for the *complete* content, so take get_document's
+    # ceiling rather than its (deliberately modest) interactive default
+    uri, _, pinpoint = id.partition("#")
+    doc = get_document(uri, pinpoint or None, max_chars=MAX_CHARS)
+    return FetchedDocument(
+        id=id, title=doc["title"], text=doc["text"],
+        url=layout.page_url(doc["uri"]) + ("#" + pinpoint if pinpoint else ""),
+        metadata={"source": doc["source"], "kind": doc["kind"],
+                  "label": doc["label"], "source_url": doc["source_url"],
+                  "pinpoint": doc["pinpoint"], "truncated": doc["truncated"],
+                  "inbound_count": doc["inbound_count"]})
 
 
 @mcp.tool(title="List documents in the corpus", annotations=READ_ONLY)
@@ -335,14 +455,31 @@ def list_sources() -> list[dict]:
 # built once at import: creates the Streamable HTTP ASGI app and, lazily, the
 # session manager `lifespan` runs. Serving at "/" internally so a mount at
 # "/mcp/" lands the endpoint on exactly /mcp/ (see mount()).
-_http_app = mcp.streamable_http_app()
+#
+# One endpoint serves both protocol eras off these settings. A 2026-07-28 client
+# sends a self-contained POST -- no initialize handshake, no Mcp-Session-Id, its
+# protocol version and capabilities riding in `params._meta` -- and the SDK
+# routes it to the single-exchange handler. A 2025-era client still handshakes;
+# `stateless_http` gives it a fresh transport per request rather than a session
+# pinned to this process, so either way no request needs sticky routing.
+#
+# DNS-rebinding protection guards localhost-bound servers from hostile web
+# pages; this server is public, unauthenticated and read-only, served behind
+# nginx which already routes by vhost. Left on (the SDK default), it would
+# 421 every request whose Host isn't localhost -- i.e. all production traffic.
+_http_app = mcp.streamable_http_app(
+    streamable_http_path="/", json_response=True, stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False))
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app):
     """Run the Streamable HTTP session manager for the lifetime of the host app.
     Wire this as the FastAPI app's `lifespan` (it is a no-op for the in-process
-    TestClient path used during `generate`, which never calls /mcp)."""
+    TestClient path used during `generate`, which never calls /mcp). Still
+    required at 2026-07-28: the manager owns the task group every request --
+    session or no session -- is dispatched from."""
     async with mcp.session_manager.run():
         yield
 
