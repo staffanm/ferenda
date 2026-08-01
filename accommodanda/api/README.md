@@ -351,6 +351,30 @@ Lägg till den URL:en som en anpassad ("custom"/"remote") MCP-server i din
 AI-värd. Ingen nyckel, ingen OAuth. Lokalt under utveckling:
 `http://127.0.0.1:8000/mcp`.
 
+### Protokollrevision
+
+Endpointen talar **2026-07-28** — revisionen som tog bort protokollets
+sessionsbegrepp: ingen `initialize`-handskakning, inget `Mcp-Session-Id`. Varje
+anrop är en fristående POST som bär klientens protokollversion och förmågor i
+`params._meta`, och värden hämtar serverns förmågor med `server/discover` när
+den behöver dem. I praktiken: vilket anrop som helst kan landa på vilken
+process som helst, så `/mcp` kan skalas bakom en vanlig round-robin utan
+sticky routing eller delat sessionslager.
+
+Samma endpoint svarar fortfarande **2025-11-25 och äldre** — de klienterna
+handskakas som förut och förhandlar ned. Värdar uppgraderar i sin egen takt, så
+båda vägarna testas mot en och samma uppkopplade server i `test/test_mcp.py`.
+
+Två detaljer att känna till om en proxy hamnar framför appen: 2026-07-28 kräver
+att varje POST bär `Mcp-Method` (och `Mcp-Name` för `tools/call`) så att
+lastbalanserare kan routa utan att läsa bodyn — SDK:n avvisar med
+`-32020` om de saknas eller inte matchar bodyn. Vår nginx-vhost proxar rakt
+igenom, så det behövs ingen konfiguration; men en proxy som *strippar* okända
+headers tystar hela endpointen. Vidare annonseras `tools/list` och
+`server/discover` som cachebara i en timme och delbara mellan användare
+(`CACHE_HINTS` i `api/mcp.py`) — verktygstabellen ändras bara vid deploy, även
+om corpuset växer varje natt.
+
 ### Verktyg (tools)
 
 | Verktyg | Vad |
@@ -358,6 +382,7 @@ AI-värd. Ingen nyckel, ingen OAuth. Lokalt under utveckling:
 | `search` | fulltextsökning över hela corpuset, ned på paragraf-/artikelnivå; en citeringsformad fråga ("avtalslagen 36", "GDPR art 32", "Instagrambilden") fäster det exakta målet överst. Degraderar till enbart citeringsträff om OpenSearch är nere |
 | `resolve_citation` | slår upp en citering skriven med namn/förkortning → exakt dokument-URI (+ fragment); kräver *inte* OpenSearch |
 | `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
+| `fetch` | samma text, men hämtad på ett `id` från `search` (`…/1962:700#K3P1`) i stället för URI + pinpoint var för sig — se *Sök/hämta-kontraktet* nedan |
 | `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
 | `get_incoming_citations` | vilka dokument som citerar exakt denna URI/paragraf (citeringsgrafen inåt — lagen.nu:s signaturfunktion) |
 | `get_outgoing_citations` | alla citeringar ett dokument gör (grafen utåt) |
@@ -366,6 +391,36 @@ AI-värd. Ingen nyckel, ingen OAuth. Lokalt under utveckling:
 Verktygen är tunna omslag kring samma `lib`-funktioner som REST-endpointerna, så
 en corpus-fakta når MCP och REST genom en kodväg. Precis som REST behöver bara
 `search` ett igång OpenSearch; de katalogberoende verktygen svarar utan klustret.
+
+### Sök/hämta-kontraktet
+
+OpenAI:s värdar förväntar sig att en kunskapsserver exponerar just `search` och
+`fetch` med en bestämd resultatform: `search` → `{results: [{id, title, url}]}`
+och `fetch` → `{id, title, text, url, metadata}`, båda som `structuredContent`
+utöver JSON-dubbletten i `content`. Vi *uppfyller* det kontraktet men har inte
+antagit det som modell — dess fält är en delmängd av vad corpuset ändå svarar
+med, så anpassningen bestod i att namnge fälten, inte i att smalna av något:
+
+- `search` fick nyckeln `id` per träff. Den pekar på **den mest precisa**
+  träffen — en paragrafdjup match id:as med sitt fragment
+  (`https://lagen.nu/1962:700#K3P1`), inte med hela balken, så en `fetch` läser
+  paragrafen och inte 300 sidor. Övriga fält (`fragments`, `inbound_count`,
+  `source`/`kind`) ligger kvar orörda för alla andra värdar.
+- `fetch` är ett nytt tunt omslag kring `get_document`. Allt kontraktet saknar
+  fält för — källa, typ, myndighetens egen sida, citeringsantal — rider i
+  `metadata`.
+- Citeringsgrafen (`get_incoming_citations`/`get_outgoing_citations`) och
+  `resolve_citation` har ingen motsvarighet i kontraktet och är oförändrade.
+  Det är de som är poängen med servern; kontraktet är en projektion av
+  läsvyn, inte modellen.
+
+De två verktygen deklarerar `TypedDict`-returer, vilket är vad SDK:n behöver för
+att alls sända `structuredContent` — en naken `-> dict` ger varken output-schema
+eller strukturerad payload. `note` i `search` skickas alltid, som `null` när
+inget är degraderat: SDK:n dumpar den validerade modellen utan `exclude_unset`,
+så ett utelämnat valfritt fält skulle ändå nå tråden som en explicit null och
+göra `structuredContent` och `content` osynkade (nycklarna kommer i olika
+ordning i de två — det är värdena som ska stämma, och ett test låser det).
 
 Servern är monterad i `api/app.py` via `api/mcp.py` (`mcp.mount(app)` +
 `lifespan`). Eftersom nginx redan proxar *allt* till appen (se

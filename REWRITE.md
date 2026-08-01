@@ -1338,15 +1338,45 @@ to a future per-doc incremental generate.
     ✅ **Incremental relate + index** (content-hash diff, see 2026-06-26 log).
   - ✅ **MCP server** (`accommodanda/api/mcp.py`, mounted at `/mcp` via
     Streamable HTTP on the same `lagen all serve` FastAPI app) — the same
-    read-only view reshaped as seven tools (`search`, `resolve_citation`,
-    `get_document`, `list_documents`, `get_incoming_citations`,
+    read-only view reshaped as eight tools (`search`, `resolve_citation`,
+    `get_document`, `fetch`, `list_documents`, `get_incoming_citations`,
     `get_outgoing_citations`, `list_sources`) for any MCP-capable AI host,
     public and unauthenticated like REST. The tools are thin wrappers over
     the same `lib` functions the REST endpoints use; `lib/pins.py` was
     extracted as the shared citation-shaped-query resolver (name+pinpoint →
     exact fragment target) behind both REST `/search` and the MCP
-    `search`/`resolve_citation` tools. `test/test_mcp.py`, incl. an
-    end-to-end Streamable HTTP round-trip against a running app.
+    `search`/`resolve_citation` tools. `test/test_mcp.py`, incl. end-to-end
+    Streamable HTTP round-trips against a running app.
+    The endpoint speaks protocol revision **2026-07-28** (SDK `mcp>=2.0`,
+    `MCPServer`), the revision that deleted the protocol's session concept:
+    no `initialize` handshake, no `Mcp-Session-Id`, every call a
+    self-contained POST carrying the client's version and capabilities in
+    `params._meta`, with `server/discover` in place of the handshake's
+    capability exchange — so any request may land on any process and `/mcp`
+    scales behind plain round-robin. The same endpoint still serves
+    2025-11-25 and older clients, which handshake as before; both paths are
+    tested against one running server. `tools/list`/`server/discover` are
+    advertised cacheable for an hour and shareable (SEP-2549 `ttlMs`/
+    `cacheScope`) since the tool table only changes at deploy.
+    Note for anything proxying the app: 2026-07-28 requires `Mcp-Method` (and
+    `Mcp-Name` on `tools/call`) on every POST so gateways can route without
+    reading the body — the SDK rejects a missing or mismatched one with
+    `-32020`. Our nginx vhost proxies straight through, but a proxy that
+    strips unknown headers would silence the endpoint.
+    `search`/`fetch` additionally satisfy the result contract OpenAI's hosts
+    expect of a knowledge server (`{results: [{id, title, url}]}` and
+    `{id, title, text, url, metadata}`, both as `structuredContent`) — met by
+    *naming* fields, not by narrowing tools: the contract's fields are a subset
+    of what the corpus already answers with, `search` gained only an `id` key
+    (the fragment URI on a paragraph-deep hit, so a fetch reads the provision
+    and not the whole statute), `fetch` is a thin wrapper over `get_document`
+    with the unmapped corpus facts in `metadata`, and the citation-graph tools
+    are untouched. Both declare `TypedDict` returns, which is what makes the
+    SDK emit `structuredContent` at all (a bare `-> dict` yields neither schema
+    nor structure). Deliberately *not* adopted as the model — it is a
+    two-tool RAG shape with no expression for the citation graph, which is the
+    point of the server — a downstream projection, never the model
+    (rule:own-typed-model, one layer up).
     Operationally: a `_LoggedMCP` ASGI wrapper logs one line per JSON-RPC
     request (client IP, method, tool name + truncated arguments) since the
     uvicorn/nginx access log only sees `POST /mcp/ 200`; the MCP SDK's
@@ -3765,6 +3795,32 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **api** (2026-08-01) — the MCP server moves to protocol revision
+  **2026-07-28** (SDK `mcp` 1.28.1 → 2.0.0, `FastMCP` → `MCPServer`), the
+  revision that deleted the protocol's session concept: no `initialize`
+  handshake, no `Mcp-Session-Id`, every call a self-contained POST carrying its
+  version and capabilities in `params._meta`, with `server/discover` replacing
+  the handshake's capability exchange — so any request may land on any process
+  and `/mcp` scales behind plain round-robin. The transport settings moved from
+  the constructor onto `streamable_http_app()`; the root-logger guard and the
+  session-manager lifespan both stay load-bearing (verified, not assumed). The
+  same endpoint still serves 2025-era clients, and `test/test_mcp.py` now drives
+  both eras against one running server — one server because `session_manager
+  .run()` is once-per-process, so a second uvicorn boot deadlocks on a lifespan
+  that can never start. `tools/list`/`server/discover` are advertised cacheable
+  for an hour and shareable (SEP-2549), the tool table only changing at deploy.
+  Alongside it, `search`/`fetch` now satisfy the result contract OpenAI's hosts
+  expect of a knowledge server, met by *naming* fields rather than narrowing
+  tools: `search` gained an `id` key (the fragment URI on a paragraph-deep hit,
+  so a fetch reads the provision and not the whole statute), `fetch` is a thin
+  wrapper over `get_document`, and the citation-graph tools are untouched — the
+  contract is a projection of the read view, deliberately not the model
+  (rule:own-typed-model). Both declare `TypedDict` returns, which is what makes
+  the SDK emit `structuredContent` at all. The relock also surfaced a latent
+  bug: `lib/net.py` imports `httpx` (a different package from the declared
+  `httpx2`) and had been getting it transitively from mcp 1.x, so the KKVFS
+  HTTP/2 harvest would have broken on the next clean `uv sync`; `httpx[http2]`
+  is now declared outright.
 - **operations/lib** (2026-07-31) — the served-site error ledger lands, the
   serving-side counterpart to `lib/runlog.py`'s build ledger: `lib/errorlog.py`
   (append-only `DATA/.build/httperrors.ndjson`, 8-hex error ids, rotated at
