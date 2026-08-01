@@ -28,6 +28,7 @@ from .avg.download import (
     kkv_body_path,
 )
 from .avg.parse import kkv_html_text
+from .edpb.download import pdf_path as edpb_pdf_path
 from .eurlex.parse import content_file, formex_members
 from .foreskrift.parse import body_path as fs_body_path
 from .lib import compress, layout, patch, pdftext
@@ -153,6 +154,13 @@ def _avg_intermediate(basefile):
     return _pdf_xml(arn_pdf_path(layout.AVG_DOWNLOADED, "arn/" + record["diarienummer"]))
 
 
+def _edpb_intermediate(basefile):
+    """An EDPB vägledning's PDF as pdftohtml XML. Every record names a document
+    -- the harvest writes none without one -- so an absent file is a broken
+    store, not a document-less entry."""
+    return _pdf_xml(edpb_pdf_path(layout.EDPB_DOWNLOADED, basefile))
+
+
 def _rs_intermediate(basefile):
     """A rättsligt ställningstagande's PDF as pdftohtml XML. Every agency
     publishes one, except for the repealed Konkurrensverket entries that keep
@@ -182,6 +190,7 @@ _INTERMEDIATE = {
     "avg": (_avg_intermediate,
             "pdftohtml XML (jk, and kkv's pre-2006 documents: HTML)"),
     "rs": (_rs_intermediate, "pdftohtml XML"),
+    "edpb": (_edpb_intermediate, "pdftohtml XML"),
     "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }
 

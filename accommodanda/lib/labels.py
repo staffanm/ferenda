@@ -340,6 +340,23 @@ def _rs(art):
 
 
 # --------------------------------------------------------------------------
+# edpb (Europeiska dataskyddsstyrelsen)
+# --------------------------------------------------------------------------
+
+def _edpb(art):
+    # short_id is the citation form the issuer's own number gives it
+    # ("Riktlinjer 05/2020", "WP 248"); the title is the subject. A document the
+    # EDPB has published in no Swedish version says so wherever it is named:
+    # the page a reader is being sent to is in English, and that is worth
+    # knowing before following the link.
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or _local(art["uri"])
+    title = md.get("title") or ident
+    described = ident if md.get("sprak") != "en" else "%s (engelsk version)" % ident
+    return Labels(ident, title, title, described)
+
+
+# --------------------------------------------------------------------------
 # icc (International Criminal Court)
 # --------------------------------------------------------------------------
 
@@ -354,7 +371,8 @@ def _icc(art):
 
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
-             "avg": _avg, "rs": _rs, "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
+             "avg": _avg, "rs": _rs, "edpb": _edpb,
+             "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc}
 
 

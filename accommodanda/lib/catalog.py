@@ -584,6 +584,15 @@ def rs_document(art, path):
     return (art["uri"], "rs", art.get("org", "rs"), label, title, str(path))
 
 
+def edpb_document(art, path):
+    # an EDPB/artikel 29-gruppen vägledning; kind is the series
+    # (riktlinjer/rekommendationer/wp), label the citation form the number gives
+    # it ("Riktlinjer 05/2020", "WP 248")
+    label = art.get("identifier") or local(art["uri"])
+    title = art.get("metadata", {}).get("title") or label
+    return (art["uri"], "edpb", art.get("serie", "edpb"), label, title, str(path))
+
+
 def hudoc_document(art, path):
     label = art.get("ecli") or art.get("itemid") or local(art["uri"])
     title = art.get("title") or label
@@ -687,7 +696,8 @@ def document_row(art, path, source):
             "forarbete": forarbete_document, "kommentar": kommentar_document,
             "begrepp": begrepp_document, "eurlex": eurlex_document,
             "foreskrift": foreskrift_document,
-            "avg": avg_document, "rs": rs_document, "hudoc": hudoc_document,
+            "avg": avg_document, "rs": rs_document, "edpb": edpb_document,
+            "hudoc": hudoc_document,
             "coe": coe_document, "icrc": icrc_document,
             "untc": untc_document, "icc": icc_document}[source](art, path)
 

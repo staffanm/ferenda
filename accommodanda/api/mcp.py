@@ -129,7 +129,7 @@ def _con():
 # doctype, …), so it stays a guided free string -- a strict enum there would
 # reject valid kinds the host sees in results.
 Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
-                 "coe", "avg", "rs", "kommentar", "begrepp"]
+                 "coe", "avg", "rs", "edpb", "kommentar", "begrepp"]
 SourceArg = Annotated[Source | None, Field(
     description="restrict to one corpus source; omit to search all")]
 KindArg = Annotated[str | None, Field(

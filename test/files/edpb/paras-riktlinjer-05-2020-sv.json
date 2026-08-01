@@ -1,0 +1,302 @@
+[
+ {
+  "text": "Riktlinjer 05/2020 om samtycke enligt förordning (EU) 2016/679",
+  "bold": true,
+  "size": 27
+ },
+ {
+  "text": "Version 1.1",
+  "bold": true,
+  "size": 27
+ },
+ {
+  "text": "Antagna den 4 maj 2020",
+  "bold": true,
+  "size": 24
+ },
+ {
+  "text": "Translations proofread by EDPB Members. This language version has not been proofread.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "antagna 1",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "Versionshistorik",
+  "bold": false,
+  "size": 24
+ },
+ {
+  "text": "Version 1.1 av den 13 maj 2020 Rättelse av formatering Version 1.0 av den 4 maj 2020 Antagande av riktlinjerna",
+  "bold": false,
+  "size": 18
+ },
+ {
+  "text": "antagna 2",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "Europeiska dataskyddsstyrelsen har",
+  "bold": true,
+  "size": 21
+ },
+ {
+  "text": "med beaktande av artikel 70.1 e i Europaparlamentets och rådets förordning (EU) 2016/679 av den 27 april 2016 om skydd för fysiska personer med avseende på behandling av personuppgifter och om det fria flödet av sådana uppgifter och om upphävande av direktiv 95/46/EG (allmän dataskyddsförordning), med beaktande av EES-avtalet, särskilt bilaga XI och protokoll 37, ändrat genom gemensamma EESkommitténs beslut nr 154/2018 av den 6 juli 2018 1 ,",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "med beaktande av artiklarna 12 och 22 i arbetsordningen och",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "med beaktande av artikel 29-gruppens riktlinjer om samtycke enligt förordning (EU) 2016/679, WP259 rev.01,",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "ANTAGIT FÖLJANDE RIKTLINJER:",
+  "bold": true,
+  "size": 18
+ },
+ {
+  "text": "0 FÖRORD",
+  "bold": false,
+  "size": 24
+ },
+ {
+  "text": "Den 10 april 2018 antog artikel 29-gruppen sina riktlinjer om samtycke enligt förordning (EU) 2016/679 (WP259.01), som godkändes av Europeiska dataskyddsstyrelsen (nedan kallad styrelsen )vid dess första plenarmöte. Detta dokument är en något uppdaterad version av dessa riktlinjer. Alla hänvisningar till artikel 29-arbetsgruppens riktlinjer om samtycke (WP259 rev.01) bör hädanefter tolkas som hänvisningar till dessa riktlinjer. Europeiska dataskyddsstyrelsen har konstaterat att det finns ett behov av ytterligare klargöranden, särskilt i fråga om följande två frågor: 1 Giltigheten av samtycke från den registrerade vid interaktion med så kallade kakväggar (cookie walls). 2 Exempel 16 om bläddring och samtycke.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "Styckena om dessa två frågor har reviderats och uppdaterats men resten av dokumentet är oförändrat utöver redaktionella ändringar. Närmare bestämt har följande reviderats:  Avsnitt om Villkor (stycke 38–41).  Avsnitt om Otvetydig viljeyttring (stycke 86).",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "1 INLEDNING",
+  "bold": false,
+  "size": 24
+ },
+ {
+  "text": "1. I dessa riktlinjer görs en grundlig analys av begreppet samtycke i förordning (EU) 2016/679, den allmänna dataskyddsförordningen. Begreppet samtycke såsom det används i dataskyddsdirektivet",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "1 Hänvisningar till ”medlemsstater” i detta dokument bör förstås som hänvisningar till ”medlemsstater i EES”.",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "antagna 4",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "(nedan kallat direktiv 95/46/EG ) och direktivet om integritet och elektronisk kommunikation har förändrats. I allmänna dataskyddsförordningen görs ett ytterligare förtydligande och en specificering av kraven för erhållande och uppvisande av giltigt samtycke. I dessa riktlinjer läggs fokus på dessa förändringar genom praktisk vägledning för att säkerställa förenlighet med allmänna dataskyddsförordningen och med utgångspunkt i artikel 29-arbetsgruppens yttrande 15/2011 om definitionen av begreppet ”samtycke”. De personuppgiftsansvariga är skyldiga att finna nya vägar för att hitta nya lösningar inom lagens råmärken och bättre stödja skyddet av registrerades personuppgifter och intressen.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "2. Samtycke förblir en av de sex lagliga grunderna för behandling av personuppgifter, såsom anges i artikel 6 i allmänna dataskyddsförordningen. 2 Vid inledandet av verksamhet som medför behandling av personuppgifter måste en personuppgiftsansvarig alltid ta sig tid och fundera över vilken som är den lämpliga rättsliga grunden för den avsedda behandlingen.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "3. Generellt sett kan samtycke enbart vara den lämpliga rättsliga grunden om den registrerade erbjuds kontroll och får en genuin valmöjlighet att godta eller vägra godta de villkor som ges eller att vägra godta dem utan problem. När den personuppgiftsansvarige ber om samtycke måste han eller hon bedöma huruvida samtliga villkor kommer att uppfyllas för erhållandet av giltigt samtycke. Om samtycke erhålls helt i linje med den allmänna dataskyddsförordningen är samtycke ett verktyg som ger de registrerade kontroll över huruvida deras personuppgifter kommer att behandlas. I annat fall blir de registrerades kontroll skenbar och samtycke kommer då att vara en ogiltig grund för behandling, vilket innebär att behandlingen blir olaglig. 3",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "4. Artikel 29-gruppens befintliga yttranden om samtycke",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "4",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "är fortsatt relevanta, i de fall där de är förenliga med den nya rättsliga ramen, eftersom den allmänna dataskyddsförordningen är en kodifiering av artikel 29-gruppens befintliga riktlinjer och allmänna goda praxis och eftersom de viktigaste delarna av samtycke är desamma i allmänna dataskyddsförordningen. I detta dokument ersätter inte styrelsen tidigare yttranden från artikel 29-gruppen om särskilda frågor som rör bland annat hänvisning till samtycke enligt direktiv 95/46/EG. I stället vidareutvecklar och kompletterar styrelsen dessa.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "5. Såsom artikel 29-gruppen angav i yttrande 15/2011 om definitionen av begreppet ”samtycke” bör uppmaningar till personer om att acceptera uppgiftsbehandling omfattas av strikta krav, eftersom det handlar om de registrerades grundläggande rättigheter och den personuppgiftsansvarige vill inleda en uppgiftsbehandling som skulle vara olaglig utan den registrerades samtycke. Samtyckets avgörande roll betonas i artiklarna 7 och 8 i Europeiska unionens stadga om de grundläggande rättigheterna (nedan kallad stadgan ). Ett erhållet samtycke innebär inte heller att man kan kringgå eller på något sätt förminska den personuppgiftsansvariges skyldigheter att iaktta behandlingsprinciperna i den",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "2 I artikel 9 i allmänna dataskyddsförordningen ges en lista över möjliga undantag till förbudet mot behandling av särskilda kategorier av uppgifter. Ett av undantagen är då den registrerade lämnar uttryckligt samtycke till användning av sådana uppgifter. 3 Se även artikel 29-gruppens yttrande 15/2011 om definitionen av begreppet ”samtycke” (WP 187), s. 6–8, och/eller yttrande 6/2014 om begreppet den registeransvariges berättigade intressen i artikel 7 i direktiv 95/46/EG (WP 217), s. 9, 10, 13 och 14. 4 Framför allt yttrande 15/2011 om definitionen av begreppet ”samtycke” (WP 187).",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "Yttrande 15/2011, sidan om definitionen av begreppet ”samtycke” (WP 187), s. 8.",
+  "bold": false,
+  "size": 15
+ },
+ {
+  "text": "antagna 5",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "allmänna dataskyddsförordningen, särskilt artikel 5 i den allmänna dataskyddsförordningen, i fråga om korrekthet, nödvändighet och proportionalitet samt datakvalitet. Behandlingen av personuppgifter grundar sig på den registrerades samtycke, men detta innebär inte att uppgifter som inte är nödvändiga för ett särskilt ändamål får behandlas, vilket i grund och botten skulle vara oskäligt.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "6. Styrelsen är samtidigt medveten om den översyn som görs av direktivet om integritet och elektronisk kommunikation (2002/58/EG). Begreppet samtycke i förslaget till förordning om integritet och elektronisk kommunikation hänger fortfarande samman med begreppet samtycke i den allmänna dataskyddsförordningen. 7 Organisationer behöver sannolikt samtycke enligt instrumentet för integritet och elektronisk kommunikation för merparten marknadsföringsmeddelanden på nätet eller marknadsföringssamtal och webbaserade spårningsverktyg, inklusive genom användning av kakor eller appar eller annan programvara. Styrelsen har redan utfärdat rekommendationer och gett vägledning till EU-lagstiftaren när det gäller förslaget till förordning om integritet och elektronisk kommunikation. 8",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "7. När det gäller det nuvarande direktivet om integritet och elektronisk kommunikation noterar styrelsen att hänvisningar till det upphävda direktivet 95/46/EG ska anses vara hänvisningar till allmänna dataskyddsförordningen. Detta gäller även hänvisningar till samtycke i det nuvarande direktivet 9 2002/58/EG, eftersom förordningen om integritet och elektronisk kommunikation inte hade trätt i kraft den 25 maj 2018. Enligt artikel 95 i allmänna dataskyddsförordningen ska inga ytterligare förpliktelser föreläggas när det gäller behandling inom ramen för tillhandahållande av allmänt tillgängliga elektroniska kommunikationstjänster i allmänna kommunikationsnät, i den mån som särskilda skyldigheter för samma ändamål införs genom direktivet om integritet och elektronisk kommunikation. Styrelsen noterar att kraven om samtycke enligt allmänna dataskyddsförordningen inte ska betraktas som någon ”ytterligare förpliktelse” utan snarare som förhandsvillkor för laglig behandling. Därför är allmänna dataskyddsförordningens villkor för erhållande av giltigt samtycke tillämpliga i situationer som omfattas av direktivet om integritet och elektronisk kommunikation.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "2 SAMTYCKE ENLIGT ARTIKEL 4.11 I ALLMÄNNA DATASKYDDSFÖRORDNINGEN",
+  "bold": false,
+  "size": 24
+ },
+ {
+  "text": "8. I artikel 4.11 i allmänna dataskyddsförordningen definieras samtycke på följande sätt: ”varje slag av frivillig, specifik, informerad och otvetydig viljeyttring, genom vilken den registrerade, antingen genom ett uttalande eller genom en entydig bekräftande handling, godtar behandling av personuppgifter som rör honom eller henne.”",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "Se även yttrande 15/2011 om definitionen av begreppet ”samtycke” (WP 187) och artikel 5 i den allmänna dataskyddsförordningen. 7 Enligt artikel 9 i den föreslagna förordningen om integritet och elektronisk kommunikation gäller den definition av och de villkor för samtycke som anges i artiklarna 4.11 och 7 i allmänna dataskyddsförordningen. Se Europeiska dataskyddsstyrelsens uttalande om integritet och elektronisk kommunikation – 25 maj 2018 och 8 Europeiska dataskyddsstyrelsens uttalande 3/2019 om lagstiftning gällande integritet och elektronisk kommunikation . 9 Se artikel 94 i allmänna dataskyddsförordningen.",
+  "bold": false,
+  "size": 15
+ },
+ {
+  "text": "antagna 6",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "9. Grundbegreppet samtycke är detsamma som i direktiv 95/46/EG och samtycke är en av de rättsliga grunder som behandling av personuppgifter måste grundas på, enligt artikel 6 i allmänna dataskyddsförordningen. Förutom den ändrade definitionen i artikel 4.11 innehåller allmänna 10 dataskyddsförordningen ytterligare vägledning i artikel 7 samt i skälen 32, 33, 42 och 43 när det gäller hur den personuppgiftsansvarige måste agera för att iaktta samtyckeskravets viktigaste delar.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "10. Det faktum att särskilda bestämmelser och skäl om återkallande av samtycke har tagits med bekräftar att samtycke bör vara ett återkalleligt beslut och att den registrerade fortsätter att ha en viss kontroll.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "3 DELAR AV GILTIGT SAMTYCKE",
+  "bold": false,
+  "size": 24
+ },
+ {
+  "text": "11. Enligt artikel 4.11 i allmänna dataskyddsförordningen innebär samtycke av den registrerade varje slag av",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": " frivillig,",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": " specifik,",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": " informerad och",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": " otvetydig viljeyttring, genom vilken den registrerade, antingen genom ett uttalande eller genom en entydig bekräftande handling, godtar behandling av personuppgifter som rör honom eller henne.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "12. I nedanstående avsnitt görs en analys av i vilken utsträckning ordalydelsen i artikel 4.11 innebär att de personuppgiftsansvariga måste ändra sina begäranden/formulär avseende samtycke, för att säkerställa förenlighet med allmänna dataskyddsförordningen. 11",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "12",
+  "bold": false,
+  "size": 13
+ },
+ {
+  "text": "3.1 Fritt/frivilligt samtycke",
+  "bold": false,
+  "size": 19
+ },
+ {
+  "text": "10 I direktiv 95/46/EG definierades samtycke som ”varje slag av frivillig, särskild och informerad viljeyttring genom vilken den registrerade godtar behandling av personuppgifter som rör honom”, vilket måste ges på ett otvetydigt sätt för att personuppgifterna ska få behandlas (artikel 7 a i direktiv 95/46/EG). Se artikel 29-gruppens yttrande 15/2011 om definitionen av begreppet ”samtycke” (WP 187) för exempel på lämpligheten av samtycke som rättslig grund. I detta yttrande gav artikel 29-gruppen vägledning för att särskilja fall där samtycke är en lämplig rättslig grund från de där grunden legitimt intresse (eventuellt med en opt out-lösning) är tillräcklig eller ett avtalsförhållande är att rekommendera. Se även artikel 29-gruppens yttrande 6/2014, punkt III.1.2, sidan 14 och följande sidor. Uttryckligt samtycke är också ett av undantagen till förbudet mot behandling av särskilda kategorier av uppgifter: se artikel 9 i allmänna dataskyddsförordningen. 11 För vägledning när det gäller pågående behandling som grundar sig på samtycke i direktiv 95/46/EG, se kapitel 7 i detta dokument och skäl 171 i allmänna dataskyddsförordningen.",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "12 Artikel 29-gruppen har i flera yttranden undersökt samtyckets gränser i situationer där det inte kan ges frivilligt. Så gjorde artikel 29-gruppen framför allt i sitt yttrande 15/2011 om definitionen av begreppet ”samtycke” (WP 187), arbetsdokument om behandling av hälsorelaterade personuppgifter i elektroniska patientjournaler (WP 131), yttrande 8/2001 om behandling av personuppgifter i anställningsförhållanden (WP 48) och andra yttrandet 4/2009 om Internationella antidopningsbyråns (Wada) internationella standard för skydd av privatlivet och personuppgifter, om bestämmelser på området i Wadas internationella antidopningsregler och om andra frågor som gäller privatlivet i samband med Wadas och (nationella) antidopningsorganisationers bekämpning av dopning inom idrotten (WP 162).",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "antagna 7",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "13. Delen ”fritt” innebär att de registrerade har kontroll och möjlighet att välja fritt. I allmänna dataskyddsförordningen anges den allmänna regeln att om de registrerade saknar möjlighet att välja fritt, känner sig tvingade att ge sitt samtycke eller kommer att få utstå negativa konsekvenser om de inte samtycker, kommer samtycket att vara ogiltigt . Om samtycke ingår som en ej förhandlingsbar 13 del av villkoren antas samtycket inte vara frivilligt. På samma sätt kommer samtycke inte anses vara frivilligt om de registrerade inte kan vägra eller ta tillbaka sitt samtycke utan problem. 14 Begreppet ojämlikhet mellan den personuppgiftsansvarige och den registrerade beaktas också i allmänna dataskyddsförordningen.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "14. Vid bedömning av huruvida samtycke är frivilligt bör hänsyn även tas till den särskilda situation då samtycke förenas med ett avtal eller tillhandahållande av en tjänst såsom anges i artikel 7.4. Artikel 7.4 har avfattats på ett icke uttömmande sätt genom orden ”bland annat”, som innebär att det kan finnas en rad andra situationer som omfattas av bestämmelsen. Varje slags otillbörligt tryck eller påverkan på den registrerade (vilket kan te sig på flera olika sätt) som hindrar honom eller henne från att utöva sin fria vilja ska generellt sett innebära att samtycket blir ogiltigt.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "15. Exempel 1: I en fotoredigeringsapp uppmanas användarna att ha GPS-lokaliseringen aktiverad för tjänsten. I appen informeras användarna även om att de insamlade uppgifterna kommer att användas för beteendestyrd nätannonsering. Vare sig geolokalisering eller beteendestyrd nätannonsering är nödvändigt för tillhandahållandet av fotoredigeringstjänsten och går utöver tillhandahållandet av huvudtjänsten i fråga. Eftersom användarna inte kan använda appen utan att ge sitt samtycke till dessa ändamål, kan samtycket inte anses ha getts frivilligt.",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "3.1.1 Maktobalans",
+  "bold": false,
+  "size": 18
+ },
+ {
+  "text": "16. I skäl 43",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "15",
+  "bold": false,
+  "size": 10
+ },
+ {
+  "text": "anges det tydligt att det är osannolikt att offentliga myndigheter kan hänvisa till samtycke till behandling, eftersom det ofta föreligger en tydlig maktobalans mellan den personuppgiftsansvarige och den registrerade när den personuppgiftsansvarige är en offentlig myndighet. Det är också tydligt i de flesta fall att den registrerade faktiskt inte kommer att ha något annat val än att godta den personuppgiftsansvariges behandling (behandlingsvillkor). Styrelsen anser att det finns andra lagliga grunder som i princip är mer lämpliga för offentliga myndigheters verksamhet . 16",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "17. Utan att det påverkar dessa allmänna överväganden är det inte helt uteslutet för offentliga myndigheter att använda sig av samtycke som en laglig grund för behandling av uppgifter enligt allmänna dataskyddsförordningens rättsliga ram. Följande exempel visar att samtycke kan vara lämpligt i vissa situationer:",
+  "bold": false,
+  "size": 17
+ },
+ {
+  "text": "18. Exempel 2: En kommun planerar vägunderhållsarbeten. Eftersom vägarbetena kan störa trafiken under en lång tid ger kommunen medborgarna möjlighet att via en e-postlista få uppdateringar om",
+  "bold": false,
+  "size": 17
+ }
+]

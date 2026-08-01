@@ -1,0 +1,6 @@
+{#- An EDPB (or endorsed artikel 29-gruppen) vägledning: the language and
+    version banners, the text, and the notes below it. Metadata rides the
+    frontmatter (page.html). -#}
+{% extends "page.html" %}
+{% import "partials/footnotes.html" as notes %}
+{% block body %}{{ banner }}{{ structure }}{% if footnotes %}{{ notes.footnote_list(footnotes) }}{% endif %}{% endblock %}

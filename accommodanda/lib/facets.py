@@ -252,6 +252,22 @@ def _dated_year(r):
     return r.date[:4] if r.date and re.match(r"\d{4}", r.date) else "okänt"
 
 
+def _edpb_year(r):
+    """The year an EDPB vägledning browses under: the year it was adopted where
+    the catalog dates it, else the year its own number carries.
+
+    The number is the fallback rather than the rule because these documents are
+    re-adopted: Riktlinjer 05/2021 is numbered for 2021 and its current version
+    was adopted in 2023, and a reader looking for what the EDPB says now is
+    looking for the later year. The endorsed artikel 29-gruppens vägledningar
+    have no year in their number at all ('edpb/wp/248'), so those rely wholly on
+    the adoption date the cover states."""
+    if r.date and re.match(r"\d{4}", r.date):
+        return r.date[:4]
+    m = re.search(r"-(\d{4})$", r.local)          # 'edpb/riktlinjer/05-2020'
+    return m.group(1) if m else "okänt"
+
+
 # the case sources (publication series / court), in browse order. The published
 # referat carry a lowercase series segment ('dom/nja/…'); the *raw* avgöranden --
 # the court's own version, harvested months before its editor referat and folded
@@ -511,6 +527,15 @@ SCHEMES = {
                                 "fi": "Finansinspektionen",
                                 "kkv": "Konkurrensverket"})),
         Level("År", _rs_year, _by_year_desc),
+    ],
+    "edpb": [
+        Level("Serie", _catalog_kind,
+              _curated(["riktlinjer", "rekommendationer", "wp"]),
+              label=_map_label({
+                  "riktlinjer": "Riktlinjer",
+                  "rekommendationer": "Rekommendationer",
+                  "wp": "Artikel 29-gruppens vägledningar"})),
+        Level("År", _edpb_year, _by_year_desc),
     ],
     "hudoc": [
         Level("Dokumenttyp", _catalog_kind,

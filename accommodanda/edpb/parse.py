@@ -1,0 +1,359 @@
+"""A harvested edpb record + its PDF -> :class:`Vagledning` -> JSON artifact.
+
+Both routes deliver the same kind of document: an EU institutional report set
+in one column, structure marked by **size alone** -- the EDPB sets no bold
+anywhere in its guidelines (body 17, sections 24, title 27), which is the
+`by_size` reading `lib.pdftext.classify_letterhead` already offers and
+Finansinspektionens ställningstaganden already need. So the block layer is the
+shared one, configured by the two patterns it takes: the cover/front-matter
+lines to drop, and the footer that has to be removed in place.
+
+What is EDPB-specific, and lives here, is the **numbered punkt**. The EDPB
+numbers every substantive paragraph and sets the number in a column of its own,
+which is exactly the case the paragraph-gap heuristic cannot see: paragraph 17
+of Riktlinjer 05/2020 sits half a line below paragraph 16 and arrives glued to
+the end of it, losing both an anchor and the boundary a citation scan needs. The
+numbers are therefore read first, as a *running sequence* -- a line opening
+"N. " counts only when N is the number the document is due next, so a year, a
+list item or an article number opening a line cannot start a paragraph -- and
+handed to `page_paragraphs` as forced breaks, the same mechanism DV's bitmap
+paragraph numbers use. Each numbered paragraph then anchors on its own number,
+so a decision citing "punkt 27 i riktlinjer 05/2020" lands on the paragraph.
+
+A paragraph continued across a page break arrives as a block of its own with no
+number of its own, and is joined back onto the numbered paragraph it continues
+-- otherwise the sentence is split mid-clause, which loses both the reference
+that straddles the break and the fragment's own place in the numbering.
+
+The one field read out of a document rather than off its index is the **WP29
+title and adoption date**, and only because the index is demonstrably wrong
+about them: the EDPB page that endorses WP250 is titled "Dataskyddsombud",
+which is WP243's subject (see `series.WP29`). Their Swedish covers state both,
+in a layout fixed across all seven, and a document naming itself beats an index
+naming it wrongly -- the same departure `rs` makes for Försäkringskassans
+serienummer.
+"""
+
+import functools
+import json
+import re
+
+from ..lib import compress
+from ..lib.datasets import NAMEDACTS
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    EURATTSFALL,
+    VAGLEDNING,
+    LagrumParser,
+    load_namedacts,
+)
+from ..lib.pdftext import (
+    classify_letterhead,
+    letterhead_footnotes,
+    page_paragraphs,
+    pdf_pages,
+)
+from ..lib.util import normalize_space, record_path
+from .download import pdf_path
+from .model import Block, Fotnot, Vagledning
+from .series import BY_KOD, WP29_BY_NUMBER
+
+# what an EDPB guideline actually cites: EU legislation (the förordning it
+# interprets, by article), the EU courts, and the EDPB's and artikel
+# 29-gruppens own guidance. It cites no Swedish statute at all, so the SFS
+# machinery is not requested -- a smaller grammar and no false "3 §" matches.
+EDPB_PARSE_TYPES = [EULAGSTIFTNING, EURATTSFALL, VAGLEDNING]
+
+# a numbered punkt opening a line: "1. ", "27. ". Matched against the line, not
+# the paragraph, because the number is set in its own column and the sequence
+# check below is what makes a bare number safe to trust.
+RE_PUNKT = re.compile(r"^(\d{1,4})\.\s+\S")
+
+# the cover and front matter, which the record already carries as fields: the
+# document's own version line and version history, its adoption dates, and the
+# EDPB's translation disclaimer. Dropped rather than published, so the body
+# starts at the body.
+RE_FRONT_MATTER = re.compile(
+    r"^(?:Version(?:shistorik)?\b.*|(?:vo\.[\d.]+\s*)+.*"
+    # the adoption line, in every inflection the translations use (antagen /
+    # antaget / antagna), and the running footer that repeats the same word
+    # with the page number -- sometimes in a paragraph of its own, sometimes
+    # with the EDPB's "efter offentligt samråd" qualifier
+    r"|(?:Senast\s+(?:reviderade|granskade)\s+och\s+)?[Aa]ntag(?:en|et|na)"
+    r"(?:\s+den\s+.*|\s*[-–]\s*efter\s+offentligt\s+samråd\s*\d*|\s*\d*)"
+    r"|Adopted(?:\s+on\s+.*|\s*\d*)|Version\s+history\b.*|Utkast\s*\d*"
+    r"|Translations?\s+proofread\s+by.*"
+    # "has not been" in some, "has not yet been" in others
+    r"|This\s+(?:language\s+version|translation)\s+has\s+not\s+(?:yet\s+)?"
+    r"been\s+proofread.*"
+    # the WP29 language mark ("17/SV") and the WP number, on one line or two
+    r"|\d{1,2}/[A-Z]{2}"
+    r"|(?:\d{1,2}/[A-Z]{2}\s+)?WP\s*\d{2,3}\s*(?:rev\.?\s*\d+)?"
+    r")$", re.I)
+
+# the running footer. The EDPB sets "Antagna <n>" ("Adopted <n>") at the foot of
+# every page; the working party set its own name and a page number. Removed in
+# place, since a body line sharing the footer's baseline arrives glued to it.
+RE_MASTHEAD = re.compile(
+    r"\s*(?:[Aa]ntagna|Adopted)\s+\d+\s*$"
+    r"|\s*ARTIKEL\s+29-ARBETSGRUPPEN[^\n]*"
+    r"|\s*ARTICLE\s+29\s+DATA\s+PROTECTION\s+WORKING\s+PARTY[^\n]*")
+
+# the WP29 cover. Its *order* is fixed across all seven documents -- the working
+# party's name, a "17/SV" language mark, the WP number, the title, then the
+# adoption dates, the last of which is the revision the EDPB endorsed -- but its
+# line breaking is not: three of the seven set the language mark and the number
+# on one line ("16/SV WP 242 rev.01") and two run the adoption dates together,
+# so every part is *searched* for rather than matched against a whole line.
+RE_WP_NUMBER = re.compile(r"\bWP\s*(\d{2,3})\s*(?:rev\.?\s*\d+)?\s*$", re.I)
+RE_WP_ADOPTED = re.compile(
+    r"(?:Senast\s+(?:reviderade|granskade)\s+och\s+)?[Aa]ntagna\s+den\s+"
+    r"(\d{1,2})\s+([a-zåäö]+)\s+(\d{4})", re.I)
+RE_WP_ADOPTED_EN = re.compile(
+    r"(?:Last\s+[Rr]evised\s+and\s+)?Adopted\s+on\s+"
+    r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})")
+# the working party naming *itself* on the cover, between the number and the
+# title. Matched only inside the cover region, where a line that is nothing but
+# the group's name (and any "för …" qualifier) cannot be prose.
+RE_WP29_NAME = re.compile(
+    r"^Artikel\s+29[-‑]arbetsgruppen(?:\s+för\s+[\w\s]+)?$", re.I)
+# Swedish and English month names, lower-cased. Four spellings coincide
+# (april, september, november, december) and are written once.
+MONTHS = {"januari": 1, "january": 1, "februari": 2, "february": 2,
+          "mars": 3, "march": 3, "april": 4, "maj": 5, "may": 5,
+          "juni": 6, "june": 6, "juli": 7, "july": 7,
+          "augusti": 8, "august": 8, "september": 9,
+          "oktober": 10, "october": 10, "november": 11, "december": 12}
+
+
+@functools.cache
+def _refparser(lang):
+    """The citation parser for a document in `lang`.
+
+    Two of them, because the corpus is two-language: the EDPB publishes 48 of
+    these in Swedish and three in English only, and the same act citation reads
+    "artikel 6.1 f i förordning (EU) 2016/679" in one and "Article 6(1)(f) of
+    Regulation (EU) 2016/679" in the other -- which is the language switch the
+    engine already carries for pre-accession EU case law. Parsing an English
+    guideline with the Swedish surface found one reference in the whole
+    document.
+
+    `named_acts` is not optional here the way it is for most verticals: a
+    riktlinje is *about* one act and names it in prose on almost every line
+    ("artikel 6.1 a i allmänna dataskyddsförordningen"). Without the named-act
+    surface those bare articles bind to whatever act was last named by number --
+    which in these documents is the repealed direktiv 95/46/EG, cited in every
+    historical aside -- and the whole document links to the wrong act. The named
+    forms are Swedish, so the English parser is built without them."""
+    return LagrumParser({}, basefile="edpb", parse_types=EDPB_PARSE_TYPES,
+                        named_acts=load_namedacts(NAMEDACTS) if lang == "swe"
+                        else None, lang=lang)
+
+
+def _fresh_parser(sprak):
+    """The shared parser with document-lifetime state reset (so one document's
+    learned act names do not bleed into the next)."""
+    parser = _refparser("swe" if sprak == "sv" else "eng")
+    parser.reset()
+    return parser
+
+
+# --------------------------------------------------------------------------
+# the numbered punkt
+# --------------------------------------------------------------------------
+
+def numbered_breaks(pages):
+    """``{pageno: {top, …}}`` -- the lines that open a numbered punkt.
+
+    The number is trusted only where it is the one the document is *due*: the
+    sequence starts at 1 and advances by one, so "2016." opening a line, an
+    article number, or a numbered list inside a paragraph cannot pass for a
+    paragraph number. A document that numbers nothing yields no breaks at all
+    and reads as the plain prose it is (the WP29 vägledningar)."""
+    breaks, expected = {}, 1
+    for pageno, lines in pages:
+        tops = set()
+        for line in lines:
+            match = RE_PUNKT.match(line.text)
+            if match and int(match.group(1)) == expected:
+                tops.add(line.top)
+                expected += 1
+        breaks[pageno] = tops
+    return breaks
+
+
+def punkt_of(text):
+    """The punkt number a block opens with, or None."""
+    match = RE_PUNKT.match(text)
+    return match.group(1) if match else None
+
+
+def join_continuations(blocks):
+    """Join a block that continues the previous numbered punkt back onto it.
+
+    Every substantive paragraph in these documents carries a number, so an
+    unnumbered paragraph directly after a numbered one is the tail of it, split
+    by a page break or by the indented run of a list. A heading ends the join --
+    what follows a heading starts something, whatever its numbering."""
+    out = []
+    for kind, text, level in blocks:
+        if (kind == "stycke" and out and out[-1][0] == "stycke"
+                and out[-1][3] and not punkt_of(text)):
+            out[-1] = (kind, "%s %s" % (out[-1][1], text), level, out[-1][3])
+            continue
+        out.append((kind, text, level, punkt_of(text) if kind == "stycke" else None))
+    return out
+
+
+def drop_repeated_title(blocks, titel):
+    """Drop the cover's copy of the title where the PDF opens with it -- the
+    page already carries it as the h1, so the body would open by repeating
+    itself. Only *leading* blocks go, so a later heading echoing the title is
+    left as the real section it is."""
+    folded = re.sub(r"[^0-9a-zåäö]+", "", titel.lower())
+    while blocks and folded:
+        head = re.sub(r"[^0-9a-zåäö]+", "", blocks[0][1].lower())
+        # a block that folds away entirely is punctuation the cover left behind
+        # (two of the 51 open with a bare "."), never content -- step over it
+        # and keep looking for the echo it hides
+        if head and (len(head) < TITLE_ECHO_MIN or not folded.startswith(head)):
+            break
+        blocks = blocks[1:]
+    return blocks
+
+
+# --------------------------------------------------------------------------
+# the cover title, where the page's is in the wrong language
+# --------------------------------------------------------------------------
+
+# how a Swedish document names itself, and how an English one does. The EDPB
+# leaves the English title standing on the Swedish page of four documents
+# (Riktlinjer 4/2019, 05/2021, 10/2020 and Rekommendationer 1/2025 all carry
+# "Guidelines …" / "Recommendations …" as the Swedish page's heading) even
+# though the Swedish PDF beside it is a full translation with its own Swedish
+# title on the cover. Everywhere else the page title is the better text -- it is
+# clean HTML rather than PDF extraction, which glues hyphenated line breaks and
+# occasionally truncates -- so the cover is consulted *only* to correct the
+# language, never as a general second opinion.
+RE_SWEDISH_LEAD = re.compile(r"^(?:Riktlinjer?|Rekommendationer?)\b", re.I)
+RE_ENGLISH_LEAD = re.compile(r"^(?:Guidelines?|Recommendations?)\b", re.I)
+# how much of the title a leading block must repeat before it counts as the
+# cover echoing the h1 rather than the body opening
+TITLE_ECHO_MIN = 8
+# a cover title runs to at most this many blocks before the version/adoption
+# line that closes it ("Riktlinjer 4/2019 om artikel 25" / "Inbyggt dataskydd
+# och dataskydd som standard" / "Version 2.0")
+COVER_TITLE_BLOCKS = 3
+
+
+def cover_title(paras):
+    """The Swedish title off the document's own cover, or None when the cover
+    does not open the way these documents' covers do."""
+    texts = [t for p in paras if (t := normalize_space(p.text))]
+    start = next((i for i, t in enumerate(texts[:COVER_TITLE_BLOCKS])
+                  if RE_SWEDISH_LEAD.match(t)), None)
+    if start is None:
+        return None
+    title = [texts[start]]
+    for text in texts[start + 1:start + 1 + COVER_TITLE_BLOCKS]:
+        if RE_FRONT_MATTER.match(text):
+            return " ".join(title)
+        title.append(text)
+    return None
+
+
+def titled(record, paras):
+    """The document's title: the EDPB page's, except where a Swedish document's
+    page kept the English heading and the Swedish cover states the real one."""
+    if record["sprak"] == "sv" and RE_ENGLISH_LEAD.match(record["titel"]):
+        return cover_title(paras) or record["titel"]
+    return record["titel"]
+
+
+# --------------------------------------------------------------------------
+# the WP29 cover
+# --------------------------------------------------------------------------
+
+def wp_cover(paras, number):
+    """``{titel, antagen}`` off an endorsed WP29 document's own cover.
+
+    The title is what stands between the WP number and the adoption dates; the
+    date is the *last* of those dates, which is the revision the EDPB endorsed
+    ("Antagna den 3 oktober 2017 / Senast granskade och antagna den 6 februari
+    2018")."""
+    texts = [normalize_space(p.text) for p in paras]
+    start = next((i for i, t in enumerate(texts)
+                  if (m := RE_WP_NUMBER.search(t)) and m.group(1) == number), None)
+    assert start is not None, (
+        "the cover of the WP%s document names no matching WP number -- the "
+        "newsroom item recorded for it in series.WP29 serves another document"
+        % number)
+    end = next((i for i, t in enumerate(texts[start + 1:], start + 1)
+                if RE_WP_ADOPTED.search(t) or RE_WP_ADOPTED_EN.search(t)), None)
+    assert end is not None, (
+        "the cover of the WP%s document states no adoption date" % number)
+    # the *last* date in the adoption block: these documents were adopted, then
+    # revised, and it is the revision the EDPB endorsed
+    dates = RE_WP_ADOPTED.findall(" ".join(texts[end:end + 2])) \
+        or RE_WP_ADOPTED_EN.findall(" ".join(texts[end:end + 2]))
+    day, month, year = dates[-1]
+    return {"titel": " ".join(t for t in texts[start + 1:end]
+                              if not RE_WP29_NAME.match(t)).strip(),
+            "antagen": "%s-%02d-%02d" % (year, MONTHS[month.lower()], int(day))}
+
+
+# --------------------------------------------------------------------------
+# body
+# --------------------------------------------------------------------------
+
+def _paragraphs(path, patch_key):
+    """The PDF's paragraph stream, with the numbered punkter forced apart."""
+    pages = list(pdf_pages(path, patch_key))
+    breaks = numbered_breaks(pages)
+    return [p for pageno, lines in pages
+            for p in page_paragraphs(lines, None, pageno,
+                                     force_break_tops=breaks[pageno])]
+
+
+def body(paras, titel):
+    """The document's text as typed blocks."""
+    return [Block("stycke", text, punkt=punkt) if kind == "stycke"
+            else Block("rubrik", text, level)
+            for kind, text, level, punkt in join_continuations(
+                drop_repeated_title(
+                    classify_letterhead(paras, RE_FRONT_MATTER, RE_MASTHEAD,
+                                        by_size=True), titel))]
+
+
+def footnotes(paras):
+    """The notes the block classifier drops -- see
+    `lib.pdftext.letterhead_footnotes`. A riktlinje's apparatus lives here: the
+    artikel 29-gruppens yttranden it builds on and the EU-domstolens judgments
+    it reads are cited in the notes far more often than in the running text."""
+    return [Fotnot(mark, text)
+            for mark, text in letterhead_footnotes(paras, RE_FRONT_MATTER,
+                                                   RE_MASTHEAD)]
+
+
+def parse_record(basefile, root):
+    """One basefile ("riktlinjer/05-2020", "wp/248") -> artifact dict, body
+    citation-scanned."""
+    serie = basefile.split("/", 1)[0]
+    assert serie in BY_KOD, "no EDPB series %r" % serie
+    record = json.loads(compress.read_text(record_path(root, serie, basefile)))
+    paras = _paragraphs(pdf_path(root, basefile), ("edpb", basefile))
+    fields = (wp_cover(paras, record["nummer"]) if serie == "wp"
+              else {"titel": titled(record, paras),
+                    "antagen": record["antagen"]})
+    return Vagledning(
+        serie=serie, nummer=record["nummer"], titel=fields["titel"],
+        sprak=record["sprak"], antagen=fields["antagen"],
+        version=record.get("version"),
+        revision=WP29_BY_NUMBER[record["nummer"]].revision
+        if serie == "wp" else None,
+        konsultation_url=record.get("konsultation_url"),
+        amnesord=list(record.get("amnesord") or []),
+        body=body(paras, fields["titel"]), fotnoter=footnotes(paras),
+        source_url=record.get("source_url"),
+        document_url=record.get("dokument_url"),
+    ).to_artifact(_fresh_parser(record["sprak"]))

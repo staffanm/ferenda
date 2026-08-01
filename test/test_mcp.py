@@ -161,8 +161,8 @@ def test_tool_schemas_steer_the_model():
     # source is an optional enum of exactly the corpus sources
     source_enum = next(b["enum"] for b in props["source"]["anyOf"] if "enum" in b)
     assert set(source_enum) == {"sfs", "dv", "hudoc", "forarbete", "foreskrift",
-                                "eurlex", "coe", "avg", "rs", "kommentar",
-                                "begrepp"}
+                                "eurlex", "coe", "avg", "rs", "edpb",
+                                "kommentar", "begrepp"}
     # kind is a plain string (no enum) but carries guidance
     assert not any("enum" in b for b in props["kind"]["anyOf"])
     assert "fffs" in props["kind"]["description"]

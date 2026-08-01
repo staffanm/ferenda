@@ -36,6 +36,8 @@ DATASETS = (
     Dataset("myndrs", "rs", "Samtliga rättsliga ställningstaganden"),
     Dataset("keyword", "begrepp", "Alla nya och ändrade begrepp"),
     Dataset("eurlex", "eurlex", "Samtliga EU-rättsakter"),
+    Dataset("euvagledning", "edpb",
+            "Samtliga riktlinjer och rekommendationer"),
 )
 BY_ALIAS = {dataset.alias: dataset for dataset in DATASETS}
 BY_SOURCE = {dataset.source: dataset for dataset in DATASETS}

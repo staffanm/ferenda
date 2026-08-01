@@ -466,6 +466,7 @@ INBOUND_GROUPS = [("sfs", "Lagrumshänvisningar hit"), ("forarbete", "Förarbete
                   ("foreskrift", "Myndighetsföreskrifter"),
                   ("dv", "Rättsfall"), ("avg", "Myndighetsavgöranden"),
                   ("rs", "Rättsliga ställningstaganden"),
+                  ("edpb", "EU:s dataskyddsriktlinjer"),
                   ("hudoc", "Europadomstolens praxis"),
                   ("icc", "Internationella brottmålsdomstolen"),
                   ("eu-caselaw", "EU-domstolens praxis"),
@@ -1222,7 +1223,7 @@ class RailSection:
 RAIL_SECTION_ORDER = (
     "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "eu-caselaw", "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
-    "eurlex", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
+    "eurlex", "edpb", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
 
 
@@ -1940,7 +1941,10 @@ def _feed_index_groups(con):
         ("Samtliga rättsliga ställningstaganden", "myndrs", {}))
     groups.append(("Rättsliga ställningstaganden", stallningstaganden))
 
-    groups.append(("EU-rätt", [("Samtliga EU-rättsakter", "eurlex", {})]))
+    groups.append(("EU-rätt", [
+        ("Samtliga EU-rättsakter", "eurlex", {}),
+        ("Samtliga riktlinjer och rekommendationer", "euvagledning", {}),
+    ]))
     groups.append(("Begrepp", [("Alla nya och ändrade begrepp", "keyword", {})]))
     return groups
 
@@ -2361,10 +2365,16 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
     return "".join(out)
 
 
-def _dv_footnotes(footnotes, site):
-    """The end-of-document footnotes as template items for the endnote list,
-    each linking back to its inline marker (#fnref-N)."""
-    return [{"n": str(fn["num"]), "html": Markup(render_runs(fn["text"], site))}
+def _footnote_items(footnotes, site, *, key="num", backref=True):
+    """Artifact footnotes -> template items for the endnote list.
+
+    `backref` says the body carries a matching inline marker to return to. DV's
+    does (its source prints "[N]", which the parser turns into a footnote run);
+    a letterhead PDF's does not -- poppler renders the superscript glued into
+    the prose, so there is nothing to anchor -- and those list with the marker
+    the document printed instead of a back-link that would go nowhere."""
+    return [{"n": str(fn[key]), "html": Markup(render_runs(fn["text"], site)),
+             "backref": backref}
             for fn in footnotes]
 
 
@@ -2403,7 +2413,7 @@ def render_dv(art, site):
         ursprunglig=_dv_ursprunglig_dom(art),
         sokord=_keywords(md.get("nyckelord") or [], site),
         structure=structure,
-        footnotes=_dv_footnotes(art.get("footnotes", []), site),
+        footnotes=_footnote_items(art.get("footnotes", []), site),
         # the curated Lagrum/Förarbeten/Rättsfall/Litteratur lists are the
         # referat editor's apparatus -- shown for a published referat, but not
         # for a raw verdict, whose PDF carries no such section (R2)
@@ -3114,6 +3124,8 @@ def render_avg(art, site):
         title, section, _doc_meta(meta, art.get("source_url")),
         toc=render_toc(toc), eyebrow=ident,
         summary_text=summary,
+        footnotes=_footnote_items(art.get("footnotes", []), site,
+                                  key="mark", backref=False),
         island=rail.island(), structure=structure))
 
 
@@ -3157,6 +3169,57 @@ def render_rs(art, site):
         toc=render_toc(toc), eyebrow=ident,
         summary_text=art.get("sammanfattning"),
         banner=Markup(banner),
+        footnotes=_footnote_items(art.get("footnotes", []), site,
+                                  key="mark", backref=False),
+        island=rail.island(), structure=structure))
+
+
+EDPB_SECTION = {"riktlinjer": "Riktlinje", "rekommendationer": "Rekommendation",
+                "wp": "Artikel 29-gruppens vägledning"}
+
+
+def render_edpb(art, site):
+    """An EDPB riktlinje/rekommendation, or an endorsed artikel 29-gruppens
+    vägledning.
+
+    Two things separate it from every other document on the site, and both are
+    said in a banner rather than left to the metadata list. Which **version**
+    this is: the EDPB adopts, consults on and re-adopts these, publishes both,
+    and republishing one without saying which would misstate what the board
+    says today -- which the EDPB's own reuse terms ("the original meaning or
+    message of the documents is not distorted") make a condition of publishing
+    it at all. And which **language**: three of them exist in no Swedish version,
+    and a reader meeting English text on a Swedish site should be told why
+    before they start reading rather than after."""
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or catalog.local(art["uri"])
+    meta = [
+        ("Utgivare", md.get("publisher")),
+        ("Antagen", md.get("antagen")),
+        ("Version", md.get("version")),
+        ("Revision", md.get("revision")),
+        ("Språk", {"sv": "svenska", "en": "engelska"}.get(md.get("sprak"))),
+        ("Ämnesord", ", ".join(md.get("amnesord", [])) or None),
+    ]
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    structure = Markup("".join(
+        render_node(n, site, art["uri"], toc, rail)
+        for n in art.get("structure", [])))
+    rail.add_document()
+    banner = Markup("").join(part for part in (
+        _BANNERS.edpb_language_banner(art.get("source_url"))
+        if md.get("sprak") == "en" else "",
+        _BANNERS.edpb_version_banner(md["version"], md.get("konsultation"))
+        if md.get("version") else "") if part)
+    return ENV.get_template("sources/edpb.html").render(page_context(
+        md.get("title") or ident,
+        EDPB_SECTION.get(art.get("serie"), "Vägledning"),
+        _doc_meta(meta, art.get("source_url")),
+        toc=render_toc(toc), eyebrow=ident,
+        banner=banner,
+        footnotes=_footnote_items(art.get("footnotes", []), site,
+                                  key="mark", backref=False),
         island=rail.island(), structure=structure))
 
 
@@ -3415,6 +3478,7 @@ def render_document(art, source, site):
     html = {"sfs": render_sfs, "dv": render_dv, "forarbete": render_forarbete,
             "begrepp": render_begrepp, "eurlex": render_eurlex,
             "foreskrift": render_foreskrift, "avg": render_avg, "rs": render_rs,
+            "edpb": render_edpb,
             "hudoc": render_hudoc, "coe": render_coe,
             "icrc": render_icrc, "untc": render_untc,
             "icc": render_icc}[source](art, site)
@@ -3437,11 +3501,12 @@ def render_document(art, source, site):
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
-                "eurlex", "coe", "icrc", "untc", "icc", "begrepp")
+                "eurlex", "edpb", "coe", "icrc", "untc", "icc", "begrepp")
 SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
                 "avg": "Myndighetsavgöranden",
                 "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
+                "edpb": "EU:s dataskyddsriktlinjer",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
                 "icrc": "Internationell humanitär rätt",
@@ -3454,7 +3519,11 @@ SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
 # browse tree of its own -- its whole listing lives on the landing page.
 FOLKRATT_SOURCES = ("hudoc", "coe", "icrc", "untc", "icc")
 FOLKRATT_LABEL = "Folkrätt"
-BROWSE_DIR = {"dv": "dom", "hudoc": "folkratt/hudoc"}
+# edpb browses under the EU-rätt masthead entry it shares with eurlex, the way
+# hudoc browses under folkrätt: the guidance belongs beside the rättsakt it
+# interprets, and has no address of its own to justify
+BROWSE_DIR = {"dv": "dom", "hudoc": "folkratt/hudoc",
+              "edpb": "eurlex/vagledning"}
 
 
 def _browse_dir(source):
@@ -3811,6 +3880,19 @@ def _folkratt_nav(entries, active_id):
     return _LISTS.folkratt_nav(entries, active_id)
 
 
+# the shared "Dokumenttyp" selector carried by every EU-rätt browse page, so a
+# reader switches between the rättsakter and the guidance written *about* them
+# from anywhere. The EDPB's riktlinjer and rekommendationer have no CELEX and
+# are not rättsakter, which is why they are a source of their own rather than an
+# eurlex doctype -- but they belong beside the förordning they interpret, which
+# is what this selector is for (the folkrätt landing's selector, second use).
+def _eurlex_axis(con):
+    return [("%s:%s" % (source, bucket["slug"]), bucket["label"],
+             _browse_url(source, [bucket["slug"]]), bucket["count"])
+            for source in ("eurlex", "edpb") if catalog.document_count(con, source)
+            for bucket in facets.tree(con, source)["buckets"]]
+
+
 def render_folkratt(con):
     body = Markup("").join(
         part for part in (_coe_listing(con), _icrc_listing(con),
@@ -4037,15 +4119,18 @@ def _fs_year_axis(source, prim):
             for sec in prim["children"]]
 
 
-def generate_browse(client, source, out_root, folk_axis=None):
+def generate_browse(client, source, out_root, cross_axis=None):
     """Write every leaf-bucket page of one source from the API's browse model,
     plus the landing copies: a primary bucket's directory shows its first
     (default) child, and the source root shows the overall default bucket -- so
     /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
     The caller (render_aggregates) already skips the one source the API does
-    not facet (kommentar), so every `source` here is faceted. `folk_axis` (the
-    shared folkrätt selector entries) prepends that selector to each page,
-    marking this source's primary bucket current -- passed only for hudoc.
+    not facet (kommentar), so every `source` here is faceted. `cross_axis` (a
+    cross-source selector's entries) prepends that selector to each page,
+    marking this source's primary bucket current -- passed for the sources that
+    share a masthead entry with a sibling source, so a reader switches between
+    them from any leaf: hudoc (the folkrätt selector) and eurlex/edpb (the
+    EU-rätt one).
 
     A small författningssamling collapses its year buckets into one listing
     (F3); a large one keeps year pages, with the year selector as a top banner
@@ -4054,8 +4139,8 @@ def generate_browse(client, source, out_root, folk_axis=None):
     view = resp.json()
     root_html = None
     for prim in view["buckets"]:
-        banner = (_folkratt_nav(folk_axis, "%s:%s" % (source, prim["slug"]))
-                  if folk_axis else "")
+        banner = (_folkratt_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
+                  if cross_axis else "")
         year_axis = None
         if source == "foreskrift" and prim["children"]:
             if sum(_fs_docs(sec) for sec in prim["children"]) < FS_YEAR_SPLIT_MIN:
@@ -4386,6 +4471,7 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
                             render_feed_page(item, entries),
                             encodings=compress.PAGE_ENCODINGS)
     folk_axis = _folkratt_axis(con)
+    eu_axis = _eurlex_axis(con)
     client = _browse_client(catalog_path)
     try:
         for source in catalog.counts(con):
@@ -4394,9 +4480,14 @@ def render_aggregates(con, out_root, catalog_path, write_index=True):
             # landing instead of a faceted-by-year tree of their own
             if source in ("kommentar", "coe", "icrc", "untc", "icc"):
                 continue
-            # hudoc browses under /folkratt/hudoc/ and carries the shared folkrätt
-            # selector; every other source browses on its own
-            generate_browse(client, source, out_root,
-                            folk_axis=folk_axis if source == "hudoc" else None)
+            # hudoc browses under /folkratt/hudoc/ and edpb under
+            # /eurlex/vagledning/, each carrying the selector it shares with the
+            # source it shares a masthead entry with; every other source browses
+            # on its own
+            generate_browse(
+                client, source, out_root,
+                cross_axis=(folk_axis if source == "hudoc"
+                            else eu_axis if source in ("eurlex", "edpb")
+                            else None))
     finally:
         api_service.app.dependency_overrides.pop(api_service.get_con, None)

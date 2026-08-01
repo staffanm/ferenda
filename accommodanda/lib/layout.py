@@ -54,7 +54,7 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
-              "rs": "rs",
+              "rs": "rs", "edpb": "edpb",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
               "icc": "icc",
               "remisser": "remisser", "kommentar": "kommentar",
@@ -76,6 +76,7 @@ EURLEX_DOWNLOADED = DOWNLOADED / "eurlex"
 FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
 RS_DOWNLOADED = DOWNLOADED / "rs"                   # <org>/<slug>.{json,pdf}
+EDPB_DOWNLOADED = DOWNLOADED / "edpb"               # <serie>/<slug>.{json,pdf}
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html}
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
@@ -147,9 +148,10 @@ def relpath(source, basefile):
     if source == "foreskrift":
         fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
         return Path(fs) / rest.replace(":", "-").replace(" ", "_")
-    if source in ("avg", "rs"):
+    if source in ("avg", "rs", "edpb"):
         # "jo/2340-2025", "jk/2024/8082" -- and, for rs, the agency's own
-        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"
+        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"; for edpb, the
+        # EDPB's own series number: "riktlinjer/05-2020", "wp/248"
         org, rest = basefile.split("/", 1)
         return Path(org) / rest.replace("/", "-").replace(":", "-")
     if source in ("hudoc", "coe", "icrc", "untc", "icc"):

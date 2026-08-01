@@ -63,6 +63,9 @@ from .dv import identity as dv_identity
 from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
 from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
+from .edpb import download as edpb_download
+from .edpb import parse as edpb_parse
+from .edpb import series as edpb_series
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
@@ -2713,6 +2716,82 @@ def rs_harvest(scopes):
         print("rs %s: %d seen, %d new" % (org, seen, new))
 
 
+# --------------------------------------------------------------------------
+# edpb source (Europeiska dataskyddsstyrelsens riktlinjer och rekommendationer)
+# --------------------------------------------------------------------------
+
+EDPB_CODE = (PKG / "edpb" / "parse.py", PKG / "edpb" / "model.py",
+             PKG / "edpb" / "series.py", PKG / "edpb" / "download.py",
+             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+
+
+def edpb_list():
+    return sorted(bf for serie in edpb_series.KODER
+                  for bf in compress.list_basefiles(layout.EDPB_DOWNLOADED, serie))
+
+
+def edpb_inputs(basefile):
+    """The record JSON plus the document PDF -- re-downloading either re-stales
+    the parse. Every edpb record names a document (the harvest writes no record
+    without one), so the PDF is always an input."""
+    return [util.record_path(layout.EDPB_DOWNLOADED, basefile.split("/", 1)[0],
+                             basefile),
+            edpb_download.pdf_path(layout.EDPB_DOWNLOADED, basefile)] \
+        + _patch_input("edpb", basefile)
+
+
+def edpb_artifact(basefile):
+    return layout.artifact("edpb", basefile)
+
+
+def edpb_parse_run(basefile):
+    write_artifact("edpb", basefile,
+                   edpb_parse.parse_record(basefile, layout.EDPB_DOWNLOADED))
+
+
+def edpb_harvest(scopes):
+    """Bulk harvest of the EDPB's guidance (scopes = series codes; empty = all
+    three). `--force` refetches every document; `--only riktlinjer/05-2020`
+    fetches a single document (needs its series scope)."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("edpb --only needs exactly one series scope, e.g. "
+                 "`lagen edpb download riktlinjer --only riktlinjer/05-2020`")
+    if RUN.dry_run:
+        print("edpb download: would download %s into %s"
+              % (RUN.only or ", ".join(scopes) or " + ".join(edpb_series.KODER),
+                 layout.EDPB_DOWNLOADED))
+        return
+    totals = edpb_download.sync(layout.EDPB_DOWNLOADED, scopes=scopes or None,
+                               full=RUN.force, only=RUN.only)
+    for serie, (seen, new) in totals.items():
+        print("edpb %s: %d seen, %d new" % (serie, seen, new))
+
+
+# No per-document download stage (the foreskrift/avg/rs rule): the guidance
+# arrives only through the bulk `edpb_harvest` sweep.
+SOURCES["edpb"] = Source("edpb", edpb_list, {
+    "parse": Stage("parse", edpb_parse_run, edpb_artifact,
+                   inputs=edpb_inputs, code=EDPB_CODE),
+},
+    harvest=edpb_harvest,
+    origin=edpb_download.SITEMAP,
+    scopes=frozenset(edpb_series.KODER),
+    notes="download flag: --only serie/nummer (fetch one; needs its series "
+          "scope)\n"
+          "scopes are the series: " + ", ".join(
+              "%s (%s)" % (s.kod, s.label) for s in edpb_series.REGISTRY)
+          + "; empty = all\n"
+          "identity is the EDPB's own number -- these documents have no CELEX, "
+          "which is why they are not eurlex (Riktlinjer 05/2020, "
+          "Rekommendation 01/2019, WP 248)\n"
+          "the Swedish version is published wherever the EDPB has issued one "
+          "(48 of 51) and the English one otherwise; the record says which\n"
+          "the wp scope is a closed corpus of seven artikel 29-gruppens "
+          "vägledningar, harvested from the Commission newsroom (the EDPB's own "
+          "pages for them carry no document) -- a run re-resolves them only "
+          "under --force, each costing a 10-28 MB language ZIP")
+
+
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden
 # arrive only through the bulk `rs_harvest` sweep, so parse runs over whatever is
 # on disk; relate/index/dump/generate act on the artifacts by source name.
@@ -3224,6 +3303,7 @@ ARTIFACTS = {
         compress.glob(layout.artifact_dir("foreskrift"), "*/*.json")),
     "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
     "rs": lambda: sorted(compress.glob(layout.artifact_dir("rs"), "*/*.json")),
+    "edpb": lambda: sorted(compress.glob(layout.artifact_dir("edpb"), "*/*.json")),
     "hudoc": lambda: layout.artifacts("hudoc"),
     "coe": lambda: layout.artifacts("coe"),
     "icrc": lambda: layout.artifacts("icrc"),
