@@ -19,11 +19,20 @@ The handlers are installed by `install`, called from api.app at import.
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..lib import errorlog, layout
+from .. import config
+from ..lib import errorlog
 from ..lib.tpl import ENV
 
-# where the ledger lives -- beside the run ledger, under the data root
-LEDGER = layout.DATA / ".build" / "httperrors.ndjson"
+# The ledger lives under CATALOG_ROOT -- the path config already guarantees is
+# local disk -- and NOT under the data root beside the run ledger.
+#
+# That distinction is the whole point: on prod the data root is NFS, and the
+# failure this ledger most needs to record is exactly the one where that mount
+# is unreadable. Writing it there made the recording itself raise EIO inside the
+# handler, so every honest 404 escalated to a bare 500 with no page and no
+# entry (observed on ferenda.lagen.nu, 2026-08-01). An error ledger on the
+# storage whose failure it reports is not a ledger.
+LEDGER = config.CATALOG_ROOT / "httperrors.ndjson"
 
 # path prefixes that answer JSON rather than a page
 API_PREFIXES = ("/api/", "/docs", "/redoc", "/openapi.json", "/mcp")
@@ -65,18 +74,32 @@ def _wants_json(request):
 
 
 def _record(request, status, exc=None, detail=None):
-    """One ledger entry for this request, returning its id.
+    """One ledger entry for this request, returning its id -- or None when the
+    ledger could not be written.
 
     The referer is the field that earns this whole module: an internal 404 with
     a referer is a dead link the site itself published, which is a bug, while
-    the same 404 with no referer is usually a bot walking urls."""
-    return errorlog.record(
-        LEDGER, status,
-        method=request.method, url=str(request.url),
-        client=request.client.host if request.client else None,
-        referer=request.headers.get("referer"),
-        user_agent=request.headers.get("user-agent"),
-        detail=detail, exc=exc)["id"]
+    the same 404 with no referer is usually a bot walking urls.
+
+    A failed *write* is caught, narrowly and deliberately: this is the one place
+    in the system where failing to record must not change what the reader gets.
+    An unwritable ledger is a real problem, but escalating every 404 on the site
+    into a 500 because we could not take a note about it is strictly worse than
+    serving the page without a reference -- and it is what happened when the
+    ledger still lived on the NFS data root. The recovery is known and complete
+    (render the page, drop the reference), which is what separates this from the
+    catch-to-log the conventions forbid (rule:no-catch-log-continue). The
+    traceback still reaches the process log via ServerErrorMiddleware."""
+    try:
+        return errorlog.record(
+            LEDGER, status,
+            method=request.method, url=str(request.url),
+            client=request.client.host if request.client else None,
+            referer=request.headers.get("referer"),
+            user_agent=request.headers.get("user-agent"),
+            detail=detail, exc=exc)["id"]
+    except OSError:
+        return None
 
 
 async def http_exception_handler(request, exc):

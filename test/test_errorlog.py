@@ -176,3 +176,29 @@ def test_a_malformed_line_before_the_tail_is_not_swallowed(ledger):
     errorlog.record(ledger, 404, url="/two")
     with pytest.raises(json.JSONDecodeError):
         errorlog.entries(ledger)
+
+
+def test_an_unwritable_ledger_still_serves_the_page(client, monkeypatch):
+    """Regression (prod, 2026-08-01): the ledger lived on the NFS data root, so
+    when that mount faulted the *recording* raised EIO inside the handler and
+    every honest 404 on the site escalated to a bare 500 with no page at all.
+
+    The ledger now lives on local disk, and a write failure is survivable: the
+    reader still gets the error page, just without a reference to quote."""
+    def boom(*a, **kw):
+        raise OSError(5, "Input/output error")
+    monkeypatch.setattr(errorlog, "record", boom)
+    resp = client.get("/no-such-page")
+    assert resp.status_code == 404                      # not escalated to 500
+    assert "Sidan finns inte" in resp.text
+    assert "ingen felreferens" in resp.text
+
+
+def test_the_ledger_does_not_live_on_the_data_root(monkeypatch):
+    """The ledger must sit on CATALOG_ROOT, the path config guarantees is local
+    disk -- not under the data root, which is NFS on prod and is precisely the
+    storage whose failure this ledger exists to record."""
+    from accommodanda import config
+    from accommodanda.lib import layout
+    assert api_errors.LEDGER.parent != layout.DATA / ".build"
+    assert api_errors.LEDGER.is_relative_to(config.CATALOG_ROOT)

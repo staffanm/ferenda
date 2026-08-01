@@ -24,9 +24,16 @@
   <li><a href="{{ href }}">{{ label }}</a></li>
   {%- endfor %}
 </ul>
+{#- no reference when the ledger could not be written: better an error page
+    without one than no error page at all (see api/errors._record) -#}
+{% if error_id %}
 <p class="errid">Felreferens <code>{{ error_id }}</code></p>
 <p class="errfoot">Uppge den om du rapporterar felet — den pekar ut exakt den
   här förfrågan i loggen.</p>
+{% else %}
+<p class="errfoot">Felet kunde inte loggas, så det finns ingen felreferens att
+  uppge den här gången.</p>
+{% endif %}
 <style>
 .frontmatter .eyebrow{font:600 .8rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;
   letter-spacing:.14em;text-transform:uppercase}
