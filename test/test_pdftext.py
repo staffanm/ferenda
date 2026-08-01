@@ -12,6 +12,7 @@ including the top-only span-grouping bug `_lines` documents as fixed), and the
 baseline span-grouping itself."""
 
 import os
+import re
 import subprocess
 from types import SimpleNamespace
 
@@ -22,8 +23,11 @@ from accommodanda.lib import layout, pdftext
 from accommodanda.lib.pdftext import (
     PAGE_STRIDE,
     Line,
+    Para,
     _lines,
+    classify_letterhead,
     flat_lines,
+    letterhead_footnotes,
     page_paragraphs,
     pdf_pages,
 )
@@ -291,3 +295,45 @@ def test_ocr_cached_sidecar_skips_subprocess(tmp_path, monkeypatch):
     cached = tmp_path / ".scan.ocr.pdf"
     cached.write_bytes(b"%PDF-1.4")
     assert pdftext.ocr_pdf(pdf, "swe") == cached
+
+
+# --------------------------------------------------------------------------
+# letterhead_footnotes -- what classify_letterhead deliberately drops
+# --------------------------------------------------------------------------
+
+NO_MARGIN = re.compile(r"^$")
+NO_MASTHEAD = re.compile(r"(?!)")
+
+
+def _stream(*small):
+    """A realistic Para stream: body prose at 17pt (the mode, and so the
+    running size) plus the small paragraphs under test."""
+    return [Para(text="Löpande text vid brödtextstorlek.", size=17)] * 6 + [
+        Para(text=t, size=9) for t in small]
+
+
+def test_letterhead_footnotes_returns_what_the_classifier_dropped():
+    notes = letterhead_footnotes(
+        _stream("12 Se riktlinjer 05/2020 om samtycke, punkt 42."),
+        NO_MARGIN, NO_MASTHEAD)
+    assert notes == [("12", "Se riktlinjer 05/2020 om samtycke, punkt 42.")]
+    # and the block stream is untouched -- the two readings are independent
+    assert not any(kind == "fotnot" for kind, _t, _l in classify_letterhead(
+        _stream("12 Se riktlinjer 05/2020."), NO_MARGIN, NO_MASTHEAD))
+
+
+def test_letterhead_footnotes_drops_the_furniture_that_shares_the_size():
+    masthead = re.compile(r"\s*Postadress:.*")
+    notes = letterhead_footnotes(
+        _stream("Postadress: Box 8114, 104 20 Stockholm",   # the masthead
+                "7",                                        # a page number
+                "3 (12)",                                   # a page mark
+                "En fotnot som är tillräckligt lång för att vara prosa."),
+        NO_MARGIN, masthead)
+    assert notes == [("", "En fotnot som är tillräckligt lång för att vara prosa.")]
+
+
+def test_a_note_without_a_marker_keeps_an_empty_mark():
+    assert letterhead_footnotes(
+        _stream("Ingen markör inleder denna anmärkning."),
+        NO_MARGIN, NO_MASTHEAD) == [("", "Ingen markör inleder denna anmärkning.")]

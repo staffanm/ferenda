@@ -57,3 +57,17 @@ att undanta dokumentet.
   `Inspektionsbekräftelse`, Klarnas dataskyddsinformation m.fl.). Det är bilagor
   och sidhänvisningar, inte beslut; hämtningen vägrar att hitta på en identitet
   åt dem, vilket är rätt. De ska inte in i korpuset.
+
+## KKV's footnotes are not collected
+
+`avg` recovers the notes its letterhead templates set below the running text
+(`lib.pdftext.letterhead_footnotes`), which is where IMY grounds a vägledning it
+has named in prose -- see `edpb/KNOWN-GAPS.md` for the measurement. That is
+wired for **imy** only.
+
+JO's and JK's templates set no notes and ARN's decisions arrive as one unbroken
+run of prose, so neither has any to collect. **KKV does**, but its three
+document formats (PDF, the pre-2006 FrontPage HTML, Word) go through one
+dispatcher, `kkv_read_document`, which would have to grow a third return value
+threaded through `kkv_body` and `parse_kkv`. Left open rather than done
+half-way.

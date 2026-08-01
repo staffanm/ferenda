@@ -1,5 +1,6 @@
 {#- A myndighets rättsligt ställningstagande: the withdrawal banner (where the
-    agency has withdrawn it) and the statement's text. Summary and metadata
-    ride the frontmatter (page.html). -#}
+    agency has withdrawn it), the statement's text and the notes below it.
+    Summary and metadata ride the frontmatter (page.html). -#}
 {% extends "page.html" %}
-{% block body %}{{ banner }}{{ structure }}{% endblock %}
+{% import "partials/footnotes.html" as notes %}
+{% block body %}{{ banner }}{{ structure }}{% if footnotes %}{{ notes.footnote_list(footnotes) }}{% endif %}{% endblock %}

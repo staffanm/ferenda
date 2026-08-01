@@ -3,6 +3,7 @@
     list, and -- on a published referat only -- the editor's curated
     Lagrum/Förarbeten/Rättsfall/Litteratur apparatus. -#}
 {% extends "page.html" %}
+{% import "partials/footnotes.html" as notes %}
 {% block body %}
 {%- if ursprunglig -%}
 <aside class="ursprunglig-dom"><span class="label">Ursprunglig dom</span> {% for it in ursprunglig %}<a href="{{ it.url }}" rel="external">{{ it.label }}{% if it.date %} ({{ it.date }}){% endif %}</a>{% if not loop.last %} · {% endif %}{% endfor %}</aside>
@@ -11,13 +12,7 @@
 <p class="sokord"><span>Sökord</span> {% for it in sokord %}{% if it.href %}<a href="{{ it.href }}">{{ it.text }}</a>{% else %}{{ it.text }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {%- endif -%}
 {{ structure }}
-{%- if footnotes -%}
-<section class="fotnoter"><h2>Fotnoter</h2><ol>
-{%- for fn in footnotes -%}
-<li id="fn-{{ fn.n }}">{{ fn.html }} <a class="fn-back" href="#fnref-{{ fn.n }}" aria-label="Tillbaka till texten">↩</a></li>
-{%- endfor -%}
-</ol></section>
-{%- endif -%}
+{%- if footnotes %}{{ notes.footnote_list(footnotes) }}{% endif -%}
 {%- for sec in curated -%}
 <section class="curated {{ sec.key }}"><h2>{{ sec.label }}</h2><ul>
 {%- for line in sec.lines -%}

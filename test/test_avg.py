@@ -11,7 +11,7 @@ import pytest
 
 from accommodanda.avg import download as avg_download
 from accommodanda.avg import parse as avg_parse
-from accommodanda.avg.model import Beslut, Block, beslut_uri
+from accommodanda.avg.model import Beslut, Block, Fotnot, beslut_uri
 from accommodanda.lib import catalog, compress, facets, layout
 from accommodanda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from accommodanda.lib.pdftext import Para
@@ -1374,3 +1374,47 @@ def test_avg_patch_intermediate_routes_the_new_organs(tmp_path, monkeypatch):
                                   {"fil": "d.pdf", "sprak": "sv"}]})
     with pytest.raises(SkipDocument, match="one patch cannot span"):
         patchsource._avg_intermediate("imy/IMY-2")
+
+
+# --------------------------------------------------------------------------
+# footnotes -- the citations the block classifier used to discard
+# --------------------------------------------------------------------------
+
+def test_imy_footnotes_carry_the_number_that_identifies_a_named_vagledning():
+    """Regression. IMY names a vägledning in prose ("Europeiska
+    dataskyddsstyrelsens riktlinjer om samtycke") and grounds it with the number
+    in the note below. `classify_letterhead` drops everything set below the
+    running size, so 43 of the 83 IMY-beslut naming this guidance carried its
+    number and none of those numbers reached the artifact -- which is why the
+    IMY→EDPB citation graph was empty."""
+    stream = [Para(text="IMY konstaterar följande i ärendet.", size=17)] * 5 + [
+        Para(text="12 Europeiska dataskyddsstyrelsens riktlinjer 05/2020 om "
+                  "samtycke, punkt 42.", size=9),
+        Para(text="Postadress: Box 8114", size=9)]        # the masthead
+    notes = avg_parse._footnotes_font_driven(
+        stream, avg_parse.RE_IMY_MARGIN, avg_parse.RE_IMY_MASTHEAD)
+    assert [(f.mark, f.text) for f in notes] == [
+        ("12", "Europeiska dataskyddsstyrelsens riktlinjer 05/2020 om "
+               "samtycke, punkt 42.")]
+
+
+class _NoRefs:
+    def parse_text(self, text, context=None):
+        return []
+
+
+def test_a_beslut_without_notes_carries_no_footnotes_key():
+    art = Beslut(org="jo", diarienummer=["1-2020"], titel="X",
+                 body=[Block("stycke", "Text.")]).to_artifact(_NoRefs())
+    assert "footnotes" not in art
+
+
+def test_footnotes_are_citation_scanned_onto_the_artifact():
+    art = Beslut(org="imy", diarienummer=["IMY-2024-1"], titel="X",
+                 body=[Block("stycke", "Se nedan.")],
+                 fotnoter=[Fotnot("12", "Se riktlinjer 05/2020 och WP 248.")],
+                 ).to_artifact(avg_parse._fresh_parser())
+    assert [x["uri"] for x in art["footnotes"][0]["text"] if isinstance(x, dict)] \
+        == ["https://lagen.nu/edpb/riktlinjer/05-2020",
+            "https://lagen.nu/edpb/wp/248"]
+    assert art["footnotes"][0]["mark"] == "12"

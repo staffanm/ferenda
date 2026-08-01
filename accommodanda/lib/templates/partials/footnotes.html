@@ -1,0 +1,19 @@
+{%- macro footnote_list(footnotes) -%}
+{#- The endnote list at the foot of a document. `footnotes` are {n, html,
+    backref}: `n` the marker the source printed, `html` the note's rendered
+    runs, `backref` true where the body carries a matching inline marker to
+    return to (dv's "[N]"), which is also what makes `n` a document-unique id.
+    A letterhead PDF's notes carry no such marker -- poppler renders the
+    superscript glued into the prose -- and their printed numbers restart per
+    page and per part document, so those list with the marker shown as a label
+    and no id: an id that repeats and anchors nothing is worse than none. -#}
+<section class="fotnoter"><h2>Fotnoter</h2><ol>
+{%- for fn in footnotes -%}
+{%- if fn.backref -%}
+<li id="fn-{{ fn.n }}">{{ fn.html }} <a class="fn-back" href="#fnref-{{ fn.n }}" aria-label="Tillbaka till texten">↩</a></li>
+{%- else -%}
+<li>{% if fn.n %}<span class="fn-mark">{{ fn.n }}</span> {% endif %}{{ fn.html }}</li>
+{%- endif -%}
+{%- endfor -%}
+</ol></section>
+{%- endmacro -%}

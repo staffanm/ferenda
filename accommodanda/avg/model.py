@@ -57,6 +57,22 @@ class Block:
 
 
 @dataclass
+class Fotnot:
+    """A note set below the running text. `mark` is the marker digit the
+    document printed (``""`` where it printed none); `text` is the note body,
+    citation-linked downstream like any other text.
+
+    Worth carrying because of what these notes hold: IMY names a vägledning in
+    prose ("Europeiska dataskyddsstyrelsens riktlinjer om samtycke") and grounds
+    it with the number in the note below ("Riktlinjer 05/2020"). Discard the
+    notes and the decision cites nothing a citation scan can resolve -- which is
+    exactly what happened: 43 of the 83 IMY-beslut that name this guidance carry
+    its number, and not one of those numbers reached the artifact."""
+    mark: str
+    text: str
+
+
+@dataclass
 class Beslut:
     org: str                            # "jo" | "jk" | "arn" | "imy" | "kkv"
     diarienummer: list[str]             # first = canonical (names the document)
@@ -68,6 +84,9 @@ class Beslut:
                                         # ("JO 1990/91 s. 70"), frozen-corpus only
     nyckelord: list[str] = field(default_factory=list)  # JO: sakområden
     body: list[Block] = field(default_factory=list)
+    fotnoter: list[Fotnot] = field(default_factory=list)  # the notes below the
+                                        # running text, where the template sets
+                                        # them smaller (imy, kkv)
     source_url: str | None = None       # the decision's own page at jo.se/jk.se
     delar: list[dict] = field(default_factory=list)     # IMY: the documents the
                                         # decision was published as
@@ -113,6 +132,10 @@ class Beslut:
                 n += 1
                 structure.append({"type": "stycke", "id": "S%d" % n,
                                   "text": runs})
+        footnotes = [{"mark": f.mark,
+                      "text": interleave(f.text,
+                                         scanner.parse_text(f.text, context={}))}
+                     for f in self.fotnoter]
         metadata = {"title": self.titel,
                     "publisher": ORG_NAME[self.org],
                     "diarienummer": self.diarienummer}
@@ -147,6 +170,8 @@ class Beslut:
         art = {"uri": self.uri, "type": "avgorande", "org": self.org,
                "identifier": self.identifier, "metadata": metadata,
                "structure": structure}
+        if footnotes:
+            art["footnotes"] = footnotes
         if self.sammanfattning:
             art["sammanfattning"] = self.sammanfattning
         if self.source_url:

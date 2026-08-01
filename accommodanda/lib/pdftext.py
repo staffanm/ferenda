@@ -887,6 +887,64 @@ def classify_letterhead(paras, margin, masthead, by_size=False):
     return blocks
 
 
+# a footnote opens with its own marker digit, which pdftohtml renders as an
+# ordinary leading number ("16 Se yttrande 15/2011 …"). The marker is the
+# footnote's identity, so it is split off rather than left in the prose.
+RE_FOOTNOTE_MARK = re.compile(r"^(\d{1,3})[.)]?\s+(?=\S)")
+# what a note must have left once its marker is split off: a letter, and more
+# than a token of it. The test runs *after* the split, because the shortest
+# notes are the ones that are nothing but a citation ("1 WP 248.", "12 Se
+# ovan.") -- exactly the data this reader exists to recover -- and a floor
+# applied to the whole string would drop them as furniture. A bare page number
+# leaves nothing behind and goes on the emptiness test alone.
+# ... and it has to read as prose rather than as a stray heading or a party
+# name the template happened to set small: more than one word, or a one-word
+# abbreviation closed with a period ("Ibid."). Without this the lowered floor
+# admitted a bare "Antagna" (the footer with its page number in another para),
+# rs section headings ("Bakgrund", "Praxis") and avg party names ("KLAGANDEN").
+RE_FOOTNOTE_PROSE = re.compile(r"[^\W\d_].*(?:\s|\.$)")
+FOOTNOTE_MIN = 4
+
+
+def letterhead_footnotes(paras, margin, masthead):
+    """The footnotes :func:`classify_letterhead` leaves behind, as
+    ``[(mark, text)]`` in document order.
+
+    A letterhead template sets its notes *below* the running size, which is the
+    one signal that separates them from the body -- and is why the block
+    classifier drops them: a note is not a paragraph of the document and must
+    not read as one. But dropping them loses text that carries citations, and in
+    one corpus carries the *identifying* ones: IMY grounds a guideline it has
+    named in prose ("Europeiska dataskyddsstyrelsens riktlinjer om samtycke")
+    with its number in the footnote below ("Riktlinjer 05/2020"), so a decision
+    whose footnotes are discarded cites nothing a citation scan can resolve.
+
+    So this reads the same Para stream a second time and returns what the
+    classifier discarded, with the page furniture that shares the small size --
+    the masthead, the running page mark, the margin column's own values, and
+    anything too short to be prose -- taken out. A note's leading marker digit is
+    split from its text; a note that carries none keeps ``""``.
+
+    Additive on purpose: the block stream every caller already consumes is
+    unchanged, so a vertical opts into footnotes by calling this as well."""
+    body = modal_size(paras)
+    notes = []
+    for p in paras:
+        if not (body and p.size and p.size < body):
+            continue
+        text = normalize_space(masthead.sub(" ", normalize_space(p.text)))
+        if not text or margin.search(text) or (RE_PAGEMARK.search(text)
+                                               and len(text) < PAGEMARK_MAX):
+            continue
+        match = RE_FOOTNOTE_MARK.match(text)
+        mark, body_text = ((match.group(1), text[match.end():]) if match
+                           else ("", text))
+        if len(body_text) < FOOTNOTE_MIN or not RE_FOOTNOTE_PROSE.search(body_text):
+            continue
+        notes.append((mark, body_text))
+    return notes
+
+
 def _heading_wrap(prev, l, marker, heading):
     """Whether line `l` continues a wrapped multi-line heading: the previous
     line and this one are both heading-fonted in the *same* size (a heading and

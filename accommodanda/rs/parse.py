@@ -42,6 +42,7 @@ from ..lib.lagrum import (
 )
 from ..lib.pdftext import (
     classify_letterhead,
+    letterhead_footnotes,
     page_paragraphs,
     pages_with_ocr,
     pdf_first_page_text,
@@ -49,7 +50,7 @@ from ..lib.pdftext import (
 from ..lib.util import normalize_space, record_path
 from .agencies import BY_ORG
 from .download import labelled_value, pdf_path
-from .model import Block, Stallningstagande
+from .model import Block, Fotnot, Stallningstagande
 
 RS_PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -300,6 +301,21 @@ def body(record, root, patch_key=None):
         record["titel"])
 
 
+def footnotes(record, root, patch_key=None):
+    """The notes the block classifier drops -- see
+    `lib.pdftext.letterhead_footnotes`. A ställningstagande grounds the
+    references its prose makes down here, so discarding them costs exactly the
+    citations that identify what the agency is reading."""
+    path = pdf_path(root, record["basefile"])
+    if not compress.exists(path):
+        return []
+    reader = READERS[record["org"]]
+    return [Fotnot(mark, text) for mark, text in letterhead_footnotes(
+        [p for pageno, lines in pages_with_ocr(path, patch_key)
+         for p in page_paragraphs(lines, BY_ORG[record["org"]].name, pageno)],
+        reader.margin, reader.masthead)]
+
+
 def header_fields(record, root):
     """The page-1 fields the listing did not carry. Nothing here overwrites what
     the listing stated: the agency's own index is authoritative for what it
@@ -329,6 +345,7 @@ def parse_record(basefile, root):
         doktyp=record.get("doktyp") or "stallningstagande",
         nyckelord=list(record.get("nyckelord") or []),
         body=body(record, root, ("rs", basefile)),
+        fotnoter=footnotes(record, root, ("rs", basefile)),
         source_url=record.get("source_url"),
         document_url=record.get("dokument_url"),
     ).to_artifact(_fresh_parser())

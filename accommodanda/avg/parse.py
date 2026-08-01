@@ -49,6 +49,7 @@ from ..lib.lagrum import (
 )
 from ..lib.pdftext import (
     classify_letterhead,
+    letterhead_footnotes,
     page_paragraphs,
     pages_with_ocr,
     pdf_pages,
@@ -64,7 +65,7 @@ from .download import (
     jo_pdf_path,
     kkv_body_path,
 )
-from .model import ORG_NAME, Beslut, Block
+from .model import ORG_NAME, Beslut, Block, Fotnot
 
 AVG_PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -397,6 +398,19 @@ def _classify_font_driven(paras, margin, masthead):
             for kind, text, level in classify_letterhead(paras, margin, masthead)]
 
 
+def _footnotes_font_driven(paras, margin, masthead):
+    """The notes the block classifier drops, as :class:`Fotnot`s -- see
+    `lib.pdftext.letterhead_footnotes`.
+
+    Wired for **imy** only. JO's and JK's templates set no notes and ARN's
+    decisions arrive as one unbroken run of prose, so neither has any to
+    collect; KKV does, but its three document formats go through one dispatcher
+    (`kkv_read_document`) that would have to grow a third return value --
+    recorded as open in `avg/KNOWN-GAPS.md`."""
+    return [Fotnot(mark, text)
+            for mark, text in letterhead_footnotes(paras, margin, masthead)]
+
+
 def classify_imy(paras):
     """An IMY decision PDF's Paras -> body blocks. The margin column carries the
     "Diarienummer:"/"Datum:" labels with their values and the footer masthead;
@@ -413,7 +427,7 @@ def imy_body(record, root, patch_key=None):
     that opened the ärende, or two nämnders beslut under one dnr) gets each
     part under a level-1 rubrik naming it, so the seam is visible."""
     parts = [d for d in record["delar"] if d["sprak"] == "sv"]
-    blocks = []
+    blocks, notes = [], []
     for part in parts:
         pdf = imy_pdf_path(root, part["fil"])
         assert pdf.exists(), \
@@ -421,10 +435,12 @@ def imy_body(record, root, patch_key=None):
                                                part["fil"], pdf)
         if len(parts) > 1:
             blocks.append(Block("rubrik", part["titel"], 1))
-        blocks.extend(classify_imy(
-            [p for pageno, lines in pdf_pages(str(pdf), patch_key)
-             for p in page_paragraphs(lines, None, pageno)]))
-    return blocks
+        paras = [p for pageno, lines in pdf_pages(str(pdf), patch_key)
+                 for p in page_paragraphs(lines, None, pageno)]
+        blocks.extend(classify_imy(paras))
+        notes.extend(_footnotes_font_driven(paras, RE_IMY_MARGIN,
+                                            RE_IMY_MASTHEAD))
+    return blocks, notes
 
 
 def parse_imy(record, root, patch_key=None):
@@ -434,12 +450,13 @@ def parse_imy(record, root, patch_key=None):
     found, which is the closest thing these decisions have to a referatrubrik.
     The etiketter are the keywords; the praxisbeslut fields and the
     sanktionsavgift ride along as metadata for the reader and the facets."""
+    body, fotnoter = imy_body(record, root, patch_key)
     return Beslut(
         org="imy", diarienummer=[record["diarienummer"]],
         titel=record["titel"], beslutsdatum=record.get("beslutsdatum"),
         sammanfattning=record.get("sammanfattning"),
         nyckelord=list(record.get("kategorier") or []),
-        body=imy_body(record, root, patch_key),
+        body=body, fotnoter=fotnoter,
         source_url=record["tillsyner"][0]["url"],
         delar=[{"titel": d["titel"], "url": d["url"], "sprak": d["sprak"]}
                for d in record["delar"]],

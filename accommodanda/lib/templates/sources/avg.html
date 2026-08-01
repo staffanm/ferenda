@@ -1,4 +1,6 @@
-{#- A JO/JK/ARN decision page: the parsed decision text, nothing else --
-    summary and metadata ride the frontmatter (page.html). -#}
+{#- A JO/JK/ARN/IMY/KKV decision page: the parsed decision text and the notes
+    the template set below it -- summary and metadata ride the frontmatter
+    (page.html). -#}
 {% extends "page.html" %}
-{% block body %}{{ structure }}{% endblock %}
+{% import "partials/footnotes.html" as notes %}
+{% block body %}{{ structure }}{% if footnotes %}{{ notes.footnote_list(footnotes) }}{% endif %}{% endblock %}

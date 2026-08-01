@@ -48,7 +48,8 @@ from ..lib.catalog import BASE
 from ..lib.lagrum import interleave
 from .agencies import BY_ORG, ORGS, number_slug
 
-__all__ = ["ORGS", "Block", "Stallningstagande", "rs_identifier", "rs_uri"]
+__all__ = ["ORGS", "Block", "Fotnot", "Stallningstagande", "rs_identifier",
+           "rs_uri"]
 
 
 def rs_uri(org, nummer):
@@ -75,6 +76,15 @@ class Block:
 
 
 @dataclass
+class Fotnot:
+    """A note the letterhead sets below the running text. `mark` is the marker
+    the document printed; `text` is the note body, citation-linked like any
+    other -- an agency grounds a reference it makes in prose down here."""
+    mark: str
+    text: str
+
+
+@dataclass
 class Stallningstagande:
     org: str                            # agencies.ORGS
     nummer: str                         # the agency's own number, verbatim
@@ -94,6 +104,7 @@ class Stallningstagande:
                                         # published in the same numbered series
     nyckelord: list[str] = field(default_factory=list)
     body: list[Block] = field(default_factory=list)
+    fotnoter: list[Fotnot] = field(default_factory=list)
     source_url: str | None = None       # the agency's own page for it
     document_url: str | None = None     # the PDF the agency published it as
 
@@ -125,6 +136,10 @@ class Stallningstagande:
                 n += 1
                 structure.append({"type": "stycke", "id": "S%d" % n,
                                   "text": runs})
+        footnotes = [{"mark": f.mark,
+                      "text": interleave(f.text,
+                                         scanner.parse_text(f.text, context={}))}
+                     for f in self.fotnoter]
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "status": self.status}
         for key, value in (("beslutsdatum", self.beslutsdatum),
@@ -141,6 +156,8 @@ class Stallningstagande:
         art = {"uri": self.uri, "type": "stallningstagande", "org": self.org,
                "doktyp": self.doktyp, "identifier": self.identifier,
                "metadata": metadata, "structure": structure}
+        if footnotes:
+            art["footnotes"] = footnotes
         if self.sammanfattning:
             art["sammanfattning"] = self.sammanfattning
         if self.source_url:

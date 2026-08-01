@@ -1,6 +1,6 @@
 """The shared artifact text flattener (accommodanda/lib/text.py)."""
 
-from accommodanda.lib import text
+from accommodanda.lib import catalog, text
 
 ART = {
     "uri": "https://lagen.nu/1962:700",
@@ -101,3 +101,39 @@ def test_dv_body_section():
     assert text.document_text(art) == "Domskäl HD finner att"
     assert text.fragment_texts(art) == [
         ("https://lagen.nu/dom/nja/2009s796#r1", "Domskäl")]
+
+
+# --------------------------------------------------------------------------
+# footnotes are presented body text
+# --------------------------------------------------------------------------
+
+FOOTNOTED = {
+    "uri": "https://lagen.nu/avg/imy/IMY-2024-1",
+    "structure": [{"type": "stycke", "id": "S1",
+                   "text": ["IMY hänvisar till styrelsens riktlinjer."]}],
+    "footnotes": [{"mark": "12",
+                   "text": ["Se ",
+                            {"uri": "https://lagen.nu/edpb/riktlinjer/05-2020",
+                             "text": "riktlinjer 05/2020"},
+                            ", punkt 42."]}],
+}
+
+
+def test_footnotes_are_walked_as_presented_body():
+    """`BODY_SECTIONS` is "what the reader sees, the index stores and the link
+    walk reads" -- and notes are presented at the foot of the page. Leaving
+    them out cost every citation a document keeps in its notes: for an
+    IMY-beslut that is the one *identifying* the vägledning its prose names,
+    and for a court decision the whole apparatus DV has printed as endnotes
+    since 2023."""
+    assert "footnotes" in text.BODY_SECTIONS
+    assert FOOTNOTED["footnotes"] in text.body_sections(FOOTNOTED)
+
+
+def test_a_footnote_citation_reaches_the_link_graph():
+    uris = [run["uri"] for _anchor, _page, run in catalog.artifact_links(FOOTNOTED)]
+    assert "https://lagen.nu/edpb/riktlinjer/05-2020" in uris
+
+
+def test_a_footnote_reaches_the_indexed_document_text():
+    assert "punkt 42" in text.document_text(FOOTNOTED)

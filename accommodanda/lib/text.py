@@ -10,7 +10,13 @@ DV / förarbete / eurlex ``body``. Everything here is pure.
 """
 
 # the top-level sections that carry renderable body text, across all sources
-BODY_SECTIONS = ("structure", "body")
+# "footnotes" is presented body text like the rest: it renders at the foot of
+# the page, so the reader sees it, the index must store it and the link walk must
+# read it. Leaving it out cost every citation a document keeps in its notes --
+# which for an IMY-beslut is the one that *identifies* the vägledning its prose
+# names, and for a court decision the whole apparatus DV has printed as endnotes
+# since 2023.
+BODY_SECTIONS = ("structure", "body", "footnotes")
 
 
 def _tom_key(cons):
