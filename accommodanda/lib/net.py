@@ -66,8 +66,10 @@ def make_session(user_agent):
 def make_http2_session(user_agent):
     """An HTTP/2-capable client for a host that refuses HTTP/1.1. Konkurrensverket
     sits behind a Cloudflare front that 403s every HTTP/1.1 request and only serves
-    HTTP/2, which requests/urllib3 cannot speak; httpx (the ``httpx2`` fork, with
-    the ``h2`` codec from its ``[http2]`` extra) can. The returned client presents
+    HTTP/2, which requests/urllib3 cannot speak; httpx (the 0.x line declared as
+    ``httpx[http2]`` -- a *different package* from the ``httpx2`` starlette's
+    TestClient wants, not a version of it -- with the ``h2`` codec from its
+    ``[http2]`` extra) can. The returned client presents
     the same small surface the harvest engine uses -- ``.request(method, url,
     ...)`` returning a response with ``raise_for_status``/``json``/``text``/
     ``content``/``status_code``/``headers``/``url``, plus a mutable ``.headers``
