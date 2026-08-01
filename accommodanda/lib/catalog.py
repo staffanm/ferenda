@@ -645,11 +645,13 @@ def expired_date(art):
 def document_date(art):
     """The document's own date (ISO yyyy-mm-dd), for chronological ordering of
     inbound references -- a förarbete's publication date, a statute's
-    utfärdandedatum, a decision's date. Field-driven across sources; None when
-    the artifact carries no date (the renderer sorts undated entries last)."""
+    utfärdandedatum, a decision's date, a väglednings adoption date. Field-driven
+    across sources; None when the artifact carries no date (the renderer sorts
+    undated entries last)."""
     props = art.get("metadata", {}).get("properties", {})
     return (art.get("date") or art.get("avgorandedatum")
             or art.get("metadata", {}).get("beslutsdatum")
+            or art.get("metadata", {}).get("antagen")
             or art.get("metadata", {}).get("utkomFranTryck")
             or props.get("rpubl:utfardandedatum")
             or props.get("rpubl:avgorandedatum")
