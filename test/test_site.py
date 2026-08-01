@@ -1301,6 +1301,22 @@ def test_facet_nav_omits_single_bucket_primary_axis():
                                 {"key": "2024", "label": "2024", "slug": "2024",
                                  "count": 1, "children": None}]})
     assert "Dokumenttyp" in render._facet_nav("hudoc", view, ["judgment", "2024"])
+    # ... unless the page's cross-source banner already lists the same buckets:
+    # the eurlex/edpb rail leaves the document types to the EU-rätt selector
+    # above rather than offering the same choice twice
+    nav = render._facet_nav("hudoc", view, ["judgment", "2024"],
+                            primary_in_banner=True)
+    assert "Dokumenttyp" not in nav
+    assert '<h2 class="facet-axis">År</h2>' in nav
+
+
+def test_a_cross_axis_selector_can_carry_more_than_one_labelled_group():
+    groups = [("EU-rättsakter", [("eurlex:regulation", "Förordningar", "/a/", 3)]),
+              ("EDPB:s vägledningar", [("edpb:riktlinjer", "Riktlinjer", "/b/", 2)])]
+    html = render._cross_nav(groups, "edpb:riktlinjer")
+    assert html.count('<h2 class="facet-axis">') == 2
+    assert '<h2 class="facet-axis">EDPB:s vägledningar</h2>' in html
+    assert html.count('aria-current="page"') == 1
 
 
 def test_generate_browse_writes_faceted_pages(tmp_path):

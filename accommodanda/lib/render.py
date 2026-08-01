@@ -3506,6 +3506,9 @@ SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
                 "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
                 "avg": "Myndighetsavgöranden",
                 "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
+                # the EU-rätt browse selector overrides this one heading; see
+                # `_EU_AXIS_LABEL` for why a group standing over all three
+                # EDPB series cannot call them all riktlinjer
                 "edpb": "EU:s dataskyddsriktlinjer",
                 "hudoc": "Europadomstolens praxis",
                 "coe": "Europarådets fördrag",
@@ -3852,9 +3855,15 @@ def _hudoc_section(con):
     return _LISTS.hudoc_section(_most_cited(con, "hudoc"))
 
 
-# the shared top-level "Dokumenttyp" selector carried by every folkrätt aggregate
-# page (the landing and the hudoc browse leaves), so a reader switches between the
-# instrument families from anywhere. Entries: the Council-of-Europe treaties as
+# A cross-source selector is a list of ``(axis heading, entries)`` groups, each
+# entry ``(id, label, url, count)``. It rides full-width above a browse listing
+# (and above the folkrätt landing), so a reader switches between the families a
+# masthead entry covers from anywhere -- and because it already carries the
+# source's own primary axis, the browse rail beside it does not repeat it.
+
+
+# the shared "Dokumenttyp" selector carried by every folkrätt aggregate page (the
+# landing and the hudoc browse leaves). Entries: the Council-of-Europe treaties as
 # one "Fördrag" bucket (protocols nest under their convention, not as a sibling
 # type) plus each HUDOC case type (currently only "Domar"). Data-driven, so a new
 # case type or the later UN/ICJ sources extend it without a code change.
@@ -3873,24 +3882,43 @@ def _folkratt_axis(con):
         for b in facets.tree(con, "hudoc")["buckets"]:
             entries.append(("hudoc:" + b["slug"], b["label"],
                             _browse_url("hudoc", [b["slug"]]), b["count"]))
-    return entries
+    return [("Dokumenttyp", entries)]
 
 
-def _folkratt_nav(entries, active_id):
-    return _LISTS.folkratt_nav(entries, active_id)
+def _cross_nav(groups, active_id):
+    return _LISTS.top_axis_nav(groups, active_id)
 
 
-# the shared "Dokumenttyp" selector carried by every EU-rätt browse page, so a
-# reader switches between the rättsakter and the guidance written *about* them
-# from anywhere. The EDPB's riktlinjer and rekommendationer have no CELEX and
-# are not rättsakter, which is why they are a source of their own rather than an
-# eurlex doctype -- but they belong beside the förordning they interpret, which
-# is what this selector is for (the folkrätt landing's selector, second use).
+# the shared selector carried by every EU-rätt browse page, so a reader switches
+# between the rättsakter and the guidance written *about* them from anywhere. The
+# EDPB's riktlinjer and rekommendationer have no CELEX and are not rättsakter,
+# which is why they are a source of their own rather than an eurlex doctype --
+# but they belong beside the förordning they interpret, which is what this
+# selector is for (the folkrätt landing's selector, second use).
+#
+# One group per issuing body rather than one flat row of document types: a
+# listing of riktlinjer is the EDPB's, not the union legislator's, and a reader
+# who cannot see whose document it is has no way to weigh it -- a riktlinje
+# binds nobody, a förordning binds everyone. The heading is what says so, and
+# the three EDPB series sit under it as the series they are.
+#
+# eurlex takes its SOURCE_LABEL unchanged. edpb overrides it, and the override
+# is the point: SOURCE_LABEL names that source by what most of it is ("EU:s
+# dataskyddsriktlinjer", which is what the frontpage row wants), while this
+# heading stands over all three of its series -- and the artikel 29-gruppens
+# vägledningar are not riktlinjer. What a group heading has to say is who
+# issued what is under it.
+_EU_AXIS_LABEL = {"eurlex": SOURCE_LABEL["eurlex"],
+                  "edpb": "EDPB:s vägledningar"}
+
+
 def _eurlex_axis(con):
-    return [("%s:%s" % (source, bucket["slug"]), bucket["label"],
-             _browse_url(source, [bucket["slug"]]), bucket["count"])
-            for source in ("eurlex", "edpb") if catalog.document_count(con, source)
-            for bucket in facets.tree(con, source)["buckets"]]
+    return [(_EU_AXIS_LABEL[source],
+             [("%s:%s" % (source, bucket["slug"]), bucket["label"],
+               _browse_url(source, [bucket["slug"]]), bucket["count"])
+              for bucket in facets.tree(con, source)["buckets"]])
+            for source in ("eurlex", "edpb")
+            if catalog.document_count(con, source)]
 
 
 def render_folkratt(con):
@@ -3899,7 +3927,7 @@ def render_folkratt(con):
                           _untc_listing(con), _icc_listing(con),
                           _hudoc_section(con)) if part)
     if body:
-        body = _folkratt_nav(_folkratt_axis(con), "coe") + body
+        body = _cross_nav(_folkratt_axis(con), "coe") + body
     return page("Folkrätt", "Folkrätt", "", body or _LISTS.empty(),
                 eyebrow="Internationell rätt och mänskliga rättigheter", solo=True)
 
@@ -3986,19 +4014,22 @@ def _facet_links(source, buckets, parent_slugs, active_keys, depth):
             for b in buckets]
 
 
-def _facet_nav(source, view, active_keys):
+def _facet_nav(source, view, active_keys, primary_in_banner=False):
     """The navigator: the primary buckets as links, plus -- under the active
     primary -- its secondary buckets (the year/… within a court/type). A primary
     axis with a single bucket is not navigable (nothing to choose), so it is
-    omitted -- e.g. HUDOC's lone 'Domar' type, whose selector lives in the shared
-    folkrätt axis above instead. The föreskrift years never list here either:
-    a large samling's year axis rides on top of the list (F4), a small one has
-    no year split at all (F3)."""
+    omitted -- e.g. HUDOC's lone 'Domar' type. It is omitted too when the page
+    carries a cross-source selector that already lists the same buckets
+    (`primary_in_banner`): eurlex's document types and edpb's series appear in
+    the EU-rätt banner above, and a rail repeating them below is the same
+    choice offered twice. The föreskrift years never list here either: a large
+    samling's year axis rides on top of the list (F4), a small one has no year
+    split at all (F3)."""
     levels, buckets = view["levels"], view["buckets"]
     parts = ([{"axis": levels[0]},
               {"axis": None,
                "links": _facet_links(source, buckets, [], active_keys, 0)}]
-             if len(buckets) > 1 else [])
+             if len(buckets) > 1 and not primary_in_banner else [])
     if len(levels) > 1 and source != "foreskrift":
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
@@ -4063,12 +4094,14 @@ def _fs_series_note(prim):
     return "Här listas även äldre föreskrifter ur %s." % listed
 
 
-def render_facet_page(source, view, nodes, banner=""):
+def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
     """A single browse bucket page: an optional cross-source `banner` (the shared
-    folkrätt selector, a large samling's year axis), the navigator, and this leaf
-    bucket's document list. `nodes` is the bucket-node path (one per level, or
-    the single merged node of an unpartitioned samling); the leaf carries its
-    `documents` (from the API, already ordered and labelled)."""
+    folkrätt selector, the EU-rätt selector, a large samling's year axis), the
+    navigator, and this leaf bucket's document list. `nodes` is the bucket-node
+    path (one per level, or the single merged node of an unpartitioned samling);
+    the leaf carries its `documents` (from the API, already ordered and
+    labelled). `primary_in_banner` says the banner already lists this source's
+    primary buckets, so the rail leaves them to it."""
     heading = _bucket_heading(source, view["levels"], nodes)
     docs = nodes[-1].get("documents") or []
     if not docs:
@@ -4082,7 +4115,8 @@ def render_facet_page(source, view, nodes, banner=""):
         listing = Markup('<dl class="%s">%s</dl>') % (
             css, Markup("").join(_browse_item(d) for d in docs))
     body = _LISTS.facet_page_body(
-        Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes]),
+        Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes],
+                                   primary_in_banner),
         heading, len(docs), listing,
         note=(_fs_series_note(nodes[0]) if source == "foreskrift" else ""))
     alias = feeds.alias_for_source(source)
@@ -4113,10 +4147,11 @@ def _fs_docs(sec):
 
 
 def _fs_year_axis(source, prim):
-    """The year selector entries of one samling, `_folkratt_nav`-shaped."""
-    return [(sec["key"], sec["label"],
-             _browse_url(source, [prim["slug"], sec["slug"]]), sec["count"])
-            for sec in prim["children"]]
+    """The year selector of one samling, as a one-group cross-axis (F4)."""
+    return [("År", [(sec["key"], sec["label"],
+                     _browse_url(source, [prim["slug"], sec["slug"]]),
+                     sec["count"])
+                    for sec in prim["children"]])]
 
 
 def generate_browse(client, source, out_root, cross_axis=None):
@@ -4126,11 +4161,13 @@ def generate_browse(client, source, out_root, cross_axis=None):
     /dom/, /dom/nja/ and /dom/nja/2025/ all resolve without a redirect or JS.
     The caller (render_aggregates) already skips the one source the API does
     not facet (kommentar), so every `source` here is faceted. `cross_axis` (a
-    cross-source selector's entries) prepends that selector to each page,
+    cross-source selector's groups) prepends that selector to each page,
     marking this source's primary bucket current -- passed for the sources that
     share a masthead entry with a sibling source, so a reader switches between
     them from any leaf: hudoc (the folkrätt selector) and eurlex/edpb (the
-    EU-rätt one).
+    EU-rätt one). That selector lists this source's own primary buckets, so the
+    rail beside the listing leaves them to it rather than offering the same
+    choice twice.
 
     A small författningssamling collapses its year buckets into one listing
     (F3); a large one keeps year pages, with the year selector as a top banner
@@ -4139,7 +4176,7 @@ def generate_browse(client, source, out_root, cross_axis=None):
     view = resp.json()
     root_html = None
     for prim in view["buckets"]:
-        banner = (_folkratt_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
+        banner = (_cross_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
                   if cross_axis else "")
         year_axis = None
         if source == "foreskrift" and prim["children"]:
@@ -4154,8 +4191,9 @@ def generate_browse(client, source, out_root, cross_axis=None):
         for i, nodes in enumerate(leaves):
             slugs = [n["slug"] for n in nodes]
             if year_axis:
-                banner = _LISTS.top_axis_nav("År", year_axis, nodes[1]["key"])
-            html = render_facet_page(source, view, nodes, banner=banner)
+                banner = _cross_nav(year_axis, nodes[1]["key"])
+            html = render_facet_page(source, view, nodes, banner=banner,
+                                     primary_in_banner=cross_axis is not None)
             _write_browse(out_root, source, slugs, html)
             if len(nodes) > 1 and i == 0:        # primary landing = first child
                 _write_browse(out_root, source, slugs[:1], html)

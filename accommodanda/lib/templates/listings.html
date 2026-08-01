@@ -45,18 +45,21 @@
 {%- if reel %}<h3>Mest hänvisade avgöranden</h3><ol class="ranked">{{ ranked(reel) }}</ol>{% endif -%}
 <p><a href="/folkratt/hudoc/">Bläddra bland avgöranden →</a></p></section>
 {%- endmacro -%}
-{%- macro top_axis_nav(axis, entries, active_id) -%}
-{#- a full-width selector above a listing: the folkrätt Dokumenttyp axis, the
-    year axis of a large författningssamling (F4) -#}
-<nav class="facets"><h2 class="facet-axis">{{ axis }}</h2><ul class="facet-list">
+{%- macro top_axis_nav(groups, active_id) -%}
+{#- a full-width selector above a listing: one or more labelled axes, each a
+    row of buckets. One group for the folkrätt Dokumenttyp axis and for the
+    year axis of a large författningssamling (F4); two for the EU-rätt
+    selector, which names the rättsakter and the EDPB's guidance separately so
+    a reader can see whose document a listing holds -#}
+<nav class="facets">
+{%- for axis, entries in groups -%}
+<h2 class="facet-axis">{{ axis }}</h2><ul class="facet-list">
 {%- for key, label, url, count in entries -%}
 <li><a href="{{ url }}"{% if key == active_id %} aria-current="page"{% endif %}>{{ label }} <span class="c">{{ count }}</span></a></li>
 {%- endfor -%}
-</ul></nav>
-{%- endmacro -%}
-{%- macro folkratt_nav(entries, active_id) -%}
-{#- the shared top-level Dokumenttyp selector on every folkrätt aggregate -#}
-{{ top_axis_nav("Dokumenttyp", entries, active_id) }}
+</ul>
+{%- endfor -%}
+</nav>
 {%- endmacro -%}
 {%- macro myndigheter_body(fs, organs, agencies) -%}
 {#- the /myndigheter/ landing (T1): what förvaltningsmyndigheterna produce --
@@ -143,8 +146,11 @@
 {%- endmacro -%}
 {%- macro facet_page_body(banner, nav, heading, count, listing, note="") -%}
 {#- facets in a left rail beside the list; a full-width selector banner (the
-    folkrätt Dokumenttyp axis, a large samling's year axis) above both; the
-    `note` names what else lists here (a succeeded series' documents, F8) -#}
+    folkrätt Dokumenttyp axis, the EU-rätt selector, a large samling's year
+    axis) above both; the `note` names what else lists here (a succeeded
+    series' documents, F8). Where the banner already carries the source's
+    primary axis the rail does not repeat it, so the two never say the same
+    thing twice -- `nav` is then the secondary axis alone, or empty -#}
 {{ banner }}<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>
 {%- if note %}<p class="browse-note">{{ note }}</p>{% endif -%}
 {{ listing }}</section></div>
