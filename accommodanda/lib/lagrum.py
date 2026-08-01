@@ -70,20 +70,21 @@ RATTSFALL = 'RATTSFALL'            # Swedish case law ("NJA 1994 s. 12")
 FORARBETEN = 'FORARBETEN'          # prop./bet./rskr./SOU/Ds/celex + page refs
 EURATTSFALL = 'EURATTSFALL'        # CJEU case law ("mål C-176/09")
 MYNDIGHETSBESLUT = 'MYNDIGHETSBESLUT'  # JO/JK/ARN decisions (by diarienummer)
+VAGLEDNING = 'VAGLEDNING'          # EDPB guidance ("Riktlinjer 05/2020", "WP 248")
 ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 
 # deterministic assembly order; kortlagrum first so its roots take
 # precedence in the ?ref alternation (an abbreviated form must win over a
 # bare generic ref that would leave the abbreviation unconsumed)
 TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
-              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT]
+              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING]
 
 # The "everything" configuration for verticals that link every reference
 # flavour (dv, forarbete, avg, wiki): all parse types except ENKLALAGRUM,
 # which is the deliberately restricted *alternative* to LAGRUM, never
 # combined with it. Import this instead of copying the list.
 ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
-                   FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT]
+                   FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING]
 
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
@@ -101,6 +102,7 @@ ROOTS = {
                  'avsnitt_list', 'forarb_doc'],
     EURATTSFALL: ['ecj_ref'],
     MYNDIGHETSBESLUT: ['arn_refs', 'jo_refs', 'jk_refs'],
+    VAGLEDNING: ['riktlinje_ref', 'rekommendation_ref', 'wp_ref'],
     # absolute SFS forms only -- a bare relative ref ("3 §") has no root,
     # so it stays unlinked (the point of the förarbete-safe subset)
     ENKLALAGRUM: ['external_refs', 'external_ref', 'named_external_law_ref',
@@ -526,12 +528,51 @@ ARENDE_NR: "ärende nr "
 JK_ID: /\d+-\d{2}-\d{2}/
 """
 
+# VAGLEDNING (EDPB guidance) -- soft law over the allmänna
+# dataskyddsförordningen, cited by the number its issuer gave it and by nothing
+# else: no CELEX, no diarienummer. Three surfaces, because there are three
+# series (see `edpb/series.py`):
+#
+#   * "Riktlinjer 05/2020", "riktlinje 3/2019" -- and the definite "riktlinjerna
+#     05/2020" Swedish prose writes as often. The EDPB pads the löpnummer in
+#     some years and not others, and a citation copies whichever it saw, so the
+#     number normalises on the way into the URI (`fmt_riktlinje_ref`) and one
+#     document has one address however it was written.
+#   * "Rekommendation 01/2020" / "Rekommendationer 02/2020" -- the EDPB itself
+#     alternates singular and plural, so both are matched.
+#   * "WP 248", "WP248", "wp248 rev.01" -- the artikel 29-gruppens own
+#     numbering, which is how its endorsed vägledningar are cited to this day.
+#
+# The WP form mints for *any* number rather than only the seven vägledningar
+# the site hosts: the working party numbered its yttranden in the same series
+# (WP 187, WP 259), a guideline's prose is full of them, and an unhosted lagen.nu
+# uri already renders as plain text rather than a dead link (render.render_runs)
+# -- which is the right reading of "we know exactly what this is and do not
+# publish it yet". The one number that is *not* a document is 29 itself: "WP29"
+# is what everyone calls the group, and `fmt_wp_ref` drops it the way
+# `jk_is_date` drops a diarienummer that is really a date.
+VAGLEDNING_RULES = r"""
+riktlinje_ref.5: RIKTLINJE_W vl_id
+rekommendation_ref.5: REKOMMENDATION_W vl_id
+wp_ref.5: WP_LABEL wp_id
+
+vl_id: VL_ID
+wp_id: WP_ID
+
+RIKTLINJE_W.4: /[Rr]iktlinje(?:n|r|rna)?\s+(?:nr\.?\s*)?/
+REKOMMENDATION_W.4: /[Rr]ekommendation(?:en|er|erna)?\s+(?:nr\.?\s*)?/
+WP_LABEL.4: /WP\s?/
+VL_ID: /\d{1,2}\/(?:19|20)\d{2}/
+WP_ID: /\d{2,3}(?![\d\/])/
+"""
+
 # grammar rule fragments per parse type (LAW_ABBREV is appended at build
 # time from the supplied abbreviations, see parser())
 RULES = {LAGRUM: LAGRUM_RULES, EULAGSTIFTNING: EU_RULES,
          KORTLAGRUM: KORTLAGRUM_RULES, RATTSFALL: RATTSFALL_RULES,
          FORARBETEN: FORARBETEN_RULES, EURATTSFALL: EURATTSFALL_RULES,
-         MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_RULES}
+         MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_RULES,
+         VAGLEDNING: VAGLEDNING_RULES}
 
 # words ending in a law suffix that are not law names (ported verbatim)
 NOLAW = {
@@ -664,12 +705,20 @@ MYNDIGHETSBESLUT_TRIGGER_SRC = r"""
   | \b(?:[Dd]nr|ärende\ nr)\ \d+-\d+-\d+        # JK diarienummer (3 parts)
 """
 
+# fires at each EDPB/WP29 guidance marker
+VAGLEDNING_TRIGGER_SRC = r"""
+    \b[Rr]iktlinje(?:n|r|rna)?\ (?:nr\.?\ ?)?\d{1,2}/(?:19|20)\d{2}
+  | \b[Rr]ekommendation(?:en|er|erna)?\ (?:nr\.?\ ?)?\d{1,2}/(?:19|20)\d{2}
+  | \bWP\ ?\d{2,3}
+"""
+
 TRIGGER_SRC = {LAGRUM: LAGRUM_TRIGGER_SRC, EULAGSTIFTNING: EU_TRIGGER_SRC,
                KORTLAGRUM: KORTLAGRUM_TRIGGER_SRC,
                RATTSFALL: RATTSFALL_TRIGGER_SRC,
                FORARBETEN: FORARBETEN_TRIGGER_SRC,
                EURATTSFALL: EURATTSFALL_TRIGGER_SRC,
-               MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_TRIGGER_SRC}
+               MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_TRIGGER_SRC,
+               VAGLEDNING: VAGLEDNING_TRIGGER_SRC}
 
 
 def expand_types(types):
@@ -1142,6 +1191,56 @@ def avg_ids(node, name):
             if s.data == name]
 
 
+# "WP29" is what everyone calls artikel 29-gruppen itself, so the number that
+# would name a document is the one number that never does
+WP29_GROUP = '29'
+
+# "Riktlinjer NN/ÅÅÅÅ" is not the EDPB's form alone -- every European authority
+# numbers its guidance that way, and Swedish prose names the issuer in front of
+# it: "Socialstyrelsens riktlinjer 2/2018", "EBA:s riktlinjer 4/2017",
+# "Europarådets rekommendation 1/2019". Those must not mint EDPB addresses, and
+# the "renders as plain text when unhosted" argument does not save them: 2/2018
+# *is* in the corpus, so a sentence about Socialstyrelsen would link to the
+# EDPB's certification guideline and write a false edge onto its rail.
+#
+# So a match is rejected when another body claims it: the text immediately
+# before it ends in a capitalised genitive ("Socialstyrelsens ", "EBA:s ") that
+# is not one of the EDPB's own names. A bare "riktlinjer 05/2020", a lower-case
+# "styrelsens riktlinjer", and every EDPB spelling stay linked -- which is what
+# IMY and the guidance itself actually write.
+EDPB_NAMES = ('Europeiska dataskyddsstyrelsen', 'Dataskyddsstyrelsen', 'EDPB',
+              'Styrelsen', 'Artikel 29-gruppen', 'Artikel 29-arbetsgruppen')
+# The genitive may fall on the second word of a name ("Europeiska
+# bankmyndighetens riktlinjer", "Europeiska kommissionens rekommendation"), so
+# the pattern spans an optional lower-case continuation after the capitalised
+# head -- which is also the shape of the EDPB's own long name, hence the
+# exemption list is tried against the whole run.
+RE_OTHER_ISSUER = re.compile(
+    r'(?<![\wåäöÅÄÖ])'
+    r'(?!(?:%s)(?:s|:s)?\s+$)'                    # ... unless it is the EDPB
+    r'[A-ZÅÄÖ][\wåäöÅÄÖ-]*'                       # a capitalised head word
+    r'(?:\s+[a-zåäö][\wåäöÅÄÖ-]*)?'               # + an optional lower-case tail
+    r'(?:s|:s)\s+$'                               # ... in the genitive, last
+    % '|'.join(re.escape(n) for n in EDPB_NAMES))
+
+# the same body under its full name: "artikel 29-gruppen" / "artikel
+# 29-arbetsgruppen", which is a *body*, not a reference to artikel 29
+ARTICLE29 = '29'
+RE_ARTICLE29_GROUP = re.compile(r'[-‑‐–—](?:arbets)?gruppen')
+
+
+def vagledning_slug(number):
+    """An EDPB series number as it appears in a URI ("5/2020" -> "05-2020").
+
+    The löpnummer is zero-padded to two digits because the EDPB pads it in some
+    years and not others -- "Riktlinjer 05/2020" beside "Riktlinjer 1/2018" --
+    and a citation copies whichever form it saw. Kept byte-identical to
+    `edpb.series.number_slug`, which mints the same address from the document's
+    side; `test_edpb.py` holds the two together."""
+    serial, _, year = number.partition('/')
+    return '%02d-%s' % (int(serial), year)
+
+
 def jk_is_date(dnr):
     """A JK diarienummer NNNN-MM-DD whose first part is a recent year and
     whose other parts read as month/day is probably a date, not a ref."""
@@ -1236,7 +1335,7 @@ class LagrumParser:
             if not m:
                 break
             tree, length = self.try_parse(text, m.start())
-            if tree is not None and self.acceptable(tree, text,
+            if tree is not None and self.acceptable(tree, text, m.start(),
                                                     m.start() + length):
                 base = m.start()
                 # let a formatter peek at the text trailing its match (the
@@ -1320,18 +1419,35 @@ class LagrumParser:
                     window = window[:upto]
         return None, 0
 
-    def acceptable(self, tree, text, end):
-        """The old ChangeRef required either a trailing period or a
-        following non-space/comma character -- "lag (1998:204) om ..."
-        is not a change note (the SFS number alone gets linked on a
-        later trigger), and neither is "Lag (1991:242)" at the very end
-        of a text node (the old lookahead failed at end-of-buffer)."""
+    def acceptable(self, tree, text, start, end):
+        """Whether a parsed match may link at all, judged on the text around it.
+
+        The old ChangeRef required either a trailing period or a following
+        non-space/comma character -- "lag (1998:204) om ..." is not a change
+        note (the SFS number alone gets linked on a later trigger), and neither
+        is "Lag (1991:242)" at the very end of a text node (the old lookahead
+        failed at end-of-buffer). `start`/`end` bound the match, so a rule can
+        read what precedes it as well as what follows."""
         node = tree.children[0]
         if isinstance(node, Tree) and node.data == 'change_ref':
             has_dot = any(t.type == 'DOT' for t in node.children
                           if isinstance(t, Token))
             if not has_dot and (end >= len(text) or text[end] in ' ,'):
                 return False
+        # another authority's numbered guidance is not the EDPB's
+        if (isinstance(node, Tree)
+                and node.data in ('riktlinje_ref', 'rekommendation_ref')
+                and RE_OTHER_ISSUER.search(text[:start])):
+            return False
+        # "artikel 29-gruppen" is the body the article established, not the
+        # article: the working party is named that way in every data-protection
+        # document written since 1995, and reading it as a reference sent 13 of
+        # one EDPB guideline's links to artikel 29 in the GDPR -- which repealed
+        # the directive the group existed under, and has no such body in it.
+        if (isinstance(node, Tree) and node.data == 'eu_ref'
+                and text[:end].rstrip().endswith(ARTICLE29)
+                and RE_ARTICLE29_GROUP.match(text[end:])):
+            return False
         return True
 
     # --- formatting (ports of the old format_* semantics) ---
@@ -1931,3 +2047,24 @@ class LagrumParser:
         for dnr, span in avg_ids(node, 'jk_ref_id'):
             if not jk_is_date(dnr):  # a plausible date is not a diarienummer
                 out.append({'_uri': self.base + 'avg/jk/' + dnr, '_span': span})
+
+    # --- VAGLEDNING (EDPB / artikel 29-gruppens guidance) ---
+
+    def _vagledning(self, node, serie, out):
+        out.append({'_uri': '%sedpb/%s/%s'
+                    % (self.base, serie,
+                       vagledning_slug(token_text(subtree(node, 'vl_id')))),
+                    '_span': node_span(node)})
+
+    def fmt_riktlinje_ref(self, node, match, out, context):
+        self._vagledning(node, 'riktlinjer', out)
+
+    def fmt_rekommendation_ref(self, node, match, out, context):
+        self._vagledning(node, 'rekommendationer', out)
+
+    def fmt_wp_ref(self, node, match, out, context):
+        number = token_text(subtree(node, 'wp_id'))
+        if number == WP29_GROUP:   # "WP29" names the group, not a document
+            return
+        out.append({'_uri': self.base + 'edpb/wp/' + number,
+                    '_span': node_span(node)})
