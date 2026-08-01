@@ -3529,34 +3529,63 @@ will actually meet — 43 of the 138 IMY-beslut in the corpus cite it — and
 because the citation scan puts each document on the rail of the artikel it
 interprets, beside the förordning itself.
 
-51 documents in the first cut: **riktlinjer** (37), **rekommendationer** (7)
-and the closed set of **artikel 29-gruppens vägledningar** the EDPB endorsed on
-25 May 2018 (7: WP 242, 243, 244, 248, 250, 251, 260). 48 are published here in
-Swedish, 3 in English (the EDPB has issued no Swedish version of those).
+60 documents: **riktlinjer** (37), **rekommendationer** (7) and the closed set
+of **artikel 29-gruppens vägledningar** the EDPB endorsed on 25 May 2018 — all
+16 Endorsement 1/2018 names. 52 are published here in Swedish, 8 in English
+(three riktlinjer for which the EDPB has issued no Swedish version, and five
+WP29 documents the working party never had translated or whose translations sit
+in a 7-Zip archive nothing in the stdlib opens).
 
 - **Nav: under EU-rätt, not a new top-level section.** These documents have no
   CELEX, which is why they are a source of their own rather than an eurlex
   doctype — but a masthead entry organised by *bindingness* would split the EU
   corpus in two and put the GDPR and its riktlinjer in different top-level
   places, which is the one adjacency a reader wants. So the folkrätt pattern:
-  edpb browses under `/eurlex/vagledning/` and shares a "Dokumenttyp" selector
-  with eurlex (`render._eurlex_axis`, the second user of the cross-source
-  selector `generate_browse` already carried for hudoc). Swedish soft law
-  (`rs`, allmänna råd) stays under Myndigheter, by issuer, where it belongs.
+  edpb browses under `/eurlex/vagledning/` and shares the cross-source selector
+  with eurlex (`render._eurlex_axis`, the second user of the selector
+  `generate_browse` already carried for hudoc). Swedish soft law (`rs`, allmänna
+  råd) stays under Myndigheter, by issuer, where it belongs.
+- **The selector names the issuing body, and the rail no longer repeats it.**
+  That selector began as one flat "Dokumenttyp" row in which "Riktlinjer" sat
+  beside "Förordningar" with nothing saying who wrote which — while the browse
+  rail below listed the same document types a second time. It is now a list of
+  labelled groups (`EU-rättsakter`, `EDPB:s vägledningar`), so a reader can see
+  whose document a listing holds — a riktlinje binds nobody, a förordning binds
+  everyone, and a reader who cannot tell them apart cannot weigh either — and
+  `_facet_nav(..., primary_in_banner=True)` drops the rail copy, since a choice
+  offered twice on one page is a choice offered once and a distraction.
 - **Identity is the EDPB's own number** — `edpb/riktlinjer/05-2020`,
   `edpb/rekommendationer/01-2019`, `edpb/wp/248` — the avg/rs grammar with the
   series in place of the myndighet. The EDPB pads the löpnummer in some years
   and not others ("05/2020" beside "1/2018"), so the URI normalises and the
   citation form keeps what the document wrote.
-- **A closed corpus written down as data.** The EDPB's own pages for the seven
-  endorsed WP29 documents are stubs — five carry no file, one links an
-  unrelated Danish decision, WP250's is titled "Dataskyddsombud" (WP243's
-  subject), and two pages exist for each of WP242 and WP260 — so `series.WP29`
-  records the Commission newsroom item that actually holds each one, and
-  `parse.wp_cover` reads the title and adoption date off the document's own
-  Swedish cover. The Swedish translations live inside 10–28 MB per-language
-  ZIPs; only the extracted PDF is stored, and a routine run does not re-resolve
-  them.
+- **A closed corpus written down as data.** The EDPB publishes a document page
+  for only eight of the sixteen endorsed WP29 documents, and the seven of those
+  under `/documents/guideline/` are stubs —
+  five carry no file, one links an unrelated Danish decision, WP250's is titled
+  "Dataskyddsombud" (WP243's subject), and two pages exist for each of WP242 and
+  WP260 — so `series.WP29` records the Commission newsroom item that actually
+  holds each one, and `parse.wp_cover` reads the title and adoption date off the
+  document's own Swedish cover. The eight with no page of their own are sourced
+  to the endorsement page, which is the EDPB's own statement that they belong
+  here. The Swedish translations live inside 10–28 MB per-language ZIPs; only
+  the extracted PDF is stored, and a routine run does not re-resolve them.
+  **One endorsed document has no WP number at all** — the position paper on the
+  artikel 30.5 derogation — and no cover either, setting its title in the
+  opening prose and dating itself nowhere, so the registry writes both down and
+  it is addressed by subject (`edpb/wp/artikel-30-5`).
+- **The two BCR application forms, and the one place this vertical publishes a
+  file it did not get from the issuing body.** WP 264 and WP 265 were issued as
+  Word *forms*, so no authoritative PDF of either exists — the newsroom still
+  serves WP 265 as `.doc`, and WP 264's item serves the WP263 PDF outright. Both
+  are taken from Hessens tillsynsmyndighets conversions, because what makes a
+  conversion trustworthy is not the host but what it can be checked against:
+  WP 264 was compared word for word against the Greek authority's independent
+  conversion (identical but for line breaking), WP 265 against the working
+  party's own Word file from the newsroom (which the PDF's author metadata still
+  names). `wp_cover` re-verifies on every parse that each file names its own WP
+  number, so a mirror that starts serving something else fails the parse rather
+  than filing the wrong text.
 - **The numbered punkt is the citable unit.** The EDPB numbers every
   substantive paragraph and sets the number in a column of its own, which the
   paragraph-gap heuristic cannot see — paragraph 17 of Riktlinjer 05/2020
@@ -3564,6 +3593,17 @@ Swedish, 3 in English (the EDPB has issued no Swedish version of those).
   *running sequence* and hands them to `page_paragraphs` as forced breaks (the
   mechanism DV's bitmap paragraph numbers use), so each anchors on its own
   number and a decision citing "punkt 27 i riktlinjer 05/2020" can land there.
+  **Only where the numbering is the document's paragraph numbering**, which is
+  now tested rather than assumed: a working document that numbers its *sections*
+  "1." and "2." had every paragraph under a section glued onto the section
+  heading, so WP 250 was a single 46,000-character block and WP 248 a
+  33,000-character one. `PUNKT_COVERAGE_MIN` separates the two populations
+  (a section-numbered document numbers ≤ 9 % of its paragraphs, a punkt-numbered
+  one ≥ 29 %); below it nothing joins and the numbers anchor nothing.
+  Adjudicated against the 51 documents that existed before the change: five
+  parse differently (WP 250, WP 248, WP 244, Riktlinjer 04/2020, Rekommendationer
+  1/2022), the other 46 byte-identically. Of the nine documents added alongside,
+  WP 263 has the same shape and would have had the same defect.
 - **New parse type `VAGLEDNING`** in `lib/lagrum.py`: `Riktlinjer 05/2020`,
   `riktlinjerna 8/2022`, `riktlinjen 4/2019`, `Rekommendation(er) NN/ÅÅÅÅ`,
   `WP 243`, `WP248 rev.01`. "WP29" names the group, not a document, and is
