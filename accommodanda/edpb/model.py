@@ -59,7 +59,7 @@ from dataclasses import dataclass, field
 
 from ..lib.catalog import BASE
 from ..lib.lagrum import interleave
-from .series import BY_KOD, KODER, number_slug
+from .series import BY_KOD, KODER, WP29_BY_SLUG, number_slug
 
 __all__ = ["KODER", "Block", "Fotnot", "Vagledning", "vagledning_identifier",
            "vagledning_uri"]
@@ -77,7 +77,19 @@ def vagledning_uri(serie, nummer):
 def vagledning_identifier(serie, nummer):
     """The citation form: "Riktlinjer 05/2020", "Rekommendation 01/2019",
     "WP 248". The number is kept exactly as the document writes it (the EDPB
-    pads it in some years and not others) -- only the URI normalises."""
+    pads it in some years and not others) -- only the URI normalises.
+
+    One endorsed WP29 document has no WP number to be cited by, and the
+    registry writes down the name it is filed under instead; every other one
+    takes the series' "WP %s"."""
+    if serie == "wp":
+        wp = WP29_BY_SLUG[nummer]
+        # keyed on the *missing number*, not on a present `citation`: a
+        # citation written into a numbered entry must not quietly displace the
+        # number it is cited by, and "WP %s" % None must never be reachable
+        # (the same inversion `parse.wp_cover` avoids for the title)
+        return wp.citation if wp.number is None \
+            else BY_KOD[serie].identifier % wp.number
     return BY_KOD[serie].identifier % nummer
 
 

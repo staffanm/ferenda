@@ -56,7 +56,7 @@ from ..lib.pdftext import (
 from ..lib.util import normalize_space, record_path
 from .download import pdf_path
 from .model import Block, Fotnot, Vagledning
-from .series import BY_KOD, WP29_BY_NUMBER
+from .series import BY_KOD, WP29_BY_SLUG
 
 # what an EDPB guideline actually cites: EU legislation (the förordning it
 # interprets, by article), the EU courts, and the EDPB's and artikel
@@ -68,6 +68,11 @@ EDPB_PARSE_TYPES = [EULAGSTIFTNING, EURATTSFALL, VAGLEDNING]
 # the paragraph, because the number is set in its own column and the sequence
 # check below is what makes a bare number safe to trust.
 RE_PUNKT = re.compile(r"^(\d{1,4})\.\s+\S")
+
+# how much of a document its numbering must cover before the numbers are read
+# as punkter at all -- see `join_continuations` for what the two populations
+# look like and what relying on the premise where it does not hold costs.
+PUNKT_COVERAGE_MIN = 0.2
 
 # the cover and front matter, which the record already carries as fields: the
 # document's own version line and version history, its adoption dates, and the
@@ -97,7 +102,15 @@ RE_FRONT_MATTER = re.compile(
 RE_MASTHEAD = re.compile(
     r"\s*(?:[Aa]ntagna|Adopted)\s+\d+\s*$"
     r"|\s*ARTIKEL\s+29-ARBETSGRUPPEN[^\n]*"
-    r"|\s*ARTICLE\s+29\s+DATA\s+PROTECTION\s+WORKING\s+PARTY[^\n]*")
+    r"|\s*ARTICLE\s+29\s+DATA\s+PROTECTION\s+WORKING\s+PARTY[^\n]*"
+    # the same masthead in title case, which one document sets ("ARTICLE 29
+    # Data Protection Working Party"). Case-insensitive but anchored to a line
+    # of its own, and deliberately not extended to the Swedish name: the group
+    # names *itself* in running prose hundreds of times across this corpus
+    # ("... anser artikel 29-arbetsgruppen att ..."), and this pattern removes
+    # to the end of the line, so a case-insensitive unanchored match on that
+    # name would delete body text wholesale.
+    r"|^\s*(?i:ARTICLE\s+29\s+DATA\s+PROTECTION\s+WORKING\s+PARTY)\s*$")
 
 # the WP29 cover. Its *order* is fixed across all seven documents -- the working
 # party's name, a "17/SV" language mark, the WP number, the title, then the
@@ -106,17 +119,24 @@ RE_MASTHEAD = re.compile(
 # on one line ("16/SV WP 242 rev.01") and two run the adoption dates together,
 # so every part is *searched* for rather than matched against a whole line.
 RE_WP_NUMBER = re.compile(r"\bWP\s*(\d{2,3})\s*(?:rev\.?\s*\d+)?\s*$", re.I)
+# the adoption line, in every inflection the translations use. A riktlinje is
+# "antagna" (plural, the guidelines) and a working document "antaget"/"antagen"
+# (singular, the document), and the revision line agrees with it -- "Senast
+# granskade och antagna" beside "Senast reviderat och antaget".
 RE_WP_ADOPTED = re.compile(
-    r"(?:Senast\s+(?:reviderade|granskade)\s+och\s+)?[Aa]ntagna\s+den\s+"
-    r"(\d{1,2})\s+([a-zåäö]+)\s+(\d{4})", re.I)
+    r"(?:Senast\s+(?:reviderad|granskad)(?:e|t)?\s+och\s+)?"
+    r"[Aa]ntag(?:na|en|et)\s+den\s+(\d{1,2})\s+([a-zåäö]+)\s+(\d{4})", re.I)
 RE_WP_ADOPTED_EN = re.compile(
     r"(?:Last\s+[Rr]evised\s+and\s+)?Adopted\s+on\s+"
     r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})")
-# the working party naming *itself* on the cover, between the number and the
-# title. Matched only inside the cover region, where a line that is nothing but
-# the group's name (and any "för …" qualifier) cannot be prose.
-RE_WP29_NAME = re.compile(
-    r"^Artikel\s+29[-‑]arbetsgruppen(?:\s+för\s+[\w\s]+)?$", re.I)
+# the working party naming *itself* between the number and the title. Stripped
+# off the front of the cover region rather than matched as a whole line: most
+# set it on a line of its own ("Artikel 29-arbetsgruppen"), and WP259 runs it
+# straight into the title ("Artikel 29-gruppen Riktlinjer om samtycke …"). No
+# qualifier follows it there -- the "FÖR UPPGIFTSSKYDD" kind belongs to the
+# masthead above the region -- so none is allowed, which is what keeps the
+# strip from eating the title behind it.
+RE_WP29_NAME = re.compile(r"^Artikel\s+29[-‑](?:arbets)?gruppen\s*", re.I)
 # Swedish and English month names, lower-cased. Four spellings coincide
 # (april, september, november, december) and are written once.
 MONTHS = {"januari": 1, "january": 1, "februari": 2, "february": 2,
@@ -191,10 +211,25 @@ def punkt_of(text):
 def join_continuations(blocks):
     """Join a block that continues the previous numbered punkt back onto it.
 
-    Every substantive paragraph in these documents carries a number, so an
-    unnumbered paragraph directly after a numbered one is the tail of it, split
-    by a page break or by the indented run of a list. A heading ends the join --
-    what follows a heading starts something, whatever its numbering."""
+    Where a document numbers its punkter, every substantive paragraph carries a
+    number, so an unnumbered paragraph directly after a numbered one is the tail
+    of it, split by a page break or by the indented run of a list. A heading ends
+    the join -- what follows a heading starts something, whatever its numbering.
+
+    That premise is *tested* rather than assumed, because a minority of these
+    documents number their **sections** "1." and "2." and set plain prose under
+    them. Relied on there it is catastrophic: the section number swallows every
+    paragraph until the next section, and WP 250 arrived as a single
+    46,000-character block, WP 248 as a 33,000-character one. Measured over the
+    corpus the two populations do not overlap -- a section-numbered document
+    numbers at most 9 % of its paragraphs, a punkt-numbered one at least 29 % --
+    so a document below `PUNKT_COVERAGE_MIN` is read as the plain prose it is:
+    nothing is joined, and its numbers anchor nothing, since a number that is
+    not a punkt is not what a citation to a punkt means."""
+    styck = [text for kind, text, _level in blocks if kind == "stycke"]
+    numbered = sum(1 for text in styck if punkt_of(text))
+    if not styck or numbered / len(styck) < PUNKT_COVERAGE_MIN:
+        return [(kind, text, level, None) for kind, text, level in blocks]
     out = []
     for kind, text, level in blocks:
         if (kind == "stycke" and out and out[-1][0] == "stycke"
@@ -205,18 +240,26 @@ def join_continuations(blocks):
     return out
 
 
+def folded(text):
+    """`text` with everything but its letters and digits taken out, for
+    comparing two renderings of the same title -- one off a PDF cover, one off
+    an index page -- which differ freely in punctuation, casing and the spaces
+    a line break leaves behind."""
+    return re.sub(r"[^0-9a-zåäö]+", "", text.lower())
+
+
 def drop_repeated_title(blocks, titel):
     """Drop the cover's copy of the title where the PDF opens with it -- the
     page already carries it as the h1, so the body would open by repeating
     itself. Only *leading* blocks go, so a later heading echoing the title is
     left as the real section it is."""
-    folded = re.sub(r"[^0-9a-zåäö]+", "", titel.lower())
-    while blocks and folded:
-        head = re.sub(r"[^0-9a-zåäö]+", "", blocks[0][1].lower())
+    title = folded(titel)
+    while blocks and title:
+        head = folded(blocks[0][1])
         # a block that folds away entirely is punctuation the cover left behind
         # (two of the 51 open with a bare "."), never content -- step over it
         # and keep looking for the echo it hides
-        if head and (len(head) < TITLE_ECHO_MIN or not folded.startswith(head)):
+        if head and (len(head) < TITLE_ECHO_MIN or not title.startswith(head)):
             break
         blocks = blocks[1:]
     return blocks
@@ -274,14 +317,39 @@ def titled(record, paras):
 # the WP29 cover
 # --------------------------------------------------------------------------
 
-def wp_cover(paras, number):
+def wp_cover(paras, wp):
     """``{titel, antagen}`` off an endorsed WP29 document's own cover.
 
     The title is what stands between the WP number and the adoption dates; the
     date is the *last* of those dates, which is the revision the EDPB endorsed
     ("Antagna den 3 oktober 2017 / Senast granskade och antagna den 6 februari
-    2018")."""
+    2018").
+
+    One of the endorsed documents sets no such cover: the ställningstagande on
+    artikel 30.5 opens with its title in the running text, states no adoption
+    date anywhere and carries no WP number to anchor either of them to. The
+    registry writes both down off the EDPB's own page for it. That document is
+    recognised by having *no number* rather than by having a registry title, so
+    that writing a title into any other entry cannot quietly turn off the
+    identity check below -- which is the whole reason a conversion published by
+    someone other than the issuer can be trusted here (`series.HBDI`). It gets
+    an identity check of its own instead: the opening prose has to state the
+    title the registry claims for it."""
     texts = [normalize_space(p.text) for p in paras]
+    if wp.number is None:
+        # `raise`, not `assert` (rule:errors-drive-retry-use-raise): this is the
+        # one check in this function whose absence would let the parse *succeed*
+        # with the wrong text -- the two below leave `start`/`end` None and die
+        # on the slice either way, so they degrade loudly. Stripped under -O,
+        # this one would file whatever the source served under this URI wearing
+        # the registry's title and date, which is the outcome it exists to stop.
+        if folded(wp.titel) not in folded(" ".join(texts[:COVER_TITLE_BLOCKS + 1])):
+            raise ValueError(
+                "the document filed as %s does not open with the title the "
+                "registry records for it -- the source it is fetched from now "
+                "serves something else" % wp.slug)
+        return {"titel": wp.titel, "antagen": wp.antagen}
+    number = wp.number
     start = next((i for i, t in enumerate(texts)
                   if (m := RE_WP_NUMBER.search(t)) and m.group(1) == number), None)
     assert start is not None, (
@@ -297,8 +365,7 @@ def wp_cover(paras, number):
     dates = RE_WP_ADOPTED.findall(" ".join(texts[end:end + 2])) \
         or RE_WP_ADOPTED_EN.findall(" ".join(texts[end:end + 2]))
     day, month, year = dates[-1]
-    return {"titel": " ".join(t for t in texts[start + 1:end]
-                              if not RE_WP29_NAME.match(t)).strip(),
+    return {"titel": RE_WP29_NAME.sub("", " ".join(texts[start + 1:end])).strip(),
             "antagen": "%s-%02d-%02d" % (year, MONTHS[month.lower()], int(day))}
 
 
@@ -342,14 +409,14 @@ def parse_record(basefile, root):
     assert serie in BY_KOD, "no EDPB series %r" % serie
     record = json.loads(compress.read_text(record_path(root, serie, basefile)))
     paras = _paragraphs(pdf_path(root, basefile), ("edpb", basefile))
-    fields = (wp_cover(paras, record["nummer"]) if serie == "wp"
+    fields = (wp_cover(paras, WP29_BY_SLUG[record["nummer"]]) if serie == "wp"
               else {"titel": titled(record, paras),
                     "antagen": record["antagen"]})
     return Vagledning(
         serie=serie, nummer=record["nummer"], titel=fields["titel"],
         sprak=record["sprak"], antagen=fields["antagen"],
         version=record.get("version"),
-        revision=WP29_BY_NUMBER[record["nummer"]].revision
+        revision=WP29_BY_SLUG[record["nummer"]].revision
         if serie == "wp" else None,
         konsultation_url=record.get("konsultation_url"),
         amnesord=list(record.get("amnesord") or []),

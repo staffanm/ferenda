@@ -26,10 +26,11 @@ from accommodanda.edpb.model import (
 )
 from accommodanda.edpb.series import (
     HARVESTED,
+    HBDI,
     KODER,
     REGISTRY,
     WP29,
-    WP29_BY_NUMBER,
+    WP29_BY_SLUG,
     number_slug,
 )
 from accommodanda.lib import catalog, facets, labels, layout, render
@@ -95,11 +96,37 @@ def test_registry_is_one_entry_per_series():
 
 
 def test_wp29_registry_is_the_closed_endorsed_set():
-    assert len(WP29) == len(WP29_BY_NUMBER) == 7
-    assert sorted(WP29_BY_NUMBER) == ["242", "243", "244", "248", "250", "251",
-                                      "260"]
+    """Endorsement 1/2018 endorsed sixteen artikel 29-gruppen documents, and
+    all sixteen are carried."""
+    assert len(WP29) == len(WP29_BY_SLUG) == 16
+    assert sorted(WP29_BY_SLUG) == [
+        "242", "243", "244", "248", "250", "251", "253", "254", "256", "257",
+        "259", "260", "263", "264", "265", "artikel-30-5"]
     for wp in WP29:
         assert wp.item.isdigit() and wp.page.startswith("https://www.edpb.")
+
+
+def test_the_two_bcr_forms_name_the_copy_they_are_taken_from():
+    """The working party issued the two BCR application forms as Word forms, so
+    every PDF of them is a conversion and none is the newsroom's. Those entries
+    carry the copy explicitly; every other one is resolved through its newsroom
+    item, and must not name a document of its own."""
+    forms = [wp for wp in WP29 if wp.document]
+    assert [wp.slug for wp in forms] == ["264", "265"]
+    for wp in forms:
+        assert wp.document.startswith(HBDI) and wp.document.endswith(".pdf")
+
+
+def test_the_one_endorsed_document_with_no_wp_number_is_named_and_dated_here():
+    """The ställningstagande on artikel 30.5 sets no cover: it opens with its
+    title in the running text and dates itself nowhere, so the registry carries
+    both -- and it is cited by name, having no number to be cited by."""
+    wp = WP29_BY_SLUG["artikel-30-5"]
+    assert wp.number is None and wp.titel and wp.antagen == "2018-04-19"
+    assert vagledning_identifier("wp", "artikel-30-5") == wp.citation
+    # every other one is cited by its number, and states its own title
+    assert vagledning_identifier("wp", "248") == "WP 248"
+    assert not any(wp.titel or wp.antagen for wp in WP29 if wp.number)
 
 
 # --------------------------------------------------------------------------
@@ -152,9 +179,9 @@ def test_page_picks_the_document_in_its_own_language_not_the_summary_beside_it()
 
 
 def test_a_wp29_stub_page_publishes_no_document():
-    """The seven endorsed WP29 pages carry no file at all -- which is how they
-    are told apart from a real document page, and why `wp29_sync` goes to the
-    Commission newsroom instead."""
+    """The endorsed WP29 pages that exist carry no file at all -- which is how
+    they are told apart from a real document page, and why `wp29_sync` goes to
+    the Commission newsroom instead."""
     page = edpb_download.parse_page(
         fixture("wp29-stub-page-sv.html"),
         "https://www.edpb.europa.eu/documents/guideline/data-protection-officer_sv",
@@ -201,11 +228,14 @@ def _zip(names):
 
 
 def test_swedish_member_takes_the_document_and_never_its_annex():
-    # six of the seven run the revision straight on, one spaces it
+    # most run the revision straight on, some space it
     assert edpb_download.swedish_member(
         _zip(["wp243rev01_en.pdf", "wp243rev01_sv.pdf"]), "243")
     assert edpb_download.swedish_member(
         _zip(["wp248 rev.01_sv.pdf"]), "248")
+    # and WP259's archive names Swedish by the *country* code instead
+    assert edpb_download.swedish_member(
+        _zip(["wp259 rev 0.1_DE.pdf", "wp259 rev 0.1_SE.pdf"]), "259")
     # the annex ships in a ZIP of its own whose members are named the same way
     assert edpb_download.swedish_member(
         _zip(["wp242rev01_annex_sv.pdf"]), "242") is None
@@ -229,9 +259,17 @@ def test_swedish_member_takes_the_document_and_never_its_annex():
     # ... and this one names the working party again between the two
     ("cover-wp260-sv.json", "260",
      "Riktlinjer om öppenhet enligt förordning (EU) 2016/679", "2018-04-11"),
+    # a *working document* is antaget/antagen, not antagna: singular through
+    # the adoption line and the revision line both
+    ("cover-wp254-sv.json", "254", "Referensram för adekvat skyddsnivå",
+     "2018-02-06"),
+    # ... and this one runs the working party's name straight into the title
+    # rather than setting it on a line of its own
+    ("cover-wp259-sv.json", "259",
+     "Riktlinjer om samtycke enligt förordning (EU) 2016/679", "2018-04-10"),
 ])
 def test_wp_cover(name, number, titel, antagen):
-    cover = edpb_parse.wp_cover(paras(name), number)
+    cover = edpb_parse.wp_cover(paras(name), WP29_BY_SLUG[number])
     assert cover["titel"] == titel
     # the *last* of the adoption dates: it is the revision the EDPB endorsed
     assert cover["antagen"] == antagen
@@ -241,7 +279,39 @@ def test_wp_cover_rejects_a_document_that_is_not_the_one_expected():
     """A wrong newsroom item in the registry must stop the parse, not file
     another document's text under this number."""
     with pytest.raises(AssertionError, match="serves another document"):
-        edpb_parse.wp_cover(paras("cover-wp248-sv.json"), "250")
+        edpb_parse.wp_cover(paras("cover-wp248-sv.json"), WP29_BY_SLUG["250"])
+
+
+def test_wp_cover_of_the_one_document_that_sets_none_comes_from_the_registry():
+    """The ställningstagande on artikel 30.5 has no cover to read, so its title
+    and date come from the registry -- but the document still has to be the one
+    the registry describes, which it states in its opening prose."""
+    cover = edpb_parse.wp_cover(paras("cover-artikel-30-5-en.json"),
+                                WP29_BY_SLUG["artikel-30-5"])
+    assert cover["titel"].startswith("Position Paper on the derogations")
+    assert cover["antagen"] == "2018-04-19"
+
+
+def test_wp_cover_rejects_an_unnumbered_document_that_is_not_the_one_expected():
+    """The identity check is what makes a registry title safe: without a WP
+    number to match, any PDF the source served would otherwise be filed under
+    that URI carrying the registry's title and date."""
+    # ValueError, not AssertionError: this is the one check here whose absence
+    # would let the parse succeed with the wrong text, so it must survive -O
+    # (rule:errors-drive-retry-use-raise)
+    with pytest.raises(ValueError, match="does not open with the title"):
+        edpb_parse.wp_cover(paras("cover-wp248-sv.json"),
+                            WP29_BY_SLUG["artikel-30-5"])
+
+
+def test_the_identity_check_is_keyed_on_the_missing_number_not_a_present_title():
+    """Regression guard: keying the no-cover branch on `wp.titel` would mean
+    that writing a title into any other entry silently turns off the check that
+    the document is the one the registry names -- which is the whole reason a
+    conversion published by someone other than the issuer is trusted here."""
+    numbered = [wp for wp in WP29 if wp.number]
+    assert numbered and all(wp.titel is None for wp in numbered)
+    assert [wp.slug for wp in WP29 if wp.number is None] == ["artikel-30-5"]
 
 
 # --------------------------------------------------------------------------
@@ -292,6 +362,41 @@ def test_a_continuation_rejoins_the_punkt_it_continues():
         "11. Samtycke innebär varje slag av frivillig, specifik och "
         "informerad viljeyttring."]
     assert blocks[-1][3] is None      # what follows a heading starts something
+
+
+def test_the_masthead_is_matched_in_title_case_but_only_on_its_own_line():
+    """WP 264 sets the running header as "ARTICLE 29 Data Protection Working
+    Party" rather than in caps, which left it standing as the document's first
+    block — and, behind it, the cover's copy of the title that
+    `drop_repeated_title` then never reached.
+
+    The guard rail is the second half. This pattern removes to the end of the
+    line, and the group names *itself* in running prose hundreds of times
+    across the corpus, so matching the name case-insensitively wherever it
+    stands would delete body text wholesale. It is anchored to a line of its
+    own, and the Swedish name is left case-sensitive."""
+    assert edpb_parse.RE_MASTHEAD.search("ARTICLE 29 Data Protection Working Party")
+    assert edpb_parse.RE_MASTHEAD.search("ARTICLE 29 DATA PROTECTION WORKING PARTY")
+    # prose naming the group must survive untouched, in either language
+    for prose in ("I följande underavsnitt ger artikel 29-arbetsgruppen "
+                  "riktlinjer om de kriterier som används i artikel 37.",
+                  "The Article 29 Data Protection Working Party Guidelines on "
+                  "transparency cover transparency in more detail."):
+        assert edpb_parse.RE_MASTHEAD.sub("", prose) == prose
+
+
+def test_a_section_numbered_document_joins_nothing_and_anchors_nothing():
+    """Regression: WP 250 numbered its *sections* "1." and "2." and set plain
+    prose under them, so each section number swallowed every paragraph until the
+    next -- the document arrived as a single 46,000-character block. Below
+    `PUNKT_COVERAGE_MIN` the numbers are section numbers, not punkter."""
+    blocks = edpb_parse.join_continuations(
+        [("stycke", "1. Anmälan till tillsynsmyndigheten", 0),
+         *[("stycke", "Ett stycke som inte är numrerat alls.", 0)
+           for _ in range(9)],
+         ("stycke", "2. Information till den registrerade", 0)])
+    assert len(blocks) == 11                    # nothing was joined
+    assert all(b[3] is None for b in blocks)    # and nothing anchors a punkt
 
 
 def test_body_reads_the_guideline_into_numbered_punkter():
@@ -497,6 +602,30 @@ def test_edpb_browses_under_the_eu_ratt_masthead_entry():
     assert "Riktlinje" in entry[2] and "Rekommendation" in entry[2]
     assert not any(e[0] in ("Vägledning", "Soft law")
                    for e in render.ENV.globals["MAST_NAV"])
+
+
+def test_the_eu_selector_names_the_body_each_group_of_documents_comes_from(
+        tmp_path):
+    """A listing of riktlinjer is the EDPB's, not the union legislator's, and the
+    shared EU-rätt selector has to say so: one labelled group per issuing body,
+    rather than one flat row of document types in which "Riktlinjer" sat beside
+    "Förordningar" with nothing saying who wrote which."""
+    db = str(tmp_path / "catalog.sqlite")
+    paths = []
+    for serie, nummer in (("riktlinjer", "05/2020"),
+                          ("rekommendationer", "01/2020"), ("wp", "248")):
+        path = tmp_path / ("%s.json" % serie)
+        path.write_text(json.dumps(_artifact(serie=serie, nummer=nummer)),
+                        "utf-8")
+        paths.append(path)
+    catalog.rebuild(db, "edpb", paths)
+    con = catalog.connect(db)
+    groups = render._eurlex_axis(con)
+    # eurlex is empty in this catalog, so only the EDPB group is offered -- the
+    # selector is built from what the corpus holds, not from a fixed list
+    assert [axis for axis, _entries in groups] == ["EDPB:s vägledningar"]
+    assert [label for _key, label, _url, _count in groups[0][1]] == [
+        "Riktlinjer", "Rekommendationer", "Artikel 29-gruppens vägledningar"]
 
 
 # --------------------------------------------------------------------------

@@ -33,12 +33,13 @@ pre-consultation first version, and the EDPB's own topic tags.
 
 **The Commission newsroom** (ec.europa.eu/newsroom/article29) is where the
 artikel 29-gruppens own documents actually live. The EDPB pages that endorse
-them are stubs -- see `series.WP29` for what is wrong with them -- so this
-route goes to the newsroom item recorded there, whose page links the English
-PDF beside a ZIP of every language version. The Swedish text is the
-``wp<N>…_sv.pdf`` member of that ZIP (never the ``…_annex_sv.pdf`` one, which
-is a separate annex document), so the ZIP is fetched, the member extracted, and
-only the extracted PDF stored.
+them are stubs where they exist at all -- see `series.WP29` for what is wrong
+with them -- so this route goes to the newsroom item recorded there, whose page
+links the English PDF beside a ZIP of every language version. The Swedish text
+is the ``wp<N>…_sv.pdf`` member of that ZIP (never the ``…_annex_sv.pdf`` one,
+which is a separate annex document), so the ZIP is fetched, the member
+extracted, and only the extracted PDF stored. Not every item carries such a
+ZIP, and the ones that do not are published here in English.
 
 Neither route paginates and both corpora are small and fully enumerable, so the
 JK/ARN idiom applies: one walk per run, fetching what is new or changed, no
@@ -361,17 +362,24 @@ def newsroom_documents(html_text, url):
 
 def swedish_member(data, number):
     """The Swedish PDF inside a newsroom language ZIP: ``wp248 rev.01_sv.pdf``,
-    ``wp250rev01_sv.pdf``. Never the ``…_annex_sv.pdf`` member -- two of the
-    seven ship their annex as a second ZIP whose members are named the same way,
-    and an annex is a document of its own, not this one's text. Returns the
-    member's bytes, or None when the archive holds no Swedish version."""
+    ``wp250rev01_sv.pdf``, ``wp259 rev 0.1_SE.pdf``. Never the
+    ``…_annex_sv.pdf`` member -- two of them ship their annex as a second ZIP
+    whose members are named the same way, and an annex is a document of its
+    own, not this one's text. Returns the member's bytes, or None when the
+    archive holds no Swedish version.
+
+    Two suffixes, because the archive is not consistent about which code names
+    the language: most members carry the language code ``sv``, and WP259's
+    carry the *country* code ``SE`` (its ZIP holds 22 members, one per official
+    language bar English, and ``_SE`` is the only one that can be the Swedish
+    of them). Both are read; nothing else in these archives ends that way."""
     archive = zipfile.ZipFile(io.BytesIO(data))
-    # no word boundary after the number: the revision runs straight on in six of
-    # the seven ("wp243rev01_sv.pdf"), and only WP248 spaces it ("wp248
-    # rev.01_sv.pdf"). What must not follow is another digit.
+    # no word boundary after the number: the revision runs straight on in most
+    # of them ("wp243rev01_sv.pdf"), and only some space it ("wp248 rev.01_
+    # sv.pdf"). What must not follow is another digit.
     name = next((n for n in archive.namelist()
                  if re.match(r"wp\s*%s(?!\d)" % number, n, re.I)
-                 and n.lower().endswith("_sv.pdf")
+                 and n.lower().endswith(("_sv.pdf", "_se.pdf"))
                  and "annex" not in n.lower()), None)
     return archive.read(name) if name else None
 
@@ -379,7 +387,14 @@ def swedish_member(data, number):
 def _wp_document(session, item_url, number, delay):
     """One endorsed WP29 document's text: the Swedish version out of the item's
     language ZIP, else the English PDF the item links directly. Returns
-    ``(language, source url, fetch)``."""
+    ``(language, source url, fetch)``.
+
+    An item offers between one and three downloads and in no fixed order, and
+    what it offers varies: some carry the language ZIP beside the English PDF,
+    some the English PDF alone (WP263 and the position paper), and WP257's
+    language archive is a **7-Zip** file, which is not a ZIP and holds no
+    member this can read -- so that one is published in English like any other
+    document the working party never had translated."""
     links = newsroom_documents(
         request(session, "GET", item_url, timeout=120).text, item_url)
     english = None
@@ -387,6 +402,11 @@ def _wp_document(session, item_url, number, delay):
         data = request(session, "GET", link, timeout=300).content
         time.sleep(delay)
         if data[:2] == b"PK":
+            assert number, (
+                "%s serves a language archive, and the document it holds has "
+                "no WP number to name a member by -- the archive's members "
+                "have to be read before this one can take a version from it"
+                % item_url)
             swedish = swedish_member(data, number)
             if swedish:
                 return "sv", link, lambda swedish=swedish: swedish
@@ -398,19 +418,27 @@ def _wp_document(session, item_url, number, delay):
 
 
 def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """Harvest the seven endorsed artikel 29-gruppen vägledningar.
+    """Harvest the endorsed artikel 29-gruppen vägledningar.
 
-    The record carries no title or adoption date: the EDPB's stub pages state
-    both wrongly (WP250's is titled "Dataskyddsombud", which is WP243's
-    subject), and the newsroom states them in English only. Both are read off
-    the document's own Swedish cover instead -- see `parse.wp_cover` -- which is
-    the same departure `rs` makes for Försäkringskassans serienummer, and for
-    the same reason: the index is not to be trusted about the document where the
-    document speaks for itself."""
+    The record carries no title or adoption date for the documents that state
+    both on their own cover: the EDPB's stub pages state them wrongly (WP250's
+    is titled "Dataskyddsombud", which is WP243's subject), and the newsroom
+    states them in English only. Both are read off the document's own Swedish
+    cover instead -- see `parse.wp_cover` -- which is the same departure `rs`
+    makes for Försäkringskassans serienummer, and for the same reason: the
+    index is not to be trusted about the document where the document speaks for
+    itself. The one document that sets no cover carries both from the registry,
+    where they are written down off the EDPB's own page for it.
+
+    A registry entry carrying its own `document` is fetched straight from there
+    and the newsroom is not consulted at all: the two BCR application forms were
+    published as Word forms, so the only PDFs of them are a tillsynsmyndighets
+    conversions (`series.HBDI`, with what each was verified against recorded
+    beside it)."""
     session = make_session(USER_AGENT)
     pending, held = [], 0
     for wp in WP29:
-        bf = basefile("wp", wp.number)
+        bf = basefile("wp", wp.slug)
         if only and bf != only:
             continue
         # resolving one of these costs the language ZIP -- 10 to 28 MB, since
@@ -421,10 +449,12 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
         if compress.exists(pdf_path(root, bf)) and not full:
             held += 1
             continue
-        lang, document_url, fetch = _wp_document(
-            session, NEWSROOM % wp.item, wp.number, delay)
+        lang, document_url, fetch = (
+            ("en", wp.document, _document_fetcher(session, wp.document))
+            if wp.document else
+            _wp_document(session, NEWSROOM % wp.item, wp.number, delay))
         pending.append(({
-            "basefile": bf, "serie": "wp", "nummer": wp.number,
+            "basefile": bf, "serie": "wp", "nummer": wp.slug,
             "revision": wp.revision, "sprak": lang,
             "source_url": wp.page, "dokument_url": document_url,
             "newsroom_url": NEWSROOM % wp.item,

@@ -1,15 +1,15 @@
 # edpb — known gaps
 
 What this vertical does *not* do, and why, so the next reader does not have to
-re-derive it. Measured against the 51-document corpus harvested 2026-08-01.
+re-derive it. Measured against the 60-document corpus harvested 2026-08-01.
 
 ## Scope: two series plus the endorsed WP29 set
 
 The EDPB publishes ~530 documents across 20 types. This vertical carries three
 series — **riktlinjer** (37 harvested of 46 EDPB pages), **rekommendationer**
-(7) and the closed **artikel 29-gruppens vägledningar** the EDPB endorsed (7) —
-because those are the interpretive layer over a regulation the site already
-holds, and 48 of the 51 exist in Swedish.
+(7) and the closed **artikel 29-gruppens vägledningar** the EDPB endorsed (all
+16) — because those are the interpretive layer over a regulation the site
+already holds, and 52 of the 60 exist in Swedish.
 
 Deliberately not carried:
 
@@ -26,6 +26,72 @@ Deliberately not carried:
 - The **register of final one-stop-shop decisions** (1,333 national decisions,
   Swedish ones included) is a different kind of corpus — national avgöranden,
   not EDPB guidance — and belongs to its own vertical if it is ever taken.
+
+## The endorsed WP29 set, and the two that took a route of their own
+
+Endorsement 1/2018 endorsed **sixteen** artikel 29-gruppen documents (the list
+is on `/endorsed-wp29-guidelines_en` and in the endorsement itself). All sixteen
+are carried, but two of them are not the Commission newsroom's copies, and the
+reason is worth stating because it is the one place this vertical publishes a
+file it did not get from the issuing body.
+
+The two **BCR application forms** — WP 264 (controllers) and WP 265
+(processors) — were published as Word *forms*, not as documents. There is no
+authoritative PDF of either and never was: item 623848 still serves WP 265 as a
+`.doc`, which this vertical cannot read, and item 623850 is worse — its title
+and date are WP 264's, but the file behind its download link is the **WP263
+PDF**, byte-identical to what item 623056 serves, cover and all. So every PDF of
+these two anywhere is somebody's conversion.
+
+Hessens tillsynsmyndighet (HBDI) publishes one of each in its own BCR guidance,
+and those are what is carried. What makes a conversion trustworthy here is not
+the host but what it can be checked against, so each was checked:
+
+- **WP 264** against the Greek tillsynsmyndighets independent conversion
+  (`dpa.gr`, a different Word export three years earlier) — 4,507 words,
+  identical but for line breaking.
+- **WP 265** against the working party's **own Word file** from the newsroom.
+  The PDF even carries that file's author metadata. Comparing the two leaves
+  nothing unaccounted for but 18 footnote markers the two extractors glue to
+  the preceding word differently.
+
+`parse.wp_cover` re-checks on every parse that each file names its own WP
+number, so a mirror that ever starts serving something else fails the parse
+rather than quietly filing the wrong text.
+
+Eight of the sixteen have no EDPB page of their own at all — the endorsement
+page links straight out to the newsroom, or to the later document that replaced
+them — so those are sourced to the endorsement page itself, which is the EDPB's
+own statement that they belong here. Of the eight that do have one, seven are
+the `/documents/guideline/` stubs described above; the eighth is the position
+paper's, which carries no file either but does state its title and date
+correctly, and is where that entry's registry values were read off.
+
+**One of them has no WP number**: the position paper on the artikel 30.5
+derogation from the record-keeping obligation. It also sets no cover — the
+title runs in the opening prose and the document dates itself nowhere — so both
+are written down in `series.WP29` off the EDPB's own page for it, and it is
+addressed and cited by subject (`edpb/wp/artikel-30-5`) rather than by a number
+it does not have.
+
+**Five of the sixteen are English-only** for source reasons rather than
+editorial ones: WP 259's language archive names Swedish by the country code
+(`_SE.pdf`, not `_sv.pdf`) and is read; WP 257's is a **7-Zip** file, which no
+stdlib reader opens, so its Swedish version is unreachable without a new
+dependency for one document. WP 263, the two BCR forms and the position paper
+were never translated.
+
+One further quirk of the HBDI conversions: WP 264 sets the running masthead in
+title case ("ARTICLE 29 Data Protection Working Party") where every other
+document sets it in caps, which left it standing as the document's first block
+and, behind it, the cover's copy of the title that `drop_repeated_title` then
+never reached. `RE_MASTHEAD` matches that casing too — but **anchored to a line
+of its own**, and only for the English name. The pattern removes to the end of
+the line, and the group names itself in running prose hundreds of times across
+this corpus ("… anser artikel 29-arbetsgruppen att …"), so a case-insensitive
+unanchored match on that name would delete body text wholesale. Measured before
+it was written: 230 paragraphs across 32 of the 60 documents would have lost
+text to it.
 
 ## How IMY actually cites this guidance (and the bug that hid it)
 
@@ -146,11 +212,30 @@ two versions are separate documents and a citation pins one of them.
 ## Documents that number no paragraphs
 
 The numbered punkt is the citable unit and becomes the anchor (`#punkt27`).
-Seven documents number nothing at all — Riktlinjer 2/2018, 3/2018, 8/2020,
-6/2020, 03/2022, 02/2025 and WP 251 — and read as plain prose with positional
-ids. That is the source's shape, not a parse failure: the running-sequence rule
-(`parse.numbered_breaks`) is deliberately conservative and finds no numbering
-where the document sets none.
+Many documents number nothing at all — Riktlinjer 2/2018, 3/2018, 8/2020,
+6/2020, 03/2022, 02/2025, most of the WP29 set — and read as plain prose with
+positional ids. That is the source's shape, not a parse failure: the
+running-sequence rule (`parse.numbered_breaks`) is deliberately conservative and
+finds no numbering where the document sets none.
+
+A second population sits between the two and used to be mistaken for the first:
+documents that number their **sections** "1." and "2." and set plain prose under
+them. `join_continuations` assumed every substantive paragraph carried a number,
+so each section number swallowed everything until the next — **WP 250 was a
+single 46,000-character block, WP 248 a 33,000-character one**, and WP 244 and
+Riktlinjer 04/2020 the same in miniature. The premise is now tested before it is
+relied on (`parse.PUNKT_COVERAGE_MIN`): measured over the corpus a
+section-numbered document numbers at most 9 % of its paragraphs and a
+punkt-numbered one at least 29 %, so the two populations are separable with a
+wide margin. Below the threshold nothing is joined and the numbers anchor
+nothing, since a number that is not a punkt is not what a citation to a punkt
+means.
+
+Adjudicated against **the 51 documents that existed before this change**: five
+parse differently — WP 250, WP 248, WP 244, Riktlinjer 04/2020 and
+Rekommendationer 1/2022 — and the other 46 byte-identically. Of the nine
+documents added at the same time, WP 263 has the same shape and would have had
+the same defect.
 
 ## Upstream data errors carried through
 
@@ -171,12 +256,14 @@ where the document sets none.
 
 ## Language
 
-48 documents are published here in Swedish and 3 in English (Riktlinjer
-01/2023, 02/2024 and 02/2025 — the EDPB has issued no Swedish version of
-those). Every one of the seven WP29 documents is Swedish. An English page carries a banner saying so, and the
-citation scan runs the English surface of the engine for it. The WP29 Swedish
-translations live inside 10–28 MB language ZIPs on the Commission newsroom; a
-routine run does not re-resolve them (`--force` does).
+52 documents are published here in Swedish and 8 in English — Riktlinjer
+01/2023, 02/2024 and 02/2025, for which the EDPB has issued no Swedish version,
+and WP 257, WP 263, WP 264, WP 265 and the position paper, whose reasons are
+above. An
+English page carries a banner saying so, and the citation scan runs the English
+surface of the engine for it. The WP29 Swedish translations live inside 10–28 MB
+language ZIPs on the Commission newsroom; a routine run does not re-resolve them
+(`--force` does).
 
 ## Republication basis
 
