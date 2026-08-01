@@ -166,6 +166,7 @@ accommodanda/
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
   rs/       rättsliga-ställningstaganden vertical (6 myndigheter) — agencies·download·model·parse
+  edpb/     EDPB guidance vertical (riktlinjer·rekommendationer·WP29) — series·download·model·parse
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
@@ -3485,6 +3486,119 @@ catalog — each number with its provenance and its status — is
 - Absent from `ARTIFACTS` like `site` and `remisser`: no citation graph, so never
   `relate`d, indexed or dumped. `test/test_stats.py` locks in the scan rules, the
   artifact pruning and the page projection.
+
+### 7m. edpb vertical — Europeiska dataskyddsstyrelsens vägledningar ✅ (first cut)
+
+`accommodanda/edpb/` — the site's first **soft law from outside Sweden**, and
+the interpretive layer over a regulation the corpus already holds. A riktlinje
+binds nobody: the EDPB states, in advance and in general, how the
+tillsynsmyndigheterna are to read the allmänna dataskyddsförordningen, and the
+myndigheter and domstolar applying it are free to read it otherwise. It is
+worth carrying because it is the reading a Swedish reader of the förordning
+will actually meet — 43 of the 138 IMY-beslut in the corpus cite it — and
+because the citation scan puts each document on the rail of the artikel it
+interprets, beside the förordning itself.
+
+51 documents in the first cut: **riktlinjer** (37), **rekommendationer** (7)
+and the closed set of **artikel 29-gruppens vägledningar** the EDPB endorsed on
+25 May 2018 (7: WP 242, 243, 244, 248, 250, 251, 260). 48 are published here in
+Swedish, 3 in English (the EDPB has issued no Swedish version of those).
+
+- **Nav: under EU-rätt, not a new top-level section.** These documents have no
+  CELEX, which is why they are a source of their own rather than an eurlex
+  doctype — but a masthead entry organised by *bindingness* would split the EU
+  corpus in two and put the GDPR and its riktlinjer in different top-level
+  places, which is the one adjacency a reader wants. So the folkrätt pattern:
+  edpb browses under `/eurlex/vagledning/` and shares a "Dokumenttyp" selector
+  with eurlex (`render._eurlex_axis`, the second user of the cross-source
+  selector `generate_browse` already carried for hudoc). Swedish soft law
+  (`rs`, allmänna råd) stays under Myndigheter, by issuer, where it belongs.
+- **Identity is the EDPB's own number** — `edpb/riktlinjer/05-2020`,
+  `edpb/rekommendationer/01-2019`, `edpb/wp/248` — the avg/rs grammar with the
+  series in place of the myndighet. The EDPB pads the löpnummer in some years
+  and not others ("05/2020" beside "1/2018"), so the URI normalises and the
+  citation form keeps what the document wrote.
+- **A closed corpus written down as data.** The EDPB's own pages for the seven
+  endorsed WP29 documents are stubs — five carry no file, one links an
+  unrelated Danish decision, WP250's is titled "Dataskyddsombud" (WP243's
+  subject), and two pages exist for each of WP242 and WP260 — so `series.WP29`
+  records the Commission newsroom item that actually holds each one, and
+  `parse.wp_cover` reads the title and adoption date off the document's own
+  Swedish cover. The Swedish translations live inside 10–28 MB per-language
+  ZIPs; only the extracted PDF is stored, and a routine run does not re-resolve
+  them.
+- **The numbered punkt is the citable unit.** The EDPB numbers every
+  substantive paragraph and sets the number in a column of its own, which the
+  paragraph-gap heuristic cannot see — paragraph 17 of Riktlinjer 05/2020
+  arrived glued to the end of 16. `numbered_breaks` reads the numbers as a
+  *running sequence* and hands them to `page_paragraphs` as forced breaks (the
+  mechanism DV's bitmap paragraph numbers use), so each anchors on its own
+  number and a decision citing "punkt 27 i riktlinjer 05/2020" can land there.
+- **New parse type `VAGLEDNING`** in `lib/lagrum.py`: `Riktlinjer 05/2020`,
+  `riktlinjerna 8/2022`, `riktlinjen 4/2019`, `Rekommendation(er) NN/ÅÅÅÅ`,
+  `WP 243`, `WP248 rev.01`. "WP29" names the group, not a document, and is
+  dropped the way `jk_is_date` drops a diarienummer that is really a date.
+  Added to `ALL_PARSE_TYPES`, so every vertical that links every reference
+  flavour picks these up on its next parse.
+- **`artikel 29-gruppen` is a body, not artikel 29.** Fixed in
+  `LagrumParser.acceptable`: the group is named in every data-protection
+  document written since 1995, and reading it as a reference sent 13 of one
+  guideline's links to artikel 29 in the GDPR — which repealed the directive
+  that established the group and has no such body in it. A corpus-wide fix, not
+  an edpb one.
+- **Version and language are modelled, not decoration.** A riktlinje is
+  adopted, consulted on and re-adopted, and the site republishes these under the
+  EDPB's own reuse terms ("the original meaning or message of the documents is
+  not distorted") — so stating the version is a condition of publishing them,
+  and both it and an English-only document's language ride a banner. The
+  version is also load-bearing for *citations*, which is a stronger claim than
+  the banner: a citation names the version that existed when it was made, and
+  the EDPB renumbers between versions, so resolving one onto the current text
+  lands the reader on a different paragraph. Only current versions are carried
+  today; `edpb/KNOWN-GAPS.md` records that taking the superseded ones needs the
+  URI to be able to name a version (the shape `sfs` has for its lydelser), and
+  sketches a future `ai-final-mapping` that would derive the draft↔adopted
+  paragraph correspondence. The
+  Swedish exceptions in 9 § and 26 a § URL are *not* the basis: both reach
+  svenska myndigheters yttranden and handlingar upprättade hos svenska
+  myndigheter, and the EDPB is neither.
+- **Footnotes were being thrown away, and with them the whole IMY→EDPB
+  graph.** IMY names a vägledning in prose ("Europeiska dataskyddsstyrelsens
+  riktlinjer om samtycke") and grounds it with the number in the note below —
+  and `classify_letterhead` drops every paragraph set below the running size,
+  which is exactly where notes live (body 14pt → notes 11pt, body 17pt → notes
+  9pt). 83 of the 138 IMY-beslut name this guidance, 43 carry its number, and
+  none of those numbers reached the artifact. New
+  `lib.pdftext.letterhead_footnotes` reads the same Para stream a second time
+  and returns what the classifier dropped, minus the furniture that shares the
+  small size; `avg` and `edpb` opt in, every other caller's block stream is
+  untouched. All 43 decisions whose PDF names a number now resolve it. The fix
+  recovers **1,200 citations across 811 notes in 131 avg decisions** (686 to EU
+  acts, 185 to EDPB guidance) plus 2,020 inside the EDPB corpus's own 1,236
+  notes. `dv`'s endnote list was the second user, so its template block moved to
+  `partials/footnotes.html` (rule:second-use-goes-to-lib); a letterhead PDF's
+  notes carry no anchorable inline marker, so they list without a back-link
+  rather than with one that goes nowhere. `rs` opted in with the same three
+  lines (3,996 notes, 4,243 citations).
+- **`footnotes` was not presented body.** `lib/text.BODY_SECTIONS` -- "what the
+  reader sees, the index stores and the link walk reads" -- listed only
+  `structure` and `body`, so even where an artifact *did* carry notes they
+  reached neither the citation graph nor the search index. That had been
+  silently true of `dv`'s endnotes since HD started printing them in 2023.
+  Adding `"footnotes"` took the IMY→EDPB graph from 13 catalogued edges to 219,
+  and from 12 decisions to 43.
+- **Scope of the bug, checked rather than assumed:** `forarbete` never had it
+  (it keeps notes as `"fotnot"`-typed nodes *inside* `structure`, ~31 per
+  document, so they were always in the graph); `foreskrift`, `remisser` and the
+  treaty sources classify on text markers with no size rule at all and drop
+  nothing. The discard was specific to the three letterhead-classified
+  verticals, and all three now keep their notes.
+- Wired end-to-end: `lagen edpb download [serie] [--only …] [--force]`,
+  `lagen edpb parse`, then the shared relate/index/dump/generate. 51 documents,
+  7,510 outbound links, 756 inbound. `test/test_edpb.py` (67 tests) over
+  hermetic fixtures in `test/files/edpb/`; `accommodanda/edpb/KNOWN-GAPS.md`
+  records the scope left out and why a *named* citation surface ("riktlinjer om
+  samtycke", the form IMY uses most) was prototyped and rejected as unsafe.
 
 ### 7b. Vertical scope closed ✅
 
