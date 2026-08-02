@@ -63,13 +63,15 @@
 {%- macro kaprubrik_bare(nid, text) -%}
 <h2{{ id_attr(nid) }} class="kaprubrik">{{ text }}</h2>
 {%- endmacro -%}
-{%- macro kapitel(t, rail_id, head, notice, children) -%}
-<section class="{{ t }}"{{ rail_attr(rail_id) }}>{{ head }}{{ notice }}{{ children }}</section>
+{%- macro kapitel(t, rail_id, head, notice, children, temporal="", upphor="", ikraft="") -%}
+{#- `temporal` is "expired"/"pending" where the variant is out of force at
+    the build date; versions.js re-evaluates it against the reader's clock -#}
+<section class="{{ t }}{% if temporal %} temporal-{{ temporal }}{% endif %}"{% if upphor %} data-upphor="{{ upphor }}"{% endif %}{% if ikraft %} data-ikraft="{{ ikraft }}"{% endif %}{{ rail_attr(rail_id) }}>{{ head }}{{ notice }}{{ children }}</section>
 {%- endmacro -%}
-{%- macro paragraf(nid, rail_id, gutter_label, notice, children) -%}
+{%- macro paragraf(nid, rail_id, gutter_label, notice, children, temporal="", upphor="", ikraft="") -%}
 {#- hanging §-numeral in the gutter; the permalink anchor keeps its own
     pilcrow glyph -#}
-<section class="paragraf"{{ id_attr(nid) }}{{ rail_attr(rail_id) }}><div class="paragraf-gutter"><span class="n">{{ gutter_label }}</span><a class="pilcrow" href="#{{ nid }}" aria-label="Permalänk">¶</a></div><div class="paragraf-body">{{ notice }}{{ children }}</div></section>
+<section class="paragraf{% if temporal %} temporal-{{ temporal }}{% endif %}"{% if upphor %} data-upphor="{{ upphor }}"{% endif %}{% if ikraft %} data-ikraft="{{ ikraft }}"{% endif %}{{ id_attr(nid) }}{{ rail_attr(rail_id) }}><div class="paragraf-gutter"><span class="n">{{ gutter_label }}</span><a class="pilcrow" href="#{{ nid }}" aria-label="Permalänk">¶</a></div><div class="paragraf-body">{{ notice }}{{ children }}</div></section>
 {%- endmacro -%}
 {%- macro generic_section(t, nid, rail_id, inner) -%}
 <section class="{{ t }}"{{ id_attr(nid) }}{{ rail_attr(rail_id) }}>{{ inner }}</section>
@@ -109,8 +111,11 @@
     own permalink anchor (#P{n}), so "punkt 42" is linkable -#}
 <p class="dom-p" id="P{{ n }}"><a class="pnum" href="#P{{ n }}">{{ n }}</a>{{ body }}</p>
 {%- endmacro -%}
-{%- macro dv_instans(anchor, court, inner) -%}
-<section class="instans"><h2 id="{{ anchor }}" class="instans-rubrik">{{ court }}</h2>{{ inner }}</section>
+{%- macro dv_instans(anchor, court, inner, final=true) -%}
+{#- the last instance is the one that settled the case; the courts below
+    it are the record of how it got there, set smaller the way the
+    föredragande's proposal already is (D6) -#}
+<section class="instans{% if not final %} instans-lower{% endif %}"><h2 id="{{ anchor }}" class="instans-rubrik">{{ court }}</h2>{{ inner }}</section>
 {%- endmacro -%}
 {%- macro dv_delmal(ordinal, inner) -%}
 <section class="delmal">{% if ordinal %}<h2 class="delmal-rubrik">{{ ordinal }}</h2>{% endif %}{{ inner }}</section>

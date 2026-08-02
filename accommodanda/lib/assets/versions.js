@@ -1,3 +1,25 @@
+/* A consolidated statute prints an amended provision as two sibling variants,
+   and around the boundary both are on the page. The build stamps which one is
+   out of force, which a nightly rebuild keeps within a day of right; this
+   re-decides it against the reader's own clock, so a page cached past midnight
+   still dims the right half (D1). */
+(function () {
+  var nodes = document.querySelectorAll('[data-upphor],[data-ikraft]');
+  if (!nodes.length) return;
+  var d = new Date();
+  var today = d.getFullYear() + '-' +
+              String(d.getMonth() + 1).padStart(2, '0') + '-' +
+              String(d.getDate()).padStart(2, '0');
+  Array.prototype.forEach.call(nodes, function (el) {
+    var upphor = el.getAttribute('data-upphor');
+    var ikraft = el.getAttribute('data-ikraft');
+    var state = (upphor && upphor <= today) ? 'expired'
+              : (ikraft && ikraft > today) ? 'pending' : '';
+    el.classList.toggle('temporal-expired', state === 'expired');
+    el.classList.toggle('temporal-pending', state === 'pending');
+  });
+})();
+
 /* Client layer for the version history: the "jämför med tidigare lydelse"
    <select> (in the details.lydelser panel on statute + lydelse pages) fetches
    the marked-up diff from /api/v1/document/diff and swaps it into #dokument --

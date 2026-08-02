@@ -21,13 +21,13 @@ from ..lib.page import (
     Toc,
     doc_meta,
     href,
-    human_fragment,
     page_context,
     plain,
     render_runs,
     render_toc,
     swedish_join,
 )
+from ..lib.pinpoint import human_fragment
 
 ENV = tpl.environment("accommodanda.eurlex")
 

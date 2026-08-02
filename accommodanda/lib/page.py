@@ -45,6 +45,7 @@ from . import (
     layout,
 )
 from .catalog import BASE
+from .pinpoint import human_fragment
 from .text import runs_text
 from .tpl import ENV
 from .util import basefile_slug, split_numalpha
@@ -79,6 +80,19 @@ class Site:
     # its rail panel is built; holds only the current document
     caselaw_memo: dict[str, dict[str, list[tuple[tuple, set]]]] = \
         field(default_factory=dict)
+    # {document uri: how many places in the corpus cite it} -- the authority
+    # signal a case-law rail orders by (D4), filled in per rail for the citers
+    # actually on the page and memoized across the pages a worker renders.
+    # Not preloaded: the whole-corpus map is a 13.5M-row pass (~9 s, 209k
+    # entries), which an `only`-scoped one-page render must not pay.
+    inbound_counts: dict[str, int] = field(default_factory=dict)
+    # the build date, as the ISO string `temporal_fields` writes. One per render
+    # pass, beside the `expired` set derived from the same moment -- a paragraf
+    # node must not read the clock, and two nodes of one page must not disagree
+    # about which variant is in force. Defaulted to today rather than "", which
+    # every dated ikraftträdande would sort after, marking the whole corpus
+    # pending: a Site built by hand (a test) must not render a wrong page.
+    today: str = field(default_factory=lambda: date.today().isoformat())
 
     @classmethod
     def from_catalog(cls, con, target_uris=None):
@@ -104,7 +118,18 @@ class Site:
                    commentary, guidance, article_guidance,
                    remiss_feedback, remiss_overall, _fk_index(con, target_uris),
                    _graphics_index(),
-                   catalog.expired_uris(con, date.today().isoformat()))
+                   catalog.expired_uris(con, date.today().isoformat()),
+                   today=date.today().isoformat())
+
+    def load_inbound_counts(self, uris):
+        """Fill `inbound_counts` for `uris` that are not memoized yet. A uri
+        nothing cites is recorded as 0 rather than left absent, so the same page
+        (or the next one this worker renders) does not re-query it."""
+        want = [u for u in dict.fromkeys(uris) if u not in self.inbound_counts]
+        if not want:
+            return
+        found = catalog.inbound_counts_for(self.con, want)
+        self.inbound_counts.update({u: found.get(u, 0) for u in want})
 
     def resolve(self, uri):
         """Fold a begrepp link baked into an artifact onto its canonical concept
@@ -392,32 +417,9 @@ def _external_href(uri):
 
 # a minted fragment id decomposes into K(ap)/§/mom/stycke/punkt/mening segments
 # (the FRAGMENT_LETTERS scheme); render it the way a lawyer would pinpoint it
-FRAG_LABEL = {"K": "kap.", "P": "§", "O": "mom.", "S": "st", "N": "p", "M": "men."}
-_FRAG_SEG = re.compile(r"([KPOSNM])([0-9a-zåäö]+)")
-
-
-def human_fragment(frag):
-    """A fragment id -> a human pinpoint: "K2P16S5" -> "2 kap. 16 § 5 st";
-    "sid39" -> "s. 39"; change markers ("L1988:187") and unknowns -> ""."""
-    if not frag:
-        return ""
-    if frag.startswith("sid"):
-        return "s. " + frag[3:]
-    coe = re.fullmatch(
-        r"A((?:\d+[A-Za-z]?|[IVXLCDM]+)(?:\.\d+)?)(?:-(\d+))?"
-        r"(?:P(\d+)(?:-(\d+))?)?(?:L([a-z])(?:-(\d+))?)?", frag)
-    if coe:
-        parts = ["artikel %s" % coe.group(1)]
-        if coe.group(3):
-            parts.append("punkt %s" % coe.group(3))
-        if coe.group(5):
-            parts.append("led %s" % coe.group(5))
-        instance = coe.group(6) or coe.group(4) or coe.group(2)
-        if instance:
-            parts.append("variant %s" % instance)
-        return " ".join(parts)
-    segs = _FRAG_SEG.findall(frag)
-    return " ".join("%s %s" % (val, FRAG_LABEL[letter]) for letter, val in segs)
+# `human_fragment` is imported from lib/pinpoint above; the transform moved
+# there so the serving layer (lib/pins) can name a provision without importing
+# the renderer. Used below by the citer/rail labelling.
 
 
 def describe_citer(from_uri, anchor, label, title, source):
@@ -609,13 +611,20 @@ class Toc:
     def __init__(self):
         self.entries = []                # (anchor, text, level)
         self._n = 0
+        # how much deeper the headings collected right now sit than their own
+        # `level` says. A DV case is a stack of court instances that each
+        # re-use the same fixed headers, so the instans opens a depth and the
+        # DOMSKÄL/DOMSLUT inside it nest under that court instead of listing
+        # beside it -- flat, the panel read DOMSKÄL three times and DOMSLUT
+        # three times, with no way to tell HD's from tingsrättens (D6).
+        self.depth = 0
 
     def add(self, node_id, text, level):
         if not node_id:
             self._n += 1
             node_id = "sec%d" % self._n
         if text.strip():
-            self.entries.append((node_id, text, level))
+            self.entries.append((node_id, text, level + self.depth))
         return node_id
 
 
@@ -724,6 +733,17 @@ def _inbound_groups(site, uris, exclude_from=(), exclude_before=None,
             # citers trail their dated peers; the label breaks ties so two runs
             # over an unchanged corpus emit the same page.
             items.sort(key=lambda r: (r[5] or "", r[1]), reverse=True)
+        elif slug == "dv":
+            site.load_inbound_counts(r[0] for r in items)
+            # Swedish case law reads most-cited first: how often the corpus
+            # cites a case is the closest computable stand-in for how much it
+            # settles. Alphabetical by name put AD 1998 nr 7 above Fruktkniven
+            # (NJA 2023 s. 560) as the lead case on misshandel -- a labour-court
+            # decision ahead of the HD judgment that drew the line (D4). The
+            # date and label break ties so two runs over an unchanged corpus
+            # emit the same page.
+            items.sort(key=lambda r: (site.inbound_counts.get(r[0], 0),
+                                      r[5] or "", r[1]), reverse=True)
         else:
             items.sort(key=lambda r: (r[2] or r[1] or "").lower())
     groups = [(slug, heading) for slug, heading in INBOUND_GROUPS
@@ -1606,6 +1626,42 @@ def _temporal_notice(node):
     return NODES.temporal_notice(" — ".join(parts))
 
 
+# an ISO date, as `temporal_fields` writes one; anything else is the source's
+# verbatim authorization phrase ("den dag som regeringen bestämmer"), which
+# names no moment and so can never say a variant is out of force
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _iso(node, key):
+    """`node[key]` when it is an ISO date, else '' -- the source's verbatim
+    authorization phrase names no moment, so there is nothing for the client
+    to re-evaluate."""
+    value = node.get(key)
+    return value if isinstance(value, str) and _ISO_DATE.fullmatch(value) else ""
+
+
+def temporal_state(node, today):
+    """Whether a temporal variant is out of force at `today` -- 'expired'
+    (its upphör date has passed), 'pending' (its ikraftträdande date has not
+    arrived), else ''.
+
+    A consolidated statute prints an amended provision as two sibling
+    variants, and around the boundary both are on the page: BrB 3 kap. 6 §
+    stood as "/Upphör att gälla: 2026-08-01/ … lägst fem år" directly above
+    "/Träder i kraft: 2026-08-01/ … lägst sex år", the expired one first and
+    the markers in small grey italics. A reader could not tell which penalty
+    was law today. The state is stamped on the node so both the stylesheet and
+    `versions.js` can dim what is not in force -- server-side against the
+    build date, which a nightly rebuild keeps within a day, then corrected in
+    the browser against the reader's own clock."""
+    upphor, ikraft = _iso(node, "upphor"), _iso(node, "ikrafttrader")
+    if upphor and upphor <= today:
+        return "expired"
+    if ikraft and ikraft > today:
+        return "pending"
+    return ""
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -1721,7 +1777,9 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
             body = kids[1:] if title is not None else kids
         children = "".join(render_node(c, site, doc_uri, toc, rail) for c in body)
         return NODES.kapitel(t, rail_id, head, _temporal_notice(node),
-                              Markup(children))
+                              Markup(children),
+                              temporal_state(node, site.today),
+                              _iso(node, "upphor"), _iso(node, "ikrafttrader"))
 
     if t == "paragraf":
         # hanging §-numeral in the gutter; the first stycke drops its inline number
@@ -1737,7 +1795,10 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return NODES.paragraf(nid or "",
                                nid if nid and nid in rail.data else None,
                                "%s §" % ordinal if ordinal else "§",
-                               _temporal_notice(node), Markup(children))
+                               _temporal_notice(node), Markup(children),
+                               temporal_state(node, site.today),
+                               _iso(node, "upphor"),
+                               _iso(node, "ikrafttrader"))
 
     # a bilaga's notice follows its heading (first child rubrik), matching the
     # source's "Bilaga 1 /Träder i kraft I:.../" heading line

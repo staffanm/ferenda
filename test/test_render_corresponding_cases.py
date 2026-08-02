@@ -2,12 +2,15 @@
 the provision's predecessors (page.corresponding_cases_margin): the
 correspondence chain is walked transitively (2025:400 -> 2001:453 -> 1980:620),
 one section per predecessor provision, headed "Äldre rättsfall för motsvarande
-bestämmelse (<the predecessor, linked>)"."""
+bestämmelse (<the predecessor, linked>)".
+
+The fixtures build a real `page.Site` rather than a duck-typed stand-in: a
+hand-rolled namespace silently goes stale every time the render context gains
+a field, which it did twice while these tests were being written."""
 
 import sqlite3
-from types import SimpleNamespace
 
-from accommodanda.lib import catalog
+from accommodanda.lib import catalog, page
 from accommodanda.lib.page import (
     _inbound_groups,
     _reassigned_before,
@@ -53,8 +56,7 @@ def _site():
     ])
     known = {L + "2025:400", L + "2001:453", L + "1980:620",
              L + "dom/ra/1993:11", L + "dom/nja/1993s679"}
-    return SimpleNamespace(con=con, expired=set(),
-                           has=lambda uri: uri.partition("#")[0] in known)
+    return page.Site(con, known)
 
 
 def test_margin_walks_chain_and_links_predecessor_citation():
@@ -109,7 +111,8 @@ def _rf_site():
     catalog.set_correspondence(con, [
         (L + "1974:152#K4P6", L + "1974:152#K4P4", "betecknas", "helt",
          None, "2011-01-01")])
-    return SimpleNamespace(con=con, expired=set(), has=lambda uri: True)
+    return page.Site(con, {uri for (uri,) in con.execute(
+        "SELECT uri FROM documents")})
 
 
 def test_renumbered_refs_margin_splits_by_date():
@@ -162,7 +165,8 @@ def _chain_site():
         (L + "1974:152#K13P2", L + "1974:152#K13P1", "betecknas", "helt",
          None, "1995-01-01"),
     ])
-    return SimpleNamespace(con=con, expired=set(), has=lambda uri: True)
+    return page.Site(con, {uri for (uri,) in con.execute(
+        "SELECT uri FROM documents")})
 
 
 def test_renumbered_chain_stays_on_lineage():

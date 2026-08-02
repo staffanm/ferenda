@@ -26,7 +26,7 @@ import re
 
 from ..lib import compress, layout
 from ..lib.eu_structure import CASELAW, doctype
-from ..lib.page import human_fragment
+from ..lib.pinpoint import human_fragment
 
 # a trailing "Lag (2011:590)." / "Förordning (2019:12)." provenance marker: the
 # amendment that last touched the node, not part of its rule

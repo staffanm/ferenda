@@ -382,6 +382,12 @@ body.parallel-appendix .gr-main { max-width: 90rem; }
 .betankande { border-left: 2px solid var(--rule); padding-left: 1rem;
               margin: 1rem 0; color: var(--ink-3); }
 .betankande .instans-rubrik { color: var(--ink-3); font-style: italic; }
+/* The last instance settled the case; the courts below it are the record of how
+   it got there. Set smaller, the way the föredragande's proposal above already
+   is -- with every instance at one weight a reader could not tell HD's domskäl
+   from tingsrättens, and the three of each read as one repeated section (D6). */
+.instans-lower { font-size: .92em; color: var(--ink-2); }
+.instans-lower > .instans-rubrik { font-size: 1.35rem; color: var(--ink-2); }
 /* footnotes (HD 2023+): inline superscript markers + the endnote list */
 sup.fnref { font-size: .7em; line-height: 0; }
 sup.fnref a { text-decoration: none; padding: 0 .1em; }
@@ -444,6 +450,21 @@ p.redaktionell { font-family: var(--serif); font-style: italic;
 /* marker row above a pending/expiring table-row variant */
 .temporal-status-rad td { border: 0; padding-bottom: 0; }
 .temporal-status-rad .temporal-status { margin: .25rem 0 0; }
+
+/* A consolidated statute prints an amended provision as two sibling variants,
+   and around the boundary both are on the page -- BrB 3 kap. 6 § stood as
+   "/Upphör att gälla: 2026-08-01/ … lägst fem år" directly above "/Träder i
+   kraft: 2026-08-01/ … lägst sex år", with nothing but a small grey marker to
+   say which was law that day. The variant that is *not* in force takes the
+   marker's own subdued treatment, so the in-force text is the one that reads
+   as the statute (D1). Set from the build date and corrected in the browser by
+   versions.js; the text stays selectable, searchable and linkable -- it is
+   still the law that was, or will be. */
+.temporal-expired > .paragraf-body, .temporal-pending > .paragraf-body,
+section.temporal-expired > :not(.temporal-status),
+section.temporal-pending > :not(.temporal-status) { color: var(--ink-3); }
+.temporal-expired .temporal-status, .temporal-pending .temporal-status {
+    font-weight: 600; }
 
 /* -- Context rail --------------------------------------------------------
    The client (scrollspy.js) fills the column with one .rail-entry per
@@ -719,6 +740,11 @@ dl.browse-list.def dd { align-self: baseline; }
                              margin-top: .1rem; }
 .browse-list .fs-andringar a { color: var(--ink-2); }
 .browse-list .fs-andringar a.subdued { color: var(--ink-3); }
+/* the listed entry is the konsoliderade version; the base text as promulgated
+   is offered from the document page instead of listing beside it (B4) */
+.browse-list .fs-konsoliderad { font-size: .8em; color: var(--ink-3);
+                                font-variant: small-caps; letter-spacing: .03em;
+                                white-space: nowrap; }
 /* the succession note under a samling's heading (F8) */
 .browse-note { margin: -0.5rem 0 1rem; color: var(--ink-3);
                font-family: var(--serif); font-style: italic; font-size: .9rem; }

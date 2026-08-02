@@ -151,3 +151,19 @@ def test_icc_eyebrow_is_the_case_not_the_document():
     lb = labels.document_labels("icc", art)
     assert lb.short_id == "ICC-01/14-01/18"                     # the case, not -403
     assert lb.short_title.startswith("The Prosecutor v.")
+
+
+def test_begrepp_forms_are_all_the_term():
+    # a concept has no identifier apart from its name. Without a handler it fell
+    # to `_generic`, whose id-of-last-resort is the uri tail -- and the
+    # descriptive form is what an inbound rail prints, so a statute's Begrepp
+    # section read "begrepp/Misshandel" (D3).
+    art = {"uri": "https://lagen.nu/begrepp/Misshandel", "title": "Misshandel"}
+    lb = labels.document_labels("begrepp", art)
+    assert lb == ("Misshandel",) * 4
+
+
+def test_begrepp_without_a_title_falls_back_to_the_uri_tail():
+    art = {"uri": "https://lagen.nu/begrepp/Allmän_handling"}
+    assert labels.document_labels("begrepp", art).descriptive_label \
+        == "Allmän_handling"

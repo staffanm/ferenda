@@ -1693,6 +1693,80 @@ def test_document_panel_drops_the_sfs_number_half_of_a_pinpointed_citation(tmp_p
     assert "NJA 2000 s. 1" in _island(sfs_render.render(LAW, site))["P6"]
 
 
+def test_document_panel_drops_a_citer_that_pinpoints_from_another_spot(tmp_path):
+    # R4: the suppression is per citing *document*, not per citing spot. A
+    # proposition that names the act as such in one avsnitt and pinpoints into
+    # it from another has already had its reading of the act shown, in the rail
+    # of the paragraf it pinpoints -- matching only the same spot left
+    # Brottsbalken with 4 899 whole-document citers against 1 804 that really
+    # name the act and nothing inside it.
+    db = tmp_path / "c.sqlite"
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1975:635", "metadata": {},
+        "structure": [{"type": "paragraf", "id": "P6", "text": ["Ränta utgår."]}]}))
+    split = tmp_path / "split.json"
+    split.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2002_s_1", "court": "HDO",
+        "referat": ["NJA 2002 s. 1"], "metadata": {},
+        "structure": [
+            {"type": "stycke", "id": "p1", "text": [
+                "se ", {"predicate": "dcterms:references", "text": "1975:635",
+                        "uri": "https://lagen.nu/1975:635"}, "."]},
+            {"type": "stycke", "id": "p2", "text": [
+                "jfr ", {"predicate": "dcterms:references", "text": "6 §",
+                         "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [split])
+    con = catalog.connect(db)
+    assert catalog.inbound_collapsed(
+        con, ["https://lagen.nu/1975:635"], whole_document=True) == []
+    # still reachable where it actually says something: §6's own rail
+    site = page.Site.from_catalog(con)
+    assert "NJA 2002 s. 1" in _island(sfs_render.render(LAW, site))["P6"]
+
+
+def test_caselaw_rail_leads_with_the_most_cited_case(tmp_path):
+    # D4: alphabetical by name put AD 1998 nr 7 above Fruktkniven as the lead
+    # case on misshandel. How often the corpus cites a case is the closest
+    # computable stand-in for how much it settles, so the rail orders by that.
+    db = tmp_path / "c.sqlite"
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1975:635", "metadata": {},
+        "structure": [{"type": "paragraf", "id": "P6", "text": ["Ränta utgår."]}]}))
+
+    def case(name, uri, extra_refs=()):
+        f = tmp_path / (name + ".json")
+        f.write_text(json.dumps({
+            "uri": uri, "court": "HDO", "referat": [name], "metadata": {},
+            "structure": [{"type": "stycke", "id": "p1", "text": [
+                "se ", {"predicate": "dcterms:references", "text": "6 §",
+                        "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}))
+        return f
+
+    # "AD" sorts first alphabetically; "NJA" is the one the corpus leans on
+    ad = case("AD 1998 nr 7", "https://lagen.nu/dom/ad/1998:7")
+    nja = case("NJA 2011 s. 89", "https://lagen.nu/dom/nja/2011s89")
+    # a third case cites NJA 2011 s. 89, giving it the authority signal
+    citer = tmp_path / "citer.json"
+    citer.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/nja/2020s1", "court": "HDO",
+        "referat": ["NJA 2020 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            "jfr ", {"predicate": "dcterms:references", "text": "NJA 2011 s. 89",
+                     "uri": "https://lagen.nu/dom/nja/2011s89"}, "."]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [ad, nja, citer])
+    con = catalog.connect(db)
+    site = page.Site.from_catalog(con)
+
+    sections = page._inbound_groups(site, ["https://lagen.nu/1975:635#P6"])
+    dv = next(s for s in sections if s.key == "dv")
+    order = re.findall(r"NJA 2011 s. 89|AD 1998 nr 7", str(dv))
+    assert order[0] == "NJA 2011 s. 89"
+
+
 def test_rail_sections_open_the_highest_priority_one_only():
     # C3: one accordion row per kind of context, ranked by RAIL_SECTION_ORDER,
     # and exactly the first present opens -- a rail with a hundred citations
@@ -2912,3 +2986,27 @@ def test_law_level_commentary_is_the_rail_default_panel(tmp_path):
     assert "Lagen reglerar avtalsslutande." in island[""]   # law-level default panel
     assert "Om dokumentet" in island[""]
     assert "Om anbud och accept." in island["P1"]            # per-paragraph still works
+
+
+def test_temporal_state_marks_the_variant_that_is_not_in_force():
+    # D1: around an amendment boundary a consolidated statute prints both
+    # variants. BrB 3 kap. 6 § stood as "/Upphör att gälla: 2026-08-01/ …
+    # lägst fem år" directly above "/Träder i kraft: 2026-08-01/ … lägst sex
+    # år", so a reader could not tell which penalty was law that day.
+    expired = {"upphor": "2026-08-01"}
+    pending = {"ikrafttrader": "2026-08-01"}
+    assert page.temporal_state(expired, "2026-08-02") == "expired"
+    assert page.temporal_state(pending, "2026-07-31") == "pending"
+    # on the day itself the repeal has taken effect and the successor is law
+    assert page.temporal_state(expired, "2026-08-01") == "expired"
+    assert page.temporal_state(pending, "2026-08-01") == ""
+    # before the boundary the outgoing text is still law
+    assert page.temporal_state(expired, "2026-07-31") == ""
+
+
+def test_temporal_state_ignores_an_open_authorization_phrase():
+    # "den dag som regeringen bestämmer" names no moment, so nothing can be
+    # said about whether the variant is in force
+    assert page.temporal_state(
+        {"ikrafttrader": "den dag som regeringen bestämmer"}, "2026-08-02") == ""
+    assert page.temporal_state({}, "2026-08-02") == ""

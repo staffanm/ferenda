@@ -212,6 +212,19 @@ def _generic(art):
 
 
 # --------------------------------------------------------------------------
+# begrepp (concepts)
+# --------------------------------------------------------------------------
+
+def _begrepp(art):
+    # a concept has no identifier separate from its name, so the term is all
+    # four forms. Without this it fell to `_generic`, whose id-of-last-resort is
+    # the uri tail -- and the *descriptive* form is what an inbound rail prints,
+    # so a statute's Begrepp section read "begrepp/Misshandel" (D3).
+    term = art.get("title") or _local(art["uri"]).rpartition("/")[2]
+    return Labels(term, term, term, term)
+
+
+# --------------------------------------------------------------------------
 # forarbete (prop/sou/ds/dir/…)
 # --------------------------------------------------------------------------
 
@@ -373,7 +386,7 @@ _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
              "avg": _avg, "rs": _rs, "edpb": _edpb,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
-             "untc": _untc, "icc": _icc}
+             "untc": _untc, "icc": _icc, "begrepp": _begrepp}
 
 
 def document_labels(source, art):

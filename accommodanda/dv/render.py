@@ -18,6 +18,7 @@ from ..lib.page import (
     footnote_items,
     href,
     page_context,
+    plain,
     render_node,
     render_runs,
     render_toc,
@@ -63,7 +64,7 @@ def _dv_numbered_paragraph(node, site):
 
 
 def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
-             state=None):
+             state=None, courts=frozenset()):
     """Render a DV structure level: court instances and the betänkande/dom split
     become titled sections (the föredragande's proposal muted), domskäl/domslut
     are transparent wrappers whose own `<h2>` leaves carry the section titles,
@@ -72,33 +73,64 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
     block with a page; a button is emitted at every page change)."""
     if state is None:
         state = {"page": None}
+    # every court this record has an instance for. The source ends an
+    # instance by naming the one that heard the appeal next ('Hovrätten över
+    # Skåne och Blekinge' closing the tingsrätt's domslut), which then reads
+    # as a section of the court below it as well as its own heading (D6).
+    courts = courts or frozenset(
+        n["court"] for n in nodes if n.get("type") == "instans" and n.get("court"))
     sib = {n.get("type") for n in nodes}
     out = []
+    # A first instance is often segmented with no court of its own, its name
+    # standing as the plain rubrik just above it ("Malmö tingsrätt"). Rendered
+    # as-is that gave a heading and then a section called "Instans", so the
+    # panel named the court and the court's own section separately (D6). The
+    # rubrik becomes the instans heading and is not emitted twice.
+    # the deciding court is the last *instans*, not the last node: 36 records
+    # end on a delmal instead, and "last node" then marked none of them final,
+    # typesetting the whole judgment -- HD's own domskäl included -- as the
+    # record of how it got there (D6)
+    last_instans = next((n for n in reversed(nodes)
+                         if n.get("type") == "instans"), None)
+    adopted, skip = {}, set()
+    for prev, n in zip(nodes, nodes[1:], strict=False):
+        if (n.get("type") == "instans" and not n.get("court")
+                and prev.get("type") == "rubrik"):
+            adopted[id(n)] = plain(prev.get("text", []))
+            skip.add(id(prev))
     for n in nodes:
         t = n.get("type")
+        if id(n) in skip:
+            continue
         pg = n.get("page")
         if pg and pg != state["page"]:
             state["page"] = pg
             out.append(_dv_page_marker(doc_uri, pg))
         if t == "instans":
-            c = n.get("court") or "Instans"
+            c = n.get("court") or adopted.get(id(n)) or "Instans"
             anchor = toc.add(None, c, 1)
+            # every instance re-uses the same fixed headers, so its own nest
+            # under the court rather than listing beside it (D6)
+            toc.depth += 1
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=n.get("court"), ruling=ruling, state=state)
-            out.append(NODES.dv_instans(anchor, c, Markup(inner)))
+                             court=n.get("court"), ruling=ruling, state=state,
+                             courts=courts)
+            toc.depth -= 1
+            out.append(NODES.dv_instans(anchor, c, Markup(inner),
+                                        final=n is last_instans))
         elif t == "delmal":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling, state=state)
+                             court=court, ruling=ruling, state=state, courts=courts)
             out.append(NODES.dv_delmal(n.get("ordinal"), Markup(inner)))
         elif t in ("betankande", "skiljaktig", "tillagg"):
             label = DV_RULING_HEADING[t]
             anchor = toc.add(None, label, 2)
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling, state=state)
+                             court=court, ruling=ruling, state=state, courts=courts)
             out.append(NODES.dv_ruling(t, anchor, label, Markup(inner)))
         elif t == "dom":
             inner = _dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                             court=court, ruling=ruling, state=state)
+                             court=court, ruling=ruling, state=state, courts=courts)
             # title the court's own ruling only where a betänkande precedes it in
             # the same instance; otherwise the instans heading already names it
             label = anchor = None
@@ -108,7 +140,10 @@ def _dv_walk(nodes, site, doc_uri, toc, rail, court=None, ruling="avgörande",
             out.append(NODES.dv_dom(anchor or "", label, Markup(inner)))
         elif t in ("domskal", "domslut"):                # transparent wrappers
             out.append(_dv_walk(n.get("children", []), site, doc_uri, toc, rail,
-                                court=court, ruling=ruling, state=state))
+                                court=court, ruling=ruling, state=state,
+                                courts=courts))
+        elif t == "rubrik" and plain(n.get("text", [])).strip() in courts:
+            continue                 # names the next instance, which heads it
         elif t == "stycke" and str(n.get("ordinal") or "").isdigit():
             out.append(_dv_numbered_paragraph(n, site))   # hanging-indent, linkable
         else:

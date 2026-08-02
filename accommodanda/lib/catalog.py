@@ -1390,12 +1390,15 @@ def inbound(con, uri, limit=None):
 # yields two link rows from the same spot: the pinpoint (…#K1P18) and the bare SFS
 # number (…/2016:1145). The bare half says nothing the pinpoint does not, and it
 # made the act's whole-document panel read as if half the corpus cited the law as
-# such (S2). Drop a whole-document row whenever the same citing spot also reaches
-# into the document -- that citation is already shown in the target paragraf's rail.
+# such (S2). Drop a whole-document row whenever the citing *document* reaches into
+# the document anywhere -- that document's reading of the act is already shown, in
+# the rail of each paragraf it pinpoints, and matching only the same citing spot
+# still left Brottsbalken with 4 899 whole-document citers where 1 804 name the act
+# and nothing inside it (R4). A less-cited act barely notices: 1999:175 goes from
+# 72 to 59, so the whole-document rail keeps its use where it has one.
 _SUPERSEDED_BY_PINPOINT = (
     " AND NOT EXISTS (SELECT 1 FROM links p WHERE p.from_uri = l.from_uri"
-    " AND p.from_anchor IS l.from_anchor AND p.to_root = l.to_root"
-    " AND p.to_uri <> l.to_uri)")
+    " AND p.to_root = l.to_root AND p.to_uri <> l.to_uri)")
 
 
 def inbound_collapsed(con, uris, exclude_from=(), whole_document=False):
@@ -1485,10 +1488,7 @@ def document_inbound_count(con: sqlite3.Connection, root_uri: str) -> int:
     -- any of its fragments or its bare uri. The 'most-hänvisade' authority
     signal (search ranking, the API's headline count), broader than
     `inbound_count`, which counts one exact uri. Self-citations excluded."""
-    return con.execute(
-        "SELECT COUNT(*) FROM (SELECT 1 FROM links l WHERE l.to_root = ?"
-        + _NOT_SELF + " GROUP BY l.from_uri, l.from_anchor)",
-        (root_uri,)).fetchone()[0]
+    return inbound_counts_for(con, [root_uri]).get(root_uri, 0)
 
 
 def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:
@@ -1499,6 +1499,26 @@ def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:
         "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
         "WHERE 1=1" + _NOT_SELF + " GROUP BY l.to_root, l.from_uri, "
         "l.from_anchor) GROUP BY to_root"))
+
+
+def inbound_counts_for(con: sqlite3.Connection, uris) -> dict[str, int]:
+    """`document_inbound_count` for a named handful of documents -- {uri: count}
+    over exactly `uris`, omitting the ones nothing cites.
+
+    The rail orders its case-law entries by this (D4), and it needs the counts
+    only for the citers on the page in front of it. The whole-corpus
+    `document_inbound_counts` is a 13.5M-row pass costing ~9 s and 209k entries,
+    which is right for the reindex that reads all of it and wrong per render
+    worker -- and wronger still on an `only`-scoped one-page render, which the
+    rest of the render path is careful to keep targeted."""
+    uris = list(uris)
+    if not uris:
+        return {}
+    return dict(con.execute(
+        "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
+        "WHERE l.to_root IN (%s)" % ",".join("?" * len(uris)) + _NOT_SELF
+        + " GROUP BY l.to_root, l.from_uri, l.from_anchor) GROUP BY to_root",
+        uris))
 
 
 def counts(con: sqlite3.Connection) -> dict[str, int]:
