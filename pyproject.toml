@@ -116,8 +116,11 @@ zip-safe = false
 [tool.setuptools.package-data]
 # the Jinja templates (and lib/assets, lib/data) must ship inside the wheel;
 # include-package-data alone only picks up SCM-tracked files when a MANIFEST
-# plugin is present
-"*" = ["templates/*.html", "assets/*", "data/*"]
+# plugin is present. The glob must recurse: lib/templates/partials/*.html never
+# matched the old flat "templates/*.html", so the shared macros shipped only by
+# accident of the sdist.
+"*" = ["templates/*.html", "templates/**/*.html", "assets/*", "assets/**/*",
+       "data/*"]
 
 # --- Linting / type checking ---
 # Scoped to the active accommodanda/ package; the legacy ferenda/ and lagen/
