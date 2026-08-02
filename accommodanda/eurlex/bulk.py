@@ -40,6 +40,7 @@ from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 
 from ..lib import compress
+from ..lib.eu_structure import doctype
 from ..lib.util import status
 from .download import (
     SECTORS,
@@ -48,7 +49,6 @@ from .download import (
     parse_notice,
     write_watermark,
 )
-from .model import doctype
 
 LANG = {"EN": "eng", "SV": "swe"}    # dump language code -> our 3-letter code
 

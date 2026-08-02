@@ -12,10 +12,11 @@ and far lossier than Formex, but citation-scannable and article-anchored.
 import re
 from pathlib import Path
 
+from ..lib.eu_structure import doctype
 from ..lib.pdftext import dehyphenate, flat_lines, ocr_pdf
 from ..lib.util import normalize_space
 from . import lang as L
-from .model import BASE, Block, EurlexDoc, doctype
+from .model import BASE, Block, EurlexDoc
 from .parse_html import eu_date
 
 PARA_GAP = 1.6       # a vertical gap > this * body-line-height starts a paragraph

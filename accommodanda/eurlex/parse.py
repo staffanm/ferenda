@@ -28,6 +28,7 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, eucasenaming, patch
 from ..lib.datasets import NAMEDACTS
+from ..lib.eu_structure import doctype
 from ..lib.lagrum import (
     EULAGSTIFTNING,
     EURATTSFALL,
@@ -38,7 +39,7 @@ from ..lib.lagrum import (
 from ..lib.util import from_roman
 from .correspond import correspondence
 from .definitions import build_matcher, extract_definitions, term_refs
-from .model import BASE, Block, EurlexDoc, doctype, official_short_title, short_label
+from .model import BASE, Block, EurlexDoc, official_short_title, short_label
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
 from .structure import nest

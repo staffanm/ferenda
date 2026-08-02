@@ -24,9 +24,9 @@ getting either wrong silently poisons a whole family of numbers:
 import json
 import re
 
-from ..eurlex.model import CASELAW, doctype
 from ..lib import compress, layout
-from ..lib.render import human_fragment
+from ..lib.eu_structure import CASELAW, doctype
+from ..lib.page import human_fragment
 
 # a trailing "Lag (2011:590)." / "Förordning (2019:12)." provenance marker: the
 # amendment that last touched the node, not part of its rule

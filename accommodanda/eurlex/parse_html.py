@@ -21,9 +21,10 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..lib.eu_structure import CASELAW, doctype
 from ..lib.util import normalize_space
 from . import lang as L
-from .model import BASE, CASELAW, Block, EurlexDoc, doctype, looks_like_act_title
+from .model import BASE, Block, EurlexDoc, looks_like_act_title
 
 # CSS classes (language-neutral) whose text is bibliographic, not body
 HEADER = {"hd-date", "hd-lg", "hd-ti", "hd-oj", "hd-coll", "hd-modifier", "hd-2"}

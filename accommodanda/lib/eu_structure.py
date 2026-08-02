@@ -79,3 +79,36 @@ def anchored_blocks(structure):
                 yield key, b
         elif t == "recital" and (num or "").isdigit():
             yield "recital-%s" % num, b
+
+
+# --------------------------------------------------------------------------
+# CELEX document classification
+# --------------------------------------------------------------------------
+# Read off the CELEX number alone, so anything holding a CELEX can classify a
+# document without the eurlex source: the parser stamps it onto the artifact,
+# the renderer picks the page's kind label from it, and the corpus statistics
+# scan separates acts from case law by it (rule:second-use-goes-to-lib).
+
+def doctype(celex):
+    """The document family from the CELEX sector digit (+ the act/case descriptor).
+    Sector 6 (case law) is split by its two-letter document code -- CJ/TJ/FJ are
+    judgments, CC an Advocate General's opinion (förslag till avgörande), CO/TO an
+    order -- so an opinion is not listed as a judgment (E4)."""
+    if celex.startswith("6"):
+        return {"CC": "opinion", "CV": "opinion", "CP": "opinion",
+                "CO": "order", "TO": "order", "FO": "order"}.get(
+                    celex[5:7], "judgment")
+    if celex.startswith("1"):
+        return "treaty"
+    if celex.startswith("3") and len(celex) > 5:
+        return {"R": "regulation", "L": "directive",
+                "D": "decision"}.get(celex[5], "act")
+    return "act"
+
+
+# the `doctype` values that `doctype` mints for sector 6. A case has no preamble
+# (no visas, no recitals, no enacting terms), so the text-inferring parsers must
+# not look for one -- a judgment quotes an act's "av följande skäl:" in passing,
+# and reading that as the start of a recital list turns its whole reasoning into
+# recitals.
+CASELAW = ("judgment", "opinion", "order")
