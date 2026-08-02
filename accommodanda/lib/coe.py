@@ -95,7 +95,7 @@ def treaty_uri(number):
     return "%sext/coe/%s" % (BASE, treaty_number(number))
 
 
-def article_uri(number, article, paragraph=None, letter=None):
+def _article_uri(number, article, paragraph=None, letter=None):
     return "%s#%s" % (
         treaty_uri(number), article_fragment(article, paragraph, letter)
     )
@@ -115,7 +115,7 @@ def hudoc_article(code):
     number = ECHR_PROTOCOLS.get(protocol) if protocol else "005"
     if number is None:
         return None
-    return article_uri(number, match.group("article"), match.group("paragraph"),
+    return _article_uri(number, match.group("article"), match.group("paragraph"),
                        match.group("letter"))
 
 

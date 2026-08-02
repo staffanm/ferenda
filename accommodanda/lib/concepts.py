@@ -77,7 +77,7 @@ def _base_score(form):
     return (len(form), inflected, form)
 
 
-def canonical_form(forms):
+def _canonical_form(forms):
     """The display/URI form for a group of surface variants: a wiki-authored form
     if the group has one, else the most base-like member."""
     wiki = [f for f in forms if f in _wiki_titles()]
@@ -156,7 +156,7 @@ def cluster(forms):
             # the wiki form, else the most base-like member
             targets = sorted(over["alias"][_norm(m)] for m in sub
                              if _norm(m) in over["alias"])
-            out[_ucfirst(targets[0]) if targets else canonical_form(sub)] = sorted(sub)
+            out[_ucfirst(targets[0]) if targets else _canonical_form(sub)] = sorted(sub)
     return out
 
 

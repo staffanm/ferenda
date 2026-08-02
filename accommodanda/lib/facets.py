@@ -473,7 +473,7 @@ _EU_CORRIGENDUM = re.compile(r"R\(\d+\)$")
 # the per-source facet schemes
 # --------------------------------------------------------------------------
 
-class Level:
+class _Level:
     """One facet axis: how to derive a document's bucket key, how to display and
     slug that key, and how to order the keys."""
 
@@ -502,23 +502,23 @@ def _map_label(mapping):
 
 
 SCHEMES = {
-    "sfs": [Level("Bokstav", _sfs_initial, _by_letter)],
-    "begrepp": [Level("Bokstav", _begrepp_initial, _by_letter)],
+    "sfs": [_Level("Bokstav", _sfs_initial, _by_letter)],
+    "begrepp": [_Level("Bokstav", _begrepp_initial, _by_letter)],
     "foreskrift": [
-        Level("Serie", _fs_series, _fs_order, label=_fs_label),
-        Level("År", _fs_year, _by_year_desc),
+        _Level("Serie", _fs_series, _fs_order, label=_fs_label),
+        _Level("År", _fs_year, _by_year_desc),
     ],
     "avg": [
-        Level("Organ", _avg_org, _curated(["jo", "jk", "arn", "imy", "kkv"]),
+        _Level("Organ", _avg_org, _curated(["jo", "jk", "arn", "imy", "kkv"]),
               label=_map_label({"jo": "Justitieombudsmannen (JO)",
                                 "jk": "Justitiekanslern (JK)",
                                 "arn": "Allmänna reklamationsnämnden (ARN)",
                                 "imy": "Integritetsskyddsmyndigheten (IMY)",
                                 "kkv": "Konkurrensverket (KKV)"})),
-        Level("År", _avg_year, _by_year_desc),
+        _Level("År", _avg_year, _by_year_desc),
     ],
     "rs": [
-        Level("Myndighet", _catalog_kind,
+        _Level("Myndighet", _catalog_kind,
               _curated(["fk", "migr", "kfm", "imy", "fi", "kkv"]),
               label=_map_label({"fk": "Försäkringskassan (FKRS)",
                                 "migr": "Migrationsverket (RS/RK)",
@@ -526,19 +526,19 @@ SCHEMES = {
                                 "imy": "Integritetsskyddsmyndigheten (IMYRS)",
                                 "fi": "Finansinspektionen",
                                 "kkv": "Konkurrensverket"})),
-        Level("År", _rs_year, _by_year_desc),
+        _Level("År", _rs_year, _by_year_desc),
     ],
     "edpb": [
-        Level("Serie", _catalog_kind,
+        _Level("Serie", _catalog_kind,
               _curated(["riktlinjer", "rekommendationer", "wp"]),
               label=_map_label({
                   "riktlinjer": "Riktlinjer",
                   "rekommendationer": "Rekommendationer",
                   "wp": "Artikel 29-gruppens vägledningar"})),
-        Level("År", _edpb_year, _by_year_desc),
+        _Level("År", _edpb_year, _by_year_desc),
     ],
     "hudoc": [
-        Level("Dokumenttyp", _catalog_kind,
+        _Level("Dokumenttyp", _catalog_kind,
               _curated(["judgment", "decision", "communicated-case",
                         "advisory-opinion", "legal-summary", "resolution",
                         "case-law"]),
@@ -548,27 +548,27 @@ SCHEMES = {
                                 "legal-summary": "Rättsfallssammanfattningar",
                                 "resolution": "Resolutioner",
                                 "case-law": "Övrig praxis"})),
-        Level("År", _dated_year, _by_year_desc),
+        _Level("År", _dated_year, _by_year_desc),
     ],
     "coe": [
-        Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
+        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
               label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll"})),
-        Level("År", _dated_year, _by_year_desc),
+        _Level("År", _dated_year, _by_year_desc),
     ],
     "icrc": [
-        Level("Typ", _catalog_kind,
+        _Level("Typ", _catalog_kind,
               _curated(["treaty", "protocol", "declaration"]),
               label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll",
                                 "declaration": "Deklarationer"})),
-        Level("År", _dated_year, _by_year_desc),
+        _Level("År", _dated_year, _by_year_desc),
     ],
     "untc": [
-        Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
+        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
               label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll"})),
-        Level("År", _dated_year, _by_year_desc),
+        _Level("År", _dated_year, _by_year_desc),
     ],
     "icc": [
-        Level("Typ", _catalog_kind,
+        _Level("Typ", _catalog_kind,
               _curated(["judgment", "sentence", "confirmation", "arrest-warrant",
                         "appeal-judgment", "appeal-interlocutory",
                         "appeal-reparations", "reparations", "investigation",
@@ -584,34 +584,34 @@ SCHEMES = {
                                 "admissibility": "Tillåtlighet",
                                 "prosecutor-review": "Åklagaromprövning",
                                 "sentence-review": "Straffomprövning"})),
-        Level("År", _dated_year, _by_year_desc),
+        _Level("År", _dated_year, _by_year_desc),
     ],
     "dv": [
-        Level("Domstol", _dv_court, _curated(list(DV_COURTS)),
+        _Level("Domstol", _dv_court, _curated(list(DV_COURTS)),
               label=_map_label(DV_COURTS)),
-        Level("År", _dv_year, _by_year_desc),
+        _Level("År", _dv_year, _by_year_desc),
     ],
     "forarbete": [
-        Level("Typ", _fa_type,
+        _Level("Typ", _fa_type,
               _curated(["prop", "sou", "ds", "dir", "skr", "lr", "fm", "so"]),
               label=_map_label({"prop": "Propositioner", "sou": "SOU", "ds": "Ds",
                                 "dir": "Kommittédirektiv", "skr": "Skrivelser",
                                 "lr": "Lagrådsremisser", "fm": "Förordningsmotiv",
                                 "so": "Internationella överenskommelser"})),
-        Level("År", _fa_year, _by_year_desc),
+        _Level("År", _fa_year, _by_year_desc),
     ],
     "eurlex": [
         # Fördrag (the constitutional texts) lead, then the legislative acts,
         # then case law -- the reader's mental order (E1). Fördrag are grouped
         # by treaty family (not year) at the second axis; see _eu_second.
-        Level("Typ", _eu_kind,
+        _Level("Typ", _eu_kind,
               _curated(["treaty", "directive", "regulation", "decision",
                         "judgment", "opinion", "act"]),
               label=_map_label({"regulation": "Förordningar", "directive": "Direktiv",
                                 "decision": "Beslut", "judgment": "Avgöranden",
                                 "opinion": "Generaladvokatens förslag",
                                 "treaty": "Fördrag", "act": "Övriga rättsakter"})),
-        Level("År", _eu_second, _eu_second_order, label=_eu_second_label),
+        _Level("År", _eu_second, _eu_second_order, label=_eu_second_label),
     ],
 }
 
@@ -646,14 +646,14 @@ def document_year(source, row):
     return None
 
 
-def is_browsable(source, local):
+def _is_browsable(source, local):
     """Whether a document belongs in the browse at all -- an EU corrigendum
     corrects an act rather than being one, so it is omitted (still reachable via
     search and the citations that point at it)."""
     return not (source == "eurlex" and _EU_CORRIGENDUM.search(local))
 
 
-def browse_label(row):
+def _browse_label(row):
     """The handle shown for a document in a listing -- the same reader-facing
     heading the page and search hits use (catalog.display_title, stamped onto the
     `display` column at relate): an act's short name + acronym where it has them,
@@ -663,7 +663,7 @@ def browse_label(row):
     return row.display or row.label or row.local
 
 
-def browse_doc(source, row, repealed=frozenset()):
+def _browse_doc(source, row, repealed=frozenset()):
     """A leaf-bucket document entry for the browse model. Every source carries
     `uri`/`url`/`display`; a statute additionally carries the split title
     (`pre` subdued + `key` emphasised), whether it is primary law (`subdued`
@@ -672,7 +672,7 @@ def browse_doc(source, row, repealed=frozenset()):
     rpubl:upphaver targets) stays listed -- point-in-time law determination
     needs it findable -- but subdued, so it never reads as in force."""
     doc = {"uri": row.uri, "url": layout.page_url(row.uri),
-           "display": browse_label(row),
+           "display": _browse_label(row),
            "short_id": row.short_id or row.label,
            "short_title": row.short_title, "description": row.description}
     if source == "sfs":
@@ -727,7 +727,7 @@ def _rows(con, source):
                 short_id, short_title, description
             in catalog.facet_documents(con, source)
             for local in (catalog.local(uri),)          # bind once, reuse below
-            if uri not in expired and is_browsable(source, local)]
+            if uri not in expired and _is_browsable(source, local)]
     if source == "eurlex":
         rows = _keep_latest_eu_revision(rows)
         rows = _drop_opinions_with_judgment(rows)
@@ -898,9 +898,9 @@ def browse_view(con, source):
     view = tree(con, source, grouped)
 
     def entry(r):
-        doc = browse_doc(source, r, repealed)
+        doc = _browse_doc(source, r, repealed)
         if r.uri in nested:
-            doc["amendments"] = [browse_doc(source, a, repealed)
+            doc["amendments"] = [_browse_doc(source, a, repealed)
                                  for a in nested[r.uri]]
         return doc
 

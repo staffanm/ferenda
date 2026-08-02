@@ -44,7 +44,7 @@ BY_SOURCE = {dataset.source: dataset for dataset in DATASETS}
 
 
 @dataclass(frozen=True)
-class Entry:
+class _Entry:
     uri: str
     url: str
     title: str
@@ -153,7 +153,7 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
                    or art.get("metadata", {}).get("sammanfattning") or title)
         if not isinstance(summary, str):
             summary = title
-        out.append(Entry(row[0], BASE + layout.page_url(row[0]), title,
+        out.append(_Entry(row[0], BASE + layout.page_url(row[0]), title,
                          published, updated, summary))
         if len(out) == limit:
             break

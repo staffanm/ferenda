@@ -292,7 +292,7 @@ _NON_TERMINAL = {"bl.a", "ca", "dnr", "dvs", "e.d", "etc", "fr.o.m", "jfr",
                  "t.ex", "t.o.m"}
 
 
-def first_sentence(text):
+def _first_sentence(text):
     """The first sentence of a prose passage, Swedish-abbreviation-aware: a
     full stop after 's.k.', an initial ('J.A.'), 'kap.' or a bare number does
     not end the sentence. The whole text when no boundary is found. Used
@@ -317,7 +317,7 @@ def _avg(art):
     ident = art.get("identifier") or _local(art["uri"])
     title = md.get("title") or ""
     if art.get("org") == "arn" and title:
-        title = first_sentence(title)
+        title = _first_sentence(title)
     return Labels(ident, title, md.get("title") or ident,
                   md.get("officialReport") or ident)
 

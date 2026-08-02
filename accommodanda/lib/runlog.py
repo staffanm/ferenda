@@ -50,14 +50,14 @@ def make_run_id(pid, dt=None):
 # runs.ndjson -- writers
 # --------------------------------------------------------------------------
 
-def append_event(path, obj):
+def _append_event(path, obj):
     """Append one JSON line to the run ledger. The mechanics are
     `util.append_json_line`, shared with the served-site error ledger."""
     append_json_line(path, obj)
 
 
 def emit_run_start(path, run, argv, pid, t=None):
-    append_event(path, {"event": "run-start", "run": run, "t": t or now_iso(),
+    _append_event(path, {"event": "run-start", "run": run, "t": t or now_iso(),
                         "argv": list(argv), "pid": pid})
 
 
@@ -66,7 +66,7 @@ def emit_segment(path, run, step, source, secs, *, total=None, ran=None,
                  t=None):
     """One (step, source) execution -- including watermark-skipped steps
     (`status="skipped"`, secs≈0) so a run detail shows the whole pipeline."""
-    append_event(path, {
+    _append_event(path, {
         "event": "segment", "run": run, "t": t or now_iso(), "step": step,
         "source": source, "secs": secs, "total": total, "ran": ran,
         "errors": errors, "skipped_fresh": skipped_fresh, "skipdoc": skipdoc,
@@ -74,7 +74,7 @@ def emit_segment(path, run, step, source, secs, *, total=None, ran=None,
 
 
 def emit_run_end(path, run, secs, ok, errors, t=None):
-    append_event(path, {"event": "run-end", "run": run, "t": t or now_iso(),
+    _append_event(path, {"event": "run-end", "run": run, "t": t or now_iso(),
                         "secs": secs, "ok": ok, "errors": errors})
 
 

@@ -106,7 +106,7 @@ def guard(p, force=False):
             "re-review." % p)
 
 
-def input_hash(data):
+def _input_hash(data):
     """The hash a layer records for one input (sha256 hex of its bytes)."""
     return hashlib.sha256(data).hexdigest()
 
@@ -115,7 +115,7 @@ def artifact_input(source, basefile):
     """One ``inputs`` entry for a parsed artifact the LLM read:
     ``{"artifact:<source>/<basefile>": <hash>}`` -- self-describing, so
     `drifted` can recompute it later without per-source knowledge."""
-    return {"artifact:%s/%s" % (source, basefile): input_hash(
+    return {"artifact:%s/%s" % (source, basefile): _input_hash(
         compress.read_bytes(layout.artifact(source, basefile)))}
 
 
@@ -124,7 +124,7 @@ def download_input(relpath):
     (the prop PDFs sfs table-correspond extracts its tables from -- often a
     bilaga volume the artifact parse never covers, so the artifact hash alone
     would miss their drift), keyed by its DOWNLOADED-relative path."""
-    return {"download:%s" % relpath: input_hash(
+    return {"download:%s" % relpath: _input_hash(
         compress.read_bytes(layout.DOWNLOADED / relpath))}
 
 
@@ -133,7 +133,7 @@ def wiki_input(p, wiki_root):
     kommentar markdown with its `guidance:` frontmatter), keyed by its
     WIKI_ROOT-relative path."""
     p = Path(p)
-    return {"wiki:%s" % p.relative_to(wiki_root): input_hash(p.read_bytes())}
+    return {"wiki:%s" % p.relative_to(wiki_root): _input_hash(p.read_bytes())}
 
 
 def _current_hash(label):
@@ -143,13 +143,13 @@ def _current_hash(label):
     if kind == "artifact":
         source, _, basefile = rest.partition("/")
         p = layout.artifact(source, basefile)
-        return input_hash(compress.read_bytes(p)) if compress.exists(p) else None
+        return _input_hash(compress.read_bytes(p)) if compress.exists(p) else None
     if kind == "download":
         p = layout.DOWNLOADED / rest
-        return input_hash(compress.read_bytes(p)) if compress.exists(p) else None
+        return _input_hash(compress.read_bytes(p)) if compress.exists(p) else None
     if kind == "wiki":
         p = config.WIKI_ROOT / rest
-        return input_hash(p.read_bytes()) if p.exists() else None
+        return _input_hash(p.read_bytes()) if p.exists() else None
     raise ValueError("unknown input label %r" % label)
 
 

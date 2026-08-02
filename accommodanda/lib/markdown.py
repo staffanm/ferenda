@@ -249,7 +249,7 @@ def target_uri(target):
 GUIDANCE_HEADING = "Externa länkar"
 
 
-def guidance_item(line):
+def _guidance_item(line):
     """A `- [label](href) — note` bullet -> `{label, href, note?}`, or None when
     the line is not a guidance bullet. A recognised link target is required
     (external url or lagen.nu-absolute); the trailing note after the em-dash is
@@ -288,7 +288,7 @@ def guidance_sections(body):
             i += 1
             items = []
             while i < n and not RE_HEADING.match(lines[i].strip()):
-                item = guidance_item(lines[i])
+                item = _guidance_item(lines[i])
                 if item:
                     items.append(item)
                 i += 1

@@ -39,7 +39,7 @@ class PatchConflictError(Exception):
     pass
 
 
-class LineEnumerator(object):
+class _LineEnumerator(object):
 
     def __init__(self, lines):
         self.lines_enum = enumerate(lines, start=1)
@@ -163,7 +163,7 @@ class Patch(object):
         :type lines: generator
         :raises: :class:`PatchConflictError`
         """
-        lines_enumerator = LineEnumerator(lines)
+        lines_enumerator = _LineEnumerator(lines)
         for hunk in self.hunks:
             while lines_enumerator.line_no < hunk.source_range[0] - 1:
                 yield lines_enumerator.next()

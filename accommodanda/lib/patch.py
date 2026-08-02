@@ -172,7 +172,7 @@ def create_patch(source, basefile, original, edited, description="", rot13=False
     unambiguous."""
     content = make_patch_text(original, edited, description)
     if not content:
-        remove_patch(source, basefile)
+        _remove_patch(source, basefile)
         return None
     suffix = ROT13_SUFFIX if rot13 else PLAIN_SUFFIX
     path = layout.patch(source, basefile, suffix)
@@ -188,7 +188,7 @@ def create_patch(source, basefile, original, edited, description="", rot13=False
     return path
 
 
-def remove_patch(source, basefile):
+def _remove_patch(source, basefile):
     """Delete any patch (plain, rot13 and the ``.desc`` sidecar) for a document;
     return the list of paths removed."""
     removed = []

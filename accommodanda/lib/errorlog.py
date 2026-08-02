@@ -38,7 +38,7 @@ FIELDS = ("id", "time", "status", "method", "url", "client", "referer",
           "user_agent", "detail", "exc_type", "exc_message", "traceback")
 
 
-def new_id():
+def _new_id():
     """A fresh error id: 8 hex chars, short enough to read over the phone.
 
     Not a uuid: this identifies one entry in one site's ledger, so it needs to
@@ -66,7 +66,7 @@ def record(path, status, *, method=None, url=None, client=None, referer=None,
     `exc` is the live exception for a 500; its type, message and traceback tail
     are kept. A 404 has none -- what matters there is the url and the referer
     that pointed at it, which is how a dead internal link is found."""
-    rec = {"id": new_id(), "time": now_iso(t), "status": status,
+    rec = {"id": _new_id(), "time": now_iso(t), "status": status,
            "method": method, "url": url, "client": client, "referer": referer,
            "user_agent": user_agent, "detail": detail,
            "exc_type": type(exc).__name__ if exc is not None else None,

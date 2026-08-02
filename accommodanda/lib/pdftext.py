@@ -808,7 +808,7 @@ MAX_HEADING_LEVEL = 4
 RE_SUSPENDED_HYPHEN = re.compile(r"-\s*,.*-$")
 
 
-def modal_size(paras):
+def _modal_size(paras):
     """The running-text font size: the commonest size among the non-bold
     paragraphs. It is the yardstick everything else in a letterhead document is
     read against -- smaller is a footnote or the masthead, bold-and-larger is a
@@ -838,7 +838,7 @@ def heading_levels(paras, body, by_size=False):
                   reverse=True)
 
 
-def join_heading(head, tail):
+def _join_heading(head, tail):
     """Rejoin the next line of a heading broken across lines. A trailing hyphen
     is kept -- see :data:`RE_SUSPENDED_HYPHEN` -- and closes up against the line
     that continues the term, except where it is the suspended hyphen of a
@@ -864,7 +864,7 @@ def classify_letterhead(paras, margin, masthead, by_size=False):
     larger than the body -- see :func:`heading_levels`), and consecutive headings
     of one level are one heading, which is how a title set across three lines
     arrives."""
-    body = modal_size(paras)
+    body = _modal_size(paras)
     levels = heading_levels(paras, body, by_size)
     blocks = []
     for p in paras:
@@ -881,7 +881,7 @@ def classify_letterhead(paras, margin, masthead, by_size=False):
             continue
         level = min(levels.index(p.size) + 1, MAX_HEADING_LEVEL)
         if blocks and blocks[-1][0] == "rubrik" and blocks[-1][2] == level:
-            blocks[-1] = ("rubrik", join_heading(blocks[-1][1], text), level)
+            blocks[-1] = ("rubrik", _join_heading(blocks[-1][1], text), level)
         else:
             blocks.append(("rubrik", text, level))
     return blocks
@@ -927,7 +927,7 @@ def letterhead_footnotes(paras, margin, masthead):
 
     Additive on purpose: the block stream every caller already consumes is
     unchanged, so a vertical opts into footnotes by calling this as well."""
-    body = modal_size(paras)
+    body = _modal_size(paras)
     notes = []
     for p in paras:
         if not (body and p.size and p.size < body):
