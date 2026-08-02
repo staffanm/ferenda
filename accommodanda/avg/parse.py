@@ -40,13 +40,7 @@ import re
 from bs4 import BeautifulSoup
 
 from ..lib import compress, patch, poi
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from ..lib.lagrum import (
-    ALL_PARSE_TYPES,
-    LagrumParser,
-    load_abbreviations,
-    load_namedlaws,
-)
+from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
     classify_letterhead,
     letterhead_footnotes,
@@ -124,21 +118,6 @@ RE_KKV_NOT_HEADING = re.compile(r"\d|^[-–•]|[.:;,!?]$")
 KKV_PROSE_MIN = 40
 RE_KKV_HTML_NOISE = re.compile(r"^\d+\s*\(\s*\d+\s*\)$|^Dnr\b|^_{3,}$"
                                r"|^Sid(?:a)? \d+")
-
-
-@functools.cache
-def _refparser():
-    return LagrumParser(load_namedlaws(SFS_NAMEDLAWS), basefile="avg",
-                        abbreviations=load_abbreviations(SFS_NAMEDLAWS),
-                        parse_types=AVG_PARSE_TYPES)
-
-
-def _fresh_parser():
-    """The shared parser with document-lifetime state reset (so one decision's
-    'samma lag' / learned law names do not bleed into the next)."""
-    parser = _refparser()
-    parser.reset()
-    return parser
 
 
 def _norm(s):
@@ -707,4 +686,4 @@ def parse_record(basefile, root):
         beslut = parse_kkv(record, root, patch_key)
     else:
         beslut = parse_arn(record, root, patch_key)
-    return beslut.to_artifact(_fresh_parser())
+    return beslut.to_artifact(sfs_parser("avg", AVG_PARSE_TYPES))

@@ -10,12 +10,14 @@ from accommodanda.lib.pdftext import Para
 from accommodanda.lib.text import node_text
 from accommodanda.foreskrift import structure
 from accommodanda.foreskrift import parse as fp
-from accommodanda.foreskrift.parse import (classify, extract_metadata, _iso,
+from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
+                                           extract_metadata, _iso,
                                            _body_start, _dedupe_bemyndigande,
-                                           konsoliderad_tom, _fresh_parser,
-                                           amendment_uri, andrar_target,
+                                           konsoliderad_tom, amendment_uri,
+                                           andrar_target,
                                            masthead_amendments, parse_record,
                                            clean_title, title_from_body)
+from accommodanda.lib.lagrum import sfs_parser
 
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------
@@ -155,7 +157,7 @@ def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
             "förordningen (2013:587) om förvaltare av alternativa investeringsfonder. "
             "Jfr Europaparlamentets och rådets direktiv 2011/61/EU av den 8 juni 2011. "
             "Denna författning träder i kraft den 22 juli 2013.")
-    meta = extract_metadata(text, _fresh_parser())
+    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["beslutsdatum"] == "2013-06-25"
     assert meta["utkomFranTryck"] == "2013-07-05"
     assert meta["ikrafttradandedatum"] == "2013-07-22"
@@ -174,7 +176,7 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
             "1. Dessa föreskrifter träder i kraft den 1 mars 2022. "
             "2. Genom föreskrifterna upphävs Säkerhetspolisens föreskrifter "
             "om säkerhetsskydd (PMFS 2019:2).")
-    meta = extract_metadata(text, _fresh_parser())
+    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
 
 
@@ -184,7 +186,7 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
     text = ("Åklagarmyndighetens föreskrifter om expediering; "
             "Föreskrifterna ersätter Åklagarmyndighetens föreskrifter "
             "(ÅFS 2005:6) om expediering.")
-    meta = extract_metadata(text, _fresh_parser())
+    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
 
 
@@ -391,7 +393,7 @@ KONSOLIDERING_HTML = Path(__file__).parent / "files/foreskrift/konsolidering.htm
 
 def test_parse_consolidation_html_builds_statute_tree_and_cutoff():
     struct, tom, refs = fp.parse_consolidation_html(KONSOLIDERING_HTML,
-                                                    _fresh_parser())
+                                                    sfs_parser("foreskrift", PARSE_TYPES))
     # the cutoff is the numerically latest ref on the "Ändrad:" line, minted
     # under its own samling (HSLF-FS beats SOSFS 2013:6: the series transition)
     assert tom == "https://lagen.nu/hslffs/2017:27"

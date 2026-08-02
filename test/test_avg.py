@@ -16,6 +16,7 @@ from accommodanda.lib import catalog, compress, facets, layout
 from accommodanda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from accommodanda.lib.pdftext import Para
 from accommodanda.lib.util import document_extension, record_path, write_atomic
+from accommodanda.lib.lagrum import sfs_parser
 
 ARN_FIXTURES = Path(__file__).parent / "files" / "avg" / "arn"
 
@@ -112,7 +113,7 @@ def test_parse_jk_artifact():
               "title": "Kritik mot Arbetsförmedlingen",
               "url": "https://www.jk.se/beslut-och-yttranden/2026/06/20252328/"}
     art = avg_parse.parse_jk(record, JK_LANDING).to_artifact(
-        avg_parse._fresh_parser())
+        sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["uri"] == "https://lagen.nu/avg/jk/2025/2328"
     assert art["identifier"] == "JK 2025/2328"
     assert art["metadata"]["beslutsdatum"] == "2026-06-25"
@@ -172,7 +173,7 @@ def test_parse_jo_pdf_text_fallback(tmp_path):
     assert beslut.sammanfattning == "Kriminalvårdspersonal har lyssnat."
     assert beslut.nyckelord == ["Avlyssning"]
     assert [b.kind for b in beslut.body] == ["stycke"]
-    art = beslut.to_artifact(avg_parse._fresh_parser())
+    art = beslut.to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     runs = [r for b in art["structure"] for r in b["text"] if isinstance(r, dict)]
     assert any(r["uri"] == "https://lagen.nu/1974:152#K2P6" for r in runs)
 
@@ -184,7 +185,7 @@ def test_jo_multi_dnr():
     beslut = Beslut(org="jo", diarienummer=["6356-2012", "6488-2012"],
                     titel="x", body=[Block("stycke", "text")])
     assert beslut.uri == "https://lagen.nu/avg/jo/6356-2012"
-    art = beslut.to_artifact(avg_parse._fresh_parser())
+    art = beslut.to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["metadata"]["diarienummer"] == ["6356-2012", "6488-2012"]
 
 
@@ -279,7 +280,7 @@ def test_classify_arn_and_citation_scan():
     beslut = Beslut(org="arn", diarienummer=["1992-3657"],
                     titel="Fråga om återbetalning", beslutsdatum="1992-11-12",
                     nyckelord=["Resor"], body=blocks)
-    art = beslut.to_artifact(avg_parse._fresh_parser())
+    art = beslut.to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["uri"] == "https://lagen.nu/avg/arn/1992-3657"
     assert art["identifier"] == "ARN 1992-3657"
     assert art["org"] == "arn"
@@ -367,7 +368,7 @@ def test_parse_jo_grafts_official_report_from_the_map(tmp_path):
               "resolve_date": "1990-06-28", "pdf_text": "Beslutets text."}
     beslut = avg_parse.parse_jo(record, tmp_path)      # no PDF: text fallback
     assert beslut.official_report == "JO 1990/91 s. 70"
-    art = beslut.to_artifact(avg_parse._fresh_parser())
+    art = beslut.to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["metadata"]["officialReport"] == "JO 1990/91 s. 70"
     # a dnr the map does not know stays clean
     other = avg_parse.parse_jo({"diary_number": "1-2001",
@@ -438,7 +439,7 @@ def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
             "avdelning": "Motor", "title": "Frågan gällde om ett bilköp.",
             "source_url": ("https://www.arn.se/globalassets/extern/pdfer/"
                            "referat-2026/arendereferat-2026-00382.pdf")}
-    art = avg_parse.parse_arn(live, tmp_path).to_artifact(avg_parse._fresh_parser())
+    art = avg_parse.parse_arn(live, tmp_path).to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["uri"] == "https://lagen.nu/avg/arn/2026-00382"
     assert art["identifier"] == "ARN 2026-00382"
     assert art["metadata"]["beslutsdatum"] == "2026-06-16"
@@ -450,7 +451,7 @@ def test_parse_arn_source_url_roundtrip(tmp_path, monkeypatch):
     frozen["source"] = "arn-legacy"
     frozen["imported_from"] = "2026/00382/index.pdf"
     art2 = avg_parse.parse_arn(frozen, tmp_path).to_artifact(
-        avg_parse._fresh_parser())
+        sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert "source_url" not in art2
 
 
@@ -885,7 +886,7 @@ def test_parse_imy_artifact(tmp_path, monkeypatch):
     pdf.parent.mkdir(parents=True, exist_ok=True)
     pdf.write_bytes(b"%PDF-1.7\n")
     art = avg_parse.parse_imy(record, tmp_path).to_artifact(
-        avg_parse._fresh_parser())
+        sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["uri"] == "https://lagen.nu/avg/imy/IMY-2024-2904"
     assert art["identifier"] == "IMY dnr IMY-2024-2904"
     assert art["org"] == "imy"
@@ -1075,7 +1076,7 @@ def test_parse_kkv_heads_the_body_with_the_curated_account(tmp_path, monkeypatch
     body = avg_download.kkv_body_path(tmp_path, record["dokument"]["fil"])
     body.parent.mkdir(parents=True, exist_ok=True)
     body.write_bytes(b"%PDF-1.7\n")
-    art = avg_parse.parse_kkv(record, tmp_path).to_artifact(avg_parse._fresh_parser())
+    art = avg_parse.parse_kkv(record, tmp_path).to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     # the curated case name beats the diarium's bureaucratic ärendemening
     assert art["metadata"]["title"] == "Aktiebolaget Svensk Bilprovning m.fl."
     assert art["metadata"]["bransch"] == ["Fordon, färdmedel, resande"]
@@ -1243,7 +1244,7 @@ def test_parse_kkv_artifact(tmp_path, monkeypatch):
     body = avg_download.kkv_body_path(tmp_path, record["dokument"]["fil"])
     body.parent.mkdir(parents=True, exist_ok=True)
     body.write_bytes(b"%PDF-1.7\n")
-    art = avg_parse.parse_kkv(record, tmp_path).to_artifact(avg_parse._fresh_parser())
+    art = avg_parse.parse_kkv(record, tmp_path).to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert art["uri"] == "https://lagen.nu/avg/kkv/558/2026"
     assert art["identifier"] == "KKV dnr 558/2026"
     md = art["metadata"]
@@ -1413,7 +1414,7 @@ def test_footnotes_are_citation_scanned_onto_the_artifact():
     art = Beslut(org="imy", diarienummer=["IMY-2024-1"], titel="X",
                  body=[Block("stycke", "Se nedan.")],
                  fotnoter=[Fotnot("12", "Se riktlinjer 05/2020 och WP 248.")],
-                 ).to_artifact(avg_parse._fresh_parser())
+                 ).to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert [x["uri"] for x in art["footnotes"][0]["text"] if isinstance(x, dict)] \
         == ["https://lagen.nu/edpb/riktlinjer/05-2020",
             "https://lagen.nu/edpb/wp/248"]

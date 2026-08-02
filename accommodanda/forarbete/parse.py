@@ -15,25 +15,17 @@ case-URI work. Body blocks are scanned for citations (SFS / other förarbeten /
 case law) and carry inline links, like SFS and DV.
 """
 
-import functools
 import re
 import subprocess
 
 from bs4 import BeautifulSoup
 
 from ..lib import compress, layout
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 
 # font-aware extraction + paragraph reflow are shared across the PDF verticals
 # (re-exported here so this module's existing import sites keep working)
 from ..lib.errors import SkipDocument
-from ..lib.lagrum import (
-    ALL_PARSE_TYPES,
-    LagrumParser,
-    interleave,
-    load_abbreviations,
-    load_namedlaws,
-)
+from ..lib.lagrum import ALL_PARSE_TYPES, interleave, sfs_parser
 from ..lib.pdftext import (
     FOOTNOTE_DROP,
     RE_KAP_MARK,
@@ -459,13 +451,6 @@ def parse_record(record, root):
                      ocr=ocr, body=body)
 
 
-@functools.cache
-def _refparser():
-    return LagrumParser(load_namedlaws(SFS_NAMEDLAWS), basefile="forarbete",
-                        abbreviations=load_abbreviations(SFS_NAMEDLAWS),
-                        parse_types=PARSE_TYPES)
-
-
 def _scan(text, parser):
     """Citation-scan one text into an inline-run list."""
     return interleave(text, parser.parse_text(text, context={}))
@@ -518,8 +503,7 @@ def to_artifact(fa):
     A `tabell` block projects to the shared table shape (`rad` children with
     `cells`, the same schema SFS uses -- catalog and render already speak it),
     row 0 flagged `th` (the nuvarande/föreslagen column header)."""
-    parser = _refparser()
-    parser.reset()                          # fresh per-document state
+    parser = sfs_parser("forarbete", PARSE_TYPES)   # fresh per-document state
     blocks = []
     for b in fa.body:
         block = ({"type": b.kind, "text": _scan(b.text, parser)}

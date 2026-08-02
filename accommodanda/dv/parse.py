@@ -27,16 +27,13 @@ from bs4 import BeautifulSoup
 from ..lib import patch
 from ..lib.casenaming import COURT_URI_SLUG, case_uri, verdict_uri
 from ..lib.datasets import NAMEDACTS
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.lagrum import (
     ALL_PARSE_TYPES,
-    LagrumParser,
     Ref,
     interleave,
     lagrum_uri,
-    load_abbreviations,
     load_namedacts,
-    load_namedlaws,
+    sfs_parser,
 )
 from ..lib.pdftext import (
     line_body_size,
@@ -450,16 +447,6 @@ def _avgorande(d, body, footnotes):
     )
 
 
-@functools.cache
-def legal_vocab():
-    """Named-law, abbreviation and EU-act tables for the citation scanner, loaded
-    once. KORTLAGRUM is enabled (court decisions cite both full law names and
-    abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB"); the EU-act table lets
-    "artikel 6 i dataskyddsförordningen" pinpoint the regulation's article."""
-    return (load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS),
-            load_namedacts(NAMEDACTS))
-
-
 def extract_footrefs(text):
     """`(clean, marks)`: `text` with its inline footnote markers removed (and
     the OOXML duplicated-digit artifact undone, so the citation scanner sees the
@@ -515,10 +502,12 @@ def scan_footnotes(footnotes):
 @functools.cache
 def _scanner():
     """The body citation scanner, built once (grammar compilation is the
-    expensive part); scan_body resets its per-document state each call."""
-    namedlaws, abbreviations, named_acts = legal_vocab()
-    return LagrumParser(namedlaws, basefile="dom", abbreviations=abbreviations,
-                        parse_types=DV_PARSE_TYPES, named_acts=named_acts)
+    expensive part); scan_body resets its per-document state each call.
+    KORTLAGRUM is enabled (court decisions cite both full law names and
+    abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB"); the EU-act table lets
+    "artikel 6 i dataskyddsförordningen" pinpoint the regulation's article."""
+    return sfs_parser("dom", DV_PARSE_TYPES,
+                      named_acts=load_namedacts(NAMEDACTS))
 
 
 def curated_runs(text, predicate, fallback_uri=None):

@@ -26,21 +26,12 @@ Two layers over the shared font-aware extraction (``lib.pdftext``):
     directives a footnote says it ``genomför``, and the regulations it replaces.
 """
 
-import functools
 import re
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from ..lib.lagrum import (
-    EULAGSTIFTNING,
-    LAGRUM,
-    LagrumParser,
-    interleave,
-    load_abbreviations,
-    load_namedlaws,
-)
+from ..lib.lagrum import EULAGSTIFTNING, LAGRUM, interleave, sfs_parser
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
 from ..lib.util import MONTHS
 from .agencies import AAFS_SERIES, REGISTRY
@@ -251,21 +242,6 @@ def extract_metadata(text, parser):
 # --------------------------------------------------------------------------
 # record -> Regulation -> artifact
 # --------------------------------------------------------------------------
-
-@functools.cache
-def _refparser():
-    return LagrumParser(load_namedlaws(SFS_NAMEDLAWS), basefile="foreskrift",
-                        abbreviations=load_abbreviations(SFS_NAMEDLAWS),
-                        parse_types=PARSE_TYPES)
-
-
-def _fresh_parser():
-    """The shared parser with document-lifetime state reset (so one document's
-    'samma lag' / learned law names do not bleed into the next)."""
-    parser = _refparser()
-    parser.reset()
-    return parser
-
 
 def _structure(blocks, parser):
     """Flat ``(kind, text, page, num)`` blocks -> the nested ``structure`` list,
@@ -495,7 +471,7 @@ def parse_record(record, root):
     fs, basefile = record["fs"], record["basefile"]
     arsutgava, lopnummer = basefile.split("/", 1)[1].split(":", 1)
     files = record.get("files", {})
-    parser = _fresh_parser()
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
 
     reg_file = files.get("regulation") or None
     structure, meta = [], {}
@@ -537,11 +513,11 @@ def parse_record(record, root):
         if cons.get("name"):
             path = Path(root) / fs / cons["name"]
             cstruct, tom, refs = (
-                parse_consolidation_html(path, _fresh_parser())
+                parse_consolidation_html(path, sfs_parser("foreskrift", PARSE_TYPES))
                 if path.suffix == ".html"
                 else parse_consolidation(path, record["identifier"],
                                          fs, arsutgava, lopnummer,
-                                         _fresh_parser()))
+                                         sfs_parser("foreskrift", PARSE_TYPES)))
             if any(c.konsolideradTom == tom and c.structure == cstruct
                    for c in reg.consolidations):
                 continue          # the landing page listed the same PDF twice

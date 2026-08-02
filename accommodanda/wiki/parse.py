@@ -29,15 +29,8 @@ import re
 from pathlib import Path
 
 from ..lib import markdown
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ..lib.eu_structure import anchored_blocks
-from ..lib.lagrum import (
-    ALL_PARSE_TYPES,
-    CELEX_BASE,
-    LagrumParser,
-    load_abbreviations,
-    load_namedlaws,
-)
+from ..lib.lagrum import ALL_PARSE_TYPES, CELEX_BASE, sfs_parser
 
 PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -60,15 +53,8 @@ RE_ARTIKEL = re.compile(r"^\s*[Aa]rtikel\s+(\d+)(?:[.\s]+(\d+))?(?:[.\s]+([a-z])
 RE_SKAL = re.compile(r"^\s*(?:[Ss]käl\s+|\()(\d+)\)?\s*$")
 
 
-@functools.cache
-def _vocab():
-    return load_namedlaws(SFS_NAMEDLAWS), load_abbreviations(SFS_NAMEDLAWS)
-
-
 def _parser(basefile):
-    namedlaws, abbreviations = _vocab()
-    return LagrumParser(namedlaws, basefile=basefile,
-                        abbreviations=abbreviations, parse_types=PARSE_TYPES)
+    return sfs_parser(basefile, PARSE_TYPES)
 
 
 def heading_fragment(heading):

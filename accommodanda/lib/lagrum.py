@@ -578,11 +578,11 @@ JK_ID: /\d+-\d{2}-\d{2}/
 # The WP form mints for *any* number rather than only the seven vägledningar
 # the site hosts: the working party numbered its yttranden in the same series
 # (WP 187, WP 259), a guideline's prose is full of them, and an unhosted lagen.nu
-# uri already renders as plain text rather than a dead link (render.render_runs)
+# uri already renders as plain text rather than a dead link (page.render_runs)
 # -- which is the right reading of "we know exactly what this is and do not
 # publish it yet". The one number that is *not* a document is 29 itself: "WP29"
 # is what everyone calls the group, and `fmt_wp_ref` drops it the way
-# `jk_is_date` drops a diarienummer that is really a date.
+# `_jk_is_date` drops a diarienummer that is really a date.
 VAGLEDNING_RULES = r"""
 riktlinje_ref.5: RIKTLINJE_W vl_id
 rekommendation_ref.5: REKOMMENDATION_W vl_id
@@ -755,7 +755,7 @@ TRIGGER_SRC = {LAGRUM: LAGRUM_TRIGGER_SRC, EULAGSTIFTNING: EU_TRIGGER_SRC,
                VAGLEDNING: VAGLEDNING_TRIGGER_SRC}
 
 
-def expand_types(types):
+def _expand_types(types):
     """Add each requested type's dependencies (one level is enough)."""
     out = set(types)
     for t in types:
@@ -852,7 +852,7 @@ def interleave(text, refs):
 
 
 @dataclass
-class DocState:
+class _DocState:
     """Reference-parser state with document lifetime."""
     lastlaw: str | None = None
     # law names learned in-document: normalized lawname -> SFS id
@@ -874,7 +874,7 @@ class NoLink(Exception):
 RE_BASEFILE_LAW = re.compile(r'\d+:(?:bih\.[_ ]?|N)?\d+(?:[_ ]s\.\d+|[_ ]\d+)?')
 
 
-def fragment_context(basefile, fragment):
+def _fragment_context(basefile, fragment):
     """Decompose a minted fragment id into baseuri attributes, like the
     old re_urisegments did with the node's URI. Bilaga fragments yield
     law-only context (the old regex never matched past a B segment). A bare
@@ -895,7 +895,7 @@ def fragment_context(basefile, fragment):
     return ctx
 
 
-def normalize_sfsid(sfsid):
+def _normalize_sfsid(sfsid):
     # the 1734 års lag balkar are often cited with a spurious "s."
     # ("handelsbalken (1736:0123 s. 2)") their registry id ("1736:0123 2")
     # never had -- drop it so the minted URI hits the catalog document (the
@@ -904,7 +904,7 @@ def normalize_sfsid(sfsid):
     return re.sub(r'(\d+:\d+)\.(\d)', r'\1 \2', sfsid).replace('\n', ' ')
 
 
-def normalize_lawname(lawname):
+def _normalize_lawname(lawname):
     lawname = lawname.lower()
     return lawname[:-1] if lawname.endswith('s') else lawname
 
@@ -1014,7 +1014,7 @@ def lagrum_uri(attrs, base='https://lagen.nu/'):
         attrs['piece'] = '1'
     for k, v in attrs.items():
         attrs[k] = ORDINALS.get(v, v)
-    law = normalize_sfsid(attrs.pop('law')).replace('\xa0', ' ')
+    law = _normalize_sfsid(attrs.pop('law')).replace('\xa0', ' ')
     # page-number laws slug like the corpus basefiles (sfs.register.sfs_slug):
     # "1904:48 s.1" -> 1904:48_s.1 -- NOT the legacy COIN template's
     # 1904:48_s._1, which the catalog never contained
@@ -1159,7 +1159,7 @@ def parser(requested, expanded, abbrevs=(), eu_acts=(), lang="swe"):
     return Lark(grammar, parser='earley')
 
 
-def tree_tokens(tree):
+def _tree_tokens(tree):
     return list(tree.scan_values(lambda v: isinstance(v, Token)))
 
 
@@ -1172,20 +1172,20 @@ ABSORB_MARKERS = frozenset((
     'PIECE_DIGIT', 'SENTENCE_WORD', 'KAP', 'MOM', 'PUNKTEN', 'ITEM_CHAR'))
 
 
-def node_span(node):
+def _node_span(node):
     """(start, end) covering every token of `node`, in the coordinates of
     the window the tree was parsed from."""
-    toks = tree_tokens(node)
+    toks = _tree_tokens(node)
     return min(t.start_pos for t in toks), max(t.end_pos for t in toks)
 
 
-def law_id_span(law_node):
+def _law_id_span(law_node):
     """Span of just the law-identifying token (the SFS number, or the named
     law word) -- not the surrounding "lagen ( … )" scaffolding, which the
     old pipeline left outside the link."""
-    toks = [t for t in tree_tokens(law_node)
+    toks = [t for t in _tree_tokens(law_node)
             if t.type in ('LAW_REF_ID', 'NAMED_LAW')]
-    return (toks[0].start_pos, toks[0].end_pos) if toks else node_span(law_node)
+    return (toks[0].start_pos, toks[0].end_pos) if toks else _node_span(law_node)
 
 
 def find_refids(tree):
@@ -1195,7 +1195,7 @@ def find_refids(tree):
     for sub in tree.iter_subtrees_topdown():
         if sub.data.endswith('_ref_id'):
             d[sub.data[:-7]] = ' '.join(
-                t.value for t in tree_tokens(sub)).strip()
+                t.value for t in _tree_tokens(sub)).strip()
     return d
 
 
@@ -1206,22 +1206,22 @@ def subtree(tree, name, *default):
                 *default)
 
 
-def token_text(tree):
+def _token_text(tree):
     """Concatenate the tree's token values (no separator)."""
-    return ''.join(t.value for t in tree_tokens(tree))
+    return ''.join(t.value for t in _tree_tokens(tree))
 
 
-def riksmote_str(node):
+def _riksmote_str(node):
     """Riksmöte id keeping the slash form ("1996/97", "1971")."""
-    return '/'.join(t.value for t in tree_tokens(node) if t.type == 'NUMBER')
+    return '/'.join(t.value for t in _tree_tokens(node) if t.type == 'NUMBER')
 
 
-def avg_ids(node, name):
+def _avg_ids(node, name):
     """(diarienummer, window-span) pairs of the named *_ref_id rule, in
     document order. A citation carrying several dnr ("dnr X och Y") is
     several separate references sharing a prefix, not one -- each links its
     own diarienummer token so the spans stay disjoint (rule:fail-fast)."""
-    return [(token_text(s), node_span(s)) for s in node.iter_subtrees_topdown()
+    return [(_token_text(s), _node_span(s)) for s in node.iter_subtrees_topdown()
             if s.data == name]
 
 
@@ -1275,7 +1275,7 @@ def vagledning_slug(number):
     return '%02d-%s' % (int(serial), year)
 
 
-def jk_is_date(dnr):
+def _jk_is_date(dnr):
     """A JK diarienummer NNNN-MM-DD whose first part is a recent year and
     whose other parts read as month/day is probably a date, not a ref."""
     ordinal, second, third = (int(x) for x in dnr.split('-'))
@@ -1283,7 +1283,7 @@ def jk_is_date(dnr):
             and 1 <= second <= 12 and 1 <= third <= 31)
 
 
-class MatchState:
+class _MatchState:
     """Per-root-match formatter state (the old clear_state cleared these
     between matches)."""
 
@@ -1316,8 +1316,8 @@ class LagrumParser:
         # relative "5 §" or an ändringshänvisning "#L<act>") is minted under,
         # used to recognise self-links from id-suppressed provisions.
         self.self_law_uri = lagrum_uri(
-            {'law': fragment_context(basefile, None)['law']}, base)
-        self.state = DocState()
+            {'law': _fragment_context(basefile, None)['law']}, base)
+        self.state = _DocState()
         self.abbreviations = abbreviations or {}
         # Default set is SFS + EU (the SFS-pipeline behaviour). Supplying
         # `abbreviations` adds KORTLAGRUM, so existing call sites keep
@@ -1327,7 +1327,7 @@ class LagrumParser:
             if abbreviations:
                 parse_types.append(KORTLAGRUM)
         requested = frozenset(parse_types)
-        self.parse_types = expand_types(parse_types)
+        self.parse_types = _expand_types(parse_types)
         assert KORTLAGRUM not in self.parse_types or self.abbreviations, \
             "KORTLAGRUM parse type requires abbreviations"
         # ENKLALAGRUM relaxes the external-ref combine rule (a lone chapter
@@ -1347,7 +1347,7 @@ class LagrumParser:
         focus, förarbete/EU-act anaphora) before parsing a new document.
         Call this instead of rebuilding the parser -- construction (grammar
         compilation, dataset loading) is the expensive part."""
-        self.state = DocState()
+        self.state = _DocState()
 
     # --- scanning ---
 
@@ -1360,7 +1360,7 @@ class LagrumParser:
         dict means no base at all: relative references stay unlinked
         until a law is named (the old nobaseuri mode)."""
         if context is None:
-            context = fragment_context(self.basefile, fragment)
+            context = _fragment_context(self.basefile, fragment)
         self.nobaseuri = not context
         refs = []
         pos = 0
@@ -1410,7 +1410,7 @@ class LagrumParser:
         spans = [list(a.get('_span', (0, length))) for a in attrlist]
         if not spans:
             return spans
-        tokens = tree_tokens(tree)
+        tokens = _tree_tokens(tree)
         markers = sorted((t.start_pos, t.end_pos) for t in tokens
                          if t.type in ABSORB_MARKERS)
         for mstart, mend in markers:
@@ -1489,7 +1489,7 @@ class LagrumParser:
     def format_root(self, tree, context):
         """Return completed attribute dicts, one per link, in document
         order. Raises NoLink when the whole match must stay unlinked."""
-        match = MatchState()
+        match = _MatchState()
         out = []
         self.dispatch(tree.children[0], match, out, context)
         if match.currentlaw:
@@ -1535,22 +1535,22 @@ class LagrumParser:
 
     def fmt_change_ref(self, node, match, out, context):
         # the change note links its whole span -- "Lag (2001:1016)."
-        self.emit({'lawref': normalize_sfsid(find_refids(node)['law'])},
-                  match, out, context, span=node_span(node))
+        self.emit({'lawref': _normalize_sfsid(find_refids(node)['law'])},
+                  match, out, context, span=_node_span(node))
 
     def fmt_sfs_nr(self, node, match, out, context):
-        law = normalize_sfsid(find_refids(node)['law'])
+        law = _normalize_sfsid(find_refids(node)['law'])
         if self.nobaseuri:  # the old format_SFSNr learned the base law
             context['law'] = law
         # link just the SFS number, not any enclosing "( … )"
-        self.emit({'law': law}, match, out, context, span=law_id_span(node))
+        self.emit({'law': law}, match, out, context, span=_law_id_span(node))
 
     def fmt_generic_ref(self, node, match, out, context):
         # no chapter stickiness here: the old GenericRef production
         # short-circuited to a single link before any state-setting
         # custom formatter could run, so "3 kap. 2 §, 13 §" resolves
         # "13 §" against the node's structural context, not chapter 3
-        self.emit(find_refids(node), match, out, context, span=node_span(node))
+        self.emit(find_refids(node), match, out, context, span=_node_span(node))
 
     fmt_section_anatomy = fmt_generic_ref
     fmt_piece_item_ref = fmt_generic_ref
@@ -1562,18 +1562,18 @@ class LagrumParser:
         # the chapter prefix ("3 kap.") folds into the first section link
         self.emit({'section': find_refids(sections[0])['section']},
                   match, out, context,
-                  span=(node_span(node.children[0])[0],
-                        node_span(sections[0])[1]))
+                  span=(_node_span(node.children[0])[0],
+                        _node_span(sections[0])[1]))
         for section in sections[1:]:
             self.emit({'section': find_refids(section)['section']},
-                      match, out, context, span=node_span(section))
+                      match, out, context, span=_node_span(section))
         # chapter stays sticky (the old formatter never reset it)
 
     def fmt_chapter_section_refs(self, node, match, out, context):
         chapter_ref, sections = node.children
         match.currentchapter = find_refids(chapter_ref)['chapter']
         self.emit({'chapter': match.currentchapter}, match, out, context,
-                  span=node_span(chapter_ref))
+                  span=_node_span(chapter_ref))
         self.dispatch(sections, match, out, context)
         # the old format_ChapterSectionRefs/format_AlternateChapter-
         # SectionRefs reset the chapter, so a trailing chapterless
@@ -1585,12 +1585,12 @@ class LagrumParser:
         chapter_ref, section_pieces = node.children
         match.currentchapter = find_refids(chapter_ref)['chapter']
         self.emit({'chapter': match.currentchapter}, match, out, context,
-                  span=node_span(chapter_ref))
+                  span=_node_span(chapter_ref))
         self.dispatch(section_pieces, match, out, context)
 
     def fmt_single_section_ref(self, node, match, out, context):
         self.emit({'section': find_refids(node)['section']},
-                  match, out, context, span=node_span(node))
+                  match, out, context, span=_node_span(node))
 
     # only reachable as the final "eller 16 §" of alternate_section_refs;
     # every other rule containing section_ref formats it itself
@@ -1602,8 +1602,8 @@ class LagrumParser:
         pieces = [c for c in node.children[1:] if isinstance(c, Tree)]
         for i, piece in enumerate(pieces):
             # the section prefix ("42 §") folds into the first piece link
-            span = ((node_span(section)[0], node_span(piece)[1]) if i == 0
-                    else node_span(piece))
+            span = ((_node_span(section)[0], _node_span(piece)[1]) if i == 0
+                    else _node_span(piece))
             self.emit(find_refids(piece), match, out, context, span=span)
         match.currentsection = None
 
@@ -1612,11 +1612,11 @@ class LagrumParser:
         match.currentsection = find_refids(section)['section']
         match.currentpiece = find_refids(piece)['piece']
         self.emit({'piece': match.currentpiece}, match, out, context,
-                  span=(node_span(section)[0], node_span(piece)[1]))
+                  span=(_node_span(section)[0], _node_span(piece)[1]))
         for item in node.children[2:]:
             if isinstance(item, Tree):
                 self.emit(find_refids(item), match, out, context,
-                          span=node_span(item))
+                          span=_node_span(item))
         match.currentsection = None
         match.currentpiece = None
 
@@ -1624,29 +1624,29 @@ class LagrumParser:
         section = node.children[0]
         match.currentsection = find_refids(section)['section']
         self.emit({'section': match.currentsection}, match, out, context,
-                  span=node_span(section))
+                  span=_node_span(section))
         for item in node.children[1:]:
             if isinstance(item, Tree) and item.data == 'item_ref':
                 # item_ref carries one ref id -- either item_ref_id ("3 a") or
                 # itemnumeric_ref_id ("tredje punkten"); emit whichever it is
                 # (lagrum_uri folds both to the N fragment letter)
                 self.emit(find_refids(item),
-                          match, out, context, span=node_span(item))
+                          match, out, context, span=_node_span(item))
         match.currentsection = None
 
     def fmt_piece_and_item_refs(self, node, match, out, context):
         self.emit(find_refids(node.children[0]), match, out, context,
-                  span=node_span(node.children[0]))
+                  span=_node_span(node.children[0]))
         self.emit(find_refids(node.children[-1]), match, out, context,
-                  span=node_span(node.children[-1]))
+                  span=_node_span(node.children[-1]))
 
     def fmt_piece_item_refs(self, node, match, out, context):
         piece = node.children[0]
         match.currentpiece = find_refids(piece)['piece']
         items = [c for c in node.children[1:] if isinstance(c, Tree)]
         for i, item in enumerate(items):
-            span = ((node_span(piece)[0], node_span(item)[1]) if i == 0
-                    else node_span(item))
+            span = ((_node_span(piece)[0], _node_span(item)[1]) if i == 0
+                    else _node_span(item))
             self.emit(find_refids(item), match, out, context, span=span)
         match.currentpiece = None
 
@@ -1683,12 +1683,12 @@ class LagrumParser:
         if combined and '_span' in inner[0]:
             # the single link swallows the trailing law expression, so its
             # text reads "4 kap. 24 § … tullagen (2000:1281)" as one link
-            inner[0]['_span'] = (inner[0]['_span'][0], node_span(law_node)[1])
+            inner[0]['_span'] = (inner[0]['_span'][0], _node_span(law_node)[1])
         if not combined and not same_law:
             match.currentchapter = None
             # an anonymous law links just its SFS number ("(1976:580)" ->
             # "1976:580"); a named one links the whole "name (number)"
-            span = law_id_span(law_node) if anonymous else node_span(law_node)
+            span = _law_id_span(law_node) if anonymous else _node_span(law_node)
             self.emit({'law': match.currentlaw}, match, out, context, span=span)
 
     fmt_external_refs = fmt_external_ref
@@ -1697,7 +1697,7 @@ class LagrumParser:
         self.resolve_law(node, match)
         # a named law links its name and any trailing "(SFS-number)"
         self.emit({'law': match.currentlaw}, match, out, context,
-                  span=node_span(node))
+                  span=_node_span(node))
         if self.nobaseuri:  # old format_NamedExternalLawRef side effect
             context['law'] = match.currentlaw
 
@@ -1717,17 +1717,17 @@ class LagrumParser:
                       if isinstance(c, Tree) and c.data == 'piece_ref'), None)
         if piece is not None:
             attrs.update(find_refids(piece))
-        self.emit(attrs, match, out, context, span=node_span(node))
+        self.emit(attrs, match, out, context, span=_node_span(node))
 
     def abbrev_to_sfsid(self, node):
         """Resolve the LAW_ABBREV token of a kortlagrum match, or raise
         NoLink for an unknown abbreviation (consumes the span, no link)."""
-        abbrev = next(t.value for t in tree_tokens(node)
+        abbrev = next(t.value for t in _tree_tokens(node)
                       if t.type == 'LAW_ABBREV')
         law = self.abbreviations.get(abbrev)
         if law is None:
             raise NoLink()
-        return normalize_sfsid(law)
+        return _normalize_sfsid(law)
 
     def resolve_law(self, law_node, match):
         """Set match.currentlaw from an external_law subtree. Raises
@@ -1735,12 +1735,12 @@ class LagrumParser:
         then consumed without producing links, like the old engine."""
         if isinstance(law_node, Tree) and law_node.data != 'same_law':
             refids = find_refids(law_node)
-            name = next((t.value for t in tree_tokens(law_node)
+            name = next((t.value for t in _tree_tokens(law_node)
                          if t.type == 'NAMED_LAW'), None)
             if 'law' in refids:
-                match.currentlaw = normalize_sfsid(refids['law'])
+                match.currentlaw = _normalize_sfsid(refids['law'])
                 if name:
-                    self.state.namedlaws[normalize_lawname(name)] = \
+                    self.state.namedlaws[_normalize_lawname(name)] = \
                         match.currentlaw
                 return
             match.currentlaw = self.namedlaw_to_sfsid(name)
@@ -1752,7 +1752,7 @@ class LagrumParser:
         match.currentlaw = self.state.lastlaw
 
     def namedlaw_to_sfsid(self, name):
-        name = normalize_lawname(name)
+        name = _normalize_lawname(name)
         if name in NOLAW or name in LAW_SYNONYMS:
             return None
         return self.state.namedlaws.get(name) or self.namedlaws.get(name)
@@ -1821,10 +1821,10 @@ class LagrumParser:
                 # from "artikel" to the node end -- the whole "artikel N i
                 # <instrument>" for the article-first order, just "artikel N" when
                 # the instrument was named first ("<treaty>, särskilt artikel N")
-                span = (node_span(subtree(node, 'artikel_part'))[0],
-                        node_span(node)[1])
+                span = (_node_span(subtree(node, 'artikel_part'))[0],
+                        _node_span(node)[1])
             else:
-                span = node_span(it)
+                span = _node_span(it)
             # A letter pinpoints whether or not a sub-article precedes it, so
             # "artikel 3 a" is point (a) of article 3. Swedish also renders an
             # *inserted* article with a space ("artikel 168 a" = 168a), and the
@@ -1838,12 +1838,12 @@ class LagrumParser:
             # the VAT directive, is the exception that pays for the rest.
             ls = letters(it)
             if len(ls) <= 1:
-                out.append(spec(d, span, token_text(ls[0]) if ls else None))
+                out.append(spec(d, span, _token_text(ls[0]) if ls else None))
             else:
                 # each letter is its own link, on the letter's own span -- the
                 # phrase span would make every one of them cover the whole
                 # coordination and overlap
-                out.extend(spec(d, node_span(l), token_text(l)) for l in ls)
+                out.extend(spec(d, _node_span(l), _token_text(l)) for l in ls)
         return out
 
     @staticmethod
@@ -1852,7 +1852,7 @@ class LagrumParser:
         underartikel, punkt)``; an instrument named with no article links itself
         once."""
         if not specs:
-            out.append({'_uri': build(None, None, None), '_span': node_span(node)})
+            out.append({'_uri': build(None, None, None), '_span': _node_span(node)})
             return
         for artikel, underartikel, punkt, span in specs:
             out.append({'_uri': build(artikel, underartikel, punkt), '_span': span})
@@ -1866,9 +1866,9 @@ class LagrumParser:
         links cannot both own it."""
         items = [it for it in node.iter_subtrees_topdown()
                  if it.data == 'skal_item']
-        part = node_span(subtree(node, 'skal_part'))
+        part = _node_span(subtree(node, 'skal_part'))
         return [(find_refids(it)['skal'],
-                 part if len(items) == 1 else node_span(it))
+                 part if len(items) == 1 else _node_span(it))
                 for it in items]
 
     @staticmethod
@@ -1881,7 +1881,7 @@ class LagrumParser:
         memory every later "artikel N i direktivet" depends on. Every eu_ref
         alternative carrying a recital ends in `rattsakt_part`, so its absence
         is a broken grammar, not a case to fall back for."""
-        return node_span(subtree(node, 'rattsakt_part'))
+        return _node_span(subtree(node, 'rattsakt_part'))
 
     def _emit_act_ref(self, out, node, parts, specs, build):
         """Emit one eu_ref onto a single act: each cited recital on its own
@@ -1912,14 +1912,14 @@ class LagrumParser:
         # a treaty / the Charter / the ECHR, cited by name -- linked onto its own
         # consolidated text (never anaphora-pinned onto the act in focus)
         if 'eu_treaty' in parts:
-            path = TREATIES[token_text(subtree(node, 'eu_treaty')).lower()]
+            path = TREATIES[_token_text(subtree(node, 'eu_treaty')).lower()]
             self._emit_uris(out, specs, node,
                             lambda a, u, p: self._treaty_uri(path, a, u, p))
             return
         # a known EU act named by short name ("artikel N i dataskyddsförordningen")
         if 'eu_namnakt' in parts:
             celex = self.named_acts.get(
-                token_text(subtree(node, 'eu_namnakt')).lower())
+                _token_text(subtree(node, 'eu_namnakt')).lower())
             if celex is None:
                 raise NoLink()
             self._emit_act_ref(out, node, parts, specs,
@@ -1937,7 +1937,7 @@ class LagrumParser:
             # so it may point at an external act a recital just named ("... i
             # förordning (EG) nr 45/2001. ... artikel N i förordningen").
             if bare:
-                tail = self._scan_text[self._scan_base + node_span(node)[1]:][:14]
+                tail = self._scan_text[self._scan_base + _node_span(node)[1]:][:14]
                 guard = (r"\s*(?:,|and|or)\s*\d|\s+of\s" if self.lang == "eng"
                          else r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s")
                 if re.match(guard, tail):
@@ -1957,7 +1957,7 @@ class LagrumParser:
         # an act cited by number ("(artikel N i) direktiv 2000/31/EG"): celex_uri
         # mints the act, and each cited article pinpoints that same act
         attrs = find_refids(node)
-        tokens = tree_tokens(node)
+        tokens = _tree_tokens(node)
         for t in tokens:
             if t.type in ('DIREKTIV', 'FORORDNING', 'REKOMMENDATION', 'BESLUT'):
                 attrs['akttyp'] = t.value
@@ -1986,7 +1986,7 @@ class LagrumParser:
                 self.emit(attrs, match, out, context, span=self._act_span(node))
                 return
         if not specs:
-            self.emit(attrs, match, out, context, span=node_span(node))
+            self.emit(attrs, match, out, context, span=_node_span(node))
             return
         for artikel, underartikel, punkt, span in specs:
             d = dict(act)
@@ -2031,7 +2031,7 @@ class LagrumParser:
     def fmt_forarb_refs(self, node, match, out, context):
         doc = node.children[0]
         base = self.forarb_doc_uri(doc.children[0])
-        self.emit_pages(node, base, out, node_span(doc)[0])
+        self.emit_pages(node, base, out, _node_span(doc)[0])
 
     def fmt_anon_prop_refs(self, node, match, out, context):
         if self.state.last_forarbete is None:
@@ -2048,9 +2048,9 @@ class LagrumParser:
         bare number, the way the golden corpus draws the boundaries."""
         pages = [s for s in node.iter_subtrees_topdown() if s.data == 'sida_num']
         for i, page in enumerate(pages):
-            pstart, pend = node_span(page)
+            pstart, pend = _node_span(page)
             span = (doc_start if i == 0 else pstart, pend)
-            out.append({'_uri': '%s#sid%s' % (base, token_text(page)),
+            out.append({'_uri': '%s#sid%s' % (base, _token_text(page)),
                         '_span': span})
 
     def fmt_avsnitt_external(self, node, match, out, context):
@@ -2081,22 +2081,22 @@ class LagrumParser:
             uri = '%sprop/%s:%s' % (self.base, riksmote, no)
             self.state.last_forarbete = uri  # for a later "a. prop."
             return uri
-        riksmote = riksmote_str(subtree(inner, 'riksmote_ref_id'))
-        no = token_text(subtree(inner, 'bet_no_ref_id') if inner.data == 'bet_ref'
+        riksmote = _riksmote_str(subtree(inner, 'riksmote_ref_id'))
+        no = _token_text(subtree(inner, 'bet_no_ref_id') if inner.data == 'bet_ref'
                         else subtree(inner, 'lopnr_ref_id'))
         return '%s%s/%s:%s' % (self.base, self.DOC_PREFIX[inner.data],
                                riksmote, no)
 
     def prop_riksmote_no(self, body):
-        riksmote = riksmote_str(subtree(body, 'riksmote_ref_id'))
-        lopnr = token_text(subtree(body, 'lopnr_ref_id'))
+        riksmote = _riksmote_str(subtree(body, 'riksmote_ref_id'))
+        lopnr = _token_text(subtree(body, 'lopnr_ref_id'))
         if body.data == 'prop_x':
-            sub = token_text(subtree(body, 'subriksmote_ref_id'))
+            sub = _token_text(subtree(body, 'subriksmote_ref_id'))
             return riksmote, (lopnr if sub == 'A' else sub + lopnr)
         return riksmote, lopnr
 
     def forarbete_celex_uri(self, inner):
-        year, lopnr = token_text(inner)[1:].split('L')
+        year, lopnr = _token_text(inner)[1:].split('L')
         if len(year) == 2:
             year = '19' + year
         return '%sext/celex/3%sL%s' % (self.base, year, lopnr)
@@ -2109,7 +2109,7 @@ class LagrumParser:
                                context['no'])
 
     def avsnitt_frags(self, node):
-        return ['S' + token_text(s).replace('.', '-')
+        return ['S' + _token_text(s).replace('.', '-')
                 for s in node.iter_subtrees_topdown()
                 if s.data == 'avsnitt_ref_id']
 
@@ -2121,9 +2121,9 @@ class LagrumParser:
         # the pre-1989 numbering ("Case 31/87") has no court letter: only the
         # ECJ existed, so its absence *means* the Court of Justice
         decision_node = subtree(node, 'ecj_decision', None)
-        decision = token_text(decision_node) if decision_node is not None else 'C'
-        serial = token_text(subtree(node, 'ecj_serial'))
-        year = token_text(subtree(node, 'ecj_year'))
+        decision = _token_text(decision_node) if decision_node is not None else 'C'
+        serial = _token_text(subtree(node, 'ecj_serial'))
+        year = _token_text(subtree(node, 'ecj_year'))
         if len(year) == 2:  # two-digit year: <54 -> 20xx else 19xx
             year = ('20' if int(year) < 54 else '19') + year
         celex = '6%sC%s%04d' % (year, self.ECJ_DESCRIPTOR[decision],
@@ -2133,16 +2133,16 @@ class LagrumParser:
     # --- MYNDIGHETSBESLUT (authority decisions) ---
 
     def fmt_arn_refs(self, node, match, out, context):
-        for dnr, span in avg_ids(node, 'arn_ref_id'):
+        for dnr, span in _avg_ids(node, 'arn_ref_id'):
             out.append({'_uri': self.base + 'avg/arn/' + dnr, '_span': span})
 
     def fmt_jo_refs(self, node, match, out, context):
-        for dnr, span in avg_ids(node, 'jo_ref_id'):
+        for dnr, span in _avg_ids(node, 'jo_ref_id'):
             out.append({'_uri': self.base + 'avg/jo/' + dnr, '_span': span})
 
     def fmt_jk_refs(self, node, match, out, context):
-        for dnr, span in avg_ids(node, 'jk_ref_id'):
-            if not jk_is_date(dnr):  # a plausible date is not a diarienummer
+        for dnr, span in _avg_ids(node, 'jk_ref_id'):
+            if not _jk_is_date(dnr):  # a plausible date is not a diarienummer
                 out.append({'_uri': self.base + 'avg/jk/' + dnr, '_span': span})
 
     # --- VAGLEDNING (EDPB / artikel 29-gruppens guidance) ---
@@ -2150,8 +2150,8 @@ class LagrumParser:
     def _vagledning(self, node, serie, out):
         out.append({'_uri': '%sedpb/%s/%s'
                     % (self.base, serie,
-                       vagledning_slug(token_text(subtree(node, 'vl_id')))),
-                    '_span': node_span(node)})
+                       vagledning_slug(_token_text(subtree(node, 'vl_id')))),
+                    '_span': _node_span(node)})
 
     def fmt_riktlinje_ref(self, node, match, out, context):
         self._vagledning(node, 'riktlinjer', out)
@@ -2160,8 +2160,42 @@ class LagrumParser:
         self._vagledning(node, 'rekommendationer', out)
 
     def fmt_wp_ref(self, node, match, out, context):
-        number = token_text(subtree(node, 'wp_id'))
+        number = _token_text(subtree(node, 'wp_id'))
         if number == WP29_GROUP:   # "WP29" names the group, not a document
             return
         out.append({'_uri': self.base + 'edpb/wp/' + number,
-                    '_span': node_span(node)})
+                    '_span': _node_span(node)})
+
+
+# --------------------------------------------------------------------------
+# the shared SFS-vocabulary parser
+# --------------------------------------------------------------------------
+
+@functools.cache
+def _sfs_vocabulary():
+    """The named-law and abbreviation tables, read once. Both derive from the
+    same hand-edited dataset, so they load together: every source's parser wants
+    the identical pair."""
+    return (load_namedlaws(datasets.NAMEDLAWS),
+            load_abbreviations(datasets.NAMEDLAWS))
+
+
+def sfs_parser(basefile, parse_types, named_acts=None):
+    """A citation parser for a source that cites Swedish law: the named-law table
+    plus the abbreviations, over `parse_types`.
+
+    Returns a **new** parser each call, with fresh document state (no learned law
+    names, no "samma lag" focus), so a caller never has to remember to reset one
+    and two parsers can never alias. That is cheap because the two expensive
+    parts are cached elsewhere -- the vocabulary in `_sfs_vocabulary` here and
+    the compiled grammar in `parser` above -- leaving construction well under a
+    tenth of a millisecond warm, against ~25 ms for the cold grammar compile.
+
+    A caller that keeps one parser across many documents must still call
+    :meth:`LagrumParser.reset` between them; every caller here takes a new one.
+    """
+    namedlaws, abbreviations = _sfs_vocabulary()
+    return LagrumParser(namedlaws, basefile=basefile,
+                        abbreviations=abbreviations,
+                        parse_types=list(parse_types),
+                        named_acts=named_acts)

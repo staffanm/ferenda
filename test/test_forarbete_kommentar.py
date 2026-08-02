@@ -1,7 +1,6 @@
 """Tests for the författningskommentar implements-extractor."""
 
 from accommodanda.forarbete.kommentar import (
-    _refparser,
     article_of,
     extract,
     fk_section,
@@ -13,6 +12,8 @@ from accommodanda.forarbete.kommentar import (
     sfs_number,
 )
 from accommodanda.forarbete.structure import flatten, nest
+from accommodanda.forarbete.parse import PARSE_TYPES
+from accommodanda.lib.lagrum import sfs_parser
 
 CELEX = "https://lagen.nu/ext/celex/"
 
@@ -61,7 +62,7 @@ def test_directive_alias_binds_to_subject_not_repealed():
         "Europaparlamentets och rådets direktiv (EU) 2022/2555 av den 14 "
         "december 2022 om ändring av förordning (EU) nr 910/2014 och om "
         "upphävande av direktiv (EU) 2016/1148 (NIS 2-direktivet)."]}]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["nis 2-direktivet"] == CELEX + "32022L2555"
     assert aliases["default"] == CELEX + "32022L2555"
 
@@ -79,7 +80,7 @@ def test_alias_listing_sentence_binds_each_alias_to_its_own_directive():
         "upphävande av direktiv 2004/17/EG (LUF-direktivet) samt direktiv "
         "2014/23/EU av den 26 februari 2014 om tilldelning av koncessioner "
         "(LUK-direktivet)."]}]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["lou-direktivet"] == CELEX + "32014L0024"
     assert aliases["luf-direktivet"] == CELEX + "32014L0025"
     assert aliases["luk-direktivet"] == CELEX + "32014L0023"
@@ -94,7 +95,7 @@ def test_alias_first_definition_wins_over_later_incidental_parenthesis():
         {"text": ["Beslutet får inte fattas för att förhindra att kontraktet "
                   "omfattas av direktiv 2014/24/EU (LUF-direktivet)."]},
     ]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["luf-direktivet"] == CELEX + "32014L0025"
 
 
@@ -110,7 +111,7 @@ def test_default_directive_from_law_level_subject_statement():
                   "paketresor upphävs. Direktiv 90/314/EEG byggde på en annan "
                   "systematik än direktiv 90/314/EEG."]},
     ]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["default"] == CELEX + "32015L2302"
 
 
@@ -226,7 +227,7 @@ def test_alias_binds_across_long_amendment_list():
         "Europaparlamentets och rådets direktiv 2002/49/EG, 2004/35/EG, "
         "2007/2/EG, 2009/147/EG och 2010/63/EU samt rådets direktiv 86/278/EEG "
         "(fågeldirektivet)."]}]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["fågeldirektivet"] == CELEX + "32009L0147"
 
 
@@ -240,7 +241,7 @@ def test_alias_lookback_survives_abbreviations():
         "livsmiljöer samt vilda djur och växter gäller bl.a. Natura "
         "2000-områden och skyddar t.ex. Barbastella barbastellus "
         "(art- och habitatdirektivet). En senare mening om annat."]}]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert aliases["art- och habitatdirektivet"] == CELEX + "31992L0043"
 
 
@@ -251,9 +252,9 @@ def test_subject_vocabulary_is_per_document_type():
     blocks = [{"text": [
         "Genom förordningen genomförs Europaparlamentets och rådets direktiv "
         "2009/147/EG av den 30 november 2009 om bevarande av vilda fåglar."]}]
-    assert resolve_directives(blocks, _refparser(), "fm")["default"] == (
+    assert resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "fm")["default"] == (
         CELEX + "32009L0147")
-    assert "default" not in resolve_directives(blocks, _refparser(), "prop")
+    assert "default" not in resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
 
 
 def test_fm_law_from_title_rubriks():
@@ -379,7 +380,7 @@ def test_directive_alias_ignores_co_cited_regulation():
     blocks = [{"text": [
         "förordning (EG) nr 1107/2006 av den 5 juli 2006 om rättigheter i "
         "samband med flygresor (jfr artikel 13.8 i direktivet)."]}]
-    aliases = resolve_directives(blocks, _refparser(), "prop")
+    aliases = resolve_directives(blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
     assert CELEX + "32006R1107" not in aliases.values()
 
 

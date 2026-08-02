@@ -26,20 +26,13 @@ so scanning it puts the agency's published reading on the rail of each paragraf
 it interprets -- next to the statute, which is where a reader meets it.
 """
 
-import functools
 import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..lib import compress
-from ..lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from ..lib.lagrum import (
-    ALL_PARSE_TYPES,
-    LagrumParser,
-    load_abbreviations,
-    load_namedlaws,
-)
+from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
     classify_letterhead,
     letterhead_footnotes,
@@ -137,21 +130,6 @@ RE_KKV_MASTHEAD = re.compile(
     r"|\s*Torsgatan 11|\s*08-700 16 00|\s*konkurrensverket@kkv\.se"
     r"|\s*www\.konkurrensverket\.se")
 RE_KKV_DNR = re.compile(r"\b\d+/\d{4}\b")
-
-
-@functools.cache
-def _refparser():
-    return LagrumParser(load_namedlaws(SFS_NAMEDLAWS), basefile="rs",
-                        abbreviations=load_abbreviations(SFS_NAMEDLAWS),
-                        parse_types=RS_PARSE_TYPES)
-
-
-def _fresh_parser():
-    """The shared parser with document-lifetime state reset (so one document's
-    'samma lag' / learned law names do not bleed into the next)."""
-    parser = _refparser()
-    parser.reset()
-    return parser
 
 
 # --------------------------------------------------------------------------
@@ -348,4 +326,4 @@ def parse_record(basefile, root):
         fotnoter=footnotes(record, root, ("rs", basefile)),
         source_url=record.get("source_url"),
         document_url=record.get("dokument_url"),
-    ).to_artifact(_fresh_parser())
+    ).to_artifact(sfs_parser("rs", RS_PARSE_TYPES))
