@@ -8,6 +8,8 @@ import pytest
 from accommodanda.hudoc import download, parse
 from accommodanda.lib import catalog, coe, facets, layout, render
 from accommodanda.lib.errors import SkipDocument
+from accommodanda.lib import page
+from accommodanda.coe import render as coe_render
 
 FIXTURES = Path(__file__).parent / "files" / "hudoc"
 
@@ -103,9 +105,9 @@ def test_hudoc_layout_and_catalog():
     assert layout.page_url(uri) == "/dom/echr/001-123456"
     assert layout.url_to_relpath("/dom/echr/001-123456") == \
         "dom/dom_echr_001_123456.html"
-    assert render.human_fragment("A6P3Ld") == "artikel 6 punkt 3 led d"
-    assert render.human_fragment("A25P1-2") == "artikel 25 punkt 1 variant 2"
-    assert render.human_fragment("AII.1") == "artikel II.1"
+    assert page.human_fragment("A6P3Ld") == "artikel 6 punkt 3 led d"
+    assert page.human_fragment("A25P1-2") == "artikel 25 punkt 1 variant 2"
+    assert page.human_fragment("AII.1") == "artikel II.1"
     art = {"uri": uri, "itemid": "001-123456", "doctype": "judgment",
            "title": "CASE OF EXAMPLE v. SWEDEN"}
     row = catalog.hudoc_document(art, "case.json")
@@ -150,8 +152,8 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
         (case["uri"], None, "001-123456", case["title"], "hudoc")]
     assert set(facets.group(con, "hudoc")) == {("judgment", "2024")}
     assert set(facets.group(con, "coe")) == {("treaty", "1950")}
-    site = render.Site(con, {treaty["uri"], case["uri"]})
-    html = render.render_coe(treaty, site)
+    site = page.Site(con, {treaty["uri"], case["uri"]})
+    html = coe_render.render(treaty, site)
     assert "Europadomstolens praxis" in html
     assert "CASE OF EXAMPLE v. SWEDEN" in html
     assert 'id="A8"' in html

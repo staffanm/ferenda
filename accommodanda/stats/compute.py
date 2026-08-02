@@ -30,7 +30,7 @@ import statistics
 from concurrent.futures import ProcessPoolExecutor
 
 from ..lib import catalog, layout
-from ..lib.render import human_fragment
+from ..lib.page import human_fragment
 from . import scan
 from .model import Cell, Measure, Point, Report, Row
 

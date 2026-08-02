@@ -1,9 +1,10 @@
 """The Jinja environment for every HTML producer in the system.
 
-Lives in its own module (not lib.render) so that modules render.py itself
-imports (lib.feeds) and modules that must never import render (api.app --
-render imports it for the in-process browse client) can still render their
-fragments from lib/templates/.
+Lives in its own module (not lib.render) so that everything which renders a
+fragment can reach the environment without importing the renderer: modules
+render.py itself imports (lib.feeds), the API's own screens (api/*), and each
+source's page renderer, which builds its own environment over its own
+templates/ with lib/templates/ as the fallback.
 
 Autoescape means plain values escape themselves and pre-rendered fragments
 pass through as markupsafe.Markup; StrictUndefined makes a missing context

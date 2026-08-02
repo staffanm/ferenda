@@ -10,6 +10,8 @@ from pathlib import Path
 from accommodanda.icrc import download, parse
 from accommodanda.icrc.model import Treaty, treaty_uri
 from accommodanda.lib import catalog, compress, facets, layout, render
+from accommodanda.lib import page
+from accommodanda.icrc import render as icrc_render
 
 FIXTURES = Path(__file__).parent / "files" / "icrc"
 
@@ -216,7 +218,7 @@ def test_render_treaty_page_highlights_folkratt_and_shows_metadata(tmp_path):
     database = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(database, "icrc", [p])
     con = catalog.connect(database)
-    html = render.render_icrc(art, render.Site(con, {art["uri"]}))
+    html = icrc_render.render(art, page.Site(con, {art["uri"]}))
     # the Folkrätt masthead entry is current for an IHL treaty page
     assert '<a href="/folkratt/" class="on">Folkrätt</a>' in html
     # the metadata block surfaces depositary + participation, the body the articles

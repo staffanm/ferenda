@@ -28,7 +28,7 @@ import time
 from datetime import date, datetime
 
 from .. import config
-from ..lib import facsimile, llm, render
+from ..lib import facsimile, llm, page
 from .tokenizer import re_ChangeNote
 
 # The source is inconsistent about its editorial delimiters. All of these occur
@@ -183,12 +183,12 @@ _BILAGA_ORD_RE = re.compile(r"[Bb]ilaga\s+(\d+(?:\s*[a-z](?:\.\d+)?)?|[A-ZÅÄÖ
 def _node_text(node):
     """Plain text of a node carrying `text` runs (stycke, rubrik), else ''."""
     runs = node.get("text")
-    return render.plain(runs) if runs else ""
+    return page.plain(runs) if runs else ""
 
 
 def _rad_text(node):
     """Plain text of a table row -- its cells joined; the road-sign anchor."""
-    return " ".join(render.plain(c) for c in node.get("cells", [])).strip()
+    return " ".join(page.plain(c) for c in node.get("cells", [])).strip()
 
 
 def _bilaga_ordinal(bilaga_node):

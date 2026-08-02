@@ -17,7 +17,8 @@ from pathlib import Path
 from markupsafe import Markup
 
 from ..lib import compress, layout, tpl
-from ..lib.render import edit_meta, escape, href, page
+from ..lib.page import escape, href, page
+from ..lib.render import edit_meta
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
 

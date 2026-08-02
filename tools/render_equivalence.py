@@ -41,8 +41,9 @@ from pathlib import Path
 
 import html5lib
 
-from accommodanda.build import sfs_version_pages
-from accommodanda.lib import catalog, compress, layout, render
+from accommodanda import browse
+from accommodanda.build import SOURCE_RENDERERS, sfs_version_pages
+from accommodanda.lib import catalog, compress, layout, page, render
 from accommodanda.site import render as site_render
 from accommodanda.stats import render as stats_render
 
@@ -237,8 +238,8 @@ def snapshot_documents(con, site, out, per_source, versions):
         except FileNotFoundError:
             skipped.append(uri)
             continue
-        html = render.render_document(art, source, site)
-        rel = Path("doc") / render.doc_relpath(uri)
+        html = render.render_document(art, source, site, SOURCE_RENDERERS)
+        rel = Path("doc") / page.doc_relpath(uri)
         target = out / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(normalize(html), encoding="utf-8")
@@ -251,8 +252,9 @@ def snapshot_aggregates(con, out):
     Browse trees are rendered whole -- they are cheap relative to documents."""
     tmp = Path(tempfile.mkdtemp(prefix="render-eq-"))
     try:
-        render.render_aggregates(con, tmp, str(CATALOG),
+        render.render_aggregates(con, tmp,
                                  write_index=not site_render.has_frontpage())
+        browse.generate_all(str(CATALOG), tmp, con)
         site_render.write_site(tmp)
         if compress.exists(layout.artifact("stats",
                                            stats_render.ARTIFACT_BASEFILE)):
@@ -298,7 +300,7 @@ def cmd_snapshot(label, per_source, versions):
         shutil.rmtree(out)
     out.mkdir(parents=True)
     con = catalog.connect(str(CATALOG))
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     ndocs, skipped = snapshot_documents(con, site, out, per_source, versions)
     naggs = snapshot_aggregates(con, out)
     print("snapshot %s: %d document pages, %d aggregate pages -> %s"
@@ -345,7 +347,7 @@ def cmd_check(label, sources, per_source, context):
     snap = SNAP_ROOT / label
     assert snap.exists(), "no snapshot %r under %s" % (label, SNAP_ROOT)
     con = catalog.connect(str(CATALOG))
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     wanted = set(sources.split(","))
     pages = [j for j in sample_documents(con, per_source) if j[1] in wanted]
     ok = bad = missing = 0
@@ -355,8 +357,8 @@ def cmd_check(label, sources, per_source, context):
                 "uri": uri, "type": source, "title": title}
         except FileNotFoundError:
             continue
-        live = normalize(render.render_document(art, source, site))
-        stored_path = snap / "doc" / render.doc_relpath(uri)
+        live = normalize(render.render_document(art, source, site, SOURCE_RENDERERS))
+        stored_path = snap / "doc" / page.doc_relpath(uri)
         if not stored_path.exists():
             missing += 1
             continue
@@ -379,7 +381,7 @@ def cmd_selftest(per_source):
     """The normalizer must be a fixed point on its own output, or the harness
     could hide its own bugs."""
     con = catalog.connect(str(CATALOG))
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     pages = sample_documents(con, per_source)
     bad = 0
     for uri, source, path, title in pages:
@@ -388,7 +390,7 @@ def cmd_selftest(per_source):
                 "uri": uri, "type": source, "title": title}
         except FileNotFoundError:
             continue
-        html = render.render_document(art, source, site)
+        html = render.render_document(art, source, site, SOURCE_RENDERERS)
         once = normalize(html)
         twice = normalize(once)
         if once != twice:

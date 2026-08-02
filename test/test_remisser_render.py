@@ -12,6 +12,8 @@ curated store (lib.annstore), and keys the feedback onto the förarbete's own ur
 import json
 
 from accommodanda.lib import annstore, catalog, layout, render
+from accommodanda.lib import page
+from accommodanda.forarbete import render as forarbete_render
 
 
 def _scenario(tmp_path, monkeypatch):
@@ -54,7 +56,7 @@ def _scenario(tmp_path, monkeypatch):
 def test_remiss_indexes_keys_feedback_on_forarbete_uri(tmp_path, monkeypatch):
     fa_uri, _ = _scenario(tmp_path, monkeypatch)
     # con is unused (remisser is never in the catalog); walk the filesystem
-    feedback, overall = render._remiss_indexes()
+    feedback, overall = page._remiss_indexes()
 
     assert list(feedback) == [(fa_uri, "a14.3.4")]
     item = feedback[(fa_uri, "a14.3.4")][0]
@@ -78,13 +80,13 @@ def test_remiss_indexes_skips_unanalyzed_answer(tmp_path, monkeypatch):
         "remitterat": [{"typ": "sou", "basefile": "2020:1"}],
         "source_url": "https://regeringen.se/svar/domstolsverket.pdf",
         "full_text": ["Domstolsverket avstyrker."]}))
-    feedback, overall = render._remiss_indexes()
+    feedback, overall = page._remiss_indexes()
     assert len(overall[fa_uri]) == 1        # only the analyzed answer contributes
 
 
 def test_remiss_html_escapes_org_and_quote():
-    rail = render.Rail(render.Site(None, set()), "https://lagen.nu/sou/2020:1")
-    html = render.render_rail_sections(
+    rail = page.Rail(page.Site(None, set()), "https://lagen.nu/sou/2020:1")
+    html = page.render_rail_sections(
         rail._remiss([{"organisation": "A & B <Org>", "sentiment": -0.8,
                        "quote": "de <säger> \"nej\"",
                        "source_url": "https://x/svar.pdf"}]))
@@ -100,10 +102,10 @@ def test_forarbete_avsnitt_carries_remiss_rail(tmp_path, monkeypatch):
     db = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(db, "forarbete", [fa_path])
     con = catalog.connect(db)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     assert (fa_uri, "a14.3.4") in site.remiss_feedback   # index picked up
 
-    html = render.render_forarbete(json.loads(fa_path.read_text()), site)
+    html = forarbete_render.render(json.loads(fa_path.read_text()), site)
     # the avsnitt heading is now wired to the scroll-driven rail
     assert 'data-rail="a14.3.4"' in html
     island = json.loads(

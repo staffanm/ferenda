@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog, compress, render
+from accommodanda import browse, build
+from accommodanda.lib import catalog, compress, page, render
+from accommodanda.avg import render as avg_render
+from accommodanda.dv import render as dv_render
+from accommodanda.eurlex import render as eurlex_render
+from accommodanda.forarbete import render as forarbete_render
+from accommodanda.foreskrift import render as foreskrift_render
+from accommodanda.sfs import render as sfs_render
 
 
 # a minimal SFS-shaped artifact: one paragraph whose stycke cites another law,
@@ -66,9 +73,10 @@ def test_generate_skips_vanished_artifact(tmp_path, capsys):
     catalog.rebuild(db, "sfs", [law, gone])
     gone.unlink()                                 # its catalog row now dangles
     out = tmp_path / "generated"
-    total, rendered = render.generate_site(db, out, source="sfs", write_index=False)
+    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS, source="sfs",
+                                           write_index=False)
     assert total == 2 and rendered == 1           # the vanished doc skipped, not fatal
-    assert compress.exists(str(out / render.doc_relpath(LAW["uri"])))  # live doc rendered
+    assert compress.exists(str(out / page.doc_relpath(LAW["uri"])))  # live doc rendered
     assert "vanished" in capsys.readouterr().err  # and the skip was warned
 
 
@@ -192,9 +200,10 @@ def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
     con = catalog.connect(str(dst / "catalog.sqlite"))
     # the render layer resolves the relative path against the new root and renders
     out = dst / "generated"
-    total, rendered = render.generate_site(str(dst / "catalog.sqlite"), str(out))
+    total, rendered = render.generate_site(str(dst / "catalog.sqlite"), str(out),
+                                           build.SOURCE_RENDERERS)
     assert rendered >= 1
-    assert compress.exists(out / render.doc_relpath(LAW["uri"]))   # page stored precompressed
+    assert compress.exists(out / page.doc_relpath(LAW["uri"]))   # page stored precompressed
 
 
 def test_generate_drops_a_colliding_page_and_carries_on(tmp_path, capsys):
@@ -216,10 +225,10 @@ def test_generate_drops_a_colliding_page_and_carries_on(tmp_path, capsys):
     catalog.rebuild(db, "begrepp", [a, b])
     out = tmp_path / "generated"
 
-    total, rendered = render.generate_site(db, str(out))
+    total, rendered = render.generate_site(db, str(out), build.SOURCE_RENDERERS)
 
     assert total == 2 and rendered == 1        # both counted, one page written
-    assert compress.exists(out / render.doc_relpath(
+    assert compress.exists(out / page.doc_relpath(
         "https://lagen.nu/begrepp/Första-hjälpen-tavlor"))
     warning = capsys.readouterr().err
     assert "output path collision" in warning
@@ -331,19 +340,19 @@ def test_force_relate_reextracts_all(tmp_path):
 
 
 def test_human_fragment():
-    assert render.human_fragment("K2P16S5") == "2 kap. 16 § 5 st"
-    assert render.human_fragment("K8P7S1N1") == "8 kap. 7 § 1 st 1 p"
-    assert render.human_fragment("P6") == "6 §"
-    assert render.human_fragment("sid39") == "s. 39"
-    assert render.human_fragment("") == ""
+    assert page.human_fragment("K2P16S5") == "2 kap. 16 § 5 st"
+    assert page.human_fragment("K8P7S1N1") == "8 kap. 7 § 1 st 1 p"
+    assert page.human_fragment("P6") == "6 §"
+    assert page.human_fragment("sid39") == "s. 39"
+    assert page.human_fragment("") == ""
 
 
 def test_describe_citer_pinpoints_statutes():
     # statute: full name + pinpoint; case: just the referat (no pinpoint)
-    assert render.describe_citer("u", "K2P16S5", "SFS 2010:800",
+    assert page.describe_citer("u", "K2P16S5", "SFS 2010:800",
                                  "Skollag (2010:800)", "sfs") \
         == "Skollag (2010:800) 2 kap. 16 § 5 st"
-    assert render.describe_citer("u", None, "NJA 1994 s. 1",
+    assert page.describe_citer("u", None, "NJA 1994 s. 1",
                                  "NJA 1994 s. 1", "dv") == "NJA 1994 s. 1"
 
 
@@ -371,24 +380,24 @@ def test_rebuild_is_idempotent(tmp_path):
 
 def test_href_and_relpath():
     # a statute is a top-level page at lagen.nu's bare /<sfsid> address (colon kept)
-    assert render.doc_relpath("https://lagen.nu/1975:635") == "1975:635.html"
-    assert render.href("https://lagen.nu/1975:635#P6") == "/1975:635#P6"
-    assert render.doc_relpath("https://lagen.nu/dom/NJA_1994_s_1") \
+    assert page.doc_relpath("https://lagen.nu/1975:635") == "1975:635.html"
+    assert page.href("https://lagen.nu/1975:635#P6") == "/1975:635#P6"
+    assert page.doc_relpath("https://lagen.nu/dom/NJA_1994_s_1") \
         == "dom/dom_NJA_1994_s_1.html"
     # external (non-lagen.nu) uris are left absolute
-    assert render.href("http://example.org/x") == "http://example.org/x"
+    assert page.href("http://example.org/x") == "http://example.org/x"
 
 
 def test_render_runs_outbound_link(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_runs(
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = page.render_runs(
         ["se ", {"uri": "https://lagen.nu/1975:635#P5", "text": "5 §"}, "."], site)
     assert html == 'se <a href="/1975:635#P5">5 §</a>.'
 
 
 def test_celex_renders_as_external_eurlex_link(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_runs(
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = page.render_runs(
         ["enligt ", {"uri": "https://lagen.nu/ext/celex/31995L0046",
                      "text": "direktiv 95/46/EG"}], site)
     assert 'class="ext"' in html
@@ -399,8 +408,8 @@ def test_celex_renders_as_external_eurlex_link(tmp_path):
 
 def test_render_runs_gates_absent_target(tmp_path):
     # a citation to a document not in the catalog renders as text, not a 404 link
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_runs(
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = page.render_runs(
         ["se ", {"uri": "https://lagen.nu/prop/1975:1#P5", "text": "prop. 1975:1"}], site)
     assert "<a " not in html
     assert '<span class="noref"' in html and "prop. 1975:1" in html
@@ -413,8 +422,8 @@ def _island(html):
 
 
 def test_law_page_has_inbound_annotation(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_sfs(LAW, site)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render(LAW, site)
     # the citing case is in §6's context-rail panel, linking back to the case
     panel = _island(html)["P6"]
     assert 'data-sec="dv" data-label="Rättsfall"' in panel
@@ -427,7 +436,7 @@ def test_paragraf_rail_shows_amendment_history(tmp_path):
     # provision's own rail panel -- "Ändrad: SFS … (Prop. …)", the SFS number
     # linking its post in the bottom-of-page register -- while other
     # provisions' changes and non-proposition förarbeten stay out
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = json.loads(json.dumps(LAW))
     art["amendments"] = [
         {"properties": {"dcterms:identifier": "SFS 1975:635"}},
@@ -438,7 +447,7 @@ def test_paragraf_rail_shows_amendment_history(tmp_path):
         {"properties": {"dcterms:identifier": "SFS 2018:1",
                         "rpubl:inforsI": ["https://lagen.nu/1975:635#P4A"]}},
     ]
-    panel = _island(render.render_sfs(art, site))["P6"]
+    panel = _island(sfs_render.render(art, site))["P6"]
     assert 'data-sec="andringar" data-label="Ändringar"' in panel
     assert 'Ändrad: <a href="#L2013:55">SFS 2013:55</a>' in panel
     assert "Prop. 2012/13:36" in panel
@@ -451,12 +460,12 @@ def test_sfs_header_and_meta_placement(tmp_path):
     # official title moves out of the h1 into dl.meta "Titel". C1: dl.meta sits under
     # the h1 in the frontmatter (not the rail), Utfärdad is dropped and the source
     # "Källa" link is its last row.
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = json.loads(json.dumps(LAW))
     art["source_url"] = "https://beta.rkrattsbaser.gov.se/sfs/item?bet=1975:635"
     art["metadata"]["properties"]["dcterms:identifier"] = \
         "SFS 1975:635 i lydelse enligt SFS 2013:55"
-    html = render.render_sfs(art, site)
+    html = sfs_render.render(art, site)
     start = html.index('<header class="frontmatter">')   # not the masthead <header>
     frontmatter = html[start:html.index("</header>", start)]
     assert '<div class="eyebrow">SFS 1975:635</div>' in frontmatter
@@ -476,8 +485,8 @@ def test_render_document_injects_edit_meta(tmp_path):
     # render_document (the dispatcher) grafts the inline-editor <meta> + editor.js
     # onto every page: a statute is commentary-editable (kind=kommentar, ref=the
     # SFS number), a case is not (dv hosts no editable content).
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    law = render.render_document(LAW, "sfs", site)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    law = render.render_document(LAW, "sfs", site, build.SOURCE_RENDERERS)
     assert '<meta name="lagen-doc" data-kind="kommentar" data-ref="1975:635"' in law
     # a statute is patchable, so its identity rides on the meta for the
     # "patch source" button beside the commentary one
@@ -485,13 +494,13 @@ def test_render_document_injects_edit_meta(tmp_path):
     # editor.js rides in the single concatenated bundle now, so the page links
     # /script.js (not a per-file /editor.js tag)
     assert law.count("</head>") == 1 and '/script.js' in law
-    case = render.render_document(CASE, "dv", site)
+    case = render.render_document(CASE, "dv", site, build.SOURCE_RENDERERS)
     assert 'name="lagen-doc"' not in case      # court decisions are read-only
     assert '/script.js' in case                # but the bundle still loads (editor inert)
 
 
 def test_expired_statute_is_marked(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     repealed = {
         "uri": "https://lagen.nu/1975:1385",
         "metadata": {"properties": {
@@ -500,7 +509,7 @@ def test_expired_statute_is_marked(tmp_path):
             "rinfoex:upphavdAv": "https://lagen.nu/2005:552"}},
         "structure": [],
     }
-    html = render.render_sfs(repealed, site)
+    html = sfs_render.render(repealed, site)
     assert 'class="gr-root expired"' in html       # drives the subdue + watermark
     assert "Upphävd författning" in html
     assert 'href="/2005:552"' in html              # link to the repealing act
@@ -508,35 +517,35 @@ def test_expired_statute_is_marked(tmp_path):
     # a *future* repeal date is still in force -> not marked
     upcoming = json.loads(json.dumps(repealed))
     upcoming["metadata"]["properties"]["rpubl:upphavandedatum"] = "2099-01-01"
-    out = render.render_sfs(upcoming, site)
+    out = sfs_render.render(upcoming, site)
     assert 'class="gr-root expired"' not in out and "expired-banner" not in out
 
 
 def test_dv_ursprunglig_dom_link(tmp_path):
     # R2 part C: a referat that absorbed the court's pre-referat verdict links its
     # PDF as "Ursprunglig dom" (served by /api/v1/dv-verdict); absent otherwise
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     case = json.loads(json.dumps(CASE))
     case["ursprunglig_dom"] = [{
         "malnummer": ["B 920-25"], "avgorandedatum": "2025-11-04",
         "url": "/api/v1/dv-verdict?court=HDO&id=abc&file=B%20920-25.pdf"}]
-    html = render.render_dv(case, site)
+    html = dv_render.render(case, site)
     assert "Ursprunglig dom" in html
     assert ('href="/api/v1/dv-verdict?court=HDO&amp;id=abc&amp;file=B%20920-25.pdf"'
             in html)
     assert "B 920-25 (2025-11-04)" in html
-    assert "Ursprunglig dom" not in render.render_dv(CASE, site)
+    assert "Ursprunglig dom" not in dv_render.render(CASE, site)
 
 
 def test_case_page_links_into_law(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_dv(CASE, site)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = dv_render.render(CASE, site)
     assert 'href="/1975:635#P6"' in html
     assert "Om dröjsmålsränta." in html  # sammanfattning rendered
 
 
 def test_case_page_renders_curated_groups(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     case = json.loads(json.dumps(CASE))
     case["metadata"].update({
         "lagrum": [{"text": "6 § räntelagen (1975:635)", "sfsnummer": "1975:635",
@@ -548,7 +557,7 @@ def test_case_page_renders_curated_groups(tmp_path):
         "litteratur": [{"text": "Ekelöf, Rättegång IV",
                         "runs": ["Ekelöf, Rättegång IV"]}],
     })
-    html = render.render_dv(case, site)
+    html = dv_render.render(case, site)
     # a resolved curated lagrum links; unresolved entries stay visible as text
     assert '<section class="curated lagrum"><h2>Lagrum</h2>' in html
     assert html.count('href="/1975:635#P6"') == 2   # body + curated lagrum
@@ -593,8 +602,8 @@ def test_foreskrift_links_come_from_presented_consolidation():
 
 
 def test_foreskrift_page_presents_consolidation(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
-    html = render.render_foreskrift(FORESKRIFT, site)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = foreskrift_render.render(FORESKRIFT, site)
     assert "Konsoliderad version" in html               # labelled, not silent
     assert "inofficiell sammanställning" in html
     assert "FFFS 2016:13" in html                       # the cutoff amendment
@@ -607,11 +616,11 @@ def test_foreskrift_page_presents_consolidation(tmp_path):
 
 
 def test_foreskrift_grund_page_shows_base_text(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     grund = dict(json.loads(json.dumps(FORESKRIFT)),
                  uri=FORESKRIFT["uri"] + "/grund", version="grund",
                  consolidations=[])
-    html = render.render_foreskrift(grund, site)
+    html = foreskrift_render.render(grund, site)
     assert "Ursprunglig lydelse" in html
     assert 'href="/fffs/2013:10"' in html               # way back
     assert "Ursprunglig hänvisning" in html             # the as-enacted body
@@ -622,12 +631,12 @@ def test_foreskrift_grund_page_shows_base_text(tmp_path):
 def test_foreskrift_page_links_unparsed_consolidation(tmp_path):
     # a konsoliderad PDF that yielded no text (image-only scan, cover sheet)
     # must not vanish: the base text renders, with the agency's PDF linked
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = json.loads(json.dumps(FORESKRIFT))
     art["consolidations"] = [{"of": art["uri"], "konsolideradTom": None,
                               "url": "https://fi.se/konsoliderad.pdf",
                               "structure": []}]
-    html = render.render_foreskrift(art, site)
+    html = foreskrift_render.render(art, site)
     assert "Ursprunglig hänvisning" in html             # base text presented
     assert "inte kunnat läsas in" in html
     assert 'href="https://fi.se/konsoliderad.pdf"' in html
@@ -711,15 +720,15 @@ def test_foreskrift_relation_edges_and_inbound_mirrors(tmp_path):
 
 def test_foreskrift_page_renders_relation_groups(tmp_path):
     con = _foreskrift_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
-    html = render.render_foreskrift(ANDRINGSFS, site)
+    site = page.Site.from_catalog(con)
+    html = foreskrift_render.render(ANDRINGSFS, site)
     assert "Ändrar</h2>" in html
     assert "Upphäver</h2>" in html
     # the catalogued target links; the uncatalogued one stays a plain span
     assert 'href="/aafs/1999:1"' in html
     assert '<span class="noref">' in html               # aafs/2005:5 unhosted
     # the replaced regulation's page names its replacer from the typed edge
-    out = render.render_foreskrift(UPPHAVDFS, site)
+    out = foreskrift_render.render(UPPHAVDFS, site)
     assert "Upphävs eller ersätts av</h2>" in out
     assert 'href="/aafs/2006:11"' in out and "ÅFS 2006:11" in out
     # ... and flags the status at the top: a repealed föreskrift must never
@@ -734,7 +743,7 @@ def test_foreskrift_page_renders_relation_groups(tmp_path):
 def test_browse_item_basic_template():
     # I2: the basic listing entry is a <dt> with the bold linked short_id + a <dd>
     # with the short name
-    html = render._browse_item({"url": "/prop/2019/20:1", "display": "x",
+    html = browse._browse_item({"url": "/prop/2019/20:1", "display": "x",
                                 "short_id": "Prop. 2019/20:1",
                                 "short_title": "Budgetpropositionen för 2020"})
     assert html == ('<dt><a href="/prop/2019/20:1"><strong>Prop. 2019/20:1</strong>'
@@ -754,13 +763,13 @@ def test_dv_listing_groups_sorts_and_formats():
         {"url": "/dom/hd/b/2026-01-01", "short_id": "HD mål B 2-25",
          "short_title": None, "description": None, "variant": "dom", "date": "2026-01-01"},
     ]
-    html = render._dv_listing(docs)
+    html = browse._dv_listing(docs)
     assert re.findall(r'dv-variant">([^<]+)<', html) == ["Domar", "Referat", "Notiser"]
     assert html.index("Ö 1-25") < html.index("B 2-25")        # domar newest first
     assert "<dd>Fotbollsmatchen: Om ansvar.</dd>" in html      # named -> namn: desc
     assert "<dd>J.A. mot HSB.</dd>" in html                    # unnamed -> just desc
     # a single-variant bucket shows no headers
-    solo = render._dv_listing([docs[0]])
+    solo = browse._dv_listing([docs[0]])
     assert "dv-variant" not in solo and solo.startswith('<dl class="browse-list def">')
 
 
@@ -780,9 +789,9 @@ def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
     # the repealed regulation stays listed (point-in-time law needs it
     # findable) but dims; its replacer reads normally
     assert by_uri[UPPHAVDFS["uri"]].get("subdued") is True
-    assert '<dt class="subdued">' in render._browse_item(by_uri[UPPHAVDFS["uri"]])
+    assert '<dt class="subdued">' in browse._browse_item(by_uri[UPPHAVDFS["uri"]])
     assert by_uri[ANDRINGSFS["uri"]].get("subdued") is None
-    assert 'class="subdued"' not in render._browse_item(by_uri[ANDRINGSFS["uri"]])
+    assert 'class="subdued"' not in browse._browse_item(by_uri[ANDRINGSFS["uri"]])
 
 
 BASFS = {
@@ -867,12 +876,12 @@ def test_foreskrift_succeeded_series_folds_into_successor(tmp_path):
                for y in imyfs["children"] for d in y["documents"])
     # I before Å in the primary axis (F1: Swedish order, ÅFS after Z)
     assert keys.index("IMYFS") < keys.index("AAFS")
-    note = render._fs_series_note(imyfs)
+    note = browse._fs_series_note(imyfs)
     assert "Datainspektionens författningssamling (DIFS)" in note
     # the registry knows RÅFS preceded ÅFS, but no RÅFS document is in the
     # bucket -- the page must not claim to list any
     aafs = next(b for b in view["buckets"] if b["key"] == "AAFS")
-    assert render._fs_series_note(aafs) == ""
+    assert browse._fs_series_note(aafs) == ""
 
 
 def test_foreskrift_small_series_gets_one_index_page(tmp_path):
@@ -880,7 +889,8 @@ def test_foreskrift_small_series_gets_one_index_page(tmp_path):
     # headed by its official name (once -- the frontmatter h1 stands down)
     con = _fs_browse_catalog(tmp_path)
     out = tmp_path / "site"
-    render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
+    render.render_aggregates(con, out)
+    browse.generate_all(str(tmp_path / "catalog.sqlite"), out, con)
     html = compress.read_text(out / "foreskrift" / "aafs" / "index.html")
     assert "Åklagarmyndighetens författningssamling (ÅFS)" in html
     assert len(re.findall(r"<h1>", html)) == 1
@@ -896,7 +906,8 @@ def test_myndigheter_landing_links_both_collections(tmp_path):
     # and the masthead's Myndigheter entry points at it
     con = _fs_browse_catalog(tmp_path)
     out = tmp_path / "site"
-    render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
+    render.render_aggregates(con, out)
+    browse.generate_all(str(tmp_path / "catalog.sqlite"), out, con)
     html = compress.read_text(out / "myndigheter" / "index.html")
     assert "<h2>Föreskrifter</h2>" in html
     assert '<a href="/foreskrift/">' in html
@@ -921,7 +932,9 @@ def test_foreskrift_large_series_partitions_by_year_with_top_axis(tmp_path):
         paths.append(p)
     catalog.rebuild(db, "foreskrift", paths)
     out = tmp_path / "site"
-    render.render_aggregates(catalog.connect(db), out, db)
+    con = catalog.connect(db)
+    render.render_aggregates(con, out)
+    browse.generate_all(db, out, con)
     html = compress.read_text(out / "foreskrift" / "tsfs" / "2020" / "index.html")
     assert "Transportstyrelsens författningssamling (TSFS) 2020" in html
     # the year axis is the top banner, current year marked; no year list in
@@ -934,7 +947,7 @@ def test_foreskrift_large_series_partitions_by_year_with_top_axis(tmp_path):
 # --- avg: JO official_report (ämbetsberättelse) ------------------------------
 
 def test_jo_page_shows_official_report(tmp_path):
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = {"uri": "https://lagen.nu/avg/jo/1672-1987", "type": "avgorande",
            "org": "jo", "identifier": "JO dnr 1672-1987",
            "metadata": {"title": "Förföljande med polisfordon",
@@ -943,17 +956,17 @@ def test_jo_page_shows_official_report(tmp_path):
                         "beslutsdatum": "1990-06-28",
                         "officialReport": "JO 1990/91 s. 70"},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Beslut."]}]}
-    html = render.render_avg(art, site)
+    html = avg_render.render(art, site)
     assert "<dt>Ämbetsberättelse</dt><dd>JO 1990/91 s. 70</dd>" in html  # dl.meta (C1)
     # a decision without one (every jk/arn, most live jo) shows no empty row
     del art["metadata"]["officialReport"]
-    assert "Ämbetsberättelse" not in render.render_avg(art, site)
+    assert "Ämbetsberättelse" not in avg_render.render(art, site)
 
 
 def test_avg_meta_drops_avgjord_av(tmp_path):
     # A3: who signed a JO decision is neither meta the reader needs nor
     # correctly labelled -- the row goes
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = {"uri": "https://lagen.nu/avg/jo/9993-2023", "type": "avgorande",
            "org": "jo", "identifier": "JO dnr 9993-2023",
            "metadata": {"title": "Kritik mot en myndighet",
@@ -961,14 +974,14 @@ def test_avg_meta_drops_avgjord_av(tmp_path):
                         "diarienummer": ["9993-2023"],
                         "avgjordAv": "Chefsjustitieombudsmannen Erik Nymansson"},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Beslut."]}]}
-    html = render.render_avg(art, site)
+    html = avg_render.render(art, site)
     assert "Avgjord av" not in html and "Nymansson" not in html
 
 
 def test_imy_page_shows_the_fine_and_the_praxis_fields(tmp_path):
     # the sanktionsavgift and the praxisbeslut page's curated fields exist
     # nowhere else on imy.se, so the decision page is where a reader meets them
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = {"uri": "https://lagen.nu/avg/imy/DI-2021-5774", "type": "avgorande",
            "org": "imy", "identifier": "IMY dnr DI-2021-5774",
            "metadata": {"title": "Utbildningsnämnden – Aspuddens skola",
@@ -980,21 +993,21 @@ def test_imy_page_shows_the_fine_and_the_praxis_fields(tmp_path):
                         "praxis": {"lagrum": "Artiklarna 6.1 c och 13.1",
                                    "overklagan": "Nej", "lagakraft": "Ja"}},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Beslutet."]}]}
-    html = render.render_avg(art, site)
+    html = avg_render.render(art, site)
     assert 'eyebrow">IMY dnr DI-2021-5774' in html
     assert "<dt>Sanktionsavgift</dt><dd>800 000 kronor</dd>" in html
     assert "<dt>Lagrum</dt><dd>Artiklarna 6.1 c och 13.1</dd>" in html
     assert "<dt>Vunnit laga kraft</dt><dd>Ja</dd>" in html
     # the same rows must not appear as empty ones on the organs that have none
     del art["metadata"]["sanktionsavgift"], art["metadata"]["praxis"]
-    bare = render.render_avg(art, site)
+    bare = avg_render.render(art, site)
     assert "Sanktionsavgift" not in bare and "Vunnit laga kraft" not in bare
 
 
 def test_kkv_page_shows_the_registers_own_fields(tmp_path):
     # a competition case is known by who it was against and what kind of case it
     # was -- both are the diarium's fields, and nothing else in avg has them
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = {"uri": "https://lagen.nu/avg/kkv/558/2026", "type": "avgorande",
            "org": "kkv", "identifier": "KKV dnr 558/2026",
            "metadata": {"title": "Anmälan om företagskoncentration",
@@ -1007,7 +1020,7 @@ def test_kkv_page_shows_the_registers_own_fields(tmp_path):
                         "beslutstyp": ["Avskrivning", "Dom"],
                         "nyckelord": ["3.2.3.2 Prövning av företagskoncentration"]},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Beslutet."]}]}
-    html = render.render_avg(art, site)
+    html = avg_render.render(art, site)
     assert "<dt>Motpart</dt><dd>HV NEF2 Invest Ascona II AS</dd>" in html
     assert "<dt>Myndighet</dt><dd>Konkurrensverket</dd>" in html
     # the curated ärendelista's own navigation fields
@@ -1016,7 +1029,7 @@ def test_kkv_page_shows_the_registers_own_fields(tmp_path):
     # the organs that have none of these show no empty rows
     for key in ("motpart", "bransch", "beslutstyp"):
         del art["metadata"][key]
-    bare = render.render_avg(art, site)
+    bare = avg_render.render(art, site)
     assert "Motpart" not in bare and "Bransch" not in bare
     assert "Typ av beslut" not in bare
 
@@ -1025,7 +1038,7 @@ def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
     # A4: the ARN "title" is the referat's preamble -- the h1 takes its first
     # sentence (abbreviation-aware: not cut at "s.k."), the whole preamble
     # reads in the sammanfattning slot above the referat text
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     preamble = ("Frågan gällde vilken lag som skulle tillämpas på ett s.k. "
                 "blandat avtal. Nämnden fann att konsumentköplagen gällde.")
     art = {"uri": "https://lagen.nu/avg/arn/2026-01631", "type": "avgorande",
@@ -1034,7 +1047,7 @@ def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
                         "publisher": "Allmänna reklamationsnämnden",
                         "diarienummer": ["2026-01631"]},
            "structure": [{"type": "stycke", "id": "S1", "text": ["Referatet."]}]}
-    html = render.render_avg(art, site)
+    html = avg_render.render(art, site)
     assert ("<h1>Frågan gällde vilken lag som skulle tillämpas på ett s.k. "
             "blandat avtal.</h1>") in html
     assert re.search(r'class="sammanfattning">Frågan gällde.*'
@@ -1087,7 +1100,7 @@ def test_dv_source_url_uses_publication_group():
 def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
     from accommodanda.lib import layout
     monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
-    from accommodanda import build
+    from accommodanda import browse, build
 
     # derived: eurlex gets its ELI even with nothing recorded
     out = layout.artifact("eurlex", "32023R2854")
@@ -1107,13 +1120,13 @@ def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
 def test_page_renders_source_link(tmp_path):
     # the source ("Källa") link lives in the context-rail island now, not the
     # frontmatter (C1) -- so the rail always has content on load
-    site = render.Site.from_catalog(build_catalog(tmp_path))
+    site = page.Site.from_catalog(build_catalog(tmp_path))
     art = dict(LAW, source_url="https://rkrattsbaser.gov.se/sfst?bet=1975:635")
-    html = render.render_sfs(art, site)
+    html = sfs_render.render(art, site)
     assert "https://rkrattsbaser.gov.se/sfst?bet=1975:635" in html   # in the rail
     assert "Källa" in html                                           # rail section head
     # absent source_url -> no Källa section at all
-    assert "Källa" not in render.render_sfs(LAW, site)
+    assert "Källa" not in sfs_render.render(LAW, site)
 
 
 PUNKTLAW = {
@@ -1134,8 +1147,8 @@ def test_renders_stycke_punkt_children(tmp_path):
     p = tmp_path / "l.json"
     p.write_text(json.dumps(PUNKTLAW))
     catalog.rebuild(db, "sfs", [p])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(PUNKTLAW, site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(PUNKTLAW, site)
     assert "föreskrifter om verkställighet, och" in html  # list item now shown
     assert "andra föreskrifter." in html
     assert 'class="punkter"' in html
@@ -1164,8 +1177,8 @@ def test_renders_nested_punkt_sublist(tmp_path):
     p = tmp_path / "l.json"
     p.write_text(json.dumps(NESTLAW))
     catalog.rebuild(db, "sfs", [p])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(NESTLAW, site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(NESTLAW, site)
     # outer list plus the nested a/b/c sublist
     assert html.count('class="punkter"') >= 2
     # a/b/c are nested under point 2 (between it and point 3), not flat siblings
@@ -1184,26 +1197,26 @@ def test_renders_nested_punkt_sublist(tmp_path):
 
 def test_outbound_link_carries_no_tooltip(tmp_path):
     con = build_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     # the case links to 1975:635#P6; hover preview is popover.js's job (built
     # client-side from the rendered target page), so the link must be plain --
     # a title attribute would fight the popover with a native tooltip
-    html = render.render_dv(CASE, site)
+    html = dv_render.render(CASE, site)
     assert 'href="/1975:635#P6"' in html
     assert 'title="Ränta beräknas enligt 5 §."' not in html
 
 
 def test_inbound_grouped_by_source(tmp_path):
     con = build_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
-    html = render.render_sfs(LAW, site)   # §6 is cited by the case
+    site = page.Site.from_catalog(con)
+    html = sfs_render.render(LAW, site)   # §6 is cited by the case
     panel = _island(html)["P6"]
     assert 'class="rail-sec dv"' in panel
     assert "Rättsfall" in panel           # the source-group heading
 
 
 def test_toc_collects_and_generates_anchors():
-    toc = render.Toc()
+    toc = page.Toc()
     assert toc.add("K1", "1 kap.", 1) == "K1"      # existing id reused
     assert toc.add(None, "Bakgrund", 1) == "sec1"  # id-less -> generated, stable
     assert toc.add(None, "  ", 1) == "sec2"        # blank text -> no entry, still counts
@@ -1211,18 +1224,18 @@ def test_toc_collects_and_generates_anchors():
 
 
 def test_render_toc_skips_short_documents():
-    toc = render.Toc()
+    toc = page.Toc()
     toc.add("a", "One", 1)
     toc.add("b", "Two", 1)
-    assert render.render_toc(toc) == ""            # < MIN_TOC headings
+    assert page.render_toc(toc) == ""            # < MIN_TOC headings
 
 
 def test_render_toc_builds_nav_with_levels():
-    toc = render.Toc()
+    toc = page.Toc()
     toc.add("K1", "1 kap.", 1)
     toc.add(None, "Rubrik", 2)
     toc.add("K2", "2 kap.", 1)
-    html = render.render_toc(toc)
+    html = page.render_toc(toc)
     assert 'class="toc"' in html and "Innehåll" in html
     assert '<a href="#K1" class="lvl1">1 kap.</a>' in html
     assert '<a href="#sec1" class="lvl2">Rubrik</a>' in html
@@ -1230,7 +1243,7 @@ def test_render_toc_builds_nav_with_levels():
 
 def test_document_page_includes_toc_and_anchors(tmp_path):
     con = build_catalog(tmp_path)  # LAW has only §6 -> no headings -> no toc
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     headed = {"uri": "https://lagen.nu/2020:1",
               "metadata": {"properties": {"dcterms:title": "Testlag (2020:1)"}},
               "structure": [
@@ -1242,7 +1255,7 @@ def test_document_page_includes_toc_and_anchors(tmp_path):
                   {"type": "kapitel", "id": "K2", "ordinal": "2", "children": [
                       {"type": "rubrik", "id": "K2R1", "level": 1,
                        "text": ["2 kap. Senare bestämmelser"]}]}]}
-    html = render.render_sfs(headed, site)
+    html = sfs_render.render(headed, site)
     assert '<nav class="toc">' in html
     # a chapter's title rubrik is folded into a single chapter heading under the
     # chapter's own id: one TOC entry per chapter (#K1, #K2), plus section rubriks
@@ -1277,9 +1290,9 @@ def test_chapter_heading_flattens_self_referencing_designator(tmp_path):
     path = tmp_path / "2020-1.json"
     path.write_text(json.dumps(doc))
     catalog.rebuild(db, "sfs", [path])                  # now a hosted document...
-    site = render.Site.from_catalog(catalog.connect(db))
+    site = page.Site.from_catalog(catalog.connect(db))
     assert site.has("https://lagen.nu/2020:1#K1")       # ...so a run WOULD link
-    html = render.render_sfs(doc, site)
+    html = sfs_render.render(doc, site)
     heading = re.search(r'<h2 id="K1" class="kaprubrik">(.*?)</h2>', html).group(1)
     assert heading == "1 kap. Inledande bestämmelser"   # designator de-linked
     assert "<a" not in heading and "#K1" not in heading  # no self-link survived
@@ -1292,7 +1305,7 @@ def test_facet_nav_omits_single_bucket_primary_axis():
                          "count": 7, "children": [
                              {"key": "2024", "label": "2024", "slug": "2024",
                               "count": 7, "children": None}]}]}
-    nav = render._facet_nav("hudoc", view, ["judgment", "2024"])
+    nav = browse._facet_nav("hudoc", view, ["judgment", "2024"])
     assert "Dokumenttyp" not in nav          # single-value primary axis suppressed
     assert '<h2 class="facet-axis">År</h2>' in nav
     # a multi-bucket primary axis is shown as before
@@ -1300,11 +1313,11 @@ def test_facet_nav_omits_single_bucket_primary_axis():
                             "count": 1, "children": [
                                 {"key": "2024", "label": "2024", "slug": "2024",
                                  "count": 1, "children": None}]})
-    assert "Dokumenttyp" in render._facet_nav("hudoc", view, ["judgment", "2024"])
+    assert "Dokumenttyp" in browse._facet_nav("hudoc", view, ["judgment", "2024"])
     # ... unless the page's cross-source banner already lists the same buckets:
     # the eurlex/edpb rail leaves the document types to the EU-rätt selector
     # above rather than offering the same choice twice
-    nav = render._facet_nav("hudoc", view, ["judgment", "2024"],
+    nav = browse._facet_nav("hudoc", view, ["judgment", "2024"],
                             primary_in_banner=True)
     assert "Dokumenttyp" not in nav
     assert '<h2 class="facet-axis">År</h2>' in nav
@@ -1313,7 +1326,7 @@ def test_facet_nav_omits_single_bucket_primary_axis():
 def test_a_cross_axis_selector_can_carry_more_than_one_labelled_group():
     groups = [("EU-rättsakter", [("eurlex:regulation", "Förordningar", "/a/", 3)]),
               ("EDPB:s vägledningar", [("edpb:riktlinjer", "Riktlinjer", "/b/", 2)])]
-    html = render._cross_nav(groups, "edpb:riktlinjer")
+    html = render.cross_nav(groups, "edpb:riktlinjer")
     assert html.count('<h2 class="facet-axis">') == 2
     assert '<h2 class="facet-axis">EDPB:s vägledningar</h2>' in html
     assert html.count('aria-current="page"') == 1
@@ -1324,7 +1337,8 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     # exercises render_aggregates end to end (frontpage + faceted browse)
     con = build_catalog(tmp_path)        # Räntelag (1975:635), one HD case
     out = tmp_path / "site"
-    render.render_aggregates(con, out, str(tmp_path / "catalog.sqlite"))
+    render.render_aggregates(con, out)
+    browse.generate_all(str(tmp_path / "catalog.sqlite"), out, con)
     # the law files under its subject initial 'R' (Räntelag); the source root and
     # the bucket page both list it (root == default bucket, no redirect)
     bucket = compress.read_text(out / "sfs" / "r" / "index.html")   # pages precompressed
@@ -1400,12 +1414,14 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
         manifest[uri] = signature(chash, dep)
         rendered_uris.append(uri)
 
-    total, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert total >= 2 and rendered == total          # first run renders every page
     assert LAW["uri"] in rendered_uris and CASE["uri"] in rendered_uris
 
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert rendered == 0 and rendered_uris == []     # nothing changed -> all skipped
 
     # edit the law's title (new bytes -> new content_hash), re-relate, regenerate:
@@ -1414,7 +1430,8 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
                    {"dcterms:title": "Räntelag (1975:635), ändrad"}}}))
     catalog.rebuild(db, "sfs", [law])
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert rendered_uris == [LAW["uri"]]             # only the edited page
 
     # a new case citing the law changes the law's inbound set -> its dependency
@@ -1428,7 +1445,8 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
                     "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}))
     catalog.rebuild(db, "dv", [case, newcase])
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris               # cited page re-rendered
     assert "https://lagen.nu/dom/NJA_2001_s_1" in rendered_uris   # the new page
 
@@ -1478,13 +1496,15 @@ def test_kommentar_edit_rerenders_host_page(tmp_path):
     manifest, rendered_uris = {}, []
     fresh, record = _incremental_harness(manifest, rendered_uris)
 
-    render.generate_site(db, out, fresh=fresh, record=record)
+    render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris
-    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
-    assert "Kommentar till 6 §." in page             # prose reached the rail
+    html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
+    assert "Kommentar till 6 §." in html            # prose reached the rail
 
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert rendered == 0                             # unchanged -> all fresh
 
     # edit the commentary prose, re-relate the kommentar source, regenerate:
@@ -1494,10 +1514,11 @@ def test_kommentar_edit_rerenders_host_page(tmp_path):
             {"type": "stycke", "text": ["Omskriven kommentar."]}]}]}))
     catalog.rebuild(db, "kommentar", [komm])
     rendered_uris.clear()
-    render.generate_site(db, out, fresh=fresh, record=record)
+    render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert rendered_uris == [LAW["uri"]]
-    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
-    assert "Omskriven kommentar." in page
+    html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
+    assert "Omskriven kommentar." in html
 
 
 def test_generate_site_only_composes_with_source(tmp_path):
@@ -1518,14 +1539,36 @@ def test_generate_site_only_composes_with_source(tmp_path):
     catalog.rebuild(db, "sfs", [law, law2])
     out = tmp_path / "site"
 
-    total, rendered = render.generate_site(
-        db, out, only={str(law)}, source="sfs")
+    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                           only={str(law)}, source="sfs")
     assert (total, rendered) == (1, 1)               # exactly the named page
 
     # a scope naming a document outside the source renders nothing
-    total, rendered = render.generate_site(
-        db, out, only={str(law)}, source="dv")
+    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                           only={str(law)}, source="dv")
     assert total == 0
+
+
+def test_pooled_generate_matches_serial(tmp_path):
+    # each source owns its renderer and the dispatch table is composed in
+    # build.py, so the pool workers receive it through _render_init's initargs
+    # (pickled by qualified name). A worker that resolved a *different* table --
+    # or none -- would still produce plausible HTML, so the two paths are
+    # compared page for page rather than merely asserted to succeed.
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps(CASE))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [case])
+
+    serial, pooled = tmp_path / "serial", tmp_path / "pooled"
+    assert render.generate_site(db, serial, build.SOURCE_RENDERERS, jobs=1) \
+        == render.generate_site(db, pooled, build.SOURCE_RENDERERS, jobs=2)
+    for uri in (LAW["uri"], CASE["uri"]):
+        rel = page.doc_relpath(uri)
+        assert compress.read_text(serial / rel) == compress.read_text(pooled / rel)
 
 
 def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
@@ -1543,10 +1586,12 @@ def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
     manifest, rendered_uris = {}, []
     fresh, record = _incremental_harness(manifest, rendered_uris)
 
-    render.generate_site(db, out, fresh=fresh, record=record)
+    render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, fresh=fresh, record=record)
+    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert rendered == 0                             # repeal not yet in force
 
     class _after_repeal(date):
@@ -1554,12 +1599,14 @@ def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
         def today(cls):
             return date(2099, 1, 2)
 
-    monkeypatch.setattr(render, "date", _after_repeal)
+    monkeypatch.setattr(render, "date", _after_repeal)      # freshness fold
+    monkeypatch.setattr(sfs_render, "date", _after_repeal)  # the upphävd banner
     rendered_uris.clear()
-    render.generate_site(db, out, fresh=fresh, record=record)
+    render.generate_site(db, out, build.SOURCE_RENDERERS,
+                                 fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris               # status flipped -> re-rendered
-    page = compress.read_text(out / render.doc_relpath(LAW["uri"]))
-    assert "pphävd" in page                          # page now marked upphävd
+    html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
+    assert "pphävd" in html                          # page now marked upphävd
 
 
 def test_inbound_excludes_kommentar_annotation(tmp_path):
@@ -1602,8 +1649,8 @@ def test_document_level_inbound_for_bare_citation(tmp_path):
                         "uri": "https://lagen.nu/1975:635"}, "."]}]}))
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "dv", [bare])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(LAW, site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(LAW, site)
     # it is context on the document, so it heads the rail's "Om dokumentet"
     # panel rather than sitting between the reader and the statute (S5)
     panel = _island(html)[""]
@@ -1642,18 +1689,18 @@ def test_document_panel_drops_the_sfs_number_half_of_a_pinpointed_citation(tmp_p
         con, ["https://lagen.nu/1975:635"], whole_document=True)]
     assert kept == ["https://lagen.nu/dom/NJA_2001_s_1"]
     # dropped from the whole-act panel, but not lost: it is in §6's own rail
-    site = render.Site.from_catalog(con)
-    assert "NJA 2000 s. 1" in _island(render.render_sfs(LAW, site))["P6"]
+    site = page.Site.from_catalog(con)
+    assert "NJA 2000 s. 1" in _island(sfs_render.render(LAW, site))["P6"]
 
 
 def test_rail_sections_open_the_highest_priority_one_only():
     # C3: one accordion row per kind of context, ranked by RAIL_SECTION_ORDER,
     # and exactly the first present opens -- a rail with a hundred citations
     # still reads at a glance
-    html = render.render_rail_sections([
-        render.RailSection("sfs", "Lagrumshänvisningar hit", 4, "<ul></ul>"),
-        render.RailSection("kommentar", "Kommentar", 1, "<p>x</p>"),
-        render.RailSection("dv", "Rättsfall", 7, "<ul></ul>")])
+    html = page.render_rail_sections([
+        page.RailSection("sfs", "Lagrumshänvisningar hit", 4, "<ul></ul>"),
+        page.RailSection("kommentar", "Kommentar", 1, "<p>x</p>"),
+        page.RailSection("dv", "Rättsfall", 7, "<ul></ul>")])
     order = [html.index('data-sec="kommentar"'), html.index('data-sec="dv"'),
              html.index('data-sec="sfs"')]
     assert order == sorted(order)
@@ -1668,11 +1715,11 @@ def test_rail_sections_open_the_highest_priority_one_only():
 def test_rail_sections_of_the_same_kind_merge():
     # a panel covering a paragraf *and* its folded first stycke can be handed
     # two of a kind; two rows with one heading would read as a rendering bug
-    merged = render.merge_rail_sections([
-        render.RailSection("kommentar", "Kommentar", 1, "<p>a</p>"),
-        render.RailSection("kommentar", "Kommentar", 2, "<p>b</p>"),
-        render.RailSection("aldre-rattsfall", "Äldre rättsfall (4 §)", 1, "<p>c</p>"),
-        render.RailSection("aldre-rattsfall", "Äldre rättsfall (5 §)", 1, "<p>d</p>")])
+    merged = page.merge_rail_sections([
+        page.RailSection("kommentar", "Kommentar", 1, "<p>a</p>"),
+        page.RailSection("kommentar", "Kommentar", 2, "<p>b</p>"),
+        page.RailSection("aldre-rattsfall", "Äldre rättsfall (4 §)", 1, "<p>c</p>"),
+        page.RailSection("aldre-rattsfall", "Äldre rättsfall (5 §)", 1, "<p>d</p>")])
     assert [(s.key, s.count, s.html) for s in merged] == [
         ("kommentar", 3, "<p>a</p><p>b</p>"),
         # distinct labels name distinct provisions, so they stay apart
@@ -1704,8 +1751,8 @@ def test_first_stycke_context_folds_into_its_paragrafs_panel(tmp_path):
              "uri": "https://lagen.nu/2020:100#P1S1"}, "."]}]}))
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "dv", [citer])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(json.loads(law.read_text()), site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(json.loads(law.read_text()), site)
     island = _island(html)
     assert "P1" in island and "P1S1" not in island
     assert 'data-rail="P1"' in html and 'data-rail="P1S1"' not in html
@@ -1748,8 +1795,8 @@ def test_first_punkt_folds_in_too_and_leaves_the_paragraf_reachable(tmp_path):
              "uri": "https://lagen.nu/2020:100#P1S1N2"}, "."]}]}))
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "dv", [citer])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(json.loads(law.read_text()), site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(json.loads(law.read_text()), site)
     island = _island(html)
     # the § and its first punkt are one panel; the second punkt is its own
     assert "P1" in island and "P1S1" not in island and "P1S1N1" not in island
@@ -1800,8 +1847,8 @@ def test_no_rail_element_opens_with_another_rail_element(tmp_path):
              "uri": "https://lagen.nu/2020:100#" + a} for a in cited]}]}))
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "dv", [citer])
-    site = render.Site.from_catalog(catalog.connect(db))
-    html = render.render_sfs(json.loads(law.read_text()), site)
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render(json.loads(law.read_text()), site)
     ids = set(re.findall(r'data-rail="([^"]+)"', html))
     # every citation above reached *some* panel: none was silently dropped
     assert set(_island(html)) == ids
@@ -1838,9 +1885,9 @@ def test_inbound_uses_descriptive_short_name(tmp_path):
     con = catalog.connect(db)
     assert con.execute("SELECT descriptive FROM documents WHERE uri = ?",
                        ("https://lagen.nu/1975:635",)).fetchone()[0] == "räntelagen"
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     target_art = json.loads(target.read_text())
-    panel = _island(render.render_sfs(target_art, site))["P1"]
+    panel = _island(sfs_render.render(target_art, site))["P1"]
     # a single pinpoint makes the citer one link, name and place together (S3)
     assert ">räntelagen 9 § 1 st<" in panel             # the descriptive short name
     assert "Räntelag (1975:635)" not in panel           # not the full official title
@@ -1850,20 +1897,20 @@ def test_inbound_uses_descriptive_short_name(tmp_path):
 
 def test_forarbete_pinpoint_maps_anchor_to_human_form():
     # (pinpoint, the anchor it links to)
-    assert render.forarbete_pinpoint("a14.3") == ("avsnitt 14.3", "a14.3")
-    assert render.forarbete_pinpoint("a1-17") == ("avsnitt 1", "a1-17")  # clash dropped
-    assert render.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
-    assert render.forarbete_pinpoint("sec7") == ("", "sec7")   # generated, no number
+    assert page.forarbete_pinpoint("a14.3") == ("avsnitt 14.3", "a14.3")
+    assert page.forarbete_pinpoint("a1-17") == ("avsnitt 1", "a1-17")  # clash dropped
+    assert page.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
+    assert page.forarbete_pinpoint("sec7") == ("", "sec7")   # generated, no number
 
 
 def test_citer_name_prefers_full_title_by_kind():
     # a förarbete carries its full title on its number; a lagrådsremiss by title
     # alone; an sfs/dv citer already stores a human title
-    assert render.citer_name("forarbete", "prop", "Prop. 2025/26:116",
+    assert page.citer_name("forarbete", "prop", "Prop. 2025/26:116",
                              "En ny funktion") == "Prop. 2025/26:116: En ny funktion"
-    assert render.citer_name("forarbete", "lr", "Lr 1", "En ny lag") \
+    assert page.citer_name("forarbete", "lr", "Lr 1", "En ny lag") \
         == "Lagrådsremiss: En ny lag"
-    assert render.citer_name("sfs", "law", "SFS 2010:800",
+    assert page.citer_name("sfs", "law", "SFS 2010:800",
                              "Skollag (2010:800)") == "Skollag (2010:800)"
 
 
@@ -1874,7 +1921,7 @@ def test_citer_line_collapses_pinpoints_and_caps_at_five():
            "Explosiva varor", "forarbete", "prop", "2025-01-01",
            "a18.4.1@,a15.2@,a16.7@,a2@,a9@,a11@",  # six avsnitt, out of order
            "Prop. 2025/26:123")                 # descriptive (unused for forarbete)
-    li = render._citer_line(row)
+    li = page._citer_line(row)
     assert 'href="/prop/2025/26:123">Prop. 2025/26:123: Explosiva varor</a>' in li
     assert "avsnitt <a" in li                             # category word once
     assert li.index("2</a>") < li.index("9</a>") < li.index("15.2</a>")  # natural sort
@@ -1886,7 +1933,7 @@ def test_citer_line_with_one_pinpoint_is_a_single_link():
     # S3: a lone pinpoint completes the citation, so name and place are one
     # anchor landing on the pinpoint -- not a link to the document beside a link
     # to the stycke, which offers a choice the reader has no basis to make
-    li = render._citer_line(
+    li = page._citer_line(
         ("https://lagen.nu/2009:1464", "SFS 2009:1464",
          "Förordning med instruktion för Statens jordbruksverk", "sfs",
          "forordning", "2009-12-01", "P22S2@",
@@ -1895,7 +1942,7 @@ def test_citer_line_with_one_pinpoint_is_a_single_link():
                   'för Statens jordbruksverk 22 § 2 st</a></li>')
     # a förarbete locator is an aside on where in the document it sits, so it
     # takes a comma where a statute designator reads on without one
-    li = render._citer_line(
+    li = page._citer_line(
         ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
          "En skyldighet att erbjuda lovskola", "forarbete", "prop",
          "2017-01-01", "a6.7@39", "Prop. 2016/17:156"))
@@ -1906,12 +1953,12 @@ def test_forarbete_pinpoint_falls_back_to_the_printed_page():
     # S4: a generated "secN" anchor is a heading with no section number, so
     # there is no avsnitt to name -- the page the citation sits on is how a
     # reader would cite it anyway. Nothing citable at all names the doc alone.
-    assert render.forarbete_pinpoint("a14.3", 39) == ("avsnitt 14.3", "a14.3")
-    assert render.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
+    assert page.forarbete_pinpoint("a14.3", 39) == ("avsnitt 14.3", "a14.3")
+    assert page.forarbete_pinpoint("sid39") == ("s. 39", "sid39")
     # the page is a real anchor on the rendered page, so it is also the target
-    assert render.forarbete_pinpoint("sec17", 39) == ("s. 39", "sid39")
-    assert render.forarbete_pinpoint("sec17") == ("", "sec17")
-    li = render._citer_line(
+    assert page.forarbete_pinpoint("sec17", 39) == ("s. 39", "sid39")
+    assert page.forarbete_pinpoint("sec17") == ("", "sec17")
+    li = page._citer_line(
         ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
          "En skyldighet att erbjuda lovskola", "forarbete", "prop",
          "2017-01-01", "sec17@39", "Prop. 2016/17:156"))
@@ -1994,8 +2041,8 @@ def test_inbound_collapsed_aggregates_pinpoints_and_excludes(tmp_path):
 
 
 def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
-    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    section, own = render.forarbeten_section(site, FORARB_LAW)
+    site = page.Site.from_catalog(build_forarb_catalog(tmp_path))
+    section, own = sfs_render.forarbeten_section(site, FORARB_LAW)
     # hosted own works link under their full-title label
     assert "Prop. 2019/20:5: Ursprungspropositionen" in section
     assert "SOU 2018:9: Utredningen" in section
@@ -2004,15 +2051,15 @@ def test_forarbeten_section_lists_own_works_and_excludes_from_panel(tmp_path):
     assert "Bet. 2019/20:XX1" not in section
     assert own == {"https://lagen.nu/prop/2019/20:5", "https://lagen.nu/sou/2018:9"}
     # the citation panel below excludes them; only the unrelated prop remains
-    panel = render.render_rail_sections(
-        render.document_inbound(site, "https://lagen.nu/2020:100", own))
+    panel = page.render_rail_sections(
+        page.document_inbound(site, "https://lagen.nu/2020:100", own))
     assert "Prop. 2023/24:9: Senare proposition" in panel
     assert "Prop. 2019/20:5" not in panel and "SOU 2018:9" not in panel
 
 
 def test_forarbeten_section_top_billed_above_citation_panel(tmp_path):
-    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    html = render.render_sfs(FORARB_LAW, site)
+    site = page.Site.from_catalog(build_forarb_catalog(tmp_path))
+    html = sfs_render.render(FORARB_LAW, site)
     # the act's own preparatory works read in the column; everything that merely
     # cites the act is rail context, so the column carries no citation panel (S5)
     assert '<section class="forarbeten">' in html
@@ -2021,10 +2068,10 @@ def test_forarbeten_section_top_billed_above_citation_panel(tmp_path):
 
 def test_inbound_panel_overflow_is_expandable(tmp_path, monkeypatch):
     # citers past PANEL_CAP go behind a <details> "+N fler" disclosure (no JS)
-    monkeypatch.setattr(render, "PANEL_CAP", 1)
-    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    panel = render.render_rail_sections(
-        render.document_inbound(site, "https://lagen.nu/2020:100"))
+    monkeypatch.setattr(page, "PANEL_CAP", 1)
+    site = page.Site.from_catalog(build_forarb_catalog(tmp_path))
+    panel = page.render_rail_sections(
+        page.document_inbound(site, "https://lagen.nu/2020:100"))
     # three förarbete citers, one shown, the other two disclosed
     assert '<details class="more"><summary>+2 fler</summary>' in panel
 
@@ -2032,9 +2079,9 @@ def test_inbound_panel_overflow_is_expandable(tmp_path, monkeypatch):
 def test_forarbete_inbound_sorted_by_kind_then_date(tmp_path):
     # in the citation panel förarbeten order prop→sou, each block oldest-first:
     # the document_date column (populated at relate) drives the chronology
-    site = render.Site.from_catalog(build_forarb_catalog(tmp_path))
-    panel = render.render_rail_sections(
-        render.document_inbound(site, "https://lagen.nu/2020:100"))
+    site = page.Site.from_catalog(build_forarb_catalog(tmp_path))
+    panel = page.render_rail_sections(
+        page.document_inbound(site, "https://lagen.nu/2020:100"))
     order = [panel.index("Prop. 2019/20:5"),   # prop, 2020-02
              panel.index("Prop. 2023/24:9"),   # prop, 2024-03 (later)
              panel.index("SOU 2018:9")]         # sou after every prop, despite 2018
@@ -2102,8 +2149,8 @@ def test_genomfor_edge_is_inbound_on_directive_article(tmp_path):
 
 
 def test_prop_page_renders_genomforande_panel(tmp_path):
-    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
-    html = render.render_forarbete(PROP, site)
+    site = page.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = forarbete_render.render(PROP, site)
     assert "Genomför EU-direktiv" in html
     assert "2 kap. 1 § genomför artikel 21.1, 21.2" in html
     # links to the directive's article on our EU page (we host it)
@@ -2111,8 +2158,8 @@ def test_prop_page_renders_genomforande_panel(tmp_path):
 
 
 def test_directive_article_shows_implementing_forarbete(tmp_path):
-    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
-    html = render.render_eurlex(DIRECTIVE, site)
+    site = page.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = eurlex_render.render(DIRECTIVE, site)
     # article 21's rail panel shows the implementing förarbete
     panel = _island(html)["21"]
     assert 'data-sec="forarbete" data-label="Förarbeten"' in panel
@@ -2123,8 +2170,8 @@ def test_directive_article_shows_implementing_forarbete(tmp_path):
 
 
 def test_genomforande_panel_absent_without_implements(tmp_path):
-    site = render.Site.from_catalog(build_eu_catalog(tmp_path))
-    html = render.render_forarbete({"uri": "https://lagen.nu/prop/x", "type": "prop",
+    site = page.Site.from_catalog(build_eu_catalog(tmp_path))
+    html = forarbete_render.render({"uri": "https://lagen.nu/prop/x", "type": "prop",
                                     "identifier": "Prop. X", "body": []}, site)
     assert "Genomför EU-direktiv" not in html
 
@@ -2193,8 +2240,8 @@ def _primed_margin(site, sfs_uri, anchor):
     # the renderer primes the memo in render_sfs (with the consolidation's
     # live anchors); a direct margin call primes it the same way
     site.caselaw_memo[sfs_uri] = catalog.caselaw_anchored(site.con, sfs_uri)
-    return render.render_rail_sections(
-        render.eu_caselaw_margin(site, sfs_uri, anchor))
+    return page.render_rail_sections(
+        page.eu_caselaw_margin(site, sfs_uri, anchor))
 
 
 def build_pin_catalog(tmp_path, extra_eurlex=()):
@@ -2253,13 +2300,13 @@ def test_scoped_site_matches_full_for_target(tmp_path):
     # The scoping itself must also be real: the other statute's FK rows stay out.
     uri = "https://lagen.nu/2021:500"
     con = build_pin_catalog(tmp_path)
-    full = render.Site.from_catalog(con)
-    scoped = render.Site.from_catalog(con, target_uris=[uri])
+    full = page.Site.from_catalog(con)
+    scoped = page.Site.from_catalog(con, target_uris=[uri])
     assert {k: v for k, v in full.fk.items() if k[0] == uri} \
         == {k: v for k, v in scoped.fk.items()}     # this statute: identical
     assert any(k[0] != uri for k in full.fk)        # the fixture has other hosts
-    assert render.site_cross_digests(scoped).get(uri) \
-        == render.site_cross_digests(full).get(uri)
+    assert page.site_cross_digests(scoped).get(uri) \
+        == page.site_cross_digests(full).get(uri)
 
 
 def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
@@ -2283,7 +2330,7 @@ def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
             {"predicate": "dcterms:references", "text": "artikel 21",
              "uri": DIR + "#21"}], "children": []}]}
     con = build_pin_catalog(tmp_path, extra_eurlex=(judgment, opinion))
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
     assert "EU-domstolens praxis" in margin
     assert "C-1/20" in margin or "62020CJ0001" in margin   # the judgment shows
@@ -2314,7 +2361,7 @@ def test_paragraf_rail_joins_subarticle_pinpoints_not_prefixes(tmp_path):
             {"predicate": "dcterms:references", "text": "artikel 210",
              "uri": DIR + "#210"}], "children": []}]}
     con = build_pin_catalog(tmp_path, extra_eurlex=(subarticle, other_article))
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
     assert "62020CJ0003" in margin
     assert "62020CJ0004" not in margin
@@ -2336,7 +2383,7 @@ def test_paragraf_rail_renders_every_case_overflow_collapsed(tmp_path):
               "uri": DIR + "#21"}], "children": []}]}
         for n in range(1, 9))                     # 8 cases, cap is 5
     con = build_pin_catalog(tmp_path, extra_eurlex=judgments)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     margin = _primed_margin(site, "https://lagen.nu/2021:500", "K2P1")
 
     for n in range(1, 9):                         # every one is in the HTML
@@ -2350,8 +2397,8 @@ def test_paragraf_rail_renders_every_case_overflow_collapsed(tmp_path):
 
 def test_statute_page_shows_genomfor_margin(tmp_path):
     con = build_pin_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
-    html = render.render_sfs(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
+    site = page.Site.from_catalog(con)
+    html = sfs_render.render(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
     # the genomför-direktiv block rides in the transposing paragraf's rail panel
     rail = "".join(_island(html).values())
     assert "Genomför EU-rätt" in rail
@@ -2389,8 +2436,8 @@ def test_fk_resolves_to_statute_anchors(tmp_path):
 
 def test_statute_paragraf_rail_shows_fk_commentary(tmp_path):
     con = build_pin_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
-    html = render.render_sfs(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
+    site = page.Site.from_catalog(con)
+    html = sfs_render.render(SFS_LAWS[1], site)   # cybersäkerhetslag 2021:500
     panel = _island(html)["K2P1"]
     assert "Författningskommentar" in panel
     assert "Paragrafen är ny och genomför direktivet." in panel
@@ -2400,8 +2447,8 @@ def test_statute_paragraf_rail_shows_fk_commentary(tmp_path):
 
 def test_law_level_fk_lands_on_document_rail(tmp_path):
     con = build_pin_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
-    html = render.render_sfs(SFS_LAWS[0], site)   # testlagen 1999:100
+    site = page.Site.from_catalog(con)
+    html = sfs_render.render(SFS_LAWS[0], site)   # testlagen 1999:100
     panel = _island(html)[""]
     assert "De ändringar som föreslås i lagen är följdändringar." in panel
 
@@ -2410,7 +2457,7 @@ def test_prop_page_highlights_fk_commentary_blocks(tmp_path):
     # blocks the FK extractor stamped `fk` render inside one fk-komm box per
     # run; quoted lagtext and ordinary prose stay outside
     con = build_pin_catalog(tmp_path)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     art = {"uri": "https://lagen.nu/prop/2021/22:9", "type": "prop",
            "identifier": "Prop. 2021/22:9", "structure": [
                {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
@@ -2420,7 +2467,7 @@ def test_prop_page_highlights_fk_commentary_blocks(tmp_path):
                 "fk": 1},
                {"type": "stycke", "text": ["Paragrafen ändras."], "fk": 2},
                {"type": "stycke", "text": ["2 § Mera lagtext."]}]}
-    html = render.render_forarbete(art, site)
+    html = forarbete_render.render(art, site)
     # one box per entry: the two fk=1 blocks share a box, fk=2 gets its own
     assert html.count('<div class="fk-komm">') == 2
     boxed = html.split('<div class="fk-komm">')[1].split("</div>")[0]
@@ -2458,17 +2505,17 @@ LAYER = {
 
 
 def _render_act(monkeypatch, tmp_path):
-    monkeypatch.setattr(render, "_load_editorial",
-                        lambda celex: render.Editorial(LAYER))
+    monkeypatch.setattr(eurlex_render, "_load_editorial",
+                        lambda celex: eurlex_render.Editorial(LAYER))
     db = str(tmp_path / "catalog.sqlite")
     act = tmp_path / "act.json"
     act.write_text(json.dumps(ACT))
     catalog.rebuild(db, "eurlex", [act])
-    return render.render_eurlex(ACT, render.Site.from_catalog(catalog.connect(db)))
+    return eurlex_render.render(ACT, page.Site.from_catalog(catalog.connect(db)))
 
 
 def test_editorial_indexes_both_directions():
-    ed = render.Editorial(LAYER)
+    ed = eurlex_render.Editorial(LAYER)
     assert ed.group_start[1]["label"] == "Bakgrund och syfte"
     assert ed.group_of[2]["id"] == "rg"
     # recital 2 is cited by article 4 (whole) and sub-point 4.1.a -> article {4}
@@ -2531,7 +2578,7 @@ def test_act_without_annotation_has_no_recital_groups(tmp_path):
     act = tmp_path / "act.json"
     act.write_text(json.dumps(ACT))
     catalog.rebuild(db, "eurlex", [act])
-    html = render.render_eurlex(ACT, render.Site.from_catalog(catalog.connect(db)))
+    html = eurlex_render.render(ACT, page.Site.from_catalog(catalog.connect(db)))
     # the editorial grouping (group headings + the article<->recital back-links) is
     # absent without a .ann
     assert "recital-group" not in html
@@ -2641,16 +2688,16 @@ def _build_eu_inbound_catalog(tmp_path):
 
 def _act_island(tmp_path):
     con = _build_eu_inbound_catalog(tmp_path)
-    return _island(render.render_eurlex(CITED_ACT, render.Site.from_catalog(con)))
+    return _island(eurlex_render.render(CITED_ACT, page.Site.from_catalog(con)))
 
 
 def test_inbound_group_splits_eurlex_by_kind():
     # a source is normally one group; eurlex splits, because its corpus holds
     # both the acts and the Court's own case law
-    assert render.inbound_group("eurlex", "judgment") == "eu-caselaw"
-    assert render.inbound_group("eurlex", "opinion") == "eu-forslag"
-    assert render.inbound_group("eurlex", "regulation") == "eurlex"
-    assert render.inbound_group("dv", "case") == "dv"
+    assert page.inbound_group("eurlex", "judgment") == "eu-caselaw"
+    assert page.inbound_group("eurlex", "opinion") == "eu-forslag"
+    assert page.inbound_group("eurlex", "regulation") == "eurlex"
+    assert page.inbound_group("dv", "case") == "dv"
 
 
 def test_act_article_rail_groups_citers_by_document_kind(tmp_path):
@@ -2719,7 +2766,7 @@ def test_defined_term_links_to_begrepp_page(tmp_path):
     catalog.rebuild(db, "eurlex", [actp])
     con = catalog.connect(db)
     catalog.canonicalize_concepts(con)     # folds the alias graph into concept_alias
-    html = render.render_eurlex(act, render.Site.from_catalog(con))
+    html = eurlex_render.render(act, page.Site.from_catalog(con))
     assert ('<a href="/begrepp/Personuppgift"><dfn>personuppgifter</dfn></a>'
             in html)
     assert "<dfn>kverkställighet</dfn>" in html               # no page -> no link
@@ -2794,9 +2841,9 @@ def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
     assert by_anchor == {"P3": "S1",              # minted -> kept
                          "P4": ""}                # not minted -> disregarded
     # and the margin spells the kept pinpoint out as citation prose
-    site = render.Site.from_catalog(con)
-    margin = render.render_rail_sections(
-        render.genomfor_margin(site, "https://lagen.nu/1999:100", "P3"))
+    site = page.Site.from_catalog(con)
+    margin = page.render_rail_sections(
+        page.genomfor_margin(site, "https://lagen.nu/1999:100", "P3"))
     assert "första stycket genomför artikel 21.1" in margin
 
 
@@ -2822,10 +2869,10 @@ def test_commentary_shows_in_paragraph_rail_not_as_page(tmp_path):
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "kommentar", [komm])
     con = catalog.connect(db)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     assert site.commentary[("https://lagen.nu/1962:700", "K3P1")]  # indexed
 
-    html = render.render_sfs(json.loads(law.read_text()), site)
+    html = sfs_render.render(json.loads(law.read_text()), site)
     island = re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1)
     assert "rail-sec kommentar" in island               # rail section emitted
     assert "Bestämmelsen kräver uppsåt." in island     # the prose, side-by-side
@@ -2858,10 +2905,10 @@ def test_law_level_commentary_is_the_rail_default_panel(tmp_path):
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "kommentar", [komm])
     con = catalog.connect(db)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
     assert ("https://lagen.nu/1915:218", None) in site.commentary  # preamble indexed
 
-    island = _island(render.render_sfs(json.loads(law.read_text()), site))
+    island = _island(sfs_render.render(json.loads(law.read_text()), site))
     assert "Lagen reglerar avtalsslutande." in island[""]   # law-level default panel
     assert "Om dokumentet" in island[""]
     assert "Om anbud och accept." in island["P1"]            # per-paragraph still works

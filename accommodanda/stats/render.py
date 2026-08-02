@@ -15,7 +15,7 @@ document.
 import json
 
 from ..lib import compress, layout
-from ..lib.render import page_context
+from ..lib.page import page_context
 from . import charts
 from .model import Cell, Measure, Point, Row
 

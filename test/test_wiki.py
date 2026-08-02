@@ -13,6 +13,8 @@ import pytest
 from accommodanda.lib import annstore, catalog, markdown
 from accommodanda.wiki import annotate
 from accommodanda.wiki import parse as wiki
+from accommodanda.lib import page
+from accommodanda.eurlex import render as eurlex_render
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 import mediawiki_to_markdown as conv  # noqa: E402
@@ -370,7 +372,6 @@ def test_eurlex_guidance_renders_in_document_rail(tmp_path):
     # panel (key '') -- shown when no single article is in focus, in place of the
     # empty-rail placeholder
     import re
-    from accommodanda.lib import render
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
@@ -394,9 +395,9 @@ def test_eurlex_guidance_renders_in_document_rail(tmp_path):
     catalog.rebuild(cat, "eurlex", [act])
     catalog.rebuild(cat, "kommentar", [komm])
     con = catalog.connect(cat)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
 
-    html = render.render_eurlex(json.loads(act.read_text()), site)
+    html = eurlex_render.render(json.loads(act.read_text()), site)
     island = json.loads(
         re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1))
     panel = island[""]                          # the document-level rail panel
@@ -414,7 +415,6 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
     # end-to-end (PRD Step 3 acceptance): a `## Artikel 5` annotation section with
     # prose + a `## Externa länkar` block shows both in article 5's context rail
     import re
-    from accommodanda.lib import render
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
@@ -446,9 +446,9 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
     catalog.rebuild(cat, "eurlex", [act])
     catalog.rebuild(cat, "kommentar", [komm])
     con = catalog.connect(cat)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
 
-    html = render.render_eurlex(json.loads(act.read_text()), site)
+    html = eurlex_render.render(json.loads(act.read_text()), site)
     island = json.loads(
         re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1))
     panel = island["5"]                         # article 5's context rail
@@ -480,7 +480,6 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path,
     # the act carries no editorial recital layer.
     monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
     import re
-    from accommodanda.lib import render
     ad = tmp_path / "art"
     ad.mkdir()
     act = ad / "act.json"
@@ -517,9 +516,9 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path,
     catalog.rebuild(cat, "eurlex", [act])
     catalog.rebuild(cat, "kommentar", [komm])
     con = catalog.connect(cat)
-    site = render.Site.from_catalog(con)
+    site = page.Site.from_catalog(con)
 
-    html = render.render_eurlex(json.loads(act.read_text()), site)
+    html = eurlex_render.render(json.loads(act.read_text()), site)
     island = json.loads(
         re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1))
     # the definition point 2.21 gets its own (dotted) citation anchor + rail panel
@@ -696,7 +695,6 @@ def test_source_link_label_names_source_and_section_desc_is_question():
 
 
 def test_canonicalize_folds_inflected_variant_to_wiki_base(tmp_path):
-    from accommodanda.lib import render
     ad = tmp_path / "art"
     ad.mkdir()
     # an SFS law whose defined term is the inflected form "Näringsidkarna"
@@ -728,8 +726,8 @@ def test_canonicalize_folds_inflected_variant_to_wiki_base(tmp_path):
         "https://lagen.nu/2018:1217"]
     # render: the law's inflected term link resolves to the canonical page (live),
     # while still showing the inflected surface text
-    site = render.Site.from_catalog(con)
-    html = render.render_runs([{"uri": "https://lagen.nu/begrepp/Näringsidkarna",
+    site = page.Site.from_catalog(con)
+    html = page.render_runs([{"uri": "https://lagen.nu/begrepp/Näringsidkarna",
                                 "predicate": "dcterms:subject",
                                 "text": "näringsidkarna"}], site)
     assert 'class="noref"' not in html          # resolved -> live, not muted

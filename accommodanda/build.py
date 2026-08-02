@@ -48,7 +48,7 @@ from urllib.parse import quote, urlsplit
 
 import requests
 
-from . import config, patchsource
+from . import browse, config, patchsource
 from .api import app as api_app
 from .api import edit as api_edit
 from .api import errors as api_errors
@@ -56,21 +56,26 @@ from .api import patch as api_patch
 from .avg import download as avg_download
 from .avg import model as avg_model
 from .avg import parse as avg_parse
+from .avg import render as avg_render
 from .coe import download as coe_download
 from .coe import parse as coe_parse
+from .coe import render as coe_render
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
+from .dv import render as dv_render
 from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
 from .edpb import download as edpb_download
 from .edpb import parse as edpb_parse
+from .edpb import render as edpb_render
 from .edpb import series as edpb_series
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
+from .eurlex import render as eurlex_render
 from .forarbete import aigenomforande as fa_aigenomforande
 from .forarbete import download as fa_download
 from .forarbete import fk as fa_fk
@@ -80,6 +85,7 @@ from .forarbete import kommentar as fa_kommentar
 from .forarbete import parse as fa_parse
 from .forarbete import propkb as fa_propkb
 from .forarbete import propriksdagen as fa_propriksdagen
+from .forarbete import render as fa_render
 from .forarbete import riksdagen as fa_riksdagen
 from .forarbete import rskr as fa_rskr
 from .forarbete import soukb as fa_soukb
@@ -87,13 +93,17 @@ from .forarbete import structure as fa_structure
 from .foreskrift import download as foreskrift_download
 from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import parse as foreskrift_parse
+from .foreskrift import render as foreskrift_render
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
 from .hudoc import parse as hudoc_parse
+from .hudoc import render as hudoc_render
 from .icc import download as icc_download
 from .icc import parse as icc_parse
+from .icc import render as icc_render
 from .icrc import download as icrc_download
 from .icrc import parse as icrc_parse
+from .icrc import render as icrc_render
 from .lib import (
     annstore,
     casenaming,
@@ -124,12 +134,14 @@ from .remisser import parse as remisser_parse
 from .rs import agencies as rs_agencies
 from .rs import download as rs_download
 from .rs import parse as rs_parse
+from .rs import render as rs_render
 from .sfs import asgit as sfs_asgit
 from .sfs import correspond as sfs_correspond
 from .sfs import download as sfs_download
 from .sfs import graphics as sfs_graphics
 from .sfs import load_inputs
 from .sfs import pdfmirror as sfs_pdfmirror
+from .sfs import render as sfs_render
 from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
 from .site import parse as site_parse
@@ -138,9 +150,11 @@ from .stats import compute as stats_compute
 from .stats import render as stats_render
 from .untc import download as untc_download
 from .untc import parse as untc_parse
+from .untc import render as untc_render
 from .wiki import annotate as wiki_annotate
 from .wiki import guidance_discover
 from .wiki import parse as wiki_parse
+from .wiki import render as wiki_render
 
 POLITENESS = 0.3   # seconds between per-document network fetches
 DATA = config.DATA                            # corpus location (config.yml: data_root)
@@ -167,7 +181,7 @@ class Stage:
     output: Callable[[str], Path]         # basefile -> produced file
     inputs: Callable[[str], list[Path]] = lambda bf: []   # dependency files
     depends: str | None = None            # upstream stage name
-    code: tuple = ()                      # impl files; their hash = version
+    code: tuple[Path, ...] = ()           # impl files; their hash = version
     # never fresh: the stage's real inputs are the whole corpus, too large to
     # hash, so the driver cannot answer "has anything changed" and must not
     # pretend it can. Without this a no-inputs stage is judged on its recipe
@@ -179,8 +193,8 @@ class Stage:
 @dataclass
 class Source:
     name: str
-    list_basefiles: Callable[[], list]
-    stages: dict                          # name -> Stage
+    list_basefiles: Callable[[], list[str]]
+    stages: dict[str, Stage]
     harvest: Callable[[list], None] | None = None  # bulk download (discovery)
     origin: str | None = None             # human base URL, shown when harvesting
     self_banner: bool = False             # source prints its own per-subtype
@@ -320,7 +334,7 @@ def file_fingerprint(paths):
     return h.hexdigest()
 
 
-def stage_fingerprint(source, stage_name):
+def stage_fingerprint(source: Source, stage_name: str) -> str:
     """A cheap fingerprint of a per-document stage's inputs (parse, versions):
     each basefile plus its input files' size+mtime (no content read). Unchanged
     ⟹ no document needs re-running and none appeared, so the whole per-document
@@ -332,7 +346,6 @@ def stage_fingerprint(source, stage_name):
     for bf in source.list_basefiles():
         h.update(bf.encode())
         for p in sorted(stage.inputs(bf), key=str):
-            # the per-source stage protocol is untyped; inputs() yields Paths
             if compress.exists(p):
                 st = compress.stat(p)
                 h.update(("\x1f%d\x1f%d" % (st.st_size, st.st_mtime_ns)).encode())
@@ -370,13 +383,13 @@ def record_step(store, kind, source, wm, code):
 
 @dataclass
 class Result:
-    planned: list = field(default_factory=list)   # (stage, basefile)
-    done: list = field(default_factory=list)
-    errors: list = field(default_factory=list)     # (stage, basefile, msg, tb)
-    updates: dict = field(default_factory=dict)    # manifest key -> entry
-    skips: list = field(default_factory=list)      # (stage, basefile) SkipDocument
-    fresh: list = field(default_factory=list)      # (stage, basefile) skipped as fresh
-    timings: list = field(default_factory=list)    # (stage, basefile, secs)
+    planned: list[tuple[str, str]] = field(default_factory=list)
+    done: list[tuple[str, str]] = field(default_factory=list)
+    errors: list[tuple[str, str, str, str]] = field(default_factory=list)
+    updates: dict[str, dict] = field(default_factory=dict)  # manifest key -> entry
+    skips: list[tuple[str, str]] = field(default_factory=list)   # SkipDocument
+    fresh: list[tuple[str, str]] = field(default_factory=list)   # skipped as fresh
+    timings: list[tuple[str, str, float]] = field(default_factory=list)
 
 
 def ensure(source, stage_name, basefile, manifest, res, force, no_deps):
@@ -1522,8 +1535,9 @@ def dv_original_verdicts(basefile):
     for m in _dv_cases()[basefile]["members"]:
         if m["store"] != "domstol" or m.get("referat") or not m.get("bilagor"):
             continue
-        record = json.loads(compress.read_text(
-            util.load_relpath(layout.DATA, m["path"])))
+        member_path = util.load_relpath(layout.DATA, m["path"])
+        assert member_path is not None, "dv member %r has no path" % m
+        record = json.loads(compress.read_text(member_path))
         pdf = next((Path(b["filnamn"]).name for b in record.get("bilagaLista") or []
                     if (b.get("filnamn") or "").lower().endswith(".pdf")), None)
         if pdf:
@@ -3704,31 +3718,73 @@ def stale_sources():
             if any(compress.stat(p).st_mtime > cutoff for p in lister())]
 
 
+# Each source's own page renderer, by catalog source key. `lib/` may not import
+# a source, so the dispatch table a document page is rendered through is composed
+# here -- build.py is the one place that composes across sources -- and handed to
+# `render.generate_site`. Every value is a module-level `render(art, site) -> str`
+# so the table pickles by qualified name into each pool worker.
+#
+# kommentar has no entry on purpose: it is an annotation rendered into a statute's
+# rail, not a page of its own (generate_site drops its rows).
+SOURCE_RENDERERS = {
+    "sfs": sfs_render.render,
+    "dv": dv_render.render,
+    "forarbete": fa_render.render,
+    "begrepp": wiki_render.render,
+    "eurlex": eurlex_render.render,
+    "foreskrift": foreskrift_render.render,
+    "avg": avg_render.render,
+    "rs": rs_render.render,
+    "edpb": edpb_render.render,
+    "hudoc": hudoc_render.render,
+    "coe": coe_render.render,
+    "icrc": icrc_render.render,
+    "untc": untc_render.render,
+    "icc": icc_render.render,
+}
+
+
 # a page's rendered HTML is a function of the render/query code plus the
 # artifacts in its prerequisite set (computed per page from the catalog)
-# generate renders the per-document pages (render.py + the modules it walks the
-# artifact with) AND, via the sanctioned in-process API inversion, the faceted
-# browse pages -- so facets.py (the bucket rules) and api/app.py (the /browse
-# projection) are part of generate's recipe: a facet-rule edit must re-stale the
-# browse pages, not leave them "up to date -- skipped".
-GENERATE_CODE = (PKG / "lib" / "render.py", PKG / "lib" / "catalog.py",
+# generate renders the per-document pages (each source's renderer + the lib/page
+# kit it walks the artifact with) AND, via the sanctioned in-process API
+# inversion, the faceted browse pages -- so facets.py (the bucket rules) and
+# api/app.py (the /browse projection) are part of generate's recipe: a facet-rule
+# edit must re-stale the browse pages, not leave them "up to date -- skipped".
+GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "text.py", PKG / "lib" / "feeds.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
                  PKG / "lib" / "labels.py", PKG / "lib" / "tpl.py",
-                 PKG / "api" / "app.py", PKG / "site" / "render.py",
-                 PKG / "stats" / "render.py", PKG / "stats" / "charts.py",
+                 PKG / "api" / "app.py", PKG / "stats" / "charts.py",
+                 # every page renderer: each source's own (SOURCE_RENDERERS),
+                 # lib's site-assembly one, plus the editorial and statistics
+                 # ones. Globbed rather than listed -- a new source's renderer
+                 # joins the recipe by existing, not by someone remembering to
+                 # add it here. Forgetting one would not fail loudly; it would
+                 # silently stop re-staling that source's pages.
+                 *sorted(PKG.glob("*/render.py")),
+                 # browse.py owns the faceted-browse markup (render_facet_page,
+                 # _facet_nav, _bucket_heading, …). It is a top-level module, so
+                 # the */render.py glob does not reach it -- and it must be here
+                 # for the same reason facets.py and api/app.py are: a browse
+                 # markup edit has to re-stale the browse pages, not leave the
+                 # coarse gate reporting "up to date -- skipped".
+                 PKG / "browse.py",
                  # the shipped static chrome (incl. the self-hosted fonts):
                  # a stylesheet/script/font edit must re-stale generate
                  # exactly like a renderer edit
                  *sorted(p for p in (PKG / "lib" / "assets").rglob("*")
                          if p.is_file()),
                  # the Jinja templates every page renders through: a template
-                 # edit is a renderer edit (rule:artifact-is-truth for pages)
-                 *sorted((PKG / "lib" / "templates").rglob("*.html")),
-                 *sorted((PKG / "site" / "templates").rglob("*.html")),
-                 *sorted((PKG / "stats" / "templates").rglob("*.html")))
+                 # edit is a renderer edit (rule:artifact-is-truth for pages).
+                 # api/templates is deliberately out -- those are the admin/ops
+                 # screens, which no generated page renders through, and an edit
+                 # to one must not cost a ~300k-page regenerate. PKG is absolute,
+                 # so the package-relative first segment is what names the owner.
+                 *sorted(p for p in PKG.glob("*/templates/**/*.html")
+                         if p.relative_to(PKG).parts[0] != "api"))
 
 
 def generate_fingerprint():
@@ -3757,7 +3813,7 @@ def generate_fingerprint():
         + list(annstore.tree("eurlex").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's) -- per page it enters the host's dependency
-        # digest (render.site_cross_digests); here it reopens the coarse gate
+        # digest (page.site_cross_digests); here it reopens the coarse gate
         + list(annstore.tree("kommentar").rglob("*.ann"))
         # the remiss answers + their ai-analyze .ann layers render onto the
         # referred förarbete's page (never related, so the catalog signature
@@ -3847,8 +3903,9 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         return
     if RUN.aggregates_only:
         con = catalog.connect(CATALOG)
-        render.render_aggregates(con, GENERATED, CATALOG,
+        render.render_aggregates(con, GENERATED,
                                  write_index=not site_render.has_frontpage())
+        browse.generate_all(CATALOG, GENERATED, con)
         con.close()
         site_render.write_site(GENERATED)
         print("generate: rebuilt frontpage + browse indexes + site pages -> %s" % GENERATED)
@@ -3896,7 +3953,7 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         # ai-correspond, the new statute's corresponding-cases margin). Content that
         # renders onto OTHER documents' pages (kommentar prose/.ann, remiss .ann,
         # the old-law side of `.corr`) enters via `dep_digest`, which generate_site
-        # folds render.site_cross_digests into per host uri.
+        # folds page.site_cross_digests into per host uri.
         p = str(art_path)
         if p not in own_hash:
             # a synthesized concept stub has no artifact on disk (empty path) and so
@@ -3954,11 +4011,17 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
     elif source in (None, "foreskrift"):
         extra += layout.foreskrift_grund_pages()
 
-    total, rendered = render.generate_site(CATALOG, GENERATED, progress=progress,
+    total, rendered = render.generate_site(CATALOG, GENERATED, SOURCE_RENDERERS,
+                                           progress=progress,
                                            fresh=fresh, record=record, only=only,
                                            source=source, jobs=jobs, extra=extra,
                                            write_index=not site_render.has_frontpage())
     if not scoped:                       # editorial pages ride a full-corpus run
+        # the faceted browse tree: generated as a client of the REST API, so it
+        # lives outside lib/ and is composed in here beside the render call
+        con = catalog.connect(CATALOG)
+        browse.generate_all(CATALOG, GENERATED, con)
+        con.close()
         site_render.write_site(GENERATED)
         # so does /statistik, for the same reason: it is one artifact-backed page
         # with no catalog rows, so `generate_site` above never reaches it. Without

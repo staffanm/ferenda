@@ -16,6 +16,8 @@ from accommodanda.icc.model import (
     load_types,
 )
 from accommodanda.lib import catalog, facets, layout, render
+from accommodanda.lib import page
+from accommodanda.icc import render as icc_render
 
 FIXTURES = Path(__file__).parent / "files" / "icc"
 
@@ -186,7 +188,7 @@ def test_render_decision_page_highlights_folkratt(tmp_path):
     database = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(database, "icc", [p])
     con = catalog.connect(database)
-    html = render.render_icc(art, render.Site(con, {art["uri"]}))
+    html = icc_render.render(art, page.Site(con, {art["uri"]}))
     assert '<a href="/folkratt/" class="on">Folkrätt</a>' in html
     assert "International Criminal Court" in html and "Trial Chamber VI" in html
     assert "Dokumentnummer" in html

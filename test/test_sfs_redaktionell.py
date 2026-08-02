@@ -9,7 +9,7 @@ bara i tryckt version/".
 """
 
 from accommodanda.lib import diff
-from accommodanda.lib.render import plain
+from accommodanda.lib.page import plain
 from accommodanda.sfs import redaktionell
 from accommodanda.sfs.model import Forfattning, Paragraf, Stycke
 from accommodanda.sfs.nf import inline_references, to_normalform

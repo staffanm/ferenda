@@ -1,5 +1,5 @@
 """Tests for the new-law paragraf margin that surfaces case law decided under
-the provision's predecessors (render.corresponding_cases_margin): the
+the provision's predecessors (page.corresponding_cases_margin): the
 correspondence chain is walked transitively (2025:400 -> 2001:453 -> 1980:620),
 one section per predecessor provision, headed "Äldre rättsfall för motsvarande
 bestämmelse (<the predecessor, linked>)"."""
@@ -8,7 +8,7 @@ import sqlite3
 from types import SimpleNamespace
 
 from accommodanda.lib import catalog
-from accommodanda.lib.render import (
+from accommodanda.lib.page import (
     _inbound_groups,
     _reassigned_before,
     corresponding_cases_margin,

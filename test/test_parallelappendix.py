@@ -9,7 +9,7 @@ import json
 import pytest
 
 from accommodanda.lib import catalog, render
-from accommodanda.lib.render import LANGUAGE_LABELS
+from accommodanda.lib.page import LANGUAGE_LABELS
 from accommodanda.sfs import parallelappendix as pa
 from accommodanda.sfs import parse_sfs_source
 from accommodanda.sfs.model import (
@@ -19,6 +19,8 @@ from accommodanda.sfs.model import (
     Konventionsbilaga,
 )
 from accommodanda.sfs.nf import to_normalform
+from accommodanda.lib import page
+from accommodanda.sfs import render as sfs_render
 
 FIXTURE = "test/files/sfs/echr-appendix.txt"
 LAYOUT_FIXTURE = "test/files/sfs/parallelappendix-layout.txt"
@@ -202,8 +204,8 @@ def test_render_lays_the_appendix_out_in_one_column_per_language(tmp_path):
     database = tmp_path / "catalog.sqlite"
     catalog.rebuild(database, "sfs", [law])
     catalog.rebuild(database, "coe", treaties)
-    site = render.Site.from_catalog(catalog.connect(database))
-    html = render.render_sfs(art, site)
+    site = page.Site.from_catalog(catalog.connect(database))
+    html = sfs_render.render(art, site)
 
     # one grid column per detected language, and every language labelled
     assert 'class="konventionsbilaga" style="--n-languages: 3"' in html

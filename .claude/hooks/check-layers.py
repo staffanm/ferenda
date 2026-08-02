@@ -25,18 +25,17 @@ import sys
 from pathlib import Path
 
 VERTICALS = {"sfs", "dv", "eurlex", "forarbete", "foreskrift", "avg", "wiki",
-             "remisser", "site"}
+             "remisser", "site", "hudoc", "coe", "icrc", "untc", "icc", "edpb",
+             "rs", "stats"}
 RESTRICTED = VERTICALS | {"api"}
 
 # (module file relative to the package, imported accommodanda-submodule
 # truncated to two components). Review §3.1 OPEN items; delete entries as
-# the fixes land.
-ALLOWLIST = {
-    # render builds the browse pages by calling the API in-process (TestClient),
-    # so it imports api.app -- the one remaining cross-layer exception. The other
-    # entries were retired when the artifact/eu-structure helpers moved into lib/.
-    ("lib/render.py", "api.app"),
-}
+# the fixes land. Empty since the browse generator -- the last lib/ module that
+# imported api.app, to render the browse pages through the in-process REST
+# client -- moved out of lib/ into accommodanda/browse.py, where importing both
+# the API and the render layer is the normal direction.
+ALLOWLIST: set[tuple[str, str]] = set()
 
 
 def zone(rel: Path) -> str:

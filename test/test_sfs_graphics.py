@@ -13,7 +13,7 @@ import json
 import pytest
 
 from accommodanda.lib import annstore, facsimile, render
-from accommodanda.lib.render import plain
+from accommodanda.lib.page import plain
 from accommodanda.sfs import graphics
 from accommodanda.sfs.model import (
     Bilaga,
@@ -26,6 +26,7 @@ from accommodanda.sfs.model import (
     Tabellrad,
 )
 from accommodanda.sfs.nf import to_normalform
+from accommodanda.lib import page
 
 BASEFILE = "9999:998"
 
@@ -567,12 +568,12 @@ DOC_URI = "https://lagen.nu/2002:780"
 
 
 def _site(graphics_index):
-    return render.Site(None, set(), graphics=graphics_index)
+    return page.Site(None, set(), graphics=graphics_index)
 
 
 def test_render_grafik_placeholder_when_unlocalized():
     node = {"type": "grafik", "id": "G1", "sort": "formel", "satt_av": "2021:734"}
-    html = render.render_grafik(node, _site({}), DOC_URI)
+    html = page.render_grafik(node, _site({}), DOC_URI)
     assert 'class="grafik-saknas"' in html and 'data-grafik="G1"' in html
     assert "Formel saknas" in html and "SFS 2021:734" in html
     assert "<img" not in html                       # no crop until localized
@@ -583,7 +584,7 @@ def test_render_grafik_figure_when_localized():
             "sort": "formel", "satt_av": "2021:734"}
     entry = {"sfs": "2021:734", "page": 2, "bbox": [72, 64, 523, 210],
              "alt": "Formel för balanstalet"}
-    html = render.render_grafik(
+    html = page.render_grafik(
         node, _site({(DOC_URI, "g-formula"): entry}), DOC_URI)
     assert '<figure class="grafik" data-grafik="g-formula">' in html
     # crop url = uri + node + a cache-buster derived from the bbox; & escaped
@@ -601,13 +602,13 @@ def test_render_roadsign_cell_localized_and_not():
     row = {"type": "rad", "cells": [["A1 Varning"], ["Beskrivning"]],
            "grafik": {"id": "G5", "key": "g-a1", "sort": "vagmarke",
                        "code": "A1"}}
-    toc, rail = render.Toc(), render.Rail(site, DOC_URI)
-    html = render.render_node(row, site, DOC_URI, toc, rail)
+    toc, rail = page.Toc(), page.Rail(site, DOC_URI)
+    html = page.render_node(row, site, DOC_URI, toc, rail)
     assert '<td class="grafik" data-grafik="g-a1"><img' in html
     assert 'alt="Vägmärke A1"' in html
     # the same row with no layer entry falls back to the honest gap cell
-    bare = render.render_node(row, _site({}), DOC_URI, render.Toc(),
-                              render.Rail(_site({}), DOC_URI))
+    bare = page.render_node(row, _site({}), DOC_URI, page.Toc(),
+                              page.Rail(_site({}), DOC_URI))
     assert '<td class="grafik-saknas" data-grafik="g-a1">[A1]</td>' in bare
 
 
@@ -626,8 +627,8 @@ def test_pending_row_variant_carries_marker_and_renders_it():
     rad = (nf["structure"][0]["children"][1]["children"][0]     # paragraf > stycke
            ["children"][0]["children"][0])                      # > tabell > rad
     assert rad["type"] == "rad" and rad["ikrafttrader"] == pending
-    html = render.render_node(rad, site, DOC_URI, render.Toc(),
-                              render.Rail(site, DOC_URI))
+    html = page.render_node(rad, site, DOC_URI, page.Toc(),
+                              page.Rail(site, DOC_URI))
     assert ('<tr class="temporal-status-rad"><td colspan="3">'
             '<p class="temporal-status">/Träder i kraft: %s/</p>' % pending
             ) in html
@@ -641,26 +642,26 @@ def test_render_temporal_notice_marks_pending_variant():
                "ikrafttrader": "den dag som regeringen bestämmer",
                "children": [{"type": "rubrik", "id": None, "level": 1,
                              "text": ["Bilaga 1"]}]}
-    html = render.render_node(pending, site, DOC_URI, render.Toc(),
-                              render.Rail(site, DOC_URI))
+    html = page.render_node(pending, site, DOC_URI, page.Toc(),
+                              page.Rail(site, DOC_URI))
     assert ('</h2><p class="temporal-status">/Träder i kraft: '
             'den dag som regeringen bestämmer/</p>') in html
     plain_bilaga = {"type": "bilaga", "id": None, "children": [
         {"type": "rubrik", "id": None, "level": 1, "text": ["Bilaga 1"]}]}
-    assert "temporal-status" not in render.render_node(
-        plain_bilaga, site, DOC_URI, render.Toc(), render.Rail(site, DOC_URI))
+    assert "temporal-status" not in page.render_node(
+        plain_bilaga, site, DOC_URI, page.Toc(), page.Rail(site, DOC_URI))
     # a dated upphor on a paragraf variant shows its ISO date in the body
     paragraf = {"type": "paragraf", "id": None, "ordinal": "1",
                 "upphor": "2027-01-01", "children": []}
     assert ('<p class="temporal-status">/Upphör att gälla: 2027-01-01/</p>'
-            in render.render_node(paragraf, site, DOC_URI, render.Toc(),
-                                  render.Rail(site, DOC_URI)))
+            in page.render_node(paragraf, site, DOC_URI, page.Toc(),
+                                  page.Rail(site, DOC_URI)))
 
 
 def test_graphic_cache_buster_covers_source_page_and_bbox():
     base = {"sfs": "2021:734", "page": 2, "bbox": [1, 2, 3, 4]}
     urls = {
-        render._grafik_crop(entry, DOC_URI, "g-one", "alt")
+        page._grafik_crop(entry, DOC_URI, "g-one", "alt")
         for entry in (base, {**base, "sfs": "2022:1"},
                       {**base, "page": 3}, {**base, "bbox": [1, 2, 3, 5]})}
     assert len(urls) == 4
@@ -675,6 +676,6 @@ def test_graphics_index_keys_by_uri_and_stable_gap_key(tmp_path, monkeypatch):
         "g-one": {"sfs": "2021:734", "page": 2, "bbox": [1, 2, 3, 4],
                   "verified": True},
         "g-two": {"sfs": "2021:734", "page": 3}}))
-    idx = render._graphics_index()
+    idx = page._graphics_index()
     assert set(idx) == {(DOC_URI, "g-one")}  # meta + unverified draft skipped
     assert idx[(DOC_URI, "g-one")]["sfs"] == "2021:734"

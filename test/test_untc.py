@@ -12,6 +12,8 @@ import pytest
 from accommodanda.lib import catalog, compress, facets, layout, render
 from accommodanda.untc import download, parse
 from accommodanda.untc.model import Treaty, load_treaties, treaty_uri
+from accommodanda.lib import page
+from accommodanda.untc import render as untc_render
 
 FIXTURES = Path(__file__).parent / "files" / "untc"
 
@@ -181,7 +183,7 @@ def test_render_treaty_page_shows_status_and_participation(tmp_path):
     database = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(database, "untc", [p])
     con = catalog.connect(database)
-    html = render.render_untc(art, render.Site(con, {art["uri"]}))
+    html = untc_render.render(art, page.Site(con, {art["uri"]}))
     assert '<a href="/folkratt/" class="on">Folkrätt</a>' in html   # masthead current
     assert "UN Secretary-General" in html and "Depositarie" in html
     assert "Registrering" in html

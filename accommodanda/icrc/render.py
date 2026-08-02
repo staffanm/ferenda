@@ -1,0 +1,59 @@
+"""IHL-fördragssidan: the instrument's provisions.
+
+Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+`render` is the `(art, site) -> str` the generate driver calls.
+"""
+
+from markupsafe import Markup
+
+from ..lib import labels, tpl
+from ..lib.page import (
+    Rail,
+    Toc,
+    doc_meta,
+    page_context,
+    plain,
+    provision_section,
+    render_node,
+    render_toc,
+)
+
+ENV = tpl.environment("accommodanda.icrc")
+
+
+def _icrc_label(node):
+    """A provision's rail label: an unnumbered provision (a preamble, a final
+    clause) has only its own heading to go by."""
+    ordinal = node.get("ordinal")
+    return "Artikel %s" % ordinal if ordinal else plain(node.get("text", []))
+
+
+def render(art, site):
+    md = art.get("metadata", {})
+    lb = labels.document_labels("icrc", art)
+    meta = [
+        ("Titel", lb.official_title if lb.official_title != lb.short_title else None),
+        ("ICRC-nummer", art.get("number")),
+        ("Antagen", md.get("adoptionDate")),
+        ("Ikraftträdande", md.get("entryIntoForce")),
+        ("I kraft", {True: "Ja", False: "Nej"}.get(md.get("inForce"))),
+        ("Depositarie", md.get("depositary")),
+        ("Ämnen", ", ".join(md.get("topics") or []) or None),
+        ("Autentiska språk", ", ".join(md.get("languages") or []) or None),
+        ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
+    ]
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    parts = []
+    for node in art.get("structure", []):
+        if node.get("type") == "artikel":
+            parts.append(provision_section(node, site, art["uri"], toc, rail,
+                                              _icrc_label(node)))
+        else:
+            parts.append(render_node(node, site, art["uri"], toc, rail))
+    rail.add_document()
+    return ENV.get_template("icrc.html").render(page_context(
+        lb.short_title or lb.official_title, "Internationell humanitär rätt",
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        eyebrow=lb.short_id, island=rail.island(),
+        lead=art.get("summary"), structure=Markup("".join(parts))))
