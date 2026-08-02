@@ -1004,6 +1004,24 @@ def load_treaties(namedacts_path, coe_path):
     return out
 
 
+# A draft statute has no number yet, and the lagstiftaren writes the gap as a
+# zero löpnummer: "järnvägstrafiklagen (2018:000)" in the betänkande that
+# proposes it, "0000:000" where the year is open too. No real SFS has a zero
+# löpnummer, so these are never citations to a document -- but the grammar minted
+# a uri for each, and ~100 000 of them piled onto a handful of targets
+# (lagen.nu/0000:000 alone collected 10 292 inbound links). They rendered as
+# plain text, the corpus holding no such document, but they sat in the catalog
+# and topped `dangling_targets` -- which is the want-list the eurlex backfill
+# downloads against (L1).
+_PLACEHOLDER_SFS = re.compile(r'\d+:0+$')
+
+
+def is_placeholder_sfsid(sfsid):
+    """Whether an SFS id is the lagstiftaren's not-yet-assigned placeholder
+    ("2018:000", "0000:00") rather than a real number."""
+    return bool(_PLACEHOLDER_SFS.fullmatch(sfsid.strip()))
+
+
 def lagrum_uri(attrs, base='https://lagen.nu/'):
     """Format collected attributes as a lagen.nu URI, replicating what
     COIN minting produced (same attribute munging as sfs_format_uri)."""
@@ -1389,6 +1407,8 @@ class LagrumParser:
                             # "artikel N" anaphora can pinpoint it
                             self.state.last_eu_act = uri.split(
                                 'ext/celex/')[-1].split('#')[0]
+                        elif is_placeholder_sfsid(str(attrs.get('law', ''))):
+                            raise NoLink()      # a draft's "(2018:000)" (L1)
                         else:
                             uri = lagrum_uri(attrs, self.base)
                         refs.append(Ref(base + s, base + e,

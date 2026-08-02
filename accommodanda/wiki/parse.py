@@ -175,7 +175,8 @@ def kommentar_artifact(path):
             (section if section is not None else nodes).append(
                 {"type": "stycke", "text": runs})
     art = {"uri": "https://lagen.nu/kommentar/" + basefile, "type": "kommentar",
-           "basefile": basefile, "annotates": law_uri, "author": meta.get("author"),
+           "basefile": basefile, "annotates": law_uri,
+           "author": markdown.byline(meta.get("author")),
            "categories": meta.get("categories", []), "body": nodes}
     if None in guidance:          # document-level external links (Step 2)
         art["guidance"] = guidance[None]

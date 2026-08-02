@@ -85,6 +85,34 @@ def _inline_list(value):
     return [_scalar(item) for item in value[1:-1].split(",") if item.strip()]
 
 
+# An `author:` byline, as it survives in the hand-authored corpus: three legacy
+# MediaWiki spellings the wikitext->markdown migration left verbatim in the
+# frontmatter, plus the modern markdown link. 21 of the 28 commentary files
+# carry one of the legacy forms, so the value reached the rail as raw markup
+# ("[http://wiki.lagen.nu/index.php/Användare:AlexanderAlk Alexander
+# Ankerstedt]", D2). Every form reduces to the label: the targets are
+# wiki.lagen.nu user pages on the retired MediaWiki, so a link would point at a
+# host this corpus is replacing.
+RE_BYLINE_LINK = re.compile(
+    r"\[\[(?:[^\]|]*\|)?(?P<wl>[^\]|]+)\]\]"            # [[Page|label]] / [[label]]
+    r"|\[(?P<md>[^\]]*)\]\((?:[^)]*)\)"                 # [label](url)
+    r"|\[(?:https?:)?//[^\s\]]+\s+(?P<ext>[^\]]*)\]"    # [url label]
+    r"|\[(?P<bare>(?:https?:)?//[^\s\]]+)\]")           # [url]
+
+
+def byline(value):
+    """An `author:` frontmatter value -> the display name(s), with any link
+    markup reduced to its label. Returns None for a missing/blank byline so a
+    caller can omit the line entirely. Joins like "X och Y" are preserved --
+    only the bracketed spans are rewritten."""
+    if not value:
+        return None
+    text = RE_BYLINE_LINK.sub(
+        lambda m: (m.group("wl") or m.group("md") or m.group("ext")
+                   or m.group("bare") or "").strip(), value)
+    return " ".join(text.split()) or None
+
+
 def frontmatter(text, path=None):
     """`(meta, body)` from a markdown file. `meta` is the parsed YAML-subset
     frontmatter (``{}`` if the file has none); `body` is everything after the

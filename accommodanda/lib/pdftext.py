@@ -31,6 +31,7 @@ import subprocess
 import tempfile
 from collections import Counter
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from pathlib import Path
 from typing import NamedTuple
 
@@ -699,6 +700,31 @@ def _strip_header_runs(runs, header_re):
     return " ".join(kept)
 
 
+# A whole line that is nothing but this page's number, in the forms Swedish
+# agencies set it: the bare number, "3 (12)" / "3(12)", and "Sida 3" /
+# "Sid 3 av 12". Every form is anchored to the page's *own* number, so a line
+# of body text can never match one -- "1 (3)" is a plausible enough string that
+# an unanchored pattern would eat real content.
+_PAGE_NUMBER = r"(?:sid(?:a|an)?\.?\s*)?%d(?:\s*[(/]\s*\d+\s*\)?|\s+av\s+\d+)?"
+
+
+@lru_cache(maxsize=None)
+def _page_number_re(pageno):
+    return re.compile(_PAGE_NUMBER % pageno, re.IGNORECASE)
+
+
+def is_page_number(text, pageno):
+    """Whether `text` is the whole of a page-number line for page `pageno`.
+
+    The bare number was already dropped; the parenthesised form was not, so
+    every föreskrift page carried its "1 (3)" into the body -- as a heading, in
+    the innehåll panel, and splitting the sentence that ran across the page
+    break (D7). A footnote is a different thing and stays: it is body the
+    document wrote, marked by its smaller size (FOOTNOTE_DROP), not chrome the
+    typesetter added."""
+    return bool(_page_number_re(pageno).fullmatch(text.strip()))
+
+
 def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
     """Reflow a page's lines into paragraphs, dropping the running header (the
     identifier, when one is known -- pass ``None``/``""`` where the source has no
@@ -735,7 +761,7 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
                 if not re.search(r"[A-Za-zÅÄÖåäö]", residue):
                     raw = residue
         text = normalize_space(raw)
-        if text and text != str(pageno) and not RE_DOTS.search(text):
+        if text and not is_page_number(text, pageno) and not RE_DOTS.search(text):
             kept.append(replace(l, text=text))
     gaps = sorted(b.top - a.top
                   for a, b in zip(kept, kept[1:], strict=False) if b.top > a.top)
@@ -948,11 +974,19 @@ def letterhead_footnotes(paras, margin, masthead):
 def _heading_wrap(prev, l, marker, heading):
     """Whether line `l` continues a wrapped multi-line heading: the previous
     line and this one are both heading-fonted in the *same* size (a heading and
-    its subsection differ in size, so they never fold), sit a heading's own
-    leading apart (HEAD_GAP x the size -- known only when font info is), and
-    this line neither opens a numbered heading of its own nor is a §/kap
-    marker."""
+    its subsection differ in size, so they never fold) *and the same weight*,
+    sit a heading's own leading apart (HEAD_GAP x the size -- known only when
+    font info is), and this line neither opens a numbered heading of its own
+    nor is a §/kap marker.
+
+    Weight has to agree because size alone is not reliable evidence of a
+    heading: a page whose opening paragraph is set a point or two above its
+    dominant body size reads as heading-fonted, and a JO decision -- bold
+    "Anmälan" on its own line, body following -- then folded the first
+    paragraph into the heading, giving a 40-word rubrik and a table of
+    contents of three paragraphs (D8). A heading that wraps keeps its weight
+    across the break; a heading followed by body text does not."""
     return bool(prev is not None and heading(prev) and heading(l) and not marker
-                and l.size and l.size == prev.size
+                and l.size and l.size == prev.size and l.bold == prev.bold
                 and 0 < l.top - prev.top <= HEAD_GAP * l.size
                 and not RE_NUM_LEAD.match(l.text))

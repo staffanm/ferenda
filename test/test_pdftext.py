@@ -27,6 +27,7 @@ from accommodanda.lib.pdftext import (
     _lines,
     classify_letterhead,
     flat_lines,
+    is_page_number,
     letterhead_footnotes,
     page_paragraphs,
     pdf_pages,
@@ -337,3 +338,82 @@ def test_a_note_without_a_marker_keeps_an_empty_mark():
     assert letterhead_footnotes(
         _stream("Ingen markör inleder denna anmärkning."),
         NO_MARGIN, NO_MASTHEAD) == [("", "Ingen markör inleder denna anmärkning.")]
+
+
+def _sized(text, top, size, bold=False):
+    return Line(text, top, bold, bold, False, size)
+
+
+def test_a_bold_heading_does_not_swallow_the_body_that_follows():
+    # D8: `heading()` also calls a line heading-fonted when it is merely larger
+    # than the page's dominant body size -- and a JO decision's opening
+    # paragraph is. With only size and leading checked, the wrap rule folded
+    # that paragraph into the bold heading above it, so "Anmälan" arrived as a
+    # 40-word rubrik and the innehåll panel read as three paragraphs.
+    lines = [_sized("Anmälan", 100, 17, bold=True),
+             _sized("AA klagade, i en anmälan som kom in till JO", 120, 17),
+             _sized("den 4 april 2005.", 140, 17),
+             _sized("Utredning", 200, 17, bold=True),
+             _sized("BB:s akt lånades in och granskades.", 220, 17)]
+    paras = page_paragraphs(lines, None, 1)
+    assert [(p.text, p.bold) for p in paras] == [
+        ("Anmälan", True),
+        ("AA klagade, i en anmälan som kom in till JO den 4 april 2005.", False),
+        ("Utredning", True),
+        ("BB:s akt lånades in och granskades.", False)]
+
+
+def test_a_wrapped_heading_still_folds_when_the_weight_agrees():
+    # the case the wrap rule exists for: a title set across two lines, both
+    # bold and the same size, a heading's leading apart
+    lines = [_sized("Kritik mot en överförmyndarnämnd för handläggningen", 100,
+                    19, bold=True),
+             _sized("av en begäran om byte av god man", 120, 19, bold=True),
+             _sized("Anmälan", 200, 17, bold=True)]
+    paras = page_paragraphs(lines, None, 1)
+    assert paras[0].text == ("Kritik mot en överförmyndarnämnd för "
+                             "handläggningen av en begäran om byte av god man")
+    assert paras[1].text == "Anmälan"
+
+
+def test_a_size_only_heading_still_wraps():
+    # a prop's numbered chapter headings are large but not bold, so a wrap with
+    # neither line bold must keep folding -- the weights agree, they are just
+    # both False
+    lines = [_sized("Överväganden och förslag om en ny", 100, 16),
+             _sized("ordning för prövningen", 118, 16)]
+    # the body has to dominate for 16pt to read as *larger than* body size
+    body = [_sized("Regeringen föreslår att detta ska gälla.", 200, 12),
+            _sized("Skälen för regeringens förslag är dessa.", 218, 12),
+            _sized("Remissinstanserna tillstyrker.", 236, 12)]
+    paras = page_paragraphs(lines + body, None, 1)
+    assert paras[0].text == ("Överväganden och förslag om en ny ordning för "
+                             "prövningen")
+
+
+def test_a_parenthesised_page_number_line_is_dropped():
+    # D7: only the bare number was dropped, so every föreskrift page carried
+    # its "1 (3)" footer into the body -- as a heading, into the innehåll
+    # panel, and splitting the sentence that ran across the page break
+    lines = [_line("unionens institutioner, organ och", 900),
+             _line("1 (3)", 1095)]
+    assert [p.text for p in page_paragraphs(lines, None, 1)] == [
+        "unionens institutioner, organ och"]
+
+
+def test_a_page_number_line_must_be_this_page_s_number():
+    # anchored to the page's own number, so a line of body text that happens to
+    # read like a footer survives
+    lines = [_line("1 (3)", 100), _line("brödtext", 200)]
+    assert "1 (3)" in " ".join(p.text for p in page_paragraphs(lines, None, 2))
+    # ...and is dropped on the page it does number
+    assert "1 (3)" not in " ".join(p.text
+                                   for p in page_paragraphs(lines, None, 1))
+
+
+def test_page_number_forms():
+    assert is_page_number("4/12", 4)
+    assert is_page_number("Sida 4 av 12", 4)
+    assert is_page_number("sid 4", 4)
+    assert not is_page_number("4 § Om ansökan", 4)
+    assert not is_page_number("(3)", 3)

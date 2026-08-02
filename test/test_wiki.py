@@ -780,3 +780,28 @@ def test_definition_links_promote_swedish_eu_terms_to_begrepp():
     eng = {"lang": "eng", "structure": [
         {"type": "point", "id": "2.a", "defines": "interest", "text": ["…"]}]}
     assert catalog.definition_links(eng) == []
+
+
+def test_byline_reduces_legacy_wiki_link_forms_to_the_name():
+    # the wikitext->markdown migration left the `author:` frontmatter verbatim,
+    # so 21 of the 28 commentary files still spell the byline as MediaWiki
+    # markup. Every form reduces to the label -- the targets are user pages on
+    # the retired wiki.lagen.nu (D2).
+    assert markdown.byline(
+        "[http://wiki.lagen.nu/index.php/Användare:AlexanderAlk"
+        " Alexander Ankerstedt]") == "Alexander Ankerstedt"
+    assert markdown.byline(
+        "[[Användare:Daniel Berger|Daniel Berger]] och"
+        " [[Användare:Tizian|Tizian Vahlberg]]") \
+        == "Daniel Berger och Tizian Vahlberg"
+    assert markdown.byline("[[Tizian]]") == "Tizian"
+    assert markdown.byline("[Namn](https://example.org/x)") == "Namn"
+    assert markdown.byline("Helena Andersson jur.kand.") \
+        == "Helena Andersson jur.kand."
+
+
+def test_byline_of_a_missing_or_blank_author_is_none():
+    # None lets the rail omit the byline line rather than print an empty dash
+    assert markdown.byline(None) is None
+    assert markdown.byline("") is None
+    assert markdown.byline("   ") is None

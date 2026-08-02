@@ -39,6 +39,7 @@ from accommodanda.lib.lagrum import (
     Ref,
     build_trigger,
     interleave,
+    is_placeholder_sfsid,
     load_abbreviations,
     load_namedacts,
     load_namedlaws,
@@ -820,3 +821,32 @@ def test_parser_reset_clears_document_state():
     parser.state.namedlaws["testlagen"] = "1999:175"
     parser.reset()
     assert not parser.state.namedlaws and parser.state.lastlaw is None
+
+
+def test_a_draft_statutes_placeholder_number_mints_no_link():
+    """L1: a not-yet-numbered statute is written with a zero löpnummer
+    ("järnvägstrafiklagen (2018:000)" in the betänkande proposing it, and
+    "0000:000" where the year is open too). No real SFS has one, so these are
+    never citations to a document -- but each minted a uri, and ~100 000 of
+    them piled onto a handful of targets, topping the dangling-target
+    want-list the backfill downloads against."""
+    parser = LagrumParser(NAMEDLAWS, basefile="9999:999", parse_types=[LAGRUM])
+
+    def uris(text):
+        parser.reset()
+        return [r.uri for r in parser.parse_text(text, context={})]
+
+    assert uris("den nya järnvägstrafiklagen (2018:000)") == []
+    assert uris("lagen (0000:000) om något") == []
+    assert uris("enligt 1 § lagen (2022:000) om test") == []
+    # a real number is untouched, including one whose löpnummer merely opens
+    # with a zero (the 1734 års lag balkar: "1736:0123")
+    assert uris("enligt 3 kap. 5 § brottsbalken (1962:700)") == \
+        ["https://lagen.nu/1962:700#K3P5"]
+
+
+def test_placeholder_predicate():
+    assert is_placeholder_sfsid("2018:000")
+    assert is_placeholder_sfsid("0000:00")
+    assert not is_placeholder_sfsid("1962:700")
+    assert not is_placeholder_sfsid("1736:0123")
