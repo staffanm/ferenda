@@ -888,6 +888,22 @@ below is not optional polish, it's the only way they enter the corpus.
     the caller supplying acts (like KORTLAGRUM's LAW_ABBREV), so SFS/förarbete
     citation parsing — and the golden — are untouched; only the DV scanner
     opts in. `test/test_lagrum.py`.
+  - ✅ **Recitals** (`skal_part`, 2026-08-02) — a recital is where an act states
+    the reasoning its articles enact, and the guidance corpus cites it for
+    exactly that: "i skäl 108 och artikel 46.1 i allmänna
+    dataskyddsförordningen föreskrivs att …". `skäl 108 i <akt>`, the
+    coordination Swedish writes by hanging one "i <akt>" off both halves, and
+    the definite generic `skäl 108 i förordningen` all mint `#recital-N` — the
+    anchor the eurlex renderer already gives each recital, so these join the
+    citation graph beside the articles. English surface too (`recital N of …`).
+    A recital that names no act does *not* anaphora-link, unlike a bare
+    article: these documents number their own paragraphs the same way, and a
+    bare number is likelier to be one of those. The act keeps its own link over
+    its own words, which is also what keeps it the act in focus for the
+    anaphora that follows. Measured on the 60 edpb artifacts: +409 links, 211
+    of them recitals, none lost — and 71 links moved off a repealed directive
+    onto the GDPR, the extra anchor points giving the anaphora chain more
+    places to re-latch. `test/test_lagrum.py`.
   - ✅ **Canonical case naming + HD's given names** (`lib/casenaming.py`, with
     `case_uri`; moved out of `dv/` since the catalog + renderer read it too). One entry
     point, `case_label`, computes a case's display title so the renderer heading,
