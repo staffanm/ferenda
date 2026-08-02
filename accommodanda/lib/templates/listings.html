@@ -116,6 +116,9 @@
 <dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><span class="pre">{{ doc.pre or "" }}</span>{{ doc.key }}</a></dt>
 {%- else -%}
 <dt{% if doc.subdued %} class="subdued"{% endif %}><a href="{{ doc.url }}"><strong>{{ doc.short_id or doc.display }}</strong></a></dt><dd>{{ doc.text }}
+{#- the entry is the konsoliderade version; the text as promulgated is one
+    click away on the document page, so it does not list here too (B4) -#}
+{%- if doc.consolidated %} <span class="fs-konsoliderad">konsoliderad</span>{% endif -%}
 {#- the ändringsförfattningar nested under their base föreskrift (F5) -#}
 {%- if doc.amendments %}<div class="fs-andringar">Ändringar: {% for a in doc.amendments -%}
 <a href="{{ a.url }}"{% if a.subdued %} class="subdued"{% endif %}>{{ a.short_id or a.display }}</a>{% if not loop.last %}, {% endif %}
@@ -157,4 +160,13 @@
 {%- endmacro -%}
 {%- macro empty() -%}
 <p class="empty">Inga dokument.</p>
+{%- endmacro -%}
+{%- macro succeeded_series_body(nav, heading, successor_label, successor_url) -%}
+{#- a författningssamling whose agency was renamed or disbanded: its documents
+    list under the successor (F8), so its own address says where they went
+    rather than serving the listing the last build happened to leave behind
+    (B2). The nav is the live tree, so the reader is not stranded -#}
+<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }}</h1>
+<p class="browse-note">Serien är avslutad. Föreskrifterna listas numera under <a href="{{ successor_url }}">{{ successor_label }}</a>.</p>
+</section></div>
 {%- endmacro -%}

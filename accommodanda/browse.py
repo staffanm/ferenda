@@ -78,6 +78,8 @@ def _browse_item(doc):
         # so the two-column dt/dd grid stays aligned row for row.
         "text": "%s: %s" % (name, desc) if name and desc
                 else (desc or name or ""),
+        # this entry is the konsoliderade version (B4)
+        "consolidated": doc.get("consolidated"),
         # a föreskrift's ändringsförfattningar, nested under it (F5)
         "amendments": [{"url": a["url"], "subdued": a.get("subdued"),
                         "short_id": a.get("short_id"),
@@ -194,6 +196,54 @@ def _fs_series_note(prim):
     return "Här listas även äldre föreskrifter ur %s." % listed
 
 
+# What each kind of EU document *is*, one sentence, on that type's browse page
+# (N2). The EU-rätt landing is one of these pages, so it stops being a bare list
+# of treaty versions. What a reader needs first is who the document binds -- a
+# förordning binds everyone directly, a direktiv binds only the states and only
+# as to the result, a generaladvokat's förslag binds nobody -- because that is
+# what decides whether the text answers their question at all.
+_EU_TYPE_NOTE = {
+    "treaty": "Unionens grundfördrag: den konstitutionella grund medlemsstaterna "
+              "har slutit med varandra och som all annan EU-rätt vilar på.",
+    "regulation": "En förordning gäller direkt som lag i varje medlemsstat, utan "
+                  "att först behöva genomföras i svensk rätt.",
+    "directive": "Ett direktiv binder medlemsstaterna i fråga om det resultat som "
+                 "ska uppnås, men överlåter åt varje stat att välja form och "
+                 "medel. Det gäller alltså inte direkt här, utan genomförs genom "
+                 "svensk lag eller förordning.",
+    "decision": "Ett beslut är bindande i alla sina delar, men bara för dem som "
+                "det riktar sig till.",
+    "judgment": "EU-domstolens avgöranden. Domstolen tolkar EU-rätten med "
+                "bindande verkan, oftast sedan en nationell domstol har begärt "
+                "förhandsavgörande.",
+    "opinion": "Generaladvokatens förslag till avgörande är en fristående "
+               "rättsutredning inför domstolens dom. Det binder inte domstolen, "
+               "men följs ofta och används för att förstå domskälen.",
+    "act": "Rekommendationer, yttranden och andra rättsakter som inte binder på "
+           "samma sätt som förordningar, direktiv och beslut.",
+    "riktlinjer": "Europeiska dataskyddsstyrelsens riktlinjer om hur "
+                  "dataskyddsförordningen ska tillämpas. De är inte bindande, men "
+                  "väger tungt i tillsynsmyndigheternas praxis.",
+    "rekommendationer": "Europeiska dataskyddsstyrelsens rekommendationer: "
+                        "praktisk vägledning i en avgränsad fråga, utan bindande "
+                        "verkan.",
+    "wp": "Artikel 29-gruppen var EDPB:s föregångare. Dess vägledningar rör "
+          "dataskyddsdirektivet, men flera av dem har uttryckligen bekräftats "
+          "under dataskyddsförordningen.",
+}
+
+
+def _bucket_note(source, nodes):
+    """The editorial line under a browse bucket's heading: what a föreskrift
+    samling carries beyond its own series (F8), or what a kind of EU document
+    is and whom it binds (N2). '' where the bucket has nothing to add."""
+    if source == "foreskrift":
+        return _fs_series_note(nodes[0])
+    if source in ("eurlex", "edpb"):
+        return _EU_TYPE_NOTE.get(nodes[0]["key"], "")
+    return ""
+
+
 def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
     """A single browse bucket page: an optional cross-source `banner` (the shared
     folkrätt selector, the EU-rätt selector, a large samling's year axis), the
@@ -217,8 +267,7 @@ def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
     body = LISTS.facet_page_body(
         Markup(banner), _facet_nav(source, view, [n["key"] for n in nodes],
                                    primary_in_banner),
-        heading, len(docs), listing,
-        note=(_fs_series_note(nodes[0]) if source == "foreskrift" else ""))
+        heading, len(docs), listing, note=_bucket_note(source, nodes))
     alias = feeds.alias_for_source(source)
     discovery = (Markup('<link rel="alternate" type="application/atom+xml" '
                         'href="/dataset/%s/feed.atom">') % alias) if alias else ""
@@ -231,6 +280,82 @@ def _write_browse(out_root, source, slugs, html):
     target.mkdir(parents=True, exist_ok=True)
     compress.write_text(target / "index.html", html,
                         encodings=compress.PAGE_ENCODINGS)
+    return target
+
+
+def _write_succeeded_series(out_root, source, view):
+    """A page at every författningssamling that a rename or a disbandment took
+    out of the tree, saying where its föreskrifter list now (B2), and returning
+    the directories written so the reaper keeps them.
+
+    Their documents fold into the successor's bucket (F8), so no bucket -- and
+    before this no page -- carried their slug, while their addresses stayed in
+    circulation: linked from elsewhere, indexed, and cited in the föreskrifter
+    themselves. The successor's page has said what it carries for a while; this
+    is the other direction."""
+    live = {b["slug"].lower() for b in view["buckets"]}
+    written = set()
+    for slug, entry in sorted(facets.FS_SERIES.items()):
+        successor = entry.get("successor")
+        if not successor or slug in live:
+            continue
+        # follow the chain to the samling that carries the documents today
+        # (säifs -> srvfs -> msbfs -> mcffs), which is the only one to send a
+        # reader to -- an intermediate is as retired as the slug we are on
+        final = facets.fs_live_series(slug)
+        heading = "%s (%s)" % (entry["title"], entry["designation"])
+        html = page(
+            heading, "Bläddra", "",
+            LISTS.succeeded_series_body(
+                _facet_nav(source, view, [final.upper()]), heading,
+                "%s (%s)" % (facets.FS_SERIES[final]["title"],
+                             facets.FS_SERIES[final]["designation"]),
+                browse_url(source, [final])),
+            solo=True, body_class=" browse", own_h1=True)
+        written.add(_write_browse(out_root, source, [slug], html))
+    return written
+
+
+def _reap_browse(out_root, source, written):
+    """Delete the browse pages this run did not write, deepest-first so a
+    parent is considered only after its children.
+
+    Generate rebuilds the pages it still plans, but nothing used to remove the
+    output of a bucket that had *left* the tree -- and a författningssamling
+    leaves the tree for good when its agency is renamed and F8 folds it into a
+    successor. The abandoned pages kept serving, with the masthead, the series
+    nav and the naming of whichever build last wrote them, which reads as a
+    dozen unrelated UI bugs rather than one un-reaped directory (B1).
+
+    Two things keep this from reaching past its own output. A source's browse
+    root can *contain* another's -- edpb browses under `eurlex/vagledning`, and
+    hudoc under `folkratt/hudoc` -- so a sibling's root is pruned rather than
+    walked; without that, generating eurlex deleted the whole EDPB tree on
+    every run, since none of it is in eurlex's `written`. And only the index
+    files this module writes are removed, with the directory going only if it
+    is then empty: a browse bucket that shares a directory with anything else
+    (a document page, a future sidecar) keeps that content."""
+    root = Path(out_root) / browse_dir(source)
+    if not root.is_dir():
+        return 0
+    # only the roots nested *inside* this one need protecting. A root that is an
+    # ancestor of ours is not a sibling to leave alone -- guarding against it too
+    # made the reaper a silent no-op for edpb, whose own root sits under eurlex's.
+    others = {p for p in (Path(out_root) / browse_dir(s) for s in facets.sources()
+                          if s != source)
+              if p != root and p.is_relative_to(root)}
+    reaped = 0
+    for d in sorted(root.rglob("*"), key=lambda p: -len(p.parts)):
+        if not d.is_dir() or d in written:
+            continue
+        if any(o == d or o in d.parents for o in others):
+            continue                    # another source's browse root, or inside one
+        for f in d.glob("index.html*"):
+            f.unlink()
+        if not any(d.iterdir()):
+            d.rmdir()
+            reaped += 1
+    return reaped
 
 
 # a författningssamling with fewer documents than this (amendments included)
@@ -276,6 +401,7 @@ def generate_browse(client, source, out_root, cross_axis=None):
     resp = client.get("/api/v1/browse", params={"source": source})
     view = resp.json()
     root_html = None
+    written = set()
     for prim in view["buckets"]:
         banner = (cross_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
                   if cross_axis else "")
@@ -295,12 +421,15 @@ def generate_browse(client, source, out_root, cross_axis=None):
                 banner = cross_nav(year_axis, nodes[1]["key"])
             html = render_facet_page(source, view, nodes, banner=banner,
                                      primary_in_banner=cross_axis is not None)
-            _write_browse(out_root, source, slugs, html)
+            written.add(_write_browse(out_root, source, slugs, html))
             if len(nodes) > 1 and i == 0:        # primary landing = first child
-                _write_browse(out_root, source, slugs[:1], html)
+                written.add(_write_browse(out_root, source, slugs[:1], html))
             if root_html is None:                # overall default = first leaf
                 root_html = html
-    _write_browse(out_root, source, [], root_html)
+    written.add(_write_browse(out_root, source, [], root_html))
+    if source == "foreskrift":
+        written |= _write_succeeded_series(out_root, source, view)
+    _reap_browse(out_root, source, written)
 
 
 # --------------------------------------------------------------------------
