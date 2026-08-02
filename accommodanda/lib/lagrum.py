@@ -218,8 +218,29 @@ EU_RULES = r"""
 // --- EU legislation (eulag.ebnf) ---
 
 eu_ref: artikel_part _W IN _W rattsakt_part
+      | skal_part _W IN _W rattsakt_part
+      | skal_part _W_AND_OR_W artikel_part _W IN _W rattsakt_part
       | rattsakt_part
       | artikel_part
+
+// a recital ("skäl 108"), which is where an act states the reasoning its
+// articles enact and is cited for exactly that -- "i skäl 108 och artikel 46.1
+// i allmänna dataskyddsförordningen föreskrivs att …". It links only where an
+// act is named or in focus: unlike an article, a bare "skäl 12" is not
+// anaphora-linked, because these documents number their own paragraphs the same
+// way and a bare number is far likelier to be one of those than a recital of
+// whatever act was last mentioned.
+//
+// The coordinated form is its own alternative because Swedish hangs one "i
+// <akt>" off both halves, and the recital must take the act the article names
+// rather than go unlinked. Only that order: "skäl … och artikel … i X" is
+// grammar, "artikel … och skäl … i X" is not, and in the corpus the recital
+// leads. The reverse still links the recital and the act, losing only the
+// article's pinpoint. A range follows `_asep` like an article range, so
+// "skälen 108-110" links the endpoints, not the span.
+skal_part: SKAL _W skal_item (_asep skal_item)*
+skal_item: skal_ref_id
+skal_ref_id: NUMBER
 
 // one or more articles: a single "artikel N(.M)", a coordinated list
 // ("artiklarna 101 och 102", "artiklarna 12, 13 och 14") or a range
@@ -262,8 +283,14 @@ datum_ref_id: DATUM
 # fmt_eu_ref), which is correct-but-unlinked rather than mis-pinned.
 EU_RULES_ENG = r"""
 eu_ref: artikel_part _W OF _W rattsakt_part
+      | skal_part _W OF _W rattsakt_part
+      | skal_part _W_AND_OR_EN artikel_part _W OF _W rattsakt_part
       | rattsakt_part
       | artikel_part
+
+skal_part: SKAL _W skal_item (_asep skal_item)*
+skal_item: skal_ref_id
+skal_ref_id: NUMBER
 
 artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
 artikel_item: artikel_ref_id (DOT underartikel_ref_id
@@ -339,6 +366,10 @@ EU_TERMINALS = {
     "swe": r"""
 ARTIKEL.3: /[Aa]rtikel/
 ARTIKLARNA.3: /[Aa]rtiklarna/
+// "skäl 108", "skälen 108 och 109", "skälet 108". Not "skäl" as the everyday
+// noun: the terminal only ever reaches the parser followed by a number, since
+// `skal_part` requires one and the trigger below fires on the pair.
+SKAL.3: /[Ss]käl(?:et|en)?/
 RADETS: /rådets/
 EP_RADETS: /Europaparlamentets och rådets/
 KOMMISSIONENS: /kommissionens/
@@ -361,6 +392,7 @@ PUNKT_LETTER: /(?!i\b)[a-z]\b/
     "eng": r"""
 ARTIKEL.3: /[Aa]rticle/
 ARTIKLARNA.3: /[Aa]rticles/
+SKAL.3: /[Rr]ecitals?/
 RADETS: /Council/
 EP_RADETS: /European Parliament and (?:of the )?Council/
 KOMMISSIONENS: /Commission/
@@ -643,6 +675,7 @@ LAGRUM_TRIGGER_SRC = r"""
 
 EU_TRIGGER_SRC = r"""
     \b[Aa]rtik(?:el|larna)\ \d                # EU article/articles (also initial)
+  | \b[Ss]käl(?:et|en)?\ \d                   # recital ("skäl 108")
   | \b(?:rådets|kommissionens|Europaparlamentets\ och\ rådets)\b
   | \b\d+/\d+/E(?:EG|G|U)\b                   # 95/46/EG
   | \bdirektiv\ (?=\(E(?:EG|G|U)\))           # bare "direktiv (EU) 2022/2555"
@@ -690,6 +723,7 @@ EURATTSFALL_TRIGGER_SRC = r"""
 # EU_TERMINALS["eng"] defines (no treaty/named-act forms: not loaded for eng)
 EU_TRIGGER_SRC_ENG = r"""
     \b[Aa]rticles?\ \d                          # Article 29 (5) / Articles 20 and 26
+  | \b[Rr]ecitals?\ \d                          # recital ("recital 108")
   | \b(?:Council|Commission|European\ Parliament)\b
   | \b\d+/\d+/E(?:EC|C|U|uratom)\b              # 71/305/EEC
   | \b[DdRr](?:irective|egulation)\ (?=\(E(?:EC|C|U)\))
@@ -1823,6 +1857,55 @@ class LagrumParser:
         for artikel, underartikel, punkt, span in specs:
             out.append({'_uri': build(artikel, underartikel, punkt), '_span': span})
 
+    def _recital_specs(self, node):
+        """Per-recital ``(recital, span)``. A single recital takes the whole
+        "skäl 108" as its span, a coordinated list one number each -- the
+        convention `_article_specs` already follows. The span never reaches the
+        act that follows, unlike a lone article's: the act phrase may be shared
+        with a coordinated article ("skäl 108 och artikel 46.1 i X"), and two
+        links cannot both own it."""
+        items = [it for it in node.iter_subtrees_topdown()
+                 if it.data == 'skal_item']
+        part = node_span(subtree(node, 'skal_part'))
+        return [(find_refids(it)['skal'],
+                 part if len(items) == 1 else node_span(it))
+                for it in items]
+
+    @staticmethod
+    def _act_span(node):
+        """The span of the phrase naming the act, inside an eu_ref that also
+        cites a recital. A recital link owns only "skäl N", so the act keeps its
+        own link over its own words -- which is what it had before recitals were
+        grammar at all ("skäl 17 i direktiv 2000/31/EG" used to match just the
+        directive), and losing it would cost both that link and the anaphora
+        memory every later "artikel N i direktivet" depends on. Every eu_ref
+        alternative carrying a recital ends in `rattsakt_part`, so its absence
+        is a broken grammar, not a case to fall back for."""
+        return node_span(subtree(node, 'rattsakt_part'))
+
+    def _emit_act_ref(self, out, node, parts, specs, build):
+        """Emit one eu_ref onto a single act: each cited recital on its own
+        "skäl N", then each cited article via `build`. Where *only* recitals were
+        cited, the act still takes the link over the words that name it -- and
+        takes it through `build`, which is what records it as the act in focus
+        for the anaphora that follows."""
+        if 'skal_item' in parts:
+            act_uri = build(None, None, None)
+            self._emit_recitals(out, node, act_uri)
+            if not specs:
+                out.append({'_uri': act_uri, '_span': self._act_span(node)})
+                return
+        self._emit_uris(out, specs, node, build)
+
+    def _emit_recitals(self, out, node, act_uri):
+        """Emit one ``#recital-N`` link per cited recital, onto `act_uri` (the
+        act's own uri, no fragment). The fragment is the anchor the eurlex
+        renderer mints for a recital (``#recital-108``), the way the article
+        fragment is the dotted one it mints for an article."""
+        for recital, span in self._recital_specs(node):
+            out.append({'_uri': '%s#recital-%s' % (act_uri, recital),
+                        '_span': span})
+
     def fmt_eu_ref(self, node, match, out, context):
         parts = {sub.data for sub in node.iter_subtrees()}
         specs = self._article_specs(node) if 'artikel_item' in parts else []
@@ -1839,8 +1922,8 @@ class LagrumParser:
                 token_text(subtree(node, 'eu_namnakt')).lower())
             if celex is None:
                 raise NoLink()
-            self._emit_uris(out, specs, node,
-                            lambda a, u, p: self._eu_celex_uri(celex, a, u, p))
+            self._emit_act_ref(out, node, parts, specs,
+                               lambda a, u, p: self._eu_celex_uri(celex, a, u, p))
             return
         # the definite generic noun ("artikel N i (det) förordningen/direktivet")
         # pinpoints the act in focus; a bare "artikel N" self-refers inside an EU
@@ -1863,9 +1946,13 @@ class LagrumParser:
                 or self.state.last_eu_act
             if not target:
                 raise NoLink()
-            self._emit_uris(out, specs, node,
-                            lambda a, u, p: self._eu_celex_uri(target, a, u, p,
-                                                               remember=False))
+            # recitals reach here too, via the generic noun ("skäl 108 i
+            # förordningen") -- the commonest of the recital forms in this
+            # corpus. Emitting them through the shared path is what keeps that
+            # from degrading to an act-level link under text promising a punkt.
+            self._emit_act_ref(out, node, parts, specs,
+                               lambda a, u, p: self._eu_celex_uri(target, a, u, p,
+                                                                 remember=False))
             return
         # an act cited by number ("(artikel N i) direktiv 2000/31/EG"): celex_uri
         # mints the act, and each cited article pinpoints that same act
@@ -1887,12 +1974,22 @@ class LagrumParser:
         if ('forordning_part' in parts and 'ar' in attrs and 'lopnummer' in attrs
                 and not any(t.type in ('NR', 'NO_EN') for t in tokens)):
             attrs['ar'], attrs['lopnummer'] = attrs['lopnummer'], attrs['ar']
+        # the act alone, with any article pinpoint stripped -- what a recital
+        # hangs its `#recital-N` off, and the base each article spec re-pinpoints
+        act = {k: v for k, v in attrs.items()
+               if k not in ('artikel', 'underartikel', 'punkt')}
+        if 'skal_item' in parts:
+            self._emit_recitals(out, node, celex_uri(act, self.base))
+            if not specs:
+                # ... and the act keeps the link over its own phrase that it had
+                # before a preceding recital was part of the same reference
+                self.emit(attrs, match, out, context, span=self._act_span(node))
+                return
         if not specs:
             self.emit(attrs, match, out, context, span=node_span(node))
             return
         for artikel, underartikel, punkt, span in specs:
-            d = {k: v for k, v in attrs.items()
-                 if k not in ('artikel', 'underartikel', 'punkt')}
+            d = dict(act)
             d['artikel'] = artikel
             if underartikel:
                 d['underartikel'] = underartikel

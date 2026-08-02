@@ -305,6 +305,20 @@ EULAGSTIFTNING_ENG_CASES = [
     # a Treaty article refuses to link (no English treaty grammar) -- correct-
     # but-unlinked, never anaphora-pinned onto the last named act
     ("Article 177 of the EEC Treaty by the Raad van State", []),
+    # recitals on the English surface, same three shapes as the Swedish one:
+    # the act named by number, the recital coordinated with an article that
+    # names it, and the definite generic noun referring back
+    ("Recital 19 of Directive 71/305/EEC states",
+     ["https://lagen.nu/ext/celex/31971L0305#recital-19",
+      "https://lagen.nu/ext/celex/31971L0305"]),
+    ("Recital 19 and Article 29 (5) of Directive 71/305/EEC provide",
+     ["https://lagen.nu/ext/celex/31971L0305#recital-19",
+      "https://lagen.nu/ext/celex/31971L0305#29.5"]),
+    ("Regulation (EEC) No 2092/91 applies. See recital 4 of the regulation.",
+     ["https://lagen.nu/ext/celex/31991R2092",
+      "https://lagen.nu/ext/celex/31991R2092#recital-4",
+      "https://lagen.nu/ext/celex/31991R2092"]),
+    ("The court gave recital 5 no weight.", []),
 ]
 
 
@@ -609,6 +623,69 @@ def test_eu_letter_coordination_links_each_letter_on_its_own_span():
     refs = _eu_parser().parse_text(text, context={})
     assert [text[r.start:r.end] for r in refs] == ["c", "e"]
     assert [r.uri for r in refs] == ["%s#6.1.c" % GDPR, "%s#6.1.e" % GDPR]
+
+
+# A recital is where an act states the reasoning its articles enact, and the
+# guidance corpus cites it for exactly that -- "i skäl 108 och artikel 46.1 i
+# allmänna dataskyddsförordningen föreskrivs att ...". The eurlex renderer
+# already mints the `#recital-N` anchor these land on.
+EU_RECITALS = [
+    ("skäl 108 i allmänna dataskyddsförordningen",
+     ["%s#recital-108" % GDPR, GDPR]),
+    # the act named by number links its own phrase too, as it always did
+    ("skäl 6 i förordning (EU) 2016/679",
+     ["%s#recital-6" % GDPR, GDPR]),
+    # a coordination is one link per recital
+    ("skälen 108 och 109 i dataskyddsförordningen",
+     ["%s#recital-108" % GDPR, "%s#recital-109" % GDPR, GDPR]),
+    # Swedish hangs one "i <akt>" off both halves; the recital must take the act
+    # the article names rather than go unlinked -- the reported case
+    ("skäl 108 och artikel 46.1 i allmänna dataskyddsförordningen",
+     ["%s#recital-108" % GDPR, "%s#46.1" % GDPR]),
+    ("skäl 108 och artiklarna 46.1 och 46.2 i dataskyddsförordningen",
+     ["%s#recital-108" % GDPR, "%s#46.1" % GDPR, "%s#46.2" % GDPR]),
+    # a recital that names no act does *not* anaphora-link: these documents
+    # number their own paragraphs the same way, and a bare number is likelier
+    # to be one of those than a recital of whatever act was last mentioned
+    ("Domstolen anförde skäl 5 utan att ange någon rättsakt.", []),
+    # ... but the definite generic noun refers back explicitly, and is the
+    # commonest recital form in the corpus. Regression: this used to link the
+    # whole phrase to the act with no fragment at all, so text reading "skäl
+    # 108" landed the reader on the act's front page
+    ("Se artikel 5 i dataskyddsförordningen. Se vidare skäl 108 i förordningen.",
+     ["%s#5" % GDPR, "%s#recital-108" % GDPR, GDPR]),
+    # and "skäl" as the everyday noun is not a citation at all
+    ("Det saknades skäl att ändra beslutet.", []),
+    ("Av dessa skäl 12 personer överklagade.", []),
+]
+
+
+@pytest.mark.parametrize("text,want", EU_RECITALS)
+def test_eu_recital_links(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
+def test_a_recital_link_spans_its_own_words_only():
+    """The recital owns "skäl 108" and no more: the trailing act phrase may be
+    shared with a coordinated article, and two links cannot both own it."""
+    text = "skäl 108 och artikel 46.1 i allmänna dataskyddsförordningen"
+    recital, artikel = _eu_parser().parse_text(text, context={})
+    assert text[recital.start:recital.end] == "skäl 108"
+    assert text[artikel.start:artikel.end] == \
+        "artikel 46.1 i allmänna dataskyddsförordningen"
+
+
+def test_a_recital_still_leaves_the_act_linked_and_in_focus():
+    """Regression: making "skäl N i <akt>" one reference swallowed the act's own
+    link and, with it, the anaphora memory every later "artikel N i direktivet"
+    depends on -- 69 links across the edpb corpus went with it."""
+    parser = _eu_parser()
+    text = "Formuleringen är identisk med den i skäl 19 i direktiv 95/46/EG."
+    refs = parser.parse_text(text, context={})
+    assert [text[r.start:r.end] for r in refs] == ["skäl 19", "direktiv 95/46/EG"]
+    # ... and the act is still what a later bare article binds to
+    assert [r.uri for r in parser.parse_text("artikel 3.1", context={})] == \
+        ["https://lagen.nu/ext/celex/31995L0046#3.1"]
 
 
 def test_eu_single_lettered_point_spans_the_whole_phrase():
