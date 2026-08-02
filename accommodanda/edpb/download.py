@@ -50,7 +50,6 @@ Stored per document under ``site/data/downloaded/edpb/{serie}/``: a
 """
 
 import io
-import json
 import re
 import time
 import zipfile
@@ -61,10 +60,10 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
+from ..lib.harvest import ItemKey, record_unchanged, store_record, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
-    Reporter,
     basefile_slug,
     document_extension,
     href,
@@ -131,15 +130,13 @@ def store_document(root, bf, data):
     return path
 
 
-def write_record(root, record, full=False):
-    """Write one record when it is new or changed. Returns True when written."""
+def store(root, record, full=False):
+    """Store one guidance document's record under its org/series directory when
+    it is new or changed. Returns True when written. (The write itself is
+    `lib.harvest.store_record`; this only knows where the record goes.)"""
     bf = record["basefile"]
-    path = record_path(root, bf.split("/", 1)[0], bf)
-    if not full and compress.exists(path) \
-            and json.loads(compress.read_text(path)) == record:
-        return False
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
-    return True
+    return store_record(record_path(root, bf.split("/", 1)[0], bf), record,
+                        full=full)
 
 
 def _select(pending, only):
@@ -153,38 +150,44 @@ def _select(pending, only):
 
 
 def _walk(root, pending, delay, full, limit, scope):
-    """Store a series' records and the documents they name, reporting progress.
+    """Store a series' records and the documents they name, through the shared
+    download loop (lib.harvest.walk) with **no watermark**: the sitemap is
+    enumerated whole on every run, so there is no depth to stop short of.
 
-    The document is fetched *before* the record is written, and a record whose
-    fetch failed is **not** written: a stored record is the assertion that the
-    document behind it is on disk, which is what lets `parse` read the store as
-    a promise rather than a hope. A failure leaves the previous good record in
-    place and the next run retries it.
+    `item_key` reports `is_downloaded` as "this record is already current on
+    disk, PDF and all", so an unchanged entry costs nothing while an upstream
+    retitling is still picked up.
+
+    ``limit`` is the shared loop's: it caps documents actually *fetched or
+    changed*, not entries looked at (this walk used to stop after N entries
+    regardless). On a steady-state run where nothing moved, ``--limit`` therefore
+    walks the whole listing and fetches nothing, which is the cheap case anyway.
 
     `pending` items are ``(record, fetch)`` where `fetch` returns the document
     bytes -- one HTTP GET for an EDPB page's PDF, a ZIP fetch and a member
-    extraction for a WP29 document."""
-    seen = new = failed = 0
-    rep = Reporter()
-    for record, fetch in pending:
+    extraction for a WP29 document. A fetch that stores nothing raises, so the
+    record is not written: a stored record is the assertion that its document is
+    on disk, and the next run retries."""
+    def item_key(item):
+        record = item[0]
         bf = record["basefile"]
-        if compress.exists(pdf_path(root, bf)) and not full:
-            new += write_record(root, record, full=full)
-        elif store_document(root, bf, fetch()) is None:
-            failed += 1
-        else:
+        return ItemKey(bf, record_unchanged(
+            record_path(root, bf.split("/", 1)[0], bf), record,
+            pdf_path(root, bf)))
+
+    def resolve(item):
+        record, fetch = item
+        bf = record["basefile"]
+        if not compress.exists(pdf_path(root, bf)) or full:
+            if store_document(root, bf, fetch()) is None:
+                raise ValueError("no document could be stored; record left unwritten")
             time.sleep(delay)
-            new += write_record(root, record, full=full)
-        seen += 1
-        rep.update(seen, len(pending), scope=scope, changed=new)
-        if limit and seen >= limit:
-            break
-    rep.done()
-    if failed:
-        print("edpb %s: %d document(s) could not be fetched; their records were "
-              "left unwritten and the next run retries them" % (scope, failed),
-              flush=True)
-    return seen, new
+        return store(root, record, full=full)
+
+    result = walk(pending, resolve=resolve, item_key=item_key, watermark=None,
+                  full=full, limit=limit, scope=scope, count_label="changed",
+                  total=len(pending))
+    return result.seen, result.new
 
 
 # --------------------------------------------------------------------------

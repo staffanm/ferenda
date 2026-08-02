@@ -80,6 +80,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
+from ..lib.harvest import ItemKey, record_unchanged, store_record, walk
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, mount_aia_chain, request
 from ..lib.pdftext import pdf_first_page_text
@@ -196,29 +197,36 @@ def fetch_document(root, bf, url, session, delay, full=False):
     return path
 
 
-def write_record(root, record, full=False):
-    """Write one record when it is new or changed. Returns True when written."""
+def store(root, record, full=False):
+    """Store one ställningstagande's record under its org/series directory when
+    it is new or changed. Returns True when written. (The write itself is
+    `lib.harvest.store_record`; this only knows where the record goes.)"""
     bf = record["basefile"]
-    path = record_path(root, bf.split("/", 1)[0], bf)
-    if not full and compress.exists(path) \
-            and json.loads(compress.read_text(path)) == record:
-        return False
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
-    return True
+    return store_record(record_path(root, bf.split("/", 1)[0], bf), record,
+                        full=full)
 
 
 def _walk(root, records, session, delay, full, limit, scope, fetch=True):
-    """Store a listing's records and the documents they name, reporting
-    progress. The shared tail of every agency's sync: the listings are single
-    pages (or, for Lifos, walked whole before this point), so every run compares
-    all of them and writes what moved.
+    """Store a listing's records and the documents they name, through the shared
+    download loop (lib.harvest.walk) with **no watermark**: these listings are
+    single pages (or, for Lifos, walked whole before this point), so there is no
+    depth to stop short of -- every run visits every entry and writes what moved.
 
-    The PDF is fetched *before* the record is written, and a record whose fetch
-    failed is **not** written at all: a stored record is the assertion that the
-    document behind it is on disk, which is what lets `parse.body` read an
-    absent PDF as "the agency published none" (a repealed Konkurrensverket
-    entry) rather than "the fetch broke". A failure therefore leaves the
-    previous good record in place and the next run retries it.
+    `item_key` therefore reports `is_downloaded` as "this record is already
+    current on disk, PDF and all", not merely "some file exists": that is what
+    lets walk skip an unchanged entry for free while still picking up an upstream
+    retitling.
+
+    ``limit`` is the shared loop's: it caps documents actually *fetched or
+    changed*, not entries looked at (this walk used to stop after N entries
+    regardless). On a steady-state run where nothing moved, ``--limit`` therefore
+    walks the whole listing and fetches nothing, which is the cheap case anyway.
+
+    A document fetch that fails raises, so walk counts and logs it and the record
+    is **not** written -- a stored record is the assertion that the document
+    behind it is on disk, which is what lets `parse.body` read an absent PDF as
+    "the agency published none" (a repealed Konkurrensverket entry) rather than
+    "the fetch broke". The previous good record stays and the next run retries.
 
     ``fetch=False`` is Försäkringskassans route, where *every* document had to be
     fetched earlier -- the number that names it is printed inside it
@@ -228,25 +236,26 @@ def _walk(root, records, session, delay, full, limit, scope, fetch=True):
     been fetched when they arrive here and must be fetched like anyone else.
     `fetch_document` returns an already-stored PDF untouched, so the two that
     were fetched early are not refetched."""
-    seen = new = failed = 0
-    rep = Reporter()
-    for record in records:
-        if fetch and record.get("dokument_url") and fetch_document(
+    def needs_fetch(record):
+        return bool(fetch and record.get("dokument_url"))
+
+    def item_key(record):
+        bf = record["basefile"]
+        companions = (pdf_path(root, bf),) if needs_fetch(record) else ()
+        return ItemKey(bf, record_unchanged(
+            record_path(root, bf.split("/", 1)[0], bf), record, *companions))
+
+    def resolve(record):
+        if needs_fetch(record) and fetch_document(
                 root, record["basefile"], record["dokument_url"],
                 session, delay, full=full) is None:
-            failed += 1
-        else:
-            new += write_record(root, record, full=full)
-        seen += 1
-        rep.update(seen, len(records), scope=scope, changed=new)
-        if limit and seen >= limit:
-            break
-    rep.done()
-    if failed:
-        print("rs %s: %d document(s) could not be fetched; their records were "
-              "left unwritten and the next run retries them" % (scope, failed),
-              flush=True)
-    return seen, new
+            raise ValueError("no PDF could be stored; record left unwritten")
+        return store(root, record, full=full)
+
+    result = walk(records, resolve=resolve, item_key=item_key, watermark=None,
+                  full=full, limit=limit, scope=scope, count_label="changed",
+                  total=len(records))
+    return result.seen, result.new
 
 
 def _select(records, only):

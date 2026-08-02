@@ -620,7 +620,7 @@ def test_the_eu_selector_names_the_body_each_group_of_documents_comes_from(
         paths.append(path)
     catalog.rebuild(db, "edpb", paths)
     con = catalog.connect(db)
-    groups = render._eurlex_axis(con)
+    groups = render.eurlex_axis(con)
     # eurlex is empty in this catalog, so only the EDPB group is offered -- the
     # selector is built from what the corpus holds, not from a fixed list
     assert [axis for axis, _entries in groups] == ["EDPB:s vägledningar"]

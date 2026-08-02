@@ -343,3 +343,44 @@ def test_walk_full_reresolves_downloaded(tmp_path):
 
     result = _run_walk(tmp_path, list(bfs), dates, on_disk, resolve, full=True)
     assert fetched == bfs and result.new == 2
+
+
+# --- watermark=None: the complete-listing policy (edpb, rs) ----------------
+
+def test_walk_without_watermark_visits_every_entry():
+    # a short, complete listing has no depth to stop short of: no watermark is
+    # kept and no early stop applies, so every entry is looked at every run
+    resolved = []
+    items = ["a", "b", "c", "d"]
+    current = {"b", "d"}                       # already current on disk
+
+    result = walk(items, resolve=lambda i: resolved.append(i) or True,
+                  item_key=lambda i: ItemKey(i, i in current), watermark=None,
+                  scope="fk", total=len(items))
+    # the current ones are skipped without a fetch; the rest are resolved
+    assert resolved == ["a", "c"]
+    assert (result.seen, result.new, result.errors) == (4, 2, 0)
+
+
+def test_walk_without_watermark_full_reresolves_current_entries():
+    resolved = []
+    result = walk(["a", "b"], resolve=lambda i: resolved.append(i) or True,
+                  item_key=lambda i: ItemKey(i, True), watermark=None, full=True)
+    assert resolved == ["a", "b"] and result.new == 2
+
+
+def test_walk_without_watermark_counts_a_failed_fetch_as_an_error(capsys):
+    # a document fetch that stores nothing raises, so the record is not written:
+    # the item is counted as an error and named, and the next run retries it
+    def resolve(item):
+        if item == "b":
+            raise ValueError("no PDF could be stored; record left unwritten")
+        return True
+
+    logged = []
+    result = walk(["a", "b", "c"], resolve=resolve,
+                  item_key=lambda i: ItemKey(i, False), watermark=None,
+                  scope="riktlinjer", log=logged.append)
+    assert (result.seen, result.new, result.errors) == (3, 2, 1)
+    assert any("riktlinjer b" in line and "left unwritten" in line
+               for line in logged)

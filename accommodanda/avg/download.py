@@ -136,7 +136,14 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    record_unchanged,
+    store_record,
+    walk,
+    write_record,
+)
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, request
 from ..lib.pdftext import pdf_first_page_text
@@ -331,9 +338,9 @@ def jo_save(root, hit, session, delay, full=False):
     basefile = "jo/" + dnrs[0]
     record = jo_record(hit, basefile)
     path = record_path(root, "jo", basefile)
-    changed = not (compress.exists(path) and json.loads(compress.read_text(path)) == record)
+    changed = not record_unchanged(path, record)
     if changed:
-        compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
+        write_record(path, record)
     pdf_url = record.get("pdf_url")
     pdf = jo_pdf_path(root, basefile)
     if pdf_url and (full or not compress.exists(pdf)):
@@ -474,12 +481,11 @@ def jk_save(root, item, session, delay, full=False):
               "title": item["title"], "url": item["url"]}
     path = record_path(root, "jk", basefile)
     landing = jk_html_path(root, basefile)
-    if not full and compress.exists(path) and compress.exists(landing) \
-            and json.loads(compress.read_text(path)) == record:
+    if not full and record_unchanged(path, record, landing):
         return False
     response = request(session, "GET", item["url"], timeout=60)
     compress.write_download(landing, response.text)
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(path, record)
     time.sleep(delay)
     return True
 
@@ -584,8 +590,7 @@ def arn_save(root, item, session, delay, full=False):
               "source_url": item["url"]}
     path = record_path(root, "arn", basefile)
     pdf = arn_pdf_path(root, basefile)
-    if not full and compress.exists(path) and compress.exists(pdf) \
-            and json.loads(compress.read_text(path)) == record:
+    if not full and record_unchanged(path, record, pdf):
         return False
     response = request(session, "GET", item["url"], timeout=120)
     time.sleep(delay)
@@ -594,7 +599,7 @@ def arn_save(root, item, session, delay, full=False):
               % (basefile, item["url"]), flush=True)
         return False
     compress.write_download(pdf, response.content)
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(path, record)
     return True
 
 
@@ -966,12 +971,8 @@ def imy_save(root, record, full=False):
     are already on disk (they are what the diarienummer was read from), so the
     record is the only thing this writes -- and rewriting it unchanged would
     re-stale the parse for nothing."""
-    path = record_path(root, "imy", record["basefile"])
-    if not full and compress.exists(path) \
-            and json.loads(compress.read_text(path)) == record:
-        return False
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
-    return True
+    return store_record(record_path(root, "imy", record["basefile"]), record,
+                        full=full)
 
 
 def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
@@ -1343,7 +1344,7 @@ def _kkv_write(root, path, stored, record, session, delay, full):
             del record[key]
     if stored == record and _kkv_bodies_on_disk(root, record) and not full:
         return False
-    compress.write_download(path, json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(path, record)
     return True
 
 

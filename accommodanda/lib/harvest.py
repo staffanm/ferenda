@@ -16,9 +16,17 @@ un-fetched records. This module is the one hardened mechanism they share:
     drives the watermark's ``begin``/``complete`` lifecycle, applies the stop
     decision, survives a single bad document, and turns any failure into a
     *dirty* store so the next run re-walks the backlog rather than skipping it.
+    Whether to stop short at all is the ``watermark`` **policy**: pass one for a
+    deep archive, or ``None`` for a source whose upstream is a short, complete
+    listing (edpb, rs) -- there is no depth to stop short of and no backlog to
+    strand, so the walk simply visits every entry every run.
   * :class:`Skip` / :func:`guarded_enumerate` -- an enumeration hole (a flaky
     index page) becomes a recorded Skip that withholds a clean completion,
     instead of aborting the run or being lost.
+  * :func:`record_unchanged` / :func:`write_record` / :func:`store_record` --
+    the harvest record on disk. Rewriting a record that has not changed would
+    re-stale the whole downstream parse for nothing, so every downloader
+    compares before writing; this is that comparison, once.
 
 A vertical supplies its own enumeration (how to list the upstream) and its own
 resolve (how to fetch + store one item) as callables, plus an ``item_key`` that
@@ -34,6 +42,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator
 
+from . import compress
 from .util import Reporter, write_atomic
 
 
@@ -209,7 +218,8 @@ def guarded_enumerate(items: Iterable[Any], log: Callable[[str], Any] = print) -
 
 
 def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
-         item_key: Callable[[Any], ItemKey | None], watermark: HarvestWatermark,
+         item_key: Callable[[Any], ItemKey | None],
+         watermark: HarvestWatermark | None,
          full: bool = False, only: str | None = None, limit: int | None = None,
          budget: float | None = None,
          scope: str = "", count_label: str = "new", total: int | None = None,
@@ -232,20 +242,30 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     bound the time a single blocked fetch can burn, the caller also sets the
     session ``deadline`` that ``lib.net.request`` honours.
 
-    The watermark lifecycle is driven here: unless this is an ``--only`` run,
-    :meth:`HarvestWatermark.begin` marks the store dirty up front and
-    :meth:`HarvestWatermark.complete` clears it only on a clean, untruncated run
-    -- a ``--limit`` truncation, an enumeration Skip, a per-doc error or a
-    zero-item run all leave the store dirty so the next run re-walks the
-    backlog. Returns a :class:`WalkResult`."""
-    backfill = full or watermark.last_harvest is None
+    ``watermark`` is the stop policy. With one, the lifecycle is driven here:
+    unless this is an ``--only`` run, :meth:`HarvestWatermark.begin` marks the
+    store dirty up front and :meth:`HarvestWatermark.complete` clears it only on
+    a clean, untruncated run -- a ``--limit`` truncation, an enumeration Skip, a
+    per-doc error or a zero-item run all leave the store dirty so the next run
+    re-walks the backlog.
+
+    ``watermark=None`` says this source's upstream is a *complete listing*: a
+    short index, walked whole on every run. There is then nothing to stop short
+    of and no backlog to strand, so no watermark is kept and no early stop is
+    applied -- the walk visits every entry, and ``item_key`` decides per item
+    whether there is anything to do. For those sources ``is_downloaded`` is the
+    interesting bit: it should report whether the *record on disk is already
+    current* (:func:`record_unchanged`), not merely whether some file exists, so
+    an upstream metadata edit is picked up while an unchanged entry costs
+    nothing. Returns a :class:`WalkResult`."""
+    backfill = full or watermark is None or watermark.last_harvest is None
     rep = reporter or Reporter()
     seen = new = errors = skips = 0
     newest_date: str | None = None
     start = time.monotonic()
     tripped = False
 
-    if only is None:
+    if only is None and watermark is not None:
         watermark.begin()
 
     for item in guarded_enumerate(items, log):
@@ -276,7 +296,8 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
             newest_date = key.date if newest_date is None else max(newest_date, key.date)
 
         if not backfill and watermark.should_stop(key.is_downloaded, key.date):
-            break
+            break                             # (watermark is not None here:
+                                              #  backfill is True without one)
         if key.is_downloaded and not full:
             continue                          # on disk already; --full re-resolves
 
@@ -291,7 +312,7 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
             break
     rep.done()
 
-    if only is None:
+    if only is None and watermark is not None:
         # a budget trip is a truncation: the un-walked backlog below must not
         # let complete() advance the date or clear begin()'s dirty flag
         truncated = (bool(limit) and new >= limit) or tripped
@@ -305,3 +326,42 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
         # backlog below the cap is retried (past the consecutive-hit stop) next run
 
     return WalkResult(seen, new, errors, skips, newest_date)
+
+
+# --------------------------------------------------------------------------
+# the harvest record on disk
+# --------------------------------------------------------------------------
+
+def record_unchanged(path: Path, record: dict, *companions: Path) -> bool:
+    """True when `path` already holds exactly `record` **and** every companion
+    file is present -- the downloader's "nothing to do here" test.
+
+    The companions matter: a stored record is the assertion that the document
+    behind it is on disk, so a record that matches while its PDF or landing page
+    is missing is *not* current, and the item must be re-resolved. Callers that
+    fetch before overwriting (jk, arn) use this as the predicate and
+    :func:`write_record` after the fetch succeeds; callers with nothing else to
+    fetch use :func:`store_record`, which is the two together.
+    """
+    return (compress.exists(path)
+            and all(compress.exists(c) for c in companions)
+            and json.loads(compress.read_text(path)) == record)
+
+
+def write_record(path: Path, record: dict) -> None:
+    """Store one harvest record as pretty-printed, non-ASCII-escaped JSON --
+    the on-disk form every source's parse stage reads back."""
+    compress.write_download(path, json.dumps(record, ensure_ascii=False,
+                                             indent=2))
+
+
+def store_record(path: Path, record: dict, *companions: Path,
+                 full: bool = False) -> bool:
+    """Write `record` to `path` unless it is already stored there unchanged (and
+    every companion is present). Returns True when it was written. `full`
+    rewrites unconditionally -- the `--force` re-verification path."""
+    if not full and record_unchanged(path, record, *companions):
+        return False
+    write_record(path, record)
+    return True
+

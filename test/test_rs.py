@@ -514,7 +514,42 @@ def test_a_failed_document_fetch_leaves_no_record(tmp_path, capsys):
                                   None, "fi")
     assert (seen, new) == (1, 0)
     assert not compress.exists(record_path(tmp_path, "fi", "fi/2026:1"))
-    assert "could not be fetched" in capsys.readouterr().out
+    # the shared walk names the document it could not store (it used to report a
+    # bare count for the whole scope), so the retry is traceable to one entry
+    out = capsys.readouterr().out
+    assert "fi/2026:1" in out and "record left unwritten" in out
+
+
+def test_a_vanished_pdf_re_resolves_its_record(tmp_path):
+    """`item_key` reports "already current" as `record_unchanged(record, pdf)` --
+    the record AND its document. A record matching byte for byte while its PDF
+    has gone is not current: the shared walk must re-resolve it rather than skip
+    it, or a lost document is never noticed again."""
+    record = {"basefile": "fi/2026:2", "org": "fi", "nummer": "2026:2",
+              "titel": "Kapitaltäckning", "status": "gällande",
+              "dokument_url": "https://www.fi.se/contentassets/y.pdf"}
+
+    class _ServesPdf:
+        def request(self, _method, _url, **_kwargs):
+            response = requests.Response()
+            response.status_code = 200
+            response._content = b"%PDF-1.4 minimal"
+            response.url = "https://www.fi.se/contentassets/y.pdf"
+            return response
+
+    # first run stores both record and PDF; a second changes nothing
+    assert rs_download._walk(tmp_path, [record], _ServesPdf(), 0, False, None,
+                             "fi") == (1, 1)
+    assert rs_download._walk(tmp_path, [record], _ServesPdf(), 0, False, None,
+                             "fi") == (1, 0)
+
+    # drop the PDF, leaving the record byte-identical: the entry is stale again,
+    # so resolve runs and the document comes back. `new` stays 0 -- it counts
+    # record *writes*, and the record itself never changed.
+    compress.unlink(rs_download.pdf_path(tmp_path, "fi/2026:2"))
+    assert rs_download._walk(tmp_path, [record], _ServesPdf(), 0, False, None,
+                             "fi") == (1, 0)
+    assert compress.exists(rs_download.pdf_path(tmp_path, "fi/2026:2"))
 
 
 def test_migr_records_are_walked_with_fetching_on(monkeypatch):

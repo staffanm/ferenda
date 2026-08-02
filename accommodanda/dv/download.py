@@ -41,7 +41,6 @@ backstop for both.
 """
 
 import argparse
-import json
 import re
 import shutil
 import time
@@ -50,7 +49,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 
@@ -124,12 +123,7 @@ def remove_record(destdir, record):
 
 def save_record(destdir, record):
     """Store the record verbatim; returns True if new or changed."""
-    path = record_dir(destdir, record).with_suffix(".json")
-    if compress.exists(path) and json.loads(compress.read_text(path)) == record:
-        return False
-    compress.write_download(path, json.dumps(record, ensure_ascii=False,
-                                              indent=2))
-    return True
+    return store_record(record_dir(destdir, record).with_suffix(".json"), record)
 
 
 def download_bilagor(session, destdir, record, delay):
