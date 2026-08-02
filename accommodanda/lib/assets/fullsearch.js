@@ -32,22 +32,21 @@
     resetPaging();
     load(true);
   }
-  var SOURCE = {sfs:'Författningar', dv:'Rättsfall', forarbete:'Förarbeten',
-    foreskrift:'Myndighetsföreskrifter', eurlex:'EU-rätt', avg:'Myndighetsavgöranden',
-    kommentar:'Lagkommentarer', begrepp:'Begrepp'};
-  var KIND = {law:'Författning', case:'Rättsfall', prop:'Proposition', sou:'SOU',
-    ds:'Ds', dir:'Kommittédirektiv', regulation:'Förordning', directive:'Direktiv',
-    decision:'Beslut', judgment:'Avgörande', treaty:'Fördrag', begrepp:'Begrepp'};
+  // every label the API has named this session, so the synthetic zero-count
+  // bucket for a selected-but-absent facet still reads as a name
+  var LABELS = {};
 
   function facetGroup(field, title, buckets) {
     var selected = params.get(field);
     buckets = (buckets || []).slice();
+    buckets.forEach(function (b) { if (b.label) LABELS[field + ':' + b.value] = b.label; });
     if (field === 'year') buckets.sort(function (a, b) { return b.value.localeCompare(a.value); });
     if (selected && !buckets.some(function (b) { return b.value === selected; }))
       buckets.unshift({value:selected, count:0});
     var buttons = buckets.map(function (b) {
-      var label = field === 'source' ? (SOURCE[b.value] || b.value) :
-                  field === 'kind' ? (KIND[b.value] || b.value) : b.value;
+      // the API names every bucket from the same facet schemes the browse pages
+      // use; a local table here is what let "bet"/"pm"/"rskr" show raw (N4)
+      var label = b.label || LABELS[field + ':' + b.value] || b.value;
       return '<button type="button" data-facet="' + esc(field) + '" data-value="' +
         esc(b.value) + '" aria-pressed="' + (selected === b.value ? 'true' : 'false') +
         '"><span>' + esc(label) + '</span><span class="facet-count">' +
@@ -67,15 +66,11 @@
       return;
     }
     results.innerHTML = data.results.map(function (r) {
-      var frag = r.fragments && r.fragments[0];
-      var target = (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : '');
-      var title = r.display || r.title || r.identifier || r.uri;
-      var snip = (frag && frag.highlight && frag.highlight[0]) ||
-                 (r.highlight && r.highlight[0]) || '';
-      return '<article class="full-search-hit"><h2><a href="' + esc(target) + '">' +
-        esc(title) + '</a></h2>' + (r.identifier && r.identifier !== title ?
-        '<p class="hit-id">' + esc(r.identifier) + '</p>' : '') +
-        (snip ? '<p class="hit-snip">' + snip + '</p>' : '') + '</article>';
+      var h = lagenDom.hitFields(r);       // shared with the ⌘K palette (Q4)
+      return '<article class="full-search-hit"><h2><a href="' + esc(h.target) + '">' +
+        esc(h.title) + '</a></h2>' +
+        (h.sub ? '<p class="hit-id">' + esc(h.sub) + '</p>' : '') +
+        (h.snippet ? '<p class="hit-snip">' + h.snippet + '</p>' : '') + '</article>';
     }).join('');
   }
   function renderPagination(total) {

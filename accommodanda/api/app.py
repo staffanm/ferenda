@@ -149,6 +149,10 @@ def get_con():
 class Fragment(BaseModel):
     uri: str
     pinpoint: str | None = None
+    # the pinpoint written the way a reader cites it ("4 kap. 4 §", "artikel
+    # 32"). Set on a citation-resolved hit, whose whole point is the provision
+    # it landed on; a full-text fragment hit carries the raw anchor only (Q2).
+    label: str | None = None
     highlight: list[str] = []
 
 
@@ -160,6 +164,10 @@ class SearchResult(BaseModel):
     display: str | None = None      # reader-facing heading (short name + acronym, else title)
     source: str | None = None
     kind: str | None = None
+    # what `kind` is called to a reader ("Lagrådsremiss", "Betänkande"). A hit
+    # whose identifier is its own title -- every förarbete published without a
+    # series number -- has nothing else to say what sort of document it is (Q4).
+    kind_label: str | None = None
     score: float | None = None
     inbound_count: int = 0
     highlight: list[str] = []
@@ -169,6 +177,11 @@ class SearchResult(BaseModel):
 class SearchFacetBucket(BaseModel):
     value: str
     count: int
+    # the reader-facing name for `value`, resolved server-side from the same
+    # facet schemes the browse pages use. The search UI used to carry its own
+    # abbreviated copy, which is how "bet"/"pm"/"rskr" reached the page as raw
+    # keys (N4); clients render `label or value`.
+    label: str | None = None
 
 
 class SearchResponse(BaseModel):
@@ -245,6 +258,10 @@ class BrowseDoc(BaseModel):
     # föreskrift-only: the ändringsförfattningar nested under their base
     # regulation in the listing (F5)
     amendments: list["BrowseDoc"] | None = None
+    # föreskrift-only: this entry is the konsoliderade version, and the text as
+    # promulgated lives at <uri>/grund. Both used to list, with the same
+    # beteckning and the same title and nothing to choose between them (B4)
+    consolidated: bool | None = None
 
 
 class FacetBucket(BaseModel):
@@ -311,7 +328,9 @@ def search_endpoint(
                             limit=limit, offset=offset, cursor=cursor)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    results = [{**r, "url": layout.page_url(r["uri"])}
+    kind_label = facets.kind_labels(singular=True)   # one hit, not a bucket
+    results = [{**r, "url": layout.page_url(r["uri"]),
+                "kind_label": kind_label.get(r.get("kind"))}
                for r in res["results"]]
     total = res["total"]
     # the resolved target is the answer to a citation-shaped query, so it leads;
@@ -327,8 +346,18 @@ def search_endpoint(
             con.close()
         results, total = pins.merge_pinned(pinned, results, total, limit)
     return SearchResponse(query=q, total=total,
-                          next_cursor=res.get("next_cursor"), facets=res["facets"],
+                          next_cursor=res.get("next_cursor"),
+                          facets=_labelled_facets(res["facets"]),
                           results=results)  # ty: ignore[invalid-argument-type]  # result/facet dicts are validated by pydantic at runtime
+
+
+def _labelled_facets(buckets):
+    """Name every facet bucket server-side, from the facet schemes (N4). `source`
+    and `kind` get reader-facing labels; `year` is its own label."""
+    named = {"source": facets.SOURCE_LABELS, "kind": facets.kind_labels()}
+    return {field: [dict(b, label=named[field].get(b["value"])) if field in named
+                    else b for b in rows]
+            for field, rows in buckets.items()}
 
 
 def _legacy_feed(con, dataset, rdf_type, rpubl_rattsfallspublikation,

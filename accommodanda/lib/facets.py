@@ -153,6 +153,13 @@ def fs_series_info(key):
     return FS_SERIES.get(key.lower(), {})
 
 
+def fs_live_series(slug):
+    """The fs slug that carries `slug`'s föreskrifter today, following the whole
+    succession chain (säifs -> srvfs -> msbfs -> mcffs). `slug` itself where the
+    series is still its own -- the inverse of `fs_predecessors`."""
+    return _FS_LIVE.get(slug, slug)
+
+
 def fs_predecessors(key):
     """(slug, registry entry) of the series whose documents now list under
     `key`'s ('IMYFS' -> the DIFS row), ordered by designation. The slug rides
@@ -477,15 +484,25 @@ class _Level:
     """One facet axis: how to derive a document's bucket key, how to display and
     slug that key, and how to order the keys."""
 
-    def __init__(self, name, key, order, label=None, slug=None):
+    def __init__(self, name, key, order, label=None, labels=None, slug=None,
+                 kind_axis=False):
         self.name = name                 # navigator heading ("Domstol", "År")
         self.key = key                   # Row -> bucket key
         self.order = order               # [key] -> [key] sorted
-        self._label = label or (lambda k: k)
+        # a bucket label is either a table (the usual case -- readable, so
+        # `kind_labels` can derive the flat map from SCHEMES rather than keep a
+        # second one that drifts, N4) or a function, where it is computed
+        self.labels = labels or {}
+        self._label = label or self.labels.get
         self._slug = slug or _slug
+        # True where this axis's bucket key *is* the catalog `kind` -- those are
+        # the axes `kind_labels()` merges into the flat map the search facets
+        # need. dv's Domstol axis is derived from the uri (its kind is 'case'),
+        # so it is not one, and föreskrift's Serie axis reads series.json.
+        self.kind_axis = kind_axis
 
     def label(self, key):
-        return self._label(key)
+        return self._label(key) or key
 
     def slug(self, key):
         return self._slug(key)
@@ -497,10 +514,6 @@ def _slug(key):
     return re.sub(r"[^0-9a-zåäö]+", "-", key.lower()).strip("-") or "-"
 
 
-def _map_label(mapping):
-    return lambda k: mapping.get(k, k)
-
-
 SCHEMES = {
     "sfs": [_Level("Bokstav", _sfs_initial, _by_letter)],
     "begrepp": [_Level("Bokstav", _begrepp_initial, _by_letter)],
@@ -510,7 +523,8 @@ SCHEMES = {
     ],
     "avg": [
         _Level("Organ", _avg_org, _curated(["jo", "jk", "arn", "imy", "kkv"]),
-              label=_map_label({"jo": "Justitieombudsmannen (JO)",
+              kind_axis=True,
+              labels=({"jo": "Justitieombudsmannen (JO)",
                                 "jk": "Justitiekanslern (JK)",
                                 "arn": "Allmänna reklamationsnämnden (ARN)",
                                 "imy": "Integritetsskyddsmyndigheten (IMY)",
@@ -518,9 +532,9 @@ SCHEMES = {
         _Level("År", _avg_year, _by_year_desc),
     ],
     "rs": [
-        _Level("Myndighet", _catalog_kind,
-              _curated(["fk", "migr", "kfm", "imy", "fi", "kkv"]),
-              label=_map_label({"fk": "Försäkringskassan (FKRS)",
+        _Level("Myndighet", _catalog_kind, kind_axis=True,
+              order=_curated(["fk", "migr", "kfm", "imy", "fi", "kkv"]),
+              labels=({"fk": "Försäkringskassan (FKRS)",
                                 "migr": "Migrationsverket (RS/RK)",
                                 "kfm": "Kronofogdemyndigheten",
                                 "imy": "Integritetsskyddsmyndigheten (IMYRS)",
@@ -529,20 +543,20 @@ SCHEMES = {
         _Level("År", _rs_year, _by_year_desc),
     ],
     "edpb": [
-        _Level("Serie", _catalog_kind,
-              _curated(["riktlinjer", "rekommendationer", "wp"]),
-              label=_map_label({
+        _Level("Serie", _catalog_kind, kind_axis=True,
+              order=_curated(["riktlinjer", "rekommendationer", "wp"]),
+              labels=({
                   "riktlinjer": "Riktlinjer",
                   "rekommendationer": "Rekommendationer",
                   "wp": "Artikel 29-gruppens vägledningar"})),
         _Level("År", _edpb_year, _by_year_desc),
     ],
     "hudoc": [
-        _Level("Dokumenttyp", _catalog_kind,
-              _curated(["judgment", "decision", "communicated-case",
+        _Level("Dokumenttyp", _catalog_kind, kind_axis=True,
+              order=_curated(["judgment", "decision", "communicated-case",
                         "advisory-opinion", "legal-summary", "resolution",
                         "case-law"]),
-              label=_map_label({"judgment": "Domar", "decision": "Beslut",
+              labels=({"judgment": "Domar", "decision": "Beslut",
                                 "communicated-case": "Kommunicerade mål",
                                 "advisory-opinion": "Rådgivande yttranden",
                                 "legal-summary": "Rättsfallssammanfattningar",
@@ -551,29 +565,29 @@ SCHEMES = {
         _Level("År", _dated_year, _by_year_desc),
     ],
     "coe": [
-        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
-              label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll"})),
+        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]), kind_axis=True,
+              labels=({"treaty": "Fördrag", "protocol": "Protokoll"})),
         _Level("År", _dated_year, _by_year_desc),
     ],
     "icrc": [
-        _Level("Typ", _catalog_kind,
-              _curated(["treaty", "protocol", "declaration"]),
-              label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll",
+        _Level("Typ", _catalog_kind, kind_axis=True,
+              order=_curated(["treaty", "protocol", "declaration"]),
+              labels=({"treaty": "Fördrag", "protocol": "Protokoll",
                                 "declaration": "Deklarationer"})),
         _Level("År", _dated_year, _by_year_desc),
     ],
     "untc": [
-        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]),
-              label=_map_label({"treaty": "Fördrag", "protocol": "Protokoll"})),
+        _Level("Typ", _catalog_kind, _curated(["treaty", "protocol"]), kind_axis=True,
+              labels=({"treaty": "Fördrag", "protocol": "Protokoll"})),
         _Level("År", _dated_year, _by_year_desc),
     ],
     "icc": [
-        _Level("Typ", _catalog_kind,
-              _curated(["judgment", "sentence", "confirmation", "arrest-warrant",
+        _Level("Typ", _catalog_kind, kind_axis=True,
+              order=_curated(["judgment", "sentence", "confirmation", "arrest-warrant",
                         "appeal-judgment", "appeal-interlocutory",
                         "appeal-reparations", "reparations", "investigation",
                         "admissibility", "prosecutor-review", "sentence-review"]),
-              label=_map_label({"judgment": "Domar", "sentence": "Straffmätning",
+              labels=({"judgment": "Domar", "sentence": "Straffmätning",
                                 "confirmation": "Åtalsbekräftelse",
                                 "arrest-warrant": "Häktning",
                                 "appeal-judgment": "Överklagandedomar",
@@ -588,15 +602,18 @@ SCHEMES = {
     ],
     "dv": [
         _Level("Domstol", _dv_court, _curated(list(DV_COURTS)),
-              label=_map_label(DV_COURTS)),
+              labels=(DV_COURTS)),
         _Level("År", _dv_year, _by_year_desc),
     ],
     "forarbete": [
-        _Level("Typ", _fa_type,
-              _curated(["prop", "sou", "ds", "dir", "skr", "lr", "fm", "so"]),
-              label=_map_label({"prop": "Propositioner", "sou": "SOU", "ds": "Ds",
-                                "dir": "Kommittédirektiv", "skr": "Skrivelser",
-                                "lr": "Lagrådsremisser", "fm": "Förordningsmotiv",
+        _Level("Typ", _fa_type, kind_axis=True,
+              order=_curated(["prop", "sou", "ds", "dir", "bet", "rskr", "skr",
+                              "lr", "pm", "fm", "so"]),
+              labels=({"prop": "Propositioner", "sou": "SOU", "ds": "Ds",
+                                "dir": "Kommittédirektiv", "bet": "Betänkanden",
+                                "rskr": "Riksdagsskrivelser", "skr": "Skrivelser",
+                                "lr": "Lagrådsremisser", "pm": "Promemorior",
+                                "fm": "Förordningsmotiv",
                                 "so": "Internationella överenskommelser"})),
         _Level("År", _fa_year, _by_year_desc),
     ],
@@ -604,10 +621,10 @@ SCHEMES = {
         # Fördrag (the constitutional texts) lead, then the legislative acts,
         # then case law -- the reader's mental order (E1). Fördrag are grouped
         # by treaty family (not year) at the second axis; see _eu_second.
-        _Level("Typ", _eu_kind,
-              _curated(["treaty", "directive", "regulation", "decision",
+        _Level("Typ", _eu_kind, kind_axis=True,
+              order=_curated(["treaty", "directive", "regulation", "decision",
                         "judgment", "opinion", "act"]),
-              label=_map_label({"regulation": "Förordningar", "directive": "Direktiv",
+              labels=({"regulation": "Förordningar", "directive": "Direktiv",
                                 "decision": "Beslut", "judgment": "Avgöranden",
                                 "opinion": "Generaladvokatens förslag",
                                 "treaty": "Fördrag", "act": "Övriga rättsakter"})),
@@ -618,6 +635,76 @@ SCHEMES = {
 
 def sources():
     return list(SCHEMES)
+
+
+# What each source is called to a reader -- the one table, read by the browse
+# chrome and the frontpage (`lib/render`, which imports this module; the reverse
+# would cycle) and by the search facets. It lived in `lib/render` alone until a
+# second copy here drifted on two entries within a day of being written, which
+# is the same failure `kind_labels` exists to prevent one axis over. The sources
+# with no browse scheme (kommentar, remisser) still surface as search buckets,
+# so they are named here too.
+SOURCE_LABELS = {
+    "sfs": "Författningar", "dv": "Rättsfall", "forarbete": "Förarbeten",
+    "foreskrift": "Myndighetsföreskrifter", "avg": "Myndighetsavgöranden",
+    "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
+    # the EU-rätt browse selector overrides this one heading; see
+    # `render._EU_AXIS_LABEL` for why a group standing over all three EDPB
+    # series cannot call them all riktlinjer
+    "edpb": "EU:s dataskyddsriktlinjer",
+    "hudoc": "Europadomstolens praxis", "coe": "Europarådets fördrag",
+    "icrc": "Internationell humanitär rätt", "untc": "FN-fördrag",
+    "icc": "Internationella brottmålsdomstolen",
+    "kommentar": "Lagkommentarer", "begrepp": "Begrepp",
+    "remisser": "Remissvar",
+}
+
+# A facet bucket counts documents, so its label is plural ("Betänkanden"); a
+# single search hit names one document, so it wants the singular. Only the kinds
+# whose two forms differ are listed -- everything else (SOU, Ds, Direktiv,
+# Beslut, Fördrag, and the organ names) is spelled the same either way.
+_KIND_SINGULAR = {
+    "prop": "Proposition", "bet": "Betänkande", "rskr": "Riksdagsskrivelse",
+    "skr": "Skrivelse", "lr": "Lagrådsremiss", "pm": "Promemoria",
+    "so": "Internationell överenskommelse", "regulation": "Förordning",
+    "judgment": "Avgörande", "law": "Författning", "case": "Rättsfall",
+    "kommentar": "Lagkommentar", "riktlinjer": "Riktlinje",
+    "rekommendationer": "Rekommendation", "declaration": "Deklaration",
+    "sentence": "Straffmätningsbeslut", "reparations": "Gottgörelsebeslut",
+}
+
+
+def kind_labels(singular=False):
+    """{catalog kind: reader-facing label} merged from every `kind_axis` level,
+    plus the föreskrift series designations. The search facets slice the whole
+    corpus by `kind` with no source to qualify it, so they need one flat map --
+    derived from SCHEMES rather than restated, since a second copy is what let
+    "bet", "pm" and "rskr" reach the reader as raw keys (N4).
+
+    A kind is per-source, not global ('imy' is both an avg organ and an rs
+    agency), so a key claimed by two sources keeps the *first* scheme's label
+    and drops the parenthetical that would misattribute a mixed bucket: the
+    search hit list holds both corpora under one button."""
+    # sources whose whole corpus is one kind slice their browse by something
+    # else (initial, court), so no kind_axis level names these
+    out = {"law": "Författningar", "case": "Rättsfall",
+           "begrepp": "Begrepp", "kommentar": "Lagkommentarer"}
+    for levels in SCHEMES.values():
+        for level in levels:
+            if not level.kind_axis:
+                continue
+            for key, label in level.labels.items():
+                # first scheme wins; a second claimant drops the parenthetical
+                # that would misattribute a bucket holding both corpora
+                out[key] = label.split(" (")[0] if key in out else label
+    # föreskrift buckets are keyed by series slug; their designations live in the
+    # hand-edited registry, and the browse folds a succeeded series into its
+    # successor -- search does not, so every slug is named here
+    for slug, info in FS_SERIES.items():
+        out.setdefault(slug, info["designation"])
+    if singular:
+        out.update({k: v for k, v in _KIND_SINGULAR.items() if k in out})
+    return out
 
 
 def document_year(source, row):
@@ -884,6 +971,36 @@ def _fold_fs_amendments(con, grouped):
     return {path: rows for path, rows in grouped.items() if rows}, nested
 
 
+# the base ("grund") version of a föreskrift that also has a consolidated one:
+# it lives at the consolidated document's uri + this suffix
+_FS_BASE_SUFFIX = "/grund"
+
+
+def _fold_fs_versions(grouped):
+    """Drop the base-version row of every föreskrift that also has a
+    consolidated one, returning the refolded buckets plus the set of uris that
+    *are* consolidated (B4).
+
+    A föreskrift with a konsoliderad version is two catalog rows -- the
+    consolidated text at the document's own uri, the text as promulgated at
+    `<uri>/grund` -- and both carried the same beteckning and the same title, so
+    the listing showed each of 1 650 föreskrifter twice with nothing to choose
+    between them. The consolidated one is the answer to "what does this
+    föreskrift say", so it is the one that lists, and it says that it is
+    consolidated; the base version stays reachable from the document page, which
+    already offers it."""
+    consolidated = set()
+    for path in list(grouped):
+        kept = []
+        for r in grouped[path]:
+            if r.uri.endswith(_FS_BASE_SUFFIX):
+                consolidated.add(r.uri[:-len(_FS_BASE_SUFFIX)])
+            else:
+                kept.append(r)
+        grouped[path] = kept
+    return {path: rows for path, rows in grouped.items() if rows}, consolidated
+
+
 def browse_view(con, source):
     """The full browse model for a source: the navigator (`tree`) with each leaf
     bucket's ordered, display-labelled documents attached. One catalog scan; this
@@ -892,13 +1009,19 @@ def browse_view(con, source):
     grouped = group(con, source)
     nested = {}
     repealed = frozenset()
+    consolidated = frozenset()
     if source == "foreskrift":
+        # versions first: a base-version row must not be treated as a document
+        # of its own by the amendment fold either
+        grouped, consolidated = _fold_fs_versions(grouped)
         grouped, nested = _fold_fs_amendments(con, grouped)
         repealed = catalog.upphaver_targets(con)
     view = tree(con, source, grouped)
 
     def entry(r):
         doc = _browse_doc(source, r, repealed)
+        if r.uri in consolidated:
+            doc["consolidated"] = True
         if r.uri in nested:
             doc["amendments"] = [_browse_doc(source, a, repealed)
                                  for a in nested[r.uri]]

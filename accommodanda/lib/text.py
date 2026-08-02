@@ -96,26 +96,29 @@ def document_text(art):
     return " ".join(p for p in parts if p).strip()
 
 
-def _collect_fragment_texts(node, doc_uri, out):
+def id_nodes(node):
+    """Every id-bearing node in a body subtree, in document order.
+
+    The one walk behind `fragment_ids`, `fragment_texts` and `fragment_text`
+    (rule:second-use-goes-to-lib). It descends *every* value, not just
+    ``children``: a walker that followed only children would miss the ids the
+    search index does find, and one that read ``structure`` directly would read
+    a consolidated statute's superseded base text instead of the lydelse
+    actually shown. That invariant now has one place to be forgotten rather
+    than three."""
     if isinstance(node, dict):
         if node.get("id"):
-            out.append((doc_uri + "#" + node["id"], node_text(node)))
+            yield node
         for value in node.values():
-            _collect_fragment_texts(value, doc_uri, out)
+            yield from id_nodes(value)
     elif isinstance(node, list):
         for item in node:
-            _collect_fragment_texts(item, doc_uri, out)
+            yield from id_nodes(item)
 
 
-def _collect_fragment_ids(node, out):
-    if isinstance(node, dict):
-        if node.get("id"):
-            out.add(node["id"])
-        for value in node.values():
-            _collect_fragment_ids(value, out)
-    elif isinstance(node, list):
-        for item in node:
-            _collect_fragment_ids(item, out)
+def _body_id_nodes(art):
+    for nodes in body_sections(art):
+        yield from id_nodes(nodes)
 
 
 def fragment_ids(art):
@@ -123,22 +126,26 @@ def fragment_ids(art):
     K1P2S1N4, …) -- the id vocabulary an authored layer's pinpoint is checked
     against (forarbete.genomforande.resolve).
 
-    Shares `body_sections` and the descend-every-value walk with
-    `fragment_texts` (rule:second-use-goes-to-lib): a walker that descended
-    only ``children`` would miss the ids the search index does find, and one
-    that read ``structure`` directly would read a consolidated statute's
-    superseded base text instead of the lydelse actually shown."""
-    out = set()
-    for nodes in body_sections(art):
-        _collect_fragment_ids(nodes, out)
-    return out
+    Shares `body_sections` and the `id_nodes` walk with `fragment_texts` and
+    `fragment_text`; that walk's docstring states the invariant."""
+    return {node["id"] for node in _body_id_nodes(art)}
 
 
 def fragment_texts(art):
     """``(fragment-uri, full text)`` for every id-bearing node in the body --
     the per-fragment children of a parent search doc. A fragment's text includes
     its descendants', so a paragraph carries its own numbered points."""
-    out = []
-    for nodes in body_sections(art):
-        _collect_fragment_texts(nodes, art["uri"], out)
-    return out
+    return [(art["uri"] + "#" + node["id"], node_text(node))
+            for node in _body_id_nodes(art)]
+
+
+def fragment_text(art, frag):
+    """The text of one id-bearing node, or '' when the presented body has no
+    node with that id.
+
+    The one-fragment twin of `fragment_texts`, which reads every node in the
+    document: the search path resolves a citation to a single provision and
+    wants that provision's words, and building Inkomstskattelagen's whole
+    fragment map to return one of them is work the query waits on."""
+    return next((node_text(node) for node in _body_id_nodes(art)
+                 if node["id"] == frag), "")

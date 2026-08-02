@@ -241,20 +241,10 @@ def render_document(art, source, site, renderers):
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
                 "eurlex", "edpb", "coe", "icrc", "untc", "icc", "begrepp")
-SOURCE_LABEL = {"sfs": "Författningar", "dv": "Rättsfall",
-                "forarbete": "Förarbeten", "foreskrift": "Myndighetsföreskrifter",
-                "avg": "Myndighetsavgöranden",
-                "rs": "Rättsliga ställningstaganden", "eurlex": "EU-rättsakter",
-                # the EU-rätt browse selector overrides this one heading; see
-                # `_EU_AXIS_LABEL` for why a group standing over all three
-                # EDPB series cannot call them all riktlinjer
-                "edpb": "EU:s dataskyddsriktlinjer",
-                "hudoc": "Europadomstolens praxis",
-                "coe": "Europarådets fördrag",
-                "icrc": "Internationell humanitär rätt",
-                "untc": "FN-fördrag",
-                "icc": "Internationella brottmålsdomstolen",
-                "kommentar": "Lagkommentarer", "begrepp": "Begrepp"}
+# the reader-facing source names, defined once in `facets` (which this module
+# imports; the reverse would cycle) and re-exported here under the name the
+# render layer has always used
+SOURCE_LABEL = facets.SOURCE_LABELS
 # the international-law sources share one masthead entry and one landing page
 # (/folkratt/): a bespoke alphabetical treaty listing (coe) beside the faceted
 # case browse (hudoc), which relocates under /folkratt/hudoc/. coe has no faceted

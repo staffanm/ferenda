@@ -261,3 +261,74 @@ def test_tree_single_level_letters(tmp_path):
     assert [b["key"] for b in tree["buckets"]] == ["A", "B"]
     assert all(b["children"] is None for b in tree["buckets"])
     assert tree["default"] == ["A"]
+
+
+def test_kind_labels_name_every_forarbete_type():
+    # bet/pm/rskr were missing from the forarbete scheme, so the TYP facet on
+    # /forarbete/ and /sok/ printed the raw catalog key (N4)
+    kl = facets.kind_labels()
+    assert kl["bet"] == "Betänkanden"
+    assert kl["pm"] == "Promemorior"
+    assert kl["rskr"] == "Riksdagsskrivelser"
+    assert kl["prop"] == "Propositioner"
+
+
+def test_kind_labels_cover_every_kind_axis_key():
+    # the flat map the search facets use is derived from SCHEMES, so no bucket a
+    # browse page can show is nameless on the search page
+    kl = facets.kind_labels()
+    for source, levels in facets.SCHEMES.items():
+        for level in levels:
+            if level.kind_axis:
+                for key in level.labels:
+                    assert kl.get(key), "%s: %r unnamed" % (source, key)
+
+
+def test_kind_shared_by_two_sources_drops_the_parenthetical():
+    # 'imy' is both an avg organ and an rs agency, and a search bucket mixes the
+    # two corpora -- so neither corpus's abbreviation may be asserted over both
+    kl = facets.kind_labels()
+    assert kl["imy"] == "Integritetsskyddsmyndigheten"
+    assert kl["kkv"] == "Konkurrensverket"
+
+
+def test_kind_labels_name_the_single_kind_sources():
+    kl = facets.kind_labels()
+    assert kl["law"] == "Författningar"
+    assert kl["case"] == "Rättsfall"
+    assert kl["kommentar"] == "Lagkommentarer"
+
+
+def test_foreskrift_series_keep_their_designation():
+    assert facets.kind_labels()["aafs"] == "ÅFS"
+
+
+def test_fold_fs_versions_drops_the_base_and_marks_the_consolidated():
+    # a föreskrift with a konsoliderad version is two catalog rows carrying the
+    # same beteckning and title, so both listed with nothing to choose between
+    # them (B4). The consolidated one lists; the base is offered from its page.
+    grouped = {("AFS", "2023"): [
+        Row(uri="https://lagen.nu/afs/2023:11", local="afs/2023:11", kind="afs",
+            label="AFS 2023:11", title="Arbetsutrustning", display="Arbetsutrustning",
+            date="2023-09-15"),
+        Row(uri="https://lagen.nu/afs/2023:11/grund", local="afs/2023:11/grund",
+            kind="afs", label="AFS 2023:11", title="Arbetsutrustning",
+            display="Arbetsutrustning", date="2023-09-15"),
+        Row(uri="https://lagen.nu/afs/2023:6", local="afs/2023:6", kind="afs",
+            label="AFS 2023:6", title="Enkla tryckkärl", display="Enkla tryckkärl",
+            date="2023-05-02"),
+    ]}
+    refolded, consolidated = facets._fold_fs_versions(grouped)
+    listed = [r.uri for r in refolded[("AFS", "2023")]]
+    assert listed == ["https://lagen.nu/afs/2023:11",
+                      "https://lagen.nu/afs/2023:6"]
+    # only the one that *has* a base version is marked
+    assert consolidated == {"https://lagen.nu/afs/2023:11"}
+
+
+def test_fold_fs_versions_leaves_a_bucket_with_no_base_versions_alone():
+    grouped = {("AFS", "2020"): [
+        Row(uri="https://lagen.nu/afs/2020:1", local="afs/2020:1", kind="afs",
+            label="AFS 2020:1", title="T", display="T", date="2020-01-01")]}
+    refolded, consolidated = facets._fold_fs_versions(grouped)
+    assert len(refolded[("AFS", "2020")]) == 1 and consolidated == set()

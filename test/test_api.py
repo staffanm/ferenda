@@ -60,10 +60,16 @@ def client(tmp_path):
                 "fragments": [{"uri": "https://lagen.nu/1962:700#K3P1",
                                "pinpoint": "K3P1", "highlight": ["<em>%s</em>" % q]}]}]}
     api._index = FakeIndex()
+    # the citation-pinning path opens the configured catalog directly rather
+    # than taking the request connection (a missing catalog must not fail a
+    # full-text search, so it is best-effort, with no Depends/503) -- point it
+    # at the fixture too, or a pinned hit reads the developer's real corpus
+    real_catalog, api.CATALOG = api.CATALOG, cat
 
     client = TestClient(api.app)
     client.catalog_path = cat            # for tests that add rows directly
     yield client
+    api.CATALOG = real_catalog
     api.app.dependency_overrides.clear()
 
 
@@ -72,10 +78,14 @@ def test_search(client):
     assert r.status_code == 200
     body = r.json()
     assert body["query"] == "mord" and body["total"] == 1
-    assert body["facets"]["source"] == [{"value": "sfs", "count": 1}]
-    assert body["facets"]["year"] == [{"value": "1962", "count": 1}]
+    # source/kind buckets are named server-side from the facet schemes, so the
+    # search UI does not keep its own abbreviated copy (N4); year is its own name
+    assert body["facets"]["source"] == [
+        {"value": "sfs", "count": 1, "label": "Författningar"}]
+    assert body["facets"]["year"] == [{"value": "1962", "count": 1, "label": None}]
     hit = body["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
+    assert hit["kind_label"] == "Författning"      # singular: one hit, not a bucket
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
     # the API resolves each hit's public page path (layout.page_url): a statute
     # at lagen.nu's bare /<sfsid> address, colon kept
@@ -249,8 +259,10 @@ def test_browse_returns_navigator_with_leaf_documents(client):
                                "description": None, "variant": None, "date": None,
                                "pre": "", "key": "Förvaltningslag (2018:585)",
                                "subdued": False, "year": "2018",
-                               # föreskrift-only nesting (F5); None elsewhere
-                               "amendments": None}]
+                               # föreskrift-only: the ändringsförfattningar
+                               # nested under their base (F5) and the
+                               # konsoliderad marker (B4) -- None elsewhere
+                               "amendments": None, "consolidated": None}]
 
 
 def test_sources(client):
@@ -299,3 +311,24 @@ def test_openapi_served(client):
     r = client.get("/openapi.json")
     assert r.status_code == 200
     assert "/api/v1/search" in r.json()["paths"]
+
+
+def test_search_pins_a_pinpoint_citation_with_its_provision(client):
+    # the reader's query names a provision, so the hit says which provision it
+    # landed on and shows that provision's own words -- "Brottsbalk (1962:700)"
+    # alone gave no sign the pin had worked (Q2)
+    body = client.get("/api/v1/search",
+                      params={"q": "3 kap. 1 § brottsbalken"}).json()
+    hit = body["results"][0]
+    assert hit["uri"] == "https://lagen.nu/1962:700"
+    frag = hit["fragments"][0]
+    assert frag["pinpoint"] == "K3P1"
+    assert frag["label"] == "3 kap. 1 §"
+    assert frag["highlight"] == ["Den som dödar annan döms för mord."]
+
+
+def test_search_pins_the_terse_law_first_pinpoint(client):
+    # "BrB 3:1" is how a lawyer types it; the grammar wants "3 kap. 1 §"
+    frag = client.get("/api/v1/search", params={"q": "BrB 3:1"}) \
+        .json()["results"][0]["fragments"][0]
+    assert frag["pinpoint"] == "K3P1" and frag["label"] == "3 kap. 1 §"

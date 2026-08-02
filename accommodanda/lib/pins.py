@@ -12,7 +12,12 @@ filter, and the document's own label/title/inbound_count are attached so a
 pinned hit ranks and renders like any other search hit.
 """
 
-from . import catalog, layout, resolve
+from . import catalog, layout, resolve, text
+from .pinpoint import pinpoint_label
+
+# how much of the resolved provision's own text to carry as the hit's snippet --
+# enough to recognise the rule, short enough to sit on two lines in the palette
+SNIPPET_CHARS = 240
 
 
 def resolved_results(con, q, source=None, kind=None):
@@ -46,10 +51,29 @@ def resolved_results(con, q, source=None, kind=None):
             "source": src, "kind": kind_,
             "score": None, "inbound_count": catalog.document_inbound_count(con, root),
             "highlight": [],
+            # A pinned hit answers a *pinpoint*, so it says which provision it
+            # landed on and shows that provision's own words. Without them the
+            # reader saw "Brottsbalk (1962:700)" for "4 kap. 4 § brottsbalken"
+            # and had no way to tell the pin had worked at all (Q2).
             "fragments": ([{"uri": root + "#" + frag, "pinpoint": frag,
-                            "highlight": []}] if frag else []),
+                            "label": pinpoint_label(frag),
+                            "highlight": _provision_text(con, _path, frag)}]
+                          if frag else []),
         })
     return out
+
+
+def _provision_text(con, path, frag):
+    """`[the provision's own text]` for a resolved pinpoint, or `[]` when the
+    document's presented body has no node with that id. One artifact read per
+    citation-shaped query -- there is at most one pinned hit, and it is the
+    query's answer."""
+    body = text.fragment_text(
+        catalog.load_artifact(catalog.data_root(con), path), frag)
+    if not body:
+        return []
+    return [body[:SNIPPET_CHARS].rstrip() + "…" if len(body) > SNIPPET_CHARS
+            else body]
 
 
 def merge_pinned(pinned, results, total, limit):

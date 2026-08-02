@@ -121,14 +121,18 @@
       return;
     }
     var start = null;
-    (function frame(ts) {
+    // paint the start value now, then tween from the next animation frame --
+    // calling frame() synchronously would pass ts === undefined, making p NaN,
+    // and `NaN < 1` is false, so the odometer would stick on "NaN" forever
+    el.textContent = NUM.format(from);
+    requestAnimationFrame(function frame(ts) {
       if (!el.isConnected) return;             // superseded by a newer query
       if (start === null) start = ts;
       var p = Math.min(1, (ts - start) / ms);
       var eased = 1 - Math.pow(1 - p, 3);      // easeOutCubic
       el.textContent = NUM.format(Math.round(from + (to - from) * eased));
       if (p < 1) requestAnimationFrame(frame);
-    })();
+    });
   }
 
   // `total` is null while the API round-trip is pending: local hits paint
@@ -151,21 +155,16 @@
       return;
     }
     var hitHtml = items.map(function (r) {
-      // r.url is the hosted page path (server-computed via layout.page_relpath);
-      // a fragment hit deep-links to its paragraph anchor (the node id == pinpoint)
-      var frag = r.fragments && r.fragments[0];
-      var hl = (frag && frag.highlight[0]) || (r.highlight && r.highlight[0]) || '';
-      var target = (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : '');
-      // lead with the page title (display: short name + acronym where the act
-      // has them, else the full title -- the same heading the document page
-      // shows), and carry the citation id (CELEX / "SFS 2018:218") as the sub,
-      // shown only when it differs from the title (DV's label == its title)
-      var primary = r.display || r.title || r.identifier || r.uri;
-      return '<a class="search-hit" href="' + esc(target) + '">' +
-        '<span class="hit-title">' + esc(primary) + '</span>' +
-        (r.identifier && r.identifier !== primary ?
-          '<span class="hit-sub">' + esc(r.identifier) + '</span>' : '') +
-        (hl ? '<span class="hit-snip">' + hl + '</span>' : '') + '</a>';
+      // shaped by lagenDom.hitFields, shared with /sok/ so the two result lists
+      // cannot describe the same hit differently (Q4): the heading is the page
+      // title, the sub is the citation id where it adds anything over that
+      // heading, else what sort of document it is, and a fragment hit
+      // deep-links to its paragraph anchor (the node id == pinpoint)
+      var h = lagenDom.hitFields(r);
+      return '<a class="search-hit" href="' + esc(h.target) + '">' +
+        '<span class="hit-title">' + esc(h.title) + '</span>' +
+        (h.sub ? '<span class="hit-sub">' + esc(h.sub) + '</span>' : '') +
+        (h.snippet ? '<span class="hit-snip">' + h.snippet + '</span>' : '') + '</a>';
     }).join('');
     if (total === null || !total) {
       refine.hidden = true;

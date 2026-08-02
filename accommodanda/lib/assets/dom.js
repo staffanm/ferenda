@@ -41,5 +41,30 @@
     try { return JSON.parse(s.textContent); } catch (e) { return {}; }
   }
 
-  window.lagenDom = { sel: sel, ownEl: ownEl, flash: flash, island: island };
+  // One search hit -> the three things both result lists show, so the ⌘K palette
+  // (search.js) and the full page (/sok/, fullsearch.js) cannot describe the
+  // same hit differently (Q4). `sub` is the citation id where it adds anything
+  // over the heading, else what sort of document this is -- a lagrådsremiss or
+  // a promemoria carries no number, so its identifier *is* its title and the
+  // full page used to show a bare heading with no hint of its kind.
+  function hitFields(r) {
+    var frag = r.fragments && r.fragments[0];
+    var title = r.display || r.title || r.identifier || r.uri;
+    // a citation-resolved hit leads with the provision it landed on -- the
+    // reader asked for "4 kap. 4 § brottsbalken", so "Brottsbalk (1962:700)"
+    // alone gave no sign the pin had worked (Q2)
+    var sub = (frag && frag.label) ||
+              ((r.identifier && r.identifier !== title) ? r.identifier
+                 : (r.kind_label || ''));
+    return {
+      target: (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : ''),
+      title: title,
+      sub: sub,
+      snippet: (frag && frag.highlight && frag.highlight[0]) ||
+               (r.highlight && r.highlight[0]) || ''
+    };
+  }
+
+  window.lagenDom = { sel: sel, ownEl: ownEl, flash: flash, island: island,
+                      hitFields: hitFields };
 })();
