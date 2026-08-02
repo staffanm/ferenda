@@ -135,9 +135,16 @@
       if (front && island['']) addEntry(front, island['']);
       Array.prototype.slice.call(root.querySelectorAll('[data-rail]'))
         .forEach(function (el) {
-          // skip a container whose own context-bearing descendant carries the
-          // marker, so nested units show one entry, not two stacked
-          if (el.querySelector('[data-rail]')) return;
+          // Every marked element gets its entry, container or not. This used to
+          // skip any element with a marked descendant, to stop a § and the
+          // stycke that starts on its own first line showing as two entries
+          // stacked at the same height -- but the rail builder already prevents
+          // that pair by *folding* them into one panel and leaving only one
+          // marker behind (`Rail.add`). What the skip actually did was drop the
+          // § itself wherever it had a second stycke or a numbered list, which
+          // is nearly every § of any length: 49 of YGL's 191 panels, 277 of
+          // brottsbalkens 995, and always the paragraf-level ones a citation is
+          // most likely to name (1 kap. 4 § YGL is cited 557 times).
           var html = island[el.getAttribute('data-rail')];
           if (html) addEntry(el, html);
         });

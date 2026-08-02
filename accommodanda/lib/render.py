@@ -1282,9 +1282,14 @@ class Rail:
         # (Externa länkar, Kommentar, …); the dl.meta facts and the "Källa" source
         # link live under the h1 in the frontmatter (C1), not here.
         self.data = {}
-        # panel id -> (heading, [node ids it covers]) -- more than one only where
-        # a first stycke folded into its paragraf (see `add`)
+        # panel id -> (heading, [node ids it covers]) -- more than one where a
+        # first stycke, and the first punkt under it, folded into their paragraf
+        # (see `add`)
         self.covers = {}
+        # every folded node id -> the panel id that took it over, so the *next*
+        # level down can find its host even though its own parent no longer has
+        # a panel of its own (1 § 1 st 1 p folds onto 1 §, not onto 1 § 1 st)
+        self.host_of = {}
         # anchor -> [(verb, nr, prop identifiers)]: the provision's own change
         # history from the SFSR register (amendment_index; render_sfs primes
         # it, every other vertical leaves it empty)
@@ -1302,14 +1307,27 @@ class Rail:
         between them just swapped the rail back and forth. The walk always
         reaches the paragraf first, so the fold is a rebuild of its panel over
         both anchors, and the citers of each collapse into one line per document.
-        A first stycke whose paragraf carries nothing keeps its own panel."""
+        A first stycke whose paragraf carries nothing keeps its own panel.
+
+        The *first punkt* of that first stycke folds in the same way and for the
+        same reason, one level deeper. Where a paragraf opens with a lead-in line
+        and then a numbered list -- 1 kap. 20 § YGL, 1 kap. 4 § YGL -- the first
+        punkt begins a line or two below the § itself, which is exactly the
+        unreadable pair the stycke fold exists to prevent. Folding it leaves the
+        first *separate* rail at "1 st 2 p", far enough down the page to be a
+        target of its own. It folds onto the paragraf, not onto the stycke, since
+        by then the stycke has no panel of its own -- `host_of` is what carries
+        that across the two levels."""
         if not nid or nid in self.data:
             return
         host, heading = nid, "Kontext%s" % (
             ' för <b>%s</b>' % escape(pinpoint) if pinpoint else "")
         anchors = [nid]
-        if nid.endswith("S1") and nid[:-2] in self.data:
-            host = nid[:-2]
+        # "…S1" onto its paragraf, "…S1N1" onto whatever took that stycke over
+        parent = nid[:-2] if nid.endswith(("S1", "N1")) else None
+        parent = self.host_of.get(parent, parent)
+        if parent in self.data:
+            host = parent
             heading, covered = self.covers[host]
             anchors = covered + [nid]
         uris = [self.doc_uri + "#" + a for a in anchors]
@@ -1338,6 +1356,8 @@ class Rail:
             return
         self.data[host] = self._panel(heading, sections)
         self.covers[host] = (heading, anchors)
+        for anchor in anchors:
+            self.host_of[anchor] = host
 
     def add_document(self, exclude_from=(), inbound=True):
         """The document-level rail panel (key ''), shown when no single paragraph

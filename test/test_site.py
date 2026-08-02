@@ -1713,6 +1713,110 @@ def test_first_stycke_context_folds_into_its_paragrafs_panel(tmp_path):
     assert island["P1"].count("NJA 2000 s. 1") == 1
 
 
+def test_first_punkt_folds_in_too_and_leaves_the_paragraf_reachable(tmp_path):
+    """The stycke fold one level deeper. Where a paragraf opens with a lead-in
+    and then a numbered list (1 kap. 20 § YGL), the first punkt starts a line or
+    two below the § -- the same unreadable pair the stycke fold prevents. It
+    folds onto the *paragraf*, since by then the stycke has no panel of its own.
+
+    And the § keeps its own rail marker, which is what was actually broken: the
+    page script used to drop any marked element that contained another, so a §
+    with a second stycke or a numbered list lost its rail entirely -- 49 of
+    YGL's panels, 277 of brottsbalkens, and always the paragraf-level ones a
+    citation is most likely to name."""
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/2020:100",
+        "metadata": {"properties": {"dcterms:title": "Testlag (2020:100)"}},
+        "structure": [{"type": "paragraf", "id": "P1", "ordinal": "1", "children": [
+            {"type": "stycke", "id": "P1S1", "text": ["Följande gäller:"],
+             "children": [
+                 {"type": "punkt", "id": "P1S1N1", "text": ["ett,"]},
+                 {"type": "punkt", "id": "P1S1N2", "text": ["två."]}]},
+            {"type": "stycke", "id": "P1S2", "text": ["Två."]}]}]}))
+    citer = tmp_path / "citer.json"
+    citer.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2000_s_1", "court": "HDO",
+        "referat": ["NJA 2000 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            {"predicate": "dcterms:references", "text": "1 §",
+             "uri": "https://lagen.nu/2020:100#P1"}, ", ",
+            {"predicate": "dcterms:references", "text": "1 § 1 st 1 p",
+             "uri": "https://lagen.nu/2020:100#P1S1N1"}, " och ",
+            {"predicate": "dcterms:references", "text": "1 § 1 st 2 p",
+             "uri": "https://lagen.nu/2020:100#P1S1N2"}, "."]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [citer])
+    site = render.Site.from_catalog(catalog.connect(db))
+    html = render.render_sfs(json.loads(law.read_text()), site)
+    island = _island(html)
+    # the § and its first punkt are one panel; the second punkt is its own
+    assert "P1" in island and "P1S1" not in island and "P1S1N1" not in island
+    assert "P1S1N2" in island
+    assert island["P1"].count("NJA 2000 s. 1") == 1
+    # ... and the § still carries its marker even though marked nodes sit inside
+    # it, which is what makes the panel reachable at all
+    assert 'data-rail="P1"' in html
+    assert 'data-rail="P1S1N1"' not in html and 'data-rail="P1S1N2"' in html
+
+
+def test_no_rail_element_opens_with_another_rail_element(tmp_path):
+    """The invariant `scrollspy.js` now relies on, asserted over every container
+    shape that carries a marker rather than the one the fold was written for.
+
+    The script used to skip any marked element containing another, to stop a
+    provision and the sub-unit starting on its own first line showing as two
+    entries at the same height. That skip cost the § its rail wherever it had a
+    second stycke or a numbered list. It is safe to drop *because* `Rail.add`
+    folds exactly those first sub-units away -- so the thing to hold is that the
+    fold fires for every container, not that one document renders right."""
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/2020:100",
+        "metadata": {"properties": {"dcterms:title": "Testlag (2020:100)"}},
+        "structure": [{"type": "kapitel", "id": "K1", "ordinal": "1",
+                       "rubrik": "Inledande bestämmelser", "children": [
+            # a § whose first stycke leads into a numbered list
+            {"type": "paragraf", "id": "K1P1", "ordinal": "1", "children": [
+                {"type": "stycke", "id": "K1P1S1", "text": ["Följande gäller:"],
+                 "children": [
+                     {"type": "punkt", "id": "K1P1S1N1", "text": ["ett,"]},
+                     {"type": "punkt", "id": "K1P1S1N2", "text": ["två."]}]},
+                {"type": "stycke", "id": "K1P1S2", "text": ["Vidare."]}]},
+            # ... and one with plain stycken only
+            {"type": "paragraf", "id": "K1P2", "ordinal": "2", "children": [
+                {"type": "stycke", "id": "K1P2S1", "text": ["Ett."]},
+                {"type": "stycke", "id": "K1P2S2", "text": ["Två."]}]}]}]}))
+    citer = tmp_path / "citer.json"
+    cited = ["K1", "K1P1", "K1P1S1", "K1P1S1N1", "K1P1S1N2", "K1P1S2",
+             "K1P2", "K1P2S1", "K1P2S2"]
+    citer.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_2000_s_1", "court": "HDO",
+        "referat": ["NJA 2000 s. 1"], "metadata": {},
+        "structure": [{"type": "stycke", "id": "p1", "text": [
+            {"predicate": "dcterms:references", "text": a,
+             "uri": "https://lagen.nu/2020:100#" + a} for a in cited]}]}))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [citer])
+    site = render.Site.from_catalog(catalog.connect(db))
+    html = render.render_sfs(json.loads(law.read_text()), site)
+    ids = set(re.findall(r'data-rail="([^"]+)"', html))
+    # every citation above reached *some* panel: none was silently dropped
+    assert set(_island(html)) == ids
+    # and no unit that opens another carries a marker of its own -- a first
+    # stycke, or the first punkt of one, is always folded into what it opens.
+    # The chain matters: a paragraf's first punkt is *two* hops down ("S1N1"),
+    # and its stycke is folded away, so testing one hop below each marker would
+    # never reach it -- which is exactly the regression this guards.
+    assert not ids & {i + suffix for i in ids
+                      for suffix in ("S1", "N1", "S1N1")}
+    # the containers keep their own markers even though marked units sit inside
+    assert {"K1", "K1P1", "K1P2"} <= ids
+    assert "K1P1S1" not in ids and "K1P1S1N1" not in ids and "K1P2S1" not in ids
+
+
 def test_inbound_uses_descriptive_short_name(tmp_path):
     # I1: a citing SFS appears in the inbound panel by its short descriptive name
     # ("räntelagen"), not its full official title ("Räntelag (1975:635)").
