@@ -376,6 +376,9 @@ def legacy_original(case):
         if member["store"] != "dv":
             continue
         path = util.load_relpath(layout.DATA, member["path"])
+        # load_relpath answers None only for an empty (catalog stub) path, and a
+        # legacy dv member always names a stored file (rule:fail-fast)
+        assert path is not None, "dv legacy member %r has no path" % member
         if path.exists() and path.stat().st_size:
             return member
     return None

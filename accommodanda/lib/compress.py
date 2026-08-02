@@ -36,6 +36,7 @@ import gzip as _gzip
 import json
 import mimetypes
 import os
+from collections.abc import Sequence
 from pathlib import Path
 
 import brotli
@@ -81,7 +82,7 @@ def _quality():
     return config.COMPRESS_QUALITY
 
 
-def compress_bytes(data, encoding):
+def compress_bytes(data: bytes, encoding: str) -> bytes:
     """Compress `data` (bytes) into the given `Content-Encoding`."""
     if encoding == "br":
         return brotli.compress(data, mode=brotli.MODE_TEXT, quality=_quality())
@@ -92,7 +93,7 @@ def compress_bytes(data, encoding):
     raise ValueError("unknown encoding %r" % encoding)
 
 
-def decompress_bytes(data, encoding):
+def decompress_bytes(data: bytes, encoding: str) -> bytes:
     """Inverse of `compress_bytes`."""
     if encoding == "br":
         return brotli.decompress(data)
@@ -101,7 +102,7 @@ def decompress_bytes(data, encoding):
     raise ValueError("unknown encoding %r" % encoding)
 
 
-def logical(path):
+def logical(path: Path | str) -> Path:
     """Strip a trailing compression suffix, giving the logical path callers use
     (``foo.json.br`` -> ``foo.json``); a path with no suffix is returned as-is."""
     p = Path(path)
@@ -111,7 +112,7 @@ def logical(path):
     return p
 
 
-def variant_suffix(path):
+def _variant_suffix(path: Path | str) -> str:
     """The compression suffix of an on-disk variant path, or ``""`` if plain."""
     name = Path(path).name
     for suffix in SUFFIXES:
@@ -120,7 +121,7 @@ def variant_suffix(path):
     return ""
 
 
-def resolve(path):
+def resolve(path: Path | str) -> Path | None:
     """The actual on-disk file for a logical `path`: the plain file if it exists,
     else the ``.br`` then ``.gz`` variant, else ``None``. `path` is taken as the
     logical name even if it already carries a suffix (so passing a resolved path
@@ -135,12 +136,12 @@ def resolve(path):
     return None
 
 
-def exists(path):
+def exists(path: Path | str) -> bool:
     """Whether a logical `path` has any on-disk representation."""
     return resolve(path) is not None
 
 
-def stat(path):
+def stat(path: Path | str) -> os.stat_result:
     """`os.stat` of the on-disk file backing a logical `path` (its real size +
     mtime -- what the freshness watermarks fingerprint). Raises like `os.stat`
     if nothing is present."""
@@ -150,18 +151,18 @@ def stat(path):
     return resolved.stat()
 
 
-def read_bytes(path):
+def read_bytes(path: Path | str) -> bytes:
     """The decompressed content behind a logical `path`, whatever variant is on
     disk. Raises `FileNotFoundError` if none is."""
     resolved = resolve(path)
     if resolved is None:
         raise FileNotFoundError(str(path))
     data = resolved.read_bytes()
-    encoding = ENCODING_FOR.get(variant_suffix(resolved))
+    encoding = ENCODING_FOR.get(_variant_suffix(resolved))
     return decompress_bytes(data, encoding) if encoding else data
 
 
-def read_text(path, encoding="utf-8"):
+def read_text(path: Path | str, encoding: str = "utf-8") -> str:
     return read_bytes(path).decode(encoding)
 
 
@@ -185,7 +186,8 @@ def _selected(encodings):
     return tuple(encodings) if config.COMPRESS else ()
 
 
-def write_bytes(path, data, encodings=PAGE_ENCODINGS):
+def write_bytes(path: Path | str, data: bytes,
+                encodings: Sequence[str] = PAGE_ENCODINGS) -> None:
     """Write `data` (bytes) for a logical `path`, storing the configured
     compressed variant(s) and clearing any stale sibling. Small files (and, with
     compression disabled, all files) are stored plain.
@@ -211,11 +213,13 @@ def write_bytes(path, data, encodings=PAGE_ENCODINGS):
     _clear_variants(p, keep=tuple(kept))
 
 
-def write_text(path, text, encodings=PAGE_ENCODINGS, encoding="utf-8"):
+def write_text(path: Path | str, text: str,
+               encodings: Sequence[str] = PAGE_ENCODINGS,
+               encoding: str = "utf-8") -> None:
     write_bytes(path, text.encode(encoding), encodings=encodings)
 
 
-def download_encodings(path):
+def download_encodings(path: Path | str) -> tuple[str, ...]:
     """The storage encodings for a downloaded logical `path`: none (store plain)
     for an already-compressed payload -- see ``INCOMPRESSIBLE_SUFFIXES`` -- else
     the configured download variant. Extension only, case-insensitively."""
@@ -224,7 +228,7 @@ def download_encodings(path):
     return DOWNLOAD_ENCODINGS
 
 
-def write_download(path, data):
+def write_download(path: Path | str, data: bytes | str) -> bool:
     """Persist a fetched file under the raw ``downloaded/`` tree, compressing text
     payloads and storing already-compressed ones (PDF, zip, ...) plain. `data` is
     bytes or str. The single write funnel for downloads, mirroring `write_bytes`
@@ -249,12 +253,12 @@ def write_download(path, data):
     return True
 
 
-def unlink(path):
+def unlink(path: Path | str) -> None:
     """Remove every representation of a logical `path` (plain + all variants)."""
     _clear_variants(logical(path), keep=())
 
 
-def media_type(logical_path):
+def media_type(logical_path: Path | str) -> str:
     """The ``Content-Type`` for a logical path, charset-tagged for text so a
     served ``.br``/``.gz`` still declares the right type (its filename suffix
     would otherwise mislead the guesser)."""
@@ -267,7 +271,7 @@ def media_type(logical_path):
     return guessed
 
 
-def glob(directory, pattern):
+def glob(directory: Path, pattern: str) -> set[Path]:
     """`Path.glob` over the logical names of a compressed tree: match `pattern`
     against plain files *and* their `.br`/`.gz` variants, mapping each hit back to
     its logical path (deduplicated). Callers keep their exact glob pattern (e.g.
@@ -279,7 +283,7 @@ def glob(directory, pattern):
             for p in root.glob(pattern + suffix)}
 
 
-def list_basefiles(root, subdir):
+def list_basefiles(root: Path | str, subdir: str) -> list[str]:
     """Every harvested basefile under `root/subdir`, read from the records.
     Compress-aware: a record stored as ``<slug>.json.br`` is enumerated and read
     transparently. Lives here (not `util`) because it walks the possibly-compressed
@@ -290,7 +294,8 @@ def list_basefiles(root, subdir):
                   if not p.name.startswith("."))
 
 
-def variants_on_disk(directory, relpath):
+def variants_on_disk(directory: str | os.PathLike[str],
+                     relpath: str) -> dict[str, tuple[Path, os.stat_result]]:
     """The compressed variants of `relpath` present under `directory`, as
     ``{encoding: (full_path, os.stat_result)}`` -- the served-file lookup the
     SiteFiles fallback uses (nginx does the equivalent with the static modules).

@@ -147,14 +147,14 @@ def sfs_slug(sfsnr):
 @dataclass
 class ChangeAct:
     sfsnr: str
-    rows: dict = field(default_factory=dict)
+    rows: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
 class Register:
     sfsnr: str
-    header: dict
-    changes: list = field(default_factory=list)
+    header: dict[str, str]
+    changes: list["ChangeAct"] = field(default_factory=list)
 
     @property
     def acts(self):

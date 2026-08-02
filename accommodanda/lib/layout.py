@@ -61,7 +61,7 @@ SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "begrepp": "begrepp", "site": "site", "stats": "stats"}
 
 
-def artifact_dir(source):
+def artifact_dir(source: str) -> Path:
     """The parsed-artifact directory of a source: ``artifact/<source>``."""
     return ARTIFACT / SOURCE_DIR[source]
 
@@ -105,7 +105,7 @@ def _alnum_slug(s):
     return "".join(c if c.isalnum() else "_" for c in s).strip("_")
 
 
-def case_slug(case_id):
+def case_slug(case_id: str) -> str:
     """Filesystem-safe form of a DV case id ("AD 1993 nr 100" ->
     "AD_1993_nr_100"); runs of non-word characters collapse to one underscore.
     Not `_alnum_slug` (which underscores each character, "s." -> "s__"). Lives
@@ -113,7 +113,7 @@ def case_slug(case_id):
     return re.sub(r"[^\w]+", "_", case_id).strip("_")
 
 
-def kommentar_host(basefile):
+def kommentar_host(basefile: str) -> str:
     """The host source a kommentar/begrepp basefile annotates. A kommentar borrows
     its host's identity (`annotates:` is an SFS number, a CELEX, an FS id or a
     förarbete id), so its artifact is filed *under that host source* -- mirroring
@@ -132,7 +132,7 @@ def kommentar_host(basefile):
 # storage relpath -> artifact / downloaded
 # --------------------------------------------------------------------------
 
-def relpath(source, basefile):
+def relpath(source: str, basefile: str) -> Path:
     """The filesystem-safe storage sub-path of a document, shared by its
     downloaded and artifact trees where both are rule-based."""
     if source == "sfs":
@@ -142,7 +142,7 @@ def relpath(source, basefile):
         return Path(case_slug(basefile))
     if source == "forarbete":
         typ, rest = basefile.split("/", 1)
-        return Path(typ) / fa_year(rest) / rest
+        return Path(typ) / _fa_year(rest) / rest
     if source == "eurlex":
         return Path(basefile[1:5]) / basefile.replace("/", "_")
     if source == "foreskrift":
@@ -180,13 +180,13 @@ def relpath(source, basefile):
     raise ValueError("unknown source %r" % source)
 
 
-def artifact(source, basefile):
+def artifact(source: str, basefile: str) -> Path:
     """The parsed-artifact path: ``artifact/<source>/<relpath>.json``."""
     rel = relpath(source, basefile)
     return artifact_dir(source) / rel.with_name(rel.name + ".json")
 
 
-def stats_snapshot(generated):
+def stats_snapshot(generated: Path) -> Path:
     """Where one day's corpus measurement is archived beside the current one:
     ``artifact/stats/archive/statistik-<YYYY-MM-DD>.json``.
 
@@ -203,7 +203,7 @@ def stats_snapshot(generated):
     return artifact_dir("stats") / "archive" / ("statistik-%s.json" % generated)
 
 
-def resolve_basefile(source, basefile, *alternates):
+def resolve_basefile(source: str, basefile: str, *alternates: str) -> str:
     """`basefile` respelled the way the artifact tree actually spells it;
     `basefile` unchanged when nothing matches.
 
@@ -268,7 +268,7 @@ def _respell(source, basefile):
 PATCHES = Path(__file__).resolve().parent.parent / "patches"   # accommodanda/patches
 
 
-def patch(source, basefile, suffix=".patch"):
+def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
     """The patch-file path for a document: ``patches/<source>/<relpath><suffix>``.
     `suffix` selects the variant -- ``.patch`` (plain), ``.rot13.patch`` (a
     rot13-obfuscated redaction, so removed personal data is not itself plain-text
@@ -292,7 +292,7 @@ def _is_document_artifact(path):
             and not path.name.endswith(".grund.json"))
 
 
-def artifacts(source):
+def artifacts(source: str) -> list[Path]:
     """Every parse artifact of `source` on disk, sorted -- the iteration
     companion to `artifact`, so the tree layout has one home and a consumer
     can't drift out of sync with it by hand-globbing. Non-document json that
@@ -317,33 +317,33 @@ def artifacts(source):
 # downloaded roots are exposed (above), not per-document rules.
 # --------------------------------------------------------------------------
 
-def sfs_source(basefile):               # new beta-API JSON (the primary form)
+def sfs_source(basefile: str) -> Path:               # new beta-API JSON (the primary form)
     year, nr = _sfs_parts(basefile)
     return SFS_DOWNLOADED / year / (nr + ".json")
 
 
-def sfs_fetched():                      # {basefile: "YYYY-MM-DD"} last-fetch map
+def sfs_fetched() -> Path:                      # {basefile: "YYYY-MM-DD"} last-fetch map
     # the last date each act was fetched from the upstream ES passthrough, bumped
     # on every fetch (incl. an unchanged one, which the content-hashed source file
     # cannot record) -- the "Senast hämtad" the SFS page shows (C1)
     return SFS_DOWNLOADED / ".fetched.json"
 
 
-def sfs_sfst(basefile):                 # legacy consolidated-text HTML
+def sfs_sfst(basefile: str) -> Path:                 # legacy consolidated-text HTML
     year, nr = _sfs_parts(basefile)
     return SFS_DOWNLOADED / "sfst" / year / (nr + ".html")
 
 
-def sfs_sfsr(basefile):                 # legacy register HTML
+def sfs_sfsr(basefile: str) -> Path:                 # legacy register HTML
     year, nr = _sfs_parts(basefile)
     return SFS_DOWNLOADED / "sfsr" / year / (nr + ".html")
 
 
-def sfs_pdf_dir():                      # the facsimile mirror's root (+ its harvest state)
+def sfs_pdf_dir() -> Path:                      # the facsimile mirror's root (+ its harvest state)
     return SFS_DOWNLOADED / "pdf"
 
 
-def sfs_pdf(basefile):                  # officially published SFS PDF (facsimile source)
+def sfs_pdf(basefile: str) -> Path:                  # officially published SFS PDF (facsimile source)
     year, nr = _sfs_parts(basefile)
     return sfs_pdf_dir() / year / (nr + ".pdf")
 
@@ -364,7 +364,7 @@ def _sfs_version_dir(stage_dir, basefile):
     return stage_dir / "archive" / year / nr / ".versions"
 
 
-def sfs_version_file(stage_dir, basefile, version):
+def sfs_version_file(stage_dir: Path, basefile: str, version: str) -> Path:
     """Physical path of one archived consolidation under a stage dir's archive
     subtree: ``<stage_dir>/archive/{y}/{n}/.versions/{vy}/{vn}.json`` -- a flat
     ``.versions/<version>.json`` for an unrecovered legacy counter with no year
@@ -415,13 +415,13 @@ def sfs_version_key(version):
     return (0, int(version))
 
 
-def sfs_version_artifact(basefile, version):
+def sfs_version_artifact(basefile: str, version: str) -> Path:
     """A parsed archived consolidation: the artifact-tree mirror of its
     download, keyed by the (possibly recovered) version id."""
     return sfs_version_file(SFS_ARTIFACT, basefile, version)
 
 
-def sfs_versions_sidecar(basefile):
+def sfs_versions_sidecar(basefile: str) -> Path:
     """The per-statute version index -- the versions stage's output, a sidecar
     next to the main artifact: which historical consolidations exist, their
     recovered version ids and their parse status."""
@@ -429,7 +429,7 @@ def sfs_versions_sidecar(basefile):
     return SFS_ARTIFACT / rel.with_name(rel.name + ".versions.json")
 
 
-def foreskrift_grund_artifact(basefile):
+def foreskrift_grund_artifact(basefile: str) -> Path:
     """The as-enacted sidecar beside a föreskrift's main artifact: the base
     structure re-projected as its own page artifact (uri ``…/grund``), written
     by parse only when the main artifact presents a consolidation *and* the
@@ -458,14 +458,14 @@ def foreskrift_grund_pages():
     return rows
 
 
-def sfs_sidecar_basefile(path):
+def sfs_sidecar_basefile(path: Path) -> str:
     """Inverse of sfs_versions_sidecar: the statute basefile a sidecar file
     describes (the {y}/{n} path segments, slug-decoded)."""
     return "%s:%s" % (path.parent.name,
                       path.name[:-len(".versions.json")].replace("_", " "))
 
 
-def fa_year(slug):
+def _fa_year(slug: str) -> str:
     """The year segment of a förarbete document's on-disk sub-path, from its
     filesystem slug. Every förarbete id but ``pm`` leads with a 4-digit year (a
     riksmöte's first year for prop/bet/rskr/skr, the utgivningsår otherwise), so
@@ -476,23 +476,23 @@ def fa_year(slug):
     return slug[:4] if slug[:4].isdigit() else "_"
 
 
-def fa_dir(root, typ, ident):
+def fa_dir(root: Path | str, typ: str, ident: str) -> Path:
     """The directory a förarbete document's record and body files share:
     ``<root>/<typ>/<year>``. `root` is a download root (``FA_DOWNLOADED``, or a
     test/scratch root); `ident` the per-type basefile (``2021:82`` or its slug),
     off which the year is read. Record and files live together, so a bare `files`
     name still resolves beside its record after segmentation."""
-    return Path(root) / typ / fa_year(basefile_slug(ident))
+    return Path(root) / typ / _fa_year(basefile_slug(ident))
 
 
-def fa_record_file(root, typ, ident):
+def fa_record_file(root: Path | str, typ: str, ident: str) -> Path:
     """The record JSON path for a förarbete document under a download `root`:
     ``<root>/<typ>/<year>/<slug>.json``. The writer-side companion to
     `fa_record` (which resolves under the global ``FA_DOWNLOADED``)."""
     return fa_dir(root, typ, ident) / (basefile_slug(ident) + ".json")
 
 
-def fa_record(basefile):
+def fa_record(basefile: str) -> Path:
     typ, rest = basefile.split("/", 1)
     return fa_record_file(FA_DOWNLOADED, typ, rest)
 
@@ -528,7 +528,7 @@ def pdf_conversion(pdf_path, kind):
     return PDFCONV / rel.with_suffix(".%s.br" % kind)
 
 
-def facsimile(source, basefile, page):
+def facsimile(source: str, basefile: str, page: int) -> Path:
     """The cached facsimile PNG of one source-PDF page:
     ``cache/facsimile/<source>/<relpath>/sid<N>.png``."""
     return FACSIMILE / source / relpath(source, basefile) / ("sid%d.png" % page)
@@ -544,7 +544,7 @@ def facsimile_crop(source, basefile, page, bbox):
     return FACSIMILE / source / relpath(source, basefile) / name
 
 
-def fa_ocr_pdf(typ, basefile):
+def fa_ocr_pdf(typ: str, basefile: str) -> Path:
     """The re-OCR sidecar PDF for a förarbete document (§7g): ``ocr/forarbete/
     <type>/<slug>.pdf``, slugged exactly like the downloaded record. Dropping a
     modern-OCR'd PDF here (an ``ocrmypdf`` pass over a frozen scan whose embedded
@@ -554,7 +554,7 @@ def fa_ocr_pdf(typ, basefile):
     return fa_dir(OCR / "forarbete", typ, basefile) / (basefile_slug(basefile) + ".pdf")
 
 
-def fa_facsimile_pdf(typ, basefile):
+def fa_facsimile_pdf(typ: str, basefile: str) -> Path:
     """The page-image PDF a förarbete document's facsimile renders from:
     ``downloaded/forarbete/<type>/<slug>.pdf``, beside the record and slugged like
     it. Raw fetched bytes, so it lives in the download tree (`.pdf` -> stored
@@ -574,7 +574,7 @@ def fa_facsimile_pdf(typ, basefile):
     return fa_dir(FA_DOWNLOADED, typ, basefile) / (basefile_slug(basefile) + ".pdf")
 
 
-def eurlex_dir(basefile):
+def eurlex_dir(basefile: str) -> Path:
     """The per-CELEX directory holding eurlex's raw files (notice.ttl + the
     per-language manifestations)."""
     return EURLEX_DOWNLOADED / relpath("eurlex", basefile)
@@ -587,7 +587,7 @@ def eurlex_dir(basefile):
 # harvester (writer) and build.py (reader) derive the same paths.
 # --------------------------------------------------------------------------
 
-def remisser_arende(basefile):
+def remisser_arende(basefile: str) -> Path:
     """One stored ärende record: ``downloaded/remisser/<typ>/<id-slug>.json`` --
     the Remiss source of truth, beside its answer PDFs (the sibling
     ``<id-slug>/`` dir). `basefile` is the referred document's own identity,
@@ -596,7 +596,7 @@ def remisser_arende(basefile):
     return REMISSER_DOWNLOADED / typ / (basefile_slug(ident) + ".json")
 
 
-def remisser_answer(arende_basefile, org_slug):
+def remisser_answer(arende_basefile: str, org_slug: str) -> Path:
     """One downloaded answer PDF:
     ``downloaded/remisser/<typ>/<id-slug>/<org-slug>.pdf`` -- the same relpath
     rule the artifact tree uses (`relpath`), so record, PDF and artifact all
@@ -641,14 +641,14 @@ SFS_ITEM = ("https://beta.rkrattsbaser.gov.se/sfs/item"
 DV_PUBLICERING = "https://rattspraxis.etjanst.domstol.se/sok/publicering/%s"
 
 
-def dv_source_url(gruppkorrelationsnummer):
+def dv_source_url(gruppkorrelationsnummer: str) -> str:
     """A case's page in the courts' public publication search. Keyed by the API
     record's gruppKorrelationsnummer (the publication group, not the record id),
     so this lives off record data -- build.dv_parse_run passes it in."""
     return DV_PUBLICERING % gruppkorrelationsnummer
 
 
-def eurlex_source_url(celex):
+def _eurlex_source_url(celex: str) -> str:
     """An EU act's canonical EUR-Lex address from its CELEX. Sector-3
     regulations, directives and decisions have an ELI -- e.g. 32023R2854 ->
     https://eur-lex.europa.eu/eli/reg/2023/2854/oj (leading zeros stripped from
@@ -660,18 +660,18 @@ def eurlex_source_url(celex):
     return EURLEX_CELEX % celex
 
 
-def source_url(source, basefile):
+def source_url(source: str, basefile: str) -> str | None:
     """The authoritative publisher url for a document, derived by rule from its
     identity where possible, else None -- in which case the downloader-recorded
     url is used instead (see build.write_artifact)."""
     if source == "eurlex":
-        return eurlex_source_url(basefile)
+        return _eurlex_source_url(basefile)
     if source == "sfs":
         return SFS_ITEM % quote(basefile, safe="")
     return None
 
 
-def page_relpath(uri):
+def page_relpath(uri: str) -> str:
     """The generated HTML file for a document uri, by uri shape -- lagen.nu's URL
     grammar: dv at dom/, förarbeten under their type segment (prop/, sou/, …), EU
     acts under eurlex/ (the CELEX kept intact). A statute is a *top-level* page
@@ -728,7 +728,7 @@ def page_relpath(uri):
     return "%s/%s.html" % (prefix, _alnum_slug(loc))
 
 
-def page_url(uri):
+def page_url(uri: str) -> str:
     """The public URL a link points at -- lagen.nu's URI grammar: the document's
     host-stripped local path, served bare (no .html). A statute is /2018:585, a
     proposition /prop/2020/21:22, a case /dom/ad/1993:100. An EU act lives under
@@ -748,7 +748,7 @@ def page_url(uri):
     return "/" + loc
 
 
-def url_to_relpath(path):
+def url_to_relpath(path: str) -> str | None:
     """Inverse of page_url: the on-disk static file for a public lagen.nu URL path.
     The path is a document's URI local form, so reattach the host and reuse the
     page_relpath rule; /celex/<id> is the public address of ext/celex/<id>."""

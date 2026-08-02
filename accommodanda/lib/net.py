@@ -54,7 +54,7 @@ BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
 
-def make_session(user_agent):
+def make_session(user_agent: str) -> requests.Session:
     session = requests.Session()
     session.headers["User-Agent"] = user_agent
     adapter = HTTPAdapter(max_retries=_RETRY)
@@ -63,7 +63,7 @@ def make_session(user_agent):
     return session
 
 
-def make_http2_session(user_agent):
+def make_http2_session(user_agent: str) -> httpx.Client:
     """An HTTP/2-capable client for a host that refuses HTTP/1.1. Konkurrensverket
     sits behind a Cloudflare front that 403s every HTTP/1.1 request and only serves
     HTTP/2, which requests/urllib3 cannot speak; httpx (the 0.x line declared as
@@ -93,7 +93,7 @@ class _LegacyTLSAdapter(HTTPAdapter):
         return super().init_poolmanager(*args, **kwargs)
 
 
-def mount_legacy_tls(session, prefix):
+def mount_legacy_tls(session: requests.Session, prefix: str) -> None:
     """Accept a legacy small-DH-key TLS handshake for one host prefix only
     (e.g. ``https://conventions-ws.coe.int/``), keeping the standard retry
     policy. The security level is lowered for that host alone, never
@@ -205,7 +205,8 @@ def _omitted_chain(leaf, session, timeout):
     return chain
 
 
-def mount_aia_chain(session, prefix, host, port=443, timeout=30):
+def mount_aia_chain(session: requests.Session, prefix: str, host: str,
+                    port: int = 443, timeout: float = 30) -> None:
     """Verify one host's TLS against a trust bundle completed by AIA chasing,
     for that host prefix alone.
 
@@ -256,7 +257,7 @@ def _header_value(name, value):
                 if part.strip()}) or ["value"])
 
 
-def describe_response(response, body_chars=2000):
+def describe_response(response: requests.Response, body_chars: int = 2000) -> str:
     """What the server actually returned, as diagnostic lines: status, reason,
     url, the `DIAGNOSTIC_HEADERS` it sent, and its body truncated to
     `body_chars`.
@@ -287,7 +288,7 @@ def describe_response(response, body_chars=2000):
     return "\n".join(lines)
 
 
-def raise_for_status(response):
+def raise_for_status(response: requests.Response) -> None:
     """`response.raise_for_status()` with what the server actually returned in
     the message -- `describe_response`: status, url, the diagnostic headers and
     the body. The single way this package turns a failed HTTP response into an
@@ -301,6 +302,9 @@ def raise_for_status(response):
     caller sees a generic 4xx and has to reproduce the request by hand.
 
     """
+    # requests initialises status_code to None and the adapter fills it in, so
+    # the declared type is int|None; any response that reached us has one
+    assert response.status_code is not None, "response carries no status code"
     if response.status_code < 400:
         return
     raise requests.HTTPError(describe_response(response), response=response)
@@ -335,7 +339,7 @@ class BudgetExceeded(Exception):
     dirty and the next run retries."""
 
 
-def is_not_found(exc):
+def is_not_found(exc: requests.RequestException) -> bool:
     """Whether `exc` is a 404 raised by :func:`request`. A 404 is the one
     status a harvester routinely reads as *content* -- "the upstream holds no
     such document" -- rather than as a failure, so telling it apart from every

@@ -934,6 +934,9 @@ class SiteFiles(StaticFiles):
     async def _serve(self, rel, accepts, scope):
         """A response for logical `rel` -- its best precompressed variant, else a
         plain file StaticFiles serves, else None (nothing on disk)."""
+        # StaticFiles types `directory` as optional; SiteFiles is always
+        # constructed with one (rule:fail-fast)
+        assert self.directory is not None, "SiteFiles has no directory"
         variants = compress.variants_on_disk(self.directory, rel)
         if variants:
             media_type = compress.media_type(rel)

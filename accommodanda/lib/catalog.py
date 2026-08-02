@@ -29,7 +29,7 @@ from .markdown import begrepp_uri
 BASE = "https://lagen.nu/"
 
 
-def norm_title(t):
+def norm_title(t: str) -> str:
     """A law title normalised for matching a proposed-law name against the SFS
     title index: SFS number dropped, whitespace collapsed, lower-cased -- so
     'Lag (2015:671) om alternativ tvistlösning …' and the proposition's 'lag om
@@ -132,7 +132,8 @@ CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 """
 
 
-def connect(path, data_root=None, exclusive=False):
+def connect(path: Path | str, data_root: Path | None = None,
+            exclusive: bool = False) -> sqlite3.Connection:
     """A read-write connection to the catalog at `path`, schema ensured.
 
     `data_root` records the corpus root the stored (data_root-relative) artifact
@@ -210,7 +211,7 @@ _ro_lock = threading.Lock()
 _ro_migrated = set()
 
 
-def connect_ro(path):
+def connect_ro(path: Path | str) -> sqlite3.Connection:
     """A read-only connection to the catalog at `path`, for the serving layer
     (the REST endpoints and the MCP tools open one per request/tool call --
     SQLite connections are not shared across threads). The first call per
@@ -227,11 +228,11 @@ def connect_ro(path):
     return sqlite3.connect("file:%s?mode=ro" % path, uri=True)
 
 
-def local(uri):
+def local(uri: str) -> str:
     return uri[len(BASE):] if uri.startswith(BASE) else uri
 
 
-def strip_fragment(uri):
+def strip_fragment(uri: str) -> str:
     return uri.split("#", 1)[0]
 
 
@@ -269,7 +270,7 @@ def _data_root(con):
     return _catalog_file(con).parent
 
 
-def data_root(con):
+def data_root(con: sqlite3.Connection) -> Path:
     """The corpus root a catalog's stored (data_root-relative) artifact paths
     resolve against. When the catalog lives outside the corpus (catalog_root !=
     data_root) a full rebuild records the absolute root in `meta`; otherwise this
@@ -278,7 +279,7 @@ def data_root(con):
     return _data_root(con)
 
 
-def quiesce_wal(path):
+def quiesce_wal(path: Path | str) -> None:
     """Fold a catalog's write-ahead log back into its main file and drop the
     `-wal`/`-shm` sidecars, leaving a self-contained single file.
 
@@ -319,7 +320,7 @@ def quiesce_wal(path):
         path.with_name(path.name + suffix).unlink(missing_ok=True)
 
 
-def artifact_path(root, stored):
+def _artifact_path(root: Path, stored: str) -> Path | None:
     """Resolve a stored (data_root-relative) artifact path to an absolute Path, or
     None for a synthesized stub (empty `path`). `root` is `data_root(con)`. Thin
     domain-named wrapper over the shared `util.load_relpath`."""
@@ -330,14 +331,14 @@ def load_artifact(root, stored):
     """The parsed artifact JSON behind a documents row, `{}` for a synthesized
     stub (empty `path` -- begrepp rows have no artifact file). Reads through
     `compress` so a brotli-precompressed artifact tree serves unchanged."""
-    p = artifact_path(root, stored)
+    p = _artifact_path(root, stored)
     return json.loads(compress.read_bytes(p)) if p else {}
 
 
 def artifact_updated(root, stored):
     """A documents row's artifact last-build time as an ISO 8601 UTC string,
     None for a synthesized stub or a missing file."""
-    p = artifact_path(root, stored)
+    p = _artifact_path(root, stored)
     return (datetime.fromtimestamp(compress.stat(p).st_mtime,
                                    timezone.utc).isoformat()
             if p and compress.exists(p) else None)
@@ -423,7 +424,7 @@ def subject_links(art):
             for n in art.get("metadata", {}).get("nyckelord", []) if n.strip()]
 
 
-def bemyndigande_links(art):
+def _bemyndigande_links(art):
     """The bemyndigande edges a föreskrift artifact carries: it is *meddelad* (issued)
     under one or more empowering SFS paragrafer, a fact that lives in metadata, not
     the body text, so the inline-link walk misses it. The edge points föreskrift ->
@@ -513,7 +514,7 @@ def definition_links(art):
 # document rows
 # --------------------------------------------------------------------------
 
-def sfs_document(art, path):
+def _sfs_document(art, path):
     props = art.get("metadata", {}).get("properties", {})
     return (art["uri"], "sfs", "law", "SFS " + local(art["uri"]),
             props.get("dcterms:title") or ("SFS " + local(art["uri"])),
@@ -530,24 +531,24 @@ def dv_document(art, path):
     return (art["uri"], "dv", "case", label, label, str(path))
 
 
-def forarbete_document(art, path):
+def _forarbete_document(art, path):
     label = art.get("identifier") or local(art["uri"])
     return (art["uri"], "forarbete", art.get("type", "forarbete"),
             label, art.get("title") or label, str(path))
 
 
-def kommentar_document(art, path):
+def _kommentar_document(art, path):
     # title carries the author (shown in the inbound entry); label is generic
     return (art["uri"], "kommentar", "kommentar", "Kommentar",
             art.get("author") or "Kommentar", str(path))
 
 
-def begrepp_document(art, path):
+def _begrepp_document(art, path):
     title = art.get("title") or local(art["uri"])
     return (art["uri"], "begrepp", "begrepp", title, title, str(path))
 
 
-def eurlex_document(art, path):
+def _eurlex_document(art, path):
     # kind is the doctype (regulation/directive/judgment/treaty); label is the
     # CELEX (the short id citations use). A judgment's inbound-citation name is
     # the case citation stamped at parse ("C-311/18 (Schrems II)"), not its
@@ -559,7 +560,7 @@ def eurlex_document(art, path):
             label, title, str(path))
 
 
-def foreskrift_document(art, path):
+def _foreskrift_document(art, path):
     # an agency regulation; kind is the författningssamling (fffs/nfs/…), label
     # the short id citations + the bemyndigande margin use ("FFFS 2013:10")
     label = art.get("identifier") or local(art["uri"])
@@ -576,7 +577,7 @@ def avg_document(art, path):
     return (art["uri"], "avg", art.get("org", "avg"), label, title, str(path))
 
 
-def rs_document(art, path):
+def _rs_document(art, path):
     # a myndighets rättsliga ställningstagande; kind is the agency (fk/imy/…),
     # label the citation form ("FKRS 2025:01", "RS/028/2021")
     label = art.get("identifier") or local(art["uri"])
@@ -634,7 +635,7 @@ def icc_document(art, path):
             label, title, str(path))
 
 
-def expired_date(art):
+def _expired_date(art: dict) -> str | None:
     """The date a document's repeal takes effect, if its metadata declares one (a
     statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
     the browse listings can omit a statute once the date has passed (still reachable
@@ -642,7 +643,7 @@ def expired_date(art):
     return art.get("metadata", {}).get("properties", {}).get("rpubl:upphavandedatum")
 
 
-def document_date(art):
+def document_date(art: dict) -> str | None:
     """The document's own date (ISO yyyy-mm-dd), for chronological ordering of
     inbound references -- a förarbete's publication date, a statute's
     utfärdandedatum, a decision's date, a väglednings adoption date. Field-driven
@@ -658,7 +659,7 @@ def document_date(art):
             or props.get("rpubl:beslutsdatum"))
 
 
-def document_description(art, source):
+def _document_description(art, source):
     """A source's own one-line description of a document, for the browse listing --
     a court decision's sammanfattning (the referatrubrik that heads the entry after
     its number). None where a source has no such abstract, so the listing shows the
@@ -668,7 +669,7 @@ def document_description(art, source):
     return None
 
 
-def document_publisher(art):
+def _document_publisher(art: dict) -> str | None:
     """The issuing organization, normalized only structurally (not renamed).
 
     It is catalogued because legacy Atom publisher filters are public request
@@ -694,11 +695,11 @@ def display_title(art, title):
 
 
 def document_row(art, path, source):
-    return {"sfs": sfs_document, "dv": dv_document,
-            "forarbete": forarbete_document, "kommentar": kommentar_document,
-            "begrepp": begrepp_document, "eurlex": eurlex_document,
-            "foreskrift": foreskrift_document,
-            "avg": avg_document, "rs": rs_document, "edpb": edpb_document,
+    return {"sfs": _sfs_document, "dv": dv_document,
+            "forarbete": _forarbete_document, "kommentar": _kommentar_document,
+            "begrepp": _begrepp_document, "eurlex": _eurlex_document,
+            "foreskrift": _foreskrift_document,
+            "avg": avg_document, "rs": _rs_document, "edpb": edpb_document,
             "hudoc": hudoc_document,
             "coe": coe_document, "icrc": icrc_document,
             "untc": untc_document, "icc": icc_document}[source](art, path)
@@ -708,7 +709,7 @@ def document_row(art, path, source):
 # rebuild
 # --------------------------------------------------------------------------
 
-def content_hash(raw):
+def content_hash(raw: bytes) -> str:
     """The change-detection key for an artifact: sha256 of its on-disk bytes.
     Stored on the documents row so relate (and, via the row, index) can skip an
     artifact whose bytes are unchanged since last time."""
@@ -756,20 +757,20 @@ def _index_document(con, art, path, source):
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
-         expired_date(art),
+         _expired_date(art),
          display,                                 # the reader-facing heading
-         document_date(art), document_publisher(art),
+         document_date(art), _document_publisher(art),
          # the reader-facing name forms the listings + inbound panels use (labels;
          # I1/I2): descriptive citing form, the bare id, the short name, and the
          # source's own one-line description (a case's sammanfattning)
          lb.descriptive_label, lb.short_id, lb.short_title,
-         document_description(art, source)))
+         _document_description(art, source)))
     # the metadata producers describe the document, not a place in it, so they
     # pad the body walk's (anchor, page, run) shape with a pageless entry
     edges = artifact_links(art) + [
         (anchor, None, run)
         for anchor, run in (subject_links(art) + definition_links(art)
-                            + bemyndigande_links(art) + relation_links(art)
+                            + _bemyndigande_links(art) + relation_links(art)
                             + curated_links(art))]
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"), page)
@@ -1479,7 +1480,7 @@ def andrar_edges(con):
     return edges
 
 
-def document_inbound_count(con, root_uri):
+def document_inbound_count(con: sqlite3.Connection, root_uri: str) -> int:
     """How many (citing document, pinpoint) entries cite a document *as a whole*
     -- any of its fragments or its bare uri. The 'most-hänvisade' authority
     signal (search ranking, the API's headline count), broader than
@@ -1490,7 +1491,7 @@ def document_inbound_count(con, root_uri):
         (root_uri,)).fetchone()[0]
 
 
-def document_inbound_counts(con):
+def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:
     """`document_inbound_count` for every cited root at once -- {root_uri:
     count}, same semantics as the per-uri query. One pass over the links table
     instead of one GROUP-BY subquery per document (the full-reindex path)."""
@@ -1500,7 +1501,7 @@ def document_inbound_counts(con):
         "l.from_anchor) GROUP BY to_root"))
 
 
-def counts(con):
+def counts(con: sqlite3.Connection) -> dict[str, int]:
     return dict(con.execute(
         "SELECT source, COUNT(*) FROM documents GROUP BY source").fetchall())
 
@@ -1514,7 +1515,7 @@ def source_stats(con):
         "FROM documents GROUP BY source ORDER BY source").fetchall()}
 
 
-def expired_uris(con, today):
+def expired_uris(con: sqlite3.Connection, today: str) -> set[str]:
     """The uris whose declared repeal date (`expired`) is on or before `today` (an
     ISO date string) -- repealed statutes to drop from the browse listings. A
     future repeal date (not yet in force) is kept."""
@@ -1523,13 +1524,13 @@ def expired_uris(con, today):
         (today,))}
 
 
-def concept_aliases(con):
+def concept_aliases(con: sqlite3.Connection) -> dict[str, str]:
     """The variant-uri -> canonical-uri map (`concept_alias`), so the renderer can
     resolve a begrepp link baked into an artifact onto its canonical concept page."""
     return dict(con.execute("SELECT variant, canonical FROM concept_alias"))
 
 
-def document(con, uri):
+def document(con: sqlite3.Connection, uri: str) -> dict | None:
     """A document's catalog row (uri, source, kind, label, title, path), or
     None -- the metadata behind an API /document lookup."""
     return con.execute(
@@ -1605,7 +1606,8 @@ def facet_documents(con, source):
     ).fetchall()
 
 
-def document_count(con, source=None, kind=None):
+def document_count(con: sqlite3.Connection, source: str | None = None,
+                   kind: str | None = None) -> int:
     """How many documents match the same `source`/`kind` filter -- the total for
     a paginated `documents` listing."""
     where, params = _doc_filter(source, kind)

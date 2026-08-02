@@ -65,7 +65,7 @@ class Consolidation:
     konsolideradTom: str | None = None   # uri of the most recent amendment folded in
     file: str | None = None      # stored konsoliderad PDF
     url: str | None = None       # the agency's own link for the konsoliderad PDF
-    structure: list = field(default_factory=list)
+    structure: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -85,14 +85,14 @@ class Regulation:
     beslutsdatum: str | None = None
     ikrafttradandedatum: str | None = None
     utkomFranTryck: str | None = None
-    bemyndigande: list = field(default_factory=list)   # SFS paragraf uris
-    upphaver: list = field(default_factory=list)       # föreskrift uris
-    andrar: list = field(default_factory=list)         # föreskrift uris
-    genomfor: list = field(default_factory=list)       # EU directive uris
+    bemyndigande: list[str] = field(default_factory=list)   # SFS paragraf uris
+    upphaver: list[str] = field(default_factory=list)       # föreskrift uris
+    andrar: list[str] = field(default_factory=list)         # föreskrift uris
+    genomfor: list[str] = field(default_factory=list)       # EU directive uris
 
-    structure: list = field(default_factory=list)      # förarbete-style §§ tree
-    consolidations: list = field(default_factory=list) # Consolidation
-    amendments: list = field(default_factory=list)     # Amendment
+    structure: list[dict] = field(default_factory=list)  # förarbete-style §§ tree
+    consolidations: list["Consolidation"] = field(default_factory=list)
+    amendments: list["Amendment"] = field(default_factory=list)
     file: str | None = None              # the original grundförfattning PDF
     source_url: str | None = None        # the agency landing page ("Källa")
 

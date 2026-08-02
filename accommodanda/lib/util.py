@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-def text_slug(text, *, sep="-", maxlen=None):
+def text_slug(text: str, *, sep: str = "-", maxlen: int | None = None) -> str:
     """A stable, URL/file-safe slug from arbitrary text: NFKD-folded to ASCII (so
     å/ä/ö/é/ü/… degrade to a/a/o/e/u), lower-cased, every run of non-alphanumerics
     collapsed to a single `sep`, optionally truncated to `maxlen` characters (the
@@ -25,7 +25,7 @@ def text_slug(text, *, sep="-", maxlen=None):
     return slug[:maxlen].strip(sep) if maxlen else slug
 
 
-def write_atomic(path, data):
+def write_atomic(path: Path | str, data: bytes | str) -> None:
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
     atomic rename, so an interrupted run never leaves a partial file behind.
     The temp name is per-process unique: concurrent writers (parallel `lagen`
@@ -43,7 +43,7 @@ def write_atomic(path, data):
         raise
 
 
-def store_relpath(path, root):
+def store_relpath(path: Path | str, root: Path) -> str:
     """Render an absolute `path` as a `root`-relative string, so an on-disk index
     (the catalog, the dv identity index, …) stays portable across data_root
     moves: an index rsync'd to a host with a different data_root still resolves
@@ -52,13 +52,13 @@ def store_relpath(path, root):
     return str(Path(path).relative_to(root))
 
 
-def load_relpath(root, stored):
+def load_relpath(root: Path, stored: str) -> Path | None:
     """Inverse of `store_relpath`: the absolute Path for a `root`-relative stored
     path, or None for an empty (stub) path."""
     return root / stored if stored else None
 
 
-def basefile_slug(basefile):
+def basefile_slug(basefile: str) -> str:
     """Filesystem-safe form of a basefile; the true identifier lives in the
     record JSON, so this only has to be unique and stable."""
     return basefile.replace("/", "-").replace(":", "-").replace(" ", "_")
@@ -82,12 +82,12 @@ def href(anchor):
     return value
 
 
-def record_path(root, subdir, basefile):
+def record_path(root: Path | str, subdir: str, basefile: str) -> Path:
     """The harvest-record JSON path for `basefile` under `root/subdir`."""
     return Path(root) / subdir / (basefile_slug(basefile) + ".json")
 
 
-def document_extension(data):
+def document_extension(data: bytes) -> str | None:
     """The file extension for a document, read from its leading magic bytes (a
     URL suffix or a served/on-disk extension is unreliable; the bytes are not).
     None when the bytes are not a document we recognize -- so a mislabelled asset
@@ -106,7 +106,7 @@ def document_extension(data):
     return None
 
 
-def sniff_extension(path):
+def sniff_extension(path: Path | str) -> str | None:
     """`document_extension` for an on-disk file, streamed -- only the leading
     8 bytes are read, so a large network-mounted asset isn't read whole just
     to inspect its header."""
@@ -251,7 +251,7 @@ def _fit_line(line, eta, width):
     return line[:budget]                           # no room for an ETA -- just clip
 
 
-def hms(seconds):
+def _hms(seconds: float) -> str:
     """A compact human duration: '9.1s', '1m42s', '1h07m'."""
     if seconds < 60:
         return "%.1fs" % seconds
@@ -282,7 +282,7 @@ def progress(seen, total=None, *, scope=None, page=None, elapsed=None,
     head = "%s " % scope if scope else ""
     pg = "page %d " % page if page is not None else ""
     tally = ", ".join("%d %s" % (value, label) for label, value in counts.items())
-    tail = " [+%s]" % hms(elapsed) if elapsed is not None else ""
+    tail = " [+%s]" % _hms(elapsed) if elapsed is not None else ""
     status(seen, total, tally + note, actual=actual,
            prefix="%s%s%s" % (clock, head, pg), tail=tail, stream=stream)
 
@@ -294,7 +294,7 @@ def progress_break(stream=sys.stderr):
     stream.flush()
 
 
-def harvest_start(label, url):
+def harvest_start(label: str, url: str) -> None:
     """The uniform banner that opens a harvest segment: ``<label>: Starting at
     <url>``. ``label`` is ``<source> <action>`` -- a source's ``download``, an
     extra action (``mirror-pdf``), or a subtype (``forarbete prop``). Printed once
@@ -381,13 +381,13 @@ re_roman = re.compile(
     r"^M?M?M?(CM|CD|D?C?C?C?)(XC|XL|L?X?X?X?)(IX|IV|V?I?I?I?)$").match
 
 
-def normalize_space(s):
+def normalize_space(s: str) -> str:
     """Whitespace-collapsed and stripped display form. None-safe (an absent
     value normalizes to "")."""
     return " ".join((s or "").split())
 
 
-def normalize_fold(s):
+def normalize_fold(s: str) -> str:
     """Whitespace-collapsed, stripped and case-folded -- the matching key for
     comparing titles/headings/terms case- and spacing-insensitively while the
     display form is kept elsewhere. None-safe (an absent value folds to ""); the
@@ -395,7 +395,7 @@ def normalize_fold(s):
     return " ".join((s or "").split()).lower()
 
 
-def split_numalpha(s):
+def split_numalpha(s: str) -> list[str | int]:
     """'10 a §' -> ['', 10, ' a §'], so strings with mixed numbers and
     letters sort naturally."""
     res = []
@@ -422,7 +422,7 @@ def numcmp(x, y):
     return (nx > ny) - (nx < ny)
 
 
-def from_roman(s):
+def from_roman(s: str) -> int:
     s = s.upper()
     total = 0
     prev = 0
@@ -438,7 +438,7 @@ SWEDISH_ORDINALS = ("första", "andra", "tredje", "fjärde", "femte", "sjätte",
 SWEDISH_ORDINAL_MAP = {word: i + 1 for i, word in enumerate(SWEDISH_ORDINALS)}
 
 
-def swedish_ordinal(s):
+def swedish_ordinal(s: str) -> int | None:
     """'första' -> 1, or None"""
     return SWEDISH_ORDINAL_MAP.get(s.lower())
 
@@ -450,7 +450,7 @@ SV_DATE = re.compile(r"(\d{1,2})\s+(%s)\s+(\d{4})" % "|".join(MONTHS),
                      re.IGNORECASE)
 
 
-def swedish_date(text):
+def swedish_date(text: str) -> str | None:
     """'den 30 juni 2026' / '09 april 2026' -> ISO '2026-06-30', or None."""
     m = SV_DATE.search(text or "")
     return ("%s-%02d-%02d" % (m.group(3), MONTHS[m.group(2).lower()], int(m.group(1)))
@@ -463,12 +463,12 @@ def swedish_date(text):
 # durability requirement and had identical copies of both of these
 # --------------------------------------------------------------------------
 
-def now_iso(dt=None):
+def now_iso(dt: datetime | None = None) -> str:
     """ISO-8601 UTC second-resolution timestamp; `dt` injectable for tests."""
     return (dt or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def append_json_line(path, obj):
+def append_json_line(path: Path | str, obj: object) -> None:
     """Append one JSON object as a line to an ndjson ledger, flushed so a crash
     right after the write still leaves the record on disk."""
     path = Path(path)
@@ -478,7 +478,7 @@ def append_json_line(path, obj):
         f.flush()
 
 
-def read_json_lines(path, *, errors="strict"):
+def read_json_lines(path: Path | str, *, errors: str = "strict") -> list[dict]:
     """Every record in an ndjson ledger, in file order; a missing file is just
     empty.
 
