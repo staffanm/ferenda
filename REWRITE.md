@@ -153,7 +153,7 @@ Current code layout (this three-layer split is now realized in the package):
 ```
 accommodanda/
   browse.py composing layer: the faceted browse tree, generated as a client of the REST API
-  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, page (the shared page kit) + render (site assembly) + tpl and the Jinja templates/ their markup lives in, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, page (the shared page kit) + render (site assembly) + tpl and the Jinja templates/ their markup lives in, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids, pinpoint
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
@@ -2344,6 +2344,25 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   `test_foreskrift_succeeded_series_folds_into_successor`,
   `test_foreskrift_small_series_gets_one_index_page`,
   `test_foreskrift_large_series_partitions_by_year_with_top_axis`).
+- ✅ **Browse hygiene + search facet labels (2026-08-02).** A succeeded
+  författningssamling's own slug now gets a page saying its föreskrifter list
+  under the successor (`browse._write_succeeded_series`, following the
+  whole chain — säifs → srvfs → msbfs → mcffs — via `facets.fs_live_series`);
+  before this the folded series carried no page at all, though its old
+  addresses stayed in circulation. `generate` also reaps any browse directory
+  the run no longer writes (`browse._reap_browse`), so a folded-away samling's
+  pages from an older build stop serving. A föreskrift with a konsoliderad
+  version listed twice — the consolidated text and its as-enacted `/grund`
+  sibling carry the same beteckning and title — so the listing now folds the
+  base version out under the consolidated one, marked `consolidated`
+  (`facets._fold_fs_versions`); the base stays reachable from the document
+  page. Separately, the search facets' kind → label map (`facets.kind_labels`)
+  is now derived from the same `SCHEMES` the browse pages use rather than a
+  second table, fixing forarbete's "bet"/"pm"/"rskr" buckets reaching the
+  search UI as raw catalog keys; `/api/v1/search` serves it as `kind_label` per
+  result and `label` per facet bucket. `test/test_browse_generate.py`,
+  `test/test_facets.py` (`test_kind_labels_name_every_forarbete_type`,
+  `test_fold_fs_versions_drops_the_base_and_marks_the_consolidated`), `test/test_api.py`.
 
 ### 7f. avg vertical — JO + JK + ARN + IMY + KKV myndighetsavgöranden ✅ (first cut)
 
