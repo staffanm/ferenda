@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from html import escape
 from urllib.parse import urlencode
 
-from . import catalog, facets, layout, util
+from . import catalog, facets, labels, layout, util
 from .tpl import ENV
 
 BASE = catalog.BASE.rstrip("/")
@@ -95,7 +95,7 @@ def _mtime(ns):
 
 
 def _sfs_type(title, local):
-    if facets.sfs_is_statute(title or "", local):
+    if labels.sfs_is_statute(title or "", local):
         return "lag"
     if re.match(r"^förordning(?:en)?\b", title or "", re.I):
         return "forordning"

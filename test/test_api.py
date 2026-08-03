@@ -51,10 +51,10 @@ def client(tmp_path):
                 raise ValueError("invalid search cursor")
             return {"total": 1, "next_cursor": None, "facets": {
                 "source": [{"value": "sfs", "count": 1}],
-                "kind": [{"value": "law", "count": 1}],
+                "kind": [{"value": "lag", "count": 1}],
                 "year": [{"value": "1962", "count": 1}]}, "results": [{
                 "uri": "https://lagen.nu/1962:700", "identifier": "SFS 1962:700",
-                "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "law",
+                "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "lag",
                 "score": 9.1, "inbound_count": 1,
                 "highlight": ["… <em>%s</em> …" % q],
                 "fragments": [{"uri": "https://lagen.nu/1962:700#K3P1",
@@ -85,7 +85,9 @@ def test_search(client):
     assert body["facets"]["year"] == [{"value": "1962", "count": 1, "label": None}]
     hit = body["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
-    assert hit["kind_label"] == "Författning"      # singular: one hit, not a bucket
+    # singular: one hit, not a bucket. Brottsbalken is a balk, so its kind is
+    # 'lag' -- SFS splits lag from förordning in the catalog (see test_facets)
+    assert hit["kind_label"] == "Lag"
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
     # the API resolves each hit's public page path (layout.page_url): a statute
     # at lagen.nu's bare /<sfsid> address, colon kept

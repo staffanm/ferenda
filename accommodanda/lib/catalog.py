@@ -44,7 +44,12 @@ CREATE TABLE IF NOT EXISTS meta (
 CREATE TABLE IF NOT EXISTS documents (
     uri          TEXT PRIMARY KEY,
     source       TEXT NOT NULL,    -- 'sfs' | 'dv'
-    kind         TEXT,             -- 'law' | 'case'
+    kind         TEXT,             -- the source's own document type, so the
+                                   -- vocabulary is per source and a value is
+                                   -- only unique paired with it: sfs is
+                                   -- 'lag'/'forordning', dv 'case'/'judgment',
+                                   -- forarbete 'prop'/'sou'/…, foreskrift the
+                                   -- fs slug
     label        TEXT,             -- short display id (SFS number / referat)
     title        TEXT,             -- full heading
     descriptive  TEXT,             -- short descriptive citing form (labels, I1)
@@ -100,6 +105,17 @@ CREATE TABLE IF NOT EXISTS fk_kommentar (
     text       TEXT NOT NULL        -- the commentary prose
 );
 CREATE INDEX IF NOT EXISTS idx_fk_sfs ON fk_kommentar(sfs_uri, sfs_anchor);
+CREATE TABLE IF NOT EXISTS norm_chain (
+    lower_uri   TEXT NOT NULL,  -- the subordinate document (no fragment)
+    lower_pin   TEXT,           -- the provision of it the relation names, if any
+    upper_uri   TEXT NOT NULL,  -- the document it derives its authority from
+    upper_pin   TEXT,           -- the empowering/transposed provision, if named
+    predicate   TEXT NOT NULL,  -- the typed relation that states it
+    lower_level INTEGER NOT NULL,   -- rung of each end, so a walk can order them
+    upper_level INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chain_lower ON norm_chain(lower_uri);
+CREATE INDEX IF NOT EXISTS idx_chain_upper ON norm_chain(upper_uri);
 CREATE TABLE IF NOT EXISTS correspondence (
     new_uri  TEXT NOT NULL,         -- the new statute paragraf (full uri, doc#id)
     old_uri  TEXT NOT NULL,         -- the old paragraf it corresponds to (a
@@ -234,6 +250,12 @@ def local(uri: str) -> str:
 
 def strip_fragment(uri: str) -> str:
     return uri.split("#", 1)[0]
+
+
+def fragment(uri):
+    """The fragment of a uri, or None where it has none -- `strip_fragment`'s
+    other half."""
+    return uri.split("#", 1)[1] if "#" in uri else None
 
 
 def _catalog_file(con):
@@ -424,6 +446,105 @@ def subject_links(art):
             for n in art.get("metadata", {}).get("nyckelord", []) if n.strip()]
 
 
+# --------------------------------------------------------------------------
+# the norm hierarchy (norm_chain)
+# --------------------------------------------------------------------------
+
+# Which rung of the Swedish norm hierarchy a document occupies, keyed by
+# (source, kind) -- both catalog data, so this stays a table rather than a
+# branch on any particular source. A source not listed has no place in the
+# hierarchy: a förarbete, a dom and a JO-beslut are *about* rules without being
+# rules, and the chain must not pretend otherwise.
+NORM_LEVEL = {("eurlex", None): 0, ("sfs", "lag"): 1,
+              ("sfs", "forordning"): 2, ("foreskrift", None): 3}
+
+# `norm_chain` is metadata, not a rendered panel. A first attempt showed it in
+# the context rail and the audit found the display is the hard part, not the
+# data: on a paragraf that transposes an EU article the rung duplicated the
+# richer "Genomför EU-rätt" row, and the lag<->förordning rung is present for
+# the ~700 förordningar that state their authority in one of two fixed ingress
+# formulas and absent for the rest, with nothing on the page to explain the
+# difference. Helping a reader up and down the hierarchy needs an editorial
+# layer, so the table is built and left for one to read.
+
+# The typed relations that place one document under another. Each is stated by
+# the *subordinate* document about the one above it -- a föreskrift names the
+# paragraf empowering it, a statute the directive it transposes -- so the citing
+# end is always the lower rung. Plain references are deliberately absent: an
+# ordinary cross-reference says two provisions are related, not that one derives
+# its authority from the other, and admitting them turns the chain into the
+# citation graph it exists to be distinguishable from.
+CHAIN_PREDICATES = ("rpubl:bemyndigande", "rpubl:genomforDirektiv",
+                    "rinfoex:kompletterar")
+
+
+def norm_level(source, kind):
+    """The document's rung, or None if it is not itself a rule."""
+    return NORM_LEVEL.get((source, kind), NORM_LEVEL.get((source, None)))
+
+
+def _sfs_authority_links(art):
+    """The authority edges a *förordning* artifact carries: the empowering
+    provisions its bemyndigandeupplysning names ("Denna förordning är meddelad
+    med stöd av 1 kap. 8 § cybersäkerhetslagen i fråga om 4 §") and the act its
+    ingress says it completes ("innehåller kompletterande bestämmelser till
+    säkerhetsskyddslagen (2018:585)"). Read at parse time (sfs.bemyndigande);
+    the catalog only publishes them as typed edges.
+
+    A bemyndigande edge is anchored to the provision it authorises where the
+    clause names one, so the chain can be walked provision-to-provision; the
+    clause's own punkt is not a useful anchor and is not kept. `kompletterar`
+    is document-level by nature and carries no anchor."""
+    out = [(fragment(provision),
+            {"uri": entry["lagrum"], "predicate": "rpubl:bemyndigande",
+             "text": entry["lagrum"]})
+           for entry in art.get("bemyndigande", [])
+           for provision in (entry["provisions"] or [""])]
+    return out + [(None, {"uri": uri, "predicate": "rinfoex:kompletterar",
+                          "text": uri})
+                  for uri in art.get("kompletterar", [])]
+
+
+def rebuild_norm_chain(con):
+    """Recompute `norm_chain` from the typed authority edges in `links`.
+
+    One row per stated relation, both ends resolved to a rung. An edge whose
+    either end is not a rule (a förarbete citing a föreskrift, a document not in
+    the corpus) is dropped: the chain answers "what authorises this", and only a
+    rule can. An edge that does not descend a rung is dropped too -- a föreskrift
+    amending a sibling föreskrift is a relation between equals, not authority."""
+    con.execute("DELETE FROM norm_chain")
+    con.execute(
+        "INSERT INTO norm_chain (lower_uri, lower_pin, upper_uri, upper_pin, "
+        "                        predicate, lower_level, upper_level) "
+        "SELECT DISTINCT l.from_uri, l.from_anchor, l.to_root, "
+        "       CASE WHEN instr(l.to_uri, '#') > 0 "
+        "            THEN substr(l.to_uri, instr(l.to_uri, '#') + 1) END, "
+        "       l.predicate, lo.lvl, up.lvl "
+        "  FROM links l "
+        "  JOIN (%s) lo ON lo.uri = l.from_uri "
+        "  JOIN (%s) up ON up.uri = l.to_root "
+        " WHERE l.predicate IN (%s) AND lo.lvl > up.lvl"
+        % (_LEVEL_SELECT, _LEVEL_SELECT,
+           ",".join("'%s'" % p for p in CHAIN_PREDICATES)))
+    # commit like every other relate post-pass (set_correspondence,
+    # synthesize_concepts): the caller closes the connection without one, so an
+    # uncommitted rebuild is silently discarded and the table keeps whatever it
+    # held before -- which reads as "the chain did not change", not as a failure
+    con.commit()
+    return con.execute("SELECT count(*) FROM norm_chain").fetchone()[0]
+
+
+# documents resolved to a rung, as a subquery: the level table expressed in SQL
+# so the join happens in one statement rather than a row-at-a-time Python walk
+_LEVEL_SELECT = "SELECT uri, CASE %s END AS lvl FROM documents WHERE %s" % (
+    " ".join("WHEN source = '%s'%s THEN %d"
+             % (source, "" if kind is None else " AND kind = '%s'" % kind, lvl)
+             for (source, kind), lvl in NORM_LEVEL.items()),
+    " OR ".join("source = '%s'" % source for source in
+                dict.fromkeys(source for source, _ in NORM_LEVEL)))
+
+
 def _bemyndigande_links(art):
     """The bemyndigande edges a föreskrift artifact carries: it is *meddelad* (issued)
     under one or more empowering SFS paragrafer, a fact that lives in metadata, not
@@ -515,10 +636,15 @@ def definition_links(art):
 # --------------------------------------------------------------------------
 
 def _sfs_document(art, path):
+    """One SFS row. ``kind`` separates 'lag' from 'forordning' rather than
+    calling both 'law': a förordning is subordinate to the lag that delegates
+    to it, and collapsing the two made the norm hierarchy unreadable from the
+    catalog -- 2025:1506 and 2025:1507 are one rung apart, not the same kind of
+    thing (`labels.sfs_is_statute`)."""
     props = art.get("metadata", {}).get("properties", {})
-    return (art["uri"], "sfs", "law", "SFS " + local(art["uri"]),
-            props.get("dcterms:title") or ("SFS " + local(art["uri"])),
-            str(path))
+    title = props.get("dcterms:title") or ("SFS " + local(art["uri"]))
+    kind = "lag" if labels.sfs_is_statute(title, local(art["uri"])) else "forordning"
+    return (art["uri"], "sfs", kind, "SFS " + local(art["uri"]), title, str(path))
 
 
 def dv_document(art, path):
@@ -770,7 +896,8 @@ def _index_document(con, art, path, source):
     edges = artifact_links(art) + [
         (anchor, None, run)
         for anchor, run in (subject_links(art) + definition_links(art)
-                            + _bemyndigande_links(art) + relation_links(art)
+                            + _bemyndigande_links(art)
+                            + _sfs_authority_links(art) + relation_links(art)
                             + curated_links(art))]
     rows = [(uri, anchor, run.get("predicate", "dcterms:references"),
              run["uri"], strip_fragment(run["uri"]), run.get("text"), page)

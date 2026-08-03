@@ -19,7 +19,7 @@ import re
 from collections import namedtuple
 from datetime import date
 
-from . import catalog, datasets, lagrum, layout
+from . import catalog, datasets, labels, lagrum, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
@@ -63,7 +63,9 @@ def _curated(order):
 # strip an SFS title down to its subject so it files under the subject initial
 # (lagen.nu's "börjar på A"), not under the document-type word that opens almost
 # every title ("Förordning …", "Lag …"): 'Lag (2008:1302) om avtal …' -> 'avtal …'
-_SFS_EDITORIAL = re.compile(r"/[^/]*/")          # /Rubriken upphör att gälla …/
+# the editorial interpolation stripper lives with `labels.sfs_is_statute`, which
+# reads the same designation off the same title (rule:second-use-goes-to-lib)
+_SFS_EDITORIAL = labels.SFS_EDITORIAL
 _SFS_DESIGNATION = re.compile(
     r"^(lag(en)?|förordning(en)?|kungörelse(n)?|tillkännagivande(t)?|cirkulär(et)?|"
     r"brev(et)?|reglemente(t)?|instruktion(en)?|stadga(n)?|kungl\.? ?maj:ts)\b", re.I)
@@ -86,27 +88,6 @@ def _sfs_split(title):
 
 def _sfs_sortname(title):
     return _sfs_split(title)[1]
-
-
-# parliamentary primary law -- a lag, a balk (Brottsbalk, Jordabalk, …), or one of
-# the grundlagar -- shown at full weight; secondary instruments (förordning,
-# kungörelse, tillkännagivande, …) are subdued in the listing. The grundlagar open
-# with their own designation, not "Lag"/"Balk", so they're pinned by SFS id.
-_GRUNDLAGAR = {"1974:152", "1949:105", "1991:1469", "1810:0926", "2014:801"}
-_SFS_STATUTE_END = ("lag", "lagen", "balk", "balken")
-
-
-def sfs_is_statute(title, local):
-    """Whether an SFS is parliamentary primary law -- a lag, a balk, or one of the
-    grundlagar -- as opposed to a förordning/kungörelse/etc. The designation is the
-    phrase before the SFS number; a lag/balk ends in just that, however compound
-    ('Lag', 'Förvaltningslag', 'Radio- och tv-lag', 'Plan- och bygglag',
-    'Brottsbalk'). The grundlagar open with their own designation, so they're
-    pinned by SFS id. Drives the listing's visual hierarchy and the legacy
-    feed ``rdf_type`` filter (feeds)."""
-    head = re.sub(r"\s+", " ", _SFS_EDITORIAL.sub("", title)).strip()
-    designation = head.split("(", 1)[0].strip().lower()
-    return local in _GRUNDLAGAR or designation.endswith(_SFS_STATUTE_END)
 
 
 def _initial(s):
@@ -667,7 +648,8 @@ _KIND_SINGULAR = {
     "prop": "Proposition", "bet": "Betänkande", "rskr": "Riksdagsskrivelse",
     "skr": "Skrivelse", "lr": "Lagrådsremiss", "pm": "Promemoria",
     "so": "Internationell överenskommelse", "regulation": "Förordning",
-    "judgment": "Avgörande", "law": "Författning", "case": "Rättsfall",
+    "judgment": "Avgörande", "lag": "Lag", "forordning": "Förordning",
+    "case": "Rättsfall",
     "kommentar": "Lagkommentar", "riktlinjer": "Riktlinje",
     "rekommendationer": "Rekommendation", "declaration": "Deklaration",
     "sentence": "Straffmätningsbeslut", "reparations": "Gottgörelsebeslut",
@@ -687,7 +669,7 @@ def kind_labels(singular=False):
     search hit list holds both corpora under one button."""
     # sources whose whole corpus is one kind slice their browse by something
     # else (initial, court), so no kind_axis level names these
-    out = {"law": "Författningar", "case": "Rättsfall",
+    out = {"lag": "Lagar", "forordning": "Förordningar m.m.", "case": "Rättsfall",
            "begrepp": "Begrepp", "kommentar": "Lagkommentarer"}
     for levels in SCHEMES.values():
         for level in levels:
@@ -764,8 +746,12 @@ def _browse_doc(source, row, repealed=frozenset()):
            "short_title": row.short_title, "description": row.description}
     if source == "sfs":
         pre, key = _sfs_split(row.title or "")
+        # parliamentary primary law -- a lag, a balk, a grundlag -- is shown at
+        # full weight, secondary instruments (förordning, kungörelse, …)
+        # subdued. The test lives in lib.labels because the catalog stamps it on
+        # every SFS row as `kind` and cannot import this module.
         doc.update(pre=pre, key=key or doc["display"],
-                   subdued=not sfs_is_statute(row.title or "", row.local),
+                   subdued=not labels.sfs_is_statute(row.title or "", row.local),
                    year=row.local.split(":", 1)[0])
     elif source == "dv":
         doc.update(variant=_dv_variant(row.local), date=row.date)

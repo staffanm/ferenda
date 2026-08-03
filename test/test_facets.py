@@ -293,8 +293,13 @@ def test_kind_shared_by_two_sources_drops_the_parenthetical():
 
 
 def test_kind_labels_name_the_single_kind_sources():
+    # SFS is two kinds, not one: a förordning is subordinate to the lag that
+    # delegates to it, and the catalog says so (`labels.sfs_is_statute`) so the
+    # norm hierarchy is readable from a document row. The förordning bucket also
+    # holds kungörelser and tillkännagivanden, hence "m.m.".
     kl = facets.kind_labels()
-    assert kl["law"] == "Författningar"
+    assert kl["lag"] == "Lagar"
+    assert kl["forordning"] == "Förordningar m.m."
     assert kl["case"] == "Rättsfall"
     assert kl["kommentar"] == "Lagkommentarer"
 

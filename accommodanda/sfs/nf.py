@@ -40,7 +40,7 @@ from pathlib import Path
 from ..lib import lagrum, util
 from ..lib.catalog import BASE
 from ..lib.coe_ids import article_fragment
-from . import begrepp, graphics, redaktionell
+from . import begrepp, bemyndigande, graphics, redaktionell
 from . import register as register_mod
 from .model import (
     Avdelning,
@@ -94,11 +94,17 @@ def to_normalform(doc, basefile, now=None, refparser=None,
     metadata = (register_mod.build_metadata(sfst_header, register, basefile)
                 if register is not None and sfst_header is not None
                 else {"uri": None, "properties": {}, "secondary": {}})
+    uri = register_mod.amendment_uri(basefile, BASE)
     return {
-        "uri": register_mod.amendment_uri(basefile, BASE),
+        "uri": uri,
         "metadata": metadata,
         "structure": structure,
         "amendments": amendments,
+        # which lag a förordning answers to, read from its ingress -- the
+        # artifact is the source of truth for it, so the catalog stays a pure
+        # consumer (see sfs.bemyndigande). Empty for a lag and for a förordning
+        # that states neither formula.
+        **bemyndigande.extract(structure, uri.split("#", 1)[0]),
     }
 
 

@@ -391,3 +391,37 @@ _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
 
 def document_labels(source, art):
     return _DISPATCH.get(source, _generic)(art)
+
+# --------------------------------------------------------------------------
+# what kind of instrument an SFS is
+# --------------------------------------------------------------------------
+
+# Editorial interpolations in an SFS title ("/Rubriken upphör att gälla …/").
+# Public: `facets` strips the same thing off the same titles for its sort key.
+SFS_EDITORIAL = re.compile(r"/[^/]*/")
+# The grundlagar open with their own designation, not "Lag"/"Balk", so they are
+# pinned by SFS id rather than recognised from the title.
+_GRUNDLAGAR = {"1974:152", "1949:105", "1991:1469", "1810:0926", "2014:801"}
+_SFS_STATUTE_END = ("lag", "lagen", "balk", "balken")
+
+
+def sfs_is_statute(title, local):
+    """Whether an SFS is parliamentary primary law -- a lag, a balk, or one of
+    the grundlagar -- as opposed to a förordning/kungörelse/etc. The designation
+    is the phrase before the SFS number; a lag/balk ends in just that, however
+    compound ('Lag', 'Förvaltningslag', 'Radio- och tv-lag', 'Plan- och
+    bygglag', 'Brottsbalk').
+
+    The title is the only signal with full coverage, and it is a good one: of
+    the 654 SFS carrying a "meddelad med stöd av" clause -- an independent
+    statement that the instrument is delegated, and so not a lag -- this rule
+    calls 653 a förordning. (The one dissenter, Miljöbalk (1998:808), contains
+    the phrase in its body rather than as its own ingress.) The clause itself
+    cannot carry the distinction: it appears in under a tenth of förordningar.
+
+    Drives the browse listing's visual hierarchy, the legacy feed ``rdf_type``
+    filter, the catalog ``kind``, and through it which rung of the norm
+    hierarchy a document occupies (`catalog.norm_level`)."""
+    head = re.sub(r"\s+", " ", SFS_EDITORIAL.sub("", title)).strip()
+    designation = head.split("(", 1)[0].strip().lower()
+    return local in _GRUNDLAGAR or designation.endswith(_SFS_STATUTE_END)

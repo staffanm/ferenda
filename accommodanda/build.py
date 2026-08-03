@@ -891,7 +891,7 @@ def save_fingerprints(store):
 PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
-    "parallelappendix", "register", "begrepp",
+    "parallelappendix", "register", "begrepp", "bemyndigande",
     "graphics")) + (PKG / "lib" / "lagrum.py",)
 
 
@@ -2023,6 +2023,10 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                PKG / "eurlex" / "correspond.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
                PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",
+               # the pre-Formex tier reads its body through the shared PDF
+               # machinery (parse_pdf imports pdftext.flat_lines), so an edit
+               # there changes those artifacts exactly as it does forarbete's
+               PKG / "lib" / "pdftext.py",
                PKG / "lib" / "lagrum.py")
 
 
@@ -2470,6 +2474,52 @@ def foreskrift_browser_download(_basefiles):
                              full=RUN.force, only=RUN.only, jobs=1)
 
 
+def foreskrift_reap(basefiles):
+    """`lagen foreskrift reap`: remove harvested records that a later run re-filed
+    under another författningssamling.
+
+    An fs reassignment (an agency taking over a renamed agency's samling, so its
+    listing is read with ``fs_from_designation``) leaves the pre-reassignment run's
+    records behind under the old fs, claiming the same landing pages as the
+    correctly-filed ones. They parse and publish like any other document, so the
+    same rule shows up twice in a rail -- as "MSBFS 2026:8" beside "MCFFS 2026:8",
+    an identifier from a samling that stopped issuing when MSB was renamed at the
+    end of 2025.
+
+    Removal is per document and takes the whole chain -- record, bodies, artifact,
+    generated page -- because a record left behind re-parses and a page left behind
+    keeps serving. Nothing here is recoverable only by deletion: a mistakenly
+    reaped document comes back on the next `download --full`. Use `--dry-run` to
+    list without removing.
+
+    The scan is always over the whole store, never a scope: a leftover is only
+    recognisable *beside* the correctly-filed record that superseded it, and the
+    two are by definition in different författningssamlingar, so a scoped walk
+    would silently find nothing."""
+    if basefiles:
+        sys.exit("foreskrift reap takes no scopes -- a leftover is only "
+                 "recognisable beside the record in the other samling that "
+                 "superseded it, so the scan is always store-wide")
+    stale = foreskrift_download.superseded(str(layout.FORESKRIFT_DOWNLOADED))
+    if not stale:
+        print("foreskrift reap: no superseded records")
+        return
+    for basefile, (winner, url) in sorted(stale.items()):
+        print("foreskrift reap: %s superseded by %s (%s)" % (basefile, winner, url))
+        if RUN.dry_run:
+            continue
+        for path in foreskrift_download.superseded_files(
+                str(layout.FORESKRIFT_DOWNLOADED), basefile):
+            compress.unlink(path)
+        compress.unlink(layout.artifact("foreskrift", basefile))
+        compress.unlink(layout.foreskrift_grund_artifact(basefile))
+        compress.unlink(GENERATED / layout.page_relpath(
+            "https://lagen.nu/" + basefile))
+    print("foreskrift reap: %s %d superseded record(s) -- re-run relate to drop "
+          "them from the catalog" % ("would remove" if RUN.dry_run else "removed",
+                                     len(stale)))
+
+
 # the parser is one shared engine over every fs (its own model/structure plus the
 # shared PDF extraction + citation engine), so a change to any of these re-stales
 # every föreskrift the recipe-version way -- just like SFS/eurlex parse.
@@ -2552,7 +2602,8 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
-    actions={"browser-download": foreskrift_browser_download},
+    actions={"browser-download": foreskrift_browser_download,
+             "reap": foreskrift_reap},
     # display label only, nothing is ever fetched from a central index: the
     # harvest engine drives each agency's own site from foreskrift/agencies.py
     origin="the %d agency sites in foreskrift/agencies.py"
@@ -2562,7 +2613,9 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
           "scopes are författningssamling codes (fffs, …); empty = all non-browser "
           "agencies\n"
           "browser-download: harvest just the headful-Chrome agencies (skvfs, "
-          "mtfs), kept off the default sweep for a separate schedule")
+          "mtfs), kept off the default sweep for a separate schedule\n"
+          "reap: remove records an fs reassignment left behind under the old "
+          "författningssamling (--dry-run lists them)")
 
 
 # --------------------------------------------------------------------------
@@ -3453,11 +3506,16 @@ def cmd_relate(names):
         catalog.set_correspondence(con, corr)
         folded = catalog.canonicalize_concepts(con)
         concepts = catalog.synthesize_concepts(con)
+        # the norm hierarchy: which rule derives its authority from which. Needs
+        # every source related (a chain crosses EU -> lag -> förordning ->
+        # föreskrift), so it runs here rather than per source.
+        chain = catalog.rebuild_norm_chain(con)
         anchor_warnings = kommentar_anchor_warnings(con)
         con.close()
         _emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
         record_fingerprint(store, "relate", "__corr__", corr_wm)
         dirty = True
+        print("relate: %d norm-chain relations" % chain)
         print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
               % pinned)
         print("relate: %d författningskommentar entries pinned to SFS "
