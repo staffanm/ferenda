@@ -3,6 +3,7 @@ intermediate hooks that apply patches at parse time (sfs plain text, dv innehål
 HTML, eurlex Formex XML), the `mkpatch`/`patch-show` CLI verbs, and the
 authenticated web editor (`api/patch.py`)."""
 
+import pathlib
 import dataclasses
 import subprocess
 from types import SimpleNamespace
@@ -211,8 +212,14 @@ def test_pdf_pages_applies_patch(patches, monkeypatch):
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<pdf2xml>\n'
            '<page number="1">\n<text top="1" left="1" height="10">Namn SECRET</text>\n'
            "</page>\n</pdf2xml>\n")
-    monkeypatch.setattr(pdftext.subprocess, "run",
-                        lambda *a, **k: SimpleNamespace(stdout=xml.encode("utf-8")))
+    # the converter is given an output base in a temp directory and reads the
+    # XML back from it -- which is what keeps the images poppler extracts out of
+    # the corpus -- so the stub writes the file rather than returning stdout
+    def run(cmd, *a, **k):
+        pathlib.Path(cmd[-1] + ".xml").write_bytes(xml.encode("utf-8"))
+        return SimpleNamespace(stdout=xml.encode("utf-8"))
+
+    monkeypatch.setattr(pdftext.subprocess, "run", run)
     # no patch -> the pdftohtml XML is parsed as-is
     assert list(pdftext.pdf_pages("x.pdf", ("remisser", "c/o")))[0][1][0].text \
         == "Namn SECRET"

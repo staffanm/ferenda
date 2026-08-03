@@ -8,6 +8,7 @@ from accommodanda.forarbete import parse as fa_parse
 from accommodanda.forarbete.model import Block
 from accommodanda.forarbete.parse import (
     classify,
+    figure_index,
     mint_uri,
     rskr_body,
     tag_frontmatter,
@@ -746,3 +747,28 @@ def test_merge_continued_joins_cross_page_table_and_drops_repeated_header():
     assert len(merged) == 2
     assert merged[0].rows == [("Ålder", "Belopp"), ("22 år", "25 000"),
                               ("23 år", "27 500")]
+
+
+def test_a_figure_lands_after_the_text_that_introduces_it():
+    """An illustration is placed by its y on the page, not appended to it: prop.
+    2017/18:89's pyramid belongs under the sentence ending "…i pyramidens topp",
+    and appending it put it at the foot of the page instead."""
+    on_page = [Block("rubrik", "4.2 Säkerhetsskyddslagens tillämpningsområde",
+                     40, 2, top=120),
+               Block("stycke", "…där säkerhetsskyddslagens tillämpningsområde "
+                     "anges i pyramidens topp.", 40, top=200),
+               Block("stycke", "Nästa stycke.", 40, top=470)]
+    assert figure_index(on_page, 338) == 2         # between the two stycken
+    assert figure_index(on_page, 90) == 0          # above the heading
+    assert figure_index(on_page, 600) == 3         # below everything
+
+
+def test_a_block_without_geometry_does_not_drag_a_figure_above_it():
+    """A tabell is rebuilt from its cells and carries no `top`. Reading that
+    absence as y=0 made every figure on the page sort below it, so a figure
+    printed under a table jumped above it."""
+    on_page = [Block("stycke", "Inledning.", 12, top=100),
+               Block("tabell", "", 12, rows=[("Ålder", "Belopp")], th=True),
+               Block("stycke", "Efter tabellen.", 12, top=500)]
+    assert on_page[1].top is None
+    assert figure_index(on_page, 400) == 2         # after the table, not before

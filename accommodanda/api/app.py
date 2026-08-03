@@ -751,10 +751,29 @@ _PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _rs_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf
 _FAX_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
-def _facsimile_response(local, sid):
+def _parse_bbox(raw):
+    """A ``bbox=x0,y0,x1,y1`` query value as the float list the crop renderer
+    takes, in PDF points from the page's top-left. A malformed or degenerate
+    rectangle is client input, so it is a 400 rather than an assertion."""
+    parts = raw.split(",")
+    if len(parts) != 4:
+        raise HTTPException(400, "bbox needs four comma-separated numbers")
+    try:
+        bbox = [float(p) for p in parts]
+    except ValueError:
+        raise HTTPException(400, "bbox coordinates must be numbers") from None
+    if not facsimile.valid_bbox(bbox):
+        raise HTTPException(400, "bbox must satisfy 0 <= x0 < x1, 0 <= y0 < y1")
+    return bbox
+
+
+def _facsimile_response(local, sid, bbox=None):
     """The facsimile PNG for page `sid` of the document at uri-local path
     `local` ("prop/2013/14:116"), rendering into the disk cache on first
-    request."""
+    request. With `bbox`, just that rectangle of the page -- the same renderer
+    and cache the SFS graphics layer crops its figures with, so a förarbete's
+    illustration needs no extraction path of its own: the pixels are already
+    in the source PDF and this reads them where they are."""
     if ".." in local or sid < 1:
         raise HTTPException(404, "no such document: %r" % local)
     resolved = next(filter(None, (r(local) for r in _PDF_RESOLVERS)), None)
@@ -762,7 +781,8 @@ def _facsimile_response(local, sid):
         raise HTTPException(404, "no PDF source downloaded for %r" % local)
     source, basefile, pdf = resolved
     try:
-        png = facsimile.cached_page(source, basefile, pdf, sid)
+        png = (facsimile.cached_region(source, basefile, pdf, sid, bbox)
+               if bbox else facsimile.cached_page(source, basefile, pdf, sid))
     except subprocess.CalledProcessError as exc:
         # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
         # file" -- the source is corrupt, a corpus data-integrity problem
@@ -781,11 +801,16 @@ def _facsimile_response(local, sid):
 def facsimile_endpoint(
         uri: str = Query(..., description="full lagen.nu document uri"),
         sid: int = Query(..., ge=1, description="printed page number "
-                         "(the #sid{N} anchor)")):
+                         "(the #sid{N} anchor)"),
+        bbox: str | None = Query(None, description="crop to x0,y0,x1,y1 in PDF "
+                                 "points from the page's top-left; omit for the "
+                                 "whole page")):
     """A facsimile PNG of one printed page of the document's source PDF
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
-    resolution (150 DPI) on first request and cached on disk."""
-    return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid)
+    resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
+    region of that page -- what a figure inside a förarbete is."""
+    return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid,
+                               _parse_bbox(bbox) if bbox else None)
 
 
 _DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"

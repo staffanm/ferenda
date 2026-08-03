@@ -516,15 +516,24 @@ def forarbete_pinpoint(anchor, page=None):
     return ("s. %d" % page, "sid%d" % page) if page else ("", anchor)
 
 
+# Sources whose documents are divided into chapters and paragrafer and mint the
+# SFS fragment syntax (`K2P3`, `P5S1`) for them, so a citing spot inside one is
+# nameable as "2 kap. 3 §". Föreskrifter are built that way by design
+# (foreskrift/structure) -- the statutory layer and the agency layer under it
+# pinpoint identically, and a föreskrift row that named no place was throwing
+# away an anchor the catalog already held.
+PARAGRAF_SOURCES = ("sfs", "foreskrift")
+
+
 def _citer_pinpoint(source, anchor, page=None):
     """The human pinpoint for a citing document's source anchor, with the anchor
     the pinpoint should link to: an avsnitt/page for a förarbete, a chapter/§ for
-    a statute; other sources cite whole-doc."""
+    a statute or a föreskrift; other sources cite whole-doc."""
     if not anchor:
         return "", anchor
     if source == "forarbete":
         return forarbete_pinpoint(anchor, page)
-    if source == "sfs":
+    if source in PARAGRAF_SOURCES:
         return human_fragment(anchor), anchor
     return "", anchor
 
@@ -552,6 +561,27 @@ def swedish_join(parts):
     return ", ".join(parts[:-1]) + " och " + parts[-1]
 
 
+# Sources whose descriptive citing form is a bare designation that names nothing
+# -- "MCFFS 2026:8" tells a reader neither the issuing agency's subject nor the
+# rule. For those, the document's own title rides along as a subtitle, the way
+# `_bemyndigande_margin` already writes it, so the panel says what the citer *is*
+# rather than only what it is called. A source whose citing form is itself
+# meaningful ("räntelagen", "NJA 2023 s. 560") stays bare: repeating the long
+# title behind a recognised citation is noise.
+SUBTITLED_SOURCES = ("foreskrift",)
+
+
+def _citer_subtitle(source, display, title):
+    """The `<span class="prov">` naming a citer whose designation does not, for
+    the sources where the designation alone is opaque. Empty when the source
+    reads fine bare, or when the title *is* the designation (an unparsed
+    föreskrift whose title fell back to its number -- repeating it would say
+    the same thing twice)."""
+    if source not in SUBTITLED_SOURCES or not title or title == display:
+        return ""
+    return ' <span class="prov">%s</span>' % escape(" ".join(title.split()))
+
+
 def _citer_line(row):
     """One collapsed "<li>" for a citing document: its full-title name (linking
     to the document) followed by up to PINPOINT_CAP distinct source pinpoints,
@@ -566,6 +596,7 @@ def _citer_line(row):
     choice they have no basis to make, and the pinpoint is the better landing."""
     from_uri, label, title, source, kind, _date, anchors, descriptive = row
     display = citer_name(source, kind, label, title, descriptive)
+    subtitle = _citer_subtitle(source, display, title)
     name = '<a href="%s">%s</a>' % (escape(href(from_uri)), escape(display))
     pins, seen = [], set()
     for entry in (anchors.split(",") if anchors else []):
@@ -576,7 +607,7 @@ def _citer_line(row):
             seen.add(pin)
             pins.append((pin, target))
     if not pins:
-        return "<li>%s</li>" % name
+        return "<li>%s%s</li>" % (name, subtitle)
     pins.sort(key=lambda p: split_numalpha(p[0]))
     shown, overflow = pins[:PINPOINT_CAP], len(pins) > PINPOINT_CAP
 
@@ -588,7 +619,8 @@ def _citer_line(row):
         # a statute pinpoint completes the citation ("… 22 § 2 st"); a förarbete
         # locator is an aside on where in the document it sits (", avsnitt 6.7")
         sep = ", " if source == "forarbete" else " "
-        return "<li>%s</li>" % link(pins[0][1], display + sep + pins[0][0])
+        return "<li>%s%s</li>" % (
+            link(pins[0][1], display + sep + pins[0][0]), subtitle)
     words = {pin.split(" ")[0] for pin, _ in shown}
     if source == "forarbete" and len(words) == 1 and " " in shown[0][0]:
         word = escape(shown[0][0].split(" ", 1)[0])       # "avsnitt" / "s."
@@ -596,7 +628,8 @@ def _citer_line(row):
             [link(a, pin.split(" ", 1)[1]) for pin, a in shown])
     else:
         body = swedish_join([link(a, pin) for pin, a in shown])
-    return "<li>%s, %s%s</li>" % (name, body, " m.fl." if overflow else "")
+    return "<li>%s, %s%s%s</li>" % (name, body, " m.fl." if overflow else "",
+                                    subtitle)
 
 
 # --------------------------------------------------------------------------
@@ -650,6 +683,22 @@ INBOUND_CAP = 40   # citing docs shown expanded in the predecessor-case
                    # rail; the rest are rendered too, collapsed
 
 
+# the emphasis a run's `style` flags render as, innermost last. One character
+# per flag, since `_emphasise` reads the string a character at a time -- the
+# flags are minted by `pdftext.run_style`, so an unknown one is a bug here
+# rather than input to tolerate. Superscript is not among them: a footnote
+# marker is its own run kind, tagged by the footnote pass.
+STYLE_TAGS = {"b": "strong", "i": "em"}
+
+
+def _emphasise(html, style):
+    """`html` wrapped in the tags a run's style flags name. Empty style is the
+    common case and passes through untouched."""
+    for flag in reversed(style or ""):
+        html = "<%s>%s</%s>" % (STYLE_TAGS[flag], html, STYLE_TAGS[flag])
+    return html
+
+
 def render_runs(runs, site):
     if isinstance(runs, str):
         return escape(runs)
@@ -657,6 +706,10 @@ def render_runs(runs, site):
     for run in runs:
         if isinstance(run, str):
             out.append(escape(run))
+            continue
+        if "uri" not in run:
+            # a plain text run the document emphasised (lib.lagrum._styled)
+            out.append(_emphasise(escape(run["text"]), run.get("style")))
             continue
         if run.get("kind") == "footnote":
             # an inline footnote marker -> superscript link to the endnote, with
@@ -674,21 +727,22 @@ def render_runs(runs, site):
             # tooltip. A "term" run is an in-act use of a defined term:
             # underlined, same hover affordance.
             cls = ' class="term"' if run.get("kind") == "term" else ""
-            out.append('<a%s href="%s">%s</a>'
-                       % (cls, escape(href(uri)), escape(run["text"])))
+            link = ('<a%s href="%s">%s</a>'
+                    % (cls, escape(href(uri)), escape(run["text"])))
         elif _is_external(uri):
             # an ext/ reference we don't host -- out to the external service
             # (EUR-Lex for a CELEX); becomes a local link once we parse it
-            out.append('<a class="ext" href="%s" rel="external">%s</a>'
-                       % (escape(_external_href(uri)), escape(run["text"])))
+            link = ('<a class="ext" href="%s" rel="external">%s</a>'
+                    % (escape(_external_href(uri)), escape(run["text"])))
         elif uri.startswith(BASE):
             # a lagen.nu document with no page yet -- show the text, not a
             # link that would 404. Becomes live once that doc is parsed.
-            out.append('<span class="noref" title="%s">%s</span>'
-                       % (escape(catalog.local(uri)), escape(run["text"])))
+            link = ('<span class="noref" title="%s">%s</span>'
+                    % (escape(catalog.local(uri)), escape(run["text"])))
         else:
-            out.append('<a class="ext" href="%s" rel="external">%s</a>'
-                       % (escape(uri), escape(run["text"])))
+            link = ('<a class="ext" href="%s" rel="external">%s</a>'
+                    % (escape(uri), escape(run["text"])))
+        out.append(_emphasise(link, run.get("style")))
     return "".join(out)
 
 

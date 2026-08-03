@@ -406,6 +406,34 @@ def test_celex_renders_as_external_eurlex_link(tmp_path):
     assert "noref" not in html  # external, not a dead internal link
 
 
+def test_render_runs_emphasises_styled_runs(tmp_path):
+    """A styled text run renders as the tag its flag names, and a styled link
+    keeps the emphasis *outside* the anchor so the link is one element."""
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    assert page.render_runs(
+        ["se ", {"text": "bilaga 1", "style": "i"}, "."], site) \
+        == "se <em>bilaga 1</em>."
+    assert page.render_runs([{"text": "Obs", "style": "b"}], site) \
+        == "<strong>Obs</strong>"
+    # innermost last: "bi" is bold outside, italic in
+    assert page.render_runs([{"text": "x", "style": "bi"}], site) \
+        == "<strong><em>x</em></strong>"
+    assert page.render_runs(
+        [{"uri": "https://lagen.nu/1975:635#P5", "text": "5 §", "style": "i"}],
+        site) == '<em><a href="/1975:635#P5">5 §</a></em>'
+
+
+def test_a_footnote_marker_is_still_a_footnote_not_a_styled_run(tmp_path):
+    """The styled-run branch tests `"uri" not in run` and sits above the
+    footnote branch, so it must not swallow a marker: a footnote run carries a
+    uri (`#fn-N`) and renders as the superscript backlink pair."""
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = page.render_runs(
+        [{"uri": "#fn-3", "text": "3", "kind": "footnote"}], site)
+    assert html == ('<sup class="fnref" id="fnref-3">'
+                    '<a href="#fn-3">3</a></sup>')
+
+
 def test_render_runs_gates_absent_target(tmp_path):
     # a citation to a document not in the catalog renders as text, not a 404 link
     site = page.Site.from_catalog(build_catalog(tmp_path))

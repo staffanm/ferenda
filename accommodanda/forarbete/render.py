@@ -85,7 +85,7 @@ def render(art, site):
             rail_id = key if key in rail.data else None
             fax = (None if bil else "/api/v1/facsimile?uri=%s&sid=%d"
                    % (quote(doc_uri, safe=""), pg))
-            parts.append(NODES.fa_sid(key, rail_id, pg, fax))
+            parts.append(NODES.fa_sid(key, rail_id, pg, fax, bil))
 
     def close_komm():
         if state["komm"] is not None:
@@ -117,6 +117,15 @@ def render(art, site):
                       "cells": [Markup(render_runs(c, site))
                                 for c in r.get("cells", [])]}
                      for r in n.get("children", [])]))
+            elif n.get("type") == "bild" and n.get("bbox") and n.get("page"):
+                # the pixels stay in the source PDF: the facsimile endpoint
+                # crops the figure's rectangle on demand and caches the result,
+                # the same renderer the page buttons above use
+                parts.append(NODES.fa_bild(
+                    "/api/v1/facsimile?uri=%s&sid=%d&bbox=%s"
+                    % (quote(doc_uri, safe=""), n["page"],
+                       ",".join("%.1f" % v for v in n["bbox"])),
+                    "Illustration på sidan %d" % n["page"]))
             else:
                 # författningskommentar blocks (`fk`, stamped per entry by
                 # forarbete's extractor at parse time): one highlight box per
@@ -128,8 +137,9 @@ def render(art, site):
                         state["komm"] = n["fk"]
                 else:
                     close_komm()
-                parts.append(NODES.fa_p(n.get("type") == "fotnot",
-                                         Markup(render_runs(n["text"], site))))
+                kind = n.get("type") if n.get("type") in ("fotnot", "ruta") else ""
+                parts.append(NODES.fa_p(kind,
+                                        Markup(render_runs(n["text"], site))))
 
     state["komm"] = None
     walk(art.get("structure", []))

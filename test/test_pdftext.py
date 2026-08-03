@@ -12,6 +12,7 @@ including the top-only span-grouping bug `_lines` documents as fixed), and the
 baseline span-grouping itself."""
 
 import os
+import pathlib
 import re
 import subprocess
 from types import SimpleNamespace
@@ -28,6 +29,12 @@ from accommodanda.lib.pdftext import (
     classify_letterhead,
     flat_lines,
     is_page_number,
+    points_from_pdftohtml,
+    Run,
+    FIGURE_MIN,
+    Figure,
+    is_figure,
+    is_italic_subheading,
     letterhead_footnotes,
     page_paragraphs,
     pdf_pages,
@@ -74,8 +81,13 @@ PAGE_XML = (b"<pdf2xml>"
 
 
 def _fake_run(calls):
+    """As `_fake_pdftohtml`, for the tests that only inspect the command: the
+    converter is given an output base in a temp directory and reads the XML back
+    from it, so the stub has to write the file rather than return stdout."""
     def run(cmd, capture_output, check):
         calls.append(cmd)
+        if cmd[0] == "pdftohtml":
+            pathlib.Path(cmd[-1] + ".xml").write_bytes(PAGE_XML)
         return SimpleNamespace(stdout=PAGE_XML)
     return run
 
@@ -89,7 +101,10 @@ def test_pdf_pages_hidden_flag(monkeypatch):
     list(pdf_pages("doc.pdf", hidden=True))
     assert "-hidden" not in calls[0]
     assert "-hidden" in calls[1]
-    assert [c for c in calls[1] if c != "-hidden"] == calls[0]
+    # the trailing output base is a fresh temp directory each call (which is
+    # what keeps poppler's extracted images out of the corpus), so the commands
+    # are compared without it: -hidden is the only difference that means anything
+    assert [c for c in calls[1][:-1] if c != "-hidden"] == calls[0][:-1]
 
 
 def test_flat_lines_offsets_pages(monkeypatch):
@@ -166,7 +181,11 @@ def test_numbered_continuation_does_not_fold_into_previous_heading():
 # the converter is not run again.
 
 def _fake_pdftohtml(monkeypatch, xml=b"<pdf2xml><page number=\"1\"/></pdf2xml>"):
-    """Stand in for the converter, counting how often it actually runs."""
+    """Stand in for the converter, counting how often it actually runs.
+
+    Writes its output to `<base>.xml` the way poppler does when given an output
+    base, rather than to stdout: that base is a temporary directory, which is
+    what keeps the images poppler extracts alongside it out of the corpus."""
     calls = []
 
     class Done:
@@ -174,10 +193,18 @@ def _fake_pdftohtml(monkeypatch, xml=b"<pdf2xml><page number=\"1\"/></pdf2xml>")
 
     def run(args, **kw):
         calls.append(args)
+        if args[0] == "pdftohtml":
+            pathlib.Path(args[-1] + ".xml").write_bytes(xml)
         return Done()
 
     monkeypatch.setattr(pdftext.subprocess, "run", run)
     return calls
+
+
+def _xml_cache(pdf, hidden=False):
+    """Where `pdftohtml_xml` caches its conversion of `pdf` -- one stable entry
+    per format; the command it was produced by is recorded inside it."""
+    return layout.pdf_conversion(pdf, "hidden.xml" if hidden else "xml")
 
 
 def test_pdftohtml_xml_converts_once_then_serves_the_cache(monkeypatch, tmp_path):
@@ -192,8 +219,8 @@ def test_pdftohtml_xml_converts_once_then_serves_the_cache(monkeypatch, tmp_path
     second = pdftext.pdftohtml_xml(pdf)
     assert first == second                      # byte-identical either way
     assert len(calls) == 1                      # converted once only
-    cached = layout.pdf_conversion(pdf, "xml")
-    assert brotli.decompress(cached.read_bytes()) == first
+    stored = brotli.decompress(_xml_cache(pdf).read_bytes())
+    assert stored.partition(b"\n")[2] == first     # digest line, then payload
 
 
 def test_pdftohtml_xml_reconverts_when_the_pdf_is_newer(monkeypatch, tmp_path):
@@ -207,7 +234,7 @@ def test_pdftohtml_xml_reconverts_when_the_pdf_is_newer(monkeypatch, tmp_path):
     pdf.write_bytes(b"%PDF-1.4")
     calls = _fake_pdftohtml(monkeypatch)
     pdftext.pdftohtml_xml(pdf)
-    cache_mtime = layout.pdf_conversion(pdf, "xml").stat().st_mtime_ns
+    cache_mtime = _xml_cache(pdf).stat().st_mtime_ns
     os.utime(pdf, ns=(cache_mtime + 10**9, cache_mtime + 10**9))
     pdftext.pdftohtml_xml(pdf)
     assert len(calls) == 2
@@ -417,3 +444,196 @@ def test_page_number_forms():
     assert is_page_number("sid 4", 4)
     assert not is_page_number("4 § Om ansökan", 4)
     assert not is_page_number("(3)", 3)
+
+
+def test_an_unnumbered_page_has_no_page_number_line():
+    """`printed_pages` leaves a page past a numbering restart that names no
+    bilaga without a printed number (prop. 2008/09:1's separately paginated
+    utgiftsområden). Nothing on such a page can be its page number, and the
+    patterns only hold because they are anchored to the page's own -- formatting
+    one against None raised instead, which took 4,586 förarbeten down with it
+    the first time every one of them was reparsed."""
+    assert not is_page_number("4/12", None)
+    assert not is_page_number("1 (3)", None)
+    assert not is_page_number("Sida 4 av 12", None)
+
+
+# --------------------------------------------------------------------------
+# what a proposition's typography marks, and how extraction loses it
+# --------------------------------------------------------------------------
+
+def _span(top, left, right, text, *, size=15, bold=False, italic=False,
+          height=13):
+    """One pdftohtml <text> fragment, in the tuple shape `_lines` consumes."""
+    return (top, left, top + height, text, bold, italic, right, size)
+
+
+def test_a_margin_fragment_does_not_split_a_heading():
+    """A proposition prints its running header in the left margin at a `top`
+    between a chapter number and its title, while number and title share a
+    baseline. Walked in `top` order the header lands between them and each span
+    is only compared with the group last opened, so the heading came apart --
+    the title became a stycke and the number a paragraph of its own."""
+    lines = _lines([
+        _span(61, 251, 507, "Ärendet och dess beredning ", size=23, height=25),
+        _span(63, 55, 163, "Prop. 2017/18:89 ", height=13),
+        _span(65, 183, 194, "3", size=23, height=20),
+    ])
+    assert [l.text for l in lines] == ["Prop. 2017/18:89",
+                                       "3 Ärendet och dess beredning"]
+
+
+def test_a_font_change_is_not_a_word_boundary():
+    """poppler splits a line at every font change, so an italic phrase inside a
+    sentence arrives as three runs and the punctuation after it starts its own.
+    Joining those on a space wrote "bilaga 1 ." -- a space before every period
+    that trails an italic phrase, throughout the corpus. Whether the seam
+    carried a space is recorded only in the runs' own edge whitespace: the
+    geometry cannot say, both seams here leaving the runs touching."""
+    line, = _lines([
+        _span(194, 183, 286, "lagförslag finns i "),
+        _span(194, 286, 335, "bilaga 2", italic=True),
+        _span(194, 335, 629, ". Utredningens betänkande har remissbehandlats. "),
+    ])
+    assert line.text == ("lagförslag finns i bilaga 2. Utredningens "
+                         "betänkande har remissbehandlats.")
+
+
+def test_an_indented_first_line_starts_a_paragraph():
+    """Swedish government typography marks a new paragraph by indenting its
+    first line, not by leaving space above it -- the ordinary line-height runs
+    between. A gap rule alone ran whole sections together, every paragraph after
+    the first."""
+    lines = _lines([
+        _span(228, 183, 629, "ställning av remissvaren finns tillgänglig i "),
+        _span(245, 183, 310, "Justitiedepartementet (Ju2015/02740/L4). "),
+        _span(263, 196, 629, "När det gäller utkontraktering av "),
+        _span(280, 183, 629, "säkerhetskänslig verksamhet har händelser. "),
+    ])
+    paras = page_paragraphs(lines, None, 32, indent_breaks=True)
+    assert len(paras) == 2
+    assert paras[1].text.startswith("När det gäller")
+    # ...and only where the caller says the document is set that way. It is a
+    # claim about a förarbete's typography, not about PDFs, so the other
+    # PDF-bodied sources (whose segmentation it moves by +8% to +50%, some of
+    # it through the middle of a sentence) keep the gap rule alone.
+    assert len(page_paragraphs(lines, None, 32)) == 1
+
+
+def test_an_italic_line_of_its_own_is_a_subheading():
+    """A förarbete sets its unnumbered subheadings in italics at body size --
+    "Lagrådet", "Skälen för regeringens förslag" -- not in bold. Nothing else
+    about them says heading, so they read as the first line of the paragraph
+    beneath and the two ran together."""
+    assert is_italic_subheading("Lagrådet", True)
+    assert is_italic_subheading("Skälen för regeringens förslag", True)
+    # an italic clause inside prose is not one: it carries its terminator, or
+    # runs on past a heading's length
+    assert not is_italic_subheading("Lagrådet", False)
+    assert not is_italic_subheading("En ny säkerhetsskyddslag.", True)
+    assert not is_italic_subheading("x" * 80, True)
+
+
+def test_the_italic_subheading_breaks_the_paragraph_after_it():
+    lines = [
+        Line("förfaranden inte får genomföras.", 677, False, False, False, 15,
+             [Run(183, 386, "förfaranden inte får genomföras.", False, False, 15)]),
+        Line("Lagrådet", 711, False, False, True, 15,
+             [Run(183, 242, "Lagrådet", False, True, 15)]),
+        Line("Regeringen beslutade den 16 november 2017 att inhämta", 734,
+             False, False, False, 15,
+             [Run(183, 629, "Regeringen beslutade den 16 november 2017 att "
+                            "inhämta", False, False, 15)]),
+    ]
+    assert [p.text for p in page_paragraphs(lines, None, 32)] == [
+        "förfaranden inte får genomföras.",
+        "Lagrådet",
+        "Regeringen beslutade den 16 november 2017 att inhämta"]
+
+
+def test_a_poppler_flag_change_reconverts_in_place(monkeypatch, tmp_path):
+    """The cache keys on the PDF's mtime, which a flag change does not move, so
+    an entry naming only the output format kept serving bytes produced by the
+    old command: dropping `-i` ("ignore images"), which had been discarding
+    every figure in the corpus, appeared to do nothing at all.
+
+    The command's digest is recorded *in* the entry, so a change reconverts and
+    overwrites. Keying the filename on it instead would leave the superseded
+    file on disk forever -- 4.5 GB of orphans the first time, and the whole
+    cache again on every future flag change."""
+    monkeypatch.setattr(layout, "DATA", tmp_path)
+    monkeypatch.setattr(layout, "PDFCONV", tmp_path / "cache" / "pdfconv")
+    pdf = tmp_path / "downloaded" / "x" / "a.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    calls = _fake_pdftohtml(monkeypatch)
+
+    pdftext.pdftohtml_xml(pdf)
+    assert len(calls) == 1
+    entries = list(_xml_cache(pdf).parent.glob("*.br"))
+    assert len(entries) == 1
+
+    # the same PDF, converted by a different command
+    real = pdftext.pdftohtml_xml
+    monkeypatch.setattr(pdftext, "command_digest", lambda args: "deadbeef")
+    real(pdf)
+    assert len(calls) == 2                       # reconverted, not served
+    assert list(_xml_cache(pdf).parent.glob("*.br")) == entries   # in place
+
+
+def test_which_rasters_count_as_an_illustration():
+    """The shape filter that separates a figure from page furniture, pinned to
+    the measurements it was tuned against: prop. 2017/18:89 sets its text
+    77-523 px and prints its säkerhetsskydd pyramid 145 px wide inside that
+    measure, while 2,798 of the 3,637 placements over 40 förarbeten are bullet
+    glyphs and hairline rules under 60 px. Loosening this drops illustrations
+    or drags letterhead marks into the reading text, in neither case visibly."""
+    margins = (77, 523)                      # a 446 px measure
+    pyramid = Figure(40, 190, 338, 145, 114)
+    assert is_figure(pyramid, margins)
+    # a bullet glyph: inside the margins, far too small in both dimensions
+    assert not is_figure(Figure(40, 90, 200, 8, 8), margins)
+    # a letterhead mark: big enough, but set outside the text margins
+    assert not is_figure(Figure(1, 20, 30, 200, 60), margins)
+    # ...and one that starts inside but runs past the right margin
+    assert not is_figure(Figure(1, 400, 30, 200, 60), margins)
+    # a tall narrow rule counts: the test is either dimension, not both
+    assert is_figure(Figure(5, 80, 100, 20, int(FIGURE_MIN * 446) + 1), margins)
+    # a scan has no placed text, so no margins and nothing to judge against
+    assert not is_figure(pyramid, (None, None))
+
+
+def test_pdftohtml_geometry_converts_to_pdf_points():
+    """poppler reports its XML geometry in its own pixel space (1.5 px per point
+    at its default resolution), not in points, so the figure coordinates it
+    gives cannot be handed to the crop renderer as they stand -- prop.
+    2017/18:89's illustration sits at pdftohtml (331, 338) on a 701 px wide page
+    that measures 467.76 pt, and cropping at those raw numbers lands on body
+    text a third of the way past it."""
+    box = points_from_pdftohtml(701, 467.76, (331, 338, 145, 114))
+    assert [round(v, 1) for v in box] == [220.9, 225.5, 317.6, 301.6]
+    # a page whose two measurements agree needs no scaling
+    assert points_from_pdftohtml(600, 600, (10, 20, 30, 40)) == [10, 20, 40, 60]
+
+
+def test_a_margin_header_sharing_a_baseline_is_still_stripped():
+    """Grouping spans in baseline order (which is what stopped a header from
+    splitting a heading) also merges a margin header onto the first line of
+    prose it shares a baseline with. `_strip_header_runs` reads its offsets
+    from `_join_runs`, the function that actually assembles the line -- deriving
+    them as "each run plus a joining space" was right only while that was the
+    join, and once runs were butted together and spaced by geometry no boundary
+    lined up, so the identifier appeared inside the body text of every such
+    page."""
+    lines = _lines([
+        _span(63, 55, 163, "Prop. 2017/18:89 "),
+        _span(60, 183, 190, "•"),
+        _span(64, 204, 628, "Ett bortfall av eller en svår störning"),
+    ])
+    paras = page_paragraphs(lines, "Prop. 2017/18:89", 40)
+    assert paras[0].text == "• Ett bortfall av eller en svår störning"
+
+
+def test_a_line_that_is_only_the_header_drops_out():
+    lines = _lines([_span(63, 55, 163, "Prop. 2017/18:89 ")])
+    assert page_paragraphs(lines, "Prop. 2017/18:89", 40) == []

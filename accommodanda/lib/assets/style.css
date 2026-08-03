@@ -407,12 +407,25 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
 .genomforande h2 { font-family: var(--serif); font-size: 1rem; font-weight: 600;
                    margin: 0 0 .5rem; border: 0; }
 .genomforande ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; }
-.sid { display: inline-block; font-family: var(--serif); font-variant-numeric: oldstyle-nums;
-       color: var(--ink-4); font-size: .8rem; margin: 1.25rem 0 .25rem;
-       border-top: 1px solid var(--rule-soft); padding-top: .25rem; scroll-margin-top: var(--scroll-clear); }
-.sid::before { content: "s. "; font-style: italic; }
-.sid button { all: unset; cursor: pointer; }
-.sid button:hover { color: var(--accent); text-decoration: underline; }
+/* The page boundary of the source PDF, and the control that shows that page as
+   it was printed. Set as a pair of tabs sitting on the rule: as a bare oldstyle
+   "s. 33" the number read as a footnote and gave no hint that it was a button
+   at all, so the facsimile -- the thing that settles what the document actually
+   says -- went unfound. */
+.sid { display: flex; align-items: stretch; gap: 2px; margin: 1.75rem 0 .75rem;
+       font-size: .78rem; font-family: var(--sans);
+       border-bottom: 1px solid var(--rule); scroll-margin-top: var(--scroll-clear); }
+.sid-nr, .sid button { padding: .25rem .6rem; border: 1px solid var(--rule);
+       border-bottom: 0; border-radius: 4px 4px 0 0; margin-bottom: -1px;
+       line-height: 1.5; }
+.sid-nr { color: var(--ink-3); background: var(--bg-2); font-weight: 500; }
+.sid button { all: unset; box-sizing: border-box; cursor: pointer;
+       padding: .25rem .6rem; border: 1px solid transparent; border-bottom: 0;
+       border-radius: 4px 4px 0 0; margin-bottom: -1px; color: var(--ink-4);
+       display: inline-flex; align-items: center; gap: .35rem; }
+.sid button:hover, .sid button:focus-visible {
+       color: var(--accent); border-color: var(--rule); background: var(--bg-2); }
+.sid-ico { flex: none; opacity: .75; }
 .sid.fax-loading button { opacity: .4; cursor: progress; }
 img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1rem;
                border: 1px solid var(--rule); border-radius: 4px;
@@ -1139,3 +1152,25 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
 .viz-bars tr.viz-split th { font:600 .72rem/1.3 var(--sans); color:var(--ink-4);
   text-transform:uppercase; letter-spacing:.05em; padding-top:.9rem;
   border-bottom:1px solid var(--rule); }
+
+/* The ruled box a förarbete states its proposal or assessment in ("Regeringens
+   förslag:", "Förslag:", "Bedömning:"). The rule is a vector drawing pdftohtml
+   discards, so the box is recovered from the narrower measure it is set to
+   (lib/pdftext.boxed) and drawn here. The printed rule is black, so the border
+   follows the ink rather than the light --rule the page uses to separate its
+   own furniture -- the box is part of the document, not part of the site. No
+   background tint for the same reason: the source sets it on plain paper.
+   Consecutive ruta paragraphs are one box: the borders between them collapse. */
+p.ruta { border: 1px solid var(--ink-2); border-bottom: 0;
+         margin: 0; padding: .7rem 1rem .2rem; }
+p.ruta + p.ruta { border-top: 0; padding-top: 0; }
+p.ruta:last-of-type, p.ruta:not(:has(+ p.ruta)) {
+         border-bottom: 1px solid var(--ink-2); padding-bottom: .7rem;
+         margin-bottom: 1.1rem; }
+p.ruta:first-of-type, p:not(.ruta) + p.ruta { margin-top: 1.1rem; }
+
+/* An illustration the source PDF carries, rendered on demand as a crop of its
+   page (lib/facsimile.cached_region) rather than copied into the corpus. */
+figure.bild { margin: 1.4rem 0; text-align: center; }
+figure.bild img { max-width: 100%; height: auto; border: 1px solid var(--rule-soft);
+                  border-radius: 3px; }

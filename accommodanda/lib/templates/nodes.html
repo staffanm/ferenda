@@ -104,7 +104,7 @@
 {#- ============================== DV walk ================================ -#}
 {%- macro dv_page_marker(pg, fax) -%}
 {#- a facsimile page button at each PDF page boundary of a parsed verdict -#}
-<span class="sid" id="sid{{ pg }}"><button type="button" data-fax="{{ fax }}" title="Visa faksimil av sidan {{ pg }}">{{ pg }}</button></span>
+<span class="sid" id="sid{{ pg }}"><span class="sid-nr">Sida {{ pg }}</span><button type="button" data-fax="{{ fax }}" title="Visa sidan {{ pg }} som den trycktes"><svg class="sid-ico" viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> Original</button></span>
 {%- endmacro -%}
 {%- macro dv_numbered_paragraph(n, body) -%}
 {#- a numbered domskäl paragraph: the number hangs in the gutter and is its
@@ -129,11 +129,12 @@
 <section class="dom">{% if label %}<h3 id="{{ anchor }}" class="instans-rubrik">{{ label }}</h3>{% endif %}{{ inner }}</section>
 {%- endmacro -%}
 {#- =========================== förarbete walk ============================ -#}
-{%- macro fa_sid(key, rail_id, pg, fax) -%}
+{%- macro fa_sid(key, rail_id, pg, fax, bil=None) -%}
 {#- the page-number anchor; with `fax` it doubles as the facsimile button
     (a bilaga page repeats a printed body number, so it gets no button) -#}
 <span class="sid" id="{{ key }}"{{ rail_attr(rail_id) }}>
-{%- if fax %}<button type="button" data-fax="{{ fax }}" title="Visa faksimil av sidan {{ pg }}">{{ pg }}</button>{% else %}{{ pg }}{% endif -%}
+<span class="sid-nr">{% if bil %}Bilaga {{ bil }} s. {{ pg }}{% else %}Sida {{ pg }}{% endif %}</span>
+{%- if fax %}<button type="button" data-fax="{{ fax }}" title="Visa sidan {{ pg }} som den trycktes"><svg class="sid-ico" viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> Original</button>{% endif -%}
 </span>
 {%- endmacro -%}
 {%- macro fa_avsnitt(lvl, anchor, rail_id, body) -%}
@@ -148,8 +149,16 @@
 {%- endfor -%}
 </table>
 {%- endmacro -%}
-{%- macro fa_p(fotnot, body) -%}
-<p{% if fotnot %} class="fotnot"{% endif %}>{{ body }}</p>
+{%- macro fa_bild(src, alt) -%}
+{#- an illustration the source PDF carries: rendered on demand as a crop
+    of the page it sits on, so no image is copied into the corpus -#}
+<figure class="bild"><img src="{{ src }}" alt="{{ alt }}" loading="lazy"></figure>
+{%- endmacro -%}
+{%- macro fa_p(kind, body) -%}
+{#- a body paragraph; `kind` names the ones set apart: a small-print
+    fotnot, or a ruta -- the ruled box a förarbete states its proposal
+    or assessment in -#}
+<p{% if kind %} class="{{ kind }}"{% endif %}>{{ body }}</p>
 {%- endmacro -%}
 {#- ============================ eurlex blocks ============================ -#}
 {%- macro eu_heading(lvl, anchor, body) -%}

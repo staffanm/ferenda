@@ -31,12 +31,15 @@ from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
     bilaga_labels,
+    is_italic_subheading,
     line_body_size,
     page_number_candidates,
     page_paragraphs,
+    pdf_figures,
     pdf_first_page_text,
     pdf_info,
     pdf_pages,
+    points_from_pdftohtml,
     printed_pages,
 )
 from ..lib.util import basefile_slug
@@ -86,29 +89,41 @@ def classify(paras, page, body=0):
                       RE_NUM_TITLE.match(p.text))
         heading_font = not p.size or not body or p.bold or p.size > body
         if body and p.size and p.size <= body - FOOTNOTE_DROP:
-            blocks.append(Block("fotnot", p.text, page))
+            blocks.append(Block("fotnot", p.text, page, spans=p.spans, top=p.top))
         elif mk and (p.lead_bold or not p.text[mk.end():].strip()):
             # bold marker leading text, or a bare centered "2 kap." (the
             # page-centered chapter anchor over a lydelse table is not bold)
-            blocks.append(Block("kapitel", p.text, page, num=mk.group(1)))
+            blocks.append(Block("kapitel", p.text, page, num=mk.group(1),
+                                spans=p.spans, top=p.top))
         elif mp and (p.lead_bold or not p.text[mp.end():].strip()):
             blocks.append(Block("paragraf", p.text, page,
-                                num=re.sub(r"\s+", "", mp.group(1))))
+                                num=re.sub(r"\s+", "", mp.group(1)),
+                                spans=p.spans, top=p.top))
         elif mt and len(p.text) < 120 and heading_font:
             blocks.append(Block("rubrik", p.text, page,
-                                mt.group(1).count(".") + 1))
+                                mt.group(1).count(".") + 1, spans=p.spans, top=p.top))
         elif p.bold and len(p.text) < 120:
-            blocks.append(Block("rubrik", p.text, page, 3))   # unnumbered subhead
+            blocks.append(Block("rubrik", p.text, page, 3,
+                                spans=p.spans, top=p.top))   # unnumbered subhead
+        elif is_italic_subheading(p.text, p.italic):
+            # the italic, body-sized subheading a förarbete uses inside a
+            # section ("Lagrådet", "Skälen för regeringens förslag"). The
+            # italics are consumed as the heading signal, so they are not also
+            # carried into the text -- the heading would render its whole self
+            # emphasised, saying the same thing twice.
+            blocks.append(Block("rubrik", p.text, page, 3, top=p.top))
         elif RE_HEADING_NUM.match(p.text):
             nxt = paras[i + 1].text if i + 1 < len(paras) else ""
             if (heading_font and nxt[:1].isupper()
                     and not RE_HEADING_NUM.match(nxt)):
                 blocks.append(Block("rubrik", "%s %s" % (p.text, nxt), page,
-                                    p.text.count(".") + 1))
+                                    p.text.count(".") + 1, top=p.top))
                 i += 2
                 continue
+        elif p.boxed:
+            blocks.append(Block("ruta", p.text, page, spans=p.spans, top=p.top))
         else:
-            blocks.append(Block("stycke", p.text, page))
+            blocks.append(Block("stycke", p.text, page, spans=p.spans, top=p.top))
         i += 1
     return blocks
 
@@ -139,6 +154,7 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     a table segment becomes one `tabell` block whose rows pair the aligned
     cell paragraphs (row 0 the column header pair)."""
     raw = list(pdf_pages(pdf_path, patch_key))
+    figures = pdf_figures(pdf_path, patch_key)
     printed_map = printed_pages(
         {pageno: page_number_candidates(lines[:3] + lines[-3:], identifier)
          for pageno, lines in raw},
@@ -163,7 +179,8 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
                 continue
             if page_has_lydelse:
                 segs.append(("paras",
-                             page_paragraphs(seg[1], identifier, printed),
+                             page_paragraphs(seg[1], identifier, printed,
+                                             indent_breaks=True),
                              None))
                 continue
             # generic tables (budget tables, bilaga listings) within the
@@ -171,7 +188,8 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
             for gkind, gdata, grows in tabell.split_generic(seg[1]):
                 if gkind == "lines":
                     segs.append(("paras",
-                                 page_paragraphs(gdata, identifier, printed),
+                                 page_paragraphs(gdata, identifier, printed,
+                                                 indent_breaks=True),
                                  None))
                 else:
                     segs.append(("gtabell", gdata, grows))
@@ -179,6 +197,10 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     body = line_body_size([p for _pg, segs in pages
                            for kind, data, _x in segs if kind == "paras"
                            for p in data])
+    # printed page -> the PDF page it came from, so a figure found by PDF page
+    # lands on the block stream keyed by printed page
+    pageno_of = {printed_map[pageno][0]: pageno for pageno, _ in raw
+                 if printed_map[pageno][0] is not None}
     blocks = []
     for (printed, bilaga), segs in pages:
         on_page = []
@@ -194,10 +216,40 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
                     cells.insert(0, (header.runs[0].text, header.runs[1].text))
                 on_page.append(Block("tabell", "", printed, rows=cells,
                                      th=header is not None))
+        # the page's figures, placed where they were printed: an image carries
+        # its own y, and so does every paragraph, so a figure goes after the
+        # last block that begins above it. Appending them to the page instead
+        # put the pyramid at the foot of prop. 2017/18:89 p. 40 rather than
+        # under the sentence that introduces it.
+        figs, pt_width, px_width = figures.get(pageno_of[printed], ((), 0, 0)) \
+            if printed in pageno_of else ((), 0, 0)
+        for fig in sorted(figs, key=lambda f: f.top, reverse=True):
+            block = Block("bild", "", printed, top=fig.top,
+                          bbox=points_from_pdftohtml(
+                              px_width, pt_width,
+                              (fig.left, fig.top, fig.width, fig.height)))
+            on_page.insert(figure_index(on_page, fig.top), block)
         for block in on_page:               # a bilaga numbering its own pages
             block.bilaga = bilaga
         blocks += on_page
     return tabell.merge_continued(blocks)
+
+
+def figure_index(on_page, fig_top):
+    """Where in a page's block stream a figure printed at `fig_top` belongs:
+    after the last block that begins above it.
+
+    A block with no geometry of its own (a tabell, rebuilt from its cells rather
+    than from lines) sits where the last block that had one did -- the page is
+    already in reading order, so carrying that y forward keeps a figure printed
+    below a table below it. Reading a missing top as 0 put it above instead, and
+    the same sentinel put prop. 2017/18:89's pyramid at the foot of its page."""
+    after, last = 0, None
+    for i, block in enumerate(on_page):
+        last = block.top if block.top is not None else last
+        if last is not None and last < fig_top:
+            after = i + 1
+    return after
 
 
 def _is_signer_name(text):
@@ -451,9 +503,10 @@ def parse_record(record, root):
                      ocr=ocr, body=body)
 
 
-def _scan(text, parser):
-    """Citation-scan one text into an inline-run list."""
-    return interleave(text, parser.parse_text(text, context={}))
+def _scan(text, parser, spans=()):
+    """Citation-scan one text into an inline-run list, keeping the emphasis the
+    document set (`spans`, from the PDF's font runs)."""
+    return interleave(text, parser.parse_text(text, context={}), spans)
 
 
 # the year a lagen.nu citation target carries in its uri: an SFS number
@@ -506,11 +559,12 @@ def to_artifact(fa):
     parser = sfs_parser("forarbete", PARSE_TYPES)   # fresh per-document state
     blocks = []
     for b in fa.body:
-        block = ({"type": b.kind, "text": _scan(b.text, parser)}
+        block = ({"type": b.kind, "text": _scan(b.text, parser, b.spans)}
                  | ({"page": b.page} if b.page is not None else {})
                  | ({"bilaga": b.bilaga} if b.bilaga else {})
                  | ({"level": b.level} if b.level else {})
-                 | ({"num": b.num} if b.num else {}))
+                 | ({"num": b.num} if b.num else {})
+                 | ({"bbox": b.bbox} if b.bbox else {}))
         if b.rows is not None:
             block["children"] = [
                 {"type": "rad", "cells": [_scan(c, parser) for c in row]}

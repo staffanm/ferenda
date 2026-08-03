@@ -4,6 +4,7 @@ the API endpoint in both its documented and legacy-path forms."""
 import json
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from accommodanda import config
@@ -210,3 +211,30 @@ def test_sfs_full_page_facsimile_resolver(corpus):
                    params={"uri": "https://lagen.nu/2021:734", "sid": 1})
     assert r.status_code == 200
     assert r.content[:4] == PNG_MAGIC
+
+
+# --------------------------------------------------------------------------
+# the endpoint's crop parameter
+# --------------------------------------------------------------------------
+
+def test_bbox_query_parses_to_the_renderer_shape():
+    assert api._parse_bbox("331,338,476,452") == [331.0, 338.0, 476.0, 452.0]
+    assert api._parse_bbox("220.9,225.5,317.6,301.6") == [
+        220.9, 225.5, 317.6, 301.6]
+
+
+@pytest.mark.parametrize("raw", [
+    "1,2,3",                 # too few
+    "1,2,3,4,5",             # too many
+    "a,2,3,4",               # not numbers
+    "3,2,1,4",               # x1 <= x0
+    "1,4,3,2",               # y1 <= y0
+    "-1,0,3,4",              # negative origin
+])
+def test_a_malformed_bbox_is_client_error_not_an_assertion(raw):
+    """The crop renderer asserts its bbox, which is right for an internal
+    invariant and wrong for a query string: a bad one is the caller's mistake,
+    so it is a 400 rather than a 500 with a traceback."""
+    with pytest.raises(HTTPException) as exc:
+        api._parse_bbox(raw)
+    assert exc.value.status_code == 400

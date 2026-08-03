@@ -25,6 +25,7 @@ The Swedish-legal markers a chapter/§ begins with (``RE_KAP_MARK`` /
 its own paragraph) and the classifiers reuse them.
 """
 
+import hashlib
 import os
 import re
 import subprocess
@@ -48,6 +49,8 @@ RE_PARA_MARK = re.compile(r"^(\d+\s*[a-z]?)\s*§(?:\s|$)")  # "3 §" / "3 a §"
 
 LINE_TOL = 4          # spans within this many y-units are the same visual line
 PARA_GAP = 1.5        # a vertical gap > PARA_GAP x line-height starts a paragraph
+INDENT_MIN = 8        # a first line this far right of the margin starts one too
+BOX_INSET = 6         # a line inset this far at *both* margins is in a ruta
 HEAD_GAP = 1.6        # a wrapped heading's leading, in multiples of its font size
 FOOTNOTE_DROP = 3     # a footnote sits >= this many size units below body size
 PAGE_STRIDE = 100000  # per-page `top` offset used by flat_lines: far larger than
@@ -79,6 +82,9 @@ class Line:
     size: int = 0       # dominant font size (pt, from the fontspec) -- 0 where
                         # the source carries no font info (OCR/legacy routes)
     runs: list[Run] = field(default_factory=list)
+    # (start, end, "i"/"b"/"bi") over `text`: which stretches the document
+    # emphasised, kept per-span rather than collapsed to the whole-line flags
+    spans: list[tuple[int, int, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -88,6 +94,40 @@ class Para:
     lead_bold: bool = False
     italic: bool = False
     size: int = 0       # font size of the opening line; 0 = unknown
+    top: int = 0        # y of the first line, for placing a figure among the
+                        # paragraphs it was printed between
+    # style spans over `text`, carried across the lines it was reflowed from
+    spans: list[tuple[int, int, str]] = field(default_factory=list)
+    boxed: bool = False   # set to a narrower measure than the body: a ruta
+
+
+def command_digest(args):
+    """A short, stable digest of the exact command a cache entry was produced
+    by. Stored *inside* the entry rather than in its name: a PDF has exactly one
+    current conversion per format, so a command change makes the stored one
+    wrong, not an alternative -- naming the entry after the digest would leave
+    the superseded file on disk forever and grow the cache by its whole size on
+    every future poppler flag change. (The facsimile *crop* cache is the
+    opposite case and rightly keys its bbox into the filename: many crops of one
+    page are valid at once.)"""
+    return hashlib.sha256(
+        " ".join(str(a) for a in args).encode()).hexdigest()[:16]
+
+
+def _run_conversion(args):
+    """Run a poppler conversion and return its output bytes.
+
+    A ``pdftohtml`` invocation that ends in an output base writes into a
+    temporary directory and is read back from it; poppler puts the images it
+    extracts beside that base, so the directory is what keeps them out of the
+    corpus. Anything else (``pdftotext``, or a command already using
+    ``-stdout``) is captured from stdout as before."""
+    if args[0] != "pdftohtml":
+        return subprocess.run(args, capture_output=True, check=True).stdout
+    with tempfile.TemporaryDirectory() as tmp:
+        base = str(Path(tmp) / "out")
+        subprocess.run([*args, base], capture_output=True, check=True)
+        return (Path(tmp) / "out.xml").read_bytes()
 
 
 def _converted(pdf_path, cache, args):
@@ -97,20 +137,30 @@ def _converted(pdf_path, cache, args):
     These subprocesses are the dominant cost of parsing a PDF-bodied document
     (`pdftohtml` is 53-91% of it, 11.8 s for one 4 MB born-digital SOU) and
     their input never changes -- a downloaded PDF is immutable, so every
-    re-parse after a parser change was re-running them for nothing. An entry
-    older than its PDF is stale: a re-download rewrites the PDF and moves its
-    mtime past the entry's."""
+    re-parse after a parser change was re-running them for nothing.
+
+    Two things make an entry stale, and both must, because either alone is a
+    silent wrong answer rather than an error. The PDF is *newer* than the entry:
+    a re-download rewrites the file and moves its mtime past the entry's. Or the
+    entry was produced by a *different command*: a flag change alters the output
+    while leaving the PDF untouched, so nothing about the file says so, and the
+    digest recorded in the entry is the only witness. Dropping ``-i`` and still
+    seeing no images was that second case."""
+    digest = command_digest(args).encode()
     if cache is not None and cache.exists() and \
             cache.stat().st_mtime_ns >= Path(pdf_path).stat().st_mtime_ns:
-        return brotli.decompress(cache.read_bytes())
-    out = subprocess.run(args, capture_output=True, check=True).stdout
+        stored = brotli.decompress(cache.read_bytes())
+        head, _, payload = stored.partition(b"\n")
+        if head == digest:
+            return payload
+    out = _run_conversion(args)
     if cache is not None:
         cache.parent.mkdir(parents=True, exist_ok=True)
         # quality 5, not the corpus default 11: this write sits in the parse's
         # critical path, and at 11 brotli would cost more than the conversion it
         # is meant to save. The entry is rebuildable, so size is not precious.
-        write_atomic(cache, brotli.compress(out, mode=brotli.MODE_TEXT,
-                                            quality=5))
+        write_atomic(cache, brotli.compress(digest + b"\n" + out,
+                                            mode=brotli.MODE_TEXT, quality=5))
     return out
 
 
@@ -121,11 +171,26 @@ def pdftohtml_xml(pdf_path, hidden=False):
     JO/ARN, remissvar). `pdf_pages` parses it; `patchsource` shows it for editing.
     ``hidden=True`` adds ``-hidden`` so invisible text is included -- the OCR layer
     ocrmypdf renders behind the page image is invisible, and pdftohtml drops it
-    otherwise. Cached (see `_converted`)."""
+    otherwise. Cached (see `_converted`).
+
+    ``-i`` ("ignore images") is deliberately *not* passed: poppler reports every
+    embedded raster as an ``<image>`` with its placement on the page, which is
+    what a förarbete's figure is, and passing it discarded them before anything
+    could see one.
+
+    But without ``-i`` poppler also *extracts* every one of those rasters to a
+    file, and it derives their path from the PDF's own -- writing them into the
+    corpus beside the source, ``-stdout`` notwithstanding. On a scanned SOU that
+    is one full-page JPEG per page: the first corpus-wide run wrote 1,064,761
+    files totalling 350 GB into ``downloaded/forarbete/sou`` and filled the
+    disk. So the conversion runs with its output base inside a temporary
+    directory, which takes the extracted images with it when it goes. Only the
+    geometry is wanted here; `facsimile.cached_region` renders the pixels on
+    demand from the PDF itself."""
+    args = ["pdftohtml", "-xml", *(["-hidden"] if hidden else []),
+            "-nodrm", str(pdf_path)]
     kind = "hidden.xml" if hidden else "xml"
-    return _converted(pdf_path, layout.pdf_conversion(pdf_path, kind),
-                      ["pdftohtml", "-xml", "-i", *(["-hidden"] if hidden else []),
-                       "-nodrm", "-stdout", str(pdf_path)])
+    return _converted(pdf_path, layout.pdf_conversion(pdf_path, kind), args)
 
 
 def ocr_pdf(path, lang):
@@ -252,8 +317,15 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
     for page in root.findall("page"):
         spans = []
         for t in page.findall("text"):
-            text = normalize_space("".join(t.itertext()))
-            if text:
+            # internal whitespace collapsed but the run's *edge* spaces kept:
+            # poppler splits a line at every font change, and whether the
+            # printed line had a space at that seam is recorded only there --
+            # the geometry cannot say, since a font change with a space
+            # ("finns i " + "bilaga 2") and one without ("bilaga 2" + ".")
+            # both leave the runs touching. `_join_runs` reads them; the Line's
+            # own text is normalized after assembly, so no edge survives.
+            text = re.sub(r"\s+", " ", "".join(t.itertext()))
+            if text.strip():
                 top, height = int(t.get("top")), int(t.get("height") or 0)
                 left = int(t.get("left"))
                 spans.append((top, left, top + height, text,
@@ -262,6 +334,64 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
                               left + int(t.get("width") or 0),
                               sizes.get(t.get("font"), 0)))
         yield int(page.get("number")), _lines(spans)
+
+
+RE_PAGE_SIZE = re.compile(r"^Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+)", re.M)
+
+
+def _page_pt_width(pdf_path, pageno):
+    """The width of one page in PDF points, which pdftohtml's XML does not
+    carry: its geometry is in poppler's own pixel space, and the ratio of the
+    two is what converts a figure's box for the crop renderer. One `pdfinfo`
+    per page *that has a figure* -- roughly one page in three hundred."""
+    out = subprocess.run(["pdfinfo", "-f", str(pageno), "-l", str(pageno),
+                          str(pdf_path)],
+                         capture_output=True, check=True, text=True).stdout
+    m = RE_PAGE_SIZE.search(out)
+    assert m, "pdfinfo reported no page size for %s p.%d" % (pdf_path, pageno)
+    return float(m.group(1))
+
+
+def pdf_figures(pdf_path, patch_key=None):
+    """The images a PDF carries that are document content, as
+    ``{page: ([Figure], page_pt_width, page_px_width)}`` -- the two page widths
+    so a caller can convert a figure's geometry to the points the crop renderer
+    takes (`points_from_pdftohtml`).
+
+    Poppler reports every embedded raster, which is mostly furniture: bullet
+    glyphs, hairline rules, samling logos, and for a scanned document the page
+    image itself. `is_figure` keeps the ones set inside the text margins at the
+    measure's own scale. Reads the same cached conversion `pdf_pages` does, so
+    this costs a parse of already-converted XML, not a second poppler run."""
+    xml = pdftohtml_xml(pdf_path)
+    if patch_key is not None and patch.has_patch(*patch_key):
+        source, basefile = patch_key
+        xml = patch.apply(source, basefile,
+                          xml.decode("utf-8", "replace")).encode("utf-8")
+    root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
+                                                 no_network=True))
+    out = {}
+    for page in root.findall("page"):
+        images = page.findall("image")
+        if not images:
+            continue
+        pageno = int(page.get("number"))
+        px_width = int(page.get("width") or 0)
+        # the text margins of this page, which is what "inside the margins"
+        # and the measure are both read from
+        lefts = Counter(int(t.get("left")) for t in page.findall("text"))
+        rights = Counter(int(t.get("left")) + int(t.get("width") or 0)
+                         for t in page.findall("text"))
+        left = lefts.most_common(1)[0][0] if lefts else None
+        right = rights.most_common(1)[0][0] if rights else None
+        figs = [f for f in
+                (Figure(pageno, int(im.get("left")), int(im.get("top")),
+                        int(im.get("width") or 0), int(im.get("height") or 0))
+                 for im in images)
+                if is_figure(f, (left, right))]
+        if figs:
+            out[pageno] = (figs, _page_pt_width(pdf_path, pageno), px_width)
+    return out
 
 
 def pages_with_ocr(pdf_path, patch_key=None, lang="swe"):
@@ -330,6 +460,131 @@ def pdf_images(pdf_path):
             for page in root.findall("page") for im in page.findall("image")]
 
 
+SPACE_MIN = 3         # horizontal gap between runs that means a real space
+
+
+# A figure is sized against the *text column*, not the paper: a förarbete sets
+# its illustrations to the measure its prose is set to, and the paper carries
+# margins the figure never uses. Prop. 2017/18:89's pyramid on page 40 is 145 px
+# on a 701 px page but a 446 px column -- 21% of the paper, 33% of the measure --
+# so a paper-relative floor rejects the one figure we know we want.
+FIGURE_MIN = 0.25     # of the text measure, in width OR height
+
+
+@dataclass
+class Figure:
+    """An image poppler reports on a page, in its own pixel geometry."""
+    page: int
+    left: int
+    top: int
+    width: int
+    height: int
+
+
+def is_figure(fig, margins):
+    """Whether an image is document content rather than page furniture.
+
+    Deliberately conservative: it must sit *inside the text margins* -- which
+    excludes the logos, rules and letterhead marks a samling prints outside them
+    -- and be large in one dimension relative to the text measure, which
+    excludes the bullet glyphs and hairline rules that make up the bulk of what
+    poppler reports (2,798 of 3,637 distinct placements over 40 förarbeten are
+    under 60 px). A full-page scan fails the margin test by covering them.
+
+    A page whose text poppler could not place (a scan) has no margins, and so no
+    measure to judge a figure against: nothing on it is content."""
+    left, right = margins
+    if left is None or right is None or right <= left:
+        return False
+    return (left <= fig.left and fig.left + fig.width <= right
+            and max(fig.width, fig.height) >= FIGURE_MIN * (right - left))
+
+
+def points_from_pdftohtml(page_px, page_pt, box):
+    """A pdftohtml ``(left, top, width, height)`` as the ``[x0, y0, x1, y1]`` in
+    PDF points that `lib.facsimile.render_region` crops with.
+
+    poppler reports its XML geometry in its own pixel space, not in points --
+    1.5 px per point at its default resolution, so prop. 2017/18:89's 467.76 pt
+    page is 701 px wide. The scale is derived from the page's own two
+    measurements rather than assumed, since it is a poppler default and nothing
+    in the format promises it. Cropping with the raw numbers lands roughly a
+    third of the way down and to the right of the figure, on body text."""
+    scale = page_px / page_pt
+    left, top, width, height = box
+    return [left / scale, top / scale,
+            (left + width) / scale, (top + height) / scale]
+
+
+def run_style(run):
+    """The emphasis a run carries, as a stable flag string ("i", "b", "bi") --
+    empty for ordinary body text. Superscript is not a font attribute poppler
+    reports; it is inferred from geometry by the footnote-marker pass, which
+    tags its own runs."""
+    return ("b" if run.bold else "") + ("i" if run.italic else "")
+
+
+def _normalized_with_spans(text, spans):
+    """`normalize_space(text)` with the style spans remapped onto the result.
+    The offsets have to be carried through the same collapse that produces the
+    text, since a span recorded against the raw join would slide by however many
+    spaces the collapse removed before it."""
+    out, index, prev_ws = [], [], True      # prev_ws: leading space is dropped
+    for ch in text:
+        if ch.isspace():
+            if prev_ws:
+                index.append(len(out))
+                continue
+            prev_ws = True
+            index.append(len(out))
+            out.append(" ")
+            continue
+        prev_ws = False
+        index.append(len(out))
+        out.append(ch)
+    index.append(len(out))
+    while out and out[-1] == " ":            # trailing space
+        out.pop()
+    end = len(out)
+    remapped = [(min(index[a], end), min(index[b], end), style)
+                for a, b, style in spans]
+    return "".join(out), [(a, b, s) for a, b, s in remapped if a < b]
+
+
+def _join_runs(runs):
+    """One line's runs as `(text, style spans)`. A run boundary is not a word
+    boundary: poppler splits a line at every font change, so an italic phrase
+    inside a sentence arrives as three runs and the punctuation that follows it
+    starts its own ("En sammanfattning … finns i " / "bilaga 1" /
+    ". Utredningens …"). Joining those on a space wrote "bilaga 1 ." -- a space
+    before every period, comma and parenthesis that trails an italic or bold
+    phrase, throughout the corpus.
+
+    The runs carry their own spacing, so they are butted together and a space is
+    added only where the geometry says one was printed: a horizontal gap with no
+    whitespace already at either side of the seam.
+
+    The spans are what the run boundary is *for*: which stretch of the line the
+    document set in italics or bold, in the line's own text coordinates, so the
+    emphasis survives into the artifact instead of being flattened to a
+    whole-line flag."""
+    if not runs:                 # every run was a header fragment, dropped
+        return "", []
+    out, spans, pos = [], [], 0
+    for prev, run in zip([None] + runs[:-1], runs, strict=True):
+        if (prev is not None and run.left - prev.right >= SPACE_MIN
+                and not prev.text.endswith((" ", "\t"))
+                and not run.text.startswith((" ", "\t"))):
+            out.append(" ")
+            pos += 1
+        style = run_style(run)
+        if style:
+            spans.append((pos, pos + len(run.text), style))
+        out.append(run.text)
+        pos += len(run.text)
+    return _normalized_with_spans("".join(out), spans)
+
+
 def _lines(spans):
     """Group spans sharing a text baseline (top + height) into visual lines, left
     to right. We group on the baseline, not the top, because one line may mix font
@@ -339,9 +594,21 @@ def _lines(spans):
     (and reflow e.g. '9 Författningskommentar' to 'Författningskommentar 9', which
     then fails heading detection). The line's `top` is the topmost of its spans;
     its `size` the largest run's (superscript footnote markers ride along without
-    shrinking their line)."""
+    shrinking their line).
+
+    The spans are walked in *baseline* order, not `top` order, for the same
+    reason the grouping keys on it. Each span is only compared with the group
+    most recently opened, so a fragment on some third baseline sorting between
+    two that share one splits them: a proposition prints its running header in
+    the left margin at a `top` between a chapter number and its title ("3" at
+    top 65, "Ärendet och dess beredning" at 61, "Prop. 2017/18:89" at 63,
+    baselines 85, 86 and 76). Sorted by top the header lands in the middle and
+    the heading comes apart -- the title becomes a stycke and the number a
+    paragraph of its own, on every numbered heading whose page prints the header
+    at that height."""
     grouped: list[tuple[int, list[Run], int]] = []
-    for top, left, base, text, bold, italic, right, size in sorted(spans):
+    for top, left, base, text, bold, italic, right, size in sorted(
+            spans, key=lambda s: (s[2], s[1], s[0])):
         run = Run(left, right, text, bold, italic, size)
         if grouped and abs(base - grouped[-1][0]) <= LINE_TOL:
             prev_base, runs, prev_top = grouped[-1]
@@ -352,10 +619,11 @@ def _lines(spans):
     out = []
     for _base, runs, top in grouped:
         runs.sort(key=lambda r: r.left)
-        out.append(Line(normalize_space(" ".join(r.text for r in runs)), top,
+        text, spans = _join_runs(runs)
+        out.append(Line(text, top,
                         all(r.bold for r in runs), runs[0].bold,
                         all(r.italic for r in runs),
-                        max(r.size for r in runs), runs))
+                        max(r.size for r in runs), runs, spans))
     return out
 
 
@@ -677,27 +945,43 @@ def dehyphenate(acc, line):
 
 
 def _strip_header_runs(runs, header_re):
-    """The line's text with its running-header fragments removed: a
-    `header_re` match whose boundaries coincide with run boundaries is a
-    margin header (the id alone, or split "Prop." + "2007/08:138" across
-    fragments) and its runs go; a match inside a longer run is prose naming
-    the identifier and stays whole."""
+    """The line's runs with its running-header fragments removed: a `header_re`
+    match whose boundaries coincide with run boundaries is a margin header (the
+    id alone, or split "Prop." + "2007/08:138" across fragments) and its runs
+    go; a match inside a longer run is prose naming the identifier and stays
+    whole.
+
+    The offsets are taken from `_join_runs`, which is what actually assembles
+    the line: computing them here as "each run plus a joining space" was right
+    only while that was the join. Once runs were butted together and spaced by
+    geometry, every boundary was off by however many spaces the line did not
+    have, no match lined up, and the header stopped being stripped at all --
+    it appeared inside the body text of every page whose header shares a
+    baseline with the first line of prose."""
+    joined, _ = _join_runs(runs)
     starts, ends, pos = set(), set(), 0
-    for r in runs:
-        starts.add(pos)
-        pos += len(r.text)
-        ends.add(pos)
-        pos += 1                                # the joining space
-    joined = " ".join(r.text for r in runs)
+    for run in runs:
+        text, _ = _join_runs([run])
+        offset = joined.find(text, pos)
+        # every run's own normalisation is a substring of the line's, since
+        # `_join_runs` collapses both the same way. If that ever stops holding
+        # the header silently reappears inside body prose corpus-wide, which is
+        # the bug this function was rewritten to fix -- so it fails loudly
+        # instead (rule:fail-fast).
+        assert offset >= 0, "run %r not found in joined line %r" % (text, joined)
+        starts.add(offset)
+        ends.add(offset + len(text))
+        pos = offset + len(text)
     drop = [(m.start(), m.end()) for m in header_re.finditer(joined)
             if m.start() in starts and m.end() in ends]
     kept, pos = [], 0
-    for r in runs:
-        span = (pos, pos + len(r.text))
-        pos += len(r.text) + 1
-        if not any(s <= span[0] and span[1] <= e for s, e in drop):
-            kept.append(r.text)
-    return " ".join(kept)
+    for run in runs:
+        text, _ = _join_runs([run])
+        offset = joined.find(text, pos)
+        pos = offset + len(text)
+        if not any(s <= offset and offset + len(text) <= e for s, e in drop):
+            kept.append(run)
+    return kept
 
 
 # A whole line that is nothing but this page's number, in the forms Swedish
@@ -721,11 +1005,21 @@ def is_page_number(text, pageno):
     the innehåll panel, and splitting the sentence that ran across the page
     break (D7). A footnote is a different thing and stays: it is body the
     document wrote, marked by its smaller size (FOOTNOTE_DROP), not chrome the
-    typesetter added."""
+    typesetter added.
+
+    ``pageno`` is None for a page `printed_pages` could not place -- one past a
+    numbering restart that names no bilaga (prop. 2008/09:1's separately
+    paginated utgiftsområden). Such a page keeps no printed number, so nothing
+    on it can be that number, and the whole force of these patterns is that they
+    are anchored to the page's own: unanchored, "1 (3)" is a plausible enough
+    string to eat real content."""
+    if pageno is None:
+        return False
     return bool(_page_number_re(pageno).fullmatch(text.strip()))
 
 
-def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
+def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
+                    indent_breaks=False):
     """Reflow a page's lines into paragraphs, dropping the running header (the
     identifier, when one is known -- pass ``None``/``""`` where the source has no
     fixed header to strip, e.g. a letter whose sender's name is prose, not a
@@ -735,14 +1029,24 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
     page-number line and TOC dotted-leader lines. A bold line (heading or a
     §/chapter marker) always begins its own paragraph; otherwise a vertical gap
     larger than the body line-height does. A page dominated by dotted leaders is
-    the table of contents -- skipped whole."""
+    the table of contents -- skipped whole.
+
+    ``indent_breaks`` additionally starts a paragraph at an indented first line.
+    Off by default because it is a claim about a document's typography, not
+    about PDFs: a förarbete sets its body flush at one margin and indents only
+    to start a paragraph, so there the indent is the *only* signal where the
+    leading does not change. Measured over the other PDF-bodied sources it moves
+    paragraph counts by +8% (coe) to +50% (avg) -- much of it right (a masthead
+    or a running footer stops being glued to the prose) and some of it wrong (a
+    line of a quoted block, breaking a sentence). Neither is validated for them,
+    so they keep the segmentation they had."""
     if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
         return []
     header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
                  if identifier else None)
     kept = []
     for l in lines:
-        raw = l.text
+        raw, spans = l.text, l.spans
         if header_re and header_re.search(raw):
             # A running header is its own text fragment(s) -- a standalone
             # margin line, or a margin id the baseline assembly merged onto a
@@ -753,16 +1057,19 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
             # the docstring always promised. Strictly conservative vs the old
             # strip-everywhere: everything dropped here was dropped before.
             if l.runs:
-                raw = _strip_header_runs(l.runs, header_re)
+                # the line is rebuilt from the runs that survive, so its style
+                # spans are re-derived against the stripped text rather than
+                # left pointing at offsets the strip has moved
+                raw, spans = _join_runs(_strip_header_runs(l.runs, header_re))
             else:
                 # no run geometry (OCR/legacy routes): strip only a line that
                 # is nothing but the header and a page number/date
                 residue = header_re.sub(" ", raw)
                 if not re.search(r"[A-Za-zÅÄÖåäö]", residue):
                     raw = residue
-        text = normalize_space(raw)
+        text, spans = _normalized_with_spans(raw, spans)
         if text and not is_page_number(text, pageno) and not RE_DOTS.search(text):
-            kept.append(replace(l, text=text))
+            kept.append(replace(l, text=text, spans=spans))
     gaps = sorted(b.top - a.top
                   for a, b in zip(kept, kept[1:], strict=False) if b.top > a.top)
     body_gap = gaps[len(gaps) // 2] if gaps else 0      # median line-height
@@ -771,7 +1078,51 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
     def heading(l):
         # heading-ness by font: bold, or larger than the page's body size --
         # a prop's numbered chapter headings are large but NOT bold
-        return l.bold or (l.size and body_size and l.size > body_size)
+        return (l.bold or is_italic_subheading(l.text, l.italic)
+                or (l.size and body_size and l.size > body_size))
+
+    # Swedish government typography marks a new paragraph by indenting its first
+    # line, not by leaving extra space above it: in a proposition the body sets
+    # flush at one margin and a paragraph opens ~13 units to the right of it,
+    # with the ordinary line-height between. A gap rule alone therefore ran
+    # whole sections together -- every paragraph after the first, on nearly
+    # every page. The margin is the page's own most common line start, so a
+    # document that indents differently (or not at all) needs no configuring.
+    starts_at = Counter(l.runs[0].left for l in kept if l.runs).most_common(1)
+    margin = starts_at[0][0] if starts_at else None
+
+    # A förarbete sets its proposal and assessment statements in a ruled box --
+    # "Regeringens förslag:" in a proposition, "Förslag:"/"Bedömning:" in a SOU
+    # -- and the rule itself is a vector drawing pdftohtml discards. The box is
+    # legible from the text anyway: it is set to a *narrower measure*, inset at
+    # both margins, where an ordinary paragraph's indent moves its first line
+    # only and leaves the right edge alone. Both edges are read per page, since
+    # a förarbete mirrors its margins on facing pages (prop. 2017/18:89 sets
+    # 77-523 on page 49 and 183-629 on page 50).
+    ends_at = Counter(l.runs[-1].right for l in kept if l.runs).most_common(1)
+    measure_end = ends_at[0][0] if ends_at else None
+
+    def box_left(l):
+        return (margin is not None and l.runs
+                and margin + BOX_INSET <= l.runs[0].left)
+
+    def box_right(l):
+        return (measure_end is not None and l.runs
+                and l.runs[-1].right <= measure_end - BOX_INSET)
+
+    def boxed(l):
+        return box_left(l) and box_right(l)
+
+    # A ruta is set to its own margin, so its paragraphs indent from *that*:
+    # measuring their first lines against the page's would make every line of
+    # the box a paragraph of its own, since all of them are inset from it.
+    inside = Counter(l.runs[0].left for l in kept if l.runs and boxed(l))
+    box_margin = inside.most_common(1)[0][0] if inside else None
+
+    def indented(l):
+        base = box_margin if (boxed(l) and box_margin is not None) else margin
+        return (indent_breaks and base is not None and l.runs
+                and base + INDENT_MIN <= l.runs[0].left)
 
     paras, cur, prev = [], None, None
     for l in kept:
@@ -780,7 +1131,7 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
         # a caller-forced break (DV's bitmap paragraph numbers, whose paragraphs
         # carry no extra vertical gap the heuristic below could see)
         starts = (cur is None or heading(l) or marker or l.top in force_break_tops
-                  or (prev and heading(prev))
+                  or (prev and heading(prev)) or indented(l)
                   or (body_gap and prev and l.top - prev.top > PARA_GAP * body_gap))
         if starts and _heading_wrap(prev, l, marker, heading):
             starts = False                # wrapped heading line: same paragraph
@@ -788,10 +1139,24 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset()):
             paras.append(cur)
             cur = None
         if cur is None:
-            cur = Para(l.text, l.bold, bool(marker), l.italic, l.size)
+            cur = Para(l.text, l.bold, bool(marker), l.italic, l.size, l.top,
+                       list(l.spans), boxed(l))
+            box_run = [box_left(l), box_right(l)]
         else:
-            cur.text = dehyphenate(cur.text, l.text)
+            # the line's spans slide by wherever its text landed in the
+            # paragraph -- one past the end for the joining space, one *before*
+            # it where a soft hyphen was closed up ("för-" + "fogar")
+            joined = dehyphenate(cur.text, l.text)
+            offset = len(joined) - len(l.text)
+            cur.spans += [(a + offset, b + offset, st) for a, b, st in l.spans]
+            cur.text = joined
             cur.italic = cur.italic and l.italic
+            # a ruta justifies *every* line to its own narrower measure; a
+            # paragraph of ordinary prose only lets its last line fall short, so
+            # the right edge is judged on the line before this one -- whichever
+            # turns out to be last is exempt
+            cur.boxed = box_run[0] and box_run[1] and box_left(l)
+            box_run = [box_left(l), box_right(l)]
         prev = l
     if cur is not None:
         paras.append(cur)
@@ -804,6 +1169,24 @@ def line_body_size(lines):
     are too few for a stable mode, its lines are not."""
     sizes = [l.size for l in lines if l.size]
     return Counter(sizes).most_common(1)[0][0] if sizes else 0
+
+
+# The unnumbered subheading a förarbete sets in *italics* at body size --
+# "Lagrådet", "Skälen för regeringens förslag", "Remissinstanserna" -- rather
+# than in bold. Nothing else about it says heading: it is neither bold nor
+# larger than the body, so without this it read as the first line of the
+# paragraph beneath it and the two ran together.
+#
+# The shape is what separates it from an italic phrase inside prose: a whole
+# line italic, short, and not a sentence (a quoted or emphasised clause carries
+# its terminator). Deliberately narrow -- italics do a lot of other work in a
+# förarbete, marking quoted lagtext, betänkande titles and defined terms.
+ITALIC_SUBHEAD_MAX = 60
+
+
+def is_italic_subheading(text, italic):
+    return bool(italic and text and len(text) <= ITALIC_SUBHEAD_MAX
+                and not text.rstrip().endswith((".", ":", ",", ";")))
 
 
 # a line opening its own numbered heading ("5.1 Offentligfinansiella …") is
