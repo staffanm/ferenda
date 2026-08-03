@@ -45,3 +45,6 @@ opencode.json
 
 # Vendored POI jars (fetch via tools/fetch_poi.sh)
 vendor/poi/*.jar
+
+# UX audit reports (screenshots + findings) -- not needed in the git repo
+/ux-audit/

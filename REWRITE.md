@@ -444,6 +444,26 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   notice keeps its link to the repealing SFS. The renderer gives it the same
   subdued treatment as a grafik placeholder (`p.redaktionell`).
   `test/test_sfs_redaktionell.py`.
+- ✅ **A förordning's authority, read from its ingress** (`sfs/bemyndigande.py`,
+  2026-08-03) — nothing in an SFS artifact says a förordning is subordinate to
+  the lag it serves (`rdf:type` is `KonsolideradGrundforfattning` for both, and
+  the register carries no instrument type), so the relation is read from the
+  two fixed forms Swedish drafting states it in. The **bemyndigandeupplysning**
+  ("Denna förordning är meddelad med stöd av 1. 1 kap. 8 § cybersäkerhetslagen
+  (2025:1506) i fråga om 4 §, …") is recognised structurally, not by parsing its
+  prose: a punkt's references *out* of the document are the delegation, its
+  references *into* the document what it authorises, so the chain is walkable
+  provision-to-provision; a punkt naming only regeringsformen (the government's
+  own 8 kap. 7 § RF norm-giving power) yields no edge. The **kompletterar
+  ingress** ("… innehåller kompletterande bestämmelser till
+  säkerhetsskyddslagen (2018:585)") is document-level only. Of 8,179
+  förordningar, 654 carry the first and ~50 the second — neither is universal,
+  so neither decides *whether* a document is a förordning
+  (`labels.sfs_is_statute` does that, from the title, with full coverage).
+  `extract` runs at `nf.py` projection time, a peer of `graphics`/`redaktionell`;
+  `catalog._sfs_authority_links` publishes both as typed edges
+  (`rpubl:bemyndigande`, `rinfoex:kompletterar`) feeding the norm-hierarchy
+  table (§6). `test/test_norm_chain.py`.
 - ✅ **Version history / time travel / diff** (`sfs/versions.py`, `lib/diff.py`,
   the `versions` Stage) — the old archive machinery's user-facing features,
   rebuilt over artifacts. The `versions` stage parses every archived
@@ -971,7 +991,11 @@ below is not optional polish, it's the only way they enter the corpus.
     subset). DV (`dv_parse`) now scans with all seven via `DV_PARSE_TYPES`.
   - 💤 **Never implemented in the old engine** (declared constants only, no
     ebnf branch): FORESKRIFTER, INTLLAGSTIFTNING, INTLRATTSFALL,
-    DOMSTOLSAVGORANDEN — "porting" these means greenfield grammar design,
+    DOMSTOLSAVGORANDEN — "porting" these means greenfield grammar design. One
+    is now built: **FORESKRIFT** (§7e, 2026-08-03) recognises a
+    myndighetsföreskrift by its författningssamling designation + number
+    ("PMFS 2022:1"), the first of these written from scratch rather than
+    ported. INTLLAGSTIFTNING, INTLRATTSFALL, DOMSTOLSAVGORANDEN remain
     deferred (user decision).
 - ✅ **Identity / URI minting at the right seams.** There is deliberately no
   universal identity library: identity belongs to each source model. Pieces
@@ -1129,6 +1153,20 @@ to a future per-doc incremental generate.
   the old WAL so a stale `-wal` can't be misapplied onto the new file, then fsync
   file, `os.replace`, fsync dir); readers keep serving the old catalog until the
   rename. Incremental `relate` is unchanged — in-place, WAL.
+- ✅ **Norm hierarchy table** (`catalog.rebuild_norm_chain`, `norm_chain`, run
+  once per `relate` over the whole corpus — a chain crosses EU → lag →
+  förordning → myndighetsföreskrift, so it cannot be scoped per source) — one
+  row per typed authority relation (`rpubl:bemyndigande`/`rpubl:genomforDirektiv`/
+  `rinfoex:kompletterar`), both ends resolved to a rung (`NORM_LEVEL`/
+  `norm_level`) and dropped unless the citing end sits below the cited end (a
+  plain cross-reference or a same-rung amendment is not authority). **No reader
+  yet**: a first attempt rendered it as a context-rail section and was
+  withdrawn — the display turned out to be the hard part, not the data (a
+  genomförDirektiv rung duplicated the richer "Genomför EU-rätt" row, and the
+  lag/förordning rung is present for only the ~700 förordningar stating one of
+  the two authority formulas, with nothing on the page to explain the gap).
+  Kept as data for a future editorial (`ai-*`) command to read, not a rendered
+  feature. `test/test_norm_chain.py`.
 - ✅ **Cross-source inbound-link graph** — the killer feature, working
   end-to-end. `catalog.inbound(con, uri)` = the distinct docs citing exactly
   that fragment uri. Verified on the partial corpus: **2,037 cases cite
@@ -1242,8 +1280,12 @@ to a future per-doc incremental generate.
   sorts under (emphasised), so the eye lands on the sort key (`facets._sfs_split`);
   parliamentary primary law (a *lag*, a *balk*, or a grundlag) is shown at full
   weight while secondary instruments (förordning, kungörelse, …) are dimmed
-  (`_sfs_is_statute`). The listing carries `pre`/`key`/`subdued` on each
-  `BrowseDoc`. `test/test_facets.py`, `test/test_api.py`.
+  (`labels.sfs_is_statute`, moved out of `facets.py` 2026-08-03 so the catalog
+  can read it too: an SFS row's `kind` is now `lag` or `forordning` rather than
+  one uniform `law`, which is also the norm hierarchy's rung test, §6). The
+  listing carries `pre`/`key`/`subdued` on each `BrowseDoc`; the kind split also
+  renamed the browse's kind buckets ("Lagar"/"Förordningar m.m." replacing one
+  "Författningar"). `test/test_facets.py`, `test/test_api.py`.
 - ✅ **Publishing layer — search, REST/OpenAPI, bulk dumps** (replaces the
   retired Fuseki/RDF publishing). All three are **derived & rebuildable** from
   artifacts + catalog, never a source of truth, and slot in as **corpus-wide
@@ -1577,6 +1619,33 @@ them resolve.
   mines for commit authorship and message body — reading a förarbete artifact
   stays förarbete's job, composed in by `build.py` like `ai-correspond`.
   `test/test_forarbete_parse.py`.
+- ✅ **Ruled boxes, emphasis spans and embedded figures (2026-08-03).** A
+  förarbete's stated proposal/assessment ("Regeringens förslag:", a SOU's
+  "Förslag:"/"Bedömning:") is set inside a ruled box whose rule `pdftohtml`
+  discards as a vector drawing; `classify` recovers it from the narrower
+  measure the paragraph is set to (`Para.boxed`) and tags it a `ruta` block,
+  rendered as a bordered box rather than an ordinary stycke. Separately,
+  `pdftext.pdf_pages` now carries each line's bold/italic **spans** (not just a
+  whole-line flag; superscript is not a font attribute poppler reports, and a
+  footnote marker stays its own run kind), threaded through `classify`/`_scan`
+  into the
+  rendered inline styling (`lib/lagrum.interleave`'s new `styles=` parameter
+  splits plain text where the emphasis changes and only styles a citation link
+  where one emphasis covers the whole of it). And `pdf_figures`
+  (`Figure`/`is_figure`) reports the images poppler embeds that are document
+  content — inside the text margins, large relative to the measure, which
+  excludes bullet glyphs, hairline rules and a scanned page's own full-page
+  image — placed among the paragraphs they were printed between as `bild`
+  blocks (`bbox` in PDF points via `points_from_pdftohtml`). No pixels are
+  copied into the corpus: the API's `/api/v1/facsimile` endpoint gained a
+  `bbox=` crop parameter (`lib/facsimile.cached_region`, the same renderer the
+  SFS graphics layer crops with), and a `bild` block's `<figure>` renders that
+  crop on demand. En route, `pdftohtml_xml` stopped extracting images to disk
+  (`-i` dropped so poppler reports figure placement, but its unrequested image
+  *files* — 1,064,761 of them, 350 GB, on the first corpus-wide run — now land
+  in a temporary directory the conversion discards), and its cache entries
+  gained a command digest so a future flag change re-converts instead of
+  silently serving a stale one. `test/test_pdftext.py`.
 - ⬜ lr/SÖ content, page-number offset for
   docs whose front matter shifts the printed sequence; general (non-lydelse)
   tables — the budget prop's statistics tables still flatten to stycken; a
@@ -2086,9 +2155,10 @@ Binding regulations issued by ~100 agencies into their own författningssamling
 (FFFS, AFS, NFS, …). The value-add: a föreskrift's **`bemyndigande`** points into
 SFS at the empowering paragraf — a *new* edge type (statute → regulation) that
 makes a law's page list the regulations issued under it — plus `genomforDirektiv`
-(→ EU) and `upphaver`/`andrar` (the intra-fs amendment graph). Note the FORESKRIFTER
-*citation* grammar was never implemented in the old engine (§5 💤), so föreskrifter
-are not yet citation *targets*; the inbound value comes from the edges above.
+(→ EU) and `upphaver`/`andrar` (the intra-fs amendment graph). A föreskrift is
+now also a citation *target* in its own right (`FORESKRIFT`, below); the
+FORESKRIFTER grammar was never implemented in the old engine (§5 💤), so this
+is greenfield, not a port.
 
 - **Landscape (poked, 2026):** no central API — lagrummet.se is a link directory,
   the old rinfo aggregation is dead — so harvest is irreducibly per-agency. But the
@@ -2363,6 +2433,42 @@ are not yet citation *targets*; the inbound value comes from the edges above.
   result and `label` per facet bucket. `test/test_browse_generate.py`,
   `test/test_facets.py` (`test_kind_labels_name_every_forarbete_type`,
   `test_fold_fs_versions_drops_the_base_and_marks_the_consolidated`), `test/test_api.py`.
+- ✅ **Föreskrifter become citation targets (2026-08-03).** A new `FORESKRIFT`
+  parse type (`lib/lagrum.py`) recognises a myndighetsföreskrift by its printed
+  författningssamling designation + number ("PMFS 2022:1", "ELSÄK-FS 2008:1", in
+  running text or inside a name's parenthesis) — the corpus held **zero**
+  inbound references to any of its 12,936 föreskrifter before this, a fact
+  about the missing production, not about Swedish drafting. The designation
+  terminal is built from the `foreskrift/data/series.json` registry
+  (`FS_SLUG`/`FS_DESIGNATIONS`), so only a registered series mints a uri and the
+  printed form maps to its real slug (ÅFS → `aafs`, not Arbetsmiljöverkets
+  `afs`). Added to `ALL_PARSE_TYPES` (dv/forarbete/avg/wiki cite föreskrifter
+  now) and to `foreskrift/parse.py`'s own `PARSE_TYPES`, since an agency's
+  regulations constantly cross-refer each other in operative text ("Utöver
+  denna föreskrift gäller MSBFS 2020:7") — the masthead-only `andrar`/
+  `upphaver` edges never captured that. En route, a `generic_ref` naming a
+  chapter now stays *sticky* for the bare sections that follow ("4 kap. 7 §
+  samt 8 och 9 §§" resolves both trailing refs into chapter 4, not chapterless
+  `#P8`/`#P9`) — the same chapter-continuation rule every other chaptered
+  production already had. `test/test_lagrum.py`.
+- ✅ **`lagen foreskrift reap` (2026-08-03)** — removes a harvested record an fs
+  reassignment left behind under the *old* författningssamling. An agency
+  taking over a renamed/absorbed agency's samling is read by
+  `fs_from_designation`; turning that reading on for an agency the harvest had
+  already walked without it re-files its whole back catalogue under the new fs
+  while the old run's records stay on disk claiming the same landing pages
+  (MCF's listing was first walked under `msbfs`, so every MCFFS/SÄIFS/SRVFS/
+  KBMFS regulation on mcf.se also carries a stale `msbfs/…` record — MSB was
+  renamed at the end of 2025, so "MSBFS 2026:8" does not exist — and both
+  parse, publish and cite, doubling a rail row). `foreskrift/download.superseded`
+  (`stored_series`/`superseded_files`) finds them positively: two records
+  claiming one landing page, the landing slug naming the samling the site
+  itself files it under, so the claim the slug corroborates is the real one and
+  the other is the leftover — never a scoped guess, since the whole point is
+  comparing across författningssamlingar. `reap` removes the loser's record,
+  cached landing page and body PDFs (`--dry-run` lists without removing);
+  `relate` then drops it from the catalog on the next run. Registered as a
+  `foreskrift` action alongside `browser-download`.
 
 ### 7f. avg vertical — JO + JK + ARN + IMY + KKV myndighetsavgöranden ✅ (first cut)
 
