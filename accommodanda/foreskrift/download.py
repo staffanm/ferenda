@@ -4,14 +4,26 @@ the named författningssamlingar (default all); ``--full`` re-walks and refreshe
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
+import json
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
+from pathlib import Path
 
+from ..lib import compress
 from ..lib.compress import list_basefiles as _list_basefiles
-from ..lib.util import NullReporter, Reporter
+from ..lib.util import NullReporter, Reporter, record_path
 from . import harvest
 from .agencies import REGISTRY
+
+# the agency sites slug a designation into ASCII ("SÄIFS" -> "saifs-19831"),
+# our fs codes keep the Swedish letters -- folded, the two compare
+_FOLD = str.maketrans("åäö", "aao")
+
+
+def _fold(s):
+    return s.translate(_FOLD)
 
 
 def browser_scopes():
@@ -113,3 +125,78 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1)
 
 def list_basefiles(root, fs):
     return _list_basefiles(root, fs)
+
+
+def stored_series(root):
+    """Every författningssamling with records on disk. Not the same set as
+    ``REGISTRY``: a predecessor samling has no harvester of its own (nobody
+    issues an SRVFS any more) and so no registry entry, but its still-in-force
+    regulations sit in the corpus under their own fs, harvested off the
+    successor agency's listing. Anything walking the store must read the store."""
+    return sorted(p.name for p in Path(root).iterdir() if p.is_dir())
+
+
+def superseded(root, scopes=None):
+    """Harvested records that a *later* run has re-filed under another
+    författningssamling, as ``{basefile: (winning basefile, landing url)}``.
+
+    An agency that has taken over a renamed agency's samling serves several
+    författningssamlingar off one listing, and which samling a row belongs to is
+    read from its printed designation (``fs_from_designation``). Turning that on
+    for an agency already harvested without it re-files its whole back
+    catalogue: MCF's listing was first walked under ``msbfs`` (the agency's fs at
+    the time), so every MCFFS/SÄIFS/SRVFS/KBMFS regulation on mcf.se also has an
+    ``msbfs/...`` record naming a samling that never issued it -- MSB was renamed
+    at the end of 2025, so "MSBFS 2026:8" does not exist. Both records then parse,
+    publish and cite, and a rail row lists the same rule twice.
+
+    A run never deletes what it merely failed to enumerate (a half-served
+    paginated listing must not look like a repeal). The test here is positive
+    and local: two records claim *the same landing page*, so the site itself says
+    they are one document, and the one whose stored designation the landing slug
+    does not corroborate is the leftover."""
+    claims = {}
+    for fs in (scopes or stored_series(root)):
+        for basefile in _list_basefiles(root, fs):
+            url = json.loads(compress.read_text(
+                record_path(root, fs, basefile))).get("url")
+            if url:
+                claims.setdefault(url, []).append(basefile)
+    stale = {}
+    for url, basefiles in claims.items():
+        if len(basefiles) < 2:
+            continue
+        # the landing slug names the samling the site itself files the document
+        # under ("…/gallande-regler/mcffs-20268/" -> "mcffs"); the claim it
+        # corroborates is the real one, the rest are the leftovers. Slugs are
+        # ASCII, fs codes are not (SÄIFS -> "saifs-…"), so both fold.
+        named = re.match(r"[a-zåäö]+", url.rstrip("/").rsplit("/", 1)[-1].lower())
+        winners = [bf for bf in basefiles
+                   if named and _fold(bf.split("/", 1)[0]) == _fold(named.group())]
+        if len(winners) != 1:
+            # nothing (or everything) corroborated. The ordinary cause is
+            # several regulations legitimately sharing one index page as their
+            # source, so the group is skipped silently rather than reported:
+            # removal needs the landing slug to name exactly one of the claims,
+            # and without that there is no evidence to act on or to show.
+            continue
+        stale.update({bf: (winners[0], url) for bf in basefiles
+                      if bf != winners[0]})
+    return stale
+
+
+def superseded_files(root, basefile):
+    """Every downloaded file the superseded record for `basefile` owns: the
+    record JSON, the cached landing page, and the bodies it points at (the
+    regulation PDF and any consolidation/amendment/attachment). The winning
+    record downloaded its own copies under its own slug, so nothing here is
+    shared with it."""
+    fs = basefile.split("/", 1)[0]
+    record = record_path(root, fs, basefile)
+    paths = [record, record.with_suffix(".html")]
+    files = json.loads(compress.read_text(record)).get("files", {})
+    for role in files.values():
+        for entry in (role if isinstance(role, list) else [role]):
+            if entry and entry.get("name"):
+                paths.append(Path(root) / fs / entry["name"])
+    return paths

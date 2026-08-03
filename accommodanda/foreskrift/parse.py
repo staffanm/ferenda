@@ -31,16 +31,19 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib.lagrum import EULAGSTIFTNING, LAGRUM, interleave, sfs_parser
+from ..lib.lagrum import EULAGSTIFTNING, FORESKRIFT, LAGRUM, interleave, sfs_parser
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
 from ..lib.util import MONTHS
 from .agencies import AAFS_SERIES, REGISTRY
 from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
 
-# a föreskrift cites SFS (the empowering law) and EU directives (what it
-# implements); it does not cite case law or förarbeten in its operative text.
-PARSE_TYPES = [LAGRUM, EULAGSTIFTNING]
+# a föreskrift cites SFS (the empowering law), EU directives (what it
+# implements) and its siblings -- an agency's regulations cross-refer constantly
+# ("Utöver denna föreskrift gäller MSBFS 2020:7"), and the metadata relations
+# (upphäver/ändrar, RE_FS_REF below) only ever capture the masthead's, never one
+# in the operative text. It does not cite case law or förarbeten.
+PARSE_TYPES = [LAGRUM, EULAGSTIFTNING, FORESKRIFT]
 
 RE_RUBRIK_NUM = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")     # "2.1 Heading"
 RE_LIST_ITEM = re.compile(r"^(?:\d+[.)]|[-–—•])\s")       # "1." / "– " list rows
@@ -52,8 +55,51 @@ RE_BESLUTAD = re.compile(r"beslutad[e]?\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re
 RE_UTKOM = re.compile(r"Utkom\s+från\s+trycket.*?den\s+(\d{1,2})\s+(\w+)\s+(\d{4})",
                       re.IGNORECASE | re.DOTALL)
 RE_IKRAFT = re.compile(r"träder\s+i\s+kraft\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)
-RE_STODAV = re.compile(r"[Mm]ed\s+stöd\s+av\b(.*?)(?:föreskriver|kungör|beslutar|"
-                       r"meddelar|följande|\.)", re.DOTALL)
+# The bemyndigande clause every agency föreskrift must carry -- 18 b §
+# författningssamlingsförordningen (1976:725): "I ingressen till författningen
+# skall uppgift lämnas om det bemyndigande på vilket myndighetens beslutanderätt
+# grundar sig". A föreskrift without one is this parser failing, not the
+# document being silent, so the clause is found in two explicit steps rather
+# than by one regex that can quietly match the wrong occurrence.
+RE_STODAV = re.compile(r"[Mm]ed\s+stöd\s+av\b")
+STODAV_WINDOW = 600     # longest real clause seen is FFFS 2014:12's ~400 chars
+# Where the clause stops: the preamble verb it runs into, "att"/"i fråga om"
+# (past which an ändringsförfattning names the föreskrift it *amends*, which is
+# not its bemyndigande), or the end of the sentence.
+#
+# "End of sentence" cannot be a bare `\.`. A delegation almost always runs
+# through a chapter, so "7 kap. 7 § fastighetstaxeringslagen (1979:1152)"
+# truncated at the abbreviation dot to " 7 kap" -- no §, no act, nothing to
+# resolve. That single character was most of the missing corpus, a delegation
+# into an unchaptered act being the exception. Nor can it be "a period followed
+# by a capital": the sentence a clause most often runs into is the first
+# provision, ". 1 § Dessa föreskrifter …", which opens with a digit. So the test
+# looks *behind* instead, at the abbreviations that occur inside a lagrum.
+#
+# The verbs are \b-anchored: unanchored, "kungör" matched inside "kungörelsen"
+# and cut "13 § kungörelsen (1958:272) om tjänstekort" to "13 §", losing the act.
+RE_STODAV_END = re.compile(
+    r"\b(?:föreskriver|kungör|beslutar|meddelar|följande|att)\b"
+    r"|\bi\s+fråga\s+om\b"
+    # the abbreviations that occur *inside* a lagrum, whose dot is not a
+    # sentence: kapitel, moment, bihang, stycke, nummer, punkt, m.fl., f/ff
+    r"|(?<!\bkap)(?<!\bmom)(?<!\bbih)(?<!\bst)(?<!\bnr)(?<!\bpkt)(?<!\bp)"
+    r"(?<!\bm)(?<!\bfl)(?<!\bff)(?<!\bf)\.")
+
+
+def stodav_clause(text):
+    """The "med stöd av …" bemyndigande clause of a föreskrift's ingress, or
+    None. The window is bounded so a clause whose terminator two-column
+    extraction has mangled yields its opening -- partial but right -- instead of
+    running on into the body and collecting unrelated citations; and the *first*
+    occurrence always wins, so a document with a long clause cannot silently
+    fall through to a later, unrelated "med stöd av" further down."""
+    start = RE_STODAV.search(text)
+    if not start:
+        return None
+    window = text[start.end():start.end() + STODAV_WINDOW]
+    end = RE_STODAV_END.search(window)
+    return window[:end.start()] if end else window
 # active masthead form ("ersätter/upphäver …") and the transitional-provision
 # passive ("Genom föreskrifterna upphävs … (PMFS 2019:2)")
 RE_ERSATTER = re.compile(r"\b(?:ersätter|upphäv(?:er|s))\b(.*?)(?:\.|$)",
@@ -215,10 +261,10 @@ def extract_metadata(text, parser):
         "bemyndigande": [], "genomfor": [], "upphaver": [], "andrar": [],
     }
     # bemyndigande: the SFS paragrafer named in the "med stöd av …" clause
-    stod = RE_STODAV.search(text)
+    stod = stodav_clause(text)
     if stod:
         meta["bemyndigande"] = _dedupe_bemyndigande(
-            {r.uri for r in parser.parse_text(stod.group(1), context={})
+            {r.uri for r in parser.parse_text(stod, context={})
              if r.predicate.endswith("references")})
     # genomför: the directive each "Jfr … direktiv …" footnote points to (its
     # first directive ref; later ones in the clause are amended, not implemented)
@@ -260,12 +306,58 @@ def _full_text(blocks):
     return "\n".join(text for _, text, _, _ in blocks)
 
 
-# the rubric a föreskrift opens its operative body with: '<Agency>s
-# föreskrifter om …; beslutade den …' (or 'Föreskrifter om ändring i …').
-# Everything up to the beslutade clause is the document's own title.
-RE_TITLE_BLOCK = re.compile(
-    r"^(.{5,400}?(?:föreskrifter|allmänna råd|kungörelse)[^;]{0,300}?)"
-    r"\s*;?\s*beslutade?\b", re.IGNORECASE | re.DOTALL)
+# The title a föreskrift prints in its masthead: '<Agency>s föreskrifter om …;
+# beslutade den …' (or 'Föreskrifter om ändring i …'). It is read in three
+# explicit steps rather than by one regex over the whole masthead, because the
+# masthead is the part of the page text extraction mangles worst -- it is set in
+# two columns, so the "Utkom från trycket / den 4 februari 2022" block lands
+# *inside* the title sentence, between its semicolon and the "beslutade" clause.
+#
+# The type word is what anchors the read. Everything before it back to the last
+# the standing masthead text (the ISSN, the publisher line, the samling's name,
+# the FS number, a date) is the issuing agency's possessive; everything after it up
+# to the semicolon or the beslutade/utfärdad clause is the subject.
+RE_TITLE_TYPE = re.compile(
+    r"\b(?:föreskrifter|föreskrift|allmänna\s+råd|allmänt\s+råd|kungörelse"
+    r"|tillkännagivande)\b", re.IGNORECASE)
+# What the masthead prints on every föreskrift, whatever it says: the
+# samling's name, the ISSN, the utgivare, "Utkom från trycket", the FS number,
+# the dates. Only the title varies, so everything here is removed to leave it.
+# It is *removed* rather than treated as a boundary,
+# because the masthead's second column lands in the middle of the title
+# sentence, not beside it: "Skolverkets föreskrifter Utkom från trycket den 21
+# mars 2012 om betygskatalog för vuxenutbildning" is one block of extracted
+# text. Cutting at that text would keep "Skolverkets föreskrifter" and lose
+# the subject; deleting it rejoins the sentence that was printed.
+RE_MASTHEAD_BOILERPLATE = re.compile(
+    # the samling's own name, possessive included: dropping only the head word
+    # leaves it orphaned in front of the title ("Statens skolverks" +
+    # "Skolverkets föreskrifter om …")
+    r"(?:[A-ZÅÄÖ][\wåäöÅÄÖ-]*(?:\s+[\wåäöÅÄÖ-]+){0,3}\s+)?författningssamling\w*"
+    r"|ISSN\s*[\d\s-]{4,}|Utgivare:\s*|Utkom\s+från\s+trycket"
+    # the agency's own contact block, which several samlingar print in the
+    # masthead's second column ("Box 7821, 103 97 Stockholm, Sverige, www.fi.se")
+    r"|\bwww\.[\w.-]+|\bBox\s+\d+|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäö]+,?"
+    r"|\bTfn\b[\s\d-]*|\bSverige\b,?"
+    r"|Publicerings?datum|Publicerade?\s+den|\b[A-ZÅÄÖ]{2,}-?FS\b|\b\d{4}:\d+\b"
+    r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?|\bnr\s+\d+"
+    % "|".join(MONTHS), re.IGNORECASE)
+# a word the removal left doubled ("Kriminalvårdens
+# [författningssamling] Kriminalvårdens föreskrifter …")
+RE_TITLE_DOUBLED = re.compile(r"\b(\w{3,})(\s+\1)+\b", re.IGNORECASE)
+# a parenthesis emptied by the removal above: an ändringsförfattning's title
+# names the regulation it amends by number ("Läkemedelsverkets föreskrifter
+# (LVFS 1997:13) om …"), which is the one place the designation belongs in a
+# title, so those spans are held back from the removal and restored after
+RE_TITLE_PARENS = re.compile(r"\([^()]{0,80}\)")
+# the second column's own headers, which land wherever the first column's line
+# broke -- including inside a parenthesis
+RE_MASTHEAD_COLUMN = re.compile(
+    r"Utkom\s+från\s+trycket|Publicerings?datum|Publicerade?\s+den"
+    r"|\b(?:den\s+)?\d{1,2}\s+(?:%s)(?:\s+\d{4})?" % "|".join(MONTHS),
+    re.IGNORECASE)
+# where the title stops: its own semicolon, or the clause that follows it
+RE_TITLE_END = re.compile(r";|\bbeslutad|\butfärdad|\bbeslutat\b", re.IGNORECASE)
 # link chrome a harvest title trails off into ('(pdf, 63 kB)', 'Pdf, 278.1 kB,
 # öppnas i nytt fönster.', a bare '.pdf') -- from the pdf token to the end
 RE_TITLE_CHROME = re.compile(r"\s*[,(]?\s*(?:pdf|\.pdf)\b.*$",
@@ -292,14 +384,83 @@ def clean_title(raw, identifier):
     return t if len(probe) >= 8 else None
 
 
-def title_from_body(blocks, start):
-    """The opening rubric of the operative body as the document title --
-    '<Agency>s föreskrifter om …' up to the 'beslutade den' clause -- or None
-    when the first blocks carry no such phrase."""
-    for _, text, _, _ in blocks[start:start + 3]:
-        m = RE_TITLE_BLOCK.match(" ".join(text.split()))
-        if m:
-            return m.group(1).rstrip(" ;,")
+TITLE_MAX = 300      # a subject longer than this is extraction running on
+# lower-case words that join an agency's name ("Myndigheten *för* civilt
+# försvars", "Post- *och* telestyrelsens")
+_NAME_JOINERS = {"för", "och", "av", "i", "med", "samt", "vid", "om"}
+
+
+def _strip_boilerplate(masthead):
+    """The masthead with its standing text deleted and the sentence rejoined,
+    parenthesised references left intact."""
+    # a held parenthesis keeps its FS number but not the column header the
+    # second column dropped into it ("(LVFS Utkom från trycket 2006:16)")
+    held = [" ".join(RE_MASTHEAD_COLUMN.sub(" ", p).split())
+            for p in RE_TITLE_PARENS.findall(masthead)]
+    masked = RE_TITLE_PARENS.sub("\x00", masthead)
+    cleaned = RE_TITLE_DOUBLED.sub(
+        r"\1", " ".join(RE_MASTHEAD_BOILERPLATE.sub(" ", masked).split()))
+    for paren in held:
+        cleaned = cleaned.replace("\x00", paren, 1)
+    return " ".join(cleaned.split())
+
+
+def _agency_possessive(before):
+    """The issuing agency's possessive immediately preceding the type word, as a
+    start offset into `before` (its length when there is none -- 'Föreskrifter om
+    ändring i …' names no agency).
+
+    Walked backwards over tokens rather than matched, because the token that
+    ends the name is the only reliable landmark: it is the possessive '-s'
+    ('Säkerhetspolisens', 'Myndigheten för civilt försvars'). From there the name
+    runs back through its lower-case joiners to the capitalised word that begins
+    it. Two adjacent capitalised words are a boundary, not a name -- that is what
+    keeps the utgivare off the front of the title, the masthead's two columns
+    having landed 'Utgivare: Gunilla Hedwall' directly before
+    'Säkerhetspolisens föreskrifter om säkerhetsskydd'."""
+    tokens = list(re.finditer(r"\S+", before))
+    if not tokens or not tokens[-1].group().endswith(("s", "s:")):
+        return len(before)
+    start = len(tokens) - 1
+    while start > 0:
+        prev, cur = tokens[start - 1].group(), tokens[start].group()
+        if not prev[:1].isalpha() or prev.endswith((":", ".")):
+            break                       # standing masthead text, not a name
+        if prev.lower() in _NAME_JOINERS or prev[:1].islower():
+            start -= 1
+            continue
+        # a capitalised word: part of the name only where the word it precedes
+        # is not itself capitalised ("Statens jordbruksverks", not
+        # "Hedwall Säkerhetspolisens")
+        if cur[:1].isupper():
+            break
+        start -= 1
+        break
+    return tokens[start].start()
+
+
+def title_from_masthead(blocks, start):
+    """The document's own title, read from the printed masthead -- '<Agency>s
+    föreskrifter om …' up to the semicolon or the beslutade clause -- or None
+    where the masthead carries no such phrase.
+
+    The masthead is `blocks[:start]`, not the operative body: this used to search
+    the first blocks *past* `_body_start`, where the title has already been left
+    behind, so it found one only for the föreskrifter whose body happens to
+    repeat it. The blocks are joined, and the standing masthead text deleted,
+    before matching: two-column extraction interleaves the columns, so neither
+    block holds the whole sentence and the second column lands inside it."""
+    masthead = _strip_boilerplate(" ".join(_full_text(blocks[:start]).split()))
+    for word in RE_TITLE_TYPE.finditer(masthead):
+        head = _agency_possessive(masthead[:word.start()].rstrip())
+        rest = masthead[word.end():word.end() + TITLE_MAX]
+        stop = RE_TITLE_END.search(rest)
+        title = (masthead[head:word.end()]
+                 + (rest[:stop.start()] if stop else rest)).strip(" ;,.-")
+        # a bare type word with no subject is the samling's own name or a
+        # running header, not this document's title
+        if stop and len(title) > len(word.group()) + 4:
+            return " ".join(title.split())
     return None
 
 
@@ -315,7 +476,7 @@ def parse_pdf(path, identifier, parser, patch_key=None):
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(_full_text(blocks[:start]) or _full_text(blocks))
     # the body's own rubric, for records whose harvest title is link chrome (F7)
-    meta["title"] = title_from_body(blocks, start)
+    meta["title"] = title_from_masthead(blocks, start)
     return _structure(blocks[start:], parser), meta
 
 

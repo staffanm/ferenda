@@ -16,7 +16,7 @@ from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
                                            konsoliderad_tom, amendment_uri,
                                            andrar_target,
                                            masthead_amendments, parse_record,
-                                           clean_title, title_from_body)
+                                           clean_title, title_from_masthead)
 from accommodanda.lib.lagrum import sfs_parser
 
 
@@ -219,15 +219,67 @@ def test_clean_title_rejects_chrome_only_titles():
         assert clean_title(raw, ident) is None, raw
 
 
-def test_title_from_body_reads_the_opening_rubric():
-    blocks = [("rubrik", "Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
+def test_title_is_read_from_the_masthead_not_the_body():
+    """The title is printed in the masthead, above the operative body. This
+    used to search the blocks *past* `_body_start`, where it has already been
+    left behind, and so found one only where the body happened to repeat it --
+    1,736 föreskrifter were left titled by their own number."""
+    blocks = [("rubrik", "Åklagarmyndighetens författningssamling", 1, None),
+              ("rubrik", "Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
                          "lokalisering och verksamhetsområden; beslutade den "
                          "1 december 2006.", 1, None),
-              ("stycke", "Åklagarmyndigheten föreskriver följande.", 1, None)]
-    assert title_from_body(blocks, 0) == \
+              ("stycke", "Åklagarmyndigheten föreskriver följande.", 1, None),
+              ("kapitel", "1 kap. Inledande bestämmelser", 1, None)]
+    assert title_from_masthead(blocks, 3) == \
         ("Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
          "lokalisering och verksamhetsområden")
-    assert title_from_body([("stycke", "1 § Denna föreskrift.", 1, None)], 0) is None
+    assert title_from_masthead([("stycke", "1 § Denna föreskrift.", 1, None)],
+                               1) is None
+
+
+def test_title_survives_the_second_column_landing_inside_it():
+    """The masthead is set in two columns, so extraction drops the right-hand
+    column's standing text into the middle of the title sentence. Cutting there
+    would keep "Skolverkets föreskrifter" and lose the subject; the standing
+    text is deleted instead, which rejoins the sentence that was printed."""
+    blocks = [("rubrik", "Statens skolverks författningssamling ISSN 1102-1950",
+               1, None),
+              ("stycke", "Skolverkets föreskrifter Utkom från trycket den 21 "
+                         "mars 2012 om betygskatalog för vuxenutbildning; "
+                         "beslutade den 8 mars 2012.", 1, None),
+              ("kapitel", "1 kap. Inledande bestämmelser", 1, None)]
+    assert title_from_masthead(blocks, 2) == \
+        "Skolverkets föreskrifter om betygskatalog för vuxenutbildning"
+
+
+def test_the_amended_regulations_number_stays_in_the_title():
+    """An ändringsförfattning names the regulation it amends by number, which is
+    the one place a designation belongs in a title -- so a parenthesis is held
+    back from the removal that strips the masthead's own FS number."""
+    blocks = [("rubrik", "Läkemedelsverkets författningssamling ISSN 1101-5225",
+               1, None),
+              ("stycke", "Föreskrifter om ändring i Läkemedelsverkets "
+                         "föreskrifter (LVFS 1997:13) om förskrivning av vissa "
+                         "livsmedel; beslutade den 5 mars 2013.", 1, None),
+              ("kapitel", "1 kap. Inledande", 1, None)]
+    assert title_from_masthead(blocks, 2) == \
+        ("Föreskrifter om ändring i Läkemedelsverkets föreskrifter "
+         "(LVFS 1997:13) om förskrivning av vissa livsmedel")
+
+
+def test_the_utgivare_does_not_become_part_of_the_agency_name():
+    """Two adjacent capitalised words are a boundary, not one name: the second
+    column puts "Utgivare: Gunilla Hedwall" directly before "Säkerhetspolisens
+    föreskrifter om säkerhetsskydd"."""
+    blocks = [("rubrik", "Polismyndighetens författningssamling", 1, None),
+              ("stycke", "ISSN 2002-0139 Utgivare: Gunilla Hedwall", 1, None),
+              ("rubrik", "Säkerhetspolisens föreskrifter om säkerhetsskydd;",
+               1, None),
+              ("stycke", "Utkom från trycket beslutade den 31 januari 2022. "
+                         "den 4 februari 2022", 1, None),
+              ("kapitel", "1 kap. Allmänna bestämmelser", 1, None)]
+    assert title_from_masthead(blocks, 4) == \
+        "Säkerhetspolisens föreskrifter om säkerhetsskydd"
 
 
 def test_parse_record_mints_andrar_from_the_pdf_rubric(tmp_path, monkeypatch):
@@ -435,3 +487,67 @@ def test_masthead_amendments_lists_this_fs_sorted_base_excluded():
                 "FFFS 2014:29, NFS 2015:1, FFFS 2013:10")
     assert masthead_amendments(masthead, "fffs", "2013", "10") == [
         ("FFFS", "2014", "29"), ("FFFS", "2017", "7")]
+
+
+# --------------------------------------------------------------------------
+# the bemyndigande ingress clause (18 b § författningssamlingsförordningen)
+# --------------------------------------------------------------------------
+
+def _bemyndigande(text):
+    """The SFS uris a föreskrift's ingress clause delegates from."""
+    clause = fp.stodav_clause(text)
+    if clause is None:
+        return None
+    return sorted(r.uri.replace("https://lagen.nu/", "")
+                  for r in sfs_parser("foreskrift", PARSE_TYPES).parse_text(
+                      clause, context={})
+                  if r.predicate.endswith("references"))
+
+
+def test_bemyndigande_clause_survives_a_chaptered_delegation():
+    """18 b § makes the bemyndigande mandatory, so a missing one is a parser
+    failure. The clause used to end at the first `.`, and a delegation almost
+    always runs through a chapter -- "7 kap. 7 § fastighetstaxeringslagen" was
+    cut at the abbreviation dot to "7 kap", yielding no citation at all. That
+    one character left 44% of the corpus with no bemyndigande."""
+    assert _bemyndigande(
+        "Skatteverket föreskriver med stöd av 7 kap. 7 § fastighetstaxerings"
+        "lagen (1979:1152) och 6 kap. 1 § första stycket fastighetstaxerings"
+        "förordningen (1993:1199) följande.") == \
+        ["1979:1152#K7P7", "1993:1199#K6P1S1"]
+    assert _bemyndigande(
+        "Säkerhetspolisen föreskriver med stöd av 8 kap. 7 § säkerhetsskydds"
+        "förordningen (2021:955) följande.") == ["2021:955#K8P7"]
+
+
+def test_bemyndigande_clause_stops_before_the_sentence_that_follows():
+    """The sentence a clause runs into is usually the first provision, which
+    opens with a digit ("… om den officiella statistiken. 1 § Dessa …"), so the
+    boundary cannot be "a period followed by a capital" either."""
+    assert _bemyndigande(
+        "Statistiska centralbyrån föreskriver följande med stöd av 15 § "
+        "förordningen (2001:100) om den officiella statistiken. 1 § Dessa "
+        "föreskrifter innehåller kompletterande bestämmelser till "
+        "kommissionens genomförandeförordning (EU) 2020/1197.") == ["2001:100#P15"]
+
+
+def test_bemyndigande_clause_excludes_the_foreskrift_an_amendment_amends():
+    """Past "att"/"i fråga om" an ändringsförfattning names the föreskrift it
+    amends; that is its target, not the delegation it is issued under."""
+    assert _bemyndigande(
+        "Tullverket föreskriver med stöd av 1 kap. 5 § tullförordningen "
+        "(2016:287) i fråga om Tullverkets föreskrifter och allmänna råd "
+        "(TFS 2016:2) om en tullordning att 1 kap. 5 § ska ha följande "
+        "lydelse.") == ["2016:287#K1P5"]
+
+
+def test_bemyndigande_verb_boundary_keeps_the_delegating_act():
+    """The preamble verbs are word-anchored: unanchored, "kungör" matched
+    inside "kungörelsen" and dropped the act the delegation comes from."""
+    assert _bemyndigande(
+        "Med stöd av 13 § kungörelsen (1958:272) om tjänstekort meddelar "
+        "rikspolisstyrelsen följande.") == ["1958:272#P13"]
+
+
+def test_no_bemyndigande_clause_is_not_an_empty_one():
+    assert _bemyndigande("Riksdagsdirektören föreskriver följande.") is None
