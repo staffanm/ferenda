@@ -25,13 +25,13 @@
           <str> eller av sådana tjänster som avses i </str>
           <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P5S3">5 kap. 5 § tredje stycket</LinkSubject>
           <str> samt </str>
-          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P5a">5 a</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P5a">5 a</LinkSubject>
           <str>, </str>
-          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P6a">6 a</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P6a">6 a</LinkSubject>
           <str>, </str>
-          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P6b">6 b</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P6b">6 b</LinkSubject>
           <str> och </str>
-          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#P7a">7 a §§</LinkSubject>
+          <LinkSubject predicate="dcterms:references" uri="http://localhost:8000/res/sfs/9999:998#K5P7a">7 a §§</LinkSubject>
           <str>, om den som omsätter varan eller tjänsten är en utländsk företagare och förvärvaren är registrerad till mervärdesskatt här: den som förvärvar varan eller tjänsten,</str>
         </Listelement><Listelement id="P2S1N4" ordinal="4">
           <str>för sådan efterföljande omsättning inom landet som avses i </str>

@@ -340,6 +340,16 @@ def fixture_links(elem, out):
 
 LINK_GAPS = set()
 
+# Adjudicated fixture edit, tricky-nastlade-listor.xml: "5 kap. 5 § tredje
+# stycket samt 5 a, 6 a, 6 b och 7 a §§" recorded the trailing four as the
+# chapterless #P5a/#P6a/#P6b/#P7a. Mervärdesskattelagen, which the fixture text
+# is lifted from, is chaptered throughout and has no top-level paragraf at all,
+# so those four targets could never resolve -- the fixture had frozen the
+# dropped-chapter bug (a named chapter did not stay sticky across a continued
+# enumeration; see test_lagrum's
+# test_a_named_chapter_stays_sticky_across_a_continued_enumeration). They now
+# expect #K5P5a etc., the chapter the sentence is plainly continuing in.
+
 
 @pytest.mark.parametrize("txt", params())
 def test_sfs_links(txt):

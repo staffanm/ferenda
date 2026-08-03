@@ -63,6 +63,15 @@ from .coe_ids import article_fragment as coe_article_fragment
 CELEX_LOCAL = 'ext/celex/'
 CELEX_BASE = 'https://lagen.nu/' + CELEX_LOCAL
 
+# printed författningssamling designation -> the slug its documents live under
+# ("ÅFS" -> aafs, "ELSÄK-FS" -> elsakfs). The hand-edited registry
+# (foreskrift/data/series.json via lib.datasets) is the one source: the grammar
+# terminal and this lookup are built from it together, so the two cannot drift
+# and the engine mints no uri for a series the corpus does not know.
+FS_SLUG = {entry["designation"]: slug
+           for slug, entry in datasets.load_fs_series().items()}
+FS_DESIGNATIONS = sorted(FS_SLUG)
+
 LAGRUM = 'LAGRUM'                  # SFS references ("3 kap. 2 § lagen …")
 KORTLAGRUM = 'KORTLAGRUM'          # abbreviated SFS refs ("3 § MBL", "JB 22:2")
 EULAGSTIFTNING = 'EULAGSTIFTNING'  # EU treaties/regulations/directives
@@ -71,20 +80,22 @@ FORARBETEN = 'FORARBETEN'          # prop./bet./rskr./SOU/Ds/celex + page refs
 EURATTSFALL = 'EURATTSFALL'        # CJEU case law ("mål C-176/09")
 MYNDIGHETSBESLUT = 'MYNDIGHETSBESLUT'  # JO/JK/ARN decisions (by diarienummer)
 VAGLEDNING = 'VAGLEDNING'          # EDPB guidance ("Riktlinjer 05/2020", "WP 248")
+FORESKRIFT = 'FORESKRIFT'          # agency regulations ("PMFS 2022:1", "ELSÄK-FS 2008:1")
 ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 
 # deterministic assembly order; kortlagrum first so its roots take
 # precedence in the ?ref alternation (an abbreviated form must win over a
 # bare generic ref that would leave the abbreviation unconsumed)
 TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
-              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING]
+              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING, FORESKRIFT]
 
 # The "everything" configuration for verticals that link every reference
 # flavour (dv, forarbete, avg, wiki): all parse types except ENKLALAGRUM,
 # which is the deliberately restricted *alternative* to LAGRUM, never
 # combined with it. Import this instead of copying the list.
 ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
-                   FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING]
+                   FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING,
+                   FORESKRIFT]
 
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
@@ -103,6 +114,7 @@ ROOTS = {
     EURATTSFALL: ['ecj_ref'],
     MYNDIGHETSBESLUT: ['arn_refs', 'jo_refs', 'jk_refs'],
     VAGLEDNING: ['riktlinje_ref', 'rekommendation_ref', 'wp_ref'],
+    FORESKRIFT: ['foreskrift_ref'],
     # absolute SFS forms only -- a bare relative ref ("3 §") has no root,
     # so it stays unlinked (the point of the förarbete-safe subset)
     ENKLALAGRUM: ['external_refs', 'external_ref', 'named_external_law_ref',
@@ -598,13 +610,46 @@ VL_ID: /\d{1,2}\/(?:19|20)\d{2}/
 WP_ID: /\d{2,3}(?![\d\/])/
 """
 
+# FORESKRIFT (myndighetsföreskrifter: "PMFS 2022:1", "ELSÄK-FS 2008:1").
+#
+# An agency regulation is cited by its författningssamling designation and
+# number, in running text ("Se vidare MSBFS 2020:7") or, most often, inside the
+# parenthesis of its full name ("Säkerhetspolisens föreskrifter (PMFS 2022:1) om
+# säkerhetsskydd"). Neither form was recognised at all, so a förarbete, a dom or
+# a sibling föreskrift naming one produced no reference -- the corpus held
+# exactly zero inbound references to any of its 12,936 föreskrifter, which read
+# as a fact about Swedish legal writing and was an absent production.
+#
+# FS_DESIGNATION is built at parser() time from the författningssamling
+# registry, like EU_NAMNAKT is from the EU act names: only a registered series
+# matches, so an unknown "XYZFS 2020:1" mints nothing rather than a dangling
+# uri, and the printed designation maps to its own slug (ÅFS -> aafs, not afs,
+# which is Arbetsmiljöverkets samling).
+FORESKRIFT_RULES = r"""
+foreskrift_ref.6: FS_DESIGNATION _W? FS_NUMBER
+FS_NUMBER: /\d{4}:\d+/
+"""
+
+# fires at a registered designation followed by a number. Built from the same
+# registry as the grammar terminal, longest-first so a designation is not
+# shadowed by a shorter one it starts with. Spelling the shape by hand instead
+# ("[A-ZÅÄÖ]…FS") missed the two series that are not FS-shaped at all (LBS,
+# RA-MS) while the terminal accepted them, so the production existed and simply
+# never fired -- silently, which is the failure this whole type was added to
+# end.
+FORESKRIFT_TRIGGER_SRC = r"""
+    \b(?:%s)\ ?\d{4}:\d+
+""" % "|".join(re.escape(d)
+               for d in sorted(FS_DESIGNATIONS, key=len, reverse=True))
+
 # grammar rule fragments per parse type (LAW_ABBREV is appended at build
 # time from the supplied abbreviations, see parser())
 RULES = {LAGRUM: LAGRUM_RULES, EULAGSTIFTNING: EU_RULES,
          KORTLAGRUM: KORTLAGRUM_RULES, RATTSFALL: RATTSFALL_RULES,
          FORARBETEN: FORARBETEN_RULES, EURATTSFALL: EURATTSFALL_RULES,
          MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_RULES,
-         VAGLEDNING: VAGLEDNING_RULES}
+         VAGLEDNING: VAGLEDNING_RULES,
+         FORESKRIFT: FORESKRIFT_RULES}
 
 # words ending in a law suffix that are not law names (ported verbatim)
 NOLAW = {
@@ -747,6 +792,7 @@ VAGLEDNING_TRIGGER_SRC = r"""
 """
 
 TRIGGER_SRC = {LAGRUM: LAGRUM_TRIGGER_SRC, EULAGSTIFTNING: EU_TRIGGER_SRC,
+               FORESKRIFT: FORESKRIFT_TRIGGER_SRC,
                KORTLAGRUM: KORTLAGRUM_TRIGGER_SRC,
                RATTSFALL: RATTSFALL_TRIGGER_SRC,
                FORARBETEN: FORARBETEN_TRIGGER_SRC,
@@ -823,12 +869,36 @@ def yield_overlaps(uses, cites):
             if not any(u.start < c.end and c.start < u.end for c in cites)]
 
 
-def interleave(text, refs):
+def _styled(text, start, end, styles):
+    """`text[start:end]` as runs, split where the emphasis changes: a plain
+    `str` where the document set nothing, a ``{"text", "style"}`` dict where it
+    did. Unstyled text stays a bare string, which is the overwhelming majority
+    of the corpus and keeps the artifact's shape unchanged for it."""
+    if not styles:
+        return [text[start:end]] if start < end else []
+    cuts = sorted({start, end} | {p for a, b, _ in styles for p in (a, b)
+                                  if start < p < end})
+    out = []
+    for lo, hi in zip(cuts, cuts[1:], strict=False):
+        style = "".join(sorted({c for a, b, s in styles
+                                if a <= lo and hi <= b for c in s}))
+        out.append({"text": text[lo:hi], "style": style} if style
+                   else text[lo:hi])
+    return out
+
+
+def interleave(text, refs, styles=()):
     """Splice `refs` (Ref objects with disjoint [start, end) spans) into
     `text`, returning the inline-run list the artifact stores: plain `str`
     runs interleaved with {"predicate", "uri", "text"} link dicts, in
     document order. Text with no refs is a single-element list `[text]`;
     empty text is `[]`.
+
+    `styles` are (start, end, flags) spans of emphasis the document set --
+    "i", "b", "bi" -- in the same coordinates. Plain text is split where the
+    emphasis changes; a link takes a style only where one covers the whole of
+    it, since a half-italic citation would otherwise have to become two
+    separate links, which is worse than losing the emphasis on it.
 
     Spans must be disjoint -- parse_text consumes matched spans, and the
     one caller merging two ref lists (eurlex cites + term uses) filters
@@ -839,16 +909,18 @@ def interleave(text, refs):
         assert ref.start >= pos, (
             "overlapping ref spans: %r [%d:%d] overlaps text already "
             "consumed up to %d" % (ref.text, ref.start, ref.end, pos))
-        if ref.start > pos:
-            out.append(text[pos:ref.start])
+        out += _styled(text, pos, ref.start, styles)
         run = {"predicate": ref.predicate, "uri": ref.uri, "text": ref.text}
         if ref.kind:
             run["kind"] = ref.kind
+        covering = "".join(sorted({c for a, b, s in styles
+                                   if a <= ref.start and ref.end <= b
+                                   for c in s}))
+        if covering:
+            run["style"] = covering
         out.append(run)
         pos = ref.end
-    if pos < len(text):
-        out.append(text[pos:])
-    return out
+    return out + _styled(text, pos, len(text), styles)
 
 
 @dataclass
@@ -1174,6 +1246,11 @@ def parser(requested, expanded, abbrevs=(), eu_acts=(), lang="swe"):
             grammar += EU_NAMNAKT_RULES
             grammar += "\nEU_NAMNAKT: %s\n" % " | ".join(
                 '"%s"i' % a for a in eu_acts)
+    if FORESKRIFT in expanded:
+        # longest designation first, so "ELSÄK-FS" is not shadowed by a shorter
+        # registered series that prefixes it
+        grammar += "\nFS_DESIGNATION: %s\n" % " | ".join(
+            '"%s"' % d for d in sorted(FS_DESIGNATIONS, key=len, reverse=True))
     return Lark(grammar, parser='earley')
 
 
@@ -1279,6 +1356,20 @@ RE_OTHER_ISSUER = re.compile(
 # 29-arbetsgruppen", which is a *body*, not a reference to artikel 29
 ARTICLE29 = '29'
 RE_ARTICLE29_GROUP = re.compile(r'[-‑‐–—](?:arbets)?gruppen')
+
+# A document that lists its own chapters ("Innehållet i föreskrifterna är
+# uppdelat enligt följande: 1 kap. – Allmänna bestämmelser 2 kap. – …") has its
+# table of contents read as citations into whatever act its ingress named last
+# -- PMFS 2022:1 1 § sends all eight of its own chapters into
+# säkerhetsskyddsförordningen. Resolving it here was tried and abandoned: a
+# self-reference phrase ("dessa föreskrifter", "denna lag") that ends the
+# anaphoric focus also strips the base from the legitimate anaphora that
+# follows, and suppressed ~0.7% of links corpus-wide -- "8 kap. 2 § första
+# stycket samma lag", the "Förordning (2007:926)." change notes -- to save the
+# handful a table of contents costs. The signal that separates the two is
+# structural, not grammatical (consecutive chapters, each trailed by a dash and
+# a heading, none carrying a §), so it belongs to whatever recognises a TOC
+# block at parse time, not to the citation engine.
 
 
 def vagledning_slug(number):
@@ -1566,11 +1657,23 @@ class LagrumParser:
         self.emit({'law': law}, match, out, context, span=_law_id_span(node))
 
     def fmt_generic_ref(self, node, match, out, context):
-        # no chapter stickiness here: the old GenericRef production
-        # short-circuited to a single link before any state-setting
-        # custom formatter could run, so "3 kap. 2 §, 13 §" resolves
-        # "13 §" against the node's structural context, not chapter 3
-        self.emit(find_refids(node), match, out, context, span=_node_span(node))
+        # A generic_ref that names a chapter makes it sticky, like every other
+        # chapter-bearing production here. The old GenericRef production
+        # short-circuited to a single link before any state-setting formatter
+        # could run, so a following bare section resolved against the *node's*
+        # structural context instead -- which made the same construction mean
+        # two things depending on its joiner: "3 kap. 2 § och 13 §" already read
+        # 13 § as chapter 3's (fmt_individual_chapter_section_refs holds the
+        # chapter), while "3 kap. 2 §, 13 §" did not. Swedish drafting
+        # continues within the chapter until a new one or a new law is named, so
+        # "4 kap. 7 § första stycket samt 8 och 9 §§ säkerhetsskyddslagen" means
+        # 4 kap. 8-9 §§, not the chapterless 8 § the act does not have. An
+        # explicit law on the later ref still resets (emit prefers its own
+        # attrs), so a cross-act "… samt 5 § lagen (1990:52)" is untouched.
+        ids = find_refids(node)
+        self.emit(ids, match, out, context, span=_node_span(node))
+        if ids.get('chapter'):
+            match.currentchapter = ids['chapter']
 
     fmt_section_anatomy = fmt_generic_ref
     fmt_piece_item_ref = fmt_generic_ref
@@ -2151,6 +2254,18 @@ class LagrumParser:
         out.append({'_uri': self.base + 'ext/celex/' + celex})
 
     # --- MYNDIGHETSBESLUT (authority decisions) ---
+
+    # --- FORESKRIFT (myndighetsföreskrifter) ---
+
+    def fmt_foreskrift_ref(self, node, match, out, context):
+        """"PMFS 2022:1" -> ``pmfs/2022:1``. The löpnummer is normalised the way
+        the föreskrift basefiles mint it (no leading zeros), so a citation and
+        the document it names agree on one uri."""
+        toks = {t.type: t.value for t in _tree_tokens(node)}
+        arsutgava, lopnummer = toks['FS_NUMBER'].split(':')
+        out.append({'_uri': '%s%s/%s:%d' % (self.base, FS_SLUG[toks['FS_DESIGNATION']],
+                                            arsutgava, int(lopnummer)),
+                    '_span': _node_span(node)})
 
     def fmt_arn_refs(self, node, match, out, context):
         for dnr, span in _avg_ids(node, 'arn_ref_id'):

@@ -24,12 +24,15 @@ from pathlib import Path
 
 import pytest
 
+from accommodanda.lib import catalog
 from accommodanda.lib.datasets import NAMEDACTS
 from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from accommodanda.lib.lagrum import (
     ALL_PARSE_TYPES,
     ENKLALAGRUM,
     EULAGSTIFTNING,
+    FORESKRIFT_TRIGGER_SRC,
+    FS_DESIGNATIONS,
     EURATTSFALL,
     FORARBETEN,
     LAGRUM,
@@ -46,6 +49,7 @@ from accommodanda.lib.lagrum import (
     with_indefinite_aliases,
     yield_overlaps,
 )
+from accommodanda.lib.text import runs_text
 from accommodanda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
@@ -796,6 +800,57 @@ def test_interleave_disjoint_refs():
     ]
 
 
+def test_interleave_carries_emphasis_into_the_runs():
+    """The emphasis a document set survives into the artifact as a third run
+    shape: a ``{"text", "style"}`` dict beside the bare strings and the link
+    dicts. Unstyled text stays a bare string -- that is the overwhelming
+    majority of the corpus, and the artifact's shape for it is unchanged."""
+    text = "se bilaga 1 och 3 § nedan"
+    refs = [Ref(16, 19, "3 §", "dcterms:references", "https://x/#P3")]
+    # "bilaga 1" italic, the rest plain
+    assert interleave(text, refs, styles=[(3, 11, "i")]) == [
+        "se ",
+        {"text": "bilaga 1", "style": "i"},
+        " och ",
+        {"predicate": "dcterms:references", "uri": "https://x/#P3",
+         "text": "3 §"},
+        " nedan",
+    ]
+
+
+def test_a_link_takes_emphasis_only_when_it_is_wholly_covered():
+    """Half an italic citation cannot become two links without splitting the
+    reference, so a partial cover drops the emphasis on the link rather than the
+    link itself."""
+    text = "enligt 3 § nedan"
+    refs = [Ref(7, 10, "3 §", "dcterms:references", "https://x/#P3")]
+    assert interleave(text, refs, styles=[(0, 16, "i")]) == [
+        {"text": "enligt ", "style": "i"},
+        {"predicate": "dcterms:references", "uri": "https://x/#P3",
+         "text": "3 §", "style": "i"},
+        {"text": " nedan", "style": "i"},
+    ]
+    # the emphasis stops mid-citation: the link is whole, its style dropped
+    assert interleave(text, refs, styles=[(0, 9, "i")]) == [
+        {"text": "enligt ", "style": "i"},
+        {"predicate": "dcterms:references", "uri": "https://x/#P3",
+         "text": "3 §"},
+        " nedan",
+    ]
+
+
+def test_styled_runs_are_not_links():
+    """The artifact's link graph reads runs by `"uri" in run`, so a styled text
+    run -- which has none -- must not reach it. A styled run that counted as a
+    link would put an entry with no target in `links`."""
+    text = "se bilaga 1"
+    runs = interleave(text, [], styles=[(3, 11, "i")])
+    out = []
+    catalog.collect_links({"id": "P1", "text": runs}, None, None, out)
+    assert out == []
+    assert runs_text(runs) == text          # the text itself is still readable
+
+
 def test_interleave_rejects_overlapping_refs():
     # Every producer guarantees disjoint spans (parse_text consumes matched
     # spans; call sites merging two ref lists filter overlaps first), so an
@@ -850,3 +905,99 @@ def test_placeholder_predicate():
     assert is_placeholder_sfsid("0000:00")
     assert not is_placeholder_sfsid("1962:700")
     assert not is_placeholder_sfsid("1736:0123")
+
+
+def test_a_named_chapter_stays_sticky_across_a_continued_enumeration():
+    """A generic_ref that names a chapter keeps it for the bare sections that
+    follow, so a continued enumeration lands in the chapter it continues.
+
+    Säkerhetsskyddsförordningen 6 kap. 2 § cites "4 kap. 7 § första stycket samt
+    8 och 9 §§ säkerhetsskyddslagen"; the trailing pair used to mint the
+    chapterless `#P8`/`#P9`, which säkerhetsskyddslagen -- chaptered throughout
+    -- has no such provisions for, so the citation landed nowhere and 4 kap.
+    8-9 §§ never saw the citer in its rail. The joiner used to decide the
+    reading: "3 kap. 2 § och 13 §" already resolved 13 § inside chapter 3 while
+    ", 13 §" did not."""
+    parser = LagrumParser(NAMEDLAWS, basefile="2021:955", parse_types=[LAGRUM])
+
+    def uris(text):
+        parser.reset()
+        return [r.uri for r in parser.parse_text(text, context={})]
+
+    assert uris("enligt 4 kap. 7 § första stycket samt 8 och 9 §§ "
+                "säkerhetsskyddslagen (2018:585)") == [
+        "https://lagen.nu/2018:585#K4P7S1",
+        "https://lagen.nu/2018:585#K4P8",
+        "https://lagen.nu/2018:585#K4P9",
+        "https://lagen.nu/2018:585"]
+    # comma and "och" now agree, on the reading "och" already had
+    assert uris("i 3 kap. 2 §, 13 § brottsbalken") == \
+        uris("i 3 kap. 2 § och 13 § brottsbalken") == [
+        "https://lagen.nu/1962:700#K3P2",
+        "https://lagen.nu/1962:700#K3P13",
+        "https://lagen.nu/1962:700"]
+    # a later ref naming its own act is not the earlier chapter's continuation
+    assert uris("enligt 4 kap. 7 § säkerhetsskyddslagen (2018:585) samt "
+                "5 § lagen (1990:52) om vård") == [
+        "https://lagen.nu/2018:585#K4P7", "https://lagen.nu/1990:52#P5"]
+
+
+def test_foreskrift_references_mint_their_series_uri():
+    """A myndighetsföreskrift cited by designation and number. The engine had no
+    production for these at all, so a förarbete, a dom or a sibling föreskrift
+    naming one produced nothing -- the corpus held exactly zero inbound
+    references to any of its 12,936 föreskrifter, which read as a fact about
+    Swedish legal writing and was a missing rule."""
+    parser = LagrumParser(NAMEDLAWS, basefile="prop/2025/26:28",
+                          parse_types=ALL_PARSE_TYPES,
+                          abbreviations=ABBREVIATIONS)
+
+    def uris(text):
+        parser.reset()
+        return [r.uri for r in parser.parse_text(text, context={})]
+
+    # the parenthesised form a föreskrift's full name uses, and running text
+    assert uris("Säkerhetspolisens föreskrifter (PMFS 2022:1) om säkerhetsskydd") \
+        == ["https://lagen.nu/pmfs/2022:1"]
+    assert uris("Se vidare MSBFS 2020:7 och FFFS 2013:10.") == [
+        "https://lagen.nu/msbfs/2020:7", "https://lagen.nu/fffs/2013:10"]
+    # the designation maps through the författningssamling registry, so a series
+    # whose slug is not its naive transliteration lands right: ÅFS is
+    # Åklagarmyndighetens, not Arbetsmiljöverkets afs
+    assert uris("Åklagarmyndighetens föreskrifter (ÅFS 2005:9)") == \
+        ["https://lagen.nu/aafs/2005:9"]
+    assert uris("Elsäkerhetsverkets föreskrifter (ELSÄK-FS 2008:1)") == \
+        ["https://lagen.nu/elsakfs/2008:1"]
+    assert uris("Bokföringsnämndens allmänna råd (BFNAR 2012:1)") == \
+        ["https://lagen.nu/bfnar/2012:1"]
+
+
+def test_every_registered_series_reaches_the_grammar():
+    """The trigger regex decides which text is handed to the parser at all, so a
+    designation the grammar terminal accepts but the trigger never fires at is a
+    production that exists and silently never runs. Both are built from the
+    författningssamling registry; this pins that they stay in step -- spelling
+    the trigger by hand ("[A-ZÅÄÖ]…FS") missed LBS and RA-MS, which are not
+    FS-shaped."""
+    trigger = re.compile(FORESKRIFT_TRIGGER_SRC, re.X)
+    missed = [d for d in FS_DESIGNATIONS if not trigger.search("%s 2020:1" % d)]
+    assert missed == [], "registered series the trigger never fires at: %s" % missed
+
+
+def test_an_unregistered_series_mints_nothing():
+    """Only a registered författningssamling matches, so an invented or
+    mis-transcribed designation stays text rather than minting a dangling uri."""
+    parser = LagrumParser(NAMEDLAWS, basefile="prop/2025/26:28",
+                          parse_types=ALL_PARSE_TYPES,
+                          abbreviations=ABBREVIATIONS)
+    assert [r.uri for r in parser.parse_text("en hittepåserie XYZFS 2020:1",
+                                             context={})] == []
+
+
+def test_foreskrift_refs_do_not_disturb_sfs_refs():
+    parser = LagrumParser(NAMEDLAWS, basefile="prop/2025/26:28",
+                          parse_types=ALL_PARSE_TYPES,
+                          abbreviations=ABBREVIATIONS)
+    assert [r.uri for r in parser.parse_text(
+        "Enligt 3 kap. 5 § brottsbalken (1962:700) gäller annat.",
+        context={})] == ["https://lagen.nu/1962:700#K3P5"]
