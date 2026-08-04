@@ -37,4 +37,4 @@ en liten men viktig byggsten i ett sånt kunskapsbygge.
 
 Min förhoppning är att lagen.nu ska vara en sån byggsten.
 
-Staffan Malmgren, staffan@tomtebo.org
+Staffan Malmgren, staffan.malmgren@gmail.com

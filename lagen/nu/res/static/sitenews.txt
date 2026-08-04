@@ -105,7 +105,7 @@ presenteras sida vid sida med information om samma text - kommentarer,
 rättsfall, hänvisningar från andra lagar m.m. Samtidigt har
 färgschemat och övriga grafiska detaljer fått en översyn. Maila gärna
 dina kommentarer till <a
-href="staffan@tomtebo.org">staffan@tomtebo.org</a></p>
+href="mailto:staffan.malmgren@gmail.com">staffan.malmgren@gmail.com</a></p>
 
 2009-08-03 20:41:13 Betaversion av lagen.nu
 
@@ -147,7 +147,7 @@ för att driva ett pilotprojekt.</p>
 
 <p>För mer information, se <a
 href="http://wiki.lagen.nu/index.php/Huvudsida">projektsidan</a>, och
-skicka <a href="mailto:staffan@tomtebo.org">mig</a> en intresseanmälan
+skicka <a href="mailto:staffan.malmgren@gmail.com">mig</a> en intresseanmälan
 om det verkar intressant!</p>
 
 2009-02-19 21:02:11 Dags att uppgradera IE6
@@ -200,7 +200,7 @@ tidigare. Men det finns säkerligen massor av fel kvar! Därför finns
 det ett litet formulär för felanmälan på alla sidor. Använd gärna det
 om du stöter på något som inte ser rätt ut. Eller så kan du meddela
 problem och brister via epost till <a
-href="mailto:staffan@tomtebo.org">staffan@tomtebo.org</a>.</p>
+href="mailto:staffan.malmgren@gmail.com">staffan.malmgren@gmail.com</a>.</p>
 
 2008-02-23 13:26:49 Tack för hjälpen!
 
@@ -625,7 +625,7 @@ som jag vill ha med är på plats, och att det kan finnas massor av
 fel. Under de närmaste veckorna kommer mer funktionalitet på plats,
 men om det är något särskilt du efterlyser, eller om du hittat några
 buggar, kontakta mig gärna på <a
-href="mailto:staffan@tomtebo.org">staffan@tomtebo.org</a>. </p>
+href="mailto:staffan.malmgren@gmail.com">staffan.malmgren@gmail.com</a>. </p>
 
 2004-10-28 02:39:42 Publiceringsfunktion på plats
 

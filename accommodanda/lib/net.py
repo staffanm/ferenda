@@ -49,7 +49,7 @@ RETRY_STATUS = frozenset({403, 408, 425, 429, 500, 502, 503, 504})
 # the pipeline's two client identities: the honest harvester UA for services
 # that accept it, and a browser UA for the government sites that 403 bare
 # clients (the documents are public records; politeness lives in the delays)
-HARVESTER_UA = "lagen.nu harvester (https://lagen.nu/, staffan@tomtebo.org)"
+HARVESTER_UA = "lagen.nu harvester (https://lagen.nu/, staffan.malmgren@gmail.com)"
 BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
