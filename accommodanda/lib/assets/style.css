@@ -706,6 +706,13 @@ a.ext { color: var(--accent); }
 a.ext::after { content: " \2197"; font-size: .8em; color: var(--ink-4); }
 table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: .92rem; }
 td { border-top: 1px solid var(--rule); padding: .35rem .7rem; vertical-align: top; }
+th { border-bottom: 1px solid var(--ink-4); padding: .35rem .7rem;
+     vertical-align: bottom; text-align: left; font-weight: 600; }
+/* a wide authored table scrolls inside its own box rather than pushing the
+   page sideways (the /om pages' endpoint and tool tables on a phone).
+   `.site` is the editorial pages' body class -- document-page tables keep
+   their own layout rules above. */
+.site table { display: block; overflow-x: auto; }
 
 /* -- Frontpage / browse -- */
 .lead { font-family: var(--serif); font-size: 1.2rem; color: var(--ink-2); }

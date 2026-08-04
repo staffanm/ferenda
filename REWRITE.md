@@ -1392,7 +1392,14 @@ to a future per-doc incremental generate.
     `artifact/<source>/**.json` re-serialised one-per-line, gzipped, to
     `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
     artifact; the citation graph is already inline, so a line is self-contained
-    (no catalog read, no transform). Listed at `/api/v1/dumps`. Verified on the
+    (no catalog read, no transform). Listed at `/api/v1/dumps` (a manifest —
+    `source`/`file`/`size` — not a download route: the app's static mount
+    covers `generated/` only). The files themselves are now served by the
+    reverse proxy, not uvicorn — a `location /dumps/` block in
+    `docker/nginx/ferenda.lagen.nu.conf` (autoindex on, gzip off, sendfile +
+    byte ranges) over a read-only mount of `<data_root>/dumps`
+    (`docker-compose.prod.yml`), since the set is ~4.5 GB (forarbete alone
+    ~3.6 GB) — committed but **not yet deployed** to prod. Verified on the
     real `kommentar` source (212 lines). `test/test_dump.py`.
   - New deps: `opensearch-py`, `fastapi`, `uvicorn` (pyproject). ✅ **`lagen all
     index` run at corpus scale** against a provisioned OpenSearch — works.
@@ -3351,19 +3358,29 @@ one-off by `tools/migrate_site_content.py` from the legacy MediaWiki
 `Lagen.nu:Huvudsida` page, `lagen/nu/res/static/*.rst`, and `sitenews.txt` —
 the markdown is the source of truth thereafter.
 
-- **`model.py`**: a small block tree (`Heading`/`Paragraph`/`Bullets`/`Code`,
-  Swedish on-disk discriminators `rubrik`/`stycke`/`lista`/`kod`) plus the
-  three page shapes `Frontpage`, `AboutPage`, `Sitenews`/`NewsItem` — no
-  `Forfattning`/`Avgorande`-style domain model, since there's no citation
-  graph to hang one on.
+- **`model.py`**: a small block tree (`Heading`/`Paragraph`/`Bullets`/`Table`/
+  `Code`/`Rule`, Swedish on-disk discriminators `rubrik`/`stycke`/`lista`/
+  `tabell`/`kod`/`avdelare`) plus the three page shapes `Frontpage`,
+  `AboutPage`, `Sitenews`/`NewsItem` — no `Forfattning`/`Avgorande`-style
+  domain model, since there's no citation graph to hang one on. `Bullets`
+  carries `ordered` (`<ol>` vs `<ul>`); a run gained `italic` alongside
+  `bold`/`code`.
 - **`parse.py`**: markdown → JSON artifact for three fixed basefiles
   (`frontpage`, `om/<slug>`, `sitenews`, the last split into dated
-  `NewsItem`s on `## YYYY-MM-DD HH:MM:SS Title` heads); reuses
-  `lib.markdown`'s frontmatter/link/heading grammar and adds only the block
-  layer (bullet lists, fenced code) the legal-prose parser doesn't need. A
-  generic, symmetric `sfs:`/`eurlex:` link scheme (`[FB](sfs:1949:381)`,
-  `[GDPR](eurlex:32016R0679)`) was added to `lib.markdown.target_uri` for the
-  frontpage's law links — the content names the source, never its URL shape.
+  `NewsItem`s on `## YYYY-MM-DD HH:MM:SS Title` heads). The block and inline
+  layers are parsed by **markdown-it-py** (CommonMark + the GFM `table` rule,
+  `html: False`) rather than a line scanner of our own — editorial content
+  needs the whole ordinary markdown vocabulary (tables, ordered lists,
+  emphasis), which `lib.markdown` deliberately doesn't have; `blocks(body,
+  where)` walks the resulting `SyntaxTreeNode` onto this vertical's typed
+  blocks and runs, raising `ValueError` naming the basefile for a construct
+  with no block form (rule:errors-drive-retry-use-raise) rather than dropping
+  the prose. Link *targets* still resolve through the shared
+  `lib.markdown.target_uri` grammar, extended locally with site-relative
+  `/…`/`#…` cross-links and `mailto:`. A generic, symmetric `sfs:`/`eurlex:`
+  link scheme (`[FB](sfs:1949:381)`, `[GDPR](eurlex:32016R0679)`) was added to
+  `lib.markdown.target_uri` for the frontpage's law links — the content names
+  the source, never its URL shape.
 - **`render.py`**: artifacts → static HTML + an Atom feed, one entry point
   `write_site(out_root)`. Registered in `build.py` as `SOURCES["site"]` with
   a `parse` Stage, but — like `remisser` — it is **absent from `ARTIFACTS`**,
@@ -3981,6 +3998,20 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **site** (2026-08-03) — `site/parse.py`'s hand-rolled block scanner replaced
+  by **markdown-it-py** (CommonMark + the GFM `table` rule, `html: False`);
+  `blocks(body, where)` walks the resulting `SyntaxTreeNode` onto the
+  vertical's typed blocks, raising `ValueError` naming the basefile for a
+  construct with no block form rather than dropping the prose
+  (rule:errors-drive-retry-use-raise). Link *targets* still resolve through
+  the shared `lib.markdown.target_uri`, extended locally with site-relative
+  `/…`/`#…` and `mailto:`. `model.py` gained `Table` (`tabell`; head/rows/align,
+  each cell its own run list) and `Rule` (`avdelare`); `Bullets` gained
+  `ordered` (`<ol>` vs `<ul>`); runs gained `italic`. `render.py` emits tables
+  (with `text-align` from `|---:|`), ordered lists, `<hr>` and `<em>`.
+  `markdown-it-py` moved from a transitive (`rich`) to a declared dependency.
+  Fixes live defects: ordered lists and italics on the `/om` pages were
+  rendering as literal `1.` and `*asterisks*`, tables as walls of pipes.
 - **render/lib** (2026-08-02) — `lib/render.py` (4,551 lines) split three ways.
   The shared page kit — `Site` (the render context), the generic node walk
   (`render_node`/`render_runs`), the context rail (`Rail`/`RailSection` + the

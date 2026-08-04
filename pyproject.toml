@@ -59,6 +59,10 @@ dependencies = [
     "langdetect",
     "lark",
     "lxml",
+    # CommonMark + GFM tables for the editorial site markdown (site/parse.py).
+    # It reached the venv transitively via rich; declared here because we import
+    # it directly, the same reason httpx is spelled out above.
+    "markdown-it-py",
     # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- MCPServer +
     # the Streamable HTTP transport. >=2.0 is what speaks the 2026-07-28 protocol
     # revision (no initialize handshake, no Mcp-Session-Id); the 1.x line stops at

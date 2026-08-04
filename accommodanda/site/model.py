@@ -3,20 +3,21 @@ sitenews). Unlike the legal-document verticals this carries no citation graph --
 it is hand-authored prose, links and lists -- so the model is a small block
 tree, not a `Forfattning`/`Avgorande`-style domain structure.
 
-A **block** is one of `Heading` / `Paragraph` / `Bullets` / `Code`; its `type`
-field is the on-disk discriminator the renderer dispatches on (kept in Swedish
-to match the other artifacts: `rubrik`/`stycke`/`lista`/`kod`). Inline content
-is a list of *runs*: a bare `str` for plain text, or a dict `{"text", "uri"?,
-"bold"?, "code"?}` for a link / emphasised / code span (`uri` resolved at parse
-time via the shared `lib.markdown` link grammar, so the artifact is the source
-of truth for structure and links).
+A **block** is one of `Heading` / `Paragraph` / `Bullets` / `Table` / `Code` /
+`Rule`; its `type` field is the on-disk discriminator the renderer dispatches on
+(kept in Swedish to match the other artifacts: `rubrik`/`stycke`/`lista`/
+`tabell`/`kod`/`avdelare`). Inline content is a list of *runs*: a bare `str` for
+plain text, or a dict `{"text", "uri"?, "bold"?, "italic"?, "code"?}` for a link
+/ emphasised / code span (`uri` resolved at parse time via the shared
+`lib.markdown` link grammar, so the artifact is the source of truth for
+structure and links).
 """
 
 from dataclasses import dataclass
 
 # an inline run: a bare str (plain text) or a dict {"text", "uri"?, "bold"?,
-# "code"?} for a link / emphasised / code span (no run dataclass -- runs are the
-# leaf serialised shape the renderer consumes directly)
+# "italic"?, "code"?} for a link / emphasised / code span (no run dataclass --
+# runs are the leaf serialised shape the renderer consumes directly)
 Run = str | dict
 
 
@@ -36,7 +37,21 @@ class Paragraph:
 @dataclass
 class Bullets:
     items: list[list[Run]]      # one run list per <li>
+    ordered: bool               # `1.` -> <ol>, `-`/`*` -> <ul>
     type: str = "lista"
+
+
+@dataclass
+class Table:
+    """A GFM pipe table. `head` is the one header row, `rows` the body; each cell
+    is its own run list. `align` carries the `|---:|` delimiter row, one entry
+    per column (`"left"`/`"center"`/`"right"`, or None where unset) -- required,
+    not defaulted, so a Table whose `align` cannot line up with `head` is not
+    constructible in the first place."""
+    head: list[list[Run]]
+    rows: list[list[list[Run]]]
+    align: list[str | None]
+    type: str = "tabell"
 
 
 @dataclass
@@ -45,7 +60,13 @@ class Code:
     type: str = "kod"
 
 
-Block = Heading | Paragraph | Bullets | Code
+@dataclass
+class Rule:
+    """A `---` thematic break."""
+    type: str = "avdelare"
+
+
+Block = Heading | Paragraph | Bullets | Table | Code | Rule
 
 
 @dataclass

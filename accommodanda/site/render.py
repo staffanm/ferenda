@@ -39,10 +39,13 @@ def _run_html(run):
         html = "<code>%s</code>" % html
     if "uri" in run:
         uri = run["uri"]
-        ext = not (uri.startswith("https://lagen.nu") or uri[:1] in ("/", "#"))
+        ext = not (uri.startswith(("https://lagen.nu", "mailto:"))
+                   or uri[:1] in ("/", "#"))
         html = '<a%s href="%s"%s>%s</a>' % (
             ' class="ext"' if ext else "", escape(href(uri)),
             ' rel="external"' if ext else "", html)
+    if run.get("italic"):
+        html = "<em>%s</em>" % html
     if run.get("bold"):
         html = "<strong>%s</strong>" % html
     return html
@@ -56,6 +59,29 @@ def _runs_text(runs):
     return "".join(r if isinstance(r, str) else r["text"] for r in runs)
 
 
+def _cell_html(tag, runs, align):
+    return "<%s%s>%s</%s>" % (
+        tag, ' style="text-align:%s"' % align if align else "",
+        _runs_html(runs), tag)
+
+
+def _row_html(tag, cells, align):
+    # markdown-it's table rule normalises every row to the header's column
+    # count (a short row is padded, a long one truncated), so align lines up
+    # cell for cell -- verified against its token tree, not enforced here
+    return "<tr>%s</tr>" % "".join(
+        _cell_html(tag, c, a) for c, a in zip(cells, align, strict=True))
+
+
+def _table_html(block):
+    align = block["align"]
+    return "<table>%s%s</table>" % (
+        "<thead>%s</thead>" % _row_html("th", block["head"], align),
+        "<tbody>%s</tbody>" % "".join(
+            _row_html("td", row, align) for row in block["rows"])
+        if block["rows"] else "")
+
+
 def _block_html(block):
     t = block["type"]
     if t == "rubrik":
@@ -64,10 +90,15 @@ def _block_html(block):
     if t == "stycke":
         return "<p>%s</p>" % _runs_html(block["runs"])
     if t == "lista":
-        return "<ul>%s</ul>" % "".join(
-            "<li>%s</li>" % _runs_html(item) for item in block["items"])
+        tag = "ol" if block["ordered"] else "ul"
+        return "<%s>%s</%s>" % (tag, "".join(
+            "<li>%s</li>" % _runs_html(item) for item in block["items"]), tag)
+    if t == "tabell":
+        return _table_html(block)
     if t == "kod":
         return "<pre>%s</pre>" % escape(block["text"])
+    if t == "avdelare":
+        return "<hr>"
     raise ValueError("unknown site block type %r" % t)
 
 

@@ -6,6 +6,8 @@ import json
 import xml.dom.minidom as minidom
 from pathlib import Path
 
+import pytest
+
 from accommodanda.lib import compress, markdown
 from accommodanda.site import parse, render
 
@@ -47,9 +49,95 @@ def test_about_parse_title_code_and_links():
     assert art["title"] == "Länkning"
     code = next(b for b in art["blocks"] if b["type"] == "kod")
     assert code["text"] == "https://lagen.nu/2003:389"
-    uris = {r["uri"] for b in art["blocks"] if b["type"] == "stycke"
+    # not every styled run is a link -- the fixture also carries bold/code runs
+    uris = {r.get("uri") for b in art["blocks"] if b["type"] == "stycke"
             for r in b["runs"] if not isinstance(r, str)}
     assert "https://lagen.nu/1960:729" in uris
+
+
+def test_about_parses_a_gfm_table_with_alignment():
+    # the whole reason the site vertical parses with markdown-it rather than a
+    # line scanner of its own: a pipe table used to fall through to a paragraph
+    # and render as a wall of literal `|`
+    art = parse.artifact(FIX, "om/lankning")
+    table = next(b for b in art["blocks"] if b["type"] == "tabell")
+    assert [_flat(c) for c in table["head"]] == ["Sort", "Adress", "Not"]
+    assert table["align"] == [None, None, "right"]        # the `|---:|` column
+    assert len(table["rows"]) == 2
+    # cells carry runs, not text: a code span and a link survive into the cell
+    assert table["rows"][0][1] == [
+        {"text": "https://lagen.nu/2003:389", "code": True}]
+    assert table["rows"][1][1] == [
+        {"text": "dom", "uri": "/dom/ad/1993:100"}]
+
+
+def test_about_parses_ordered_lists_emphasis_mailto_and_rule():
+    art = parse.artifact(FIX, "om/lankning")
+    ordered = next(b for b in art["blocks"]
+                   if b["type"] == "lista" and b["ordered"])
+    assert [_flat(i) for i in ordered["items"]] == ["hitta lagen",
+                                                    "hitta paragrafen"]
+    # `*paragrafen*` is emphasis, not two literal asterisks
+    assert {"text": "paragrafen", "italic": True} in ordered["items"][1]
+    assert any(b["type"] == "avdelare" for b in art["blocks"])    # `---`
+    runs = [r for b in art["blocks"] if b["type"] == "stycke"
+            for r in b["runs"] if not isinstance(r, str)]
+    assert {"text": "mig", "uri": "mailto:staffan.malmgren@gmail.com"} in runs
+
+
+def test_about_render_emits_table_ordered_list_and_rule():
+    html = render.render_about(parse.artifact(FIX, "om/lankning"))
+    assert "<table><thead><tr><th>Sort</th>" in html
+    assert '<td style="text-align:right">1</td>' in html
+    assert "<ol><li>hitta lagen</li>" in html
+    assert "<em>paragrafen</em>" in html
+    assert "<hr>" in html
+    # a mailto: link is not decorated as an outbound-site link
+    assert '<a href="mailto:staffan.malmgren@gmail.com">mig</a>' in html
+
+
+def test_a_hard_wrap_inside_a_link_stays_one_run():
+    # the author's wrap column is typography, not content: the softbreak used to
+    # become its own styled run, so a wrapped link rendered as three <a>s -- the
+    # middle one a link-decorated, arrow-suffixed space (live on /om/api)
+    art = parse.artifact(FIX, "om/lankning")
+    runs = [r for b in art["blocks"] if b["type"] == "stycke" for r in b["runs"]]
+    assert {"text": "bryts över två rader",
+            "uri": "https://example.org/a"} in runs
+    assert {"text": "fet text", "bold": True} in runs
+    html = render.render_about(art)
+    body = html[html.find("<main"):html.find("</main>")]
+    assert '<a class="ext" href="https://example.org/a" rel="external">' \
+        'bryts över två rader</a>' in body
+    # no run-split elements in the body (the masthead's adjacent nav anchors
+    # are why this is scoped to <main>)
+    assert "</a><a" not in body and "</strong><strong" not in body
+
+
+def test_a_heading_keeps_its_code_span():
+    # `_text` kept only `text` tokens, so a code span in a heading vanished
+    # outright and left a double space -- the silent loss this parser exists to
+    # prevent
+    art = parse.artifact(FIX, "om/lankning")
+    assert "Ankaret #K6P18 i en rubrik" in [
+        b["text"] for b in art["blocks"] if b["type"] == "rubrik"]
+
+
+def test_unmappable_markdown_names_the_basefile():
+    # a construct with no block form must say so rather than drop the prose
+    with pytest.raises(ValueError, match="om/x: block markdown 'blockquote'"):
+        parse.blocks("> citat", "om/x")
+
+
+def test_an_empty_link_label_names_the_basefile():
+    # `[](/a)` resolves its target but has nothing to hang it on, so the link
+    # would vanish without trace
+    with pytest.raises(ValueError, match="om/x: the link to '/a' has an empty"):
+        parse.blocks("se [](/a) här", "om/x")
+
+
+def _flat(runs):
+    return "".join(r if isinstance(r, str) else r["text"] for r in runs)
 
 
 def test_about_site_relative_and_begrepp_links():
