@@ -48,6 +48,82 @@ def test_body_lines_drops_sub_body_size_marginalia():
     assert texts == ["Bakgrund till målet.", "beslutet ska verkställas."]
 
 
+def test_body_lines_rebuilds_the_style_spans_with_the_text():
+    """A line keeps only its body-size runs, so its text gets shorter -- and its
+    emphasis spans have to be re-derived from the same runs. Leaving the original
+    line's spans on the shortened text left them pointing past its end, which
+    crashed 44 MMOD/PMOD verdicts in `page_paragraphs` ("Den som vill överklaga
+    Mark- och miljö-" is 39 characters and carried a span at 40-63)."""
+    runs = [Run(46, 52, "Dok.Id 1234", False, False, 15),      # doc-id stamp
+            Run(213, 500, "Den som vill ", False, False, 19),
+            Run(500, 800, "överklaga", False, True, 19)]       # italic
+    l = Line(text="Dok.Id 1234 Den som vill överklaga", top=90, bold=False,
+             lead_bold=False, italic=False, size=19, runs=runs,
+             spans=[(26, 35, "i")])                # against the *unstripped* text
+    kept = _body_lines([l], 19)[0]
+    assert kept.text == "Den som vill överklaga"
+    assert kept.spans == [(13, 22, "i")]
+    assert max(b for _a, b, _s in kept.spans) <= len(kept.text)
+    # ...and the rebuild goes through _join_runs, so a run boundary is not forced
+    # to be a word boundary either
+    assert page_paragraphs([kept], None, 1)[0].text == "Den som vill överklaga"
+
+
+def test_inject_numbers_shifts_the_spans_it_pushes_along():
+    """The domskäl number is prepended to the line's text, so every emphasis span
+    over it moves by exactly what was inserted."""
+    l = Line(text="stycket börjar", top=100, bold=False, lead_bold=False,
+             italic=False, size=19,
+             runs=[Run(213, 800, "stycket börjar", False, False, 19)],
+             spans=[(0, 7, "b")])
+    injected, _breaks = _inject_numbers([l], [(100, 12)])
+    assert injected[0].text == "12. stycket börjar"
+    assert injected[0].spans == [(4, 11, "b")]
+    assert injected[0].text[4:11] == "stycket"
+
+
+def test_an_injected_number_survives_a_line_that_names_the_court():
+    """The ordinal lives in the line's `text`, not in its runs, so anything that
+    rebuilds the line from its runs drops it. `page_paragraphs` did exactly that
+    for every line its court-header regex merely *matched* -- and a numbered
+    domskäl paragraph very often opens by naming the court, so the number went
+    missing from precisely the paragraphs that carry one."""
+    runs = [Run(213, 700, "Högsta domstolen meddelade prövningstillstånd.",
+                False, False, 19)]
+    l = Line(text=runs[0].text, top=100, bold=False, lead_bold=False,
+             italic=False, size=19, runs=runs, spans=[])
+    injected, _breaks = _inject_numbers([l], [(100, 5)])
+    assert page_paragraphs(injected, "Högsta domstolen", 1)[0].text == \
+        "5. Högsta domstolen meddelade prövningstillstånd."
+
+
+def test_a_margin_header_run_is_still_stripped():
+    """The guard above must not stop a real running header from going: when the
+    strip does drop a run, the line is still rebuilt from what survives."""
+    runs = [Run(46, 120, "Högsta domstolen", False, False, 15),   # margin id
+            Run(213, 700, "Detta är brödtext i domen.", False, False, 19)]
+    l = Line(text="Högsta domstolen Detta är brödtext i domen.", top=200,
+             bold=False, lead_bold=False, italic=False, size=19, runs=runs,
+             spans=[])
+    assert page_paragraphs([l], "Högsta domstolen", 1)[0].text == \
+        "Detta är brödtext i domen."
+
+
+def test_body_lines_rederives_the_style_flags_too():
+    """`bold`/`lead_bold`/`italic` are derived from the run set exactly like the
+    spans, so dropping the marginalia has to re-derive them. It didn't: a bold
+    heading sharing a baseline with the vertical Dok.Id stamp kept the whole
+    line's `bold=False` and shipped as a `Stycke` instead of a `Rubrik`."""
+    runs = [Run(46, 52, "D", False, False, 15),                   # doc-id stamp
+            Run(213, 600, "DOMSKÄL", True, False, 19)]            # bold heading
+    l = Line(text="D DOMSKÄL", top=90, bold=False, lead_bold=False, italic=False,
+             size=19, runs=runs, spans=[])
+    kept = _body_lines([l], 19)[0]
+    assert kept.text == "DOMSKÄL"
+    assert kept.bold and kept.lead_bold          # both were False before
+    assert page_paragraphs([kept], None, 1)[0].bold
+
+
 def test_inject_numbers_forces_paragraph_breaks():
     # R2: HD prints domskäl numbers as margin bitmaps and packs the paragraphs with
     # no extra vertical gap. _inject_numbers prepends "N. " to the line at each
@@ -657,7 +733,13 @@ def test_clean_nyckelord_strips_register_junk():
 # against a real poppler run, which the synthetic-Line unit tests cannot.
 
 def _pdf_record():
-    return {"domstol": {"domstolKod": "HDO", "domstolNamn": "Högsta domstolen"},
+    # `domstolNamn` is spelled the way the fixture PDF spells it. The generator
+    # writes plain ASCII (the minimal PDF carries no accented font encoding), so
+    # an accented name here would never match the PDF's own text -- and the
+    # court-header path would go unexercised, which is exactly how the fixture
+    # missed the lost-ordinal bug: `page_paragraphs` rebuilds a matched line from
+    # its runs, and the third domskäl paragraph opens by naming the court.
+    return {"domstol": {"domstolKod": "HDO", "domstolNamn": "Hogsta domstolen"},
             "malNummerLista": ["Ä 1-24"], "referatNummerLista": [],
             "avgorandedatum": "2024-01-01"}
 
@@ -679,6 +761,10 @@ def test_parse_pdf_record_recovers_contiguous_domskal_numbers():
     # the three margin bitmaps become contiguous ordinals 1, 2, 3 on their lines
     assert [b.ordinal for b in numbered] == ["1", "2", "3"]
     assert numbered[0].text.startswith("Fragan")
+    # paragraph 3 opens by naming the court, so its line matches the running-
+    # header regex. That must not cost it its ordinal: the rebuild-from-runs
+    # that strips a header run drops anything held only in the line's text.
+    assert numbered[2].text.startswith("Hogsta domstolen gor")
     # every recovered block is page-tagged for the facsimile link
     assert all(b.page == 1 for b in numbered)
     # the DOMSKÄL heading survives as an unnumbered rubrik

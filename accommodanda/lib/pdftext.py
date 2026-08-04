@@ -552,7 +552,13 @@ def _normalized_with_spans(text, spans):
 
 
 def _join_runs(runs):
-    """One line's runs as `(text, style spans)`. A run boundary is not a word
+    """One line's runs as `(text, style spans)` -- the one way to rebuild a
+    line's text from its runs, so the text and the spans over it cannot get out
+    of step. (dv drops a line's sub-body-size runs and rebuilds it; joining
+    those on a space and keeping the original line's spans left them pointing
+    past the end of the shorter text.)
+
+    A run boundary is not a word
     boundary: poppler splits a line at every font change, so an italic phrase
     inside a sentence arrives as three runs and the punctuation that follows it
     starts its own ("En sammanfattning … finns i " / "bilaga 1" /
@@ -619,12 +625,30 @@ def _lines(spans):
     out = []
     for _base, runs, top in grouped:
         runs.sort(key=lambda r: r.left)
-        text, spans = _join_runs(runs)
-        out.append(Line(text, top,
-                        all(r.bold for r in runs), runs[0].bold,
-                        all(r.italic for r in runs),
-                        max(r.size for r in runs), runs, spans))
+        out.append(line_from_runs(runs, top))
     return out
+
+
+def line_from_runs(runs, top):
+    """A `Line` built from its runs -- text, style spans *and* the whole-line
+    style flags all derived from the same run set, so they cannot disagree.
+
+    The one constructor, for the same reason `_join_runs` is the one way to
+    rebuild the text: a caller that drops runs from a line (dv strips the
+    sub-body-size marginalia its verdicts share a baseline with) and then
+    patches only `text` leaves `bold`/`lead_bold`/`italic` describing the run
+    set that no longer exists. That is not cosmetic -- `page_paragraphs.heading`
+    and dv's `Rubrik` test both read those flags, so a bold heading that shared
+    a baseline with a Dok.Id stamp shipped as a `Stycke`."""
+    # a precondition, not validation of external data: `_lines`' groups are
+    # non-empty by construction and a run-dropping caller filters first. Without
+    # it the failure is a bare IndexError out of `runs[0].bold` (rule:fail-fast)
+    assert runs, "line_from_runs needs at least one run"
+    text, spans = _join_runs(runs)
+    return Line(text, top,
+                all(r.bold for r in runs), runs[0].bold,
+                all(r.italic for r in runs),
+                max(r.size for r in runs), runs, spans)
 
 
 def flat_lines(pdf_path, hidden=False):
@@ -1059,8 +1083,16 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
             if l.runs:
                 # the line is rebuilt from the runs that survive, so its style
                 # spans are re-derived against the stripped text rather than
-                # left pointing at offsets the strip has moved
-                raw, spans = _join_runs(_strip_header_runs(l.runs, header_re))
+                # left pointing at offsets the strip has moved -- but only when
+                # the strip actually dropped a run. `header_re.search` hits on
+                # prose that merely names the identifier too, and rebuilding
+                # there discards anything a caller put in `text` that is not in
+                # `runs`: dv prepends a numbered domskäl paragraph's ordinal
+                # ("5. ") to the text, and every such paragraph whose first line
+                # named the court silently lost its number.
+                body_runs = _strip_header_runs(l.runs, header_re)
+                if len(body_runs) != len(l.runs):
+                    raw, spans = _join_runs(body_runs)
             else:
                 # no run geometry (OCR/legacy routes): strip only a line that
                 # is nothing but the header and a page number/date

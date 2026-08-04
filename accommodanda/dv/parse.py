@@ -37,11 +37,11 @@ from ..lib.lagrum import (
 )
 from ..lib.pdftext import (
     line_body_size,
+    line_from_runs,
     page_paragraphs,
     pdf_images,
     pdf_pages,
 )
-from ..lib.util import normalize_space
 from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -321,15 +321,22 @@ def _body_lines(lines, body_size):
     and the address footer, and critically the *vertical* "Dok.Id …" stamp whose
     characters share a baseline with the last body line of each page (so they'd
     otherwise splice a stray "1 3 " onto the text). Rebuilt from the surviving
-    runs in reading order."""
+    runs in reading order, through `line_from_runs` -- text, style spans *and*
+    the whole-line style flags are derived from the same surviving runs, so none
+    of them can describe the run set that was dropped. The spans pointing past
+    the shorter text crashed 44 MMOD/PMOD verdicts; `bold`/`lead_bold` kept
+    describing the marginalia, so a bold heading sharing a baseline with the
+    vertical Dok.Id stamp came out non-bold and shipped as a `Stycke`."""
     if not body_size:
         return lines
     out = []
     for l in lines:
         runs = [r for r in l.runs if r.size >= body_size]
-        text = normalize_space(" ".join(r.text for r in runs))
-        if text:
-            out.append(replace(l, text=text, runs=runs))
+        if not runs:
+            continue
+        line = line_from_runs(runs, l.top)
+        if line.text:
+            out.append(line)
     return out
 
 
@@ -367,7 +374,12 @@ def _inject_numbers(lines, numbers):
         n = next((num for top, num in numbers
                   if abs(l.top - top) <= NUMBER_TOP_TOL), None)
         if n is not None:
-            l = replace(l, text="%d. %s" % (n, l.text))
+            # the number is prepended to the text, so the emphasis spans over it
+            # slide by exactly what was inserted
+            prefix = "%d. " % n
+            l = replace(l, text=prefix + l.text,
+                        spans=[(a + len(prefix), b + len(prefix), style)
+                               for a, b, style in l.spans])
             breaks.add(l.top)
         out.append(l)
     return out, breaks
