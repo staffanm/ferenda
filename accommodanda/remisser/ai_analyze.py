@@ -1,6 +1,9 @@
 """`lagen remisser ai-analyze <basefile>` -- the sole LLM pass for the remiss
 corpus: map one organisation's remissvar onto the *specific sections* of the
 SOU/Ds it discusses, with a per-section sentiment score and a verbatim quote.
+An argument may name a single answer or a whole *ärende*, which `answers`
+expands to every answer fetched for it -- the useful unit, since a remiss is
+read as "what did the instances say about this betänkande".
 
 The remiss corpus is never published as its own pages; the point of this pass is
 to feed the referred förarbete's page a context rail ("here's what
@@ -19,13 +22,14 @@ Like every ai-* action the LLM is called only here, on an explicit analyze of a
 named basefile -- never from a corpus-wide parse/relate/generate.
 """
 
+import difflib
 import json
 from pathlib import Path
 
 from ..lib import annstore, compress, layout, llm
-from ..lib.text import runs_text
+from ..lib.text import runs_text, sentences
 from ..lib.util import basefile_slug, normalize_space
-from .model import Remissvar
+from .model import Remiss, Remissvar, org_slug
 
 PROMPT = Path(__file__).with_name("sentiment_prompt.txt")
 OUTLINE_PLACEHOLDER = "[OUTLINE]"
@@ -40,6 +44,39 @@ LABEL_MAX = 160
 # a chain-of-thought plus a quote-carrying segment list (the endpoint default of
 # 4096 would truncate a long reasoning trace into a `length` finish)
 MAX_TOKENS = 16000
+# what kind of sentence the quote is. "grund" carries the reason the instance
+# gives (the reader-valuable part); "standpunkt" says the answer stated no reason
+# for this section, only its position. Swedish remissvar are asymmetric here --
+# an organisation argues when it objects and often just endorses when it agrees --
+# so a large share of positive segments genuinely have no grounds to quote, and
+# the honest answer must be available or the model will invent one.
+QUOTE_TYPES = frozenset({"grund", "standpunkt"})
+
+
+class Unanalyzable(ValueError):
+    """The model twice failed to produce a usable analysis of one answer.
+
+    Its own name, because the caller has to tell this apart from every other
+    ValueError `analyze` can surface -- a verified layer refused by
+    `annstore.guard`, a corrupt artifact failing `json.loads` -- which are
+    permanent faults. Only this one is worth another draw: sampling is
+    stochastic, so a re-run genuinely re-samples. Reporting the others as
+    "re-run to retry" would promise a retry that can never succeed."""
+
+
+# how many consecutive sentences one citation may cover. A reason usually lives
+# in one sentence and sometimes runs into the next; three is enough for the
+# "claim, then its ground" pattern and small enough that a rail excerpt stays an
+# excerpt rather than a paragraph.
+MAX_SPAN = 3
+# a reworded quote is snapped back to the answer's own wording only when one unit
+# is plainly the one meant: this similar, and this far clear of the runner-up.
+# Calibrated over every rejected quote this corpus produced -- at 0.90/0.05 half
+# recover, and those left behind are the ones whose source is itself damaged (a
+# footnote spliced into the sentence, OCR debris), where "restoring the original"
+# would publish the damage.
+SNAP_MIN = 0.90
+SNAP_MARGIN = 0.05
 
 
 def _avsnitt(nodes):
@@ -65,12 +102,69 @@ def section_outline(structure):
     return "\n".join(lines), ids
 
 
-def _check_scored(obj, haystack, where, valid_ids=None):
+def answer_units(full_text):
+    """The quotable units of an answer, flat and in document order: sentences,
+    split further at the colon/dash that introduces a clause so a verdict and its
+    reason are separately quotable. Paragraph boundaries end a unit whether or
+    not the paragraph ended in a full stop (PDF prose often does not), so a bare
+    list item is a unit like any other.
+
+    These are what `snap_to_source` matches a reworded quote against, so the
+    granularity is the granularity of the repair: too coarse and a quote that
+    trimmed a lead-in cannot be recognised, too fine and two units compete."""
+    return [s for para in full_text for s in sentences(para, clause_breaks=True)]
+
+
+def snap_to_source(quote, units, haystack):
+    """The answer's own wording for a `quote` the model reworded, or None when no
+    unit is clearly the one meant.
+
+    Candidates are filtered to those that actually occur in `haystack` first.
+    Joining consecutive units with a space does *not* always reproduce the
+    source: the unit split drops a letterless chunk (the dash introducing a
+    bulleted ground), so a two-unit span can reassemble text that is not
+    contiguous in the answer -- exactly the splice the prompt forbids. Filtering
+    keeps the one guarantee this pass rests on: whatever reaches the `.ann`
+    occurs verbatim in the answer.
+
+    The model does not fabricate -- measured over every rejected quote in this
+    corpus, all were 60-95%% similar to a real passage and none was invented. The
+    failure is misquotation: a dropped clause, a normalised word order,
+    "förordrar" for "förordar". Recovering the source wording is therefore a
+    lookup, not a guess, *provided* one candidate stands clearly above the rest.
+
+    Both bars must be cleared. `SNAP_MIN` keeps the match close enough to be the
+    same passage; `SNAP_MARGIN` requires the runner-up to be visibly worse, which
+    is what rules out an answer that says nearly the same thing twice. Below
+    them the caller rejects, which is the right outcome: the quotes that match
+    weakly are the ones whose source is itself damaged (a footnote spliced into
+    the sentence, OCR debris), and "restoring" those would publish the damage."""
+    scored = sorted(
+        ((difflib.SequenceMatcher(None, quote, u, autojunk=False).ratio(), u)
+         for u in _spans(units) if normalize_space(u) in haystack),
+        key=lambda r: -r[0])
+    if not scored or scored[0][0] < SNAP_MIN:
+        return None
+    runner_up = next((r for r, u in scored[1:] if u != scored[0][1]), 0.0)
+    return scored[0][1] if scored[0][0] - runner_up >= SNAP_MARGIN else None
+
+
+def _spans(units, k=MAX_SPAN):
+    """Every run of 1..k consecutive units -- a quote may legitimately cover more
+    than one, so the candidates must too."""
+    for i in range(len(units)):
+        for n in range(1, k + 1):
+            if i + n <= len(units):
+                yield " ".join(units[i:i + n])
+
+
+def _check_scored(obj, where, valid_ids=None):
     """Shape-check one scored object (overall, or a segment when `valid_ids` is
-    given): a numeric `sentiment` in [-1, 1], a non-empty `quote` that is a
-    verbatim substring of the answer, and -- for a segment -- a `forarbete_id`
-    that is a real section. Raises `ValueError` naming the fault (fed back on the
-    retry) so a hallucinated id or an invented quote never reaches the `.ann`."""
+    given): a numeric `sentiment` in [-1, 1], a `quote_type`, and -- for a
+    segment -- a `forarbete_id` that is a real section. The quote is handled
+    separately by `_resolved_quote`, which can repair it rather than only reject
+    it. Raises `ValueError` naming the fault (fed back on the retry) so a
+    hallucinated id never reaches the `.ann`."""
     if not isinstance(obj, dict):
         raise ValueError("%s is not an object" % where)
     sentiment = obj.get("sentiment")
@@ -79,21 +173,40 @@ def _check_scored(obj, haystack, where, valid_ids=None):
         raise ValueError("%s has a non-numeric sentiment" % where)
     if not -1 <= sentiment <= 1:
         raise ValueError("%s sentiment %r is outside [-1, 1]" % (where, sentiment))
-    quote = obj.get("quote")
-    if not (isinstance(quote, str) and quote.strip()):
-        raise ValueError("%s has an empty quote" % where)
-    # the model paraphrases unless forced not to; the quote powers a rail excerpt,
-    # so require it be actual answer text -- compared whitespace-normalised, not
-    # byte-exact, since the PDF-extracted text wraps and re-spaces freely
-    if normalize_space(quote) not in haystack:
-        raise ValueError("%s quote is not a verbatim substring of the answer: %r"
-                         % (where, quote[:80]))
+    # the score already carries the stance, so a quote that merely restates it
+    # adds nothing; `quote_type` makes that distinction explicit rather than
+    # leaving a reader (or the rail) to guess whether "Tillstyrks" is all the
+    # answer said or all the model found. Naming "standpunkt" as a legitimate
+    # answer is what keeps the model from inventing grounds for the many answers
+    # that endorse without giving any.
+    if obj.get("quote_type") not in QUOTE_TYPES:
+        raise ValueError("%s has quote_type %r, expected one of %s"
+                         % (where, obj.get("quote_type"), sorted(QUOTE_TYPES)))
     if valid_ids is not None and obj.get("forarbete_id") not in valid_ids:
         raise ValueError("segment cites forarbete_id %r not in the outline"
                          % obj.get("forarbete_id"))
 
 
-def _validate(content, valid_ids, haystack):
+def _resolved_quote(obj, where, units, haystack):
+    """The answer's own wording for one object's quote. A quote that is already
+    verbatim stands; one the model reworded is snapped back to the unit it
+    plainly meant, so the layer carries the organisation's words and not the
+    model's paraphrase of them. A quote matching nothing clearly raises -- the
+    retry draws again, and a second failure leaves no layer at all."""
+    quote = obj.get("quote")
+    if not (isinstance(quote, str) and quote.strip()):
+        raise ValueError("%s has an empty quote" % where)
+    if normalize_space(quote) in haystack:
+        return quote
+    snapped = snap_to_source(normalize_space(quote), units, haystack)
+    if snapped is None:
+        raise ValueError("%s quote is not a verbatim substring of the answer, and "
+                         "no single passage is clearly the one meant: %r"
+                         % (where, quote[:80]))
+    return snapped
+
+
+def _validate(content, valid_ids, units, haystack):
     """Parse and shape-check the model's reply into the `.ann` payload:
     `{"overall": {...}, "segments": [...]}`. `segments` may be empty (an answer can
     be purely general). Raises `ValueError` -- not assert, per
@@ -103,19 +216,45 @@ def _validate(content, valid_ids, haystack):
     if not isinstance(data, dict):
         raise ValueError("response is not a JSON object")
     overall = data.get("overall")
-    _check_scored(overall, haystack, "overall")
+    _check_scored(overall, "overall")
     segments = data.get("segments")
     if not isinstance(segments, list):
         raise ValueError("response lacks a segments list")
     for seg in segments:
-        _check_scored(seg, haystack, "a segment", valid_ids=valid_ids)
+        _check_scored(seg, "a segment", valid_ids=valid_ids)
     return {
         "overall": {"sentiment": float(overall["sentiment"]),
-                    "quote": overall["quote"]},
+                    "quote": _resolved_quote(overall, "overall", units, haystack),
+                    "quote_type": overall["quote_type"]},
         "segments": [{"forarbete_id": s["forarbete_id"],
                       "sentiment": float(s["sentiment"]),
-                      "quote": s["quote"]} for s in segments],
+                      "quote": _resolved_quote(s, "a segment", units, haystack),
+                      "quote_type": s["quote_type"]} for s in segments],
     }
+
+
+def is_arende(basefile):
+    """Whether a basefile names a whole remiss ärende ("<typ>/<document id>")
+    rather than one answer ("<typ>/<document id>/<org-slug>"). One home for the
+    rule: `answers` expands on it and the CLI action decides on it, and two
+    copies would drift."""
+    return basefile.count("/") == 1
+
+
+def answers(basefile):
+    """The remissvar basefiles one `ai-analyze` argument names. An *ärende*
+    ("<typ>/<document id>" -- "sou/2026-21") expands to every answer actually
+    fetched for it, in the order its record lists them; an argument that already
+    names one answer ("<typ>/<document id>/<org-slug>") is returned unchanged, so
+    the action takes either. Expansion reads the stored `Remiss` record rather
+    than globbing the artifact tree: the record is what says an instance was
+    downloaded at all, the same authority `remisser_list` parses from."""
+    if not is_arende(basefile):
+        return [basefile]
+    remiss = Remiss.from_dict(json.loads(
+        compress.read_text(layout.remisser_arende(basefile))))
+    return ["%s/%s" % (remiss.basefile, org_slug(inst.source_url))
+            for inst in remiss.svar if inst.downloaded]
 
 
 def analyze(basefile, force=False):
@@ -154,11 +293,17 @@ def analyze(basefile, force=False):
                        % (basefile, typ, fa_basefile))
 
     text = "\n\n".join(svar.full_text)
+    units = answer_units(svar.full_text)
+    assert units, "%s: the parsed answer has no quotable text" % basefile
     prompt = (PROMPT.read_text().replace(OUTLINE_PLACEHOLDER, outline)
               .replace(TEXT_PLACEHOLDER, text))
     haystack = normalize_space(text)
-    result = llm.author(prompt, lambda reply: _validate(reply, valid_ids, haystack),
-                        max_tokens=MAX_TOKENS)
+    try:
+        result = llm.author(
+            prompt, lambda reply: _validate(reply, valid_ids, units, haystack),
+            max_tokens=MAX_TOKENS)
+    except ValueError as exc:
+        raise Unanalyzable("%s: %s" % (basefile, exc)) from exc
 
     return annstore.write(out, result,
                           {**annstore.artifact_input("remisser", basefile),
