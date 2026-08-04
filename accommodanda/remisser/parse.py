@@ -30,7 +30,14 @@ from pathlib import Path
 
 from ..lib import compress, layout, poi
 from ..lib.errors import SkipDocument
-from ..lib.pdftext import page_paragraphs, pages_with_ocr
+from ..lib.pdftext import (
+    drop_footnotes,
+    join_across_pages,
+    page_paragraphs,
+    pages_with_ocr,
+    strip_addressing,
+    strip_page_furniture,
+)
 from ..lib.util import sniff_extension
 from .model import Remiss, Remissvar, org_slug
 
@@ -95,8 +102,16 @@ def _body_text(path, patch_key):
     if kind != ".pdf":
         raise ValueError("%s: stored as a document but its bytes are %s"
                          % (path, kind or "not a document format we read"))
-    return [p.text for pageno, lines in _pages(path, patch_key)
-            for p in page_paragraphs(lines, None, pageno) if p.text]
+    # no fixed identifier to name (see the module docstring), so the furniture is
+    # found by its shape instead -- and the two halves of a sentence a page break
+    # split are rejoined, which the strip alone does not do. Footnotes go too:
+    # in a remissvar they are source references, never the sentence saying why
+    # the organisation objects, and poppler splices note and marker into the
+    # middle of the body sentence that cites them.
+    pages = drop_footnotes(strip_page_furniture(_pages(path, patch_key)))
+    return strip_addressing(join_across_pages(
+        [[p.text for p in page_paragraphs(lines, None, pageno) if p.text]
+         for pageno, lines in pages]))
 
 
 def parse_record(basefile, root):

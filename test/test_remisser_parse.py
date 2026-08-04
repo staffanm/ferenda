@@ -73,6 +73,13 @@ def test_parse_record_to_dict_from_dict_roundtrip(corpus):
     assert again == result
 
 
+def _line(text, size=12):
+    """A minimal stand-in for a real extracted line. It must be a Line, not a
+    bare str: the extraction reads `.size` to tell a footnote from body text."""
+    return pdftext.Line(text=text, top=0, bold=False, lead_bold=False,
+                        italic=False, size=size)
+
+
 def test_pages_always_asks_for_hidden_text(corpus, monkeypatch):
     """Some remissvar carry a text layer poppler renders invisible (observed:
     Valmyndigheten's answer to SOU 2026:2, which extracts to nothing without
@@ -80,7 +87,7 @@ def test_pages_always_asks_for_hidden_text(corpus, monkeypatch):
     hidden text, so those are never silently empty."""
     seen = []
     monkeypatch.setattr(pdftext, "pdf_pages",
-                        lambda path, key, hidden: seen.append(hidden) or [(1, ["x"])])
+                        lambda path, key, hidden: seen.append(hidden) or [(1, [_line("x")])])
     monkeypatch.setattr(parse, "page_paragraphs", lambda lines, ident, no: [])
     parse.parse_record("sou/2025:99/kammarkollegiet", corpus)
     assert seen == [True]
@@ -95,11 +102,12 @@ def test_pages_falls_back_to_ocr_when_a_pdf_has_no_text_layer(corpus, monkeypatc
 
     def fake_pages(path, key, hidden):
         assert hidden
-        return [(1, ["recovered"])] if path == str(ocred) else [(1, []), (2, [])]
+        return ([(1, [_line("recovered")])] if path == str(ocred)
+                else [(1, []), (2, [])])
 
     monkeypatch.setattr(pdftext, "pdf_pages", fake_pages)
     monkeypatch.setattr(parse, "page_paragraphs",
-                        lambda lines, ident, no: [SimpleNamespace(text=t) for t in lines])
+                        lambda lines, ident, no: [SimpleNamespace(text=l.text) for l in lines])
     result = parse.parse_record("sou/2025:99/kammarkollegiet", corpus)
     assert result.full_text == ["recovered"]
 
@@ -111,7 +119,7 @@ def test_pages_does_not_ocr_a_pdf_that_yielded_lines(corpus, monkeypatch):
     monkeypatch.setattr(pdftext, "ocr_pdf",
                         lambda path, lang: pytest.fail("OCR ran on a text PDF"))
     monkeypatch.setattr(pdftext, "pdf_pages",
-                        lambda path, key, hidden: [(1, ["a letterhead line"])])
+                        lambda path, key, hidden: [(1, [_line("a letterhead line")])])
     monkeypatch.setattr(parse, "page_paragraphs", lambda lines, ident, no: [])
     assert parse.parse_record("sou/2025:99/kammarkollegiet", corpus).full_text == []
 
