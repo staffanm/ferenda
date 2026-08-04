@@ -22,22 +22,22 @@ import pytest
 
 from accommodanda.lib import layout, pdftext
 from accommodanda.lib.pdftext import (
+    FIGURE_MIN,
     PAGE_STRIDE,
+    Figure,
     Line,
     Para,
+    Run,
     _lines,
     classify_letterhead,
     flat_lines,
-    is_page_number,
-    points_from_pdftohtml,
-    Run,
-    FIGURE_MIN,
-    Figure,
     is_figure,
     is_italic_subheading,
+    is_page_number,
     letterhead_footnotes,
     page_paragraphs,
     pdf_pages,
+    points_from_pdftohtml,
 )
 
 
@@ -637,3 +637,204 @@ def test_a_margin_header_sharing_a_baseline_is_still_stripped():
 def test_a_line_that_is_only_the_header_drops_out():
     lines = _lines([_span(63, 55, 163, "Prop. 2017/18:89 ")])
     assert page_paragraphs(lines, "Prop. 2017/18:89", 40) == []
+
+
+# ---- running page furniture, discovered by shape ---------------------------
+# Regression for a real remisser defect: sou/2026-20/ydre-kommun's letterhead
+# footer is spliced into the middle of a sentence ("...i kommuner Datum Sida
+# Ydre kommun 2026-05-19 KS 2026/130 4(5) med ett redan högt skattetryck..."),
+# so a verbatim quote spanning the page break matched nothing in the artifact.
+
+def _page(pageno, rows):
+    """(pageno, [Line]) from (text, top, size) triples."""
+    return (pageno, [pdftext.Line(text=t, top=top, bold=False, lead_bold=False,
+                                  italic=False, size=size)
+                     for t, top, size in rows])
+
+
+def _furniture_pages():
+    """Four pages whose footer repeats with a changing page number and date."""
+    return [_page(n, [("Ydre kommun %d(4)" % n, 10, 8),
+                      ("Datum 2026-05-1%d KS 2026/130" % n, 20, 8),
+                      ("brödtext på sidan %d som fortsätter" % n, 500, 11),
+                      ("Ydre kommun %d(4)" % n, 990, 8)])
+            for n in range(1, 5)]
+
+
+def test_strip_page_furniture_drops_a_repeating_numbered_footer():
+    out = pdftext.strip_page_furniture(_furniture_pages())
+    kept = [l.text for _pageno, lines in out for l in lines]
+    # the page number differs on every page, so only digit-masked matching finds it
+    assert not [t for t in kept if "Ydre kommun" in t]
+    assert not [t for t in kept if t.startswith("Datum")]
+    assert len(kept) == 4 and all(t.startswith("brödtext") for t in kept)
+
+
+def test_strip_page_furniture_spares_a_single_page():
+    """One page cannot establish that anything recurs, and leaving a masthead in
+    is much cheaper than deleting a real sentence. The floor is two rather than
+    three deliberately: a third of these answers are one or two pages, and at
+    three they were never stripped at all. At two, a line must appear on *both*
+    pages, which is still evidence -- the digit masking is what makes "1(2)" and
+    "2(2)" the same line."""
+    pages = _furniture_pages()[:1]
+    assert pdftext.strip_page_furniture(pages) == pages
+
+
+def test_strip_page_furniture_uses_a_two_page_document():
+    kept = [l.text for _pageno, lines in
+            pdftext.strip_page_furniture(_furniture_pages()[:2]) for l in lines]
+    assert not [t for t in kept if "Ydre kommun" in t]
+    assert all(t.startswith("brödtext") for t in kept)
+
+
+def test_strip_page_furniture_spares_body_text_that_repeats():
+    """A refrain in the body is not furniture: it is body-positioned and
+    body-sized, so two of the three signals are absent."""
+    pages = [_page(n, [("Ydre kommun %d(4)" % n, 10, 8),
+                       ("Kommunen avstyrker förslaget", 500, 11),
+                       ("annan brödtext %d" % n, 600, 11)])
+             for n in range(1, 5)]
+    kept = [l.text for _pageno, lines in pdftext.strip_page_furniture(pages)
+            for l in lines]
+    assert kept.count("Kommunen avstyrker förslaget") == 4
+    assert not [t for t in kept if "Ydre kommun" in t]
+
+
+def test_join_across_pages_rejoins_a_split_sentence():
+    joined = pdftext.join_across_pages([
+        ["Risken är att både invånare och företag i kommuner"],
+        ["med ett redan högt skattetryck blir dubbelbestraffade."]])
+    assert joined == ["Risken är att både invånare och företag i kommuner "
+                      "med ett redan högt skattetryck blir dubbelbestraffade."]
+
+
+def test_join_across_pages_leaves_real_paragraph_boundaries_alone():
+    # the first page ends a sentence, and the next starts with a capital
+    assert pdftext.join_across_pages([
+        ["Kommunen tillstyrker förslaget."],
+        ["Vad gäller finansieringen har kommunen synpunkter."]]) == [
+        "Kommunen tillstyrker förslaget.",
+        "Vad gäller finansieringen har kommunen synpunkter."]
+    # a mid-page paragraph is never joined to the one before it
+    assert pdftext.join_across_pages([
+        ["slutar utan punkt", "börjar med gemen men är inte sidans första"]]) == [
+        "slutar utan punkt", "börjar med gemen men är inte sidans första"]
+
+
+# ---- footnotes, for a source that does not want them ------------------------
+# Regression for sou/2026-9/kommerskollegium: the note and its marker land
+# inside the body sentence citing them, so the text read "...de som registreras
+# 7 EU-kommissionens vägledning, C (2023)1392 slutlig tilldelas ett
+# samordningsnummer" and no quote spanning the splice matched.
+
+def _run(text, size):
+    return pdftext.Run(left=0, right=100, text=text, bold=False, italic=False, size=size)
+
+
+def _footnote_page():
+    """One page: body at size 17, a marker run and a note line at 14 (exactly
+    FOOTNOTE_DROP below), matching the measured Kommerskollegium PDF."""
+    body = pdftext.Line(text="de som registreras 7 tilldelas ett samordningsnummer",
+                        top=100, bold=False, lead_bold=False, italic=False, size=17,
+                        runs=[_run("de som registreras ", 17), _run("7", 14),
+                              _run(" tilldelas ett samordningsnummer", 17)])
+    note = pdftext.Line(text="Se EU-kommissionens vägledning, kapitel 5.3.",
+                        top=900, bold=False, lead_bold=False, italic=False, size=14)
+    other = pdftext.Line(text="Kommerskollegium tillstyrker i huvudsak förslaget.",
+                         top=200, bold=False, lead_bold=False, italic=False, size=17)
+    return [(1, [body, note, other])]
+
+
+def test_drop_footnotes_removes_the_note_and_its_marker():
+    (_pageno, lines), = pdftext.drop_footnotes(_footnote_page())
+    assert [l.text for l in lines] == [
+        "de som registreras tilldelas ett samordningsnummer",
+        "Kommerskollegium tillstyrker i huvudsak förslaget."]
+
+
+def test_drop_footnotes_keeps_a_number_set_at_body_size():
+    """Size is the signal, not the digit: "3" in the body is a paragraph number,
+    an amount or a chapter, and dropping those would eat real text."""
+    line = pdftext.Line(text="kapitel 3 anger att", top=100, bold=False,
+                        lead_bold=False, italic=False, size=17,
+                        runs=[_run("kapitel ", 17), _run("3", 17),
+                              _run(" anger att", 17)])
+    (_pageno, lines), = pdftext.drop_footnotes([(1, [line, line])])
+    assert [l.text for l in lines] == ["kapitel 3 anger att"] * 2
+
+
+def test_drop_footnotes_leaves_a_page_without_font_info_alone():
+    """The OCR and legacy routes carry no sizes, so there is no signal -- and
+    guessing from the digits alone would delete real numbers."""
+    pages = [(1, [pdftext.Line(text="7 kap. 2 § anger", top=10, bold=False,
+                               lead_bold=False, italic=False, size=0)])]
+    assert pdftext.drop_footnotes(pages) == pages
+
+
+# ---- the letter's addressing apparatus --------------------------------------
+# `strip_page_furniture` finds what repeats; a masthead is printed once. Over 400
+# reparsed remissvar that left 48% carrying a contact block and 44% a Datum/Dnr
+# line, so composition rather than repetition has to catch these.
+
+APPARATUS = [
+    "Företagarförbundet Tel: 020-760 761 Org.nr: 802488-8805 Box 1132, "
+    "262 22 Ängelholm E-post: info@ff.se Hemsida: www.ff.se",
+    "Justitiedepartementet ju.remissvar@regeringskansliet.se",
+    "Ert dnr Ju2021/00658",
+    "Diarienummer: Ju2022/02173",
+    "Yttrande Diarienummer 31 januari 2024 2023/04213",
+    "• VÄSTMANLANDS TINGSRÄTT Datum Diarienummer",
+    "Box 913, 391 29 Kalmar E-post: registrator@ehalsomyndigheten.se "
+    "Besök: Södra Långgatan 60, Kalmar",
+]
+
+PROSE = [
+    # cites a diarienummer but is plainly a sentence -- the token rule alone
+    # would have eaten the reference, and an earlier phone pattern really did
+    "Utredningen (dnr Ju2021/00658) föreslår att kravet på tillstånd tas bort, "
+    "vilket kommunen anser är en rimlig avvägning mellan tillgänglighet och kontroll.",
+    "Kommunen avstyrker förslaget om skattebroms eftersom det inskränker det "
+    "kommunala självstyret på ett sätt som inte har utretts tillräckligt.",
+    # a bare amount that looks like a phone number until you require 0/+46
+    "Beloppet uppgår till 020 000 kronor enligt 3 kap. 2 § och bör enligt "
+    "kommunen räknas upp årligen med index för att behålla sitt värde.",
+    "Tillstyrks",
+    "Kommunen tillstyrker förslaget.",
+]
+
+
+def test_strip_addressing_drops_the_masthead_and_reference_lines():
+    assert pdftext.strip_addressing(APPARATUS) == []
+
+
+def test_strip_addressing_keeps_prose_untouched():
+    assert pdftext.strip_addressing(PROSE) == PROSE
+
+
+def test_strip_addressing_leaves_surviving_prose_byte_identical():
+    """Removing address tokens is how apparatus is *recognised*, never what is
+    stored. An earlier cut emitted the token-stripped text for kept paragraphs
+    too, which silently deleted a cited URL out of the artifact -- and the
+    artifact is the source of truth for the text. The cost of the fix is that a
+    recipient's e-mail spliced into a sentence stays; that is noise a reader can
+    skip, unlike a missing citation, which they cannot recover."""
+    cited = ("Se vidare Datainspektionens vägledning på www.imy.se/vagledningar "
+             "som kommunen anser bör beaktas i det fortsatta lagstiftningsarbetet.")
+    spliced = ("Remiss av betänkandet Ett effektivt straffrättsligt skydd för "
+               "statliga johanna.johansson@regeringskansliet.se stöd till företag, "
+               "och de förslag som lämnas där, bör enligt förbundet omarbetas.")
+    assert pdftext.strip_addressing([cited, spliced]) == [cited, spliced]
+
+
+def test_strip_addressing_drops_a_page_marker_line():
+    """On a one-page letter nothing repeats, so `strip_page_furniture` cannot see
+    the printed page marker; shape has to catch it. Bounded by length, because
+    prose cites "artikel 8 (3) i Infosoc-direktivet" and must survive."""
+    assert pdftext.strip_addressing(
+        ["Lantmäterimyndigheten 1 (1)", "Remissvar 1(2)", "1(2) Tillväxtverket",
+         "Medicinska fakulteten sid 3 (3)"]) == []
+    prose = ("Detta gällde särskilt implementeringen av artikel 8 (3) i "
+             "Infosoc-direktivet liksom lagstiftningen om tillfälliga kopior.")
+    assert pdftext.strip_addressing([prose, "Kapitel 5 Huvudmannen i fokus"]) == [
+        prose, "Kapitel 5 Huvudmannen i fokus"]

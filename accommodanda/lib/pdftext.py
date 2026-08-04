@@ -1042,6 +1042,246 @@ def is_page_number(text, pageno):
     return bool(_page_number_re(pageno).fullmatch(text.strip()))
 
 
+# --- running page furniture, discovered rather than named ---------------------
+# `page_paragraphs` strips a header the caller can *name* (förarbete's document
+# identifier, avg's court name). A source where every document carries a
+# different masthead -- remisser, where each of ~90 organisations answers on its
+# own letterhead -- has no such string, and passing the organisation's own name
+# is worse than nothing: it recurs as ordinary self-reference in body prose
+# ("Ale kommun välkomnar..."). What the furniture does have, whatever it says, is
+# a shape: it repeats on most pages, sits in a margin, and is set small.
+
+FURNITURE_MIN_PAGES = 2     # below this, repetition is not evidence of anything
+FURNITURE_MIN_SHARE = 0.6   # of pages a line class must appear on
+FURNITURE_MARGIN = 0.12     # top/bottom fraction of the page it must sit in
+_RE_DIGITS = re.compile(r"\d+")
+
+
+def _furniture_key(text):
+    """The class a line belongs to for repetition counting: its text with digit
+    runs masked and whitespace collapsed. Masking is what makes this work at all
+    -- a running footer carries the page number and often the date, so it differs
+    literally on every page ("... 4(5)", "... 5(5)") while being the same
+    furniture. Returns None for a line too short to judge."""
+    key = _RE_DIGITS.sub("#", normalize_space(text))
+    return key if len(key) >= 4 else None
+
+
+def strip_page_furniture(pages, min_pages=FURNITURE_MIN_PAGES,
+                         min_share=FURNITURE_MIN_SHARE, margin=FURNITURE_MARGIN):
+    """`[(pageno, [Line])]` -> the same, with running headers/footers dropped.
+
+    A line is furniture when all three hold: its digit-masked text recurs on at
+    least `min_share` of the pages, it sits within `margin` of the top or bottom
+    of the page's text block, and it is no larger than the page's dominant body
+    size. Requiring them together is deliberate -- deleting a real sentence is
+    far worse than leaving a masthead in, and each signal alone has a plausible
+    counter-example: a short answer may repeat a real sentence, a heading sits
+    high on the page, and body text is body-sized by definition.
+
+    Where the source carries no font sizes (the OCR and legacy routes) the size
+    test cannot apply and repetition plus margin position decide alone. That is
+    the opposite call from `drop_footnotes`, which refuses to act at all without
+    sizes -- deliberately: a footnote is *only* identifiable by its size, whereas
+    a line repeating in the margin of every page is already furniture whatever
+    it is set in.
+
+    Documents under `min_pages` pages are returned untouched -- a single page
+    establishes nothing. The floor is two rather than three deliberately: a third
+    of remissvar are one or two pages and at three were never stripped at all,
+    while at two a line must appear on *both* pages, which is evidence. The digit
+    masking is what makes "1(2)" and "2(2)" the same line.
+    """
+    pages = list(pages)
+    if len(pages) < min_pages:
+        return pages
+    counts = Counter()
+    for _pageno, lines in pages:
+        # per page, not per line: a phrase repeated three times on one page is
+        # not thereby a running header
+        counts.update({k for k in (_furniture_key(l.text) for l in lines) if k})
+    threshold = max(2, int(len(pages) * min_share))
+    repeated = {k for k, n in counts.items() if n >= threshold}
+    if not repeated:
+        return pages
+
+    out = []
+    for pageno, lines in pages:
+        tops = [l.top for l in lines]
+        if not tops:
+            out.append((pageno, lines))
+            continue
+        lo, hi = min(tops), max(tops)
+        span = (hi - lo) or 1
+        body_size = line_body_size(lines)
+        kept = [l for l in lines
+                if not (_furniture_key(l.text) in repeated
+                        and ((l.top - lo) / span <= margin
+                             or (hi - l.top) / span <= margin)
+                        and (not body_size or not l.size or l.size <= body_size))]
+        out.append((pageno, kept))
+    return out
+
+
+# --- footnotes, for a source that does not want them --------------------------
+# förarbete and dv *keep* footnotes: for a court decision the endnote apparatus is
+# where the citations live. A remissvar is the opposite case -- its footnotes are
+# nearly always a source reference ("Se EU-kommissionens vägledning, kapitel
+# 5.3"), never the sentence stating why the organisation objects, and poppler
+# interleaves both the note and its superscript marker into the body text, so a
+# sentence reads "...de som registreras 7 EU-kommissionens vägledning, C
+# (2023)1392 slutlig tilldelas ett samordningsnummer". A reader gets nonsense and
+# a quote spanning the splice matches nothing. Same size test förarbete already
+# uses to *find* footnotes (`FOOTNOTE_DROP`), applied to drop them instead.
+_RE_MARKER = re.compile(r"^[\s\[(]*\d{1,3}[\s\])]*$")
+
+
+def _marker_runs(runs, body):
+    """`runs` with superscript reference markers removed: a run set noticeably
+    smaller than the body size whose whole text is a bare number. Size is the
+    signal, not the digit -- "3" at body size is a paragraph number, an amount or
+    a chapter, and dropping those would eat real text."""
+    return [r for r in runs
+            if not (r.size and r.size <= body - FOOTNOTE_DROP
+                    and _RE_MARKER.fullmatch(r.text))]
+
+
+def drop_footnotes(pages):
+    """`[(pageno, [Line])]` -> the same with footnote text and the superscript
+    markers referencing it removed. A line whose own size sits `FOOTNOTE_DROP`
+    below the page's body size is the note; a small bare-number run inside a
+    body line is its marker. Pages carrying no font information (the OCR and
+    legacy routes) are returned untouched -- without sizes there is no signal,
+    and guessing from the digits alone would delete real numbers."""
+    out = []
+    for pageno, lines in pages:
+        body = line_body_size(lines)
+        if not body:
+            out.append((pageno, lines))
+            continue
+        kept = []
+        for line in lines:
+            if line.size and line.size <= body - FOOTNOTE_DROP:
+                continue                      # the note's own text
+            if line.runs:
+                runs = _marker_runs(line.runs, body)
+                if len(runs) != len(line.runs):
+                    text, spans = _join_runs(runs)
+                    line = replace(line, text=text, spans=spans, runs=runs)
+            kept.append(line)
+        out.append((pageno, kept))
+    return out
+
+
+# --- the letter's addressing apparatus ---------------------------------------
+# `strip_page_furniture` finds what *repeats*. A letter's masthead does not: the
+# recipient department, the reference line ("Ert dnr Ju2021/00658") and the
+# sender's contact block are printed once, on page one, and a third of these
+# answers are too short for repetition to be evidence of anything at all.
+# Measured over 400 reparsed answers, that left 48% still carrying a contact
+# block and 44% a Datum/Dnr line.
+#
+# What the apparatus does have is composition: it is dense in tokens prose does
+# not contain -- an address, a phone number, a postal code, an org number -- and
+# it is not built of sentences. Both halves are needed. The tokens alone would
+# eat "Utredningen (dnr Ju2021/00658) föreslår att ..."; the shape alone would
+# eat a heading.
+_ADDRESS_TOKEN = re.compile(r"""(?:
+      \S+@\S+\.\w{2,}                            # e-postadress
+    | (?:https?://|www\.)\S+                     # webbplats
+    | (?:\+46|\b0)\d[\d\s()-]{6,}\d              # telefonnummer (svenskt: 0 / +46)
+    | \b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäöA-ZÅÄÖ]+  # postnummer + ort
+    | \bOrg\.?\s?nr\.?:?\s*[\d\s-]+              # organisationsnummer
+    | \bOrganisationsnummer:?\s*[\d\s-]+
+)""", re.X)
+_APPARATUS_LABEL = re.compile(
+    r"\b(?:Dnr|Diarienummer|Ärendenummer|Datum|Sida|Handläggare|Beteckning|"
+    r"Postadress|Besöksadress|Gatuadress|Telefon|Telefax|E-post|Epost|Webbplats|"
+    r"Hemsida|Box|Bankgiro|Plusgiro)\b", re.I)
+# how much of a paragraph may be address tokens before it is apparatus rather
+# than prose that happens to contain one
+APPARATUS_SHARE = 0.25
+
+
+def _is_prose(text):
+    """Whether a paragraph reads as running text rather than as apparatus: enough
+    words to be a sentence and a terminator, or long enough that it must be prose
+    however it ends (PDF extraction loses plenty of full stops)."""
+    words = text.split()
+    return len(words) >= 12 or (len(words) >= 8 and text.rstrip()[-1:] in ".!?:")
+
+
+def _is_apparatus(para, cleaned):
+    """Whether a paragraph is the letter's addressing apparatus rather than what
+    the organisation had to say. Judged on what removing the address tokens costs
+    it: a contact block is mostly tokens and collapses, while a sentence that
+    merely cites a diarienummer barely changes. A short line stacking two or more
+    reference labels ("VÄSTMANLANDS TINGSRÄTT Datum Diarienummer") is the printed
+    reference header, which carries no tokens at all."""
+    if not para:
+        return False
+    if 1 - len(cleaned) / len(para) >= APPARATUS_SHARE:
+        return True
+    labels, words = len(_APPARATUS_LABEL.findall(para)), len(cleaned.split())
+    if labels >= 2 and words < 14:
+        return True
+    # "Lantmäterimyndigheten 1 (1)", "Remissvar 1(2)" -- the printed page marker
+    # with whatever the masthead sets beside it. On a one-page letter nothing
+    # repeats, so `strip_page_furniture` cannot see it. Bounded by length: prose
+    # cites "artikel 8 (3) i Infosoc-direktivet" and must survive.
+    if RE_PAGEMARK.search(para) and not _is_prose(cleaned) and words < 10:
+        return True
+    # a single label is enough on a line too short to be a sentence: "Ert dnr
+    # Ju2021/00658", "Yttrande Diarienummer 31 januari 2024". Prose that cites a
+    # diarienummer runs far longer than this, so the length bound is what keeps
+    # the two apart.
+    return bool(labels and words < 10 and not _is_prose(cleaned))
+
+
+def strip_addressing(paras):
+    """Paragraph texts with the letter's addressing apparatus -- the masthead,
+    the reference line, the contact footer -- dropped whole.
+
+    A paragraph that survives is emitted **unchanged**. Removing the address
+    tokens is how apparatus is *recognised* (a contact block collapses, a
+    sentence citing a diarienummer barely changes), not what is stored: a
+    remissvar that cites its source by URL ("Se vidare vägledningen på
+    www.imy.se/...") would otherwise have that URL silently deleted from the
+    artifact, and the artifact is the source of truth for the text
+    (rule:artifact-is-truth). The cost is that a recipient's e-mail spliced into
+    a sentence stays in the prose, which is noise a reader can skip -- unlike a
+    missing citation, which they cannot recover."""
+    return [para for para in paras
+            if not _is_apparatus(para, normalize_space(_ADDRESS_TOKEN.sub(" ", para)))
+            and re.search(r"[^\W\d_]", para)]
+
+
+# a page break falls mid-sentence far more often than at one: `page_paragraphs`
+# reflows a page at a time, so the tail of page 3 and the head of page 4 come
+# back as two paragraphs even when they are one sentence. Stripping the
+# furniture between them is only half the repair -- without the join, a verbatim
+# quote spanning the break is still not a substring of any single paragraph.
+_SENTENCE_END = re.compile(r"[.!?:;»”\"')\]]\s*$")
+
+
+def join_across_pages(per_page):
+    """`[[str]]` (a page's paragraph texts, in order) -> one flat [str] with
+    paragraphs that a page break split rejoined. A page's last paragraph and the
+    next page's first are one paragraph when the former does not end a sentence
+    and the latter does not begin one (no leading capital, digit or bullet) --
+    the conservative reading, since wrongly joining two real paragraphs merely
+    merges them while wrongly splitting one breaks every quote across it."""
+    out = []
+    for paras in per_page:
+        for i, para in enumerate(paras):
+            if (i == 0 and out and para[:1].islower()
+                    and not _SENTENCE_END.search(out[-1])):
+                out[-1] = "%s %s" % (out[-1], para)
+            else:
+                out.append(para)
+    return out
+
+
 def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
                     indent_breaks=False):
     """Reflow a page's lines into paragraphs, dropping the running header (the

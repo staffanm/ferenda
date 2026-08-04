@@ -9,6 +9,8 @@ sections differ per source: SFS ``structure`` (+ each amendment's ``content``),
 DV / förarbete / eurlex ``body``. Everything here is pure.
 """
 
+import re
+
 # the top-level sections that carry renderable body text, across all sources
 # "footnotes" is presented body text like the rest: it renders at the foot of
 # the page, so the reader sees it, the index must store it and the link walk must
@@ -17,6 +19,68 @@ DV / förarbete / eurlex ``body``. Everything here is pure.
 # names, and for a court decision the whole apparatus DV has printed as endnotes
 # since 2023.
 BODY_SECTIONS = ("structure", "body", "footnotes")
+
+# tokens a Swedish sentence never ends on -- abbreviations whose trailing dot is
+# not a full stop. Moved here from `labels._first_sentence` when a second caller
+# (remisser ai-analyze, splitting an answer into the units a reworded quote is
+# matched back against) needed the same boundary rule
+# (rule:second-use-goes-to-lib).
+NON_TERMINAL = frozenset({
+    "bl.a", "ca", "dnr", "dvs", "e.d", "etc", "fr.o.m", "jfr", "kap", "kr",
+    "m.fl", "m.m", "milj", "nr", "p.g.a", "s.k", "t.ex", "t.o.m"})
+
+_SENTENCE_BOUNDARY = re.compile(r"[.!?](?=\s|$)")
+# a colon or dash before a capital or a list marker ends a *clause* that a reader
+# would quote on its own: "CKS avstyrker därför X av följande skäl: – Utredningens
+# egna data ger inte stöd för ...". Splitting there makes the reason addressable
+# without the verdict in front of it -- the one sub-sentence trim the old
+# free-form quoting used well. Opt-in: `labels._first_sentence` wants whole
+# sentences, and a title cut at its first colon would lose its subject.
+_CLAUSE_BOUNDARY = re.compile(r"[:;](?=\s+[-–—•]?\s*[A-ZÅÄÖ])|(?<=\s)[–—](?=\s)")
+
+
+def _is_boundary(text, end):
+    """Whether the terminator ending at `end` closes a sentence: not when the
+    word before it is a known abbreviation, an initial, a bare number, or itself
+    contains a dot ("3 kap.", "J.A.", "2026:20")."""
+    tail = ((text[:end].rsplit(None, 1) or [""])[-1].lower().lstrip("(\"'”„"))
+    return not (tail in NON_TERMINAL or len(tail) <= 1 or "." in tail
+                or tail.isdigit())
+
+
+def _emit(out, chunk):
+    """Append `chunk` as a unit unless it carries no letters. A clause break can
+    leave the bullet or dash that introduced the clause stranded on its own, and
+    a unit a reader could not quote is worse than no unit -- it takes a number
+    and returns punctuation."""
+    chunk = chunk.strip()
+    if chunk and re.search(r"[^\W\d_]", chunk):
+        out.append(chunk)
+
+
+def sentences(text, clause_breaks=False):
+    """`text` split into sentences, Swedish-abbreviation-aware. Text with no
+    terminator at all is one sentence, which is what makes a bare list item
+    ("Tillstyrks") a unit like any other rather than being swallowed by its
+    neighbour; text carrying no letters at all ("123. 456.") yields nothing,
+    since a unit a reader could not quote is worse than no unit. The split is
+    *stable* -- callers that match a model's quote back against these units must
+    use this same function, with the same flags, on both sides.
+
+    `clause_breaks` additionally ends a unit at a colon, semicolon or dash that
+    introduces one, so a verdict and the reason after it are separately
+    quotable."""
+    bounds = sorted(
+        [m.start() for m in _SENTENCE_BOUNDARY.finditer(text)
+         if _is_boundary(text, m.start())]
+        + ([m.start() for m in _CLAUSE_BOUNDARY.finditer(text)]
+           if clause_breaks else []))
+    out, start = [], 0
+    for b in bounds:
+        _emit(out, text[start:b + 1])
+        start = b + 1
+    _emit(out, text[start:])
+    return out
 
 
 def _tom_key(cons):

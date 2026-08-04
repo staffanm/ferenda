@@ -27,6 +27,7 @@ import re
 from typing import NamedTuple
 
 from . import datasets
+from .text import sentences
 
 # the document-uri prefix, mirrored from catalog.BASE. labels sits *below* catalog
 # (catalog imports labels to stamp the `descriptive` column), so it cannot import
@@ -298,26 +299,15 @@ def _untc(art):
 # avg (JO / JK / ARN decisions)
 # --------------------------------------------------------------------------
 
-# tokens a Swedish sentence never ends on -- abbreviations whose trailing dot
-# is not a full stop
-_NON_TERMINAL = {"bl.a", "ca", "dnr", "dvs", "e.d", "etc", "fr.o.m", "jfr",
-                 "kap", "kr", "m.fl", "m.m", "milj", "nr", "p.g.a", "s.k",
-                 "t.ex", "t.o.m"}
-
-
 def _first_sentence(text):
     """The first sentence of a prose passage, Swedish-abbreviation-aware: a
     full stop after 's.k.', an initial ('J.A.'), 'kap.' or a bare number does
     not end the sentence. The whole text when no boundary is found. Used
-    where a preamble must stand in for a title (an ARN referat, A4)."""
-    for m in re.finditer(r"[.!?](?=\s|$)", text):
-        tail = ((text[:m.start()].rsplit(None, 1) or [""])[-1]
-                .lower().lstrip("(\"'”„"))
-        if (tail in _NON_TERMINAL or len(tail) <= 1 or "." in tail
-                or tail.isdigit()):
-            continue
-        return text[:m.end()]
-    return text
+    where a preamble must stand in for a title (an ARN referat, A4). The
+    boundary rule itself lives in `lib.text.sentences`, which a second caller
+    (remisser ai-analyze) needed whole rather than just its first result."""
+    found = sentences(text)
+    return found[0] if found else text
 
 
 def _avg(art):
