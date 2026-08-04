@@ -186,6 +186,10 @@ services:
       - "443:443"
     volumes:
       - /mnt/data/lagen/data:/usr/share/nginx/html:ro
+      # the NDJSON bulk dumps `lagen all dump` writes into accommodanda's
+      # data_root, served as static files by the ferenda.lagen.nu vhost's
+      # /dumps/ block (multi-GB files nginx should stream, not uvicorn)
+      - /mnt/forstor/accommodanda/dumps:/usr/share/nginx/dumps:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
       - certbot-webroot:/var/www/certbot                    # serves ACME http-01 challenges for certbot
       - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro

@@ -237,9 +237,13 @@ API.
 The endpoint reports each dump's `source`, `file` name and size. The dump
 **files themselves** are written to `<data_root>/dumps/<source>.ndjson.gz`; the
 `/api/v1/dumps` endpoint is a manifest, not a download route, and the app's
-static mount serves `generated/`, not `dumps/`. Exposing the files publicly is a
-deployment concern (a static route in the reverse proxy over `<data_root>/dumps`).
-Once fetched:
+static mount serves `generated/`, not `dumps/`. The files are served by the
+reverse proxy instead — `location /dumps/` in
+`docker/nginx/ferenda.lagen.nu.conf`, over a read-only mount of the same
+directory (`docker-compose.prod.yml`) — so a dump is at
+`https://ferenda.lagen.nu/dumps/<source>.ndjson.gz`, with an autoindex at
+`/dumps/`. nginx and not uvicorn because the set is ~4.5 GB (forarbete alone
+~3.6 GB) and wants sendfile and byte ranges. Once fetched:
 
 ```sh
 zcat sfs.ndjson.gz | head -1     # one artifact per line
