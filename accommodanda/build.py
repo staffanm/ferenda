@@ -2962,18 +2962,64 @@ def remisser_harvest(scopes):
 def remisser_ai_analyze(basefiles):
     """`lagen remisser ai-analyze <basefile> ...` -- the sole LLM pass: map one
     remissvar onto the sections of the SOU/Ds it discusses (sentiment + verbatim
-    quote per section, plus an overall stance), written as a `.ann` sidecar. One
-    basefile is `"<typ>/<document id>/<org-slug>"`; the LLM is never called from
-    parse/relate/generate."""
+    quote per section, plus an overall stance), written as a `.ann` sidecar. A
+    basefile is either one answer (`"<typ>/<document id>/<org-slug>"`) or a whole
+    ärende (`"<typ>/<document id>"`), which expands to all its answers; the LLM
+    is never called from parse/relate/generate.
+
+    An expanded ärende skips answers that already carry a layer -- a remiss
+    collects answers over months, so the second run over one is normally "the
+    twelve that arrived since", not 50 re-analyses. A directly named answer is
+    always re-run (that is what naming it asks for); `--force` re-runs
+    everything and is what overwrites a hand-verified layer."""
     if not basefiles:
         sys.exit("usage: lagen remisser ai-analyze <basefile> [<basefile> ...]")
-    for basefile in basefiles:
+    targets = []
+    for arg in basefiles:
+        if not remisser_analyze.is_arende(arg):   # one answer -- always (re)run it
+            targets.append(arg)
+            continue
+        expanded = remisser_analyze.answers(arg)
+        assert expanded, (
+            "%s names no downloaded answers -- check the basefile (an ärende is "
+            "'<typ>/<document id>', e.g. sou/2026-21)" % arg)
+        fresh = [b for b in expanded
+                 if RUN.force or not annstore.path("remisser", b).exists()]
+        print("remisser ai-analyze %s: %d answers, %d already analysed, "
+              "%d to analyze" % (arg, len(expanded),
+                                 len(expanded) - len(fresh), len(fresh)))
+        targets.extend(fresh)
+    failed = []
+    for basefile in targets:
         if RUN.dry_run:
             print("remisser ai-analyze: would analyze %s -> %s"
                   % (basefile, annstore.path("remisser", basefile)))
             continue
-        out = remisser_analyze.analyze(basefile, force=RUN.force)
+        try:
+            out = remisser_analyze.analyze(basefile, force=RUN.force)
+        except remisser_analyze.Unanalyzable:
+            # Exactly one failure is tolerated here: the model twice failing to
+            # answer usably about one answer, which must not abandon the other 50
+            # of its ärende. No layer is written, so a re-run retries exactly
+            # these -- worth doing, since sampling is stochastic. Everything else
+            # `analyze` can raise is a permanent fault (a missing förarbete
+            # artifact, an empty `remitterat`, a verified layer refused by
+            # `annstore.guard`, a corrupt artifact) and propagates, because
+            # reporting those as "re-run to retry" would promise a retry that can
+            # never succeed (rule:narrow-what-you-catch).
+            traceback.print_exc()
+            failed.append(basefile)
+            continue
         print("remisser ai-analyze %s: wrote %s" % (basefile, out))
+    if failed:
+        # sampling is stochastic (llm_temperature 1.0), so re-running genuinely
+        # retries rather than reproducing: the usual failure is the model
+        # paraphrasing where it was told to quote, and it quotes correctly next
+        # time often enough to be worth another pass
+        print("remisser ai-analyze: %d of %d failed, no layer written -- re-run "
+              "to retry just these: %s" % (len(failed), len(targets),
+                                           " ".join(failed)))
+        sys.exit(1)
 
 
 # No per-document download stage (the avg/foreskrift rule): answers arrive only
@@ -2998,7 +3044,10 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
           "skrivelse or an EU proposal is recorded but its answers are never "
           "fetched\n"
           "ai-analyze <basefile>: LLM-map one answer onto the referred SOU/Ds's "
-          "sections (sentiment + quote per section), written as a .ann sidecar\n"
+          "sections (sentiment + quote per section), written as a .ann sidecar; "
+          "<basefile> is one answer (sou/2026-21/domstolsverket) or a whole "
+          "ärende (sou/2026-21), which analyzes every answer still lacking a "
+          "layer\n"
           "this source is never related/generated -- it feeds the referred "
           "förarbete's rail, not its own pages")
 

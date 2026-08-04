@@ -102,9 +102,21 @@ must not kill a corpus run:
   every failed snapshot is recorded and reported before any fast-import
   starts; the export then refuses the incomplete corpus rather than writing
   a history that a later repair would append out of order
+- `remisser ai-analyze`'s per-answer boundary (`build.py`) — one answer the
+  model twice fails to analyse usably must not abandon the other fifty of
+  its ärende. This one catches a *named* exception, not `Exception`:
+  `remisser.ai_analyze.Unanalyzable`, raised only where `llm.author` gives
+  up after its retry. Everything else `analyze` can raise is permanent (a
+  missing förarbete artifact, an empty `remitterat`, a verified layer
+  refused by `annstore.guard`, a corrupt artifact) and propagates, because
+  the failures are reported as "re-run to retry just these" and a permanent
+  fault would be promised a retry that can never succeed. No layer is
+  written for a failure, so the re-run retries exactly those — worth doing,
+  since sampling is stochastic
 
 Each site carries `# noqa: BLE001 — <what it survives, and where the
-failure is recorded>`. Adding a *new* resilience point means adding it to
+failure is recorded>`, unless it catches a named exception narrow enough
+to need no suppression. Adding a *new* resilience point means adding it to
 this list in the same change, with the user's agreement.
 
 ### rule:errors-drive-retry-use-raise

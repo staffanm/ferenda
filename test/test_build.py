@@ -1184,3 +1184,97 @@ def test_the_real_stats_compute_stage_is_marked_always():
     # the mark is what keeps `lagen all rebuild` re-measuring the corpus rather
     # than publishing one day's figures for ever
     assert build.SOURCES["stats"].stages["compute"].always is True
+
+
+# ---- remisser ai-analyze: ärende expansion and per-answer resilience --------
+
+def _analyze_targets(monkeypatch, expansions, outcome, tmp_path):
+    """Drive `remisser_ai_analyze`, recording which basefiles it analyzed.
+    `expansions` fakes `answers()`; `outcome` decides per basefile whether the
+    analysis raises."""
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    monkeypatch.setattr(build.remisser_analyze, "answers",
+                        lambda arg: expansions[arg])
+    seen = []
+
+    def fake_analyze(basefile, force=False):
+        seen.append(basefile)
+        outcome(basefile)
+        path = annstore.path("remisser", basefile)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}")
+        return path
+
+    monkeypatch.setattr(build.remisser_analyze, "analyze", fake_analyze)
+    return seen
+
+
+def test_remisser_ai_analyze_survives_one_unanalyzable_answer(monkeypatch, tmp_path,
+                                                              capsys):
+    """The model paraphrasing where it was told to quote fails one answer; the
+    other 50 of the ärende must still be analyzed (build.py's per-doc resilience
+    convention), and the failure must be named and exit nonzero. `Unanalyzable`
+    is the *only* tolerated failure -- a permanent fault (missing förarbete
+    artifact, verified layer, corrupt artifact) propagates instead, so it is
+    never advertised as retryable."""
+    answers = ["sou/2026:21/a", "sou/2026:21/b", "sou/2026:21/c"]
+    seen = _analyze_targets(
+        monkeypatch, {"sou/2026-21": answers},
+        lambda bf: (_ for _ in ()).throw(
+            build.remisser_analyze.Unanalyzable("quote is not verbatim"))
+        if bf.endswith("/b") else None,
+        tmp_path)
+
+    with pytest.raises(SystemExit) as exc:
+        build.remisser_ai_analyze(["sou/2026-21"])
+    assert exc.value.code == 1
+    assert seen == answers                       # b's failure did not stop c
+    out = capsys.readouterr().out
+    assert "1 of 3 failed" in out
+    assert "sou/2026:21/b" in out
+    # no layer for the failure, so a plain re-run retries exactly that one
+    assert not annstore.path("remisser", "sou/2026:21/b").exists()
+
+
+def test_remisser_ai_analyze_skips_already_analysed_answers_of_an_arende(
+        monkeypatch, tmp_path, capsys):
+    """A remiss collects answers over months: re-running an ärende analyzes the
+    ones that arrived since, not all of them again."""
+    answers = ["sou/2026:21/a", "sou/2026:21/b"]
+    seen = _analyze_targets(monkeypatch, {"sou/2026-21": answers},
+                            lambda bf: None, tmp_path)
+    done = annstore.path("remisser", "sou/2026:21/a")
+    done.parent.mkdir(parents=True, exist_ok=True)
+    done.write_text("{}")
+
+    build.remisser_ai_analyze(["sou/2026-21"])
+    assert seen == ["sou/2026:21/b"]
+    assert "1 already analysed" in capsys.readouterr().out
+
+
+def test_remisser_ai_analyze_reruns_a_directly_named_answer(monkeypatch, tmp_path):
+    """Naming one answer is a request to redo it -- the skip applies only to an
+    expanded ärende, where it is the difference between 1 analysis and 51."""
+    bf = "sou/2026-21/a"
+    # no expansion mapping: a directly named answer never reaches `answers()`
+    seen = _analyze_targets(monkeypatch, {}, lambda _: None, tmp_path)
+    done = annstore.path("remisser", bf)
+    done.parent.mkdir(parents=True, exist_ok=True)
+    done.write_text("{}")
+
+    build.remisser_ai_analyze([bf])
+    assert seen == [bf]
+
+
+def test_remisser_ai_analyze_does_not_swallow_a_permanent_fault(monkeypatch, tmp_path):
+    """A verified layer, a missing förarbete artifact or a corrupt artifact are
+    permanent: `analyze` surfaces them as ValueError/AssertionError and they must
+    reach the operator, not be listed under "re-run to retry just these" --
+    a promise that could never be kept."""
+    seen = _analyze_targets(
+        monkeypatch, {"sou/2026-21": ["sou/2026:21/a"]},
+        lambda bf: (_ for _ in ()).throw(ValueError("layer is verified")),
+        tmp_path)
+    with pytest.raises(ValueError, match="verified"):
+        build.remisser_ai_analyze(["sou/2026-21"])
+    assert seen == ["sou/2026:21/a"]
