@@ -28,8 +28,10 @@ needs a running OpenSearch (``OPENSEARCH_URL``, default localhost:9200).
 
 import base64
 import json
+import queue
 import re
 import sys
+import threading
 import time
 
 from opensearchpy import OpenSearch, helpers
@@ -242,7 +244,7 @@ def doc_actions(row, inbound_count, version=None, expired=None):
 
     Pure: the caller supplies `inbound_count`/`version` (read from the catalog up
     front), so no DB handle is touched while the bulk helper streams these actions
-    -- which lets index_source feed parallel_bulk from a pool thread safely.
+    -- which is what lets `_threaded_bulk` hand them to worker threads at all.
 
     No `_index` -- index_source passes index= to the bulk helper, so the actions
     follow the SearchIndex instance's index, not a hardcoded constant."""
@@ -456,7 +458,7 @@ class SearchIndex:
     def __init__(self, url=None, index=INDEX, pool_maxsize=POOL_MAXSIZE):
         self.index = index
         # urllib3 pools one connection per host by default, so every caller past
-        # the first (parallel_bulk's threads, the API's threadpool) opens a
+        # the first (`_threaded_bulk`'s workers, the API's threadpool) opens a
         # connection the pool then discards on return -- a new TCP handshake per
         # request plus a urllib3 warning each time. Size the pool to the callers.
         self.client = OpenSearch(
@@ -578,26 +580,98 @@ class SearchIndex:
         count: a förarbete/eurlex artifact is full document text, so 500 in one
         request once ballooned past OpenSearch's parent circuit breaker; 5 MB/chunk
         keeps the per-request reservation small regardless of document size.
-        jobs>1 fans the round-trips across a thread pool (parallel_bulk); the
-        action generator is still pulled single-threaded, so no DB handle is
-        shared across threads. Returns (indexed, errors)."""
+        jobs>1 fans the round-trips across worker threads; the action generator is
+        still pulled single-threaded (by the feeder), so no DB handle is shared
+        across threads. Returns (indexed, errors)."""
         common = dict(index=self.index, chunk_size=200,
                       max_chunk_bytes=5 * 1024 * 1024,
                       request_timeout=REQUEST_TIMEOUT)
         if jobs > 1:
-            indexed, errors = 0, []
-            for ok, item in helpers.parallel_bulk(
-                    self.client, actions, thread_count=jobs, queue_size=jobs,
-                    raise_on_exception=False, raise_on_error=False, **common):  # ty: ignore[invalid-argument-type]  # **common widens kwargs to object
-                if ok:
-                    indexed += 1
-                else:
-                    errors.append(item)
-            return indexed, errors
-        # single-threaded path keeps the 429 backoff (parallel_bulk has no retry)
+            return self._threaded_bulk(actions, jobs, common)
         return helpers.bulk(self.client, actions, raise_on_error=False,
                             max_retries=RETRIES, initial_backoff=2,
                             max_backoff=BACKOFF_CAP, **common)  # ty: ignore[invalid-argument-type]  # **common widens kwargs to object
+
+    def _threaded_bulk(self, actions, jobs, common):
+        """`jobs` worker threads, each running `streaming_bulk` over its share of
+        `actions`, fed from one queue so the generator itself stays
+        single-threaded.
+
+        Not `helpers.parallel_bulk`, which is the obvious call and was the one
+        here: it hands each chunk straight to `_process_bulk_chunk` and takes no
+        `max_retries` at all, so a chunk the cluster rejects under load (429, or a
+        circuit breaker) fails every item in it *permanently* and the units are
+        silently missing from the index. One rebuild lost 1,497 eurlex and 241
+        förarbete documents that way. `streaming_bulk` is the helper that owns the
+        retry-with-backoff loop, so each worker runs that instead."""
+        work = queue.Queue(maxsize=jobs * 4)
+        indexed, errors, failures, lock = 0, [], [], threading.Lock()
+
+        def worker():
+            nonlocal indexed
+            # whether this worker has taken its sentinel: there is exactly one per
+            # worker, so the post-failure drain below must not wait for a second
+            drained = False
+
+            def drain():
+                nonlocal drained
+                while (action := work.get()) is not None:
+                    yield action
+                drained = True
+
+            try:
+                for ok, item in helpers.streaming_bulk(
+                        self.client, drain(), raise_on_exception=False,
+                        raise_on_error=False, max_retries=RETRIES,
+                        initial_backoff=2, max_backoff=BACKOFF_CAP, **common):
+                    with lock:
+                        if ok:
+                            indexed += 1
+                        else:
+                            errors.append(item)
+            except Exception as exc:  # noqa: BLE001 — thread boundary: an exception
+                # left in a worker is lost, so it is marshalled to the feeder and
+                # re-raised there (below) rather than swallowed (rule:no-catch-log-continue).
+                # `raise_on_exception=False` only covers a TransportError inside
+                # the chunk; a SerializationError on a bad action is not a
+                # TransportError and escapes regardless. Draining continues
+                # deliberately: a worker that simply stops leaves the feeder
+                # blocked on a queue nobody empties -- with every worker dead that
+                # is a hang, not a crash, and `lagen index` sits there forever.
+                # Only until this worker's own sentinel, though: the last chunk is
+                # flushed *after* `drain` takes it, so a failure there would
+                # otherwise wait on a sentinel that has already been consumed --
+                # the same deadlock, one window narrower.
+                with lock:
+                    failures.append(exc)
+                while not drained and work.get() is not None:
+                    pass
+
+        workers = [threading.Thread(target=worker, daemon=True)
+                   for _ in range(jobs)]
+        for w in workers:
+            w.start()
+        try:
+            fed = 0
+            for action in actions:
+                work.put(action)
+                fed += 1
+        finally:
+            for _ in workers:            # one sentinel each, then drain out
+                work.put(None)
+            for w in workers:
+                w.join()
+        if failures:
+            raise failures[0]
+        if fed != indexed + len(errors):
+            # every action `streaming_bulk` is handed yields exactly one outcome,
+            # so a shortfall means units went to the cluster unaccounted for --
+            # the silent under-indexing this whole path exists to stop. Raise, not
+            # assert: `python -O` would strip the one check that catches it.
+            raise ValueError(
+                "index: fed %d actions but accounted for %d indexed + %d failed"
+                % (fed, indexed, len(errors)))
+        return indexed, errors
 
     def index_source(self, con, source, progress=None, jobs=1, force=False,
                      inbound_counts=None):

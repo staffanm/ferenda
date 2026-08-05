@@ -336,6 +336,51 @@ def test_search_returns_cursor_and_merges_best_fragment():
     assert sort == [5.0, "u1"] and seen == 1
 
 
+def test_threaded_bulk_passes_the_retry_arguments_to_streaming_bulk(monkeypatch):
+    """A chunk the cluster rejects under load must be retried, not written off.
+
+    `helpers.parallel_bulk` -- which this path used to call -- hands each chunk
+    straight to the bulk endpoint and takes no `max_retries` at all, so one 429
+    failed every item in it permanently and the units went silently missing from
+    the index (a rebuild lost 1,497 eurlex and 241 förarbete documents that way).
+    Each worker runs `streaming_bulk` instead, which owns the retry loop. The
+    retry itself is that helper's, so what is checked here is that the arguments
+    turning it on actually reach the call -- and that every action reaches a
+    worker."""
+    seen = {}
+
+    def fake_streaming_bulk(client, actions, **kw):
+        seen.update(kw)
+        for _ in actions:                 # drain, so the feeder is not blocked
+            yield True, {}
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk", fake_streaming_bulk)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    indexed, errors = index._threaded_bulk(
+        iter([{"_id": str(i)} for i in range(20)]), 3, {"index": "lagen-test"})
+    assert (indexed, errors) == (20, [])          # every action reached a worker
+    assert seen["max_retries"] == search.RETRIES  # ... with the backoff attached
+    assert seen["max_backoff"] == search.BACKOFF_CAP
+    assert seen["raise_on_error"] is False        # errors are collected, not raised
+
+
+def test_threaded_bulk_collects_the_items_the_cluster_rejected(monkeypatch):
+    def fake_streaming_bulk(client, actions, **kw):
+        for action in actions:
+            ok = action["_id"] != "3"
+            yield ok, {} if ok else {"index": {"_id": "3", "status": 429,
+                                               "error": {"type": "circuit_breaking"}}}
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk", fake_streaming_bulk)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    indexed, errors = index._threaded_bulk(
+        iter([{"_id": str(i)} for i in range(6)]), 2, {"index": "lagen-test"})
+    assert indexed == 5
+    assert [e["index"]["status"] for e in errors] == [429]
+
+
 @pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
                     reason="needs a running OpenSearch (set OPENSEARCH_URL)")
 def test_index_and_search_round_trip(tmp_path):
@@ -432,3 +477,79 @@ def test_index_source_force_reindexes_all(tmp_path):
     finally:
         if index.client.indices.exists(index="lagen-test"):
             index.client.indices.delete(index="lagen-test")
+
+
+def test_threaded_bulk_raises_when_a_worker_dies(monkeypatch):
+    """A worker can die on something `raise_on_exception=False` does not cover --
+    the serializer choking on a bad action, say. Left to itself it took its
+    buffered chunk with it and `_threaded_bulk` still returned a clean count, so
+    units went missing with a zero error count and a zero exit code: the very
+    failure this path replaced `parallel_bulk` to stop."""
+    calls = iter(range(100))
+
+    def dying_streaming_bulk(client, actions, **kw):
+        first = next(calls) == 0
+        for i, _ in enumerate(actions):
+            if first and i == 5:
+                raise RuntimeError("worker blew up")
+            yield True, {}
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk", dying_streaming_bulk)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    with pytest.raises(RuntimeError, match="worker blew up"):
+        index._threaded_bulk(iter([{"_id": str(i)} for i in range(2000)]), 4,
+                             {"index": "lagen-test"})
+
+
+def test_threaded_bulk_does_not_hang_when_every_worker_dies(monkeypatch):
+    """With no worker left draining it, the feeder blocks on a full queue and the
+    whole command sits there forever -- a hang, not a crash, so nothing reports
+    it. A dead worker keeps draining precisely so this cannot happen."""
+    def dead_streaming_bulk(client, actions, **kw):
+        raise RuntimeError("all dead")
+        yield                                  # pragma: no cover -- a generator
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk", dead_streaming_bulk)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    with pytest.raises(RuntimeError, match="all dead"):
+        index._threaded_bulk(iter([{"_id": str(i)} for i in range(5000)]), 2,
+                             {"index": "lagen-test"})
+
+
+def test_threaded_bulk_refuses_to_report_fewer_outcomes_than_actions(monkeypatch):
+    """`streaming_bulk` yields exactly one outcome per action, so a shortfall
+    means units reached the cluster unaccounted for. Raise rather than assert:
+    `python -O` would strip the one check that catches silent under-indexing."""
+    def swallowing_streaming_bulk(client, actions, **kw):
+        for i, _ in enumerate(actions):
+            if i % 2 == 0:                     # silently drops every other one
+                yield True, {}
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk", swallowing_streaming_bulk)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    with pytest.raises(ValueError, match="fed 10 actions but accounted for"):
+        index._threaded_bulk(iter([{"_id": str(i)} for i in range(10)]), 1,
+                             {"index": "lagen-test"})
+
+
+def test_threaded_bulk_does_not_hang_when_the_final_flush_dies(monkeypatch):
+    """The narrowest window, and the one the first fix reopened: `streaming_bulk`
+    sends its last buffered chunk *after* `drain` has taken this worker's
+    sentinel, so a failure there has no sentinel left to drain to. Waiting for one
+    parks the worker in `get()` and the caller in `join()` -- a silent hang of
+    `lagen index`, the failure mode this whole path exists to remove."""
+    def raise_after_the_stream_ends(client, actions, **kw):
+        for _ in actions:                      # consumes the sentinel too
+            yield True, {}
+        raise RuntimeError("final chunk flush blew up")
+
+    monkeypatch.setattr(search.helpers, "streaming_bulk",
+                        raise_after_the_stream_ends)
+    index = search.SearchIndex.__new__(search.SearchIndex)
+    index.client = object()
+    with pytest.raises(RuntimeError, match="final chunk flush"):
+        index._threaded_bulk(iter([{"_id": str(i)} for i in range(50)]), 2,
+                             {"index": "lagen-test"})

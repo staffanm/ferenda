@@ -7,6 +7,7 @@ import pytest
 from accommodanda.forarbete import parse as fa_parse
 from accommodanda.forarbete.model import Block
 from accommodanda.forarbete.parse import (
+    censor_future_citations,
     classify,
     figure_index,
     mint_uri,
@@ -772,3 +773,31 @@ def test_a_block_without_geometry_does_not_drag_a_figure_above_it():
                Block("stycke", "Efter tabellen.", 12, top=500)]
     assert on_page[1].top is None
     assert figure_index(on_page, 400) == 2         # after the table, not before
+
+
+def test_censor_future_citations_reads_a_styled_run_that_is_not_a_link():
+    """`lagrum.interleave` emits two kinds of dict run: a link, and a
+    {"text", "style"} run for the emphasis the document set. The chronology
+    check read `run["uri"]` off both, so one italic word ahead of a citation
+    crashed the whole document (sou/2002-99, KeyError: 'uri')."""
+    blocks = [{"text": ["Enligt ",
+                        {"text": "lagen", "style": "i"},
+                        {"predicate": "dcterms:references",
+                         "uri": "https://lagen.nu/1984:437", "text": "1984:437"},
+                        " gäller detta."],
+               "page": 12}]
+    # the citation is still censored -- 1984 is well past a 1971 document ...
+    suspects = censor_future_citations(blocks, 1971)
+    assert [s["uri"] for s in suspects] == ["https://lagen.nu/1984:437"]
+    # ... demoted to its plain text, and the styled run is left exactly as it was
+    assert blocks[0]["text"] == ["Enligt ", {"text": "lagen", "style": "i"},
+                                 "1984:437", " gäller detta."]
+
+
+def test_censor_future_citations_leaves_a_contemporary_citation_alone():
+    blocks = [{"text": [{"text": "kursivt", "style": "i"},
+                        {"predicate": "dcterms:references",
+                         "uri": "https://lagen.nu/1962:700", "text": "1962:700"}],
+               "page": 3}]
+    assert censor_future_citations(blocks, 1971) == []
+    assert isinstance(blocks[0]["text"][1], dict)

@@ -533,12 +533,21 @@ def censor_future_citations(blocks, doc_year):
 
     def sweep(runs, page):
         for i, run in enumerate(runs):
-            if isinstance(run, dict) and (m := RE_TARGET_YEAR.match(run["uri"])):
+            # not every dict run is a link: `lagrum.interleave` also emits
+            # {"text", "style"} runs for the emphasis the document set, and those
+            # carry no uri. Reading it directly crashed the whole document
+            # (sou/2002-99, KeyError: 'uri') as soon as one of them preceded a
+            # citation in a scan old enough to reach this check. The default is
+            # for the *absent* key only -- a link run always carries a uri
+            # (`Ref.uri` is not optional), so a present-but-empty one would be a
+            # bug upstream, and `or ""` would hide it.
+            if isinstance(run, dict) and (m := RE_TARGET_YEAR.match(
+                    run.get("uri", ""))):
                 if (int(m.group(1)) > doc_year + 1
-                        and m.group(1) in (run.get("text") or "")):
-                    suspects.append({"text": run.get("text"), "uri": run["uri"],
+                        and m.group(1) in run["text"]):
+                    suspects.append({"text": run["text"], "uri": run["uri"],
                                      "page": page})
-                    runs[i] = run.get("text") or ""
+                    runs[i] = run["text"]
 
     for b in blocks:
         sweep(b.get("text") or [], b.get("page"))
