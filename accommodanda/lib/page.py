@@ -45,7 +45,7 @@ from . import (
     layout,
 )
 from .catalog import BASE
-from .pinpoint import human_fragment
+from .pinpoint import STYCKE_ORDINAL, human_fragment
 from .text import runs_text
 from .tpl import ENV
 from .util import basefile_slug, split_numalpha
@@ -863,12 +863,9 @@ def directive_link(site, directive, target=None):
     return ext_link(_external_href(directive), label)
 
 
-_STYCKE_ORDINAL = {1: "första", 2: "andra", 3: "tredje", 4: "fjärde",
-                   5: "femte", 6: "sjätte", 7: "sjunde", 8: "åttonde",
-                   9: "nionde", 10: "tionde", 11: "elfte", 12: "tolfte",
-                   13: "trettonde", 14: "fjortonde", 15: "femtonde",
-                   16: "sextonde", 17: "sjuttonde", 18: "artonde",
-                   19: "nittonde", 20: "tjugonde"}
+# the stycke ordinal table lives in `lib.pinpoint`, the dependency-free leaf this
+# module was factored into, so the EU and SFS pinpoint prose cannot drift apart
+_STYCKE_ORDINAL = STYCKE_ORDINAL
 
 
 def _stycke_label(sfs_pin):

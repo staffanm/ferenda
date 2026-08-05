@@ -11,8 +11,8 @@ from html import escape
 from markupsafe import Markup
 
 from ..lib import annstore, catalog, labels, tpl
+from ..lib.eu_structure import Anchors, citable, first_stycke
 from ..lib.eu_structure import flatten as eurlex_flatten
-from ..lib.eu_structure import subarticle_key
 from ..lib.markdown import begrepp_uri
 from ..lib.page import (
     NODES,
@@ -27,7 +27,7 @@ from ..lib.page import (
     render_toc,
     swedish_join,
 )
-from ..lib.pinpoint import human_fragment
+from ..lib.pinpoint import eu_article_label, human_fragment
 
 ENV = tpl.environment("accommodanda.eurlex")
 
@@ -38,7 +38,8 @@ EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
 
 # block type -> css class for the generic (paragraph-like) EU blocks
 EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble",
-                "paragraph": "paragraph", "point": "point", "ruling": "ruling",
+                "paragraph": "paragraph", "stycke": "stycke",
+                "point": "point", "ruling": "ruling",
                 "note": "note", "row": "row"}
 
 
@@ -64,7 +65,7 @@ class Editorial:
 
     def __init__(self, layer):
         # keys are normalised to the dotted sub-article grammar the renderer mints,
-        # so recitals_for(subarticle_key(...)) matches regardless of the on-disk form
+        # so recitals_for(Anchors().key(...)) matches regardless of the on-disk form
         self.a2r = {_sub_to_dot(k): v
                     for k, v in layer.get("articleToRecitals", {}).items()}
         self.groups = layer.get("recitalGroups", [])
@@ -156,14 +157,20 @@ def _eurlex_marker(t, num):
     """Display form of an EU block's structural number. The artifact stores the
     bare token ("42", "1", "a") -- the surrounding punctuation is presentational:
     a recital is parenthesised ("(42)"), a numbered paragraph gets a full stop
-    ("1."), a lettered/roman point the list-parenthesis ("a)", "i)"). Other
-    numbered kinds (ruling, note) keep the bare token."""
+    ("1."), a lettered/roman point the list-parenthesis ("a)", "i)"). A point
+    marked with a typographic bullet rather than an enumerator keeps it bare --
+    the parenthesis belongs to a letter or a numeral, not to "—". Other numbered
+    kinds (ruling, note) keep the bare token."""
     if t == "recital":
         return "(%s)" % num
     if t == "point":
-        return "%s)" % num
+        return "%s)" % num if citable(num) else num
     if t == "paragraph":
         return "%s." % num
+    if t == "stycke":
+        # a stycke's ordinal names it in a citation but is not printed beside it,
+        # in the act or on an SFS page: it is simply the next block of prose
+        return None
     return num
 
 
@@ -174,12 +181,14 @@ def _eurlex_pin(t, num, bid):
     if t == "article":
         return "Artikel %s" % (num or bid or "")
     if bid and "." in bid:            # a dotted sub-article id ("5.2", "6.2.a")
-        return "Artikel %s" % bid
+        label = eu_article_label(bid) or "artikel %s" % bid
+        # first character only: .capitalize() would lowercase the rest and fold an
+        # uppercase list marker ("5.1.A") onto the lowercase point of the same article
+        return label[:1].upper() + label[1:]
     return human_fragment(bid)
 
 
-def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
-                         cur_article=None, cur_parag=None):
+def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None, key=None):
     runs = render_runs(b["text"], site)
     bid = b.get("id")
     t = b["type"]
@@ -190,33 +199,30 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
         return NODES.eu_heading(min(level + 1, 5), anchor, Markup(runs))
     if t == "keyword":
         return NODES.eu_keyword(Markup(runs))
-    # a numbered recital is a citation target in its own right (`#recital-N`), so
-    # it can be cited, commented on and ride the rail even with no editorial layer.
-    if t == "recital" and num and num.isdigit():
-        bid = "recital-%s" % num
     # editorial layer (.ann): wire this block into the article<->recital graph.
     # A recital gets a back-link panel (its articles + group); an article/
     # sub-article (paragraph/point, keyed like the .ann's "4.5") gets a forward
     # panel of its relevant recitals. Both ride the scroll-driven rail.
     extra = []
-    if t == "recital" and num and num.isdigit():
-        if editorial:
-            extra = _recital_context_sections(editorial, int(num))
-    else:
+    if t == "recital":
+        # a numbered recital is a citation target in its own right (`#recital-N`),
+        # so it can be cited, commented on and ride the rail with no editorial layer
+        if key:
+            bid = key
+            if editorial:
+                extra = _recital_context_sections(editorial, int(num))
+    elif key:
         # an article's key is its own id; a sub-article's is the dotted form. Every
         # numbered sub-article (paragraph/point) gets that id, so a reader can link
         # to it directly (`#4.22.a`) -- but it only *rides* the rail when it has
         # context to show (rail.add is a no-op otherwise, and the data-rail
         # marker is then omitted), so ubiquitous ids don't clutter the margin. The
         # editorial layer additionally gives a block a forward panel of its recitals.
-        key = (cur_article if t == "article"
-               else subarticle_key(t, num, cur_article, cur_parag))
-        if key:
-            recitals = editorial.recitals_for(key) if editorial else None
-            if t != "article":
-                bid = bid or key       # synthesise the sub-article citation id
-            if recitals:
-                extra = _recital_links_sections(recitals)
+        recitals = editorial.recitals_for(key) if editorial else None
+        if t != "article":
+            bid = bid or key           # synthesise the sub-article citation id
+        if recitals:
+            extra = _recital_links_sections(recitals)
     # the article is a citation target (id == its number); its inbound (incl.
     # implementing förarbeten) drives the rail, like an SFS paragraph
     pin = _eurlex_pin(t, num, bid)
@@ -229,6 +235,10 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
     # a marked recital/paragraph/point hangs its marker in the left margin
     if num and t in ("recital", "paragraph", "point"):
         classes.append("hang")
+    # a point nested inside another point (a definition's own sub-list) indents
+    # a step further, so the depth the anchor records is also the depth the eye reads
+    if t == "point" and (b.get("level") or 1) > 1:
+        classes.append("sub")
     # a definitions-article point is a citation target (#<article>.<point>) and
     # the begrepp the act defines -- emit its id and emphasise the defined term
     defines = b.get("defines")
@@ -239,7 +249,8 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None,
                            rail_id,
                            bid if num and bid else None,
                            _eurlex_marker(t, num) if num else None,
-                           Markup(runs))
+                           Markup(runs),
+                           first_stycke(t, num, key) or "")
 
 
 def _emphasize_term(runs_html, term, site):
@@ -294,13 +305,14 @@ def render(art, site):
     toc = Toc()
     rail = Rail(site, art["uri"])
     parts = []
-    cur_article = cur_parag = None       # running context for sub-article keys
+    anchors = Anchors()                  # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
     # the artifact is a nested structure (divisions > articles > paragraphs >
     # points); render reads it in document order -- the heading levels and the
     # TOC already convey the hierarchy, so no nested <section> markup is needed
     for b in eurlex_flatten(art.get("structure", [])):
         t = b["type"]
+        key = anchors.key(t, b.get("num"), b.get("id"), b.get("level"))
         if editorial and t == "recital" and (b.get("num") or "").isdigit():
             group = editorial.group_start.get(int(b["num"]))
             if group:
@@ -310,12 +322,8 @@ def render(art, site):
                     preamble_in_toc = True
                 toc.add(anchor, group.get("label", ""), 2)
                 parts.append(_recital_group_heading(group))
-        if t == "article":
-            cur_article, cur_parag = b.get("id") or b.get("num"), None
-        elif t == "paragraph":
-            cur_parag = b.get("num")
         parts.append(_render_eurlex_block(b, site, art["uri"], toc, rail,
-                                          editorial, cur_article, cur_parag))
+                                          editorial, key))
     rail.add_document()        # external links + commentary, the rail's default panel
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
     return ENV.get_template("eurlex.html").render(page_context(

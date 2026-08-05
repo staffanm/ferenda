@@ -145,9 +145,267 @@ def test_definition_list_entries_are_paragraphs_with_nested_points():
     # the lettered sub-list is captured as points (previously dropped entirely)
     assert ("point", "a", "den ansvarige är etablerad,") in seen
     assert ("point", "b", "registrerade påverkas, eller") in seen
+    # they hang off a *paragraph*, so they are the first point level and carry no
+    # nesting level -- an enumeration emitted as paragraphs is not a point level,
+    # and counting it as one indented these a step past every other lettered point
+    assert all(b.level is None for b in doc.body if b.kind == "point")
     # nesting reconstructs to article.paragraph.point anchors
     anchors = {a for a, _ in anchored_blocks(to_artifact(doc)["structure"])}
     assert {"4.22", "4.22.a", "4.22.b"} <= anchors
+
+
+# a definitions article written in Formex's explicit definition-list markup
+# (DLIST: PREFIX + TERM + DEFINITION), the shape of 2015/1535 art. 1.1 -- with a
+# definition that carries its own nested definition list (b) and one that carries
+# a plain roman sub-list (c). Previously unhandled: DLIST fell through every
+# branch, so the whole article flattened into one paragraph with no points, no
+# anchors and no defined terms.
+DLIST_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20150909">20150909</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001">
+      <TI.ART>Artikel 1</TI.ART>
+      <PARAG IDENTIFIER="001.001"><NO.PARAG>1.</NO.PARAG><ALINEA>
+        <P>I detta direktiv gäller följande definitioner:</P>
+        <DLIST SEPARATOR=":">
+          <DLIST.ITEM><PREFIX>a)</PREFIX>
+            <TERM><HT TYPE="ITALIC">produkt</HT></TERM>
+            <DEFINITION>alla industriellt framställda produkter,</DEFINITION></DLIST.ITEM>
+          <DLIST.ITEM><PREFIX>b)</PREFIX>
+            <TERM><HT TYPE="ITALIC">tjänst</HT></TERM>
+            <DEFINITION><P>alla informationssamhällets tjänster.</P>
+              <P>I denna definition avses med</P>
+              <DLIST SEPARATOR=":">
+                <DLIST.ITEM><PREFIX>i)</PREFIX><TERM>på distans</TERM>
+                  <DEFINITION>tjänster utan samtidig närvaro,</DEFINITION></DLIST.ITEM>
+                <DLIST.ITEM><PREFIX>ii)</PREFIX><TERM>på elektronisk väg</TERM>
+                  <DEFINITION>en tjänst som sänds vid utgångspunkten.</DEFINITION></DLIST.ITEM>
+              </DLIST></DEFINITION></DLIST.ITEM>
+          <DLIST.ITEM><PREFIX>c)</PREFIX>
+            <TERM><HT TYPE="ITALIC">föreskrift för tjänster</HT></TERM>
+            <DEFINITION><P>ett krav av allmän art.</P>
+              <LIST TYPE="roman">
+                <ITEM><NP><NO.P>i)</NO.P><TXT>uttryckligen och riktat,</TXT></NP></ITEM>
+                <ITEM><NP><NO.P>ii)</NO.P><TXT>indirekt eller accessoriskt.</TXT></NP></ITEM>
+              </LIST></DEFINITION></DLIST.ITEM>
+        </DLIST>
+      </ALINEA></PARAG>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_definition_list_markup_becomes_points_with_terms():
+    doc = parse_formex(ET.fromstring(DLIST_XML), "32015L1535", "swe")
+    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    # the announcing line stays the paragraph; each DLIST.ITEM is its own point,
+    # its term and definition joined by the list's separator
+    assert ("paragraph", "1", None,
+            "I detta direktiv gäller följande definitioner:") in seen
+    assert ("point", "a", None,
+            "produkt: alla industriellt framställda produkter,") in seen
+    # a definition holding a nested list keeps only its own lead text ...
+    assert ("point", "b", None, "tjänst: alla informationssamhällets tjänster. "
+            "I denna definition avses med") in seen
+    # ... and the nested list becomes points one level deeper, whether it is
+    # written as another DLIST (b) or as a plain LIST (c)
+    assert ("point", "i", 2, "på distans: tjänster utan samtidig närvaro,") in seen
+    assert ("point", "i", 2, "uttryckligen och riktat,") in seen
+
+
+def test_definition_list_markup_anchors_and_defines():
+    art = to_artifact(parse_formex(ET.fromstring(DLIST_XML), "32015L1535", "swe"))
+    anchors = dict(anchored_blocks(art["structure"]))
+    # a nested point hangs under its parent point, so the two sub-lists that both
+    # start at "i)" do not collide on one id
+    assert {"1.1", "1.1.a", "1.1.b", "1.1.b.i", "1.1.b.ii", "1.1.c",
+            "1.1.c.i", "1.1.c.ii"} <= set(anchors)
+    # each entry's term is extracted and anchored, the nested ones included; the
+    # announcing paragraph defines nothing
+    defines = {a: b["defines"] for a, b in anchors.items() if b.get("defines")}
+    assert defines == {"1.1.a": "produkt", "1.1.b": "tjänst",
+                       "1.1.b.i": "på distans", "1.1.b.ii": "på elektronisk väg",
+                       "1.1.c": "föreskrift för tjänster"}
+
+
+# a list item whose sub-list sits *inside* the item's own TXT rather than beside
+# it -- the shape of 93/104 art. 18.1 b. Read with the plain skip, the sub-list
+# lands in the item's lead text and again as its own points, printing it twice.
+NESTED_IN_TXT_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="19931123">19931123</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="018">
+      <TI.ART>Artikel 18</TI.ART>
+      <PARAG IDENTIFIER="018.001"><NO.PARAG>1.</NO.PARAG><ALINEA>
+        <LIST TYPE="alpha">
+          <ITEM><NP><NO.P>a)</NO.P><TXT>Medlemsstaterna skall anta de lagar
+            som är nödvändiga.</TXT></NP></ITEM>
+          <ITEM><NP><NO.P>b)</NO.P><TXT><LIST TYPE="roman">
+            <ITEM><NP><NO.P>i)</NO.P><TXT>En medlemsstat får dock avstå,
+              varvid den skall se till att</TXT>
+              <P><LIST TYPE="DASH">
+                <ITEM><P>ingen arbetsgivare kräver mer än 48 timmar,</P></ITEM>
+              </LIST></P></NP></ITEM>
+          </LIST></TXT></NP></ITEM>
+        </LIST>
+      </ALINEA></PARAG>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_sublist_inside_an_items_own_text_is_not_printed_twice():
+    doc = parse_formex(ET.fromstring(NESTED_IN_TXT_XML), "31993L0104", "swe")
+    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    # point b holds only its sub-list: its own lead is empty, and the sub-list
+    # appears once -- as points, not folded into b's text as well
+    assert ("point", "b", None, "") in seen
+    assert sum("En medlemsstat får dock avstå" in text for *_, text in seen) == 1
+    assert ("point", "i", 2, "En medlemsstat får dock avstå, varvid den skall "
+            "se till att") in seen
+    # a dash bullet keeps the marker the source writes ...
+    assert ("point", None, 3, "ingen arbetsgivare kräver mer än 48 timmar,") in seen
+    # ... and the citable points anchor under their parent. The paragraph is
+    # also its own first stycke ("artikel 18.1 första stycket")
+    anchors = [a for a, _ in anchored_blocks(to_artifact(doc)["structure"])]
+    assert anchors == ["18", "18.1", "18.1.S1", "18.1.a", "18.1.b", "18.1.b.i"]
+
+
+# an item with no marker of its own whose lead is a P and whose sub-list sits in
+# a second P -- the shape of 2009/68 annex II. The item has no TXT at all, so a
+# `.//TXT` lead lookup reaches into the sub-list and reads its first item's text
+# as the parent's, printing it on both blocks.
+LEAD_BELOW_SUBLIST_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20090713">20090713</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001">
+      <TI.ART>Artikel 1</TI.ART>
+      <ALINEA>
+        <LIST TYPE="DASH">
+          <ITEM>
+            <P>Bestämmelserna gäller även för särskilda strålkastare, med
+              följande ändringar:</P>
+            <P><LIST TYPE="alpha">
+              <ITEM><NP><NO.P>a)</NO.P><TXT>De lägsta belysningsvärden som
+                fastställs minskas.</TXT></NP></ITEM>
+            </LIST></P>
+          </ITEM>
+        </LIST>
+      </ALINEA>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_item_lead_is_its_own_not_its_sublists_first_entry():
+    doc = parse_formex(ET.fromstring(LEAD_BELOW_SUBLIST_XML), "32009L0068", "swe")
+    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    assert ("point", None, None, "Bestämmelserna gäller även för särskilda "
+            "strålkastare, med följande ändringar:") in seen
+    assert ("point", "a", 2,
+            "De lägsta belysningsvärden som fastställs minskas.") in seen
+    # the sub-item's text belongs to the sub-item alone
+    assert sum("De lägsta belysningsvärden" in text for *_, text in seen) == 1
+
+
+# a paragraph written as several ALINEAs -- Formex's sub-paragraphs (stycken).
+# The shape of 2005/85 art. 9.2, whose two derogations from the rule its first
+# stycke states were dropped outright: `parag.find("ALINEA")` read one and left
+# the siblings unparsed (831 stycken across 600 sampled acts).
+STYCKEN_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20051201">20051201</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="009">
+      <TI.ART>Artikel 9</TI.ART>
+      <PARAG IDENTIFIER="009.002"><NO.PARAG>2.</NO.PARAG>
+        <ALINEA><P>När en ansökan avslås ska skälen anges i beslutet.</P>
+          <LIST TYPE="alpha">
+            <ITEM><NP><NO.P>a)</NO.P><TXT>de faktiska skälen,</TXT></NP></ITEM>
+          </LIST></ALINEA>
+        <ALINEA>Medlemsstaterna behöver inte uppge skälen.</ALINEA>
+        <ALINEA>Dessutom behöver de inte lämna skriftlig information.</ALINEA>
+      </PARAG>
+    </ARTICLE>
+    <ARTICLE IDENTIFIER="008">
+      <TI.ART>Artikel 8</TI.ART>
+      <ALINEA>Medlemsstaterna ska se till att ansökningar prövas.</ALINEA>
+      <ALINEA>De ska då beakta samtliga omständigheter.</ALINEA>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_further_stycken_of_a_paragraph_are_kept():
+    doc = parse_formex(ET.fromstring(STYCKEN_XML), "32005L0085", "swe")
+    seen = [(b.kind, b.num, b.text) for b in doc.body]
+    # the paragraph's own text is its first stycke; the rest follow as `stycke`
+    assert ("paragraph", "2", "När en ansökan avslås ska skälen anges i beslutet.") in seen
+    assert ("stycke", "2", "Medlemsstaterna behöver inte uppge skälen.") in seen
+    assert ("stycke", "3", "Dessutom behöver de inte lämna skriftlig information.") in seen
+    # an article whose stycken sit directly under it, with no numbered paragraph:
+    # every one is a `stycke`, numbered from 1, so the unnumbered prose that
+    # trails the enacting terms (a signature block) is not mistaken for one
+    assert ("stycke", "1",
+            "Medlemsstaterna ska se till att ansökningar prövas.") in seen
+    assert ("stycke", "2", "De ska då beakta samtliga omständigheter.") in seen
+
+
+def test_stycke_anchors_follow_the_sfs_grammar():
+    art = to_artifact(parse_formex(ET.fromstring(STYCKEN_XML), "32005L0085", "swe"))
+    anchors = [a for a, _ in anchored_blocks(art["structure"])]
+    # "artikel 9.2" and "artikel 9.2 första stycket" are distinct citations that
+    # name the same run of text, so the paragraph answers to both. Document order:
+    # the first stycke's own point precedes the stycken that follow it
+    assert anchors[:6] == ["9", "9.2", "9.2.S1", "9.2.a", "9.2.S2", "9.2.S3"]
+    # an article's own stycken hang off the article ("artikel 8 andra stycket")
+    assert anchors[-3:] == ["8", "8.S1", "8.S2"]
+    # a point is named the same whichever stycke holds it: the stycke never
+    # enters its key, which stays article.paragraph.point
+    assert "9.2.a" in anchors and "9.2.S1.a" not in anchors
+
+
+# an amending act: article 1 has its own lettered enumeration, and one of its
+# points quotes the replacement text -- a whole article of the *amended* act,
+# with a lettered list of its own
+AMENDING_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20150420">20150420</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001">
+      <TI.ART>Artikel 1</TI.ART>
+      <ALINEA>
+        <P>Förordning (EU) nr 1 ska ändras på följande sätt:</P>
+        <LIST TYPE="alpha">
+          <ITEM><NP><NO.P>a)</NO.P><TXT>Artikel 3 ska ersättas med följande:
+            <QUOT.S><ARTICLE IDENTIFIER="003"><TI.ART>Artikel 3</TI.ART><ALINEA>
+              <P>Med avvikelse gäller följande:</P>
+              <LIST TYPE="alpha">
+                <ITEM><NP><NO.P>a)</NO.P><TXT>ett citerat led,</TXT></NP></ITEM>
+                <ITEM><NP><NO.P>b)</NO.P><TXT>ett citerat led till.</TXT></NP></ITEM>
+              </LIST></ALINEA></ARTICLE></QUOT.S></TXT></NP></ITEM>
+          <ITEM><NP><NO.P>b)</NO.P><TXT>Artikel 4 utgår.</TXT></NP></ITEM>
+        </LIST>
+      </ALINEA>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_quoted_amending_text_stays_prose():
+    doc = parse_formex(ET.fromstring(AMENDING_XML), "32015R0613", "swe")
+    art = to_artifact(doc)
+    anchors = [a for a, _ in anchored_blocks(art["structure"])]
+    # the amending act's own points anchor; the quoted act's lettered list is not
+    # lifted into them (it would collide with them, "1.a" twice on one page).
+    # The article's unnumbered lead is its first stycke ("artikel 1 första stycket")
+    assert anchors == ["1", "1.S1", "1.a", "1.b"]
+    # ... and it is not lost either -- the quotation is kept whole, as prose
+    quoting = next(b for b in doc.body if b.num == "a")
+    assert quoting.text.endswith("a) ett citerat led, b) ett citerat led till.")
 
 
 # CELLAR serves an act published across several OJ files under a GENERAL root

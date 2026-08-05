@@ -40,13 +40,52 @@ def human_fragment(frag):
 
 # an EU act anchors an article on its bare number ("32", "6.1", "6.1.c") -- a
 # shape `human_fragment` deliberately does not type, since its callers in stats
-# and eurlex/render handle those anchors themselves
-_EU_ARTICLE = re.compile(r"\d+[a-z]?(?:\.\d+)*(?:\.[a-z])?")
+# and eurlex/render handle those anchors themselves. A trailing ".S<n>" is a
+# stycke (sub-paragraph) of that article: "9.2.S2" = artikel 9.2 andra stycket.
+# A point never carries one -- the act names it by its paragraph whichever stycke
+# holds it -- so the two tails are alternatives, not a sequence.
+_EU_ARTICLE = re.compile(
+    r"(\d+[a-z]?(?:\.\d+)*)(?:\.([a-z])|\.S(\d+))?", re.IGNORECASE)
+
+# the Swedish ordinal a stycke is named by ("andra stycket"), which is how the
+# acts themselves and everyone citing them write it -- never "stycke 2". Shared
+# with `lib.page`, which renders the same prose for an SFS stycke pinpoint
+# (rule:second-use-goes-to-lib); this is the leaf, so page imports it back.
+STYCKE_ORDINAL = {1: "första", 2: "andra", 3: "tredje", 4: "fjärde",
+                  5: "femte", 6: "sjätte", 7: "sjunde", 8: "åttonde",
+                  9: "nionde", 10: "tionde", 11: "elfte", 12: "tolfte",
+                  13: "trettonde", 14: "fjortonde", 15: "femtonde",
+                  16: "sextonde", 17: "sjuttonde", 18: "artonde",
+                  19: "nittonde", 20: "tjugonde"}
+
+
+def eu_article_label(frag):
+    """An EU act's article/sub-article anchor -> the pinpoint a reader
+    recognises: "6.1" -> "artikel 6.1", "6.1.c" -> "artikel 6.1 c", and a stycke
+    anchor "9.2.S2" -> "artikel 9.2 andra stycket". '' when `frag` is not an EU
+    article anchor, or when its stycke runs past the ordinal table -- "21 stycket"
+    is not Swedish, and reader-facing prose is the whole point of this module."""
+    m = _EU_ARTICLE.fullmatch(frag or "")
+    if not m:
+        return ""
+    article, punkt, stycke = m.groups()
+    if punkt:
+        return "artikel %s %s" % (article, punkt)
+    if not stycke:
+        return "artikel " + article
+    ordinal = STYCKE_ORDINAL.get(int(stycke))
+    return "artikel %s %s stycket" % (article, ordinal) if ordinal else ""
 
 
 def pinpoint_label(frag):
     """A fragment id -> the pinpoint to *show a reader*, covering the bare EU
     article anchor as well as the Swedish and CoE forms `human_fragment` types.
-    Returns '' for an id with no reader-facing form."""
-    return human_fragment(frag) or (
-        "artikel " + frag if frag and _EU_ARTICLE.fullmatch(frag) else "")
+    Returns '' for an id with no reader-facing form.
+
+    An EU anchor is decided by shape and never falls through: it is all digits and
+    dots, which no Swedish or CoE fragment is (those lead with K/P/O/S/N/M, "sid"
+    or "A"), while `human_fragment`'s segment scan *does* match the "S2" inside
+    "9.2.S2" and would read a stycke anchor as the bare "2 st"."""
+    if _EU_ARTICLE.fullmatch(frag or ""):
+        return eu_article_label(frag)
+    return human_fragment(frag)

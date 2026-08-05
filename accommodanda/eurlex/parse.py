@@ -62,6 +62,22 @@ SKIP_INLINE = {"NOTE"}
 # ("...2022/2555" + "av den..." -> "...2022/2555 av den...")
 INLINE = {"HT", "IE", "FT", "DATE", "QUOT.START", "QUOT.END", "QUOT.S",
           "REF.DOC.OJ", "REF.NP.ECR", "REF.DOC.ECR", "NAME.CASE"}
+# regions whose inner structure belongs to something other than the act's own
+# outline: the verbatim quotation an amending act inserts (text of *another* act)
+# and a table (a cell's list is the cell's). A list inside one of these is read as
+# part of its enclosing run of text and never lifted out as a point of its own.
+ATOMIC = {"QUOT.S", "TBL"}
+# a numbered paragraph's marker is carried as the block's `num`, so it is not part
+# of the text -- it has to be dropped explicitly for the PARAG that carries no
+# ALINEA, where it would otherwise open the paragraph's prose ("1. 1. Kommittén …")
+_PARAG_SKIP = SKIP_INLINE | {"NO.PARAG"}
+# reading the lead text of a block that also holds nested lists: the lists are
+# emitted as their own points (`_sublists`, its exact inverse), so their text must
+# not be folded into the lead as well
+_LEAD_SKIP = _PARAG_SKIP | {"LIST", "DLIST"}
+# ... and the same for a list item, whose own marker (NO.P) is likewise carried
+# as `num` rather than as the opening of its text
+_ITEM_SKIP = _LEAD_SKIP | {"NO.P"}
 
 
 # --------------------------------------------------------------------------
@@ -113,18 +129,26 @@ def _formex_roots(path, celex):
 # text extraction
 # --------------------------------------------------------------------------
 
-def flatten(elem):
+def flatten(elem, skip=SKIP_INLINE):
     """The element's mixed text content as one string, recursively: footnote
     subtrees dropped, inline elements spliced in place, block-level children
-    space-separated, element tails kept, whitespace normalised."""
+    space-separated, element tails kept, whitespace normalised. `skip` widens the
+    dropped set to the nested lists a caller emits as their own blocks."""
     parts = [elem.text or ""]
     for child in elem:
-        if child.tag in SKIP_INLINE:
+        if child.tag in skip:
             pass
+        elif child.tag in ATOMIC:
+            # the widened skip stops at an atomic region -- `_sublists` does not
+            # descend into one either, so a list in there is neither emitted as a
+            # point nor dropped from the text (an amending act's article 1 would
+            # otherwise collide with the lettered points of every article it quotes)
+            text = flatten(child)
+            parts.append(text if child.tag in INLINE else " %s" % text)
         elif child.tag in INLINE:
-            parts.append(flatten(child))
+            parts.append(flatten(child, skip))
         else:
-            parts.append(" %s" % flatten(child))
+            parts.append(" %s" % flatten(child, skip))
         parts.append(child.tail or "")
     return " ".join("".join(parts).split())
 
@@ -154,48 +178,160 @@ def _article_number(article):
 
 
 def _is_numbered_list(lst):
-    """True for an Arabic-numbered LIST ("1.", "2.", ...) -- the numbering an
+    """True for an Arabic-numbered list ("1.", "2.", ...) -- the numbering an
     article's own top-level enumeration uses, as opposed to the lettered/roman
     markers of a nested sub-list. Reads the Formex TYPE, falling back to the first
     item's marker when it is absent."""
     t = lst.get("TYPE", "").lower()
     if t:
         return t == "arab"
-    nop = lst.find("ITEM/NP/NO.P")
-    return nop is not None and any(c.isdigit() for c in "".join(nop.itertext()))
+    marker = (lst.find("DLIST.ITEM/PREFIX") if lst.tag == "DLIST"
+              else lst.find("ITEM/NP/NO.P"))
+    return marker is not None and any(c.isdigit()
+                                      for c in "".join(marker.itertext()))
 
 
-def _emit_list(lst, blocks, kind="point"):
-    """LIST -> a block per ITEM (its NO.P marker + lead text), recursing into a
-    nested sub-LIST as deeper points. `kind` is this level's block kind: an
+def _sublists(holder):
+    """The lists nested in a block's body, in document order: at any depth in its
+    own prose (Formex wraps them in a P or an ALINEA as readily as it doesn't),
+    but never inside another list, whose own emitter picks those up.
+
+    This is the exact inverse of what `_LEAD_SKIP` drops, and the two must stay
+    that way: the lead text skips a nested list at any depth, so an emitter that
+    only looked one level down would lose the deeper ones outright rather than
+    merely leaving them flat."""
+    found = []
+    for child in holder:
+        if child.tag in ("LIST", "DLIST"):
+            found.append(child)
+        elif child.tag not in SKIP_INLINE and child.tag not in ATOMIC:
+            found.extend(_sublists(child))
+    return found
+
+
+def _emit_sublists(holder, blocks, depth):
+    """Every list nested in `holder`, as points one level deeper."""
+    for sub in _sublists(holder):
+        (_emit_dlist if sub.tag == "DLIST" else _emit_list)(
+            sub, blocks, "point", depth)
+
+
+def _marker(text):
+    """A list item's structural marker from its raw label ("a)" -> "a"), or None
+    when it has none. The marker is kept as the source writes it, a typographic
+    bullet ("—") included -- it is what the page hangs in the margin. Whether it
+    can also carry a citation anchor is the anchor grammar's call, not the
+    parser's (`lib.eu_structure`)."""
+    return (text or "").strip("().") or None
+
+
+def _point_level(kind, depth):
+    """The `level` a point block carries: its nesting depth, so the anchor
+    grammar can hang it under its parent point (`1.1.f.ii`) and the renderer can
+    indent it. Only points nest; a paragraph-level enumeration carries none."""
+    return depth if kind == "point" and depth > 1 else None
+
+
+def _sub_depth(kind, depth):
+    """The depth a nested list's points sit at. `depth` counts *point* nesting,
+    not list nesting: a list emitted as the article's own numbered paragraphs
+    (GDPR art. 4) is not a point level, so the lettered sub-list hanging off it is
+    the first one -- counting it as the second indented those points a step past
+    every structurally identical point elsewhere."""
+    return depth + 1 if kind == "point" else 1
+
+
+def _emit_list(lst, blocks, kind="point", depth=1):
+    """LIST -> a block per ITEM (its NO.P marker + its text), recursing into a
+    nested sub-list as deeper points. `kind` is this level's block kind: an
     article's own numbered enumeration is paragraph-level, a lettered or nested
-    sub-list is points. The lead text is the item's own TXT/P -- a nested sub-list
-    is emitted as its own points, never folded into the lead."""
+    sub-list is points.
+
+    The text is everything the item says in its own right -- reading only its
+    first TXT/P instead dropped whatever followed (2022/1636's annex tables sit in
+    a second P), and reading it with the plain skip repeated a sub-list that
+    Formex wrote inside the item's own TXT (93/104 art. 18.1 b) rather than
+    beside it."""
     for item in lst.findall("ITEM"):
         np = item.find("NP")
         holder = np if np is not None else item
-        marker = _text(np, "NO.P").strip("().") if np is not None else None
-        blocks.append(Block(kind, _text(holder, "TXT", "P"), num=marker or None))
-        for sub in (holder.findall("LIST") + holder.findall("P/LIST")
-                    + holder.findall("ALINEA/LIST")):
-            _emit_list(sub, blocks, "point")
+        blocks.append(Block(kind, flatten(holder, _ITEM_SKIP),
+                            num=_marker(_text(np, "NO.P")) if np is not None else None,
+                            level=_point_level(kind, depth)))
+        _emit_sublists(holder, blocks, _sub_depth(kind, depth))
 
 
-def _emit_alinea(content, num, blocks):
+def _definition_text(term, sep, body):
+    """A definition-list entry as one run of text: its defined term, the list's
+    separator and the definition ("produkt: alla industriellt framställda
+    produkter …"). This is the `term: definition` shape the rest of the pipeline
+    already reads -- the definition extractor takes the term from it and the
+    renderer emphasises that lead as the act's <dfn> -- so the two Formex ways of
+    writing a definitions article (a plain LIST of "term: …" items and this
+    explicit DLIST markup) reach them identically. A word separator gets spaces
+    on both sides; a punctuation mark attaches to the term."""
+    if not term:
+        return body
+    return "%s%s %s" % (term, sep, body) if sep in ":.," else \
+        "%s %s %s" % (term, sep, body)
+
+
+def _emit_dlist(dlist, blocks, kind="point", depth=1):
+    """DLIST (Formex's definition list) -> a block per DLIST.ITEM: its PREFIX as
+    the marker, its TERM and DEFINITION joined into one `term: definition` run,
+    and any list nested in the definition as deeper points.
+
+    Previously unhandled entirely, so an article written this way -- 2015/1535
+    art. 1.1, the whole "produkt"/"tjänst"/"teknisk föreskrift" catalogue -- was
+    flattened into a single unreadable paragraph with no points, no anchors and
+    no defined terms."""
+    sep = dlist.get("SEPARATOR") or ":"
+    for item in dlist.findall("DLIST.ITEM"):
+        prefix, term = item.find("PREFIX"), item.find("TERM")
+        defn = item.find("DEFINITION")
+        blocks.append(Block(
+            kind,
+            _definition_text(flatten(term) if term is not None else "", sep,
+                             flatten(defn, _LEAD_SKIP) if defn is not None else ""),
+            num=_marker(flatten(prefix)) if prefix is not None else None,
+            level=_point_level(kind, depth)))
+        if defn is not None:
+            _emit_sublists(defn, blocks, _sub_depth(kind, depth))
+
+
+def _emit_alinea(content, num, blocks, stycke=None):
     """A PARAG/ALINEA body: a plain paragraph, or a lead paragraph followed by
-    a LIST. A numbered list that is the article's own enumeration (not inside a
+    a list. A numbered list that is the article's own enumeration (not inside a
     numbered paragraph) is paragraph-level -- so its items nest their own points
-    and read as "1." like the official act; any other list is points."""
-    lists = content.findall("LIST")
+    and read as "1." like the official act; any other list is points.
+
+    `stycke` is the ordinal of a *second or later* sub-paragraph of the same
+    numbered paragraph; the block is then a `stycke` carrying that ordinal rather
+    than the paragraph's own number, which the first sub-paragraph keeps."""
+    # `num` stays the *paragraph's* number throughout: it is what decides whether
+    # a numbered list is the article's own enumeration (below), and a stycke
+    # ordinal must not stand in for it
+    kind = "stycke" if stycke else "paragraph"
+    block_num = str(stycke) if stycke else num
+    lists = _sublists(content)
     if not lists:
-        blocks.append(Block("paragraph", flatten(content), num=num))
+        blocks.append(Block(kind, flatten(content, _PARAG_SKIP), num=block_num))
         return
-    lead = " ".join(flatten(p) for p in content.findall("P"))
-    if lead.strip():
-        blocks.append(Block("paragraph", lead, num=num))
+    # everything the block says in its own right -- reading only its direct P
+    # children instead dropped whatever else it holds (2022/1636's annex tables
+    # are five sixths of that act), and reading it with the plain skip repeated
+    # the lists that are emitted as points below
+    lead = flatten(content, _LEAD_SKIP)
+    # a numbered paragraph is itself a citation target ("artikel 18.1") and the
+    # parent its points anchor under, so it is emitted even when it introduces its
+    # list with no prose of its own -- dropping it silently reparented the points
+    # onto the article ("18.a" for what the act calls 18.1 a)
+    if lead or block_num:
+        blocks.append(Block(kind, lead, num=block_num))
     for lst in lists:
-        kind = "paragraph" if num is None and _is_numbered_list(lst) else "point"
-        _emit_list(lst, blocks, kind)
+        list_kind = ("paragraph" if num is None and _is_numbered_list(lst)
+                     else "point")
+        (_emit_dlist if lst.tag == "DLIST" else _emit_list)(lst, blocks, list_kind)
 
 
 def parse_article(article, blocks):
@@ -206,13 +342,40 @@ def parse_article(article, blocks):
                         num=num, anchor=num))
     parags = article.findall("PARAG")
     if parags:
+        # an article's unnumbered PARAGs are all stycken of the article itself, so
+        # their ordinals run across them: restarting per PARAG gave two blocks the
+        # same `8.S1`. A numbered paragraph owns its own run and resets it.
+        n = 0
         for parag in parags:
             marker = _text(parag, "NO.PARAG").strip(". ") or None
-            alinea = parag.find("ALINEA")
-            _emit_alinea(alinea if alinea is not None else parag, marker, blocks)
+            n = _emit_stycken(parag.findall("ALINEA") or [parag], marker,
+                              blocks, n)
     else:
-        for alinea in article.findall("ALINEA"):
-            _emit_alinea(alinea, None, blocks)
+        _emit_stycken(article.findall("ALINEA"), None, blocks, 0)
+
+
+def _emit_stycken(alineas, num, blocks, start):
+    """The stycken (sub-paragraphs) of one numbered paragraph, or of an article
+    that has none -- the first as the container's own block, the rest as `stycke`
+    blocks numbered after it. Returns the ordinal reached, for the article-level
+    run `start` continues.
+
+    Formex writes each stycke as its own ALINEA, and reading only the first
+    (`parag.find("ALINEA")`) silently dropped every one after it: 831 stycken
+    across 600 sampled acts, 2005/85 art. 9.2 losing both derogations from the
+    rule its first stycke states. A stycke is a citation target in its own right
+    ("artikel 9.2 andra stycket"), anchored `9.2.S2` the way SFS anchors
+    `P2S2`."""
+    for i, alinea in enumerate(alineas):
+        # a numbered paragraph's first stycke is the paragraph's own block (it
+        # answers to both "artikel 9.2" and "artikel 9.2 första stycket"); an
+        # article's stycken are all `stycke` blocks, numbered from 1, so that the
+        # unnumbered prose trailing the enacting terms -- a signature block, an
+        # annex paragraph -- is not mistaken for one and given its anchor
+        ordinal = i + 1 if num else start + i + 1
+        _emit_alinea(alinea, num, blocks,
+                     stycke=None if (num and ordinal == 1) else ordinal)
+    return 0 if num else start + len(alineas)
 
 
 def parse_division(division, level, blocks):
@@ -458,11 +621,16 @@ def walk_content(elem, blocks, level=2):
             if text:
                 blocks.append(Block("heading", text, level=level))
         elif tag in ("P", "ALINEA", "TXT", "NP"):
-            text = flatten(child)
+            # a list wrapped in prose keeps its own points (a glossary in an annex
+            # reads as entries, not as one run-on paragraph)
+            text = flatten(child, _LEAD_SKIP)
             if text:
                 blocks.append(Block("paragraph", text))
+            _emit_sublists(child, blocks, 1)
         elif tag == "LIST":
             _emit_list(child, blocks)
+        elif tag == "DLIST":
+            _emit_dlist(child, blocks)
         elif tag == "TBL":
             _emit_table(child, blocks)
         elif tag == "DIVISION":

@@ -140,9 +140,14 @@ def act_map(host_art):
     `recital-15` a recital. Labels are truncated -- the model needs to recognise a
     node, not read it."""
     lines, anchors = [], set()
-    for anchor, b in anchored_blocks(host_art["structure"]):
+    # one line per node, so `aliases=False`: a numbered paragraph also answers to
+    # its first-stycke anchor, but offering the model both names for one run of
+    # text would just spend tokens on a choice that cannot matter
+    for anchor, b in anchored_blocks(host_art["structure"], aliases=False):
         anchors.add(anchor)
         lines.append("[%s] %s" % (anchor, runs_text(b["text"]).strip()[:LABEL_MAX]))
+    # ... but a stycke anchor the model copies off a line is still valid to accept
+    anchors |= {a for a, _ in anchored_blocks(host_art["structure"])}
     return "\n".join(lines), anchors
 
 

@@ -37,6 +37,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import NamedTuple
 
 from lark import Lark, Token, Tree
 from lark.exceptions import UnexpectedInput
@@ -264,7 +265,16 @@ artikel_part: (ARTIKEL | ARTIKLARNA) _W artikel_item (_asep artikel_item)*
 // paths -- "artikel 6 c i Europakonventionen" returned nothing at all, losing
 // the treaty link rather than merely the pinpoint. See `_article_specs` for why
 // the sub-article-less form is read as a point.
-artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W punkt_ref_id (_asep punkt_ref_id)*)?
+// The stycke (sub-paragraph) sits between the sub-article and the lettered
+// point, which is the order the acts use: "artikel 3.1 tredje stycket a" is 460
+// of the 496 sampled orderings. It anchors `#9.2.S2`, the id the eurlex parser
+// mints for that stycke -- but only where no letter follows, since a point is
+// anchored by its paragraph whichever stycke holds it. Without this production
+// the whole reference used to fail, losing the *article* too and degrading to an
+// act-level link.
+artikel_item: artikel_ref_id (DOT underartikel_ref_id)? (_W stycke_ref)? (_W punkt_ref_id (_asep punkt_ref_id)*)?
+stycke_ref: stycke_ref_id _W PIECE_WORD
+stycke_ref_id: ORDINAL_WORD
 _asep: _W_AND_OR_W | HYP | COMMA _W
 artikel_ref_id: NUMBER
 underartikel_ref_id: NUMBER
@@ -846,7 +856,42 @@ EU_KEYS = ('ar', 'artikel', 'akttyp')
 # (no treaty/act/generic noun). It self-refers inside an EU act, else anaphora-
 # links the last named act (fmt_eu_ref).
 BARE_PARTS = frozenset(('eu_ref', 'artikel_part', 'artikel_item',
-                        'artikel_ref_id', 'underartikel_ref_id', 'punkt_ref_id'))
+                        'artikel_ref_id', 'underartikel_ref_id', 'punkt_ref_id',
+                        'stycke_ref', 'stycke_ref_id'))
+
+
+class Pinpoint(NamedTuple):
+    """What one EU article reference pinpoints inside its act: the article, its
+    numbered sub-article, the stycke (sub-paragraph) and the lettered point.
+    Passed whole rather than as four positionals, so adding a level does not
+    thread through every uri builder."""
+    artikel: str | None = None
+    underartikel: str | None = None
+    stycke: str | None = None
+    punkt: str | None = None
+
+
+# the act itself, pinpointing nothing -- the default every uri builder falls back
+# to. A module singleton because ruff's B008 forbids the constructor call in an
+# argument default (harmless for an immutable NamedTuple, but the rule is on)
+NO_PINPOINT = Pinpoint()
+
+
+def eu_fragment(pin):
+    """An EU act's uri fragment for `pin` -- the dotted grammar the eurlex parser
+    mints for the anchor it targets: `6.1`, `6.1.c`, `9.2.S2`, `56.7.S2.a`. ''
+    when no article is named.
+
+    A stycke is used only where no lettered point is named: the act names a point
+    by its paragraph whichever stycke holds it ("artikel 11 a" for a point in the
+    second stycke), so the point is both the finer pinpoint and the only form
+    written -- and it is the anchor the eurlex parser mints."""
+    if not pin.artikel:
+        return ''
+    frag = '.'.join(p for p in (pin.artikel, pin.underartikel) if p)
+    if pin.punkt:
+        return frag + '.' + pin.punkt
+    return frag + ('.S' + pin.stycke if pin.stycke else '')
 
 
 @dataclass
@@ -1152,15 +1197,11 @@ def celex_uri(attrs, base='https://lagen.nu/'):
               'directive': 'L', 'regulation': 'R',
               'recommendation': 'H', 'decision': 'D'}[attrs['akttyp'].lower()]
     uri = base + 'ext/celex/3%04d%s%04d' % (year, letter, number)
-    if attrs.get('artikel'):
-        uri += '#' + attrs['artikel']
-        if attrs.get('underartikel'):
-            uri += '.' + attrs['underartikel']
-        # the lettered point, for an act cited by number as well as by name
-        # ("artikel 125.4 a i förordning (EU) nr 1303/2013")
-        if attrs.get('punkt'):
-            uri += '.' + attrs['punkt']
-    return uri
+    # the sub-article, stycke and lettered point, for an act cited by number as
+    # well as by name ("artikel 125.4 a i förordning (EU) nr 1303/2013")
+    frag = eu_fragment(Pinpoint(attrs.get('artikel'), attrs.get('underartikel'),
+                                attrs.get('stycke'), attrs.get('punkt')))
+    return uri + ('#' + frag if frag else '')
 
 
 # the named-EU-act extension, added only when EULAGSTIFTNING is active AND the
@@ -1882,43 +1923,37 @@ class LagrumParser:
 
     # --- EU ---
 
-    def _eu_celex_uri(self, celex, artikel=None, underartikel=None, punkt=None,
-                      remember=True):
-        """ext/celex/<CELEX> deep-linked to the cited article, sub-article and
-        lettered point. Names the act as the document's current EU act (for later
-        anaphora) unless `remember` is false (an anaphoric ref must not refresh
-        what it points at). The fragment is the dotted grammar the eurlex renderer
-        mints for the target anchor (#6.1.c)."""
+    def _eu_celex_uri(self, celex, pin=NO_PINPOINT, remember=True):
+        """ext/celex/<CELEX> deep-linked to what `pin` names inside it. Names the
+        act as the document's current EU act (for later anaphora) unless
+        `remember` is false (an anaphoric ref must not refresh what it points at).
+        The fragment is the dotted grammar the eurlex renderer mints for the
+        target anchor (#6.1.c, #9.2.S2)."""
         if remember:
             self.state.last_eu_act = celex
-        uri = self.base + 'ext/celex/' + celex
-        if artikel:
-            uri += '#' + artikel + ('.' + underartikel if underartikel else '')
-            if punkt:
-                uri += '.' + punkt
-        return uri
+        frag = eu_fragment(pin)
+        return self.base + 'ext/celex/' + celex + ('#' + frag if frag else '')
 
-    def _treaty_uri(self, path, artikel=None, underartikel=None, punkt=None):
-        """ext/<path> (celex/12016E/TXT, coe/005) deep-linked to the cited article
-        and sub-article, like _eu_celex_uri but for a primary-law instrument keyed
-        by name. A treaty is never remembered as the anaphora act in focus. An EU
-        instrument fragments its article the CELEX way (#16.2); a Council-of-Europe
-        treaty uses the CoE article grammar its own artifact mints (#A8, #A6P1)."""
+    def _treaty_uri(self, path, pin=NO_PINPOINT):
+        """ext/<path> (celex/12016E/TXT, coe/005) deep-linked to what `pin` names,
+        like _eu_celex_uri but for a primary-law instrument keyed by name. A treaty
+        is never remembered as the anaphora act in focus. An EU instrument
+        fragments its article the CELEX way (#16.2); a Council-of-Europe treaty
+        uses the CoE article grammar its own artifact mints (#A8, #A6P1)."""
         uri = self.base + 'ext/' + path
-        if artikel:
-            if path.startswith('coe/'):
-                # a Council-of-Europe treaty uses the CoE article grammar its own
-                # artifact mints (#A8, #A6P1), shared via the dependency-free
-                # lib.coe_ids leaf (importing lib.coe here would cycle)
-                uri += '#' + coe_article_fragment(artikel, underartikel, punkt)
-            else:
-                uri += '#' + artikel + ('.' + underartikel if underartikel else '')
-                if punkt:
-                    uri += '.' + punkt
-        return uri
+        if not pin.artikel:
+            return uri
+        if path.startswith('coe/'):
+            # a Council-of-Europe treaty uses the CoE article grammar its own
+            # artifact mints (#A8, #A6P1), shared via the dependency-free
+            # lib.coe_ids leaf (importing lib.coe here would cycle). It has no
+            # stycke form, so a stycke pinpoint lands on the article.
+            return uri + '#' + coe_article_fragment(pin.artikel, pin.underartikel,
+                                                    pin.punkt)
+        return uri + '#' + eu_fragment(pin)
 
     def _article_specs(self, node):
-        """Per-article ``(artikel, underartikel, punkt, span)``. A single article
+        """Per-article ``(Pinpoint, span)``. A single article
         keeps the whole eu_ref span (so "artikel 47 i stadgan" links as one
         phrase); a coordinated list or a range ("artiklarna 101 och 102", "12–15")
         links each number on its own span.
@@ -1935,7 +1970,13 @@ class LagrumParser:
                     if s.data == 'punkt_ref_id']
 
         def spec(d, span, punkt):
-            return (d.get('artikel'), d.get('underartikel'), punkt, span)
+            # the stycke is written as an ordinal word ("andra stycket"); the
+            # anchor counts from 1, so it is settled to a digit here. The grammar's
+            # ORDINAL_WORD and this table are the same nine words, so a miss is a
+            # broken program, not a pinpoint to quietly drop
+            stycke = d.get('stycke')
+            return (Pinpoint(d.get('artikel'), d.get('underartikel'),
+                             ORDINALS[stycke] if stycke else None, punkt), span)
 
         out = []
         for it in items:
@@ -1971,14 +2012,13 @@ class LagrumParser:
 
     @staticmethod
     def _emit_uris(out, specs, node, build):
-        """Emit one ``{_uri, _span}`` per article spec via ``build(artikel,
-        underartikel, punkt)``; an instrument named with no article links itself
-        once."""
+        """Emit one ``{_uri, _span}`` per article spec via ``build(pinpoint)``; an
+        instrument named with no article links itself once."""
         if not specs:
-            out.append({'_uri': build(None, None, None), '_span': _node_span(node)})
+            out.append({'_uri': build(NO_PINPOINT), '_span': _node_span(node)})
             return
-        for artikel, underartikel, punkt, span in specs:
-            out.append({'_uri': build(artikel, underartikel, punkt), '_span': span})
+        for pin, span in specs:
+            out.append({'_uri': build(pin), '_span': span})
 
     def _recital_specs(self, node):
         """Per-recital ``(recital, span)``. A single recital takes the whole
@@ -2013,7 +2053,7 @@ class LagrumParser:
         takes it through `build`, which is what records it as the act in focus
         for the anaphora that follows."""
         if 'skal_item' in parts:
-            act_uri = build(None, None, None)
+            act_uri = build(NO_PINPOINT)
             self._emit_recitals(out, node, act_uri)
             if not specs:
                 out.append({'_uri': act_uri, '_span': self._act_span(node)})
@@ -2037,7 +2077,7 @@ class LagrumParser:
         if 'eu_treaty' in parts:
             path = TREATIES[_token_text(subtree(node, 'eu_treaty')).lower()]
             self._emit_uris(out, specs, node,
-                            lambda a, u, p: self._treaty_uri(path, a, u, p))
+                            lambda pin: self._treaty_uri(path, pin))
             return
         # a known EU act named by short name ("artikel N i dataskyddsförordningen")
         if 'eu_namnakt' in parts:
@@ -2046,7 +2086,7 @@ class LagrumParser:
             if celex is None:
                 raise NoLink()
             self._emit_act_ref(out, node, parts, specs,
-                               lambda a, u, p: self._eu_celex_uri(celex, a, u, p))
+                               lambda pin: self._eu_celex_uri(celex, pin))
             return
         # the definite generic noun ("artikel N i (det) förordningen/direktivet")
         # pinpoints the act in focus; a bare "artikel N" self-refers inside an EU
@@ -2074,8 +2114,8 @@ class LagrumParser:
             # corpus. Emitting them through the shared path is what keeps that
             # from degrading to an act-level link under text promising a punkt.
             self._emit_act_ref(out, node, parts, specs,
-                               lambda a, u, p: self._eu_celex_uri(target, a, u, p,
-                                                                 remember=False))
+                               lambda pin: self._eu_celex_uri(target, pin,
+                                                             remember=False))
             return
         # an act cited by number ("(artikel N i) direktiv 2000/31/EG"): celex_uri
         # mints the act, and each cited article pinpoints that same act
@@ -2100,7 +2140,7 @@ class LagrumParser:
         # the act alone, with any article pinpoint stripped -- what a recital
         # hangs its `#recital-N` off, and the base each article spec re-pinpoints
         act = {k: v for k, v in attrs.items()
-               if k not in ('artikel', 'underartikel', 'punkt')}
+               if k not in ('artikel', 'underartikel', 'stycke', 'punkt')}
         if 'skal_item' in parts:
             self._emit_recitals(out, node, celex_uri(act, self.base))
             if not specs:
@@ -2111,13 +2151,15 @@ class LagrumParser:
         if not specs:
             self.emit(attrs, match, out, context, span=_node_span(node))
             return
-        for artikel, underartikel, punkt, span in specs:
+        for pin, span in specs:
             d = dict(act)
-            d['artikel'] = artikel
-            if underartikel:
-                d['underartikel'] = underartikel
-            if punkt:
-                d['punkt'] = punkt
+            d['artikel'] = pin.artikel
+            if pin.underartikel:
+                d['underartikel'] = pin.underartikel
+            if pin.stycke:
+                d['stycke'] = pin.stycke
+            if pin.punkt:
+                d['punkt'] = pin.punkt
             self.emit(d, match, out, context, span=span)
 
     # --- RATTSFALL (Swedish case law) ---

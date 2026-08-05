@@ -170,14 +170,17 @@
 {%- macro eu_article(anchor, rail_id, body) -%}
 <h3 id="{{ anchor }}" class="artikel"{{ rail_attr(rail_id) }}>{{ body }}</h3>
 {%- endmacro -%}
-{%- macro eu_block(nid, cls, rail_id, marker_target, marker_label, body) -%}
+{%- macro eu_block(nid, cls, rail_id, marker_target, marker_label, body, stycke_id="") -%}
 {#- the marker doubles as the block's permalink when the block is
-    addressable; an unaddressable block keeps a plain span -#}
+    addressable; an unaddressable block keeps a plain span.
+    `stycke_id` is a numbered paragraph's first-stycke anchor: the paragraph and
+    its first stycke are the same run of text but two citable units ("artikel
+    9.2" and "artikel 9.2 första stycket"), so the text carries the second id -#}
 <p{{ id_attr(nid) }}{% if cls %} class="{{ cls }}"{% endif %}{{ rail_attr(rail_id) }}>
 {%- if marker_label -%}
 {%- if marker_target %}<a class="num" href="#{{ marker_target }}">{{ marker_label }}</a> {% else %}<span class="num">{{ marker_label }}</span> {% endif -%}
 {%- endif -%}
-{{ body }}</p>
+{% if stycke_id %}<span id="{{ stycke_id }}">{{ body }}</span>{% else %}{{ body }}{% endif %}</p>
 {%- endmacro -%}
 {%- macro eu_recital_group(anchor, range_label, label, refs) -%}
 {#- the thematic recital-group lead: a subdued outdented editorial line -#}

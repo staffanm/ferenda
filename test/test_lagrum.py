@@ -587,6 +587,47 @@ def test_eu_lettered_point_pinpoints(text, want):
     assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
 
 
+# A stycke (sub-paragraph) pinpoint: "artikel 9.2 andra stycket" anchors #9.2.S2,
+# the id the eurlex parser mints for that stycke. Before the production existed
+# the whole reference failed to match, so the *article* was lost too and the
+# citation degraded to an act-level link -- adding the word made the link worse.
+EU_STYCKE_PINPOINTS = [
+    ("artikel 9.2 andra stycket i direktiv 2005/85/EG",
+     ["https://lagen.nu/ext/celex/32005L0085#9.2.S2"]),
+    ("artikel 93.1 andra stycket i direktiv 2014/65/EU",
+     ["https://lagen.nu/ext/celex/32014L0065#93.1.S2"]),
+    # an article's own stycken, with no numbered paragraph between
+    ("artikel 8 andra stycket i direktiv 98/34/EG",
+     ["https://lagen.nu/ext/celex/31998L0034#8.S2"]),
+    ("artikel 12 första stycket i direktiv 98/34/EG",
+     ["https://lagen.nu/ext/celex/31998L0034#12.S1"]),
+    # a lettered point is anchored by its paragraph whichever stycke holds it --
+    # which is also the only form the acts write ("artikel 11 a") -- so the point
+    # takes the fragment and the stycke drops out
+    ("artikel 3.1 tredje stycket a i förordning (EG) nr 1272/2008",
+     ["https://lagen.nu/ext/celex/32008R1272#3.1.a"]),
+    ("artikel 9.2 b i direktiv 2005/85/EG",
+     ["https://lagen.nu/ext/celex/32005L0085#9.2.b"]),
+    # ... and an article cited with no stycke is untouched
+    ("artikel 2.1 i direktiv (EU) 2015/1535",
+     ["https://lagen.nu/ext/celex/32015L1535#2.1"]),
+]
+
+
+@pytest.mark.parametrize("text,want", EU_STYCKE_PINPOINTS)
+def test_eu_stycke_pinpoints(text, want):
+    assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
+
+
+def test_eu_stycke_link_spans_the_whole_phrase():
+    # the ordinal and "stycket" belong to the link, not to the text around it
+    parser = _eu_parser()
+    text = "Den ska tillämpas från och med artikel 93.1 andra stycket i direktiv 2014/65/EU."
+    refs = parser.parse_text(text, context={})
+    assert text[refs[0].start:refs[0].end] == \
+        "artikel 93.1 andra stycket i direktiv 2014/65/EU"
+
+
 @pytest.mark.parametrize("text,want", [
     # a Council-of-Europe treaty fragments its own way (A6P3Lc, not 6.3.c), and
     # the ECHR artifact really does mint A6P3La..A6P3Le -- the letter must reach

@@ -11,7 +11,8 @@ an ordered `Block` list that keeps the signals: a `heading` carries its division
   * a `heading` opens an `avdelning` (division) nested under the nearest open
     division of lower `level` (parts > titles > chapters > sections);
   * an `article` is contained by the current deepest division (or the root) and
-    holds the `paragraph`s that follow; a `paragraph` holds its `point`s;
+    holds the `paragraph`s that follow; a `paragraph` holds its further `stycke`n
+    and its `point`s;
   * preamble matter (title/keyword/citation/recital/preamble) and trailing
     matter (ruling/signature) stay where they fall, as leaves.
 
@@ -29,6 +30,7 @@ vocabulary.
 from ..lib.eu_structure import ARTICLE as _ARTICLE
 from ..lib.eu_structure import PARAGRAPH as _PARAGRAPH
 from ..lib.eu_structure import POINT as _POINT
+from ..lib.eu_structure import STYCKE as _STYCKE
 
 # block kinds that contain others (everything else is a leaf)
 _DIVISION = "heading"
@@ -64,6 +66,12 @@ def nest(blocks):
             node = {**b, "children": []}
             (article["children"] if article else parent()).append(node)
             parag = node
+        elif t == _STYCKE:
+            # a further sub-paragraph of the open paragraph (or of the article,
+            # when its stycken sit directly under it); it does not open a new
+            # paragraph, so the points that follow keep hanging off the same one
+            target = parag or article
+            (target["children"] if target else parent()).append(dict(b))
         elif t == _POINT:
             target = parag or article
             (target["children"] if target else parent()).append(dict(b))

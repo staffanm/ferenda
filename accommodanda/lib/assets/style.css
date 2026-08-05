@@ -685,7 +685,15 @@ p.recital { scroll-margin-top: var(--scroll-clear); }
    ("1.", "a)"). */
 p.recital.hang { padding-left: 2.4rem; text-indent: -2.4rem; }
 p.paragraph.hang, p.point.hang { padding-left: 1.5rem; text-indent: -1.5rem; }
+/* a stycke carries no marker (the act prints none either), so it needs no rule
+   of its own: it sets flush, aligning with the text of the paragraph it
+   continues, whose own marker hangs in the margin. The class is the anchor
+   hook -- the SFS <p id="P2S1"> shape. */
 p.point { margin-left: 2.2rem; }
+/* a point nested inside another point (a definition's own roman sub-list, e.g.
+   2015/1535 art. 1.1 f ii) steps in once more, so the depth its anchor records
+   is the depth the eye reads */
+p.point.sub { margin-left: 4rem; }
 /* every addressable enacting-terms block clears the sticky masthead when a
    #4.22.a permalink scrolls to it */
 p.hang { scroll-margin-top: var(--scroll-clear); }

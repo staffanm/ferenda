@@ -39,16 +39,26 @@ DEFN_ACT = """<ACT>
 # -- the helper functions -------------------------------------------------
 
 def test_term_of_takes_lead_phrase_before_colon():
-    assert _term_of("sårbarhet: en svaghet som kan utnyttjas.") == "sårbarhet"
-    assert _term_of("nätverks- och informationssystem: ...") \
+    assert _term_of("sårbarhet: en svaghet som kan utnyttjas.", "swe") == "sårbarhet"
+    assert _term_of("nätverks- och informationssystem: ...", "swe") \
         == "nätverks- och informationssystem"
+    # the definition's body may itself be the sub-list that follows
+    assert _term_of("transportabla tryckbärande anordningar:", "swe") \
+        == "transportabla tryckbärande anordningar"
+    # a definition that goes on to introduce sub-definitions is still a definition:
+    # the announcing phrase is only disqualifying in the *head*
+    assert _term_of("tjänst: alla tjänster. I denna definition avses med", "swe") \
+        == "tjänst"
 
 
 def test_term_of_rejects_non_definition_points():
-    assert _term_of("en löpande mening utan kolon") is None     # no colon
-    assert _term_of(": tom") is None                            # empty head
-    long_head = "x" * 90 + ": def"                              # head too long
-    assert _term_of(long_head) is None
+    assert _term_of("en löpande mening utan kolon", "swe") is None   # no colon
+    assert _term_of(": tom", "swe") is None                          # empty head
+    long_head = "x" * 90 + ": def"                                   # head too long
+    assert _term_of(long_head, "swe") is None
+    # the line announcing the list is a numbered paragraph in some acts
+    # (2015/1535 art. 1.1) -- it defines nothing
+    assert _term_of("I detta direktiv gäller följande definitioner:", "swe") is None
 
 
 def test_extract_definitions_anchors_points_and_maps_terms():

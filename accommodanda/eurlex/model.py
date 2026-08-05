@@ -131,7 +131,11 @@ class Block:
     text: str
     num: str | None = None     # structural marker: recital "(1)", article "1",
                                # paragraph "2", point "a"
-    level: int | None = None   # heading/division depth (1 = outermost)
+    level: int | None = None   # nesting depth, read per kind: a heading's
+                               # division depth (1 = outermost), a point's depth
+                               # in *point* nesting (unset = the first point
+                               # level, 2 = inside a point, …), which is what
+                               # hangs its anchor under its parent's ("1.1.f.ii")
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
     defines: str | None = None # a definitions-article point: the term it defines
 
@@ -144,7 +148,10 @@ class Block:
 #   preamble    preamble framing text (PREAMBLE.INIT / .FINAL)
 #   heading     a division/section/chapter title in the body
 #   article     an article title (TI.ART)
-#   paragraph   a body paragraph (numbered PARAG, ALINEA, or judgment NP)
+#   paragraph   a body paragraph (numbered PARAG, ALINEA, or judgment NP) --
+#               its text is the paragraph's *first* stycke
+#   stycke      a second or later sub-paragraph of that paragraph (ALINEA),
+#               cited as "artikel 9.2 andra stycket" and anchored 9.2.S2
 #   point       a list item (LIST/ITEM)
 #   ruling      the operative part of a judgment (JURISDICTION/DISPOSITIF)
 #   signature   place/date/signatories

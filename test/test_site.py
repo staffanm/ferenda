@@ -11,6 +11,8 @@ import pytest
 
 from accommodanda import browse, build
 from accommodanda.lib import catalog, compress, page, render
+from accommodanda.lib.eu_structure import Anchors, subarticle_key
+from accommodanda.lib.pinpoint import pinpoint_label
 from accommodanda.avg import render as avg_render
 from accommodanda.dv import render as dv_render
 from accommodanda.eurlex import render as eurlex_render
@@ -2593,7 +2595,13 @@ ACT = {
          "children": [
             {"type": "paragraph", "num": "1",
              "text": ["Datahållaren ska göra data tillgänglig."], "children": [
-                {"type": "point", "num": "a", "text": ["på ett säkert sätt."]}]}]},
+                {"type": "point", "num": "a", "text": ["på ett säkert sätt."]},
+                # a point nested inside point a (a definition's own sub-list)
+                {"type": "point", "num": "i", "level": 2,
+                 "text": ["i synnerhet krypterat."]},
+                # a further stycke of the same paragraph
+                {"type": "stycke", "num": "2",
+                 "text": ["Detta gäller inte små företag."]}]}]},
     ],
 }
 LAYER = {
@@ -2626,11 +2634,48 @@ def test_editorial_indexes_both_directions():
 
 
 def test_subarticle_key_grammar():
-    from accommodanda.lib.eu_structure import subarticle_key
     assert subarticle_key("paragraph", "1", "4", None) == "4.1"
     assert subarticle_key("point", "a", "4", "1") == "4.1.a"
     assert subarticle_key("point", "a", "4", None) == "4.a"
+    assert subarticle_key("point", "ii", "1", "1", "f") == "1.1.f.ii"
     assert subarticle_key("paragraph", "1", None, None) is None
+
+
+def test_act_page_indents_and_anchors_a_nested_point(monkeypatch, tmp_path):
+    html = _render_act(monkeypatch, tmp_path)
+    # a point directly under the paragraph, then one nested inside it: the nested
+    # one hangs its anchor under its parent and steps in a further level (.sub)
+    assert '<p id="4.1.a" class="point hang"' in html
+    assert '<p id="4.1.a.i" class="point hang sub"' in html
+
+
+def test_act_page_anchors_a_paragraph_and_its_stycken(monkeypatch, tmp_path):
+    html = _render_act(monkeypatch, tmp_path)
+    # "artikel 4.1" and "artikel 4.1 första stycket" name the same run of text but
+    # are distinct citations, so the paragraph carries both ids -- its own on the
+    # block, the first stycke's on the text (the SFS <p id="P2S1"> shape)
+    assert '<p id="4.1" class="paragraph hang"' in html
+    assert '<span id="4.1.S1">Datahållaren ska göra data tillgänglig.</span>' in html
+    # a further stycke is its own block, anchored and unmarked (the act prints no
+    # number beside it either)
+    assert '<p id="4.1.S2" class="stycke">Detta gäller inte små företag.</p>' in html
+
+
+def test_anchors_track_nesting_and_close_at_a_heading():
+    a = Anchors()
+    assert a.key("article", "1", "1") == "1"
+    assert a.key("paragraph", "1") == "1.1"
+    assert a.key("point", "e") == "1.1.e"
+    # two sibling sub-lists under one paragraph both start at "i)": each nested
+    # point hangs under its own parent, so the two do not collide on one id
+    assert a.key("point", "i", None, 2) == "1.1.e.i"
+    assert a.key("point", "ii", None, 2) == "1.1.e.ii"
+    assert a.key("point", "f") == "1.1.f"
+    assert a.key("point", "i", None, 2) == "1.1.f.i"
+    # an annex heading ends the enacting terms: its own lettered list is not the
+    # last article's points ("BILAGA I ... a)" must not anchor as "1.a")
+    assert a.key("heading", None) is None
+    assert a.key("point", "a") is None
 
 
 def test_act_page_renders_recital_group_heading(monkeypatch, tmp_path):
@@ -3038,3 +3083,30 @@ def test_temporal_state_ignores_an_open_authorization_phrase():
     assert page.temporal_state(
         {"ikrafttrader": "den dag som regeringen bestämmer"}, "2026-08-02") == ""
     assert page.temporal_state({}, "2026-08-02") == ""
+
+
+def test_pinpoint_label_reads_every_anchor_grammar():
+    # the reader-facing pinpoint for each of the three anchor grammars the corpus
+    # mints. The EU form is decided by shape and never falls through to the
+    # Swedish reading: `human_fragment`'s segment scan matches the "S2" inside
+    # "9.2.S2" and would render a stycke anchor as the bare "2 st"
+    assert pinpoint_label("9.2.S2") == "artikel 9.2 andra stycket"
+    assert pinpoint_label("8.S2") == "artikel 8 andra stycket"
+    assert pinpoint_label("6.1.c") == "artikel 6.1 c"
+    assert pinpoint_label("6.1") == "artikel 6.1"
+    assert pinpoint_label("32") == "artikel 32"
+    # an uppercase list marker keeps its case
+    assert pinpoint_label("5.1.A") == "artikel 5.1 A"
+    # ... and the Swedish and CoE forms are untouched
+    assert pinpoint_label("K2P16S5") == "2 kap. 16 § 5 st"
+    assert pinpoint_label("sid39") == "s. 39"
+    assert pinpoint_label("A6P3Lc") == "artikel 6 punkt 3 led c"
+    assert pinpoint_label("recital-15") == ""
+
+
+def test_pinpoint_label_refuses_prose_it_cannot_write():
+    # past the ordinal table there is no Swedish for it -- "trettionde stycket"
+    # is not what anyone writes, and "30 st" is the wrong grammar entirely. The
+    # same refusal lib.page makes for an SFS stycke pinpoint.
+    assert pinpoint_label("5.3.S12") == "artikel 5.3 tolfte stycket"
+    assert pinpoint_label("5.3.S30") == ""

@@ -3,11 +3,13 @@
 Modern EU acts gather their definitions in a dedicated article ("Article N --
 Definitions"): an intro paragraph ("For the purposes of this Directive, the
 following definitions apply:") followed by a numbered list of points, each
-shaped ``term: definition`` (Swedish and English alike). We read each such point
-as a definition of the lead term (the text before the first colon) and anchor it
-as ``<article>.<point>`` -- the very fragment the citation engine mints for
-"artikel 6.15 i ..." (lib.lagrum.celex_uri) -- so a pinpoint citation and the
-definition it points at agree by construction.
+shaped ``term: definition`` (Swedish and English alike -- either written out that
+way in the running text, or in Formex's explicit ``DLIST`` term/definition markup,
+which the parser joins into the same shape). We read each such point as a
+definition of the lead term (the text before the first colon) and anchor it with
+the shared sub-article grammar (`lib.eu_structure.Anchors`) -- the very fragment
+the citation engine mints for "artikel 6.15 i ..." (lib.lagrum.celex_uri) -- so a
+pinpoint citation and the definition it points at agree by construction.
 
 A definition is valid only within its act (cross-act reuse goes through explicit
 references), so occurrences are interlinked act-locally: every later use of a
@@ -24,6 +26,7 @@ bulk of modern acts). Definitions stated inline in running prose ("'X' means
 
 import re
 
+from ..lib.eu_structure import Anchors
 from ..lib.lagrum import Ref
 
 # the relation a use-of-a-defined-term run carries; internal to the act, so the
@@ -57,13 +60,27 @@ _TERM_MAX = 80   # a definition's lead term is short; a long head means the colo
                  # sits mid-prose, not at a definition boundary
 
 
-def _term_of(point_text):
+def _is_intro(text, lang):
+    """Whether `text` is the line *announcing* a definitions list ("I detta
+    direktiv gäller följande definitioner:") rather than a definition itself."""
+    spec = DEFN_VOCAB.get(lang, DEFN_VOCAB["eng"])
+    return any(p in (text or "").lower() for p in spec["intro"])
+
+
+def _term_of(point_text, lang):
     """The defined term of a ``term: definition`` point -- the lead phrase before
-    the first colon -- or None when the point is not so shaped."""
+    the first colon -- or None when the point is not so shaped.
+
+    The announcing line is tested for and rejected on the *head* alone: it ends in
+    a colon like a definition does and is itself a numbered paragraph in some acts
+    (2015/1535 art. 1.1), so it would otherwise be read as defining its whole self.
+    Testing the head rather than the block keeps the same phrase inside a genuine
+    definition ("tjänst: … I denna definition avses med …") harmless."""
     if not _COLON.search(point_text):
         return None
     head = _COLON.split(point_text, 1)[0].strip()
-    if 2 <= len(head) <= _TERM_MAX and any(c.isalpha() for c in head):
+    if (2 <= len(head) <= _TERM_MAX and any(c.isalpha() for c in head)
+            and not _is_intro(head, lang)):
         return head
     return None
 
@@ -72,7 +89,7 @@ def _is_definitions_article(article, intro, lang):
     spec = DEFN_VOCAB.get(lang, DEFN_VOCAB["eng"])
     if any(t in (article.text or "").lower() for t in spec["titles"]):
         return True
-    return any(p in (intro or "").lower() for p in spec["intro"])
+    return _is_intro(intro, lang)
 
 
 def extract_definitions(body, lang):
@@ -89,19 +106,24 @@ def extract_definitions(body, lang):
             intro = body[i + 1].text if (i + 1 < n
                                          and body[i + 1].kind == "paragraph") else ""
             if art_num and _is_definitions_article(block, intro, lang):
+                # the anchor a definition point gets must be the one the renderer
+                # mints for it, so track the same running context: an entry may
+                # sit directly under the article (GDPR art. 4), one numbered
+                # paragraph deep (2015/1535 art. 1.1 -> "1.1.b") or inside another
+                # definition (its roman sub-list -> "1.1.b.i")
+                anchors = Anchors()
+                anchors.key("article", art_num, art_num)
                 i += 1
                 while i < n and body[i].kind not in ("article", "heading"):
                     point = body[i]
-                    # a definitions entry is the article's own enumeration: a
-                    # numbered `paragraph` when it sits directly under the article
-                    # (GDPR art. 4), a `point` when the list is one paragraph deep
-                    # (NIS2 art. 6). Its lettered sub-points are never definitions.
-                    term = (_term_of(point.text)
+                    key = anchors.key(point.kind, point.num, point.anchor,
+                                      point.level)
+                    term = (_term_of(point.text, lang)
                             if point.kind in ("paragraph", "point") else None)
-                    if term and point.num:
-                        point.anchor = "%s.%s" % (art_num, point.num)
+                    if term and key:
+                        point.anchor = key
                         point.defines = term
-                        terms.setdefault(term, point.anchor)
+                        terms.setdefault(term, key)
                     i += 1
                 continue
         i += 1
