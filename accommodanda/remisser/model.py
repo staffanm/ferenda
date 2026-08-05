@@ -71,12 +71,16 @@ class Remiss:
     # forarbete cross-refs from the "Dokument som remitteras"/"Genvägar"
     # link(s): {"typ", "basefile"}
     remitterat: list[dict[str, str]] = field(default_factory=list)
-    # the remitted document was authored *outside* regeringen -- by an agency, an
-    # external party or the EU -- and so has no regeringen.se legal-document
-    # landing page. Such an ärende's answers are never harvested: they comment on a
-    # document this corpus does not (and will not) hold, so there is nothing to
-    # hang their sentiment on. The ärende record itself is still written, because
-    # the on-disk slug is the incremental walk's stop condition.
+    # no document this corpus holds (or ever will) corresponds to this ärende, so
+    # its answers are never harvested: they comment on something there is nothing
+    # to hang their sentiment on. Two ways to get here, and the flag deliberately
+    # does not distinguish them, because nothing downstream acts on the reason:
+    # the usual one is that the document was authored *outside* regeringen -- an
+    # agency, an external party, the EU -- and so has no regeringen.se
+    # legal-document landing page; the rare one is that regeringen published it
+    # with no identifier at all (`download.UNNUMBERED_DOCUMENTS`), which leaves it
+    # unkeyable and so equally unreachable. The ärende record itself is still
+    # written, because the on-disk slug is the incremental walk's stop condition.
     externt_dokument: bool = False
     remissinstanser_pdf: str | None = None   # the single "who was asked" PDF
     svar: list[Remissinstans] = field(default_factory=list)

@@ -5,6 +5,7 @@ Hermetic: parses the three captured live pages under test/files/remisser/ and
 drives sync() against a stubbed session -- no network."""
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -114,6 +115,119 @@ def test_match_forarbete_falls_back_to_the_landing_slug_without_a_dnr():
     pm = "/rattsliga-dokument/departementsserien-och-promemorior/2026/07/nagot/"
     assert download._match_forarbete(pm, "Promemoria: Något", None) == {
         "typ": "pm", "basefile": "nagot", "slug": "nagot"}
+
+
+def test_match_forarbete_reads_the_number_off_the_landing_slug():
+    """regeringen.se prints the identifier without its colon often enough to
+    matter -- the SOU 2023:27 remiss says "SOU 2023 27" in the link text, the
+    title and the page heading. No identifier regex can match that (forarbete's
+    own listing walk skips such an item for the same reason), but the landing
+    slug is regeringen's machine-made form and carries the number intact."""
+    href = "/rattsliga-dokument/statens-offentliga-utredningar/2023/06/sou-202327/"
+    assert download._match_forarbete(href, "SOU 2023 27 Kamerabevakning", None) == {
+        "typ": "sou", "basefile": "2023:27"}
+    # the year is the leading four digits, so a one-digit number still parses
+    assert download._match_forarbete(
+        "/rattsliga-dokument/statens-offentliga-utredningar/2017/01/sou-20172/",
+        "Kraftsamling för framtidens energi", None) == {
+            "typ": "sou", "basefile": "2017:2"}
+    # a correctly printed identifier is still read from the text, not the slug
+    assert download._match_forarbete(
+        "/rattsliga-dokument/statens-offentliga-utredningar/2023/06/nagot/",
+        "SOU 2023:27 Kamerabevakning", None) == {
+            "typ": "sou", "basefile": "2023:27"}
+
+
+def test_match_forarbete_distrusts_the_path_segment_over_the_link_text():
+    """regeringen.se files a document under another type's segment now and then:
+    Ds 2015:51 sits under `/rattsliga-dokument/skrivelse/`. The link text names
+    it correctly, so the segment is the thing to distrust."""
+    href = "/rattsliga-dokument/skrivelse/2015/11/skr.-201551/"
+    assert download._match_forarbete(
+        href, "Ds 2015:51 Avgiftsfrihet för viss screening", None) == {
+            "typ": "ds", "basefile": "2015:51"}
+
+
+def test_match_forarbete_still_declines_a_document_it_cannot_key():
+    """The fallbacks must not turn into a stub-minting machine. Each declines a
+    case that looks close enough to tempt it."""
+    # a numberless landing page under a numbered series: nothing to read
+    assert download._match_forarbete(
+        "/rattsliga-dokument/forordningsmotiv/2019/12/forordning-om-nagot/",
+        "Förslag till förordning om något", None) is None
+    # a slug whose *own* prefix names another series: the segment says SOU, the
+    # slug says Ds. Reading the digits as this segment's number would mint SOU
+    # 2015:51 -- a real but entirely unrelated document -- so the slug is refused
+    # and the link text settles it instead
+    assert download._match_forarbete(
+        "/rattsliga-dokument/statens-offentliga-utredningar/2015/11/ds-201551/",
+        "Ds 2015:51 Avgiftsfrihet för viss screening", None) == {
+            "typ": "ds", "basefile": "2015:51"}
+    # an unrecognised doctype: the link text is some other kind of document's
+    # title, so an identifier mentioned in passing is not the document
+    assert download._match_forarbete(
+        "/rattsliga-dokument/nagon-ny-typ/2026/01/nagot/",
+        "Remiss av utkast, jfr Prop. 2015/16:51", None) is None
+    # ... and the same for a known but numberless type this function has no rule
+    # for: SÖ keeps raising upstream rather than claiming the Dir it cites
+    assert download._match_forarbete(
+        "/rattsliga-dokument/sveriges-internationella-overenskommelser/1980/06/"
+        "so-198072/", "SÖ 1980:72 överenskommelse, se Dir. 1979:12", None) is None
+    # a series named *in passing* under a numbered segment is a reference, not the
+    # identity. The types are swept in TYPES order, not by position in the text,
+    # so an unanchored sweep let this tilläggsdirektiv be filed as SOU 2015:51 --
+    # a real, unrelated document that exists in the corpus alongside dir/2015:51
+    assert download._match_forarbete(
+        "/rattsliga-dokument/kommittedirektiv/2015/11/nagot/",
+        "Tilläggsdirektiv till utredningen … (SOU 2015:51)", None) is None
+
+
+def _unnumbered_html():
+    """The closed-ärende fixture with its remitted-document link replaced by a
+    genuinely numberless one -- a förordningsmotiv with no number in the text and
+    none in the slug, which is the shape UNNUMBERED_DOCUMENTS exists for. The
+    "(SOU 2026:14)" in the ärende title goes too, or `_title_forarbete` recovers
+    the identifier from there and the page is not the shape under test."""
+    html = (FILES / "case-closed.html").read_text()
+    out, links = re.subn(
+        r'href="/rattsliga-dokument/statens-offentliga-utredningar/2026/03/'
+        r'sou-202614/"[^>]*>[^<]*</a>',
+        'href="/rattsliga-dokument/forordningsmotiv/2019/12/forordning-om-nagot/">'
+        'Förslag till förordning om något</a>', html)
+    out, titles = re.subn(r"\(SOU 2026:14\)", "", out)
+    # each rewrite is checked on its own: together, one silently doing nothing
+    # would leave the page still identifiable and the test failing far from here
+    assert links, "fixture no longer carries the island link this rewrites"
+    assert titles, "fixture no longer names the SOU in its title"
+    return out
+
+
+def test_parse_case_unnumbered_document_is_treated_as_external(monkeypatch):
+    """A remitted document regeringen published with no identifier anywhere has
+    no counterpart in the corpus -- forarbete skips a numberless listing item for
+    the same reason -- so the ärende is closed as external rather than failing and
+    being retried on every run forever."""
+    url = "https://www.regeringen.se/remisser/2019/12/nagot-onumrerat/"
+    html = _unnumbered_html()
+    # without the curated entry the ärende is a loud, retried failure
+    with pytest.raises(ValueError, match="needs an identity rule"):
+        download.parse_arende(html, url)
+    monkeypatch.setattr(download, "UNNUMBERED_DOCUMENTS",
+                        frozenset({"/remisser/2019/12/nagot-onumrerat"}))
+    assert download.parse_arende(html, url).externt_dokument is True
+
+
+def test_parse_case_stale_unnumbered_entry_raises_rather_than_dropping_it():
+    """The entry claims the document has no identifier. If it turns out to have
+    one, the curated line is stale -- and silently discarding a real ärende (whose
+    answers would then never be fetched, permanently, since the examined-index
+    records it as closed) is the last thing it should do."""
+    url = "https://www.regeringen.se/remisser/2019/12/nagot-onumrerat/"
+    entry = frozenset({"/remisser/2019/12/nagot-onumrerat"})
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(download, "UNNUMBERED_DOCUMENTS", entry)
+        with pytest.raises(ValueError, match="drop the entry"):
+            download.parse_arende((FILES / "case-closed.html").read_text(), url)
 
 
 @pytest.mark.parametrize("fixture,url", [

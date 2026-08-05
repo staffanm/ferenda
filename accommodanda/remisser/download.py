@@ -56,7 +56,15 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, layout
 from ..lib.net import BROWSER_UA, make_session, request
-from ..lib.regeringen import BASE, TYPES, listing_items, lr_identity, pm_identity
+from ..lib.regeringen import (
+    BASE,
+    TYPES,
+    listing_items,
+    lr_identity,
+    pm_identity,
+    regeringen_path,
+    slug_number,
+)
 from ..lib.util import Reporter, swedish_date, write_atomic
 from .model import Remiss, Remissinstans, org_slug
 
@@ -98,7 +106,8 @@ SUBARENDE = re.compile(r"^(.+/\d+)[–-]\d+$")
 # remitteras" on current pages, "Genväg"/"Genvägar" on older ones.
 ISLAND_HEADING = ("Dokument", "Genväg")
 
-# Pages whose own markup defeats that match, corrected one page at a time. A
+# Pages whose own markup -- or whose own missing identifier -- defeats that match,
+# corrected one page at a time. A
 # laxer heading pattern would change how all 3000+ ärenden are read to
 # accommodate a handful of infomaster slips, so the fix is curated per document
 # -- one line each, with the fault and the answer it yields. Keyed on the
@@ -114,12 +123,46 @@ MARKUP_FIXES = {
         "typ": "pm", "basefile": "S2026/00342",
         "slug": "elektronisk-overvakning--ett-verktyg-for-socialtjansten-till-"
                 "skydd-for-barn-och-unga"},
+    # Miljömålsberedningen's delbetänkande: regeringen published the landing page
+    # with neither a number in the link text ("Delbetänkande av
+    # Miljömålsberedningen - En klimat- och luftvårdsstrategi för Sverige") nor
+    # one in the slug (`en-klimat--och-luftvardsstrategi-for-sverige`). It is
+    # SOU 2016:47 -- the ärende's own remissammanställning names it, and the
+    # corpus already holds that SOU under exactly this title.
+    "/remisser/2016/06/remiss-av-delbetankande-fran-miljomalsberedningen-med-"
+    "forslag-om-en-klimat--och-luftvardsstrategi-for-sverige": {
+        "typ": "sou", "basefile": "2016:47"},
 }
+
+
+# Ärenden whose remitted document regeringen published with no identifier at all
+# -- no series number in the link text, none in the landing slug, and no number
+# anywhere in the series for that year. `parse_arende` is right to raise on a
+# /rattsliga-dokument/ link it cannot key (a stub basefile would file the ärende
+# where no join could find it), but for these there is nothing to key it *to*:
+# forarbete's own listing walk skips a numberless item for the same reason, so no
+# counterpart document will ever enter the corpus. Recording them here treats the
+# ärende as external -- examined once and closed, no answers fetched -- instead of
+# failing and being retried on every run forever. One line per url with the
+# evidence; an entry is wrong the moment the document turns out to have a number
+# (use MARKUP_FIXES then, as the Miljömålsberedningen delbetänkande above does),
+# and `parse_arende` raises when it sees that. Note it only sees it while the
+# ärende is still being polled: once recorded, the examined-index closes it
+# forever, so a later staleness surfaces through `--only`, not the sweep.
+UNNUMBERED_DOCUMENTS = frozenset({
+    # Förordningsmotiv for "Förordning om miljö- och trafiksäkerhetskrav för
+    # myndigheters bilar", landing slug `forordning-om-miljo--och-
+    # trafiksakerhetskrav-for-myndigheters-bilar`. The fm series carries no 2019
+    # number at all (it runs 2000:2–2001:x, then 2020:1 onwards), and no document
+    # in the corpus bears this title.
+    "/remisser/2019/12/remiss-av-forslag-till-uppdaterad-forordning-om-miljo--"
+    "och-trafiksakerhetskrav-for-myndigheters-bilar-och-bilresor",
+})
 
 
 def _markup_fix(url):
     """The curated cross-ref for a page whose markup defeats the parser, or None."""
-    return MARKUP_FIXES.get(url.split("regeringen.se", 1)[-1].rstrip("/"))
+    return MARKUP_FIXES.get(regeringen_path(url))
 
 
 # Answer PDFs regeringen.se lists but cannot deliver. The general handler in
@@ -136,6 +179,16 @@ BROKEN_ANSWERS = frozenset({
     # lists the answer, so regeringen believes it exists; the bytes do not.
     "https://www.regeringen.se/contentassets/"
     "231e2958e5e04d869d6c1888b797c519/sportfiskarna.pdf",
+    # The air-quality directive attached to the KN2025/01294 remiss: HTTP 200,
+    # `Content-Length: 0`, `Content-Type: application/pdf` on every attempt
+    # (three in a row here, and once per sweep before that) -- a broken upload,
+    # not an outage. `_fetch_pending` already refuses to record an empty body as
+    # downloaded, so without this the ärende re-requests it on every poll of its
+    # remissperiod.
+    "https://www.regeringen.se/contentassets/"
+    "c930185b992c4b538febc2a7b781e85c/europaparlamentets-och-radets-direktiv-"
+    "20242881-av-den-23-oktober-2024-om-luftkvalitet-och-renare-luft-i-europa-"
+    "omarbetning.pdf",
 })
 
 
@@ -186,9 +239,18 @@ def _landing_year(href):
 
 def _match_forarbete(href, text, dnr):
     """A remitted-document link -> {"typ", "basefile"} if it names a known
-    förarbete type, else None. The href's first path segment picks the type;
+    förarbete type, else None. The href's first path segment *proposes* the type;
     that type's identifier regex, applied to the *link text* (which is free of
     the remiss page's "Remiss av" noise), recovers the canonical basefile.
+
+    Two things the segment alone cannot settle, each handled below where it
+    arises: regeringen prints an identifier malformed often enough to matter
+    ("SOU 2023 27", no colon), so a numbered series falls back to the number in
+    its own landing slug (`lib.regeringen.slug_number`); and it files a document
+    under another type's segment now and then, so a numbered type whose rules all
+    missed falls back to sweeping every type's regex over the link text. Neither
+    fallback fires for a segment this function has no numbered rule for -- those
+    still yield None, and `parse_arende` raises.
 
     The two types regeringen.se publishes *without* a series number are resolved
     by the rules `forarbete` itself keys them on (`lib.regeringen`), so the same
@@ -216,13 +278,18 @@ def _match_forarbete(href, text, dnr):
     m = SEGMENT.match(href)
     if not m:
         return None
+    numbered = False        # the segment named a type whose identifier is a regex
     for typ, (segment, _category, idre) in TYPES.items():
         if segment != m.group(1):
             continue
+        numbered = bool(idre)
         if idre:
             hit = re.search(idre, text)
             if hit:
                 return {"typ": typ, "basefile": hit.group(1)}
+            number = slug_number(typ, _landing_slug(href))
+            if number:
+                return {"typ": typ, "basefile": number}
         elif typ == "pm":
             sub = SUBARENDE.match(dnr or "")
             slug = _landing_slug(href)
@@ -232,18 +299,38 @@ def _match_forarbete(href, text, dnr):
         elif typ == "lr":
             return {"typ": typ,
                     "basefile": lr_identity(_landing_year(href), text)[0]}
-    return None
+    # A *known* type whose own rules all missed: regeringen files a document under
+    # another type's segment now and then -- Ds 2015:51 sits at
+    # `/rattsliga-dokument/skrivelse/2015/11/skr.-201551/` -- and the link text
+    # still names it correctly, so the segment is the thing to distrust. The same
+    # every-type sweep `_title_forarbete` runs, over a cleaner string than the
+    # ärende title it reads.
+    #
+    # Only for a type whose identity *is* a printed identifier. An unknown segment,
+    # or a numberless type this function has no rule for (`so`), is not that case
+    # and must keep yielding None so `parse_arende` raises: the link text is then
+    # some other doctype's title, and an identifier mentioned in passing ("SÖ
+    # 1980:72, se Dir. 1979:12") is not the document. That raise is how a new
+    # regeringen.se doctype announces itself.
+    return _title_forarbete(text, anchored=True) if numbered else None
 
 
-def _title_forarbete(title):
+def _title_forarbete(title, anchored=False):
     """A förarbete cross-ref recovered straight from the ärende title when the page
     carries no "Genvägar" island at all (observed on real pages, e.g. a
     betänkande remiss whose title just names "... (SOU 2026:8)" with no shortcut
     link) -- every type's identifier regex is tried in turn against the title
-    text, first match wins."""
+    text, first match wins.
+
+    `anchored` requires the identifier to *open* the text, for the caller reading a
+    link's own label rather than an ärende title. A label names its document
+    identifier-first ("Ds 2015:51 Avgiftsfrihet …"); a series mentioned anywhere
+    later is a reference, not the identity, and the types are tried in `TYPES`
+    order rather than by position, so an unanchored sweep let a passing
+    "Tilläggsdirektiv … (SOU 2015:51)" outrank the direktiv it actually names."""
     for typ, (_segment, _category, idre) in TYPES.items():
         if idre:
-            hit = re.search(idre, title)
+            hit = (re.match(idre, title) if anchored else re.search(idre, title))
             if hit:
                 return {"typ": typ, "basefile": hit.group(1)}
     return None
@@ -277,7 +364,11 @@ def _externt_dokument(links, remitterat):
 
     A ``/rattsliga-dokument/`` link therefore means *not* external even when no
     basefile could be derived from it: that combination is a missing identity
-    rule, which `parse_arende` raises on rather than passing the ärende over."""
+    rule, which `parse_arende` raises on rather than passing the ärende over --
+    except for the curated `UNNUMBERED_DOCUMENTS`, where the missing identity is
+    regeringen's and permanent. `parse_arende` applies that one, not this
+    function: the question here is who *wrote* the document, and there the answer
+    is still regeringen."""
     if any(RATTSLIGA_HREF.match(href) for href, _ in links):
         return False
     return not remitterat
@@ -333,7 +424,12 @@ def parse_arende(html, url):
     it would file the ärende somewhere no join could ever find it, so it fails
     loudly and the sweep records it as a per-ärende failure to be retried once the
     rule is added (rule:errors-drive-retry-use-raise -- a `raise`, not an
-    `assert`, since `-O` would strip the check that keeps the tree honest)."""
+    `assert`, since `-O` would strip the check that keeps the tree honest).
+
+    The curated `UNNUMBERED_DOCUMENTS` answer that same question the other way:
+    there the missing identifier is regeringen's own and permanent, so the ärende
+    is closed as external instead. An entry that turns out to key after all is
+    stale, and raises rather than discarding a real ärende."""
     soup = BeautifulSoup(html, "html.parser")
     h1 = soup.find("h1", id="h1id")
     if h1 is None:
@@ -351,12 +447,25 @@ def parse_arende(html, url):
     links = _remitterade_lankar(soup)
     fix = _markup_fix(url)
     remitterat = [fix] if fix else _remitterat(links, titel, dnr)
+    curated_unnumbered = regeringen_path(url) in UNNUMBERED_DOCUMENTS
+    if curated_unnumbered and remitterat:
+        # the entry says this document has no identifier; it now has one, so the
+        # curated line is stale and silently discarding a real ärende is the last
+        # thing it should do (rule:errors-drive-retry-use-raise)
+        raise ValueError(
+            "remiss %s is in UNNUMBERED_DOCUMENTS but now keys to %s/%s -- drop "
+            "the entry (or move it to MARKUP_FIXES)"
+            % (url, remitterat[0]["typ"], remitterat[0]["basefile"]))
     externt = _externt_dokument(links, remitterat)
     if not externt and not remitterat:
-        raise ValueError(
-            "remiss %s remits a regeringen.se document but yields no basefile "
-            "(links: %s) -- lib.regeringen needs an identity rule for it"
-            % (url, [href for href, _ in links] or "none"))
+        # a curated entry answers exactly this question: regeringen published the
+        # document with no identifier at all, so there is nothing to key it to
+        if not curated_unnumbered:
+            raise ValueError(
+                "remiss %s remits a regeringen.se document but yields no basefile "
+                "(links: %s) -- lib.regeringen needs an identity rule for it"
+                % (url, [href for href, _ in links] or "none"))
+        externt = True
     return Remiss(
         # the referred document *is* the ärende's identity; an external ärende has
         # none (and is never stored -- see `sync`), so it keys off its url slug

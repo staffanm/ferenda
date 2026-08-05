@@ -39,11 +39,50 @@ MISLEADING_URLS = frozenset({
 })
 
 
+def regeringen_path(url):
+    """A regeringen.se url as the path a curated table keys on: scheme and host
+    dropped, trailing slash off, so http/https and with/without-slash variants all
+    match the one entry."""
+    return url.split("regeringen.se", 1)[-1].rstrip("/")
+
+
 def is_misleading(url):
     """Whether `url` is on the curated skip-list, ignoring scheme/host and a
     trailing slash so http/https and with/without-slash variants all match."""
-    path = url.split("regeringen.se", 1)[-1].rstrip("/")
-    return path in MISLEADING_URLS
+    return regeringen_path(url) in MISLEADING_URLS
+
+
+# The landing slug of a plainly-numbered series is regeringen's own machine-made
+# form of the identifier -- `.../2023/06/sou-202327/` is SOU 2023:27 -- so it
+# recovers the number where the *printed* one is malformed. It regularly is: the
+# SOU 2023:27 remiss says "SOU 2023 27" in its link text, its title and its H1,
+# colon and all missing, which no identifier regex can match.
+#
+# Only the `<series> <year>:<no>` types, whose slug is that shape: a prop/skr
+# number is riksmöte-based ("2015/16:51") and a slug like `skr.-20151651` would
+# read as 2015:1651. And only when the slug's *own* prefix names the type -- the
+# path segment it was reached under is not enough, since regeringen files a
+# document under another type's segment now and then (a Ds at
+# `/rattsliga-dokument/skrivelse/…`), and reading `ds-201551` as this segment's
+# SOU 2015:51 would mint a real but entirely unrelated document.
+SLUG_NUMBERED = ("sou", "ds", "dir", "fm")
+_SLUG_NUMBER = {t: re.compile(r"^%s\.?-(\d{4})(\d+)$" % t) for t in SLUG_NUMBERED}
+
+
+def slug_number(typ, slug):
+    """``YYYY:N`` read off a numbered series' landing slug, or None when `typ` is
+    not one of those series or the slug is not its number. The year is the leading
+    four digits, so `sou-20172` is 2017:2 and `sou-202327` 2023:27.
+
+    Lives here, beside the other identity rules, because a basefile rule is site
+    knowledge both verticals must agree on -- but only remisser applies this one
+    today. forarbete simply *skips* a listing item whose text carries no
+    identifier, so a document regeringen mis-numbered on its listing is
+    unharvestable from that side and the cross-ref remisser mints for it can
+    dangle until forarbete learns the same rule (the slug is already in hand
+    there)."""
+    hit = _SLUG_NUMBER[typ].match(slug) if typ in _SLUG_NUMBER else None
+    return "%s:%s" % hit.groups() if hit else None
 
 
 def landing_vignette(html):
