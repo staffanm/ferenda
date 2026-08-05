@@ -3999,6 +3999,81 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **render/remisser** (2026-08-06) — the remiss rail states how a section was
+  received, not just who answered. Each answer carries a five-level sentiment
+  mark set as a geometric shape (direction by the triangle's orientation,
+  strength by whether it is filled, a diamond for neither): a lone "−" read as a
+  dash separating the organisation from its quote, which inverted the meaning of
+  every critical entry at a glance. Three or more answers to one section also get
+  a verdict above the list ("Avsnittet har **övervägande kritiserats**") — below
+  three there is no mottagande to describe. `page._sentiment_level` is the single
+  reader of the band table, so the mark and the verdict cannot disagree about
+  where neutral ends (they did, at exactly ±0.15). The rail also decides focus by
+  *extent* now rather than by the marker element's own box: a förarbete marks the
+  heading itself, one line high, so containment on that rect alone opened a
+  section's panel for the moment its title crossed the focus line and closed it
+  over the whole body beneath — while the previous nearest-preceding-entry rule
+  left 3.2.3's remissvar standing beside an unannotated section 4, saying those
+  organisations had commented on it. A heading's extent now runs to its next
+  same-or-higher sibling, bounded by every heading rather than only the annotated
+  ones. The facsimile control became a real tab pair (page number ⇄ Original,
+  `aria-selected`, the selected tab inert) after reading as a toggle disguised as
+  tabs, and `ai-analyze` skips answers under `MIN_ANSWER_CHARS` when expanding a
+  whole ärende — measured segment yield runs 0% below 300 characters and 16% at
+  600–900, against 60% at 900–1200.
+
+- **eurlex** (2026-08-06) — the corpus now names what it deliberately does
+  not carry. `UNCARRIED` (CELEX → why) makes `parse_dir` raise `SkipDocument`,
+  so the driver writes the empty artifact that marks a document
+  built-and-not-to-be-retried: the catalog drops its row and the index its
+  units. The bar is *the document cannot be served*, not "it parses badly" —
+  the single entry is 32018R0688, whose annex I is a 6,000-page EBA reference
+  portfolio (a 97 MB Formex file parsing to 50 M characters and rendering to a
+  53 MB page). Each entry states the measurement that meets the bar, in terms
+  that stay true, so a later reader can retest rather than inherit it: drop the
+  entry, reparse the CELEX, reindex, look for the named failure. Nothing in the
+  driver reaps `generated/`, so uncarrying an act that was previously carried
+  means unlinking its html by hand, on dev and on prod.
+
+- **forarbete/lib** (2026-08-06) — three `pdftext.page_paragraphs` misreads
+  fixed, all found on SOU 2025:115: a superscript footnote-reference marker
+  stands as a line of its own (its raised baseline sorts *above* the text it
+  follows), so left standing it set the paragraph's own size, forced a
+  mid-sentence paragraph break and printed ahead of its own text — new
+  `drop_marker_lines` drops it, keeping only a footnote's own leading number
+  (told apart by sharing its `top` with a footnote-sized line); the running
+  header's residue (a chapter title set beside the identifier survived
+  stripping as its own paragraph, 598 of the document's pages, each read as a
+  `fotnot`) is now dropped alongside the identifier when it stood as its own
+  run and its size *differs* from the page body, not merely falls below it (a
+  bilaga's running head is set larger than its own smaller body); and box
+  detection (`Para.boxed`, the ruled `ruta`) is now read per contiguous inset
+  run — ≥2 lines sharing a left edge (`aligned`) and filling most of the
+  body's measure (`measured`, `BOX_MIN_MEASURE`) — with the page's margin read
+  as the leftmost start a real share of its lines agree on (`MARGIN_SHARE`)
+  and the measure as the furthest right edge among lines starting there,
+  rather than off a single page-wide mode, so a page given over to a ruled
+  box no longer outvotes the body for its own geometry. `join_across_pages`
+  now also closes a word a page break hyphenated, told apart from a hanging
+  Swedish compound coordinator ("studie- och yrkesvägledare") by the
+  conjunction after it. `forarbete/parse.py` gained `running_text_size` (the
+  smaller of a page's own dominant size and the document's — fixes a bilaga
+  reproducing text smaller than its body, and SOU 2015:93's near-50/50 split
+  between two body sizes, both of which the document-wide mode was reading as
+  footnotes or flipping on a hundred paragraphs) and `heading_level_by_size`
+  (a font-size → heading-level map learned from the document's own numbered
+  headings, gated to sizes where numbered headings are a majority of what's
+  set in them and excluding a lagförslag's own kap./§ headings — this is what
+  finally places unnumbered display headings like "Sammanfattning" at their
+  real level instead of filing them as stycken, SOU 2018:82). Only SOU
+  2025:115 and SOU 2018:82 were rebuilt to check these; the corpus at large is
+  not yet reparsed. Two unrelated fixes landed alongside: `build.py`'s
+  `remisser_ai_analyze` now skips answers under
+  `remisser_analyze.MIN_ANSWER_CHARS` (900) when expanding a whole ärende,
+  since a segment almost never results below it; and `lib/assets/drawers.js`
+  pins the mobile bottom toolbar to `window.visualViewport` rather than the
+  layout viewport, which on iOS strands the bar mid-page as the browser
+  chrome shrinks or grows.
 - **remisser/lib** (2026-08-04) — `lib/pdftext.py` gained four source-agnostic
   PDF-cleaning functions for a corpus with no fixed masthead to name: each of
   remisser's ~90 organisations answers on its own letterhead, so a running
