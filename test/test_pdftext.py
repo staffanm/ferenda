@@ -35,6 +35,7 @@ from accommodanda.lib.pdftext import (
     is_italic_subheading,
     is_page_number,
     letterhead_footnotes,
+    line_from_runs,
     page_paragraphs,
     pdf_pages,
     points_from_pdftohtml,
@@ -838,3 +839,332 @@ def test_strip_addressing_drops_a_page_marker_line():
              "Infosoc-direktivet liksom lagstiftningen om tillfälliga kopior.")
     assert pdftext.strip_addressing([prose, "Kapitel 5 Huvudmannen i fokus"]) == [
         prose, "Kapitel 5 Huvudmannen i fokus"]
+
+
+def test_join_across_pages_closes_a_hyphen_the_reflow_left_open():
+    """A paragraph ending in a hyphen is never a real paragraph end -- the hyphen
+    is a line break `page_paragraphs` could not close, which happens wherever the
+    line spacing is too irregular to group lines at all (a scanned answer becomes
+    one paragraph per line). Regression for sou/2018-82/forsvarets-radioanstalt,
+    whose text carried "kostnadseffektivt säkerhets- skydd" and so rejected the
+    model's correct quote."""
+    assert pdftext.join_across_pages([
+        ["bidrar till ett balanserat och kostnadseffektivt säkerhets-",
+         "skydd. FRA har i huvudsak följande synpunkter."]]) == [
+        "bidrar till ett balanserat och kostnadseffektivt säkerhetsskydd. "
+        "FRA har i huvudsak följande synpunkter."]
+
+
+def test_join_across_pages_keeps_a_hanging_hyphen():
+    """Correct Swedish, not an artifact: "studie- och yrkesvägledare",
+    "fri- och rättigheter". Closing these up would produce "studieoch"."""
+    assert pdftext.join_across_pages([
+        ["Där fyller studie-", "och yrkesvägledarna en viktig roll."]]) == [
+        "Där fyller studie- och yrkesvägledarna en viktig roll."]
+    assert pdftext.join_across_pages([
+        ["arbeta för att människors grundläggande fri-",
+         "och rättigheter skyddas."]]) == [
+        "arbeta för att människors grundläggande fri- och rättigheter skyddas."]
+
+
+# ---- superscript references and the ruled box -------------------------------
+# Both read the run geometry pdftohtml reports, so both are built from real
+# measurements off SOU 2025:115 rather than round numbers.
+
+def _geo(text, top, size, left, right, bold=False):
+    """A line with run geometry -- what the margin, measure and box rules read."""
+    return line_from_runs(
+        [Run(left=left, right=right, text=text, bold=bold, italic=False, size=size)],
+        top)
+
+
+def test_a_reference_marker_leaves_the_paragraph_it_marks_whole():
+    """SOU 2025:115 p. 84, body 17 and references 10. A raised reference has a
+    baseline of its own, so it arrives as a line holding one digit, sorted ahead
+    of the line it belongs to. That line used to open the paragraph -- which then
+    carried the *marker's* size, so classify filed running text as `fotnot`, and
+    sat far right of the margin, so indent_breaks cut the sentence in two."""
+    lines = [
+        _geo("4", 312, 10, 594, 599),
+        _geo("I strategin framhålls genomförandet av direktiv (EU) 2022/2555",
+             312, 17, 149, 594),
+        _geo("5", 333, 10, 483, 488),
+        _geo("(NIS 2-direktivet) och direktiv (EU) 2022/2557 (CER-direktivet)",
+             333, 17, 149, 617),
+        _geo("som viktiga delar att uppnå ökad cybersäkerhet.", 353, 17, 149, 619),
+    ]
+    paras = page_paragraphs(lines, None, 84, indent_breaks=True)
+    assert len(paras) == 1
+    assert paras[0].size == 17
+    # the citation is intact: neither split by the marker nor glued to it
+    assert "direktiv (EU) 2022/2555 (NIS 2-direktivet)" in paras[0].text
+
+
+def test_a_footnote_keeps_its_own_number():
+    """The note's leading number is raised off its text exactly like a reference
+    is, and is a line of its own for the same reason -- but it is the note's
+    label, not chrome, and the line it sits beside is footnote-sized, not body."""
+    lines = [
+        _geo("Strategin framhåller att samhällsviktiga funktioner måste skyddas.",
+             312, 17, 149, 594),
+        _geo("Strategin innehåller också initiativ för att förebygga angrepp.",
+             333, 17, 149, 617),
+        _geo("Strategin erkänner den roll som privata aktörer har.", 353, 17, 149, 619),
+        _geo("4", 824, 8, 149, 153),
+        _geo("Europaparlamentets och rådets direktiv (EU) 2022/2555.",
+             824, 12, 153, 606),
+    ]
+    paras = page_paragraphs(lines, None, 84, indent_breaks=True)
+    assert paras[-1].text.startswith("4 Europaparlamentets")
+    # and is still one, by the test classify applies (body 17)
+    assert paras[-1].size <= 17 - pdftext.FOOTNOTE_DROP
+
+
+# The box's own lines are the ones that must not vote on where the body's
+# measure ends. Measured off SOU 2025:115 p. 307: body 85-555, box 96-543. The
+# page-wide modal right was 539 -- the *box's* edge -- so every box line failed
+# box_right, and since a box line is inset from the body margin by definition,
+# indent_breaks then started a paragraph at each of them in turn.
+BOX_PAGE = [
+    _geo("Utredningens bedömning: Av artikel 64.5 i EU:s cyberresiliens-",
+         162, 17, 96, 537),
+    _geo("förordning framgår vilka omständigheter som ska beaktas vid",
+         182, 17, 96, 530),
+    _geo("fastställande av sanktionsavgift.", 203, 17, 96, 441),
+    _geo("Av artikel 64.5 i EU:s cyberresiliensförordning framgår att vid beslut",
+         453, 17, 85, 555),
+    _geo("om storleken på den administrativa sanktionsavgiften i varje enskilt",
+         474, 17, 85, 554),
+    _geo("fall ska alla relevanta omständigheter i den specifika situationen",
+         494, 17, 85, 550),
+    _geo("beaktas och vederbörlig hänsyn ska tas till följande.", 514, 17, 85, 347),
+]
+
+
+def test_a_ruta_is_one_boxed_paragraph():
+    paras = page_paragraphs(BOX_PAGE, None, 307, indent_breaks=True)
+    assert len(paras) == 2
+    assert paras[0].boxed
+    assert paras[0].text.startswith("Utredningens bedömning:")
+    assert paras[0].text.endswith("fastställande av sanktionsavgift.")
+    assert not paras[1].boxed
+
+
+def test_a_block_quotation_is_not_a_ruta_but_still_reflows():
+    """Same page, further down: a recital quoted from the förordning, inset by 21
+    where the box is inset by 11. Geometry cannot tell the two apart -- the size
+    can, since the box carries running text and is set like it. The narrower
+    measure is real either way, so the quotation still reflows against its own
+    margin instead of coming out as one paragraph per line."""
+    quote = [
+        _geo("(120) För att säkerställa en effektiv efterlevnadskontroll av de",
+             813, 15, 106, 549),
+        _geo("skyldigheter som fastställs i denna förordning bör varje",
+             830, 15, 106, 548),
+        _geo("marknadskontrollmyndighet ha befogenhet att påföra sanktions-",
+             846, 15, 106, 548),
+        _geo("avgifter.", 863, 15, 106, 226),
+    ]
+    paras = page_paragraphs(BOX_PAGE + quote, None, 307, indent_breaks=True)
+    assert paras[0].boxed                             # the ruta is unaffected
+    assert paras[-1].text.startswith("(120) För att")
+    assert paras[-1].text.endswith("påföra sanktionsavgifter.")
+    assert not paras[-1].boxed
+
+
+def test_one_inset_short_line_is_not_a_ruta():
+    """A lead-in ("Strategins huvudmål är:") is inset at the left and short, so
+    it clears both box tests on its own. Only a *run* of lines at one narrower
+    measure is a box -- with a run of one, a page's short lines each became a
+    one-line ruta and took two paragraph breaks, entering and leaving, with
+    them."""
+    lines = [
+        _geo("kraft mot cyberattacker och säkerställa att medborgare och företag",
+             103, 17, 149, 615),
+        _geo("kan använda tillförlitliga digitala tjänster.", 123, 17, 149, 603),
+        _geo("Strategins huvudmål är:", 184, 17, 170, 337),
+        _geo("– att stärka cyberresiliens och teknologiskt självbestämmande,",
+             213, 17, 149, 592),
+        _geo("– öka operativ förmåga att förebygga och hantera attacker.",
+             243, 17, 149, 603),
+    ]
+    paras = page_paragraphs(lines, None, 84, indent_breaks=True)
+    assert not any(p.boxed for p in paras)
+
+
+def _multi(runs, top):
+    """A line assembled from several runs -- what a running head is: the
+    identifier and the chapter title set beside each other on one baseline."""
+    return line_from_runs([Run(left=a, right=b, text=t, bold=False, italic=False,
+                               size=s) for a, b, t, s in runs], top)
+
+
+def test_the_running_heads_other_half_goes_with_it():
+    """Stripping the identifier leaves the chapter title standing, and it is a
+    real line of real text -- so it survived as a paragraph on nearly every page
+    of a förarbete (598 of SOU 2025:115's), each one classified `fotnot` for
+    being set smaller than the body."""
+    lines = [_multi([(85, 200, "SOU 2025:115", 12), (205, 638, "Sanktioner", 12)], 52),
+             _geo("Av artikel 64.5 i EU:s cyberresiliensförordning framgår att vid",
+                  453, 17, 85, 555),
+             _geo("beslut om storleken på den administrativa sanktionsavgiften ska",
+                  474, 17, 85, 554),
+             _geo("alla relevanta omständigheter beaktas.", 494, 17, 85, 350)]
+    paras = page_paragraphs(lines, "SOU 2025:115", 307, indent_breaks=True)
+    assert len(paras) == 1
+    assert "Sanktioner" not in paras[0].text
+
+
+def test_the_running_head_goes_even_where_it_outsizes_the_page():
+    """Size is not what identifies it. A förarbete sets its annexes smaller than
+    its body but its running head at one size throughout, so on SOU 2025:115's
+    bilaga 2 the head is *larger* than the text under it -- and sparing it there
+    only moved the damage, from 138 pages of "Bilaga 2" as a footnote to 138 of it
+    as a heading, in the table of contents."""
+    lines = [_multi([(117, 200, "SOU 2025:115", 12), (205, 664, "Bilaga 2", 12)], 52),
+             _geo("1. Förvaltare av programvara med fri och öppen källkod ska",
+                  140, 10, 147, 610),
+             _geo("anta och dokumentera en verifierbar cybersäkerhetspolicy så",
+                  158, 10, 147, 610),
+             _geo("att det utvecklas en säker produkt med digitala element.",
+                  176, 10, 147, 560)]
+    paras = page_paragraphs(lines, "SOU 2025:115", 544, indent_breaks=True)
+    assert "Bilaga 2" not in " ".join(p.text for p in paras)
+
+
+def test_body_prose_naming_the_identifier_is_not_a_running_head():
+    """What identifies the head is that the identifier stood as a run of its own.
+    Prose carries it *inside* a run, which `_strip_header_runs` leaves alone --
+    so the line is never a candidate, wherever on the page it falls."""
+    lines = [_geo("Se närmare SOU 2025:115 och de förslag som lämnas där.",
+                  100, 17, 85, 540),
+             _geo("Utredningen har övervägt frågan i ett tidigare sammanhang.",
+                  120, 17, 85, 555)]
+    paras = page_paragraphs(lines, "SOU 2025:115", 307, indent_breaks=True)
+    assert "SOU 2025:115" in " ".join(p.text for p in paras)
+
+
+def test_a_centred_heading_pair_is_not_a_ruta():
+    """A heading centred over its centred title is inset at both margins and
+    consecutive, so it clears every geometric test a box has -- but the two start
+    at different lefts, where a box holds one edge. SOU 2025:115 reproduces the
+    cyberresiliensförordning as bilaga 2, which sets a pair like this over every
+    article."""
+    lines = [_geo("Artikel 24", 100, 10, 359, 398),
+             _geo("Skyldigheter för förvaltare av programvara med fri källkod",
+                  118, 10, 231, 525),
+             _geo("1. Förvaltare av programvara med fri och öppen källkod ska",
+                  140, 10, 147, 610),
+             _geo("anta och dokumentera en verifierbar cybersäkerhetspolicy så",
+                  158, 10, 147, 610),
+             _geo("att det utvecklas en säker produkt med digitala element.",
+                  176, 10, 147, 560)]
+    paras = page_paragraphs(lines, None, 544, indent_breaks=True)
+    assert not any(p.boxed for p in paras)
+
+
+def test_a_column_of_chart_labels_is_not_a_ruta():
+    """Inset at both margins, consecutive, and agreeing on nothing else: a bar
+    chart's axis labels are a column of fragments 36 units wide against a body
+    measure of 472. SOU 2024:50's charts made 1,211 boxes this way."""
+    lines = [_geo("det är något färre kommuner som får tillägg och fler som",
+                  100, 17, 85, 553),
+             _geo("får avdrag jämfört med i dag.", 120, 17, 85, 371),
+             _geo("Med förslaget får Habo det största tillägget i modellen.",
+                  140, 17, 85, 557),
+             _geo("4 000", 200, 12, 127, 151),
+             _geo("3 000", 216, 12, 127, 151),
+             _geo("2 000", 232, 12, 127, 151),
+             _geo("1 000", 248, 12, 127, 151)]
+    paras = page_paragraphs(lines, None, 325, indent_breaks=True)
+    assert not any(p.boxed for p in paras)
+
+
+# The page geometry that motivates each of the box rules, one page per rule.
+# They are separated because each is satisfied by the others' fixtures for the
+# wrong reason -- a lone lead-in is rejected by its *width* before the
+# run-length rule is ever consulted, so only a wide one tests that rule.
+
+def test_a_page_the_box_dominates_still_finds_the_body_margin():
+    """`margin` is the leftmost start a real share of the lines agree on, not the
+    commonest. Here the box's 12 lines outnumber the body's 8, so the mode is the
+    box's own inset -- which leaves the box not inset from anything, and the body
+    outdented past it."""
+    box = [_geo("Utredningens förslag rad %d som fyller hela satsytan här." % i,
+                100 + 20 * i, 17, 96, 540) for i in range(12)]
+    body = [_geo("Av artikel 64.5 framgår att alla relevanta omständigheter i "
+                 "den enskilda situationen ska beaktas vid beslut %d." % i,
+                 400 + 20 * i, 17, 85, 555) for i in range(8)]
+    paras = page_paragraphs(box + body, None, 307, indent_breaks=True)
+    assert [p.boxed for p in paras][0]
+    assert not paras[-1].boxed
+
+
+def test_a_box_is_broken_from_the_prose_that_follows_it():
+    """Crossing out of a box is a paragraph break in itself. Without it the box's
+    closing line runs on into the prose that resumes after it -- the vertical gap
+    cannot be relied on to do it, since a box set at ordinary leading has none."""
+    lines = [_geo("Utredningens förslag: myndigheten får avstå från att ta ut",
+                  100, 17, 96, 540),
+             _geo("en sanktionsavgift när överträdelsen bedöms som ringa.",
+                  120, 17, 96, 535),
+             _geo("Av artikel 64.5 i förordningen framgår att alla relevanta",
+                  140, 17, 85, 555),
+             _geo("omständigheter ska beaktas vid beslut om avgiftens storlek.",
+                  160, 17, 85, 554)]
+    paras = page_paragraphs(lines, None, 307, indent_breaks=True)
+    assert len(paras) == 2
+    assert paras[0].boxed and not paras[1].boxed
+    assert paras[1].text.startswith("Av artikel 64.5")
+
+
+def test_one_wide_inset_line_is_not_a_ruta():
+    """The run-length rule, on the only shape that isolates it: a *wide* lone
+    inset line clears both the alignment and the measure test on its own, so
+    nothing but "a box is at least two lines" rejects it."""
+    lines = [_geo("Av artikel 64.5 framgår att alla relevanta omständigheter",
+                  100, 17, 85, 555),
+             _geo("ska beaktas vid beslut om sanktionsavgiftens storlek.",
+                  120, 17, 85, 554),
+             _geo("Kommissionen offentliggör vägledning om tillämpningen här.",
+                  140, 17, 96, 543),
+             _geo("Bestämmelsen kräver ingen kompletterande författning alls.",
+                  160, 17, 85, 550)]
+    paras = page_paragraphs(lines, None, 307, indent_breaks=True)
+    assert not any(p.boxed for p in paras)
+
+
+def test_a_stripped_header_stops_reporting_its_own_width():
+    """The header line survives when its residue is set at body size (it is only
+    dropped when the style differs), and then its *runs* have to lose the
+    identifier with its text: left standing they report the head's full width as
+    the body's measure, which is wide enough to call the page's inset lines a
+    box."""
+    lines = [_multi([(85, 200, "SOU 2025:115", 17), (205, 638, "Sanktioner", 17)],
+                    52),
+             _geo("Av artikel 64.5 framgår att alla relevanta omständigheter",
+                  100, 17, 85, 555),
+             _geo("ska beaktas vid beslut om sanktionsavgiftens storlek här.",
+                  120, 17, 85, 554),
+             _geo("a) överträdelsens art, allvarlighetsgrad och varaktighet samt",
+                  140, 17, 96, 600),
+             _geo("dess konsekvenser för de berörda ekonomiska aktörerna i stort",
+                  160, 17, 96, 600),
+             _geo("Bestämmelsen kräver ingen kompletterande författning alls.",
+                  200, 17, 85, 550)]
+    paras = page_paragraphs(lines, "SOU 2025:115", 307, indent_breaks=True)
+    assert "Sanktioner" in " ".join(p.text for p in paras)   # residue kept
+    assert not any(p.boxed for p in paras)
+
+
+def test_a_page_with_no_shared_line_start_has_no_margin():
+    """`margin` is the leftmost start a real share of the lines agree on, so a
+    page where every line starts somewhere different has none -- and then there
+    is no indent to measure against and no box to find. Reflow falls back to the
+    leading alone, which is the honest answer for a page with no measurable
+    typography (a chart, a scanned form)."""
+    lines = [_geo("fragment %d" % i, 100 + 20 * i, 17, 100 + 17 * i, 300 + 20 * i)
+             for i in range(10)]
+    paras = page_paragraphs(lines, None, 1, indent_breaks=True)
+    assert not any(p.boxed for p in paras)
+    assert " ".join(p.text for p in paras).count("fragment") == 10

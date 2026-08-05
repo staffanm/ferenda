@@ -801,3 +801,82 @@ def test_censor_future_citations_leaves_a_contemporary_citation_alone():
                "page": 3}]
     assert censor_future_citations(blocks, 1971) == []
     assert isinstance(blocks[0]["text"][1], dict)
+
+
+# ---- what counts as running text, per page ----------------------------------
+
+def test_running_text_size_takes_the_page_over_the_document():
+    """A bilaga reproducing an EU regulation at 10 against a body of 17 is not
+    1,861 footnotes, which is what SOU 2025:115's annexes came out as while one
+    document-wide size decided it for every page."""
+    assert fa_parse.running_text_size(10, 17) == 10
+
+
+def test_running_text_size_never_widens_the_footnote_test():
+    """The smaller of the two, so a page set entirely in display sizes -- a
+    cover, a part title -- cannot declare everything beneath its heading a
+    footnote."""
+    assert fa_parse.running_text_size(28, 17) == 17
+
+
+def test_running_text_size_falls_back_to_whichever_is_known():
+    # a page (or a document) whose source carries no font info at all
+    assert fa_parse.running_text_size(0, 17) == 17
+    assert fa_parse.running_text_size(10, 0) == 10
+    assert fa_parse.running_text_size(0, 0) == 0
+
+
+# ---- what a font size means, learned from the document ----------------------
+
+def _p(text, size, bold=False):
+    return Para(text=text, bold=bold, size=size)
+
+
+def test_heading_level_by_size_learns_from_the_numbered_headings():
+    """A display heading carries no number to count dots in and is not bold
+    either, so nothing placed it and it stayed a stycke -- while the bold
+    subheads under it became headings with no parent, arriving in the table of
+    contents as top-level entries. What it does share is its size: SOU 2018:82
+    sets "Sammanfattning" at the same 28 as "1 Författningsförslag"."""
+    paras = [_p("1 Författningsförslag", 28), _p("2 Utredningens uppdrag", 28),
+             _p("3 Bakgrund och viss relevant reglering", 28),
+             _p("Sammanfattning", 28),
+             _p("1.1 Förslag till lag om ändring", 19),
+             _p("1.2 Förslag till förordning", 19),
+             _p("Vad är säkerhetsskydd", 19)]
+    assert fa_parse.heading_level_by_size(paras, 17) == {28: 1, 19: 2}
+
+
+def test_heading_level_by_size_ignores_a_size_headings_do_not_own():
+    """Two or three numbered paragraphs among a hundred short ones at a size is a
+    misdetection, not a style. Prop. 2020/21:100 numbers five things at its
+    17-point size and 168 other short paragraphs share it -- the handover
+    sentence, "Stefan Löfven", "(Finansdepartementet)" -- and reading a level off
+    that turned 52 level-1 headings into 296."""
+    paras = ([_p("2.1 Regeringens vidtagna åtgärder", 17)]
+             + [_p("Stefan Löfven", 17), _p("(Finansdepartementet)", 17),
+                _p("Återhämtningen i världsekonomin har stannat av", 17)])
+    assert fa_parse.heading_level_by_size(paras, 12) == {}
+
+
+def test_heading_level_by_size_ignores_a_lagforslags_own_chapters():
+    """A lagförslag's chapter and § headings are numbered too, and their number
+    counts no dots, so they read as level 1 wherever they are set. They are not
+    the document's headings -- `classify` takes them first -- and counting them
+    put prop. 2017/18:89's "8.3.1 …" size at level 1 on the strength of the
+    "1 kap." headings that share it, above the "2.1 …" size it sets larger."""
+    paras = [_p("1 kap. Lagens tillämpningsområde", 17),
+             _p("3 kap. Säkerhetsprövning", 17),
+             _p("5 kap. Övriga bestämmelser", 17),
+             _p("8.3.1 Nuvarande system ska behållas", 17),
+             _p("8.3.4 Krav på svenskt medborgarskap", 17)]
+    assert fa_parse.heading_level_by_size(paras, 15) == {17: 3}
+
+
+def test_classify_places_a_display_heading_by_its_size():
+    paras = [_p("Sammanfattning", 28), _p("Vad är säkerhetsskydd", 19, bold=True),
+             _p("Med säkerhetsskydd avses skydd av säkerhetskänslig verksamhet "
+                "mot spioneri, sabotage och terroristbrott.", 17)]
+    blocks = fa_parse.classify(paras, 19, 17, {28: 1, 19: 2})
+    assert [(b.kind, b.level) for b in blocks] == [
+        ("rubrik", 1), ("rubrik", 2), ("stycke", None)]

@@ -17,6 +17,7 @@ case law) and carry inline links, like SFS and DV.
 
 import re
 import subprocess
+from collections import Counter, defaultdict
 
 from bs4 import BeautifulSoup
 
@@ -52,6 +53,7 @@ PARSE_TYPES = ALL_PARSE_TYPES
 
 RE_HEADING_NUM = re.compile(r"^\d+(?:\.\d+)*$")       # "4" / "4.3.2" (own line)
 RE_NUM_TITLE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")        # "15 Title" / "4.3 T"
+HEADING_MAX = 120     # characters: past this a paragraph is prose, not a title
 
 # prop/skr front matter (the överlämnande on page 1): the handover sentence,
 # the ort/datum line ("Stockholm den 20 maj 2021", occasionally Harpsund), and
@@ -69,18 +71,23 @@ def mint_uri(typ, basefile):
     return "https://lagen.nu/%s/%s" % (typ, basefile)
 
 
-def classify(paras, page, body=0):
+def classify(paras, page, body=0, levels=None):
     """Paragraphs -> Blocks. Bold chapter/§ markers (recovered from font) become
     `kapitel`/`paragraf` blocks -- the structure that lets commentary be tied to
     a paragraf; other bold or numbered paragraphs are headings; the rest stycken.
 
-    `body` is the document's body font size (see `line_body_size`); where the source
-    carries font info it gates two misreads a bare "N Title" pattern invites:
-    text clearly smaller than the body is a `fotnot` ("1 Senaste lydelse
-    2008:1266." -- the lagtext provenance footnotes, previously read as level-1
-    rubriks), and a numbered rubrik must be bold or larger than the body (a
-    body-sized table row "22 år 25 000 …" is not a heading). Size-less paras
-    (OCR/legacy) keep the permissive rules."""
+    `body` is the page's running-text font size (`running_text_size`); where the
+    source carries font info it gates two misreads a bare "N Title" pattern
+    invites: text clearly smaller than the running text is a `fotnot` ("1 Senaste
+    lydelse 2008:1266." -- the lagtext provenance footnotes, previously read as
+    level-1 rubriks), and a numbered rubrik must be bold or larger than the body
+    (a body-sized table row "22 år 25 000 …" is not a heading). Size-less paras
+    (OCR/legacy) keep the permissive rules.
+
+    `levels` maps a font size to the heading level the document's own numbered
+    headings use it at (`heading_level_by_size`), which is what recognises the
+    display headings that carry neither a number nor bold weight."""
+    levels = levels or {}
     blocks = []
     i = 0
     while i < len(paras):
@@ -99,10 +106,22 @@ def classify(paras, page, body=0):
             blocks.append(Block("paragraf", p.text, page,
                                 num=re.sub(r"\s+", "", mp.group(1)),
                                 spans=p.spans, top=p.top))
-        elif mt and len(p.text) < 120 and heading_font:
+        elif mt and len(p.text) < HEADING_MAX and heading_font:
             blocks.append(Block("rubrik", p.text, page,
                                 mt.group(1).count(".") + 1, spans=p.spans, top=p.top))
-        elif p.bold and len(p.text) < 120:
+        elif p.size in levels and len(p.text) < HEADING_MAX:
+            # An unnumbered heading, placed by the size this document reserves
+            # for headings of a known level. That covers the display headings
+            # that were falling through to `stycke` for carrying neither a
+            # number nor bold weight ("Sammanfattning" at SOU 2018:82's chapter
+            # size, level 1) -- and, ahead of the bold rule, the unnumbered
+            # *sub*heads too: they are set at the size the document numbers its
+            # sections at, so they are sections, not the flat level 3 every one
+            # of them used to get. Without that, fixing the parent alone still
+            # left a summary's subsections as siblings of its sections.
+            blocks.append(Block("rubrik", p.text, page, levels[p.size],
+                                spans=p.spans, top=p.top))
+        elif p.bold and len(p.text) < HEADING_MAX:
             blocks.append(Block("rubrik", p.text, page, 3,
                                 spans=p.spans, top=p.top))   # unnumbered subhead
         elif is_italic_subheading(p.text, p.italic):
@@ -126,6 +145,84 @@ def classify(paras, page, body=0):
             blocks.append(Block("stycke", p.text, page, spans=p.spans, top=p.top))
         i += 1
     return blocks
+
+
+def heading_level_by_size(paras, body):
+    """Font size -> heading level, learned from the document's own numbered
+    headings.
+
+    A förarbete's display headings -- "Sammanfattning", "Förkortningar", "Till
+    statsrådet och chefen för Justitiedepartementet" -- carry no number to count
+    dots in, and are not bold either (these documents set their chapter titles
+    large and regular), so `classify` had nothing to recognise them by and filed
+    them as stycken. The sub-headings under them *are* bold, so they became
+    headings, and with their own parent missing they arrived in the table of
+    contents as top-level entries.
+
+    What a display heading does share is its size. SOU 2018:82 sets
+    "Sammanfattning" at the same 28 as "1 Författningsförslag" through
+    "12 Författningskommentar" -- headings the numbering already places at level
+    1. So the numbered headings teach the mapping and the unnumbered ones read
+    their level off it: no font table, no per-document configuration, and nothing
+    invented for a document that numbers nothing (there the map is empty and a
+    display heading stays the stycke it was).
+
+    A size earns its place only where the numbered headings are *most* of what is
+    set in it. Two or three of them among a hundred short paragraphs is a
+    misdetection, not a style: prop. 2020/21:100 numbers five things at its
+    17-point size and 168 other short paragraphs share it -- the handover
+    sentence, "Stefan Löfven", "(Finansdepartementet)" -- and reading a level off
+    that turned 52 level-1 headings into 296. Where the headings really are the
+    style they run 86 to 100 per cent of it."""
+    short, numbered = Counter(), defaultdict(Counter)
+    for p in paras:
+        if not (p.size and body and p.size > body and len(p.text) < HEADING_MAX):
+            continue
+        # A lagförslag's own chapter and § headings are numbered too, and their
+        # number counts no dots, so they read as level 1 wherever they are set.
+        # They are not the document's headings -- `classify` takes them before it
+        # takes a numbered rubrik -- and counting them put prop. 2017/18:89's
+        # "8.3.1 …" size at level 1 on the strength of the "1 kap." headings that
+        # share it, above the "2.1 …" size the document sets larger. Out of both
+        # counts, not just the numbered one: they are headings, so their presence
+        # is no evidence *against* the size being a heading size either.
+        if RE_KAP_MARK.match(p.text) or RE_PARA_MARK.match(p.text):
+            continue
+        short[p.size] += 1
+        if m := RE_NUM_TITLE.match(p.text):
+            numbered[p.size][m.group(1).count(".") + 1] += 1
+    return {size: seen.most_common(1)[0][0] for size, seen in numbered.items()
+            if sum(seen.values()) * 2 > short[size]}
+
+
+def _size_scheme(paras):
+    """`(running-text size, size -> heading level)` for a whole document -- the
+    pair every `classify` call needs, derived in one place so the PDF and OCR
+    body routes cannot drift apart on how a size is read."""
+    body = line_body_size(paras)
+    return body, heading_level_by_size(paras, body)
+
+
+def running_text_size(page, document):
+    """The size a page's running text is set in: the smaller of the page's own
+    dominant size and the document's.
+
+    `classify` calls anything `FOOTNOTE_DROP` below the running text a footnote,
+    so what counts as running text has to be read where the reader is. One
+    document-wide size gets two things wrong. A bilaga reproducing an EU
+    regulation at 12 against a body of 17 is not 1,861 footnotes, which is what
+    SOU 2025:115's annexes came out as. And where a document is split near-evenly
+    between two sizes the document-wide mode is a coin toss: SOU 2015:93 sets
+    1,392 paragraphs at 16 and 1,197 at 12, and a hundred paragraphs moving either
+    way flipped the mode and reclassified 1,269 blocks with it.
+
+    The *smaller* of the two, not the page's alone, because the failure being
+    fixed is body text read as apparatus: the smaller size can only ever mark
+    fewer paragraphs as footnotes than either estimate by itself. That keeps a
+    page set entirely in display sizes -- a cover, a part title -- from declaring
+    everything beneath its heading a footnote, and it keeps a page that is mostly
+    notes from promoting them to body."""
+    return min(page, document) if page and document else (page or document)
 
 
 def _pdf_probe(pdf_path):
@@ -193,20 +290,30 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
                                  None))
                 else:
                     segs.append(("gtabell", gdata, grows))
-        pages.append(((printed, bilaga), segs))
-    body = line_body_size([p for _pg, segs in pages
-                           for kind, data, _x in segs if kind == "paras"
-                           for p in data])
+        # The page's own body size, read off its *lines* rather than the
+        # paragraphs it reflowed into -- a sparse page has too few paragraphs for
+        # a stable mode, and enough lines either way (`line_body_size`). These are
+        # the page's raw lines, so the running header, the folio and a lydelse
+        # table's cells all vote; on a page dominated by a table that pulls the
+        # size below the prose's. `running_text_size` takes the smaller of this
+        # and the document's, so the error can only ever *narrow* the footnote
+        # test -- the safe direction, and the reason this is not worth the second
+        # reflow it would cost to measure the kept lines instead.
+        pages.append(((printed, bilaga), segs, line_body_size(lines)))
+    body, levels = _size_scheme(
+        [p for _pg, segs, _sz in pages
+         for kind, data, _x in segs if kind == "paras" for p in data])
     # printed page -> the PDF page it came from, so a figure found by PDF page
     # lands on the block stream keyed by printed page
     pageno_of = {printed_map[pageno][0]: pageno for pageno, _ in raw
                  if printed_map[pageno][0] is not None}
     blocks = []
-    for (printed, bilaga), segs in pages:
+    for (printed, bilaga), segs, page_size in pages:
         on_page = []
         for kind, data, rows in segs:
             if kind == "paras":
-                on_page += classify(data, printed, body)
+                on_page += classify(data, printed,
+                                    running_text_size(page_size, body), levels)
             elif kind == "gtabell":
                 on_page.append(Block("tabell", "", printed, rows=list(rows or []),
                                      th=bool(data)))
@@ -309,8 +416,14 @@ def _paged_body(pages):
     and scanned-PDF (pdftotext) OCR routes; OCR noise rides along, but the
     citation scanner still lights up the references it can read."""
     pages = list(pages)
-    body = line_body_size([p for _pageno, paras in pages for p in paras])
-    return [b for pageno, paras in pages for b in classify(paras, pageno, body)]
+    body, levels = _size_scheme([p for _pageno, paras in pages for p in paras])
+    # the page's own size off its paragraphs, which is all these routes have --
+    # `running_text_size` takes the smaller of the two anyway, so a page whose
+    # paragraphs are too few to settle on a size cannot widen the footnote test
+    return [b for pageno, paras in pages
+            for b in classify(paras, pageno,
+                              running_text_size(line_body_size(paras), body),
+                              levels)]
 
 
 def _legacy_pdf_body(pdf_path, identifier, patch_key=None):

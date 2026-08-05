@@ -51,6 +51,12 @@ LINE_TOL = 4          # spans within this many y-units are the same visual line
 PARA_GAP = 1.5        # a vertical gap > PARA_GAP x line-height starts a paragraph
 INDENT_MIN = 8        # a first line this far right of the margin starts one too
 BOX_INSET = 6         # a line inset this far at *both* margins is in a ruta
+# Between the two populations it has to separate, measured on SOU 2025:115: the
+# running head hangs into the outer margin at a left no other line shares (1 of a
+# page's ~41 lines, 2%), while the body margin and a ruled box's own inset run
+# 31% and 34% of p. 307. Anything from ~5% to ~30% would do; 0.2 is the middle.
+MARGIN_SHARE = 0.2    # a line start this common is a margin, not an indent
+BOX_MIN_MEASURE = 0.5 # a ruta fills at least this much of the body's measure
 HEAD_GAP = 1.6        # a wrapped heading's leading, in multiples of its font size
 FOOTNOTE_DROP = 3     # a footnote sits >= this many size units below body size
 PAGE_STRIDE = 100000  # per-page `top` offset used by flat_lines: far larger than
@@ -1146,6 +1152,47 @@ def _marker_runs(runs, body):
                     and _RE_MARKER.fullmatch(r.text))]
 
 
+def drop_marker_lines(lines, body):
+    """`lines` without the superscript reference markers that stand as lines of
+    their own -- the note text they point at is untouched.
+
+    A raised reference has a baseline of its own, so `_lines` -- which groups on
+    the baseline, and must -- hands back a line holding nothing but the digit.
+    Left standing it does three kinds of damage downstream, all of them on
+    SOU 2025:115 p. 84 (body 17, references 10): the reflow reads its size as the
+    paragraph's, so `classify` files running text as `fotnot`; its `left` sits far
+    right of the margin, so `indent_breaks` starts a paragraph at it and cuts a
+    sentence in half; and because the raised baseline sorts *above* the line it
+    belongs to, the digit comes out ahead of the text it follows -- "4 I strategin
+    framhålls genomförandet av direktiv (EU) 2022/2555", then a break, then
+    "5 (NIS 2-direktivet)".
+
+    Dropped rather than merged back in, because a marker reads as a digit either
+    way and glues itself to whatever it followed: merging by horizontal position
+    turns "direktiv (EU) 2022/2555" into "direktiv (EU) 2022/25554" -- a citation
+    the FORARBETEN grammar can no longer resolve. Nothing downstream can recover a
+    reference from a bare digit in running text, so the marker is chrome, and this
+    is the same judgement `drop_footnotes` already makes about the markers it
+    finds *inside* a line.
+
+    Only the markers that point *into* body text go. A footnote's own leading
+    number is raised off its note the same way and is a line of its own for the
+    same reason -- but there it is the note's label, and the note is not running
+    text, so it stays and reflows into the note as before. The line a marker
+    shares its `top` with is what tells the two apart. Sizeless sources
+    (OCR/legacy) are returned untouched -- without sizes a bare number is as
+    likely to be a list ordinal as a reference."""
+    if not body:
+        return lines
+    small = [i for i, l in enumerate(lines)
+             if l.size and l.size <= body - FOOTNOTE_DROP
+             and _RE_MARKER.fullmatch(l.text)]
+    drop = {i for i in small
+            if i + 1 < len(lines) and abs(lines[i + 1].top - lines[i].top) <= LINE_TOL
+            and lines[i + 1].size > body - FOOTNOTE_DROP}
+    return [l for i, l in enumerate(lines) if i not in drop]
+
+
 def drop_footnotes(pages):
     """`[(pageno, [Line])]` -> the same with footnote text and the superscript
     markers referencing it removed. A line whose own size sits `FOOTNOTE_DROP`
@@ -1262,6 +1309,7 @@ def strip_addressing(paras):
 # furniture between them is only half the repair -- without the join, a verbatim
 # quote spanning the break is still not a substring of any single paragraph.
 _SENTENCE_END = re.compile(r"[.!?:;»”\"')\]]\s*$")
+_RE_COORDINATION = re.compile(r"(?:och|eller|samt)\b")
 
 
 def join_across_pages(per_page):
@@ -1274,9 +1322,24 @@ def join_across_pages(per_page):
     out = []
     for paras in per_page:
         for i, para in enumerate(paras):
-            if (i == 0 and out and para[:1].islower()
-                    and not _SENTENCE_END.search(out[-1])):
-                out[-1] = "%s %s" % (out[-1], para)
+            # A paragraph ending in a hyphen is never a real paragraph end: the
+            # hyphen is a line break the reflow failed to close. That happens
+            # wherever `page_paragraphs` could not group lines at all -- a
+            # scanned answer's line spacing is irregular enough that every line
+            # becomes its own paragraph, so `dehyphenate` (which fires only when
+            # joining lines *into* a paragraph) never runs, and the text carries
+            # "säkerhets- skydd" through to the rail.
+            hyphenated = out and out[-1].rstrip().endswith("-")
+            if (out and para[:1].islower()
+                    and (hyphenated
+                         or (i == 0 and not _SENTENCE_END.search(out[-1])))):
+                # A *hanging* hyphen is correct Swedish and must survive the
+                # join: "studie- och yrkesvägledare", "fri- och rättigheter".
+                # The coordinating conjunction after it is what tells the two
+                # apart -- closing one up would produce "studieoch".
+                out[-1] = ("%s %s" % (out[-1].rstrip(), para)
+                           if hyphenated and _RE_COORDINATION.match(para)
+                           else dehyphenate(out[-1].rstrip(), para))
             else:
                 out.append(para)
     return out
@@ -1308,9 +1371,9 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
         return []
     header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
                  if identifier else None)
-    kept = []
+    kept, first_headed = [], False
     for l in lines:
-        raw, spans = l.text, l.spans
+        raw, spans, stripped = l.text, l.spans, False
         if header_re and header_re.search(raw):
             # A running header is its own text fragment(s) -- a standalone
             # margin line, or a margin id the baseline assembly merged onto a
@@ -1332,7 +1395,25 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
                 # named the court silently lost its number.
                 body_runs = _strip_header_runs(l.runs, header_re)
                 if len(body_runs) != len(l.runs):
-                    raw, spans = _join_runs(body_runs)
+                    stripped = True
+                    # Rebuilt through the one constructor, so that text, spans,
+                    # geometry *and* the whole-line style flags all describe the
+                    # runs that survive -- patching the text alone is the exact
+                    # failure `line_from_runs` documents: `bold`/`lead_bold`/
+                    # `size` would keep describing a run set that is gone, and
+                    # both `heading()` below and dv's `Rubrik` test read them.
+                    # The geometry matters twice over here: a line that kept the
+                    # dropped runs reported the *header's* extent to the margin
+                    # and measure (SOU 2025:115 sets its head across the full
+                    # width, 638 against a body ending at 555 -- wide enough to
+                    # call the page's inset lines a box), and its `size` stayed
+                    # the largest run's, which is the identifier's wherever the
+                    # head is set larger than the title beside it.
+                    if body_runs:
+                        l = line_from_runs(body_runs, l.top)
+                        raw, spans = l.text, l.spans
+                    else:
+                        raw, spans = "", []     # the line was only the header
             else:
                 # no run geometry (OCR/legacy routes): strip only a line that
                 # is nothing but the header and a page number/date
@@ -1341,7 +1422,41 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
                     raw = residue
         text, spans = _normalized_with_spans(raw, spans)
         if text and not is_page_number(text, pageno) and not RE_DOTS.search(text):
+            first_headed = first_headed or (stripped and not kept)
             kept.append(replace(l, text=text, spans=spans))
+    page_body = line_body_size(kept)
+    # The *other* half of the running head. Stripping the identifier off the top
+    # line leaves whatever was set beside it -- in a förarbete the chapter title,
+    # "SOU 2025:115 Sanktioner" -> "Sanktioner" -- and that residue is a real line
+    # of real text, so it survived as a paragraph on nearly every page: 598 of
+    # SOU 2025:115's, each classified `fotnot` for being set smaller than the
+    # body. It says nothing the body does not (the heading it names is printed in
+    # the text below it), so the whole line goes.
+    #
+    # Two things keep this off body text, and neither is the residue's size. The
+    # identifier has to have stood as *its own run(s)* -- `_strip_header_runs`
+    # leaves a match inside a longer run alone, which is what prose naming the
+    # identifier looks like ("… (SOU 2008:97). I betänkandet …"), so this is
+    # only ever true of a line that set it apart. And the line has to be the page's
+    # first: a running head is, and the footnotes that cite the document's own
+    # number are at the foot.
+    #
+    # Third, the residue has to be set in the head's own style rather than the
+    # body's, which is what separates the *other half of the head* from a first
+    # line of prose the margin identifier merely shares a baseline with -- there
+    # the residue is the body text itself and deleting it costs a real sentence.
+    # Differ*ing* from the body, not falling below it: a förarbete sets its
+    # annexes smaller than its body but its running head at one size throughout,
+    # so on SOU 2025:115's bilaga 2 the head is larger than the text under it, and
+    # a `smaller than body` test merely moved the damage there -- from 138 pages
+    # of "Bilaga 2" as a footnote to 138 of it as a heading, in the table of
+    # contents where it is harder to miss.
+    if first_headed and kept[0].size and page_body and kept[0].size != page_body:
+        kept = kept[1:]
+    # before any measurement: a raised reference is a line of its own, and every
+    # statistic below (line-height, margin, measure) would otherwise be taken
+    # over a population that includes single digits floating in the right margin
+    kept = drop_marker_lines(kept, page_body)
     gaps = sorted(b.top - a.top
                   for a, b in zip(kept, kept[1:], strict=False) if b.top > a.top)
     body_gap = gaps[len(gaps) // 2] if gaps else 0      # median line-height
@@ -1358,10 +1473,21 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     # flush at one margin and a paragraph opens ~13 units to the right of it,
     # with the ordinary line-height between. A gap rule alone therefore ran
     # whole sections together -- every paragraph after the first, on nearly
-    # every page. The margin is the page's own most common line start, so a
+    # every page. The margin is read off the page's own line starts, so a
     # document that indents differently (or not at all) needs no configuring.
-    starts_at = Counter(l.runs[0].left for l in kept if l.runs).most_common(1)
-    margin = starts_at[0][0] if starts_at else None
+    #
+    # The *leftmost* start a real share of the page's lines agree on, rather than
+    # the commonest one. Nothing sets further left than the body margin, but a
+    # page can easily have more inset lines than flush ones -- a page given over
+    # to a ruled box does (SOU 2025:115 p. 307: 12 lines start inside the box at
+    # 96, 11 at the body's 85), and the commonest start is then the box's own,
+    # which leaves the box not inset from anything and the body outdented past
+    # it. The share is what keeps a one-off outdent from winning instead: these
+    # documents hang the running head into the outer margin, at a left no other
+    # line on the page shares.
+    starts_at = Counter(l.runs[0].left for l in kept if l.runs)
+    floor = MARGIN_SHARE * sum(starts_at.values())
+    margin = min((x for x, n in starts_at.items() if n >= floor), default=None)
 
     # A förarbete sets its proposal and assessment statements in a ruled box --
     # "Regeringens förslag:" in a proposition, "Förslag:"/"Bedömning:" in a SOU
@@ -1371,8 +1497,26 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     # only and leaves the right edge alone. Both edges are read per page, since
     # a förarbete mirrors its margins on facing pages (prop. 2017/18:89 sets
     # 77-523 on page 49 and 183-629 on page 50).
-    ends_at = Counter(l.runs[-1].right for l in kept if l.runs).most_common(1)
-    measure_end = ends_at[0][0] if ends_at else None
+    #
+    # The measure is read off the lines that start *at* the margin -- the body's
+    # own -- and not off the page as a whole. A box is inset at the left by
+    # definition, so its lines are exactly the ones that must not vote on where
+    # the body ends: on a page given over to a large ruta they are the majority,
+    # and the page-wide mode then returned the *box's* right edge. Every box line
+    # failed `box_right` against it, `boxed` came back false, and -- because a
+    # box's lines are all inset from the body margin -- `indented` fired on each
+    # of them in turn, so the box came out as one paragraph per line instead of
+    # one ruta (SOU 2025:115 p. 307: body 85-555, box 96-543, page-wide mode 539).
+    # The *furthest* of them, not the commonest: a line at the margin ends where
+    # its text ran out, and only a full one reaches the measure. Ragged-right
+    # setting leaves no two rights alike (SOU 2025:115 p. 85 ends its 24 body
+    # lines at 24 different x), so a mode picks whichever the counter happened to
+    # see first -- there it was a paragraph's last line, and the box on that page
+    # broke exactly as it did before any of this. Nothing at the margin overruns
+    # the measure, so the maximum is the measure.
+    ends_at = [l.runs[-1].right for l in kept
+               if l.runs and l.runs[0].left == margin]
+    measure_end = max(ends_at) if ends_at else None
 
     def box_left(l):
         return (margin is not None and l.runs
@@ -1385,25 +1529,107 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     def boxed(l):
         return box_left(l) and box_right(l)
 
+    def ruled(l):
+        # A *ruled* box, as against anything else set to a narrower measure. The
+        # box carries the document's proposal and assessment statements -- running
+        # text, set like running text -- while the other inset blocks are set
+        # smaller: a block quotation from a directive, a table's cells and its
+        # source note, a chart's axis labels. Geometry alone cannot tell them
+        # apart (SOU 2025:115 p. 307 insets its förslag box by 11 and the recital
+        # it quotes by 21, both at a narrower measure), and without the size test
+        # a budget proposition's indicator tables came out as 125 spurious rutor.
+        #
+        # Only the *label* is gated. The narrower measure is real either way, so a
+        # quotation still reflows against its own margin rather than the page's --
+        # it is simply not a box.
+        return not l.size or not body_size or l.size >= body_size
+
+    def aligned(run):
+        # ...whose lines actually share that margin. "Set to its own margin" is a
+        # claim worth checking: a box holds every line to one left edge, give or
+        # take a paragraph indent. A bar chart's labels are inset and consecutive
+        # and pass every other test, but each fragment starts wherever poppler
+        # put it -- SOU 2024:50 p. 325 runs 115, 127, 115, 167, 182 down a single
+        # "box" -- so no edge carries the run. Strictly more than half, so the
+        # test still says something about a run of two: a centred heading and the
+        # centred title under it are inset at both margins and consecutive, and
+        # each starts at its own left ("Artikel 24" at 359 over its title at 231,
+        # in the EU regulation SOU 2025:115 reproduces as bilaga 2).
+        lefts = Counter(l.runs[0].left for l in run)
+        return lefts.most_common(1)[0][1] * 2 > len(run)
+
+    def measured(run):
+        # ...and set to a measure of its own worth the name. A ruta is a *little*
+        # narrower than the body -- it is the same running text, indented off both
+        # margins by a few units -- so it fills nearly the whole measure: 447 of
+        # the body's 470 on SOU 2025:115 p. 307, 448 of 471 on p. 85. A column of
+        # a bar chart's axis labels is inset at both margins too, and consecutive,
+        # and so passes every test above, but it is 36 units wide against a body
+        # measure of 472. SOU 2024:50's charts alone made 1,211 boxes that way,
+        # once its annexes stopped being (just as wrongly) read as footnotes.
+        # a run exists only where `box_left` and `box_right` both passed, and
+        # neither can without the page's margin and measure (rule:fail-fast)
+        assert margin is not None and measure_end is not None, (
+            "a boxed line on a page with no margin or measure")
+        return (max(l.runs[-1].right for l in run)
+                - min(l.runs[0].left for l in run)
+                >= BOX_MIN_MEASURE * (measure_end - margin))
+
     # A ruta is set to its own margin, so its paragraphs indent from *that*:
     # measuring their first lines against the page's would make every line of
     # the box a paragraph of its own, since all of them are inset from it.
-    inside = Counter(l.runs[0].left for l in kept if l.runs and boxed(l))
-    box_margin = inside.most_common(1)[0][0] if inside else None
+    #
+    # Per *box*, not per page: one page can inset two things by different
+    # amounts, and a single page-wide inset then breaks the deeper one exactly
+    # the way the page margin breaks a box. SOU 2025:115 p. 307 holds a förslag
+    # box at 96 and a block quotation at 106; taking the page's commonest inset
+    # gives 96, and the quotation -- 10 further in, past INDENT_MIN -- came out
+    # as one paragraph per line. A box's lines are consecutive by construction,
+    # so each run of them carries its own margin.
+    #
+    # The run is also what *is* the box: a lone inset short line is an ordinary
+    # paragraph's first line, a list item's runover or a lead-in ("Strategins
+    # huvudmål är:"), and nothing about it distinguishes a box until a second
+    # line holds the same narrower measure. Membership here is therefore the
+    # whole boxed test below -- with a run of one, a page's short lines each
+    # became a one-line ruta *and* took two paragraph breaks (entering and
+    # leaving) with them, at +30% paragraphs over SOU 2025:115.
+    box_base, start = {}, None
+    for i, l in enumerate(kept + [None]):
+        if l is not None and boxed(l):
+            start = i if start is None else start
+            continue
+        if start is not None:
+            run = kept[start:i]
+            if (len(run) >= 2 and aligned(run)      # one inset line is not a box
+                    and measured(run)):
+                box_base |= dict.fromkeys(
+                    range(start, i),
+                    Counter(x.runs[0].left for x in run).most_common(1)[0][0])
+            start = None
 
-    def indented(l):
-        base = box_margin if (boxed(l) and box_margin is not None) else margin
-        return (indent_breaks and base is not None and l.runs
+    def indented(i, l):
+        # A first line inset from the measure *its own block* is set to. Crossing
+        # in or out of a box is a break in itself, whatever the two insets are:
+        # the box is a block, and without this its opening line would run on from
+        # the sentence that introduces it ("... anges bland annat följande:") and
+        # its closing line into the prose that resumes after it.
+        if not indent_breaks:
+            return False
+        base = box_base.get(i, margin)
+        if i and base != box_base.get(i - 1, margin):
+            return True
+        return (base is not None and l.runs
                 and base + INDENT_MIN <= l.runs[0].left)
 
     paras, cur, prev = [], None, None
-    for l in kept:
+    for i, l in enumerate(kept):
         marker = l.lead_bold and (RE_KAP_MARK.match(l.text)
                                   or RE_PARA_MARK.match(l.text))
         # a caller-forced break (DV's bitmap paragraph numbers, whose paragraphs
         # carry no extra vertical gap the heuristic below could see)
         starts = (cur is None or heading(l) or marker or l.top in force_break_tops
-                  or (prev and heading(prev)) or indented(l)
+                  or (prev and heading(prev)) or indented(i, l)
                   or (body_gap and prev and l.top - prev.top > PARA_GAP * body_gap))
         if starts and _heading_wrap(prev, l, marker, heading):
             starts = False                # wrapped heading line: same paragraph
@@ -1412,8 +1638,7 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
             cur = None
         if cur is None:
             cur = Para(l.text, l.bold, bool(marker), l.italic, l.size, l.top,
-                       list(l.spans), boxed(l))
-            box_run = [box_left(l), box_right(l)]
+                       list(l.spans), i in box_base and ruled(l))
         else:
             # the line's spans slide by wherever its text landed in the
             # paragraph -- one past the end for the joining space, one *before*
@@ -1423,12 +1648,9 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
             cur.spans += [(a + offset, b + offset, st) for a, b, st in l.spans]
             cur.text = joined
             cur.italic = cur.italic and l.italic
-            # a ruta justifies *every* line to its own narrower measure; a
-            # paragraph of ordinary prose only lets its last line fall short, so
-            # the right edge is judged on the line before this one -- whichever
-            # turns out to be last is exempt
-            cur.boxed = box_run[0] and box_run[1] and box_left(l)
-            box_run = [box_left(l), box_right(l)]
+            # a ruta justifies *every* line to its own narrower measure, so a
+            # paragraph is in one only while every line of it is
+            cur.boxed = cur.boxed and i in box_base and ruled(l)
         prev = l
     if cur is not None:
         paras.append(cur)
