@@ -2023,6 +2023,12 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                PKG / "eurlex" / "correspond.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
                PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",
+               # the defined terms and their anchors are stamped into the
+               # artifact (`defines`), so this is a parse input like the rest --
+               # it had been restaling only by riding along with parse.py edits
+               PKG / "eurlex" / "definitions.py",
+               # the shared anchor grammar the parser stamps ids from
+               PKG / "lib" / "eu_structure.py",
                # the pre-Formex tier reads its body through the shared PDF
                # machinery (parse_pdf imports pdftext.flat_lines), so an edit
                # there changes those artifacts exactly as it does forarbete's

@@ -2597,7 +2597,7 @@ ACT = {
              "text": ["Datahållaren ska göra data tillgänglig."], "children": [
                 {"type": "point", "num": "a", "text": ["på ett säkert sätt."]},
                 # a point nested inside point a (a definition's own sub-list)
-                {"type": "point", "num": "i", "level": 2,
+                {"type": "point", "num": "i", "depth": 2,
                  "text": ["i synnerhet krypterat."]},
                 # a further stycke of the same paragraph
                 {"type": "stycke", "num": "2",
@@ -2644,9 +2644,17 @@ def test_subarticle_key_grammar():
 def test_act_page_indents_and_anchors_a_nested_point(monkeypatch, tmp_path):
     html = _render_act(monkeypatch, tmp_path)
     # a point directly under the paragraph, then one nested inside it: the nested
-    # one hangs its anchor under its parent and steps in a further level (.sub)
+    # one hangs its anchor under its parent and steps its indent in by one graded
+    # level (`sub2`; the step saturates at `sub4`, since points nest to seven)
     assert '<p id="4.1.a" class="point hang"' in html
-    assert '<p id="4.1.a.i" class="point hang sub"' in html
+    assert '<p id="4.1.a.i" class="point hang sub2"' in html
+    # the graded classes and the stylesheet's rules are one pair: every class the
+    # renderer can emit has a rule, and the deepest one saturates rather than
+    # walking the text off the page
+    css = (Path(page.__file__).parent / "assets" / "style.css").read_text()
+    for depth in range(2, eurlex_render.SUB_INDENT_MAX + 1):
+        assert "p.point.sub%d {" % depth in css
+    assert "p.point.sub%d {" % (eurlex_render.SUB_INDENT_MAX + 1) not in css
 
 
 def test_act_page_anchors_a_paragraph_and_its_stycken(monkeypatch, tmp_path):

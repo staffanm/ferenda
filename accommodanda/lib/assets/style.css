@@ -691,9 +691,12 @@ p.paragraph.hang, p.point.hang { padding-left: 1.5rem; text-indent: -1.5rem; }
    hook -- the SFS <p id="P2S1"> shape. */
 p.point { margin-left: 2.2rem; }
 /* a point nested inside another point (a definition's own roman sub-list, e.g.
-   2015/1535 art. 1.1 f ii) steps in once more, so the depth its anchor records
-   is the depth the eye reads */
-p.point.sub { margin-left: 4rem; }
+   2015/1535 art. 1.1 f ii) steps in once per level, so the depth its anchor
+   records is the depth the eye reads. Points nest to seven; the step saturates
+   at the fourth, past which the remaining 1% would walk off a narrow screen. */
+p.point.sub2 { margin-left: 4rem; }
+p.point.sub3 { margin-left: 5.8rem; }
+p.point.sub4 { margin-left: 7.6rem; }
 /* every addressable enacting-terms block clears the sticky masthead when a
    #4.22.a permalink scrolls to it */
 p.hang { scroll-margin-top: var(--scroll-clear); }

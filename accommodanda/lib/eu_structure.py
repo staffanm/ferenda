@@ -90,8 +90,8 @@ class Anchors:
     point whenever a definition carries its own sub-list, and two sibling sub-lists
     under one paragraph both start at "i)" -- so a nested point has to carry its
     parent point in the anchor ("1.1.f.ii") or the two collide on one id. The open
-    points are kept as a stack, keyed on the `level` the parser stamps on a nested
-    point (absent or 1 = directly under the paragraph).
+    points are kept as a stack, keyed on the `depth` the parser stamps on a nested
+    point (absent or 1 = the first point level).
 
     One tracker for every consumer of the artifact tree, so the anchors the parser
     stamps, the ones the renderer emits and the ones the guidance layer links onto
@@ -109,10 +109,11 @@ class Anchors:
         return subarticle_key(PARAGRAPH, self.parag, self.article,
                               self.parag) or self.article
 
-    def key(self, t, num, bid=None, level=None):
+    def key(self, t, num, bid=None, depth=None):
         """The anchor for the next block in document order, or None when the block
-        cannot anchor. Updates the context as a side effect, so this must be called
-        for *every* block, not only the anchorable ones."""
+        cannot anchor. `depth` is a point's nesting inside another point. Updates
+        the context as a side effect, so this must be called for *every* block, not
+        only the anchorable ones."""
         if t == ARTICLE:
             self.article, self.parag, self.stycke = bid or num, None, None
             self.points = []
@@ -132,13 +133,13 @@ class Anchors:
             self.stycke, self.points = num, []
             return key
         if t == POINT:
-            depth = (level or 1) - 1
-            del self.points[depth:]                 # close this point's siblings
+            slot = (depth or 1) - 1
+            del self.points[slot:]                  # close this point's siblings
             # a level may be skipped (a lettered sub-list hanging off a numbered
             # *paragraph*, GDPR art. 4.22 a), so pad rather than shift: the stack
-            # slot has to stay the block's own level or the next sibling reads the
+            # slot has to stay the block's own depth or the next sibling reads the
             # previous one as its parent
-            self.points += [None] * (depth - len(self.points))
+            self.points += [None] * (slot - len(self.points))
             # the stycke is deliberately *not* in a point's key: the act names a
             # point by its paragraph whichever stycke holds it ("artikel 11 a"),
             # and that is the only form anyone cites. Threading the stycke through
@@ -185,7 +186,7 @@ def anchored_blocks(structure, aliases=True):
     anchors = Anchors()
     for b in flatten(structure):
         t, num = b.get("type"), b.get("num")
-        key = anchors.key(t, num, b.get("id"), b.get("level"))
+        key = anchors.key(t, num, b.get("id"), b.get("depth"))
         if key:
             yield key, b
             alias = first_stycke(t, num, key) if aliases else None

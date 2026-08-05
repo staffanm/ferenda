@@ -131,11 +131,11 @@ class Block:
     text: str
     num: str | None = None     # structural marker: recital "(1)", article "1",
                                # paragraph "2", point "a"
-    level: int | None = None   # nesting depth, read per kind: a heading's
-                               # division depth (1 = outermost), a point's depth
-                               # in *point* nesting (unset = the first point
-                               # level, 2 = inside a point, …), which is what
-                               # hangs its anchor under its parent's ("1.1.f.ii")
+    level: int | None = None   # a heading's division depth (1 = outermost)
+    depth: int | None = None   # a point's nesting inside another point (unset =
+                               # the first point level, 2 = inside a point, …),
+                               # which hangs its anchor under its parent's
+                               # ("1.1.f.ii") and steps its indent in
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
     defines: str | None = None # a definitions-article point: the term it defines
 

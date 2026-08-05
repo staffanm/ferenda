@@ -117,7 +117,7 @@ def extract_definitions(body, lang):
                 while i < n and body[i].kind not in ("article", "heading"):
                     point = body[i]
                     key = anchors.key(point.kind, point.num, point.anchor,
-                                      point.level)
+                                      point.depth)
                     term = (_term_of(point.text, lang)
                             if point.kind in ("paragraph", "point") else None)
                     if term and key:

@@ -36,6 +36,13 @@ EURLEX_KIND = {"regulation": "EU-förordning", "directive": "EU-direktiv",
                "decision": "EU-beslut", "judgment": "EU-domstolen",
                "treaty": "Fördrag", "act": "EU-rättsakt"}
 
+# the deepest point nesting the stylesheet grades: 63% of points sit at the first
+# level, 23% at the second, 10% at the third and 4% deeper -- past `sub4` the
+# indent saturates rather than walking the text off the page. Raising this needs a
+# matching `p.point.subN` rule in lib/assets/style.css, which is what the classes
+# below are for; test_site locks the pair together.
+SUB_INDENT_MAX = 4
+
 # block type -> css class for the generic (paragraph-like) EU blocks
 EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble",
                 "paragraph": "paragraph", "stycke": "stycke",
@@ -235,10 +242,11 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None, key=None):
     # a marked recital/paragraph/point hangs its marker in the left margin
     if num and t in ("recital", "paragraph", "point"):
         classes.append("hang")
-    # a point nested inside another point (a definition's own sub-list) indents
-    # a step further, so the depth the anchor records is also the depth the eye reads
-    if t == "point" and (b.get("level") or 1) > 1:
-        classes.append("sub")
+    # a point nested inside another point (a definition's own sub-list) steps its
+    # indent in, graded by the depth its anchor records -- and saturating, since
+    # points nest to seven and the text would otherwise run off a narrow screen
+    if t == "point" and (b.get("depth") or 1) > 1:
+        classes.append("sub%d" % min(b["depth"], SUB_INDENT_MAX))
     # a definitions-article point is a citation target (#<article>.<point>) and
     # the begrepp the act defines -- emit its id and emphasise the defined term
     defines = b.get("defines")
@@ -312,7 +320,7 @@ def render(art, site):
     # TOC already convey the hierarchy, so no nested <section> markup is needed
     for b in eurlex_flatten(art.get("structure", [])):
         t = b["type"]
-        key = anchors.key(t, b.get("num"), b.get("id"), b.get("level"))
+        key = anchors.key(t, b.get("num"), b.get("id"), b.get("depth"))
         if editorial and t == "recital" and (b.get("num") or "").isdigit():
             group = editorial.group_start.get(int(b["num"]))
             if group:

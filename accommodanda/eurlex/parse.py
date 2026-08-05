@@ -225,10 +225,11 @@ def _marker(text):
     return (text or "").strip("().") or None
 
 
-def _point_level(kind, depth):
-    """The `level` a point block carries: its nesting depth, so the anchor
-    grammar can hang it under its parent point (`1.1.f.ii`) and the renderer can
-    indent it. Only points nest; a paragraph-level enumeration carries none."""
+def _point_depth(kind, depth):
+    """The `depth` a point block carries: its nesting inside another point, so the
+    anchor grammar can hang it under its parent (`1.1.f.ii`) and the renderer can
+    step its indent in. Only points nest; a paragraph-level enumeration carries
+    none, and neither does the first point level."""
     return depth if kind == "point" and depth > 1 else None
 
 
@@ -257,7 +258,7 @@ def _emit_list(lst, blocks, kind="point", depth=1):
         holder = np if np is not None else item
         blocks.append(Block(kind, flatten(holder, _ITEM_SKIP),
                             num=_marker(_text(np, "NO.P")) if np is not None else None,
-                            level=_point_level(kind, depth)))
+                            depth=_point_depth(kind, depth)))
         _emit_sublists(holder, blocks, _sub_depth(kind, depth))
 
 
@@ -294,16 +295,77 @@ def _emit_dlist(dlist, blocks, kind="point", depth=1):
             _definition_text(flatten(term) if term is not None else "", sep,
                              flatten(defn, _LEAD_SKIP) if defn is not None else ""),
             num=_marker(flatten(prefix)) if prefix is not None else None,
-            level=_point_level(kind, depth)))
+            depth=_point_depth(kind, depth)))
         if defn is not None:
             _emit_sublists(defn, blocks, _sub_depth(kind, depth))
 
 
-def _emit_alinea(content, num, blocks, stycke=None):
-    """A PARAG/ALINEA body: a plain paragraph, or a lead paragraph followed by
-    a list. A numbered list that is the article's own enumeration (not inside a
-    numbered paragraph) is paragraph-level -- so its items nest their own points
-    and read as "1." like the official act; any other list is points.
+def _stycke_units(alinea):
+    """An ALINEA's content split into stycken, each as the run of sibling elements
+    that says it.
+
+    Formex writes the further sub-paragraphs of one paragraph two ways: as sibling
+    ALINEAs, and -- for about a quarter of the multi-stycke paragraphs -- as
+    sibling `P`s inside a single ALINEA. Both are stycken and both must anchor, or
+    the citation grammar mints a `#40.2.S2` (2009/1272 art. 40.2) that the page
+    does not carry. A new stycke opens at each `P` with prose of its own; what
+    follows it -- a list, a table, a `P` that only wraps a list -- belongs to it.
+
+    An ALINEA is returned whole -- the single-stycke reading, unchanged -- when it
+    holds at most one such `P`, and also when it carries direct text of its own,
+    which belongs to no child run and would be dropped by splitting.
+
+    The children are held in a list and the split keyed on their *index*: lxml
+    builds an element proxy on demand and frees it as soon as the last reference
+    goes, so `id()` is not a stable identity across two passes over the same
+    parent. Keying on it silently mis-split 80 of 152 multi-`P` ALINEAs on the
+    production tree while passing green against a stdlib-ElementTree fixture,
+    where element identity happens to hold."""
+    children = list(alinea)
+    opens = {i for i, c in enumerate(children)
+             if c.tag == "P" and flatten(c, _LEAD_SKIP)}
+    if len(opens) < 2 or (alinea.text or "").strip():
+        return [[alinea]]
+    units, current = [], []
+    for i, child in enumerate(children):
+        if i in opens and current:
+            units.append(current)
+            current = []
+        current.append(child)
+    return units + [current] if current else units
+
+
+def _unit_text(unit, skip):
+    """The text of one stycke's run of elements, joined the way `flatten` joins
+    block-level siblings -- each element's tail included, since the run's text is
+    everything between its members too.
+
+    `skip` is applied to the run's own elements as well as (via `flatten`) to
+    their children: `flatten` tests an element's *children* against it and not the
+    element it is handed, so a `LIST` or a `NO.PARAG` that is itself a member of
+    the run would otherwise be read as prose -- the list twice, once here and once
+    as the points `_unit_lists` emits."""
+    parts = []
+    for el in unit:
+        if el.tag not in skip:
+            parts.append(flatten(el, skip))
+        parts.append(" ".join((el.tail or "").split()))
+    return " ".join(p for p in parts if p)
+
+
+def _unit_lists(unit):
+    """The lists this stycke owns: a list element in the run itself, plus any
+    nested in its prose (`_sublists`)."""
+    return [lst for el in unit
+            for lst in ([el] if el.tag in ("LIST", "DLIST") else _sublists(el))]
+
+
+def _emit_alinea(unit, num, blocks, stycke=None):
+    """One stycke -- a run of sibling elements (`_stycke_units`) -- as a plain
+    paragraph, or a lead paragraph followed by a list. A numbered list that is the
+    article's own enumeration (not inside a numbered paragraph) is paragraph-level
+    -- so its items nest their own points and read as "1." like the official act;
+    any other list is points.
 
     `stycke` is the ordinal of a *second or later* sub-paragraph of the same
     numbered paragraph; the block is then a `stycke` carrying that ordinal rather
@@ -313,15 +375,15 @@ def _emit_alinea(content, num, blocks, stycke=None):
     # ordinal must not stand in for it
     kind = "stycke" if stycke else "paragraph"
     block_num = str(stycke) if stycke else num
-    lists = _sublists(content)
+    lists = _unit_lists(unit)
     if not lists:
-        blocks.append(Block(kind, flatten(content, _PARAG_SKIP), num=block_num))
+        blocks.append(Block(kind, _unit_text(unit, _PARAG_SKIP), num=block_num))
         return
     # everything the block says in its own right -- reading only its direct P
     # children instead dropped whatever else it holds (2022/1636's annex tables
     # are five sixths of that act), and reading it with the plain skip repeated
     # the lists that are emitted as points below
-    lead = flatten(content, _LEAD_SKIP)
+    lead = _unit_text(unit, _LEAD_SKIP)
     # a numbered paragraph is itself a citation target ("artikel 18.1") and the
     # parent its points anchor under, so it is emitted even when it introduces its
     # list with no prose of its own -- dropping it silently reparented the points
@@ -360,22 +422,23 @@ def _emit_stycken(alineas, num, blocks, start):
     blocks numbered after it. Returns the ordinal reached, for the article-level
     run `start` continues.
 
-    Formex writes each stycke as its own ALINEA, and reading only the first
-    (`parag.find("ALINEA")`) silently dropped every one after it: 831 stycken
-    across 600 sampled acts, 2005/85 art. 9.2 losing both derogations from the
-    rule its first stycke states. A stycke is a citation target in its own right
-    ("artikel 9.2 andra stycket"), anchored `9.2.S2` the way SFS anchors
-    `P2S2`."""
-    for i, alinea in enumerate(alineas):
+    Formex writes each stycke as its own ALINEA -- or as a sibling `P` inside one
+    (`_stycke_units`) -- and reading only the first (`parag.find("ALINEA")`)
+    silently dropped every one after it: 831 stycken across 600 sampled acts,
+    2005/85 art. 9.2 losing both derogations from the rule its first stycke
+    states. A stycke is a citation target in its own right ("artikel 9.2 andra
+    stycket"), anchored `9.2.S2` the way SFS anchors `P2S2`."""
+    units = [unit for alinea in alineas for unit in _stycke_units(alinea)]
+    for i, unit in enumerate(units):
         # a numbered paragraph's first stycke is the paragraph's own block (it
         # answers to both "artikel 9.2" and "artikel 9.2 första stycket"); an
         # article's stycken are all `stycke` blocks, numbered from 1, so that the
         # unnumbered prose trailing the enacting terms -- a signature block, an
         # annex paragraph -- is not mistaken for one and given its anchor
         ordinal = i + 1 if num else start + i + 1
-        _emit_alinea(alinea, num, blocks,
+        _emit_alinea(unit, num, blocks,
                      stycke=None if (num and ordinal == 1) else ordinal)
-    return 0 if num else start + len(alineas)
+    return 0 if num else start + len(units)
 
 
 def parse_division(division, level, blocks):
@@ -789,7 +852,7 @@ def to_artifact(doc):
         uses = yield_overlaps(
             term_refs(b.text, matcher, index, doc.uri, b.anchor), cites)
         block = {"type": b.kind, "text": interleave(b.text, cites + uses)}
-        for key in ("num", "level"):
+        for key in ("num", "level", "depth"):
             if getattr(b, key) is not None:
                 block[key] = getattr(b, key)
         # the citation anchor is the artifact `id` -- the key the catalog

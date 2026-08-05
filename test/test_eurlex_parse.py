@@ -4,9 +4,11 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 import pytest
+from lxml import etree
 
 from accommodanda.eurlex.correspond import correspondence
 from accommodanda.eurlex.parse import (
+    XML_PARSER,
     _annex_anchor,
     content_file,
     doctype,
@@ -24,6 +26,12 @@ from accommodanda.lib.eu_structure import flatten as flatten_structure
 
 def _flat(xml):
     return flatten(ET.fromstring(xml))
+
+
+def _lxml(xml):
+    """A tree from the same parser `load_formex` uses, for the cases where the
+    element implementation itself is what is under test."""
+    return etree.fromstring(xml.encode("utf-8"), XML_PARSER)
 
 
 def test_flatten_keeps_inline_drops_footnotes():
@@ -148,7 +156,7 @@ def test_definition_list_entries_are_paragraphs_with_nested_points():
     # they hang off a *paragraph*, so they are the first point level and carry no
     # nesting level -- an enumeration emitted as paragraphs is not a point level,
     # and counting it as one indented these a step past every other lettered point
-    assert all(b.level is None for b in doc.body if b.kind == "point")
+    assert all(b.depth is None for b in doc.body if b.kind == "point")
     # nesting reconstructs to article.paragraph.point anchors
     anchors = {a for a, _ in anchored_blocks(to_artifact(doc)["structure"])}
     assert {"4.22", "4.22.a", "4.22.b"} <= anchors
@@ -198,7 +206,7 @@ DLIST_XML = """<ACT>
 
 def test_definition_list_markup_becomes_points_with_terms():
     doc = parse_formex(ET.fromstring(DLIST_XML), "32015L1535", "swe")
-    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    seen = [(b.kind, b.num, b.depth, b.text) for b in doc.body]
     # the announcing line stays the paragraph; each DLIST.ITEM is its own point,
     # its term and definition joined by the list's separator
     assert ("paragraph", "1", None,
@@ -258,7 +266,7 @@ NESTED_IN_TXT_XML = """<ACT>
 
 def test_sublist_inside_an_items_own_text_is_not_printed_twice():
     doc = parse_formex(ET.fromstring(NESTED_IN_TXT_XML), "31993L0104", "swe")
-    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    seen = [(b.kind, b.num, b.depth, b.text) for b in doc.body]
     # point b holds only its sub-list: its own lead is empty, and the sub-list
     # appears once -- as points, not folded into b's text as well
     assert ("point", "b", None, "") in seen
@@ -302,7 +310,7 @@ LEAD_BELOW_SUBLIST_XML = """<ACT>
 
 def test_item_lead_is_its_own_not_its_sublists_first_entry():
     doc = parse_formex(ET.fromstring(LEAD_BELOW_SUBLIST_XML), "32009L0068", "swe")
-    seen = [(b.kind, b.num, b.level, b.text) for b in doc.body]
+    seen = [(b.kind, b.num, b.depth, b.text) for b in doc.body]
     assert ("point", None, None, "Bestämmelserna gäller även för särskilda "
             "strålkastare, med följande ändringar:") in seen
     assert ("point", "a", 2,
@@ -352,6 +360,46 @@ def test_further_stycken_of_a_paragraph_are_kept():
     assert ("stycke", "1",
             "Medlemsstaterna ska se till att ansökningar prövas.") in seen
     assert ("stycke", "2", "De ska då beakta samtliga omständigheter.") in seen
+
+
+# the other way Formex writes stycken: sibling <P>s inside a *single* ALINEA,
+# about a quarter of the multi-stycke paragraphs (2009/1272 art. 40.2). No text
+# was lost this way -- it was flattened into one paragraph -- but the citation
+# grammar mints a #40.2.S2 the page then did not carry.
+STYCKEN_IN_ONE_ALINEA_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20091210">20091210</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Test</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="040">
+      <TI.ART>Artikel 40</TI.ART>
+      <PARAG IDENTIFIER="040.002"><NO.PARAG>2.</NO.PARAG><ALINEA>
+        <P>Anbudsförfarandet ska inledas enligt följande:</P>
+        <LIST TYPE="alpha">
+          <ITEM><NP><NO.P>a)</NO.P><TXT>genom ett meddelande,</TXT></NP></ITEM>
+        </LIST>
+        <P>Den första tidsfristen ska läggas tidigast sex dagar efter.</P>
+        <P>En andra tidsfrist får fastställas.</P>
+      </ALINEA></PARAG>
+    </ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_stycken_written_as_sibling_paragraphs_in_one_alinea():
+    # parsed with the *production* parser: lxml frees an element proxy as soon as
+    # the last reference to it goes, so a split keyed on `id()` mis-splits there
+    # while passing green on a stdlib-ElementTree tree, where identity holds
+    doc = parse_formex(_lxml(STYCKEN_IN_ONE_ALINEA_XML), "32009R1272", "swe")
+    seen = [(b.kind, b.num, b.text) for b in doc.body]
+    # each <P> with prose of its own opens a stycke; the list between them belongs
+    # to the stycke it follows, not to the one after
+    assert ("paragraph", "2", "Anbudsförfarandet ska inledas enligt följande:") in seen
+    assert ("point", "a", "genom ett meddelande,") in seen
+    assert ("stycke", "2",
+            "Den första tidsfristen ska läggas tidigast sex dagar efter.") in seen
+    assert ("stycke", "3", "En andra tidsfrist får fastställas.") in seen
+    anchors = [a for a, _ in anchored_blocks(to_artifact(doc)["structure"])]
+    assert anchors == ["40", "40.2", "40.2.S1", "40.2.a", "40.2.S2", "40.2.S3"]
 
 
 def test_stycke_anchors_follow_the_sfs_grammar():
