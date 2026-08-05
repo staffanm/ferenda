@@ -45,4 +45,36 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAll();
   });
+
+  /* Pin the toolbar to the *visual* viewport.
+
+     `position: fixed; bottom: 0` resolves against the layout viewport, and on
+     iOS the two come apart: the browser chrome shrinks as you scroll down, the
+     visible area grows under it, and the layout viewport the bar is measured
+     against does not follow. The bar then sits where the bottom used to be --
+     stranded a chrome's height up the page, with the text it is supposed to
+     float over running past it on both sides.
+
+     visualViewport reports where the visible area actually is, so the gap
+     between the two bottoms is the correction. Signed, not clamped: the same
+     mismatch runs the other way when the chrome expands again, and a pinch-zoom
+     pan moves the visual viewport inside the layout one. Where the browser keeps
+     them together the gap is 0 and the transform is dropped rather than set to a
+     no-op, so nothing is left behind on a desktop that never needed it. */
+  var vv = window.visualViewport;
+  var bar = document.querySelector('.mobile-bar');
+  if (vv && bar) {
+    var pending = false;
+    var pin = function () {
+      pending = false;
+      var gap = window.innerHeight - vv.offsetTop - vv.height;
+      bar.style.transform = gap ? 'translateY(' + (-gap) + 'px)' : '';
+    };
+    var schedule = function () {
+      if (!pending) { pending = true; requestAnimationFrame(pin); }
+    };
+    vv.addEventListener('resize', schedule);
+    vv.addEventListener('scroll', schedule);
+    pin();
+  }
 })();
