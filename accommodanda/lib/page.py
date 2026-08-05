@@ -1165,18 +1165,77 @@ def renumbered_refs_margin(site, uri):
     return out
 
 
+# Five levels rather than three, as geometric shapes: direction by the triangle's
+# orientation, strength by whether it is filled, a diamond for neither. A lone
+# "−" read as a dash separating the organisation from its quote rather than as a
+# minus sign, which inverted the meaning of every critical entry at a glance.
+# Text-presentation Unicode (Geometric Shapes), so it renders as a glyph in the
+# page's own colour rather than as a colour emoji.
+_SENTIMENT_LEVELS = (
+    (-0.6, "sentiment-neg-strong", "▼", "avstyrker eller riktar stark kritik"),
+    (-0.15, "sentiment-neg", "▽", "kritisk"),
+    (0.15, "sentiment-neutral", "◇", "neutral eller blandad"),
+    (0.6, "sentiment-pos", "△", "positiv"),
+    (1.01, "sentiment-pos-strong", "▲", "tillstyrker helt"),
+)
+
+
+def _sentiment_level(sentiment):
+    """The `_SENTIMENT_LEVELS` row a score falls in -- the one place the band
+    edges are read.
+
+    Read twice, from the table once: the mark beside an answer and the verdict
+    over a section have to agree about where "neutral" ends, and while each
+    carried its own copy of ±0.15 they did not. A score of exactly 0.15 drew the
+    positive triangle and was counted as neither positive nor negative, so three
+    answers at 0.15 showed three "△ positiv" marks over "fått blandat
+    mottagande"."""
+    row = next((r for r in _SENTIMENT_LEVELS if sentiment < r[0]), None)
+    # ai_analyze validates the score into [-1, 1] and the top band closes above
+    # it, so falling off the end means the layer was written by something that
+    # did not (rule:fail-fast -- a bare StopIteration names none of that)
+    assert row is not None, (
+        "sentiment %r is outside the scale ai_analyze validates" % (sentiment,))
+    return row
+
+
 def _sentiment_span(sentiment):
     """A compact, self-contained sentiment indicator for the remiss rail: a glyph
-    (+ / − / ±) and a sign/magnitude css class the stylesheet colours. A small band
-    around zero reads neutral. `sentiment` is a validated numeric score from the
-    `.ann` (ai_analyze enforces [-1, 1]), so it is not user-escaped HTML."""
-    if sentiment >= 0.15:
-        cls, glyph = "sentiment-pos", "+"
-    elif sentiment <= -0.15:
-        cls, glyph = "sentiment-neg", "−"
+    and a css class the stylesheet colours, plus a `title` naming the level in
+    words -- the shape alone is a legend the reader does not have. `sentiment` is
+    a validated numeric score from the `.ann` (ai_analyze enforces [-1, 1]), so it
+    is not user-escaped HTML."""
+    _bound, cls, glyph, label = _sentiment_level(sentiment)
+    return '<span class="sentiment %s" title="%s">%s</span>' % (cls, label, glyph)
+
+
+def _remiss_summary(items, subject):
+    """`{subject, verdict}` summarising how a section was received, or None when
+    too few answers addressed it to generalise. Returned in parts, not as a
+    sentence: the verdict is emphasised and the emphasis belongs in the template
+    (rule:markup-in-templates).
+
+    Below three answers there is no "mottagande" to describe -- two critical
+    answers are two opinions, not a pattern -- and a summary over one or two
+    would read as a finding the evidence does not support."""
+    if len(items) < 3:
+        return None
+    # counted by the band each score lands in, not by a second copy of its edges
+    sides = [_sentiment_level(it["sentiment"])[1] for it in items]
+    neg = sum(1 for c in sides if c.startswith("sentiment-neg"))
+    pos = sum(1 for c in sides if c.startswith("sentiment-pos"))
+    n = len(items)
+    if neg == n:
+        verdict = "genomgående kritiserats"
+    elif pos == n:
+        verdict = "genomgående tillstyrkts"
+    elif neg >= 2 * n / 3:
+        verdict = "övervägande kritiserats"
+    elif pos >= 2 * n / 3:
+        verdict = "övervägande tillstyrkts"
     else:
-        cls, glyph = "sentiment-neutral", "±"
-    return '<span class="sentiment %s">%s</span>' % (cls, glyph)
+        verdict = "fått blandat mottagande"
+    return {"subject": subject, "verdict": verdict}
 
 
 # --------------------------------------------------------------------------
@@ -1326,7 +1385,8 @@ class Rail:
                         + self._guidance(
                             self.site.article_guidance.get((self.doc_uri, anchor)))
                         + self._remiss(
-                            self.site.remiss_feedback.get((self.doc_uri, anchor)))
+                            self.site.remiss_feedback.get((self.doc_uri, anchor)),
+                            "Avsnittet")
                         + genomfor_margin(self.site, self.doc_uri, anchor)
                         + eu_caselaw_margin(self.site, self.doc_uri, anchor)
                         + _bemyndigande_margin(self.site, uri)
@@ -1361,7 +1421,8 @@ class Rail:
             # the "most interesting feedback" for the whole SOU/Ds. v1
             # deliberately renders every overall stance as-is; a later pass
             # can rank by |sentiment| to surface only the strongest.
-            + self._remiss(self.site.remiss_overall.get(self.doc_uri)))
+            + self._remiss(self.site.remiss_overall.get(self.doc_uri),
+                           "Betänkandet"))
         if inbound:
             sections += document_inbound(self.site, self.doc_uri, exclude_from)
         if sections:
@@ -1372,7 +1433,7 @@ class Rail:
         return ('<div class="rail-h">%s</div>%s'
                 % (heading, render_rail_sections(sections)))
 
-    def _remiss(self, items):
+    def _remiss(self, items, subject):
         """Remiss (referral) feedback on a node -- what each answering organisation
         said about this section (or, in `add_document`, the SOU/Ds as a whole),
         from the `.ann` sentiment layer. Render-only: the remiss corpus has no page
@@ -1389,7 +1450,8 @@ class Rail:
                                       _sentiment_span(it["sentiment"])),
                                   "quote": it["quote"],
                                   "source_url": it["source_url"]}
-                                 for it in items]))]
+                                 for it in items],
+                                _remiss_summary(items, subject)))]
 
     def _guidance(self, items):
         """A list of curated external links -- the wiki annotation's `## Externa

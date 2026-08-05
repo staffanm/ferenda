@@ -89,11 +89,12 @@ def test_remiss_html_escapes_org_and_quote():
     html = page.render_rail_sections(
         rail._remiss([{"organisation": "A & B <Org>", "sentiment": -0.8,
                        "quote": "de <säger> \"nej\"",
-                       "source_url": "https://x/svar.pdf"}]))
+                       "source_url": "https://x/svar.pdf"}], "Avsnittet"))
     assert "Remissvar" in html
     assert "A &amp; B &lt;Org&gt;" in html          # organisation escaped
     assert "de &lt;säger&gt;" in html               # quote escaped
-    assert "sentiment-neg" in html                  # negative sentiment class
+    assert "sentiment-neg-strong" in html           # -0.8 is the strong band
+    assert "▼" in html                              # ...and its filled marker
     assert 'rel="external"' in html and "svar.pdf" in html
 
 
@@ -115,3 +116,51 @@ def test_forarbete_avsnitt_carries_remiss_rail(tmp_path, monkeypatch):
     assert "delat ansvar" in island["a14.3.4"]
     # the document-level "most interesting" overall panel at the top
     assert "Kammarkollegiet tillstyrker" in island[""]
+
+
+def test_remiss_rail_summarises_a_section_only_once_enough_answered():
+    """Three answers is where "mottagande" starts meaning something: two critical
+    answers are two opinions, not a pattern, and a verdict over them would read
+    as a finding the evidence does not support."""
+    rail = page.Rail(page.Site(None, set()), "https://lagen.nu/sou/2020:1")
+
+    def html_for(*sentiments):
+        return page.render_rail_sections(rail._remiss(
+            [{"organisation": "Org%d" % i, "sentiment": s, "quote": "q",
+              "source_url": "https://x/%d.pdf" % i}
+             for i, s in enumerate(sentiments)], "Avsnittet"))
+
+    assert "remiss-sum" not in html_for(-0.9, -0.8)          # two: no verdict
+    assert "genomgående kritiserats" in html_for(-0.9, -0.8, -0.7)
+    assert "genomgående tillstyrkts" in html_for(0.9, 0.8, 0.7)
+    assert "övervägande kritiserats" in html_for(-0.9, -0.8, -0.7, 0.8)
+    assert "fått blandat mottagande" in html_for(-0.9, -0.8, 0.7, 0.8)
+    # the verdict is emphasised, and the emphasis lives in the template
+    assert "<strong>genomgående kritiserats</strong>" in html_for(-0.9, -0.8, -0.7)
+
+
+def test_remiss_rail_names_the_document_not_the_section_at_document_level():
+    """The same summary serves the SOU-wide panel, where "Avsnittet" would be
+    wrong -- there is no avsnitt, the answers are about the betänkande."""
+    rail = page.Rail(page.Site(None, set()), "https://lagen.nu/sou/2020:1")
+    html = page.render_rail_sections(rail._remiss(
+        [{"organisation": "Org%d" % i, "sentiment": -0.9, "quote": "q",
+          "source_url": "https://x/%d.pdf" % i} for i in range(3)], "Betänkandet"))
+    assert "Betänkandet har" in html and "Avsnittet" not in html
+
+
+def test_the_sentiment_bands_meet_where_the_table_says():
+    """The band edges, pinned after they became a single definition: `_remiss_
+    summary` used to carry its own copy of ±0.15 and disagreed with the mark at
+    exactly that value. Every band is half-open upward (`sentiment < bound`), so
+    an edge belongs to the band above it -- which makes the scale asymmetric
+    about zero (-0.15 is neutral, +0.15 is positiv). Deliberate or not, it is now
+    stated in one place, and this is that place's test."""
+    band = lambda s: page._sentiment_level(s)[1]        # noqa: E731
+    assert band(-1.0) == "sentiment-neg-strong"
+    assert band(-0.6) == "sentiment-neg"        # the edge falls upward
+    assert band(-0.15) == "sentiment-neutral"
+    assert band(0.0) == "sentiment-neutral"
+    assert band(0.15) == "sentiment-pos"
+    assert band(0.6) == "sentiment-pos-strong"
+    assert band(1.0) == "sentiment-pos-strong"

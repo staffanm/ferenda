@@ -150,6 +150,56 @@
         });
     }
 
+    /* How far down an entry's context reaches -- its *extent*, not the box of
+       the element carrying the marker.
+
+       The two differ completely by source. SFS marks a `section.paragraf`, a
+       block as tall as the provision it holds, so its own rect is the extent. A
+       förarbete marks the `<h2..h5 class="rubrik">` heading itself (nodes.html's
+       `fa_avsnitt`), a box one line high: judging containment on that rect alone
+       would open the section's panel for the ~30px its title takes to cross the
+       focus line and close it for the whole body underneath, which is the reader
+       standing inside a section being told there is no commentary on it.
+
+       A heading's extent therefore runs to the next heading of the same or a
+       higher level -- past its own subsections, which are its content, and
+       stopping at its sibling. *All* headings bound it, not just the ones
+       carrying a rail: an unannotated section 4 has to end the extent of an
+       annotated 3.2.3, which is exactly the case where the rail used to strand
+       3.2.3's remissvar beside section 4 and say those organisations had
+       commented on it. Anything that is not a heading (a page marker, a paragraf,
+       the frontmatter) ranks below all of them, so the next mark of any kind ends
+       it, and it keeps its own box besides.
+
+       Known limit: forarbete/render.py clamps its heading tags at h5, so model
+       levels 4, 5 and 6 all arrive as the same rank. A level-4 avsnitt therefore
+       still ends at its own level-5 children in a document numbered four deep
+       (prop. 2017/18:89's 8.3.1.1). Strictly better than the one-line rect it
+       replaces, and the clamp is where to fix it. */
+    var RANK = { H1: 1, H2: 2, H3: 3, H4: 4, H5: 5, H6: 6 };
+    function rank(el) { return RANK[el.tagName] || 99; }
+    var marks = Array.prototype.slice.call(
+      root.querySelectorAll('h1,h2,h3,h4,h5,h6,[data-rail]'));
+    entries.forEach(function (e) {
+      if (marks.indexOf(e.el) < 0) marks.push(e.el);   // header.frontmatter
+    });
+    marks.sort(function (a, b) {
+      return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+        ? -1 : 1;
+    });
+    entries.forEach(function (e) {
+      var at = marks.indexOf(e.el), r = rank(e.el);
+      e.until = null;                     // nothing after it: runs to the end
+      for (var j = at + 1; j < marks.length; j++) {
+        // a mark *inside* the entry is its content, never its end: the
+        // frontmatter wraps the document's own <h1>, so without this the
+        // document-level panel's extent collapsed onto the header itself and
+        // the rail went empty over everything before the first annotated node
+        if (e.el.contains(marks[j])) continue;
+        if (rank(marks[j]) <= r) { e.until = marks[j]; break; }
+      }
+    });
+
     // Absolute placement: each entry's line sits beside the location it
     // annotates. Both rects are read in the same frame, so their difference is
     // the offset inside the rail regardless of scroll position or which element
@@ -224,9 +274,20 @@
         }
       }
       if (entries.length) {
-        var best = entries[0];
+        // the entry whose *extent* the focus line is inside, not merely the last
+        // one above it. Picking the nearest preceding entry left the previous
+        // section's panel open beside a section that has no context of its own --
+        // reading section 4 while the rail showed 3.2.3's remissvar said,
+        // wrongly, that those organisations had commented on section 4. Leaving
+        // an extent closes the rail instead (setActive(null)), which is what "a
+        // location with no context has no entry" means once you are standing in
+        // one.
+        var best = null;
         for (var j = 0; j < entries.length; j++) {
-          if (entries[j].el.getBoundingClientRect().top <= LINE) best = entries[j];
+          var r = entries[j].el.getBoundingClientRect();
+          var end = entries[j].until
+            ? entries[j].until.getBoundingClientRect().top : Infinity;
+          if (r.top <= LINE && Math.max(r.bottom, end) > LINE) best = entries[j];
         }
         setActive(best);
       }

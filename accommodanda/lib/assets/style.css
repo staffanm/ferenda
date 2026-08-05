@@ -29,6 +29,7 @@
   --fk-bg:#eaf1f8; --fk-border:#c3d5e6;
   --overlay:rgba(18,22,28,.34); --shadow-modal:rgba(18,22,28,.30);
   --mark:#f0e4a6; --danger:#b5402c; --on-accent:#ffffff;
+  --senti-neg:#a3402f; --senti-pos:#2f6b46;
 
   --serif:"Source Serif 4","Charter",Georgia,serif;
   --sans:"Inter","Helvetica Neue",system-ui,sans-serif;
@@ -47,6 +48,7 @@
 /* ── Dark ────────────────────────────────────────────────────── */
 :root[data-theme="dark"] {
   --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+  --senti-neg:#d98b7a; --senti-pos:#7fb494;
   --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
   --rule:#2b323b; --rule-soft:#222831;
   --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
@@ -61,6 +63,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --bg:#12161b; --surf:#1a1f26; --surf-2:#232a33; --surf-3:#2f3843;
+  --senti-neg:#d98b7a; --senti-pos:#7fb494;
     --ink:#e7e9ec; --ink-2:#b6bcc4; --ink-3:#868d97; --ink-4:#5c636d;
     --rule:#2b323b; --rule-soft:#222831;
     --accent:#cd6f56; --case:#c9884f; --forarbete:#9b90d2; --kommentar:#cf7295;
@@ -426,6 +429,11 @@ sup.fnref a { text-decoration: none; padding: 0 .1em; }
 .sid button:hover, .sid button:focus-visible {
        color: var(--accent); border-color: var(--rule); background: var(--bg-2); }
 .sid-ico { flex: none; opacity: .75; }
+/* the two controls are tabs, not toggles: the selected one is lit and inert,
+   the other is what switches away from it */
+.sid button[aria-selected="true"] { color: var(--ink); background: var(--surf-2);
+                                    cursor: default; font-weight: 500; }
+.sid button[aria-selected="false"] { color: var(--ink-3); background: transparent; }
 .sid.fax-loading button { opacity: .4; cursor: progress; }
 img.faksimil { display: block; width: 100%; max-width: 40rem; margin: .5rem 0 1rem;
                border: 1px solid var(--rule); border-radius: 4px;
@@ -505,6 +513,21 @@ section.temporal-pending > :not(.temporal-status) { color: var(--ink-3); }
 .rail-panelbox { position: absolute; left: 1rem; right: .75rem; bottom: 0;
                  z-index: 2; pointer-events: none; }
 .rail-panelbox:not(.rail-open) { display: none; }
+/* the remiss rail's sentiment mark: direction by the triangle's orientation,
+   strength by whether it is filled, a diamond for neither -- five levels where
+   three could not tell "avstyrker" from "tillstyrker med en invändning". A lone
+   "−" read as a dash separating the organisation from its quote rather than as a
+   minus sign, which inverted the meaning of every critical entry at a glance.
+   Colour only groups them for the eye; the shape carries the meaning, and the
+   title attribute carries it in words. */
+.sentiment { font-size: .95em; line-height: 1; cursor: help; }
+.sentiment-neg, .sentiment-neg-strong { color: var(--senti-neg); }
+.sentiment-pos, .sentiment-pos-strong { color: var(--senti-pos); }
+.sentiment-neutral { color: var(--ink-4); }
+/* what an organisation wrote, set apart from the organisation naming it */
+.rail .q { font-style: italic; }
+/* the verdict over a section's answers, above the list it summarises */
+.remiss-sum { margin: 0 0 .45rem; color: var(--ink-2); }
 .rail-panel { position: sticky; top: 4rem; max-height: calc(100vh - 5rem);
               overflow-y: auto; padding: 1rem 1.1rem 1.25rem;
               border-radius: 6px; background: var(--surf);

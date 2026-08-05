@@ -48,7 +48,10 @@
 {%- endfor -%}
 </ul>
 {%- endmacro -%}
-{%- macro remiss_list(items) -%}
+{%- macro remiss_list(items, summary) -%}
+{#- the one-line verdict over the answers below, shown only where enough of them
+    addressed this section for "mottagande" to mean anything (page._remiss_summary) -#}
+{%- if summary %}<p class="remiss-sum">{{ summary.subject }} har <strong>{{ summary.verdict }}</strong></p>{% endif -%}
 <ul>
 {%- for it in items -%}
 <li><span class="remiss-org">{{ it.organisation }}</span> {{ it.sentiment }} <span class="q">”{{ it.quote }}”</span> <a href="{{ it.source_url }}" rel="external">Läs remissvaret</a></li>
