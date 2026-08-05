@@ -8,6 +8,7 @@ from lxml import etree
 
 from accommodanda.eurlex.correspond import correspondence
 from accommodanda.eurlex.parse import (
+    UNCARRIED,
     XML_PARSER,
     _annex_anchor,
     content_file,
@@ -20,6 +21,7 @@ from accommodanda.eurlex.parse import (
     parse_formex,
     to_artifact,
 )
+from accommodanda.lib.errors import SkipDocument
 from accommodanda.lib.eu_structure import anchored_blocks
 from accommodanda.lib.eu_structure import flatten as flatten_structure
 
@@ -909,3 +911,26 @@ def test_parse_dir_corrigendum_takes_its_own_notice_date(tmp_path):
     # the same act under a non-corrigendum CELEX keeps its own bib date
     art = parse_dir(_doc_dir(tmp_path, xml, notice), "32012R0509")
     assert art["date"] == "2012-06-15"
+
+
+def test_exactly_one_act_is_uncarried():
+    """A per-document carry exception is the kind of table that becomes a dumping
+    ground, so the *contents* are the invariant: adding a second entry has to be a
+    deliberate edit here, with the measurement that meets the bar the table's own
+    comment states. Asserting on the prose instead (a length floor, say) only
+    enforces verbosity, and gets padded to keep green."""
+    assert list(UNCARRIED) == ["32018R0688"]
+
+
+def test_an_uncarried_act_is_skipped_before_its_source_is_opened(monkeypatch):
+    """`SkipDocument`, not an error: the driver writes the empty artifact that
+    marks a document built-and-not-retried, so the act costs one skip per run
+    instead of failing the whole rebuild's exit code every time. Raised by the
+    parser rather than the build driver, so a --force run honours it too (the
+    golden harness in tools/ calls `parse_dir` with no handler and would abort on
+    one -- no uncarried CELEX is in its snapshot, and the claim is not made here)."""
+    monkeypatch.setitem(UNCARRIED, "32099R9999", "because")
+    # the 97 MB source is the problem, so nothing may open it: a nonexistent dir
+    # would return None rather than raise if the guard were not the first statement
+    with pytest.raises(SkipDocument, match="32099R9999: because"):
+        parse_dir("/nonexistent", "32099R9999")

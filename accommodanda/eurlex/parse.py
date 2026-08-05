@@ -28,6 +28,7 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, eucasenaming, patch
 from ..lib.datasets import NAMEDACTS
+from ..lib.errors import SkipDocument
 from ..lib.eu_structure import doctype
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -984,6 +985,34 @@ def _plausible_date(value):
         return False
 
 
+# Acts this corpus deliberately does not carry, CELEX -> why. `parse_dir` raises
+# `SkipDocument` for them, and the driver writes the empty artifact that marks a
+# document built-and-not-to-be-retried: the catalog then drops its row
+# (`catalog`: an artifact with no content is not a document) and the index its
+# units. It does **not** remove an already-rendered page -- nothing in the driver
+# reaps `generated/`, so uncarrying an act that was previously carried means
+# unlinking its html by hand, here and on prod.
+#
+# The bar is *the document cannot be served*, not "it is awkward": an act that
+# merely parses badly is a bug to fix, and one that is genuinely repealed or empty
+# already has its own path. Each entry states the measurement that meets that bar,
+# in terms that stay true -- a fact about one build does not -- and enough for a
+# later reader to retest the claim rather than inherit it. The downloaded Formex
+# stays on disk, so the retest is always: drop the entry, `lagen eurlex parse
+# <celex>`, reindex, and look for the failure named below.
+UNCARRIED = {
+    "32018R0688":
+        "annex I is a 6,000-page table of the EBA's reference portfolios: a 97 MB "
+        "Formex file that parses to 50,493,892 characters and renders to a 53 M "
+        "character page. OpenSearch's JSON parser refuses a string field past "
+        "50,000,000 -- bracketed against a live cluster, 50 MB accepted and 52 MB "
+        "rejected with mapper_parsing_exception -- so the whole-document unit and "
+        "its bilaga-1 fragment can never be indexed, and the page is past what a "
+        "reader can be served in any case. Nothing in the corpus cites it (0 rows "
+        "in `links`), so dropping it dangles no reference",
+}
+
+
 def parse_dir(doc_dir, celex):
     """A document dir -> artifact dict: the best content file parsed, the
     notice work date filling in a missing or impossible document date. None
@@ -992,7 +1021,14 @@ def parse_dir(doc_dir, celex):
 
     A corrigendum's Formex bibliography carries the *corrected act's* date, not
     its own; its notice work date (the correcting OJ's publication) is the
-    document's actual date, so it wins there."""
+    document's actual date, so it wins there.
+
+    An `UNCARRIED` act raises SkipDocument before anything is opened: its source
+    is on disk and will never be servable, so the driver's empty-artifact marker
+    is the honest outcome -- the alternative is a per-document failure on every
+    build, forever, which only teaches the operator to ignore a red exit."""
+    if celex in UNCARRIED:
+        raise SkipDocument("%s: %s" % (celex, UNCARRIED[celex]))
     path, lang, route = content_file(doc_dir)
     if path is None:
         return None
