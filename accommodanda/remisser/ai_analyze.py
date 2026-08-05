@@ -79,6 +79,28 @@ MAX_SPAN = 3
 # would publish the damage.
 SNAP_MIN = 0.90
 SNAP_MARGIN = 0.05
+# an answer shorter than this is not analysed when a whole ärende is expanded --
+# naming one directly still runs it, since that is an explicit request.
+#
+# The pass costs the same per answer whatever its length, so the shortest are the
+# worst value. What makes an answer worth the minute is not that it takes a
+# position but that it engages a *specific* subsection: the rail hangs a segment
+# on a numbered avsnitt, so an answer commenting only on the betänkande as a
+# whole ("Kammarrätten tillstyrker förslagen") yields an `overall` with nowhere
+# to go. Measured on 1,554 layers already produced -- a segment IS a subsection
+# hit, so this is the real thing rather than a proxy for it:
+#
+#     chars      layers   produced >=1 segment
+#     0-300          38     0%
+#     300-600       191     2%
+#     600-900        81    16%
+#     900-1200       55    60%      <- the break
+#     1200-1800      87    82%
+#     2500+       1,009    97%
+#
+# Below 900 five answers in six produce nothing the rail can show. The floor sits
+# at the break, not at the length distribution's median or any round number.
+MIN_ANSWER_CHARS = 900
 
 
 def _avsnitt(nodes):
@@ -292,6 +314,29 @@ def updatable(today=None):
             if download.still_open(
                 Remiss.from_dict(json.loads(
                     compress.read_text(layout.remisser_arende(a)))), today)]
+
+
+def answer_chars(basefile):
+    """How much prose one parsed answer carries -- the measure the length floor
+    is applied to, read off the artifact rather than the PDF so it is the text
+    the model would actually have seen."""
+    # `answers()` expands an ärende to every instance the *record* says was
+    # downloaded, parsed or not, so an unparsed one reaches here. Naming the
+    # missing step beats the bare FileNotFoundError from `read_bytes`, which
+    # surfaced from inside a list comprehension in the caller and killed the
+    # whole run at planning time, before a single answer was analysed
+    # (rule:fail-fast).
+    assert compress.exists(layout.artifact("remisser", basefile)), (
+        "%s is downloaded but not parsed -- run `lagen remisser parse` before "
+        "ai-analyze" % basefile)
+    raw = compress.read_bytes(layout.artifact("remisser", basefile))
+    if not raw.strip():
+        # the build driver's empty-artifact marker, written where `parse` raised
+        # SkipDocument -- a permanently unreadable PDF (`parse.BROKEN_PDFS`).
+        # There is no prose, so it sits below any floor and is skipped, which is
+        # the same outcome as analysing it would reach far more expensively.
+        return 0
+    return sum(len(p) for p in Remissvar.from_dict(json.loads(raw)).full_text)
 
 
 def is_arende(basefile):

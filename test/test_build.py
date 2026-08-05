@@ -1212,6 +1212,10 @@ def _analyze_targets(monkeypatch, expansions, outcome, tmp_path):
         return path
 
     monkeypatch.setattr(build.remisser_analyze, "analyze", fake_analyze)
+    # the helper fakes the analysis, so it must fake the length lookup too --
+    # otherwise the length floor reads artifacts that this fixture never wrote.
+    # Long enough to clear the floor; a test that cares overrides it after.
+    monkeypatch.setattr(build.remisser_analyze, "answer_chars", lambda _: 10_000)
     return seen
 
 
@@ -1304,3 +1308,29 @@ def test_remisser_ai_analyze_update_with_nothing_open_is_a_no_op(monkeypatch,
     monkeypatch.setattr(build.remisser_analyze, "updatable", lambda: [])
     build.remisser_ai_analyze([])
     assert "0 analysed ärende(n) still open" in capsys.readouterr().out
+
+
+def test_remisser_ai_analyze_skips_answers_under_the_length_floor(monkeypatch,
+                                                                  tmp_path, capsys):
+    """The pass costs the same per answer whatever its length, so the shortest
+    are the worst value. Only when expanding an ärende -- and the count is
+    reported, so a skipped answer is visible rather than silently absent."""
+    answers = ["sou/2026:21/short", "sou/2026:21/long"]
+    seen = _analyze_targets(monkeypatch, {"sou/2026-21": answers},
+                            lambda _: None, tmp_path)
+    monkeypatch.setattr(build.remisser_analyze, "answer_chars",
+                        lambda bf: 100 if bf.endswith("/short") else 9000)
+    build.remisser_ai_analyze(["sou/2026-21"])
+    assert seen == ["sou/2026:21/long"]
+    assert "1 under %d chars" % build.remisser_analyze.MIN_ANSWER_CHARS in \
+        capsys.readouterr().out
+
+
+def test_remisser_ai_analyze_runs_a_short_answer_named_directly(monkeypatch,
+                                                                tmp_path):
+    """Naming one answer is an explicit request and overrides the floor."""
+    bf = "sou/2026-21/short"
+    seen = _analyze_targets(monkeypatch, {}, lambda _: None, tmp_path)
+    monkeypatch.setattr(build.remisser_analyze, "answer_chars", lambda _: 100)
+    build.remisser_ai_analyze([bf])
+    assert seen == [bf]

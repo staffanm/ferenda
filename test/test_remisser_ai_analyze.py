@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from accommodanda.lib import annstore, layout
+from accommodanda.lib import annstore, compress, layout
 from accommodanda.remisser import ai_analyze
 
 STRUCTURE = [
@@ -667,3 +667,52 @@ def test_marking_twice_updates_rather_than_duplicates(tmp_path, monkeypatch):
     assert ai_analyze.analysed_arenden() == ["sou/2026-14"]
     assert json.loads(layout.REMISSER_ANALYSED.read_text()) == {
         "sou/2026-14": "2026-08-05"}
+
+
+# ---- the length floor's own measurement -------------------------------------
+
+def _paths(tmp_path, monkeypatch):
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+
+
+def _answer_artifact(basefile, paragraphs):
+    path = layout.artifact("remisser", basefile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_text(path, json.dumps({
+        "basefile": basefile, "arende_basefile": basefile.rsplit("/", 1)[0],
+        "organisation": basefile.rsplit("/", 1)[1], "arende_titel": "En utredning",
+        "remitterat": [], "source_url": "https://x/a.pdf",
+        "full_text": paragraphs}, ensure_ascii=False))
+
+
+def test_answer_chars_counts_the_text_the_model_would_see(tmp_path, monkeypatch):
+    _paths(tmp_path, monkeypatch)
+    _answer_artifact("sou/2026-30/a", ["Kammarrätten tillstyrker.", "Inga övriga."])
+    assert ai_analyze.answer_chars("sou/2026-30/a") == len(
+        "Kammarrätten tillstyrker.") + len("Inga övriga.")
+
+
+def test_answer_chars_reads_an_empty_artifact_marker_as_no_prose(tmp_path,
+                                                                 monkeypatch):
+    """The build driver writes an empty artifact where `parse` raised
+    SkipDocument (a permanently unreadable PDF). It carries no prose, so it sits
+    below any floor -- and it must not raise on the way there, which would kill
+    the whole sweep at planning time."""
+    _paths(tmp_path, monkeypatch)
+    path = layout.artifact("remisser", "sou/2026-30/broken")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    compress.write_text(path, "")
+    assert ai_analyze.answer_chars("sou/2026-30/broken") == 0
+
+
+def test_answer_chars_names_an_unparsed_answer(tmp_path, monkeypatch):
+    """`answers()` expands an ärende to every instance the record says was
+    *downloaded*, parsed or not, so an unparsed one reaches here. The bare
+    FileNotFoundError it used to raise surfaced from inside a list comprehension
+    in the caller and killed the run before a single answer was analysed."""
+    _paths(tmp_path, monkeypatch)
+    with pytest.raises(AssertionError, match="downloaded but not parsed"):
+        ai_analyze.answer_chars("sou/2026-30/never-parsed")

@@ -3001,9 +3001,21 @@ def remisser_ai_analyze(basefiles):
         expanded = remisser_analyze.answers(arg)
         fresh = [b for b in expanded
                  if RUN.force or not annstore.path("remisser", b).exists()]
+        # the pass costs the same per answer whatever its length, so the shortest
+        # are the worst value -- see remisser_analyze.MIN_ANSWER_CHARS for what
+        # the floor buys and what it gives up. Only when expanding an ärende: a
+        # directly named answer is an explicit request and always runs. `--force`
+        # is one too, and outranks the floor -- applying it there would leave the
+        # short answers' *existing* layers untouched by a re-run meant to rewrite
+        # every layer after a prompt or model change, and say so only as a count.
+        short = set() if RUN.force else {
+            b for b in fresh
+            if remisser_analyze.answer_chars(b) < remisser_analyze.MIN_ANSWER_CHARS}
+        fresh = [b for b in fresh if b not in short]
         print("remisser ai-analyze %s: %d answers, %d already analysed, "
-              "%d to analyze" % (arg, len(expanded),
-                                 len(expanded) - len(fresh), len(fresh)))
+              "%d under %d chars, %d to analyze"
+              % (arg, len(expanded), len(expanded) - len(fresh) - len(short),
+                 len(short), remisser_analyze.MIN_ANSWER_CHARS, len(fresh)))
         # marked whatever the count: an ärende analysed before its first answer
         # arrived leaves no layer, and --update has to come back for it later
         if not RUN.dry_run:
