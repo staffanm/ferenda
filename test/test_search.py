@@ -5,6 +5,7 @@ on OPENSEARCH_URL."""
 
 import json
 import os
+import threading
 
 import pytest
 
@@ -485,12 +486,24 @@ def test_threaded_bulk_raises_when_a_worker_dies(monkeypatch):
     buffered chunk with it and `_threaded_bulk` still returned a clean count, so
     units went missing with a zero error count and a zero exit code: the very
     failure this path replaced `parallel_bulk` to stop."""
-    calls = iter(range(100))
+    # the first worker to draw *any* action is the one that dies, decided under a
+    # lock -- picking it by call order instead let the loser be starved of actions
+    # on a loaded machine and the test pass without ever raising
+    victim, drawn, lock = [], [], threading.Lock()
 
     def dying_streaming_bulk(client, actions, **kw):
-        first = next(calls) == 0
-        for i, _ in enumerate(actions):
-            if first and i == 5:
+        me = object()
+        for _ in actions:
+            with lock:
+                if not victim:
+                    victim.append(me)
+                mine = victim[0] is me
+                if mine:
+                    drawn.append(1)
+            # the victim reports a few successes first, then dies holding what it
+            # has buffered -- the shape that made `_threaded_bulk` return a clean
+            # count for an incomplete index
+            if mine and len(drawn) > 5:
                 raise RuntimeError("worker blew up")
             yield True, {}
 
