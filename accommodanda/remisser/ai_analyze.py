@@ -24,11 +24,13 @@ named basefile -- never from a corpus-wide parse/relate/generate.
 
 import difflib
 import json
+from datetime import date
 from pathlib import Path
 
 from ..lib import annstore, compress, layout, llm
 from ..lib.text import runs_text, sentences
-from ..lib.util import basefile_slug, normalize_space
+from ..lib.util import basefile_slug, normalize_space, write_atomic
+from . import download
 from .model import Remiss, Remissvar, org_slug
 
 PROMPT = Path(__file__).with_name("sentiment_prompt.txt")
@@ -233,12 +235,74 @@ def _validate(content, valid_ids, units, haystack):
     }
 
 
+def _load_analysed():
+    """The ärende -> last-analysed-date index, `{}` when nothing has run yet."""
+    path = layout.REMISSER_ANALYSED
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def mark_analysed(arende, today=None):
+    """Record that ai-analyze has run over `arende`, in the index `updatable`
+    reads.
+
+    The answer layers alone cannot carry this. An ärende analysed the week it
+    opened may have had no answers yet, or every answer may have failed -- either
+    way it leaves no `.ann`, so it would be invisible to `--update` and the
+    answers arriving later would never be picked up. That is exactly the ärende
+    an update pass exists for.
+
+    One index file rather than a marker per ärende: this is bookkeeping, not
+    authored output, and the curated store is git-tracked -- a per-ärende marker
+    would dirty ~2,300 files on every pass, each rewritten only to restamp its
+    date."""
+    index = _load_analysed()
+    index[arende] = (today or date.today()).isoformat()
+    layout.REMISSER_ANALYSED.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(layout.REMISSER_ANALYSED,
+                 json.dumps(index, ensure_ascii=False, indent=1, sort_keys=True))
+
+
+def analysed_arenden():
+    """Every ärende basefile ai-analyze has run over: those in the index, plus
+    those carrying at least one answer layer.
+
+    The union is deliberate. The index is the reliable record going forward, but
+    layers written before it existed are equally good evidence that the ärende
+    was analysed -- reading both means the feature works retroactively instead of
+    forgetting everything analysed to date. A layer's path pins the ärende
+    exactly: `relpath` slugs an answer to `<typ>/<ident-slug>/<org>`, one segment
+    per level whatever the identifier looked like."""
+    return sorted(set(_load_analysed())
+                  | {"%s/%s" % (p.parent.parent.name, p.parent.name)
+                     for p in annstore.tree("remisser").rglob("*.ann")})
+
+
+def updatable(today=None):
+    """The ärenden an `--update` run should re-analyse: those already analysed
+    once whose remissperiod has not closed.
+
+    Answers accumulate on an ärende page for the whole period, so an analysis
+    made the week a remiss opened is missing whatever arrived after it. Bounded
+    by the same deadline plus grace the download side re-polls by
+    (`download.still_open`) -- past that no answer is coming, and re-running
+    would spend the LLM to rewrite what it already wrote. Ärenden never analysed
+    at all are *not* included: this refreshes a decision already taken, it does
+    not decide which ärenden are worth analysing."""
+    return [a for a in analysed_arenden()
+            if download.still_open(
+                Remiss.from_dict(json.loads(
+                    compress.read_text(layout.remisser_arende(a)))), today)]
+
+
 def is_arende(basefile):
-    """Whether a basefile names a whole remiss ärende ("<typ>/<document id>")
-    rather than one answer ("<typ>/<document id>/<org-slug>"). One home for the
-    rule: `answers` expands on it and the CLI action decides on it, and two
-    copies would drift."""
-    return basefile.count("/") == 1
+    """Whether a basefile names a whole remiss ärende rather than one answer.
+
+    Decided by whether an ärende record exists at that basefile, because the
+    shape alone cannot tell them apart: a promemoria's identifier carries its own
+    slash ("pm/LI2026/01339"), so an ärende has two segments or three exactly as
+    an answer does, and 1,050 of the stored ärenden are of that kind. One home
+    for the rule -- `answers` expands on it and the CLI action decides on it."""
+    return compress.exists(layout.remisser_arende(basefile))
 
 
 def answers(basefile):
@@ -250,6 +314,10 @@ def answers(basefile):
     than globbing the artifact tree: the record is what says an instance was
     downloaded at all, the same authority `remisser_list` parses from."""
     if not is_arende(basefile):
+        assert compress.exists(layout.artifact("remisser", basefile)), (
+            "%s is neither a stored ärende nor a parsed answer -- check the "
+            "basefile (an ärende is '<typ>/<document id>', an answer adds "
+            "'/<org-slug>')" % basefile)
         return [basefile]
     remiss = Remiss.from_dict(json.loads(
         compress.read_text(layout.remisser_arende(basefile))))

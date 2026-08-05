@@ -691,8 +691,11 @@ def test_fingerprint_skipped_step_emits_skipped_segment(wire, tmp_path, monkeypa
     _materialise_downloads(src)                    # stable parse inputs across runs
     # rebuild's derived steps need the real catalog/layout; stub them out so the
     # test isolates the parse fingerprint gate
-    for fn in ("cmd_relate", "cmd_index", "cmd_dump", "cmd_generate"):
+    for fn in ("cmd_relate", "cmd_dump", "cmd_generate"):
         monkeypatch.setattr(build, fn, lambda *a, **k: None)
+    # cmd_index reports whether any unit failed to index, and cmd_all folds that
+    # into the run's verdict -- the stub has to honour the same contract
+    monkeypatch.setattr(build, "cmd_index", lambda *a, **k: False)
     build.main(["syn", "rebuild", "-j1"])          # parse runs, records fingerprint
     build.main(["syn", "rebuild", "-j1"])          # unchanged -> parse skipped
 
@@ -755,8 +758,11 @@ def test_all_all_contains_harvest_exceptions(wire, tmp_path, monkeypatch):
     monkeypatch.setitem(build.SOURCES, src2.name, src2)
     
     # Stub rebuild's derived steps
-    for fn in ("cmd_relate", "cmd_index", "cmd_dump", "cmd_generate"):
+    for fn in ("cmd_relate", "cmd_dump", "cmd_generate"):
         monkeypatch.setattr(build, fn, lambda *a, **k: None)
+    # cmd_index reports whether any unit failed to index, and cmd_all folds that
+    # into the run's verdict -- the stub has to honour the same contract
+    monkeypatch.setattr(build, "cmd_index", lambda *a, **k: False)
         
     with pytest.raises(SystemExit) as exc_info:
         build.main(["all", "all", "-j1"])
@@ -1278,3 +1284,23 @@ def test_remisser_ai_analyze_does_not_swallow_a_permanent_fault(monkeypatch, tmp
     with pytest.raises(ValueError, match="verified"):
         build.remisser_ai_analyze(["sou/2026-21"])
     assert seen == ["sou/2026:21/a"]
+
+
+def test_remisser_ai_analyze_update_refuses_named_basefiles(monkeypatch, tmp_path):
+    """--update selects the ärenden itself; naming basefiles too is a mistake
+    about what the flag does, not a narrowing of it. sys.exit, not assert: a CLI
+    misuse check that `-O` strips would silently analyse a different set of
+    ärenden at real LLM cost."""
+    monkeypatch.setattr(build.RUN, "update", True)
+    with pytest.raises(SystemExit, match="don't also name basefiles"):
+        build.remisser_ai_analyze(["sou/2026-21"])
+
+
+def test_remisser_ai_analyze_update_with_nothing_open_is_a_no_op(monkeypatch,
+                                                                 tmp_path, capsys):
+    """No open ärende is the normal steady state, not a usage error -- it must
+    not print the usage line and exit nonzero."""
+    monkeypatch.setattr(build.RUN, "update", True)
+    monkeypatch.setattr(build.remisser_analyze, "updatable", lambda: [])
+    build.remisser_ai_analyze([])
+    assert "0 analysed ärende(n) still open" in capsys.readouterr().out

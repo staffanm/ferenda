@@ -464,6 +464,7 @@ class RunOptions:
     rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
     rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
+    update: bool = False         # remisser ai-analyze: refresh every open ärende
     jobs: int = 1                # worker count for harvests that fan out (foreskrift)
 
 
@@ -2978,22 +2979,35 @@ def remisser_ai_analyze(basefiles):
     twelve that arrived since", not 50 re-analyses. A directly named answer is
     always re-run (that is what naming it asks for); `--force` re-runs
     everything and is what overwrites a hand-verified layer."""
-    if not basefiles:
-        sys.exit("usage: lagen remisser ai-analyze <basefile> [<basefile> ...]")
+    if RUN.update:
+        if basefiles:
+            sys.exit("--update selects the ärenden itself (every analysed one "
+                     "still open); don't also name basefiles")
+        basefiles = remisser_analyze.updatable()
+        print("remisser ai-analyze --update: %d analysed ärende(n) still open"
+              % len(basefiles))
+        if not basefiles:
+            return
+    elif not basefiles:
+        sys.exit("usage: lagen remisser ai-analyze <basefile> [<basefile> ...]\n"
+                 "       lagen remisser ai-analyze --update")
     targets = []
     for arg in basefiles:
         if not remisser_analyze.is_arende(arg):   # one answer -- always (re)run it
             targets.append(arg)
             continue
+        # `answers` reads the stored record, so a typoed basefile raises there;
+        # an ärende that legitimately has no fetched answers yet comes back empty
         expanded = remisser_analyze.answers(arg)
-        assert expanded, (
-            "%s names no downloaded answers -- check the basefile (an ärende is "
-            "'<typ>/<document id>', e.g. sou/2026-21)" % arg)
         fresh = [b for b in expanded
                  if RUN.force or not annstore.path("remisser", b).exists()]
         print("remisser ai-analyze %s: %d answers, %d already analysed, "
               "%d to analyze" % (arg, len(expanded),
                                  len(expanded) - len(fresh), len(fresh)))
+        # marked whatever the count: an ärende analysed before its first answer
+        # arrived leaves no layer, and --update has to come back for it later
+        if not RUN.dry_run:
+            remisser_analyze.mark_analysed(arg)   # tracked even at zero answers
         targets.extend(fresh)
     failed = []
     for basefile in targets:
@@ -3049,6 +3063,11 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
           "page) are harvested; an ärende remitting an agency report, an external "
           "skrivelse or an EU proposal is recorded but its answers are never "
           "fetched\n"
+          "ai-analyze --update: re-analyze every ärende already analysed whose "
+          "remissperiod (deadline + grace, as for download) has not closed -- "
+          "answers arrive throughout the period, so an analysis made early is "
+          "missing whatever came after it; already-analysed answers are skipped, "
+          "so it costs the LLM only for the new ones. Never part of a rebuild\n"
           "ai-analyze <basefile>: LLM-map one answer onto the referred SOU/Ds's "
           "sections (sentiment + quote per section), written as a .ann sidecar; "
           "<basefile> is one answer (sou/2026-21/domstolsverket) or a whole "
@@ -3610,7 +3629,7 @@ def cmd_index(names, jobs=1):
     round-trips across threads. Needs a running OpenSearch (OPENSEARCH_URL,
     default http://localhost:9200)."""
     store = load_fingerprints()
-    dirty = False
+    dirty = had_errors = False
     # one keep-alive connection per bulk thread, or the pool discards and
     # re-handshakes on every round-trip
     index = search.SearchIndex(pool_maxsize=jobs)
@@ -3644,10 +3663,13 @@ def cmd_index(names, jobs=1):
                       status="errors" if errors else "ok")
         record_step(store, "index", name, wm, INDEX_CODE)
         dirty = True
+        had_errors |= bool(errors)
         sys.stderr.write("\n")
         print("index %s: %d documents -> %d units indexed, %d up to date, "
               "%d deleted, %d errors"
               % (name, docs, indexed, skipped, deleted, len(errors)))
+        if errors:
+            _report_index_errors(name, errors)
         if missing:
             print("index %s: %d catalogued artifacts gone from disk, skipped "
                   "(run `lagen %s relate` to prune): %s"
@@ -3657,6 +3679,38 @@ def cmd_index(names, jobs=1):
     if dirty:
         save_fingerprints(store)
     print("search index '%s' on %s" % (search.INDEX, config.OPENSEARCH_URL))
+    return had_errors
+
+
+INDEX_ERROR_SAMPLES = 3         # distinct reasons shown per failing index run
+
+
+def _report_index_errors(name, errors):
+    """Print what the cluster actually rejected, grouped by reason.
+
+    The bulk helper hands back the failed items in full; the count alone used to
+    be all that survived, so a run that lost 70,909 units left nothing to say
+    *why* -- the reason had to be re-derived from cluster stats that a restart had
+    already rolled over. Grouped rather than dumped: a rejection is systemic (one
+    breaker trip fails a whole chunk), so a handful of distinct reasons covers
+    tens of thousands of items, and one id per reason is enough to go look."""
+    reasons = {}
+    for item in errors:
+        # the helper reports one {op_type: {_id, status, error}} per failed item;
+        # it is untyped, so the shape is read rather than assumed
+        info: dict = next(iter(item.values()), {})
+        err = info.get("error") or {}
+        key = (info.get("status"),
+               err.get("type") if isinstance(err, dict) else str(err)[:60])
+        seen, sample = reasons.get(key, (0, None))
+        reasons[key] = (seen + 1, sample or info.get("_id"))
+    for (status, kind), (count, sample) in sorted(
+            reasons.items(), key=lambda kv: -kv[1][0])[:INDEX_ERROR_SAMPLES]:
+        print("index %s:   %d x [%s] %s (e.g. %s)"
+              % (name, count, status, kind, sample))
+    if len(reasons) > INDEX_ERROR_SAMPLES:
+        print("index %s:   ... and %d more distinct reasons"
+              % (name, len(reasons) - INDEX_ERROR_SAMPLES))
 
 
 def cmd_dump(names):
@@ -3789,7 +3843,10 @@ def cmd_all(names, jobs, whole_corpus, download=False):
             if name == "dv" and step == "parse":
                 dv_reconcile_artifacts()      # R2: reconcile folded verdicts
     cmd_relate(names)
-    cmd_index(names, jobs)
+    # a bulk item the cluster rejected is a *unit missing from search*, so it
+    # belongs in the run's verdict like a failed parse -- one rebuild dropped
+    # 1,497 eurlex and 241 förarbete documents from the index and still exited 0
+    had_errors |= cmd_index(names, jobs)
     cmd_dump(names)
     # the corpus measurements read the catalog `relate` just rebuilt *and* the
     # artifact trees `parse` just wrote, so compute belongs here -- after both,
@@ -4452,6 +4509,10 @@ def main(argv=None):
                    help="sfs download: resume a backfill interrupted mid-sweep, "
                        "from the ES search_after cursor printed when it was "
                        "interrupted")
+    p.add_argument("--update", action="store_true",
+                   help="remisser ai-analyze: re-analyze every ärende already "
+                        "analysed whose remissperiod is still open, picking up "
+                        "answers that arrived since")
     p.add_argument("--rebuild-history", action="store_true",
                    help="sfs history-as-git: rebuild main from the complete "
                         "current corpus when corrected or backfilled history "
@@ -4470,6 +4531,7 @@ def main(argv=None):
     RUN.rot13 = args.rot13
     RUN.resume_after = args.resume_after
     RUN.rebuild_history = args.rebuild_history
+    RUN.update = args.update
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
     RUN.jobs = jobs      # harvests that fan out (foreskrift's per-agency pool) read it
@@ -4761,7 +4823,8 @@ def _dispatch(args, p, jobs):
         cmd_relate(names)
         return
     if args.action == "index":
-        cmd_index(names, jobs)
+        if cmd_index(names, jobs):
+            sys.exit(1)
         return
     if args.action == "dump":
         cmd_dump(names)

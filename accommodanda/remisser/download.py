@@ -418,6 +418,26 @@ def _until(remiss):
             if remiss.sista_svarsdag else None)
 
 
+def _open_on(until, today):
+    """Whether `until` (an ISO date, or None for "no deadline stated") still lies
+    ahead of `today`. One comparison, read by both the poll decision and the
+    analyse decision -- two copies of it would drift."""
+    return until is None or today <= date.fromisoformat(until)
+
+
+def still_open(remiss, today=None):
+    """Whether answers may still arrive for `remiss`: its deadline plus
+    GRACE_PERIOD has not passed. An ärende whose page states no deadline counts
+    as open indefinitely, since nothing on it says the answers have stopped.
+
+    The same closing date `_needs_poll` decides re-polling by, read off the
+    stored record rather than the examined index -- `ai_analyze.updatable` needs
+    it per *ärende basefile*, while the index is keyed by URL slug. One
+    definition either way: a remiss that is still worth fetching answers for is
+    exactly one whose analysis is still worth refreshing."""
+    return _open_on(_until(remiss), today or date.today())
+
+
 def _needs_poll(entry, today):
     """Whether an ärende's page must be fetched again, decided from its index entry
     alone -- no request, no record read.
@@ -432,7 +452,7 @@ def _needs_poll(entry, today):
         return True
     if entry["basefile"] is None:
         return False
-    return entry["until"] is None or today <= date.fromisoformat(entry["until"])
+    return _open_on(entry["until"], today)
 
 
 def _merge(remiss, fresh):

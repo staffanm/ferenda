@@ -612,6 +612,11 @@ def remisser_answer(arende_basefile: str, org_slug: str) -> Path:
 # an incremental walk stop without re-fetching every ärende page. Derived state:
 # delete it to force a full re-examination of the archive.
 REMISSER_SEEN = REMISSER_DOWNLOADED / ".seen.json"
+# which ärenden `ai-analyze` has run over, so `--update` can come back to one
+# whose answers arrived after its analysis. Bookkeeping, not authored output, so
+# it lives beside the download state rather than in the curated store: a marker
+# per ärende there would rewrite ~2,300 git-tracked files on every pass.
+REMISSER_ANALYSED = REMISSER_DOWNLOADED / ".analysed.json"
 
 
 # --------------------------------------------------------------------------

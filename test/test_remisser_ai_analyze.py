@@ -3,6 +3,7 @@ reply validation, and the end-to-end write + retry. The LLM call itself is
 faked (it is the one deliberately network-bound, on-demand step)."""
 
 import json
+from datetime import date
 
 import pytest
 
@@ -63,7 +64,11 @@ def test_section_outline_truncates_long_headings():
 @pytest.fixture
 def arende(tmp_path, monkeypatch):
     """A stored `Remiss` record with three instances, one of them not fetched."""
-    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
     path = layout.remisser_arende("sou/2026:14")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
@@ -503,3 +508,162 @@ def test_answer_units_split_a_verdict_from_its_reason():
          "Utredningens egna data ger inte stöd för detta."])
     assert units == ["CKS avstyrker därför skattebromsavgift av följande skäl:",
                      "Utredningens egna data ger inte stöd för detta."]
+
+
+# ---- --update: refresh the ärenden that can still gain answers --------------
+
+def _arende_record(tmp_path, basefile, deadline, orgs=("a",)):
+    path = layout.remisser_arende(basefile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "basefile": basefile, "titel": "En utredning",
+        "url": "https://example.org/remiss", "sista_svarsdag": deadline,
+        "svar": [{"organisation": o, "downloaded": True,
+                  "source_url": "https://example.org/a/%s.pdf" % o} for o in orgs],
+    }, ensure_ascii=False))
+
+
+def _layer(basefile):
+    p = annstore.path("remisser", basefile)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"meta": {"status": "generated", "inputs": {}},
+                             "overall": {}, "segments": []}))
+
+
+@pytest.fixture
+def analysed(tmp_path, monkeypatch):
+    """Three analysed ärenden -- one open, one closed, one with no deadline --
+    plus one that has answers but was never analysed."""
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _arende_record(tmp_path, "sou/2026:10", "2026-08-01")   # open (grace 21d)
+    _arende_record(tmp_path, "sou/2026:11", "2026-05-01")   # long closed
+    _arende_record(tmp_path, "sou/2026:12", None)           # no deadline stated
+    _arende_record(tmp_path, "sou/2026:13", "2026-08-01")   # never analysed
+    for bf in ("sou/2026:10/a", "sou/2026:11/a", "sou/2026:12/a"):
+        _layer(bf)
+
+
+def test_updatable_takes_the_analysed_arenden_still_open(analysed):
+    assert ai_analyze.updatable(today=date(2026, 8, 5)) == [
+        "sou/2026-10", "sou/2026-12"]
+
+
+def test_updatable_drops_an_arende_once_the_grace_has_passed(analysed):
+    """Past deadline + grace no answer is coming, so re-running would spend the
+    LLM to rewrite what it already wrote."""
+    assert "sou/2026-10" in ai_analyze.updatable(today=date(2026, 8, 22))
+    assert "sou/2026-10" not in ai_analyze.updatable(today=date(2026, 8, 23))
+
+
+def test_updatable_ignores_an_arende_never_analysed(analysed):
+    """--update refreshes a decision already taken; it does not decide which
+    ärenden are worth analysing."""
+    assert "sou/2026-13" not in ai_analyze.updatable(today=date(2026, 8, 5))
+
+
+def test_analysed_arenden_reads_the_store_layout(analysed):
+    assert ai_analyze.analysed_arenden() == [
+        "sou/2026-10", "sou/2026-11", "sou/2026-12"]
+
+
+def test_an_arende_analysed_with_no_answers_is_still_tracked(tmp_path, monkeypatch):
+    """The gap the index exists for: an ärende analysed the week it opened has
+    no answers yet, so it leaves no `.ann` -- and that is precisely the ärende
+    --update must come back to once answers arrive. Same if every answer failed."""
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _arende_record(tmp_path, "sou/2026:30", "2026-08-01", orgs=())
+
+    assert ai_analyze.answers("sou/2026-30") == []      # nothing fetched yet
+    assert ai_analyze.analysed_arenden() == []          # and nothing tracked
+    ai_analyze.mark_analysed("sou/2026-30")
+    assert ai_analyze.analysed_arenden() == ["sou/2026-30"]
+    assert ai_analyze.updatable(today=date(2026, 8, 5)) == ["sou/2026-30"]
+
+
+def test_a_marked_arende_is_counted_once_alongside_its_layers(tmp_path, monkeypatch):
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _arende_record(tmp_path, "sou/2026:30", "2026-08-01")
+    _layer("sou/2026:30/a")
+    ai_analyze.mark_analysed("sou/2026-30")
+    assert ai_analyze.analysed_arenden() == ["sou/2026-30"]
+
+
+def test_answers_rejects_a_basefile_that_names_nothing(tmp_path, monkeypatch):
+    """A typoed basefile must fail loudly, and say why. Since `is_arende` reads
+    the record rather than counting slashes, an unknown basefile would otherwise
+    be taken for an answer and surface much later as a confusing missing-artifact
+    error -- an ärende with no answers is an empty list, a basefile naming
+    nothing is a mistake."""
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    with pytest.raises(AssertionError, match="neither a stored ärende nor"):
+        ai_analyze.answers("sou/9999-99")
+
+
+def test_is_arende_reads_the_record_not_the_slash_count(tmp_path, monkeypatch):
+    """A promemoria's identifier carries its own slash, so a pm *ärende* has as
+    many segments as an sou *answer* -- 1,050 of the stored ärenden are of that
+    kind. Counting slashes gets them backwards; the record settles it."""
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    _arende_record(tmp_path, "sou/2026:14", "2026-08-01")
+    _arende_record(tmp_path, "pm/LI2026/01339", "2026-08-01")
+
+    assert ai_analyze.is_arende("sou/2026-14")            # one slash, an ärende
+    assert ai_analyze.is_arende("pm/LI2026/01339")        # two slashes, also an ärende
+    assert not ai_analyze.is_arende("sou/2026-14/kammarkollegiet")   # an answer
+    assert not ai_analyze.is_arende("sou/9999-99")        # nothing at all
+
+
+def test_the_index_round_trips_every_arende_shape(tmp_path, monkeypatch):
+    """mark_analysed/analysed_arenden must agree for a promemoria and a
+    lagrådsremiss too, not just the one-slash sou form the first cut handled."""
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    for bf in ("sou/2026:14", "pm/LI2026/01339", "lr/2026/en-ny-ordning"):
+        _arende_record(tmp_path, bf, "2026-08-01")
+    marked = ["sou/2026-14", "pm/LI2026/01339", "lr/2026/en-ny-ordning"]
+    for bf in marked:
+        ai_analyze.mark_analysed(bf, today=date(2026, 8, 5))
+    assert ai_analyze.analysed_arenden() == sorted(marked)
+    # and every one of them resolves to a readable record, so updatable() works
+    assert ai_analyze.updatable(today=date(2026, 8, 5)) == sorted(marked)
+
+
+def test_marking_twice_updates_rather_than_duplicates(tmp_path, monkeypatch):
+    monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
+    monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
+                        tmp_path / "downloaded" / "remisser")
+    monkeypatch.setattr(layout, "REMISSER_ANALYSED",
+                        tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    _arende_record(tmp_path, "sou/2026:14", "2026-08-01")
+    ai_analyze.mark_analysed("sou/2026-14", today=date(2026, 8, 1))
+    ai_analyze.mark_analysed("sou/2026-14", today=date(2026, 8, 5))
+    assert ai_analyze.analysed_arenden() == ["sou/2026-14"]
+    assert json.loads(layout.REMISSER_ANALYSED.read_text()) == {
+        "sou/2026-14": "2026-08-05"}
