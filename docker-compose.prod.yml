@@ -109,6 +109,15 @@ services:
       # disk: SQLite's per-statement locking becomes slow synchronous round-trips
       # over NFS. See accommodanda config.resolve_catalog_root (CATALOG_ROOT env).
       - CATALOG_ROOT=/app/catalog
+      # Server-side analytics for the machine-facing surfaces (/api/v1 and /mcp),
+      # which have no browser to run the pages' tracker snippet in -- see
+      # accommodanda/api/analytics.py. The Matomo container over the compose
+      # network, so the hit never leaves the host. MATOMO_SITE_API is a separate
+      # Matomo site from the two human ones (1 = legacy lagen.nu, 2 = the
+      # rebuilt site): agent traffic would otherwise poison the reader numbers.
+      # Unset either variable and no server-side tracking happens at all.
+      - MATOMO_URL=http://matomo/matomo.php
+      - MATOMO_SITE_API=3
     volumes:
       # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
       # the roomy 2 TB /mnt/forstor NFS mount.
