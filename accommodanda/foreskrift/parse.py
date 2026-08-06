@@ -33,7 +33,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.lagrum import EULAGSTIFTNING, FORESKRIFT, LAGRUM, interleave, sfs_parser
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
-from ..lib.util import MONTHS
+from ..lib.util import MONTHS, approximate_date
 from .agencies import AAFS_SERIES, REGISTRY
 from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
@@ -47,6 +47,9 @@ PARSE_TYPES = [LAGRUM, EULAGSTIFTNING, FORESKRIFT]
 
 RE_RUBRIK_NUM = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")     # "2.1 Heading"
 RE_LIST_ITEM = re.compile(r"^(?:\d+[.)]|[-–—•])\s")       # "1." / "– " list rows
+# the årsutgåva inside a föreskrift designation ("PMFS 2023:12" -> 2023), which
+# is what dates a consolidation: its newest amendment is its own cutoff
+RE_FS_YEAR = re.compile(r"\b(\d{4}):\d")
 
 # masthead facts (best-effort; the layout that carries them is often mangled)
 RE_DATE = re.compile(r"den\s+(\d{1,2})\s+(%s)(?:\s+(\d{4}))?" % "|".join(MONTHS),
@@ -632,7 +635,13 @@ def parse_record(record, root):
     fs, basefile = record["fs"], record["basefile"]
     arsutgava, lopnummer = basefile.split("/", 1)[1].split(":", 1)
     files = record.get("files", {})
-    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    # Dated by årsutgåva, which is all that is known before the body is read: a
+    # föreskrift's beslutsdatum is extracted from page 1 of the PDF (`_meta`),
+    # which happens below with this parser already in hand. The årsutgåva is the
+    # right granularity anyway -- `approximate_date` places a bare year at its
+    # middle, and no act a föreskrift cites changes name twice within one year.
+    parser = sfs_parser("foreskrift", PARSE_TYPES,
+                        written=approximate_date(arsutgava))
 
     reg_file = files.get("regulation") or None
     structure, meta = [], {}
@@ -669,16 +678,29 @@ def parse_record(record, root):
         reg.amendments.append(Amendment(
             identifier=am["identifier"], uri=amendment_uri(am["identifier"]),
             url=am["url"], beslutsdatum=None))
+    # A consolidation is a snapshot at its *own* cutoff, not at the base act's
+    # year, and the two are a median 8 years apart (max 33). Dating one by the
+    # base årsutgåva moved 156 links in consolidation bodies onto acts already
+    # repealed by the time the consolidated text was written -- into the very
+    # text `presented_consolidation` shows as the reading text. The cutoff it
+    # states (`konsolideradTom`) is produced by the parse below, so it cannot
+    # date the parser that produces it; the newest amendment on the record is
+    # in hand here and agrees with it in 1,043 of 1,127 consolidations.
+    cons_written = approximate_date(max(
+        (m.group(1) for a in files.get("amendment", [])
+         if (m := RE_FS_YEAR.search(a.get("identifier") or ""))), default=""))
     known = {a.uri for a in reg.amendments if a.uri}
     for cons in files.get("consolidation", []):
         if cons.get("name"):
             path = Path(root) / fs / cons["name"]
             cstruct, tom, refs = (
-                parse_consolidation_html(path, sfs_parser("foreskrift", PARSE_TYPES))
+                parse_consolidation_html(
+                    path, sfs_parser("foreskrift", PARSE_TYPES, written=cons_written))
                 if path.suffix == ".html"
                 else parse_consolidation(path, record["identifier"],
                                          fs, arsutgava, lopnummer,
-                                         sfs_parser("foreskrift", PARSE_TYPES)))
+                                         sfs_parser("foreskrift", PARSE_TYPES,
+                                                    written=cons_written)))
             if any(c.konsolideradTom == tom and c.structure == cstruct
                    for c in reg.consolidations):
                 continue          # the landing page listed the same PDF twice

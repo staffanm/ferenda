@@ -42,6 +42,7 @@ from ..lib.pdftext import (
     pdf_images,
     pdf_pages,
 )
+from ..lib.util import approximate_date
 from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -480,7 +481,7 @@ def extract_footrefs(text):
     return "".join(parts), marks
 
 
-def scan_body(body):
+def scan_body(body, written):
     """Each body block's text as an inline-run list (plain `str` runs
     interleaved with `{"predicate", "uri", "text"}` link dicts at their
     exact positions) -- the same shape SFS emits for its text nodes, so the
@@ -491,7 +492,10 @@ def scan_body(body):
     law-name learning carry across blocks. Inline footnote markers are lifted
     out as zero-width `kind="footnote"` runs."""
     parser = _scanner()
-    parser.reset()                        # fresh per-document state
+    # fresh per-document state, and the decision's own date: a verdict citing
+    # "11 kap. 1 § socialtjänstlagen" means the act in force when it was
+    # decided, not the one that replaced it years later
+    parser.reset(written=written)
     runs = []
     for b in body:
         clean, marks = extract_footrefs(b.text)
@@ -502,11 +506,11 @@ def scan_body(body):
     return runs
 
 
-def scan_footnotes(footnotes):
+def scan_footnotes(footnotes, written):
     """Footnote-body texts as inline-run lists, citation-scanned like the body
     (HD's footnotes cite CJEU case law and EU regulations)."""
     parser = _scanner()
-    parser.reset()
+    parser.reset(written=written)
     return [interleave(fn.text, parser.parse_text(fn.text, context={}))
             for fn in footnotes]
 
@@ -522,23 +526,29 @@ def _scanner():
                       named_acts=load_namedacts(NAMEDACTS))
 
 
-def curated_runs(text, predicate, fallback_uri=None):
+def curated_runs(text, predicate, written, fallback_uri=None):
     """One curated metadata string normalized to an inline-run list through the
     same citation grammar the body uses, every resolved reference carrying the
     field's typed `predicate`. Unresolved text survives as plain runs -- a
     failed normalization retains the editor's string, it never erases it. When
     the grammar finds nothing and the source supplies an authoritative identity
     beside the string (lagrumLista's sfsNummer, a hanvisning's grupp join), the
-    whole string links to that `fallback_uri` instead."""
+    whole string links to that `fallback_uri` instead.
+
+    Dated like the body: `lagrum` is the most law-name-dense field a decision
+    has, and it is projected as the `rpubl:lagrum` relation edges *and* the
+    displayed lagrum list, so an undated scan here left the decision's most
+    prominent citations resolving against today's act while its prose no longer
+    did."""
     parser = _scanner()
-    parser.reset()
+    parser.reset(written=written)
     refs = parser.parse_text(text, context={}, predicate=predicate)
     if not refs and fallback_uri:
         return [{"predicate": predicate, "uri": fallback_uri, "text": text}]
     return interleave(text, refs)
 
 
-def _related_entry(h, grupp_uris):
+def _related_entry(h, grupp_uris, written):
     """A hanvisad publicering as a curated artifact entry. The fritext grammar
     resolves the published citation form; a fritext the grammar cannot read
     falls back to the grupp join (the cited case's publication group), which is
@@ -549,7 +559,8 @@ def _related_entry(h, grupp_uris):
     edges that may be wrong instead of the disagreement being undetectable."""
     grupp_id = grupp_uris.get(h.grupp) if h.grupp else None
     grupp_uri = case_uri(grupp_id) if grupp_id else None
-    runs = curated_runs(h.fritext, "rpubl:rattsfallshanvisning", grupp_uri)
+    runs = curated_runs(h.fritext, "rpubl:rattsfallshanvisning", written,
+                        grupp_uri)
     entry = {"text": h.fritext, "runs": runs}
     if h.grupp:
         entry["grupp"] = h.grupp
@@ -561,7 +572,10 @@ def _related_entry(h, grupp_uris):
 
 def to_artifact(av, canonical_id=None, grupp_uris=None):
     grupp_uris = grupp_uris or {}
-    runs = scan_body(av.body)
+    # the decision's own date, threaded to every scan the artifact makes: the
+    # body, the curated metadata fields and the footnotes
+    written = approximate_date(av.avgorandedatum)
+    runs = scan_body(av.body, written=written)
     def block(b, text):
         # `page` (the source PDF page) is carried only for a raw verdict parsed
         # from its PDF -- it drives the facsimile links; the HTML path leaves it None
@@ -600,17 +614,18 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
             # dcterms:relation), with unresolved strings retained as plain runs
             "lagrum": [{"text": l.referens, "sfsnummer": l.sfsnummer,
                         "runs": curated_runs(
-                            l.referens, "rpubl:lagrum",
+                            l.referens, "rpubl:lagrum", written,
                             lagrum_uri({"law": l.sfsnummer})
                             if l.sfsnummer else None)}
                        for l in av.lagrum if l.referens],
             "forarbeten": [{"text": f,
-                            "runs": curated_runs(f, "rpubl:forarbete")}
+                            "runs": curated_runs(f, "rpubl:forarbete", written)}
                            for f in av.forarbeten],
             "sammanfattning": av.sammanfattning,
-            "related": [_related_entry(h, grupp_uris) for h in av.related],
+            "related": [_related_entry(h, grupp_uris, written)
+                        for h in av.related],
             "litteratur": [{"text": t,
-                            "runs": curated_runs(t, "dcterms:relation")}
+                            "runs": curated_runs(t, "dcterms:relation", written)}
                            for t in av.litteratur if t],
         },
         # the content-bearing instance/ruling tree (delmål → instans →
@@ -621,7 +636,7 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
                            for b, text in zip(av.body, runs, strict=True)]),
         "footnotes": [{"num": fn.num, "text": runs}
                       for fn, runs in zip(av.footnotes,
-                                          scan_footnotes(av.footnotes),
+                                          scan_footnotes(av.footnotes, written),
                                           strict=True)],
         "sources": av.sources,
     }

@@ -48,7 +48,12 @@ from ..lib.pdftext import (
     pages_with_ocr,
     pdf_pages,
 )
-from ..lib.util import document_extension, normalize_space, record_path
+from ..lib.util import (
+    approximate_date,
+    document_extension,
+    normalize_space,
+    record_path,
+)
 from .download import (
     arn_pdf_path,
     imy_pdf_path,
@@ -686,4 +691,7 @@ def parse_record(basefile, root):
         beslut = parse_kkv(record, root, patch_key)
     else:
         beslut = parse_arn(record, root, patch_key)
-    return beslut.to_artifact(sfs_parser("avg", AVG_PARSE_TYPES))
+    # the decision's own date, so a bare law name resolves to the act in force
+    # when it was written rather than to whatever replaced it since
+    return beslut.to_artifact(sfs_parser("avg", AVG_PARSE_TYPES,
+                                         written=approximate_date(beslut.beslutsdatum)))

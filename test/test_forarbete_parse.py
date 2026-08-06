@@ -880,3 +880,24 @@ def test_classify_places_a_display_heading_by_its_size():
     blocks = fa_parse.classify(paras, 19, 17, {28: 1, 19: 2})
     assert [(b.kind, b.level) for b in blocks] == [
         ("rubrik", 1), ("rubrik", 2), ("stycke", None)]
+
+
+# ---- dating a förarbete's citations ------------------------------------------
+
+def _fa(basefile, date=None, typ="prop"):
+    from accommodanda.forarbete.model import Forarbete
+    return Forarbete(type=typ, basefile=basefile, identifier="x", uri="u",
+                     title="t", date=date)
+
+
+def test_written_date_prefers_the_recorded_date():
+    assert fa_parse.written_date(_fa("2017/18:89", "2018-03-08")) == "2018-03-08"
+
+
+def test_written_date_falls_back_to_the_basefile():
+    """57% of the förarbete corpus records no date -- every kommittédirektiv --
+    but a basefile always carries at least the year, and for a proposition the
+    riksmöte. Both are spans, and `approximate_date` places them at the middle."""
+    assert fa_parse.written_date(_fa("2017/18:89")) == "2018-01-01"   # riksmöte
+    assert fa_parse.written_date(_fa("1987:53", typ="dir")) == "1987-07-01"
+    assert fa_parse.written_date(_fa("2000:2", typ="sou")) == "2000-07-01"

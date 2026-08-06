@@ -40,7 +40,7 @@ from ..lib.pdftext import (
     pages_with_ocr,
     pdf_first_page_text,
 )
-from ..lib.util import normalize_space, record_path
+from ..lib.util import approximate_date, normalize_space, record_path
 from .agencies import BY_ORG
 from .download import labelled_value, pdf_path
 from .model import Block, Fotnot, Stallningstagande
@@ -326,4 +326,7 @@ def parse_record(basefile, root):
         fotnoter=footnotes(record, root, ("rs", basefile)),
         source_url=record.get("source_url"),
         document_url=record.get("dokument_url"),
-    ).to_artifact(sfs_parser("rs", RS_PARSE_TYPES))
+        # the position's own date, so a bare law name resolves to the act in
+        # force when it was written (lib.util.approximate_date fills a partial)
+    ).to_artifact(sfs_parser("rs", RS_PARSE_TYPES,
+                             written=approximate_date(fields.get("beslutsdatum"))))

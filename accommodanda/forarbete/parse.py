@@ -43,7 +43,7 @@ from ..lib.pdftext import (
     points_from_pdftohtml,
     printed_pages,
 )
-from ..lib.util import basefile_slug
+from ..lib.util import approximate_date, basefile_slug
 from . import legacy_formats, lydelse, tabell, volumes
 from .model import Block, Forarbete
 from .structure import RE_TRAILING_PAREN, nest
@@ -670,6 +670,19 @@ def censor_future_citations(blocks, doc_year):
     return suspects
 
 
+def written_date(fa):
+    """When this förarbete was written, as one representative day, so a bare law
+    name resolves to the act in force then rather than to whatever replaced it.
+
+    The recorded date where there is one; otherwise the basefile, which always
+    carries at least the year and for a proposition the riksmöte. Both go through
+    `approximate_date`, which places a span at its middle -- and a förarbete's
+    span is never worse than a riksmöte, so the date is off by at most months
+    while the acts it cites change over years."""
+    return approximate_date(fa.date) or approximate_date(
+        fa.basefile.split(":")[0])
+
+
 def to_artifact(fa):
     """Project to JSON. Each block becomes an inline-run list (plain runs +
     {predicate,uri,text} link dicts), scanned with one parser threaded across the
@@ -678,7 +691,8 @@ def to_artifact(fa):
     A `tabell` block projects to the shared table shape (`rad` children with
     `cells`, the same schema SFS uses -- catalog and render already speak it),
     row 0 flagged `th` (the nuvarande/föreslagen column header)."""
-    parser = sfs_parser("forarbete", PARSE_TYPES)   # fresh per-document state
+    parser = sfs_parser("forarbete", PARSE_TYPES,   # fresh per-document state
+                        written=written_date(fa))
     blocks = []
     for b in fa.body:
         block = ({"type": b.kind, "text": _scan(b.text, parser, b.spans)}
