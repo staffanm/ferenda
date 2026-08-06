@@ -23,6 +23,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .. import config
 from . import compress, concepts, labels, text, util
 from .markdown import begrepp_uri
 
@@ -285,11 +286,55 @@ def _record_data_root(con, path, data_root):
                     "('data_root', ?)", (str(Path(data_root).resolve()),))
 
 
+# roots already probed -- one row read plus one stat per distinct root, not per
+# call, since `data_root` is called on every render and every search hit
+_checked_roots: set[Path] = set()
+
+
+# rows to probe before calling a root wrong. A misresolved root misses
+# *systematically*; one missing artifact is an ordinary state (a document
+# deleted, or catalogued before it was parsed), and below a sample this size the
+# two are indistinguishable -- which is the shape of the only false positive this
+# check can produce, so it declines to judge there instead.
+ROOT_SAMPLE = 20
+
+
+def _resolves(con, root):
+    """Whether this catalog's stored paths find their artifacts under `root`.
+
+    Asked of real rows rather than of the tree's shape: the stored path is
+    exactly what every reader joins to the root, so resolving one is the
+    question, and it stays true whatever the layout. Undecidable (too few rows)
+    counts as resolving -- the caller then keeps what it had."""
+    rows = con.execute("SELECT path FROM documents WHERE path != '' LIMIT ?",
+                       (ROOT_SAMPLE,)).fetchall()
+    # `_artifact_path` is None only for the empty stored path the query excludes
+    return (len(rows) < ROOT_SAMPLE
+            or any((p := _artifact_path(root, r[0])) and compress.exists(p)
+                   for r in rows))
+
+
 def _data_root(con):
     row = con.execute("SELECT value FROM meta WHERE key = 'data_root'").fetchone()
     if row and row[0]:
         return Path(row[0])
-    return _catalog_file(con).parent
+    # The colocated default, but only where the catalog really is colocated: a
+    # corpus root has an `artifact/` tree beside the catalog file, and that is
+    # what makes the guess a guess rather than an assumption.
+    #
+    # Where it is not -- a separated layout whose catalog carries no recorded
+    # root -- the running process's own configured root is better information
+    # than the directory the file happens to sit in. That combination is not
+    # hypothetical: a catalog built on dev is *deliberately* left unstamped so it
+    # stays rsync-portable, and prod puts the catalog on a local disk because its
+    # data_root is root_squashed NFS. Rsync one to the other and every stored
+    # path resolved against the catalog's own directory, so every artifact read
+    # missed -- MCP text retrieval returned nothing for the entire corpus while
+    # the artifacts sat healthy one mount away, and the generated pages, being
+    # static, gave no hint. Prod only re-recorded the root by running its own
+    # relate, which had been disabled since an unrelated NFS fault.
+    beside = _catalog_file(con).parent
+    return beside if _resolves(con, beside) else config.DATA
 
 
 def data_root(con: sqlite3.Connection) -> Path:
@@ -297,8 +342,23 @@ def data_root(con: sqlite3.Connection) -> Path:
     resolve against. When the catalog lives outside the corpus (catalog_root !=
     data_root) a full rebuild records the absolute root in `meta`; otherwise this
     falls back to the directory the catalog file itself lives in (the colocated
-    default -- which also keeps the catalog rsync-portable, see `_record_data_root`)."""
-    return _data_root(con)
+    default -- which also keeps the catalog rsync-portable, see `_record_data_root`).
+
+    Checked once per process, because the failure is otherwise silent: a root
+    pointing at a tree with no artifacts reads as "every document is missing"
+    rather than as a misconfiguration, and only the consumers that read artifacts
+    at runtime notice (the generated pages are static and keep serving). A
+    catalog with rows must have an artifact tree under its root
+    (rule:fail-fast)."""
+    root = _data_root(con)
+    if root not in _checked_roots:
+        assert _resolves(con, root), (
+            "catalog %s resolves its artifact paths against %s, where its own "
+            "rows find no artifact -- record the real corpus root in its `meta` "
+            "table, or point config's data_root at it"
+            % (_catalog_file(con), root))
+        _checked_roots.add(root)
+    return root
 
 
 def quiesce_wal(path: Path | str) -> None:

@@ -5,6 +5,7 @@ temp files -- no real corpus, no JVM, fast."""
 
 import json
 import os
+import shutil
 import socket
 import sqlite3
 from urllib.parse import urlparse
@@ -1334,3 +1335,40 @@ def test_remisser_ai_analyze_runs_a_short_answer_named_directly(monkeypatch,
     monkeypatch.setattr(build.remisser_analyze, "answer_chars", lambda _: 100)
     build.remisser_ai_analyze([bf])
     assert seen == [bf]
+
+
+def test_catalog_falls_back_to_the_configured_root_when_the_recorded_one_is_gone(
+        tmp_path, monkeypatch):
+    """A catalog built on dev is deliberately left unstamped so it stays
+    rsync-portable; prod puts the catalog on a local disk because its data_root
+    is root_squashed NFS. Rsync one to the other and the colocated default
+    resolved every stored path against the catalog's own directory -- MCP text
+    retrieval returned nothing for the whole corpus while the artifacts sat
+    healthy one mount away. A root its own rows systematically miss is not the
+    root."""
+    data_root = tmp_path / "corpus"
+    (data_root / "artifact" / "sfs" / "9999").mkdir(parents=True)
+    arts = []
+    for i in range(catalog.ROOT_SAMPLE):
+        art = data_root / "artifact" / "sfs" / "9999" / ("%d.json" % i)
+        art.write_text(json.dumps({"uri": "https://lagen.nu/9999:%d" % i,
+                                   "kind": "law", "label": "9999:%d" % i,
+                                   "title": "Testlag %d" % i, "body": []}))
+        arts.append(art)
+
+    # built colocated (nothing recorded), then "rsynced" to a separate disk
+    db = data_root / "catalog.sqlite"
+    catalog.rebuild(db, "sfs", arts, data_root=data_root)
+    assert db.exists()
+    elsewhere = tmp_path / "fast"
+    elsewhere.mkdir()
+    shutil.copy(db, elsewhere / "catalog.sqlite")
+
+    monkeypatch.setattr(catalog.config, "DATA", data_root)
+    monkeypatch.setattr(catalog, "_checked_roots", set())
+    con = catalog.connect(elsewhere / "catalog.sqlite")
+    assert catalog.data_root(con) == data_root          # not `elsewhere`
+    stored = con.execute("SELECT path FROM documents LIMIT 1").fetchone()[0]
+    assert catalog.load_artifact(catalog.data_root(con), stored)["title"].startswith(
+        "Testlag")
+    con.close()
