@@ -143,10 +143,47 @@ CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
 CREATE INDEX IF NOT EXISTS idx_corr_old ON correspondence(old_uri);
 CREATE INDEX IF NOT EXISTS idx_genomf_sfs ON genomforande(sfs_uri, sfs_anchor);
 CREATE INDEX IF NOT EXISTS idx_links_to_uri  ON links(to_uri);
-CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(to_root);
 CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
+-- their `to_root` sibling is deliberately NOT here: it is covering, and building
+-- it over a populated table is minutes of work that `executescript(SCHEMA)`
+-- would do on the serving path. `connect` creates it while the table is still
+-- empty; `widen_to_root_index` rebuilds it later. See INDEX_TO_ROOT_COLUMNS.
 CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 """
+
+# The inbound-citation queries count one entry per (citing document, pinpoint),
+# not one per link row, so they look a document up by `to_root` and then group by
+# `from_uri, from_anchor`. A to_root-only index answers the *lookup* from the
+# index and then fetches each matching row out of the 2.1 GB links table for the
+# other two columns -- one scattered read per matching link, and Rättegångsbalken
+# has 228 297 of them. Carrying the two grouped columns in the index makes it
+# covering: the query never touches the table, and reads one contiguous index
+# range instead. Both figures below are that same count, cold, per machine:
+#
+#            dev (NVMe, 0.068 ms/random read)   prod (disk, ~9-11 ms, ~100 IOPS)
+#   narrow   2.81 s, 194 MB read                190 s
+#   wide     0.24 s, 33 MB read                 (not yet measured)
+#
+# Which is why dev never noticed. Don't read the prod column as seeks x latency:
+# 194 MB of 4 KB reads would be ~48 000 of them and so ~480 s, and it measured
+# 190 -- readahead coalesces some of the range. The gap is the point, not its
+# exact multiple.
+#
+# Everything that reports an inbound count paid this: `get_document`, `fetch`,
+# `resolve_citation` and citation-shaped `search` over MCP; `/api/v1/document`
+# and the same `search` resolution over REST (lib/pins.py); and, by volume the
+# largest, lib/page.py once per rendered page in every generate worker.
+#
+# `to_root` stays leftmost, so this serves every plain `to_root = ?` lookup the
+# narrow index served and replaces rather than joins it -- at the cost of a wider
+# range to scan for the ones that only wanted `to_root` (stats/compute.py runs
+# one such count per statute). The index measured 735 MB built alongside the
+# narrow one on dev; built as its replacement, `DROP` returns the old pages to
+# the freelist for `CREATE` to reuse, and the real corpus catalog went from
+# 4.87 to 4.96 GB.
+INDEX_TO_ROOT_COLUMNS = ("to_root", "from_uri", "from_anchor")
+_CREATE_TO_ROOT = ("CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(%s)"
+                   % ", ".join(INDEX_TO_ROOT_COLUMNS))
 
 
 def connect(path: Path | str, data_root: Path | None = None,
@@ -221,7 +258,40 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE genomforande ADD COLUMN sfs_pinpoint TEXT")
     con.execute("CREATE INDEX IF NOT EXISTS idx_docs_publisher "
                 "ON documents(source, publisher)")
+    # Only while the table is empty, i.e. on a fresh catalog, where it is free.
+    # Building this index over a populated links table is minutes of work, and
+    # `connect` is on the serving path (`connect_ro` calls it for its one-time
+    # migration, inside the first request, with every concurrent request queued
+    # behind it). So a populated catalog that lacks the index -- built before the
+    # widening, or left index-less by a relate that died mid-rebuild -- keeps
+    # answering correctly and slowly rather than stalling here; `rebuild` is what
+    # puts it right (`widen_to_root_index`).
+    if not con.execute("SELECT 1 FROM links LIMIT 1").fetchone():
+        con.execute(_CREATE_TO_ROOT)
     return con
+
+
+def widen_to_root_index(con: sqlite3.Connection) -> bool:
+    """Rebuild `idx_links_to_root` covering (INDEX_TO_ROOT_COLUMNS) if it is not
+    already, returning whether it had to. Idempotent; asks `index_info` for the
+    indexed columns rather than pattern-matching the recorded CREATE, so a
+    half-widened index is detected as the miss it is.
+
+    Called from `rebuild` and nowhere else, deliberately: re-sorting every link
+    row is ordinary for a relate and quite wrong for the serving path (see
+    `connect`). In one transaction, because SQLite commits bare DDL as it goes --
+    a `DROP` that committed before its `CREATE` died would leave a populated
+    catalog with no index at all, which is slower than the narrow one it
+    replaced and reads as a plan regression rather than as a crash.
+    """
+    if tuple(row[2] for row in con.execute(
+            "PRAGMA index_info(idx_links_to_root)")) == INDEX_TO_ROOT_COLUMNS:
+        return False
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("DROP INDEX IF EXISTS idx_links_to_root")
+    con.execute(_CREATE_TO_ROOT)
+    con.execute("COMMIT")
+    return True
 
 
 _ro_lock = threading.Lock()
@@ -1029,6 +1099,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     Returns (documents, links, changed): the source's row + link totals after the
     sync, and how many documents were (re)written this run."""
     con = connect(catalog_path, data_root=data_root, exclusive=exclusive)
+    widen_to_root_index(con)     # build-cost work belongs here, not in serving
     # artifact paths are stored data_root-relative (portable catalog); the root is
     # what `connect` just recorded (or the catalog file's own directory when the two
     # are colocated), never assumed to be catalog_path.parent -- catalog_root may
