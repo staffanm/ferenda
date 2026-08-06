@@ -584,13 +584,43 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   (`Ref kind="term"`), threaded through the projection. Compared as a term-URI set
   (the source stycke drifts like any reference); **~97% recall** on definition-heavy
   laws. `test/test_sfs_begrepp.py`.
-- ✅ **Named-law data** — `sfs.ttl` → hand-editable `sfs_namedlaws.json` (187 labels /
-  106 abbrevs; `load_namedlaws`/`load_abbreviations`/`register.abbreviations` read
-  JSON, no rdflib). Complete for SFS's bare-citation class — all 12 balkar + the
-  grundlagar are present (that is where "brottsbalken → 1962:700" comes from). Within
-  SFS the *full* citation form is the convention (resolved by SFS number or in-document
-  learning), so the colloquial long tail (`avtalslagen`, …) is DV/förarbete work, not
-  §3. `riksdagsordningen` de-staled to the current `2014:801`.
+- ✅ **Named-law data** — `sfs.ttl` → hand-editable `namedlaws.json` (203 labels /
+  120 abbrevs across 309 id-keyed entries; `load_namedlaws`/`load_abbreviations`/
+  `register.abbreviations` read JSON, no rdflib). Complete for SFS's bare-citation
+  class — all 12 balkar + the grundlagar are present (that is where "brottsbalken →
+  1962:700" comes from). Within SFS the *full* citation form is the convention
+  (resolved by SFS number or in-document learning), so the colloquial long tail
+  (`avtalslagen`, …) is DV/förarbete work, not §3. `riksdagsordningen` de-staled to
+  the current `2014:801`.
+- ✅ **Named-law data is dated (2026-08-06)** — a name outlives the act holding it:
+  the dataset mapped each name to *one* SFS id, always the current act, so a 2010
+  decision citing "11 kap. 1 § socialtjänstlagen" resolved to 2025:400, a statute
+  that didn't exist yet — found as a context rail on 11 kap. 1 § listing 5 rättsfall
+  and 100+ myndighetsbeslut all older than the law. `namedlaws.json` stays keyed by
+  SFS id, but a name may now span several ids, each with an optional `from`/`until`
+  (ISO dates, `until` exclusive); 245 → 309 entries, 49 names dated, 64 predecessor
+  rows added. `load_namedlaws`/`load_abbreviations` return a `NamedLaws`
+  (`lib/lagrum.py`), a dict subclass that still *is* the flat name→SFS-id map of the
+  current act — existing call sites and the grammar's NAMED_LAW terminal are
+  unchanged — plus `.at(name, when)` for the act that carried the name on a given
+  date. `LagrumParser(..., written=)`/`sfs_parser(..., written=)` set the document's
+  own date; `reset(written=)` sets it per document for a cached parser. A law the
+  document itself names ("lagen (2001:453) om …") still outranks the dated table.
+  `tools/namedlaws_history.py` derives the `from`/`until` spans from the corpus
+  itself, walking `rinfoex:upphavdAv` backwards from each named act with
+  `rpubl:upphavandedatum` as the boundaries — a predecessor inherits the name only
+  if its own title yields it (the chain alone is wrong: begravningslagen 1990:1144
+  replaced "Lag (1963:537) om gravrätt m.m.", never cited as begravningslagen),
+  which takes 89 chained predecessors down to 49 real ones. Re-runnable and
+  idempotent; `--write` edits the dataset in place, default prints the diff. dv, avg,
+  rs and foreskrift now pass `written=` off the document's own date (`lib/util.py`'s
+  new `approximate_date` fills a partial one — a bare year, year-month or riksmöte —
+  to the middle of the span it can mean); förarbete's `written_date` falls back to
+  the basefile since 57% of that corpus (every kommittédirektiv) records no date.
+  wiki is deliberately left undated — editorial commentary is written now, so
+  today's law is the correct reading. **The corpus has not been reparsed for this**:
+  the corrected links only reach the context rail once dv, avg, rs, foreskrift and
+  forarbete are reparsed.
 - ✅ **Inline links / runs-spans** — every NF text node is a list of `str` runs +
   `{predicate,uri,text}` link objects at exact positions (per-link sub-spans recovered
   from the parse tree, with trailing-marker absorption reproducing the fixtures'
@@ -3848,6 +3878,7 @@ rewrite work.
 | Path | What |
 |---|---|
 | `tools/golden_sfs.py` | golden-corpus comparator (`normalize` parsed XHTML → NF on the fly) |
+| `tools/namedlaws_history.py` | dates `sfs/data/namedlaws.json` from the corpus: walks `rinfoex:upphavdAv` backwards from each named act, `rpubl:upphavandedatum` as the `from`/`until` boundaries, keeping only predecessors whose own title yields the name. Re-runnable/idempotent; `--write` edits the dataset, default prints the diff |
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `labels` (every source's four reader-facing name forms — eyebrow/h1/official-title/citing-form — dispatched per source over the parse-time-stamped artifact + the curated datasets, read identically by `render.py` and `catalog.py`), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `redaktionell` (typed publisher-editorial-note detection, retyped in place at projection time) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
@@ -3998,6 +4029,24 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **sfs/lib** (2026-08-06) — a named law now resolves against the act that bore
+  the name *when a document was written*, not always the current one: `namedlaws.json`
+  mapped each name to one SFS id, so a 2010 decision citing "11 kap. 1 §
+  socialtjänstlagen" resolved to 2025:400, a statute that didn't exist yet — found
+  as a context rail on 11 kap. 1 § listing 5 rättsfall and 100+ myndighetsbeslut all
+  older than the law. The dataset stays keyed by SFS id, but a name may now span
+  several ids with `from`/`until` (245 → 309 entries, 49 names dated, 64 predecessor
+  rows added, derived from the corpus by the new `tools/namedlaws_history.py`).
+  `lib/lagrum.py`'s `load_namedlaws`/`load_abbreviations` return a `NamedLaws` (dict
+  subclass, `.at(name, when)`); `LagrumParser`/`sfs_parser` gain `written=`, `reset`
+  gains it per document for a cached parser. `lib/util.py` gained `approximate_date`
+  (a partial date → the middle of the span it can mean — mid-month, mid-year, or for
+  a riksmöte its turn-of-year). dv/avg/rs/foreskrift now pass their decision/beslut's
+  own date; förarbete's `written_date` falls back to the basefile's year/riksmöte
+  (57% of that corpus records no date); wiki stays undated on purpose. **Not yet
+  reparsed** — dv, avg, rs, foreskrift and forarbete need a full reparse before the
+  corrected links reach the rail. See §3d.
 
 - **render/remisser** (2026-08-06) — the remiss rail states how a section was
   received, not just who answered. Each answer carries a five-level sentiment
