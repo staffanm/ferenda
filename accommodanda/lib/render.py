@@ -872,13 +872,16 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     return total, rendered
 
 
-# The browser chrome from lib/assets/, in the order the page loads them: dom.js
-# defines window.lagenDom (the shared vocabulary the others build on) and MUST
-# come first; the rest are order-independent IIFEs, editor.js last. They are
-# concatenated into one script.js so the page links a single URL -- adding a
-# module changes only script.js, never the per-page HTML, so a new script ships
-# as an --assets-only refresh instead of forcing a full corpus regenerate.
-SCRIPT_FILES = ("dom.js", "scrollspy.js", "search.js", "popover.js",
+# The browser chrome from lib/assets/, in the order the page loads them:
+# matomo.js first (it depends on nothing, and the bundle is one script -- an
+# uncaught error in any module stops the rest, so the analytics ping must not sit
+# downstream of the reading chrome); then dom.js, which defines window.lagenDom
+# (the shared vocabulary the others build on) and MUST precede them; the rest are
+# order-independent IIFEs, editor.js last. They are concatenated into one
+# script.js so the page links a single URL -- adding a module changes only
+# script.js, never the per-page HTML, so a new script ships as an --assets-only
+# refresh instead of forcing a full corpus regenerate.
+SCRIPT_FILES = ("matomo.js", "dom.js", "scrollspy.js", "search.js", "popover.js",
                 "fullsearch.js", "versions.js", "faksimil.js", "drawers.js",
                 "editor.js")
 SCRIPT_BUNDLE = "script.js"     # the single served URL (render.PAGE links it)

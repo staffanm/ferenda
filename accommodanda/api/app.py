@@ -54,7 +54,7 @@ from ..lib import (
     search,
 )
 from ..lib.util import basefile_slug
-from . import auth, edit, errors, ops, patch
+from . import analytics, auth, edit, errors, ops, patch
 from . import mcp as mcp_server
 
 CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
@@ -1037,6 +1037,22 @@ def serve(directory, host="127.0.0.1", port=8000):
     # so without a root handler those lines vanish
     logging.basicConfig(level=logging.INFO,
                         format="%(levelname)s:     %(name)s: %(message)s")
+    # Matomo tracking for the machine-facing routes -- the counterpart to the
+    # browser snippet the generated pages carry (lib/assets/matomo.js), reporting
+    # to its own Matomo site (api/analytics.py). Installed here for the same
+    # reason as the static mount below: `generate` drives this very app through
+    # an in-process TestClient (browse.py) inside the same container that carries
+    # MATOMO_URL, so an import-time middleware would have every nightly build
+    # report its own ~12 /api/v1/browse calls as a daily API consumer.
+    # ...and announced either way: a tracker whose only symptom of being
+    # misconfigured is numbers that never arrive should say, once, which it is.
+    if analytics.ENABLED:
+        logging.info("matomo: tracking /api/v1 + /mcp as site %d via %s",
+                     config.MATOMO_SITE_API, analytics.TRACKER)
+        app.add_middleware(analytics.Tracked)
+    else:
+        logging.info("matomo: server-side tracking off "
+                     "(needs both MATOMO_URL and MATOMO_SITE_API)")
     app.mount("/", SiteFiles(directory=directory, html=True), name="site")
     # proxy_headers so the app sees the real client IP/scheme/host behind the
     # prod TLS proxy (nginx must send X-Forwarded-For/-Proto) -- notably,

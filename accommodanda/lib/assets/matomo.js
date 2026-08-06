@@ -1,0 +1,40 @@
+/* Matomo page tracking -- the same self-hosted, cookie-less analytics legacy
+   lagen.nu has always used (lagen/nu/res/xsl/analytics-tracker.xsl), reporting
+   to the same Matomo container under its *own* site id so "legacy vs. rebuilt"
+   is one comparison in the All Websites dashboard.
+
+   Two departures from the legacy snippet:
+
+   * The tracker URL is same-origin (/matomo/, an nginx block on this host
+     proxying the Matomo container) rather than //lagen.nu/matomo/. A
+     cross-origin tracker is what browser tracking protection exists to block,
+     and Matomo falls back to POST for long payloads, which cross-origin would
+     need CORS on Matomo's side.
+   * The site id is looked up by hostname, so only a host we have actually
+     registered in Matomo reports anything: a dev serve on localhost, a staging
+     copy or a mirror stays silent instead of writing into prod's numbers.
+     Promoting the rebuilt site to lagen.nu means adding that name here.
+
+   Kept first in the script.js bundle deliberately: the bundle is one
+   concatenated script, so an uncaught error anywhere in it stops everything
+   after -- the ping should not be downstream of the reading chrome. */
+(function () {
+  var SITES = {"ferenda.lagen.nu": 2};        // hostname -> Matomo site id
+  var site = SITES[location.hostname];
+  if (!site) return;
+  var u = "/matomo/";
+  var _paq = window._paq = window._paq || [];
+  /* no cookie, no browser fingerprint: a visit is counted, a visitor is not
+     followed -- the privacy stance lagen.nu ships with */
+  _paq.push(["disableCookies"]);
+  _paq.push(["disableBrowserFeatureDetection"]);
+  _paq.push(["trackPageView"]);
+  _paq.push(["setTrackerUrl", u + "matomo.php"]);
+  _paq.push(["setSiteId", String(site)]);
+  var g = document.createElement("script"),
+      s = document.getElementsByTagName("script")[0];
+  g.async = true;
+  g.defer = true;
+  g.src = u + "matomo.js";
+  s.parentNode.insertBefore(g, s);
+})();

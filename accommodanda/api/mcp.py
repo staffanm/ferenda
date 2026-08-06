@@ -35,6 +35,7 @@ from starlette.routing import Route
 from .. import config
 from ..lib import catalog, layout, pins, text
 from ..lib.search import SearchIndex
+from . import analytics
 
 CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 
@@ -484,17 +485,24 @@ async def lifespan(app):
         yield
 
 
-def _describe(body):
-    """One grep-friendly token run for a JSON-RPC request body: the method, and
-    for tools/call the tool name + its arguments (truncated -- get_document can
-    take a 200k max_chars but the *arguments* stay small; the cap only guards
-    against a hostile oversized payload flooding the log)."""
+def _message(body):
+    """The request body as a JSON-RPC message object, or None if it is not one
+    (an empty GET body, a malformed POST). Parsed once per request and handed to
+    both readers below."""
     try:
         msg = json.loads(body)
     except ValueError:
-        return "<non-json body, %d bytes>" % len(body)
-    if not isinstance(msg, dict):
-        return "<non-object body>"
+        return None
+    return msg if isinstance(msg, dict) else None
+
+
+def _describe(msg, size):
+    """One grep-friendly token run for a JSON-RPC request: the method, and for
+    tools/call the tool name + its arguments (truncated -- get_document can take
+    a 200k max_chars but the *arguments* stay small; the cap only guards against
+    a hostile oversized payload flooding the log)."""
+    if msg is None:
+        return "<unparseable body, %d bytes>" % size
     method = msg.get("method", "<no method>")
     if method != "tools/call":
         return method
@@ -503,12 +511,25 @@ def _describe(body):
     return "%s %s %s" % (method, params.get("name"), args[:500])
 
 
+def _called(msg):
+    """`(method, tool)` for a JSON-RPC request -- what analytics counts -- or
+    None if the body carried no method to count. `tool` is None for every method
+    but tools/call."""
+    if msg is None or "method" not in msg:
+        return None
+    if msg["method"] != "tools/call":
+        return msg["method"], None
+    return msg["method"], msg.get("params", {}).get("name")
+
+
 class _LoggedMCP:
     """ASGI wrapper logging one line per MCP request -- client IP, JSON-RPC
-    method, tool name and arguments. The uvicorn/nginx access logs see only
-    `POST /mcp/ 200`, so tool-level visibility has to come from here. The
-    request body is buffered to be parsed (bodies are single JSON-RPC messages,
-    stateless_http -- small by construction) and replayed to the wrapped app."""
+    method, tool name and arguments -- and reporting the same call to Matomo
+    (api/analytics.py) when a tracker is configured. The uvicorn/nginx access
+    logs see only `POST /mcp/ 200`, so tool-level visibility has to come from
+    here. The request body is buffered to be parsed (bodies are single JSON-RPC
+    messages, stateless_http -- small by construction) and replayed to the
+    wrapped app."""
 
     def __init__(self, app):
         self.app = app
@@ -525,7 +546,11 @@ class _LoggedMCP:
         body = b"".join(m.get("body", b"") for m in messages
                         if m["type"] == "http.request")
         client = scope.get("client")
-        log.info("%s %s", client[0] if client else "-", _describe(body))
+        msg = _message(body)
+        log.info("%s %s", client[0] if client else "-", _describe(msg, len(body)))
+        called = _called(msg)
+        if analytics.ENABLED and called:
+            analytics.track_mcp(scope, *called)
         replay = iter(messages)
 
         async def receive_replayed():

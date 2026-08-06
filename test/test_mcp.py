@@ -304,3 +304,22 @@ def test_end_to_end_streamable_http(corpus, caplog):
     assert any(m.endswith("initialize") for m in logged)        # the 2025 opener
     assert any("tools/call get_document" in m
                and '"uri": "https://lagen.nu/1962:700"' in m for m in logged)
+
+
+def test_what_a_request_body_is_counted_as():
+    """`_called` is what decides which tool an MCP hit is filed under in Matomo
+    (api/analytics.track_mcp), so its reading of a body is fixtured here."""
+    call = mcpmod._message(json.dumps(
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+         "params": {"name": "get_document", "arguments": {"uri": "x"}}}).encode())
+    assert mcpmod._called(call) == ("tools/call", "get_document")
+    # every other method counts as itself, with no tool
+    assert mcpmod._called(mcpmod._message(b'{"method": "initialize"}')) == \
+        ("initialize", None)
+    # nothing to count: a notification-less body, a non-object, a GET's empty body
+    assert mcpmod._called(mcpmod._message(b'{"id": 1}')) is None
+    assert mcpmod._called(mcpmod._message(b'[1, 2]')) is None
+    assert mcpmod._called(mcpmod._message(b"")) is None
+    # ...and the log line survives a body that could not be read at all
+    assert mcpmod._describe(mcpmod._message(b"not json"), 8) == \
+        "<unparseable body, 8 bytes>"

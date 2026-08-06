@@ -361,6 +361,60 @@ def resolve_cookie_secure(doc):
     return value
 
 
+def resolve_matomo_url(doc):
+    """The Matomo tracking endpoint the machine-facing surfaces (/api/v1, /mcp)
+    report to -- ``api/analytics.py``. On prod this is the Matomo container over
+    the compose network (``http://matomo/matomo.php``), not the public
+    ``https://lagen.nu/matomo/matomo.php``: the hit never leaves the host, so it
+    costs no TLS handshake and cannot be blocked by anything between us. Unset
+    (``None``) disables server-side tracking entirely, which is what a dev serve
+    wants. Precedence: the ``MATOMO_URL`` environment variable, then the
+    ``matomo_url`` key in config.yml, else ``None``.
+
+    The scheme is checked here so the common typo (a bare host, a path with no
+    scheme) is reported against *this* setting by name. It is only half the
+    guard: `api/analytics.py` parses the whole URL at import, because everything
+    a prefix check cannot see -- a bad port, a stray newline -- would otherwise
+    raise inside the tracking worker thread and stop analytics silently."""
+    env = os.environ.get("MATOMO_URL")
+    value = env if env else doc.get("matomo_url")
+    if value is None:
+        return None
+    where = "MATOMO_URL" if env else "matomo_url at %s" % _at(doc, "matomo_url")
+    if not isinstance(value, str) or not value.startswith(("http://", "https://")):
+        raise ConfigError("%s set to invalid value %r (expected a http(s) URL to "
+                          "Matomo's matomo.php)" % (where, value))
+    return value
+
+
+def resolve_matomo_site_api(doc):
+    """The Matomo *site id* machine traffic (the REST API + the MCP server) is
+    recorded under. Deliberately a different site from the one the reader-facing
+    pages ping (that id lives in ``lib/assets/matomo.js``, since the pages track
+    from the browser): agents and scripts have no bounce rate or visit duration
+    worth reading, and mixing them into the human numbers would poison both.
+    Unset (``None``) disables server-side tracking. Precedence: the
+    ``MATOMO_SITE_API`` environment variable, then ``matomo_site_api`` in
+    config.yml, else ``None``."""
+    env = os.environ.get("MATOMO_SITE_API")
+    # `if env`, like every sibling resolver here: an exported-but-empty variable
+    # is how a shell spells "unset", and unsetting either half of the analytics
+    # config is the documented off switch -- it must not fail the boot instead.
+    raw = env if env else doc.get("matomo_site_api")
+    if raw is None:
+        return None
+    where = ("MATOMO_SITE_API" if env
+             else "matomo_site_api at %s" % _at(doc, "matomo_site_api"))
+    try:
+        site = int(raw)
+    except (TypeError, ValueError):
+        raise ConfigError("%s set to invalid value %r (expected a Matomo site id)"
+                          % (where, raw)) from None
+    if site < 1:
+        raise ConfigError("%s set to %d (Matomo site ids start at 1)" % (where, site))
+    return site
+
+
 def resolve_editors(doc):
     """The registry of people allowed to edit content inline, keyed by login
     name. Each entry maps a username to a ``name``/``email`` (the git identity
@@ -412,3 +466,5 @@ EDITORS = resolve_editors(_doc)
 COMPRESS = resolve_compress(_doc)
 COMPRESS_QUALITY = resolve_compress_quality(_doc)
 COOKIE_SECURE = resolve_cookie_secure(_doc)
+MATOMO_URL = resolve_matomo_url(_doc)
+MATOMO_SITE_API = resolve_matomo_site_api(_doc)
