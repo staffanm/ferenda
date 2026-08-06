@@ -457,6 +457,51 @@ def swedish_date(text: str) -> str | None:
             if m else None)
 
 
+RE_RIKSMOTE = re.compile(r"^(\d{4})/(\d{2}|\d{4})$")
+
+
+def approximate_date(value: str | None) -> str | None:
+    """A partial date as one representative day: the middle of the span it can
+    mean. `None` for anything that names no time at all.
+
+        2004-05-17  -> 2004-05-17     (already a day)
+        2004-04     -> 2004-04-15     (mid-month)
+        2004        -> 2004-07-01     (mid-year)
+        2004/05     -> 2005-01-01     (a riksmöte, autumn to summer)
+
+    For dating a citation against the act in force when it was written, which is
+    what the caller wants: an exact day is rarely on record, and the midpoint is
+    the choice that minimises how far off it can be. A year read as 01-01 would
+    put every document written in it before a law that took effect that January,
+    and 12-31 would put them all after -- the middle is wrong by at most six
+    months in either direction rather than twelve in one.
+
+    A riksmöte runs from one autumn into the next summer, so its middle is the
+    turn of the year: "2004/05" is January 2005. This is what a prop's basefile
+    carries when the document itself records no date."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    if m := RE_RIKSMOTE.match(value):
+        # a riksmöte always spans two consecutive years, so the second is the
+        # first plus one -- computed, not read off the suffix, which would need
+        # century logic to get 1999/2000 right. The suffix has to agree: a value
+        # that is not the next year is not a riksmöte and names no span this can
+        # place (rule:fail-fast).
+        start, end = int(m.group(1)), m.group(2)
+        later = start + 1
+        if end != ("%04d" % later if len(end) == 4 else "%02d" % (later % 100)):
+            return None
+        return "%d-01-01" % later
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return value
+    if re.fullmatch(r"\d{4}-\d{2}", value):
+        return value + "-15"
+    if re.fullmatch(r"\d{4}", value):
+        return value + "-07-01"
+    return None
+
+
 # --------------------------------------------------------------------------
 # ndjson ledgers -- shared by the run ledger (lib/runlog) and the served-site
 # error ledger (lib/errorlog), which are append-only files with the same

@@ -52,11 +52,19 @@ class Labels(NamedTuple):
 
 @functools.lru_cache(maxsize=1)
 def _namedlaws():
-    """SFS id ("2018:585") -> its established short name ("säkerhetsskyddslagen")."""
+    """SFS id ("2018:585") -> its established short name ("säkerhetsskyddslagen").
+
+    Only the act that carries the name *now*. A row with an `until` records that
+    an act once bore the name, which is what dates a citation written back then
+    -- it is not what the act is called today, and reading it as one gave all
+    three socialtjänstlagar the same short title and the same descriptive label.
+    `descriptive_label` drives listings and inbound links, so the context rail
+    this dating was built for would have shown three indistinguishable entries."""
     data = json.loads(datasets.NAMEDLAWS.read_text(encoding="utf-8"))
     return {lawid.replace("_", " "): entry["label"]
             for lawid, entry in data.items()
-            if isinstance(entry, dict) and entry.get("label")}
+            if isinstance(entry, dict) and entry.get("label")
+            and "until" not in entry}
 
 
 def _first(value):

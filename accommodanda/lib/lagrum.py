@@ -1026,25 +1026,112 @@ def _normalize_lawname(lawname):
     return lawname[:-1] if lawname.endswith('s') else lawname
 
 
+RE_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+class NamedLaws(dict):
+    """Name -> SFS id, as a plain dict of the law *currently* carrying each name,
+    plus `at(name, when)` for the law that carried it on a given date.
+
+    A name outlives the act holding it: "socialtjänstlagen" meant 2001:453 until
+    2025-07-01 and 2025:400 after it, and a 2010 decision citing "11 kap. 1 §
+    socialtjänstlagen" means the former. Resolved against today's law, every one
+    of those citations lands on a statute that did not exist when it was written
+    -- 5 rättsfall and 100+ myndighetsbeslut on 11 kap. 1 § alone, all predating
+    the law they were filed under.
+
+    Kept a dict subclass rather than a new type because the flat mapping is what
+    a dozen call sites already pass around and what the grammar builds its
+    NAMED_LAW terminal from: the keys are unchanged, so only a caller that has a
+    date to offer needs to know this is more than a dict."""
+
+    def __init__(self, current, history):
+        super().__init__(current)
+        # name -> ((from|None, until|None, sfsid), …) oldest first. Only names
+        # that have moved between acts appear; the rest resolve straight off the
+        # dict, which is why this stays empty for 154 of the 203 named laws.
+        self._history = {name: tuple(spans)
+                         for name, spans in dict(history).items()}
+
+    def at(self, name, when=None):
+        """The SFS id `name` denoted on `when` (an ISO date, or None for today's
+        act). A name with no recorded history, and an undated caller, get the
+        current act -- so nothing that never asks a date changes behaviour.
+
+        `None` where the date falls before every recorded window. The name meant
+        *some* earlier act then and this table does not know which, so there is
+        no link to mint: answering with today's act would be the very thing this
+        exists to stop, and answering with the oldest one on record would assert
+        a succession nobody established. A missing link is visibly missing; a
+        wrong one reads as adjudicated (rule:fail-fast)."""
+        spans = self._history.get(name)
+        if not (when and spans):
+            return self.get(name)
+        when = when.isoformat() if hasattr(when, "isoformat") else str(when)
+        assert RE_ISO_DAY.fullmatch(when), (
+            "`written` must be an ISO day (lib.util.approximate_date turns a "
+            "partial date into one); got %r" % (when,))
+        for start, until, lawid in spans:
+            if (start is None or start <= when) and (until is None or when < until):
+                return lawid
+        earliest = next((s[0] for s in spans if s[0]), None)
+        return None if earliest and when < earliest else self.get(name)
+
+
+def _named_at(mapping, name, when):
+    """`mapping[name]` as of `when`, for a mapping that may or may not carry
+    dates. Plain dicts are what tests and hand-built vocabularies pass, and they
+    answer for today -- the dating is an enrichment of the dataset, not a new
+    requirement on every caller."""
+    at = getattr(mapping, "at", None)
+    return at(name, when) if at else mapping.get(name)
+
+
 def load_namedlaws(path):
-    """Map each named law ("brottsbalken", "miljöbalken", …) to its SFS id,
-    from the hand-editable named-law dataset (law id -> {label?, abbr?})."""
-    data = json.loads(Path(path).read_text(encoding='utf-8'))
-    return {entry["label"]: lawid.replace('_', ' ')
-            for lawid, entry in data.items() if "label" in entry}
+    """Map each named law ("brottsbalken", "miljöbalken", …) to its SFS id, from
+    the hand-editable named-law dataset (law id -> {label?, abbr?, from?, until?}).
+
+    Where several acts have carried one name, `from`/`until` say when each did;
+    the returned :class:`NamedLaws` answers for today by default and for any date
+    on request. An act with neither is current and unambiguous."""
+    return _named_index(json.loads(Path(path).read_text(encoding='utf-8')), "label")
+
+
+def _named_index(data, key):
+    """`NamedLaws` over one naming key of the dataset -- `label` for the spelled
+    names, `abbr` for the acronyms, which move between acts with them (SoL named
+    2001:453 before 2025:400 and the new act after). A law may carry several of
+    either; each is stored as a str or a list."""
+    spans: dict[str, list] = {}
+    for lawid, entry in data.items():
+        val = entry.get(key)
+        for name in ([val] if isinstance(val, str) else val or []):
+            spans.setdefault(name, []).append(
+                (entry.get("from"), entry.get("until"), lawid.replace('_', ' ')))
+    current = {}
+    for name, ss in spans.items():
+        ss.sort(key=lambda s: (s[0] or "", s[1] or "9999-99-99"))
+        # Exactly one act may be open-ended: two would mean the dataset says two
+        # acts carry the name today, and the flat mapping every undated caller
+        # reads would silently take the *earlier* of them (`next` scans ascending
+        # by `from`). That is a dataset error, not a case to resolve.
+        open_ended = [s[2] for s in ss if s[1] is None]
+        assert len(open_ended) <= 1, (
+            "%r is recorded as still carried by %s -- only one act can hold a "
+            "name today" % (name, ", ".join(open_ended)))
+        # failing that (a name no act carries today) the last to have held it
+        current[name] = open_ended[0] if open_ended else ss[-1][2]
+    return NamedLaws(current, {k: v for k, v in spans.items() if len(v) > 1})
 
 
 def load_abbreviations(path):
     """Map each law abbreviation (JB, RB, BrB, …) to its SFS id -- the data
     the old KORTLAGRUM LawAbbreviation terminal was built from. A law may have
-    several (its `abbr` is then a list); all of them resolve to the same law."""
-    data = json.loads(Path(path).read_text(encoding='utf-8'))
-    out = {}
-    for lawid, entry in data.items():
-        abbr = entry.get("abbr")
-        for a in ([abbr] if isinstance(abbr, str) else abbr or []):
-            out[a] = lawid.replace('_', ' ')
-    return out
+    several (its `abbr` is then a list); all of them resolve to the same law.
+
+    A `NamedLaws`, like the spelled names: an acronym follows the name it
+    abbreviates from one act to the next, so it needs the same dating."""
+    return _named_index(json.loads(Path(path).read_text(encoding='utf-8')), "abbr")
 
 
 def _act_aliases(entry):
@@ -1452,8 +1539,12 @@ class LagrumParser:
 
     def __init__(self, namedlaws, basefile, base='https://lagen.nu/',
                  abbreviations=None, parse_types=None, named_acts=None,
-                 lang="swe"):
+                 lang="swe", written=None):
         self.namedlaws = namedlaws
+        # the date the document being parsed was written, so a bare law name
+        # resolves to the act that bore it *then*. None = today's law, which is
+        # what every caller without a date gets and what the parser always did.
+        self.written = written
         self.basefile = basefile
         self.base = base
         self.lang = lang
@@ -1492,12 +1583,18 @@ class LagrumParser:
                            lang)
         self.trigger = build_trigger(self.parse_types, lang)
 
-    def reset(self):
+    def reset(self, written=None):
         """Discard per-document state (learned law names, the "samma lag"
         focus, förarbete/EU-act anaphora) before parsing a new document.
         Call this instead of rebuilding the parser -- construction (grammar
-        compilation, dataset loading) is the expensive part."""
+        compilation, dataset loading) is the expensive part.
+
+        `written` is the next document's own date, since a reused parser meets
+        documents from different years: it is per-document state like the rest,
+        so it is set here rather than at construction. Omitted means today's law,
+        the same as never setting it."""
         self.state = _DocState()
+        self.written = written
 
     # --- scanning ---
 
@@ -1888,7 +1985,7 @@ class LagrumParser:
         NoLink for an unknown abbreviation (consumes the span, no link)."""
         abbrev = next(t.value for t in _tree_tokens(node)
                       if t.type == 'LAW_ABBREV')
-        law = self.abbreviations.get(abbrev)
+        law = _named_at(self.abbreviations, abbrev, self.written)
         if law is None:
             raise NoLink()
         return _normalize_sfsid(law)
@@ -1916,10 +2013,16 @@ class LagrumParser:
         match.currentlaw = self.state.lastlaw
 
     def namedlaw_to_sfsid(self, name):
+        """The act a spelled law name denotes, as of the document's own date.
+
+        A name the *document itself* introduced ("lagen (1994:953) om ...") wins
+        over the dataset whatever the date: it is this document saying which act
+        it means, which is better evidence than any table."""
         name = _normalize_lawname(name)
         if name in NOLAW or name in LAW_SYNONYMS:
             return None
-        return self.state.namedlaws.get(name) or self.namedlaws.get(name)
+        return (self.state.namedlaws.get(name)
+                or _named_at(self.namedlaws, name, self.written))
 
     # --- EU ---
 
@@ -2357,7 +2460,7 @@ def _sfs_vocabulary():
             load_abbreviations(datasets.NAMEDLAWS))
 
 
-def sfs_parser(basefile, parse_types, named_acts=None):
+def sfs_parser(basefile, parse_types, named_acts=None, written=None):
     """A citation parser for a source that cites Swedish law: the named-law table
     plus the abbreviations, over `parse_types`.
 
@@ -2375,4 +2478,4 @@ def sfs_parser(basefile, parse_types, named_acts=None):
     return LagrumParser(namedlaws, basefile=basefile,
                         abbreviations=abbreviations,
                         parse_types=list(parse_types),
-                        named_acts=named_acts)
+                        named_acts=named_acts, written=written)

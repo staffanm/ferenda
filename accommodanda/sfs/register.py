@@ -299,8 +299,14 @@ def abbreviations():
     it's not reproduced.)"""
     data = json.loads(NAMEDLAWS_JSON.read_text(encoding="utf-8"))
     # a law's primary abbreviation is the first one listed (the golden's pick)
+    #
+    # Only acts that carry the abbreviation now. A row with an `until` is there
+    # to date a citation written while that act held the name; stamping it as
+    # the act's own `dcterms:alternate` is a different claim, and one the golden
+    # corpus has never made -- 20 of the 25 historical rows would have moved it
+    # unadjudicated, including a value mismatch on 1991:900.
     return {lawid: (e["abbr"] if isinstance(e["abbr"], str) else e["abbr"][0])
-            for lawid, e in data.items() if "abbr" in e}
+            for lawid, e in data.items() if "abbr" in e and "until" not in e}
 
 
 def build_metadata(sfst_header, register, basefile):

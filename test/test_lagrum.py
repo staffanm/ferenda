@@ -18,6 +18,7 @@ of the rewrite.
 """
 
 import ast
+import json
 import re
 import time
 from pathlib import Path
@@ -1042,3 +1043,147 @@ def test_foreskrift_refs_do_not_disturb_sfs_refs():
     assert [r.uri for r in parser.parse_text(
         "Enligt 3 kap. 5 § brottsbalken (1962:700) gäller annat.",
         context={})] == ["https://lagen.nu/1962:700#K3P5"]
+
+
+# ---- a law name outlives the act that holds it ------------------------------
+
+_SOL_DATASET = {
+    "1980:620": {"label": "socialtjänstlagen", "abbr": "SoL",
+                 "until": "2002-01-01"},
+    "2001:453": {"label": "socialtjänstlagen", "abbr": "SoL",
+                 "from": "2002-01-01", "until": "2025-07-01"},
+    "2025:400": {"label": "socialtjänstlagen", "abbr": "SoL",
+                 "from": "2025-07-01"},
+    "1962:700": {"label": "brottsbalken", "abbr": "BrB"},
+}
+
+
+def _dataset(tmp_path, data=None):
+    p = tmp_path / "namedlaws.json"
+    p.write_text(json.dumps(data or _SOL_DATASET, ensure_ascii=False),
+                 encoding="utf-8")
+    return p
+
+
+def test_a_named_law_resolves_to_the_act_that_bore_the_name_then(tmp_path):
+    """Three acts have been socialtjänstlagen. A 2010 decision citing "11 kap.
+    1 § socialtjänstlagen" means the 2001 act; resolved against today's, every
+    such citation lands on a statute that did not exist when it was written --
+    which is how 5 rättsfall and 100+ myndighetsbeslut came to sit in the context
+    rail of a law younger than all of them."""
+    laws = load_namedlaws(_dataset(tmp_path))
+    assert laws.at("socialtjänstlagen", "1995-06-01") == "1980:620"
+    assert laws.at("socialtjänstlagen", "2010-05-04") == "2001:453"
+    assert laws.at("socialtjänstlagen", "2026-01-01") == "2025:400"
+
+
+def test_the_boundary_day_belongs_to_the_new_act(tmp_path):
+    """`until` is exclusive: an act applies up to but not including the day its
+    successor takes over, which is the day the repeal takes effect."""
+    laws = load_namedlaws(_dataset(tmp_path))
+    assert laws.at("socialtjänstlagen", "2025-06-30") == "2001:453"
+    assert laws.at("socialtjänstlagen", "2025-07-01") == "2025:400"
+
+
+def test_an_undated_lookup_still_answers_for_today(tmp_path):
+    """The dating is an enrichment, not a new requirement: a caller with no date
+    -- and every name that has only ever meant one act -- behaves as before."""
+    laws = load_namedlaws(_dataset(tmp_path))
+    assert laws.at("socialtjänstlagen") == "2025:400"
+    assert laws["socialtjänstlagen"] == "2025:400"          # plain dict access
+    assert laws.at("brottsbalken", "1970-01-01") == "1962:700"
+    assert dict(laws) == {"socialtjänstlagen": "2025:400", "brottsbalken": "1962:700"}
+
+
+def test_an_abbreviation_travels_with_the_name_it_abbreviates(tmp_path):
+    """"SoL" meant the 2001 act in 2010 for the same reason the spelled name
+    did."""
+    abbrevs = load_abbreviations(_dataset(tmp_path))
+    assert abbrevs.at("SoL", "2010-05-04") == "2001:453"
+    assert abbrevs.at("SoL") == "2025:400"
+
+
+def test_the_parser_dates_a_bare_law_name_by_the_documents_own_date(tmp_path):
+    laws = load_namedlaws(_dataset(tmp_path))
+    text = "Enligt 11 kap. 1 § socialtjänstlagen ska nämnden inleda utredning."
+
+    def cited(written):
+        p = LagrumParser(laws, "dom/test", written=written,
+                                parse_types=[LAGRUM])
+        return [n.uri for n in p.parse_text(text, context={})
+                if not isinstance(n, str)]
+
+    assert cited("2010-05-04") == ["https://lagen.nu/2001:453#K11P1"]
+    assert cited(None) == ["https://lagen.nu/2025:400#K11P1"]
+
+
+def test_a_law_the_document_names_itself_outranks_the_dated_table(tmp_path):
+    """"lagen (2001:453) om ..." is this document saying which act it means --
+    better evidence than any table, whatever date the document carries."""
+    laws = load_namedlaws(_dataset(tmp_path))
+    p = LagrumParser(laws, "dom/test", written="2026-01-01",
+                            parse_types=[LAGRUM])
+    p.parse_text("Enligt socialtjänstlagen (2001:453) gäller följande.",
+                 context={})
+    refs = [n.uri for n in p.parse_text("Se 11 kap. 1 § socialtjänstlagen.",
+                                        context={}) if not isinstance(n, str)]
+    assert refs == ["https://lagen.nu/2001:453#K11P1"]
+
+
+def test_a_date_before_every_recorded_window_mints_no_link(tmp_path):
+    """The name meant some earlier act then and the table does not know which.
+    Answering with today's act is the very thing this exists to stop; answering
+    with the oldest on record asserts a succession nobody established."""
+    data = {"1990:100": {"label": "tullagen", "from": "1988-01-01",
+                         "until": "2000-01-01"},
+            "2000:1": {"label": "tullagen", "from": "2000-01-01"}}
+    laws = load_namedlaws(_dataset(tmp_path, data))
+    assert laws.at("tullagen", "1980-01-01") is None       # before the chain
+    assert laws.at("tullagen", "1995-01-01") == "1990:100"
+
+
+def test_the_oldest_act_on_record_is_open_at_the_start(tmp_path):
+    """A chain whose oldest row has no `from` is open-ended backwards -- that is
+    what "as far as we know it was always this act" looks like, and it is the
+    normal shape, since a repealed act's own start is often unrecorded."""
+    laws = load_namedlaws(_dataset(tmp_path))              # 1980:620 has no from
+    assert laws.at("socialtjänstlagen", "1975-01-01") == "1980:620"
+
+
+def test_two_acts_cannot_both_still_carry_a_name(tmp_path):
+    """Both open-ended means the dataset says two acts hold the name today; the
+    flat mapping would silently take the earlier of them."""
+    data = {"1990:100": {"label": "tullagen"}, "2000:1": {"label": "tullagen"}}
+    with pytest.raises(AssertionError, match="only one act can hold a name"):
+        load_namedlaws(_dataset(tmp_path, data))
+
+
+def test_at_requires_a_real_day(tmp_path):
+    """`lib.util.approximate_date` is what turns a partial date into one; a bare
+    year truncated and compared lexicographically would land in whichever span
+    happened to sort right."""
+    laws = load_namedlaws(_dataset(tmp_path))
+    with pytest.raises(AssertionError, match="must be an ISO day"):
+        laws.at("socialtjänstlagen", "2010")
+
+
+def test_a_renamed_successor_leaves_the_old_name_on_the_repealed_act(tmp_path):
+    """Where the replacement renamed the concept, no act carries the old name
+    today, so a citation to it can only mean the repealed one -- there is nothing
+    ambiguous to resolve and nothing to move. firmalagen (1974:156) was replaced
+    by "Lag (2018:1653) om företagsnamn"; "1 § firmalagen" written in 2026 still
+    means 1974:156."""
+    data = {"1974:156": {"label": "firmalagen"}}
+    laws = load_namedlaws(_dataset(tmp_path, data))
+    assert laws.at("firmalagen", "2026-01-01") == "1974:156"
+    assert laws.at("firmalagen") == "1974:156"
+
+
+def test_a_same_name_successor_takes_the_name_over(tmp_path):
+    """The ambiguous case, and the only one worth moving: two acts have been
+    polisdatalagen, so the date decides."""
+    data = {"1998:622": {"label": "polisdatalagen", "until": "2012-03-01"},
+            "2010:361": {"label": "polisdatalagen", "from": "2012-03-01"}}
+    laws = load_namedlaws(_dataset(tmp_path, data))
+    assert laws.at("polisdatalagen", "2008-01-01") == "1998:622"
+    assert laws.at("polisdatalagen", "2026-01-01") == "2010:361"
