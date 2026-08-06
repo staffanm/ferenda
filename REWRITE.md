@@ -607,11 +607,19 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   own date; `reset(written=)` sets it per document for a cached parser. A law the
   document itself names ("lagen (2001:453) om …") still outranks the dated table.
   `tools/namedlaws_history.py` derives the `from`/`until` spans from the corpus
-  itself, walking `rinfoex:upphavdAv` backwards from each named act with
-  `rpubl:upphavandedatum` as the boundaries — a predecessor inherits the name only
+  itself, walking `rinfoex:upphavdAv` both ways from each named act with
+  `rpubl:upphavandedatum` as the boundaries — through the införandelag where
+  there is one, since that is what `upphavdAv` names for a major statute and
+  following it literally stopped the chain at exactly the most-cited
+  successions (skollagen, aktiebolagslagen, folkbokföringslagen,
+  försäkringsrörelselagen); forward, a successor takes the name over only
+  where it carries it (polisdatalagen 1998:622 → 2010:361), and where the
+  replacement renamed the concept there is nothing to move because no act
+  holds the old name today (firmalagen, skuldsaneringslagen) — a predecessor inherits the name only
   if its own title yields it (the chain alone is wrong: begravningslagen 1990:1144
   replaced "Lag (1963:537) om gravrätt m.m.", never cited as begravningslagen),
-  which takes 89 chained predecessors down to 49 real ones. Re-runnable and
+  which over the 245 curated entries takes 93 named laws with a repealed
+  predecessor down to the 53 whose predecessor carried the same name. Re-runnable and
   idempotent; `--write` edits the dataset in place, default prints the diff. dv, avg,
   rs and foreskrift now pass `written=` off the document's own date (`lib/util.py`'s
   new `approximate_date` fills a partial one — a bare year, year-month or riksmöte —
@@ -621,6 +629,11 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   today's law is the correct reading. **The corpus has not been reparsed for this**:
   the corrected links only reach the context rail once dv, avg, rs, foreskrift and
   forarbete are reparsed.
+  `sfs/versions.py` needs no date: statute text always cites another act by
+  SFS number except for the balkar and the grundlagar, and those are never
+  repealed and re-enacted under the same name — verified against the dataset,
+  where none of the 58 names that ever moved between acts is either (the one
+  balk that was replaced, giftermålsbalken, became äktenskapsbalken).
 - ✅ **Inline links / runs-spans** — every NF text node is a list of `str` runs +
   `{predicate,uri,text}` link objects at exact positions (per-link sub-spans recovered
   from the parse tree, with trailing-marker absorption reproducing the fixtures'
