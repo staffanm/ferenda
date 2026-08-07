@@ -1,0 +1,14 @@
+Borttagen kropp: källan levererar fel avgörande
+
+Domstolsverkets API levererar NJA 1990 s. 228:s avgörande (G.A., olovlig
+körning, Ö 1601-89) som innehåll även för NJA 1990 s. 442 -- de två posternas
+innehåll är byteidentiska, medan sammanfattning, lagrum och sökord är
+korrekta och skilda för var post. Samma sammanblandning noterades i den gamla
+pipelinen (patches/dv/patches/HDO/T14-87_1.patch, "Korrigerat sammanblandat
+dokument med NJA 1990 s 228").
+
+En patch kan bara ta bort den felaktiga kroppen, inte leverera den rätta:
+sidans rubrik kommer från API-postens metadata och går inte att sätta om. Att
+publicera ett annat måls dom under den här referensen är sämre än att
+publicera ingen dom alls, så kroppen tas bort tills det riktiga avgörandet
+finns att lägga in.
