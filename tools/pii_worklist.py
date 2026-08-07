@@ -81,7 +81,13 @@ RESIDENCE = re.compile(
 PROFESSIONAL = re.compile(
     r"advokat|advokatfirma|advokatbyrå|jur\.?\s?kand|ombud|åklagar|"
     r"riksenheten|myndighet|\bBox\b|\bAB\b|\bKB\b|\bHB\b|förvaltare|"
-    r"domstol|nämnd|kammare|Rättighetsalliansen", re.IGNORECASE)
+    r"domstol|nämnd|kammare|Rättighetsalliansen|"
+    # an incorporated party has a registered office, not a home. Deliberately
+    # no "firma": an enskild firma's address *is* its owner's, which is how
+    # Marknadsdomstolen prints a sole trader's home in the party block.
+    r"aktiebolag|handelsbolag|kommanditbolag|ekonomisk förening|"
+    r"\bförening\b|stiftelse|samfällighet|kommun\b|landsting|region\b",
+    re.IGNORECASE)
 # An organisationsnummer is *not* automatically company data. A sole trader's
 # is literally their personnummer, and a one-person AB's points at exactly one
 # natural person — the public register says who. Being public does not make an
@@ -95,11 +101,13 @@ ONE_PERSON = re.compile(
     r"eget bolag|egna bolag|sitt bolag|sitt eget bolag|hans bolag|hennes bolag|"
     r"eget aktiebolag|egen firma|ägs av [A-ZÅÄÖ]|ägdes av [A-ZÅÄÖ]",
     re.IGNORECASE)
-# ...and a firm whose name *is* a person's name ("Karlssons Bygg AB",
-# "M.G. Åkeri AB") ties the number to that person whatever the ownership
-EPONYMOUS_FIRM = re.compile(
-    r"\b(?:[A-ZÅÄÖ][a-zåäöé]+(?:sson|son|ström|qvist|kvist|gren|stedt|dahl)s?"
-    r"|[A-ZÅÄÖ]\.\s?[A-ZÅÄÖ]\.)\s+[\w& ]{0,30}?\b(?:AB|Aktiebolag|HB|KB)\b")
+# NB there is deliberately no "the firm carries a surname" signal. It was tried
+# and had *zero* precision: every one of the 22 hits it produced was an ordinary
+# limited company whose trade name happens to contain a founder's surname
+# ("Söderhamn Eriksson AB", "Nilssons Grus & Transport", "Otterdahls
+# Bilservice") -- which is unremarkable in Swedish business and says nothing
+# about ownership. What makes an orgnr personal data is that *one person* is
+# behind it, and only the text can say so.
 
 
 @dataclass
@@ -124,16 +132,17 @@ def score(kind, hit, context):
         return (base * 4, "fastighet i civilrättsligt mål") if PRIVATE_LAW.search(context) \
             else (0, None)
     if kind == "adress":
+        # a residence marker wins over the party-block form words: "med enskild
+        # firma …, Södra Klöverstigen 81 LGH 1201" is a home whatever else the
+        # line names
+        if RESIDENCE.search(context):
+            return base * 3, "bostadsadress"
         if PROFESSIONAL.search(context):
             return 0, None
-        return ((base * 3, "bostadsadress") if RESIDENCE.search(context)
-                else (1, None))     # a building, until something says otherwise
+        return 1, None              # a building, until something says otherwise
     if kind == "organisationsnummer":
-        if ONE_PERSON.search(context):
-            return base * 2, "enmansbolagets orgnr"
-        if EPONYMOUS_FIRM.search(context):
-            return base, "orgnr för bolag med personnamn i firman"
-        return 0, None
+        return ((base, "enmansbolagets orgnr") if ONE_PERSON.search(context)
+                else (0, None))
     return base, None
 
 
