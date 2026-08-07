@@ -28,7 +28,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -75,6 +75,15 @@ app = FastAPI(
 # data, so any origin may read it.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
+
+# FastAPI serves the interactive docs at exactly /docs and /redoc, and the
+# trailing-slash forms are different paths. Starlette's own redirect_slashes
+# never fires for them because serve() mounts the static site at "/", so every
+# such path matches something and /docs/ 404s instead -- which is what a reader
+# who types the directory-looking form gets. Redirect them by hand, ahead of
+# that mount. 308 rather than 307: these are permanent and GET-only.
+app.add_route("/docs/", lambda request: RedirectResponse("/docs", 308))
+app.add_route("/redoc/", lambda request: RedirectResponse("/redoc", 308))
 
 # the ops dashboard (/ops*), registered like /api/v1 -- before the SiteFiles
 # mount added in serve(), so its explicit routes win over the static catch-all
