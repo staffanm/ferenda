@@ -417,10 +417,16 @@ its sibling for authoring source-fix **patch files** (`lib/patch.py`,
 `lib/patchit.py`, `patchsource.py`; see "Patch files" below). `api/analytics.py`
 is **server-side Matomo tracking** for the two surfaces that have no browser to
 run the pages' tracker snippet in: an ASGI middleware counts the REST API
-(`/api/v1`, `/docs` — minus the editor's own routes, and minus same-origin XHR
-from our own pages, which the browser tracker already counts) and `_LoggedMCP`
-reports each JSON-RPC call under a synthetic `/mcp/<method>/<tool>` URL, so the
-Pages report breaks down by tool. It posts to the self-hosted Matomo over the
+(`/api/v1`, `/docs` — minus the editor's own routes, and minus *successful*
+same-origin XHR from our own pages, which the browser tracker already counts)
+and `_LoggedMCP` reports each JSON-RPC call under a synthetic
+`/mcp/<method>/<tool>` URL, so the Pages report breaks down by tool. **Failures
+are counted too**, whoever made the call, under an `error` branch of the page
+title (`API/error/search`, `MCP/error/tools/call/get_document`) while the URL
+stays the same — so Pages counts demand per endpoint/tool and Titles splits
+working from broken. On the MCP side that means reading the outcome out of the
+JSON-RPC envelope after the response (a tool failure is answered with HTTP 200),
+which is what `mcp._failed` and the wrapper's bounded response capture are for. It posts to the self-hosted Matomo over the
 compose network (`MATOMO_URL`) under its **own site id** (`MATOMO_SITE_API`),
 separate from the two human ones — legacy lagen.nu and the rebuilt site — so
 agent traffic never enters the reader numbers; hits are queued to one daemon

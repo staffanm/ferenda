@@ -24,11 +24,14 @@ Four things this is built around:
     user-agent and the date, under a salt minted fresh per process -- a day's
     calls from one client group into one visit without the address itself
     reaching Matomo. Same privacy stance as the pages' cookie-less tracker.
-  * **Only foreign traffic.** The site's own pages call `/api/v1/*` over XHR
-    (the ⌘K palette, the context rail, `auth/me` on every load). Those are
-    already counted as page views by the browser tracker, so counting them again
-    here would bury actual API consumers under the site's own chatter --
-    same-origin browser fetches are skipped, see `_own_page_xhr`.
+  * **Only foreign traffic -- until something breaks.** The site's own pages
+    call `/api/v1/*` over XHR (the ⌘K palette, the context rail, `auth/me` on
+    every load). Those are already counted as page views by the browser tracker,
+    so counting them again here would bury actual API consumers under the site's
+    own chatter -- same-origin browser fetches are skipped, see `_own_page_xhr`.
+    A *failing* call is exempt: every error is recorded, whoever made it, under
+    an `error` branch of the page title. Failures are the half of the traffic
+    nobody reports back, so the numbers have to.
 """
 
 import hashlib
@@ -149,6 +152,16 @@ def _hit(url, title, request):
                   request.headers.get("accept-language", "").encode("latin-1")})
 
 
+def _under(path, prefixes):
+    """Whether `path` is one of `prefixes` or below it, on a segment boundary --
+    `/docs` and `/docs/oauth` are the docs, `/docsomething` is a stranger. A bare
+    `startswith` would hand that stranger the docs' identity, and since failures
+    are now tracked too, anything a remote caller can spell would become a
+    tracked action name."""
+    return any(path == prefix or path.startswith(prefix + "/")
+               for prefix in prefixes)
+
+
 def _own_page_xhr(request):
     """Whether this is one of our own pages calling the API from the browser.
     `Sec-Fetch-Site` is sent by every current browser and by nothing else, so a
@@ -160,31 +173,37 @@ def _own_page_xhr(request):
     return bool(referer) and urlsplit(referer).netloc == request.url.netloc
 
 
-def _api_title(path):
-    """The Matomo page title for a REST hit: `/api/v1/search` -> "API/search".
-    Matomo splits titles on "/" into a tree, so the whole REST surface reads as
-    one expandable branch beside the MCP one."""
-    return "API/" + path.removeprefix("/api/v1").strip("/")
+def _titled(steps, failed):
+    """A Matomo page title from its path steps, branched on the outcome:
+    `API/search` when it worked, `API/error/search` when it did not.
+
+    Matomo splits a title on "/" into a tree, so one `error` branch per surface
+    collects every failure of that surface -- the split a reader wants first
+    ("is anything broken?") without a second site or a configured custom
+    dimension, and each tool/endpoint still keeps its own leaf underneath."""
+    return "/".join([steps[0]] + (["error"] if failed else []) + list(steps[1:]))
 
 
-def track_mcp(scope, method, tool):
-    """Track one MCP request -- `method` is the JSON-RPC method and `tool` the
-    tool name for a `tools/call` (None otherwise).
+def _api_title(path, failed):
+    """The title for a REST hit: `/api/v1/search` -> "API/search"."""
+    return _titled(["API", path.removeprefix("/api/v1").strip("/")], failed)
+
+
+def track_mcp(scope, method, tool, failed=False):
+    """Track one MCP request -- `method` is the JSON-RPC method, `tool` the tool
+    name for a `tools/call` (None otherwise), and `failed` whether the response
+    carried an error.
 
     The URL is synthetic (`/mcp/tools/call/get_document`): every MCP request is a
     POST to the same `/mcp/` path, so the tool name has to go *somewhere* for the
     Pages report to be worth anything, and a URL path is what Matomo builds its
-    tree from. Nothing links to these; they exist to be counted.
-
-    Counted on the way in, before the tool runs -- deliberately unlike the REST
-    half below, which drops error responses. A JSON-RPC failure is answered with
-    HTTP 200 and an error object, so "did it succeed" is not readable here
-    without parsing the response stream; and an AI host asking for a tool is the
-    demand signal worth having even when the arguments turn out to be wrong."""
+    tree from. Nothing links to these; they exist to be counted. The URL is the
+    same whether the call worked or not -- so Pages counts demand per tool, and
+    the title's `error` branch counts what that demand ran into."""
     request = Request(scope)
     steps = [method] if tool is None else [method, tool]
     _hit(str(request.base_url).rstrip("/") + "/mcp/" + "/".join(steps),
-         "/".join(["MCP"] + steps), request)
+         _titled(["MCP"] + steps, failed), request)
 
 
 class Tracked:
@@ -207,8 +226,8 @@ class Tracked:
         # OPTIONS preflight itself with a 200 -- counting those would double
         # every hit from exactly the browser-app consumers worth counting.
         if (scope["type"] != "http" or scope["method"] != "GET"
-                or not scope["path"].startswith(API_PREFIXES)
-                or scope["path"].startswith(API_EXCLUDED)):
+                or not _under(scope["path"], API_PREFIXES)
+                or _under(scope["path"], API_EXCLUDED)):
             return await self.app(scope, receive, send)
         status = None
 
@@ -218,9 +237,23 @@ class Tracked:
                 status = message["status"]
             await send(message)
 
-        await self.app(scope, receive, watched)
+        try:
+            await self.app(scope, receive, watched)
+        except Exception:
+            # Something got past the app's own exception handlers (api/errors.py).
+            # Whether the caller has already had a 200 header or gets a 500 does
+            # not change what happened -- the request did not complete, and that
+            # is the thing worth counting. Recorded, then re-raised untouched:
+            # this middleware observes, it does not handle.
+            self._record(scope, failed=True)
+            raise
+        self._record(scope, failed=status is None or status >= 400)
+
+    def _record(self, scope, failed):
         request = Request(scope)
-        # errors are not audience: a 404 from a scanner or a 422 from a malformed
-        # query says nothing about who uses the API
-        if status is not None and status < 400 and not _own_page_xhr(request):
-            _hit(str(request.url), _api_title(scope["path"]), request)
+        # Our own pages call the API over XHR, and the browser tracker already
+        # counted the page that made the call -- so a *successful* one would
+        # double-count. A failing one is a defect report rather than an audience
+        # measurement, and those are worth having whoever made the call.
+        if failed or not _own_page_xhr(request):
+            _hit(str(request.url), _api_title(scope["path"], failed), request)

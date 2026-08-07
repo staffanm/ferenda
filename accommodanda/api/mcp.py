@@ -522,6 +522,46 @@ def _called(msg):
     return msg["method"], msg.get("params", {}).get("name")
 
 
+# How much of a response to hold on to while deciding whether it was an error.
+# A JSON-RPC failure is a sentence ("no document ... in the catalog"), while the
+# bodies that run past this are successful reads -- get_document alone returns up
+# to MAX_CHARS. So a capture that overflows is a success by construction, and the
+# cap is what keeps a 200k-character document from being copied to count it.
+CAPTURE_MAX = 64 * 1024
+
+
+def _failed(status, body, truncated):
+    """Whether an MCP response carries an error.
+
+    The status alone cannot say: the transport answers 200 and puts the failure
+    *inside* the JSON-RPC envelope -- either a top-level `error` (bad method, bad
+    params) or, for a tool that raised, a result flagged `isError`.
+
+    Two responses carry no envelope to read, and neither is a failure: one
+    `truncated` at CAPTURE_MAX (only a successful read grows that big -- an error
+    is a sentence), and the empty body of the 202 that acknowledges a
+    notification. Anything else unreadable is counted as failed rather than
+    waved through: this runs *after* the response has gone out, where raising
+    would leave the caller mid-stream, so the honest move is to record an
+    envelope we cannot vouch for as the anomaly it is."""
+    if status is None or status >= 400:
+        return True
+    if truncated or not body:
+        return False
+    try:
+        msg = json.loads(body)
+    except ValueError:
+        return True
+    if not isinstance(msg, dict):
+        return True                    # not an envelope we can vouch for
+    # `result` is whatever the peer sent -- `null` is legal JSON-RPC, and any
+    # other non-object is malformed. Test the type rather than reaching into it:
+    # this runs *past* the response, where an AttributeError does not become a
+    # 500 but a second response.
+    return "error" in msg or (isinstance(msg.get("result"), dict)
+                              and msg["result"].get("isError") is True)
+
+
 class _LoggedMCP:
     """ASGI wrapper logging one line per MCP request -- client IP, JSON-RPC
     method, tool name and arguments -- and reporting the same call to Matomo
@@ -529,7 +569,12 @@ class _LoggedMCP:
     logs see only `POST /mcp/ 200`, so tool-level visibility has to come from
     here. The request body is buffered to be parsed (bodies are single JSON-RPC
     messages, stateless_http -- small by construction) and replayed to the
-    wrapped app."""
+    wrapped app.
+
+    The *response* is watched too, up to CAPTURE_MAX, because whether a tool call
+    failed is only readable there -- see `_failed`. Nothing is withheld from the
+    caller: each message is passed on as it arrives, and the tracking hit is sent
+    after the response has gone out."""
 
     def __init__(self, app):
         self.app = app
@@ -549,14 +594,42 @@ class _LoggedMCP:
         msg = _message(body)
         log.info("%s %s", client[0] if client else "-", _describe(msg, len(body)))
         called = _called(msg)
-        if analytics.ENABLED and called:
-            analytics.track_mcp(scope, *called)
         replay = iter(messages)
 
         async def receive_replayed():
             return next(replay, None) or await receive()
 
-        await self.app(scope, receive_replayed, send)
+        if not (analytics.ENABLED and called):
+            return await self.app(scope, receive_replayed, send)
+
+        status, captured = None, bytearray()
+
+        async def watched(message):
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+            elif message["type"] == "http.response.body":
+                # slice to the room left, not just skip once full: with
+                # json_response the whole envelope arrives as ONE message, so a
+                # test on the buffer alone always sees an empty buffer and copies
+                # the entire body -- the cap would bound nothing. And extend, not
+                # `+=`: an augmented assignment would rebind the name and so make
+                # it local to this closure.
+                captured.extend(message.get("body", b"")[:CAPTURE_MAX - len(captured)])
+            await send(message)
+
+        try:
+            await self.app(scope, receive_replayed, watched)
+        except Exception:
+            # the call did not complete, whatever the caller ends up receiving
+            # (api/errors.py's 500, or a body cut short if the transport had
+            # already started one). Count it, then let the exception through
+            # untouched -- this wrapper observes, it does not handle.
+            analytics.track_mcp(scope, *called, failed=True)
+            raise
+        analytics.track_mcp(scope, *called,
+                            failed=_failed(status, bytes(captured),
+                                           len(captured) >= CAPTURE_MAX))
 
 
 async def _redirect_to_slash(request):

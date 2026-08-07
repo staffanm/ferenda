@@ -101,9 +101,33 @@ def test_the_editors_own_routes_are_not_an_audience(client, hits):
     assert hits == []
 
 
-def test_an_error_is_not_a_visit(client, hits):
+def test_an_error_is_tracked_under_an_error_branch(client, hits):
+    # was: errors were dropped as "not audience". They are the half of the
+    # traffic nobody reports back, so they are counted -- under a title branch
+    # that keeps them out of the working-traffic numbers.
     client.get("/api/v1/vanished")
-    assert hits == []
+    (params, _headers), = hits
+    assert params["action_name"] == "API/error/vanished"
+    assert params["url"] == "https://ferenda.lagen.nu/api/v1/vanished"
+
+
+def test_a_failing_call_from_our_own_pages_is_still_counted(client, hits):
+    # the successful twin of this call is skipped (the browser tracker counted
+    # the page that made it) -- but a defect is worth having whoever hit it
+    client.get("/api/v1/vanished", headers={"sec-fetch-site": "same-origin"})
+    assert hits[0][0]["action_name"] == "API/error/vanished"
+
+
+def test_an_exception_past_the_handlers_is_counted_then_re_raised(hits):
+    async def boom(request):
+        raise RuntimeError("kaboom")
+
+    app = Starlette(routes=[Route("/api/v1/boom", boom)])
+    client = TestClient(analytics.Tracked(app), base_url="https://ferenda.lagen.nu")
+    with pytest.raises(RuntimeError):
+        client.get("/api/v1/boom")
+    # the caller's exception is untouched; the failure is still on the record
+    assert hits[0][0]["action_name"] == "API/error/boom"
 
 
 def test_a_cors_preflight_is_not_a_second_hit(client, hits):
@@ -148,6 +172,18 @@ def test_the_openapi_pages_count_as_api(client, hits):
     assert hits[0][0]["action_name"] == "API/docs"
 
 
+def test_a_path_that_merely_starts_like_ours_is_not_ours(hits):
+    # `/docs` must not claim `/docsomething`: with failures tracked too, a bare
+    # startswith would let any remote caller mint tracked action names
+    assert analytics._under("/docs", analytics.API_PREFIXES)
+    assert analytics._under("/docs/oauth2-redirect", analytics.API_PREFIXES)
+    assert not analytics._under("/docsomething", analytics.API_PREFIXES)
+    assert not analytics._under("/api/v1x/search", analytics.API_PREFIXES)
+    # ...and the exclusions read the same way
+    assert analytics._under("/api/v1/auth/me", analytics.API_EXCLUDED)
+    assert not analytics._under("/api/v1/authority", analytics.API_EXCLUDED)
+
+
 def test_a_tool_call_is_counted_under_its_tool_name(hits):
     scope = {"type": "http", "method": "POST", "path": "/mcp/", "root_path": "",
              "scheme": "https", "server": ("ferenda.lagen.nu", 443),
@@ -162,6 +198,17 @@ def test_a_tool_call_is_counted_under_its_tool_name(hits):
     assert params["url"] == "https://ferenda.lagen.nu/mcp/tools/call/get_document"
     assert params["action_name"] == "MCP/tools/call/get_document"
     assert headers["User-Agent"] == b"claude-code/2.1"
+
+
+def test_a_failed_tool_call_is_counted_under_the_error_branch(hits):
+    scope = {"type": "http", "method": "POST", "path": "/mcp/", "root_path": "",
+             "scheme": "https", "server": ("ferenda.lagen.nu", 443),
+             "query_string": b"", "client": ("192.0.2.1", 44321), "headers": []}
+    analytics.track_mcp(scope, "tools/call", "get_document", failed=True)
+    params, _headers = hits[0]
+    assert params["action_name"] == "MCP/error/tools/call/get_document"
+    # ...but the URL is the tool's own either way, so Pages still counts demand
+    assert params["url"] == "https://ferenda.lagen.nu/mcp/tools/call/get_document"
 
 
 def test_a_handshake_is_counted_without_a_tool(hits):

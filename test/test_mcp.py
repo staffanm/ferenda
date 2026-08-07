@@ -12,7 +12,10 @@ import uvicorn
 from mcp.client import Client, ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
+from starlette.testclient import TestClient
 
+from accommodanda import config
+from accommodanda.api import analytics
 from accommodanda.api import app as api
 from accommodanda.api import mcp as mcpmod
 from accommodanda.lib import catalog
@@ -304,6 +307,113 @@ def test_end_to_end_streamable_http(corpus, caplog):
     assert any(m.endswith("initialize") for m in logged)        # the 2025 opener
     assert any("tools/call get_document" in m
                and '"uri": "https://lagen.nu/1962:700"' in m for m in logged)
+
+
+def _tracked(monkeypatch, asgi_app, hits):
+    """A TestClient over `_LoggedMCP` with tracking on and hits captured."""
+    monkeypatch.setattr(analytics, "ENABLED", True)
+    monkeypatch.setattr(analytics, "_enqueue",
+                        lambda params, headers: hits.append(params))
+    monkeypatch.setattr(config, "MATOMO_SITE_API", 3)
+    return TestClient(mcpmod._LoggedMCP(asgi_app))
+
+def test_the_wrapper_passes_the_response_through_while_counting_it(monkeypatch):
+    """Drives `_LoggedMCP` itself -- the response-watching closure that decides
+    what Matomo is told. Written after that closure shipped with an augmented
+    assignment that made its buffer function-local: every tracked MCP call raised
+    UnboundLocalError *after* the response had started, which the SDK turned into
+    a second http.response.start. Nothing here drove the wrapper, so nothing
+    caught it."""
+    hits = []
+    body = b'{"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":true}}'
+
+    async def jsonrpc(scope, receive, send):
+        await receive()
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": body})
+
+    resp = _tracked(monkeypatch, jsonrpc, hits).post(
+        "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                       "params": {"name": "get_document"}})
+    assert resp.status_code == 200 and resp.content == body   # caller unaffected
+    assert hits[0]["action_name"] == "MCP/error/tools/call/get_document"
+
+
+
+
+def test_a_big_response_is_not_copied_whole_to_classify_it(monkeypatch):
+    """CAPTURE_MAX must bound what the wrapper buffers. It did not: the cap was
+    tested against the buffer *before* appending, and with json_response the whole
+    envelope arrives as one message -- so an empty buffer accepted a 200k-char
+    get_document reply in full, every time.
+
+    What the bug costs is memory, not correctness -- the classification comes out
+    the same either way -- so the assertion has to be on the bytes actually
+    buffered, which is what `_failed` is handed."""
+    hits, seen = [], {}
+    monkeypatch.setattr(mcpmod, "CAPTURE_MAX", 32)
+    monkeypatch.setattr(mcpmod, "_failed", lambda status, body, truncated:
+                        bool(seen.update(size=len(body), truncated=truncated)))
+    body = b'{"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":true}}'
+    assert len(body) > 32
+
+    async def big(scope, receive, send):
+        await receive()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": body})
+
+    resp = _tracked(monkeypatch, big, hits).post(
+        "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                       "params": {"name": "get_document"}})
+    assert resp.content == body                     # nothing withheld from the caller
+    assert seen == {"size": 32, "truncated": True}  # ...and only 32 bytes kept
+    assert hits[0]["action_name"] == "MCP/tools/call/get_document"
+
+
+def test_an_exception_inside_the_transport_is_counted_then_re_raised(monkeypatch):
+    hits = []
+
+    async def boom(scope, receive, send):
+        await receive()
+        raise RuntimeError("transport gave up")
+
+    with pytest.raises(RuntimeError):
+        _tracked(monkeypatch, boom, hits).post(
+            "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                           "params": {"name": "search"}})
+    assert hits[0]["action_name"] == "MCP/error/tools/call/search"
+
+
+def test_what_counts_as_a_failed_response():
+    """A JSON-RPC failure rides inside an HTTP 200, so `_failed` -- which decides
+    whether a tracked MCP call lands in Matomo's error branch -- has to read the
+    envelope, not the status."""
+    ok = b'{"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"{}"}]}}'
+    assert mcpmod._failed(200, ok, False) is False
+    # a tool that raised: 200, with the result flagged
+    flagged = b'{"jsonrpc":"2.0","id":1,"result":{"content":[],"isError":true}}'
+    assert mcpmod._failed(200, flagged, False) is True
+    # a protocol-level failure: bad method or bad params
+    protocol = b'{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"nope"}}'
+    assert mcpmod._failed(200, protocol, False) is True
+    # a body that is not an envelope at all
+    assert mcpmod._failed(200, b'[1, 2]', False) is True
+    # transport-level
+    assert mcpmod._failed(500, b"", False) is True
+    assert mcpmod._failed(None, b"", False) is True
+    # `result` is whatever the peer sent, and this runs past the response where
+    # an AttributeError would become a second response rather than a 500
+    for odd in (b"null", b"5", b'"ok"', b"true"):
+        assert mcpmod._failed(200, b'{"jsonrpc":"2.0","id":1,"result":%s}' % odd,
+                              False) is False
+    # the two bodies with no envelope to read, neither of them a failure: one cut
+    # off at CAPTURE_MAX (only a successful read grows that big) ...
+    assert mcpmod._failed(200, ok[:40], True) is False
+    # ... and the empty 202 that acknowledges a notification
+    assert mcpmod._failed(202, b"", False) is False
+    # anything else unreadable is the anomaly it looks like, not a success
+    assert mcpmod._failed(200, b"<html>a proxy error page</html>", False) is True
 
 
 def test_what_a_request_body_is_counted_as():
