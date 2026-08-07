@@ -27,11 +27,15 @@ from .register import (
 from .tokenizer import Tokenizer
 
 
-def _assemble(text, basefile):
+def _assemble(text, basefile, historical=False):
     # the plain statute text is SFS's intermediate format: apply any curated
-    # patch (a correction, or a rot13 redaction of personal data) here, before
+    # patch (a correction, or an obfuscated redaction of personal data) here, before
     # the reader tokenises it, so the fix flows into every downstream artifact.
-    text = patch.apply("sfs", basefile, text)
+    # `historical` is an archived consolidation (the versions stage), where the
+    # statute's own patch is offered to a wording it may predate or postdate --
+    # see `patch.apply_if_fits`.
+    text = (patch.apply_if_fits("sfs", basefile, text) if historical
+            else patch.apply("sfs", basefile, text))
     # A statute that incorporates a convention as a bi-/trilingual parallel-text
     # appendix is recognised by its structure, not its SFS number:
     # parse_parallel_appendix() returns (statute_text, Konventionsbilaga) or None
@@ -53,12 +57,12 @@ def _assemble(text, basefile):
     return assemble(Tokenizer(reader, basefile))
 
 
-def parse_sfs(path, basefile):
+def parse_sfs(path, basefile, historical=False):
     """Parse a downloaded SFS HTML file into a Forfattning tree."""
-    return _assemble(extract_body(path), basefile)
+    return _assemble(extract_body(path), basefile, historical)
 
 
-def parse_sfs_source(source, basefile):
+def parse_sfs_source(source, basefile, historical=False):
     """Parse a downloaded JSON ``_source`` (the new beta API) into a
     Forfattning tree. ``fulltext.forfattningstext`` is already the plain body
     text that extract_body recovers from the legacy HTML."""
@@ -68,7 +72,7 @@ def parse_sfs_source(source, basefile):
         # ago, or published then withdrawn before entering force. Nothing to
         # parse -- a deliberately empty document, not a failure.
         raise SkipDocument("%s: no forfattningstext" % basefile)
-    return _assemble(text.replace("\r", ""), basefile)
+    return _assemble(text.replace("\r", ""), basefile, historical)
 
 
 def input_paths(path):

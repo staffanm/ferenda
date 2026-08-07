@@ -270,8 +270,8 @@ PATCHES = Path(__file__).resolve().parent.parent / "patches"   # accommodanda/pa
 
 def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
     """The patch-file path for a document: ``patches/<source>/<relpath><suffix>``.
-    `suffix` selects the variant -- ``.patch`` (plain), ``.rot13.patch`` (a
-    rot13-obfuscated redaction, so removed personal data is not itself plain-text
+    `suffix` selects the variant -- ``.patch`` (plain), ``.rot18.patch`` (an
+    obfuscated redaction, so removed personal data is not itself plain-text
     googleable in the committed patch) or ``.desc`` (a multi-line description
     sidecar)."""
     rel = relpath(source, basefile)

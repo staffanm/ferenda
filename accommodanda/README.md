@@ -129,6 +129,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `errorlog.py` | the served-site HTTP error ledger — append-only ndjson at `DATA/.build/httperrors.ndjson`, 8-hex error ids, rotated at 8 MB keeping one `.1` generation; distinct from `runlog.py`'s `errors.json`, which is the *build*'s per-document outcome store — this is the *serving* side, written by `api/errors.py` and read by `lagen all errors` |
 | `net.py` | shared HTTP session setup + a resilient `request()` helper for the source downloaders (transport-level retry, Retry-After, throttle logging, riding out failures from both the `requests` and `httpx` transports); `mount_legacy_tls` accepts a legacy small-DH-key TLS handshake for one host prefix only (`conventions-ws.coe.int`); `make_http2_session` (`httpx[http2]` — the 0.x line, a different package from the `httpx2` starlette's TestClient wants) is an HTTP/2-only fallback for hosts that refuse HTTP/1.1 behind a Cloudflare front (foreskrift's kkvfs) |
 | `patch.py` / `patchit.py` | the source-file patch layer (apply-at-parse) and its interactive authoring CLI — see "Patch files" below |
+| `markup.py` | makes a markup document diffable — one block element per line, without changing what a parser reads out of it (`block_lines` for HTML, `indent_xml` for XML) — because a unified diff is a diff over lines and two patchable sources ship their whole body on one line: ~9% of dv's API records, and eurlex's Formex/OJ manifestations as a rule. Only invoked when a document actually has a patch, from `patchsource.py` and from `dv.parse`/`eurlex.parse` themselves so the patched intermediate re-parses identically |
 | `git.py` | the one place that shells out to the git CLI — the inline editor's commit engine, the MediaWiki history importer and the `history-as-git` export |
 | `poi.py` / `poi_worker.py` | Apache POI (HWPF/XWPF) → a flat `(text, bold, in_table)` paragraph stream for legacy `.doc`/`.docx` bodies; moved here from `dv/word.py` (2026-07-17) under rule:second-use-goes-to-lib — `dv/legacy.py` imports it as `poi as word` (förarbete's `.docx` bodies went back to plain lxml, and its `.doc` bodies go through `antiword`, since proptrips-era `.doc` is mostly Word 6/95 binaries POI's HWPF refuses); strips Word field-control characters (`\x13`/`\x14`/`\x15`) and their instruction segments, which otherwise leaked into extracted text. Split client/worker (2026-07-19): `poi.py` is jpype-free and drives a persistent `poi_worker` subprocess (line-delimited JSON over pipes, one JVM per build worker, exits on stdin EOF) so the JVM never shares an address space with the build — nothing may import `poi_worker` |
 | `errors.py` | `SkipDocument` — the shared control-flow signal a source's extractor raises for an expired/removed/empty document |
@@ -1036,20 +1037,39 @@ Controlled, version-controlled fixes to a document's **source material**, applie
 at parse time before the text is tokenised — the old pipeline's `patch_if_needed`,
 re-done. A **correction** fixes a real error in a downloaded source (an OCR slip, a
 broken table); a **redaction** removes personal data (a named party, a
-personnummer) and is stored **rot13-obfuscated** so the removed text is not
+personnummer) and is stored **obfuscated** (ROT13 over letters, ROT5 over
+digits) so the removed text is not
 plain-text googleable in the committed tree.
 
 A patch is an ordinary unified diff against a document's **best intermediate
 format** — the representation its parser actually reads and a human can edit: plain
-text for `sfs`, the `innehåll` HTML for `dv`, the Formex XML for `eurlex`, and the
-`pdftohtml -xml` output (verbose but editable) for the PDF-bodied sources
+text for `sfs`; the Formex XML for `eurlex` (the OJ HTML for pre-Formex acts); and
+the `pdftohtml -xml` output (verbose but editable) for the PDF-bodied sources
 (`forarbete`, `foreskrift`, `remisser`, and JO/ARN/IMY under `avg`; JK, and KKV's pre-2006 documents, are landing-page/published
-HTML). Each vertical's parser applies the patch at that choke point —
-`lib.patch.patch_if_needed(...)` for the text/HTML/XML sources, a `patch_key`
+HTML). `dv` has three: the **whole API record JSON**, not just its `innehåll`
+body — a redaction has to reach `malNummerLista` and the running text alike, or
+a redacted party finds their own case again through the field the patch didn't
+touch; the court's own PDF as `pdftohtml -xml`, for a verdict published before
+its referat (no `innehåll` yet); and the frozen notis XML for a legacy-only
+case. A legacy Word referat has no editable text form (read through POI) and
+cannot be patched, the same as avg's two Word documents. `dv`'s and `eurlex`'s
+intermediates ship their whole body on one line, which a line-based diff can't
+usefully target, so both are normalised to one block element per line first
+(`lib.markup.block_lines`/`indent_xml`) — a transform that only inserts
+newlines *between* elements, so what the parser reads back out is unchanged.
+
+Each vertical's parser applies the patch at that choke point —
+`lib.patch.patch_if_needed(...)` for the text/JSON/HTML/XML sources, a `patch_key`
 threaded into `lib.pdftext.pdf_pages` for the PDF ones; a patch that no longer
 applies is a **fatal** parse error (the source drifted — it must be regenerated,
-never silently skipped). Patches live committed in the repo at
-`patches/<source>/<relpath>.patch` (or `.rot13.patch`), keyed by the same rule as
+never silently skipped). The one exception is an archived SFS consolidation (the
+`versions` stage): the statute's patch is offered to every superseded wording via
+`lib.patch.apply_if_fits`, which skips a **correction** that doesn't fit an older
+lydelse (a conflict there is the normal case, not a broken patch) but keeps a
+**redaction** fatal — republishing unredacted personal data because an older
+wording didn't line up is exactly the harm, so that version is recorded as
+skipped rather than published (`sfs.versions.build`). Patches live committed in the repo at
+`patches/<source>/<relpath>.patch` (or `.rot18.patch`), keyed by the same rule as
 the artifact tree (`layout.patch`); they are folded into every patchable source's
 parse freshness inputs so editing one re-stales its document.
 
@@ -1059,7 +1079,7 @@ Author them from the CLI or the inline web editor:
 lagen sfs patch-show 2018:585 > /tmp/585.txt   # the intermediate text (patch applied)
 $EDITOR /tmp/585.txt                            # edit to the desired final text
 lagen sfs mkpatch 2018:585 /tmp/585.txt "Rättad OCR-felaktighet"
-lagen dv mkpatch "NJA 2015 s 1" /tmp/case.html "Avidentifierad part" --rot13
+lagen dv mkpatch "NJA 2015 s 1" /tmp/case.json "Avidentifierad part" --obfuscated
 ```
 
 The web surface (`api/patch.py`, gated by the same editor auth as the commentary

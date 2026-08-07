@@ -106,13 +106,13 @@ def parse_version(basefile, version, path, refparser=None):
         header = (archival_header(path)
                   if sniff_encoding(compress.read_bytes(path)) == "latin-1"
                   else register_mod.parse_sfst_header(path))
-        art = to_normalform(parse_sfs(path, basefile), basefile,
+        art = to_normalform(parse_sfs(path, basefile, historical=True), basefile,
                             refparser=refparser)
     else:
         source = json.loads(compress.read_text(path))
         header = register_mod.sfst_header_from_source(source)
-        art = to_normalform(parse_sfs_source(source, basefile), basefile,
-                            refparser=refparser,
+        art = to_normalform(parse_sfs_source(source, basefile, historical=True),
+                            basefile, refparser=refparser,
                             register=register_mod.register_from_source(source),
                             sfst_header=header)
     recovered = header_cutoff(header) or version

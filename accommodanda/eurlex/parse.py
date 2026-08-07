@@ -26,7 +26,7 @@ from pathlib import Path
 
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
-from ..lib import compress, eucasenaming, patch
+from ..lib import compress, eucasenaming, markup, patch
 from ..lib.datasets import NAMEDACTS
 from ..lib.errors import SkipDocument
 from ..lib.eu_structure import doctype
@@ -111,6 +111,14 @@ def load_formex(path):
     return [etree.fromstring(data, XML_PARSER) for _, data in formex_members(path)]
 
 
+def formex_intermediate(data):
+    """The main act's Formex XML as the text a patch is diffed against: one
+    element per line (`lib.markup`), because a Formex manifestation ships as a
+    single line -- 45 000 characters at the median, 1.2 MB at the worst -- which
+    no useful diff can be cut against."""
+    return markup.indent_xml(etree.fromstring(data, XML_PARSER))
+
+
 def _formex_roots(path, celex):
     """`load_formex` with the act's patch applied to the *main act's* Formex XML
     (the eurlex intermediate format) before it is parsed. Annexes are not
@@ -121,7 +129,8 @@ def _formex_roots(path, celex):
     roots = []
     for i, (_name, data) in enumerate(members):
         if i == 0:   # the main act
-            data = patch.apply("eurlex", celex, data.decode("utf-8")).encode("utf-8")
+            data = patch.apply("eurlex", celex,
+                               formex_intermediate(data)).encode("utf-8")
         roots.append(etree.fromstring(data, XML_PARSER))
     return roots
 
@@ -944,8 +953,8 @@ def parse_content(path, route, celex, lang):
     if route == "html":
         data = compress.read_bytes(path)
         if patch.has_patch("eurlex", celex):
-            data = patch.apply("eurlex", celex,
-                               data.decode("utf-8", "replace")).encode("utf-8")
+            data = patch.apply("eurlex", celex, markup.block_lines(
+                data.decode("utf-8", "replace"))).encode("utf-8")
         return parse_html(data, celex, lang)
     if route == "pdf":
         return parse_pdf(path, celex, lang)

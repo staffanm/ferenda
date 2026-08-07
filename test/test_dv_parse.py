@@ -755,7 +755,7 @@ def test_pdf_images_finds_the_margin_number_bitmaps():
 
 
 def test_parse_pdf_record_recovers_contiguous_domskal_numbers():
-    av = parse_pdf_record(_pdf_record(), FIXTURES / "verdict_numbered.pdf")
+    av = parse_pdf_record(_pdf_record(), FIXTURES / "verdict_numbered.pdf", None)
     assert isinstance(av, Avgorande)
     numbered = [b for b in av.body if isinstance(b, Stycke) and b.ordinal]
     # the three margin bitmaps become contiguous ordinals 1, 2, 3 on their lines

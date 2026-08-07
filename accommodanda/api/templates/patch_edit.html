@@ -20,11 +20,11 @@
  <span class="fmt">— intermediate format: {{ format }}</span></h1>
 <p class="hint">Edit the source text below to the desired final text; saving stores
  the <em>minimal</em> diff. An edit identical to the original removes the patch.
- Use <b>rot13</b> to obfuscate a redaction of personal data.</p>
+ Tick <b>Redigera bort personuppgift</b> when the edit removes personal data: the patch is then stored ROT18-obfuscated, so what you removed is not searchable in the committed tree.</p>
 <textarea id="text" spellcheck="false"></textarea>
 <div class="row">
  <input type="text" id="desc" placeholder="Short description (e.g. 'Rättad OCR-felaktighet')">
- <label><input type="checkbox" id="rot13"> rot13 (redaction)</label>
+ <label><input type="checkbox" id="obfuscated"> Redigera bort personuppgift (lagras ROT18-obfuskerad)</label>
  <button id="save">Save patch</button>
  <span id="msg"></span>
 </div>
@@ -40,13 +40,13 @@ async function load(){
  const d=await r.json(); base_sha=d.base_sha;
  document.getElementById("text").value=d.text;
  if(d.description) document.getElementById("desc").value=d.description;
- document.getElementById("rot13").checked=d.is_rot13;
+ document.getElementById("obfuscated").checked=d.is_obfuscated;
  show(d.has_patch?"Existing patch applied.":"No patch yet.",true);
 }
 document.getElementById("save").onclick=async()=>{
  const body={source,basefile,edited_text:document.getElementById("text").value,
    description:document.getElementById("desc").value,
-   rot13:document.getElementById("rot13").checked,base_sha};
+   obfuscated:document.getElementById("obfuscated").checked,base_sha};
  const r=await fetch("/api/v1/patch/save",{method:"POST",credentials:"same-origin",
    headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
  if(!r.ok){show("Save failed: "+r.status+" "+await r.text(),false);return;}

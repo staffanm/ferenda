@@ -461,7 +461,7 @@ class RunOptions:
     only: str | None = None      # source-specific targeted download
     riksmote: str | None = None  # forarbete bet: narrow the harvest to one riksmöte
     limit: int | None = None     # harvest/import cap (a test/backfill slice)
-    rot13: bool = False          # mkpatch: obfuscate the patch (PII redactions)
+    obfuscated: bool = False     # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
     rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
     update: bool = False         # remisser ai-analyze: refresh every open ärende
@@ -987,10 +987,13 @@ SFS_VERSIONS_CODE = SFS_CODE + (PKG / "sfs" / "versions.py",)
 
 
 def sfs_versions_inputs(basefile):
-    """Freshness inputs of the versions stage: every archived consolidation.
-    Archive files are immutable once written, so this set changes only when
-    the downloader supersedes a consolidation (or history is imported)."""
-    return [path for _, path in layout.sfs_version_downloads(basefile)]
+    """Freshness inputs of the versions stage: every archived consolidation,
+    plus the statute's patch -- the same patch is offered to every archived
+    wording (`patch.apply_if_fits`), so editing it re-stales the whole history.
+    Archive files are immutable once written, so this set otherwise changes only
+    when the downloader supersedes a consolidation (or history is imported)."""
+    return ([path for _, path in layout.sfs_version_downloads(basefile)]
+            + _patch_input("sfs", basefile))
 
 
 def sfs_versions_sidecar(basefile):
@@ -1458,7 +1461,10 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
            PKG / "lib" / "poi_worker.py", PKG / "lib" / "pdftext.py",
-           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py")
+           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py",
+           # the innehåll is normalised through this before a patch is applied
+           # to it, so it decides what a patched document parses from
+           PKG / "lib" / "markup.py")
 
 
 @functools.cache
@@ -1661,7 +1667,8 @@ def dv_parse_run(basefile):
     # a not-yet-published HD/HFD verdict has no innehåll HTML -- only the court's
     # own PDF attachment; parse its body from that instead (R2)
     pdf = None if record.get("innehall") else dv_verdict_pdf(basefile, record)
-    av = parse_pdf_record(record, pdf) if pdf else parse_api_record(record, basefile)
+    av = (parse_pdf_record(record, pdf, basefile) if pdf
+          else parse_api_record(record, basefile))
     # the case's public publication-search page is keyed by the record's
     # gruppKorrelationsnummer (the publication group), not derivable from basefile
     grupp = record.get("gruppKorrelationsnummer")
@@ -2034,6 +2041,9 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                # machinery (parse_pdf imports pdftext.flat_lines), so an edit
                # there changes those artifacts exactly as it does forarbete's
                PKG / "lib" / "pdftext.py",
+               # a patched act's Formex/OJ markup is normalised through this
+               # before the patch is applied, so it decides what it parses from
+               PKG / "lib" / "markup.py",
                PKG / "lib" / "lagrum.py")
 
 
@@ -4517,8 +4527,8 @@ def main(argv=None):
     p.add_argument("--limit", type=int, metavar="N",
                    help="harvest/import at most N documents (a test/backfill slice; "
                         "supported by hudoc/coe and legacy imports)")
-    p.add_argument("--rot13", action="store_true",
-                   help="mkpatch: store the patch rot13-obfuscated, so a "
+    p.add_argument("--obfuscated", action="store_true",
+                   help="mkpatch: store the patch ROT18-obfuscated, so a "
                         "redaction of personal data is not plain-text googleable "
                         "in the committed patch")
     p.add_argument("--resume-after", metavar="JSON",
@@ -4544,7 +4554,7 @@ def main(argv=None):
     RUN.only = args.only
     RUN.riksmote = args.riksmote
     RUN.limit = args.limit
-    RUN.rot13 = args.rot13
+    RUN.obfuscated = args.obfuscated
     RUN.resume_after = args.resume_after
     RUN.rebuild_history = args.rebuild_history
     RUN.update = args.update
@@ -4676,7 +4686,7 @@ def cmd_mkpatch(args, p):
     """`lagen <source> mkpatch <basefile> <edited-file> [description]` -- author a
     patch from a hand-edited copy of the intermediate text. Diffs the pristine
     intermediate against `<edited-file>` and writes the minimal unified diff to
-    the document's patch location (`patches/<source>/…`). `--rot13` stores it
+    the document's patch location (`patches/<source>/…`). `--obfuscated` stores it
     obfuscated (redactions of personal data). An edited file identical to the
     pristine text removes any existing patch."""
     if args.source not in patchsource._INTERMEDIATE:
@@ -4693,13 +4703,14 @@ def cmd_mkpatch(args, p):
               or "mkpatch: no differences; nothing to write")
         return
     path = patch.create_patch(args.source, basefile, pristine, edited,
-                              description=description, rot13=RUN.rot13)
+                              description=description,
+                              obfuscated=RUN.obfuscated)
     if path is None:
         print("mkpatch %s %s: no differences; removed any existing patch"
               % (args.source, basefile))
     else:
         print("mkpatch %s %s: wrote %s patch %s (%s intermediate)"
-              % (args.source, basefile, "rot13" if RUN.rot13 else "plain",
+              % (args.source, basefile, "obfuscated" if RUN.obfuscated else "plain",
                  path, label))
 
 

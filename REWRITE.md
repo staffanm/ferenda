@@ -153,7 +153,7 @@ Current code layout (this three-layer split is now realized in the package):
 ```
 accommodanda/
   browse.py composing layer: the faceted browse tree, generated as a client of the REST API
-  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, page (the shared page kit) + render (site assembly) + tpl and the Jinja templates/ their markup lives in, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids, pinpoint
+  lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, page (the shared page kit) + render (site assembly) + tpl and the Jinja templates/ their markup lives in, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, markup, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids, pinpoint
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
@@ -4066,6 +4066,30 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **lib/dv/eurlex/sfs** (2026-08-07) — the patch layer's shape changed on three
+  fronts, on top of §7's port of the legacy sfs/dv patches. New `lib/markup.py`
+  (`block_lines` for HTML, `indent_xml` for XML) puts one block element per
+  line in a markup document without changing what its parser reads out of it —
+  needed because a unified diff is a diff over lines, and two patchable
+  sources ship their whole body on one: ~9% of dv's API records, and eurlex's
+  Formex/OJ manifestations as a rule (median longest line 45,508 characters).
+  `patchsource`, `dv.parse` and `eurlex.parse` normalise through it, only when
+  a document actually has a patch. dv's patchable intermediate is now the
+  *whole* API record JSON, not just the `innehåll` body, so a redaction
+  reaches structured metadata (`malNummerLista`) as well as the running text —
+  dv now has three intermediates (the record JSON; the court's own PDF as
+  pdftohtml XML for a verdict published before its referat; the frozen notis
+  XML for a legacy-only case); a legacy Word referat stays unpatchable.
+  Redaction patches are now stored **ROT18** (`.rot18.patch`,
+  `lib.patch.obfuscate`), not ROT13 — ROT13 rotates letters only, so every
+  personnummer/organisationsnummer/telephone number a redaction removed was
+  still readable in the "obfuscated" file; the CLI flag is `--obfuscated`, the
+  API field `obfuscated`/`is_obfuscated`. Archived SFS consolidations (the
+  `versions` stage) now offer their statute's patch non-fatally via
+  `lib.patch.apply_if_fits`: a **correction** that doesn't fit an older wording
+  is skipped, a **redaction** that doesn't fit stays fatal and the version is
+  recorded as skipped rather than published unredacted.
 
 - **sfs/lib** (2026-08-06) — a named law now resolves against the act that bore
   the name *when a document was written*, not always the current one: `namedlaws.json`

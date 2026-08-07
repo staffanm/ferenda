@@ -304,7 +304,7 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
     one font run carrying <b>/<i>; fragments on the same baseline are one visual
     line, bold/italic when all their runs are. `patch_key=(source, basefile)`
     applies that document's patch to the pdftohtml XML before parsing -- the
-    PDF-bodied sources' patch hook (a correction, or a rot13 redaction).
+    PDF-bodied sources' patch hook (a correction, or an obfuscated redaction).
     ``hidden=True`` adds ``-hidden`` so invisible text is included -- the OCR layer
     ocrmypdf renders behind the page image is invisible, and pdftohtml drops it
     otherwise."""

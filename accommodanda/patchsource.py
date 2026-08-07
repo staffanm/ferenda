@@ -28,10 +28,11 @@ from .avg.download import (
     kkv_body_path,
 )
 from .avg.parse import kkv_html_text
+from .dv.parse import record_intermediate as dv_record_intermediate
 from .edpb.download import pdf_path as edpb_pdf_path
-from .eurlex.parse import content_file, formex_members
+from .eurlex.parse import content_file, formex_intermediate, formex_members
 from .foreskrift.parse import body_path as fs_body_path
-from .lib import compress, layout, patch, pdftext
+from .lib import compress, layout, markup, patch, pdftext
 from .lib.errors import SkipDocument
 from .lib.util import document_extension, record_path
 from .rs.download import pdf_path as rs_pdf_path
@@ -52,25 +53,54 @@ def _sfs_intermediate(basefile):
 
 
 def _dv_intermediate(basefile):
-    """DV's intermediate is the API record's innehåll HTML."""
+    """DV's intermediate is whichever source its parse reads, and dv has three:
+    the whole API record for a case the domstol API publishes -- body *and*
+    metadata, so a redaction reaches the målnummer as well as the running text
+    (`dv.parse.record_intermediate`); the court's own PDF, as pdftohtml XML, for
+    a verdict published before its referat (no innehåll at all); and the frozen
+    notis XML for a legacy-only case. A legacy Word referat is read through POI
+    and has no editable text form to diff against, the same as avg's two Word
+    documents."""
     # lazy: build imports this module (via api.patch), so a top-level
     # `from .build import` would close a build->api.patch->patchsource->build
     # cycle. The one sanctioned in-function import here (rule:no-infunction-imports).
-    from .build import dv_record  # noqa: PLC0415 -- breaks the build import cycle
-    record = json.loads(compress.read_text(dv_record(basefile)))
-    return record.get("innehall") or ""
+    from .build import (  # noqa: PLC0415 -- breaks the build import cycle
+        dv_record,
+        dv_verdict_pdf,
+    )
+    path = dv_record(basefile)
+    if path.suffix.lower() == ".xml":
+        return path.read_text()
+    if path.suffix.lower() != ".json":
+        raise SkipDocument("%s: a legacy Word referat (%s) has no patchable "
+                           "intermediate" % (basefile, path.name))
+    record = json.loads(compress.read_text(path))
+    if not record.get("innehall"):
+        # a verdict published before its referat has no innehåll at all -- parse
+        # reads its body from the court's own PDF, so that PDF's pdftohtml XML
+        # is what a patch targets (the PDF-bodied sources' intermediate). Some
+        # ~290 cases have neither, which parse tolerates (they are metadata-only
+        # entries): there is nothing to diff against.
+        pdf = dv_verdict_pdf(basefile, record)
+        if pdf is None:
+            raise SkipDocument("%s: the record carries neither innehåll nor a "
+                               "verdict PDF" % basefile)
+        return _pdf_xml(pdf)
+    return dv_record_intermediate(record)
 
 
 def _eurlex_intermediate(basefile):
     """eurlex's intermediate is the main act's Formex XML (or the OJ HTML for the
-    older acts that have no Formex manifestation)."""
+    older acts that have no Formex manifestation), normalised to one element per
+    line -- both manifestations ship as a single line, and `eurlex.parse`
+    normalises identically before applying the patch."""
     path, _lang, route = content_file(layout.eurlex_dir(basefile))
     if path is None:
         raise SkipDocument("%s: no content file to patch" % basefile)
     if route == "fmx4":
-        return formex_members(path)[0][1].decode("utf-8")
+        return formex_intermediate(formex_members(path)[0][1])
     if route == "html":
-        return compress.read_bytes(path).decode("utf-8", "replace")
+        return markup.block_lines(compress.read_bytes(path).decode("utf-8", "replace"))
     raise ValueError("%s: the %s manifestation is not text-patchable "
                      "(PDF-only act)" % (basefile, route))
 
@@ -183,8 +213,9 @@ def _remisser_intermediate(basefile):
 # its intermediate choke point) makes it patchable from the CLI and web editor.
 _INTERMEDIATE = {
     "sfs": (_sfs_intermediate, "plain text"),
-    "dv": (_dv_intermediate, "innehåll HTML"),
-    "eurlex": (_eurlex_intermediate, "Formex XML"),
+    "dv": (_dv_intermediate, "API record JSON (opublicerad dom: pdftohtml XML; "
+                             "legacy notisfall: intermediate XML)"),
+    "eurlex": (_eurlex_intermediate, "Formex XML (pre-Formex acts: the OJ HTML)"),
     "forarbete": (_forarbete_intermediate, "pdftohtml XML"),
     "foreskrift": (_foreskrift_intermediate, "pdftohtml XML"),
     "avg": (_avg_intermediate,

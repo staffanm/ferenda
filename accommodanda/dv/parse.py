@@ -18,13 +18,14 @@ misclassified heading still keeps its text, so nothing is lost.
 
 import functools
 import html as htmllib
+import json
 import re
 from dataclasses import replace
 from datetime import date
 
 from bs4 import BeautifulSoup
 
-from ..lib import patch
+from ..lib import markup, patch
 from ..lib.casenaming import COURT_URI_SLUG, case_uri, verdict_uri
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import (
@@ -386,15 +387,24 @@ def _inject_numbers(lines, numbers):
     return out, breaks
 
 
-def parse_pdf_record(d, pdf_path):
+def parse_pdf_record(d, pdf_path, basefile):
     """A raw verdict whose text is only in a PDF attachment -> Avgorande. Before
     the NJA referat is published a HD/HFD decision has no `innehall` HTML, only the
     court's own PDF (`{målnummer}.pdf`); its body comes from `lib.pdftext` instead,
     each block tagged with its PDF page (facsimile links) and the domskäl paragraph
     numbers recovered from their margin bitmaps. Metadata (court, målnummer, date,
-    lagrum, …) is the record's, exactly as for the HTML path."""
+    lagrum, …) is the record's, exactly as for the HTML path.
+
+    The patch hook is the PDF one: `pdf_pages` applies the document's patch to
+    the pdftohtml XML, as it does for every other PDF-bodied source. A case on
+    this path is exactly the kind that needs it -- an unpublished verdict has
+    had no editorial pass at all, and its party block prints in the clear."""
     court_namn = d["domstol"]["domstolNamn"]
-    pages = list(pdf_pages(str(pdf_path)))
+    # `basefile` is required, not defaulted: the only thing a caller could
+    # achieve by omitting it is publishing an unredacted verdict silently.
+    # Pass None explicitly to parse without a patch key.
+    pages = list(pdf_pages(str(pdf_path),
+                           patch_key=("dv", basefile) if basefile else None))
     body_size = line_body_size([l for _pageno, lines in pages for l in lines])
     numbers = _paragraph_numbers(pdf_path)
     paged = []
@@ -406,14 +416,56 @@ def parse_pdf_record(d, pdf_path):
     return _avgorande(d, classify_pdf(paged), [])
 
 
-def parse_api_record(d, basefile=None):
-    """API record dict -> Avgorande. The innehåll HTML is DV's intermediate
-    format: when `basefile` is given, apply any curated patch to it (a
-    correction, or a rot13 redaction anonymising a party) before it is parsed."""
+def record_intermediate(d):
+    """The API record as the text a dv patch is diffed against: the record's own
+    JSON, pretty-printed one field per line, with the innehåll HTML split into
+    one block element per line so a paragraph is one line of the diff.
+
+    The *whole record*, not just its body, because the two are one document. A
+    målnummer a court published in the clear appears both in `malNummerLista`
+    and in the running text, and a redaction reaching only one of them leaves
+    the other to be found — which is exactly how a redacted party finds their
+    own case again. On this route everything parse reads is patchable.
+
+    Two things the patch does *not* reach, both stated here because the editor
+    is handed the whole record and would otherwise expect it to.
+    `gruppKorrelationsnummer` is read off the raw record by the driver
+    (`build.dv_parse_run`, for the artifact's source_url) before this function
+    ever sees it, so editing that field has no effect. And on the PDF route
+    (`parse_pdf_record`) — a verdict published before its referat, with no
+    innehåll — the patch targets the pdftohtml XML, so no record field is
+    reachable at all and a målnummer can only be redacted in the body. Those
+    documents would need both texts under one patch key, which one diff cannot
+    span.
+
+    The innehåll is split rather than left as one JSON string because the API
+    ships a tenth of its records with the whole decision on a single line (see
+    `lib.markup`); as a list of block elements each paragraph is its own line."""
     innehall = d.get("innehall")
-    if basefile is not None and innehall is not None:
-        innehall = patch.apply("dv", basefile, innehall)
-    body, footnotes = parse_body(innehall)
+    return json.dumps(
+        {**d, "innehall": markup.block_lines(innehall).split("\n") if innehall else innehall},
+        indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def record_from_intermediate(text):
+    """Inverse of `record_intermediate`: the patched intermediate back to the
+    record dict the rest of parse reads."""
+    d = json.loads(text)
+    if isinstance(d.get("innehall"), list):
+        d["innehall"] = "\n".join(d["innehall"])
+    return d
+
+
+def parse_api_record(d, basefile=None):
+    """API record dict -> Avgorande. When `basefile` is given, apply any curated
+    patch to the record (a correction, or an obfuscated redaction of a party)
+    before it is parsed — over the whole record, see `record_intermediate`.
+    Only a document that actually has a patch is round-tripped through that
+    form, so the common path stays untouched."""
+    if basefile is not None and patch.has_patch("dv", basefile):
+        d = record_from_intermediate(
+            patch.apply("dv", basefile, record_intermediate(d)))
+    body, footnotes = parse_body(d.get("innehall"))
     return _avgorande(d, body, footnotes)
 
 

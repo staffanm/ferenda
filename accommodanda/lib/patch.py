@@ -7,15 +7,19 @@ into the document model. Two uses, both carried over from the old pipeline:
     corrected once, by hand, so every re-parse produces the right document
     without re-editing.
   * *redaction* -- personal data that must not appear (a named party in a court
-    decision, a personnummer) is removed. Such a patch is stored
-    rot13-obfuscated so the removed text is not itself plain-text googleable in
-    the committed patch.
+    decision, a personnummer) is removed. Such a patch is stored *obfuscated*
+    so the removed text is not itself plain-text googleable in the committed
+    patch: letters rotate 13 and digits rotate 5 (ROT13 + ROT5, commonly
+    "ROT18"). Plain ROT13 is not enough here and was the original bug -- it
+    leaves every digit untouched, so a personnummer, an organisationsnummer or
+    a telephone number, which is exactly what these patches remove, sat in the
+    "obfuscated" file in the clear.
 
 A patch is an ordinary unified diff (``difflib`` / ``diff -u`` format) against
 the document's *best intermediate format* -- the representation the parser
 actually reads and that a human can meaningfully edit: plain text for SFS, the
 innehåll HTML for DV, the Formex XML for eurlex. It lives at
-``patches/<source>/<relpath>.patch`` (or ``.rot13.patch``), committed with the
+``patches/<source>/<relpath>.patch`` (or ``.rot18.patch``), committed with the
 pipeline code (``layout.patch``). A single-line description rides on the first
 hunk's ``@@`` header; a multi-line one goes in a sibling ``.desc`` file.
 
@@ -28,15 +32,31 @@ to produce the pristine intermediate text for the ``mkpatch`` CLI and the web
 editor.
 """
 
-import codecs
 import io
+import string
 from difflib import unified_diff
 
 from . import layout, util
 from .patchit import PatchConflictError, PatchSet, PatchSyntaxError
 
 PLAIN_SUFFIX = ".patch"
-ROT13_SUFFIX = ".rot13.patch"
+ROT18_SUFFIX = ".rot18.patch"
+
+# ROT13 over the letters, ROT5 over the digits. Both halves are involutions --
+# applying the table twice is the identity -- so one function both obfuscates
+# and reads back, the way `codecs.decode(..., "rot13")` did before it.
+_ROT18 = str.maketrans(
+    string.ascii_lowercase + string.ascii_uppercase + string.digits,
+    string.ascii_lowercase[13:] + string.ascii_lowercase[:13]
+    + string.ascii_uppercase[13:] + string.ascii_uppercase[:13]
+    + string.digits[5:] + string.digits[:5])
+
+
+def obfuscate(text):
+    """A redaction patch's stored form, and its own inverse. Deliberately not
+    encryption: the point is only that the removed personal data is not
+    plain-text searchable in the committed tree."""
+    return text.translate(_ROT18)
 
 
 class PatchError(Exception):
@@ -50,12 +70,13 @@ class PatchError(Exception):
 # --------------------------------------------------------------------------
 
 def find_patch(source, basefile):
-    """The patch file for a document and whether it is rot13-obfuscated:
-    ``(path, is_rot13)``, or ``(None, False)`` if none exists. The rot13 variant
-    wins over a plain one (a redaction supersedes -- you would not keep both)."""
-    rot13 = layout.patch(source, basefile, ROT13_SUFFIX)
-    if rot13.exists():
-        return rot13, True
+    """The patch file for a document and whether it is obfuscated:
+    ``(path, is_obfuscated)``, or ``(None, False)`` if none exists. The
+    obfuscated variant wins over a plain one (a redaction supersedes -- you
+    would not keep both)."""
+    obfuscated = layout.patch(source, basefile, ROT18_SUFFIX)
+    if obfuscated.exists():
+        return obfuscated, True
     plain = layout.patch(source, basefile, PLAIN_SUFFIX)
     if plain.exists():
         return plain, False
@@ -63,16 +84,14 @@ def find_patch(source, basefile):
 
 
 def has_patch(source, basefile):
-    """True iff a patch (plain or rot13) exists -- the cheap guard a parser uses
+    """True iff a patch (plain or obfuscated) exists -- the cheap guard a parser uses
     to keep the common no-patch path byte-identical."""
     return find_patch(source, basefile)[0] is not None
 
 
-def _read_patch_text(path, is_rot13):
+def _read_patch_text(path, is_obfuscated):
     text = path.read_text(encoding="utf-8")
-    if is_rot13:
-        text = codecs.decode(text, "rot13")
-    return text
+    return obfuscate(text) if is_obfuscated else text
 
 
 def _description(patchset, source, basefile):
@@ -86,13 +105,13 @@ def _description(patchset, source, basefile):
 
 
 def load_patchset(source, basefile):
-    """Parse a document's patch into a ``patchit.PatchSet`` (rot13-decoded if
+    """Parse a document's patch into a ``patchit.PatchSet`` (de-obfuscated if
     needed), returning ``(patchset, description)`` -- or ``(None, None)`` if
     there is no patch. Raises `PatchError` on a malformed patch."""
-    path, is_rot13 = find_patch(source, basefile)
+    path, is_obfuscated = find_patch(source, basefile)
     if path is None:
         return None, None
-    text = _read_patch_text(path, is_rot13)
+    text = _read_patch_text(path, is_obfuscated)
     try:
         ps = PatchSet.from_stream(io.StringIO(text))
     except PatchSyntaxError as e:
@@ -132,6 +151,39 @@ def apply(source, basefile, text):
     return patch_if_needed(source, basefile, text)[0]
 
 
+def apply_if_fits(source, basefile, text):
+    """`apply` for a *historical revision* of a document -- an archived SFS
+    consolidation, where the same patch is offered to every superseded wording
+    of the same statute. For a **correction** a conflict is the normal case,
+    not a broken patch: an OCR slip or a lost blank line entered the source at
+    some amendment and was corrected at another, so the patch fits the
+    revisions in between and no others. Those revisions are published
+    unpatched -- an uncorrected lydelse is still a true lydelse.
+
+    A **redaction** is never skipped. Republishing the personal data a patch
+    exists to remove, because a diff did not line up against an older wording,
+    is precisely the harm; a conflict there stays fatal, and the versions
+    stage records it as a skipped version rather than publishing one
+    (`sfs.versions.build`). Which of the two a patch is, is exactly what
+    `find_patch` already reports.
+
+    Deliberately *not* the default: for the document a patch was authored
+    against, a conflict always means the source drifted out from under it
+    (`patch_if_needed`)."""
+    path, is_obfuscated = find_patch(source, basefile)
+    if path is None:
+        return text
+    if is_obfuscated:
+        return apply(source, basefile, text)
+    ps, _desc = load_patchset(source, basefile)
+    lines = text.split("\n")
+    try:
+        ps.patches[0].adjust(lines)
+        return "\n".join(ps.patches[0].merge(lines))
+    except PatchConflictError:
+        return text
+
+
 # --------------------------------------------------------------------------
 # create (the mkpatch CLI + the web editor)
 # --------------------------------------------------------------------------
@@ -163,23 +215,25 @@ def make_patch_text(original, edited, description=""):
     return "".join(diff)
 
 
-def create_patch(source, basefile, original, edited, description="", rot13=False):
+def create_patch(source, basefile, original, edited, description="",
+                 obfuscated=False):
     """Write the minimal patch turning `original` into `edited` to its canonical
     location and return that ``Path`` -- or ``None`` if there was no difference
-    (in which case any existing patch for the document is removed). A `rot13`
-    patch is stored obfuscated (redactions); a multi-line `description` goes to a
-    sibling ``.desc`` file. Exactly one variant is kept, so `find_patch` is
-    unambiguous."""
+    (in which case any existing patch for the document is removed). An
+    `obfuscated` patch is stored ROT18-encoded (redactions); a multi-line
+    `description` goes to a sibling ``.desc`` file. Exactly one variant is kept,
+    so `find_patch` is unambiguous."""
     content = make_patch_text(original, edited, description)
     if not content:
         _remove_patch(source, basefile)
         return None
-    suffix = ROT13_SUFFIX if rot13 else PLAIN_SUFFIX
+    suffix = ROT18_SUFFIX if obfuscated else PLAIN_SUFFIX
     path = layout.patch(source, basefile, suffix)
-    other = layout.patch(source, basefile, PLAIN_SUFFIX if rot13 else ROT13_SUFFIX)
+    other = layout.patch(source, basefile,
+                         PLAIN_SUFFIX if obfuscated else ROT18_SUFFIX)
     if other.exists():
         other.unlink()
-    util.write_atomic(path, codecs.encode(content, "rot13") if rot13 else content)
+    util.write_atomic(path, obfuscate(content) if obfuscated else content)
     descpath = layout.patch(source, basefile, ".desc")
     if description and "\n" in description:
         util.write_atomic(descpath, description)
@@ -189,10 +243,10 @@ def create_patch(source, basefile, original, edited, description="", rot13=False
 
 
 def _remove_patch(source, basefile):
-    """Delete any patch (plain, rot13 and the ``.desc`` sidecar) for a document;
-    return the list of paths removed."""
+    """Delete any patch (plain, obfuscated and the ``.desc`` sidecar) for a
+    document; return the list of paths removed."""
     removed = []
-    for suffix in (PLAIN_SUFFIX, ROT13_SUFFIX, ".desc"):
+    for suffix in (PLAIN_SUFFIX, ROT18_SUFFIX, ".desc"):
         path = layout.patch(source, basefile, suffix)
         if path.exists():
             path.unlink()

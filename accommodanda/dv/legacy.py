@@ -34,7 +34,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 
-from ..lib import layout, util
+from ..lib import layout, patch, util
 from ..lib import poi as word
 from .identity import NOTIS_SERIES, canonical_court
 from .model import Avgorande, Hanvisning, Lagrum, Rubrik, Stycke
@@ -134,13 +134,19 @@ def _first(head, key):
 def parse_legacy_file(path, case=None):
     """A legacy file (Word referat or notis intermediate XML) -> Avgorande.
     `case` is the identity-index entry, used for canonical
-    referat/court/målnummer when present."""
+    referat/court/målnummer when present -- and, for a notis, as the patch key."""
     path = Path(path).resolve()
     # store-relative provenance for store files; the CLI also takes strays
     source = (util.store_relpath(path, layout.DATA)
               if path.is_relative_to(layout.DATA) else str(path))
     if path.suffix.lower() == ".xml":
-        return parse_notis(path.read_text(), path.parent.name, path.name,
+        # a notis's frozen intermediate XML is its patchable format -- plain
+        # `<para>`-per-line text, unlike the Word referat beside it, which is
+        # read through POI and has no editable text form to diff against
+        text = path.read_text()
+        if case:
+            text = patch.apply("dv", case["canonical_id"], text)
+        return parse_notis(text, path.parent.name, path.name,
                            case, sources=[source])
     head, body = parse_head_body(word.read(path))
     return build_avgorande(head, body, case, sources=[source])

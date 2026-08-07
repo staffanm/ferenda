@@ -3,22 +3,26 @@ intermediate hooks that apply patches at parse time (sfs plain text, dv innehål
 HTML, eurlex Formex XML), the `mkpatch`/`patch-show` CLI verbs, and the
 authenticated web editor (`api/patch.py`)."""
 
-import pathlib
 import dataclasses
+import json
+import pathlib
 import subprocess
 from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
+from lxml import etree
 
 import accommodanda.sfs as sfs
 from accommodanda import build, config, patchsource
 from accommodanda.api import app as api
 from accommodanda.api import auth
 from accommodanda.api import patch as patch_api
+from accommodanda.dv import legacy as dv_legacy
 from accommodanda.dv import parse as dv_parse
 from accommodanda.eurlex import parse as eurlex_parse
-from accommodanda.lib import layout, patch, pdftext
+from accommodanda.lib import layout, markup, patch, pdftext
+from accommodanda.lib.errors import SkipDocument
 
 ORIG = "line one\nSECRET NAME\nline three\nline four\n"
 EDITED = "line one\n[redacted]\nline three\nline four\n"
@@ -67,10 +71,10 @@ def test_minimal_diff(patches):
     assert "line four" not in body.replace(" line four", "")  # only as context, once
 
 
-def test_rot13_is_obfuscated_but_roundtrips(patches):
+def test_obfuscated_patch_hides_its_content_and_roundtrips(patches):
     p = patch.create_patch("dv", "NJA 2001 s 1", ORIG, EDITED,
-                           description="Redact", rot13=True)
-    assert p.name.endswith(".rot13.patch")
+                           description="Redact", obfuscated=True)
+    assert p.name.endswith(".rot18.patch")
     raw = p.read_text()
     assert "SECRET NAME" not in raw and "[redacted]" not in raw   # not googleable
     assert patch.find_patch("dv", "NJA 2001 s 1") == (p, True)
@@ -78,10 +82,23 @@ def test_rot13_is_obfuscated_but_roundtrips(patches):
     assert out == EDITED and desc == "Redact"
 
 
-def test_rot13_supersedes_plain(patches):
+def test_obfuscation_covers_digits(patches):
+    # the bug this guards: plain ROT13 rotates letters only, so a personnummer,
+    # an organisationsnummer or a telephone number -- all digits, and most of
+    # what a redaction patch removes -- sat in the "obfuscated" file in the clear
+    text = "Personnummer 820310-5542 och telefon 070-123 45 67\n"
+    patch.create_patch("dv", "NJA 2001 s 1", text,
+                       text.replace("820310-5542", "[borttaget]"), obfuscated=True)
+    raw = patch.find_patch("dv", "NJA 2001 s 1")[0].read_text()
+    assert "820310-5542" not in raw
+    assert "070-123 45 67" not in raw
+    assert patch.obfuscate(patch.obfuscate(text)) == text     # an involution
+
+
+def test_obfuscated_supersedes_plain(patches):
     patch.create_patch("sfs", "1999:175", ORIG, EDITED)
-    patch.create_patch("sfs", "1999:175", ORIG, EDITED, rot13=True)
-    # exactly one variant kept; the rot13 one wins
+    patch.create_patch("sfs", "1999:175", ORIG, EDITED, obfuscated=True)
+    # exactly one variant kept; the obfuscated one wins
     assert not layout.patch("sfs", "1999:175", ".patch").exists()
     assert patch.find_patch("sfs", "1999:175")[1] is True
 
@@ -125,6 +142,168 @@ def test_context_drift_is_tolerated(patches):
     assert out == "new preamble line\n" + EDITED
 
 
+def test_apply_if_fits_skips_a_correction_that_conflicts(patches):
+    # a historical revision the correction predates is published unpatched --
+    # an uncorrected lydelse is still a true lydelse
+    patch.create_patch("sfs", "1999:175", ORIG, EDITED)
+    other = "completely\ndifferent\nsource\n"
+    assert patch.apply_if_fits("sfs", "1999:175", other) == other
+    assert patch.apply_if_fits("sfs", "1999:175", ORIG) == EDITED
+
+
+def test_apply_if_fits_never_skips_a_redaction(patches):
+    # republishing the personal data the patch exists to remove, because the
+    # diff did not line up against an older wording, is the harm itself
+    patch.create_patch("sfs", "1999:175", ORIG, EDITED, obfuscated=True)
+    with pytest.raises(patch.PatchError):
+        patch.apply_if_fits("sfs", "1999:175", "completely\ndifferent\nsource\n")
+    assert patch.apply_if_fits("sfs", "1999:175", ORIG) == EDITED
+
+
+def test_apply_if_fits_without_a_patch(patches):
+    assert patch.apply_if_fits("sfs", "1999:175", ORIG) == ORIG
+
+
+# --------------------------------------------------------------------------
+# markup normalisation -- what makes a single-line source diffable at all
+# --------------------------------------------------------------------------
+
+def test_block_lines_breaks_only_between_blocks():
+    one_line = "<div><p>first para</p><p>second <em>emphasised</em> para</p></div>"
+    assert markup.block_lines(one_line).split("\n") == [
+        "<div>", "<p>first para</p>", "<p>second <em>emphasised</em> para</p>", "</div>"]
+
+
+def test_block_lines_leaves_a_block_body_alone():
+    # `<br>` is dv's only in-paragraph newline, and a second one would show up
+    # as an empty line in the stycke -- so nothing inside a block may be split
+    assert markup.block_lines("<p>a<br>b</p>") == "<p>a<br>b</p>"
+
+
+def test_block_lines_is_idempotent():
+    once = markup.block_lines("<p>a</p><p>b</p>")
+    assert markup.block_lines(once) == once
+
+
+def test_indent_xml_keeps_element_text_on_one_line():
+    root = etree.fromstring(b"<DOC><TI>Title</TI><P>Some <HT>mixed</HT> text.</P></DOC>")
+    assert markup.indent_xml(root).split("\n") == [
+        "<DOC>", "  <TI>Title</TI>", "  <P>Some <HT>mixed</HT> text.</P>", "</DOC>"]
+
+
+def test_dv_intermediate_is_the_whole_record_one_block_per_line(patches,
+                                                                monkeypatch, tmp_path):
+    record = tmp_path / "case.json"
+    record.write_text('{"malNummerLista": ["B 1-11"], "innehall": "<p>one</p><p>two</p>"}',
+                      encoding="utf-8")
+    monkeypatch.setattr(build, "dv_record", lambda bf: record)
+    text, _label = patchsource.intermediate("dv", "NJA 2001 s 1")
+    # the record's own JSON, so the structured metadata is patchable too, with
+    # the innehåll as one block element per line
+    assert json.loads(text) == {"malNummerLista": ["B 1-11"],
+                                "innehall": ["<p>one</p>", "<p>two</p>"]}
+
+
+def test_dv_notis_intermediate_and_patch(patches, monkeypatch, tmp_path):
+    # a legacy-only notisfall is patched through its frozen intermediate XML --
+    # plain `<para>`-per-line text, so no normalisation applies
+    xml = ("<body>\n<para>R4 M:REGR Unr:g Lnr:RÅ 1996 not 1</para>\n"
+           "<para>Lagrum:</para>\n<para>37 c § SECRET (1971:291)</para>\n</body>\n")
+    # parse_notis reads the series off the parent directory name
+    (tmp_path / "REG").mkdir()
+    record = tmp_path / "REG" / "1996_not_1.xml"
+    record.write_text(xml, encoding="utf-8")
+    monkeypatch.setattr(build, "dv_record", lambda bf: record)
+    assert patchsource.intermediate("dv", "RÅ 1996 not 1")[0] == xml
+
+    patch.create_patch("dv", "RÅ 1996 not 1", xml, xml.replace("SECRET", "[X]"),
+                       obfuscated=True)
+    case = {"canonical_id": "RÅ 1996 not 1", "courts": ["REGR"],
+            "malnummer": [], "referat": ["RÅ 1996 not 1"]}
+    av = dv_legacy.parse_legacy_file(record, case)
+    joined = " ".join(_all_text(av, []))
+    assert "[X]" in joined and "SECRET" not in joined
+
+
+def test_dv_word_referat_has_no_patchable_intermediate(patches, monkeypatch,
+                                                       tmp_path):
+    # read through POI, so there is no editable text form to diff against
+    doc = tmp_path / "T 1-99.doc"
+    doc.write_bytes(b"\xd0\xcf\x11\xe0")
+    monkeypatch.setattr(build, "dv_record", lambda bf: doc)
+    with pytest.raises(SkipDocument):
+        patchsource.intermediate("dv", "NJA 1999 s. 1")
+
+
+def test_dv_intermediate_without_innehall_or_pdf(patches, monkeypatch, tmp_path):
+    # ~290 dv cases carry neither; parse tolerates them, so this must skip
+    # cleanly rather than crash the editor on a None path
+    record = tmp_path / "case.json"
+    record.write_text('{"malNummerLista": ["B 1-11"]}', encoding="utf-8")
+    monkeypatch.setattr(build, "dv_record", lambda bf: record)
+    monkeypatch.setattr(build, "dv_verdict_pdf", lambda bf, rec: None)
+    with pytest.raises(SkipDocument):
+        patchsource.intermediate("dv", "MDO 2002-7")
+
+
+def test_dv_record_intermediate_roundtrips():
+    record = {"malNummerLista": ["B 1-11"], "avgorandedatum": "2011-01-01",
+              "innehall": "<p>one</p><p>two</p>"}
+    back = dv_parse.record_from_intermediate(dv_parse.record_intermediate(record))
+    # every field survives; the innehåll comes back one block per line, which is
+    # what parse reads, so a second round trip is the identity
+    assert back == {**record, "innehall": "<p>one</p>\n<p>two</p>"}
+    assert dv_parse.record_from_intermediate(dv_parse.record_intermediate(back)) == back
+
+
+def test_dv_hook_normalises_before_patching(patches):
+    # the API ships a tenth of its records as one line; a patch is authored
+    # against the normalised record, so parse must normalise identically
+    record = {"domstol": {"domstolKod": "HD", "domstolNamn": "Högsta domstolen"},
+              "innehall": "<p>Käranden AA yrkade.</p><p>Svaranden bestred.</p>"}
+    text = dv_parse.record_intermediate(record)
+    patch.create_patch("dv", "NJA 2001 s 1", text,
+                       text.replace("AA", "[part]"), obfuscated=True)
+    joined = " ".join(_all_text(dv_parse.parse_api_record(record, "NJA 2001 s 1").body, []))
+    assert "[part]" in joined and "AA" not in joined
+
+
+def test_dv_pdf_record_applies_patch(patches, monkeypatch):
+    # a verdict published before its referat has no innehåll at all -- its body
+    # comes from the court's own PDF, so the patch hook there is the PDF one
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<pdf2xml>\n'
+           '<page number="1">\n<text top="1" left="1" height="10">Namn SECRET</text>\n'
+           "</page>\n</pdf2xml>\n")
+
+    def run(cmd, *a, **k):
+        pathlib.Path(cmd[-1] + ".xml").write_bytes(xml.encode("utf-8"))
+        return SimpleNamespace(stdout=xml.encode("utf-8"))
+
+    monkeypatch.setattr(pdftext.subprocess, "run", run)
+    monkeypatch.setattr(dv_parse, "_paragraph_numbers", lambda path: {})
+    record = {"domstol": {"domstolKod": "HD", "domstolNamn": "Högsta domstolen"}}
+    patch.create_patch("dv", "HD B 1-25", xml, xml.replace("SECRET", "[X]"),
+                       obfuscated=True)
+    av = dv_parse.parse_pdf_record(record, "x.pdf", "HD B 1-25")
+    joined = " ".join(_all_text(av.body, []))
+    assert "[X]" in joined and "SECRET" not in joined
+
+
+def test_dv_patch_reaches_structured_metadata(patches):
+    # a målnummer the court published in the clear is in `malNummerLista` as
+    # well as the running text; redacting one and not the other leaves the
+    # redacted party able to find their own case by the number
+    record = {"domstol": {"domstolKod": "HFD", "domstolNamn": "HFD"},
+              "malNummerLista": ["4337-12"],
+              "innehall": "<p>Mål nr 4337-12, föredragande Axelsson</p>"}
+    text = dv_parse.record_intermediate(record)
+    patch.create_patch("dv", "HFD 2013 ref. 47", text,
+                       text.replace("4337-12", "0000-12"), obfuscated=True)
+    av = dv_parse.parse_api_record(record, "HFD 2013 ref. 47")
+    assert av.malnummer == ["0000-12"]
+    assert "4337-12" not in " ".join(_all_text(av.body, []))
+
+
 # --------------------------------------------------------------------------
 # per-source parse hooks (the "best intermediate format" per source)
 # --------------------------------------------------------------------------
@@ -139,11 +318,12 @@ def test_sfs_hook_applies_patch_to_plain_text(patches):
     assert not any("SECRET" in t for t in body)
 
 
-def test_dv_hook_applies_patch_to_innehall_html(patches):
+def test_dv_hook_applies_patch_to_the_record(patches):
     record = {"domstol": {"domstolKod": "HD", "domstolNamn": "Högsta domstolen"},
               "innehall": "<p>Käranden AA yrkade.</p>"}
-    patch.create_patch("dv", "NJA 2001 s 1", record["innehall"],
-                       record["innehall"].replace("AA", "[part]"), rot13=True)
+    text = dv_parse.record_intermediate(record)
+    patch.create_patch("dv", "NJA 2001 s 1", text,
+                       text.replace("AA", "[part]"), obfuscated=True)
     av = dv_parse.parse_api_record(record, "NJA 2001 s 1")
     joined = " ".join(_all_text(av.body, []))
     assert "[part]" in joined and "AA" not in joined
@@ -163,7 +343,11 @@ def test_eurlex_hook_applies_patch_to_formex(patches, tmp_path):
            "<DOC>\n<P>Article one SECRET.</P>\n</DOC>\n")
     src = tmp_path / "swe.fmx4"
     src.write_text(xml, encoding="utf-8")
-    patch.create_patch("eurlex", "32016R0679", xml, xml.replace("SECRET", "REDACTED"))
+    # a Formex patch targets the *normalised* XML (one element per line) --
+    # the same text `patchsource.intermediate` hands the editor
+    normalised = eurlex_parse.formex_intermediate(xml.encode("utf-8"))
+    patch.create_patch("eurlex", "32016R0679", normalised,
+                       normalised.replace("SECRET", "REDACTED"))
     roots = eurlex_parse._formex_roots(src, "32016R0679")
     assert roots[0].findtext("P") == "Article one REDACTED."
 
@@ -244,7 +428,7 @@ def test_cli_mkpatch_and_show(patches, monkeypatch, tmp_path, capsys):
                         lambda s, bf: (patch.patch_if_needed(s, bf, ORIG)[0], "plain text"))
     edited = tmp_path / "edited.txt"
     edited.write_text(EDITED)
-    monkeypatch.setattr(build.RUN, "rot13", False)
+    monkeypatch.setattr(build.RUN, "obfuscated", False)
     monkeypatch.setattr(build.RUN, "dry_run", False)
 
     args = SimpleNamespace(source="sfs", basefiles=["1999:175", str(edited), "OCR fix"])
@@ -257,15 +441,15 @@ def test_cli_mkpatch_and_show(patches, monkeypatch, tmp_path, capsys):
     assert "[redacted]" in capsys.readouterr().out
 
 
-def test_cli_mkpatch_rot13_flag(patches, monkeypatch, tmp_path):
+def test_cli_mkpatch_obfuscated_flag(patches, monkeypatch, tmp_path):
     monkeypatch.setattr(patchsource, "intermediate", lambda s, bf: (ORIG, "plain text"))
-    monkeypatch.setattr(build.RUN, "rot13", True)
+    monkeypatch.setattr(build.RUN, "obfuscated", True)
     monkeypatch.setattr(build.RUN, "dry_run", False)
     edited = tmp_path / "e.txt"
     edited.write_text(EDITED)
     build.cmd_mkpatch(SimpleNamespace(source="sfs", basefiles=["1999:175", str(edited)]),
                       _Parser())
-    assert patch.find_patch("sfs", "1999:175")[1] is True   # stored rot13
+    assert patch.find_patch("sfs", "1999:175")[1] is True   # stored obfuscated
 
 
 def test_cli_mkpatch_rejects_unpatchable_source(patches):
@@ -339,7 +523,7 @@ def test_web_save_commits_and_reparses(webenv):
                      params={"source": "sfs", "basefile": "1999:175"}).json()["base_sha"]
     r = c.post("/api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
-        "description": "Rättad OCR", "rot13": False, "base_sha": base_sha})
+        "description": "Rättad OCR", "obfuscated": False, "base_sha": base_sha})
     assert r.status_code == 200
     assert r.json()["path"] == "patches/sfs/1999/175.patch"
     assert patch.patch_if_needed("sfs", "1999:175", ORIG) == (EDITED, "Rättad OCR")
@@ -347,15 +531,15 @@ def test_web_save_commits_and_reparses(webenv):
     assert _git(repo, "log", "-1", "--format=%an|%ae") == "Anna Ek|anna@example.org"
 
 
-def test_web_save_rot13(webenv):
+def test_web_save_obfuscated(webenv):
     c = TestClient(api.app)
     _login(c)
     base_sha = c.get("/api/v1/patch/document",
                      params={"source": "sfs", "basefile": "1999:175"}).json()["base_sha"]
     r = c.post("/api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
-        "description": "", "rot13": True, "base_sha": base_sha})
-    assert r.status_code == 200 and r.json()["path"].endswith(".rot13.patch")
+        "description": "", "obfuscated": True, "base_sha": base_sha})
+    assert r.status_code == 200 and r.json()["path"].endswith(".rot18.patch")
     assert patch.find_patch("sfs", "1999:175")[1] is True
 
 
@@ -364,7 +548,7 @@ def test_web_save_stale_source_409(webenv):
     _login(c)
     r = c.post("/api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
-        "description": "", "rot13": False, "base_sha": "stale-sha"})
+        "description": "", "obfuscated": False, "base_sha": "stale-sha"})
     assert r.status_code == 409
 
 
@@ -376,11 +560,11 @@ def test_web_save_noop_removes(webenv):
                 params={"source": "sfs", "basefile": "1999:175"}).json()
     c.post("/api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
-        "description": "", "rot13": False, "base_sha": doc["base_sha"]})
+        "description": "", "obfuscated": False, "base_sha": doc["base_sha"]})
     # editing back to the pristine text removes the patch
     r = c.post("/api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": ORIG,
-        "description": "", "rot13": False, "base_sha": doc["base_sha"]})
+        "description": "", "obfuscated": False, "base_sha": doc["base_sha"]})
     assert r.json()["removed"] is True
     assert not patch.has_patch("sfs", "1999:175")
 

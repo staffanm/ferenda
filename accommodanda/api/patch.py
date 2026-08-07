@@ -1,6 +1,6 @@
 """The patch-file editor -- the write surface for authoring controlled fixes to a
 document's *source material*: a correction of a real error in the downloaded
-source, or a rot13 redaction of personal data. (The commentary/concept editor
+source, or an obfuscated redaction of personal data. (The commentary/concept editor
 next door, `edit.py`, edits editorial markdown; this edits the source the parser
 reads.)
 
@@ -78,7 +78,7 @@ class PatchView(BaseModel):
     format: str
     text: str                 # current: pristine with any existing patch applied
     has_patch: bool
-    is_rot13: bool
+    is_obfuscated: bool
     description: str | None
     base_sha: str             # fingerprint of the pristine text (concurrency guard)
 
@@ -88,7 +88,7 @@ class SaveBody(BaseModel):
     basefile: str
     edited_text: str
     description: str = ""
-    rot13: bool = False
+    obfuscated: bool = False
     base_sha: str
 
 
@@ -97,10 +97,10 @@ def get_document(source: str = Query(...), basefile: str = Query(...),
                  editor: Editor = Depends(require_editor)):
     """A document's intermediate source text to edit, patch already applied."""
     pristine, current, label = _load(source, basefile)
-    path, is_rot13 = patchlib.find_patch(source, basefile)
+    path, is_obfuscated = patchlib.find_patch(source, basefile)
     desc = patchlib.load_patchset(source, basefile)[1] if path else None
     return PatchView(source=source, basefile=basefile, format=label, text=current,
-                     has_patch=path is not None, is_rot13=is_rot13,
+                     has_patch=path is not None, is_obfuscated=is_obfuscated,
                      description=desc, base_sha=_sha(pristine))
 
 
@@ -118,22 +118,22 @@ def save(body: SaveBody, editor: Editor = Depends(require_editor)):
         raise HTTPException(409, "the source changed since you loaded it; reload")
     path = patchlib.create_patch(body.source, body.basefile, pristine,
                                  body.edited_text, description=body.description,
-                                 rot13=body.rot13)
+                                 obfuscated=body.obfuscated)
     removed = path is None
     sha = _commit(body.source, body.basefile, editor, removed=removed,
-                  rot13=body.rot13)
+                  obfuscated=body.obfuscated)
     _reparse(body.source, body.basefile)
     return {"removed": removed, "sha": sha,
             "path": None if removed else str(path.relative_to(config.REPO))}
 
 
-def _commit(source, basefile, editor, removed, rot13):
+def _commit(source, basefile, editor, removed, obfuscated):
     """Stage a document's patch files and commit them to the code repo as the
     logged-in editor (git identity = their name/email, exactly as a hand commit
     would attribute it). Returns the commit sha, or HEAD when nothing changed."""
     repo = config.REPO
     rels = [str(layout.patch(source, basefile, sfx).relative_to(repo))
-            for sfx in (patchlib.PLAIN_SUFFIX, patchlib.ROT13_SUFFIX, ".desc")]
+            for sfx in (patchlib.PLAIN_SUFFIX, patchlib.ROT18_SUFFIX, ".desc")]
     # stage only the variants that exist on disk (a write) or are tracked (a
     # deletion) -- a pathspec matching neither aborts `git add` with a fatal
     tracked = set(git.run(repo, "ls-files", "-z", "--", *rels, capture=True).split("\0"))
@@ -143,7 +143,7 @@ def _commit(source, basefile, editor, removed, rot13):
     git.run(repo, "add", "-A", "--", *paths)
     if not git.run(repo, "status", "--porcelain", "--", *paths, capture=True):
         return git.run(repo, "rev-parse", "HEAD", capture=True)
-    verb = "Remove patch for" if removed else ("Redact" if rot13 else "Patch")
+    verb = "Remove patch for" if removed else ("Redact" if obfuscated else "Patch")
     env = {**os.environ,
            "GIT_AUTHOR_NAME": editor.name, "GIT_AUTHOR_EMAIL": editor.email,
            "GIT_COMMITTER_NAME": editor.name, "GIT_COMMITTER_EMAIL": editor.email}
