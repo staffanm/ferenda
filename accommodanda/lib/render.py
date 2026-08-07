@@ -34,6 +34,8 @@ from . import (
     datasets,
     facets,
     feeds,
+    inbound,
+    util,
 )
 from .page import Site, doc_relpath, href, page, page_context, site_cross_digests
 from .tpl import ENV
@@ -675,7 +677,7 @@ _RENDER: dict = {}
 def _render_init(catalog_path, out_root, renderers):
     con = catalog.connect(catalog_path)
     _RENDER.update(con=con, site=Site.from_catalog(con), out_root=Path(out_root),
-                   renderers=renderers)
+                   renderers=renderers, data_root=catalog.data_root(con))
 
 
 def _write_page(uri, source, path, title, site, out_root, renderers):
@@ -697,11 +699,98 @@ def _write_page(uri, source, path, title, site, out_root, renderers):
     return True
 
 
+def _write_inbound(con, data_root, uri):
+    """Write this document's inbound-citation file beside its page (lib.inbound).
+
+    Here, and not in a pass of its own, because generate is where the work is
+    already free: the page in front of us is being rendered precisely because its
+    citation relationships changed, and `catalog.DEP_INBOUND_COLUMNS` -- what its
+    dependency digest covers -- is every column this file carries. A separate
+    sweep would have to re-derive that, and a full one costs a corpus-wide pass
+    over the 13.2M-row links table.
+    """
+    inbound.write(data_root, uri, inbound.citations(con, uri))
+
+
+def _sync_inbound_tree(con, data_root, verbose):
+    """Bring the whole inbound tree in line with the catalog. A full run only.
+
+    Two things the per-page write above cannot do, because both are statements
+    about documents it is never handed. (Counts measured 2026-08-07; the corpus
+    grows nightly, so retest before reasoning from one.)
+
+    **The corpus' gaps.** 756 105 citations -- 6.9% of the links -- land on one
+    of 92 219 uris with no `documents` row, headed by PUL (1998:204) with 68 736
+    of them. They get no page, so nothing renders them, and "who cites PUL" would
+    go from an answer to silence. These are exactly the gaps
+    `catalog.dangling_targets` exists to name. Re-derived whole each run: a
+    dangling target has no page whose freshness could stand in for it.
+
+    **Reaping.** `inbound.write` removes a file whose citations are gone, but
+    only for a document something still renders. A document dropped from the
+    corpus, or an uncatalogued target that stops being cited -- which is what
+    *fixing* the citation extraction does to the mis-slugged begrepp uris -- is
+    never visited again, and its file would serve the previous build's answer
+    forever. A derived tree is only as trustworthy as its deletions, so the
+    sweep is what earns `inbound.read`'s "absent means uncited".
+
+    The pass costs ~35 s and ~39 MB over the whole corpus.
+    """
+    # every uri that should have a file: the catalogued documents (whose files
+    # the page renders wrote, this run or a previous one) and the dangling
+    # targets (written here). Catalogued first, and by path -- a dangling uri
+    # whose slug collides with a catalogued one must not overwrite the real
+    # document's file, the same collision `generate_site` warns about below.
+    expected = {str(inbound.path(data_root, uri)) for (uri,) in
+                con.execute("SELECT uri FROM documents")}
+
+    targets = catalog.dangling_targets(con, catalog.BASE)
+    # A `to_root` is a document uri by definition, and 24 of them are not:
+    # `set_genomforande` writes `to_uri = directive + "#" + article`, and where
+    # the recorded directive already carries an article fragment the split
+    # leaves the fragment in the root (202 link rows, all uncatalogued). That is
+    # a defect in the genomförande extraction, upstream of anything here; skip
+    # them and say so rather than dying on a full build over 92 000 targets.
+    malformed = [uri for (uri, _l, _c) in targets if "#" in uri]
+    targets = [row[0] for row in targets if "#" not in row[0]]
+    documents, written = len(expected), 0
+    for i, uri in enumerate(targets):
+        path = str(inbound.path(data_root, uri))
+        if path not in expected:                 # never clobber a real document's
+            expected.add(path)
+            written += 1
+            inbound.write(data_root, uri, inbound.citations(con, uri))
+        if verbose and i % 500 == 0:
+            util.status(i, len(targets), "inbound  uncatalogued targets")
+    if verbose:
+        util.status(len(targets), len(targets), "inbound  uncatalogued targets")
+        sys.stderr.write("\n")
+
+    reaped = 0
+    expected.add(str(Path(data_root) / inbound.TREE / inbound.BUILT))
+    for path in (Path(data_root) / inbound.TREE).rglob("*"):
+        if path.is_file() and str(compress.logical(path)) not in expected:
+            path.unlink()
+            reaped += 1
+    # last, so the marker means "the sweep above finished" and nothing else
+    inbound.mark_built(data_root, documents, written)
+    if verbose and reaped:
+        sys.stderr.write("inbound: reaped %d file(s) for documents the corpus no "
+                         "longer holds or no longer cites\n" % reaped)
+    if malformed:
+        sys.stderr.write(
+            "warning: %d citation target(s) carry a fragment in their document "
+            "uri and were skipped -- a genomförande row whose directive uri is "
+            "already pinpointed (e.g. %s)\n" % (len(malformed), malformed[0]))
+
+
 def _render_one(job):
     """ProcessPool entry point: render `job` (uri, source, path, title) against
     this worker's prebuilt Site, returning (uri, written)."""
     written = _write_page(*job, _RENDER["site"], _RENDER["out_root"],  # ty: ignore[too-many-positional-arguments]  # job is a 4-tuple; ty cannot see arity through *
                           _RENDER["renderers"])
+    if written:
+        _write_inbound(_RENDER["con"], _RENDER["data_root"], job[0])
     return job[0], written
 
 
@@ -726,7 +815,11 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     path, title) page rows that have no catalog row (the sfs historical
     consolidations). `jobs>1` renders the stale pages across a process pool.
     Returns (total_pages, rendered) -- rendered < total when pages were
-    skipped."""
+    skipped.
+
+    Every page rendered also (re)writes its inbound-citation file under data_root
+    (`_write_inbound`), so the two stay in step: the same staleness that
+    re-renders a page is what makes its citation set stale."""
     out_root = Path(out_root)
     con = catalog.connect(catalog_path)
     rows = con.execute(
@@ -843,6 +936,8 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
         for (uri, src, path, title, dep, chash) in plan:
             written = _write_page(uri, src, path, title, site, out_root,
                                   renderers)
+            if written:
+                _write_inbound(con, root, uri)
             finish(uri, path, dep, chash, written)
 
     if skipped:
@@ -865,6 +960,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
             sys.stderr.write("  ... and %d more\n" % (len(collisions) - 20))
 
     if only is None and source is None:          # corpus-wide pages on a full run
+        _sync_inbound_tree(con, root, progress is not None)
         render_aggregates(con, out_root, write_index=write_index)
     if progress:
         progress(total, total, "", rendered)

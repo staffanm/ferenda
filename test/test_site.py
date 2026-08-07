@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from accommodanda import browse, build
-from accommodanda.lib import catalog, compress, page, render
+from accommodanda.lib import catalog, compress, inbound, page, render
 from accommodanda.lib.eu_structure import Anchors, subarticle_key
 from accommodanda.lib.pinpoint import pinpoint_label
 from accommodanda.avg import render as avg_render
@@ -152,6 +152,40 @@ def test_scoped_dep_digests_match_batched(tmp_path):
     assert scoped == batched
 
 
+def test_dep_digest_moves_when_a_citer_repoints_within_the_same_document(tmp_path):
+    """A citing document re-parsed so that it points at a *different provision*
+    of the same law, from the same spot in its own text, must re-stale that law's
+    page.
+
+    This is what a lagrum-grammar fix does -- `6 §` read as `#P6` yesterday and
+    `#P6a` today -- and it moves the citation from one paragraf's margin to
+    another's, as well as changing the law's inbound file. The digest used to
+    hash only (from_uri, from_anchor, label, title, source), all of which are
+    unchanged here, so the page stayed "fresh" with the citation drawn in the
+    wrong margin."""
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    case = tmp_path / "case.json"
+
+    def cite(target):
+        case.write_text(json.dumps({**CASE, "structure": [
+            {"type": "stycke", "id": "domskal", "text": [
+                "Bolaget yrkade ränta enligt ",
+                {"predicate": "dcterms:references", "text": "6 § räntelagen",
+                 "uri": target}, "."]}]}))
+        catalog.rebuild(db, "sfs", [law])
+        catalog.rebuild(db, "dv", [case])
+        con = catalog.connect(db)
+        digest = catalog.page_dependency_digests(con)[LAW["uri"]]
+        assert catalog.page_dependency_digests_for(con, [LAW["uri"]]) == \
+            {LAW["uri"]: digest}                 # the two passes stay in step
+        con.close()
+        return digest
+
+    assert cite(LAW["uri"] + "#P6") != cite(LAW["uri"] + "#P6a")
+
+
 def test_relate_survives_artifact_path_move(tmp_path):
     # a document's identity is its uri, not its on-disk path: when an artifact
     # moves to a new path (a storage-layout change) but keeps its uri, relate must
@@ -235,6 +269,103 @@ def test_generate_drops_a_colliding_page_and_carries_on(tmp_path, capsys):
     warning = capsys.readouterr().err
     assert "output path collision" in warning
     assert "Första" in warning                 # names what to fold
+
+
+def test_generate_writes_each_rendered_page_its_inbound_file(tmp_path):
+    """The serving layer answers /document/inbound from these files, so generate
+    has to leave one beside every page it writes. Here rather than in a pass of
+    its own because the staleness signal is already computed: a page is rendered
+    precisely when its citation relationships changed."""
+    build_catalog(tmp_path).close()
+    render.generate_site(str(tmp_path / "catalog.sqlite"),
+                         str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+
+    rows = inbound.read(tmp_path, LAW["uri"])
+    assert [r["uri"] for r in rows] == [CASE["uri"]]
+    # the citation reached into the law, and the file is keyed on the law: the
+    # whole point of `to_root`
+    assert rows[0]["target"] == LAW["uri"] + "#P6"
+    # the law's own "enligt 5 §" is its outbound navigation, not inbound context
+    assert not any(r["uri"] == LAW["uri"] for r in rows)
+    # nothing cites the case, so it gets no file at all
+    assert not compress.exists(inbound.path(tmp_path, CASE["uri"]))
+
+
+def test_generate_covers_citation_targets_the_corpus_does_not_hold(tmp_path):
+    """756 105 citations -- 6.9% of the corpus' links -- land on one of 92 219
+    uris with no `documents` row, headed by PUL (1998:204) with 68 736 of them.
+    They get no page, so the per-render write never reaches them, and "who cites
+    PUL" would go from an answer to silence. A full run covers them; a scoped one
+    leaves them alone, like every other corpus-wide output."""
+    citing = tmp_path / "citing.json"
+    citing.write_text(json.dumps({
+        "uri": "https://lagen.nu/2018:218",
+        "metadata": {"properties": {"dcterms:title": "Dataskyddslag (2018:218)"}},
+        "structure": [{"type": "paragraf", "id": "P1", "children": [
+            {"type": "stycke", "id": "P1S1", "text": [
+                "Ersätter ",
+                {"predicate": "dcterms:references", "text": "9 § personuppgiftslagen",
+                 "uri": "https://lagen.nu/1998:204#P9"}, "."]}]}]}))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [citing])
+    gone = "https://lagen.nu/1998:204"
+
+    render.generate_site(db, str(tmp_path / "scoped"), build.SOURCE_RENDERERS,
+                         source="sfs")
+    assert inbound.read(tmp_path, gone) == []      # scoped: corpus-wide work skipped
+
+    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    rows = inbound.read(tmp_path, gone)
+    assert [(r["uri"], r["target"]) for r in rows] == \
+        [("https://lagen.nu/2018:218", gone + "#P9")]
+
+
+def test_generate_reaps_inbound_files_the_corpus_no_longer_accounts_for(tmp_path):
+    """A derived tree is only as trustworthy as its deletions. `inbound.write`
+    removes a file whose citations are gone, but only for a document something
+    still renders -- a document dropped from the corpus, or an uncatalogued
+    target that stops being cited (which is what *fixing* the citation extraction
+    does), is never visited again and would serve the previous build's answer
+    forever."""
+    build_catalog(tmp_path).close()
+    db = str(tmp_path / "catalog.sqlite")
+    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    assert compress.exists(inbound.path(tmp_path, LAW["uri"]))
+
+    orphan = "https://lagen.nu/1999:175"        # never in this catalog
+    inbound.write(tmp_path, orphan, inbound.read(tmp_path, LAW["uri"]))
+    assert compress.exists(inbound.path(tmp_path, orphan))
+
+    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    assert not compress.exists(inbound.path(tmp_path, orphan))
+    assert compress.exists(inbound.path(tmp_path, LAW["uri"]))   # the real one stays
+
+
+def test_generate_survives_a_citation_target_that_is_not_a_document_uri(
+        tmp_path, capsys):
+    """`set_genomforande` writes `to_uri = directive + "#" + article`, and 24
+    recorded directive uris already carry an article fragment -- so 202 link rows
+    have a `to_root` with a `#` in it, which a `to_root` by definition does not.
+    The defect is upstream, and a full run over 92 000 targets must not die on it
+    at hour three; it is skipped, and named so it can be fixed."""
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(LAW))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+    con = catalog.connect(db)
+    con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?,?,?,?,?)",
+                (LAW["uri"], "P6S1", "rpubl:genomforDirektiv",
+                 "https://lagen.nu/ext/celex/31995L0046#8.4.a#2",
+                 "https://lagen.nu/ext/celex/31995L0046#8.4.a"))
+    con.commit()
+    con.close()
+
+    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+
+    warning = capsys.readouterr().err
+    assert "carry a fragment in their document uri" in warning
+    assert "31995L0046#8.4.a" in warning         # names the row to fix
 
 
 def test_relate_migrates_legacy_absolute_paths(tmp_path):

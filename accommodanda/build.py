@@ -3939,6 +3939,10 @@ GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
                  PKG / "lib" / "labels.py", PKG / "lib" / "tpl.py",
+                 # generate also writes each page's inbound-citation file
+                 # (render._write_inbound), so a change to what goes in one or
+                 # how it is ordered has to re-stale the pages that carry it
+                 PKG / "lib" / "inbound.py",
                  PKG / "api" / "app.py", PKG / "stats" / "charts.py",
                  # every page renderer: each source's own (SOURCE_RENDERERS),
                  # lib's site-assembly one, plus the editorial and statistics

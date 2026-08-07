@@ -18,7 +18,7 @@ from accommodanda import config
 from accommodanda.api import analytics
 from accommodanda.api import app as api
 from accommodanda.api import mcp as mcpmod
-from accommodanda.lib import catalog
+from accommodanda.lib import catalog, inbound
 
 
 @pytest.fixture
@@ -50,6 +50,17 @@ def corpus(tmp_path, monkeypatch):
                        "text": ["Kunna delägarne ej enas..."]}]}))
     cat = tmp_path / "catalog.sqlite"
     catalog.rebuild(cat, "sfs", [bb, fl, sml])
+
+    # get_incoming_citations answers from generate's per-document citation files,
+    # not from the catalog -- write them here as a generate run would
+    # (render._write_inbound). data_root is tmp_path (the catalog's own dir).
+    con = catalog.connect(cat)
+    uris = ("https://lagen.nu/1962:700", "https://lagen.nu/2018:585",
+            "https://lagen.nu/1904:48_s.1")
+    for uri in uris:
+        inbound.write(tmp_path, uri, inbound.citations(con, uri))
+    inbound.mark_built(tmp_path, len(uris), 0)
+    con.close()
 
     # point the tools at the fixture catalog (catalog.connect_ro tracks its
     # one-time migration per path, so a fresh tmp catalog needs no flag reset)
@@ -130,8 +141,21 @@ def test_get_document_truncates(corpus):
 
 
 def test_citation_graph(corpus):
-    inbound = mcpmod.get_incoming_citations("https://lagen.nu/1962:700#K3P1")
-    assert any(c["uri"] == "https://lagen.nu/2018:585" for c in inbound)
+    incoming = mcpmod.get_incoming_citations("https://lagen.nu/1962:700#K3P1")
+    assert any(c["uri"] == "https://lagen.nu/2018:585"
+               for c in incoming["citations"])
+    assert incoming["total"] == 1 and incoming["by_source"] == {"sfs": 1}
+
+    # a bare law uri answers for the law *and its provisions*: the only citation
+    # here names 3 kap. 1 §, so the model still finds it without knowing to ask
+    # at paragraph level -- which is the whole reason the default scope changed
+    whole = mcpmod.get_incoming_citations("https://lagen.nu/1962:700")
+    assert [c["target"] for c in whole["citations"]] == \
+        ["https://lagen.nu/1962:700#K3P1"]
+
+    # and the source filter narrows without a second query
+    assert mcpmod.get_incoming_citations(
+        "https://lagen.nu/1962:700", source="dv")["total"] == 0
 
     outbound = mcpmod.get_outgoing_citations("https://lagen.nu/2018:585")
     ref = next(c for c in outbound if c["uri"] == "https://lagen.nu/1962:700#K3P1")

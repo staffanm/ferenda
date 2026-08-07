@@ -82,10 +82,21 @@ def _quality():
     return config.COMPRESS_QUALITY
 
 
-def compress_bytes(data: bytes, encoding: str) -> bytes:
-    """Compress `data` (bytes) into the given `Content-Encoding`."""
+def compress_bytes(data: bytes, encoding: str, quality: int | None = None) -> bytes:
+    """Compress `data` (bytes) into the given `Content-Encoding`.
+
+    `quality` overrides the configured Brotli level for one call. The default
+    (11) is right for the two trees this module was written for, where the ratio
+    is what matters and the encode is paid once per document. It is wrong for a
+    payload that is *highly* repetitive: on the inbound-citation tree, q11 buys
+    17% over q9 and costs 180x the time (52 MB: 56 s vs 0.31 s), because q11's
+    exhaustive match search has to work through millions of near-identical
+    records. Decode speed is identical at every level, so the reader loses
+    nothing. Ignored for gzip.
+    """
     if encoding == "br":
-        return brotli.compress(data, mode=brotli.MODE_TEXT, quality=_quality())
+        return brotli.compress(data, mode=brotli.MODE_TEXT,
+                               quality=_quality() if quality is None else quality)
     if encoding == "gzip":
         # mtime=0 so the gzip header is reproducible (a rebuild of unchanged
         # content yields byte-identical output, keeping watermarks/etags stable).
@@ -180,6 +191,16 @@ def _clear_variants(logical_path, keep=()):
             sibling.unlink()
 
 
+def remove(path: Path | str) -> None:
+    """Delete every on-disk representation of a logical `path`. The counterpart
+    of `write_bytes` for a *derived* file that has become empty: a derived tree
+    is only as trustworthy as its deletions, and a variant left behind would
+    serve the previous build's answer forever. A path with nothing on disk is
+    not an error -- that is the ordinary case, and the caller wants the same
+    end state either way."""
+    _clear_variants(logical(path), keep=())
+
+
 def _selected(encodings):
     """The encodings actually written: the caller's request, gated by the master
     ``config.COMPRESS`` switch (off => store plain)."""
@@ -187,10 +208,12 @@ def _selected(encodings):
 
 
 def write_bytes(path: Path | str, data: bytes,
-                encodings: Sequence[str] = PAGE_ENCODINGS) -> None:
+                encodings: Sequence[str] = PAGE_ENCODINGS,
+                quality: int | None = None) -> None:
     """Write `data` (bytes) for a logical `path`, storing the configured
     compressed variant(s) and clearing any stale sibling. Small files (and, with
-    compression disabled, all files) are stored plain.
+    compression disabled, all files) are stored plain. `quality` overrides the
+    configured Brotli level -- see `compress_bytes`.
 
     Every variant is written atomically (util.write_atomic: same-directory temp
     file + rename): this is the single write funnel for the artifact tree -- the
@@ -208,7 +231,8 @@ def write_bytes(path: Path | str, data: bytes,
     kept = []
     for enc in encs:
         suffix = SUFFIX_FOR[enc]
-        write_atomic(p.with_name(p.name + suffix), compress_bytes(data, enc))
+        write_atomic(p.with_name(p.name + suffix),
+                     compress_bytes(data, enc, quality=quality))
         kept.append(suffix)
     _clear_variants(p, keep=tuple(kept))
 

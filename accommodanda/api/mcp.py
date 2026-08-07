@@ -33,7 +33,7 @@ from starlette.responses import RedirectResponse
 from starlette.routing import Route
 
 from .. import config
-from ..lib import catalog, layout, pins, text
+from ..lib import catalog, inbound, layout, pins, text
 from ..lib.search import SearchIndex
 from . import analytics
 
@@ -328,7 +328,7 @@ def get_document(uri: str, pinpoint: str | None = None,
         uri, source, kind, label, title, path = row
         # synthesized begrepp stubs are real rows with no artifact file (path='')
         art = catalog.load_artifact(catalog.data_root(con), path)
-        inbound = catalog.document_inbound_count(con, uri)
+        inbound_count = catalog.document_inbound_count(con, uri)
     if pinpoint:
         want = uri + "#" + pinpoint.lstrip("#")
         body = next((t for furi, t in text.fragment_texts(art) if furi == want),
@@ -340,7 +340,7 @@ def get_document(uri: str, pinpoint: str | None = None,
         body = text.document_text(art)
     return {"uri": uri, "source": source, "kind": kind, "label": label,
             "title": title, "source_url": art.get("source_url"),
-            "inbound_count": inbound, "pinpoint": pinpoint,
+            "inbound_count": inbound_count, "pinpoint": pinpoint,
             "truncated": len(body) > max_chars, "text": body[:max_chars]}
 
 
@@ -403,21 +403,46 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
 
 @mcp.tool(title="Who cites this document (inbound citations)",
           annotations=READ_ONLY)
-def get_incoming_citations(uri: str, limit: int = 100) -> list[dict]:
-    """Which other documents cite exactly `uri` -- the citation graph inbound,
-    lagen.nu's signature feature as data. Answers "which cases apply this statute
-    paragraph", "what refers to this ruling". Pass a fragment URI
-    (`…#K3P1`) to query at paragraph level, or a bare document URI for the whole
-    document. One entry per (citing document, pinpoint); self-citations excluded;
-    `limit` caps the rows. Each: uri (the citing document), anchor (where in it the
-    citation sits), label, title, source.
+def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
+                           source: str | None = None) -> dict:
+    """Which other documents cite `uri` -- the citation graph inbound, lagen.nu's
+    signature feature as data. Answers "which cases apply this statute
+    paragraph", "what refers to this ruling".
+
+    Pass a fragment URI (`…#K3P1`) to ask at paragraph level -- much the sharper
+    question. A bare document URI answers for the law **and every provision in
+    it**, which for a big statute is tens of thousands of rows: read `total` and
+    `by_source` in the reply to see the shape of it, then narrow by pinpoint or
+    by `source` rather than paging through.
+
+    Ordered as lagen.nu itself orders these: case law first for a statute, then
+    agency decisions, then the citation graph -- so the default first rows are
+    the ones a lawyer would look at first. `source` filters to one corpus
+    ("dv" for court decisions, "forarbete" for preparatory works, "sfs" for
+    statutes; `list_sources` has them all). `limit`/`offset` page a stable order.
+
+    Returns: uri; total (rows you can page through, so *after* any `source`);
+    by_source ({source: rows} over the whole answer, before `source`, so it still
+    tells you what the other corpora hold); limit; offset; and citations -- each
+    with uri (the citing document), target (the provision it cited), anchor and
+    page (where in the citer it sits), label, title, source, kind, date.
     """
-    limit = max(1, min(limit, 1000))
+    limit, offset = max(1, min(limit, 1000)), max(0, offset)
     with _con() as con:
-        return [{"uri": from_uri, "anchor": anchor, "label": label,
-                 "title": title, "source": src}
-                for from_uri, anchor, label, title, src
-                in catalog.inbound(con, uri, limit=limit)]
+        root = catalog.data_root(con)
+        if not inbound.available(root):
+            raise ValueError("inbound citations are not built on this corpus -- "
+                             "run `lagen all generate`")
+        rows = inbound.scoped(inbound.read(root, uri), uri)
+    # counted over the whole scope, before `source` narrows it: the breakdown is
+    # what tells the model which corpus to ask for next, so filtering it to the
+    # one already asked for would answer a question nobody has
+    counts = inbound.by_source(rows)
+    if source is not None:
+        rows = [row for row in rows if row["source"] == source]
+    return {"uri": uri, "total": len(rows), "by_source": counts,
+            "limit": limit, "offset": offset,
+            "citations": rows[offset:offset + limit]}
 
 
 @mcp.tool(title="What this document cites (outbound citations)",

@@ -1919,6 +1919,36 @@ def _combine_dep(inbound_hex, outbound_hex):
 EMPTY_DEP_DIGEST = _combine_dep(None, None)
 
 
+# Everything about one inbound citation that a page's rendering reads, and so
+# everything its freshness has to cover. Named once because the batched pass and
+# the scoped one below must hash byte-identically -- two copied SELECT lists were
+# a divergence waiting to happen, and the digest decides every page's freshness.
+#
+# `to_uri`, `predicate` and `from_page` were added 2026-08-07 with the inbound
+# artifact tree, but they were missing before it: the citation's *target* is what
+# assigns it to a paragraf margin, its predicate is what routes it to the
+# bemyndigande/ändrar panels instead, and its page is what the line reads as
+# "s. 45". A citer re-parse that moved a pinpoint from `#K1P18` to `#K1P18a`
+# without moving the citing anchor -- exactly what a lagrum-grammar fix does --
+# therefore left the cited page fresh with the citation drawn in the wrong
+# margin. `kind` and `date` join them because the rail groups and orders on them,
+# as it already did on the `label`/`title`/`source` that were covered.
+DEP_INBOUND_COLUMNS = ("l.from_uri", "l.from_anchor", "l.to_uri", "l.predicate",
+                       "l.from_page", "d.label", "d.title", "d.source", "d.kind",
+                       "d.date")
+DEP_INBOUND_COLUMNS_SQL = ", ".join(DEP_INBOUND_COLUMNS)
+# a total order over the link columns (the `d.` ones are functionally determined
+# by from_uri), so two rows sharing a citing spot still hash in a fixed order
+DEP_INBOUND_ORDER_SQL = ", ".join(c for c in DEP_INBOUND_COLUMNS
+                                  if c.startswith("l."))
+
+
+def _dep_row(fields) -> bytes:
+    """One citation's contribution to a dependency digest. `str` because
+    `from_page` is an INTEGER and the rest are TEXT."""
+    return "\x1f".join("" if c is None else str(c) for c in fields).encode()
+
+
 def page_dependency_digests(con):
     """`{uri: digest}` for every document with a citation relationship -- a digest
     of everything *besides its own artifact* that its rendered page depends on, for
@@ -1929,8 +1959,9 @@ def page_dependency_digests(con):
     appears/disappears -- not when an unchanged neighbour's bytes change. Two parts,
     combined into the per-uri digest:
 
-      * inbound -- the (citing doc, pinpoint, label) rows it renders in its
-        margins and panel: a new or removed citer changes this;
+      * inbound -- the citation rows it renders in its margins and panel
+        (`DEP_INBOUND_COLUMNS`): a new or removed citer changes this, and so does
+        a citer whose re-parse moved which provision it points at;
       * outbound -- the set of hosted documents it links to, so a link goes live
         the moment its target is parsed (and dims if the target disappears).
 
@@ -1942,15 +1973,15 @@ def page_dependency_digests(con):
     inbound = {}
     cur, h = None, hashlib.sha256()
     for root, *fields in con.execute(
-            "SELECT l.to_root, l.from_uri, l.from_anchor, d.label, d.title, d.source "
-            "FROM links l JOIN documents d ON d.uri = l.from_uri "
+            "SELECT l.to_root, " + DEP_INBOUND_COLUMNS_SQL
+            + " FROM links l JOIN documents d ON d.uri = l.from_uri "
             "WHERE l.from_uri <> l.to_root "
-            "ORDER BY l.to_root, l.from_uri, l.from_anchor"):
+            "ORDER BY l.to_root, " + DEP_INBOUND_ORDER_SQL):
         if root != cur:
             if cur is not None:
                 inbound[cur] = h.hexdigest()
             cur, h = root, hashlib.sha256()
-        h.update(("\x1f".join("" if c is None else c for c in fields)).encode())
+        h.update(_dep_row(fields))
         h.update(b"\x1e")
     if cur is not None:
         inbound[cur] = h.hexdigest()
@@ -1985,11 +2016,11 @@ def page_dependency_digests_for(con, uris):
     for uri in uris:
         h, rows = hashlib.sha256(), 0
         for fields in con.execute(
-                "SELECT l.from_uri, l.from_anchor, d.label, d.title, d.source "
-                "FROM links l JOIN documents d ON d.uri = l.from_uri "
+                "SELECT " + DEP_INBOUND_COLUMNS_SQL
+                + " FROM links l JOIN documents d ON d.uri = l.from_uri "
                 "WHERE l.to_root = ? AND l.from_uri <> l.to_root "
-                "ORDER BY l.from_uri, l.from_anchor", (uri,)):
-            h.update(("\x1f".join("" if c is None else c for c in fields)).encode())
+                "ORDER BY " + DEP_INBOUND_ORDER_SQL, (uri,)):
+            h.update(_dep_row(fields))
             h.update(b"\x1e")
             rows += 1
         inbound = h.hexdigest() if rows else None

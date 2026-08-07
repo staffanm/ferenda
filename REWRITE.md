@@ -1215,6 +1215,25 @@ to a future per-doc incremental generate.
   that fragment uri. Verified on the partial corpus: **2,037 cases cite
   räntelagen § 6** (`1975:635#P6`); a case → law-paragraph → back-to-every-
   case-on-that-paragraph round-trip renders both directions.
+  **Since 2026-08-07 the serving layer reads it from a derived tree, not from
+  the catalog** (`lib/inbound.py`, written per page by `generate`). Two problems
+  forced it, and they turned out to be one. *Cost*: the links table is keyed by
+  the citing document, so "who cites brottsbalken and everything in it" gathers
+  162,909 rows scattered across 2.1 GB — 231 MB of random reads, minutes on
+  prod's ~100-IOPS disk, and no index closes it (the query needs five link
+  columns *and* a join per citer). *Answer*: any caller sees a page of a panel
+  far too big to return whole, and every cheap sort key was unrepresentative —
+  by source name the first 100 citations of brottsbalken were 100 JK/JO/ARN
+  decisions; by the citer's own authority, 100 statutes. Both need all the rows
+  materialised first, which *is* the expensive read. Sorting once at build time
+  in the order the site's context rail already uses settles both. The API
+  contract changed with it (whole-law scope by default, `total`/`by_source`,
+  10,000-row pages) while there are still no external consumers. Same date,
+  `catalog.DEP_INBOUND_COLUMNS` (what a page's freshness digest covers) widened
+  from five link columns to ten, fixing a real staleness bug along the way: a
+  citer re-parse that only moved *which* provision a pinpoint landed on (e.g. a
+  lagrum-grammar fix) left the cited page's digest unchanged, so it kept serving
+  the citation drawn in the old margin.
 - ✅ **Static HTML site** (`accommodanda/lib/render.py`, `generate`). A single
   generic node renderer (keyed on artifact `type`) handles both the SFS
   structure tree and the DV body; **outbound** links are live `<a>`s to the
@@ -1393,7 +1412,10 @@ to a future per-doc incremental generate.
     the corpus — *not* search, which requires `q`; carries `updated` = artifact
     mtime and `source_url` denormalised into the catalog like `title`),
     `document?uri=…` (URI as query param — `lagen.nu` URIs carry `:`/`/`),
-    `document/inbound` (the killer feature as data),
+    `document/inbound` (the killer feature as data — `scope=tree` by default, so
+    a law answers for itself *and every provision in it*, served from the
+    per-document files `generate` writes rather than a live catalog query; see
+    `lib/inbound.py`),
     `document/outbound` (`hosted` flag for un-parsed targets), `sources`, `dumps`.
     Auto `/openapi.json` + `/docs`. CORS-open (read-only public data) so the
     static site reaches it cross-origin. Verified live against the **real
@@ -3930,6 +3952,7 @@ rewrite work.
 | `tools/golden_eurlex.py` | EUR-Lex metadata cross-check against a retained CELLAR snapshot (no legacy oracle exists for this vertical) |
 | `accommodanda/build.py` | orchestrator: `lagen <source> <action>` build driver + freshness; corpus verbs `relate`/`generate`/`index`/`dump`/`serve` (one process serving the static site + REST API + MCP) |
 | `accommodanda/lib/catalog.py` | derived SQLite catalog + cross-source citation graph (`relate`) |
+| `accommodanda/lib/inbound.py` | derived per-document inbound-citation tree under `data_root/inbound/`, written per page by `generate` and read by REST `/document/inbound` + MCP `get_incoming_citations` instead of a live catalog query — see the "Cross-source inbound-link graph" bullet above |
 | `accommodanda/lib/page.py` | the shared page kit every source's `render.py` stands on: `Site` (render context), the generic node walk (`render_node`/`render_runs`), the context rail (`Rail`/`RailSection` + margin builders), the page shell (`page`/`page_context`, the TOC collector). Knows no source by name |
 | `accommodanda/lib/render.py` | corpus-wide site assembly (`generate`): frontpage, folkrätt/EU-rätt landings, Atom feeds, static chrome, `generate_site` (the render driver, dispatching per-document pages to each source's own `render.py` through the `renderers` registry `build.SOURCE_RENDERERS` hands in) + live ⌘K search |
 | `accommodanda/browse.py` | the faceted browse tree, generated as a client of the REST API (`api.app` driven through a FastAPI `TestClient`) — lives outside `lib/` since `lib/` may not import `api` |

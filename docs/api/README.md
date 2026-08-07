@@ -156,11 +156,32 @@ The `artifact` object is the same one you get per line in the bulk dumps.
 ### Derived views
 
 **Inbound links / citation graph — `GET /api/v1/document/inbound?uri=…`** — the
-killer feature as data: every other document that cites *exactly* this uri (one
-entry per citing document + pinpoint; self-citations excluded). Pass a fragment
-uri (`…#P6`) for citations to that paragraph, or a bare uri for the whole
-document. Returns a list of `Citation` — for inbound, `uri` is the **citing**
-document, with its `label`/`title`/`source`.
+killer feature as data: every other document that cites this uri (one entry per
+citing document, citing spot and provision cited; self-citations excluded).
+
+`scope=tree`, the default, answers for the uri **and everything inside it** — on
+a law that is every citation of every paragraf, which is what mirroring
+lagen.nu's own pages takes (brottsbalken, measured 2026-08-07: 40 696 citations
+of the act as such, 162 909 counting its 2 844 cited provisions). `scope=exact`
+is the narrow question, only the rows naming the uri itself. Pass a fragment uri
+(`…#P6`) to ask at paragraph level; `tree` then covers its stycken and points.
+
+Rows come back in the order the site's own context rail uses — case law first
+for a statute, then decisions, then the citation graph — so the first page is
+representative rather than whichever source name sorts earliest. The order is
+total and build-independent, so `offset` paging is stable across rebuilds.
+`limit` defaults to (and caps at) 10 000 rows; `total` and `by_source` describe
+the whole answer, not the page returned.
+
+The set is **unreduced**: the site folds a document's repeated citations into
+one line and hides whole-document citations superseded by a pinpointed one, and
+both are presentation. Filter on `predicate` for the typed relations
+(`rpubl:bemyndigande`, `rpubl:andrar`, `rpubl:upphaver`) and on `source` for
+lagen.nu's own commentary. The citation's surface text is not carried — it
+belongs to the citing document, and `/document/outbound` on that uri has it.
+
+Served from a per-document file the build writes, not from a live query: on the
+production disk the whole-law query is minutes of scattered reads.
 
 **Outbound citations — `GET /api/v1/document/outbound?uri=…`** — every citation a
 document makes; `uri` is the **cited target**. `hosted: false` marks a target not

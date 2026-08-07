@@ -249,9 +249,30 @@ Okänd URI ger `404`. Saknas katalogen helt ges `503` (kör `lagen all relate`).
 
 ### `GET /api/v1/document/inbound` — vilka som hänvisar hit
 
-Signaturfunktionen som data: alla *andra* dokument som citerar exakt den angivna
-URI:n — en post per (citerande dokument, pinpoint). Självcitering exkluderas.
-Ange en fragment-URI för att fråga på paragrafnivå.
+Signaturfunktionen som data: alla *andra* dokument som citerar den angivna
+URI:n — en post per (citerande dokument, citerande ställe, citerad bestämmelse).
+Självcitering exkluderas.
+
+`scope=tree` (standard) svarar för URI:n **och allt som ligger i den**: på en lag
+alltså varje citering av varje paragraf, vilket är vad som krävs för att spegla
+lagen.nu:s egna sidor (brottsbalken, mätt 2026-08-07: 40 696 gånger som balk och
+162 909 gånger om man räknar dess 2 844 citerade bestämmelser). `scope=exact` ger den
+snäva frågan — bara de rader som namnger URI:n själv. Ange en fragment-URI för
+att fråga på paragrafnivå; `tree` täcker då paragrafens stycken och punkter.
+
+Ordningen är densamma som i sidans kontextspalt — rättsfall först för en lag,
+sedan myndighetsavgöranden, sedan lagrumshänvisningar — så att första sidan är
+representativ i stället för att styras av vilket källnamn som råkar sortera
+först. Ordningen är total och oberoende av bygget, så `offset` är stabilt mellan
+ombyggnader. `limit` är 10 000 rader (och taket); `total` och `by_source` avser
+hela svaret, inte den returnerade sidan.
+
+Mängden är **oreducerad**: sidan slår ihop ett dokuments upprepade citeringar
+till en rad och döljer heldokumentscitat som ersätts av en pinpoint — båda är
+presentation. Filtrera på `predicate` för de typade relationerna
+(`rpubl:bemyndigande`, `rpubl:andrar`, `rpubl:upphaver`) och på `source` för
+lagen.nu:s egen kommentar. Citatets ordalydelse ingår inte — den tillhör det
+citerande dokumentet, och `/document/outbound` på den URI:n har den.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/document/inbound \
@@ -259,20 +280,34 @@ curl -G http://127.0.0.1:8001/api/v1/document/inbound \
 ```
 
 ```json
-[
-  {
-    "uri": "https://lagen.nu/dom/nja/2009s796",
-    "anchor": "domskal",
-    "predicate": null,
-    "text": null,
-    "label": "NJA 2009 s. 796",
-    "source": "dv",
-    "hosted": true
-  }
-]
+{
+  "uri": "https://lagen.nu/1975:635#P6",
+  "scope": "tree",
+  "total": 3924,
+  "limit": 10000,
+  "offset": 0,
+  "by_source": {"dv": 2767, "forarbete": 874, "avg": 164, "sfs": 116,
+                "foreskrift": 2, "begrepp": 1},
+  "citations": [
+    {
+      "uri": "https://lagen.nu/dom/mmd/F8748-25/2026-07-15",
+      "target": "https://lagen.nu/1975:635#P6",
+      "anchor": null,
+      "page": 1,
+      "predicate": "dcterms:references",
+      "label": "F 8748-25",
+      "title": "F 8748-25",
+      "source": "dv",
+      "kind": "case",
+      "date": "2026-07-15"
+    }
+  ]
+}
 ```
 
-(6 § räntelagen har i det fullständiga corpuset ~2 800 citerande dokument.)
+Svaret läses ur en per-dokument-fil som bygget skriver, inte ur en direktfråga
+mot katalogen: på produktionsdisken tar heldokumentsfrågan minuter av spridda
+läsningar.
 
 ### `GET /api/v1/document/outbound` — vad ett dokument hänvisar till
 
@@ -384,7 +419,7 @@ om corpuset växer varje natt.
 | `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
 | `fetch` | samma text, men hämtad på ett `id` från `search` (`…/1962:700#K3P1`) i stället för URI + pinpoint var för sig — se *Sök/hämta-kontraktet* nedan |
 | `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
-| `get_incoming_citations` | vilka dokument som citerar exakt denna URI/paragraf (citeringsgrafen inåt — lagen.nu:s signaturfunktion) |
+| `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader i sidans egen ordning (rättsfall först), filtrerbart på `source` |
 | `get_outgoing_citations` | alla citeringar ett dokument gör (grafen utåt) |
 | `list_sources` | corpusets källor och antal — orientering för `source`-filtret |
 

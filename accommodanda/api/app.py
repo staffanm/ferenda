@@ -48,6 +48,7 @@ from ..lib import (
     facsimile,
     feeds,
     history,
+    inbound,
     layout,
     pins,
     regeringen,
@@ -201,6 +202,37 @@ class Citation(BaseModel):
     title: str | None = None
     source: str | None = None
     hosted: bool = True
+
+
+class InboundCitation(BaseModel):
+    """One citation *into* a document. Distinct from `Citation` because the
+    inbound direction has a field the outbound one cannot have: `target`, the
+    provision the citation landed on, which is the whole answer when the query
+    was a law rather than a paragraf. `hosted` has no inbound counterpart -- a
+    citer is a catalogued document or it would not be here."""
+    uri: str                        # the citing document
+    target: str                     # what it cited: `uri` or a fragment of it
+    anchor: str | None = None       # where in the citing document it sits
+    page: int | None = None         # the printed page, where the citer has pages
+    predicate: str | None = None
+    label: str | None = None
+    title: str | None = None
+    source: str | None = None
+    kind: str | None = None
+    date: str | None = None
+
+
+class InboundCitations(BaseModel):
+    uri: str
+    scope: str
+    total: int                      # matching the scope, before paging
+    limit: int
+    offset: int
+    # {source: rows} over the whole scope, not the page -- so a client that took
+    # the first 10 000 of brottsbalken's 162 909 can still see what the rest is
+    # made of, and page towards it, instead of inferring the corpus from a slice.
+    by_source: dict[str, int]
+    citations: list[InboundCitation]
 
 
 class DocumentSummary(BaseModel):
@@ -597,14 +629,52 @@ def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute uri")
     return HTMLResponse(note + html)
 
 
-@app.get("/api/v1/document/inbound", response_model=list[Citation], tags=["document"])
+INBOUND_MAX = 10_000            # rows per response; ~3.5 MB of JSON
+
+
+@app.get("/api/v1/document/inbound", response_model=InboundCitations,
+         tags=["document"])
 def inbound_endpoint(uri: str = Query(..., description="document or fragment uri"),
+                     scope: str = Query(
+                         "tree", pattern="^(tree|exact)$",
+                         description="tree: uri and everything inside it "
+                                     "(default); exact: only citations naming "
+                                     "uri itself"),
+                     limit: int = Query(INBOUND_MAX, ge=1, le=INBOUND_MAX),
+                     offset: int = Query(0, ge=0),
                      con: sqlite3.Connection = Depends(get_con)):
-    """Which other documents cite exactly `uri` (the killer feature as data) --
-    one entry per (citing document, pinpoint). Self-citations excluded."""
-    return [Citation(uri=from_uri, anchor=anchor, label=label, title=title,
-                     source=src)
-            for from_uri, anchor, label, title, src in catalog.inbound(con, uri)]
+    """Which other documents cite `uri` (the killer feature as data) -- one entry
+    per (citing document, spot it cites from, provision cited).
+
+    `scope=tree`, the default, answers for the uri **and everything inside it**:
+    on a law that is every citation of every paragraf, which is what mirroring
+    lagen.nu's own pages takes -- brottsbalken was cited 40 696 times as an act
+    and 162 909 times counting its 2 844 cited provisions when this was measured
+    (2026-08-07), and reaching those the old way meant one call per provision. `scope=exact` is the narrow question
+    (only rows naming `uri` itself), which is what this endpoint used to answer.
+
+    Ordered as the site's context rail orders its panels -- case law first for a
+    statute, then decisions, then the citation graph -- so the first page is
+    representative rather than whichever source name sorts earliest. The order is
+    total and build-independent, so `offset` paging is stable.
+
+    The complete set, unreduced: the site folds a document's repeated citations
+    into one line and hides whole-document citations superseded by a pinpointed
+    one, and both are presentation. `predicate` separates the typed relations
+    (bemyndigande, ändrar, upphäver) and `source` the commentary. The citation's
+    surface text is not carried -- it belongs to the citing document, and
+    `/document/outbound` on that uri has it.
+    """
+    root = catalog.data_root(con)
+    if not inbound.available(root):
+        raise HTTPException(503, "inbound citations not built -- run "
+                                 "`lagen all generate`")
+    rows = inbound.read(root, uri)
+    rows = inbound.scoped(rows, uri) if scope == "tree" else inbound.exact(rows, uri)
+    return InboundCitations(
+        uri=uri, scope=scope, total=len(rows), limit=limit, offset=offset,
+        by_source=inbound.by_source(rows),
+        citations=[InboundCitation(**row) for row in rows[offset:offset + limit]])
 
 
 @app.get("/api/v1/document/outbound", response_model=list[Citation], tags=["document"])

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from accommodanda import config
 from accommodanda.api import app as api
-from accommodanda.lib import catalog, compress
+from accommodanda.lib import catalog, compress, inbound
 
 
 @pytest.fixture
@@ -33,6 +33,16 @@ def client(tmp_path):
                                         "text": "3 kap. 1 §"}, " brottsbalken."]}]}))
     cat = tmp_path / "catalog.sqlite"
     catalog.rebuild(cat, "sfs", [bb, fl])
+
+    # the inbound endpoint answers from generate's per-document citation files,
+    # not from the catalog -- write them here as a generate run would
+    # (render._write_inbound). data_root is tmp_path (the catalog's own dir).
+    con = catalog.connect(cat)
+    uris = ("https://lagen.nu/1962:700", "https://lagen.nu/2018:585")
+    for uri in uris:
+        inbound.write(tmp_path, uri, inbound.citations(con, uri))
+    inbound.mark_built(tmp_path, len(uris), 0)
+    con.close()
 
     # point the request-scoped catalog connection at the fixture catalog
     def _con():
@@ -215,9 +225,50 @@ def test_inbound_is_the_citation_graph(client):
     r = client.get("/api/v1/document/inbound",
                    params={"uri": "https://lagen.nu/1962:700#K3P1"})
     assert r.status_code == 200
-    rows = r.json()
-    assert [c["uri"] for c in rows] == ["https://lagen.nu/2018:585"]
-    assert rows[0]["label"] == "SFS 2018:585"
+    body = r.json()
+    assert [c["uri"] for c in body["citations"]] == ["https://lagen.nu/2018:585"]
+    assert body["citations"][0]["label"] == "SFS 2018:585"
+    assert body["total"] == 1 and body["by_source"] == {"sfs": 1}
+
+
+def test_inbound_on_a_law_reaches_the_citations_of_its_paragrafer(client):
+    """The default scope answers for the law *and everything in it*: the fixture's
+    only citation names 3 kap. 1 §, never the balk as such, so `exact` -- the
+    question this endpoint used to answer -- finds nothing at all."""
+    tree = client.get("/api/v1/document/inbound",
+                      params={"uri": "https://lagen.nu/1962:700"}).json()
+    assert [c["target"] for c in tree["citations"]] == \
+        ["https://lagen.nu/1962:700#K3P1"]
+    exact = client.get("/api/v1/document/inbound",
+                       params={"uri": "https://lagen.nu/1962:700",
+                               "scope": "exact"}).json()
+    assert exact["total"] == 0 and exact["citations"] == []
+
+
+def test_inbound_refuses_when_the_tree_is_not_built(client, tmp_path):
+    """Absence of one file means "nothing cites this"; absence of the whole tree
+    means the corpus was never generated, or the deploy's artifact rsync has not
+    landed. Answering the second with `total: 0` would report, with a 200, that
+    nothing in Swedish law cites anything -- so it refuses, exactly as a missing
+    catalog does.
+
+    Keyed on the sweep's marker, not on the directory: the sweep *creates* the
+    directory before it fills it, and `generate --ignore-code-changes` renders
+    almost no pages, so a directory holding only the uncatalogued targets would
+    have passed a `is_dir()` test and reached the very failure this prevents."""
+    (tmp_path / inbound.TREE / inbound.BUILT).unlink()
+    r = client.get("/api/v1/document/inbound",
+                   params={"uri": "https://lagen.nu/1962:700"})
+    assert r.status_code == 503 and "generate" in r.json()["detail"]
+
+
+def test_inbound_pages_a_stable_order(client):
+    body = client.get("/api/v1/document/inbound",
+                      params={"uri": "https://lagen.nu/1962:700",
+                              "limit": 1, "offset": 1}).json()
+    # `total` and `by_source` describe the whole answer, not the page returned
+    assert body["total"] == 1 and body["by_source"] == {"sfs": 1}
+    assert body["citations"] == []
 
 
 def test_outbound_marks_unhosted_targets(client):
