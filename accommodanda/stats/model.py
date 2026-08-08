@@ -69,7 +69,6 @@ class Measure:
     rows: list[Row] = field(default_factory=list)        # toplist | table
     points: list[Point] = field(default_factory=list)    # series | histogram | bars
     cells: list[Cell] = field(default_factory=list)      # matrix
-    columns: list[str] = field(default_factory=list)     # table header
     xlabel: str = ""
     ylabel: str = ""
 

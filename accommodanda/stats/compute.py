@@ -29,7 +29,7 @@ import datetime
 import statistics
 from concurrent.futures import ProcessPoolExecutor
 
-from ..lib import catalog, layout
+from ..lib import catalog, layout, util
 from ..lib.pinpoint import human_fragment
 from . import scan
 from .model import Cell, Measure, Point, Report, Row
@@ -610,8 +610,7 @@ def bill_lag(propdate, laws):
             if f in propdate and a["ikraft"] >= propdate[f]]
 
 
-MONTHS = ("januari", "februari", "mars", "april", "maj", "juni", "juli",
-          "augusti", "september", "oktober", "november", "december")
+MONTHS = tuple(util.MONTHS)
 
 
 def _ikraft_months(laws):
@@ -942,9 +941,9 @@ def _in_force(con, scans):
             "laws": [r for r in scans["laws"] if r["uri"] in live]}
 
 
-def compute(catalog_path, jobs=None, progress=None):
+def compute(catalog_path, progress=None):
     """Every measurement, as a `Report`."""
-    scans = run_scans(jobs=jobs, progress=progress)
+    scans = run_scans(progress=progress)
     if progress:
         progress("measures")
     con = catalog.connect_ro(str(catalog_path))

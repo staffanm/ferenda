@@ -12,7 +12,6 @@ navigation, because the reader's task here is browsing, not following a
 document.
 """
 
-import json
 
 from ..lib import compress, layout
 from ..lib.page import page_context
@@ -36,7 +35,6 @@ def _as_measure(d):
         rows=[Row(**r) for r in d.get("rows", [])],
         points=[Point(**p) for p in d.get("points", [])],
         cells=[Cell(**c) for c in d.get("cells", [])],
-        columns=d.get("columns", []),
         xlabel=d.get("xlabel", ""), ylabel=d.get("ylabel", ""))
 
 
@@ -67,7 +65,7 @@ def write_stats(out_root):
     if not compress.exists(path):
         raise FileNotFoundError(
             "no stats artifact at %s -- run `lagen stats compute` first" % path)
-    art = json.loads(compress.read_text(path))
+    art = compress.read_json(path)
     dest = out_root / "statistik"
     dest.mkdir(parents=True, exist_ok=True)
     compress.write_text(dest / "index.html", render_stats(art),

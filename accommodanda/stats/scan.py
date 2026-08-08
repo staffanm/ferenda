@@ -21,7 +21,6 @@ getting either wrong silently poisons a whole family of numbers:
   (2011:590).*" trailer; counted naively it is the shortest rule in Swedish law.
 """
 
-import json
 import re
 
 from ..lib import compress, layout
@@ -51,7 +50,7 @@ def load(path):
     way), so a scan must not read one as a broken file."""
     if compress.stat(path).st_size == 0:
         return None
-    return json.loads(compress.read_text(path))
+    return compress.read_json(path)
 
 
 def _run_text(runs):
@@ -281,7 +280,7 @@ def scan_forarbete(path):
 
     for block in art.get("structure") or []:
         walk(block)
-    return {"uri": art.get("uri"), "type": art.get("type"),
+    return {"uri": art.get("uri"), "type": art.get("doctype"),
             "identifier": art.get("identifier"), "title": art.get("title") or "",
             "date": art.get("date"), "chars": chars}
 

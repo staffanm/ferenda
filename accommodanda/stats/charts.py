@@ -244,7 +244,7 @@ def _href(uri):
 
 # --------------------------------------------------------------------------
 
-_FORMS = {"toplist": toplist_html, "table": toplist_html, "matrix": matrix_html,
+_FORMS = {"toplist": toplist_html, "matrix": matrix_html,
           "scalar": hero_html, "series": series_svg,
           "histogram": bars_svg, "bars": bars_svg}
 
