@@ -71,21 +71,37 @@ def _at(doc, key):
     return "%s:%d" % (CONFIG_PATH.name, line)
 
 
+def _resolve_str(doc, key, env_name, default, post=None):
+    """Shared parse for a scalar string setting: the ``env_name`` environment
+    variable, then ``key`` in config.yml, else ``default`` (a value, or a
+    zero-arg callable for a default that must stay lazy -- e.g.
+    `resolve_catalog_root` falling back to `resolve_data_root`, which must
+    not run, and must not raise, just because ``CATALOG_ROOT`` was already
+    set). ``if env`` rather than ``env is not None``: an exported-but-empty
+    variable is how a shell spells "unset" and must fall through to the
+    config key. ``post`` (e.g. ``Path.expanduser`` or ``str.rstrip``), if
+    given, transforms the env value and the config value the same way, but
+    never the literal ``default`` -- every one of these settings already
+    stores its built-in default pre-transformed."""
+    env = os.environ.get(env_name)
+    if env:
+        return post(env) if post else env
+    if key not in doc:
+        return default() if callable(default) else default
+    value = doc[key]
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError("%s set to invalid value %r at %s"
+                          % (key, value, _at(doc, key)))
+    return post(value) if post else value
+
+
 def resolve_data_root(doc):
     """The corpus root: where the downloaded + generated corpus is stored.
     Precedence mirrors every other scalar setting here -- the ``DATA_ROOT``
     environment variable, then the ``data_root`` key in config.yml, then
     ``<repo>/site/data``."""
-    env = os.environ.get("DATA_ROOT")
-    if env:
-        return Path(env).expanduser()
-    if "data_root" not in doc:
-        return DEFAULT_DATA
-    value = doc["data_root"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError(
-            "data_root set to invalid value %r at %s" % (value, _at(doc, "data_root")))
-    return Path(value).expanduser()
+    return _resolve_str(doc, "data_root", "DATA_ROOT", DEFAULT_DATA,
+                        post=lambda v: Path(v).expanduser())
 
 
 def resolve_catalog_root(doc):
@@ -99,16 +115,9 @@ def resolve_catalog_root(doc):
     must stay local. Precedence: the ``CATALOG_ROOT`` environment variable, then the
     ``catalog_root`` key in config.yml, then ``data_root`` (colocated -- the
     historical layout, and still the default)."""
-    env = os.environ.get("CATALOG_ROOT")
-    if env:
-        return Path(env).expanduser()
-    if "catalog_root" not in doc:
-        return resolve_data_root(doc)
-    value = doc["catalog_root"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("catalog_root set to invalid value %r at %s"
-                          % (value, _at(doc, "catalog_root")))
-    return Path(value).expanduser()
+    return _resolve_str(doc, "catalog_root", "CATALOG_ROOT",
+                        lambda: resolve_data_root(doc),
+                        post=lambda v: Path(v).expanduser())
 
 
 def resolve_wiki_root(doc):
@@ -117,32 +126,15 @@ def resolve_wiki_root(doc):
     ``wiki_root`` key in config.yml, then ``<repo>/../lagen-wiki`` (the sibling
     checkout). Authored separately in its own git repo (a sibling checkout, not a
     submodule), so it is not under ``data_root``."""
-    env = os.environ.get("WIKI_ROOT")
-    if env:
-        return Path(env).expanduser()
-    if "wiki_root" not in doc:
-        return DEFAULT_WIKI_ROOT
-    value = doc["wiki_root"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("wiki_root set to invalid value %r at %s"
-                          % (value, _at(doc, "wiki_root")))
-    return Path(value).expanduser()
+    return _resolve_str(doc, "wiki_root", "WIKI_ROOT", DEFAULT_WIKI_ROOT,
+                        post=lambda v: Path(v).expanduser())
 
 
 def resolve_opensearch_url(doc):
     """The OpenSearch endpoint for the search index. Precedence: the
     ``OPENSEARCH_URL`` environment variable (for ad-hoc overrides), then the
     ``opensearch_url`` key in config.yml, then ``http://localhost:9200``."""
-    env = os.environ.get("OPENSEARCH_URL")
-    if env:
-        return env
-    if "opensearch_url" not in doc:
-        return DEFAULT_OPENSEARCH_URL
-    value = doc["opensearch_url"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("opensearch_url set to invalid value %r at %s"
-                          % (value, _at(doc, "opensearch_url")))
-    return value
+    return _resolve_str(doc, "opensearch_url", "OPENSEARCH_URL", DEFAULT_OPENSEARCH_URL)
 
 
 def resolve_llm_model(doc):
@@ -151,16 +143,7 @@ def resolve_llm_model(doc):
     overrides), then the ``llm_model`` key in config.yml, then the built-in
     default. Picking a faster/smaller model here is the lever for the latency of
     those passes."""
-    env = os.environ.get("BERGET_MODEL")
-    if env:
-        return env
-    if "llm_model" not in doc:
-        return DEFAULT_LLM_MODEL
-    value = doc["llm_model"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("llm_model set to invalid value %r at %s"
-                          % (value, _at(doc, "llm_model")))
-    return value
+    return _resolve_str(doc, "llm_model", "BERGET_MODEL", DEFAULT_LLM_MODEL)
 
 
 def resolve_llm_base_url(doc):
@@ -172,16 +155,8 @@ def resolve_llm_base_url(doc):
     endpoint needs no API key: ``lib/llm`` demands ``BERGET_API_KEY`` only for a
     remote host. Precedence: the ``LLM_BASE_URL`` environment variable, then the
     ``llm_base_url`` key in config.yml, then Berget."""
-    env = os.environ.get("LLM_BASE_URL")
-    if env:
-        return env.rstrip("/")
-    if "llm_base_url" not in doc:
-        return DEFAULT_LLM_BASE_URL
-    value = doc["llm_base_url"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("llm_base_url set to invalid value %r at %s"
-                          % (value, _at(doc, "llm_base_url")))
-    return value.rstrip("/")
+    return _resolve_str(doc, "llm_base_url", "LLM_BASE_URL", DEFAULT_LLM_BASE_URL,
+                        post=lambda v: v.rstrip("/"))
 
 
 def _resolve_float(doc, key, env_name, default, lo, hi):
@@ -248,15 +223,29 @@ def resolve_vision_model(doc):
     default (Kimi-K2.6). Kept separate from `llm_model` because the text passes
     run a reasoning model that has no vision, and the vision model is the pricier
     of the two -- one lever each."""
-    env = os.environ.get("BERGET_VISION_MODEL")
-    if env:
-        return env
-    if "vision_model" not in doc:
-        return DEFAULT_VISION_MODEL
-    value = doc["vision_model"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("vision_model set to invalid value %r at %s"
-                          % (value, _at(doc, "vision_model")))
+    return _resolve_str(doc, "vision_model", "BERGET_VISION_MODEL", DEFAULT_VISION_MODEL)
+
+
+def _resolve_bool(doc, key, env_name, default):
+    """Shared parse for an on/off setting: the ``env_name`` environment
+    variable (``0``/``1``, ``false``/``true``, ``no``/``yes``, ``off``/``on``),
+    then ``key`` in config.yml, else ``default``. A present-but-uninterpretable
+    value raises rather than guessing."""
+    env = os.environ.get(env_name)
+    if env is not None:
+        low = env.strip().lower()
+        if low in ("1", "true", "yes", "on"):
+            return True
+        if low in ("0", "false", "no", "off"):
+            return False
+        raise ConfigError("%s set to invalid value %r "
+                          "(expected a boolean)" % (env_name, env))
+    if key not in doc:
+        return default
+    value = doc[key]
+    if not isinstance(value, bool):
+        raise ConfigError("%s set to invalid value %r at %s "
+                          "(expected true/false)" % (key, value, _at(doc, key)))
     return value
 
 
@@ -270,21 +259,27 @@ def resolve_compress(doc):
     Precedence: the ``FERENDA_COMPRESS`` environment variable (``0``/``1``,
     ``false``/``true``), then the ``compress`` key in config.yml, else on. A
     present-but-uninterpretable value raises rather than guessing."""
-    env = os.environ.get("FERENDA_COMPRESS")
-    if env is not None:
-        low = env.strip().lower()
-        if low in ("1", "true", "yes", "on"):
-            return True
-        if low in ("0", "false", "no", "off"):
-            return False
-        raise ConfigError("FERENDA_COMPRESS set to invalid value %r "
-                          "(expected a boolean)" % env)
-    if "compress" not in doc:
-        return True
-    value = doc["compress"]
-    if not isinstance(value, bool):
-        raise ConfigError("compress set to invalid value %r at %s "
-                          "(expected true/false)" % (value, _at(doc, "compress")))
+    return _resolve_bool(doc, "compress", "FERENDA_COMPRESS", True)
+
+
+def _resolve_int(doc, key, env_name, default, lo, hi, invalid_hint, range_hint):
+    """Shared parse + range check for an integer setting: the ``env_name``
+    environment variable, then ``key`` in config.yml, else ``default``.
+    Out-of-range or unparseable raises rather than clamping/guessing, same
+    rationale as `_resolve_float`. ``hi`` may be ``None`` for an open-ended
+    upper bound (e.g. a Matomo site id)."""
+    env = os.environ.get(env_name)
+    raw = env if env else doc.get(key)
+    if raw is None:
+        return default
+    where = env_name if env else "%s at %s" % (key, _at(doc, key))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        raise ConfigError("%s set to invalid value %r (%s)"
+                          % (where, raw, invalid_hint)) from None
+    if value < lo or (hi is not None and value > hi):
+        raise ConfigError("%s set to %d (%s)" % (where, value, range_hint))
     return value
 
 
@@ -297,21 +292,8 @@ def resolve_compress_quality(doc):
     when build latency matters more than bytes. Precedence:
     ``FERENDA_COMPRESS_QUALITY`` env var, then the ``compress_quality`` config
     key, else 11."""
-    env = os.environ.get("FERENDA_COMPRESS_QUALITY")
-    raw = env if env is not None else doc.get("compress_quality")
-    if raw is None:
-        return 11
-    where = ("FERENDA_COMPRESS_QUALITY" if env is not None
-             else "compress_quality at %s" % _at(doc, "compress_quality"))
-    try:
-        quality = int(raw)
-    except (TypeError, ValueError):
-        raise ConfigError("%s set to invalid value %r (expected an integer 0-11)"
-                          % (where, raw)) from None
-    if not 0 <= quality <= 11:
-        raise ConfigError("%s set to %d (out of the valid Brotli range 0-11)"
-                          % (where, quality))
-    return quality
+    return _resolve_int(doc, "compress_quality", "FERENDA_COMPRESS_QUALITY", 11, 0, 11,
+                        "expected an integer 0-11", "out of the valid Brotli range 0-11")
 
 
 def resolve_editor_secret(doc):
@@ -322,16 +304,7 @@ def resolve_editor_secret(doc):
     variable, then the ``editor_secret`` key in config.yml, else ``None``. A
     present-but-invalid value raises ``ConfigError`` rather than silently
     disabling auth."""
-    env = os.environ.get("EDITOR_SECRET")
-    if env:
-        return env
-    if "editor_secret" not in doc:
-        return None
-    value = doc["editor_secret"]
-    if not isinstance(value, str) or not value.strip():
-        raise ConfigError("editor_secret set to invalid value %r at %s"
-                          % (value, _at(doc, "editor_secret")))
-    return value
+    return _resolve_str(doc, "editor_secret", "EDITOR_SECRET", None)
 
 
 def resolve_cookie_secure(doc):
@@ -343,22 +316,7 @@ def resolve_cookie_secure(doc):
     only for a plain-http dev serve. Precedence: the ``EDITOR_COOKIE_SECURE``
     environment variable (``0``/``1``, ``false``/``true``), then the
     ``cookie_secure`` key in config.yml, else on."""
-    env = os.environ.get("EDITOR_COOKIE_SECURE")
-    if env is not None:
-        low = env.strip().lower()
-        if low in ("1", "true", "yes", "on"):
-            return True
-        if low in ("0", "false", "no", "off"):
-            return False
-        raise ConfigError("EDITOR_COOKIE_SECURE set to invalid value %r "
-                          "(expected a boolean)" % env)
-    if "cookie_secure" not in doc:
-        return True
-    value = doc["cookie_secure"]
-    if not isinstance(value, bool):
-        raise ConfigError("cookie_secure set to invalid value %r at %s "
-                          "(expected true/false)" % (value, _at(doc, "cookie_secure")))
-    return value
+    return _resolve_bool(doc, "cookie_secure", "EDITOR_COOKIE_SECURE", True)
 
 
 def resolve_matomo_url(doc):
@@ -396,23 +354,8 @@ def resolve_matomo_site_api(doc):
     Unset (``None``) disables server-side tracking. Precedence: the
     ``MATOMO_SITE_API`` environment variable, then ``matomo_site_api`` in
     config.yml, else ``None``."""
-    env = os.environ.get("MATOMO_SITE_API")
-    # `if env`, like every sibling resolver here: an exported-but-empty variable
-    # is how a shell spells "unset", and unsetting either half of the analytics
-    # config is the documented off switch -- it must not fail the boot instead.
-    raw = env if env else doc.get("matomo_site_api")
-    if raw is None:
-        return None
-    where = ("MATOMO_SITE_API" if env
-             else "matomo_site_api at %s" % _at(doc, "matomo_site_api"))
-    try:
-        site = int(raw)
-    except (TypeError, ValueError):
-        raise ConfigError("%s set to invalid value %r (expected a Matomo site id)"
-                          % (where, raw)) from None
-    if site < 1:
-        raise ConfigError("%s set to %d (Matomo site ids start at 1)" % (where, site))
-    return site
+    return _resolve_int(doc, "matomo_site_api", "MATOMO_SITE_API", None, 1, None,
+                        "expected a Matomo site id", "Matomo site ids start at 1")
 
 
 def resolve_editors(doc):
