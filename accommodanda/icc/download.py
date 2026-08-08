@@ -23,10 +23,15 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import Reporter, document_extension, normalize_space
+from ..lib.util import (
+    Reporter,
+    document_extension,
+    english_date,
+    normalize_space,
+)
 from .model import RE_DOC_BASE, doc_basefile, load_types
 
 ICC = "https://www.icc-cpi.int"
@@ -136,8 +141,7 @@ def _stored_record(record, lt):
 
 
 def list_basefiles(root):
-    return sorted(path.stem for path in compress.glob(root, "*.json")
-                  if not path.name.startswith("."))
+    return compress.list_stems(root)
 
 
 def resolve(session, root, record, full=False, delay=0.3):
@@ -147,7 +151,7 @@ def resolve(session, root, record, full=False, delay=0.3):
     basefile = doc_basefile(record["base"])
     path = record_path(root, basefile)
     body = body_path(root, basefile)
-    stored = json.loads(compress.read_text(path)) if compress.exists(path) else None
+    stored = compress.read_json(path, default=None)
     if not full and stored is not None and (stored.get("lt") is None
                                             or compress.exists(body)):
         return False
@@ -155,8 +159,7 @@ def resolve(session, root, record, full=False, delay=0.3):
     if lt and lt.get("slug"):
         compress.write_download(body, fetch_pdf(session, lt["slug"]))
         time.sleep(delay)
-    compress.write_download(path, json.dumps(_stored_record(record, lt),
-                                             ensure_ascii=False, indent=2))
+    write_record(path, _stored_record(record, lt))
     return True
 
 
@@ -187,13 +190,6 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     return result.seen, result.new
 
 
-_MONTHS = {m: i for i, m in enumerate(
-    ["January", "February", "March", "April", "May", "June", "July", "August",
-     "September", "October", "November", "December"], 1)}
-
-
 def _iso(value):
     """The ICC listing date ('4 February 2021') as an ISO date, for the watermark."""
-    match = re.match(r"(\d{1,2})\s+([A-Z][a-z]+)\s+(\d{4})", value or "")
-    return ("%04d-%02d-%02d" % (int(match.group(3)), _MONTHS[match.group(2)],
-                                int(match.group(1)))) if match else None
+    return english_date(value or "")

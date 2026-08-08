@@ -55,6 +55,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, layout
+from ..lib.harvest import write_record
 from ..lib.net import BROWSER_UA, make_session, request
 from ..lib.regeringen import (
     BASE,
@@ -491,8 +492,7 @@ def parse_arende(html, url):
 # --------------------------------------------------------------------------
 
 def _write_arende(remiss):
-    compress.write_download(layout.remisser_arende(remiss.basefile),
-                            json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
+    write_record(layout.remisser_arende(remiss.basefile), remiss.to_dict())
 
 
 def _load_seen():
@@ -673,7 +673,7 @@ def sync_one(url, delay=0.5):
     remiss = parse_arende(request(session, "GET", url).text, url)
     existing = layout.remisser_arende(remiss.basefile)
     if not remiss.externt_dokument and compress.exists(existing):
-        stored = Remiss.from_dict(json.loads(compress.read_text(existing)))
+        stored = Remiss.from_dict(compress.read_json(existing))
         _merge(stored, remiss)
         remiss = stored
     fetched = 0
@@ -719,7 +719,7 @@ def _poll(session, slug, url, examined, summary, delay, log):
     stored = layout.remisser_arende(fresh.basefile)
     remiss = fresh
     if compress.exists(stored):
-        remiss = Remiss.from_dict(json.loads(compress.read_text(stored)))
+        remiss = Remiss.from_dict(compress.read_json(stored))
         _merge(remiss, fresh)
         summary["repolled"] += 1
     else:
@@ -848,5 +848,5 @@ def list_basefiles():
     """Every case basefile ("<typ>/<document id>") on disk, sorted -- not answer
     basefiles. Records live one directory deep (``<typ>/<id-slug>.json``), which
     also keeps the examined-index out of the glob."""
-    return sorted(json.loads(compress.read_text(p))["basefile"]
+    return sorted(compress.read_json(p)["basefile"]
                   for p in compress.glob(layout.REMISSER_DOWNLOADED, "*/*.json"))

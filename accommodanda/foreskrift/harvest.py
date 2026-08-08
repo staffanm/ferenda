@@ -19,8 +19,8 @@ An architecture is two callables over that shared loop:
     agencies) and downloads them. A direct-PDF agency would use a thinner
     resolve.
 
-Four ``enumerate`` shapes are implemented (``indexed``/``paginated``/``json``/
-``sitemap``, plus bespoke per-agency enumerators) and two ordinary HTTP
+Three ``enumerate`` shapes are implemented (``indexed``/``paginated``/``json``,
+plus bespoke per-agency enumerators) and two ordinary HTTP
 ``resolve`` shapes (``resolve_landing``, ``resolve_direct`` -- the listing
 anchor already *is* the PDF). Browser-protected sources supply the same two
 seams but select the detached headful-Chrome transport in their ``Agency``
@@ -28,7 +28,6 @@ config. New shapes are added when an agency needs one, not speculatively (the
 rewrite's "don't design the horizontal layer from one source" rule).
 """
 
-import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -42,7 +41,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress
 from ..lib.browser import DetachedChrome
-from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import is_not_found, make_http2_session, make_session, request
 from ..lib.util import basefile_slug as slug
@@ -260,10 +259,7 @@ def save_single_pdf_record(root, agency, ref, pdf_url, pdf_data, *, source_url=N
             "attachment": [],
         },
     }
-    compress.write_download(
-        record_path(root, fs, ref.basefile),
-        json.dumps(record, ensure_ascii=False, indent=2),
-    )
+    write_record(record_path(root, fs, ref.basefile), record)
     return record
 
 
@@ -336,8 +332,7 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
         "title": ref.title, "publisher": agency.publisher,
         "url": ref.url, "files": files,
     }
-    compress.write_download(record_path(root, fs, ref.basefile),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(record_path(root, fs, ref.basefile), record)
     return record
 
 
@@ -386,8 +381,7 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
         "title": ref.title or extra.get("title"), "publisher": agency.publisher,
         "url": extra.get("source_url") or ref.url, "files": files,
     }
-    compress.write_download(record_path(root, fs, ref.basefile),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(record_path(root, fs, ref.basefile), record)
     return record
 
 
@@ -566,31 +560,6 @@ def json_enumerate(session, agency):
                       title=r.get(p.get("title_field", "heading")), direct=direct)
         if docref:
             yield docref
-
-
-def sitemap_enumerate(session, agency):
-    """The index is XML sitemap(s) of landing-page URLs. params: ``sitemaps``
-    (list of sitemap URLs), ``loc_filter`` (substring a doc <loc> must contain),
-    ``id_from_loc`` (regex with year+lopnummer groups over the <loc>). Used where
-    the site has no scrapable list but a complete sitemap (STAFS)."""
-    p = agency.params
-    idre = re.compile(p["id_from_loc"])
-    seen = set()
-    for sm in p["sitemaps"]:
-        try:
-            xml = request(session, "GET", sm).text
-        except requests.exceptions.RequestException as exc:
-            yield Skip("%s: %r" % (sm, exc))    # one sitemap of several is down
-            continue
-        for loc in re.findall(r"<loc>\s*([^<]+?)\s*</loc>", xml):
-            if p.get("loc_filter") and p["loc_filter"] not in loc.lower():
-                continue
-            m = idre.search(loc)
-            if not m:
-                continue
-            docref = ref(agency, "%s:%s" % (m.group(1), m.group(2)), loc, seen)
-            if docref:
-                yield docref
 
 
 # --------------------------------------------------------------------------

@@ -10,14 +10,13 @@ is that call plus one PDF per treaty.  The web service's TLS still offers a
 legacy small DH key, hence ``mount_legacy_tls``.
 """
 
-import json
 import re
 import time
 from pathlib import Path
 
 from ..lib import compress
 from ..lib.coe import treaty_number
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, mount_legacy_tls, request
 from ..lib.util import document_extension, normalize_space
@@ -102,7 +101,7 @@ def body_path(root, record):
 
 def resolve(root, record, session, full=False, delay=0.3):
     old_path = record_path(root, record["number"])
-    old = json.loads(compress.read_text(old_path)) if compress.exists(old_path) else None
+    old = compress.read_json(old_path, default=None)
     if full or old is None or not compress.exists(Path(root) / old["file"]):
         response = request(session, "GET", record["text_url"], timeout=180)
         if document_extension(response.content) != ".pdf":
@@ -115,16 +114,14 @@ def resolve(root, record, session, full=False, delay=0.3):
         time.sleep(delay)
     else:
         record = {**record, "file": old["file"]}
-    changed = old != record
-    if changed:
-        compress.write_download(old_path,
-                                json.dumps(record, ensure_ascii=False, indent=2))
-    return changed
+    # `full` is deliberately not passed on: a --force run re-verifies the PDF over
+    # the network, but a record that came back identical must still not be
+    # rewritten -- its mtime is what the downstream freshness watermarks key on.
+    return store_record(old_path, record)
 
 
 def list_basefiles(root):
-    return sorted(path.stem for path in compress.glob(root, "*.json")
-                  if not path.name.startswith("."))     # skip .watermark.json
+    return compress.list_stems(root)                    # skips .watermark.json
 
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
@@ -151,7 +148,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
         path = record_path(root, record["number"])
         downloaded = False
         if compress.exists(path):
-            data = json.loads(compress.read_text(path))
+            data = compress.read_json(path)
             downloaded = compress.exists(Path(root) / data["file"])
         return ItemKey(record["number"], downloaded, record["opening_date"])
 

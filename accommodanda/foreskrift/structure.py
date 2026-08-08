@@ -18,7 +18,6 @@ all) stay at the top level, so a body without a single § still renders.
 import re
 
 RE_LEAD_PARA = re.compile(r"^(\d+\s*[a-z]?)\s*§")     # "3 §" / "3 a §" leading a block
-RE_LEAD_KAP = re.compile(r"^(\d+)\s*kap\.")           # "2 kap." leading a block
 
 
 def _para_anchor(kap, num, seen):

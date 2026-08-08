@@ -8,8 +8,8 @@ closed series with no live harvester (RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS): their
 documents live in the corpus. SKVFS and MTFS select a detached headful-Chrome
 transport in config; ordinary agencies stay on HTTP.
 
-An agency is *config*, not a pipeline. Many sites are covered by the four
-generic enumerate shapes (``indexed``/``paginated``/``json``/``sitemap``) plus a
+An agency is *config*, not a pipeline. Many sites are covered by the three
+generic enumerate shapes (``indexed``/``paginated``/``json``) plus a
 ``resolve`` (``resolve_landing`` / ``resolve_direct``) and a classify; the
 representative spread:
 
@@ -47,6 +47,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, util
+from ..lib.harvest import write_record
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
@@ -1861,9 +1862,6 @@ TVFS = Agency(
 )
 
 
-_TRANSLIT = str.maketrans("åäöÅÄÖ", "aaoAAO")
-
-
 # --------------------------------------------------------------------------
 # AFS (Arbetsmiljöverket) -- indexed + landing + filename-classify, but the
 # PDFs hang on a per-regulation *författningshistorik* subpage, not the base
@@ -1986,7 +1984,7 @@ def ts_enumerate(session, agency):
             if not m or "om ändring" in a.get_text(" ", strip=True).lower():
                 continue
             arsutgava, lopnummer, prefix = m.group(1), str(int(m.group(2))), m.group(3)
-            doc_fs = re.sub(r"[^0-9a-z]", "", prefix.translate(_TRANSLIT).lower())
+            doc_fs = re.sub(r"[^0-9a-z]", "", util.fold_swedish(prefix).lower())
             basefile = "%s/%s:%s" % (doc_fs, arsutgava, lopnummer)
             if basefile in seen:
                 continue
@@ -2049,7 +2047,7 @@ def trv_enumerate(session, agency):
         if prefix in TRV_SKIP_PREFIX:
             continue
         arsutgava, lopnummer = m.group(2), str(int(m.group(3)))
-        doc_fs = prefix.translate(_TRANSLIT).lower()
+        doc_fs = util.fold_swedish(prefix).lower()
         basefile = "%s/%s:%s" % (doc_fs, arsutgava, lopnummer)
         if basefile in seen:
             continue
@@ -2095,8 +2093,7 @@ def trv_resolve(session, agency, ref, root, delay=0.5, *, log=print, rejects=Non
     record = {"fs": fs, "basefile": ref.basefile, "identifier": ref.identifier,
               "title": ref.title or title, "publisher": agency.publisher,
               "url": ref.url, "files": files}
-    compress.write_download(record_path(root, fs, ref.basefile),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(record_path(root, fs, ref.basefile), record)
     return record
 
 

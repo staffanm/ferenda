@@ -4,7 +4,6 @@ the named författningssamlingar (default all); ``--full`` re-walks and refreshe
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
-import json
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,17 +12,9 @@ from pathlib import Path
 
 from ..lib import compress
 from ..lib.compress import list_basefiles as _list_basefiles
-from ..lib.util import NullReporter, Reporter, record_path
+from ..lib.util import NullReporter, Reporter, fold_swedish, record_path
 from . import harvest
 from .agencies import REGISTRY
-
-# the agency sites slug a designation into ASCII ("SÄIFS" -> "saifs-19831"),
-# our fs codes keep the Swedish letters -- folded, the two compare
-_FOLD = str.maketrans("åäö", "aao")
-
-
-def _fold(s):
-    return s.translate(_FOLD)
 
 
 def browser_scopes():
@@ -158,8 +149,8 @@ def superseded(root, scopes=None):
     claims = {}
     for fs in (scopes or stored_series(root)):
         for basefile in _list_basefiles(root, fs):
-            url = json.loads(compress.read_text(
-                record_path(root, fs, basefile))).get("url")
+            url = compress.read_json(
+                record_path(root, fs, basefile)).get("url")
             if url:
                 claims.setdefault(url, []).append(basefile)
     stale = {}
@@ -172,7 +163,8 @@ def superseded(root, scopes=None):
         # ASCII, fs codes are not (SÄIFS -> "saifs-…"), so both fold.
         named = re.match(r"[a-zåäö]+", url.rstrip("/").rsplit("/", 1)[-1].lower())
         winners = [bf for bf in basefiles
-                   if named and _fold(bf.split("/", 1)[0]) == _fold(named.group())]
+                   if named and fold_swedish(bf.split("/", 1)[0])
+                   == fold_swedish(named.group())]
         if len(winners) != 1:
             # nothing (or everything) corroborated. The ordinary cause is
             # several regulations legitimately sharing one index page as their
@@ -194,7 +186,7 @@ def superseded_files(root, basefile):
     fs = basefile.split("/", 1)[0]
     record = record_path(root, fs, basefile)
     paths = [record, record.with_suffix(".html")]
-    files = json.loads(compress.read_text(record)).get("files", {})
+    files = compress.read_json(record).get("files", {})
     for role in files.values():
         for entry in (role if isinstance(role, list) else [role]):
             if entry and entry.get("name"):

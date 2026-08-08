@@ -377,7 +377,7 @@ def analyze(basefile, force=False):
     out = annstore.path("remisser", basefile)
     annstore.guard(out, force)
     art_path = layout.artifact("remisser", basefile)
-    svar = Remissvar.from_dict(json.loads(compress.read_bytes(art_path)))
+    svar = Remissvar.from_dict(compress.read_json(art_path))
     assert svar.remitterat, (
         "%s references no förarbete document (remitterat is empty) -- nothing to "
         "map onto; the caller should have scoped it out" % basefile)
@@ -401,7 +401,7 @@ def analyze(basefile, force=False):
         "`lagen forarbete parse %s/%s` first"
         % (basefile, host_path, typ, fa_basefile))
     outline, valid_ids = section_outline(
-        json.loads(compress.read_bytes(host_path))["structure"])
+        compress.read_json(host_path)["structure"])
     assert valid_ids, ("%s host förarbete %s/%s has no sections to map onto"
                        % (basefile, typ, fa_basefile))
 

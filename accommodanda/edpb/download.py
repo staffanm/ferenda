@@ -54,22 +54,16 @@ import re
 import time
 import zipfile
 from datetime import date
-from pathlib import Path
+from functools import partial
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import ItemKey, record_unchanged, store_record, walk
+from ..lib.harvest import dispatch_scopes, pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import (
-    basefile_slug,
-    document_extension,
-    href,
-    normalize_space,
-    record_path,
-)
+from ..lib.util import document_extension, href, normalize_space
 from .series import (
     BY_KOD,
     HARVESTED,
@@ -103,91 +97,17 @@ DOCUMENT_FILE = r"_%s(_\d+)?\.pdf$"
 
 
 # --------------------------------------------------------------------------
-# shared storage + fetch
+# identity
 # --------------------------------------------------------------------------
+#
+# Where a record and its PDF go, how ``--only`` narrows the index and the walk
+# that stores both are the shared record walk's (`lib.harvest.walk_records`):
+# the sitemap and the WP29 registry are enumerated whole on every run, so there
+# is no depth to stop short of. What is this source's own is the basefile.
 
 def basefile(serie, nummer):
     """The harvest basefile of one document ("riktlinjer/05-2020", "wp/248")."""
     return "%s/%s" % (serie, nummer if serie == "wp" else number_slug(nummer))
-
-
-def pdf_path(root, bf):
-    """The document PDF beside its record ("riktlinjer/05-2020" ->
-    ``<root>/riktlinjer/riktlinjer-05-2020.pdf``) -- the avg/rs body-file
-    shape."""
-    return Path(root) / bf.split("/", 1)[0] / (basefile_slug(bf) + ".pdf")
-
-
-def store_document(root, bf, data):
-    """Store one document's PDF bytes. Returns the stored path, or None when the
-    server served something that is not a PDF (an error page under a .pdf name),
-    which is reported rather than filed as the document."""
-    if document_extension(data) != ".pdf":
-        print("edpb: %s: served a non-PDF body, skipping" % bf, flush=True)
-        return None
-    path = pdf_path(root, bf)
-    compress.write_download(path, data)
-    return path
-
-
-def store(root, record, full=False):
-    """Store one guidance document's record under its org/series directory when
-    it is new or changed. Returns True when written. (The write itself is
-    `lib.harvest.store_record`; this only knows where the record goes.)"""
-    bf = record["basefile"]
-    return store_record(record_path(root, bf.split("/", 1)[0], bf), record,
-                        full=full)
-
-
-def _select(pending, only):
-    """The one (record, fetch) pair `only` ("riktlinjer/05-2020") names, or every
-    pair."""
-    if not only:
-        return pending
-    picked = [item for item in pending if item[0]["basefile"] == only]
-    assert picked, "the EDPB index carries no document %s" % only
-    return picked
-
-
-def _walk(root, pending, delay, full, limit, scope):
-    """Store a series' records and the documents they name, through the shared
-    download loop (lib.harvest.walk) with **no watermark**: the sitemap is
-    enumerated whole on every run, so there is no depth to stop short of.
-
-    `item_key` reports `is_downloaded` as "this record is already current on
-    disk, PDF and all", so an unchanged entry costs nothing while an upstream
-    retitling is still picked up.
-
-    ``limit`` is the shared loop's: it caps documents actually *fetched or
-    changed*, not entries looked at (this walk used to stop after N entries
-    regardless). On a steady-state run where nothing moved, ``--limit`` therefore
-    walks the whole listing and fetches nothing, which is the cheap case anyway.
-
-    `pending` items are ``(record, fetch)`` where `fetch` returns the document
-    bytes -- one HTTP GET for an EDPB page's PDF, a ZIP fetch and a member
-    extraction for a WP29 document. A fetch that stores nothing raises, so the
-    record is not written: a stored record is the assertion that its document is
-    on disk, and the next run retries."""
-    def item_key(item):
-        record = item[0]
-        bf = record["basefile"]
-        return ItemKey(bf, record_unchanged(
-            record_path(root, bf.split("/", 1)[0], bf), record,
-            pdf_path(root, bf)))
-
-    def resolve(item):
-        record, fetch = item
-        bf = record["basefile"]
-        if not compress.exists(pdf_path(root, bf)) or full:
-            if store_document(root, bf, fetch()) is None:
-                raise ValueError("no document could be stored; record left unwritten")
-            time.sleep(delay)
-        return store(root, record, full=full)
-
-    result = walk(pending, resolve=resolve, item_key=item_key, watermark=None,
-                  full=full, limit=limit, scope=scope, count_label="changed",
-                  total=len(pending))
-    return result.seen, result.new
 
 
 # --------------------------------------------------------------------------
@@ -335,7 +255,10 @@ def edpb_sync(root, serie, full=False, only=None, limit=None, delay=0.5):
             "dokument_url": published["document"],
         }
         pending.append((record, _document_fetcher(session, published["document"])))
-    return _walk(root, _select(pending, only), delay, full, limit, serie)
+    return walk_records(
+        root, select_pending(pending, only,
+                             "the EDPB index carries no document %s"),
+        delay=delay, full=full, limit=limit, scope=serie)
 
 
 def _document_fetcher(session, url):
@@ -464,7 +387,8 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
         }, fetch))
     assert pending or held or not only, \
         "no endorsed WP29 document is called %s" % only
-    seen, new = _walk(root, pending, delay, full, limit, "wp")
+    seen, new = walk_records(root, pending, delay=delay, full=full, limit=limit,
+                             scope="wp")
     return seen + held, new
 
 
@@ -472,17 +396,14 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
 # entry point
 # --------------------------------------------------------------------------
 
+# the two open series come off the EDPB site's own index, one harvest
+# parametrized by which; the closed WP29 one comes from the newsroom instead
+SYNC = {**{kod: partial(edpb_sync, serie=kod) for kod in HARVESTED},
+        "wp": wp29_sync}
+
+
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
     """Download the named series (default all three). Returns
     {serie: (seen, new)}."""
-    totals = {}
-    for serie in (scopes or KODER):
-        scoped_only = only if only and only.startswith(serie + "/") else None
-        if serie == "wp":
-            totals[serie] = wp29_sync(str(root), full=full, only=scoped_only,
-                                      limit=limit, delay=delay)
-            continue
-        assert serie in HARVESTED, "no EDPB series %r" % serie
-        totals[serie] = edpb_sync(str(root), serie, full=full, only=scoped_only,
-                                  limit=limit, delay=delay)
-    return totals
+    return dispatch_scopes(root, scopes, SYNC, KODER, full=full, only=only,
+                           limit=limit, delay=delay)

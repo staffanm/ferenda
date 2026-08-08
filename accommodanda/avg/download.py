@@ -139,6 +139,7 @@ from ..lib import compress
 from ..lib.harvest import (
     HarvestWatermark,
     ItemKey,
+    dispatch_scopes,
     record_unchanged,
     store_record,
     walk,
@@ -154,6 +155,7 @@ from ..lib.util import (
     normalize_space,
     record_path,
 )
+from .model import ORGS
 
 RE_ARN_DNR = re.compile(r"\d{4}-\d{4,}")
 
@@ -235,7 +237,6 @@ KKV_CASETYPES = (
 # a whole group's result set in one response -- the largest is ~700 cases, and
 # `kkv_listing` asserts rather than truncating if that ever stops holding
 KKV_TAKE = 5000
-KKV_ARENDELISTA_PAGE = 9      # the curated listing's fixed page size
 RE_KKV_DNR = re.compile(r"(\d+/\d{4})")
 
 IMY_BASE = "https://www.imy.se"
@@ -1000,7 +1001,7 @@ def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
             "publishes it is unknown -- run a full `lagen avg download imy` "
             "first" % only)
         slugs = {t["slug"] for t in
-                 json.loads(compress.read_text(path))["tillsyner"]}
+                 compress.read_json(path)["tillsyner"]}
         items = [i for i in items if i["slug"] in slugs]
         assert items, "imy.se listing no longer carries %s" % only
     if limit:
@@ -1312,7 +1313,7 @@ def kkv_save(root, item, referat, session, delay, full=False):
     for the whole diarium side rather than one per case."""
     basefile = "kkv/" + item["caseNumber"]
     path = record_path(root, "kkv", basefile)
-    stored = json.loads(compress.read_text(path)) if compress.exists(path) else None
+    stored = compress.read_json(path, default=None)
     if stored and not full \
             and _kkv_settled(stored) == _kkv_settled(kkv_record(item, {}, referat)) \
             and _kkv_bodies_on_disk(root, stored):
@@ -1325,7 +1326,7 @@ def kkv_save(root, item, referat, session, delay, full=False):
 def kkv_save_curated(root, dnr, referat, session, delay, full=False):
     """Store a case the ärendelista carries and the diarium's set does not."""
     path = record_path(root, "kkv", "kkv/" + dnr)
-    stored = json.loads(compress.read_text(path)) if compress.exists(path) else None
+    stored = compress.read_json(path, default=None)
     record = kkv_curated_record(dnr, referat)
     return _kkv_write(root, path, stored, record, session, delay, full)
 
@@ -1453,13 +1454,11 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
 # entry point
 # --------------------------------------------------------------------------
 
+SYNC = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync, "imy": imy_sync,
+        "kkv": kkv_sync}
+
+
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
     """Download the named organs (default all five). Returns {org: (seen, new)}."""
-    totals = {}
-    for org in (scopes or ("jo", "jk", "arn", "imy", "kkv")):
-        run = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync,
-               "imy": imy_sync, "kkv": kkv_sync}[org]
-        scoped_only = only if only and only.startswith(org + "/") else None
-        totals[org] = run(str(root), full=full, only=scoped_only,
-                          limit=limit, delay=delay)
-    return totals
+    return dispatch_scopes(root, scopes, SYNC, ORGS, full=full, only=only,
+                           limit=limit, delay=delay)

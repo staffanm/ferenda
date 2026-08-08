@@ -14,14 +14,13 @@ keeps ``WORKERS`` body fetches in flight ahead of the walk, each worker pacing
 itself by ``delay``.
 """
 
-import json
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 
@@ -119,12 +118,9 @@ def save_record(root, record, body):
     """Store one metadata record and, when ``body`` (an in-flight or finished
     body fetch) is given, its HTML body.  Returns whether anything changed."""
     itemid = record["itemid"]
-    record_file = record_path(root, itemid)
-    changed = not (compress.exists(record_file)
-                   and json.loads(compress.read_text(record_file)) == record)
-    if changed:
-        compress.write_download(record_file,
-                                json.dumps(record, ensure_ascii=False, indent=2))
+    # the body is stored whether or not the metadata moved, so it is not a
+    # store_record companion: `changed` reports the record alone
+    changed = store_record(record_path(root, itemid), record)
     if body is not None:
         compress.write_download(body_path(root, itemid), body.result().content)
     return changed
@@ -142,8 +138,7 @@ def _prefetched(records, submit, depth):
 
 
 def list_basefiles(root):
-    return sorted(path.stem for path in compress.glob(root, "*.json")
-                  if not path.name.startswith("."))     # skip .watermark.json
+    return compress.list_stems(root)                    # skips .watermark.json
 
 
 def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES, limit=None,

@@ -70,7 +70,6 @@ Stored per ställningstagande under ``site/data/downloaded/rs/{org}/``: a
 ``<slug>.json`` record and the ``<slug>.pdf`` document.
 """
 
-import json
 import re
 import tempfile
 import time
@@ -80,17 +79,15 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import ItemKey, record_unchanged, store_record, walk
+from ..lib.harvest import dispatch_scopes, pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, mount_aia_chain, request
 from ..lib.pdftext import pdf_first_page_text
 from ..lib.util import (
     Reporter,
-    basefile_slug,
     document_extension,
     href,
     normalize_space,
-    record_path,
     swedish_date,
 )
 from .agencies import BY_ORG, ORGS, number_slug
@@ -166,7 +163,7 @@ LABEL_WINDOW = 120
 
 
 # --------------------------------------------------------------------------
-# shared storage + fetch
+# identity, and the shared record walk
 # --------------------------------------------------------------------------
 
 def basefile(org, nummer):
@@ -174,97 +171,37 @@ def basefile(org, nummer):
     return "%s/%s" % (org, number_slug(nummer))
 
 
-def pdf_path(root, bf):
-    """The document PDF beside its record ("fk/2025:01" ->
-    ``<root>/fk/fk-2025-01.pdf``) -- the avg body-file shape."""
-    return Path(root) / bf.split("/", 1)[0] / (basefile_slug(bf) + ".pdf")
-
-
-def fetch_document(root, bf, url, session, delay, full=False):
-    """Store one ställningstagande's PDF. Returns the stored path, or None when
-    the agency served something that is not a PDF (an error page under a .pdf
-    name), which is logged rather than filed as the document."""
-    path = pdf_path(root, bf)
-    if compress.exists(path) and not full:
-        return path
-    response = request(session, "GET", url, timeout=180)
-    time.sleep(delay)
-    if document_extension(response.content) != ".pdf":
-        print("rs: %s: %s served a non-PDF body, skipping" % (bf, url),
-              flush=True)
-        return None
-    compress.write_download(path, response.content)
-    return path
-
-
-def store(root, record, full=False):
-    """Store one ställningstagande's record under its org/series directory when
-    it is new or changed. Returns True when written. (The write itself is
-    `lib.harvest.store_record`; this only knows where the record goes.)"""
-    bf = record["basefile"]
-    return store_record(record_path(root, bf.split("/", 1)[0], bf), record,
-                        full=full)
-
-
-def _walk(root, records, session, delay, full, limit, scope, fetch=True):
+def _walk(root, records, session, delay, full, limit, scope, fetch=True,
+          only=None):
     """Store a listing's records and the documents they name, through the shared
-    download loop (lib.harvest.walk) with **no watermark**: these listings are
-    single pages (or, for Lifos, walked whole before this point), so there is no
-    depth to stop short of -- every run visits every entry and writes what moved.
+    record walk (`lib.harvest.walk_records`) with **no watermark**: these
+    listings are single pages (or, for Lifos, walked whole before this point),
+    so there is no depth to stop short of -- every run visits every entry and
+    writes what moved. This only says how a ställningstagande's PDF is fetched;
+    everything else about the walk is the shared one.
 
-    `item_key` therefore reports `is_downloaded` as "this record is already
-    current on disk, PDF and all", not merely "some file exists": that is what
-    lets walk skip an unchanged entry for free while still picking up an upstream
-    retitling.
-
-    ``limit`` is the shared loop's: it caps documents actually *fetched or
-    changed*, not entries looked at (this walk used to stop after N entries
-    regardless). On a steady-state run where nothing moved, ``--limit`` therefore
-    walks the whole listing and fetches nothing, which is the cheap case anyway.
-
-    A document fetch that fails raises, so walk counts and logs it and the record
-    is **not** written -- a stored record is the assertion that the document
-    behind it is on disk, which is what lets `parse.body` read an absent PDF as
-    "the agency published none" (a repealed Konkurrensverket entry) rather than
-    "the fetch broke". The previous good record stays and the next run retries.
+    A record naming no ``dokument_url`` gets no fetch and is stored on its own:
+    that is a repealed Konkurrensverket entry, a förteckning row whose document
+    the agency has withdrawn, which is a register entry rather than a failure.
 
     ``fetch=False`` is Försäkringskassans route, where *every* document had to be
     fetched earlier -- the number that names it is printed inside it
     (`self_named_document`) -- and is already on disk. Migrationsverket looks
     like that route but is not: only the two entries whose index row states no
     RS/RK number go through `self_named_document`, so the other ~100 have never
-    been fetched when they arrive here and must be fetched like anyone else.
-    `fetch_document` returns an already-stored PDF untouched, so the two that
-    were fetched early are not refetched."""
-    def needs_fetch(record):
-        return bool(fetch and record.get("dokument_url"))
+    been fetched when they arrive here and must be fetched like anyone else. The
+    shared walk leaves an already-stored PDF untouched, so the two that were
+    fetched early are not refetched."""
+    def body(record):
+        url = record.get("dokument_url")
+        if not (fetch and url):
+            return None
+        return lambda: request(session, "GET", url, timeout=180).content
 
-    def item_key(record):
-        bf = record["basefile"]
-        companions = (pdf_path(root, bf),) if needs_fetch(record) else ()
-        return ItemKey(bf, record_unchanged(
-            record_path(root, bf.split("/", 1)[0], bf), record, *companions))
-
-    def resolve(record):
-        if needs_fetch(record) and fetch_document(
-                root, record["basefile"], record["dokument_url"],
-                session, delay, full=full) is None:
-            raise ValueError("no PDF could be stored; record left unwritten")
-        return store(root, record, full=full)
-
-    result = walk(records, resolve=resolve, item_key=item_key, watermark=None,
-                  full=full, limit=limit, scope=scope, count_label="changed",
-                  total=len(records))
-    return result.seen, result.new
-
-
-def _select(records, only):
-    """The one record `only` ("fk/2025:01") names, or every record."""
-    if not only:
-        return records
-    picked = [r for r in records if r["basefile"] == only]
-    assert picked, "the listing carries no ställningstagande %s" % only
-    return picked
+    return walk_records(
+        root, select_pending([(r, body(r)) for r in records], only,
+                             "the listing carries no ställningstagande %s"),
+        delay=delay, full=full, limit=limit, scope=scope)
 
 
 # --------------------------------------------------------------------------
@@ -334,7 +271,7 @@ def imy_sync(root, full=False, only=None, limit=None, delay=0.5):
                         "nummer": item["nummer"], "titel": item["titel"],
                         "source_url": str(response.url),
                         **imy_parse_page(response.text, str(response.url))})
-    return _walk(root, _select(records, only), session, delay, full, limit, "imy")
+    return _walk(root, records, session, delay, full, limit, "imy", only=only)
 
 
 # --------------------------------------------------------------------------
@@ -391,7 +328,7 @@ def fi_sync(root, full=False, only=None, limit=None, delay=0.5):
                 "source_url": BY_ORG["fi"].listing, **item}
                for item in fi_parse_listing(
                    request(session, "GET", BY_ORG["fi"].listing, timeout=120).text)]
-    return _walk(root, _select(records, only), session, delay, full, limit, "fi")
+    return _walk(root, records, session, delay, full, limit, "fi", only=only)
 
 
 # --------------------------------------------------------------------------
@@ -461,7 +398,7 @@ def stored_numbers(root, org, key):
     would re-download every PDF just to re-read a number that has not moved."""
     return {record[key]: record["nummer"]
             for path in compress.glob(Path(root) / org, "*.json")
-            for record in [json.loads(compress.read_text(path))]
+            for record in [compress.read_json(path)]
             if key in record}
 
 
@@ -523,8 +460,8 @@ def fk_sync(root, full=False, only=None, limit=None, delay=0.5):
     rep.done()
     # the PDFs are already stored under their resolved names, so only the
     # records remain to be written
-    return _walk(root, _select(records, only), session, delay, full, None, "fk",
-                 fetch=False)
+    return _walk(root, records, session, delay, full, None, "fk", fetch=False,
+                 only=only)
 
 
 # --------------------------------------------------------------------------
@@ -581,7 +518,7 @@ def kfm_sync(root, full=False, only=None, limit=None, delay=0.5):
                 "arsgrupp": item["arsgrupp"],
                 "source_url": BY_ORG["kfm"].listing,
                 "dokument_url": item["dokument_url"]} for item in items]
-    return _walk(root, _select(records, only), session, delay, full, limit, "kfm")
+    return _walk(root, records, session, delay, full, limit, "kfm", only=only)
 
 
 # --------------------------------------------------------------------------
@@ -756,8 +693,8 @@ def migr_sync(root, full=False, only=None, limit=None, delay=0.5):
     if orphans:
         print("migr: %d document(s) name no RS/RK number and cannot be filed: %s"
               % (len(orphans), ", ".join(orphans)), flush=True)
-    return _walk(root, _select(migr_current(records), only), session, delay,
-                 full, None, "migr")
+    return _walk(root, migr_current(records), session, delay, full, None,
+                 "migr", only=only)
 
 
 # --------------------------------------------------------------------------
@@ -852,7 +789,7 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
         records.append({"basefile": basefile("kkv", item["nummer"]), "org": "kkv",
                         "source_url": item["url"] or BY_ORG["kkv"].listing,
                         **{k: v for k, v in item.items() if k != "url"}, **page})
-    return _walk(root, _select(records, only), session, delay, full, limit, "kkv")
+    return _walk(root, records, session, delay, full, limit, "kkv", only=only)
 
 
 # --------------------------------------------------------------------------
@@ -866,9 +803,5 @@ SYNC = {"imy": imy_sync, "fi": fi_sync, "fk": fk_sync, "kfm": kfm_sync,
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
     """Download the named agencies' ställningstaganden (default all six).
     Returns {org: (seen, new)}."""
-    totals = {}
-    for org in (scopes or ORGS):
-        scoped_only = only if only and only.startswith(org + "/") else None
-        totals[org] = SYNC[org](str(root), full=full, only=scoped_only,
-                                limit=limit, delay=delay)
-    return totals
+    return dispatch_scopes(root, scopes, SYNC, ORGS, full=full, only=only,
+                           limit=limit, delay=delay)

@@ -11,11 +11,11 @@ that list call plus one included fetch per treaty; the stored record is the raw
 JSON:API envelope, so parse never touches the network.
 """
 
-import json
+import time
 from pathlib import Path
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk
+from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 
@@ -90,21 +90,20 @@ def fetch_treaty(session, number):
     return envelope
 
 
-def resolve(session, root, record, full=False):
+def resolve(session, root, record, full=False, delay=0.3):
     """Refetch a treaty when it is new, forced, or its `changed` stamp advanced;
     otherwise leave the stored envelope untouched.  Returns whether it changed."""
     path = record_path(root, record["number"])
-    stored = json.loads(compress.read_text(path)) if compress.exists(path) else None
+    stored = compress.read_json(path, default=None)
     if not (full or stored is None or _changed(stored) != record["changed"]):
         return False
-    envelope = fetch_treaty(session, record["number"])
-    compress.write_download(path, json.dumps(envelope, ensure_ascii=False, indent=2))
+    write_record(path, fetch_treaty(session, record["number"]))
+    time.sleep(delay)                       # one fetch per treaty (rule:respect-politeness)
     return True
 
 
 def list_basefiles(root):
-    return sorted(path.stem for path in compress.glob(root, "*.json")
-                  if not path.name.startswith("."))     # skip .watermark.json
+    return compress.list_stems(root)                    # skips .watermark.json
 
 
 def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
@@ -115,7 +114,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
         record = next((r for r in records if r["number"] == str(only)), None)
         if record is None:
             raise ValueError("ICRC lists no treaty %s" % only)
-        return 1, int(resolve(session, root, record, full=full))
+        return 1, int(resolve(session, root, record, full=full, delay=delay))
 
     # newest-changed first, so the watermark lookahead meets freshly-updated
     # treaties (a new ratification advances `changed`) before the downloaded
@@ -127,7 +126,7 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     def item_key(record):
         path = record_path(root, record["number"])
         downloaded = (compress.exists(path)
-                      and _changed(json.loads(compress.read_text(path)))
+                      and _changed(compress.read_json(path))
                       == record["changed"])
         # the watermark's safety window parses this as a bare date, so pass the
         # date portion; the full `changed` timestamp drives change-detection above
@@ -136,7 +135,8 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
 
     result = walk(
         records,
-        resolve=lambda record: resolve(session, root, record, full=full),
+        resolve=lambda record: resolve(session, root, record, full=full,
+                                       delay=delay),
         item_key=item_key,
         watermark=watermark,
         full=full,

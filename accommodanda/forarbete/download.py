@@ -48,7 +48,6 @@ already-downloaded doc); `--full` re-walks the whole listing, skipping existing.
 
 import hashlib
 import itertools
-import json
 import re
 import time
 from datetime import date
@@ -58,7 +57,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, layout, net
-from ..lib.harvest import HarvestWatermark
+from ..lib.harvest import HarvestWatermark, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
 from ..lib.regeringen import (
@@ -138,13 +137,22 @@ def resolve_identity(typ, item, landing_html):
 
 
 def fetch(session, url, timeout=60):
-    """GET with one retry on regeringen.se's habit of 400-ing the first hit."""
-    response = session.get(url, timeout=timeout)
-    if response.status_code == 400:
+    """GET through `lib.net.request` -- exponential backoff, Retry-After, the
+    throttle statuses and the harvest deadline -- with one extra retry on
+    regeringen.se's habit of 400-ing the first hit.
+
+    That 400 is retried here rather than by adding it to `net.RETRY_STATUS`: a
+    400 is a genuine, immediately-fatal client error for every other source in
+    the pipeline, and widening the shared set would make all of them burn six
+    attempts on a malformed request. The quirk is this one host's, so the
+    handling stays with it."""
+    try:
+        return net.request(session, "GET", url, timeout=timeout)
+    except requests.HTTPError as exc:
+        if exc.response is None or exc.response.status_code != 400:
+            raise
         time.sleep(2)
-        response = session.get(url, timeout=timeout)
-    net.raise_for_status(response)
-    return response
+        return net.request(session, "GET", url, timeout=timeout)
 
 
 # --------------------------------------------------------------------------
@@ -363,7 +371,7 @@ def download_document(session, root, item, delay, log=print):
                             landing.text)
     stored = layout.fa_record_file(root, typ, basefile)
     if not files and compress.exists(stored):
-        previous = json.loads(compress.read_text(stored))
+        previous = compress.read_json(stored)
         if previous.get("files"):
             # This landing page links no document, but the document already has
             # a body -- from KB, riksdagen or the Trips import, whose provenance
@@ -382,7 +390,7 @@ def download_document(session, root, item, delay, log=print):
     record = {"type": typ, "basefile": basefile, "identifier": identifier,
               "title": item["title"], "date": item["date"], "url": item["url"],
               "files": files}
-    compress.write_download(stored, json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(stored, record)
     return record
 
 
@@ -433,7 +441,7 @@ def refetch_landings(root, select, replace_bodies, types=("prop", "ds", "sou"),
     for typ in types:
         recs = sorted(compress.glob(root / typ, "*/*.json"))
         for i, recpath in enumerate(recs):
-            record = json.loads(compress.read_text(recpath))
+            record = compress.read_json(recpath)
             if not select(record):
                 continue
             if limit and checked >= limit:
@@ -472,9 +480,8 @@ def refetch_landings(root, select, replace_bodies, types=("prop", "ds", "sou"),
                         updated += 1
                         record["files"] = stored
                         record.pop("body_format", None)
-                        compress.write_download(
-                            layout.fa_record_file(root, typ, basefile),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+                        write_record(layout.fa_record_file(root, typ, basefile),
+                                     record)
             except requests.HTTPError as exc:
                 errors += 1
                 log("  %s %s: %s" % (typ, record.get("url"), exc))
@@ -501,7 +508,7 @@ def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
     for typ in types:
         recs = sorted(compress.glob(root / typ, "*/*.json"))
         for i, recpath in enumerate(recs):
-            record = json.loads(compress.read_text(recpath))
+            record = compress.read_json(recpath)
             if ("legacy_files" in record or "source" in record
                     or record.get("files")):
                 continue
@@ -524,9 +531,7 @@ def refetch_bodies(root, types=("lr", "so"), limit=None, delay=0.5, log=print):
                 if stored:
                     recovered += 1
                     record["files"] = stored
-                    compress.write_download(
-                        layout.fa_record_file(root, typ, basefile),
-                        json.dumps(record, ensure_ascii=False, indent=2))
+                    write_record(layout.fa_record_file(root, typ, basefile), record)
             except requests.HTTPError as exc:
                 errors += 1
                 log("  %s %s: %s" % (typ, record["url"], exc))
@@ -563,7 +568,7 @@ def has_live_record(root, typ, basefile):
     recpath = layout.fa_record_file(root, typ, basefile)
     if not compress.exists(recpath):
         return False
-    record = json.loads(compress.read_text(recpath))
+    record = compress.read_json(recpath)
     return "source" not in record and not word_bodied(record)
 
 
@@ -587,8 +592,8 @@ def needs_harvest(root, typ, basefile):
     riksdagen walk has its own currency rule (`riksdagen._currency`)."""
     if not has_live_record(root, typ, basefile):
         return True
-    record = json.loads(compress.read_text(
-        layout.fa_record_file(root, typ, basefile)))
+    record = compress.read_json(
+        layout.fa_record_file(root, typ, basefile))
     return not record.get("files")
 
 
