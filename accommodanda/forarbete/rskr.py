@@ -26,12 +26,11 @@ riksdagen.py, shared riksmöte-sliced backfill); the feed serves ~50k rskr from
 there on, ~400 per riksmöte.
 """
 
-import json
 import time
 from pathlib import Path
 
 from ..lib import compress, layout
-from ..lib.harvest import HarvestWatermark
+from ..lib.harvest import HarvestWatermark, write_record
 from ..lib.net import request
 from ..lib.util import basefile_slug
 from . import riksdagen
@@ -77,8 +76,7 @@ def download_document(session, root, entry, delay):
         layout.fa_dir(root, TYPE, record["basefile"]) / name, html)
     record["files"] = [name]
     time.sleep(delay)
-    compress.write_download(layout.fa_record_file(root, TYPE, record["basefile"]),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(layout.fa_record_file(root, TYPE, record["basefile"]), record)
     return record
 
 

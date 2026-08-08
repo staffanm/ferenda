@@ -27,13 +27,13 @@ records that exist, so a listing walk can never reach it. Resumable -- a record
 that gained a body is skipped, so a killed run is just rerun.
 """
 
-import json
 import time
 from pathlib import Path
 
 import requests
 
 from ..lib import compress, layout
+from ..lib.harvest import write_record
 from ..lib.net import BROWSER_UA, make_session, request
 from ..lib.util import Reporter, basefile_slug
 
@@ -51,7 +51,7 @@ def pending(root):
     for rec in compress.glob(Path(root) / TYPE, "*/*.json"):
         if rec.name.startswith("."):
             continue
-        record = json.loads(compress.read_text(rec))
+        record = compress.read_json(rec)
         if record.get("files") or HOST not in (record.get("url") or ""):
             continue
         out.append(record)
@@ -75,9 +75,7 @@ def download_one(root, session, record, delay):
         layout.fa_dir(root, TYPE, record["basefile"]) / name, html)
     record["files"] = [name]
     record["body_format"] = BODY_FORMAT
-    compress.write_download(
-        layout.fa_record_file(root, TYPE, record["basefile"]),
-        json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(layout.fa_record_file(root, TYPE, record["basefile"]), record)
     time.sleep(delay)
     return True
 

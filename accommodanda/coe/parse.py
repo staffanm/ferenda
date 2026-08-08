@@ -5,10 +5,10 @@ rm.coe.int (the downloader refuses anything else), so the body path is
 pdftohtml -> page_paragraphs -> :func:`build_structure`.
 """
 
-import json
 import re
 
 from ..lib import compress
+from ..lib.artifact import unique_id
 from ..lib.coe import article_fragment
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import normalize_space
@@ -39,11 +39,6 @@ def _runs(text):
     return [text]
 
 
-def _unique_id(base, ids):
-    ids[base] = ids.get(base, 0) + 1
-    return base if ids[base] == 1 else "%s-%d" % (base, ids[base])
-
-
 def _section_structure(root, ids):
     """Turn section divisions into provision containers for the exceptional
     instruments (notably ETS 048A) whose operative structure has Sections but
@@ -58,7 +53,7 @@ def _section_structure(root, ids):
             ordinal = division.group(2).upper()
             section_children = []
             section = {
-                "type": "sektion", "id": _unique_id("Sec%s" % ordinal, ids),
+                "type": "sektion", "id": unique_id("Sec%s" % ordinal, ids),
                 "ordinal": ordinal, "text": node["text"],
                 "children": section_children,
             }
@@ -92,7 +87,7 @@ def build_structure(paragraphs):
                 title += " – " + match.group(2)
             article_children = []
             article = {"type": "artikel",
-                       "id": _unique_id(article_fragment(number), ids),
+                       "id": unique_id(article_fragment(number), ids),
                        "ordinal": number, "text": _runs(title),
                        "children": article_children}
             root.append(article)
@@ -105,7 +100,7 @@ def build_structure(paragraphs):
             number = numbered.group(1)
             paragraph_children = []
             paragraph = {"type": "stycke",
-                         "id": _unique_id("%sP%s" % (article["id"], number), ids),
+                         "id": unique_id("%sP%s" % (article["id"], number), ids),
                          "ordinal": number, "text": _runs(numbered.group(2)),
                          "children": paragraph_children}
             article_children.append(paragraph)
@@ -114,7 +109,7 @@ def build_structure(paragraphs):
         if article and article_children is not None and point:
             letter = point.group(1)
             node = {"type": "punkt",
-                    "id": _unique_id("%sL%s" % (
+                    "id": unique_id("%sL%s" % (
                         paragraph["id"] if paragraph else article["id"], letter), ids),
                     "ordinal": letter, "text": _runs(point.group(2))}
             (paragraph_children if paragraph_children is not None
@@ -123,7 +118,7 @@ def build_structure(paragraphs):
         node = {"type": "stycke", "text": _runs(text)}
         if article and article_children is not None:
             article_serial += 1
-            node["id"] = _unique_id("%sS%d" % (article["id"], article_serial), ids)
+            node["id"] = unique_id("%sS%d" % (article["id"], article_serial), ids)
             article_children.append(node)
         else:
             loose += 1
@@ -150,6 +145,6 @@ def parse_record(record, paragraphs):
 
 
 def parse(basefile, root):
-    record = json.loads(compress.read_text(record_path(root, basefile)))
+    record = compress.read_json(record_path(root, basefile))
     body = body_path(root, record)
     return parse_record(record, pdf_paragraphs(body, ("coe", basefile)))

@@ -210,7 +210,7 @@ def write_site(out_root):
     out = Path(out_root)
     page_fmt = compress.PAGE_ENCODINGS
     for path in layout.artifacts("site"):
-        art = json.loads(compress.read_bytes(path))
+        art = compress.read_json(path)
         if art["type"] == "frontpage":
             compress.write_text(out / "index.html",
                                 _editable(render_frontpage(art), "frontpage"), page_fmt)

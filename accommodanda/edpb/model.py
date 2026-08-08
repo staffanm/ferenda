@@ -57,8 +57,8 @@ division of its output, then the identity it gave the document.
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import footnote_nodes, scanned_nodes
 from ..lib.catalog import BASE
-from ..lib.lagrum import interleave
 from .series import BY_KOD, KODER, WP29_BY_SLUG, number_slug
 
 __all__ = ["KODER", "Block", "Fotnot", "Vagledning", "vagledning_identifier",
@@ -148,25 +148,16 @@ class Vagledning:
         citations -- which is what puts a riktlinje on the rail of the artikel
         it interprets. A numbered paragraph anchors on its own number
         (``#punkt27``), an unnumbered one on its position."""
-        structure = []
-        n = 0
-        for b in self.body:
-            runs = interleave(b.text, scanner.parse_text(b.text, context={}))
-            if b.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": b.level,
-                                  "text": runs})
-                continue
-            n += 1
-            node = {"type": "stycke",
-                    "id": "punkt%s" % b.punkt if b.punkt else "S%d" % n,
-                    "text": runs}
+        structure = scanned_nodes(
+            self.body, scanner,
+            anchor=lambda b, n: "punkt%s" % b.punkt if b.punkt else "S%d" % n)
+        # the EDPB's own paragraph number, kept beside the anchor minted from it
+        # -- one node per block, in order, is `scanned_nodes`' contract (a rubrik
+        # never carries a punkt: `parse.body` numbers only the styckena)
+        for b, node in zip(self.body, structure, strict=True):
             if b.punkt:
                 node["punkt"] = b.punkt
-            structure.append(node)
-        footnotes = [{"mark": f.mark,
-                      "text": interleave(f.text,
-                                         scanner.parse_text(f.text, context={}))}
-                     for f in self.fotnoter]
+        footnotes = footnote_nodes(self.fotnoter, scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "sprak": self.sprak}
         for key, value in (("antagen", self.antagen),

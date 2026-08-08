@@ -43,7 +43,7 @@ from ..lib.pdftext import (
     pdf_images,
     pdf_pages,
 )
-from ..lib.util import approximate_date
+from ..lib.util import MONTHS, approximate_date
 from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -90,11 +90,6 @@ RE_FOOTDEF = re.compile(r"^\[(\d{1,2})\]\s*(.*)", re.S)
 # as the artifact; an unrelated trailing digit is kept as real text.
 RE_FOOTREF = re.compile(r"(\d)?([.,]?)\[(\d{1,2})\]")
 
-MONTHS = {
-    "januari": 1, "februari": 2, "mars": 3, "april": 4,
-    "maj": 5, "juni": 6, "juli": 7, "augusti": 8,
-    "september": 9, "oktober": 10, "november": 11, "december": 12,
-}
 COURT_DATE_ALIASES = {
     "HDO": ("HD", "Högsta domstolen"),
     "HFD": ("HFD", "Högsta förvaltningsdomstolen", "Regeringsrätten"),
@@ -686,7 +681,7 @@ def to_artifact(av, canonical_id=None, grupp_uris=None):
         # skeleton); the renderer walks it to show the instance structure
         "structure": nest([block(b, text)
                            for b, text in zip(av.body, runs, strict=True)]),
-        "footnotes": [{"num": fn.num, "text": runs}
+        "footnotes": [{"mark": fn.num, "text": runs}
                       for fn, runs in zip(av.footnotes,
                                           scan_footnotes(av.footnotes, written),
                                           strict=True)],

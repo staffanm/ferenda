@@ -1,6 +1,5 @@
 """HUDOC metadata + converted Word HTML to :class:`HudocCase` artifacts."""
 
-import json
 import re
 from datetime import datetime
 
@@ -143,7 +142,7 @@ def parse_record(record, html_text):
 
 
 def parse(basefile, root):
-    record = json.loads(compress.read_text(record_path(root, basefile)))
+    record = compress.read_json(record_path(root, basefile))
     html = patch.apply("hudoc", basefile,
                        compress.read_text(body_path(root, basefile)))
     return parse_record(record, html).to_artifact()

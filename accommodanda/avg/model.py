@@ -23,8 +23,8 @@ later did with the decision, which becomes the head of the document body.
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import footnote_nodes, scanned_nodes
 from ..lib.catalog import BASE
-from ..lib.lagrum import interleave
 
 ORGS = ("jo", "jk", "arn", "imy", "kkv")
 ORG_NAME = {"jo": "Justitieombudsmannen", "jk": "Justitiekanslern",
@@ -121,52 +121,27 @@ class Beslut:
         """The JSON artifact: shared node convention (`structure` of
         rubrik/stycke nodes with inline-run text) so catalog/render/search reuse
         their generic walkers; every text scanned for citations."""
-        structure = []
-        n = 0
-        for b in self.body:
-            runs = interleave(b.text, scanner.parse_text(b.text, context={}))
-            if b.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": b.level,
-                                  "text": runs})
-            else:
-                n += 1
-                structure.append({"type": "stycke", "id": "S%d" % n,
-                                  "text": runs})
-        footnotes = [{"mark": f.mark,
-                      "text": interleave(f.text,
-                                         scanner.parse_text(f.text, context={}))}
-                     for f in self.fotnoter]
+        structure = scanned_nodes(self.body, scanner)
+        footnotes = footnote_nodes(self.fotnoter, scanner)
         metadata = {"title": self.titel,
                     "publisher": ORG_NAME[self.org],
                     "diarienummer": self.diarienummer}
-        if self.beslutsdatum:
-            metadata["beslutsdatum"] = self.beslutsdatum
-        if self.avgjord_av:
-            metadata["avgjordAv"] = self.avgjord_av
-        if self.official_report:
-            metadata["officialReport"] = self.official_report
-        if self.nyckelord:
-            metadata["nyckelord"] = self.nyckelord
-        if self.delar:
-            metadata["dokument"] = self.delar
-        if self.tillsyner:
-            metadata["tillsyner"] = self.tillsyner
-        if self.arendetyp:
-            metadata["arendetyp"] = self.arendetyp
-        if self.motpart:
-            metadata["motpart"] = self.motpart
-        if self.bransch:
-            metadata["bransch"] = self.bransch
-        if self.beslutstyp:
-            metadata["beslutstyp"] = self.beslutstyp
-        if self.referat_url:
-            metadata["referatUrl"] = self.referat_url
-        if self.artal:
-            metadata["artal"] = self.artal
-        if self.praxis:
-            metadata["praxis"] = self.praxis
-        if self.sanktionsavgift:
-            metadata["sanktionsavgift"] = self.sanktionsavgift
+        for key, value in (("beslutsdatum", self.beslutsdatum),
+                           ("avgjordAv", self.avgjord_av),
+                           ("officialReport", self.official_report),
+                           ("nyckelord", self.nyckelord),
+                           ("dokument", self.delar),
+                           ("tillsyner", self.tillsyner),
+                           ("arendetyp", self.arendetyp),
+                           ("motpart", self.motpart),
+                           ("bransch", self.bransch),
+                           ("beslutstyp", self.beslutstyp),
+                           ("referatUrl", self.referat_url),
+                           ("artal", self.artal),
+                           ("praxis", self.praxis),
+                           ("sanktionsavgift", self.sanktionsavgift)):
+            if value:
+                metadata[key] = value
         art = {"uri": self.uri, "type": "avgorande", "org": self.org,
                "identifier": self.identifier, "metadata": metadata,
                "structure": structure}

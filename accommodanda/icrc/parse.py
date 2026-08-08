@@ -11,7 +11,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
+from ..lib import compress, patch
 from ..lib.util import normalize_space
 from .download import record_path
 from .model import (
@@ -157,5 +157,6 @@ def parse_envelope(envelope):
 
 
 def parse(basefile, root):
-    envelope = json.loads(compress.read_text(record_path(root, basefile)))
-    return parse_envelope(envelope).to_artifact()
+    text = patch.apply("icrc", basefile,
+                       compress.read_text(record_path(root, basefile)))
+    return parse_envelope(json.loads(text)).to_artifact()

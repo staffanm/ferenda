@@ -38,7 +38,7 @@ def law_index(con):
 
 
 def _ikraft(path):
-    props = json.loads(compress.read_bytes(path)).get("metadata", {}).get(
+    props = compress.read_json(path).get("metadata", {}).get(
         "properties", {})
     return props.get("rpubl:ikrafttradandedatum")
 
@@ -119,7 +119,7 @@ def resolve(con, layers=None):
     ).fetchall()
     rows, sfs_ids = [], {}
     for prop_uri, prop_path in props:
-        art = json.loads(compress.read_bytes(root / prop_path))
+        art = compress.read_json(root / prop_path)
         prop_date, prop_label = art.get("date"), art.get("identifier")
         for rec in prop_implements(art, layers.get(prop_uri)):
             sfs_uri = resolve_law(rec.get("law"), prop_date, title_idx, path_idx)
@@ -136,7 +136,7 @@ def resolve(con, layers=None):
             if sfs_pin:
                 if sfs_uri not in sfs_ids:
                     sfs_ids[sfs_uri] = text.fragment_ids(
-                        json.loads(compress.read_bytes(path_idx[sfs_uri])))
+                        compress.read_json(path_idx[sfs_uri]))
                 if anchor + sfs_pin not in sfs_ids[sfs_uri]:
                     sfs_pin = ""
             by_art = kommentar.pinpoints_by_article(rec.get("pinpoints") or [])

@@ -64,7 +64,6 @@ best-effort through the ordinary live-PDF branch with no OCR fallback -- an
 accepted limitation, revisited with the full-crawl decision.
 """
 
-import json
 import time
 from pathlib import Path
 from urllib.parse import quote
@@ -72,7 +71,7 @@ from urllib.parse import quote
 import requests
 
 from ..lib import compress, layout
-from ..lib.harvest import HarvestWatermark
+from ..lib.harvest import HarvestWatermark, write_record
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
@@ -234,8 +233,7 @@ def download_document(session, root, entry, delay):
         # body on `body_format` and KeyErrors without one
         record["body_format"] = BODY_FORMAT
         time.sleep(delay)
-    compress.write_download(layout.fa_record_file(root, TYPE, record["basefile"]),
-                            json.dumps(record, ensure_ascii=False, indent=2))
+    write_record(layout.fa_record_file(root, TYPE, record["basefile"]), record)
     return record
 
 
@@ -263,8 +261,8 @@ def _currency(root, basefile, entry):
     filbilaga)."""
     if not has_live_record(root, TYPE, basefile):
         return None
-    record = json.loads(compress.read_text(
-        layout.fa_record_file(root, TYPE, basefile)))
+    record = compress.read_json(
+        layout.fa_record_file(root, TYPE, basefile))
     if record["files"]:
         return "final"
     if pdf_fil(entry) is not None:

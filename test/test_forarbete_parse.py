@@ -882,6 +882,68 @@ def test_classify_places_a_display_heading_by_its_size():
         ("rubrik", 1), ("rubrik", 2), ("stycke", None)]
 
 
+def test_classify_reads_the_signature_block_as_prose_not_headings():
+    # Prop. 2023/24:27's first page. The signatories are set in body-size italic
+    # -- the same signal a subheading uses -- so 3 140 propositions listed their
+    # prime minister in the table of contents. Only the dateline above them says
+    # they are signatures.
+    paras = [_p("Pausad uppräkning av skiktgränsen", 23),
+             Para(text="Regeringen överlämnar denna proposition till riksdagen. "
+                       "Stockholm den 12 oktober 2023", size=15),
+             Para(text="Ulf Kristersson", size=15, italic=True),
+             Para(text="Gunnar Strömmer", size=15, italic=True),
+             Para(text="(Finansdepartementet)", size=15),
+             _p("Propositionens huvudsakliga innehåll", 23)]
+    assert [(b.kind, b.level, b.text) for b in
+            fa_parse.classify(paras, 1, 15, {23: 1, 19: 2})] == [
+        ("rubrik", 1, "Pausad uppräkning av skiktgränsen"),
+        ("stycke", None, "Regeringen överlämnar denna proposition till riksdagen. "
+                         "Stockholm den 12 oktober 2023"),
+        ("stycke", None, "Ulf Kristersson"),
+        ("stycke", None, "Gunnar Strömmer"),
+        ("stycke", None, "(Finansdepartementet)"),
+        # a size the document reserves for a heading ends the block -- without
+        # that, the first real heading after the signatures was swallowed too
+        ("rubrik", 1, "Propositionens huvudsakliga innehåll")]
+
+
+def test_classify_keeps_an_italic_subheading_that_follows_no_dateline():
+    # the rule the signature block borrows its look from must still work
+    paras = [Para(text="Skälen för regeringens förslag", size=15, italic=True)]
+    assert [(b.kind, b.level) for b in fa_parse.classify(paras, 1, 15, {})] == [
+        ("rubrik", 3)]
+
+
+def test_classify_keeps_an_italic_subheading_under_a_lagradsremiss_dateline():
+    # prop. 2004/05:141: a bilaga reproduces the lagrådsremiss, whose own
+    # dateline is followed by its signatures and then the heading "Lagrådet".
+    # A heading is not a name -- Swedish sets them in sentence case, so
+    # "Lagrådet" and "Lagrådets yttrande" both fail the name shape.
+    paras = [Para(text="Stockholm den 5 maj 2005", size=15),
+             Para(text="Thomas Bodström", size=15, italic=True),
+             Para(text="Lagrådet", size=15, italic=True),
+             Para(text="Lagrådets yttrande", size=15, italic=True)]
+    assert [(b.kind, b.text) for b in fa_parse.classify(paras, 1, 15, {})] == [
+        ("stycke", "Stockholm den 5 maj 2005"),
+        ("stycke", "Thomas Bodström"),
+        ("rubrik", "Lagrådet"),
+        ("rubrik", "Lagrådets yttrande")]
+
+
+def test_classify_ends_the_signature_block_at_the_next_numbered_heading():
+    # a betänkande dates its closing without a day ("Stockholm i mars 2019")
+    paras = [Para(text="Stockholm i mars 2019", size=15),
+             Para(text="Anna Andersson", size=15, italic=True),
+             Para(text="1 Utredningens uppdrag", size=15, bold=True),
+             Para(text="Lagrådet", size=15, italic=True)]
+    assert [(b.kind, b.level, b.text) for b in
+            fa_parse.classify(paras, 1, 15, {})] == [
+        ("stycke", None, "Stockholm i mars 2019"),
+        ("stycke", None, "Anna Andersson"),
+        ("rubrik", 1, "1 Utredningens uppdrag"),
+        ("rubrik", 3, "Lagrådet")]
+
+
 # ---- dating a förarbete's citations ------------------------------------------
 
 def _fa(basefile, date=None, typ="prop"):

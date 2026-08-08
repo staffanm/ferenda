@@ -26,7 +26,6 @@ so scanning it puts the agency's published reading on the rail of each paragraf
 it interprets -- next to the statute, which is where a reader meets it.
 """
 
-import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -40,7 +39,12 @@ from ..lib.pdftext import (
     pages_with_ocr,
     pdf_first_page_text,
 )
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import (
+    approximate_date,
+    drop_leading_title_echo,
+    normalize_space,
+    record_path,
+)
 from .agencies import BY_ORG
 from .download import labelled_value, pdf_path
 from .model import Block, Fotnot, Stallningstagande
@@ -223,26 +227,14 @@ READERS = {
 }
 
 
-def _fold(text):
-    """A heading compared the way a reader would compare it: case- and
-    space-insensitive, and free of the punctuation and the number the letterhead
-    may set alongside the title."""
-    return re.sub(r"[^0-9a-zåäö]+", "", text.lower())
-
-
 def drop_front_matter(blocks, titel):
     """Drop the letterhead's caption and the document's own title where the PDF
-    opens with them.
-
-    The page already carries both -- the caption as the section label, the title
-    as the h1 -- so the PDF's copies would read as the body opening by repeating
-    itself. Only *leading* blocks go, so a later heading that happens to echo
-    the title is left alone as the real section it is."""
-    folded = _fold(titel)
-    while blocks and (RE_LEAD.match(blocks[0].text)
-                      or (folded and _fold(blocks[0].text).endswith(folded))):
-        blocks = blocks[1:]
-    return blocks
+    opens with them -- the page already carries both, the caption as the section
+    label and the title as the h1. The echo matching (including the
+    truncated-title shape a cover line break leaves) is the shared
+    `drop_leading_title_echo`; only the caption pattern is rs's own."""
+    return drop_leading_title_echo(blocks, titel, text_of=lambda b: b.text,
+                                   lead=RE_LEAD.match)
 
 
 def body(record, root, patch_key=None):
@@ -305,11 +297,11 @@ def header_fields(record, root):
     return {k: v for k, v in fields.items() if v and not record.get(k)}
 
 
-def parse_record(basefile, root):
+def parse(basefile, root):
     """One basefile ("fk/2025:01", "kfm/1-23-VER", "migr/RS-028-2021") ->
     artifact dict, body citation-scanned."""
     org = basefile.split("/", 1)[0]
-    record = json.loads(compress.read_text(record_path(root, org, basefile)))
+    record = compress.read_json(record_path(root, org, basefile))
     fields = {**record, **header_fields(record, root)}
     return Stallningstagande(
         org=org, nummer=record["nummer"], titel=record["titel"],

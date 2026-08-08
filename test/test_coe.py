@@ -160,7 +160,7 @@ def test_coe_layout_and_catalog():
     assert layout.url_to_relpath("/coe/005") == "coe/005.html"
     art = {"uri": uri, "number": "005", "identifier": "ETS No. 005",
            "doctype": "treaty", "title": "European Convention"}
-    row = catalog.coe_document(art, "005.json")
+    row = catalog.document_row(art, "005.json", "coe")
     assert row[1:5] == ("coe", "treaty", "ETS No. 005", "European Convention")
 
 

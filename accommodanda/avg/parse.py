@@ -39,7 +39,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress, patch, poi
+from ..lib import compress, patch, poi, util
 from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
     classify_letterhead,
@@ -78,8 +78,7 @@ RE_JO_NOISE = re.compile(
     r"|E-post:|justitieombudsmannen@jo\.se|www\.jo\.se"
     r"|^Dnr(\s|$)|^Datum(\s|$)|^BESLUT$|^\d+-\d{4}$|^\d{4}-\d{2}-\d{2}$")
 
-JK_MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "maj": 5, "jun": 6,
-             "jul": 7, "aug": 8, "sep": 9, "okt": 10, "nov": 11, "dec": 12}
+JK_MONTHS = {m[:3]: i for m, i in util.MONTHS.items()}
 
 RE_IMY_MARGIN = re.compile(
     r"^(?:Diarienummer|Ert diarienummer|Datum|Diarienr|Beslut)\s*:?$"
@@ -672,12 +671,12 @@ def parse_kkv(record, root, patch_key=None):
 # entry point (the build driver's recipe)
 # --------------------------------------------------------------------------
 
-def parse_record(basefile, root):
+def parse(basefile, root):
     """One basefile ("jo/2340-2025" / "jk/2024-8082" / "arn/1992-3657" /
     "imy/IMY-2024-2904" / "kkv/558/2026") -> artifact dict, body
     citation-scanned."""
     org = basefile.split("/", 1)[0]
-    record = json.loads(compress.read_text(record_path(root, org, basefile)))
+    record = compress.read_json(record_path(root, org, basefile))
     patch_key = ("avg", basefile)
     if org == "jo":
         beslut = parse_jo(record, root, patch_key)

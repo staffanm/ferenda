@@ -44,8 +44,8 @@ document.
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import footnote_nodes, scanned_nodes
 from ..lib.catalog import BASE
-from ..lib.lagrum import interleave
 from .agencies import BY_ORG, ORGS, number_slug
 
 __all__ = ["ORGS", "Block", "Fotnot", "Stallningstagande", "rs_identifier",
@@ -125,21 +125,8 @@ class Stallningstagande:
         rubrik/stycke nodes with inline-run text), every text scanned for
         citations -- which is what puts a ställningstagande on the rail of the
         paragraf it interprets."""
-        structure = []
-        n = 0
-        for b in self.body:
-            runs = interleave(b.text, scanner.parse_text(b.text, context={}))
-            if b.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": b.level,
-                                  "text": runs})
-            else:
-                n += 1
-                structure.append({"type": "stycke", "id": "S%d" % n,
-                                  "text": runs})
-        footnotes = [{"mark": f.mark,
-                      "text": interleave(f.text,
-                                         scanner.parse_text(f.text, context={}))}
-                     for f in self.fotnoter]
+        structure = scanned_nodes(self.body, scanner)
+        footnotes = footnote_nodes(self.fotnoter, scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "status": self.status}
         for key, value in (("beslutsdatum", self.beslutsdatum),
@@ -154,7 +141,7 @@ class Stallningstagande:
         if self.nyckelord:
             metadata["nyckelord"] = self.nyckelord
         art = {"uri": self.uri, "type": "stallningstagande", "org": self.org,
-               "doktyp": self.doktyp, "identifier": self.identifier,
+               "doctype": self.doktyp, "identifier": self.identifier,
                "metadata": metadata, "structure": structure}
         if footnotes:
             art["footnotes"] = footnotes

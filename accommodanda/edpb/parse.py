@@ -35,10 +35,9 @@ serienummer.
 """
 
 import functools
-import json
 import re
 
-from ..lib import compress
+from ..lib import compress, util
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -53,7 +52,12 @@ from ..lib.pdftext import (
     page_paragraphs,
     pdf_pages,
 )
-from ..lib.util import normalize_space, record_path
+from ..lib.util import (
+    drop_leading_title_echo,
+    match_fold,
+    normalize_space,
+    record_path,
+)
 from .download import pdf_path
 from .model import Block, Fotnot, Vagledning
 from .series import BY_KOD, WP29_BY_SLUG
@@ -139,11 +143,7 @@ RE_WP_ADOPTED_EN = re.compile(
 RE_WP29_NAME = re.compile(r"^Artikel\s+29[-‑](?:arbets)?gruppen\s*", re.I)
 # Swedish and English month names, lower-cased. Four spellings coincide
 # (april, september, november, december) and are written once.
-MONTHS = {"januari": 1, "january": 1, "februari": 2, "february": 2,
-          "mars": 3, "march": 3, "april": 4, "maj": 5, "may": 5,
-          "juni": 6, "june": 6, "juli": 7, "july": 7,
-          "augusti": 8, "august": 8, "september": 9,
-          "oktober": 10, "october": 10, "november": 11, "december": 12}
+MONTHS = util.MONTHS | util.MONTHS_EN
 
 
 @functools.cache
@@ -240,29 +240,13 @@ def join_continuations(blocks):
     return out
 
 
-def folded(text):
-    """`text` with everything but its letters and digits taken out, for
-    comparing two renderings of the same title -- one off a PDF cover, one off
-    an index page -- which differ freely in punctuation, casing and the spaces
-    a line break leaves behind."""
-    return re.sub(r"[^0-9a-zåäö]+", "", text.lower())
-
-
 def drop_repeated_title(blocks, titel):
     """Drop the cover's copy of the title where the PDF opens with it -- the
     page already carries it as the h1, so the body would open by repeating
-    itself. Only *leading* blocks go, so a later heading echoing the title is
-    left as the real section it is."""
-    title = folded(titel)
-    while blocks and title:
-        head = folded(blocks[0][1])
-        # a block that folds away entirely is punctuation the cover left behind
-        # (two of the 51 open with a bare "."), never content -- step over it
-        # and keep looking for the echo it hides
-        if head and (len(head) < TITLE_ECHO_MIN or not title.startswith(head)):
-            break
-        blocks = blocks[1:]
-    return blocks
+    itself. The echo matching (including the letterhead-before-the-title shape,
+    and the step-over of cover punctuation that folds away entirely) is the
+    shared `drop_leading_title_echo`."""
+    return drop_leading_title_echo(blocks, titel, text_of=lambda b: b[1])
 
 
 # --------------------------------------------------------------------------
@@ -280,9 +264,6 @@ def drop_repeated_title(blocks, titel):
 # language, never as a general second opinion.
 RE_SWEDISH_LEAD = re.compile(r"^(?:Riktlinjer?|Rekommendationer?)\b", re.I)
 RE_ENGLISH_LEAD = re.compile(r"^(?:Guidelines?|Recommendations?)\b", re.I)
-# how much of the title a leading block must repeat before it counts as the
-# cover echoing the h1 rather than the body opening
-TITLE_ECHO_MIN = 8
 # a cover title runs to at most this many blocks before the version/adoption
 # line that closes it ("Riktlinjer 4/2019 om artikel 25" / "Inbyggt dataskydd
 # och dataskydd som standard" / "Version 2.0")
@@ -343,7 +324,8 @@ def wp_cover(paras, wp):
         # on the slice either way, so they degrade loudly. Stripped under -O,
         # this one would file whatever the source served under this URI wearing
         # the registry's title and date, which is the outcome it exists to stop.
-        if folded(wp.titel) not in folded(" ".join(texts[:COVER_TITLE_BLOCKS + 1])):
+        if match_fold(wp.titel) not in match_fold(
+                " ".join(texts[:COVER_TITLE_BLOCKS + 1])):
             raise ValueError(
                 "the document filed as %s does not open with the title the "
                 "registry records for it -- the source it is fetched from now "
@@ -402,12 +384,12 @@ def footnotes(paras):
                                                    RE_MASTHEAD)]
 
 
-def parse_record(basefile, root):
+def parse(basefile, root):
     """One basefile ("riktlinjer/05-2020", "wp/248") -> artifact dict, body
     citation-scanned."""
     serie = basefile.split("/", 1)[0]
     assert serie in BY_KOD, "no EDPB series %r" % serie
-    record = json.loads(compress.read_text(record_path(root, serie, basefile)))
+    record = compress.read_json(record_path(root, serie, basefile))
     paras = _paragraphs(pdf_path(root, basefile), ("edpb", basefile))
     fields = (wp_cover(paras, WP29_BY_SLUG[record["nummer"]]) if serie == "wp"
               else {"titel": titled(record, paras),

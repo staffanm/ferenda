@@ -7,7 +7,6 @@ Hermetic: the fixtures under ``test/files/rs/`` are trimmed captures of the live
 exercised against what the agencies actually publish without network or poppler.
 """
 
-import inspect
 import json
 from pathlib import Path
 
@@ -390,6 +389,19 @@ def test_front_matter_drops_the_caption_and_the_repeated_title():
         "Intern kontroll över säkerhetsskyddschefen behandlas i avsnitt 3."]
 
 
+def test_front_matter_drops_a_truncated_title_echo():
+    """Regression (RS/041/2021 and four more migr documents): the PDF's title
+    line breaks early, so the printed copy is only the *start* of the title --
+    the old ends-with test kept it and the page opened by repeating its own
+    heading. The rule shared with edpb catches the truncated shape."""
+    blocks = [Block("rubrik", "Kontroll av förvarsbesluts giltighet"),
+              Block("stycke", "Ett beslut om förvar ska prövas på nytt.")]
+    kept = rs_parse.drop_front_matter(
+        blocks, "Kontroll av förvarsbesluts giltighetstid")
+    assert [b.text for b in kept] == [
+        "Ett beslut om förvar ska prövas på nytt."]
+
+
 # --------------------------------------------------------------------------
 # artifact projection
 # --------------------------------------------------------------------------
@@ -586,7 +598,7 @@ def test_a_record_naming_no_document_is_still_written(tmp_path):
     assert compress.exists(record_path(tmp_path, "kkv", "kkv/2019:1"))
 
 
-def test_parse_record_without_a_document(tmp_path):
+def test_parse_without_a_document(tmp_path):
     """A repealed Konkurrensverket entry keeps its förteckning row and nothing
     else: it parses to a register entry with an empty body rather than failing."""
     record = {"basefile": "kkv/2023:3", "org": "kkv", "nummer": "2023:3",
@@ -597,7 +609,7 @@ def test_parse_record_without_a_document(tmp_path):
     path = record_path(tmp_path, "kkv", "kkv/2023:3")
     path.parent.mkdir(parents=True, exist_ok=True)
     compress.write_download(path, json.dumps(record, ensure_ascii=False))
-    art = rs_parse.parse_record("kkv/2023:3", tmp_path)
+    art = rs_parse.parse("kkv/2023:3", tmp_path)
     assert art["structure"] == []
     assert art["metadata"]["status"] == "upphävt"
     assert art["identifier"] == "Konkurrensverkets ställningstagande 2023:3"

@@ -129,7 +129,7 @@ def scan_api(domstoldir):
     for path in sorted(compress.glob(Path(domstoldir), "**/*.json")):
         if path.name.startswith("."):
             continue   # not a record: the .watermark.json harvest marker, junk
-        d = json.loads(compress.read_text(path))
+        d = compress.read_json(path)
         if d.get("typ") in EXCLUDE_TYP:
             continue   # a prövningstillstånd / förhandsavgörande is not a case
         court = canonical_court(d["domstol"]["domstolKod"])

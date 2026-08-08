@@ -25,7 +25,6 @@ har...", and `page_paragraphs` strips a matching substring anywhere in a
 line, not just where it forms a whole running-header line, so using it as the
 identifier silently deleted the organisation's name out of real sentences)."""
 
-import json
 from pathlib import Path
 
 from ..lib import compress, layout, poi
@@ -114,7 +113,7 @@ def _body_text(path, patch_key):
          for pageno, lines in pages]))
 
 
-def parse_record(basefile, root):
+def parse(basefile, root):
     """A remiss-answer basefile ("<typ>/<document id>/<org-slug>", e.g.
     ``sou/2026:14/kammarkollegiet``) -> Remissvar. Reads the ärende record for its
     metadata + cross-refs and the org's answer PDF for the body text (both under
@@ -133,8 +132,8 @@ def parse_record(basefile, root):
         raise SkipDocument("%s: %s" % (basefile, BROKEN_PDFS[basefile]))
     arende_basefile, slug = basefile.rsplit("/", 1)
     rel = layout.relpath("remisser", basefile)          # <typ>/<id-slug>/<org>
-    remiss = Remiss.from_dict(json.loads(compress.read_text(
-        Path(root) / rel.parent.parent / (rel.parent.name + ".json"))))
+    remiss = Remiss.from_dict(compress.read_json(
+        Path(root) / rel.parent.parent / (rel.parent.name + ".json")))
     inst = next((i for i in remiss.svar if org_slug(i.source_url) == slug),
                None)
     assert inst is not None, (

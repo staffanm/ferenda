@@ -327,7 +327,7 @@ def record(root, basefile):
     return d / "om" / (basefile[len("om/"):] + ".md")
 
 
-def artifact(root, basefile):
+def artifact(basefile, root):
     """basefile -> its parsed artifact as a plain JSON-serialisable dict."""
     path = record(root, basefile)
     if basefile == "frontpage":

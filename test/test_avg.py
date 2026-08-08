@@ -209,7 +209,7 @@ def test_catalog_row():
     art = {"uri": "https://lagen.nu/avg/jo/2340-2025", "org": "jo",
            "identifier": "JO dnr 2340-2025",
            "metadata": {"title": "Allvarlig kritik"}}
-    uri, source, kind, label, title, path = catalog.avg_document(art, "p.json")
+    uri, source, kind, label, title, path = catalog.document_row(art, "p.json", "avg")
     assert (source, kind, label, title) == \
         ("avg", "jo", "JO dnr 2340-2025", "Allvarlig kritik")
 
@@ -382,7 +382,7 @@ def test_arn_catalog_and_uri():
     art = {"uri": "https://lagen.nu/avg/arn/1992-3657", "org": "arn",
            "identifier": "ARN 1992-3657",
            "metadata": {"title": "Fråga om återbetalning"}}
-    uri, source, kind, label, title, path = catalog.avg_document(art, "p.json")
+    uri, source, kind, label, title, path = catalog.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "arn", "ARN 1992-3657")
     assert layout.relpath("avg", "arn/1992-3657").as_posix() == "arn/1992-3657"
 
@@ -928,7 +928,7 @@ def test_imy_layout_catalog_and_facets():
     assert layout.page_relpath(uri) == "avg/imy_IMY-2024-2904.html"
     art = {"uri": uri, "org": "imy", "identifier": "IMY dnr IMY-2024-2904",
            "metadata": {"title": "Polismyndigheten, VIS och gränsförordningen"}}
-    _uri, source, kind, label, title, _path = catalog.avg_document(art, "p.json")
+    _uri, source, kind, label, title, _path = catalog.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "imy", "IMY dnr IMY-2024-2904")
     assert title == "Polismyndigheten, VIS och gränsförordningen"
 
@@ -1302,7 +1302,7 @@ def test_kkv_layout_catalog_and_facets():
     assert layout.url_to_relpath("/avg/kkv/558/2026") == "avg/kkv_558_2026.html"
     art = {"uri": uri, "org": "kkv", "identifier": "KKV dnr 558/2026",
            "metadata": {"title": "Anmälan om företagskoncentration"}}
-    _uri, source, kind, label, _title, _path = catalog.avg_document(art, "p.json")
+    _uri, source, kind, label, _title, _path = catalog.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "kkv", "KKV dnr 558/2026")
 
     class R:

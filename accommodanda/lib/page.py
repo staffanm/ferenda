@@ -21,16 +21,20 @@ module owns what they all stand on:
   * the page shell -- ``page`` / ``page_context``, the ``dl.meta`` block and the
     TOC collector, so every source's template extends one chrome.
 
-Nothing here knows a source by name: what varies per source lives in that
-source's own renderer. ``lib/render.py`` (site assembly: frontpage, folkrätt
-landing, faceted browse, feeds) imports this module; the dependency never runs
-the other way.
+What varies per source lives in that source's own renderer. Where the shared kit
+itself has to vary -- how a citing document is named and pinpointed
+(``CITER_STYLE``), which inbound group it files under (``INBOUND_GROUPS``) -- the
+variation is a table keyed by the source name *as it appears in the data*, never
+an import of source code (rule:lib-never-imports-vertical). ``lib/render.py``
+(site assembly: frontpage, folkrätt landing, faceted browse, feeds) imports this
+module; the dependency never runs the other way.
 """
 import hashlib
 import json
 import re
 import sqlite3
 import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from html import escape
@@ -42,6 +46,7 @@ from . import (
     annstore,
     catalog,
     compress,
+    facets,
     layout,
 )
 from .catalog import BASE
@@ -168,7 +173,7 @@ def _kommentar_indexes(con):
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
         path = root / path
-        art = json.loads(compress.read_bytes(path))
+        art = compress.read_json(path)
         # wiki/parse stamps `annotates` (the host act uri) on every kommentar
         # artifact, so a missing key is a corrupt artifact, not an opt-out: fail
         # fast rather than silently drop the whole commentary from every statute
@@ -260,7 +265,7 @@ def _remiss_indexes():
         ann = annstore.for_artifact(path)
         if not ann.exists():
             continue                       # answer not analyzed yet -- nothing to show
-        svar = json.loads(compress.read_bytes(path))
+        svar = compress.read_json(path)
         # v1 maps only the first cross-ref, matching ai_analyze.analyze (a remiss
         # almost always sends out exactly one SOU/Ds); cache the referred
         # förarbete's uri so N answers to the same document reopen it once.
@@ -274,7 +279,7 @@ def _remiss_indexes():
             fa_path = layout.artifact("forarbete", layout.resolve_basefile(
                 "forarbete", "%s/%s" % (typ, basefile_slug(fa_basefile)),
                 *(["%s/%s" % (typ, ref["slug"])] if ref.get("slug") else [])))
-            host_uri[key] = json.loads(compress.read_bytes(fa_path))["uri"]
+            host_uri[key] = compress.read_json(fa_path)["uri"]
         fa_uri = host_uri[key]
 
         layer = json.loads(ann.read_text())      # malformed .ann -> JSONDecodeError
@@ -440,23 +445,30 @@ def describe_citer(from_uri, anchor, label, title, source):
     return name + (" " + pin if pin else "")
 
 
-# What each inbound group is called in the rail. These are *inbound* --
-# documents pointing here -- so the statute group keeps lagen.nu's long-standing
-# "Lagrumshänvisningar hit", which says the direction out loud; the others are
-# unambiguous under a heading that reads "Kontext för 18 §". Ranking lives in
+# The inbound rail's accordion rows, in display order. Ranking lives in
 # RAIL_SECTION_ORDER, keyed by these same slugs.
-INBOUND_GROUPS = [("sfs", "Lagrumshänvisningar hit"), ("forarbete", "Förarbeten"),
-                  ("foreskrift", "Myndighetsföreskrifter"),
-                  ("dv", "Rättsfall"), ("avg", "Myndighetsavgöranden"),
-                  ("rs", "Rättsliga ställningstaganden"),
-                  ("edpb", "EU:s dataskyddsriktlinjer"),
-                  ("hudoc", "Europadomstolens praxis"),
-                  ("icc", "Internationella brottmålsdomstolen"),
-                  ("eu-caselaw", "EU-domstolens praxis"),
-                  ("eu-forslag", "Generaladvokatens förslag till avgörande"),
-                  ("eurlex", "EU-rätt"), ("coe", "Europarådets fördrag"),
-                  ("icrc", "Humanitärrättsliga fördrag"),
-                  ("untc", "FN-fördrag"), ("begrepp", "Begrepp")]
+INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "edpb",
+                 "hudoc", "icc", "eu-caselaw", "eu-forslag", "eurlex", "coe",
+                 "icrc", "untc", "begrepp")
+
+# What a group is called where that is *not* simply what the source is called
+# (`facets.SOURCE_LABELS`). Three of them differ because these are **inbound** --
+# documents pointing here: the statute group keeps lagen.nu's long-standing
+# "Lagrumshänvisningar hit", which says the direction out loud, and the two
+# treaty/act groups name what cites rather than the corpus it comes from. The
+# other two are the pseudo-sources the eurlex corpus splits into
+# (INBOUND_KIND_GROUPS), which no source label covers. Every remaining group
+# takes the source's own name unchanged -- restated here, they were a third copy
+# of that table waiting to drift (the same failure `facets.SOURCE_LABELS`
+# records in its own comment).
+_INBOUND_LABEL = {"sfs": "Lagrumshänvisningar hit",
+                  "eurlex": "EU-rätt",
+                  "icrc": "Humanitärrättsliga fördrag",
+                  "eu-caselaw": "EU-domstolens praxis",
+                  "eu-forslag": "Generaladvokatens förslag till avgörande"}
+
+INBOUND_GROUPS = [(slug, _INBOUND_LABEL.get(slug) or facets.SOURCE_LABELS[slug])
+                  for slug in INBOUND_ORDER]
 
 # One source is normally one group, but the eurlex corpus holds two kinds of
 # citing document that a reader keeps apart: the acts, and the Court's own case
@@ -516,13 +528,71 @@ def forarbete_pinpoint(anchor, page=None):
     return ("s. %d" % page, "sid%d" % page) if page else ("", anchor)
 
 
+def _paragraf_pinpoint(anchor, _page=None):
+    return human_fragment(anchor), anchor
+
+
+def _whole_document_pinpoint(anchor, _page=None):
+    return "", anchor
+
+
+def _descriptive_name(_kind, label, title, descriptive):
+    return descriptive or title or label
+
+
+def _forarbete_name(kind, label, title, _descriptive):
+    if kind == "lr":
+        return "Lagrådsremiss: %s" % title if title and title != label \
+            else "Lagrådsremiss"
+    return "%s: %s" % (label, title) if title and title != label else label
+
+
+@dataclass(frozen=True)
+class CiterStyle:
+    """How one source's documents are written on an inbound citer line: what
+    names the document, what names a spot inside it, and how the two join.
+    Everything `_citer_line` varies by source, as data (`CITER_STYLE`) --
+    lib may not import a source, so a source's idiosyncrasy lives here as a
+    table entry rather than as a name check in the middle of the renderer."""
+    # (anchor, printed page or None) -> (human pinpoint, the anchor to link)
+    pinpoint: Callable[[str, int | None], tuple[str, str]]
+    # (kind, label, title, descriptive) -> the document's display name
+    name: Callable[[str, str, str, str | None], str]
+    # between the name and a lone pinpoint: a statute pinpoint completes the
+    # citation ("… 22 § 2 st"), a förarbete locator is an aside on where in the
+    # document it sits (", avsnitt 6.7")
+    sep: str
+    # whether several pinpoints share one leading category word, written once
+    # ("avsnitt 3, 5 och 7") instead of repeated on each
+    shared_word: bool
+
+
+# Most sources cite whole-document, under the short *descriptive* citing form
+# `labels.descriptive_label` stamped in the catalog: "räntelagen" not "Räntelag
+# (1975:635)", "JO 2024 s. 246" not the decision's long title (I1). An older
+# catalog with no `descriptive` column falls back to the full title.
+DEFAULT_CITER_STYLE = CiterStyle(_whole_document_pinpoint, _descriptive_name,
+                                 " ", False)
+
 # Sources whose documents are divided into chapters and paragrafer and mint the
 # SFS fragment syntax (`K2P3`, `P5S1`) for them, so a citing spot inside one is
 # nameable as "2 kap. 3 §". Föreskrifter are built that way by design
 # (foreskrift/structure) -- the statutory layer and the agency layer under it
 # pinpoint identically, and a föreskrift row that named no place was throwing
 # away an anchor the catalog already held.
-PARAGRAF_SOURCES = ("sfs", "foreskrift")
+_PARAGRAF_STYLE = CiterStyle(_paragraf_pinpoint, _descriptive_name, " ", False)
+
+# A förarbete is pinpointed by avsnitt or printed page, and named by its number
+# carrying its full title ("Prop. 2025/26:116: En ny funktion …") -- a
+# lagrådsremiss by title alone ("Lagrådsremiss: …"), it having no number.
+_FORARBETE_STYLE = CiterStyle(forarbete_pinpoint, _forarbete_name, ", ", True)
+
+CITER_STYLE = {"sfs": _PARAGRAF_STYLE, "foreskrift": _PARAGRAF_STYLE,
+               "forarbete": _FORARBETE_STYLE}
+
+
+def citer_style(source):
+    return CITER_STYLE.get(source, DEFAULT_CITER_STYLE)
 
 
 def _citer_pinpoint(source, anchor, page=None):
@@ -531,27 +601,13 @@ def _citer_pinpoint(source, anchor, page=None):
     a statute or a föreskrift; other sources cite whole-doc."""
     if not anchor:
         return "", anchor
-    if source == "forarbete":
-        return forarbete_pinpoint(anchor, page)
-    if source in PARAGRAF_SOURCES:
-        return human_fragment(anchor), anchor
-    return "", anchor
+    return citer_style(source).pinpoint(anchor, page)
 
 
 def citer_name(source, kind, label, title, descriptive=None):
     """The preferred display name for a citing/preparatory document in an inbound
-    panel. A förarbete carries its full title on its number ("Prop. 2025/26:116:
-    En ny funktion …") -- a lagrådsremiss by title alone ("Lagrådsremiss: …"), it
-    having no number. Every other source uses its short *descriptive* citing form
-    (`labels.descriptive_label`, stored in the catalog): "räntelagen" not
-    "Räntelag (1975:635)", "JO 2024 s. 246" not the decision's long title (I1). An
-    older catalog with no `descriptive` column falls back to the full title."""
-    if source == "forarbete":
-        if kind == "lr":
-            return "Lagrådsremiss: %s" % title if title and title != label \
-                else "Lagrådsremiss"
-        return "%s: %s" % (label, title) if title and title != label else label
-    return descriptive or title or label
+    panel -- see the `CITER_STYLE` entries for what each source is named by."""
+    return citer_style(source).name(kind, label, title, descriptive)
 
 
 def swedish_join(parts):
@@ -595,7 +651,8 @@ def _citer_line(row):
     the stycke (S3). Two adjacent links to the same document offer the reader a
     choice they have no basis to make, and the pinpoint is the better landing."""
     from_uri, label, title, source, kind, _date, anchors, descriptive = row
-    display = citer_name(source, kind, label, title, descriptive)
+    style = citer_style(source)
+    display = style.name(kind, label, title, descriptive)
     subtitle = _citer_subtitle(source, display, title)
     name = '<a href="%s">%s</a>' % (escape(href(from_uri)), escape(display))
     pins, seen = [], set()
@@ -616,13 +673,10 @@ def _citer_line(row):
             escape(href(from_uri + "#" + anchor)), escape(text))
 
     if len(pins) == 1:
-        # a statute pinpoint completes the citation ("… 22 § 2 st"); a förarbete
-        # locator is an aside on where in the document it sits (", avsnitt 6.7")
-        sep = ", " if source == "forarbete" else " "
         return "<li>%s%s</li>" % (
-            link(pins[0][1], display + sep + pins[0][0]), subtitle)
+            link(pins[0][1], display + style.sep + pins[0][0]), subtitle)
     words = {pin.split(" ")[0] for pin, _ in shown}
-    if source == "forarbete" and len(words) == 1 and " " in shown[0][0]:
+    if style.shared_word and len(words) == 1 and " " in shown[0][0]:
         word = escape(shown[0][0].split(" ", 1)[0])       # "avsnitt" / "s."
         body = word + " " + swedish_join(
             [link(a, pin.split(" ", 1)[1]) for pin, a in shown])
@@ -1927,6 +1981,23 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                                   Markup("".join(rendered)))
 
 
+def document_body(art, site, key="structure"):
+    """A document's body walked once into `(structure, toc, rail)`: the rendered
+    HTML, the headings collected while rendering it, and the rail the walk filled
+    (closed with its document-level sections). The three come back together
+    because they are one pass -- the TOC's anchors are the ids the body emitted,
+    and a rail whose `add_document` was forgotten silently loses every
+    document-level citation panel. `key` names the artifact's body array, which
+    is ``structure`` for a document with a formal structure and ``body`` for a
+    wiki page's prose."""
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    structure = Markup("".join(render_node(node, site, art["uri"], toc, rail)
+                               for node in art.get(key, [])))
+    rail.add_document()
+    return structure, toc, rail
+
+
 # --------------------------------------------------------------------------
 # page shells
 # --------------------------------------------------------------------------
@@ -1988,15 +2059,16 @@ def prop_link(site, ident):
 
 
 ANDRINGAR_CAP = 5    # register rows shown expanded in a provision's rail
-def footnote_items(footnotes, site, *, key="num", backref=True):
-    """Artifact footnotes -> template items for the endnote list.
+def footnote_items(footnotes, site, *, backref=True):
+    """Artifact footnotes -> template items for the endnote list. Every source
+    keys the printed marker as "mark" (a marker need not be a number).
 
     `backref` says the body carries a matching inline marker to return to. DV's
     does (its source prints "[N]", which the parser turns into a footnote run);
     a letterhead PDF's does not -- poppler renders the superscript glued into
     the prose, so there is nothing to anchor -- and those list with the marker
     the document printed instead of a back-link that would go nowhere."""
-    return [{"n": str(fn[key]), "html": Markup(render_runs(fn["text"], site)),
+    return [{"n": str(fn["mark"]), "html": Markup(render_runs(fn["text"], site)),
              "backref": backref}
             for fn in footnotes]
 

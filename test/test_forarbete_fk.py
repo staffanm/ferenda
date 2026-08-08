@@ -11,7 +11,7 @@ from accommodanda.forarbete.structure import flatten
 
 
 def prop(*blocks):
-    return {"type": "prop", "uri": "https://lagen.nu/prop/2000/01:1",
+    return {"doctype": "prop", "uri": "https://lagen.nu/prop/2000/01:1",
             "structure": [
                 {"type": "rubrik", "level": 1,
                  "text": ["16 Författningskommentar"]},
@@ -69,7 +69,7 @@ def test_span_survives_one_off_bilaga_mention_in_fk_prose():
 def test_span_opens_from_stycke_reflowed_heading():
     # prop 2017/18:269: the FK chapter heading is lost to a stycke and
     # reflowed to "Författningskommentar 18"
-    art = {"type": "prop", "structure": [
+    art = {"doctype": "prop", "structure": [
         {"type": "stycke", "text": ["Författningskommentar 18"]},
         LAW,
         {"type": "paragraf", "num": "1",
@@ -277,7 +277,7 @@ def test_comment_verb_continuation_is_a_marker_not_a_citation():
 def test_fk_heading_survives_merged_page_marginalia():
     # prop 1996/97:74: the heading arrives as "7 Författningskommentar
     # Prop. 1997:74" (page-header marginalia fused in)
-    art = {"type": "prop", "structure": [
+    art = {"doctype": "prop", "structure": [
         {"type": "rubrik", "level": 1,
          "text": ["7 Författningskommentar Prop. 1997:74"]},
         LAW,
@@ -342,4 +342,4 @@ def test_parse_marks_ranges_and_letters():
 
 
 def test_non_prop_yields_nothing():
-    assert extract({"type": "sou", "structure": []}) == []
+    assert extract({"doctype": "sou", "structure": []}) == []

@@ -51,7 +51,6 @@ and the true figure may sit below the range. This is a deliberate, one-time bulk
 fetch: it is not part of any incremental build and no other phase depends on it.
 """
 
-import json
 import time
 from pathlib import Path
 
@@ -88,7 +87,7 @@ def download_one(session, root, record, delay):
     key). The record is deliberately not written -- see the module docstring."""
     basefile = record["basefile"]
     dest = layout.fa_dir(root, TYPE, basefile) / layout.fa_facsimile_pdf(TYPE, basefile).name
-    if dest.exists():
+    if compress.exists(dest):
         return False                                  # resumable: already fetched
     data = request(session, "GET", scan_url(record["orig_url"])).content
     # load-bearing validation of untrusted remote bytes: KB serves the scan as
@@ -111,7 +110,7 @@ def sync(root, limit=None, delay=0.5):
     scan) so the progress line carries a real total and an ETA
     (rule:one-line-progress); the caller prints the final stdout summary."""
     session = make_session(BROWSER_UA)
-    worklist = [r for r in (json.loads(compress.read_text(p))
+    worklist = [r for r in (compress.read_json(p)
                             for p in sorted(compress.glob(Path(root) / TYPE, "*/*.json")))
                 if wanted(r)]
     rep = util.Reporter()

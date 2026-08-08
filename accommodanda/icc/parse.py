@@ -6,7 +6,6 @@ per-page court-record running header dropped. A record Legal Tools could not
 resolve stays metadata-only (empty structure), like a status record.
 """
 
-import json
 import re
 
 from ..lib import compress
@@ -53,14 +52,15 @@ def _classify(texts):
     return blocks
 
 
-def _blocks(path):
+def _blocks(path, basefile):
     """The decision PDF's paragraphs, classified."""
-    return _classify(para.text for page, lines in pdf_pages(str(path), None)
+    return _classify(para.text
+                     for page, lines in pdf_pages(str(path), ("icc", basefile))
                      for para in page_paragraphs(lines, None, page))
 
 
 def parse(basefile, root):
-    record = json.loads(compress.read_text(record_path(root, basefile)))
+    record = compress.read_json(record_path(root, basefile))
     lt = record.get("lt") or {}          # lt is legitimately None (unresolved)
     icc = record["icc"]                  # always written by the downloader
     base = record["base"]
@@ -75,5 +75,5 @@ def parse(basefile, root):
         date=(lt.get("dateCreated") or "")[:10] or _iso(icc.get("date")),
         chamber=icc.get("chamber") or lt.get("source"),
         slug=lt.get("slug"),
-        body=_blocks(body) if compress.exists(body) else [],
+        body=_blocks(body, basefile) if compress.exists(body) else [],
     ).to_artifact()

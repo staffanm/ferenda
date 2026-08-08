@@ -458,7 +458,7 @@ def test_footnotes_reach_the_artifact_and_are_citation_scanned():
             "text": "3", "kind": "footnote"} in body_links
     # the footnote itself is in the artifact, its case number linked
     [fn] = art["footnotes"]
-    assert fn["num"] == "3"
+    assert fn["mark"] == "3"
     assert any(isinstance(r, dict) and r["uri"].endswith("62021CJ0268")
                for r in fn["text"])
 

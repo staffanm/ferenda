@@ -45,7 +45,6 @@ and leaves those joins to the caller. See REWRITE.md.
 """
 
 import argparse
-import json
 import re
 
 from ..lib import compress, layout
@@ -389,7 +388,7 @@ def extract(art):
     (published alongside the enacted förordning) -- while a lagrådsremiss/SOU/Ds
     still has its provisions renumbered and revised before enactment, so the
     commentary of any other förarbete type yields nothing."""
-    typ = art.get("type")
+    typ = art.get("doctype")
     if typ not in {"prop", "fm"}:
         return []
     blocks = flatten(art["structure"])      # document-order flat view of the tree
@@ -504,7 +503,7 @@ def main():
     ap.add_argument("record", help="a förarbete record JSON (or its artifact)")
     ap.add_argument("--root", default=str(layout.FA_DOWNLOADED))
     args = ap.parse_args()
-    data = json.loads(compress.read_bytes(args.record))
+    data = compress.read_json(args.record)
     art = data if "structure" in data else to_artifact(parse_record(data, args.root))
     records = extract(art)
     print("%d implements-statements in författningskommentar" % len(records))

@@ -26,7 +26,6 @@ RE_DOTS = re.compile(r"(?:\.\s?){4,}")
 # a TOC row: a *dotted* section number opens the first cell ("1.3.1 Kunskaps-
 # yrkenas ...") -- a bare leading number ("22 år") is a data row, not a TOC
 RE_TOC_SECTION = re.compile(r"\d+\.\d+(?:\.\d+)*(?:\s|$)|Bilaga\b|Kapitel\b")
-RE_TOC_PAGENO = re.compile(r"\d{1,4}")
 # page-margin marker runs (running header / bilaga stamp), never table cells
 RE_MARGIN = re.compile(
     r"^(?:Prop\. \d{4}(?:/\d{2,4})?:\d+|Bilaga \d+|SOU \d{4}:\d+|Ds \d{4}:\d+)$")

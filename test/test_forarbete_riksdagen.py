@@ -536,5 +536,5 @@ def test_metadata_only_record_parses_to_empty_body_artifact(tmp_path):
     art = fa_parse.to_artifact(fa)
     assert art["uri"] == "https://lagen.nu/bet/2026/27:FiU8"
     assert art["identifier"] == "Bet. 2026/27:FiU8"
-    assert art["type"] == "bet"
+    assert art["doctype"] == "bet"
     assert art["structure"] == []                         # empty body, still valid

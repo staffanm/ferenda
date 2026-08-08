@@ -18,7 +18,6 @@ the composing layer, importing both the API and the render layer is the normal
 direction -- which is what retired the checker's last allowlist entry.
 """
 
-import sqlite3
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -53,7 +52,7 @@ def _browse_client(catalog_path):
     the same REST endpoints a network client would, with no running server. The
     get_con override is cleared by `generate_all`'s own finally."""
     def _con():
-        con = sqlite3.connect("file:%s?mode=ro" % catalog_path, uri=True)
+        con = catalog.connect_ro(catalog_path)
         try:
             yield con
         finally:
@@ -449,11 +448,12 @@ def generate_all(catalog_path, out_root, con):
     eu_axis = eurlex_axis(con)
     client = _browse_client(catalog_path)
     try:
+        browsable = set(facets.browsable())
         for source in catalog.counts(con):
-            # kommentar is an annotation layer, not a browsable source; the coe,
-            # icrc, untc and icc instruments are listed in full on the folkrätt
-            # landing instead of a faceted-by-year tree of their own
-            if source in ("kommentar", "coe", "icrc", "untc", "icc"):
+            # which schemes become pages is facets' own declaration
+            # (facets.UNGENERATED); a source with no scheme at all (kommentar,
+            # an annotation layer) has nothing to browse either way
+            if source not in browsable:
                 continue
             # hudoc browses under /folkratt/hudoc/ and edpb under
             # /eurlex/vagledning/, each carrying the selector it shares with the

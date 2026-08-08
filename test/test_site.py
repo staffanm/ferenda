@@ -2229,7 +2229,7 @@ FORARB_LAW = {
 
 def _citer(uri, ident, title, dt, anchors):
     """A förarbete artifact citing the whole Testlag from each of `anchors`."""
-    return {"uri": uri, "type": "prop" if "prop" in uri else "sou",
+    return {"uri": uri, "doctype": "prop" if "prop" in uri else "sou",
             "identifier": ident, "title": title, "date": dt,
             "structure": [{"type": "avsnitt", "id": a, "children": [
                 {"type": "stycke", "text": [
@@ -2329,7 +2329,7 @@ def test_forarbete_inbound_sorted_by_kind_then_date(tmp_path):
 # and the EU directive it points at (article 21 is a citation target).
 PROP = {
     "uri": "https://lagen.nu/prop/2023/24:1",
-    "type": "prop", "identifier": "Prop. 2023/24:1", "title": "Cybersäkerhetslag",
+    "doctype": "prop", "identifier": "Prop. 2023/24:1", "title": "Cybersäkerhetslag",
     "structure": [
         {"type": "avsnitt", "id": "sec1", "level": 1, "page": 100,
          "text": ["Författningskommentar"], "children": [
@@ -2406,9 +2406,12 @@ def test_directive_article_shows_implementing_forarbete(tmp_path):
 
 def test_genomforande_panel_absent_without_implements(tmp_path):
     site = page.Site.from_catalog(build_eu_catalog(tmp_path))
-    html = forarbete_render.render({"uri": "https://lagen.nu/prop/x", "type": "prop",
+    html = forarbete_render.render({"uri": "https://lagen.nu/prop/x", "doctype": "prop",
                                     "identifier": "Prop. X", "body": []}, site)
     assert "Genomför EU-direktiv" not in html
+    # regression (type->doctype rename): the Typ meta row reads the doctype key;
+    # a missed consumer made _meta_dl silently drop the row, with no failure
+    assert "Typ" in html and "Proposition" in html
 
 
 # --- genomför-direktiv pinned to SFS paragrafs (REWRITE.md §7d) -----------
@@ -2425,7 +2428,7 @@ def _impl(law, chapter, paragraf, pinpoint, partial=False):
 
 # one proposition exercising all three resolution paths
 PROP_PIN = {
-    "uri": "https://lagen.nu/prop/2021/22:9", "type": "prop",
+    "uri": "https://lagen.nu/prop/2021/22:9", "doctype": "prop",
     "identifier": "Prop. 2021/22:9", "date": "2021-10-01",
     "body": [{"type": "rubrik", "level": 1, "page": 50,
               "text": ["Författningskommentar"]}],
@@ -2693,7 +2696,7 @@ def test_prop_page_highlights_fk_commentary_blocks(tmp_path):
     # run; quoted lagtext and ordinary prose stay outside
     con = build_pin_catalog(tmp_path)
     site = page.Site.from_catalog(con)
-    art = {"uri": "https://lagen.nu/prop/2021/22:9", "type": "prop",
+    art = {"uri": "https://lagen.nu/prop/2021/22:9", "doctype": "prop",
            "identifier": "Prop. 2021/22:9", "structure": [
                {"type": "rubrik", "level": 1, "text": ["16 Författningskommentar"]},
                {"type": "paragraf", "num": "1", "text": ["1 § Lagtext här."]},
@@ -2957,7 +2960,7 @@ def _build_eu_inbound_catalog(tmp_path):
                 {"predicate": "dcterms:references", "text": "testförordningen",
                  "uri": ACT_URI}, "."]}]}]})])
     catalog.rebuild(db, "forarbete", [w("prop.json", {
-        "uri": "https://lagen.nu/prop/2099/00:1", "type": "prop",
+        "uri": "https://lagen.nu/prop/2099/00:1", "doctype": "prop",
         "identifier": "Prop. 2099/00:1", "title": "En kompletteringslag",
         "date": "2099-03-01",
         "body": [{"type": "stycke", "id": "a1", "text": [
@@ -3066,7 +3069,7 @@ def test_genomfor_pinpoints_split_per_article(tmp_path):
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
     prop.write_text(json.dumps({
-        "uri": "https://lagen.nu/prop/2025/26:28", "type": "prop",
+        "uri": "https://lagen.nu/prop/2025/26:28", "doctype": "prop",
         "identifier": "Prop. 2025/26:28", "date": "2025-10-14",
         "body": [{"type": "rubrik", "level": 1, "page": 1,
                   "text": ["Författningskommentar"]}],
@@ -3102,7 +3105,7 @@ def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
     prop = tmp_path / "prop.json"
     law_rubrik = "15.1 Förslaget till lag om ändring i testlagen (1999:100)"
     prop.write_text(json.dumps({
-        "uri": "https://lagen.nu/prop/2025/26:28", "type": "prop",
+        "uri": "https://lagen.nu/prop/2025/26:28", "doctype": "prop",
         "identifier": "Prop. 2025/26:28", "date": "2025-10-14",
         "body": [{"type": "rubrik", "level": 1, "page": 1,
                   "text": ["Författningskommentar"]}],

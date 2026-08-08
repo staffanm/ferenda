@@ -54,7 +54,6 @@ the whole batch. The LLM is called only from here, never from
 parse/relate/generate.
 """
 
-import json
 import re
 from pathlib import Path
 
@@ -117,7 +116,7 @@ def directive_articles(celex):
     assert compress.exists(path), \
         "%s: no parsed eurlex artifact -- run `lagen eurlex parse %s` first" \
         % (celex, celex)
-    art = json.loads(compress.read_bytes(path))
+    art = compress.read_json(path)
     out = {}
 
     def walk(node):
@@ -169,7 +168,7 @@ def build_catalog(celexes, prop_art):
     catalog = []
     for i, celex in enumerate(celexes):
         articles = directive_articles(celex)
-        art = json.loads(compress.read_bytes(layout.artifact("eurlex", celex)))
+        art = compress.read_json(layout.artifact("eurlex", celex))
         title = (art.get("title") or celex).strip()
         alias = (aliases.get(celex) or [None])[0]
         label = "%s (%s)" % (alias, title) if alias else title

@@ -18,7 +18,6 @@ from accommodanda.lib import pdftext
 from accommodanda.lib.errors import SkipDocument
 from accommodanda.remisser import parse
 from accommodanda.remisser.model import Remiss, Remissinstans, Remissvar, org_slug
-from accommodanda.remisser.parse import parse_record
 
 FIXTURE_PDF = Path(__file__).parent / "files" / "remisser" / "instance.pdf"
 
@@ -45,9 +44,9 @@ def corpus(tmp_path):
     return root
 
 
-def test_parse_record_extracts_body_text(corpus):
+def test_parse_extracts_body_text(corpus):
     root = corpus
-    result = parse_record("sou/2025:99/kammarkollegiet", root)
+    result = parse.parse("sou/2025:99/kammarkollegiet", root)
     assert result.basefile == "sou/2025:99/kammarkollegiet"
     assert result.arende_basefile == "sou/2025:99"
     assert result.organisation == "Kammarkollegiet"
@@ -61,13 +60,13 @@ def test_parse_record_extracts_body_text(corpus):
     # regression: page_paragraphs' header-strip used to be driven by the
     # organisation's own name, which silently deleted it out of ordinary
     # self-referencing prose too ("Kammarkollegiet har, utifrån ..." ->
-    # "har, utifrån ...") -- parse_record must pass no identifier at all
+    # "har, utifrån ...") -- parse must pass no identifier at all
     assert any("Kammarkollegiet har," in p for p in result.full_text)
 
 
-def test_parse_record_to_dict_from_dict_roundtrip(corpus):
+def test_parse_to_dict_from_dict_roundtrip(corpus):
     root = corpus
-    result = parse_record("sou/2025:99/kammarkollegiet", root)
+    result = parse.parse("sou/2025:99/kammarkollegiet", root)
     again = Remissvar.from_dict(json.loads(json.dumps(result.to_dict(),
                                                        ensure_ascii=False)))
     assert again == result
@@ -89,7 +88,7 @@ def test_pages_always_asks_for_hidden_text(corpus, monkeypatch):
     monkeypatch.setattr(pdftext, "pdf_pages",
                         lambda path, key, hidden: seen.append(hidden) or [(1, [_line("x")])])
     monkeypatch.setattr(parse, "page_paragraphs", lambda lines, ident, no: [])
-    parse.parse_record("sou/2025:99/kammarkollegiet", corpus)
+    parse.parse("sou/2025:99/kammarkollegiet", corpus)
     assert seen == [True]
 
 
@@ -108,7 +107,7 @@ def test_pages_falls_back_to_ocr_when_a_pdf_has_no_text_layer(corpus, monkeypatc
     monkeypatch.setattr(pdftext, "pdf_pages", fake_pages)
     monkeypatch.setattr(parse, "page_paragraphs",
                         lambda lines, ident, no: [SimpleNamespace(text=l.text) for l in lines])
-    result = parse.parse_record("sou/2025:99/kammarkollegiet", corpus)
+    result = parse.parse("sou/2025:99/kammarkollegiet", corpus)
     assert result.full_text == ["recovered"]
 
 
@@ -121,16 +120,16 @@ def test_pages_does_not_ocr_a_pdf_that_yielded_lines(corpus, monkeypatch):
     monkeypatch.setattr(pdftext, "pdf_pages",
                         lambda path, key, hidden: [(1, [_line("a letterhead line")])])
     monkeypatch.setattr(parse, "page_paragraphs", lambda lines, ident, no: [])
-    assert parse.parse_record("sou/2025:99/kammarkollegiet", corpus).full_text == []
+    assert parse.parse("sou/2025:99/kammarkollegiet", corpus).full_text == []
 
 
-def test_parse_record_missing_instance_asserts(corpus):
+def test_parse_missing_instance_asserts(corpus):
     root = corpus
     with pytest.raises(AssertionError, match="no answer instance"):
-        parse_record("sou/2025:99/no-such-org", root)
+        parse.parse("sou/2025:99/no-such-org", root)
 
 
-def test_parse_record_not_yet_downloaded_asserts(corpus):
+def test_parse_not_yet_downloaded_asserts(corpus):
     root = corpus
     remiss = Remiss.from_dict(json.loads(
         (root / "sou" / "2025-99.json").read_text()))
@@ -138,7 +137,7 @@ def test_parse_record_not_yet_downloaded_asserts(corpus):
     (root / "sou" / "2025-99.json").write_text(
         json.dumps(remiss.to_dict(), ensure_ascii=False, indent=2))
     with pytest.raises(AssertionError, match="has not been downloaded"):
-        parse_record("sou/2025:99/kammarkollegiet", root)
+        parse.parse("sou/2025:99/kammarkollegiet", root)
 
 
 def test_a_broken_answer_pdf_is_skipped_not_errored(corpus, monkeypatch):
@@ -148,7 +147,7 @@ def test_a_broken_answer_pdf_is_skipped_not_errored(corpus, monkeypatch):
     monkeypatch.setitem(parse.BROKEN_PDFS, "sou/2025:99/kammarkollegiet",
                         "trasig PDF hos regeringen.se")
     with pytest.raises(SkipDocument):
-        parse_record("sou/2025:99/kammarkollegiet", corpus)
+        parse.parse("sou/2025:99/kammarkollegiet", corpus)
 
 
 def test_every_broken_pdf_entry_is_well_formed():
@@ -177,7 +176,7 @@ def test_a_word_answer_stored_as_pdf_is_read_as_word(corpus):
     poppler is what produced five per-build `pdftohtml` failures; `_body_text`
     dispatches on the magic bytes instead and reads them through lib.poi."""
     shutil.copy(WORD_FIXTURE, corpus / "sou" / "2025-99" / "kammarkollegiet.pdf")
-    result = parse_record("sou/2025:99/kammarkollegiet", corpus)
+    result = parse.parse("sou/2025:99/kammarkollegiet", corpus)
     assert "REMISSVAR" in result.full_text
     assert any("tillstyrker de remitterade förslagen" in p
                for p in result.full_text)
@@ -192,7 +191,7 @@ def test_an_answer_that_is_neither_pdf_nor_word_raises(corpus):
     (corpus / "sou" / "2025-99" / "kammarkollegiet.pdf").write_bytes(
         b"<!doctype html><title>502 Bad Gateway</title>")
     with pytest.raises(ValueError, match="its bytes are"):
-        parse_record("sou/2025:99/kammarkollegiet", corpus)
+        parse.parse("sou/2025:99/kammarkollegiet", corpus)
 
 
 def test_a_pdf_with_an_unreadable_xref_is_repaired_not_lost(corpus):
@@ -209,5 +208,5 @@ def test_a_pdf_with_an_unreadable_xref_is_repaired_not_lost(corpus):
     broken = re.sub(rb"startxref\s+\d+", b"startxref\r\n116",
                     answer.read_bytes()).replace(b"trailer", b"traiier")
     answer.write_bytes(broken)
-    result = parse_record("sou/2025:99/kammarkollegiet", corpus)
+    result = parse.parse("sou/2025:99/kammarkollegiet", corpus)
     assert any("remitterade förslagen" in p for p in result.full_text)

@@ -53,7 +53,7 @@ def render(art, site):
     lb = labels.document_labels("forarbete", art)
     title = lb.short_title or art["uri"]
     # the identifier is the eyebrow (below), so it needs no "Beteckning" dl row
-    meta = [("Typ", FA_TYPE_LABEL.get(art.get("type"), art.get("type"))),
+    meta = [("Typ", FA_TYPE_LABEL.get(art.get("doctype"), art.get("doctype"))),
             ("Datum", art.get("date"))]
     parts = []
     toc = Toc()

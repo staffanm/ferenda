@@ -168,7 +168,7 @@ def annotate(celex, force=False):
     assert compress.exists(art_path), \
         "%s: no parsed artifact at %s -- run `lagen eurlex parse %s` first" \
         % (celex, art_path, celex)
-    art = json.loads(compress.read_bytes(art_path))
+    art = compress.read_json(art_path)
     prompt = PROMPT.read_text().replace(PLACEHOLDER, act_markdown(art))
     layer = llm.author(prompt, _validate)
     return annstore.write(out, {"editorialLayer": layer},

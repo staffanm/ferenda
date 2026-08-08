@@ -46,10 +46,6 @@ def _by_year_desc(keys):
     return sorted(keys, key=lambda k: (0, -int(k)) if k.isdigit() else (1, 0))
 
 
-def _by_alpha(keys):
-    return sorted(keys)
-
-
 def _curated(order):
     """Order by a fixed sequence; anything outside it trails, alphabetically."""
     rank = {k: i for i, k in enumerate(order)}
@@ -616,6 +612,23 @@ SCHEMES = {
 
 def sources():
     return list(SCHEMES)
+
+
+# Sources whose facet scheme serves the API and the search buckets only: their
+# reader-facing browse is the folkrätt landing's complete treaty/decision
+# listing, so generate writes no faceted tree of their own. Declared here as
+# data -- next to the schemes it qualifies -- rather than as a skip list inside
+# browse.py, so there is one authority for which schemes become pages (the two
+# used to disagree: the API answered /browse for four sources whose pages were
+# never generated).
+UNGENERATED = frozenset({"coe", "icrc", "untc", "icc"})
+assert UNGENERATED <= set(SCHEMES), "UNGENERATED names a source with no scheme"
+
+
+def browsable():
+    """The sources generate writes browse trees for: every scheme except the
+    folkrätt-landing set above."""
+    return [s for s in SCHEMES if s not in UNGENERATED]
 
 
 # What each source is called to a reader -- the one table, read by the browse

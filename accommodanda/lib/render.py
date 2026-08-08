@@ -35,6 +35,7 @@ from . import (
     facets,
     feeds,
     inbound,
+    labels,
     util,
 )
 from .page import Site, doc_relpath, href, page, page_context, site_cross_digests
@@ -76,8 +77,27 @@ def _render_feed_page(item, entries, params=None):
     return page(item.title, "Nyheter", "", body, solo=True, head=discovery)
 
 
+# A förarbete feed is named for its document type: "Alla propositioner". The type
+# is the browse bucket -- `facets` names it ("Propositioner"), and a feed line is
+# a sentence, so the initial drops to lower case. An abbreviation is not a word
+# and keeps its printed form, which is what this table holds (and all it holds:
+# every other type derives).
+_FEED_ABBREVIATED = {"sou": "Alla SOU", "ds": "Alla Ds", "so": "Alla SÖ"}
+
+
+def _all_label(bucket):
+    return _FEED_ABBREVIATED.get(bucket["key"]) or (
+        "Alla " + bucket["label"][:1].lower() + bucket["label"][1:])
+
+
 def _feed_index_groups(con):
-    """The legacy all-feeds directory, reshaped from the current catalog."""
+    """The legacy all-feeds directory, reshaped from the current catalog.
+
+    The förarbete types, the avg organs and the rs myndigheter -- their names and
+    their order both -- come from `facets.SCHEMES`, the one place a bucket of any
+    of those three sources is named (the browse tree and the /myndigheter landing
+    read the same table). Restating them here is what let this page call 24 803
+    betänkanden "Alla bet" and Justitieombudsmannen "Riksdagens ombudsmän"."""
     groups = [("Nyheter", [("Nyheter om webbtjänsten", "sitenews", {})])]
     groups.append(("Lagar", [
         ("Alla förordningar", "sfs", {"rdf_type": "type/forordning"}),
@@ -94,14 +114,8 @@ def _feed_index_groups(con):
     dv.append(("Samtliga rättsfall", "dv", {}))
     groups.append(("Rättsfall", dv))
 
-    type_labels = {"prop": "Alla propositioner", "sou": "Alla SOU",
-                   "ds": "Alla Ds", "dir": "Alla kommittédirektiv",
-                   "skr": "Alla skrivelser", "lr": "Alla lagrådsremisser",
-                   "fm": "Alla förordningsmotiv", "so": "Alla SÖ"}
-    kinds = [row[0] for row in con.execute(
-        "SELECT DISTINCT kind FROM documents WHERE source = 'forarbete' ORDER BY kind")]
-    fa = [(type_labels.get(kind, "Alla %s" % kind), "forarbeten",
-           {"rdf_type": "type/" + kind}) for kind in kinds]
+    fa = [(_all_label(bucket), "forarbeten", {"rdf_type": "type/" + bucket["key"]})
+          for bucket in facets.tree(con, "forarbete")["buckets"]]
     fa.append(("Samtliga förarbeten", "forarbeten", {}))
     groups.append(("Förarbeten", fa))
 
@@ -111,27 +125,16 @@ def _feed_index_groups(con):
     publishers.append(("Samtliga föreskrifter", "myndfs", {}))
     groups.append(("Föreskrifter", publishers))
 
-    avg_labels = {"arn": "Allmänna reklamationsnämnden",
-                  "jk": "Justitiekanslern", "jo": "Riksdagens ombudsmän",
-                  "imy": "Integritetsskyddsmyndigheten",
-                  "kkv": "Konkurrensverket"}
-    organs = [row[0] for row in con.execute(
-        "SELECT DISTINCT kind FROM documents WHERE source = 'avg' ORDER BY kind")]
-    praxis = [("Dokument publicerade av %s" % avg_labels.get(kind, kind),
-               "myndprax", {"dcterms_publisher": "publisher/" + kind})
-              for kind in organs]
+    praxis = [("Dokument publicerade av %s" % bucket["label"], "myndprax",
+               {"dcterms_publisher": "publisher/" + bucket["key"]})
+              for bucket in facets.tree(con, "avg")["buckets"]]
     praxis.append(("Samtliga dokument", "myndprax", {}))
     groups.append(("Praxis", praxis))
 
-    rs_labels = {"fk": "Försäkringskassan", "migr": "Migrationsverket",
-                 "kfm": "Kronofogdemyndigheten", "fi": "Finansinspektionen",
-                 "imy": "Integritetsskyddsmyndigheten",
-                 "kkv": "Konkurrensverket"}
     stallningstaganden = [
-        ("Ställningstaganden publicerade av %s" % rs_labels.get(kind, kind),
-         "myndrs", {"dcterms_publisher": "publisher/" + kind})
-        for kind in (row[0] for row in con.execute(
-            "SELECT DISTINCT kind FROM documents WHERE source = 'rs' ORDER BY kind"))]
+        ("Ställningstaganden publicerade av %s" % bucket["label"], "myndrs",
+         {"dcterms_publisher": "publisher/" + bucket["key"]})
+        for bucket in facets.tree(con, "rs")["buckets"]]
     stallningstaganden.append(
         ("Samtliga rättsliga ställningstaganden", "myndrs", {}))
     groups.append(("Rättsliga ställningstaganden", stallningstaganden))
@@ -317,17 +320,6 @@ def _render_index(con):
 # /folkratt/hudoc/) plus a most-cited reel.
 # --------------------------------------------------------------------------
 
-@functools.lru_cache(maxsize=None)
-def _treaty_named(path):
-    """A hand-edited treaty names.json (coe or icrc) as {number: entry}: the
-    curated central instruments surfaced first on the folkrätt page, each
-    carrying the informal Swedish name(s) (`label`) and acronym (`abbr`), either
-    a string or a list. Cached per file -- the folkrätt page rebuilds often."""
-    return {number: entry
-            for number, entry in json.loads(path.read_text("utf-8")).items()
-            if isinstance(entry, dict)}
-
-
 def _ext_number(uri):
     return uri.rsplit("/", 1)[-1]                 # '…/ext/coe/005' -> '005'
 
@@ -343,12 +335,6 @@ def _treaty_rows(con, source):
             in catalog.facet_documents(con, source)]
 
 
-def _first(value):
-    """The primary form of a names.json `label`/`abbr` (a string, or the first of
-    a list)."""
-    return value[0] if isinstance(value, list) else value
-
-
 def _treaty_parenthetical(row, named, reference):
     """The subdued gloss after a treaty title: its informal Swedish name and
     acronym where registered, then always the given reference --
@@ -356,10 +342,10 @@ def _treaty_parenthetical(row, named, reference):
     entry = named.get(row["number"]) or {}
     parts = []
     if entry.get("label"):
-        name = _first(entry["label"])
+        name = labels.primary(entry["label"])
         parts.append(name[:1].upper() + name[1:])
     if entry.get("abbr"):
-        parts.append(_first(entry["abbr"]))
+        parts.append(labels.primary(entry["abbr"]))
     parts.append(reference)
     return ", ".join(parts)
 
@@ -412,7 +398,7 @@ def _coe_listing(con):
     rows = _treaty_rows(con, "coe")
     if not rows:
         return ""
-    named = _treaty_named(datasets.COE_NAMES)
+    named = labels.treaty_names(datasets.COE_NAMES)
     top, children = _coe_nest(rows)
     groups = Markup("").join(
         LISTS.folkratt_group(heading, Markup("").join(
@@ -467,24 +453,24 @@ def _folkratt_section(title, groups):
     return LISTS.folkratt_section(title, body) if body else ""
 
 
-def _grouped_listing(title, rows, group_of, labels, entry, reverse=False):
-    """A folkrätt listing bucketed by `group_of`, headed by the `labels` in their
-    order then any trailing bucket, each group sorted by (date, title). '' when
-    the source has no rows. The two flat sources (untc, icc) share this whole
+def _grouped_listing(title, rows, group_of, headings, entry, reverse=False):
+    """A folkrätt listing bucketed by `group_of`, headed by the `headings` in
+    their order then any trailing bucket, each group sorted by (date, title). ''
+    when the source has no rows. The two flat sources (untc, icc) share this whole
     body; icrc keeps its own (a central group + orphan-folded topic index)."""
     if not rows:
         return ""
     by_group = {}
     for row in rows:
         by_group.setdefault(group_of(row), []).append(row)
-    order = list(labels) + [key for key in by_group if key not in labels]
+    order = list(headings) + [key for key in by_group if key not in headings]
     groups = []
     for key in order:
         members = sorted(by_group.get(key, []),
                          key=lambda r: (r["date"] or "", r["title"].lower()),
                          reverse=reverse)
         if members:
-            groups.append(_folkratt_group(labels.get(key, key), members, entry))
+            groups.append(_folkratt_group(headings.get(key, key), members, entry))
     return _folkratt_section(title, groups)
 
 
@@ -495,7 +481,7 @@ def _icrc_listing(con):
     rows = _treaty_rows(con, "icrc")
     if not rows:
         return ""
-    named = _treaty_named(datasets.ICRC_NAMES)
+    named = labels.treaty_names(datasets.ICRC_NAMES)
     root = catalog.data_root(con)
     entry = lambda row: _icrc_entry(row, named)
     central = sorted((r for r in rows if r["number"] in named),
@@ -525,7 +511,7 @@ def _icrc_listing(con):
 def _untc_curated():
     """The curated UN Treaty Collection list as {mtdsg_no: entry} -- the Swedish
     name/acronym and subject group the catalog does not carry. Cached: the
-    folkrätt page rebuilds often (as with `_treaty_named`)."""
+    folkrätt page rebuilds often (as with `labels.treaty_names`)."""
     return {t["mtdsg_no"]: t
             for t in json.loads(datasets.UNTC_TREATIES.read_text("utf-8"))["treaties"]}
 
@@ -688,14 +674,13 @@ def _write_page(uri, source, path, title, site, out_root, renderers):
     on disk (empty path) and renders a shell whose content is its aggregated
     inbound; everything else loads its artifact."""
     try:
-        art = (json.loads(compress.read_bytes(path)) if path
+        art = (compress.read_json(path) if path
                else {"uri": uri, "type": source, "title": title})
     except FileNotFoundError:
         return False               # stale catalog row; run `lagen <source> relate`
     out = Path(out_root) / doc_relpath(uri)
     out.parent.mkdir(parents=True, exist_ok=True)
-    compress.write_text(out, render_document(art, source, site, renderers),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(out, render_document(art, source, site, renderers))
     return True
 
 
@@ -1003,11 +988,9 @@ def write_assets(out_root):
     plain via the size floor in compress.write."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
-    compress.write_text(out_root / SCRIPT_BUNDLE, _bundled_script(),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(out_root / SCRIPT_BUNDLE, _bundled_script())
     compress.write_text(out_root / "robots.txt",
-                        (ASSETS / "robots.txt").read_text(encoding="utf-8"),
-                        encodings=compress.PAGE_ENCODINGS)
+                        (ASSETS / "robots.txt").read_text(encoding="utf-8"))
     # style.css ships the self-hosted @font-face set first (assets/fonts/,
     # replacing the fonts.googleapis.com stylesheet -- no visitor request
     # leaves the site for a font), then the reader stylesheet, then the editor
@@ -1016,8 +999,7 @@ def write_assets(out_root):
     compress.write_text(out_root / "style.css",
                         (ASSETS / "fonts" / "fonts.css").read_text(encoding="utf-8")
                         + (ASSETS / "style.css").read_text(encoding="utf-8")
-                        + (ASSETS / "editor.css").read_text(encoding="utf-8"),
-                        encodings=compress.PAGE_ENCODINGS)
+                        + (ASSETS / "editor.css").read_text(encoding="utf-8"))
     # the font binaries themselves: woff2 is already compressed, so they are
     # stored plain (no .br sibling), under the /fonts/ urls fonts.css names
     fonts_dir = out_root / "fonts"
@@ -1045,37 +1027,29 @@ def render_aggregates(con, out_root, write_index=True):
     out_root.mkdir(parents=True, exist_ok=True)
     write_assets(out_root)
     if write_index:
-        compress.write_text(out_root / "index.html", _render_index(con),
-                            encodings=compress.PAGE_ENCODINGS)
+        compress.write_text(out_root / "index.html", _render_index(con))
     folkratt_dir = out_root / "folkratt"
     folkratt_dir.mkdir(parents=True, exist_ok=True)
-    compress.write_text(folkratt_dir / "index.html", render_folkratt(con),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(folkratt_dir / "index.html", render_folkratt(con))
     myndigheter_dir = out_root / "myndigheter"
     myndigheter_dir.mkdir(parents=True, exist_ok=True)
-    compress.write_text(myndigheter_dir / "index.html", _render_myndigheter(con),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(myndigheter_dir / "index.html", _render_myndigheter(con))
     search_dir = out_root / "sok"
     search_dir.mkdir(parents=True, exist_ok=True)
-    compress.write_text(search_dir / "index.html", _render_search_page(),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(search_dir / "index.html", _render_search_page())
     admin_dir = out_root / "admin"
     admin_dir.mkdir(parents=True, exist_ok=True)
-    compress.write_text(admin_dir / "index.html", _render_admin_page(),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(admin_dir / "index.html", _render_admin_page())
     # The legacy feed directory and per-repository feeds. Query-parameter
     # variants are rendered live by api/app.py; these unfiltered copies keep the
     # generated tree independently publishable at the same stable URLs.
     feed_index = out_root / "dataset" / "sitenews"
     feed_index.mkdir(parents=True, exist_ok=True)
-    compress.write_text(feed_index / "index.html", _render_feed_index(con),
-                        encodings=compress.PAGE_ENCODINGS)
+    compress.write_text(feed_index / "index.html", _render_feed_index(con))
     for item in feeds.DATASETS:
         entries = feeds.entries(con, item)
         target = out_root / "dataset" / item.alias
         (target / "feed").mkdir(parents=True, exist_ok=True)
-        compress.write_text(target / "feed.atom", feeds.render_atom(item, entries),
-                            encodings=compress.PAGE_ENCODINGS)
+        compress.write_text(target / "feed.atom", feeds.render_atom(item, entries))
         compress.write_text(target / "feed" / "index.html",
-                            _render_feed_page(item, entries),
-                            encodings=compress.PAGE_ENCODINGS)
+                            _render_feed_page(item, entries))

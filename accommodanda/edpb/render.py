@@ -9,12 +9,10 @@ from markupsafe import Markup
 from ..lib import catalog, tpl
 from ..lib.page import (
     BANNERS,
-    Rail,
-    Toc,
     doc_meta,
+    document_body,
     footnote_items,
     page_context,
-    render_node,
     render_toc,
 )
 
@@ -48,12 +46,7 @@ def render(art, site):
         ("Språk", {"sv": "svenska", "en": "engelska"}.get(md.get("sprak"))),
         ("Ämnesord", ", ".join(md.get("amnesord", [])) or None),
     ]
-    toc = Toc()
-    rail = Rail(site, art["uri"])
-    structure = Markup("".join(
-        render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", [])))
-    rail.add_document()
+    structure, toc, rail = document_body(art, site)
     banner = Markup("").join(part for part in (
         BANNERS.edpb_language_banner(art.get("source_url"))
         if md.get("sprak") == "en" else "",
@@ -66,5 +59,5 @@ def render(art, site):
         toc=render_toc(toc), eyebrow=ident,
         banner=banner,
         footnotes=footnote_items(art.get("footnotes", []), site,
-                                  key="mark", backref=False),
+                                  backref=False),
         island=rail.island(), structure=structure))

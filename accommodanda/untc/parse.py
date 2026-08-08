@@ -10,17 +10,11 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
-from ..lib.util import normalize_space
+from ..lib import compress, patch
+from ..lib.util import english_date, normalize_space
 from .download import page_path
 from .model import Party, Treaty, load_treaties
 
-# the MTDSG mixes full ("27 January 1980") and abbreviated ("27 Jun 2001")
-# month names, so the lookup keys on the three-letter prefix
-MONTHS = {m: i for i, m in enumerate(
-    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
-     "Sep", "Oct", "Nov", "Dec"], 1)}
-RE_DATE = re.compile(r"(\d{1,2})\s+([A-Z][a-z]{2,})\s+(\d{4})")
 # the consent-to-be-bound column closes each date with a case-sensitive action
 # marker (a plain date is a ratification); the markers are documented in the
 # column header itself ("Accession(a), Succession(d), Ratification")
@@ -35,11 +29,9 @@ def _text(soup, id_suffix):
 
 
 def _date(value):
-    match = RE_DATE.search(value or "")
-    if not match:
-        return None
-    return "%04d-%02d-%02d" % (int(match.group(3)), MONTHS[match.group(2)[:3]],
-                               int(match.group(1)))
+    # the MTDSG mixes full ("27 January 1980") and abbreviated ("27 Jun 2001")
+    # month names; english_date's prefix matching covers both
+    return english_date(value or "")
 
 
 def _conclusion(value):
@@ -121,5 +113,6 @@ def parse_page(entry, html):
 
 def parse(basefile, root):
     entry = load_treaties()[basefile]
-    html = compress.read_text(page_path(root, basefile))
+    html = patch.apply("untc", basefile,
+                       compress.read_text(page_path(root, basefile)))
     return parse_page(entry, html).to_artifact()

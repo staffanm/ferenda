@@ -38,7 +38,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import annstore, compress, layout, llm, markdown, net, util
@@ -73,8 +72,8 @@ def fetch_pdf(url):
     cached = CACHE / (hashlib.sha1(url.encode()).hexdigest()[:16] + ".pdf")
     if cached.exists():
         return cached
-    resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=120)
-    net.raise_for_status(resp)
+    session = net.make_session(USER_AGENT)
+    resp = net.request(session, "GET", url, timeout=120)
     # untrusted remote content: a WAF challenge / error page comes back 200 with
     # HTML, not a PDF. raise (not assert, which -O strips) so a non-PDF is rejected
     # loudly, and write atomically only after the check passes -- a poisoned body
@@ -232,7 +231,7 @@ def annotate(basefile, wiki_root, force=False):
     assert compress.exists(host_path), \
         ("%s: no parsed host artifact at %s -- run `lagen eurlex parse %s` first"
          % (basefile, host_path, celex))
-    host_art = json.loads(compress.read_bytes(host_path))
+    host_art = compress.read_json(host_path)
     act, anchors = act_map(host_art)
     assert anchors, "%s host act %s has no anchors to link against" % (basefile, celex)
 

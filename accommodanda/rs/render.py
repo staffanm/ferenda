@@ -9,12 +9,10 @@ from markupsafe import Markup
 from ..lib import catalog, labels, layout, tpl
 from ..lib.page import (
     BANNERS,
-    Rail,
-    Toc,
     doc_meta,
+    document_body,
     footnote_items,
     page_context,
-    render_node,
     render_toc,
 )
 
@@ -41,12 +39,7 @@ def render(art, site):
         ("Ersätter", md.get("ersatter")),
         ("Ämnesord", ", ".join(md.get("nyckelord", [])) or None),
     ]
-    toc = Toc()
-    rail = Rail(site, art["uri"])
-    structure = Markup("".join(
-        render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", [])))
-    rail.add_document()
+    structure, toc, rail = document_body(art, site)
     banner = BANNERS.rs_upphavd_banner(
         md.get("upphavd"),
         _sibling_rs(site, md.get("ersattAv"), art["uri"])) if upphavd else ""
@@ -62,7 +55,7 @@ def render(art, site):
         summary_text=art.get("sammanfattning"),
         banner=Markup(banner),
         footnotes=footnote_items(art.get("footnotes", []), site,
-                                  key="mark", backref=False),
+                                  backref=False),
         island=rail.island(), structure=structure))
 
 

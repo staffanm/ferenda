@@ -89,7 +89,7 @@ def test_parse_metadata_without_body():
     assert art["doctype"] == "judgment"
     assert art["title"] == "The Prosecutor v. Bosco Ntaganda"
     assert art["identifier"] == "ICC-01/04-02/06 (Judgment)"
-    assert art["date"] == "2019-07-08"
+    assert art["avgorandedatum"] == "2019-07-08"
     md = art["metadata"]
     assert md["publisher"] == "International Criminal Court"
     assert md["caseNumber"] == "ICC-01/04-02/06"
@@ -152,7 +152,7 @@ def test_icc_layout_round_trips_and_catalog_row():
 def _stub(number, case, kind, date):
     return {"uri": decision_uri(number), "docnumber": number, "doctype": kind,
             "type": "avgorande", "court": "icc",
-            "identifier": "%s (x)" % number, "title": case, "date": date,
+            "identifier": "%s (x)" % number, "title": case, "avgorandedatum": date,
             "metadata": {"documentNumber": number, "caseNumber": number}, "references": [],
             "structure": []}
 

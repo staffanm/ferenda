@@ -204,9 +204,6 @@ RE_TRIPS_DATE = re.compile(r"A:\s*(\d{2}|\d{4})-(\d{2})-(\d{2})")
 # HD's month-compilation lead: "Den 9:e. 1. (Ö 4629-01) V.B. och D.B. mot …"
 RE_HDO_LEAD = re.compile(r"^Den\s+(\d{1,2}):?e?\.\s+\d+\.\s*(.*)", re.S)
 RE_PAREN_MALNR = re.compile(r"\(([ÖBT]\s?\d+-\d+)\)")
-MONTH_ORDINAL = {name: i + 1 for i, name in enumerate(
-    ("januari", "februari", "mars", "april", "maj", "juni", "juli",
-     "augusti", "september", "oktober", "november", "december"))}
 # TRIPS record markers ("*REGI") interleaved with the text
 RE_TRIPS_MARKER = re.compile(r"^\*[A-Z]+$")
 
@@ -282,8 +279,8 @@ def parse_notis_head(paras, filename):
             in_body = True
             body.append(word.Para(lead.group(2), p.bold, p.in_table))
             continue
-        if text.lower() in MONTH_ORDINAL:
-            month = MONTH_ORDINAL[text.lower()]
+        if text.lower() in util.MONTHS:
+            month = util.MONTHS[text.lower()]
             continue
         if "Lnr:" in text or (text.startswith(("R4", "G:"))
                               and RE_TRIPS_MALNR.search(text)):

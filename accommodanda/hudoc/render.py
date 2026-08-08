@@ -8,12 +8,10 @@ from markupsafe import Markup
 
 from ..lib import labels, tpl
 from ..lib.page import (
-    Rail,
-    Toc,
     doc_meta,
+    document_body,
     page_context,
     ref_list,
-    render_node,
     render_toc,
 )
 
@@ -26,16 +24,11 @@ def render(art, site):
     # the application number is the eyebrow now, so it needs no dl row of its own
     meta = [
         ("Domstol", md.get("publisher")),
-        ("Avgörandedatum", art.get("date")),
+        ("Avgörandedatum", art.get("avgorandedatum")),
         ("ECLI", art.get("ecli")),
         ("Artiklar", ", ".join(md.get("articles", [])) or None),
     ]
-    toc = Toc()
-    rail = Rail(site, art["uri"])
-    structure = Markup("".join(
-        render_node(node, site, art["uri"], toc, rail)
-        for node in art.get("structure", [])))
-    rail.add_document()
+    structure, toc, rail = document_body(art, site)
     return ENV.get_template("hudoc.html").render(page_context(
         lb.short_title or art.get("itemid"), "Europadomstolen",
         doc_meta(meta, art.get("source_url")), toc=render_toc(toc),

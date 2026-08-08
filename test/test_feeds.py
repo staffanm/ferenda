@@ -110,6 +110,53 @@ def test_every_dataset_is_reachable_from_the_feed_index(tmp_path):
     assert {d.alias for d in feeds.DATASETS} <= listed
 
 
+def test_feed_index_names_its_series_from_the_facet_scheme(tmp_path):
+    """The förarbete types, the avg organs and the rs myndigheter are named --
+    and ordered -- by `facets.SCHEMES`, the one table that names a bucket of
+    those sources (the browse tree and the /myndigheter landing read it too).
+    Restated in the feed index, the copies drifted: betänkanden listed as "Alla
+    bet" and JO as "Riksdagens ombudsmän", where its own browse bucket says
+    "Justitieombudsmannen (JO)".
+
+    The bucket key doubles as the feed's filter value, so each generated link
+    must also select the documents it promises -- a facet key that stopped being
+    the catalog `kind` would leave every link listing nothing."""
+    db = tmp_path / "catalog.sqlite"
+    bet = tmp_path / "bet.json"
+    bet.write_text(json.dumps({
+        "uri": "https://lagen.nu/bet/2024/25:JuU1", "doctype": "bet",
+        "identifier": "Bet. 2024/25:JuU1", "title": "Ett betänkande",
+        "date": "2024-11-01", "body": []}))
+    catalog.rebuild(db, "forarbete", [bet])
+    beslut = tmp_path / "jo.json"
+    beslut.write_text(json.dumps({
+        "uri": "https://lagen.nu/avg/jo/2340-2025", "org": "jo",
+        "identifier": "JO dnr 2340-2025",
+        "metadata": {"title": "Ett beslut", "beslutsdatum": "2025-03-04"}}))
+    catalog.rebuild(db, "avg", [beslut])
+    stallning = tmp_path / "fk.json"
+    stallning.write_text(json.dumps({
+        "uri": "https://lagen.nu/rs/fk/2025-01", "org": "fk",
+        "identifier": "FKRS 2025:01",
+        "metadata": {"title": "Ett ställningstagande", "beslutsdatum": "2025-01-02"}}))
+    catalog.rebuild(db, "rs", [stallning])
+    con = catalog.connect(db)
+
+    groups = dict(render._feed_index_groups(con))
+    assert ("Alla betänkanden", "forarbeten", {"rdf_type": "type/bet"}) \
+        in groups["Förarbeten"]
+    assert ("Dokument publicerade av Justitieombudsmannen (JO)", "myndprax",
+            {"dcterms_publisher": "publisher/jo"}) in groups["Praxis"]
+    assert ("Ställningstaganden publicerade av Försäkringskassan (FKRS)",
+            "myndrs", {"dcterms_publisher": "publisher/fk"}) \
+        in groups["Rättsliga ställningstaganden"]
+    # every generated link selects its own documents
+    for heading in ("Förarbeten", "Praxis", "Rättsliga ställningstaganden"):
+        for _label, alias, params in groups[heading]:
+            assert feeds.entries(con, feeds.dataset(alias), **params), \
+                "%s: %s selects nothing" % (alias, params)
+
+
 def test_document_date_covers_every_source_field_with_stable_precedence():
     """catalog.document_date is the one home for the date-field policy (feeds
     ordering, documents.date at relate, chronology panels). Each source's field

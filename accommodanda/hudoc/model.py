@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import numbered_nodes
 from ..lib.catalog import BASE
 from ..lib.coe import hudoc_articles
 
@@ -60,25 +61,15 @@ class HudocCase:
         return document_kind(self.collection)
 
     def to_artifact(self):
-        structure = []
-        serial = 0
-        ids = {}
-        for block in self.body:
-            if block.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": block.level,
-                                  "text": [block.text]})
-                continue
-            serial += 1
-            base_id = "P%s" % block.number if block.number else "S%d" % serial
-            ids[base_id] = ids.get(base_id, 0) + 1
-            node_id = (base_id if ids[base_id] == 1
-                       else "%s-%d" % (base_id, ids[base_id]))
-            node = {"type": "stycke", "text": [block.text], "id": node_id}
-            if block.number:
-                node["ordinal"] = block.number
+        structure = numbered_nodes(self.body)
+        # HUDOC sets a judgment's footnotes as ordinary paragraphs inside an
+        # `_ftn` container, so they arrive as blocks of their own; the tag rides
+        # along on the node so the page can tell them from the running text. One
+        # node per block, in order, is `numbered_nodes`' contract (and a rubrik
+        # is never a note -- `parse.parse_body` classifies the two apart)
+        for block, node in zip(self.body, structure, strict=True):
             if block.kind == "note":
                 node["class"] = "note"
-            structure.append(node)
 
         articles = []
         for code in self.article_codes:
@@ -109,7 +100,7 @@ class HudocCase:
             "itemid": self.itemid,
             "doctype": self.kind,
             "title": self.title,
-            "date": self.date,
+            "avgorandedatum": self.date,
             "metadata": metadata,
             "references": references,
             "structure": structure,

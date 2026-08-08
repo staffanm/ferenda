@@ -29,7 +29,7 @@ def test_list_basefiles():
 
 
 def test_frontpage_parse_categories_bold_and_link():
-    art = parse.artifact(FIX, "frontpage")
+    art = parse.artifact("frontpage", FIX)
     assert art["type"] == "frontpage"
     assert [b["text"] for b in art["blocks"] if b["type"] == "rubrik"] \
         == ["Familjerätt", "Straffrätt"]
@@ -44,7 +44,7 @@ def test_frontpage_parse_categories_bold_and_link():
 
 
 def test_about_parse_title_code_and_links():
-    art = parse.artifact(FIX, "om/lankning")
+    art = parse.artifact("om/lankning", FIX)
     assert art["type"] == "om" and art["slug"] == "lankning"
     assert art["title"] == "Länkning"
     code = next(b for b in art["blocks"] if b["type"] == "kod")
@@ -59,7 +59,7 @@ def test_about_parses_a_gfm_table_with_alignment():
     # the whole reason the site vertical parses with markdown-it rather than a
     # line scanner of its own: a pipe table used to fall through to a paragraph
     # and render as a wall of literal `|`
-    art = parse.artifact(FIX, "om/lankning")
+    art = parse.artifact("om/lankning", FIX)
     table = next(b for b in art["blocks"] if b["type"] == "tabell")
     assert [_flat(c) for c in table["head"]] == ["Sort", "Adress", "Not"]
     assert table["align"] == [None, None, "right"]        # the `|---:|` column
@@ -72,7 +72,7 @@ def test_about_parses_a_gfm_table_with_alignment():
 
 
 def test_about_parses_ordered_lists_emphasis_mailto_and_rule():
-    art = parse.artifact(FIX, "om/lankning")
+    art = parse.artifact("om/lankning", FIX)
     ordered = next(b for b in art["blocks"]
                    if b["type"] == "lista" and b["ordered"])
     assert [_flat(i) for i in ordered["items"]] == ["hitta lagen",
@@ -86,7 +86,7 @@ def test_about_parses_ordered_lists_emphasis_mailto_and_rule():
 
 
 def test_about_render_emits_table_ordered_list_and_rule():
-    html = render.render_about(parse.artifact(FIX, "om/lankning"))
+    html = render.render_about(parse.artifact("om/lankning", FIX))
     assert "<table><thead><tr><th>Sort</th>" in html
     assert '<td style="text-align:right">1</td>' in html
     assert "<ol><li>hitta lagen</li>" in html
@@ -100,7 +100,7 @@ def test_a_hard_wrap_inside_a_link_stays_one_run():
     # the author's wrap column is typography, not content: the softbreak used to
     # become its own styled run, so a wrapped link rendered as three <a>s -- the
     # middle one a link-decorated, arrow-suffixed space (live on /om/api)
-    art = parse.artifact(FIX, "om/lankning")
+    art = parse.artifact("om/lankning", FIX)
     runs = [r for b in art["blocks"] if b["type"] == "stycke" for r in b["runs"]]
     assert {"text": "bryts över två rader",
             "uri": "https://example.org/a"} in runs
@@ -118,7 +118,7 @@ def test_a_heading_keeps_its_code_span():
     # `_text` kept only `text` tokens, so a code span in a heading vanished
     # outright and left a double space -- the silent loss this parser exists to
     # prevent
-    art = parse.artifact(FIX, "om/lankning")
+    art = parse.artifact("om/lankning", FIX)
     assert "Ankaret #K6P18 i en rubrik" in [
         b["text"] for b in art["blocks"] if b["type"] == "rubrik"]
 
@@ -141,7 +141,7 @@ def _flat(runs):
 
 
 def test_about_site_relative_and_begrepp_links():
-    art = parse.artifact(FIX, "om/index")
+    art = parse.artifact("om/index", FIX)
     runs = [r for b in art["blocks"] if b["type"] == "stycke"
             for r in b["runs"] if not isinstance(r, str)]
     uris = {r["uri"] for r in runs}
@@ -150,7 +150,7 @@ def test_about_site_relative_and_begrepp_links():
 
 
 def test_sitenews_parse_preserves_file_order():
-    art = parse.artifact(FIX, "sitenews")
+    art = parse.artifact("sitenews", FIX)
     assert [it["published"][:10] for it in art["items"]] \
         == ["2018-09-11", "2020-09-17"]
     assert art["items"][0]["id"] == "n2018-09-11-10-39-00"
@@ -159,7 +159,7 @@ def test_sitenews_parse_preserves_file_order():
 
 
 def test_sitenews_render_is_newest_first():
-    art = parse.artifact(FIX, "sitenews")
+    art = parse.artifact("sitenews", FIX)
     html = render.render_sitenews(art)
     assert html.count("<article") == 2
     assert html.index("Lysator") < html.index("Ny version lanserad")
@@ -168,7 +168,7 @@ def test_sitenews_render_is_newest_first():
 
 
 def test_atom_is_wellformed_and_newest_first():
-    art = parse.artifact(FIX, "sitenews")
+    art = parse.artifact("sitenews", FIX)
     atom = render.render_atom(art)
     minidom.parseString(atom)                            # raises if malformed
     assert atom.index("Lysator") < atom.index("Ny version lanserad")
@@ -177,7 +177,7 @@ def test_atom_is_wellformed_and_newest_first():
 
 
 def test_frontpage_render_links_and_masthead():
-    html = render.render_frontpage(parse.artifact(FIX, "frontpage"))
+    html = render.render_frontpage(parse.artifact("frontpage", FIX))
     assert 'href="/1949:381"' in html                    # sfs uri -> bare /id
     assert "<strong>" in html
     assert ">Om</a>" in html and ">Nyheter</a>" in html   # new masthead entries
@@ -189,7 +189,7 @@ def test_write_site_emits_expected_paths(tmp_path, monkeypatch):
     paths = []
     for bf in ("frontpage", "sitenews", "om/index"):
         p = artdir / (bf.replace("/", "_") + ".json")
-        p.write_text(json.dumps(parse.artifact(FIX, bf)))
+        p.write_text(json.dumps(parse.artifact(bf, FIX)))
         paths.append(p)
     monkeypatch.setattr(render.layout, "artifacts", lambda source: paths)
     out = tmp_path / "out"

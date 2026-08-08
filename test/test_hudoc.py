@@ -43,7 +43,7 @@ def test_parse_hudoc_fixture_to_artifact():
     art = parse.parse_record(record, html).to_artifact()
     assert art["uri"] == "https://lagen.nu/dom/echr/001-123456"
     assert art["doctype"] == "judgment"
-    assert art["date"] == "2024-03-12"
+    assert art["avgorandedatum"] == "2024-03-12"
     assert art["ecli"].startswith("ECLI:CE:ECHR:")
     assert art["metadata"]["applicationNumber"] == ["12345/20", "67890/21"]
     assert [node["id"] for node in art["structure"] if node["type"] == "stycke"][:3] \
@@ -138,7 +138,7 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
     case = {"uri": "https://lagen.nu/dom/echr/001-123456",
             "itemid": "001-123456", "doctype": "judgment",
             "title": "CASE OF EXAMPLE v. SWEDEN",
-            "date": "2024-03-12",
+            "avgorandedatum": "2024-03-12",
             "references": [{"uri": target, "predicate": "dcterms:references",
                             "text": "8"}], "structure": []}
     treaty_path, case_path = tmp_path / "005.json", tmp_path / "case.json"

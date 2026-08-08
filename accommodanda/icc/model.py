@@ -14,6 +14,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..lib.artifact import numbered_nodes
 from ..lib.catalog import BASE
 
 COURT = "International Criminal Court"
@@ -73,22 +74,7 @@ class Decision:
         return "%s/court-record/%s" % (SITE, self.doc_number.lower())
 
     def to_artifact(self):
-        structure = []
-        serial = 0
-        ids = {}
-        for block in self.body:
-            if block.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": block.level,
-                                  "text": [block.text]})
-                continue
-            serial += 1
-            base_id = "P%s" % block.number if block.number else "S%d" % serial
-            ids[base_id] = ids.get(base_id, 0) + 1
-            node_id = base_id if ids[base_id] == 1 else "%s-%d" % (base_id, ids[base_id])
-            node = {"type": "stycke", "text": [block.text], "id": node_id}
-            if block.number:
-                node["ordinal"] = block.number
-            structure.append(node)
+        structure = numbered_nodes(self.body)
         metadata = {
             "title": self.title,
             "publisher": COURT,
@@ -106,7 +92,7 @@ class Decision:
             "docnumber": self.doc_number,
             "identifier": "%s (%s)" % (self.case_number, self.title),
             "title": self.case_name,
-            "date": self.date,
+            "avgorandedatum": self.date,
             "metadata": metadata,
             "references": [],
             "structure": structure,

@@ -576,7 +576,7 @@ def test_layout_files_a_document_under_its_series():
 
 def test_catalog_rows_carry_the_series_as_the_kind():
     art = _artifact()
-    uri, source, kind, label, title, path = catalog.edpb_document(art, "x.json")
+    uri, source, kind, label, title, path = catalog.document_row(art, "x.json", "edpb")
     assert (source, kind, label) == ("edpb", "riktlinjer", "Riktlinjer 05/2020")
     assert title == "Riktlinjer 05/2020 om samtycke"
 
@@ -754,6 +754,18 @@ def test_a_title_echo_behind_cover_punctuation_still_goes():
     titel = "Riktlinjer 03/2021 om tillämpningen av artikel 65.1 a"
     blocks = [("stycke", ".", 0), ("rubrik", titel, 1), ("stycke", "Brödtext.", 0)]
     assert edpb_parse.drop_repeated_title(blocks, titel) == blocks[2:]
+
+
+def test_a_letterhead_before_the_title_echo_still_goes():
+    """Regression (wp/259): the cover puts the issuer's letterhead and the
+    title in one block, so the block is longer than the title and the old
+    prefix test kept it -- the page opened with "ARTIKEL 29-GRUPPEN …"
+    letterhead debris. The rule shared with rs catches the block that *ends
+    with* the title."""
+    titel = "Riktlinjer om samtycke enligt förordning (EU) 2016/679"
+    blocks = [("rubrik", "ARTIKEL 29-GRUPPEN Artikel 29-gruppen " + titel, 1),
+              ("stycke", "Brödtext.", 0)]
+    assert edpb_parse.drop_repeated_title(blocks, titel) == blocks[1:]
 
 
 def test_one_word_furniture_is_not_a_footnote():

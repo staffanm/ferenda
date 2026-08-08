@@ -67,33 +67,36 @@ def _namedlaws():
             and "until" not in entry}
 
 
-def _first(value):
+def primary(value):
     """A dataset `label`/`abbr` may be a str or a list of variants; take the
-    primary (first) one."""
+    primary (first) one. Public because the folkrätt listing in `lib/render`
+    reads the same fields off the same files (rule:second-use-goes-to-lib)."""
     return value[0] if isinstance(value, list) else value
 
 
 def _named(label, abbr):
     """Compose a treaty's display name from its curated Swedish label and acronym:
     "Europakonventionen (EKMR)", or just the label when there is no acronym."""
-    label, abbr = _first(label), _first(abbr)
+    label, abbr = primary(label), primary(abbr)
     if label and abbr:
         return "%s (%s)" % (label, abbr)
     return label or abbr or ""
 
 
-@functools.lru_cache(maxsize=1)
-def _coe_names():
-    """ETS/CETS number ("005") -> {label, abbr} (europakonventalen / EKMR)."""
-    data = json.loads(datasets.COE_NAMES.read_text(encoding="utf-8"))
-    return {k: v for k, v in data.items() if isinstance(v, dict)}
+@functools.lru_cache(maxsize=None)
+def treaty_names(path):
+    """A hand-edited treaty names.json (coe or icrc) as {number: entry}, each
+    entry carrying the informal Swedish name(s) (`label`) and acronym (`abbr`),
+    either a string or a list: COE "005" -> europakonventionen / EKMR, ICRC
+    "375" -> tredje Genèvekonventionen / GK III.
 
-
-@functools.lru_cache(maxsize=1)
-def _icrc_names():
-    """ICRC number ("375") -> {label, abbr} (tredje Genèvekonventionen / GK III)."""
-    data = json.loads(datasets.ICRC_NAMES.read_text(encoding="utf-8"))
-    return {k: v for k, v in data.items() if isinstance(v, dict)}
+    One loader for both files, keyed on the path -- the two sources' name files
+    have one shape, and the folkrätt listing in `lib/render` (which surfaces the
+    curated instruments first) reads them the same way. Cached per file: that
+    page rebuilds often."""
+    return {number: entry
+            for number, entry in json.loads(path.read_text("utf-8")).items()
+            if isinstance(entry, dict)}
 
 
 @functools.lru_cache(maxsize=1)
@@ -224,6 +227,17 @@ def _generic(art):
 # begrepp (concepts)
 # --------------------------------------------------------------------------
 
+def _kommentar(art):
+    # deliberately inert: a kommentar is never a page of its own (absent from
+    # build.SOURCE_RENDERERS by design) and no rail prints its name -- the rails
+    # embed its *content* on the commented document's page, and the inbound
+    # panel excludes the source (page.INBOUND_ORDER). Fixed forms here keep the
+    # catalog columns stable ("Kommentar" + the author line, what the inbound
+    # sidecar records) and stop the generic fallback's uri tail ("kommentar/
+    # 1810:0926") from landing in the descriptive column.
+    return Labels("Kommentar", "", art.get("author") or "Kommentar", "Kommentar")
+
+
 def _begrepp(art):
     # a concept has no identifier separate from its name, so the term is all
     # four forms. Without this it fell to `_generic`, whose id-of-last-resort is
@@ -283,22 +297,22 @@ def _hudoc(art):
 # --------------------------------------------------------------------------
 
 def _coe(art):
-    entry = _coe_names().get(art.get("number"), {})
+    entry = treaty_names(datasets.COE_NAMES).get(art.get("number"), {})
     name = _named(entry.get("label"), entry.get("abbr"))
     short_id = art.get("identifier") or ("CETS " + (art.get("number") or ""))
     return Labels(short_id, name, art.get("title") or short_id, name or short_id)
 
 
 def _icrc(art):
-    entry = _icrc_names().get(art.get("number"), {})
-    abbr, name = _first(entry.get("abbr")), _named(entry.get("label"), entry.get("abbr"))
+    entry = treaty_names(datasets.ICRC_NAMES).get(art.get("number"), {})
+    abbr, name = primary(entry.get("abbr")), _named(entry.get("label"), entry.get("abbr"))
     short_id = abbr or art.get("identifier") or ("ICRC " + (art.get("number") or ""))
     return Labels(short_id, name, art.get("title") or short_id, name or short_id)
 
 
 def _untc(art):
     entry = _untc_names().get(art.get("number"), {})
-    abbr, name = _first(entry.get("abbr")), _named(entry.get("sv"), entry.get("abbr"))
+    abbr, name = primary(entry.get("abbr")), _named(entry.get("sv"), entry.get("abbr"))
     short_id = abbr or art.get("identifier") or ("MTDSG " + (art.get("number") or ""))
     return Labels(short_id, name, art.get("title") or short_id, name or short_id)
 
@@ -384,7 +398,8 @@ _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
              "avg": _avg, "rs": _rs, "edpb": _edpb,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
-             "untc": _untc, "icc": _icc, "begrepp": _begrepp}
+             "untc": _untc, "icc": _icc, "begrepp": _begrepp,
+             "kommentar": _kommentar}
 
 
 def document_labels(source, art):

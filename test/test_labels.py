@@ -99,7 +99,7 @@ def test_dv_pre_referat_named_case_splits_on_the_parenthetical():
 
 
 def test_forarbete_eyebrow_is_the_identifier():
-    art = {"uri": "https://lagen.nu/prop/2019/20:1", "type": "prop",
+    art = {"uri": "https://lagen.nu/prop/2019/20:1", "doctype": "prop",
            "identifier": "Prop. 2019/20:1", "title": "Budgetpropositionen för 2020"}
     lb = labels.document_labels("forarbete", art)
     assert lb.short_id == "Prop. 2019/20:1"

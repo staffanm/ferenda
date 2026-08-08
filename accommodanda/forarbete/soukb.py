@@ -107,11 +107,11 @@ def download_one(session, root, entry, delay):
     files = [slug + ("" if i == 0 else "-%d" % i) + ".pdf" for i in range(len(urns))]
     recpath = layout.fa_record_file(root, TYPE, basefile)
     dests = [layout.fa_dir(root, TYPE, basefile) / name for name in files]
-    if compress.exists(recpath) and all(d.exists() for d in dests):
+    if compress.exists(recpath) and all(compress.exists(d) for d in dests):
         return False                              # resumable: entry already done
     fetched = False
     for urn_url, dest in zip(urns, dests, strict=True):
-        if dest.exists():
+        if compress.exists(dest):
             continue                              # resumable: this part is done
         data = request(session, "GET", pdf_url(session, urn_url)).content
         # load-bearing validation of untrusted remote bytes: KB serves the scan

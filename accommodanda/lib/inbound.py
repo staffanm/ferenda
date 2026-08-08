@@ -267,7 +267,7 @@ def read(root: Path, uri: str):
     p = path(root, uri)
     if not compress.exists(p):
         return []
-    payload = json.loads(compress.read_bytes(p))
+    payload = compress.read_json(p)
     return (payload["citations"]
             if payload["uri"] == catalog.strip_fragment(uri) else [])
 

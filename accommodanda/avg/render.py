@@ -4,16 +4,12 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 
-from markupsafe import Markup
-
 from ..lib import catalog, labels, tpl
 from ..lib.page import (
-    Rail,
-    Toc,
     doc_meta,
+    document_body,
     footnote_items,
     page_context,
-    render_node,
     render_toc,
 )
 
@@ -52,12 +48,7 @@ def render(art, site):
         ("Överklagat", (md.get("praxis") or {}).get("overklagan")),
         ("Vunnit laga kraft", (md.get("praxis") or {}).get("lagakraft")),
     ]
-    toc = Toc()
-    rail = Rail(site, art["uri"])
-    structure = Markup("".join(
-        render_node(n, site, art["uri"], toc, rail)
-        for n in art.get("structure", [])))
-    rail.add_document()
+    structure, toc, rail = document_body(art, site)
     section = {"jo": "JO-beslut", "jk": "JK-beslut", "arn": "ARN-beslut",
                "imy": "IMY-beslut",
                "kkv": "KKV-beslut"}.get(art.get("org"), "Myndighetsavgörande")
@@ -66,5 +57,5 @@ def render(art, site):
         toc=render_toc(toc), eyebrow=ident,
         summary_text=summary,
         footnotes=footnote_items(art.get("footnotes", []), site,
-                                  key="mark", backref=False),
+                                  backref=False),
         island=rail.island(), structure=structure))

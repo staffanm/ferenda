@@ -51,7 +51,6 @@ the same machinery the genomför-direktiv edges use).
 """
 
 import argparse
-import json
 import re
 
 from ..lib import catalog, compress, layout
@@ -225,7 +224,7 @@ def extract(art, include_empty=False, mark=False):
     prop page can highlight the commentary visually, one box per entry. Only a proposition's FK
     accompanies the final enactment text (`kommentar.extract` has the full
     argument), so other types yield []."""
-    if art.get("type") != "prop":
+    if art.get("doctype") != "prop":
         return []
     blocks = flatten(art["structure"])
     span = fk_span(blocks)
@@ -402,7 +401,7 @@ def resolve(con):
     for prop_uri, path, label, date in con.execute(
             "SELECT uri, path, label, date FROM documents "
             "WHERE source = 'forarbete' AND kind = 'prop'"):
-        art = json.loads(compress.read_bytes(root / path))
+        art = compress.read_json(root / path)
         entries = art.get("kommentarer")
         if not entries:
             continue
@@ -426,7 +425,7 @@ def main():
     ap.add_argument("--full", action="store_true",
                     help="print each entry's full commentary text")
     args = ap.parse_args()
-    data = json.loads(compress.read_bytes(args.record))
+    data = compress.read_json(args.record)
     art = data if "structure" in data else to_artifact(parse_record(data, args.root))
     entries = extract(art)
     print("%d författningskommentar entries" % len(entries))

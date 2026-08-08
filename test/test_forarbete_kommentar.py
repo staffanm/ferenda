@@ -118,7 +118,7 @@ def test_default_directive_from_law_level_subject_statement():
 def test_extract_implements_from_kommentar():
     # a minimal proposition artifact: the directive definition, then a
     # författningskommentar section with one implements statement
-    art = {"type": "prop", "structure": nest([
+    art = {"doctype": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Europaparlamentets och rådets direktiv (EU) 2022/2555 "
             "(NIS 2-direktivet) ska genomföras."]},
@@ -147,7 +147,7 @@ def test_extract_implements_from_kommentar():
 def test_extract_ignores_references_outside_kommentar():
     # a "genomför artikel" sentence in the general motivering is not an
     # författningskommentar implements statement
-    art = {"type": "prop", "structure": nest([
+    art = {"doctype": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Direktiv (EU) 2022/2555 (NIS 2-direktivet)."]},
         {"type": "stycke", "text": [
@@ -170,9 +170,9 @@ def test_extract_only_from_proposition():
         {"type": "stycke", "text": [
             "Paragrafen genomför artikel 21 i NIS 2-direktivet."]},
     ])
-    assert extract({"type": "prop", "structure": body})      # prop: extracted
-    assert extract({"type": "lr", "structure": body}) == []  # lagrådsremiss: not
-    assert extract({"type": "sou", "structure": body}) == []
+    assert extract({"doctype": "prop", "structure": body})      # prop: extracted
+    assert extract({"doctype": "lr", "structure": body}) == []  # lagrådsremiss: not
+    assert extract({"doctype": "sou", "structure": body}) == []
 
 
 def test_implements_subject_forordningen_only_in_fm():
@@ -181,7 +181,7 @@ def test_implements_subject_forordningen_only_in_fm():
     # förordning, but the emitted row would inherit the lag section's
     # law/chapter/paragraf context -- a false edge pinned to the wrong
     # instrument -- so the prop pattern must not match the subject at all.
-    prop = {"type": "prop", "structure": nest([
+    prop = {"doctype": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Direktiv (EU) 2022/2555 (NIS 2-direktivet)."]},
         {"type": "rubrik", "level": 1, "text": ["15 Författningskommentar"]},
@@ -193,7 +193,7 @@ def test_implements_subject_forordningen_only_in_fm():
     ])}
     assert extract(prop) == []
 
-    fm = {"type": "fm", "structure": nest([
+    fm = {"doctype": "fm", "structure": nest([
         {"type": "rubrik", "level": 3, "text": ["Förordningsmotiv"]},
         {"type": "rubrik", "level": 3,
          "text": ["Förordning om ändring i artskyddsförordningen (2007:845)"]},
@@ -323,7 +323,7 @@ def test_extract_from_forordningsmotiv():
     # the författningskommentar rubrik comes out at level 3, its förordning named
     # in the title rubriks, and "Andra/Fjärde punkten genomför artikel 5 b/d i
     # fågeldirektivet" fire as implements statements keyed to 4 §.
-    art = {"type": "fm", "structure": nest([
+    art = {"doctype": "fm", "structure": nest([
         {"type": "rubrik", "level": 3, "text": ["Förordningsmotiv"]},
         {"type": "rubrik", "level": 3, "text": ["Förordning"]},
         {"type": "rubrik", "level": 3,
@@ -357,7 +357,7 @@ def test_extract_forordningsmotiv_editorial_change_yields_nothing():
     # Fm 2025:1 (ny socialtjänstförordning): the commentary is purely editorial
     # ("Ändringarna är endast språkliga") with no genomför statement -- zero rows
     # is correct-by-content, not a pattern gap.
-    art = {"type": "fm", "structure": nest([
+    art = {"doctype": "fm", "structure": nest([
         {"type": "rubrik", "level": 3, "text": ["Förordningsmotiv"]},
         {"type": "rubrik", "level": 3, "text": ["Socialtjänstförordning"]},
         {"type": "stycke", "page": 1, "text": ["Utfärdad den 22 maj 2025"]},
@@ -390,7 +390,7 @@ def test_extract_survives_in_fk_chapter_pseudo_rubrik():
     # fk_span bound (rewrite-parity finding 04) scans past it, so an implements
     # statement deeper in the chapter is found -- while a statement inside the
     # trailing bilagor still is not
-    art = {"type": "prop", "structure": nest([
+    art = {"doctype": "prop", "structure": nest([
         {"type": "stycke", "text": [
             "Europaparlamentets och rådets direktiv 2011/61/EU "
             "(AIFM-direktivet) ska genomföras."]},

@@ -54,6 +54,29 @@ PARSE_TYPES = ALL_PARSE_TYPES
 RE_HEADING_NUM = re.compile(r"^\d+(?:\.\d+)*$")       # "4" / "4.3.2" (own line)
 RE_NUM_TITLE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")        # "15 Title" / "4.3 T"
 HEADING_MAX = 120     # characters: past this a paragraph is prose, not a title
+# The dateline that closes a proposition or skrivelse, "Stockholm den 12 oktober
+# 2023" (a betänkande writes it without a day, "Stockholm i mars 2019"). What
+# follows it is the signature block that regeringsformen 7 kap. 7 § requires:
+# the statsminister, the föredragande statsråd, and the department in
+# parentheses. Those names are set in the same body-size italic a förarbete uses
+# for a subheading ("Lagrådet", "Skälen för regeringens förslag"), so they were
+# read as headings -- and 3 140 propositions listed their prime minister in the
+# table of contents, between "Ärendet och dess beredning" and "Konsekvenser".
+# Nothing about a name says it is a name; its position after the dateline does.
+RE_DATELINE = re.compile(
+    r"\bStockholm (?:den \d{1,2}|i) \s*\w+ \d{4}\s*\.?\s*$", re.IGNORECASE)
+# How far the signature block reaches: two signatories, the department, and
+# slack for a name that wrapped. A numbered heading or a heading-sized line ends
+# it sooner (below) -- this bound only matters where neither turns up.
+SIGNATURE_LINES = 4
+# What a signature line looks like: a personal name, two or three capitalised
+# words ("Ulf Kristersson", "Lena Hjelm-Wallén", "Lina Axelsson Kihlblom").
+# Swedish sets headings in sentence case, so every-word-capitalised is itself
+# the signal -- "Lagrådets yttrande" has a lowercase second word. Requiring it
+# keeps the window off "Lagrådet", the italic subheading that follows a
+# lagrådsremiss's own dateline in a bilaga (prop. 2004/05:141).
+RE_SIGNATURE_NAME = re.compile(
+    r"^[A-ZÅÄÖ][\wåäöé'’-]+(?: [A-ZÅÄÖ][\wåäöé'’-]+){1,2}$")
 
 # prop/skr front matter (the överlämnande on page 1): the handover sentence,
 # the ort/datum line ("Stockholm den 20 maj 2021", occasionally Harpsund), and
@@ -90,11 +113,18 @@ def classify(paras, page, body=0, levels=None):
     levels = levels or {}
     blocks = []
     i = 0
+    signature_left = 0       # short lines still to read as a signature, not a head
     while i < len(paras):
         p = paras[i]
         mk, mp, mt = (RE_KAP_MARK.match(p.text), RE_PARA_MARK.match(p.text),
                       RE_NUM_TITLE.match(p.text))
         heading_font = not p.size or not body or p.bold or p.size > body
+        # anything the document marks as a heading in its own right -- a number,
+        # or a size it reserves for a heading level -- ends the signature block.
+        # Only the weak signals (body-size bold or italic) are suppressed by it,
+        # which is what the signatures are set in.
+        if mk or mp or mt or p.size in levels:
+            signature_left = 0
         if body and p.size and p.size <= body - FOOTNOTE_DROP:
             blocks.append(Block("fotnot", p.text, page, spans=p.spans, top=p.top))
         elif mk and (p.lead_bold or not p.text[mk.end():].strip()):
@@ -121,6 +151,11 @@ def classify(paras, page, body=0, levels=None):
             # left a summary's subsections as siblings of its sections.
             blocks.append(Block("rubrik", p.text, page, levels[p.size],
                                 spans=p.spans, top=p.top))
+        elif signature_left and RE_SIGNATURE_NAME.match(p.text):
+            # a name under the dateline (see RE_DATELINE), set in the body-size
+            # italic a subheading also uses -- so only position tells them apart
+            signature_left -= 1
+            blocks.append(Block("stycke", p.text, page, spans=p.spans, top=p.top))
         elif p.bold and len(p.text) < HEADING_MAX:
             blocks.append(Block("rubrik", p.text, page, 3,
                                 spans=p.spans, top=p.top))   # unnumbered subhead
@@ -143,6 +178,10 @@ def classify(paras, page, body=0, levels=None):
             blocks.append(Block("ruta", p.text, page, spans=p.spans, top=p.top))
         else:
             blocks.append(Block("stycke", p.text, page, spans=p.spans, top=p.top))
+        if blocks and blocks[-1].kind == "rubrik":
+            signature_left = 0      # a heading of any kind closes the block
+        if RE_DATELINE.search(p.text):
+            signature_left = SIGNATURE_LINES
         i += 1
     return blocks
 
@@ -707,7 +746,7 @@ def to_artifact(fa):
                 | ({"th": True} if b.th and i == 0 else {})
                 for i, row in enumerate(b.rows)]
         blocks.append(block)
-    art = {"uri": fa.uri, "type": fa.type, "identifier": fa.identifier,
+    art = {"uri": fa.uri, "doctype": fa.type, "identifier": fa.identifier,
            "basefile": fa.basefile, "title": fa.title, "date": fa.date}
     # OCR bodies get the chronology sanity check before the tree is built:
     # the basefile always leads with the riksmöte/calendar year, even when
