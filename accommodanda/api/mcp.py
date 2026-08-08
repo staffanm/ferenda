@@ -11,10 +11,10 @@ session manager and must be wired into the FastAPI app that mounts it.
 
 Every tool reads the same three rebuildable backends as the REST service: the
 SQLite **catalog** (metadata + the citation graph), **OpenSearch** (full-text;
-only `search` needs it -- and it degrades to citation resolution when the cluster
-is down), and the **artifact JSON** on disk (a document's full parsed body). The
-tools are thin wrappers over `lib`, so a corpus fact reaches MCP and REST through
-one code path.
+only `search` needs it, and a down cluster is a visible tool error), and the
+**artifact JSON** on disk (a document's full parsed body). The tools answer
+through `api/reads.py` -- the same functions the REST endpoints call -- so a
+corpus fact reaches MCP and REST through one code path.
 """
 
 import contextlib
@@ -27,17 +27,13 @@ from mcp.server import MCPServer
 from mcp.server.caching import CacheableMethod, CacheHint
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
-from opensearchpy.exceptions import OpenSearchException
 from pydantic import ConfigDict, Field
 from starlette.responses import RedirectResponse
 from starlette.routing import Route
 
-from .. import config
-from ..lib import catalog, inbound, layout, pins, text
+from ..lib import layout, pins, text
 from ..lib.search import SearchIndex
-from . import analytics
-
-CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
+from . import analytics, db, reads
 
 # the ceiling on a single document body, shared by `get_document`'s clamp and
 # `fetch`, which deliberately reads at it -- one number so raising it can't
@@ -115,23 +111,20 @@ with _root_logging_preserved():
 
 # one search client for the process; constructing it opens no connection, so
 # importing/mounting never needs a running OpenSearch -- only a `search` call
-# does (and that degrades gracefully -- see below). Tests swap this out.
+# does. Tests swap this out.
 _index = SearchIndex()
 
 
 @contextlib.contextmanager
 def _con():
-    """A read-only catalog connection, opened per tool call (SQLite connections
-    are not shared across threads, and the SDK runs sync tools in a threadpool);
-    `catalog.connect_ro` applies the additive schema migrations once per
-    process first."""
-    if not CATALOG.exists():
-        raise RuntimeError("catalog not built -- run `lagen all relate`")
-    con = catalog.connect_ro(CATALOG)
-    try:
+    """`db.connection()` for a tool call: the same read-only catalog handle the
+    REST endpoints take, with the unbuilt catalog reported as a plain
+    RuntimeError (the SDK turns that into the tool's error result -- there is no
+    HTTP status to raise here)."""
+    if not db.catalog_ready():
+        raise RuntimeError(db.NOT_BUILT)
+    with db.connection() as con:
         yield con
-    finally:
-        con.close()
 
 
 # the corpus sources -- a closed set, so a strict enum: the schema teaches the
@@ -195,21 +188,12 @@ class SearchHit(TypedDict):
 
 
 class SearchResults(TypedDict):
-    """`results` is the contract; `query`/`total`/`note` are ours, and are
-    declared so they survive into structuredContent.
-
-    `note` is always present and null when nothing is degraded, rather than
-    omitted: the SDK dumps the validated model without `exclude_unset`, so an
-    absent optional key still reaches the wire as an explicit null. Declaring it
-    nullable keeps structuredContent and the JSON in `content` carrying the same
-    keys and values (their key *order* differs -- one is insertion order, the
-    other the model's), which is what the search/fetch contract asks for.
-    """
+    """`results` is the contract; `query`/`total` are ours, and are declared so
+    they survive into structuredContent."""
 
     results: list[SearchHit]
     query: str
     total: int
-    note: str | None
 
 
 class FetchedDocument(TypedDict):
@@ -262,27 +246,13 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
     `get_document` (or `fetch`) for the full text.
     """
     limit = max(1, min(limit, 50))
-    results, total, note = [], 0, None
-    # full-text needs the cluster; if it's down (or the index is missing), still
-    # answer with the pinned citation resolution (catalog-only) rather than
-    # failing the whole call -- but only an OpenSearch failure degrades; a bug
-    # in the reshaping below must still raise
-    try:
-        res = _index.search(query, source=source, kind=kind, limit=limit)
-    except OpenSearchException as exc:
-        note = ("full-text search is unavailable (%s); showing only citation "
-                "resolution" % type(exc).__name__)
-    else:
-        results = [{**r, "url": layout.page_url(r["uri"])} for r in res["results"]]
-        total = res["total"]
-    # the resolved target answers a citation-shaped query, so it leads; drop any
-    # full-text row for the same document (the pinned hit is more precise)
-    if CATALOG.exists():
-        with _con() as con:
-            pinned = pins.resolved_results(con, query, source, kind)
-        results, total = pins.merge_pinned(pinned, results, total, limit)
-    return SearchResults(query=query, total=total, note=note,
-                         results=[{**r, "id": _hit_id(r)} for r in results])
+    # a down cluster raises reads.SearchUnavailable, which the SDK returns as
+    # the tool's error result -- a visible failure, never a silently smaller
+    # answer (the old degrade-to-citation-only read as "nothing else exists")
+    res = reads.search(_index, query, source=source, kind=kind, limit=limit)
+    return SearchResults(query=query, total=res["total"],
+                         results=[{**r, "id": _hit_id(r)}
+                                  for r in res["results"]])
 
 
 @mcp.tool(title="Resolve a legal citation to its URI", annotations=READ_ONLY)
@@ -322,25 +292,21 @@ def get_document(uri: str, pinpoint: str | None = None,
     """
     max_chars = max(1, min(max_chars, MAX_CHARS))
     with _con() as con:
-        row = catalog.document(con, uri)
-        if not row:
-            raise ValueError("no document %r in the catalog" % uri)
-        uri, source, kind, label, title, path = row
-        # synthesized begrepp stubs are real rows with no artifact file (path='')
-        art = catalog.load_artifact(catalog.data_root(con), path)
-        inbound_count = catalog.document_inbound_count(con, uri)
+        data = reads.document(con, uri)
+    if data is None:
+        raise ValueError("no document %r in the catalog" % uri)
+    art = data.pop("artifact")
     if pinpoint:
-        want = uri + "#" + pinpoint.lstrip("#")
+        want = data["uri"] + "#" + pinpoint.lstrip("#")
         body = next((t for furi, t in text.fragment_texts(art) if furi == want),
                     None)
         if body is None:
             raise ValueError("no section %r in %s -- check the pinpoint against a "
-                             "search fragment or a citation anchor" % (pinpoint, uri))
+                             "search fragment or a citation anchor"
+                             % (pinpoint, uri))
     else:
         body = text.document_text(art)
-    return {"uri": uri, "source": source, "kind": kind, "label": label,
-            "title": title, "source_url": art.get("source_url"),
-            "inbound_count": inbound_count, "pinpoint": pinpoint,
+    return {**data, "pinpoint": pinpoint,
             "truncated": len(body) > max_chars, "text": body[:max_chars]}
 
 
@@ -389,31 +355,26 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     with _con() as con:
-        total = catalog.document_count(con, source, kind)
-        root = catalog.data_root(con)             # stored paths are data_root-relative
-        docs = []
-        for uri, src, kind_, label, title, source_url, path, _display in \
-                catalog.documents(con, source, kind, limit, offset):
-            updated = catalog.artifact_updated(root, path)
-            docs.append({"uri": uri, "source": src, "kind": kind_, "label": label,
-                         "title": title, "source_url": source_url,
-                         "updated": updated})
-    return {"total": total, "limit": limit, "offset": offset, "documents": docs}
+        return reads.documents(con, source=source, kind=kind,
+                               limit=limit, offset=offset)
 
 
 @mcp.tool(title="Who cites this document (inbound citations)",
           annotations=READ_ONLY)
 def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
-                           source: str | None = None) -> dict:
+                           source: str | None = None,
+                           scope: Literal["tree", "exact"] = "tree") -> dict:
     """Which other documents cite `uri` -- the citation graph inbound, lagen.nu's
     signature feature as data. Answers "which cases apply this statute
     paragraph", "what refers to this ruling".
 
     Pass a fragment URI (`…#K3P1`) to ask at paragraph level -- much the sharper
     question. A bare document URI answers for the law **and every provision in
-    it**, which for a big statute is tens of thousands of rows: read `total` and
-    `by_source` in the reply to see the shape of it, then narrow by pinpoint or
-    by `source` rather than paging through.
+    it** (`scope="tree"`, the default), which for a big statute is tens of
+    thousands of rows: read `total` and `by_source` in the reply to see the
+    shape of it, then narrow by pinpoint or by `source` rather than paging
+    through. `scope="exact"` is the narrow question: only citations naming
+    `uri` itself, none of its provisions.
 
     Ordered as lagen.nu itself orders these: case law first for a statute, then
     agency decisions, then the citation graph -- so the default first rows are
@@ -421,28 +382,17 @@ def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
     ("dv" for court decisions, "forarbete" for preparatory works, "sfs" for
     statutes; `list_sources` has them all). `limit`/`offset` page a stable order.
 
-    Returns: uri; total (rows you can page through, so *after* any `source`);
-    by_source ({source: rows} over the whole answer, before `source`, so it still
-    tells you what the other corpora hold); limit; offset; and citations -- each
-    with uri (the citing document), target (the provision it cited), anchor and
-    page (where in the citer it sits), label, title, source, kind, date.
+    Returns: uri; scope and source (the filters, echoed); total (rows you can
+    page through, so *after* any `source`); by_source ({source: rows} over the
+    whole scope, before `source`, so it still tells you what the other corpora
+    hold); limit; offset; and citations -- each with uri (the citing document),
+    target (the provision it cited), anchor and page (where in the citer it
+    sits), label, title, source, kind, date.
     """
     limit, offset = max(1, min(limit, 1000)), max(0, offset)
     with _con() as con:
-        root = catalog.data_root(con)
-        if not inbound.available(root):
-            raise ValueError("inbound citations are not built on this corpus -- "
-                             "run `lagen all generate`")
-        rows = inbound.scoped(inbound.read(root, uri), uri)
-    # counted over the whole scope, before `source` narrows it: the breakdown is
-    # what tells the model which corpus to ask for next, so filtering it to the
-    # one already asked for would answer a question nobody has
-    counts = inbound.by_source(rows)
-    if source is not None:
-        rows = [row for row in rows if row["source"] == source]
-    return {"uri": uri, "total": len(rows), "by_source": counts,
-            "limit": limit, "offset": offset,
-            "citations": rows[offset:offset + limit]}
+        return reads.inbound_citations(con, uri, scope=scope, source=source,
+                                       limit=limit, offset=offset)
 
 
 @mcp.tool(title="What this document cites (outbound citations)",
@@ -457,11 +407,7 @@ def get_outgoing_citations(uri: str) -> list[dict]:
     URI.
     """
     with _con() as con:
-        return [{"uri": to_uri, "anchor": anchor, "predicate": predicate,
-                 "text": text_, "label": label, "title": title, "source": src,
-                 "hosted": src is not None}
-                for to_uri, predicate, text_, anchor, label, title, src
-                in catalog.outbound(con, uri)]
+        return reads.outbound(con, uri)
 
 
 @mcp.tool(title="List the corpus sources and their sizes", annotations=READ_ONLY)
@@ -470,8 +416,7 @@ def list_sources() -> list[dict]:
     the `source` filter on `search`/`list_documents`. Each: source, documents.
     """
     with _con() as con:
-        return [{"source": s, "documents": n}
-                for s, n in sorted(catalog.counts(con).items())]
+        return reads.sources(con)
 
 
 # --------------------------------------------------------------------------

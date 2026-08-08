@@ -175,13 +175,13 @@ def test_the_openapi_pages_count_as_api(client, hits):
 def test_a_path_that_merely_starts_like_ours_is_not_ours(hits):
     # `/docs` must not claim `/docsomething`: with failures tracked too, a bare
     # startswith would let any remote caller mint tracked action names
-    assert analytics._under("/docs", analytics.API_PREFIXES)
-    assert analytics._under("/docs/oauth2-redirect", analytics.API_PREFIXES)
-    assert not analytics._under("/docsomething", analytics.API_PREFIXES)
-    assert not analytics._under("/api/v1x/search", analytics.API_PREFIXES)
+    assert analytics.under("/docs", analytics.API_PREFIXES)
+    assert analytics.under("/docs/oauth2-redirect", analytics.API_PREFIXES)
+    assert not analytics.under("/docsomething", analytics.API_PREFIXES)
+    assert not analytics.under("/api/v1x/search", analytics.API_PREFIXES)
     # ...and the exclusions read the same way
-    assert analytics._under("/api/v1/auth/me", analytics.API_EXCLUDED)
-    assert not analytics._under("/api/v1/authority", analytics.API_EXCLUDED)
+    assert analytics.under("/api/v1/auth/me", analytics.API_EXCLUDED)
+    assert not analytics.under("/api/v1/authority", analytics.API_EXCLUDED)
 
 
 def test_a_tool_call_is_counted_under_its_tool_name(hits):

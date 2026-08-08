@@ -51,7 +51,7 @@ class Block:
     # "bild": the figure's rectangle on its PDF page, in points from the page's
     # top-left -- what the facsimile endpoint crops. The pixels stay in the
     # source PDF and are rendered on demand, so no image is copied into the
-    # corpus (lib/facsimile.cached_region)
+    # corpus (lib/facsimile.cached)
     bbox: list[float] | None = None
     top: int | None = None    # y on the source page, used only while placing a
                               # figure among the paragraphs it was printed

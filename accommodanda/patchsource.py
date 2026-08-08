@@ -45,7 +45,7 @@ def _sfs_intermediate(basefile):
     the legacy SFST HTML exactly as the parser does (``sfs.extract.extract_body``)."""
     src = layout.sfs_source(basefile)
     if compress.exists(src):
-        text = (json.loads(compress.read_text(src)).get("fulltext") or {}).get("forfattningstext")
+        text = (compress.read_json(src).get("fulltext") or {}).get("forfattningstext")
         if text is None:
             raise SkipDocument("%s: no forfattningstext to patch" % basefile)
         return text.replace("\r", "")
@@ -74,7 +74,7 @@ def _dv_intermediate(basefile):
     if path.suffix.lower() != ".json":
         raise SkipDocument("%s: a legacy Word referat (%s) has no patchable "
                            "intermediate" % (basefile, path.name))
-    record = json.loads(compress.read_text(path))
+    record = compress.read_json(path)
     if not record.get("innehall"):
         # a verdict published before its referat has no innehåll at all -- parse
         # reads its body from the court's own PDF, so that PDF's pdftohtml XML
@@ -117,7 +117,7 @@ def _forarbete_intermediate(basefile):
     """A förarbete's live-harvest body PDF as pdftohtml XML (the same first PDF
     parse reads). Frozen legacy-import bodies carry non-XML formats and are not
     patched at source level."""
-    record = json.loads(compress.read_text(layout.fa_record(basefile)))
+    record = compress.read_json(layout.fa_record(basefile))
     if "legacy_files" in record:
         raise ValueError("%s: frozen legacy-import body is not text-patchable "
                          "at source level" % basefile)
@@ -152,7 +152,7 @@ def _avg_intermediate(basefile):
     one part would be attempted against the next and fail the document. Those
     are refused here rather than offered a patch that cannot hold."""
     org = basefile.split("/", 1)[0]
-    record = json.loads(compress.read_text(record_path(layout.AVG_DOWNLOADED, org, basefile)))
+    record = compress.read_json(record_path(layout.AVG_DOWNLOADED, org, basefile))
     if org == "jk":
         return compress.read_text(jk_html_path(layout.AVG_DOWNLOADED, basefile))
     if org == "jo":
@@ -231,6 +231,21 @@ def patchable_sources():
     return sorted(_INTERMEDIATE)
 
 
+def is_patchable(source):
+    """Whether `source` has a text-patchable intermediate at all -- the check
+    the CLI and the web editor make before offering to patch a document, so
+    neither has to reach into the table itself."""
+    return source in _INTERMEDIATE
+
+
+def unpatchable_message(source):
+    """The one wording for "this source cannot be patched", raised by
+    `intermediate` and answered as a 400 by the web editor -- so a reader gets
+    the same sentence and the same list wherever they hit it."""
+    return ("source %r has no text-patchable intermediate; patchable sources "
+            "are %s" % (source, ", ".join(patchable_sources())))
+
+
 def format_label(source):
     """The human label of `source`'s patchable intermediate format, or None."""
     entry = _INTERMEDIATE.get(source)
@@ -244,15 +259,22 @@ def intermediate(source, basefile):
     remisser, avg's JO/ARN -- their fix stage is post-extraction, not wired)."""
     entry = _INTERMEDIATE.get(source)
     if entry is None:
-        raise ValueError(
-            "source %r has no text-patchable intermediate; patchable sources are %s"
-            % (source, ", ".join(patchable_sources())))
+        raise ValueError(unpatchable_message(source))
     provider, label = entry
     return provider(basefile), label
+
+
+def pristine_and_current(source, basefile):
+    """``(pristine, current, format_label)``: the pre-patch text *and* the same
+    text with any existing patch applied. What the web editor needs in one read
+    -- recovering an intermediate can mean running pdftohtml over a whole
+    document, so it is done once, not once per form."""
+    text, label = intermediate(source, basefile)
+    return text, patch.patch_if_needed(source, basefile, text)[0], label
 
 
 def current(source, basefile):
     """The intermediate with any existing patch already applied -- the editor's
     seed text, so a new edit is a diff against the *effective* current text."""
-    text, label = intermediate(source, basefile)
-    return patch.patch_if_needed(source, basefile, text)[0], label
+    _pristine, text, label = pristine_and_current(source, basefile)
+    return text, label

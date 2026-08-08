@@ -145,14 +145,21 @@ def verify(token):
         if not hmac.compare_digest(_unb64(sig_txt), _sign(body_b)):
             return None
         claims = json.loads(body_b)
-    except (ValueError, json.JSONDecodeError):
+    # binascii.Error (bad base64url) and json.JSONDecodeError are both
+    # ValueErrors -- a malformed cookie is an anonymous request, not an error
+    except ValueError:
         return None
-    if not isinstance(claims, dict) or claims.get("exp", 0) < time.time():
+    # past the signature check the payload is one `issue()` wrote -- but
+    # possibly a *previous deploy's* issue(): a claim added to the cookie
+    # format is missing from every cookie minted before the deploy, for up to
+    # SESSION_TTL. Per this function's own contract that is an anonymous
+    # request (re-login mints the new format), not a 500.
+    try:
+        if claims["exp"] < time.time():
+            return None
+        return claims["u"], claims["pf"]
+    except KeyError:
         return None
-    username = claims.get("u")
-    if not isinstance(username, str):
-        return None
-    return username, claims.get("pf")
 
 
 # --------------------------------------------------------------------------

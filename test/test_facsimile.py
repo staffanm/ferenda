@@ -81,14 +81,14 @@ def test_render_page_produces_png(corpus, tmp_path):
     assert not list(out.parent.glob("*.tmp*"))       # temp root cleaned up
 
 
-def test_cached_page_renders_once(corpus, monkeypatch):
+def test_cached_renders_once(corpus, monkeypatch):
     pdf = layout.fa_dir(corpus / "forarbete", "prop", "2013/14:116") / "2013-14-116.pdf"
     calls = []
     real = facsimile.render_page
     monkeypatch.setattr(facsimile, "render_page",
                         lambda *a: calls.append(a) or real(*a))
-    first = facsimile.cached_page("forarbete", "prop/2013-14-116", pdf, 1)
-    second = facsimile.cached_page("forarbete", "prop/2013-14-116", pdf, 1)
+    first = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)
+    second = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)
     assert first == second == layout.facsimile("forarbete",
                                                "prop/2013-14-116", 1)
     assert len(calls) == 1                           # second hit from cache
@@ -140,19 +140,19 @@ def test_render_region_crops_to_bbox_pixels(corpus, tmp_path):
     assert not list(out.parent.glob("*.tmp*"))       # temp root cleaned up
 
 
-def test_cached_region_renders_once_keyed_by_bbox(corpus, monkeypatch):
+def test_cached_crop_renders_once_keyed_by_bbox(corpus, monkeypatch):
     pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
     calls = []
     real = facsimile.render_region
     monkeypatch.setattr(facsimile, "render_region",
                         lambda *a: calls.append(a) or real(*a))
-    a = facsimile.cached_region("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
-    b = facsimile.cached_region("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
+    a = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
+    b = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
     assert a == b == layout.facsimile_crop("sfs", "2021:734", 1,
                                            [72, 72, 300, 200])
     assert len(calls) == 1                            # second hit from cache
     # a different bbox is a different cache file (re-verification never stale)
-    facsimile.cached_region("sfs", "2021:734", pdf, 1, [72, 72, 300, 300])
+    facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 300])
     assert len(calls) == 2
 
 

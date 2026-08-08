@@ -16,7 +16,6 @@ target a JSON API endpoint, not this page.
 """
 
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,12 +25,12 @@ from opensearchpy.exceptions import OpenSearchException
 
 from .. import config
 from ..lib import catalog, git, runlog, search, tpl
+from . import db
 from .auth import require_editor
 
 RUNS = config.DATA / ".build" / "runs.ndjson"
 ERRORS = config.DATA / ".build" / "errors.json"
 STATUS = config.DATA / ".build" / "status.json"
-CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 
 # the canonical pipeline stages, in run order, the health matrix lays out as
 # columns (a source that never ran a stage simply has no cell there). The actual
@@ -101,27 +100,15 @@ def _age(t, *, now=None):
     return "%dd ago" % (secs // 86400)
 
 
-def _catalog_counts():
-    """Per-source catalog document counts, or None when no catalog is built --
-    a legitimate empty-state for the delta widget, not a 503."""
-    if not CATALOG.exists():
-        return None
-    con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
-    try:
-        return catalog.counts(con)
-    finally:
-        con.close()
-
-
 def _source_stats():
-    """{source: (docs, bytes)} from the catalog, or None when it isn't built."""
-    if not CATALOG.exists():
+    """{source: (docs, bytes)} from the catalog -- the corpus table's rows and
+    the document counts the catalog-delta widget compares against -- or None
+    when no catalog is built, which is a legitimate empty state for both, not
+    a 503. One query per page load, not one per widget."""
+    if not db.catalog_ready():
         return None
-    con = sqlite3.connect("file:%s?mode=ro" % CATALOG, uri=True)
-    try:
+    with db.connection() as con:
         return catalog.source_stats(con)
-    finally:
-        con.close()
 
 
 def _version():
@@ -137,7 +124,7 @@ def _version():
 def _index_size():
     """Human size of the OpenSearch index, 'index not built' when absent, or
     'unavailable' when the cluster can't be reached -- the health page must load
-    even when search is down (same spirit as _catalog_counts' None)."""
+    even when search is down (same spirit as _source_stats' None)."""
     try:
         size = _index.store_size()
     except OpenSearchException:
@@ -169,7 +156,7 @@ def ops_overview():
     runs = runlog.read_runs(RUNS)
     successes = runlog.last_success(RUNS)
     history = runlog.duration_history(RUNS)
-    counts = _catalog_counts()
+    stats = _source_stats()
 
     parts = []
 
@@ -188,7 +175,6 @@ def ops_overview():
         _index_size()))
 
     # corpus: document count + artifact size per source, from the catalog
-    stats = _source_stats()
     crows = []
     if stats:
         for src in sorted(stats):
@@ -214,13 +200,14 @@ def ops_overview():
         cell = status[src].get(stage)
         if cell is None:
             return None
-        failed = cell.get("failed", 0)
-        stale = cell.get("stale", 0)
+        # every writer of a status cell (build.cmd_status, build's per-segment
+        # writer) emits the whole set of counts, so a missing one is schema
+        # drift worth crashing on rather than rendering as a zero
+        failed, stale = cell["failed"], cell["stale"]
         key = (stage, src)
         return {"cls": "fail" if failed else ("stale" if stale else "ok"),
                 "tip": "last ok %s" % _age(successes.get(key)),
-                "counts": "%d/%d" % (cell.get("fresh", 0),
-                                     cell.get("total", 0)),
+                "counts": "%d/%d" % (cell["fresh"], cell["total"]),
                 "failed": failed, "stale": stale,
                 "regress": history.get(key, {}).get("regression")}
 
@@ -228,12 +215,15 @@ def ops_overview():
         {"source": src, "cells": [matrix_cell(src, stage) for stage in columns]}
         for src in sources]))
 
-    # catalog delta: parsed-but-not-catalogued per source
+    # catalog delta: parsed-but-not-catalogued per source. A source with no
+    # parse stage has no cell to read (hence the .get), and a source whose
+    # artifacts are never catalogued -- remisser -- has no stats row.
     delta = None
-    if counts is not None:
+    if stats is not None:
         delta = [{"source": src,
-                  "fresh": (fresh := status[src].get("parse", {}).get("fresh", 0)),
-                  "catn": (catn := counts.get(src, 0)),
+                  "fresh": (fresh := status[src]["parse"]["fresh"]
+                            if "parse" in status[src] else 0),
+                  "catn": (catn := stats[src][0] if src in stats else 0),
                   "delta": fresh - catn}
                  for src in sources]
     parts.append(TPL.delta_table(delta))
@@ -295,14 +285,17 @@ def ops_run_detail(run_id: str):
                               for step, segs in sorted(by_step.items())]))
 
     # segment table
+    # every key is written by `runlog.emit_segment` on every segment, so they
+    # are read directly -- a missing one is ledger drift, not a blank cell
+    # (`total`/`ran` are legitimately None for a step with no doc counts)
     parts.append(TPL.segments_table([
         {"step": seg["step"], "source": seg["source"],
-         "total": _n(seg.get("total")), "ran": _n(seg.get("ran")),
-         "skipped": _n(seg.get("skipped_fresh")),
-         "skipdoc": _n(seg.get("skipdoc")), "errors": seg["errors"],
+         "total": _n(seg["total"]), "ran": _n(seg["ran"]),
+         "skipped": _n(seg["skipped_fresh"]),
+         "skipdoc": _n(seg["skipdoc"]), "errors": seg["errors"],
          "secs": "%.1f" % seg["secs"],
          "slowest": ", ".join("%s %.1fs" % (bf, sc)
-                              for bf, sc in seg.get("slowest") or [])}
+                              for bf, sc in seg["slowest"])}
         for seg in segments]))
 
     # this run's errors grouped by (source, stage)

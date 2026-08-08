@@ -13,7 +13,7 @@ from opensearchpy.exceptions import OpenSearchException
 
 from accommodanda import config
 from accommodanda.api import app as api
-from accommodanda.api import auth, ops
+from accommodanda.api import auth, db, ops
 from accommodanda.lib import catalog, runlog
 
 
@@ -88,7 +88,7 @@ def ledger(tmp_path, monkeypatch, editor_auth):
     monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", errors)
     monkeypatch.setattr(ops, "STATUS", status)
-    monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")  # absent
+    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")  # absent
     return {"good": good, "bad": bad, "dir": build}
 
 
@@ -166,7 +166,7 @@ def test_corpus_section_lists_docs_and_size_per_source(client, tmp_path, monkeyp
          ("u3", "dv", "case", "C1", "T3", "p3", 500)])
     con.commit()
     con.close()
-    monkeypatch.setattr(ops, "CATALOG", cat)
+    monkeypatch.setattr(db, "CATALOG", cat)
     body = client.get("/ops").text
     assert "<h2>corpus</h2>" in body
     assert "3.0 kB" in body                          # sfs: 1000 + 2000
@@ -186,7 +186,7 @@ def test_versions_cell_renders_a_column(tmp_path, monkeypatch, editor_auth):
     monkeypatch.setattr(ops, "RUNS", build / "runs.ndjson")
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
     monkeypatch.setattr(ops, "STATUS", status)
-    monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
     body = _login(TestClient(api.app)).get("/ops").text
     assert "<th>versions</th>" in body
 
@@ -253,7 +253,7 @@ def test_empty_states_render_without_files(tmp_path, monkeypatch, editor_auth):
     monkeypatch.setattr(ops, "RUNS", empty / "runs.ndjson")
     monkeypatch.setattr(ops, "ERRORS", empty / "errors.json")
     monkeypatch.setattr(ops, "STATUS", empty / "status.json")
-    monkeypatch.setattr(ops, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
     c = _login(TestClient(api.app))
     assert "no runs recorded yet" in c.get("/ops").text
     assert c.get("/ops/runs").status_code == 200

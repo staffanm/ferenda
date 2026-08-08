@@ -8,9 +8,11 @@ import sqlite3
 import pytest
 from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
+from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
 from accommodanda import config
 from accommodanda.api import app as api
+from accommodanda.api import db
 from accommodanda.lib import catalog, compress, inbound
 
 
@@ -63,7 +65,8 @@ def client(tmp_path):
                 "source": [{"value": "sfs", "count": 1}],
                 "kind": [{"value": "lag", "count": 1}],
                 "year": [{"value": "1962", "count": 1}]}, "results": [{
-                "uri": "https://lagen.nu/1962:700", "identifier": "SFS 1962:700",
+                "uri": "https://lagen.nu/1962:700", "url": "/1962:700",
+                "identifier": "SFS 1962:700",
                 "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "lag",
                 "score": 9.1, "inbound_count": 1,
                 "highlight": ["… <em>%s</em> …" % q],
@@ -74,12 +77,12 @@ def client(tmp_path):
     # than taking the request connection (a missing catalog must not fail a
     # full-text search, so it is best-effort, with no Depends/503) -- point it
     # at the fixture too, or a pinned hit reads the developer's real corpus
-    real_catalog, api.CATALOG = api.CATALOG, cat
+    real_catalog, db.CATALOG = db.CATALOG, cat
 
     client = TestClient(api.app)
     client.catalog_path = cat            # for tests that add rows directly
     yield client
-    api.CATALOG = real_catalog
+    db.CATALOG = real_catalog
     api.app.dependency_overrides.clear()
 
 
@@ -118,6 +121,19 @@ def test_search_cursor_validation_and_bounded_offset(client):
                       params={"q": "mord", "offset": 10000}).status_code == 422
     assert client.get("/api/v1/search", params={
         "q": "mord", "cursor": "anything", "offset": 1}).status_code == 422
+
+
+def test_search_fails_visibly_when_opensearch_is_down(client):
+    """A down cluster is a 503 with a plain reason, not a raw 500 -- and the
+    same visible-failure policy as the MCP search tool (one code path,
+    api/reads.py)."""
+    class Down:
+        def search(self, *a, **k):
+            raise OpenSearchConnectionError("no cluster")
+    api._index = Down()
+    r = client.get("/api/v1/search", params={"q": "mord"})
+    assert r.status_code == 503
+    assert "search is unavailable" in r.json()["detail"]
 
 
 def test_legacy_atom_feed_urls_and_filters(client):
@@ -243,6 +259,18 @@ def test_inbound_on_a_law_reaches_the_citations_of_its_paragrafer(client):
                        params={"uri": "https://lagen.nu/1962:700",
                                "scope": "exact"}).json()
     assert exact["total"] == 0 and exact["citations"] == []
+
+
+def test_inbound_source_filter_narrows_but_by_source_counts_the_whole_scope(client):
+    """`source` narrows the citing side (the fixture's one citation is from
+    sfs, so asking for dv finds nothing) while `by_source` still reports the
+    unfiltered scope -- it is what tells a client which corpus to ask for."""
+    body = client.get("/api/v1/document/inbound",
+                      params={"uri": "https://lagen.nu/1962:700",
+                              "source": "dv"}).json()
+    assert body["source"] == "dv"
+    assert body["total"] == 0 and body["citations"] == []
+    assert body["by_source"] == {"sfs": 1}
 
 
 def test_inbound_refuses_when_the_tree_is_not_built(client, tmp_path):

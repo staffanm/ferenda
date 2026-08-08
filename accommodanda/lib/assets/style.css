@@ -1211,7 +1211,7 @@ p.ruta:last-of-type, p.ruta:not(:has(+ p.ruta)) {
 p.ruta:first-of-type, p:not(.ruta) + p.ruta { margin-top: 1.1rem; }
 
 /* An illustration the source PDF carries, rendered on demand as a crop of its
-   page (lib/facsimile.cached_region) rather than copied into the corpus. */
+   page (lib/facsimile.cached with a bbox) rather than copied into the corpus. */
 figure.bild { margin: 1.4rem 0; text-align: center; }
 figure.bild img { max-width: 100%; height: auto; border: 1px solid var(--rule-soft);
                   border-radius: 3px; }

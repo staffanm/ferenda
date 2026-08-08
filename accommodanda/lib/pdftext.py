@@ -191,7 +191,7 @@ def pdftohtml_xml(pdf_path, hidden=False):
     files totalling 350 GB into ``downloaded/forarbete/sou`` and filled the
     disk. So the conversion runs with its output base inside a temporary
     directory, which takes the extracted images with it when it goes. Only the
-    geometry is wanted here; `facsimile.cached_region` renders the pixels on
+    geometry is wanted here; `facsimile.cached` renders the pixels on
     demand from the PDF itself."""
     args = ["pdftohtml", "-xml", *(["-hidden"] if hidden else []),
             "-nodrm", str(pdf_path)]

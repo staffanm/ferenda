@@ -58,15 +58,6 @@ def render_page(pdf_path, page, out_path):
     return out_path
 
 
-def cached_page(source, basefile, pdf_path, page):
-    """The facsimile PNG for one page of a document's source PDF, rendering on
-    the first request and serving the cache thereafter."""
-    out = layout.facsimile(source, basefile, page)
-    if not out.exists():
-        render_page(pdf_path, page, out)
-    return out
-
-
 def valid_bbox(bbox):
     """True iff `bbox` is ``[x0, y0, x1, y1]`` of four finite (non-bool) numbers
     with positive, ordered bounds -- ``0 <= x0 < x1`` and ``0 <= y0 < y1``. The
@@ -112,12 +103,17 @@ def png_size(data):
             int.from_bytes(data[20:24], "big"))
 
 
-def cached_region(source, basefile, pdf_path, page, bbox):
-    """The cropped PNG for one `bbox` of a source PDF page, rendered on first
-    request and served from the cache thereafter. `source`/`basefile` identify
-    the *source* PDF (the amending SFS the region is cropped from), so crops of
-    the same region are shared and a re-verified bbox lands on a fresh file."""
-    out = layout.facsimile_crop(source, basefile, page, bbox)
+def cached(source, basefile, pdf_path, page, bbox=None):
+    """The facsimile PNG for one page of a document's source PDF -- or, with
+    `bbox`, just that rectangle of the page -- rendered on the first request and
+    served from the cache thereafter. `source`/`basefile` identify the *source*
+    PDF (for a crop, the amending SFS the region comes from), so crops of the
+    same region are shared and a re-verified bbox lands on a fresh file."""
+    out = (layout.facsimile_crop(source, basefile, page, bbox) if bbox
+           else layout.facsimile(source, basefile, page))
     if not out.exists():
-        render_region(pdf_path, page, bbox, out)
+        if bbox:
+            render_region(pdf_path, page, bbox, out)
+        else:
+            render_page(pdf_path, page, out)
     return out

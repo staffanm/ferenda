@@ -46,12 +46,15 @@ import httpx
 from starlette.requests import Request
 
 from .. import config
+from .errors import under
 
 log = logging.getLogger(__name__)
 
 # the REST surface worth counting: the public read API plus its human-facing
 # OpenAPI pages. Deliberately not the whole app -- the static site below "/" is
 # counted in the browser, and /ops is an operator dashboard, not an audience.
+# (Not the same set as errors.JSON_PREFIXES, which answers a different question:
+# what shape an error takes. Matched the same way, with `under`.)
 API_PREFIXES = ("/api/v1", "/docs", "/redoc", "/openapi.json")
 # ...minus the editor's own routes. `auth/me` alone fires on every single page
 # load (editor.js asks whether to mount the edit affordance), so leaving these in
@@ -152,16 +155,6 @@ def _hit(url, title, request):
                   request.headers.get("accept-language", "").encode("latin-1")})
 
 
-def _under(path, prefixes):
-    """Whether `path` is one of `prefixes` or below it, on a segment boundary --
-    `/docs` and `/docs/oauth` are the docs, `/docsomething` is a stranger. A bare
-    `startswith` would hand that stranger the docs' identity, and since failures
-    are now tracked too, anything a remote caller can spell would become a
-    tracked action name."""
-    return any(path == prefix or path.startswith(prefix + "/")
-               for prefix in prefixes)
-
-
 def _own_page_xhr(request):
     """Whether this is one of our own pages calling the API from the browser.
     `Sec-Fetch-Site` is sent by every current browser and by nothing else, so a
@@ -226,8 +219,8 @@ class Tracked:
         # OPTIONS preflight itself with a 200 -- counting those would double
         # every hit from exactly the browser-app consumers worth counting.
         if (scope["type"] != "http" or scope["method"] != "GET"
-                or not _under(scope["path"], API_PREFIXES)
-                or _under(scope["path"], API_EXCLUDED)):
+                or not under(scope["path"], API_PREFIXES)
+                or under(scope["path"], API_EXCLUDED)):
             return await self.app(scope, receive, send)
         status = None
 

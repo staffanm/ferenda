@@ -11,11 +11,12 @@ import pytest
 import uvicorn
 from mcp.client import Client, ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from mcp.server.mcpserver.exceptions import ToolError
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from starlette.testclient import TestClient
 
 from accommodanda import config
-from accommodanda.api import analytics
+from accommodanda.api import analytics, db, reads
 from accommodanda.api import app as api
 from accommodanda.api import mcp as mcpmod
 from accommodanda.lib import catalog, inbound
@@ -64,13 +65,18 @@ def corpus(tmp_path, monkeypatch):
 
     # point the tools at the fixture catalog (catalog.connect_ro tracks its
     # one-time migration per path, so a fresh tmp catalog needs no flag reset)
-    monkeypatch.setattr(mcpmod, "CATALOG", cat)
+    monkeypatch.setattr(db, "CATALOG", cat)
 
-    # a fake search backend -- the tools must not require a live OpenSearch
+    # a fake search backend -- the tools must not require a live OpenSearch.
+    # Same call surface as the REST fake: reads.search drives both faces
+    # through one signature (source/kind/year/limit/offset/cursor) and reads
+    # next_cursor + facets off every reply.
     class FakeIndex:
-        def search(self, q, source=None, kind=None, limit=10, offset=0):
-            return {"total": 1, "results": [{
-                "uri": "https://lagen.nu/1962:700", "identifier": "SFS 1962:700",
+        def search(self, q, source=None, kind=None, year=None, limit=10,
+                   offset=0, cursor=None):
+            return {"total": 1, "next_cursor": None, "facets": {}, "results": [{
+                "uri": "https://lagen.nu/1962:700", "url": "/1962:700",
+                "identifier": "SFS 1962:700",
                 "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "law",
                 "score": 9.1, "inbound_count": 1,
                 "highlight": ["… <em>%s</em> …" % q],
@@ -89,14 +95,20 @@ def test_search_combines_fulltext_and_pins(corpus):
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
 
 
-def test_search_degrades_without_opensearch(corpus):
+def test_search_fails_visibly_without_opensearch(corpus):
+    """A down cluster is a visible error, never a silently smaller answer --
+    the old degrade to citation-only results read as "the corpus holds nothing
+    else". Same policy as REST's 503 (one code path, api/reads.py)."""
     class Down:
         def search(self, *a, **k):
             raise OpenSearchConnectionError("no cluster")
     mcpmod._index = Down()
-    res = mcpmod.search("mord")
-    # the call still succeeds (no exception), just with a note and no full-text
-    assert res["note"] and res["results"] == []
+    with pytest.raises(reads.SearchUnavailable, match="unavailable"):
+        mcpmod.search("mord")
+    # and through the server it is a tool error carrying the same reason (the
+    # transport turns a ToolError into the client's isError result)
+    with pytest.raises(ToolError, match="unavailable"):
+        anyio.run(lambda: mcpmod.mcp.call_tool("search", {"query": "mord"}))
 
 
 def test_resolve_citation_to_fragment(corpus):
@@ -156,6 +168,12 @@ def test_citation_graph(corpus):
     # and the source filter narrows without a second query
     assert mcpmod.get_incoming_citations(
         "https://lagen.nu/1962:700", source="dv")["total"] == 0
+
+    # scope="exact" asks only about the law itself -- the fixture's one
+    # citation names 3 kap. 1 §, so the narrow question finds nothing
+    exact = mcpmod.get_incoming_citations("https://lagen.nu/1962:700",
+                                          scope="exact")
+    assert exact["scope"] == "exact" and exact["total"] == 0
 
     outbound = mcpmod.get_outgoing_citations("https://lagen.nu/2018:585")
     ref = next(c for c in outbound if c["uri"] == "https://lagen.nu/1962:700#K3P1")
@@ -228,8 +246,9 @@ def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
     non-pinpointed search result takes, and the one that decides whether a host
     fetching that id gets a document or a KeyError."""
     class DocLevel:
-        def search(self, q, source=None, kind=None, limit=10, offset=0):
-            return {"total": 1, "results": [{
+        def search(self, q, source=None, kind=None, year=None, limit=10,
+                   offset=0, cursor=None):
+            return {"total": 1, "next_cursor": None, "facets": {}, "results": [{
                 "uri": "https://lagen.nu/2018:585", "identifier": "SFS 2018:585",
                 "title": "Förvaltningslag (2018:585)", "source": "sfs",
                 "kind": "law", "score": 4.2, "inbound_count": 0,
@@ -255,12 +274,6 @@ def test_contract_tools_emit_structured_content(corpus):
                        ("fetch", {"id": "https://lagen.nu/1962:700"})):
         res = anyio.run(lambda n=name, a=args: mcpmod.mcp.call_tool(n, a))
         assert res.structured_content == json.loads(res.content[0].text), name
-
-    # `note` rides along as an explicit null rather than being omitted: the SDK
-    # dumps the validated model without exclude_unset, so declaring it optional
-    # would put a null in structuredContent that the text duplicate lacks
-    assert anyio.run(lambda: mcpmod.mcp.call_tool("search", {"query": "mord"})) \
-        .structured_content["note"] is None
 
 
 @contextlib.asynccontextmanager

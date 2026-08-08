@@ -31,7 +31,6 @@ keeping it out of here leaves this module free of the build/render graph.
 """
 
 import json
-import os
 import time
 from pathlib import Path
 
@@ -115,10 +114,11 @@ class Conflict(Exception):
 
 
 def commit(editor, message):
-    """Apply the user's whole cart as one git commit authored by `editor`, clear
-    the cart, and return `{sha, changes}` (`changes` drives the rebuild). Raises
-    `Conflict` (nothing written) if any region moved under a draft, or ValueError
-    on an empty cart / empty message."""
+    """Apply the user's whole cart as one git commit authored by `editor`
+    (`lib.git.commit_as`), clear the cart, and return `{sha, changes}`
+    (`changes` drives the rebuild). Raises `Conflict` (nothing written) if any
+    region moved under a draft, or ValueError on an empty cart / empty
+    message."""
     drafts = _load(editor.username)
     if not drafts:
         raise ValueError("nothing to commit -- the cart is empty")
@@ -141,7 +141,8 @@ def commit(editor, message):
     wiki_parse.kommentar_index.cache_clear()
     wiki_parse.begrepp_index.cache_clear()
 
-    sha = _git_commit(files, editor, message)
+    sha = git.commit_as(config.WIKI_ROOT, [str(Path(f)) for f in files],
+                        message, name=editor.name, email=editor.email)
     _save(editor.username, [])
     seen, deduped = set(), []
     for c in changes:                    # one rebuild per touched file, not per hunk
@@ -150,22 +151,3 @@ def commit(editor, message):
             seen.add(key)
             deduped.append(c)
     return {"sha": sha, "changes": deduped}
-
-
-def _git_commit(files, editor, message):
-    """Stage exactly `files` and commit them authored *and* committed as `editor`
-    -- both identities set, so `git log` attributes the web edit to the person
-    who made it, indistinguishable from a local commit. Returns the new sha, or
-    the unchanged HEAD when applying the drafts left the files byte-identical to
-    disk (a rare no-op edit that would otherwise make `git commit` exit non-zero
-    and 500)."""
-    repo = config.WIKI_ROOT
-    paths = [str(Path(f)) for f in files]
-    git.run(repo, "add", "--", *paths)
-    if not git.run(repo, "status", "--porcelain", "--", *paths, capture=True):
-        return git.run(repo, "rev-parse", "HEAD", capture=True)   # nothing to commit
-    env = {**os.environ,
-           "GIT_AUTHOR_NAME": editor.name, "GIT_AUTHOR_EMAIL": editor.email,
-           "GIT_COMMITTER_NAME": editor.name, "GIT_COMMITTER_EMAIL": editor.email}
-    git.run(repo, "commit", "-m", message, "--", *paths, env=env)
-    return git.run(repo, "rev-parse", "HEAD", capture=True)

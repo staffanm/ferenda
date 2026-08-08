@@ -21,9 +21,6 @@ flow:
     patch.
 """
 
-import hashlib
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -33,6 +30,7 @@ from ..lib import git, layout, tpl
 from ..lib import patch as patchlib
 from ..lib.errors import SkipDocument
 from .auth import Editor, require_editor
+from .db import base_sha
 
 _EDITOR_PAGE = tpl.environment("accommodanda.api").get_template(
     "patch_edit.html")
@@ -52,24 +50,16 @@ def set_reparse(fn):
     _reparse = fn
 
 
-def _sha(text):
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
 def _load(source, basefile):
     """``(pristine, current, label)`` for a document, or a 4xx: an unpatchable
     source is 400, a source with no readable content is 404."""
-    if source not in patchsource._INTERMEDIATE:
-        raise HTTPException(400, "source %r has no patchable intermediate; "
-                            "patchable: %s"
-                            % (source, ", ".join(patchsource.patchable_sources())))
+    if not patchsource.is_patchable(source):
+        raise HTTPException(400, patchsource.unpatchable_message(source))
     try:
-        pristine, label = patchsource.intermediate(source, basefile)
+        return patchsource.pristine_and_current(source, basefile)
     except (FileNotFoundError, OSError, SkipDocument, ValueError) as exc:
         raise HTTPException(404, "no patchable source for %s/%s: %s"
                             % (source, basefile, exc)) from exc
-    current, _desc = patchlib.patch_if_needed(source, basefile, pristine)
-    return pristine, current, label
 
 
 class PatchView(BaseModel):
@@ -101,7 +91,7 @@ def get_document(source: str = Query(...), basefile: str = Query(...),
     desc = patchlib.load_patchset(source, basefile)[1] if path else None
     return PatchView(source=source, basefile=basefile, format=label, text=current,
                      has_patch=path is not None, is_obfuscated=is_obfuscated,
-                     description=desc, base_sha=_sha(pristine))
+                     description=desc, base_sha=base_sha(pristine))
 
 
 @router.post("/save")
@@ -114,7 +104,7 @@ def save(body: SaveBody, editor: Editor = Depends(require_editor)):
         raise HTTPException(503, "reparse not wired -- the editor runs under "
                                  "`lagen serve`, which supplies it")
     pristine, _current, _label = _load(body.source, body.basefile)
-    if _sha(pristine) != body.base_sha:
+    if base_sha(pristine) != body.base_sha:
         raise HTTPException(409, "the source changed since you loaded it; reload")
     path = patchlib.create_patch(body.source, body.basefile, pristine,
                                  body.edited_text, description=body.description,
@@ -140,16 +130,9 @@ def _commit(source, basefile, editor, removed, obfuscated):
     paths = sorted({r for r in rels if (repo / r).exists()} | (tracked - {""}))
     if not paths:
         return git.run(repo, "rev-parse", "HEAD", capture=True)
-    git.run(repo, "add", "-A", "--", *paths)
-    if not git.run(repo, "status", "--porcelain", "--", *paths, capture=True):
-        return git.run(repo, "rev-parse", "HEAD", capture=True)
     verb = "Remove patch for" if removed else ("Redact" if obfuscated else "Patch")
-    env = {**os.environ,
-           "GIT_AUTHOR_NAME": editor.name, "GIT_AUTHOR_EMAIL": editor.email,
-           "GIT_COMMITTER_NAME": editor.name, "GIT_COMMITTER_EMAIL": editor.email}
-    git.run(repo, "commit", "-m", "%s %s %s" % (verb, source, basefile),
-            "--", *paths, env=env)
-    return git.run(repo, "rev-parse", "HEAD", capture=True)
+    return git.commit_as(repo, paths, "%s %s %s" % (verb, source, basefile),
+                         name=editor.name, email=editor.email)
 
 
 # --------------------------------------------------------------------------
@@ -162,8 +145,8 @@ def edit_page(source: str = Query(...), basefile: str = Query(...),
               editor: Editor = Depends(require_editor)):
     """A minimal self-contained editor page for one document's patch. Gated like
     every write route; the page's fetches carry the session cookie."""
-    if source not in patchsource._INTERMEDIATE:
-        raise HTTPException(400, "source %r is not patchable" % source)
+    if not patchsource.is_patchable(source):
+        raise HTTPException(400, patchsource.unpatchable_message(source))
     return _EDITOR_PAGE.render(
         source=source, basefile=basefile,
-        format=patchsource.format_label(source) or "")
+        format=patchsource.format_label(source))

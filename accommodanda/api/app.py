@@ -48,17 +48,15 @@ from ..lib import (
     facsimile,
     feeds,
     history,
-    inbound,
     layout,
-    pins,
     regeringen,
     search,
 )
 from ..lib.util import basefile_slug
-from . import analytics, auth, edit, errors, ops, patch
+from . import analytics, auth, db, edit, errors, ops, patch, reads
 from . import mcp as mcp_server
+from .db import get_con
 
-CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 DUMPS = config.DATA / "dumps"
 
 app = FastAPI(
@@ -137,19 +135,6 @@ def _cached_diff_html(basefile, from_version, to):
                 _diff_cache.pop(next(iter(_diff_cache)))
             _diff_cache[key] = html
     return html
-
-
-def get_con():
-    """A read-only catalog connection per request (SQLite connections are not
-    shared across threads); `catalog.connect_ro` applies the additive schema
-    migrations once per process first."""
-    if not CATALOG.exists():
-        raise HTTPException(503, "catalog not built -- run `lagen all relate`")
-    con = catalog.connect_ro(CATALOG)
-    try:
-        yield con
-    finally:
-        con.close()
 
 
 # --------------------------------------------------------------------------
@@ -234,7 +219,8 @@ class InboundCitation(BaseModel):
 class InboundCitations(BaseModel):
     uri: str
     scope: str
-    total: int                      # matching the scope, before paging
+    source: str | None = None       # the citing-side filter, echoed back
+    total: int                      # matching the scope and filter, before paging
     limit: int
     offset: int
     # {source: rows} over the whole scope, not the page -- so a client that took
@@ -336,12 +322,6 @@ class DumpInfo(BaseModel):
 # endpoints
 # --------------------------------------------------------------------------
 
-# the ⌘K resolver's hits for `q`, shaped as SearchResults (the citation-shaped
-# query -> one exact, fragment-deep target the full-text index can't reach);
-# shared verbatim with the MCP search/resolve_citation tools (lib/pins.py)
-_resolved_results = pins.resolved_results
-
-
 @app.get("/api/v1/search", response_model=SearchResponse, tags=["search"])
 def search_endpoint(
         q: str = Query(..., description="free-text query"),
@@ -365,29 +345,17 @@ def search_endpoint(
     if cursor and offset:
         raise HTTPException(422, "cursor and offset are mutually exclusive")
     try:
-        res = _index.search(q, source=source, kind=kind, year=year,
-                            limit=limit, offset=offset, cursor=cursor)
+        res = reads.search(_index, q, source=source, kind=kind, year=year,
+                           limit=limit, offset=offset, cursor=cursor)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except reads.SearchUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
     kind_label = facets.kind_labels(singular=True)   # one hit, not a bucket
-    results = [{**r, "url": layout.page_url(r["uri"]),
-                "kind_label": kind_label.get(r.get("kind"))}
+    results = [{**r, "kind_label": kind_label.get(r.get("kind"))}
                for r in res["results"]]
-    total = res["total"]
-    # the resolved target is the answer to a citation-shaped query, so it leads;
-    # only on the first page (it's one fixed target, not paginated). Drop any
-    # full-text row for the same document -- the pinned hit is more precise.
-    # Resolution confirms its target against the catalog, but a missing catalog
-    # mustn't fail a full-text search, so it's best-effort (no Depends/503).
-    if offset == 0 and not cursor and not year and CATALOG.exists():
-        con = catalog.connect_ro(CATALOG)
-        try:
-            pinned = _resolved_results(con, q, source, kind)
-        finally:
-            con.close()
-        results, total = pins.merge_pinned(pinned, results, total, limit)
-    return SearchResponse(query=q, total=total,
-                          next_cursor=res.get("next_cursor"),
+    return SearchResponse(query=q, total=res["total"],
+                          next_cursor=res["next_cursor"],
                           facets=_labelled_facets(res["facets"]),
                           results=results)  # ty: ignore[invalid-argument-type]  # result/facet dicts are validated by pydantic at runtime
 
@@ -506,16 +474,11 @@ def documents_endpoint(
     full-text search (that is /search, which requires a query); it enumerates the
     corpus. `source_url` is the publisher's page where known; `updated` is the
     artifact's last-build time."""
-    total = catalog.document_count(con, source, kind)
-    docs = []
-    root = catalog.data_root(con)              # stored paths are data_root-relative
-    for uri, src, kind_, label, title, source_url, path, _display in \
-            catalog.documents(con, source, kind, limit, offset):
-        updated = catalog.artifact_updated(root, path)
-        docs.append(DocumentSummary(uri=uri, source=src, kind=kind_, label=label,
-                                    title=title, source_url=source_url,
-                                    updated=updated))
-    return DocumentList(total=total, limit=limit, offset=offset, documents=docs)
+    listing = reads.documents(con, source=source, kind=kind,
+                              limit=limit, offset=offset)
+    return DocumentList(total=listing["total"], limit=limit, offset=offset,
+                        documents=[DocumentSummary(**d)
+                                   for d in listing["documents"]])
 
 
 @app.get("/api/v1/document", response_model=Document, tags=["document"])
@@ -523,16 +486,10 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
                       con: sqlite3.Connection = Depends(get_con)):
     """A document's metadata plus its full parsed artifact (structure/body with
     inline citations)."""
-    row = catalog.document(con, uri)
-    if not row:
+    data = reads.document(con, uri)
+    if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
-    uri, source, kind, label, title, path = row
-    # synthesized begrepp stubs are real catalog rows with no artifact file
-    # (path='') -- served as an empty artifact, like the rendered shell pages
-    art = catalog.load_artifact(catalog.data_root(con), path)
-    return Document(uri=uri, source=source, kind=kind, label=label, title=title,
-                    source_url=art.get("source_url"), artifact=art,
-                    inbound_count=catalog.document_inbound_count(con, uri))
+    return Document(**data)
 
 
 # an SFS basefile / version id as it may appear in a query param: "1998:204",
@@ -573,7 +530,7 @@ def _version_artifact(basefile, version):
         raise HTTPException(404, "no %s consolidation of %s -- see "
                                  "/api/v1/document/versions"
                                  % (version or "current", basefile))
-    return json.loads(compress.read_bytes(path))
+    return compress.read_json(path)
 
 
 class VersionInfo(BaseModel):
@@ -598,9 +555,9 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute u
     in from the statute's register where known."""
     basefile = _sfs_basefile(uri)
     row = catalog.document(con, catalog.BASE + basefile)
-    info = (history.amendment_info(json.loads(
-                compress.read_bytes(catalog.data_root(con) / row[5])))
-            if row and row[5] else {})
+    info = (history.amendment_info(
+                catalog.load_artifact(catalog.data_root(con), row[5]))
+            if row else {})
     return VersionList(uri=catalog.BASE + basefile, versions=[
         VersionInfo(version=v, uri=vuri, url=layout.page_url(vuri),
                     ikraft=info.get(v, (None, []))[0],
@@ -649,6 +606,9 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
                          description="tree: uri and everything inside it "
                                      "(default); exact: only citations naming "
                                      "uri itself"),
+                     source: str | None = Query(
+                         None, description="only citations from one corpus "
+                                           "(dv, forarbete, sfs, …)"),
                      limit: int = Query(INBOUND_MAX, ge=1, le=INBOUND_MAX),
                      offset: int = Query(0, ge=0),
                      con: sqlite3.Connection = Depends(get_con)):
@@ -674,16 +634,15 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
     surface text is not carried -- it belongs to the citing document, and
     `/document/outbound` on that uri has it.
     """
-    root = catalog.data_root(con)
-    if not inbound.available(root):
-        raise HTTPException(503, "inbound citations not built -- run "
-                                 "`lagen all generate`")
-    rows = inbound.read(root, uri)
-    rows = inbound.scoped(rows, uri) if scope == "tree" else inbound.exact(rows, uri)
+    try:
+        data = reads.inbound_citations(con, uri, scope=scope, source=source,
+                                       limit=limit, offset=offset)
+    except reads.InboundUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
     return InboundCitations(
-        uri=uri, scope=scope, total=len(rows), limit=limit, offset=offset,
-        by_source=inbound.by_source(rows),
-        citations=[InboundCitation(**row) for row in rows[offset:offset + limit]])
+        uri=uri, scope=scope, source=source, total=data["total"],
+        limit=limit, offset=offset, by_source=data["by_source"],
+        citations=[InboundCitation(**row) for row in data["citations"]])
 
 
 @app.get("/api/v1/document/outbound", response_model=list[Citation], tags=["document"])
@@ -691,17 +650,13 @@ def outbound_endpoint(uri: str = Query(..., description="citing document uri"),
                       con: sqlite3.Connection = Depends(get_con)):
     """Every citation a document makes. Targets not (yet) in the corpus come back
     with `hosted: false` and no label/title."""
-    return [Citation(uri=to_uri, anchor=anchor, predicate=predicate, text=text,
-                     label=label, title=title, source=src, hosted=src is not None)
-            for to_uri, predicate, text, anchor, label, title, src
-            in catalog.outbound(con, uri)]
+    return [Citation(**row) for row in reads.outbound(con, uri)]
 
 
 @app.get("/api/v1/sources", response_model=list[SourceInfo], tags=["catalog"])
 def sources_endpoint(con: sqlite3.Connection = Depends(get_con)):
     """The corpus' sources and their document counts."""
-    return [SourceInfo(source=s, documents=n)
-            for s, n in sorted(catalog.counts(con).items())]
+    return [SourceInfo(**row) for row in reads.sources(con)]
 
 
 # --------------------------------------------------------------------------
@@ -738,7 +693,7 @@ def _fa_pdf(local):
     record_path = layout.fa_record(basefile)
     if not compress.exists(record_path):
         return None
-    record = json.loads(compress.read_text(record_path))
+    record = compress.read_json(record_path)
     pdfs = [layout.fa_dir(layout.FA_DOWNLOADED, typ, num) / f
             for f in record.get("files", []) if f.lower().endswith(".pdf")]
     if pdfs:
@@ -762,7 +717,7 @@ def _foreskrift_pdf(local):
         return None
     # the page anchors come from the `regulation` PDF (the body foreskrift's
     # parse reads), so that is the one a facsimile must rasterize
-    regulation = json.loads(compress.read_text(record_path))["files"].get("regulation")
+    regulation = compress.read_json(record_path)["files"].get("regulation")
     if not regulation:
         return None
     return ("foreskrift", local, layout.FORESKRIFT_DOWNLOADED / fs
@@ -808,14 +763,11 @@ def _dv_pdf(local):
     # court attachment keyed by an opaque uuid), so the path is read from the
     # artifact's stamped `facsimile_pdf`. Only raw verdicts carry it; a referat
     # renders from HTML and has no facsimile.
-    if not local.startswith("dom/") or not CATALOG.exists():
+    if not local.startswith("dom/") or not db.catalog_ready():
         return None
-    con = catalog.connect_ro(CATALOG)
-    try:
+    with db.connection() as con:
         row = catalog.document(con, catalog.BASE + local)
         art = catalog.load_artifact(catalog.data_root(con), row[5]) if row else {}
-    finally:
-        con.close()
     ref = art.get("facsimile_pdf")
     if not ref:
         return None
@@ -846,6 +798,24 @@ def _parse_bbox(raw):
     return bbox
 
 
+def _png_response(source, basefile, pdf, page, bbox, missing):
+    """The cached facsimile PNG of one source-PDF page (or `bbox` of it) as a
+    response, rendering it on first request. `missing` is the 404 detail for a
+    page the PDF does not have."""
+    try:
+        png = facsimile.cached(source, basefile, pdf, page, bbox)
+    except subprocess.CalledProcessError as exc:
+        # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
+        # file" -- the source is corrupt, a corpus data-integrity problem
+        # that must fail loudly, not read as a client 404. 99 ("other
+        # error") is what an out-of-range -f/-l page range produces -- a
+        # genuinely missing page, so that alone is a 404.
+        if exc.returncode == 1:
+            raise
+        raise HTTPException(404, missing) from None
+    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
+
+
 def _facsimile_response(local, sid, bbox=None):
     """The facsimile PNG for page `sid` of the document at uri-local path
     `local` ("prop/2013/14:116"), rendering into the disk cache on first
@@ -859,20 +829,8 @@ def _facsimile_response(local, sid, bbox=None):
     if resolved is None:
         raise HTTPException(404, "no PDF source downloaded for %r" % local)
     source, basefile, pdf = resolved
-    try:
-        png = (facsimile.cached_region(source, basefile, pdf, sid, bbox)
-               if bbox else facsimile.cached_page(source, basefile, pdf, sid))
-    except subprocess.CalledProcessError as exc:
-        # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
-        # file" -- the source is corrupt, a corpus data-integrity problem
-        # that must fail loudly, not read as a client 404. 99 ("other
-        # error") is what an out-of-range -f/-l page range produces -- a
-        # genuinely missing page, so that alone is a 404.
-        if exc.returncode == 1:
-            raise
-        raise HTTPException(404, "%r has no page %d" % (local, sid)) \
-            from None
-    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
+    return _png_response(source, basefile, pdf, sid, bbox,
+                         "%r has no page %d" % (local, sid))
 
 
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
@@ -963,15 +921,8 @@ def _sfs_graphic_response(local, node):
     pdf = layout.sfs_pdf(src)
     if not pdf.exists():
         raise HTTPException(404, "source SFS %s is not mirrored" % src)
-    try:
-        png = (facsimile.cached_region("sfs", src, pdf, page, bbox) if bbox
-               else facsimile.cached_page("sfs", src, pdf, page))
-    except subprocess.CalledProcessError as exc:
-        if exc.returncode == 1:      # corrupt source PDF -- corpus integrity
-            raise
-        raise HTTPException(404, "SFS %s has no page %d" % (src, page)) \
-            from None
-    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
+    return _png_response("sfs", src, pdf, page, bbox,
+                         "SFS %s has no page %d" % (src, page))
 
 
 @app.get("/api/v1/sfs-graphic", response_class=FileResponse, tags=["document"],
@@ -1030,16 +981,12 @@ class SiteFiles(StaticFiles):
       its index.html -- nginx's try_files rules, in Starlette."""
 
     async def get_response(self, path, scope):
-        # a plain file / directory index that StaticFiles serves outright (tiny
-        # assets kept uncompressed) wins first; a path never has both a plain and
-        # a compressed representation, so a 200 here is authoritative.
-        try:
-            resp = await super().get_response(path, scope)
-            if resp.status_code != 404:
-                return resp
-        except StarletteHTTPException as exc:
-            if exc.status_code != 404:
-                raise
+        # each candidate relpath is looked up once -- its precompressed variants
+        # first, then (in `_serve`) plain StaticFiles, which is what serves the
+        # tiny files kept uncompressed and answers a directory with its index or
+        # its trailing-slash redirect. A path never has both a plain and a
+        # compressed representation, so the order within a candidate settles
+        # nothing that could differ.
         accepts = _accept_encoding(scope)
         for rel in self._candidates(path):
             served = await self._serve(rel, accepts, scope)

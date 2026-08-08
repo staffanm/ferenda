@@ -34,8 +34,11 @@ from ..lib.tpl import ENV
 # storage whose failure it reports is not a ledger.
 LEDGER = config.CATALOG_ROOT / "httperrors.ndjson"
 
-# path prefixes that answer JSON rather than a page
-API_PREFIXES = ("/api/", "/docs", "/redoc", "/openapi.json", "/mcp")
+# path prefixes that answer JSON rather than a page. Distinct from
+# analytics.API_PREFIXES, which is a different set for a different question
+# (what to *count*): the editor's routes are tracked nowhere but still answer
+# JSON, and /mcp is the reverse.
+JSON_PREFIXES = ("/api", "/docs", "/redoc", "/openapi.json", "/mcp")
 
 _COPY = {
     404: ("Sidan finns inte",
@@ -69,8 +72,18 @@ def _page(status, error_id):
         toc="", island="", meta="", summary="", summary_text="")
 
 
+def under(path, prefixes):
+    """Whether `path` is one of `prefixes` or below it, on a segment boundary --
+    `/docs` and `/docs/oauth2-redirect` are the docs, `/docsomething` is a
+    stranger. A bare `startswith` would hand that stranger the API's error shape
+    (or, in the analytics middleware that shares this, the docs' identity), and
+    a stranger is exactly what an unmatched url on the static site is."""
+    return any(path == prefix or path.startswith(prefix + "/")
+               for prefix in prefixes)
+
+
 def _wants_json(request):
-    return request.url.path.startswith(API_PREFIXES)
+    return under(request.url.path, JSON_PREFIXES)
 
 
 def _record(request, status, exc=None, detail=None):

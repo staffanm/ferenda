@@ -1,12 +1,15 @@
 """The one place we shell out to the git CLI.
 
-Three callers: the inline editor's commit engine (`api/editcart.py`), the
-one-time MediaWiki history importer (`tools/mediawiki_to_markdown.py`) and the
-SFS history export. They need the same `git -C <repo> …` invocation with
+Callers: the inline editor's commit engine (`api/editcart.py`), the patch-file
+editor (`api/patch.py`), the ops dashboard's push-state probe (`api/ops.py`),
+the one-time MediaWiki history importer (`tools/mediawiki_to_markdown.py`) and
+the SFS history export. They need the same `git -C <repo> …` invocation with
 fail-fast errors, so it lives here rather than as copies
-(rule:second-use-goes-to-lib).
+(rule:second-use-goes-to-lib) -- as does `commit_as`, the attributed commit both
+editors make.
 """
 
+import os
 import subprocess
 
 
@@ -26,6 +29,25 @@ def run(repo, *args, env=None, capture=False, check=True):
     subprocess.run(["git", "-C", str(repo), *args], check=True, env=env,
                    stdout=subprocess.DEVNULL)
     return None
+
+
+def commit_as(repo, paths, message, *, name, email):
+    """Stage exactly `paths` and commit them authored *and* committed as
+    (`name`, `email`) -- both identities set, so `git log` attributes a web edit
+    to the person who made it, indistinguishable from a local commit. Returns
+    the new sha, or the unchanged HEAD when the staged paths hold no change (a
+    no-op edit, which `git commit` would otherwise exit non-zero on and 500).
+
+    `add -A` so a pathspec whose file was *deleted* (the patch editor removing a
+    patch) stages the deletion; for a path that exists it is plain `git add`."""
+    run(repo, "add", "-A", "--", *paths)
+    if not run(repo, "status", "--porcelain", "--", *paths, capture=True):
+        return run(repo, "rev-parse", "HEAD", capture=True)
+    env = {**os.environ,
+           "GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email,
+           "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email}
+    run(repo, "commit", "-m", message, "--", *paths, env=env)
+    return run(repo, "rev-parse", "HEAD", capture=True)
 
 
 def push_state(repo):

@@ -24,13 +24,13 @@ edit made through the web UI is indistinguishable from one made in an editor +
 """
 
 import dataclasses
-import hashlib
 from pathlib import Path
 
 from .. import config
 from ..lib import layout, markdown
 from ..site import parse as site_parse
 from ..wiki import parse as wiki_parse
+from .db import base_sha
 
 KINDS = ("kommentar", "begrepp", "site")
 
@@ -61,10 +61,6 @@ class Region:
 def region_of(draft):
     """Rebuild a Region from a stored cart draft."""
     return Region(draft["kind"], draft["ref"], draft.get("anchor"))
-
-
-def _sha(text):
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _wiki_path(*parts):
@@ -172,10 +168,10 @@ def read(region):
         text = "".join(lines[span[0]:span[1]]).rstrip("\n")
         text = text + "\n" if text else template
         return {"markdown": text, "exists": bool(text.strip()),
-                "base_sha": _sha(text) if text.strip() else ""}
+                "base_sha": base_sha(text) if text.strip() else ""}
     # begrepp / site: the whole body below the frontmatter
     text = body.rstrip("\n") + "\n"
-    return {"markdown": text, "exists": True, "base_sha": _sha(text)}
+    return {"markdown": text, "exists": True, "base_sha": base_sha(text)}
 
 
 def write(region, new_text):
