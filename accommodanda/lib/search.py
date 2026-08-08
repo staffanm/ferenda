@@ -39,7 +39,7 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
-from . import catalog, compress, facets, text
+from . import catalog, compress, facets, layout, text
 
 INDEX = "lagen"
 # bump when emitted units change without artifact changes. 5: dropped the `all`
@@ -269,8 +269,11 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     if not raw.strip():
         return
     art = json.loads(raw)
-    if "year" not in shared and re.match(r"\d{4}", art.get("date") or ""):
-        shared["year"] = art["date"][:4]
+    # the year facet reads the one-date projection, not the raw "date" key --
+    # a court decision's date is "avgorandedatum", a väglednings "antagen"
+    doc_date = catalog.document_date(art)
+    if "year" not in shared and doc_date and re.match(r"\d{4}", doc_date):
+        shared["year"] = doc_date[:4]
     # the reader-facing heading, shared with the page and listings: short name +
     # acronym where the artifact carries them, else the full title (catalog)
     display = catalog.display_title(art, title)
@@ -437,6 +440,10 @@ def parse_hit(h):
                    "highlight": hl.get("text", [])}])
     return {
         "uri": src["doc_uri"],
+        # the public page path, set here rather than by each consumer: the other
+        # producer of this shape (`pins.resolved_results`) has always set it, so
+        # both REST and MCP were re-adding it to every full-text row
+        "url": layout.page_url(src["doc_uri"]),
         "identifier": src.get("identifier") or src.get("doc_label"),
         "title": src.get("title") or src.get("doc_title"),
         "display": src.get("display") or src.get("doc_display"),
@@ -808,9 +815,6 @@ class SearchIndex:
                 "facets": {field: buckets(field)
                            for field in ("source", "kind", "year")},
                 "results": results}
-
-    def doccount(self):
-        return _retry(lambda: self.client.count(index=self.index), "count")["count"]
 
     def store_size(self):
         """Total on-disk size (bytes) of the index -- primaries only, which on the
