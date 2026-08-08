@@ -110,6 +110,24 @@ Stop-hook ruff/ty/layer checks). The essentials:
   commit touches several related things. Add a body explaining the *why*
   and the scope when the change is broad.
 
+## Writing style — Simplified Technical English
+
+Everything written for a person to read — chat replies, reports, review
+docs, artifacts, commit bodies — follows ASD-STE100
+(https://github.com/danyuchn/asd-ste100-skill):
+
+- Keep sentences short, about 20 words. One idea per sentence.
+- Use active voice and present tense. "The parser removes the copy",
+  not "the copy is stripped".
+- Use simple, common verbs: remove, not strip/elide; differ, not diverge.
+- Show, don't describe: give a concrete before/after example instead of
+  an abstract characterization. Verify the example against the real code.
+- Use lists for parallel facts. Headings state the problem in plain words.
+- No session-internal shorthand, invented labels, or codenames. Use the
+  project's established terms ("references", not "edges").
+
+Code comments are exempt: they follow the surrounding file's style.
+
 ## AI Agent Behavior
 
 - Act with integrity

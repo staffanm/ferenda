@@ -417,7 +417,7 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   (2007:90's hundreds of signs) without losing prior sign-offs. The layer
   stores raw PDF points (top-left origin) and is hand-editable; generated,
   unverified candidates stay out of the public render. `lib/facsimile.py`
-  crops the bbox (`render_region`/`cached_region`); `GET
+  crops the bbox (`facsimile.cached` with a `bbox`); `GET
   /api/v1/sfs-graphic?uri=&node=` serves the crop lazily, resolving the
   provenance-correct PDF from the `.graphics` layer; the renderer's `grafik`
   node emits a `<figure>`/`<img>` crop with source-SFS attribution when the
@@ -1710,7 +1710,7 @@ them resolve.
   image — placed among the paragraphs they were printed between as `bild`
   blocks (`bbox` in PDF points via `points_from_pdftohtml`). No pixels are
   copied into the corpus: the API's `/api/v1/facsimile` endpoint gained a
-  `bbox=` crop parameter (`lib/facsimile.cached_region`, the same renderer the
+  `bbox=` crop parameter (`lib/facsimile.cached`, the same renderer the
   SFS graphics layer crops with), and a `bild` block's `<figure>` renders that
   crop on demand. En route, `pdftohtml_xml` stopped extracting images to disk
   (`-i` dropped so poppler reports figure placement, but its unrequested image
@@ -2584,7 +2584,7 @@ now have internal targets.
   top-cited), pages render with live links + rail.
 - **Wired end-to-end**: `lagen avg download [jo|jk] [--only org/dnr]` (harvest)
   + `parse` Stage (recipe-versioned); `layout` (`avg/{org}/{dnr}` page grammar,
-  storage relpath), `catalog.avg_document`, `avg/render.py`'s `render` (JO-beslut/JK-beslut
+  storage relpath), avg's catalog row (the shared `catalog.document_row`), `avg/render.py`'s `render` (JO-beslut/JK-beslut
   page with sammanfattning + meta), facets (Organ → År browse), frontpage
   entry. relate/index/dump/generate act on the artifacts generically.
   `test/test_avg.py` (16 hermetic tests).

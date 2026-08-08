@@ -260,6 +260,12 @@ lagen.nu:s egna sidor (brottsbalken, mätt 2026-08-07: 40 696 gånger som balk o
 snäva frågan — bara de rader som namnger URI:n själv. Ange en fragment-URI för
 att fråga på paragrafnivå; `tree` täcker då paragrafens stycken och punkter.
 
+`source` filtrerar på vem som citerar — `source=dv` ger bara rättsfallen. De två
+filtren är oberoende axlar: `scope` avgränsar vad frågan gäller, `source` vem
+som räknas. `total` räknas efter båda filtren (det är vad `offset` bläddrar i);
+`by_source` räknas för hela scopet *före* `source`-filtret, så svaret ändå
+visar vad de andra källorna håller.
+
 Ordningen är densamma som i sidans kontextspalt — rättsfall först för en lag,
 sedan myndighetsavgöranden, sedan lagrumshänvisningar — så att första sidan är
 representativ i stället för att styras av vilket källnamn som råkar sortera
@@ -419,13 +425,15 @@ om corpuset växer varje natt.
 | `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
 | `fetch` | samma text, men hämtad på ett `id` från `search` (`…/1962:700#K3P1`) i stället för URI + pinpoint var för sig — se *Sök/hämta-kontraktet* nedan |
 | `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
-| `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader i sidans egen ordning (rättsfall först), filtrerbart på `source` |
+| `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader i sidans egen ordning (rättsfall först), filtrerbart på `source` (vem som citerar) och `scope` (`tree`/`exact` — vad frågan gäller) |
 | `get_outgoing_citations` | alla citeringar ett dokument gör (grafen utåt) |
 | `list_sources` | corpusets källor och antal — orientering för `source`-filtret |
 
-Verktygen är tunna omslag kring samma `lib`-funktioner som REST-endpointerna, så
-en corpus-fakta når MCP och REST genom en kodväg. Precis som REST behöver bara
-`search` ett igång OpenSearch; de katalogberoende verktygen svarar utan klustret.
+Verktygen svarar genom `api/reads.py` — samma funktioner som REST-endpointerna
+anropar — så en corpus-fakta når MCP och REST genom en kodväg, med samma filter
+på båda sidor. Precis som REST behöver bara `search` ett igång OpenSearch; de
+katalogberoende verktygen svarar utan klustret. Ett nere kluster är ett synligt
+fel på båda sidor (REST: 503, MCP: tool-fel) — aldrig ett tyst mindre svar.
 
 ### Sök/hämta-kontraktet
 
@@ -451,11 +459,8 @@ med, så anpassningen bestod i att namnge fälten, inte i att smalna av något:
 
 De två verktygen deklarerar `TypedDict`-returer, vilket är vad SDK:n behöver för
 att alls sända `structuredContent` — en naken `-> dict` ger varken output-schema
-eller strukturerad payload. `note` i `search` skickas alltid, som `null` när
-inget är degraderat: SDK:n dumpar den validerade modellen utan `exclude_unset`,
-så ett utelämnat valfritt fält skulle ändå nå tråden som en explicit null och
-göra `structuredContent` och `content` osynkade (nycklarna kommer i olika
-ordning i de två — det är värdena som ska stämma, och ett test låser det).
+eller strukturerad payload. `structuredContent` och JSON-dubbletten i `content`
+ska bära samma nycklar och värden (ordningen skiljer; ett test låser det).
 
 Servern är monterad i `api/app.py` via `api/mcp.py` (`mcp.mount(app)` +
 `lifespan`). Eftersom nginx redan proxar *allt* till appen (se
