@@ -286,18 +286,27 @@ def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
 _NON_ARTIFACT_NAMES = frozenset({DOM_INDEX.name, GUIDANCE_INDEX.name})
 
 
-def _is_document_artifact(path):
+def _is_document_artifact(path, root):
+    """Whether one json file under a source's artifact dir is a corpus document:
+    not an index sidecar, not a per-document `.versions`/`.grund` sidecar, and
+    not part of the `archive/` consolidation subtree (sfs's superseded wordings
+    -- tens of thousands of files that are extra *pages*, never documents; see
+    `sfs_version_file`). Everything a source publishes lives at the depth
+    `relpath` puts it at, so the archive is excluded by its subtree, not by
+    guessing at a file's name."""
     return (path.name not in _NON_ARTIFACT_NAMES
             and not path.name.endswith(".versions.json")
-            and not path.name.endswith(".grund.json"))
+            and not path.name.endswith(".grund.json")
+            and "archive" not in path.relative_to(root).parts[:-1])
 
 
 def artifacts(source: str) -> list[Path]:
     """Every parse artifact of `source` on disk, sorted -- the iteration
     companion to `artifact`, so the tree layout has one home and a consumer
     can't drift out of sync with it by hand-globbing. Non-document json that
-    happens to live in the artifact dir (the identity/guidance index sidecars,
-    the sfs `.versions.json` layers) is excluded -- it is not a corpus document.
+    happens to live in the artifact dir is excluded -- the identity/guidance
+    index sidecars, the sfs `.versions.json` / föreskrift `.grund.json` layers
+    and the whole `archive/` subtree of superseded consolidations.
 
     Artifacts are stored precompressed (lib/compress), so a document may be on
     disk as `.json`, `.json.br` or `.json.gz`; each is mapped back to its logical
@@ -307,7 +316,7 @@ def artifacts(source: str) -> list[Path]:
     root = artifact_dir(source)
     logical = {compress.logical(p) for suffix in ("", *compress.SUFFIXES)
                for p in root.glob("**/*.json" + suffix)}
-    return sorted(p for p in logical if _is_document_artifact(p))
+    return sorted(p for p in logical if _is_document_artifact(p, root))
 
 
 # --------------------------------------------------------------------------
@@ -628,6 +637,21 @@ REMISSER_ANALYSED = REMISSER_DOWNLOADED / ".analysed.json"
 FORARBETE = ("prop/", "sou/", "ds/", "dir/", "fm/", "skr/", "so/", "lr/",
              "bet/", "rskr/")
 
+# the ext/<ns>/ uri namespaces: documents identified by a foreign publisher's own
+# id (a CELEX, a CETS number, an ICRC/UNTC/ICC number), which is why they sit
+# under ext/ in the uri space -- but each gets its own top-level segment on the
+# web and its own dir on disk. ext/celex/32016R0679 is the file
+# eurlex/32016R0679.html served at /celex/32016R0679. One table drives all three
+# rules (page_relpath, page_url, url_to_relpath) so a new namespace is a row,
+# not three edits: namespace -> (generated-page dir, file-name slug rule). Only
+# celex deviates -- its dir is the source name and a CELEX's own '/' (12016E/TXT)
+# is the only character to fold, so it keeps the id's case.
+_EXT_NS = {"celex": ("eurlex", lambda rest: rest.replace("/", "_")),
+           "coe": ("coe", _alnum_slug),
+           "icrc": ("icrc", _alnum_slug),
+           "untc": ("untc", _alnum_slug),
+           "icc": ("icc", _alnum_slug)}
+
 
 # --------------------------------------------------------------------------
 # authoritative source url -- a document's canonical location at the publisher,
@@ -683,22 +707,17 @@ def page_relpath(uri: str) -> str:
     named by its bare SFS id with the colon kept (2018:585 -> 2018:585.html), so
     it is served at lagen.nu's /2018:585 address (see `page_url`)."""
     loc = local(strip_fragment(uri))
+    ns, _, rest = loc[len("ext/"):].partition("/") if loc.startswith("ext/") \
+        else ("", "", "")
+    if ns in _EXT_NS:
+        directory, slug = _EXT_NS[ns]
+        return "%s/%s.html" % (directory, slug(rest))
     if loc.startswith("dom/"):
         prefix = "dom"
     elif loc.startswith("kommentar/"):
         prefix = "kommentar"
     elif loc.startswith("begrepp/"):
         prefix = "begrepp"
-    elif loc.startswith("ext/celex/"):
-        return "eurlex/%s.html" % loc[len("ext/celex/"):].replace("/", "_")
-    elif loc.startswith("ext/coe/"):
-        return "coe/%s.html" % _alnum_slug(loc[len("ext/coe/"):])
-    elif loc.startswith("ext/icrc/"):
-        return "icrc/%s.html" % _alnum_slug(loc[len("ext/icrc/"):])
-    elif loc.startswith("ext/untc/"):
-        return "untc/%s.html" % _alnum_slug(loc[len("ext/untc/"):])
-    elif loc.startswith("ext/icc/"):
-        return "icc/%s.html" % _alnum_slug(loc[len("ext/icc/"):])
     elif loc.startswith(FORARBETE):
         # keep the type as the top-level segment, slug only the rest:
         # prop/2024/25:1 -> prop/2024_25_1.html (served at /prop/…)
@@ -740,16 +759,10 @@ def page_url(uri: str) -> str:
     /celex/<celexid> (its ext/celex/ namespace collapsed). The static server maps
     these back to the flattened on-disk files (see url_to_relpath, api.app.SiteFiles)."""
     loc = local(strip_fragment(uri))
-    if loc.startswith("ext/celex/"):
-        return "/celex/" + loc[len("ext/celex/"):]
-    if loc.startswith("ext/coe/"):
-        return "/coe/" + loc[len("ext/coe/"):]
-    if loc.startswith("ext/icrc/"):
-        return "/icrc/" + loc[len("ext/icrc/"):]
-    if loc.startswith("ext/untc/"):
-        return "/untc/" + loc[len("ext/untc/"):]
-    if loc.startswith("ext/icc/"):
-        return "/icc/" + loc[len("ext/icc/"):]
+    # an ext/ namespace is served bare (/celex/32016R0679): the namespace is
+    # itself lagen.nu's top-level segment, so only the ext/ prefix drops
+    if loc.startswith("ext/") and loc[len("ext/"):].partition("/")[0] in _EXT_NS:
+        return "/" + loc[len("ext/"):]
     return "/" + loc
 
 
@@ -763,16 +776,9 @@ def url_to_relpath(path: str) -> str | None:
     # on the static server's containment check alone
     if ".." in loc.split("/"):
         return None
-    if loc.startswith("celex/"):
-        loc = "ext/celex/" + loc[len("celex/"):]
-    elif loc.startswith("coe/"):
-        loc = "ext/coe/" + loc[len("coe/"):]
-    elif loc.startswith("icrc/"):
-        loc = "ext/icrc/" + loc[len("icrc/"):]
-    elif loc.startswith("untc/"):
-        loc = "ext/untc/" + loc[len("untc/"):]
-    elif loc.startswith("icc/"):
-        loc = "ext/icc/" + loc[len("icc/"):]
+    ns, sep, _rest = loc.partition("/")
+    if sep and ns in _EXT_NS:      # /celex/<id> is the public form of ext/celex/<id>
+        loc = "ext/" + loc
     return page_relpath(BASE + loc)
 
 

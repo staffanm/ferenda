@@ -253,7 +253,8 @@ def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     # (_catalog_current_for) must report stale, so relate still runs
     monkeypatch.setattr(build, "CATALOG", tmp_path / "catalog.sqlite")
     related = []
-    monkeypatch.setattr(build, "cmd_relate", lambda names: related.append(names))
+    monkeypatch.setattr(build, "cmd_relate",
+                        lambda names, force=None: related.append(names))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert src.stages["parse"].output("a").read_text() == "HELLO"
@@ -269,7 +270,8 @@ def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypat
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "_catalog_current_for", lambda name, bfs: True)
     monkeypatch.setattr(build, "cmd_relate",
-                        lambda names: pytest.fail("must not relate when current"))
+                        lambda names, force=None:
+                        pytest.fail("must not relate when current"))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert src.stages["parse"].output("a").read_text() == "HELLO"
@@ -312,7 +314,8 @@ def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch)
     src.name = "sfs"
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "cmd_relate",
-                        lambda names: pytest.fail("must not relate with --no-deps"))
+                        lambda names, force=None:
+                        pytest.fail("must not relate with --no-deps"))
     monkeypatch.setattr(build.RUN, "no_deps", True)
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
@@ -821,7 +824,8 @@ def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
     monkeypatch.setattr(build, "kommentar_parse_run", lambda bf: parsed.append(("kommentar", bf)))
     monkeypatch.setattr(build, "begrepp_parse_run", lambda bf: parsed.append(("begrepp", bf)))
     monkeypatch.setattr(build, "site_parse_run", lambda bf: parsed.append(("site", bf)))
-    monkeypatch.setattr(build, "cmd_relate", lambda names: related.append(list(names)))
+    monkeypatch.setattr(build, "cmd_relate",
+                        lambda names, force=None: related.append(list(names)))
     monkeypatch.setattr(
         build, "cmd_generate",
         lambda only=None, source=None, jobs=1, force=False:

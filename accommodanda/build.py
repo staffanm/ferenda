@@ -40,7 +40,7 @@ import sqlite3
 import sys
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 from typing import Callable
@@ -253,6 +253,62 @@ def write_artifact_to(path, art):
     compress.write_text(
         path, json.dumps(art, ensure_ascii=False, indent=2, sort_keys=True),
         encodings=compress.ARTIFACT_ENCODINGS)
+
+
+# --------------------------------------------------------------------------
+# source-shape helpers. A source is a program, not a subclass -- but several of
+# them are the *same* program over different data (the download module, the
+# parser, the download root, the recipe files, the help text), and a few checks
+# recur across otherwise unrelated ones. Those are configured here rather than
+# copied per source; anything a source actually does differently stays its own
+# code (rule:sources-are-programs -- variation as data, never as a base class).
+# --------------------------------------------------------------------------
+
+def _require_single_scope(name, scopes, noun, example):
+    """Refuse `--only` unless exactly one scope says where to look. `--only`
+    names one document; with no scope (or several) the harvester would walk
+    every listing to find it, which is never what the flag is asking for."""
+    if RUN.only and len(scopes) != 1:
+        sys.exit("%s --only needs exactly one %s scope, e.g. `%s`"
+                 % (name, noun, example))
+
+
+def _parse_stage(name, parse_fn, root, *, inputs, code):
+    """The parse stage of a source whose parser turns (basefile, download root)
+    into a finished artifact in one call -- eight sources' entire parse recipe,
+    which is why neither the recipe nor the artifact path is worth a named
+    two-line function apiece."""
+    return Stage("parse", lambda bf: write_artifact(name, bf, parse_fn(bf, root)),
+                 functools.partial(layout.artifact, name),
+                 inputs=inputs, code=code)
+
+
+def _simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
+                   notes, dry_label, sync_extra=None):
+    """A source whose whole chain is the common shape: one bulk
+    ``sync(root, full=, only=, limit=, delay=)`` over a publisher's own list of
+    instruments, and a parse that reads the stored record(s) into an artifact in
+    one call. No sub-scopes, no per-document download stage, no extra actions.
+
+    `dry_label` names what a `--dry-run` would fetch; `sync_extra` supplies the
+    one keyword a source's sync takes beyond the shared five (hudoc's
+    `languages`). A source that needs more than that keeps its own registration
+    -- this is a shape shared by several sources, not a base class to bend."""
+
+    def harvest(_scopes):
+        if RUN.dry_run:
+            print("%s download: would download %s into %s"
+                  % (name, RUN.only or dry_label, root))
+            return
+        seen, changed = download_mod.sync(
+            root, full=RUN.force, only=RUN.only, limit=RUN.limit,
+            delay=POLITENESS, **(sync_extra() if sync_extra else {}))
+        print("%s download: %d seen, %d changed" % (name, seen, changed))
+
+    return Source(name, lambda: download_mod.list_basefiles(root),
+                  {"parse": _parse_stage(name, parse_fn, root,
+                                         inputs=inputs, code=code)},
+                  harvest=harvest, origin=origin, notes=notes)
 
 
 # --------------------------------------------------------------------------
@@ -522,9 +578,14 @@ def _update_status_cell(source, stage, cell):
     runlog.update_status_cell(STATUS, source, stage, cell)
 
 
-def build_one(source, action, basefile, manifest):
+def build_one(source, action, basefile, manifest, force=None):
+    """Bring one document's `action` up to date. `force` overrides the run's own
+    `--force` for this build (None = use it): a targeted generate's upstream
+    prerequisites stay freshness-checked, because the `--force` was aimed at the
+    generate the user named, not at re-parsing its inputs."""
     res = Result()
-    ensure(source, action, basefile, manifest, res, RUN.force, RUN.no_deps)
+    ensure(source, action, basefile, manifest, res,
+           RUN.force if force is None else force, RUN.no_deps)
     return res
 
 
@@ -598,10 +659,14 @@ LOST_RESULT_TIMEOUT = 3600
 WORKER_POLL = 60
 
 
-def _run_parallel(source, action, order, jobs, absorb):
+def _run_parallel(source, action, order, jobs, absorb, force=None):
     """Fan the basefiles out across `jobs` worker processes, absorbing each
     result as it completes (imap_unordered: continuous feeding, no barriers,
     a slow doc stalls nothing but itself).
+
+    `force` overrides the run's `--force` for these builds (None = use it).
+    A worker reads it off its copy of the run options, which is why the override
+    travels in the options the pool is initialised with rather than per job.
 
     `order` is already in dispatch order -- descending expected duration, with
     the never-built document first (`expected_secs`). This is the old pipeline's
@@ -639,7 +704,8 @@ def _run_parallel(source, action, order, jobs, absorb):
     lost = set()                           # attributed to a dead worker
     quiet = 0.0                            # seconds since the last result
     with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
-                              initargs=(RUN,),
+                              initargs=(RUN if force is None
+                                        else replace(RUN, force=force),),
                               maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
         results = pool.imap_unordered(_worker, jobs_list, chunksize=1)
         while len(outstanding) > len(lost):
@@ -679,11 +745,15 @@ def _run_parallel(source, action, order, jobs, absorb):
     # (an imap accounting anomaly delivering StopIteration with residue) must
     # crash with a diagnosis here, not be papered over by the rebuild below
     assert outstanding == lost, (outstanding, lost)
+    # the in-parent rebuild runs under the same force the pool's workers got;
+    # with nothing overridden the call is build_one's own default (RUN.force)
+    rebuild = build_one if force is None \
+        else functools.partial(build_one, force=force)
     for bf in sorted(outstanding):
         # every doc still outstanding lost its worker; one serial in-parent
         # rebuild completes the run (a second crash here kills the run --
         # rare^2, and then genuinely a case for the --jobs 1 fallback)
-        absorb(build_one(source, action, bf, manifest), bf)
+        absorb(rebuild(source, action, bf, manifest), bf)
 
 
 def expected_secs(source_name, action, basefiles, manifest):
@@ -714,7 +784,10 @@ def expected_secs(source_name, action, basefiles, manifest):
     return weights, order
 
 
-def run_action(source, action, basefiles, jobs):
+def run_action(source, action, basefiles, jobs, force=None):
+    """Run `action` over `basefiles`, in parallel where the stage allows it,
+    reporting progress. `force` overrides the run's `--force` for this action
+    (None = use it) -- see `build_one`."""
     manifest = load_manifest()
     merged = Result()
     total = len(basefiles)
@@ -749,10 +822,10 @@ def run_action(source, action, basefiles, jobs):
         # daemonic, and a recipe that parallelises internally (stats compute fans
         # its corpus scan over a ProcessPoolExecutor) cannot spawn children there.
         if jobs > 1 and len(basefiles) > 1 and not RUN.dry_run:
-            _run_parallel(source, action, order, jobs, absorb)
+            _run_parallel(source, action, order, jobs, absorb, force)
         else:
             for bf in basefiles:
-                absorb(build_one(source, action, bf, manifest), bf)
+                absorb(build_one(source, action, bf, manifest, force), bf)
     finally:
         # always flush what was done -- on normal completion AND on Ctrl-C, so an
         # interrupted slow source (forarbete) keeps the docs it already parsed
@@ -931,10 +1004,6 @@ def sfs_inputs(basefile):
     return inputs + _patch_input("sfs", basefile)
 
 
-def sfs_artifact(basefile):
-    return layout.artifact("sfs", basefile)
-
-
 def sfs_download_run(basefile):
     """Fetch one named act's consolidated _source from the beta database,
     archiving any superseded consolidation (the old download_single). New-act
@@ -958,7 +1027,7 @@ def sfs_harvest(scopes):
     mirrored, or known to have no PDF, costs nothing, so only the first harvest
     pays for the corpus-wide backfill. `--force` here scopes *discovery* (walk
     the whole corpus rather than stop at the first known page); re-fetching
-    every facsimile is `mirror-pdf --full`, and asking for one is no way to ask
+    every facsimile is `mirror-pdf --force`, and asking for one is no way to ask
     for the other."""
     if RUN.dry_run:
         print("sfs download: would download the corpus into %s"
@@ -1036,8 +1105,8 @@ def sfs_ai_correspond(basefiles):
         sys.exit("usage: lagen sfs ai-correspond <new-sfs> <prop-basefile> "
                  "[<old-sfs>]  (e.g. 2018:585 prop/2017-18-89)")
     new_sfs, prop = basefiles[0], basefiles[1]
-    new_art = json.loads(compress.read_bytes(sfs_artifact(new_sfs)))
-    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
+    new_art = compress.read_json(layout.artifact("sfs", new_sfs))
+    prop_art = compress.read_json(layout.artifact("forarbete", prop))
     old_uri = ("https://lagen.nu/" + basefiles[2] if len(basefiles) == 3
                else sfs_correspond.detect_old_law(new_art))
     if not old_uri:
@@ -1046,7 +1115,7 @@ def sfs_ai_correspond(basefiles):
                          "transition clause; pass it as the third argument"
                          % new_sfs)
     old_sfs = old_uri.rsplit("/", 1)[-1]
-    old_art = json.loads(compress.read_bytes(sfs_artifact(old_sfs)))
+    old_art = compress.read_json(layout.artifact("sfs", old_sfs))
     out = annstore.path("sfs", new_sfs, ".corr")
     if RUN.dry_run:
         print("sfs ai-correspond: would map %s <- %s via %s -> %s"
@@ -1086,8 +1155,8 @@ def sfs_table_correspond(basefiles):
                  "[<old-sfs>[=TAG] ...]  (e.g. 2009:400 prop/2008-09-150, or "
                  "2011:1244 prop/2010-11-165 1990:324=TL 1997:483=SBL)")
     new_sfs, prop = basefiles[0], basefiles[1]
-    new_art = json.loads(compress.read_bytes(sfs_artifact(new_sfs)))
-    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
+    new_art = compress.read_json(layout.artifact("sfs", new_sfs))
+    prop_art = compress.read_json(layout.artifact("forarbete", prop))
     olds = []                   # [(old_sfs, tag or None)]
     for arg in basefiles[2:]:
         old_arg, _, tag = arg.partition("=")
@@ -1102,7 +1171,7 @@ def sfs_table_correspond(basefiles):
         olds = [(old_uri.rsplit("/", 1)[-1], None)]
     out = annstore.path("sfs", new_sfs, ".corr")
     typ, slug = prop.split("/", 1)
-    record = json.loads(compress.read_bytes(layout.fa_record(prop)))
+    record = compress.read_json(layout.fa_record(prop))
     pdfs = [layout.fa_dir(layout.FA_DOWNLOADED, typ, slug) / f
             for f in record["files"] if f.lower().endswith(".pdf")]
     if RUN.dry_run:
@@ -1128,7 +1197,7 @@ def sfs_table_correspond(basefiles):
         inputs |= annstore.download_input(pdf.relative_to(layout.DOWNLOADED))
     edges, old_uris = [], []
     for old_sfs, tag in olds:
-        old_art = json.loads(compress.read_bytes(sfs_artifact(old_sfs)))
+        old_art = compress.read_json(layout.artifact("sfs", old_sfs))
         tabs = sfs_correspond.relevant_tables(all_tabs, old_sfs, tag=tag)
         try:
             sidecar, stats = sfs_correspond.table_correspond(
@@ -1182,7 +1251,7 @@ def sfs_renumber_correspond(basefiles):
         sys.exit("usage: lagen sfs renumber-correspond <sfs> [...]  "
                  "(e.g. 1974:152)")
     for sfs in basefiles:
-        art = json.loads(compress.read_bytes(sfs_artifact(sfs)))
+        art = compress.read_json(layout.artifact("sfs", sfs))
         payload, stats = sfs_correspond.renumbering_payload(art)
         out = annstore.path("sfs", sfs, ".corr")
         if not payload["correspondence"]["edges"]:
@@ -1214,11 +1283,12 @@ def _forarbete_meta(identifier):
     proposition/riksdagsskrivelse is förarbete's job; build composes the two
     verticals, exactly like ai-correspond."""
     typ, _, ident = identifier.partition(" ")
-    path = fa_artifact("%s/%s" % (typ.rstrip(".").lower(),
-                                  util.basefile_slug(ident)))
+    path = layout.artifact("forarbete",
+                           "%s/%s" % (typ.rstrip(".").lower(),
+                                      util.basefile_slug(ident)))
     if not compress.exists(path):
         return None
-    art = json.loads(compress.read_bytes(path))
+    art = compress.read_json(path)
     return {"title": art.get("title") or "",
             "signers": fa_structure.signers(art["structure"]),
             "ingress": fa_structure.ingress(art["structure"])}
@@ -1256,13 +1326,13 @@ def sfs_mirror_pdf(basefiles):
     and nothing else. Each act's source follows from its SFS number
     (`pdfmirror.has_facsimile` / `is_online_series`); naming one older than both
     sources is an error. Idempotent -- already-present PDFs are skipped unless
-    --full is given. The source for the localization crop.
+    --force is given. The source for the localization crop.
 
     A rerun is cheap because both answers are local: an act already mirrored is
     skipped from disk, and one the upstream has already denied from the mirror's
     record of those (`pdfmirror.MirrorState`). Only an act nobody has asked
     about yet costs a request."""
-    targets = [b for b in basefiles if not b.startswith("--")]
+    targets = list(basefiles)
     # A named act older than every facsimile source is a question with no
     # answer, so say so rather than report it as "no published PDF" -- during a
     # corpus sweep those acts are simply the era that predates the mirrors.
@@ -1273,14 +1343,14 @@ def sfs_mirror_pdf(basefiles):
                      "exist only on paper"
                      % (beteckning, sfs_pdfmirror.RKRATTSDB_FIRST))
     _sfs_mirror_pdf_run(targets or sfs_pdfmirror.corpus_beteckningar(sfs_list()),
-                        force="--full" in basefiles or RUN.force)
+                        force=RUN.force)
 
 
 def _sfs_mirror_pdf_run(targets, force):
     """Mirror `targets`, reporting what each of the three outcomes cost. `force`
     is taken as an argument rather than read off RUN: it means "re-fetch every
     PDF already on disk and re-ask about every act the upstream once denied",
-    which is mirror-pdf's own `--full`, and must not be inferred from a
+    which is what `mirror-pdf --force` asks for, and must not be inferred from a
     `--force` that was aimed at another action (`sfs download --force` means
     walk the corpus for discovery, not re-download tens of thousands of
     facsimiles)."""
@@ -1345,8 +1415,8 @@ def _sfs_mirror_on_demand(beteckningar):
 
 
 def _sfs_includegraphics_one(basefile):
-    art = json.loads(compress.read_bytes(sfs_artifact(basefile)))
-    register = json.loads(compress.read_bytes(sfs_source(basefile)))
+    art = compress.read_json(layout.artifact("sfs", basefile))
+    register = compress.read_json(sfs_source(basefile))
     gaps = sfs_graphics.collect_gaps(art["structure"])
     out = annstore.path("sfs", basefile, ".graphics")
     if not gaps:
@@ -1406,7 +1476,8 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
     # is valid regardless of the fetcher's version, so inputs/code stay empty:
     # an act on disk is "fresh" until --force re-fetches it.
     "download": Stage("download", sfs_download_run, sfs_source),
-    "parse": Stage("parse", sfs_parse_run, sfs_artifact,
+    "parse": Stage("parse", sfs_parse_run,
+                   functools.partial(layout.artifact, "sfs"),
                    inputs=sfs_inputs, code=SFS_CODE),
     # historical consolidations: parse the download archive (superseded
     # versions, incl. two decades of legacy HTML snapshots) into per-version
@@ -1437,7 +1508,7 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
          "part of `download`). 2018:160 and later come from "
          "svenskforfattningssamling.se, 1998:306-2018:159 from rkrattsdb.gov.se, "
          "and a named act before 1998:306 is an error -- it exists only in "
-         "print. --full re-fetches existing and re-asks about acts an upstream "
+         "print. --force re-fetches existing and re-asks about acts an upstream "
          "once said it had no PDF for\n"
          "ai-includegraphics <basefile> [...]: vision-localize the dropped "
          "graphics to page+bbox in the provenance-correct published PDF into a "
@@ -1491,10 +1562,6 @@ def _dv_session():
     return dv_download.make_session(dv_download.USER_AGENT)
 
 
-def dv_artifact(basefile):
-    return layout.artifact("dv", basefile)
-
-
 def dv_member(basefile):
     """The member record parse reads for a case: the API record when the case
     has one, else the legacy original (a frozen Word referat or notis XML)."""
@@ -1544,7 +1611,7 @@ def dv_original_verdicts(basefile):
             continue
         member_path = util.load_relpath(layout.DATA, m["path"])
         assert member_path is not None, "dv member %r has no path" % m
-        record = json.loads(compress.read_text(member_path))
+        record = compress.read_json(member_path)
         pdf = next((Path(b["filnamn"]).name for b in record.get("bilagaLista") or []
                     if (b.get("filnamn") or "").lower().endswith(".pdf")), None)
         if pdf:
@@ -1611,12 +1678,19 @@ def dv_harvest(scopes):
         print("dv download: no new records, identity index left as is")
     # also refresh the named-rättsfall snapshot: HD updates that list on its own
     # cadence (independent of which cases we just downloaded), so a harvest is the
-    # natural moment to re-pull it. Best-effort -- a fetch failure here must not
-    # undo a successful case harvest (the committed snapshot stays the fallback).
+    # natural moment to re-pull it. A fetch failure here must not undo a
+    # successful case harvest (the committed snapshot stays the fallback), so it
+    # is caught -- but it is an outcome of the run, so it lands in the ledger as
+    # its own failed segment (the sibling harvest catches' pattern) instead of a
+    # printed line no ops surface ever sees.
+    t0 = time.perf_counter()
     try:
         dv_namedcases()
-    except requests.exceptions.RequestException as e:
-        print("dv download: named-rättsfall refresh skipped (%s)" % e)
+        _emit_segment("namedcases", "dv", time.perf_counter() - t0, status="ok")
+    except requests.exceptions.RequestException:
+        traceback.print_exc()
+        _emit_segment("namedcases", "dv", time.perf_counter() - t0,
+                      status="errors", errors=1)
 
 
 def dv_reindex(args=()):
@@ -1663,7 +1737,7 @@ def dv_parse_run(basefile):
         art["label"] = casenaming.case_label(art)
         write_artifact("dv", basefile, art)
         return
-    record = json.loads(compress.read_text(dv_record(basefile)))
+    record = compress.read_json(dv_record(basefile))
     # a not-yet-published HD/HFD verdict has no innehåll HTML -- only the court's
     # own PDF attachment; parse its body from that instead (R2)
     pdf = None if record.get("innehall") else dv_verdict_pdf(basefile, record)
@@ -1689,7 +1763,8 @@ def dv_parse_run(basefile):
 
 SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
     "download": Stage("download", dv_download_run, dv_record),
-    "parse": Stage("parse", dv_parse_run, dv_artifact,
+    "parse": Stage("parse", dv_parse_run,
+                   functools.partial(layout.artifact, "dv"),
                    inputs=lambda bf: [dv_record(bf)] + _patch_input("dv", bf),
                    code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
@@ -1730,10 +1805,6 @@ def fa_parse_inputs(basefile):
             + _patch_input("forarbete", basefile))
 
 
-def fa_artifact(basefile):
-    return layout.artifact("forarbete", basefile)
-
-
 def fa_list():
     """Every harvested record as 'type/slug', read from the year-segmented
     download tree (`<type>/<year>/<slug>.json`); the type is the grandparent dir.
@@ -1755,9 +1826,8 @@ def fa_harvest(scopes):
     `--riksmote YYYY/YY` (with exactly the bet or rskr scope) narrows that
     harvest to one riksmöte -- a dev/manual slice that never advances the
     watermark."""
-    if RUN.only and len(scopes) != 1:
-        sys.exit("forarbete --only needs exactly one doctype, e.g. "
-                 "`lagen forarbete download prop --only 2025/26:28`")
+    _require_single_scope("forarbete", scopes, "doctype",
+                          "lagen forarbete download prop --only 2025/26:28")
     riksdagen_syncs = {"bet": fa_riksdagen.sync, "rskr": fa_rskr.sync}
     rd_scopes = [s for s in (scopes or riksdagen_syncs) if s in riksdagen_syncs]
     reg_scopes = [s for s in scopes if s not in riksdagen_syncs]
@@ -1786,7 +1856,7 @@ def fa_harvest(scopes):
 
 
 def fa_parse_run(basefile):
-    record = json.loads(compress.read_text(fa_record(basefile)))
+    record = compress.read_json(fa_record(basefile))
     art = fa_parse.to_artifact(fa_parse.parse_record(record, layout.FA_DOWNLOADED))
     # a proposition's författningskommentar states which EU directive article a
     # provision transposes -- attach those genomför relations as a typed section
@@ -1921,7 +1991,7 @@ def fa_refetch_landings(args):
         n = sum(1 for typ in ("prop", "ds", "sou")
                 for p in compress.glob(layout.FA_DOWNLOADED / typ, "*/*.json")
                 if not p.name.startswith(".")
-                and select(json.loads(compress.read_text(p))))
+                and select(compress.read_json(p)))
         print("forarbete refetch-landings %s: up to %d landing page(s) to "
               "fetch%s (already-stored ones are passed over by the real run)"
               % (which, n, " and their documents" if word else ""))
@@ -1948,7 +2018,7 @@ def fa_ai_genomforande(basefiles):
                  "[<CELEX> ...]  (e.g. prop/2025-26-28 32022L2555; the CELEX "
                  "defaults to the directives the prop's implements names)")
     prop, celexes = basefiles[0], basefiles[1:]
-    prop_art = json.loads(compress.read_bytes(fa_artifact(prop)))
+    prop_art = compress.read_json(layout.artifact("forarbete", prop))
     if not celexes:
         celexes = fa_aigenomforande.detect_directives(prop_art)
     # a directive whose eurlex artifact is absent cannot be validated against;
@@ -1991,7 +2061,8 @@ def fa_ai_genomforande(basefiles):
 
 
 SOURCES["forarbete"] = Source("forarbete", fa_list, {
-    "parse": Stage("parse", fa_parse_run, fa_artifact,
+    "parse": Stage("parse", fa_parse_run,
+                   functools.partial(layout.artifact, "forarbete"),
                    inputs=fa_parse_inputs, code=FA_CODE),
 }, harvest=fa_harvest, origin=_origin(fa_download.BASE), self_banner=True,
    scopes=frozenset(fa_download.TYPES) | {"bet", "rskr"},
@@ -2062,10 +2133,6 @@ def eurlex_content(basefile):
     wanted language."""
     path, _lang, _route = eurlex_parse.content_file(layout.eurlex_dir(basefile))
     return [path] if path else []
-
-
-def eurlex_artifact(basefile):
-    return layout.artifact("eurlex", basefile)
 
 
 def eurlex_parse_run(basefile):
@@ -2219,7 +2286,8 @@ def eurlex_casenames(args=()):
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
-    "parse": Stage("parse", eurlex_parse_run, eurlex_artifact,
+    "parse": Stage("parse", eurlex_parse_run,
+                   functools.partial(layout.artifact, "eurlex"),
                    inputs=lambda bf: eurlex_content(bf) + _patch_input("eurlex", bf),
                    depends="download", code=EURLEX_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
@@ -2241,9 +2309,10 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 # --------------------------------------------------------------------------
 
 HUDOC_CODE = (PKG / "hudoc" / "parse.py", PKG / "hudoc" / "model.py",
-              PKG / "lib" / "coe.py")
+              PKG / "lib" / "coe.py", PKG / "lib" / "artifact.py")
 COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
-            PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py")
+            PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py",
+            PKG / "lib" / "artifact.py")
 
 
 def hudoc_inputs(basefile):
@@ -2252,30 +2321,18 @@ def hudoc_inputs(basefile):
         + _patch_input("hudoc", basefile)
 
 
-def hudoc_parse_run(basefile):
-    write_artifact("hudoc", basefile,
-                   hudoc_parse.parse(basefile, layout.HUDOC_DOWNLOADED))
+def _hudoc_languages():
+    """The one keyword hudoc's sync takes beyond the shared five: `--lang
+    ENG,FRE` (case- and space-insensitive), else the module's own default."""
+    return {"languages":
+            tuple(lang.strip().upper() for lang in RUN.lang.split(","))
+            if RUN.lang else hudoc_download.DEFAULT_LANGUAGES}
 
 
-def hudoc_harvest(_scopes):
-    if RUN.dry_run:
-        print("hudoc download: would download %s into %s"
-              % (RUN.only or "HUDOC case law", layout.HUDOC_DOWNLOADED))
-        return
-    languages = tuple(lang.strip().upper() for lang in RUN.lang.split(",")) \
-        if RUN.lang else hudoc_download.DEFAULT_LANGUAGES
-    seen, changed = hudoc_download.sync(
-        layout.HUDOC_DOWNLOADED, full=RUN.force, only=RUN.only,
-        languages=languages, limit=RUN.limit, delay=POLITENESS)
-    print("hudoc download: %d seen, %d changed" % (seen, changed))
-
-
-SOURCES["hudoc"] = Source(
-    "hudoc", lambda: hudoc_download.list_basefiles(layout.HUDOC_DOWNLOADED),
-    {"parse": Stage("parse", hudoc_parse_run,
-                    lambda bf: layout.artifact("hudoc", bf),
-                    inputs=hudoc_inputs, code=HUDOC_CODE)},
-    harvest=hudoc_harvest, origin=_origin(hudoc_download.BASE),
+SOURCES["hudoc"] = _simple_source(
+    "hudoc", hudoc_download, hudoc_parse.parse, layout.HUDOC_DOWNLOADED,
+    HUDOC_CODE, inputs=hudoc_inputs, origin=_origin(hudoc_download.BASE),
+    dry_label="HUDOC case law", sync_extra=_hudoc_languages,
     notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"
           "scope: Grand Chamber + Chamber judgments; default language is ENG;\n"
           "--force refreshes stored metadata and bodies; bodies are fetched\n"
@@ -2286,32 +2343,15 @@ def coe_inputs(basefile):
     record_path = coe_download.record_path(layout.COE_DOWNLOADED, basefile)
     paths = [record_path]
     if compress.exists(record_path):
-        record = json.loads(compress.read_text(record_path))
+        record = compress.read_json(record_path)
         paths.append(coe_download.body_path(layout.COE_DOWNLOADED, record))
     return paths + _patch_input("coe", basefile)
 
 
-def coe_parse_run(basefile):
-    write_artifact("coe", basefile, coe_parse.parse(basefile, layout.COE_DOWNLOADED))
-
-
-def coe_harvest(_scopes):
-    if RUN.dry_run:
-        print("coe download: would download %s into %s"
-              % (RUN.only or "all Treaty Office instruments", layout.COE_DOWNLOADED))
-        return
-    seen, changed = coe_download.sync(
-        layout.COE_DOWNLOADED, full=RUN.force, only=RUN.only,
-        limit=RUN.limit, delay=POLITENESS)
-    print("coe download: %d seen, %d changed" % (seen, changed))
-
-
-SOURCES["coe"] = Source(
-    "coe", lambda: coe_download.list_basefiles(layout.COE_DOWNLOADED),
-    {"parse": Stage("parse", coe_parse_run,
-                    lambda bf: layout.artifact("coe", bf),
-                    inputs=coe_inputs, code=COE_CODE)},
-    harvest=coe_harvest, origin=_origin(coe_download.FULL_LIST),
+SOURCES["coe"] = _simple_source(
+    "coe", coe_download, coe_parse.parse, layout.COE_DOWNLOADED, COE_CODE,
+    inputs=coe_inputs, origin=_origin(coe_download.FULL_LIST),
+    dry_label="all Treaty Office instruments",
     notes="download flags: --only <CETS-number>, --limit N\n"
           "one Treaty Office web-service search plus each official English PDF")
 
@@ -2327,28 +2367,10 @@ def icrc_inputs(basefile):
         + _patch_input("icrc", basefile)
 
 
-def icrc_parse_run(basefile):
-    write_artifact("icrc", basefile,
-                   icrc_parse.parse(basefile, layout.ICRC_DOWNLOADED))
-
-
-def icrc_harvest(_scopes):
-    if RUN.dry_run:
-        print("icrc download: would download %s into %s"
-              % (RUN.only or "all ICRC IHL treaties", layout.ICRC_DOWNLOADED))
-        return
-    seen, changed = icrc_download.sync(
-        layout.ICRC_DOWNLOADED, full=RUN.force, only=RUN.only,
-        limit=RUN.limit, delay=POLITENESS)
-    print("icrc download: %d seen, %d changed" % (seen, changed))
-
-
-SOURCES["icrc"] = Source(
-    "icrc", lambda: icrc_download.list_basefiles(layout.ICRC_DOWNLOADED),
-    {"parse": Stage("parse", icrc_parse_run,
-                    lambda bf: layout.artifact("icrc", bf),
-                    inputs=icrc_inputs, code=ICRC_CODE)},
-    harvest=icrc_harvest, origin=_origin(icrc_download.SITE),
+SOURCES["icrc"] = _simple_source(
+    "icrc", icrc_download, icrc_parse.parse, layout.ICRC_DOWNLOADED, ICRC_CODE,
+    inputs=icrc_inputs, origin=_origin(icrc_download.SITE),
+    dry_label="all ICRC IHL treaties",
     notes="download flags: --only <ICRC-treaty-number>, --limit N\n"
           "one JSON:API list call plus one included fetch per treaty")
 
@@ -2365,29 +2387,10 @@ def untc_inputs(basefile):
             PKG / "untc" / "data" / "treaties.json"] + _patch_input("untc", basefile)
 
 
-def untc_parse_run(basefile):
-    write_artifact("untc", basefile,
-                   untc_parse.parse(basefile, layout.UNTC_DOWNLOADED))
-
-
-def untc_harvest(_scopes):
-    if RUN.dry_run:
-        print("untc download: would download %s into %s"
-              % (RUN.only or "the curated UN Treaty Collection list",
-                 layout.UNTC_DOWNLOADED))
-        return
-    seen, changed = untc_download.sync(
-        layout.UNTC_DOWNLOADED, full=RUN.force, only=RUN.only,
-        limit=RUN.limit, delay=POLITENESS)
-    print("untc download: %d seen, %d fetched" % (seen, changed))
-
-
-SOURCES["untc"] = Source(
-    "untc", lambda: untc_download.list_basefiles(layout.UNTC_DOWNLOADED),
-    {"parse": Stage("parse", untc_parse_run,
-                    lambda bf: layout.artifact("untc", bf),
-                    inputs=untc_inputs, code=UNTC_CODE)},
-    harvest=untc_harvest, origin=_origin(untc_download.DETAIL),
+SOURCES["untc"] = _simple_source(
+    "untc", untc_download, untc_parse.parse, layout.UNTC_DOWNLOADED, UNTC_CODE,
+    inputs=untc_inputs, origin=_origin(untc_download.DETAIL),
+    dry_label="the curated UN Treaty Collection list",
     notes="download flags: --only <MTDSG-id, e.g. XXIII-1>, --limit N\n"
           "one static-HTML scrape per curated treaty; --force refreshes status")
 
@@ -2396,7 +2399,8 @@ SOURCES["untc"] = Source(
 # Legal Tools resolves each to metadata + PDF; the stored record + PDF are the
 # parse inputs, and the curated decision-type list is a recipe input.
 ICC_CODE = (PKG / "icc" / "parse.py", PKG / "icc" / "model.py",
-            PKG / "icc" / "data" / "decision_types.json", PKG / "lib" / "pdftext.py")
+            PKG / "icc" / "data" / "decision_types.json",
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "artifact.py")
 
 
 def icc_inputs(basefile):
@@ -2406,28 +2410,10 @@ def icc_inputs(basefile):
         + _patch_input("icc", basefile)
 
 
-def icc_parse_run(basefile):
-    write_artifact("icc", basefile, icc_parse.parse(basefile, layout.ICC_DOWNLOADED))
-
-
-def icc_harvest(_scopes):
-    if RUN.dry_run:
-        print("icc download: would download %s into %s"
-              % (RUN.only or "the curated ICC substantive decisions",
-                 layout.ICC_DOWNLOADED))
-        return
-    seen, changed = icc_download.sync(
-        layout.ICC_DOWNLOADED, full=RUN.force, only=RUN.only,
-        limit=RUN.limit, delay=POLITENESS)
-    print("icc download: %d seen, %d stored" % (seen, changed))
-
-
-SOURCES["icc"] = Source(
-    "icc", lambda: icc_download.list_basefiles(layout.ICC_DOWNLOADED),
-    {"parse": Stage("parse", icc_parse_run,
-                    lambda bf: layout.artifact("icc", bf),
-                    inputs=icc_inputs, code=ICC_CODE)},
-    harvest=icc_harvest, origin=_origin(icc_download.ICC),
+SOURCES["icc"] = _simple_source(
+    "icc", icc_download, icc_parse.parse, layout.ICC_DOWNLOADED, ICC_CODE,
+    inputs=icc_inputs, origin=_origin(icc_download.ICC),
+    dry_label="the curated ICC substantive decisions",
     notes="download flags: --only <ICC-doc-number, e.g. ICC-01/04-02/06-2359>, --limit N\n"
           "scope: substantive Rome-Statute decisions; text via the ICC Legal Tools API")
 
@@ -2439,7 +2425,7 @@ SOURCES["icc"] = Source(
 def foreskrift_list():
     """Every harvested base regulation as 'fs/year:num' (the artifact subdir
     excluded by the single-level glob)."""
-    return sorted(json.loads(compress.read_text(p))["basefile"]
+    return sorted(compress.read_json(p)["basefile"]
                   for p in compress.glob(layout.FORESKRIFT_DOWNLOADED, "*/*.json")
                   if not p.name.startswith("."))
 
@@ -2450,11 +2436,10 @@ def foreskrift_harvest(scopes):
     (skvfs, mtfs) are excluded from the default sweep -- they need the slow,
     serial DetachedChrome transport, so they run on their own schedule via
     `lagen foreskrift browser-download`. Naming one explicitly still harvests it.
-    `--full` re-walks and refreshes existing base regulations; `--only
+    `--force` re-walks and refreshes existing base regulations; `--only
     fs/year:num` (one scope) fetches a single one."""
-    if RUN.only and len(scopes) != 1:
-        sys.exit("foreskrift --only needs exactly one fs scope, e.g. "
-                 "`lagen foreskrift download fffs --only fffs/2013:10`")
+    _require_single_scope("foreskrift", scopes, "fs",
+                          "lagen foreskrift download fffs --only fffs/2013:10")
     if not scopes:
         skipped = foreskrift_download.browser_scopes()
         scopes = foreskrift_download.default_scopes()
@@ -2506,7 +2491,7 @@ def foreskrift_reap(basefiles):
     Removal is per document and takes the whole chain -- record, bodies, artifact,
     generated page -- because a record left behind re-parses and a page left behind
     keeps serving. Nothing here is recoverable only by deletion: a mistakenly
-    reaped document comes back on the next `download --full`. Use `--dry-run` to
+    reaped document comes back on the next `download --force`. Use `--dry-run` to
     list without removing.
 
     The scan is always over the whole store, never a scope: a leftover is only
@@ -2556,17 +2541,13 @@ def foreskrift_record(basefile):
         layout.FORESKRIFT_DOWNLOADED, fs, basefile)
 
 
-def foreskrift_artifact(basefile):
-    return layout.artifact("foreskrift", basefile)
-
-
 def foreskrift_inputs(basefile):
     """The record JSON plus every body PDF it references (the regulation and any
     konsoliderad versions); re-downloading any of them re-stales the parse."""
     rec = foreskrift_record(basefile)
     paths = [rec]
     if compress.exists(rec):
-        record = json.loads(compress.read_text(rec))
+        record = compress.read_json(rec)
         fsdir = layout.FORESKRIFT_DOWNLOADED / record["fs"]
         files = record.get("files", {})
         reg = files.get("regulation")
@@ -2586,7 +2567,7 @@ def foreskrift_parse_run(basefile):
     uncatalogued ``/grund`` page generate appends to its plan (the föreskrift
     counterpart of the sfs lydelse artifacts); a re-parse that no longer
     presents one removes the sidecar."""
-    record = json.loads(compress.read_text(foreskrift_record(basefile)))
+    record = compress.read_json(foreskrift_record(basefile))
     reg = foreskrift_parse.parse_record(record, str(layout.FORESKRIFT_DOWNLOADED))
     art = reg.to_artifact()
     write_artifact("foreskrift", basefile, art)
@@ -2615,7 +2596,8 @@ def foreskrift_parse_run(basefile):
 # whatever the harvest has put on disk (relate/index/dump/generate then act on the
 # artifacts by source name, like every other source).
 SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
-    "parse": Stage("parse", foreskrift_parse_run, foreskrift_artifact,
+    "parse": Stage("parse", foreskrift_parse_run,
+                   functools.partial(layout.artifact, "foreskrift"),
                    inputs=foreskrift_inputs, code=FORESKRIFT_CODE),
 },
     harvest=foreskrift_harvest,
@@ -2641,7 +2623,8 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 
 AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
             PKG / "avg" / "download.py",
-            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+            PKG / "lib" / "artifact.py")
 
 
 def avg_list():
@@ -2673,12 +2656,12 @@ def avg_inputs(basefile):
         # an IMY decision is assembled from the documents its record names --
         # shared assets, so several decisions can depend on the same PDF
         paths.extend(avg_download.imy_pdf_path(layout.AVG_DOWNLOADED, part["fil"])
-                     for part in json.loads(compress.read_text(
-                         avg_record(basefile)))["delar"])
+                     for part in compress.read_json(
+                         avg_record(basefile))["delar"])
     elif basefile.startswith("kkv/"):
         # a KKV case publishes at most one decision document (a few publish
         # none) and, for the long ones, a separate sammanfattning beside it
-        record = json.loads(compress.read_text(avg_record(basefile)))
+        record = compress.read_json(avg_record(basefile))
         paths.extend(avg_download.kkv_body_path(layout.AVG_DOWNLOADED,
                                                 record[key]["fil"])
                      for key in ("dokument", "sammanfattning_dokument")
@@ -2688,23 +2671,13 @@ def avg_inputs(basefile):
     return paths + _patch_input("avg", basefile)
 
 
-def avg_artifact(basefile):
-    return layout.artifact("avg", basefile)
-
-
-def avg_parse_run(basefile):
-    write_artifact("avg", basefile,
-                   avg_parse.parse_record(basefile, layout.AVG_DOWNLOADED))
-
-
 def avg_harvest(scopes):
     """Bulk harvest of the JO/JK/ARN/IMY/KKV decisions (scopes = organ codes;
     empty = all five). `--force` re-walks the whole corpus (JO) / refetches
     landings (JK) / refetches every document (ARN, IMY, KKV); `--only
     jo/2340-2025` fetches a single decision (needs its organ scope)."""
-    if RUN.only and len(scopes) != 1:
-        sys.exit("avg --only needs exactly one organ scope, e.g. "
-                 "`lagen avg download jo --only jo/2340-2025`")
+    _require_single_scope("avg", scopes, "organ",
+                          "lagen avg download jo --only jo/2340-2025")
     if RUN.dry_run:
         print("avg download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or "jo + jk + arn + imy + kkv",
@@ -2720,8 +2693,8 @@ def avg_harvest(scopes):
 # through the bulk `avg_harvest` sweep, so parse runs over whatever is on
 # disk; relate/index/dump/generate act on the artifacts by source name.
 SOURCES["avg"] = Source("avg", avg_list, {
-    "parse": Stage("parse", avg_parse_run, avg_artifact,
-                   inputs=avg_inputs, code=AVG_CODE),
+    "parse": _parse_stage("avg", avg_parse.parse, layout.AVG_DOWNLOADED,
+                          inputs=avg_inputs, code=AVG_CODE),
 },
     harvest=avg_harvest,
     origin="https://www.jo.se/",
@@ -2749,7 +2722,8 @@ SOURCES["avg"] = Source("avg", avg_list, {
 
 RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
            PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "artifact.py")
 
 
 def rs_list():
@@ -2773,22 +2747,12 @@ def rs_inputs(basefile):
     return paths + _patch_input("rs", basefile)
 
 
-def rs_artifact(basefile):
-    return layout.artifact("rs", basefile)
-
-
-def rs_parse_run(basefile):
-    write_artifact("rs", basefile,
-                   rs_parse.parse_record(basefile, layout.RS_DOWNLOADED))
-
-
 def rs_harvest(scopes):
     """Bulk harvest of the six agencies' rättsliga ställningstaganden (scopes =
     agency codes; empty = all six). `--force` refetches every document; `--only
     fk/2025:01` fetches a single ställningstagande (needs its agency scope)."""
-    if RUN.only and len(scopes) != 1:
-        sys.exit("rs --only needs exactly one agency scope, e.g. "
-                 "`lagen rs download fk --only fk/2025:01`")
+    _require_single_scope("rs", scopes, "agency",
+                          "lagen rs download fk --only fk/2025:01")
     if RUN.dry_run:
         print("rs download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or " + ".join(rs_agencies.ORGS),
@@ -2806,7 +2770,8 @@ def rs_harvest(scopes):
 
 EDPB_CODE = (PKG / "edpb" / "parse.py", PKG / "edpb" / "model.py",
              PKG / "edpb" / "series.py", PKG / "edpb" / "download.py",
-             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+             PKG / "lib" / "artifact.py")
 
 
 def edpb_list():
@@ -2824,22 +2789,13 @@ def edpb_inputs(basefile):
         + _patch_input("edpb", basefile)
 
 
-def edpb_artifact(basefile):
-    return layout.artifact("edpb", basefile)
-
-
-def edpb_parse_run(basefile):
-    write_artifact("edpb", basefile,
-                   edpb_parse.parse_record(basefile, layout.EDPB_DOWNLOADED))
-
-
 def edpb_harvest(scopes):
     """Bulk harvest of the EDPB's guidance (scopes = series codes; empty = all
     three). `--force` refetches every document; `--only riktlinjer/05-2020`
     fetches a single document (needs its series scope)."""
-    if RUN.only and len(scopes) != 1:
-        sys.exit("edpb --only needs exactly one series scope, e.g. "
-                 "`lagen edpb download riktlinjer --only riktlinjer/05-2020`")
+    _require_single_scope("edpb", scopes, "series",
+                          "lagen edpb download riktlinjer "
+                          "--only riktlinjer/05-2020")
     if RUN.dry_run:
         print("edpb download: would download %s into %s"
               % (RUN.only or ", ".join(scopes) or " + ".join(edpb_series.KODER),
@@ -2854,8 +2810,9 @@ def edpb_harvest(scopes):
 # No per-document download stage (the foreskrift/avg/rs rule): the guidance
 # arrives only through the bulk `edpb_harvest` sweep.
 SOURCES["edpb"] = Source("edpb", edpb_list, {
-    "parse": Stage("parse", edpb_parse_run, edpb_artifact,
-                   inputs=edpb_inputs, code=EDPB_CODE),
+    "parse": _parse_stage("edpb", edpb_parse.parse,
+                          layout.EDPB_DOWNLOADED,
+                          inputs=edpb_inputs, code=EDPB_CODE),
 },
     harvest=edpb_harvest,
     origin=edpb_download.SITEMAP,
@@ -2880,8 +2837,8 @@ SOURCES["edpb"] = Source("edpb", edpb_list, {
 # arrive only through the bulk `rs_harvest` sweep, so parse runs over whatever is
 # on disk; relate/index/dump/generate act on the artifacts by source name.
 SOURCES["rs"] = Source("rs", rs_list, {
-    "parse": Stage("parse", rs_parse_run, rs_artifact,
-                   inputs=rs_inputs, code=RS_CODE),
+    "parse": _parse_stage("rs", rs_parse.parse, layout.RS_DOWNLOADED,
+                          inputs=rs_inputs, code=RS_CODE),
 },
     harvest=rs_harvest,
     origin=rs_agencies.BY_ORG["fk"].listing,
@@ -2921,7 +2878,7 @@ def remisser_list():
     deep (``<typ>/<id-slug>.json``), which keeps the examined-index out."""
     out = []
     for path in sorted(compress.glob(layout.REMISSER_DOWNLOADED, "*/*.json")):
-        remiss = remisser_model.Remiss.from_dict(json.loads(compress.read_text(path)))
+        remiss = remisser_model.Remiss.from_dict(compress.read_json(path))
         out.extend("%s/%s" % (remiss.basefile, remisser_model.org_slug(inst.source_url))
                    for inst in remiss.svar if inst.downloaded)
     return out
@@ -2936,10 +2893,6 @@ def remisser_pdf(basefile):
     return layout.remisser_answer(arende_basefile, org_slug)
 
 
-def remisser_artifact(basefile):
-    return layout.artifact("remisser", basefile)
-
-
 def remisser_inputs(basefile):
     return [remisser_record(basefile), remisser_pdf(basefile)] + _patch_input(
         "remisser", basefile)
@@ -2947,7 +2900,7 @@ def remisser_inputs(basefile):
 
 def remisser_parse_run(basefile):
     write_artifact("remisser", basefile,
-                   remisser_parse.parse_record(
+                   remisser_parse.parse(
                        basefile, layout.REMISSER_DOWNLOADED).to_dict())
 
 
@@ -3068,7 +3021,8 @@ def remisser_ai_analyze(basefiles):
 # through the bulk `remisser_harvest` sweep, so parse runs over whatever is on
 # disk; relate/index/dump/generate never touch this source (it publishes nothing).
 SOURCES["remisser"] = Source("remisser", remisser_list, {
-    "parse": Stage("parse", remisser_parse_run, remisser_artifact,
+    "parse": Stage("parse", remisser_parse_run,
+                   functools.partial(layout.artifact, "remisser"),
                    inputs=remisser_inputs, code=REMISSER_CODE),
 },
     harvest=remisser_harvest,
@@ -3078,7 +3032,7 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
           "answer PDFs, bypassing the listing walk entirely)\n"
           "download sweeps the whole /remisser/ listing (new ärenden, watermarked "
           "so a normal run doesn't re-walk the whole archive) then re-polls every "
-          "still-open case for newly-arrived answers; --full ignores the "
+          "still-open case for newly-arrived answers; --force ignores the "
           "watermark and re-walks everything\n"
           "only ärenden remitting a document regeringen itself published (SOU, Ds, "
           "departementspromemoria -- one with a /rattsliga-dokument/ landing "
@@ -3113,10 +3067,6 @@ def kommentar_record(basefile):
     return Path(wiki_parse.kommentar_index(str(WIKI_ROOT))[basefile])
 
 
-def kommentar_artifact(basefile):
-    return layout.artifact("kommentar", basefile)
-
-
 def kommentar_parse_run(basefile):
     art = wiki_parse.kommentar_artifact(str(kommentar_record(basefile)))
     write_artifact("kommentar", basefile, art)
@@ -3124,10 +3074,6 @@ def kommentar_parse_run(basefile):
 
 def begrepp_record(basefile):
     return Path(wiki_parse.begrepp_index(str(WIKI_ROOT))[basefile])
-
-
-def begrepp_artifact(basefile):
-    return layout.artifact("begrepp", basefile)
 
 
 def begrepp_parse_run(basefile):
@@ -3147,14 +3093,14 @@ def kommentar_anchor_warnings(con, basefiles=()):
     root = catalog.data_root(con)              # stored paths are data_root-relative
     for (path,) in con.execute(
             "SELECT path FROM documents WHERE source = 'kommentar' AND path <> ''"):
-        komm = json.loads(compress.read_bytes(root / path))
+        komm = compress.read_json(root / path)
         if want and komm.get("basefile") not in want:
             continue
         row = con.execute("SELECT path FROM documents WHERE uri = ? AND path <> ''",
                           (komm.get("annotates"),)).fetchone()
         if not row:
             continue
-        bad = wiki_parse.dangling_anchors(komm, json.loads(compress.read_bytes(root / row[0])))
+        bad = wiki_parse.dangling_anchors(komm, compress.read_json(root / row[0]))
         if bad:
             out.append((komm.get("basefile"), komm.get("annotates"), bad))
     return out
@@ -3265,7 +3211,8 @@ def kommentar_propose_guidance(args):
 SOURCES["kommentar"] = Source(
     "kommentar",
     lambda: sorted(wiki_parse.kommentar_index(str(WIKI_ROOT))),
-    {"parse": Stage("parse", kommentar_parse_run, kommentar_artifact,
+    {"parse": Stage("parse", kommentar_parse_run,
+                    functools.partial(layout.artifact, "kommentar"),
                     inputs=lambda bf: [kommentar_record(bf)], code=WIKI_CODE)},
     actions={"validate": kommentar_validate, "ai-annotate": kommentar_ai_annotate,
              "discover-guidance": kommentar_discover_guidance,
@@ -3283,7 +3230,8 @@ SOURCES["kommentar"] = Source(
 SOURCES["begrepp"] = Source(
     "begrepp",
     lambda: sorted(wiki_parse.begrepp_index(str(WIKI_ROOT))),
-    {"parse": Stage("parse", begrepp_parse_run, begrepp_artifact,
+    {"parse": Stage("parse", begrepp_parse_run,
+                    functools.partial(layout.artifact, "begrepp"),
                     inputs=lambda bf: [begrepp_record(bf)], code=WIKI_CODE)})
 
 
@@ -3300,18 +3248,15 @@ def site_record(basefile):
     return site_parse.record(str(WIKI_ROOT), basefile)
 
 
-def site_artifact(basefile):
-    return layout.artifact("site", basefile)
-
-
 def site_parse_run(basefile):
-    write_artifact("site", basefile, site_parse.artifact(str(WIKI_ROOT), basefile))
+    write_artifact("site", basefile, site_parse.artifact(basefile, str(WIKI_ROOT)))
 
 
 SOURCES["site"] = Source(
     "site",
     lambda: site_parse.list_basefiles(str(WIKI_ROOT)),
-    {"parse": Stage("parse", site_parse_run, site_artifact,
+    {"parse": Stage("parse", site_parse_run,
+                    functools.partial(layout.artifact, "site"),
                     inputs=lambda bf: [site_record(bf)], code=SITE_CODE)})
 
 
@@ -3321,10 +3266,6 @@ SOURCES["site"] = Source(
 # carries no citation graph and is absent from ARTIFACTS.
 STATS_CODE = (PKG / "stats" / "compute.py", PKG / "stats" / "scan.py",
               PKG / "stats" / "model.py")
-
-
-def stats_artifact(basefile):
-    return layout.artifact("stats", basefile)
 
 
 def stats_compute_run(basefile):
@@ -3358,7 +3299,8 @@ def stats_compute_run(basefile):
 
 SOURCES["stats"] = Source(
     "stats", lambda: [stats_render.ARTIFACT_BASEFILE],
-    {"compute": Stage("compute", stats_compute_run, stats_artifact,
+    {"compute": Stage("compute", stats_compute_run,
+                      functools.partial(layout.artifact, "stats"),
                       code=STATS_CODE, always=True)},
     notes="compute: measure the whole corpus (catalog + artifact trees) into "
           "artifact/stats/statistik.json -- minutes, not incremental. Runs as "
@@ -3444,35 +3386,18 @@ api_patch.set_reparse(reparse_one)
 # incremental generate would key off that inbound set.
 # --------------------------------------------------------------------------
 
-# each source's artifacts are stored precompressed (.json.br); compress.glob
-# matches a pattern across plain + compressed variants and yields logical .json
-# paths, so these keep their exact glob shape (notably sfs's one-nesting-level
-# `*/*.json`, which must not recurse into the archive/.versions/ consolidation
-# subtree) while transparently seeing the compressed files.
-ARTIFACTS = {
-    # the versions-stage sidecars live next to the main artifacts but describe
-    # historical consolidations -- not corpus documents, so not related/dumped
-    "sfs": lambda: sorted(p for p in compress.glob(layout.SFS_ARTIFACT, "*/*.json")
-                          if not p.name.endswith(".versions.json")),
-    # dv + kommentar go through layout.artifacts(), the single home that already
-    # excludes the non-document index sidecars (DOM_INDEX / guidance-index.json)
-    # -- no hand-globbed carve-out here (else the exclusion drifts across surfaces)
-    "dv": lambda: layout.artifacts("dv"),
-    "forarbete": lambda: layout.artifacts("forarbete"),
-    "kommentar": lambda: layout.artifacts("kommentar"),
-    "begrepp": lambda: sorted(compress.glob(layout.artifact_dir("begrepp"), "*.json")),
-    "eurlex": lambda: sorted(compress.glob(layout.artifact_dir("eurlex"), "*/*.json")),
-    "foreskrift": lambda: sorted(
-        compress.glob(layout.artifact_dir("foreskrift"), "*/*.json")),
-    "avg": lambda: sorted(compress.glob(layout.artifact_dir("avg"), "*/*.json")),
-    "rs": lambda: sorted(compress.glob(layout.artifact_dir("rs"), "*/*.json")),
-    "edpb": lambda: sorted(compress.glob(layout.artifact_dir("edpb"), "*/*.json")),
-    "hudoc": lambda: layout.artifacts("hudoc"),
-    "coe": lambda: layout.artifacts("coe"),
-    "icrc": lambda: layout.artifacts("icrc"),
-    "untc": lambda: layout.artifacts("untc"),
-    "icc": lambda: layout.artifacts("icc"),
-}
+# which sources have a corpus to relate/index/dump, in one place: every
+# publishing source's artifacts, always through `layout.artifacts` -- the single
+# home that knows what in an artifact dir is a document and what is a sidecar
+# (the identity/guidance indexes, sfs's `.versions.json` layers and `archive/`
+# consolidations, föreskrift's `.grund.json` as-enacted pages). Hand-globbing
+# here is what let the exclusions drift: the föreskrift entry's `*/*.json`
+# handed relate 1,650 .grund sidecars as if they were documents.
+# Absent by design: remisser/site/stats publish no catalogued documents.
+ARTIFACTS = {name: functools.partial(layout.artifacts, name)
+             for name in ("sfs", "dv", "forarbete", "kommentar", "begrepp",
+                          "eurlex", "foreskrift", "avg", "rs", "edpb",
+                          "hudoc", "coe", "icrc", "untc", "icc")}
 
 
 # relate's per-source extraction (the documents/links it derives per artifact)
@@ -3527,12 +3452,14 @@ def _corr_watermark():
                             + sorted(annstore.tree("forarbete").rglob("*.ann")))
 
 
-def cmd_relate(names):
+def cmd_relate(names, force=None):
     """(Re)build each named source's rows in the shared catalog from its
     artifacts on disk -- documents + the citation edges they carry inline.
     Incremental on artifact content (unchanged artifacts are skipped); editing
     the extraction code (catalog.py) or passing --force re-extracts every
-    artifact of the affected source."""
+    artifact of the affected source. `force=None` reads the run's --force;
+    a targeted generate passes False so its override stays local."""
+    force = RUN.force if force is None else force
     store = load_fingerprints()
     # a missing catalog invalidates every fingerprint -- the rows it claims are
     # current don't exist, so nothing may be skipped (matches stale_sources())
@@ -3545,7 +3472,7 @@ def cmd_relate(names):
     # untouched until the rename. Under --force the per-source `up_to_date` check
     # already returns False, and a missing catalog forbids skipping, so the scratch
     # is guaranteed to receive every requested source (never a partial catalog).
-    full_rebuild = catalog_missing or (RUN.force and set(ARTIFACTS) <= set(names))
+    full_rebuild = catalog_missing or (force and set(ARTIFACTS) <= set(names))
     CATALOG.parent.mkdir(parents=True, exist_ok=True)
     target = CATALOG.with_name(CATALOG.name + ".building") if full_rebuild else CATALOG
     if full_rebuild:
@@ -3569,11 +3496,11 @@ def cmd_relate(names):
                         % (name, changed, current), actual=changed)
 
         recode = code_changed(store, "relate", name, RELATE_CODE)
-        if recode and not RUN.force:
+        if recode and not force:
             print("relate %s: extraction code changed -- re-extracting all" % name)
         t0 = time.perf_counter()
         docs, edges, changed = catalog.rebuild(
-            target, name, paths, progress=progress, force=RUN.force or recode,
+            target, name, paths, progress=progress, force=force or recode,
             data_root=DATA, exclusive=full_rebuild)
         _emit_segment("relate", name, time.perf_counter() - t0, total=docs,
                       ran=changed, status="ok")
@@ -3591,8 +3518,8 @@ def cmd_relate(names):
     # layers (the SFS .corr and förarbete genomförande .ann files), so a no-op run
     # skips them too -- gated on a fingerprint over all of them.
     corr_wm = _corr_watermark()
-    if dirty or RUN.force or not fingerprint_fresh(store, "relate", "__corr__",
-                                                 corr_wm):
+    if dirty or force or not fingerprint_fresh(store, "relate", "__corr__",
+                                               corr_wm):
         t0 = time.perf_counter()
         con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
         pinned = fa_genomforande.resolve(con, fa_genomforande.genomforande_layers())
@@ -3770,6 +3697,28 @@ def cmd_dump(names):
         save_fingerprints(store)
 
 
+def _run_harvest(source, scopes):
+    """Run one source's bulk discovery harvest, banner and ledger segment
+    included; True when it failed. `scopes` narrows the sweep to named
+    sub-corpora (forarbete doctypes, eurlex sectors) and is empty for a full
+    discovery run. The one home of the harvest call, shared by `cmd_download_all`
+    and the single-source dispatch so the two can't drift."""
+    name = source.name
+    if source.origin and not source.self_banner:
+        label = "%s %s" % (name, "/".join(scopes)) if scopes else name
+        util.harvest_start("%s download" % label, source.origin)
+    t0 = time.perf_counter()
+    try:
+        source.harvest(scopes)
+        _emit_segment("download", name, time.perf_counter() - t0, status="ok")
+    except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
+        traceback.print_exc()
+        _emit_segment("download", name, time.perf_counter() - t0,
+                      status="errors", errors=1)
+        return True
+    return False
+
+
 def cmd_download_all(names, jobs):
     """Upstream discovery + fetch for each named source: the bulk harvest where a
     source has one (sweeping in newly-published documents), else its per-document
@@ -3781,17 +3730,7 @@ def cmd_download_all(names, jobs):
     for name in names:
         source = SOURCES[name]
         if source.harvest is not None:
-            if source.origin and not source.self_banner:
-                util.harvest_start("%s download" % name, source.origin)
-            t0 = time.perf_counter()
-            try:
-                source.harvest([])                       # [] = full discovery
-                _emit_segment("download", name, time.perf_counter() - t0, status="ok")
-            except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
-                traceback.print_exc()
-                _emit_segment("download", name, time.perf_counter() - t0,
-                              status="errors", errors=1)
-                had_errors = True
+            had_errors |= _run_harvest(source, [])       # [] = full discovery
         elif "download" in source.stages:
             basefiles = source.list_basefiles()
             result = run_action(source, "download", basefiles, jobs)
@@ -4340,7 +4279,7 @@ def cmd_status_document(source, basefile):
     if not compress.exists(art_path):
         print("  (no artifact on disk -- not parsed yet)")
         return
-    art = json.loads(compress.read_bytes(art_path))
+    art = compress.read_json(art_path)
     lb = labels.document_labels(source.name, art)
     print("  uri             %s" % art.get("uri"))
     print("  source_url      %s" % (art.get("source_url") or "-"))
@@ -4763,25 +4702,24 @@ def _prepare_targeted_generate(source, basefiles, jobs):
     requested document's catalog row disagrees with its artifact, or an
     authored cross-pass layer changed.
     ``--force`` belongs to the named generate action, not these prerequisites,
-    so upstream stages remain freshness-checked.
+    so upstream stages remain freshness-checked: each of them is *passed*
+    `force=False` rather than reading it off the run options, so the override
+    cannot leak into anything else the run goes on to do.
     """
     if RUN.no_deps:
         return False
     had_errors = False
-    generate_force = RUN.force
-    RUN.force = False
-    try:
-        for stage in ("parse", "versions"):
-            if stage not in source.stages:
-                continue
-            result = run_action(source, stage, basefiles, jobs)
-            report(source, stage, result, len(basefiles), full_source=False)
-            had_errors |= bool(result.errors)
-        if not had_errors and not RUN.dry_run and source.name in ARTIFACTS \
-                and not _catalog_current_for(source.name, basefiles):
-            cmd_relate([source.name])
-    finally:
-        RUN.force = generate_force
+    for stage in ("parse", "versions"):
+        if stage not in source.stages:
+            continue
+        result = run_action(source, stage, basefiles, jobs, force=False)
+        report(source, stage, result, len(basefiles), full_source=False)
+        had_errors |= bool(result.errors)
+    if not had_errors and not RUN.dry_run and source.name in ARTIFACTS \
+            and not _catalog_current_for(source.name, basefiles):
+        # a --force meant for one page's generate must not re-extract every
+        # artifact of its source
+        cmd_relate([source.name], force=False)
     return had_errors
 
 
@@ -4875,19 +4813,7 @@ def _dispatch(args, p, jobs):
                 # (forarbete doctypes / eurlex sectors). The per-doc stage only
                 # refetches known ids; new docs come only from the bulk sweep,
                 # so this must NOT fall back to list_basefiles().
-                if source.origin and not source.self_banner:
-                    label = "%s %s" % (name, "/".join(scopes)) if scopes else name
-                    util.harvest_start("%s download" % label, source.origin)
-                t0 = time.perf_counter()
-                try:
-                    source.harvest(scopes)
-                    _emit_segment("download", name, time.perf_counter() - t0,
-                                  status="ok")
-                except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
-                    traceback.print_exc()
-                    _emit_segment("download", name, time.perf_counter() - t0,
-                                  status="errors", errors=1)
-                    had_errors = True
+                had_errors |= _run_harvest(source, scopes)
                 continue
             if scopes and source.scopes and "download" not in source.stages:
                 bad = [s for s in scopes if s not in source.scopes]
