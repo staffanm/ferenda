@@ -228,7 +228,7 @@ def corpus_beteckningar(bases):
     seen = set()
     for bf in bases:
         seen.add(bf)
-        src = json.loads(compress.read_bytes(layout.sfs_source(bf)))
+        src = compress.read_json(layout.sfs_source(bf))
         for act in src.get("andringsforfattningar") or []:
             if act.get("beteckning"):
                 seen.add(act["beteckning"])

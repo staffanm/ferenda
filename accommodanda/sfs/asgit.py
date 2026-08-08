@@ -103,7 +103,7 @@ def snapshot_text(path):
     parser consumes: `fulltext.forfattningstext` from the beta JSON,
     `extract_body` from the two legacy HTML generations."""
     if path.suffix == ".json":
-        text = json.loads(compress.read_text(path))["fulltext"]["forfattningstext"]
+        text = compress.read_json(path)["fulltext"]["forfattningstext"]
         if text is None:
             raise SkipDocument("no forfattningstext")
     else:
@@ -116,7 +116,7 @@ def snapshot_cutoff(path, basefile):
     or the basefile for an un-amended act."""
     if path.suffix == ".json":
         header = register_mod.sfst_header_from_source(
-            json.loads(compress.read_text(path)))
+            compress.read_json(path))
     elif sniff_encoding(compress.read_bytes(path)) == "latin-1":
         header = archival_header(path)
     else:
@@ -209,7 +209,7 @@ def collect(basefiles):
         if not compress.exists(art_path):
             skipped.append({"basefile": basefile, "error": "no parsed artifact"})
             continue
-        art = json.loads(compress.read_bytes(art_path))
+        art = compress.read_json(art_path)
         index = _amendment_index(art)
         for nr, meta in index.items():
             amendment_meta.setdefault(nr, meta)

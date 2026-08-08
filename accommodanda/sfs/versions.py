@@ -109,7 +109,7 @@ def parse_version(basefile, version, path, refparser=None):
         art = to_normalform(parse_sfs(path, basefile, historical=True), basefile,
                             refparser=refparser)
     else:
-        source = json.loads(compress.read_text(path))
+        source = compress.read_json(path)
         header = register_mod.sfst_header_from_source(source)
         art = to_normalform(parse_sfs_source(source, basefile, historical=True),
                             basefile, refparser=refparser,

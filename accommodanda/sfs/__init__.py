@@ -7,7 +7,6 @@ Owns its full chain: body extraction (``extract``) → text reader (``reader``)
 SFS formatting quirks; the architecture is new.
 """
 
-import json
 from pathlib import Path
 
 from ..lib import compress, patch
@@ -94,7 +93,7 @@ def load_inputs(json_path, html_path, register_path, basefile):
     single-best-source-per-document pattern. ``register``/``sfst_header`` are
     None when the legacy register page is absent or empty."""
     if json_path and compress.exists(Path(json_path)):
-        source = json.loads(compress.read_text(Path(json_path)))
+        source = compress.read_json(Path(json_path))
         return (parse_sfs_source(source, basefile),
                 register_from_source(source),
                 sfst_header_from_source(source))

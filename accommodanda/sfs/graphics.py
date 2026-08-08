@@ -643,7 +643,7 @@ def localize_group(gaps, pdf_path, src, model=None, author=llm.author,
         if not remaining:
             break
         log("%s: rendering page image(s) %d-%d" % (src, chunk[0], chunk[-1]))
-        images = [facsimile.cached_page("sfs", src, pdf_path, p).read_bytes()
+        images = [facsimile.cached("sfs", src, pdf_path, p).read_bytes()
                   for p in chunk]
         image_sizes = {page: facsimile.png_size(image)
                        for page, image in zip(chunk, images, strict=True)}

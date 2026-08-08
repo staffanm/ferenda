@@ -13,12 +13,12 @@ elements (the ``*Innehall`` aliases at the bottom of this module).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 
 
 @dataclass
 class Forfattning:
-    ikrafttrader: date | str | None = None
+    ikrafttrader: datetime | str | None = None
     children: list[ForfattningInnehall] = field(default_factory=list)
 
 
@@ -41,8 +41,8 @@ class Underavdelning:
 class Kapitel:
     ordinal: str
     rubrik: str
-    upphor: date | str | None = None
-    ikrafttrader: date | str | None = None
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
     children: list[KapitelInnehall] = field(default_factory=list)
 
 
@@ -56,8 +56,8 @@ class UpphavtKapitel:
 class Paragraf:
     ordinal: str
     moment: str | None = None
-    upphor: date | str | None = None
-    ikrafttrader: date | str | None = None
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
     children: list[Stycke] = field(default_factory=list)
 
 
@@ -71,8 +71,8 @@ class UpphavdParagraf:
 class Rubrik:
     text: str
     underrubrik: bool = False
-    upphor: date | str | None = None
-    ikrafttrader: date | str | None = None
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -102,8 +102,8 @@ class Tabell:
 @dataclass
 class Tabellrad:
     cells: list[str] = field(default_factory=list)
-    upphor: date | str | None = None
-    ikrafttrader: date | str | None = None
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
 
 
 @dataclass
@@ -121,8 +121,8 @@ class Overgangsbestammelse:
 @dataclass
 class Bilaga:
     rubrik: str
-    upphor: date | str | None = None
-    ikrafttrader: date | str | None = None
+    upphor: datetime | str | None = None
+    ikrafttrader: datetime | str | None = None
     children: list[BilagaInnehall] = field(default_factory=list)
 
 

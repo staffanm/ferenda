@@ -71,14 +71,6 @@ UTFARDANDE = {
     "2010:110": "2010-03-16", "2010:343": "2010-05-19",
 }
 
-# change acts to some special laws never repeat the base SFS no in their
-# title, so the "base SFS not in title" check is suppressed (sfs.py:673-676)
-TITLE_WITHOUT_BASEFILE = {
-    "1949:381", "1958:637", "1987:230", "1970:994", "1998:808", "1962:700",
-    "1942:740", "1981:774", "2010:110", "1949:105", "1810:0926", "1974:152",
-    "2014:801", "1991:1469"}
-
-
 # the beta-API `organisation.namnOchEnhet` occasionally carries an org name
 # that doesn't match the canonical resource label: a truncation or a case
 # variant. Map the handful seen across the corpus to their canonical labels

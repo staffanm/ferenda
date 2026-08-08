@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from accommodanda.lib import annstore, facsimile, render
+from accommodanda.lib import annstore, facsimile, page
 from accommodanda.lib.page import plain
 from accommodanda.sfs import graphics
 from accommodanda.sfs.model import (
@@ -26,7 +26,6 @@ from accommodanda.sfs.model import (
     Tabellrad,
 )
 from accommodanda.sfs.nf import to_normalform
-from accommodanda.lib import page
 
 BASEFILE = "9999:998"
 
@@ -517,7 +516,7 @@ def test_localize_group_chunks_pages_and_merges(monkeypatch):
             return _fake_png(1240, 1754)
 
     monkeypatch.setattr(facsimile, "page_count", lambda pdf: 8)
-    monkeypatch.setattr(facsimile, "cached_page",
+    monkeypatch.setattr(facsimile, "cached",
                         lambda source, src, pdf, p: _P(p))
     calls = []
 
@@ -553,7 +552,7 @@ def test_localize_group_refuses_partial_result(monkeypatch):
             return _fake_png(100, 100)
 
     monkeypatch.setattr(facsimile, "page_count", lambda pdf: 1)
-    monkeypatch.setattr(facsimile, "cached_page", lambda *args: _P())
+    monkeypatch.setattr(facsimile, "cached", lambda *args: _P())
     gap = {"id": "G1", "key": "g-one", "identity": {"n": 1},
            "sort": "formel", "anchor": "Balanstalet"}
     with pytest.raises(ValueError, match="did not locate gap.*G1"):

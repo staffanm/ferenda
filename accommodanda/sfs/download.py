@@ -296,8 +296,8 @@ def main():
                              "instead of the incremental changed-since-"
                              "watermark sync")
     parser.add_argument("--limit", type=int, help="stop after N documents")
-    parser.add_argument("--delay", type=float, default=0.3,
-                        help="seconds between pages (default 0.3)")
+    parser.add_argument("--delay", type=float, default=PAGE_DELAY,
+                        help="seconds between pages (default %s)" % PAGE_DELAY)
     parser.add_argument("--resume-after", metavar="JSON",
                         help="resume a backfill interrupted mid-sweep, from "
                              "the ES search_after cursor printed when it was "
