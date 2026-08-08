@@ -21,6 +21,7 @@ import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 
 from .. import config
@@ -484,7 +485,7 @@ def load_artifact(root, stored):
     stub (empty `path` -- begrepp rows have no artifact file). Reads through
     `compress` so a brotli-precompressed artifact tree serves unchanged."""
     p = _artifact_path(root, stored)
-    return json.loads(compress.read_bytes(p)) if p else {}
+    return compress.read_json(p) if p else {}
 
 
 def artifact_updated(root, stored):
@@ -765,50 +766,56 @@ def definition_links(art):
 # document rows
 # --------------------------------------------------------------------------
 
-def _sfs_document(art, path):
-    """One SFS row. ``kind`` separates 'lag' from 'forordning' rather than
-    calling both 'law': a förordning is subordinate to the lag that delegates
-    to it, and collapsing the two made the norm hierarchy unreadable from the
-    catalog -- 2025:1506 and 2025:1507 are one rung apart, not the same kind of
-    thing (`labels.sfs_is_statute`)."""
-    props = art.get("metadata", {}).get("properties", {})
-    title = props.get("dcterms:title") or ("SFS " + local(art["uri"]))
-    kind = "lag" if labels.sfs_is_statute(title, local(art["uri"])) else "forordning"
-    return (art["uri"], "sfs", kind, "SFS " + local(art["uri"]), title, str(path))
+# For these sources the catalog's naming IS labels' naming: label is
+# `short_id` and title is `official_title`, from the same
+# `labels.document_labels` call that stamps the descriptive column -- one
+# authority, so the citation line and the page eyebrow cannot drift apart.
+# Verified against the live catalog before the merge (2026-08-08): 0 of
+# 2,463 sampled rows differed. Only `kind` stays per-source, as data.
+# The bespoke builders below each say why their label/title deliberately
+# differ from labels' forms.
+_LABELLED_KIND = {
+    # lag vs forordning rather than one 'law': a förordning is subordinate to
+    # the lag that delegates to it, and collapsing the two made the norm
+    # hierarchy unreadable from the catalog -- 2025:1506 and 2025:1507 are one
+    # rung apart, not the same kind of thing (`labels.sfs_is_statute`)
+    "sfs": lambda art, lb: ("lag" if labels.sfs_is_statute(
+        lb.official_title, local(art["uri"])) else "forordning"),
+    "forarbete": lambda art, lb: art.get("doctype", "forarbete"),
+    "kommentar": lambda art, lb: "kommentar",
+    "begrepp": lambda art, lb: "begrepp",
+    "avg": lambda art, lb: art.get("org", "avg"),      # the organ (jo/jk/…)
+    "rs": lambda art, lb: art.get("org", "rs"),        # the agency (fk/imy/…)
+    "edpb": lambda art, lb: art.get("serie", "edpb"),  # riktlinjer/…/wp
+    "coe": lambda art, lb: art.get("doctype", "treaty"),
+}
+
+
+def _labelled_document(source, art, path):
+    lb = labels.document_labels(source, art)
+    return (art["uri"], source, _LABELLED_KIND[source](art, lb),
+            lb.short_id, lb.official_title, str(path))
 
 
 def dv_document(art, path):
-    # the canonical, name-prefixed title ("Meteoriten (NJA 2025 s. 897)") the
-    # listings and every inbound citation read -- stamped onto the artifact at
-    # parse time (build.dv_parse_run, via lib.casenaming.case_label), so the catalog
-    # stays a pure consumer. labels.dv_fallback_label owns the pre-stamp fallback
+    # bespoke: the catalog label is the WHOLE name-prefixed case label
+    # ("Meteoriten (NJA 2025 s. 897)") that listings and every inbound citation
+    # line print, where labels' short_id is the bare id ("NJA 2025 s. 897") for
+    # the page eyebrow. Stamped onto the artifact at parse time
+    # (build.dv_parse_run, via lib.casenaming.case_label), so the catalog stays
+    # a pure consumer. labels.dv_fallback_label owns the pre-stamp fallback
     # chain (shared with labels._dv so the two never drift).
     label = labels.dv_fallback_label(art)
     return (art["uri"], "dv", "case", label, label, str(path))
 
 
-def _forarbete_document(art, path):
-    label = art.get("identifier") or local(art["uri"])
-    return (art["uri"], "forarbete", art.get("type", "forarbete"),
-            label, art.get("title") or label, str(path))
-
-
-def _kommentar_document(art, path):
-    # title carries the author (shown in the inbound entry); label is generic
-    return (art["uri"], "kommentar", "kommentar", "Kommentar",
-            art.get("author") or "Kommentar", str(path))
-
-
-def _begrepp_document(art, path):
-    title = art.get("title") or local(art["uri"])
-    return (art["uri"], "begrepp", "begrepp", title, title, str(path))
-
-
 def _eurlex_document(art, path):
-    # kind is the doctype (regulation/directive/judgment/treaty); label is the
-    # CELEX (the short id citations use). A judgment's inbound-citation name is
-    # the case citation stamped at parse ("C-311/18 (Schrems II)"), not its
-    # "Domstolens dom (...)" Formex title; an act keeps its full title.
+    # bespoke: kind is the doctype (regulation/directive/judgment/treaty);
+    # label is the CELEX (the short id citations use), where labels' short_id
+    # is the printed designation ("(EU) 2016/679"). A judgment's
+    # inbound-citation name is the case citation stamped at parse
+    # ("C-311/18 (Schrems II)"), not its "Domstolens dom (...)" Formex title;
+    # an act keeps its full title.
     label = art.get("celex") or local(art["uri"])
     title = (art.get("label") if art.get("doctype") == "judgment"
              else art.get("title")) or label
@@ -817,56 +824,30 @@ def _eurlex_document(art, path):
 
 
 def _foreskrift_document(art, path):
-    # an agency regulation; kind is the författningssamling (fffs/nfs/…), label
-    # the short id citations + the bemyndigande margin use ("FFFS 2013:10")
+    # bespoke: kind is the författningssamling (fffs/nfs/…), label the short id
+    # citations + the bemyndigande margin use ("FFFS 2013:10"). The title is
+    # the artifact's own, where labels' official_title interpolates the
+    # designation into it ("Skolverkets föreskrifter (SKOLFS 2024:598) om …").
     label = art.get("identifier") or local(art["uri"])
     title = art.get("metadata", {}).get("title") or label
     return (art["uri"], "foreskrift", art.get("fs", "foreskrift"),
             label, title, str(path))
 
 
-def avg_document(art, path):
-    # a JO/JK decision; kind is the organ (jo/jk), label the citation form
-    # ("JO dnr 6356-2012" / "JK 2024/8082")
-    label = art.get("identifier") or local(art["uri"])
-    title = art.get("metadata", {}).get("title") or label
-    return (art["uri"], "avg", art.get("org", "avg"), label, title, str(path))
-
-
-def _rs_document(art, path):
-    # a myndighets rättsliga ställningstagande; kind is the agency (fk/imy/…),
-    # label the citation form ("FKRS 2025:01", "RS/028/2021")
-    label = art.get("identifier") or local(art["uri"])
-    title = art.get("metadata", {}).get("title") or label
-    return (art["uri"], "rs", art.get("org", "rs"), label, title, str(path))
-
-
-def edpb_document(art, path):
-    # an EDPB/artikel 29-gruppen vägledning; kind is the series
-    # (riktlinjer/rekommendationer/wp), label the citation form the number gives
-    # it ("Riktlinjer 05/2020", "WP 248")
-    label = art.get("identifier") or local(art["uri"])
-    title = art.get("metadata", {}).get("title") or label
-    return (art["uri"], "edpb", art.get("serie", "edpb"), label, title, str(path))
-
-
 def hudoc_document(art, path):
+    # bespoke: label is the ECLI (a stable machine id; the itemid as fallback),
+    # where labels' short_id is the application number ("no. 8906/19") the page
+    # eyebrow shows.
     label = art.get("ecli") or art.get("itemid") or local(art["uri"])
     title = art.get("title") or label
     return (art["uri"], "hudoc", art.get("doctype", "case-law"),
             label, title, str(path))
 
 
-def coe_document(art, path):
-    label = art.get("identifier") or ("CETS " + art.get("number", ""))
-    title = art.get("title") or label
-    return (art["uri"], "coe", art.get("doctype", "treaty"),
-            label, title, str(path))
-
-
 def icrc_document(art, path):
-    # an IHL treaty; kind is the doctype (treaty/protocol/declaration), label the
-    # short citation title (the folkrätt listing and any inbound citation use it)
+    # bespoke: kind is the doctype (treaty/protocol/declaration), label the
+    # treaty's full identifier ("Geneva Convention (I) on Wounded and Sick …"),
+    # where labels' short_id is the curated abbreviation ("GK I").
     label = art.get("identifier") or ("ICRC " + art.get("number", ""))
     title = art.get("title") or label
     return (art["uri"], "icrc", art.get("doctype", "treaty"),
@@ -874,8 +855,9 @@ def icrc_document(art, path):
 
 
 def untc_document(art, path):
-    # a UN Treaty Collection instrument; kind is the doctype (treaty/protocol),
-    # label the treaty title, number the MTDSG id
+    # bespoke: kind is the doctype (treaty/protocol), label the treaty title
+    # (its identifier; the MTDSG id is the number), where labels' short_id is
+    # the curated abbreviation ("CRC", "CMW").
     label = art.get("identifier") or ("MTDSG " + art.get("number", ""))
     title = art.get("title") or label
     return (art["uri"], "untc", art.get("doctype", "treaty"),
@@ -883,8 +865,10 @@ def untc_document(art, path):
 
 
 def icc_document(art, path):
-    # an ICC decision; kind is the decision type (judgment/sentence/…), label the
-    # document number (the citation form), title the case name
+    # bespoke: kind is the decision type (judgment/sentence/…), label the
+    # DOCUMENT number ("ICC-01/05-01/13-1964", the citation form for the
+    # specific decision), where labels' short_id is the CASE number the page
+    # eyebrow shows. Title is the case name.
     label = art.get("docnumber") or local(art["uri"])
     title = art.get("title") or label
     return (art["uri"], "icc", art.get("doctype", "judgment"),
@@ -900,11 +884,15 @@ def _expired_date(art: dict) -> str | None:
 
 
 def document_date(art: dict) -> str | None:
-    """The document's own date (ISO yyyy-mm-dd), for chronological ordering of
-    inbound references -- a förarbete's publication date, a statute's
-    utfärdandedatum, a decision's date, a väglednings adoption date. Field-driven
-    across sources; None when the artifact carries no date (the renderer sorts
-    undated entries last)."""
+    """ONE date per document (ISO yyyy-mm-dd), for chronological ordering of
+    listings and inbound references. This is a *projection*, not a key
+    convention: the per-source keys deliberately name different events (a
+    ruling's avgörandedatum, an agency decision's beslutsdatum, a väglednings
+    antagen, a statute's utfärdandedatum, a föreskrifts tryck/ikraft dates, a
+    treaty's opening/adoption/conclusion) and must not be collapsed onto one
+    key -- a document has several dates; this chain just picks the one a
+    listing sorts by. None when the artifact carries no date (the renderer
+    sorts undated entries last)."""
     props = art.get("metadata", {}).get("properties", {})
     return (art.get("date") or art.get("avgorandedatum")
             or art.get("metadata", {}).get("beslutsdatum")
@@ -950,15 +938,19 @@ def display_title(art, title):
     return "%s (%s)" % (name, abbr) if abbr else name
 
 
+# source -> its document-row builder. Module-level so `document_row` (~500k
+# calls per full relate) doesn't rebuild this dispatch dict on every call.
+_DOCUMENT_BUILDERS = {
+    source: partial(_labelled_document, source) for source in _LABELLED_KIND
+} | {
+    "dv": dv_document, "eurlex": _eurlex_document,
+    "foreskrift": _foreskrift_document, "hudoc": hudoc_document,
+    "icrc": icrc_document, "untc": untc_document, "icc": icc_document,
+}
+
+
 def document_row(art, path, source):
-    return {"sfs": _sfs_document, "dv": dv_document,
-            "forarbete": _forarbete_document, "kommentar": _kommentar_document,
-            "begrepp": _begrepp_document, "eurlex": _eurlex_document,
-            "foreskrift": _foreskrift_document,
-            "avg": avg_document, "rs": _rs_document, "edpb": edpb_document,
-            "hudoc": hudoc_document,
-            "coe": coe_document, "icrc": icrc_document,
-            "untc": untc_document, "icc": icc_document}[source](art, path)
+    return _DOCUMENT_BUILDERS[source](art, path)
 
 
 # --------------------------------------------------------------------------
