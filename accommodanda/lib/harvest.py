@@ -27,6 +27,11 @@ un-fetched records. This module is the one hardened mechanism they share:
     the harvest record on disk. Rewriting a record that has not changed would
     re-stale the whole downstream parse for nothing, so every downloader
     compares before writing; this is that comparison, once.
+  * :func:`pdf_path` / :func:`select_pending` / :func:`walk_records` -- the
+    whole download half of a source whose upstream is a short, complete listing
+    of records that each name one PDF (edpb, rs): where the record and its
+    document go, how ``--only`` narrows the listing, and the walk that stores
+    both.
 
 A vertical supplies its own enumeration (how to list the upstream) and its own
 resolve (how to fetch + store one item) as callables, plus an ``item_key`` that
@@ -40,10 +45,16 @@ import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any, Callable, Iterable, Iterator, Mapping
 
 from . import compress
-from .util import Reporter, write_atomic
+from .util import (
+    Reporter,
+    basefile_slug,
+    document_extension,
+    record_path,
+    write_atomic,
+)
 
 
 class HarvestWatermark:
@@ -188,13 +199,11 @@ class ItemKey:
 @dataclass
 class WalkResult:
     """The tally of one :func:`walk`: items enumerated, items newly fetched (or
-    changed), per-doc errors, enumeration Skips, and the newest item date seen
-    (what the watermark advanced to)."""
+    changed), per-doc errors, and enumeration Skips."""
     seen: int
     new: int
     errors: int
     skips: int
-    newest_date: str | None
 
 
 def guarded_enumerate(items: Iterable[Any], log: Callable[[str], Any] = print) -> Iterator[Any]:
@@ -325,7 +334,7 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
         # a truncated run just leaves the dirty flag begin() set -- the un-fetched
         # backlog below the cap is retried (past the consecutive-hit stop) next run
 
-    return WalkResult(seen, new, errors, skips, newest_date)
+    return WalkResult(seen, new, errors, skips)
 
 
 # --------------------------------------------------------------------------
@@ -345,7 +354,7 @@ def record_unchanged(path: Path, record: dict, *companions: Path) -> bool:
     """
     return (compress.exists(path)
             and all(compress.exists(c) for c in companions)
-            and json.loads(compress.read_text(path)) == record)
+            and compress.read_json(path) == record)
 
 
 def write_record(path: Path, record: dict) -> None:
@@ -364,4 +373,138 @@ def store_record(path: Path, record: dict, *companions: Path,
         return False
     write_record(path, record)
     return True
+
+
+# --------------------------------------------------------------------------
+# a complete listing of records, each naming one PDF
+# --------------------------------------------------------------------------
+#
+# The shape a source has when its upstream is a short, fully enumerable listing
+# and every entry is one metadata record plus one PDF: the basefile's first
+# segment names the store subdirectory it is filed under ("fk/2025:01" ->
+# ``<root>/fk/``), and the walk visits every entry every run, storing what moved.
+
+#: one listing entry: the record to store, and how to fetch the document it
+#: names (None where it names none)
+Pending = tuple[dict, Callable[[], bytes] | None]
+
+
+def pdf_path(root: Path | str, basefile: str) -> Path:
+    """The document PDF beside its harvest record ("fk/2025:01" ->
+    ``<root>/fk/fk-2025-01.pdf``)."""
+    return (Path(root) / basefile.split("/", 1)[0]
+            / (basefile_slug(basefile) + ".pdf"))
+
+
+def _record_json(root: Path | str, basefile: str) -> Path:
+    """The harvest record beside that PDF ("fk/2025:01" ->
+    ``<root>/fk/fk-2025-01.json``)."""
+    return record_path(root, basefile.split("/", 1)[0], basefile)
+
+
+def select_pending(pending: list[Pending], only: str | None,
+                   missing: str) -> list[Pending]:
+    """The one ``(record, body)`` pair `only` names by basefile, or every pair.
+    `missing` is the source's own message for "the listing carries no such
+    document", %-formatted with `only` -- an `--only` that names nothing is a
+    typo or a document that has gone, and either way the run has nothing to do
+    and says which."""
+    if not only:
+        return pending
+    picked = [item for item in pending if item[0]["basefile"] == only]
+    if not picked:
+        # user-typed --only: load-bearing validation raises, never asserts --
+        # under python -O an assert here made the run a silent "0 seen" no-op
+        raise ValueError(missing % only)
+    return picked
+
+
+def walk_records(root: Path | str, pending: list[Pending], *,
+                 delay: float, full: bool = False, limit: int | None = None,
+                 scope: str = "") -> tuple[int, int]:
+    """Store a listing's records and the documents they name, through
+    :func:`walk` with **no watermark**: the listing is enumerated whole on every
+    run, so there is no depth to stop short of. Returns ``(seen, new)``.
+
+    `pending` items are ``(record, body)``, where `body` returns the document's
+    bytes -- one HTTP GET, a ZIP fetch and a member extraction, whatever the
+    source's route is -- or is None for a record that names no document at all
+    (a register entry: a repealed statement kept in a förteckning with its text
+    withdrawn).
+
+    ``is_downloaded`` is reported as "this record is already current on disk,
+    PDF and all" rather than "some file exists", so an unchanged entry costs
+    nothing while an upstream retitling *or a vanished PDF* is still picked up.
+
+    A document that cannot be stored raises, so :func:`walk` counts and logs it
+    and the record is **not** written -- a stored record is the assertion that
+    the document behind it is on disk, which is what lets a parse read an absent
+    PDF as "the publisher published none" rather than "the fetch broke". The
+    previous good record stays and the next run retries.
+
+    ``limit`` is :func:`walk`'s: it caps documents actually *fetched or
+    changed*, not entries looked at. On a steady-state run where nothing moved,
+    ``--limit`` therefore walks the whole listing and fetches nothing, which is
+    the cheap case anyway."""
+    def item_key(item: Pending) -> ItemKey:
+        record, body = item
+        bf = record["basefile"]
+        return ItemKey(bf, record_unchanged(
+            _record_json(root, bf), record,
+            *((pdf_path(root, bf),) if body else ())))
+
+    def resolve(item: Pending) -> bool:
+        record, body = item
+        bf = record["basefile"]
+        if body and (full or not compress.exists(pdf_path(root, bf))):
+            data = body()
+            time.sleep(delay)
+            if document_extension(data) != ".pdf":
+                raise ValueError(
+                    "served a non-PDF body; record left unwritten")
+            compress.write_download(pdf_path(root, bf), data)
+        # no companion here: a record that has not changed is not rewritten
+        # just because its PDF was refetched above
+        return store_record(_record_json(root, bf), record, full=full)
+
+    result = walk(pending, resolve=resolve, item_key=item_key, watermark=None,
+                  full=full, limit=limit, scope=scope, count_label="changed",
+                  total=len(pending))
+    return result.seen, result.new
+
+
+# --------------------------------------------------------------------------
+# the per-scope entry point
+# --------------------------------------------------------------------------
+
+def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
+                    runners: Mapping[str, Callable[..., tuple[int, int]]],
+                    default: Iterable[str], *, full: bool = False,
+                    only: str | None = None, limit: int | None = None,
+                    delay: float = 0.5) -> dict[str, tuple[int, int]]:
+    """Run one harvest per named scope -- all of `default` when `scopes` is
+    None -- and return ``{scope: (seen, new)}``, the shape `build` expects of a
+    multi-scope source's ``sync``.
+
+    A source's scopes are its organs, agencies or series: separate upstreams
+    that share nothing but the entry point. ``only`` is a basefile
+    ("fk/2025:01"), so it names its own scope -- it is passed to the runner it
+    belongs to and withheld from every other, which is what lets a whole-source
+    run narrow to one document without every runner having to recognise a
+    basefile that is not its own."""
+    run = list(scopes or default)
+    # an --only whose scope is not in the run would otherwise be withheld from
+    # every runner -- and the run silently harvests everything BUT the one
+    # document asked for
+    if only and not any(only.startswith(scope + "/") for scope in run):
+        raise ValueError("--only %s names no scope in this run (%s)"
+                         % (only, ", ".join(run)))
+    totals = {}
+    for scope in run:
+        if scope not in runners:      # user-typed scope: raise, never assert
+            raise ValueError("no harvest scope %r" % scope)
+        totals[scope] = runners[scope](
+            str(root), full=full, limit=limit, delay=delay,
+            only=only if only and only.startswith(scope + "/") else None)
+    return totals
 

@@ -457,6 +457,78 @@ def swedish_date(text: str) -> str | None:
             if m else None)
 
 
+FOLD_SWEDISH = str.maketrans("åäöÅÄÖ", "aaoAAO")
+
+
+def fold_swedish(s: str) -> str:
+    """å/ä/ö (either case) to their ASCII base letters: 'SÄIFS' -> 'SAIFS'."""
+    return s.translate(FOLD_SWEDISH)
+
+
+def match_fold(text: str) -> str:
+    """`text` lowercased with everything but letters and digits removed -- for
+    comparing two renderings of the same title (one off a PDF, one off an index
+    page), which differ freely in case, punctuation and the spaces a line break
+    leaves behind."""
+    return re.sub(r"[^0-9a-zåäö]+", "", text.lower())
+
+
+# folded characters a partial title echo must reach before it counts -- below
+# this, a bare digit or short word would match the start of almost any title
+TITLE_ECHO_MIN = 8
+
+
+def drop_leading_title_echo(blocks, titel, *, text_of, lead=None):
+    """Drop the document's own printed copy of its title from the leading
+    `blocks` -- the page already shows the title as the h1, so the body would
+    open by repeating itself. Two shapes count as the echo, matched on
+    `match_fold`ed text: a block that *ends with* the title (a letterhead
+    printed before it, rs's shape) and a block that is the *start of* the
+    title (a cover line break left only the first piece, edpb's shape). A
+    block that folds away entirely is stray cover punctuation and is stepped
+    over; `lead` marks per-source letterhead captions that go regardless of
+    the title. Only leading blocks go -- a later heading echoing the title
+    stays, as the real section it is. The union of the two shapes was
+    measured over both corpora (315 documents, 2026-08-08): it removed six
+    real echoes the single-shape rules each missed, and no genuine content."""
+    folded_title = match_fold(titel or "")
+    while blocks:
+        text = text_of(blocks[0])
+        if lead is not None and lead(text):
+            blocks = blocks[1:]
+            continue
+        if not folded_title:
+            break
+        head = match_fold(text)
+        if (head == ""
+                or head.endswith(folded_title)
+                or (len(head) >= TITLE_ECHO_MIN
+                    and folded_title.startswith(head))):
+            blocks = blocks[1:]
+            continue
+        break
+    return blocks
+
+
+MONTHS_EN: dict[str, int] = {m: i for i, m in enumerate(
+    "january february march april may june july august september october "
+    "november december".split(), 1)}
+# month matched by three-letter prefix, so "27 Jun 2001" and "27 January 1980"
+# both parse (the UNTC listing mixes the two forms)
+_MONTH_EN_PREFIX = {m[:3]: i for m, i in MONTHS_EN.items()}
+EN_DATE = re.compile(r"(\d{1,2})\s+(%s)[a-z]*\s+(\d{4})"
+                     % "|".join(_MONTH_EN_PREFIX), re.IGNORECASE)
+
+
+def english_date(text: str) -> str | None:
+    """'27 January 1980' / '27 Jun 2001' -> ISO '1980-01-27', or None."""
+    m = EN_DATE.search(text or "")
+    return ("%04d-%02d-%02d" % (int(m.group(3)),
+                                _MONTH_EN_PREFIX[m.group(2)[:3].lower()],
+                                int(m.group(1)))
+            if m else None)
+
+
 RE_RIKSMOTE = re.compile(r"^(\d{4})/(\d{2}|\d{4})$")
 
 

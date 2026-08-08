@@ -4,8 +4,17 @@ from datetime import date, timedelta
 
 import pytest
 
-from accommodanda.lib import net
-from accommodanda.lib.harvest import HarvestWatermark, ItemKey, Skip, walk
+from accommodanda.lib import compress, net
+from accommodanda.lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    Skip,
+    dispatch_scopes,
+    pdf_path,
+    select_pending,
+    walk,
+    walk_records,
+)
 
 
 def test_harvest_watermark_new(tmp_path):
@@ -384,3 +393,77 @@ def test_walk_without_watermark_counts_a_failed_fetch_as_an_error(capsys):
     assert (result.seen, result.new, result.errors) == (3, 2, 1)
     assert any("riktlinjer b" in line and "left unwritten" in line
                for line in logged)
+
+
+# --- the record store: one record, one PDF, one scope (edpb, rs) ------------
+
+def test_walk_records_files_a_record_beside_its_pdf(tmp_path):
+    # the basefile's first segment names the store subdirectory, and the record
+    # asserts its document is on disk, so both land under it together
+    record = {"basefile": "riktlinjer/05-2020", "serie": "riktlinjer",
+              "titel": "Riktlinjer om samtycke"}
+    fetched = []
+
+    def body():
+        fetched.append(1)
+        return b"%PDF-1.7 minimal"
+
+    assert walk_records(tmp_path, [(record, body)], delay=0) == (1, 1)
+    assert compress.exists(tmp_path / "riktlinjer" / "riktlinjer-05-2020.json")
+    assert compress.exists(pdf_path(tmp_path, "riktlinjer/05-2020"))
+    # a second run over an unchanged listing costs nothing at all -- neither a
+    # record rewrite (which would re-stale the parse) nor a refetch
+    assert walk_records(tmp_path, [(record, body)], delay=0) == (1, 0)
+    assert fetched == [1]
+
+
+def test_walk_records_full_refetches_and_rewrites(tmp_path):
+    record = {"basefile": "wp/248", "serie": "wp"}
+    fetched = []
+    walk_records(tmp_path, [(record, lambda: b"%PDF-1.7 a")], delay=0)
+    assert walk_records(
+        tmp_path, [(record, lambda: fetched.append(1) or b"%PDF-1.7 b")],
+        delay=0, full=True) == (1, 1)
+    assert fetched == [1]
+
+
+def test_select_pending_narrows_to_one_basefile():
+    pending = [({"basefile": "fk/2025:01"}, None), ({"basefile": "fk/2025:02"}, None)]
+    assert select_pending(pending, None, "no %s") == pending
+    assert select_pending(pending, "fk/2025:02", "no %s") == pending[1:]
+    with pytest.raises(ValueError, match="no fk/1999:01"):
+        select_pending(pending, "fk/1999:01", "no %s")
+
+
+def test_dispatch_scopes_hands_only_to_the_scope_that_owns_it(tmp_path):
+    # `only` is a basefile, so it names its own scope: the runner it belongs to
+    # gets it and every other runner is told None, or a scope would try to
+    # narrow itself to a document that is not its own and find nothing
+    seen = {}
+
+    def runner(scope):
+        def run(root, full=False, only=None, limit=None, delay=0.5):
+            seen[scope] = (root, only, full, limit, delay)
+            return (1, 0)
+        return run
+
+    runners = {"fi": runner("fi"), "fk": runner("fk")}
+    totals = dispatch_scopes(tmp_path, None, runners, ("fi", "fk"),
+                             only="fk/2025:01", delay=0)
+    assert totals == {"fi": (1, 0), "fk": (1, 0)}
+    assert seen["fi"][1] is None and seen["fk"][1] == "fk/2025:01"
+    assert seen["fk"][0] == str(tmp_path)
+
+    # `scopes` narrows the run to the named ones, in the order given
+    seen.clear()
+    assert set(dispatch_scopes(tmp_path, ["fk"], runners, ("fi", "fk"))) == {"fk"}
+    assert set(seen) == {"fk"}
+
+    with pytest.raises(ValueError, match="no harvest scope 'nope'"):
+        dispatch_scopes(tmp_path, ["nope"], runners, ("fi", "fk"))
+
+    # an --only whose scope is not in the run raises instead of silently
+    # harvesting everything BUT the one document asked for
+    with pytest.raises(ValueError, match="names no scope in this run"):
+        dispatch_scopes(tmp_path, ["fi"], runners, ("fi", "fk"),
+                        only="fk/2025:01")

@@ -177,6 +177,18 @@ def read_text(path: Path | str, encoding: str = "utf-8") -> str:
     return read_bytes(path).decode(encoding)
 
 
+_RAISE = object()
+
+
+def read_json(path: Path | str, default=_RAISE):
+    """`json.loads` over the decompressed content behind `path` -- the single
+    most common read in the package. With `default`, a missing file yields it
+    instead of raising."""
+    if default is not _RAISE and not exists(path):
+        return default
+    return json.loads(read_bytes(path))
+
+
 def _clear_variants(logical_path, keep=()):
     """Remove every on-disk representation of `logical_path` except those whose
     suffix is in `keep` (``""`` keeps the plain file), so a logical path is left
@@ -315,6 +327,16 @@ def list_basefiles(root: Path | str, subdir: str) -> list[str]:
     directory = Path(root) / subdir
     return sorted(json.loads(read_text(p))["basefile"]
                   for p in glob(directory, "*.json")
+                  if not p.name.startswith("."))
+
+
+def list_stems(root: Path | str, pattern: str = "*.json") -> list[str]:
+    """Every basefile in a *flat* harvest directory, read from the file names.
+    The counterpart of `list_basefiles` for the sources whose file name IS the
+    basefile (a HUDOC item id, a treaty number, an MTDSG symbol) rather than a
+    field inside the record -- so the tree is listed, never opened. Dotfiles are
+    skipped: a source's own ``.watermark.json`` state lives beside its records."""
+    return sorted(p.stem for p in glob(Path(root), pattern)
                   if not p.name.startswith("."))
 
 
