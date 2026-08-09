@@ -38,7 +38,15 @@ from . import (
     labels,
     util,
 )
-from .page import Site, doc_relpath, href, page, page_context, site_cross_digests
+from .page import (
+    BRAND,
+    Site,
+    doc_relpath,
+    href,
+    page,
+    page_context,
+    site_cross_digests,
+)
 from .tpl import ENV
 
 # the browser-facing static chrome (stylesheet, client scripts, robots.txt),
@@ -306,7 +314,7 @@ def _render_index(con):
             if (entries := _most_cited(con, source))]
     body = LISTS.index_body(sum(n.values()), sum(1 for s in n if n[s]),
                              list(_index_rows(n)), cols)
-    return page("lagen.nu", "Start", "", body,
+    return page("lagen.nu", "Start", "", body, title_html=BRAND,
                 eyebrow="Sveriges lagar, med kontext", solo=True)
 
 
@@ -957,13 +965,15 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
 # matomo.js first (it depends on nothing, and the bundle is one script -- an
 # uncaught error in any module stops the rest, so the analytics ping must not sit
 # downstream of the reading chrome); then dom.js, which defines window.lagenDom
-# (the shared vocabulary the others build on) and MUST precede them; the rest are
-# order-independent IIFEs, editor.js last. They are concatenated into one
-# script.js so the page links a single URL -- adding a module changes only
+# (the shared vocabulary the others build on) and MUST precede them; then
+# drawers.js, which defines window.lagenDrawers for scrollspy.js (it closes the
+# context sheet when the section under the reading position loses its context);
+# the rest are order-independent IIFEs, editor.js last. They are concatenated
+# into one script.js so the page links a single URL -- adding a module changes only
 # script.js, never the per-page HTML, so a new script ships as an --assets-only
 # refresh instead of forcing a full corpus regenerate.
-SCRIPT_FILES = ("matomo.js", "dom.js", "scrollspy.js", "search.js", "popover.js",
-                "fullsearch.js", "versions.js", "faksimil.js", "drawers.js",
+SCRIPT_FILES = ("matomo.js", "dom.js", "drawers.js", "scrollspy.js", "search.js",
+                "popover.js", "fullsearch.js", "versions.js", "faksimil.js",
                 "editor.js")
 SCRIPT_BUNDLE = "script.js"     # the single served URL (render.PAGE links it)
 

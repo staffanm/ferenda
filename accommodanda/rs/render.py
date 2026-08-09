@@ -51,7 +51,7 @@ def render(art, site):
     return ENV.get_template("rs.html").render(page_context(
         lb.short_title or ident, "Rättsligt ställningstagande",
         doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=ident,
+        toc=render_toc(toc, ident), eyebrow=ident,
         summary_text=art.get("sammanfattning"),
         banner=Markup(banner),
         footnotes=footnote_items(art.get("footnotes", []), site,

@@ -54,7 +54,7 @@ def render(art, site):
                "kkv": "KKV-beslut"}.get(art.get("org"), "Myndighetsavgörande")
     return ENV.get_template("avg.html").render(page_context(
         title, section, doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=ident,
+        toc=render_toc(toc, ident), eyebrow=ident,
         summary_text=summary,
         footnotes=footnote_items(art.get("footnotes", []), site,
                                   backref=False),

@@ -336,6 +336,6 @@ def render(art, site):
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
     return ENV.get_template("eurlex.html").render(page_context(
         title, kind, doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=lb.short_id, island=rail.island(),
+        toc=render_toc(toc, lb.short_id), eyebrow=lb.short_id, island=rail.island(),
         opinion_href=_eurlex_opinion_href(art, site),
         structure=Markup("".join(parts))))

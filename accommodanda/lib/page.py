@@ -723,10 +723,14 @@ def plain(runs):
 MIN_TOC = 3   # below this many headings a TOC adds clutter, not navigation
 
 
-def render_toc(toc):
+def render_toc(toc, top_id):
+    """The TOC nav, headed by the document's own short id (`top_id`) as a link
+    back to the frontmatter. Every source names its own identifier -- the
+    eyebrow is not always it (a wiki page's eyebrow is "Begrepp", an unnamed
+    DV case's is the court), so the label is passed rather than derived."""
     if len(toc.entries) < MIN_TOC:
         return ""
-    return _META.toc(toc.entries)
+    return _META.toc(toc.entries, top_id)
 
 
 # --------------------------------------------------------------------------
@@ -1861,10 +1865,16 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
                           grafik_cell, cells)
     if t == "grafik":
         return render_grafik(node, site, doc_uri)
+    if t == "avskiljare":
+        return "<hr>"
     if t == "lista":
         items = "".join(render_node(c, site, doc_uri, toc, rail)
                         for c in node.get("children", []))
-        return "<ul>%s</ul>" % items
+        # a numbered list keeps its numbering: the wiki commentary writes out
+        # seven criteria for övergång av verksamhet (1982:80 6 b §), and which
+        # criterion is the fourth is part of what the text says
+        tag = "ol" if node.get("ordered") else "ul"
+        return "<%s class=\"punkter\">%s</%s>" % (tag, items, tag)
     if t == "rubrik":
         text = node.get("text", [])
         anchor = toc.add(nid, plain(text), node.get("level") or 1)
@@ -2012,7 +2022,7 @@ _RAIL = ENV.get_template("partials/rail.html").module
 NODES = ENV.get_template("nodes.html").module
 def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                  summary="", summary_text=None, island="", solo=False,
-                 body_class="", head="", own_h1=False, **extra):
+                 body_class="", head="", own_h1=False, title_html=None, **extra):
     """The page-shell context every render goes through (page.html and the
     sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
     `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
@@ -2025,12 +2035,19 @@ def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
                 body_class=body_class, head=Markup(head), own_h1=own_h1,
+                title_html=Markup(title_html) if title_html is not None else None,
                 **extra)
+
+
+# the site name set as the brand: the frontpage prints its own title, and both
+# frontpage builders pass this as `title_html`. It is not derived from the
+# title string -- a page that happens to be called "lagen.nu" is not the site
+BRAND = Markup("lagen<em>.nu</em>")
 
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
          summary="", island="", solo=False, body_class="",
-         head="", own_h1=False):
+         head="", own_h1=False, title_html=None):
     """Assemble a page (templates/page.html: masthead, frontmatter, grid,
     mobile toolbar). Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
@@ -2043,7 +2060,7 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
     return ENV.get_template("page.html").render(page_context(
         title, kind, meta, toc=toc, eyebrow=eyebrow, subtitle=subtitle,
         summary=summary, island=island, solo=solo, body_class=body_class,
-        head=head, own_h1=own_h1, body=Markup(body)))
+        head=head, own_h1=own_h1, title_html=title_html, body=Markup(body)))
 
 
 def prop_link(site, ident):
@@ -2097,22 +2114,31 @@ def _doc_title(site, uri):
     return row[0] if row else None
 
 
-def ref_link(site, uri):
+def ref_link(site, uri, name_unknown=None):
     """A link to a referenced document for a föreskrift's outbound metadata
     (bemyndigande -> SFS paragraf, genomför -> EU directive): the statute
     paragraf pinpointed and named, or the CELEX out to EUR-Lex; a plain span
-    for an SFS we have not parsed."""
+    for an SFS we have not parsed.
+
+    `name_unknown` names a target the catalog does not hold. Without it such a
+    target falls back to `catalog.local`, i.e. its slug -- and a reader told
+    that this regulation repeals "rpsfs/2011:16" has been shown the URL, not the
+    citation. The caller supplies it because only the source knows how its own
+    designations are spelled (lib stays source-agnostic)."""
     if _is_external(uri):
         return Markup('<a class="ext" href="%s" rel="external">%s</a>') % (
             _external_href(uri), catalog.local(uri).rsplit("/", 1)[-1])
     base, _, frag = uri.partition("#")
     pin = human_fragment(frag)
-    name = _law_title(site, base)
+    known = site.has(base)
+    name = _law_title(site, base) if known or not name_unknown \
+        else (name_unknown(base) or _law_title(site, base))
     label = ("%s %s" % (pin, name)).strip() if pin else name
     return (Markup('<a href="%s">%s</a>') % (href(uri), label)
-            if site.has(base)
+            if known
             else Markup('<span class="noref">%s</span>') % label)
 
 
-def ref_list(site, heading, uris):
-    return PANELS.ref_list(heading, [ref_link(site, u) for u in uris or []])
+def ref_list(site, heading, uris, name_unknown=None):
+    return PANELS.ref_list(heading, [ref_link(site, u, name_unknown)
+                                     for u in uris or []])

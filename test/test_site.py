@@ -627,7 +627,7 @@ def test_sfs_header_and_meta_placement(tmp_path):
     art["metadata"]["properties"]["dcterms:identifier"] = \
         "SFS 1975:635 i lydelse enligt SFS 2013:55"
     html = sfs_render.render(art, site)
-    start = html.index('<header class="frontmatter">')   # not the masthead <header>
+    start = html.index('<header class="frontmatter" id="top">')  # not the masthead
     frontmatter = html[start:html.index("</header>", start)]
     assert '<div class="eyebrow">SFS 1975:635</div>' in frontmatter
     assert "<h1>Räntelagen</h1>" in frontmatter            # namedlaws short name
@@ -1388,7 +1388,7 @@ def test_render_toc_skips_short_documents():
     toc = page.Toc()
     toc.add("a", "One", 1)
     toc.add("b", "Two", 1)
-    assert page.render_toc(toc) == ""            # < MIN_TOC headings
+    assert page.render_toc(toc, "SFS 2020:1") == ""   # < MIN_TOC headings
 
 
 def test_render_toc_builds_nav_with_levels():
@@ -1396,10 +1396,36 @@ def test_render_toc_builds_nav_with_levels():
     toc.add("K1", "1 kap.", 1)
     toc.add(None, "Rubrik", 2)
     toc.add("K2", "2 kap.", 1)
-    html = page.render_toc(toc)
+    html = page.render_toc(toc, "SFS 2020:1")
     assert 'class="toc"' in html and "Innehåll" in html
+    # the document's own id heads the list, linking back to the frontmatter
+    assert html.index('<a href="#top" class="lvl1 toc-top">SFS 2020:1</a>') \
+        < html.index("#K1")
     assert '<a href="#K1" class="lvl1">1 kap.</a>' in html
     assert '<a href="#sec1" class="lvl2">Rubrik</a>' in html
+
+
+def test_mobile_bar_keeps_both_drawer_buttons():
+    """The bottom toolbar has the same three places on every document page: a
+    page with no TOC disables that button rather than dropping it, and the
+    Kontext button ships disabled for scrollspy.js to enable per section."""
+    def bar(toc):
+        html = page.page("Testlag", "Författning", "", "body", toc=toc)
+        return html[html.index('<nav class="mobile-bar"'):html.index("</nav>",
+                    html.index('<nav class="mobile-bar"'))]
+
+    with_toc = bar(page.Markup('<nav class="toc"></nav>'))
+    assert with_toc.count("<button") == 3
+    assert '<button type="button" data-drawer="toc" aria-expanded="false">' \
+        in with_toc
+    assert 'data-drawer="rail" aria-expanded="false" disabled>' in with_toc
+
+    without = bar("")
+    assert without.count("<button") == 3
+    assert 'data-drawer="toc" aria-expanded="false" disabled>' in without
+    # the frontmatter is the target of the TOC's own short-id entry
+    assert '<header class="frontmatter" id="top">' in page.page(
+        "Testlag", "Författning", "", "body")
 
 
 def test_document_page_includes_toc_and_anchors(tmp_path):

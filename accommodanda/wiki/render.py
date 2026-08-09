@@ -21,5 +21,5 @@ def render(art, site):
     # tags it), so the template says so instead of showing a blank page
     return ENV.get_template("begrepp.html").render(page_context(
         title, "Begrepp", doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow="Begrepp", island=rail.island(),
+        toc=render_toc(toc, title), eyebrow="Begrepp", island=rail.island(),
         structure=structure, has_description=bool(art.get("body"))))

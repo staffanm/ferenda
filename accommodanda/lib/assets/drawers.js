@@ -46,6 +46,11 @@
     if (e.key === 'Escape') closeAll();
   });
 
+  // scrollspy.js closes the context sheet when the reading position leaves the
+  // last section that has context: the sheet shows that section's panel and
+  // nothing else, so leaving it would hold an empty sheet open over the text
+  window.lagenDrawers = { close: closeAll };
+
   /* Pin the toolbar to the *visual* viewport.
 
      `position: fixed; bottom: 0` resolves against the layout viewport, and on

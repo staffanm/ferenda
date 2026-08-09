@@ -70,6 +70,14 @@
     var rail = root.querySelector('aside.rail');
     var entries = [], activeEntry = null, panelBox = null, panel = null;
 
+    // The mobile toolbar's Kontext button. It stands for this page's rail, so
+    // only the page's own surface drives it -- an imported pane carries a rail
+    // of its own, and the toolbar is hidden while the view is split anyway.
+    // The button ships disabled: the rail is filled from the island by this
+    // script, so where there is no entry there is nothing behind the button.
+    var railBtn = root.closest('[data-pane]') ? null
+      : document.querySelector('.mobile-bar [data-drawer="rail"]');
+
     // The summary line for a collapsed entry, composed from the panel's own
     // sections: the first (highest-priority) one by name and size, then how many
     // other kinds wait behind it. Read from data-label/data-n rather than from
@@ -238,6 +246,14 @@
         panel.classList.add('rail-grow');
         entry.box.classList.add('rail-on');     // its own line steps aside
         if (entry.el) entry.el.classList.add('rail-active');
+      }
+      if (railBtn) {
+        railBtn.disabled = !entry;
+        // an open sheet holding the panel that just went away says the section
+        // being read has context it does not have -- close it with the panel
+        if (!entry && document.body.classList.contains('rail-open')) {
+          window.lagenDrawers.close();
+        }
       }
     }
 

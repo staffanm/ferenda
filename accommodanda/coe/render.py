@@ -53,7 +53,7 @@ def render(art, site):
     rail.add_document()
     return ENV.get_template("coe.html").render(page_context(
         lb.short_title or lb.official_title, "Europarådets fördrag",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(),
         implementation_link=Markup(
             ref_list(site, "Svensk inkorporering", [implementation])

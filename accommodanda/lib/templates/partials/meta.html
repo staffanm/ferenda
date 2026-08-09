@@ -12,8 +12,13 @@
 </dl>
 {%- endif -%}
 {%- endmacro -%}
-{%- macro toc(entries) -%}
+{#- `top` is the document's own short id ("SFS 1962:700", "NJA 1994 s. 3"). It
+    heads the list as a top-level entry pointing at the frontmatter, so the
+    reader always has a named way back to the top of the document -- on the
+    desktop column and in the mobile drawer alike. -#}
+{%- macro toc(entries, top) -%}
 <nav class="toc"><div class="toc-h">Innehåll</div><div class="toc-list">
+{%- if top %}<a href="#top" class="lvl1 toc-top">{{ top }}</a>{% endif -%}
 {%- for anchor, text, level in entries -%}
 <a href="#{{ anchor }}" class="lvl{{ [level, 3] | min }}">{{ text }}</a>
 {%- endfor -%}

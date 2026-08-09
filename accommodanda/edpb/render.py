@@ -56,7 +56,7 @@ def render(art, site):
         md.get("title") or ident,
         EDPB_SECTION.get(art.get("serie"), "Vägledning"),
         doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=ident,
+        toc=render_toc(toc, ident), eyebrow=ident,
         banner=banner,
         footnotes=footnote_items(art.get("footnotes", []), site,
                                   backref=False),

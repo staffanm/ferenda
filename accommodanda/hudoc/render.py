@@ -31,7 +31,7 @@ def render(art, site):
     structure, toc, rail = document_body(art, site)
     return ENV.get_template("hudoc.html").render(page_context(
         lb.short_title or art.get("itemid"), "Europadomstolen",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id,
         summary_text=("; ".join(md["conclusions"])
                       if md.get("conclusions") else None),

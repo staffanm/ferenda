@@ -180,7 +180,7 @@ def render(art, site):
     rail.add_document()
     return ENV.get_template("dv.html").render(page_context(
         title, "Rättsfall", doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=eyebrow,
+        toc=render_toc(toc, lb.short_id), eyebrow=eyebrow,
         summary_text=md.get("sammanfattning"),
         island=rail.island(),
         ursprunglig=_dv_ursprunglig_dom(art),

@@ -147,6 +147,6 @@ def render(art, site):
     rail.add_document()        # document-level remiss "most interesting" overall panel
     return ENV.get_template("forarbete.html").render(page_context(
         title, "Förarbete", doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc), eyebrow=lb.short_id, island=rail.island(),
+        toc=render_toc(toc, lb.short_id), eyebrow=lb.short_id, island=rail.island(),
         implements=_implements_items(art, site),
         structure=Markup("".join(parts))))

@@ -11,13 +11,12 @@ write-then-clobber). The sitenews listing lives at ``/dataset/sitenews/feed``
 -- the URLs the legacy site published.
 """
 
-import json
 from pathlib import Path
 
 from markupsafe import Markup
 
 from ..lib import compress, layout, tpl
-from ..lib.page import escape, href, page
+from ..lib.page import BRAND, escape, href, page
 from ..lib.render import edit_meta
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
@@ -117,7 +116,7 @@ def render_frontpage(art):
     `### category` + law lists flow into columns) so the dense index stays
     scannable in two levels."""
     body = _TPL.frontpage_body(Markup(_blocks_html(art["blocks"])))
-    return page(art["title"], "Start", "", body,
+    return page(art["title"], "Start", "", body, title_html=BRAND,
                 eyebrow="Sveriges lagar, med kontext", solo=True,
                 body_class=" site")
 
