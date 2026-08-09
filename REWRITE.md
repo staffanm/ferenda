@@ -3955,7 +3955,7 @@ rewrite work.
 | `accommodanda/lib/inbound.py` | derived per-document inbound-citation tree under `data_root/inbound/`, written per page by `generate` and read by REST `/document/inbound` + MCP `get_incoming_citations` instead of a live catalog query — see the "Cross-source inbound-link graph" bullet above |
 | `accommodanda/lib/page.py` | the shared page kit every source's `render.py` stands on: `Site` (render context), the generic node walk (`render_node`/`render_runs`), the context rail (`Rail`/`RailSection` + margin builders), the page shell (`page`/`page_context`, the TOC collector). Knows no source by name |
 | `accommodanda/lib/render.py` | corpus-wide site assembly (`generate`): frontpage, folkrätt/EU-rätt landings, Atom feeds, static chrome, `generate_site` (the render driver, dispatching per-document pages to each source's own `render.py` through the `renderers` registry `build.SOURCE_RENDERERS` hands in) + live ⌘K search |
-| `accommodanda/browse.py` | the faceted browse tree, generated as a client of the REST API (`api.app` driven through a FastAPI `TestClient`) — lives outside `lib/` since `lib/` may not import `api` |
+| `accommodanda/browse.py` | the faceted browse tree, generated as a client of the REST API (`api.app` driven through a FastAPI `TestClient`) — lives outside `lib/` since `lib/` may not import `api`. `render_landing(source, view, banner)` renders a source's root as a landing over all its primary buckets, by count; wired for eurlex only (its default-bucket root used to be a byte copy of the first leaf — one treaty's 8 consolidated versions standing in for 50,000 acts). Other sources still get the default-bucket root |
 | `accommodanda/lib/assets/` | the browser-facing static chrome as real files (`style.css`, `editor.css`, `matomo.js` — first in the bundle, the cookie-less Matomo snippet legacy lagen.nu has always used, same-origin `/matomo/`, gated on a hostname→site-id table so a dev serve/mirror stays silent — `dom.js` — shared `window.lagenDom` vocabulary: own-document anchor resolution across split-view panes, id-attribute selector, landing flash, JSON-island parse — `scrollspy.js`, `search.js`, `popover.js`, `fullsearch.js`, `versions.js`, `faksimil.js`, `drawers.js` — the mobile bottom toolbar's TOC drawer / context-rail bottom sheet — `editor.js`, `robots.txt`) — `render.write_assets` ships them via the same Brotli precompression as pages: the JS is concatenated in load order into one `script.js` bundle (the page links a single URL, so a new module publishes via `generate --assets-only` instead of forcing a full regenerate), `style.css` with `editor.css` appended |
 | `accommodanda/lib/text.py` | shared artifact text flattener (node/document/fragment plain text); `sentences(text, clause_breaks=False)` is the shared Swedish-abbreviation-aware sentence splitter, used by `labels._first_sentence` and by `remisser/ai_analyze.answer_units` |
 | `accommodanda/lib/search.py` | OpenSearch full-text indexer (standalone units collapsed by `doc_uri`, no parent-child join), `index` |
@@ -4067,6 +4067,62 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **foreskrift/forarbete/icc/icrc** (2026-08-09) — four extraction fixes found
+  by the UX audit, each measured over the corpus rather than eyeballed.
+  `foreskrift/parse.py` picks the in-force date by the document's *role*: a
+  base regulation takes the first "träder i kraft" date it declares, an
+  amending one the last, and a konsoliderad masthead vetoes the amending
+  reading. Impossible dates fell from 328 to 18; 397 föreskrifter were
+  corrected and none lost. `forarbete/parse.py` gained two classifier rules —
+  a dateline plus signature block is furniture, not a heading (597 signatory
+  names stopped reading as headings across 300 documents), and a figure label
+  is told from a heading by the typefaces the document sets *text* in
+  (`text_faces`: body face ∪ numbered-heading faces ∪ any face carrying
+  running prose), scoped to pages that carry a caption. Both rules add zero
+  headings. `icc/parse.py` asks poppler for the invisible OCR layer its scans
+  carry, taking metadata-only decisions from 119 to 2. `icrc/parse.py` reads
+  the ICRC's `empty` section label for what it is — *no section label*, not
+  *no content*: a block with text is the treaty (32 undivided 19th-century
+  declarations had lost their whole text, plus 69 operative parts of divided
+  ones), a textless block between articles is a division heading, and a
+  textless block outside the run of articles is commentary and dropped.
+- **wiki/lib** (2026-08-09) — `lib/markdown.py`'s block parser is now
+  **markdown-it** too, closing the gap the site vertical's 2026-08-03 swap
+  left open: the hand-rolled scanner behind the commentary/concept pages kept
+  MediaWiki list markers in the prose (`* Fritt utnyttjande … * Begränsat
+  utnyttjande …`, one run-on line) and printed HTML comments as body text — a
+  2009 note the authors left themselves, and the passage under it, rendered as
+  commentary on LAS, rättegångsbalken and avtalslagen. `blocks()` now walks
+  `MarkdownIt("commonmark", {"html": False})`'s token tree into `rubrik`/
+  `stycke`/`lista`/`avskiljare`, same as `site/parse.py` (which builds the same
+  engine with `.enable("table")` for its `tabell` node); the inline layer
+  (links, lagrum citations) stays hand-rolled. New `strip_comments()` drops
+  `<!-- … -->` before either parser sees the body — shared by both, since
+  `html: False` means "keep as text", not "drop". `wiki/parse.py` emits the new
+  `lista` (with `punkt` children) and `avskiljare` blocks as artifact nodes;
+  `lib/page.py`'s node walk renders them `<ol|ul class="punkter">` and `<hr>`.
+  New `tools/unfold_wiki_lists.py` is a one-off repair over the already-
+  converted `lagen-wiki` markdown: the shared `wikitext.blocks()` joins
+  consecutive non-blank source lines into one paragraph, so a MediaWiki list
+  spanning several source lines converted to one run-on markdown line with
+  its markers still inside it; the tool re-splits each into one item per line
+  (86 lists across 66 files in `commentary/`+`concept/`, applied once).
+- **browse/foreskrift** (2026-08-09) — `browse.render_landing(source, view,
+  banner)`: a source's root page as a landing over all its primary buckets
+  (by count), replacing the old default — a byte copy of the first leaf.
+  Wired for eurlex only: its first leaf is one treaty's 8 consolidated
+  versions, no way to open a corpus of 50,000 acts (V4); other sources keep
+  the default-bucket root until each has a landing worth the swap.
+  `lib/page.py` gained `BRAND` (`Markup("lagen<em>.nu</em>")`) and
+  `page_context`/`page` gained `title_html`, so a page's `<h1>` can carry
+  markup distinct from its plain-text `<title>` — both frontpage builders
+  (`site/render.py`'s editorial frontpage, `lib/render.py`'s corpus-stats
+  one) now pass `BRAND` there instead of duplicating the brand markup.
+  `catalog.py` gained `andrar_inbound` (mirroring `upphaver_inbound`): the
+  inbound side of the `rpubl:andrar` edge, so a base regulation whose agency
+  never listed its own amendments (SJÖFS 2005:25) still shows them, unioned
+  with its harvest register (`foreskrift/render.py`'s `_andrad_genom`) as new
+  "Ändrad t.o.m." / "Ändrad genom" meta rows.
 - **lib/dv/eurlex/sfs** (2026-08-07) — the patch layer's shape changed on three
   fronts, on top of §7's port of the legacy sfs/dv patches. New `lib/markup.py`
   (`block_lines` for HTML, `indent_xml` for XML) puts one block element per
