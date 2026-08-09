@@ -75,6 +75,9 @@ class Run:
     bold: bool
     italic: bool
     size: int = 0
+    # the run's typeface, folded to its family (`base_family`): the signal that
+    # separates a chart's axis labels from the prose around them
+    font: str = ""
 
 
 @dataclass
@@ -105,6 +108,7 @@ class Para:
     # style spans over `text`, carried across the lines it was reflowed from
     spans: list[tuple[int, int, str]] = field(default_factory=list)
     boxed: bool = False   # set to a narrower measure than the body: a ruta
+    font: str = ""        # its typeface (`base_family`), 0-length when unknown
 
 
 def command_digest(args):
@@ -317,8 +321,11 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
     # so parse leniently rather than abort the document
     root = etree.fromstring(xml, etree.XMLParser(recover=True, load_dtd=False,
                                                  no_network=True))
-    # font id -> point size, from the <fontspec> declarations (global ids)
+    # font id -> point size / typeface, from the <fontspec> declarations
+    # (global ids, declared on the page each is first used on)
     sizes = {f.get("id"): int(f.get("size") or 0)
+             for f in root.iter("fontspec")}
+    fonts = {f.get("id"): base_family(f.get("family"))
              for f in root.iter("fontspec")}
     for page in root.findall("page"):
         spans = []
@@ -338,7 +345,8 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
                               t.find(".//b") is not None,
                               t.find(".//i") is not None,
                               left + int(t.get("width") or 0),
-                              sizes.get(t.get("font"), 0)))
+                              sizes.get(t.get("font"), 0),
+                              fonts.get(t.get("font"), "")))
         yield int(page.get("number")), _lines(spans)
 
 
@@ -597,6 +605,35 @@ def _join_runs(runs):
     return _normalized_with_spans("".join(out), spans)
 
 
+# pdftohtml reports an embedded font by its PDF name, which carries a subset tag
+# and a style suffix that vary with the weight: one document's running text is
+# "BCDEEE+TimesNewRomanPSMT" and its headings "BCDFEE+TimesNewRomanPS". Both are
+# Times; a chart's "BCDKEE+TradeGothic" is not, and that is the distinction
+# worth keeping, so the tag and the style are folded away and the typeface kept.
+RE_FONT_SUBSET = re.compile(r"^[A-Z]{6}\+")
+# `identityh` is the CMap the font is encoded with, not a style, but poppler
+# reports it inside the name ("EUAlbertina-Regu-Identity-H") and one annex
+# reproducing an EU directive sets its prose and its headings in two spellings
+# of the same face
+_FONT_STYLE_TOKENS = ("bolditalicmt", "boldmt", "italicmt", "psmt", "mt", "ps",
+                      "identityh", "bold", "italic", "oblique", "regular",
+                      "regu")
+
+
+def base_family(name):
+    """A pdftohtml font name folded to its typeface, lowercased: the subset tag
+    and style suffixes dropped. `""` where the source names no font."""
+    fam = re.sub(r"[^a-z]", "", RE_FONT_SUBSET.sub("", name or "").lower())
+    shrinking = True
+    while shrinking:
+        shrinking = False
+        for token in _FONT_STYLE_TOKENS:
+            if fam.endswith(token) and len(fam) > len(token):
+                fam, shrinking = fam[:-len(token)], True
+                break
+    return fam
+
+
 def _lines(spans):
     """Group spans sharing a text baseline (top + height) into visual lines, left
     to right. We group on the baseline, not the top, because one line may mix font
@@ -619,9 +656,9 @@ def _lines(spans):
     paragraph of its own, on every numbered heading whose page prints the header
     at that height."""
     grouped: list[tuple[int, list[Run], int]] = []
-    for top, left, base, text, bold, italic, right, size in sorted(
+    for top, left, base, text, bold, italic, right, size, font in sorted(
             spans, key=lambda s: (s[2], s[1], s[0])):
-        run = Run(left, right, text, bold, italic, size)
+        run = Run(left, right, text, bold, italic, size, font)
         if grouped and abs(base - grouped[-1][0]) <= LINE_TOL:
             prev_base, runs, prev_top = grouped[-1]
             runs.append(run)
@@ -1638,7 +1675,8 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
             cur = None
         if cur is None:
             cur = Para(l.text, l.bold, bool(marker), l.italic, l.size, l.top,
-                       list(l.spans), i in box_base and ruled(l))
+                       list(l.spans), i in box_base and ruled(l),
+                       l.runs[0].font if l.runs else "")
         else:
             # the line's spans slide by wherever its text landed in the
             # paragraph -- one past the end for the joining space, one *before*

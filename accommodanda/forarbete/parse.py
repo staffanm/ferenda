@@ -77,6 +77,19 @@ SIGNATURE_LINES = 4
 # lagrådsremiss's own dateline in a bilaga (prop. 2004/05:141).
 RE_SIGNATURE_NAME = re.compile(
     r"^[A-ZÅÄÖ][\wåäöé'’-]+(?: [A-ZÅÄÖ][\wåäöé'’-]+){1,2}$")
+# A figure's or table's caption ("Figur 6.2 Genomsnittlig effekt på ekonomisk
+# standard", "Tabell 3.1 Utgiftsutveckling inom utgiftsområdet"). It names the
+# artwork below it; it is not a section of the document, and putting it in the
+# table of contents between "Konsekvensanalys" and "Författningskommentar" says
+# it is one.
+RE_CAPTION = re.compile(r"^(?:Figur|Diagram|Tabell|Bild)\s+\d", re.IGNORECASE)
+# A numbered heading, for the stricter purpose of *learning* what this
+# document's headings look like (`text_faces`): the number has to be followed by
+# a word, not another number. `RE_NUM_TITLE` alone also matches a chart's x-axis
+# tick row reflowed into one paragraph ("1 2 3 4 5 6 7 8 9 10"), and one such
+# row was enough to teach prop. 2023/24:27 that Calibri -- the face of the very
+# axis labels this is meant to catch -- was one of its heading faces.
+RE_NUM_HEADING = re.compile(r"^\d+(?:\.\d+)*\s+[^\W\d_]")
 
 # prop/skr front matter (the överlämnande on page 1): the handover sentence,
 # the ort/datum line ("Stockholm den 20 maj 2021", occasionally Harpsund), and
@@ -94,7 +107,7 @@ def mint_uri(typ, basefile):
     return "https://lagen.nu/%s/%s" % (typ, basefile)
 
 
-def classify(paras, page, body=0, levels=None):
+def classify(paras, page, body=0, levels=None, faces=None):
     """Paragraphs -> Blocks. Bold chapter/§ markers (recovered from font) become
     `kapitel`/`paragraf` blocks -- the structure that lets commentary be tied to
     a paragraf; other bold or numbered paragraphs are headings; the rest stycken.
@@ -109,8 +122,22 @@ def classify(paras, page, body=0, levels=None):
 
     `levels` maps a font size to the heading level the document's own numbered
     headings use it at (`heading_level_by_size`), which is what recognises the
-    display headings that carry neither a number nor bold weight."""
+    display headings that carry neither a number nor bold weight.
+
+    `faces` is `text_faces`: the typefaces this document sets text in. An
+    *unnumbered* candidate in any other face is a chart's or table's furniture.
+    Prop. 2023/24:27 published "Procent", "Inkomstgrupper" and "Kvinnor Män" --
+    the axis labels of three diagrams -- as entries in its table of contents.
+    Omitted (the legacy HTML/Word routes) the test is skipped, as it is for a
+    document whose fonts the producer left unnamed."""
     levels = levels or {}
+    faces = faces or set()
+    # the furniture rule is scoped to pages that carry a caption, i.e. pages
+    # with artwork on them. A face this document uses nowhere else is only
+    # evidence of a chart where there is a chart; on an ordinary page it is as
+    # likely to be a bilaga bringing its own typography ("Artikel 12" in an
+    # annexed EU directive, "Karlsborg." in an 1888 estimate).
+    captioned = any(RE_CAPTION.match(p.text) for p in paras)
     blocks = []
     i = 0
     signature_left = 0       # short lines still to read as a signature, not a head
@@ -139,6 +166,11 @@ def classify(paras, page, body=0, levels=None):
         elif mt and len(p.text) < HEADING_MAX and heading_font:
             blocks.append(Block("rubrik", p.text, page,
                                 mt.group(1).count(".") + 1, spans=p.spans, top=p.top))
+        elif RE_CAPTION.match(p.text) or (captioned and faces and p.font
+                                          and p.font not in faces):
+            # a caption, or artwork set in a face this document reserves for
+            # neither its prose nor its headings -- see RE_CAPTION / `faces`
+            blocks.append(Block("stycke", p.text, page, spans=p.spans, top=p.top))
         elif p.size in levels and len(p.text) < HEADING_MAX:
             # An unnumbered heading, placed by the size this document reserves
             # for headings of a known level. That covers the display headings
@@ -234,12 +266,46 @@ def heading_level_by_size(paras, body):
             if sum(seen.values()) * 2 > short[size]}
 
 
+PROSE_MIN = 200   # characters: a paragraph this long is running text, not a label
+
+
+def text_faces(paras):
+    """The typefaces this document sets *text* in, learned from the document
+    itself the way `heading_level_by_size` learns heading sizes. A heading
+    candidate in any other face is a chart's or a table's furniture, and
+    `classify` refuses to make a heading of it.
+
+    Three ways a face qualifies, because three kinds of document defeat any one
+    of them:
+
+      * it is the running text's own face -- the ordinary case;
+      * a *numbered* heading uses it. A numbered heading is a heading whatever
+        it looks like, and a budget proposition sets every heading in a display
+        face (TradeGothic) its prose never uses;
+      * it carries running prose (a paragraph over `PROSE_MIN`). A bilaga
+        reproducing an EU directive brings that directive's own typography with
+        it, headings and all, and only its prose says the face is a text face.
+
+    What is left over carries nothing but short fragments in a face the document
+    uses nowhere else: axis labels, tick values, legends. Reading this from the
+    document rather than naming faces is also what makes it safe on the older
+    corpus, where the producer stripped the real font names and every style is a
+    meaningless subset name ("TT27E0o00") -- there the body face is junk too, so
+    nothing looks foreign and the rule never fires."""
+    faces = {p.font for p in paras
+             if p.font and (len(p.text) > PROSE_MIN
+                            or (RE_NUM_HEADING.match(p.text)
+                                and len(p.text) < HEADING_MAX))}
+    fonts = Counter(p.font for p in paras if p.font)
+    return faces | ({fonts.most_common(1)[0][0]} if fonts else set())
+
+
 def _size_scheme(paras):
-    """`(running-text size, size -> heading level)` for a whole document -- the
-    pair every `classify` call needs, derived in one place so the PDF and OCR
-    body routes cannot drift apart on how a size is read."""
+    """`(running-text size, size -> heading level, text typefaces)` for a whole
+    document -- everything every `classify` call needs, derived in one place so
+    the PDF and OCR body routes cannot drift apart on how a size is read."""
     body = line_body_size(paras)
-    return body, heading_level_by_size(paras, body)
+    return body, heading_level_by_size(paras, body), text_faces(paras)
 
 
 def running_text_size(page, document):
@@ -339,7 +405,7 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
         # test -- the safe direction, and the reason this is not worth the second
         # reflow it would cost to measure the kept lines instead.
         pages.append(((printed, bilaga), segs, line_body_size(lines)))
-    body, levels = _size_scheme(
+    body, levels, faces = _size_scheme(
         [p for _pg, segs, _sz in pages
          for kind, data, _x in segs if kind == "paras" for p in data])
     # printed page -> the PDF page it came from, so a figure found by PDF page
@@ -352,7 +418,8 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
         for kind, data, rows in segs:
             if kind == "paras":
                 on_page += classify(data, printed,
-                                    running_text_size(page_size, body), levels)
+                                    running_text_size(page_size, body), levels,
+                                    faces)
             elif kind == "gtabell":
                 on_page.append(Block("tabell", "", printed, rows=list(rows or []),
                                      th=bool(data)))
@@ -455,14 +522,15 @@ def _paged_body(pages):
     and scanned-PDF (pdftotext) OCR routes; OCR noise rides along, but the
     citation scanner still lights up the references it can read."""
     pages = list(pages)
-    body, levels = _size_scheme([p for _pageno, paras in pages for p in paras])
+    body, levels, faces = _size_scheme(
+        [p for _pageno, paras in pages for p in paras])
     # the page's own size off its paragraphs, which is all these routes have --
     # `running_text_size` takes the smaller of the two anyway, so a page whose
     # paragraphs are too few to settle on a size cannot widen the footnote test
     return [b for pageno, paras in pages
             for b in classify(paras, pageno,
                               running_text_size(line_body_size(paras), body),
-                              levels)]
+                              levels, faces)]
 
 
 def _legacy_pdf_body(pdf_path, identifier, patch_key=None):
@@ -754,5 +822,10 @@ def to_artifact(fa):
     if fa.ocr and (m := re.match(r"\d{4}", fa.basefile)):
         if suspects := censor_future_citations(blocks, int(m.group(0))):
             art["suspect_citations"] = suspects
+    # the abbreviations this document declared for itself ("lagen (1994:1564)
+    # om alkoholskatt, förkortad LAS") -- stamped so a corpus scan can show
+    # where and how often the local definition shadowed the global table
+    if abbrevs := parser.local_abbreviations():
+        art["local_abbreviations"] = abbrevs
     art["structure"] = nest(blocks)
     return art

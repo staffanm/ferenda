@@ -882,6 +882,59 @@ def test_classify_places_a_display_heading_by_its_size():
         ("rubrik", 1), ("rubrik", 2), ("stycke", None)]
 
 
+def _pf(text, size, font, *, bold=False, italic=False):
+    return Para(text=text, bold=bold, italic=italic, size=size, font=font)
+
+
+def test_text_faces_learns_the_faces_this_document_sets_text_in():
+    paras = ([_pf("x" * 300, 15, "timesnewroman")] * 8       # running prose
+             + [_pf("5.2 Ikraftträdande", 15, "tradegothic"),  # a numbered heading
+                _pf("Procent", 13, "calibri"),                 # a chart's axis label
+                _pf("1 2 3 4 5 6 7 8 9 10", 14, "calibri")])   # its tick row
+    # the tick row matches RE_NUM_TITLE but not RE_NUM_HEADING, so it does not
+    # teach the document that Calibri is a heading face
+    assert fa_parse.text_faces(paras) == {"timesnewroman", "tradegothic"}
+
+
+def test_classify_does_not_make_headings_of_a_charts_labels():
+    # Prop. 2023/24:27 p. 13: a diagram's caption, its axis labels in two faces
+    # the document uses nowhere else, and the prose that resumes after it. The
+    # labels were published as table-of-contents entries.
+    faces = {"timesnewroman"}
+    paras = [_pf("Figur 6.2 Genomsnittlig effekt på ekonomisk standard", 15,
+                 "tradegothic"),
+             _pf("Procent", 13, "tradegothic"),
+             _pf("Inkomstgrupper", 15, "calibri", bold=True),
+             _pf("Effekter för sysselsättning", 15, "timesnewroman", bold=True)]
+    assert [(b.kind, b.text) for b in
+            fa_parse.classify(paras, 13, 15, {}, faces)] == [
+        ("stycke", "Figur 6.2 Genomsnittlig effekt på ekonomisk standard"),
+        ("stycke", "Procent"),
+        ("stycke", "Inkomstgrupper"),
+        ("rubrik", "Effekter för sysselsättning")]
+
+
+def test_classify_keeps_a_foreign_face_on_a_page_with_no_artwork():
+    # a bilaga reproducing an EU directive brings its own typography, and an
+    # 1888 estimate sets a run of headings in a face the rest never uses. With
+    # no caption on the page there is no chart, so nothing is furniture.
+    paras = [_pf("Artikel 12", 15, "eualbertina", bold=True),
+             _pf("Karlsborg.", 15, "arial", bold=True)]
+    assert [b.kind for b in
+            fa_parse.classify(paras, 4, 15, {}, {"timesnewroman"})] == [
+        "rubrik", "rubrik"]
+
+
+def test_classify_keeps_a_numbered_heading_in_a_display_face():
+    # a budget proposition sets every heading in TradeGothic, which its prose
+    # never uses; the number says it is a heading whatever face it is in
+    paras = [_pf("Tabell 3.1 Utgiftsutveckling", 15, "tradegothic"),
+             _pf("3.2 Utgiftsutvecklingen", 15, "tradegothic", bold=True)]
+    assert [(b.kind, b.level) for b in
+            fa_parse.classify(paras, 9, 15, {}, {"garamond"})] == [
+        ("stycke", None), ("rubrik", 2)]
+
+
 def test_classify_reads_the_signature_block_as_prose_not_headings():
     # Prop. 2023/24:27's first page. The signatories are set in body-size italic
     # -- the same signal a subheading uses -- so 3 140 propositions listed their

@@ -123,8 +123,9 @@ def test_lines_groups_spans_on_shared_baseline():
     number beside its smaller-font title shares a baseline but not a top; a
     top-only grouping split them and reflowed '9 Författningskommentar' to
     'Författningskommentar 9'."""
-    spans = [(10, 0, 30, "9", True, False, 20, 20),                      # big digit
-             (20, 50, 30, "Författningskommentar", True, False, 250, 15)]  # smaller title
+    spans = [(10, 0, 30, "9", True, False, 20, 20, "times"),           # big digit
+             (20, 50, 30, "Författningskommentar", True, False, 250, 15,
+              "times")]                                                # smaller title
     out = _lines(spans)
     assert [l.text for l in out] == ["9 Författningskommentar"]
     assert out[0].top == 10 and out[0].bold
@@ -464,9 +465,9 @@ def test_an_unnumbered_page_has_no_page_number_line():
 # --------------------------------------------------------------------------
 
 def _span(top, left, right, text, *, size=15, bold=False, italic=False,
-          height=13):
+          height=13, font="timesnewroman"):
     """One pdftohtml <text> fragment, in the tuple shape `_lines` consumes."""
-    return (top, left, top + height, text, bold, italic, right, size)
+    return (top, left, top + height, text, bold, italic, right, size, font)
 
 
 def test_a_margin_fragment_does_not_split_a_heading():
