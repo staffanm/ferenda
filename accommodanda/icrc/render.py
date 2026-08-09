@@ -8,6 +8,7 @@ from markupsafe import Markup
 
 from ..lib import labels, tpl
 from ..lib.page import (
+    BANNERS,
     Rail,
     Toc,
     doc_meta,
@@ -52,8 +53,16 @@ def render(art, site):
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
+    # No treaty is metadata-only any more: the 32 that were are the undivided
+    # 19th-century declarations, whose text the section allowlist dropped for
+    # being labelled "empty" (model.TEXT_SECTIONS). The banner stays for the
+    # case it was written for -- a record the source publishes without a text --
+    # because a page of metadata with nothing said reads as a broken page.
+    banner = "" if art.get("structure") else BANNERS.text_not_held(
+        "traktaten", art.get("source_url"), "ICRC:s fördragsdatabas")
     return ENV.get_template("icrc.html").render(page_context(
         lb.short_title or lb.official_title, "Internationell humanitär rätt",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(),
-        lead=art.get("summary"), structure=Markup("".join(parts))))
+        lead=art.get("summary"), structure=Markup("".join(parts)),
+        banner=banner))

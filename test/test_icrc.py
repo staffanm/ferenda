@@ -8,10 +8,9 @@ import json
 from pathlib import Path
 
 from accommodanda.icrc import download, parse
-from accommodanda.icrc.model import Treaty, treaty_uri
-from accommodanda.lib import catalog, compress, facets, layout, render
-from accommodanda.lib import page
 from accommodanda.icrc import render as icrc_render
+from accommodanda.icrc.model import Treaty, treaty_uri
+from accommodanda.lib import catalog, compress, facets, layout, page, render
 
 FIXTURES = Path(__file__).parent / "files" / "icrc"
 
@@ -225,3 +224,86 @@ def test_render_treaty_page_highlights_folkratt_and_shows_metadata(tmp_path):
     assert "Switzerland" in html and "Depositarie" in html
     assert "Article 3 - Conflicts not of an international character" in html
     assert art["source_url"] in html                     # the "Källa" link
+
+
+def test_an_undivided_treaty_keeps_its_text():
+    """"empty" is the ICRC's label for a treaty with no section divisions -- the
+    19th-century declarations are one block of text -- not for a block with no
+    content. Reading it as "nothing here" dropped the whole text of 32 treaties
+    (the Paris Declaration of 1856, St Petersburg, the Hague declarations),
+    leaving pages that were metadata and nothing else (V2)."""
+    envelope = {"data": [{"attributes": {"field_treaty_number": "1",
+                                         "title": "Paris Declaration, 1856"},
+                          "relationships": {"field_treaty_content": {"data": [
+                              {"type": "paragraph--treaty_content", "id": "p1"}]}}}],
+                "included": [{"type": "paragraph--treaty_content", "id": "p1",
+                              "attributes": {
+                                  "field_treaty_content_section": "empty",
+                                  "field_treaty_content_title": "Declaration",
+                                  "field_treaty_content_pre_title": "Declaration",
+                                  "field_treaty_content_content":
+                                      "<p>Privateering is and remains abolished.</p>"}}]}
+    treaty = parse.parse_envelope(envelope)
+    [provision] = treaty.provisions
+    # anchored by what the treaty calls its own text, never by the word "empty"
+    assert provision.fragment == "Declaration"
+    assert "Privateering is and remains abolished." in " ".join(provision.paragraphs)
+
+
+def _empty_block(pid, title, content):
+    return {"type": "paragraph--treaty_content", "id": pid,
+            "attributes": {"field_treaty_content_section": "empty",
+                           "field_treaty_content_title": title,
+                           "field_treaty_content_pre_title": title,
+                           "field_treaty_content_content": content}}
+
+
+def _article(pid, ordinal):
+    return {"type": "paragraph--treaty_content", "id": pid,
+            "attributes": {"field_treaty_content_section": "Article",
+                           "field_treaty_content_pre_title": "Article %s" % ordinal,
+                           "field_treaty_content_title": "Heading %s" % ordinal,
+                           "field_treaty_content_content": "<p>Text %s.</p>" % ordinal}}
+
+
+def _envelope(ids, included):
+    return {"data": [{"attributes": {"field_treaty_number": "2",
+                                     "title": "Convention (I), 1949"},
+                      "relationships": {"field_treaty_content": {"data": [
+                          {"type": "paragraph--treaty_content", "id": pid}
+                          for pid in ids]}}}],
+            "included": included}
+
+
+def test_an_unlabelled_block_with_text_is_kept():
+    """A treaty that has articles still carries unlabelled *operative* parts --
+    Final Protocol, Additional article, Technical Annex, 69 blocks in the
+    corpus. So "the treaty has articles" cannot be the drop rule; carrying text
+    is what makes an unlabelled block part of the treaty."""
+    treaty = parse.parse_envelope(_envelope(
+        ("front", "art", "final"),
+        [_empty_block("front", "Acknowledgements and Abbreviations", None),
+         _article("art", "1"),
+         _empty_block("final", "Final Protocol", "<p>Done at Geneva.</p>")]))
+    assert [p.fragment for p in treaty.provisions] == ["A1", "FinalProtocol"]
+
+
+def test_a_textless_unlabelled_block_between_articles_is_a_heading():
+    """Where a textless unlabelled block sits says what it is. "Final
+    provisions" stands between article 30 and article 31 of the 1929 Geneva
+    Convention and heads the articles after it, exactly as a `Chapter` block
+    would -- dropping it would lose the division over the final articles. The
+    other 17 textless blocks in the corpus sit outside the run of articles
+    (Acknowledgements and Introduction before it, Sources and Conclusion
+    after), and are commentary."""
+    treaty = parse.parse_envelope(_envelope(
+        ("intro", "a1", "final", "a2", "sources"),
+        [_empty_block("intro", "Introduction", None),
+         _article("a1", "1"),
+         _empty_block("final", "Final provisions", None),
+         _article("a2", "2"),
+         _empty_block("sources", "Sources", None)]))
+    assert [(p.kind, p.heading) for p in treaty.provisions] == [
+        ("artikel", "Heading 1"),
+        ("rubrik", "Final provisions"),
+        ("artikel", "Heading 2")]

@@ -8,6 +8,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from accommodanda.icc import download, parse
+from accommodanda.icc import parse as icc_parse
+from accommodanda.icc import render as icc_render
 from accommodanda.icc.model import (
     Block,
     Decision,
@@ -15,9 +17,8 @@ from accommodanda.icc.model import (
     doc_basefile,
     load_types,
 )
-from accommodanda.lib import catalog, facets, layout, render
-from accommodanda.lib import page
-from accommodanda.icc import render as icc_render
+from accommodanda.lib import catalog, facets, layout, page, render
+from accommodanda.lib.pdftext import Line
 
 FIXTURES = Path(__file__).parent / "files" / "icc"
 
@@ -204,3 +205,38 @@ def test_frontpage_folds_icc_into_the_folkratt_row():
     assert "/icc/" not in routes
     folkratt = [row for row in rows if row[0] == "/folkratt/"]
     assert len(folkratt) == 1 and folkratt[0][2] == 3 + 269 + 2
+
+
+def test_blocks_reads_the_invisible_ocr_layer(monkeypatch):
+    """The court files its records as scans carrying an *invisible* OCR text
+    layer, which poppler omits unless asked. Reading only the visible layer
+    returned one line per page -- the court's own filing stamp -- so 118 of 269
+    decisions parsed to nothing while their text sat in the PDF on disk (V2).
+    `pages_with_ocr` is the shared route for exactly that failure: it asks for
+    the hidden layer, and OCRs a scan that still yields nothing."""
+    seen = {}
+
+    def fake(path, patch_key=None, lang="swe"):
+        seen.update(path=str(path), patch_key=patch_key, lang=lang)
+        return [(1, [Line("Privateering is and remains abolished.", 10,
+                          False, False, False, 12)])]
+
+    monkeypatch.setattr(icc_parse, "pages_with_ocr", fake)
+    blocks = icc_parse._blocks("/tmp/x.pdf", "ICC-01/04-01/06-1432")
+    assert seen["lang"] == "eng"                    # the court files in English
+    assert seen["patch_key"] == ("icc", "ICC-01/04-01/06-1432")
+    assert [b.text for b in blocks] == [
+        "Privateering is and remains abolished."]
+
+
+def test_a_doubled_quotation_mark_is_collapsed_but_a_cut_title_is_left_alone():
+    """Legal Tools types the opening quote twice on one record ('entitled
+    ""Décision sur la demande…'), which reached the page as a stammered
+    delimiter (U3). A doubled delimiter is a slip, not something the title says.
+    The unbalanced quote 16 other titles carry is a different thing: the source
+    truncates them and marks the cut itself, so closing the quotation would
+    assert a boundary the record does not have."""
+    assert icc_parse.RE_DOUBLED_QUOTE.sub('"', 'entitled ""Décision sur x"') \
+        == 'entitled "Décision sur x"'
+    cut = 'entitled "Decision on the consequences of non-disclosure [ ... ]'
+    assert icc_parse.RE_DOUBLED_QUOTE.sub('"', cut) == cut

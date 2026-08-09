@@ -5,7 +5,7 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 """
 
 from ..lib import labels, tpl
-from ..lib.page import doc_meta, document_body, page_context, render_toc
+from ..lib.page import BANNERS, doc_meta, document_body, page_context, render_toc
 
 ENV = tpl.environment("accommodanda.icc")
 
@@ -22,7 +22,17 @@ def render(art, site):
     ]
     structure, toc, rail = document_body(art, site)
     lb = labels.document_labels("icc", art)
+    # Two records are identity and metadata only. (It was 119 until the text
+    # extraction started asking poppler for the invisible OCR layer these scans
+    # carry -- see `_blocks`.) What is left is one decision whose PDF the
+    # downloader never fetched, and one that is a scan with no text layer at
+    # all, whose per-page court stamp is enough text that `pages_with_ocr` does
+    # not judge it empty and never reaches ocrmypdf. Say so rather than ship six
+    # metadata rows that read as a page which failed to load.
+    banner = "" if art.get("structure") else BANNERS.text_not_held(
+        "avgörandet", art.get("source_url"), "Internationella brottmålsdomstolen")
     return ENV.get_template("icc.html").render(page_context(
         lb.short_title or lb.short_id, "Internationella brottmålsdomstolen",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc),
-        eyebrow=lb.short_id, island=rail.island(), structure=structure))
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
+        eyebrow=lb.short_id, island=rail.island(), structure=structure,
+        banner=banner))

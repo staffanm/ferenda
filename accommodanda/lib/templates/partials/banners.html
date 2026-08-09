@@ -52,6 +52,15 @@
 {%- if konsultation %} Den <a href="{{ konsultation }}" rel="external">version som remitterades</a> publiceras separat av styrelsen.{% endif -%}
 </span></div>
 {%- endmacro -%}
+{%- macro text_not_held(what, source_url, source_name) -%}
+{#- a document we hold the identity and metadata of but not the text. Six
+    metadata rows and a source link, with nothing said, reads as a page that
+    failed to load; it is in fact a page that never had the text. Saying so is
+    the difference between a gap and a bug. -#}
+<div class="note-banner"><strong>Texten finns inte här</strong><span>Vi har uppgifterna om {{ what }} men inte själva texten
+{%- if source_url %} — den finns hos <a class="ext" href="{{ source_url }}" rel="external">{{ source_name }}</a>{% endif -%}
+.</span></div>
+{%- endmacro -%}
 {%- macro foreskrift_repealed_banner(links) -%}
 <div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
 {%- endmacro -%}

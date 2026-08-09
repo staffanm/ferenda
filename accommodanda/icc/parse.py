@@ -9,7 +9,7 @@ resolve stays metadata-only (empty structure), like a status record.
 import re
 
 from ..lib import compress
-from ..lib.pdftext import page_paragraphs, pdf_pages
+from ..lib.pdftext import page_paragraphs, pages_with_ocr
 from ..lib.util import normalize_space
 from .download import _iso, body_path, record_path
 from .model import RE_CASE, Block, Decision
@@ -20,6 +20,14 @@ RE_HEADER = re.compile(r"^ICC-\S+\s+\d\d-\d\d-\d{4}\s+\d+/\d+\s+[A-Z]{1,3}\b")
 RE_NUMBERED = re.compile(r"^(\d{1,4})\.\s+(.*)$", re.DOTALL)
 RE_ROMAN_HEAD = re.compile(r"^[IVXLC]+\.\s+[A-Z]")
 RE_CAPWORD = re.compile(r"[A-Z]{2,}")
+# A quotation mark the Legal Tools record types twice ('entitled ""Décision sur
+# la demande de mise en liberté provisoire de Thomas Lubanga Dyilo"'). A
+# doubled delimiter is a typing slip, not something the title says, so it is
+# collapsed. The *unbalanced* quote 16 other titles carry is left alone: those
+# are cut off at the source, which marks the cut itself ("… stay the
+# prosecution [ ... ]"), and closing the quotation would assert a title
+# boundary the record does not have.
+RE_DOUBLED_QUOTE = re.compile(r'"{2,}')
 
 
 def _is_heading(text):
@@ -53,9 +61,18 @@ def _classify(texts):
 
 
 def _blocks(path, basefile):
-    """The decision PDF's paragraphs, classified."""
+    """The decision PDF's paragraphs, classified.
+
+    Through `pages_with_ocr`, not `pdf_pages`: the court files its records as
+    scans carrying an *invisible* OCR text layer, which poppler omits unless
+    asked for it. Reading only the visible layer returned one line per page --
+    the court's own "ICC-01/04-01/06-1432 11-07-2008 5/44" stamp -- so 118 of
+    269 decisions parsed to nothing at all while their text sat in the PDF
+    already on disk (2 132 331 bytes of it, for that one). English, so the OCR
+    fallback for a scan with no layer at all runs in English."""
     return _classify(para.text
-                     for page, lines in pdf_pages(str(path), ("icc", basefile))
+                     for page, lines in pages_with_ocr(str(path), ("icc", basefile),
+                                                       lang="eng")
                      for para in page_paragraphs(lines, None, page))
 
 
@@ -68,7 +85,8 @@ def parse(basefile, root):
     case = RE_CASE.search(base)
     return Decision(
         doc_number=base,
-        title=lt.get("title") or icc.get("title") or "Decision",
+        title=RE_DOUBLED_QUOTE.sub('"', lt.get("title")
+                                   or icc.get("title") or "Decision"),
         case_name=lt.get("caseName") or icc.get("case_name") or base,
         case_number=lt.get("caseNumber") or (case.group(0) if case else base),
         decision_type=record["kind"],

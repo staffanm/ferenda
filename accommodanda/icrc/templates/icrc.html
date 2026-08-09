@@ -1,8 +1,10 @@
 {#- An IHL (ICRC) treaty page: an editorial summary lead where the source
     provides one, then the treaty text (articles pre-rendered through the
-    node walk, which wires the TOC and the context rail). -#}
+    node walk, which wires the TOC and the context rail). Where the source
+    carries no text -- the pre-1900 declarations -- a banner says so. -#}
 {% extends "page.html" %}
 {% block body %}
+{{- banner }}
 {%- if lead %}<p class="lead">{{ lead }}</p>{% endif -%}
 {{ structure }}
 {% endblock %}

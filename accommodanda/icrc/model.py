@@ -25,7 +25,17 @@ SITE = "https://ihl-databases.icrc.org"
 # the ICRC treaty-content sections that carry operative text vs. those that are
 # only structural headings; everything else a content list holds (Table of
 # Contents, Foreword, Introduction -- the commentary front matter) is dropped.
-TEXT_SECTIONS = frozenset({"Article", "Annex", "Preamble", "Testimonium"})
+#
+# "empty" is what the ICRC calls a block with no *section* label, not a block
+# with no content. It covers the 19th-century declarations, which are one
+# undivided text -- reading the label as "nothing here" dropped the whole text
+# of 32 treaties (the Paris Declaration of 1856, the St Petersburg Declaration,
+# the Hague declarations), leaving pages that were metadata and nothing else.
+# It also covers a division heading inside a treaty, and the commentary blocks
+# the ICRC files around one; `parse._provisions` tells the three apart by
+# whether the block carries text and where it sits among the articles.
+TEXT_SECTIONS = frozenset({"Article", "Annex", "Preamble", "Testimonium",
+                           "empty"})
 HEADING_SECTIONS = frozenset({"Chapter", "Title", "Part", "Section"})
 
 RE_ARTICLE_ORDINAL = re.compile(r"Article\s+(\S+)", re.I)

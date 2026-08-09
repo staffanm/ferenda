@@ -84,9 +84,13 @@ def _provision(paragraph, annex_serial):
         match = RE_ANNEX_ORDINAL.search(pre_title)
         ordinal = match.group(1) if match else str(annex_serial)
         fragment = "Annex%d" % annex_serial
-    else:                                    # Preamble / Testimonium
+    else:                     # Preamble / Testimonium / an undivided treaty
         ordinal = None
-        fragment = section
+        # "empty" is the ICRC's label for *no section division*, not for no
+        # text; anchor such a treaty's single block by what it calls itself
+        # ("Declaration") rather than by the word "empty"
+        fragment = (re.sub(r"\W+", "", pre_title) or "Text") \
+            if section == "empty" else section
     return Provision("artikel", section, heading, fragment=fragment,
                      ordinal=ordinal,
                      paragraphs=_paragraphs(attributes.get("field_treaty_content_content"))), \
@@ -94,11 +98,35 @@ def _provision(paragraph, annex_serial):
 
 
 def _provisions(node, index):
+    paragraphs = list(_related(node, index, "field_treaty_content"))
+    sections = [p["attributes"].get("field_treaty_content_section")
+                for p in paragraphs]
     provisions, annex_serial = [], 0
-    for paragraph in _related(node, index, "field_treaty_content"):
-        section = paragraph["attributes"].get("field_treaty_content_section")
+    for position, paragraph in enumerate(paragraphs):
+        attributes = paragraph["attributes"]
+        section = sections[position]
         if section not in TEXT_SECTIONS and section not in HEADING_SECTIONS:
             continue                         # ToC / Foreword / Introduction …
+        # "empty" means the block carries no *section* label, which covers
+        # three unrelated things. A block with text is the treaty itself: an
+        # undivided declaration, or an operative part of a divided one (Final
+        # Protocol, Additional article, Technical Annex -- 69 blocks). A
+        # textless block is either a division heading or commentary, and where
+        # it sits says which: "Final provisions" stands between article 30 and
+        # article 31 of the 1929 Geneva Convention and heads the articles after
+        # it, exactly as a `Chapter` block would. The other 17 -- the
+        # Acknowledgements and Introduction the ICRC files ahead of the text,
+        # the Sources and Conclusion it files after -- sit outside the run of
+        # articles entirely, and are commentary the treaty page does not carry.
+        if section == "empty" and not attributes.get("field_treaty_content_content"):
+            if not ("Article" in sections[:position]
+                    and "Article" in sections[position + 1:]):
+                continue
+            provisions.append(Provision(
+                "rubrik", section,
+                attributes.get("field_treaty_content_title")
+                or attributes.get("field_treaty_content_pre_title") or ""))
+            continue
         provision, annex_serial = _provision(paragraph, annex_serial)
         provisions.append(provision)
     return provisions

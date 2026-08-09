@@ -1,3 +1,5 @@
-{#- An International Criminal Court decision page: the parsed decision text. -#}
+{#- An International Criminal Court decision page: the parsed decision text,
+    or -- for the two records whose text we hold no readable copy of (see
+    `render.py`) -- the banner that says the text is not here. -#}
 {% extends "page.html" %}
-{% block body %}{{ structure }}{% endblock %}
+{% block body %}{{ banner }}{{ structure }}{% endblock %}
