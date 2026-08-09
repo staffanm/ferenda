@@ -153,7 +153,7 @@ def kommentar_artifact(path):
         guidance.setdefault(frag, []).extend(items)
     parser = _parser(basefile)
     nodes, section, frag = [], None, None
-    for block in markdown.blocks(body):
+    for block in markdown.blocks(body, basefile):
         if block[0] == "rubrik":
             _, level, heading = block
             f = heading_fragment(heading)
@@ -170,6 +170,12 @@ def kommentar_artifact(path):
             else:
                 (section if section is not None else nodes).append(
                     {"type": "rubrik", "level": level, "text": [heading]})
+        elif block[0] == "lista":
+            (section if section is not None else nodes).append(
+                _lista_node(block, parser, fragment=frag))
+        elif block[0] == "avskiljare":
+            (section if section is not None else nodes).append(
+                {"type": "avskiljare"})
         else:
             runs = markdown.to_runs(block[1], parser, fragment=frag)
             (section if section is not None else nodes).append(
@@ -181,6 +187,19 @@ def kommentar_artifact(path):
     if None in guidance:          # document-level external links (Step 2)
         art["guidance"] = guidance[None]
     return art
+
+
+def _lista_node(block, parser, **parse_kw):
+    """A ``("lista", ordered, items)`` block -> the `lista`/`punkt` node pair the
+    page renderer already draws for statute lists. An ordered list numbers its
+    items from 1, which is what the renderer hangs in the item gutter; a bullet
+    list carries no ordinal."""
+    _, ordered, items = block
+    return {"type": "lista", "id": None, "ordered": ordered,
+            "children": [{"type": "punkt", "id": None,
+                          **({"ordinal": str(n)} if ordered else {}),
+                          "text": markdown.to_runs(item, parser, **parse_kw)}
+                         for n, item in enumerate(items, 1)]}
 
 
 def _id_recital_anchors(structure):
@@ -222,9 +241,13 @@ def begrepp_artifact(path):
     title = meta["title"]
     parser = _parser("begrepp")
     nodes = []
-    for block in markdown.blocks(body):
+    for block in markdown.blocks(body, title):
         if block[0] == "rubrik":
             nodes.append({"type": "rubrik", "level": block[1], "text": [block[2]]})
+        elif block[0] == "lista":
+            nodes.append(_lista_node(block, parser, context={}))
+        elif block[0] == "avskiljare":
+            nodes.append({"type": "avskiljare"})
         else:
             nodes.append({"type": "stycke",
                           "text": markdown.to_runs(block[1], parser, context={})})

@@ -19,10 +19,9 @@ shows up in its margin, a concept's page shows everything that references it.
 
 import re
 
-from .lagrum import Ref, interleave
-from .markdown import begrepp_uri  # one shared begrepp_uri (PRD §3.5)
+from .lagrum import Ref
+from .markdown import begrepp_uri, citation_runs  # shared with markdown.py
 
-RE_WIKILINK = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 # an inline link, either form: `[[wikilink]]`/`[[wikilink|label]]` (concept) or
 # single-bracket `[url label]` (external). One regex so they are consumed in a
 # single left-to-right pass (a `[url]` inside `[[ ]]` can't be mismatched).
@@ -98,12 +97,7 @@ def to_runs(text, refparser=None, **parse_kw):
     (e.g. `fragment=` or `context=`) is forwarded to the citation parser to set
     the base law for relative references."""
     plain, links = _wikilinks(text)
-    refs = list(links)
-    if refparser is not None:
-        for r in refparser.parse_text(plain, **parse_kw):
-            if not any(w.start < r.end and r.start < w.end for w in links):
-                refs.append(r)
-    return interleave(plain, refs)
+    return citation_runs(plain, links, refparser, parse_kw)
 
 
 def blocks(wikitext):

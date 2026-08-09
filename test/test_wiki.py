@@ -140,6 +140,57 @@ def test_blocks_split_headings_and_paragraphs():
     assert markdown.blocks("\\# punkt") == [("stycke", "# punkt")]
 
 
+def test_blocks_reads_lists_as_lists():
+    # the hand-rolled scanner this replaced kept the markers in the prose, so a
+    # list printed as "* Fritt utnyttjande … * Begränsat utnyttjande …"
+    assert markdown.blocks(
+        "Tre typer:\n\n* Fritt utnyttjande\n* Begränsat utnyttjande\n") == [
+        ("stycke", "Tre typer:"),
+        ("lista", False, ["Fritt utnyttjande", "Begränsat utnyttjande"])]
+    assert markdown.blocks("1. Det ska röra sig om en handling\n2. Den ska förvaras") == [
+        ("lista", True, ["Det ska röra sig om en handling", "Den ska förvaras"])]
+    # a link inside an item stays raw markdown for to_runs to resolve
+    assert markdown.blocks("* se [tvångslicens](begrepp:tvångslicens)") == [
+        ("lista", False, ["se [tvångslicens](begrepp:tvångslicens)"])]
+
+
+def test_blocks_names_the_file_for_markdown_it_cannot_model():
+    with pytest.raises(ValueError, match="concept/X: block markdown 'blockquote_open'"):
+        markdown.blocks("> citat", "concept/X")
+    with pytest.raises(ValueError, match="block markdown 'fence'"):
+        markdown.blocks("```\nkod\n```", "concept/X")
+
+
+def test_blocks_drops_html_comments_and_the_prose_they_retire():
+    # 1982:80's shape: the authors commented out a passage the 2009 wording of
+    # 5 § had outlived. The parser handles no HTML, so the marker and the
+    # retired text were both rendered as commentary prose on the LAS page.
+    body = ("Ett anställningsförhållande kan upphöra genom uppsägning.\n"
+            "\n"
+            "<!-- lagstiftningen för 5 § har uppdaterats sedan 2009 när detta "
+            "skrevs så vi tar bort denna text tills vidare\n"
+            "\n"
+            "Tidsbegränsad anställning får ingås i följande fyra fall.\n"
+            "\n"
+            "En som är anställd som vikarie blir efter två år fast anställd. -->\n"
+            "\n"
+            "## 1 §\n"
+            "\n"
+            "För arbetstagare i allmän tjänst gäller även LOA.")
+    assert markdown.blocks(body) == [
+        ("stycke", "Ett anställningsförhållande kan upphöra genom uppsägning."),
+        ("rubrik", 2, "1 §"),
+        ("stycke", "För arbetstagare i allmän tjänst gäller även LOA.")]
+
+
+def test_blocks_ends_a_comment_at_the_first_close_despite_a_bare_dash_pair():
+    # 1942:740 writes "-- " inside its comment, which is not a legal comment
+    # body in XML but is what the file contains; the first `-->` still ends it.
+    assert markdown.blocks(
+        "<!-- detta framgår inte av JK-beslutet -- behöver målnummer -->\n"
+        "\nKvar.") == [("stycke", "Kvar.")]
+
+
 def test_heading_fragment():
     assert wiki.heading_fragment("21 kap 1 §") == "K21P1"
     assert wiki.heading_fragment("1 kap. 1 c §") == "K1P1c"
@@ -347,13 +398,13 @@ def test_conversion_is_lossless(tmp_path):
     # the migration's safety property in miniature (the full corpus check is
     # tools/wiki_artifact_diff.py): wikitext -> markdown -> artifact equals the
     # old wikitext -> artifact, modulo the adjudicated normalisations (_norm).
-    # Exercises templates, plain/labelled wikilinks, a citation, a leading-#
-    # list line, a category and a byline.
+    # Exercises templates, plain/labelled wikilinks, a citation, a category and
+    # a byline. A list line is *not* part of the equality any more -- see
+    # test_a_wikitext_list_line_is_a_list_now.
     wt = ("{{mall}} En [[rättskraft]] och [[res judicata|res jud.]]. "
           "Se 2 kap 2 § tryckfrihetsförordningen och NJA 1990 s. 510. "
           "Jfr [http://www.avtalslagen2020.se/ Avtalslagen 2020] och "
           "[http://sv.wikipedia.org/wiki/Spice_(drog) Spice].\n\n"
-          "# Numrerad punkt med [[sekretess]]\n\n"
           "[[Kategori:Processrätt]]\n''Huvudförfattare: Foo Bar''")
     old = diff.old_begrepp("Begreppet", wt)
     meta, body = conv.convert_page("Begreppet", wt)
@@ -361,9 +412,25 @@ def test_conversion_is_lossless(tmp_path):
     p.write_text(conv.render_file(meta, body))
     new = wiki.begrepp_artifact(str(p))
     assert diff._norm(old) == diff._norm(new)
-    # the leading-# list line survived as prose (not swallowed as a heading)
-    assert any(r == "# Numrerad punkt med " for b in new["body"]
-               for r in b["text"] if isinstance(r, str))
+
+
+def test_a_wikitext_list_line_is_a_list_now(tmp_path):
+    # This one place the markdown pipeline deliberately no longer reproduces the
+    # wikitext artifact. The old parser kept a MediaWiki list line as prose with
+    # its marker still in the text ("# Numrerad punkt med sekretess"), which is
+    # what printed run-on lists with literal asterisks on the commentary pages.
+    # The list is now a list; its links still resolve.
+    wt = "# Numrerad punkt med [[sekretess]]\n\n[[Kategori:Processrätt]]"
+    meta, body = conv.convert_page("Begreppet", wt)
+    p = tmp_path / "p.md"
+    p.write_text(conv.render_file(meta, body))
+    [lista] = [b for b in wiki.begrepp_artifact(str(p))["body"]
+               if b["type"] == "lista"]
+    assert lista["ordered"] is True
+    [punkt] = lista["children"]
+    assert punkt["type"] == "punkt" and punkt["ordinal"] == "1"
+    assert punkt["text"][0] == "Numrerad punkt med "
+    assert punkt["text"][1]["uri"] == "https://lagen.nu/begrepp/Sekretess"
 
 
 def test_eurlex_guidance_renders_in_document_rail(tmp_path):

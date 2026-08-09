@@ -3,10 +3,12 @@ pages are now stored as (replacing the MediaWiki dump; see
 ``tools/mediawiki_to_markdown.py``) into the same inline-run shape every other
 source uses.
 
-This is the markdown counterpart of :mod:`accommodanda.lib.wikitext`: it yields
-the *identical* outputs (``frontmatter`` / ``blocks`` / ``to_runs`` /
-``begrepp_uri``) so ``wiki/parse.py`` can switch sources without changing the
-artifact it produces. The value-add still links three ways, now in markdown:
+This is the markdown counterpart of :mod:`accommodanda.lib.wikitext`: it offers
+the same entry points (``frontmatter`` / ``blocks`` / ``to_runs`` /
+``begrepp_uri``) over the same node shapes. The outputs are no longer identical
+block for block -- markdown ``blocks`` reads a list as a ``lista`` node where
+wikitext still reads the same line as a ``stycke`` -- so ``wiki/parse.py``
+handles both. The value-add still links three ways, now in markdown:
 
   * ``[label](begrepp:Concept)``           -> a ``begrepp/<Concept>`` link;
   * natural-language law/case citations in the prose ("2 kap 2 §
@@ -19,14 +21,33 @@ Frontmatter (``categories`` / ``author`` / ``annotates`` / ``aliases`` /
 wikitext, this keeps only prose + links + headings + the frontmatter metadata --
 no formatting -- because that is all the pipeline downstream consumes.
 
-The parser is deliberately hand-rolled (no markdown dependency, mirroring
-wikitext.py): legal prose is plain paragraphs + ATX headings + a strict link
-grammar, so a full CommonMark engine would only add ambiguity and a dependency.
+Block structure comes from markdown-it (``_MD`` below), the same engine the
+editorial pages read. The inline layer stays hand-rolled: a run is prose, a
+link, or a citation the lagrum engine found, and that grammar is narrower than
+CommonMark's inline set on purpose.
 """
 
 import re
 
+from markdown_it import MarkdownIt
+
 from .lagrum import CELEX_BASE, Ref, interleave
+
+# CommonMark, `html: False` so a literal `<b>` stays text. The legal-prose
+# pages used to have a line scanner of their own, which is how they came to
+# print list markers and HTML comments as prose. The editorial pages
+# (``site/parse.py``) build the same engine but `.enable("table")`, because
+# their model has a table node and this one does not. With tables off,
+# markdown-it emits no table token at all, so a pipe table here reads as one
+# run-on paragraph with its pipes showing -- the walk below never sees it and
+# cannot reject it. No commentary page has one; the two that do (`site/om/api`,
+# `site/om/mcp`) are read by the editorial engine.
+_MD = MarkdownIt("commonmark", {"html": False})
+# tokens the block walk consumes through its own indices, or that carry no block
+# of their own; anything else reaching the walk is markdown this contract does
+# not model, and says so rather than dropping the prose
+_PASSTHROUGH = frozenset({"inline", "heading_close", "paragraph_close",
+                          "list_item_open", "list_item_close"})
 
 BEGREPP = "https://lagen.nu/begrepp/"
 
@@ -35,8 +56,29 @@ BEGREPP = "https://lagen.nu/begrepp/"
 # than being swallowed into the label.
 RE_MDLINK = re.compile(r"\[([^][]+)\]\(([^)]+)\)")
 RE_HEADING = re.compile(r"^(#+)\s+(.*?)\s*#*\s*$")
+# An HTML comment, which is how the authors park prose they have taken out of
+# service ("lagstiftningen för 5 § har uppdaterats sedan 2009 när detta skrevs
+# så vi tar bort denna text tills vidare", 1982:80). Non-greedy, and matched
+# over the whole body rather than line by line: the comments run across
+# paragraphs, and one of them (1942:740) contains a bare `--`, so the first
+# `-->` is the only reliable end.
+RE_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # a recognised external link target -- everything else in (...) is left literal
 RE_URL = re.compile(r"^(?:https?:)?//", re.IGNORECASE)
+
+
+def strip_comments(text):
+    """`text` with its HTML comments and everything they enclose removed.
+
+    Both markdown parsers in the codebase need this and neither gets it for
+    free, so the rule lives here once -- the same reason `target_uri` does. The
+    legal-prose parser below handles no HTML at all; the editorial parser
+    (``site/parse.py``) runs markdown-it with ``html: False``, which is not
+    "drop the HTML" but "treat it as text", so a comment reaches the page as
+    `&lt;!-- …` there too. That is how a note the authors wrote to each other in
+    2009, and the superseded passage under it, came to be printed as commentary
+    on LAS, rättegångsbalken and avtalslagen."""
+    return RE_HTML_COMMENT.sub("", text)
 
 
 def begrepp_uri(name):
@@ -170,35 +212,78 @@ def frontmatter(text, path=None):
 # blocks + inline runs
 # --------------------------------------------------------------------------
 
-def blocks(body):
+def _text(content):
+    """An inline token's raw markdown, one line: soft-wrapped lines joined with a
+    single space, as wikitext.blocks did.
+
+    `\\#` is resolved to the literal `#` it escapes -- the only backslash escape
+    the corpus uses, left by the converter on any paragraph that began with a
+    hash. The rest are left as written, because the raw text goes on to the link
+    grammar in `to_runs` and unescaping a `\\[` there would mint a link the
+    author escaped precisely to avoid."""
+    return " ".join(line.strip().replace("\\#", "#")
+                    for line in content.split("\n") if line.strip())
+
+
+def blocks(body, where=None):
     """markdown body -> a flat list of *raw* blocks (link-parsing is left to the
     caller, which sets the citation context):
         ("rubrik", level, heading_text)
         ("stycke", raw_paragraph_text)
-    Paragraphs are blank-line separated; their lines are joined with a single
-    space (mirroring wikitext.blocks)."""
-    out, para = [], []
+        ("lista", ordered, [raw_item_text, …])
+        ("avskiljare",)
 
-    def flush():
-        if para:
-            out.append(("stycke", " ".join(para)))
-            para.clear()
+    The inline text is the *source* markdown, not rendered HTML, so the link
+    grammar in :func:`to_runs` still owns what a link means.
 
-    for raw in body.splitlines():
-        line = raw.strip()
-        if not line:
-            flush()
+    This used to be a line scanner, which is why the commentary pages printed
+    their list markers as prose (`* Fritt utnyttjande … * Begränsat …`) and their
+    HTML comments as body text. It now runs the same markdown-it configuration
+    the editorial pages do, so a construct means one thing across the content
+    repo. A block markdown has but this contract does not -- a fenced code
+    block, a blockquote -- is a `ValueError` naming `where`, never silently
+    dropped prose (rule:errors-drive-retry-use-raise), the same bargain
+    `site.parse.blocks` strikes. A table is the exception, because the engine
+    is built without the table rule: it never becomes a token, so it arrives
+    here as one paragraph of pipes. See the `_MD` comment.
+
+    A list nested inside a list item is flattened into the enclosing list: the
+    corpus has none, and one flat level is all the reader-facing model carries.
+    HTML comments are dropped, content and all (:func:`strip_comments`);
+    `iter_headings` deliberately does not, because the inline editor addresses
+    regions by heading index into the unmodified file."""
+    out, lists = [], []
+    tokens = _MD.parse(strip_comments(body))
+    i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t.type == "heading_open":
+            out.append(("rubrik", int(t.tag[1:]), _text(tokens[i + 1].content)))
+            i += 3
             continue
-        h = RE_HEADING.match(line)
-        if h:
-            flush()
-            out.append(("rubrik", len(h.group(1)), h.group(2).strip()))
-        else:
-            # an escaped leading `\#` is a literal hash (a list item / prose line
-            # that begins with `#`), not an ATX heading
-            para.append(line[1:] if line.startswith("\\#") else line)
-    flush()
-    return out
+        if t.type == "paragraph_open":
+            text = _text(tokens[i + 1].content)
+            if lists:
+                lists[-1][2].append(text)
+            else:
+                out.append(("stycke", text))
+            i += 3
+            continue
+        if t.type == "hr":
+            out.append(("avskiljare",))
+        elif t.type in ("bullet_list_open", "ordered_list_open"):
+            if lists:                       # nested: keep filling the outer list
+                lists.append(lists[-1])
+            else:
+                lists.append(["lista", t.type == "ordered_list_open", []])
+                out.append(lists[-1])
+        elif t.type in ("bullet_list_close", "ordered_list_close"):
+            lists.pop()
+        elif t.type not in _PASSTHROUGH:
+            raise ValueError("%s: block markdown %r has no block form"
+                             % (where or "<markdown>", t.type))
+        i += 1
+    return [tuple(b) if isinstance(b, list) else b for b in out]
 
 
 def split_frontmatter(text, path=None):
@@ -330,6 +415,21 @@ def guidance_sections(body):
     return (sections, "\n".join(kept)) if sections else ([], body)
 
 
+def citation_runs(plain, links, refparser, parse_kw):
+    """`plain` text plus its already-found markup `links` (`[Ref]`) -> the final
+    interleaved inline runs, adding whatever the citation engine (`refparser`,
+    when given) finds in `plain` that does not overlap a markup link. Shared
+    tail of `to_runs` here and in `wikitext.to_runs` -- both build `plain`/
+    `links` their own way (`[label](target)` vs. `[[wikilink]]`/`[url label]`)
+    but merge them with the citation engine identically."""
+    refs = list(links)
+    if refparser is not None:
+        for r in refparser.parse_text(plain, **parse_kw):
+            if not any(w.start < r.end and r.start < w.end for w in links):
+                refs.append(r)
+    return interleave(plain, refs)
+
+
 def to_runs(text, refparser=None, **parse_kw):
     """One paragraph of markdown -> inline runs: concept/external links from
     `[label](target)` plus law/case links from the citation engine,
@@ -353,9 +453,4 @@ def to_runs(text, refparser=None, **parse_kw):
         length += len(label)
     parts.append(text[last:])
     plain = "".join(parts)
-    refs = list(links)
-    if refparser is not None:
-        for r in refparser.parse_text(plain, **parse_kw):
-            if not any(w.start < r.end and r.start < w.end for w in links):
-                refs.append(r)
-    return interleave(plain, refs)
+    return citation_runs(plain, links, refparser, parse_kw)

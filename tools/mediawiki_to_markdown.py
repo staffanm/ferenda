@@ -90,9 +90,33 @@ def _stycke_to_md(raw):
             label = wikitext._strip_inline((m.group("el") or url).strip())
             parts.append("[%s](%s)" % (label, _link_target(url)))
     parts.append(wikitext._strip_inline(raw[last:]))
-    # a paragraph that begins with `#` is a wikitext list item / literal hash, not
-    # an ATX heading -- escape it so the markdown parser keeps it as prose
-    return re.sub(r"^(\s*)#", r"\1\\#", "".join(parts))
+    return _md_list("".join(parts))
+
+
+# a wikitext ordered-list line: `# item`, `## nested item`
+RE_WT_ORDERED = re.compile(r"^(#+)\s*(?=\S)")
+
+
+def _md_list(text):
+    """A wikitext list paragraph rendered as a markdown list.
+
+    `#` is MediaWiki's *ordered* list marker, and this used to escape it to
+    `\\#` "so the markdown parser keeps it as prose" -- which is exactly how the
+    commentary pages came to print numbered lists as run-on sentences with their
+    markers showing. `*` is already the markdown bullet marker and passes
+    through. A paragraph whose first line carries no marker is returned
+    unchanged."""
+    lines = text.split("\n")
+    if not RE_WT_ORDERED.match(lines[0]):
+        return text
+    out, n = [], 0
+    for line in lines:
+        if RE_WT_ORDERED.match(line):
+            n += 1
+            out.append("%d. %s" % (n, RE_WT_ORDERED.sub("", line)))
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def _link_target(target):

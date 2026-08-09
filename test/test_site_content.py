@@ -123,6 +123,15 @@ def test_a_heading_keeps_its_code_span():
         b["text"] for b in art["blocks"] if b["type"] == "rubrik"]
 
 
+def test_an_html_comment_is_dropped_with_everything_it_encloses():
+    # markdown-it runs with html:False, which renders a comment as the *text*
+    # `<!-- …` rather than dropping it -- the same leak the commentary pages had
+    # (U1). Both parsers now strip comments through lib.markdown.strip_comments.
+    assert [b.runs for b in parse.blocks(
+        "Synlig text.\n\n<!-- en notis\n\nsom sträcker sig över stycken -->\n\nOckså synlig.",
+        "om/x")] == [["Synlig text."], ["Också synlig."]]
+
+
 def test_unmappable_markdown_names_the_basefile():
     # a construct with no block form must say so rather than drop the prose
     with pytest.raises(ValueError, match="om/x: block markdown 'blockquote'"):
@@ -178,6 +187,7 @@ def test_atom_is_wellformed_and_newest_first():
 
 def test_frontpage_render_links_and_masthead():
     html = render.render_frontpage(parse.artifact("frontpage", FIX))
+    assert "<h1>lagen<em>.nu</em></h1>" in html
     assert 'href="/1949:381"' in html                    # sfs uri -> bare /id
     assert "<strong>" in html
     assert ">Om</a>" in html and ">Nyheter</a>" in html   # new masthead entries

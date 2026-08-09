@@ -4,7 +4,12 @@
 {% extends "page.html" %}
 {% block body %}
 {%- if not has_description -%}
-<p class="stub-note">Det här begreppet har ännu ingen beskrivning. Nedan visas var det definieras och används.</p>
+{#- "Nedan" was a promise the page did not keep: what defines and uses the
+    concept is in the context rail beside the text, and on a phone behind the
+    Kontext button -- so a reader who looked below found the page had ended.
+    The affordance is named instead of a direction, because it is called the
+    same thing in both layouts. -#}
+<p class="stub-note">Det här begreppet har ännu ingen beskrivning. Under Kontext visas var i rättskällorna det definieras och används.</p>
 {%- endif -%}
 {{ structure }}
 {% endblock %}

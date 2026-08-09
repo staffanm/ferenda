@@ -183,8 +183,13 @@ def _text(node):
 
 def blocks(body, where):
     """A markdown body -> a list of block dataclasses. `where` names the source
-    (a basefile) so a construct with no block form points at the file to fix."""
-    return _blocks(SyntaxTreeNode(_MD.parse(body)).children, where)
+    (a basefile) so a construct with no block form points at the file to fix.
+
+    Comments go first: `html: False` makes markdown-it render a comment as the
+    text `&lt;!-- …` rather than drop it, so the editorial pages would print
+    them just as the commentary pages did (`lib.markdown.strip_comments`)."""
+    return _blocks(SyntaxTreeNode(_MD.parse(markdown.strip_comments(body))).children,
+                   where)
 
 
 def _blocks(nodes, where):
