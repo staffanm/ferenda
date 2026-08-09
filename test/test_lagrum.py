@@ -583,6 +583,80 @@ def test_named_law_with_pinpoint_is_one_link_over_the_whole_phrase():
     assert text[refs[0].start:refs[0].end] == "35 § i förordningen (2014:1101)"
 
 
+def _abbrev_parser():
+    return LagrumParser(NAMEDLAWS, basefile="9999:999",
+                        abbreviations=ABBREVIATIONS)
+
+
+def test_local_abbreviation_definition_shadows_the_global_table():
+    # Prop. 2021/22:61 writes "lagen (1994:1564) om alkoholskatt, förkortad
+    # LAS" and then cites "8 a § LAS" 300+ times; the global table says LAS =
+    # anställningsskyddslagen (1982:80), which put punktskatteförarbeten in
+    # the employment law's context rail. The document's own definition wins
+    # for the rest of that document.
+    parser = _abbrev_parser()
+    refs = parser.parse_text(
+        "bestämmelserna är genomförda genom lagen (1994:1564) om "
+        "alkoholskatt, förkortad LAS, och av 8 a § LAS framgår vidare",
+        context={})
+    assert [r.uri for r in refs] == [
+        "https://lagen.nu/1994:1564",
+        "https://lagen.nu/1994:1564#P8a"]
+    assert parser.local_abbreviations() == {
+        "LAS": {"sfs": "1994:1564", "uses": 1, "shadows": "1982:80"}}
+
+
+def test_local_abbreviation_nedan_form():
+    # Fi2021/00144 declares the same binding as ", nedan LAS"
+    parser = _abbrev_parser()
+    refs = parser.parse_text(
+        "genom lagen (1994:1564) om alkoholskatt, nedan LAS. "
+        "I 19 § LAS anges vidare", context={})
+    assert refs[-1].uri == "https://lagen.nu/1994:1564#P19"
+
+
+def test_local_abbreviation_agreeing_definition_is_not_a_shadow():
+    # "lagen (1982:80) om anställningsskydd (LAS)" binds LAS to what the
+    # table already says: links unchanged, and the report carries no
+    # "shadows" key -- an artifact scan must be able to tell the cases apart
+    parser = _abbrev_parser()
+    refs = parser.parse_text(
+        "Enligt lagen (1982:80) om anställningsskydd (LAS) gäller 7 § LAS.",
+        context={})
+    assert refs[-1].uri == "https://lagen.nu/1982:80#P7"
+    assert parser.local_abbreviations() == {
+        "LAS": {"sfs": "1982:80", "uses": 1}}
+
+
+def test_abbreviation_without_local_definition_keeps_the_global_binding():
+    parser = _abbrev_parser()
+    assert [r.uri for r in parser.parse_text(
+        "Av 8 a § LAS framgår att", context={})] == [
+        "https://lagen.nu/1982:80#P8a"]
+    assert parser.local_abbreviations() == {}
+
+
+def test_unknown_abbreviation_definition_is_not_learned():
+    # LSE is not in the abbreviation table, so the grammar can never resolve
+    # it -- nothing to shadow, nothing to report
+    parser = _abbrev_parser()
+    parser.parse_text(
+        "genom lagen (1994:1776) om skatt på energi, förkortad LSE, gäller",
+        context={})
+    assert parser.local_abbreviations() == {}
+
+
+def test_reset_discards_local_abbreviations():
+    parser = _abbrev_parser()
+    parser.parse_text(
+        "lagen (1994:1564) om alkoholskatt, förkortad LAS,", context={})
+    assert parser.local_abbreviations()
+    parser.reset()
+    assert parser.local_abbreviations() == {}
+    assert [r.uri for r in parser.parse_text("19 § LAS", context={})] == [
+        "https://lagen.nu/1982:80#P19"]
+
+
 @pytest.mark.parametrize("text,want", EU_LETTERED_POINTS)
 def test_eu_lettered_point_pinpoints(text, want):
     assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want

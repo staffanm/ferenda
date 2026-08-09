@@ -44,6 +44,7 @@ from lark.exceptions import UnexpectedInput
 
 from . import datasets
 from .coe_ids import article_fragment as coe_article_fragment
+from .util import fold_swedish
 
 # --- parse-type configuration ---------------------------------------
 #
@@ -702,8 +703,6 @@ ORDINALS = {'första': '1', 'andra': '2', 'tredje': '3', 'fjärde': '4',
             'femte': '5', 'sjätte': '6', 'sjunde': '7', 'åttonde': '8',
             'nionde': '9'}
 
-# court code -> URI slug (lowercased, å/ä/ö folded): RÅ->ra, MÖD->mod
-SLUG_TRANS = str.maketrans('åäö', 'aao')
 
 # Trigger patterns propose candidate start positions for the parser
 # (mirroring what the old char-by-char PEG root could match), one source
@@ -974,6 +973,15 @@ class _DocState:
     lastlaw: str | None = None
     # law names learned in-document: normalized lawname -> SFS id
     namedlaws: dict[str, str] = field(default_factory=dict)
+    # abbreviations the document defined for itself ("lagen (1994:1564) om
+    # alkoholskatt, förkortad LAS"): abbrev -> SFS id, shadowing the global
+    # table for the rest of the document (see _learn_abbrev). `abbrev_shadows`
+    # keeps what the table would have said, but only where they disagree --
+    # the entries whose links an unshadowed parse would have minted wrong;
+    # `abbrev_uses` counts resolutions through each local binding.
+    abbrevs: dict[str, str] = field(default_factory=dict)
+    abbrev_shadows: dict[str, str | None] = field(default_factory=dict)
+    abbrev_uses: dict[str, int] = field(default_factory=dict)
     last_forarbete: str | None = None  # base URI of last prop ("a. prop.")
     last_eu_act: str | None = None     # CELEX of the last named EU act (anaphora)
     # CELEX of the document being parsed, when it is itself an EU act. Set so a
@@ -986,6 +994,22 @@ class _DocState:
 class NoLink(Exception):
     """The match is consumed but yields no links (unknown named law,
     or an EU reference too incomplete for a celex number)."""
+
+
+# The formula a document uses to declare its own abbreviation for an act it
+# just named: "lagen (1994:1564) om alkoholskatt, förkortad LAS" (prop.
+# 2021/22:61), ", nedan LAS" (Fi2021/00144), "(LAS)" right after the name.
+# Matched with .match(text, ref_end) anchored at the end of a resolved law
+# reference -- the link span stops at the SFS number, so the pattern first
+# crosses the closing paren and the unconsumed name tail ("om alkoholskatt").
+# A parenthesis or sentence boundary in the tail aborts the match: a formula
+# past those belongs to some other construction, not to this law.
+RE_ABBREV_DEF = re.compile(
+    r'\)?(?:\s+om\s+[^,.;:()§]{0,60}?)?'
+    r'(?:,\s*(?:förkorta[dst]|nedan(?:\s+kallad)?'
+    r'|i\s+det\s+följande(?:\s+(?:benämnd|kallad))?|benämnd|kallad)'
+    r'\s+(?P<kw>[A-ZÅÄÖ][A-Za-zÅÄÖåäö]{1,9})\b'
+    r'|\s*\((?:förkorta[dst]\s+)?(?P<paren>[A-ZÅÄÖ][A-Za-zÅÄÖåäö]{1,9})\))')
 
 
 RE_BASEFILE_LAW = re.compile(r'\d+:(?:bih\.[_ ]?|N)?\d+(?:[_ ]s\.\d+|[_ ]\d+)?')
@@ -1640,6 +1664,8 @@ class LagrumParser:
                             raise NoLink()      # a draft's "(2018:000)" (L1)
                         else:
                             uri = lagrum_uri(attrs, self.base)
+                            if 'law' in attrs:
+                                self._learn_abbrev(text, base + e, attrs)
                         refs.append(Ref(base + s, base + e,
                                         text[base + s:base + e], predicate, uri))
                 except NoLink:
@@ -1981,14 +2007,56 @@ class LagrumParser:
         self.emit(attrs, match, out, context, span=_node_span(node))
 
     def abbrev_to_sfsid(self, node):
-        """Resolve the LAW_ABBREV token of a kortlagrum match, or raise
-        NoLink for an unknown abbreviation (consumes the span, no link)."""
+        """Resolve the LAW_ABBREV token of a kortlagrum match -- the
+        document's own definition first (see _learn_abbrev), then the global
+        table -- or raise NoLink for an unknown abbreviation (consumes the
+        span, no link)."""
         abbrev = next(t.value for t in _tree_tokens(node)
                       if t.type == 'LAW_ABBREV')
+        state = self.state
+        if (local := state.abbrevs.get(abbrev)) is not None:
+            state.abbrev_uses[abbrev] = state.abbrev_uses.get(abbrev, 0) + 1
+            return local
         law = _named_at(self.abbreviations, abbrev, self.written)
         if law is None:
             raise NoLink()
         return _normalize_sfsid(law)
+
+    def _learn_abbrev(self, text, end, attrs):
+        """Register a document-local abbreviation declared right after the
+        law reference just emitted at text[..end]: "lagen (1994:1564) om
+        alkoholskatt, förkortad LAS" binds LAS to 1994:1564 for the rest of
+        this document, shadowing the global table (where LAS is
+        anställningsskyddslagen -- prop. 2021/22:61 misbound 324 links that
+        way). The evidence rule is namedlaw_to_sfsid's: the document saying
+        which act it means beats any table. Only abbreviations the grammar
+        already knows are learned -- an unknown one can never resolve, so
+        there is nothing to shadow -- and the first definition wins, matching
+        the define-at-first-use drafting convention."""
+        m = RE_ABBREV_DEF.match(text, end)
+        if m is None:
+            return
+        abbrev = m.group('kw') or m.group('paren')
+        if abbrev not in self.abbreviations or abbrev in self.state.abbrevs:
+            return
+        law = _normalize_sfsid(str(attrs['law']))
+        self.state.abbrevs[abbrev] = law
+        glob = _named_at(self.abbreviations, abbrev, self.written)
+        glob = _normalize_sfsid(glob) if glob else None
+        if glob != law:
+            self.state.abbrev_shadows[abbrev] = glob
+
+    def local_abbreviations(self):
+        """The abbreviations this document defined for itself, for artifact
+        stamping: {abbrev: {"sfs": bound id, "uses": n resolutions through
+        the binding[, "shadows": what the global table says instead]}}.
+        A "shadows" key means an unshadowed parse would have linked those
+        uses to a different law."""
+        state = self.state
+        return {abbrev: ({"sfs": law, "uses": state.abbrev_uses.get(abbrev, 0)}
+                         | ({"shadows": state.abbrev_shadows[abbrev]}
+                            if abbrev in state.abbrev_shadows else {}))
+                for abbrev, law in state.abbrevs.items()}
 
     def resolve_law(self, law_node, match):
         """Set match.currentlaw from an external_law subtree. Raises
@@ -2288,7 +2356,8 @@ class LagrumParser:
                                                '/not/' + a['notnr'])})
 
     def rattsfall_uri(self, court, year, tail):
-        slug = court.lower().translate(SLUG_TRANS)
+        # court code -> URI slug (lowercased, å/ä/ö folded): RÅ->ra, MÖD->mod
+        slug = fold_swedish(court.lower())
         return '%sdom/%s/%s%s' % (self.base, slug, year, tail)
 
     # --- FORARBETEN (preparatory works) ---
