@@ -28,12 +28,32 @@ page list the regulations issued under it.
 
 from dataclasses import dataclass, field
 
+from .agencies import REGISTRY
+
 BASE = "https://lagen.nu"
 
 
 def regulation_uri(fs, arsutgava, lopnummer):
     """The citation-target URI for a regulation, language-neutral and stable."""
     return "%s/%s/%s:%s" % (BASE, fs, arsutgava, lopnummer)
+
+
+def printed_designation(uri):
+    """The designation a regulation is cited by ("RPSFS 2011:16"), read back out
+    of its URI -- `regulation_uri`'s inverse, spelled the same way the harvest
+    spells an identifier (`agency.designation or fs.upper()`).
+
+    For the regulations a page references but the corpus does not hold: a
+    repealed predecessor series nobody harvests still has to be *named* in the
+    Upphäver row, and naming it "rpsfs/2011:16" tells the reader the slug rather
+    than the citation. `None` for a URI that is not a regulation's."""
+    rest = uri.removeprefix(BASE + "/")
+    fs, _, number = rest.partition("/")
+    if not number or "/" in number:
+        return None
+    agency = REGISTRY.get(fs)
+    return "%s %s" % ((agency.designation if agency and agency.designation
+                       else fs.upper()), number)
 
 
 @dataclass

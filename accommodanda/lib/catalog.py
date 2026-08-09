@@ -1711,6 +1711,23 @@ def upphaver_inbound(con, uri):
         "ORDER BY d.label", (uri,)).fetchall()
 
 
+def andrar_inbound(con, uri):
+    """The regulations whose own text says they amend `uri` -- the inbound side
+    of the rpubl:andrar edge: (from_uri, label, title), one per amending
+    regulation.
+
+    A base regulation otherwise learns it was amended only from its own
+    harvest record's amendment register, which is whatever the agency chose to
+    list on its landing page. SJÖFS 2005:25 has an empty register while SJÖFS
+    2006:39 says in its own title that it amends it, so the base page said
+    nothing about having been changed at all."""
+    return con.execute(
+        "SELECT DISTINCT l.from_uri, d.label, d.title "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_uri = ? AND l.predicate = 'rpubl:andrar' "
+        "ORDER BY d.label", (uri,)).fetchall()
+
+
 def upphaver_targets(con):
     """Every uri some other document's text repeals or replaces (the target
     side of all rpubl:upphaver edges) -- what the föreskrift browse listing

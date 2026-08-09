@@ -22,6 +22,7 @@ from ..lib.page import (
     render_toc,
 )
 from ..lib.text import presented_consolidation
+from .model import printed_designation
 
 ENV = tpl.environment("accommodanda.foreskrift")
 
@@ -37,6 +38,31 @@ def _upphavd_av(rows):
             layout.page_url(from_uri),
             "%s — %s" % (label, title) if title and title != label else label)
         for from_uri, label, title in rows])
+
+
+def _andrad_genom(art, rows):
+    """Every regulation known to have amended this one, as (uri, label) pairs:
+    the harvest's own amendment register plus the inbound rpubl:andrar edges,
+    which is what catches a base regulation whose agency never listed its
+    amendments (SJÖFS 2005:25 is amended by 2006:39 and said nothing)."""
+    seen, out = set(), []
+    for am in art.get("amendments", []):
+        if am.get("uri") and am["uri"] not in seen:
+            seen.add(am["uri"])
+            out.append((am["uri"], am.get("identifier")
+                        or printed_designation(am["uri"])))
+    for from_uri, label, _title in rows:
+        if from_uri not in seen:
+            seen.add(from_uri)
+            out.append((from_uri, label or printed_designation(from_uri)))
+    return sorted(out, key=lambda p: p[1] or "")
+
+
+def _andrad_links(site, pairs):
+    return Markup(", ").join(
+        (Markup('<a href="%s">%s</a>') % (layout.page_url(uri), label)
+         if site.has(uri) else Markup('<span class="noref">%s</span>') % label)
+        for uri, label in pairs)
 
 
 def _foreskrift_repealed_banner(rows):
@@ -83,9 +109,15 @@ def _konsoliderad_banner(art, site, tom):
     (the grundförfattning + ändringsförfattningar stay the authoritative
     texts), and the way to the as-enacted base text where we parsed it."""
     if tom:
+        # the fallback is reached exactly when the cutoff amendment is missing
+        # from the harvest register, so it must spell the designation the way
+        # the rest of the page does: upcasing the slug writes SJOFS for SJÖFS
         ident = next((a["identifier"] for a in art.get("amendments", [])
                       if a.get("uri") == tom and a.get("identifier")),
-                     catalog.local(tom).replace("/", " ").upper())
+                     printed_designation(tom))
+        # a konsolideradTom is always <samling>/<nummer>, which is exactly what
+        # printed_designation reads; a None here would print as the word "None"
+        assert ident, "no designation for konsolideradTom %r" % tom
         cutoff = {"url": layout.page_url(tom) if site.has(tom) else None,
                   "label": ident}
     else:
@@ -126,23 +158,37 @@ def render(art, site):
     ident = art.get("identifier") or catalog.local(base_uri)
     lb = labels.document_labels("foreskrift", art)
     title = lb.short_title or ident
+    andrad_rows = [] if grund else catalog.andrar_inbound(site.con, base_uri)
+    andrad = _andrad_genom(art, andrad_rows)
     meta = [
         ("Titel", lb.official_title if lb.official_title != title else None),
         ("Utgivare", md.get("publisher")),
         ("Beslutad", md.get("beslutsdatum")),
         ("Ikraftträdande", md.get("ikrafttradandedatum")),
+        # what has changed this regulation, in the header where the SFS pages
+        # put it ("Ändring införd t.o.m. SFS 2022:836") -- a reader cannot tell
+        # whether the text is current without it. The cutoff is only claimed
+        # where a consolidation folds the amendments in; the register below
+        # lists them either way.
+        ("Ändrad t.o.m.", _andrad_links(site, [
+            (cons["konsolideradTom"],
+             next((lbl for u, lbl in andrad if u == cons["konsolideradTom"]),
+                  printed_designation(cons["konsolideradTom"])))])
+         if cons and cons.get("konsolideradTom") else None),
+        ("Ändrad genom", _andrad_links(site, andrad)),
         # the repeal target belongs in the header, not only the refs section:
         # what this regulation replaces is identity-level metadata
         ("Upphäver", Markup(", ").join(
-            ref_link(site, u) for u in md.get("upphaver") or [])),
+            ref_link(site, u, printed_designation)
+            for u in md.get("upphaver") or [])),
     ]
     # outbound typed relations: what this regulation amends and replaces, the
     # empowering statute paragrafer (whose inbound mirror is the SFS paragraf's
     # "Föreskrifter meddelade med stöd av …" margin) and the EU directives it
     # transposes -- plus the inbound mirror of upphäver: who replaced *this*
     upphavd_rows = [] if grund else catalog.upphaver_inbound(site.con, base_uri)
-    refs = (ref_list(site, "Ändrar", md.get("andrar"))
-            + ref_list(site, "Upphäver", md.get("upphaver"))
+    refs = (ref_list(site, "Ändrar", md.get("andrar"), printed_designation)
+            + ref_list(site, "Upphäver", md.get("upphaver"), printed_designation)
             + ref_list(site, "Bemyndigande", md.get("bemyndigande"))
             + ref_list(site, "Genomför EU-direktiv", md.get("genomfor"))
             + _upphavd_av(upphavd_rows))
@@ -163,7 +209,7 @@ def render(art, site):
     rail.add_document(inbound=not grund)
     return ENV.get_template("foreskrift.html").render(page_context(
         title, "Föreskrift", doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc),
+        toc=render_toc(toc, ident),
         eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
         island=rail.island(), body_class=" inaktuell" if grund else "",
         banner=Markup(banner), refs=Markup(refs), structure=body,

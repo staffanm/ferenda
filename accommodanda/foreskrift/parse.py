@@ -33,7 +33,7 @@ from bs4 import BeautifulSoup
 
 from ..lib.lagrum import EULAGSTIFTNING, FORESKRIFT, LAGRUM, interleave, sfs_parser
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
-from ..lib.util import MONTHS, approximate_date
+from ..lib.util import MONTHS, approximate_date, fold_swedish
 from .agencies import AAFS_SERIES, REGISTRY
 from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
@@ -58,6 +58,29 @@ RE_BESLUTAD = re.compile(r"beslutad[e]?\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re
 RE_UTKOM = re.compile(r"Utkom\s+från\s+trycket.*?den\s+(\d{1,2})\s+(\w+)\s+(\d{4})",
                       re.IGNORECASE | re.DOTALL)
 RE_IKRAFT = re.compile(r"träder\s+i\s+kraft\s+den\s+(\d{1,2})\s+(\w+)\s+(\d{4})", re.I)
+# Whose entry into force a "träder i kraft" sentence states, read from the noun
+# immediately before the verb -- the only position the corpus ever puts the
+# subject in (10 830 occurrences, 199 of them with none of these nouns there). A
+# föreskrift quotes dates that are not its own: 99 sentences say "Förordningen
+# träder i kraft …" of an EU regulation named in a "Jfr" footnote, 45 read "…
+# som träder i kraft …" about the act being amended. The determiner is not
+# required, because the noun alone already disambiguates -- except for
+# `ändring`, which admits 4 real provisions ("Ändringarna träder i kraft …",
+# AFS 1993:10) at the price of also admitting a quoted "Ändringsförordningen".
+RE_IKRAFT_SUBJECT = re.compile(
+    r"(?:författ|föreskrift|allmänna\s+råd|kungörelse"
+    r"|arbetsordning|beslut|ändring)\w*\s*$", re.I)
+# What overrides an ändring declaration (RE_ANDRING / RE_AMENDING_FORMULA below):
+# a masthead saying the document is the base regulation *with its amendments
+# folded in*. Such a text names the amendments it incorporates
+# ("Grundförfattningen i dess lydelse med införda ändringar omtryckt CSNFS
+# 2009:3 ändrad CSNFS 2023:8"), so the amendment wording matches although the
+# document is a grundförfattning and dated as one. 48 föreskrifter print such a
+# note; without this veto 11 of them took the date of the newest amendment bound
+# into them -- CSNFS 1998:7, decided in 1998, came into force in 2026.
+RE_KONSOLIDERAD_MASTHEAD = re.compile(
+    r"ändringar\s+införda|grundförfattningen\s+i\s+dess\s+lydelse"
+    r"|i\s+dess\s+lydelse\s+(?:enligt|med)|konsoliderad", re.I)
 # The bemyndigande clause every agency föreskrift must carry -- 18 b §
 # författningssamlingsförordningen (1976:725): "I ingressen till författningen
 # skall uppgift lämnas om det bemyndigande på vilket myndighetens beslutanderätt
@@ -115,6 +138,15 @@ RE_FS_REF = re.compile(r"\b([A-ZÅÄÖ]+-?FS)\s*(\d{4}):(\d+)")   # NFS/TFS … 
 # only right after a "föreskrifter…"/"allmänna råd…" word (an SFS parenthesis
 # like "förordningen (2001:512)" must never mint a föreskrift target).
 RE_ANDRING = re.compile(r"ändring(?:ar)?\s+(?:i|av)\b", re.IGNORECASE)
+# The other way a document declares it amends another: the amending enacting
+# formula, "föreskriver … i fråga om <författning>" against a grundförfattning's
+# "föreskriver följande". It is the only declaration an Omtryck carries whose
+# title restates the base regulation's (SKSFS 2014:3). The span between the two
+# halves has to admit periods -- the bemyndigande sitting in it abbreviates
+# ("med stöd av 2 kap. 1 § förordningen (2010:1879), i fråga om …"), and 269
+# mastheads phrase it that way.
+RE_AMENDING_FORMULA = re.compile(
+    r"föreskriver\b.{0,160}?\bi\s+fråga\s+om\b", re.IGNORECASE | re.DOTALL)
 RE_BARE_OWN_REF = re.compile(
     r"(?:föreskrifter(?:na)?|allmänna\s+råd(?:en)?)[^()]*\((\d{4}):(\d+)\)")
 # the issuing agency, read from the masthead (searched over a whitespace-collapsed
@@ -254,13 +286,57 @@ def extract_publisher(masthead):
     return None
 
 
-def extract_metadata(text, parser):
+def ikrafttradande_date(text, declaration):
+    """The date *this* föreskrift entered into force, chosen among every
+    "träder i kraft den …" the document prints. ``declaration`` is where the
+    document says what it is (see :func:`role_declaration`).
+
+    Three such sentences can appear in one document and only one is the
+    document's own. Sentences about somebody else's regulation are dropped first
+    (:data:`RE_IKRAFT_SUBJECT`). Of what remains, an ändringsförfattning's own
+    provision is the *last* -- the text it reprints from the base regulation
+    comes before its own transitional block -- and a grundförfattning's is the
+    *first*, since a printed grundförfattning carries the transitional blocks of
+    the amendments made to it after its own. Reading the first one always (which
+    this did until 2026-08-08) gave 328 föreskrifter an entry into force before
+    the day they were decided, SJÖFS 2006:39 among them.
+
+    Falls back to the unfiltered sentences when the document phrases its
+    provision with a subject the census did not see (199 of 10 830), so a
+    recognised date is never lost to the filter."""
+    hits = list(RE_IKRAFT.finditer(text))
+    own = [m for m in hits if RE_IKRAFT_SUBJECT.search(text[:m.start()])] or hits
+    if not own:
+        return None
+    amends = ((RE_ANDRING.search(declaration) or RE_AMENDING_FORMULA.search(declaration))
+              and not RE_KONSOLIDERAD_MASTHEAD.search(declaration))
+    return _iso(*(own[-1] if amends else own[0]).groups())
+
+
+def role_declaration(masthead, harvest_title):
+    """Where to look for the document's declaration that it amends another one.
+
+    Its own masthead is the authority, but 259 föreskrifter have next to none:
+    `_body_start` finds its first ``N §`` inside a running head, leaving
+    `masthead` empty or a fragment like "GRUNDLÄGGANDE BESTÄMMELSER" (SJVFS
+    prints one on page 1). For 38 of those the harvest title is the only
+    surviving copy of the "om ändring i …" phrase, so both are searched. The
+    harvest title cannot be trusted *alone* -- it is link chrome often enough
+    that `clean_title` exists to throw it away -- but as a second place to find
+    a declaration the masthead lost, it costs nothing."""
+    return f"{masthead} {harvest_title or ''}"
+
+
+def extract_metadata(text, declaration, parser):
     """Best-effort masthead facts from the regulation's plain text. ``text`` is
-    the whole document (ikraftträdande sits at the end, the rest up front)."""
+    the whole document (ikraftträdande sits at the end, the rest up front);
+    ``declaration`` is what the document says it *is*, per
+    :func:`role_declaration`, which decides which of its ikraftträdande
+    sentences is its own."""
     meta = {
         "beslutsdatum": _first_date(RE_BESLUTAD, text),
         "utkomFranTryck": _first_date(RE_UTKOM, text),
-        "ikrafttradandedatum": _first_date(RE_IKRAFT, text),
+        "ikrafttradandedatum": ikrafttradande_date(text, declaration),
         "bemyndigande": [], "genomfor": [], "upphaver": [], "andrar": [],
     }
     # bemyndigande: the SFS paragrafer named in the "med stöd av …" clause
@@ -442,6 +518,32 @@ def _agency_possessive(before):
     return tokens[start].start()
 
 
+# The shortest repeated head worth believing in: below this, a title that
+# genuinely opens the way it continues ("Föreskrifter om föreskrifter…") would
+# be truncated. Every real case runs to 40+ characters.
+UNDOUBLE_MIN = 20
+
+
+def undouble(title):
+    """A title printed twice, reduced to the copy that is whole.
+
+    Five föreskrifter carry their masthead title twice, for two reasons, and
+    both land here as the same shape: a truncated head glued to the front of the
+    complete title. SJÖFS 2005:25 prints its title once as a page header and
+    again in the ingress, and the scan above runs from the first straight into
+    the second; the RNFS 2013:1 PDF has two text layers, so *every* line of its
+    first page is doubled ("ISSN 1401-7288ISSN 1401-7288").
+
+    The split is found from the longest candidate down, so a title that repeats
+    a short phrase inside itself keeps it -- only a head that begins what
+    follows it is a second printing."""
+    for i in range(len(title) - UNDOUBLE_MIN, UNDOUBLE_MIN - 1, -1):
+        head, rest = title[:i].strip(), title[i:].strip()
+        if len(head) >= UNDOUBLE_MIN and rest.startswith(head):
+            return rest
+    return title
+
+
 def title_from_masthead(blocks, start):
     """The document's own title, read from the printed masthead -- '<Agency>s
     föreskrifter om …' up to the semicolon or the beslutade clause -- or None
@@ -463,27 +565,28 @@ def title_from_masthead(blocks, start):
         # a bare type word with no subject is the samling's own name or a
         # running header, not this document's title
         if stop and len(title) > len(word.group()) + 4:
-            return " ".join(title.split())
+            return undouble(" ".join(title.split()))
     return None
 
 
-def parse_pdf(path, identifier, parser, patch_key=None):
+def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
     """One föreskrift PDF -> (structure tree, its metadata dict). Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
     structure is built from the operative body only, the masthead dropped.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
     blocks = parse_body(pdf_pages(path, patch_key), identifier)
     start = _body_start(blocks)
-    meta = extract_metadata(_full_text(blocks), parser)
+    masthead = _full_text(blocks[:start])
+    meta = extract_metadata(_full_text(blocks),
+                            role_declaration(masthead, harvest_title), parser)
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
-    meta["publisher"] = extract_publisher(_full_text(blocks[:start]) or _full_text(blocks))
+    meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
     # the body's own rubric, for records whose harvest title is link chrome (F7)
     meta["title"] = title_from_masthead(blocks, start)
     return _structure(blocks[start:], parser), meta
 
 
-_FOLD_SWEDISH = str.maketrans("åäö", "aao")
 # printed designation (lowercased, hyphens/spaces dropped, Swedish vowels
 # kept) -> registered samling slug, for series whose slug is not the naive
 # transliteration: 'ÅFS' -> aafs (afs is Arbetsmiljöverkets samling) and its
@@ -501,7 +604,7 @@ def _fs_key(designation):
     override the åäö transliteration ('ÅFS' folds to ``aafs``, never ``afs``;
     'ELSÄK-FS' matches the agency's ``elsakfs`` slug either way)."""
     key = designation.lower().replace("-", "").replace(" ", "")
-    return _DESIGNATION_SLUGS.get(key, key.translate(_FOLD_SWEDISH))
+    return _DESIGNATION_SLUGS.get(key, fold_swedish(key))
 
 
 def masthead_amendments(masthead, fs, base_ars, base_lop):
@@ -648,7 +751,7 @@ def parse_record(record, root):
     if reg_file:
         structure, meta = parse_pdf(
             body_path(root, fs, reg_file), record["identifier"], parser,
-            ("foreskrift", basefile))
+            ("foreskrift", basefile), record.get("title"))
 
     # the PDF masthead is the authoritative issuer; the harvest label (the current
     # custodian agency) is only the fallback when the PDF names none

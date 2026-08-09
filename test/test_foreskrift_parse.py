@@ -17,6 +17,9 @@ from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
                                            andrar_target,
                                            masthead_amendments, parse_record,
                                            clean_title, title_from_masthead)
+from accommodanda.foreskrift.model import printed_designation
+from accommodanda.foreskrift.render import _andrad_genom, _konsoliderad_banner
+from accommodanda.lib.page import Site
 from accommodanda.lib.lagrum import sfs_parser
 
 
@@ -157,13 +160,125 @@ def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
             "förordningen (2013:587) om förvaltare av alternativa investeringsfonder. "
             "Jfr Europaparlamentets och rådets direktiv 2011/61/EU av den 8 juni 2011. "
             "Denna författning träder i kraft den 22 juli 2013.")
-    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["beslutsdatum"] == "2013-06-25"
     assert meta["utkomFranTryck"] == "2013-07-05"
     assert meta["ikrafttradandedatum"] == "2013-07-22"
     assert "https://lagen.nu/2013:587#P4" in meta["bemyndigande"]
     assert "https://lagen.nu/2013:587#P5" in meta["bemyndigande"]
     assert meta["genomfor"] == ["https://lagen.nu/ext/celex/32011L0061"]
+
+
+# --- ikraftträdande: which of the printed dates is the document's own -------
+#
+# Every text below is the real wording of the named föreskrift, cut down to the
+# masthead and the sentences carrying a date. Taking the first date always (the
+# behaviour until 2026-08-08) dated 329 föreskrifter before the day they were
+# decided.
+
+def test_ikraft_date_of_an_amendment_is_its_own_not_the_reprinted_base():
+    # SJÖFS 2006:39, decided 2006-11-22: it reprints SJÖFS 2005:25, whose
+    # provision says 2006-01-01, and states its own last.
+    masthead = ("Sjöfartsverkets författningssamling Föreskrifter och allmänna råd "
+                "om ändring i Sjöfartsverkets föreskrifter och allmänna råd "
+                "(SJÖFS 2005:25) om skyddsanordningar och skyddsåtgärder på fartyg; "
+                "beslutade den 22 november 2006.")
+    text = (masthead + " Ikraftträdande- och övergångsbestämmelser "
+            "1. Denna författning träder i kraft den 1 januari 2006. "
+            "________________ "
+            "Denna författning träder i kraft den 1 januari 2007. "
+            "På Sjöfartsverkets vägnar")
+    assert fp.ikrafttradande_date(text, masthead) == "2007-01-01"
+
+
+def test_ikraft_date_of_a_base_regulation_ignores_appended_amendment_blocks():
+    # AFS 1999:4's shape: the grundförfattning's own provision first, the block
+    # of an amendment printed after it -- the mirror image of the case above,
+    # and why the rule cannot simply be "take the last one".
+    masthead = ("Arbetarskyddsstyrelsens föreskrifter om tryckbärande anordningar; "
+                "beslutade den 17 juni 1999. Arbetarskyddsstyrelsen föreskriver "
+                "följande med stöd av 18 § arbetsmiljöförordningen.")
+    text = (masthead + " Ikraftträdande och övergångsbestämmelser "
+            "Dessa föreskrifter träder i kraft den 29 november 1999. "
+            "__________________ "
+            "Dessa föreskrifter träder i kraft den 1 mars 2001.")
+    assert fp.ikrafttradande_date(text, masthead) == "1999-11-29"
+
+
+def test_ikraft_date_skips_a_date_that_is_not_the_documents_own():
+    # TSFS 2010:12 opens with a footnote about IMO resolutions that "träder i
+    # kraft den 1 juli 2006" -- somebody else's date, four years before this
+    # föreskrift was decided.
+    masthead = ("Transportstyrelsens föreskrifter och allmänna råd om "
+                "navigationssäkerhet och navigationsutrustning; beslutade den "
+                "26 januari 2010. Transportstyrelsen föreskriver följande med "
+                "stöd av 2 kap. 1 § fartygssäkerhetsförordningen (2003:438).")
+    text = (masthead + " Ändringarna antogs av IMO vid MSC:s 77:e session genom "
+            "resolutionerna MSC.142(77) och MSC.170(79) och träder i kraft den "
+            "1 juli 2006. Ikraftträdande- och övergångsbestämmelser "
+            "1. Dessa föreskrifter träder i kraft den 1 april 2010.")
+    assert fp.ikrafttradande_date(text, masthead) == "2010-04-01"
+
+
+def test_ikraft_date_reads_omtryck_and_the_amending_formula_as_an_amendment():
+    # SKSFS 2014:3 declares no "om ändring i" in its title -- it is printed as
+    # an Omtryck of SKSFS 2011:2 and uses the amending enacting formula.
+    masthead = ("Skogsstyrelsens föreskrifter och allmänna råd (SKSFS 2011:2) om "
+                "stöd till vissa åtgärder inom skogsbruket; Omtryck beslutade den "
+                "4 juni 2014. Skogsstyrelsen föreskriver med stöd av 17 § "
+                "förordningen (2010:1879) om stöd till vissa åtgärder inom "
+                "skogsbruket, i fråga om Skogsstyrelsens föreskrifter att ...")
+    text = (masthead + " ------- Denna författning träder i kraft den 1 maj 2011 . "
+            "------- Denna författning träder i kraft den 1 juli 2014 .")
+    assert fp.ikrafttradande_date(text, masthead) == "2014-07-01"
+
+
+def test_ikraft_date_of_a_consolidated_text_is_the_base_regulations_own():
+    # CSNFS 1998:7, decided 1998: the base regulation printed with every later
+    # amendment folded in. Its masthead names those amendments, so it reads as
+    # an ändringsförfattning -- and taking the last date made a 1998 föreskrift
+    # come into force in 2026. The consolidation note has to win.
+    masthead = ("Centrala studiestödsnämndens föreskrifter och allmänna råd "
+                "(CSNFS 1998:7) om ersättning till deltagare i "
+                "teckenspråksutbildning för vissa föräldrar "
+                "Grundförfattningen i dess lydelse med införda ändringar "
+                "omtryckt CSNFS 2009:3 ändrad CSNFS 2023:8 CSNFS 2025:3")
+    text = (masthead + " Till CSNFS 2005:7 Denna författning träder i kraft den "
+            "1 juli 2005 och gäller för studier från och med samma datum. "
+            "Till CSNFS 2023:8 Denna författning träder i kraft den 1 januari 2024. "
+            "Till CSNFS 2025:3 Dessa föreskrifter och allmänna råd träder i kraft "
+            "den 1 januari 2026.")
+    assert fp.ikrafttradande_date(text, masthead) == "2005-07-01"
+
+
+def test_ikraft_date_reads_the_declaration_from_the_title_when_the_masthead_is_gone():
+    # SJVFS 2015:18's shape, driven through the real wiring: the page opens with
+    # a running head that classifies as a rubrik and then goes straight into
+    # "1 §", so `_body_start` leaves a masthead of three words and the "om
+    # ändring i" declaration never reaches the parser. 259 föreskrifter have a
+    # masthead this thin; for 38 of them the harvest title is the only place the
+    # declaration survives, and without it they fall back to the first date.
+    blocks = [("rubrik", "GRUNDLÄGGANDE BESTÄMMELSER", 1, None),
+              ("paragraf", "1 § Dessa föreskrifter gäller stöd.", 1, "1"),
+              ("stycke", "Denna författning träder i kraft den 12 mars 2015.", 2, None),
+              ("stycke", "Denna författning träder i kraft den 11 maj 2015.", 2, None)]
+    masthead = fp._full_text(blocks[:_body_start(blocks)])
+    assert masthead == "GRUNDLÄGGANDE BESTÄMMELSER"      # the declaration is not in it
+    title = "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (SJVFS 2015:2)"
+    text = fp._full_text(blocks)
+    assert fp.ikrafttradande_date(text, fp.role_declaration(masthead, None)) == "2015-03-12"
+    assert fp.ikrafttradande_date(text, fp.role_declaration(masthead, title)) == "2015-05-11"
+
+
+def test_ikraft_date_keeps_an_unrecognised_subject_rather_than_losing_the_date():
+    # No sentence names a subject the census saw, so the filter must not empty
+    # the candidate list and drop the only date the document prints.
+    text = "Bestämmelserna i bilaga 1 träder i kraft den 1 januari 2020."
+    assert fp.ikrafttradande_date(text, "") == "2020-01-01"
+
+
+def test_ikraft_date_is_none_when_the_document_states_no_date():
+    assert fp.ikrafttradande_date("Dessa föreskrifter gäller tills vidare.", "") is None
 
 
 def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
@@ -176,7 +291,7 @@ def test_extract_metadata_upphaver_from_the_transitional_passive_clause():
             "1. Dessa föreskrifter träder i kraft den 1 mars 2022. "
             "2. Genom föreskrifterna upphävs Säkerhetspolisens föreskrifter "
             "om säkerhetsskydd (PMFS 2019:2).")
-    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["upphaver"] == ["https://lagen.nu/pmfs/2019:2"]
 
 
@@ -186,8 +301,66 @@ def test_extract_metadata_upphaver_folds_designation_to_the_fs_slug():
     text = ("Åklagarmyndighetens föreskrifter om expediering; "
             "Föreskrifterna ersätter Åklagarmyndighetens föreskrifter "
             "(ÅFS 2005:6) om expediering.")
-    meta = extract_metadata(text, sfs_parser("foreskrift", PARSE_TYPES))
+    meta = extract_metadata(text, "", sfs_parser("foreskrift", PARSE_TYPES))
     assert meta["upphaver"] == ["https://lagen.nu/aafs/2005:6"]
+
+
+def test_printed_designation_names_a_regulation_the_corpus_does_not_hold():
+    # a repealed predecessor series nobody harvests still has to be *named* in
+    # the Upphäver row; without this the reader was shown the slug
+    assert printed_designation("https://lagen.nu/rpsfs/2011:16") == "RPSFS 2011:16"
+    assert printed_designation("https://lagen.nu/aafs/2005:6") == "ÅFS 2005:6"
+    assert printed_designation("https://lagen.nu/sjofs/2006:39") == "SJÖFS 2006:39"
+    # an SFS paragraf is not a regulation designation
+    assert printed_designation("https://lagen.nu/1977:1166#P18") is None
+
+
+def test_andrad_genom_unions_the_register_with_the_inbound_edge():
+    # SJÖFS 2005:25's agency never listed its amendments, but SJÖFS 2006:39 says
+    # in its own title that it amends it -- so the page said nothing at all
+    art = {"amendments": [{"uri": "https://lagen.nu/sjofs/2008:66",
+                           "identifier": "SJÖFS 2008:66"}]}
+    rows = [("https://lagen.nu/sjofs/2006:39", "SJÖFS 2006:39", "…"),
+            ("https://lagen.nu/sjofs/2008:66", "SJÖFS 2008:66", "…")]
+    assert _andrad_genom(art, rows) == [
+        ("https://lagen.nu/sjofs/2006:39", "SJÖFS 2006:39"),
+        ("https://lagen.nu/sjofs/2008:66", "SJÖFS 2008:66")]   # deduped, sorted
+
+
+def test_konsoliderad_banner_spells_the_cutoff_the_way_the_page_does():
+    """The cutoff amendment is normally in the harvest register and the banner
+    quotes its printed identifier. Where it is not, the banner has to derive
+    one -- and upcasing the URI slug wrote "SJOFS 2006:39" beside the header
+    row's "SJÖFS 2006:39" on the same page."""
+    banner = _konsoliderad_banner(
+        {"uri": "https://lagen.nu/sjofs/2003:12", "amendments": [], "structure": []},
+        Site(None, set()), "https://lagen.nu/sjofs/2006:39")
+    assert "SJÖFS 2006:39" in banner
+    assert "SJOFS" not in banner
+
+
+def test_undouble_keeps_the_whole_copy_of_a_title_printed_twice():
+    # SJÖFS 2005:25 prints its title once as a page header and again in the
+    # ingress, and the masthead scan runs from the first straight into the
+    # second, so the page read as a stammer.
+    assert fp.undouble(
+        "Sjöfartsverkets föreskrifter och allmänna råd om skyddsanordningar och "
+        "Sjöfartsverkets föreskrifter och allmänna råd om skyddsanordningar "
+        "och skyddsåtgärder på fartyg") == (
+        "Sjöfartsverkets föreskrifter och allmänna råd om skyddsanordningar "
+        "och skyddsåtgärder på fartyg")
+
+
+def test_undouble_leaves_a_title_that_merely_repeats_a_phrase():
+    # an ändringsförfattning names the regulation it amends, so its own
+    # designation phrase recurs -- but the head does not begin what follows it
+    title = ("Föreskrifter och allmänna råd om ändring i Sjöfartsverkets "
+             "föreskrifter och allmänna råd (SJÖFS 2005:25) om skyddsanordningar")
+    assert fp.undouble(title) == title
+    # nor is a repeal title a doubling
+    repeal = ("Sjöfartsverkets föreskrifter om upphävande av Sjöfartsverkets "
+              "föreskrifter (SJÖFS 1990:1) om lotsning")
+    assert fp.undouble(repeal) == repeal
 
 
 # --- titles: harvest link chrome vs the PDF's own rubric (F7) ----------------
