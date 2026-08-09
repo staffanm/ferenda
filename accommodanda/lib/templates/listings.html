@@ -158,6 +158,23 @@
 {%- if note %}<p class="browse-note">{{ note }}</p>{% endif -%}
 {{ listing }}</section></div>
 {%- endmacro -%}
+{%- macro source_landing_body(banner, heading, count, groups) -%}
+{#- A source's own root. It used to be a byte copy of the first leaf, so
+    /eurlex/ opened titled "Fördraget om Europeiska unionen, 8 dokument" -- a
+    corpus of 50 000 acts introduced by one treaty's consolidated versions.
+    This lists what the source *holds*: every primary bucket with its size, and
+    under each the buckets a reader would go to next. -#}
+{{ banner }}<section class="browse-main browse-group"><h1>{{ heading }} <span class="c">{{ count }}</span></h1>
+<div class="landing-groups">
+{%- for g in groups %}
+<div class="landing-group"><h2><a href="{{ g.url }}">{{ g.label }}</a> <span class="c">{{ g.count }}</span></h2>
+{%- if g.children %}<ul class="landing-children">
+{%- for c in g.children %}<li><a href="{{ c.url }}">{{ c.label }}</a> <span class="c">{{ c.count }}</span></li>{% endfor -%}
+</ul>{% endif -%}
+</div>
+{%- endfor -%}
+</div></section>
+{%- endmacro -%}
 {%- macro empty() -%}
 <p class="empty">Inga dokument.</p>
 {%- endmacro -%}

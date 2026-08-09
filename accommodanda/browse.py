@@ -274,6 +274,33 @@ def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
                 body_class=" browse", own_h1=True)
 
 
+# How many second-level buckets a landing lists under a type before it stops:
+# enough to show the shape of the branch (the newest years, the treaty
+# families), not the 60-year run of a case-law series.
+LANDING_CHILDREN = 12
+
+
+def render_landing(source, view, banner=""):
+    """A source's root page: what the corpus holds, by primary bucket.
+
+    The root used to be a byte copy of the first leaf page, which is how
+    /eurlex/ came to open as "Fördraget om Europeiska unionen, 8 dokument" --
+    50 000 acts introduced by one treaty's consolidated versions (V4, old N2).
+    A reader arriving at a source needs its extent and its branches, and one
+    branch's leaf is neither."""
+    groups = [{"url": browse_url(source, [b["slug"]]), "label": b["label"],
+               "count": b["count"],
+               "children": [{"url": browse_url(source, [b["slug"], c["slug"]]),
+                             "label": c["label"], "count": c["count"]}
+                            for c in (b["children"] or [])[:LANDING_CHILDREN]]}
+              for b in view["buckets"]]
+    heading = SOURCE_LABEL.get(source, source)
+    body = LISTS.source_landing_body(
+        Markup(banner), heading, sum(g["count"] for g in groups), groups)
+    return page(heading, "Bläddra", "", body, solo=True,
+                body_class=" browse", own_h1=True)
+
+
 def _write_browse(out_root, source, slugs, html):
     target = Path(out_root).joinpath(browse_dir(source), *slugs)
     target.mkdir(parents=True, exist_ok=True)
@@ -425,6 +452,16 @@ def generate_browse(client, source, out_root, cross_axis=None):
                 written.add(_write_browse(out_root, source, slugs[:1], html))
             if root_html is None:                # overall default = first leaf
                 root_html = html
+    # eurlex's root is a landing over all its types rather than a copy of the
+    # first leaf: its first leaf is one treaty's eight consolidated versions,
+    # which is no way to open a corpus of 50 000 acts (V4). The other sources
+    # keep the default-bucket root until each has a landing worth the swap.
+    if source == "eurlex":
+        # no bucket is current here: the landing stands above all of them, so
+        # marking the first one would tell a reader they are inside Fördrag
+        # while the page lists every type
+        root_html = render_landing(source, view, banner=cross_nav(cross_axis, None)
+                                   if cross_axis else "")
     written.add(_write_browse(out_root, source, [], root_html))
     if source == "foreskrift":
         written |= _write_succeeded_series(out_root, source, view)

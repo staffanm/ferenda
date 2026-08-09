@@ -132,3 +132,34 @@ def test_reap_still_works_for_a_source_nested_inside_another(tmp_path):
     assert browse._reap_browse(tmp_path, "edpb", {keep}) == 1
     assert not gone.exists()
     assert (keep / "index.html").exists()
+
+
+def test_source_landing_lists_every_type_not_one_leaf():
+    """/eurlex/ used to be a byte copy of its first leaf page, so a corpus of
+    50 000 acts opened titled "Fördraget om Europeiska unionen, 8 dokument"
+    (V4). The root now names the source and lists what it holds."""
+    view = {"levels": ["Typ", "År"], "buckets": [
+        {"slug": "fordrag", "key": "treaty", "label": "Fördrag", "count": 40,
+         "children": [{"slug": "eu", "key": "eu", "label": "EU-fördraget",
+                       "count": 8}]},
+        {"slug": "forordningar", "key": "regulation", "label": "Förordningar",
+         "count": 23754, "children": [{"slug": "2026", "key": "2026",
+                                       "label": "2026", "count": 702}]},
+    ]}
+    html = browse.render_landing("eurlex", view)
+    assert "<h1>EU-rättsakter" in html
+    assert ">23794<" in html                       # the whole corpus, summed
+    for expected in ("Fördrag", "Förordningar", "EU-fördraget", "2026"):
+        assert expected in html
+    # the leaf that used to *be* this page is now one link among the branches
+    assert html.count('href="/eurlex/') >= 4
+
+
+def test_source_landing_caps_the_children_it_lists():
+    view = {"levels": ["Typ", "År"], "buckets": [
+        {"slug": "d", "key": "d", "label": "Direktiv", "count": 3808,
+         "children": [{"slug": str(y), "key": str(y), "label": str(y),
+                       "count": 1} for y in range(2026, 1980, -1)]}]}
+    html = browse.render_landing("eurlex", view)
+    assert html.count("<li>") == browse.LANDING_CHILDREN
+    assert ">2026<" in html and ">1990<" not in html   # newest kept, tail dropped

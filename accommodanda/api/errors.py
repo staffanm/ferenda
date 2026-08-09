@@ -21,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import config
 from ..lib import errorlog
+from ..lib.page import page_context
 from ..lib.tpl import ENV
 
 # The ledger lives under CATALOG_ROOT -- the path config already guarantees is
@@ -59,17 +60,16 @@ def _page(status, error_id):
     """The rendered error page. `status` is 404 or 500; anything else borrows
     the 500 copy, since an unexpected status is a server-side surprise."""
     title, lead, suggestions = _COPY.get(status, _COPY[500])
-    return ENV.get_template("error.html").render(
-        # error.html's own slots
-        error_id=error_id, suggestions=suggestions,
-        # page.html's frontmatter carries the heading block: the status code as
-        # the eyebrow, the message as the h1, the explanation as the subtitle
-        title=title, eyebrow="Fel %d" % status, subtitle=lead,
-        # the shell's remaining slots. solo drops the side columns (there is no
-        # document here to hang a toc or a rail off); the rest are the empty
-        # values StrictUndefined would otherwise refuse
-        kind="", solo=True, own_h1=False, body_class="", head="", body="",
-        toc="", island="", meta="", summary="", summary_text="")
+    # through page_context like every other page: the shell's slots are its
+    # defaults, so a new one cannot leave this page as the single render that
+    # StrictUndefined refuses (it did -- `title_html`, added 2026-08-08).
+    # page.html's frontmatter carries the heading block: the status code as the
+    # eyebrow, the message as the h1, the explanation as the subtitle. solo
+    # drops the side columns -- there is no document here to hang a toc or a
+    # rail off. error_id and suggestions are error.html's own slots.
+    return ENV.get_template("error.html").render(page_context(
+        title, "", "", solo=True, eyebrow="Fel %d" % status, subtitle=lead,
+        error_id=error_id, suggestions=suggestions))
 
 
 def under(path, prefixes):
