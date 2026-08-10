@@ -202,7 +202,8 @@ def project_overgangsbestammelse(ob, proj):
     node_id = proj.minter.mint(pairs, ob)
     return {"type": "overgangsbestammelse", "id": node_id,
             "children": project_children(
-                ob.children, pairs if node_id else None, proj, node_id or "")}
+                ob.children, pairs if node_id else None, proj, node_id or "",
+                in_appendix=True)}
 
 
 @dataclass
@@ -222,7 +223,7 @@ class Projection:
         self._grafik += 1
         return "G%d" % self._grafik
 
-    def inline(self, text, context, live=True, subject_term=None):
+    def inline(self, text, context, live=True, subject_terms=()):
         """Return `text` as a list of inline nodes: plain `str` runs and
         `{"predicate", "uri", "text"}` link objects, one per reference
         found, in document order. `context` is the node's own fragment,
@@ -241,8 +242,11 @@ class Projection:
         pipeline omitted those, so self-links are dropped here; references to
         other laws still link.
 
-        `subject_term` is a defined begreppsdefinition term found in this node;
-        it becomes a dcterms:subject link over the term's span (kind "term")."""
+        `subject_terms` are the begreppsdefinition terms this node defines; each
+        becomes a dcterms:subject link over its own span (kind "term"). One
+        sentence can define several -- "... säkerhetskänslig verksamhet
+        (verksamhetsutövare) ska utreda behovet av säkerhetsskydd
+        (säkerhetsskyddsanalys)" defines both."""
         if not text:
             return []
         refs = []
@@ -253,15 +257,18 @@ class Projection:
                 selfuri = rp.self_law_uri
                 refs = [r for r in refs
                         if r.uri != selfuri and not r.uri.startswith(selfuri + "#")]
-        if subject_term and (idx := text.find(subject_term)) >= 0:
-            # the term-use link yields to any citation it overlaps (a defined
-            # term is often also a named-law/change-note reference on the same
-            # span); interleave needs disjoint spans
-            term = lagrum.Ref(idx, idx + len(subject_term), subject_term,
-                              "dcterms:subject",
-                              begrepp.term_to_subject(subject_term),
-                              kind="term")
-            refs += lagrum.yield_overlaps([term], refs)
+        # the term-use links yield to any citation they overlap (a defined term
+        # is often also a named-law/change-note reference on the same span), and
+        # to each other -- interleave needs disjoint spans
+        spans = []
+        for subject_term in subject_terms:
+            if (idx := text.find(subject_term)) >= 0:
+                spans.append(lagrum.Ref(idx, idx + len(subject_term),
+                                        subject_term, "dcterms:subject",
+                                        begrepp.term_to_subject(subject_term),
+                                        kind="term"))
+        for span in spans:
+            refs += lagrum.yield_overlaps([span], refs)
         if not refs:
             return [text]
         return lagrum.interleave(text, refs)
@@ -454,7 +461,8 @@ def retype_editorial(nf, stycke):
     return {**nf, "type": "redaktionell", "sort": ed[0], "satt_av": ed[1]}
 
 
-def project_children(children, pairs, proj, frag, live=True, satt_av=None):
+def project_children(children, pairs, proj, frag, live=True, satt_av=None,
+                     in_appendix=False):
     gov = graphics.governing_sfs(children) or satt_av
     out = []
     for node in children:
@@ -467,7 +475,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 if node.underrubrik:
                     kids.append(rubrik_nf(node.underrubrik, 2, proj, ctx, live=live))
                 kids += project_children(node.children, sub if node_id else None,
-                                         proj, ctx, live, satt_av=gov)
+                                         proj, ctx, live, satt_av=gov,
+                                         in_appendix=in_appendix)
                 out.append({"type": "avdelning", "id": node_id,
                             "ordinal": node.ordinal, "children": kids})
             case Underavdelning():
@@ -476,7 +485,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 ctx = node_id or frag
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=live)]
                 kids += project_children(node.children, sub if node_id else None,
-                                         proj, ctx, live, satt_av=gov)
+                                         proj, ctx, live, satt_av=gov,
+                                         in_appendix=in_appendix)
                 out.append({"type": "underavdelning", "id": node_id,
                             "children": kids})
             case Kapitel():
@@ -486,7 +496,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 clive = live and _in_force(node, proj.minter)
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=clive)]
                 kids += project_children(node.children, sub if node_id else None,
-                                         proj, ctx, clive, satt_av=gov)
+                                         proj, ctx, clive, satt_av=gov,
+                                         in_appendix=in_appendix)
                 out.append({"type": "kapitel", "id": node_id,
                             "ordinal": node.ordinal,
                             **temporal_fields(node), "children": kids})
@@ -503,7 +514,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                             **temporal_fields(node),
                             "children": project_paragraf(
                                 node, sub if node_id else None, proj,
-                                node_id or frag, plive, satt_av=gov)})
+                                node_id or frag, plive, satt_av=gov,
+                                in_appendix=in_appendix)})
             case Rubrik():
                 sub = extend(pairs, "R", position_ordinal(node, children))
                 node_id = proj.minter.mint(sub, node)
@@ -523,7 +535,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 else:
                     sub = extend(pairs, "S", position_ordinal(node, children))
                     out.append(retype_editorial(
-                        stycke_nf(node, sub, proj, frag, live, satt_av=gov),
+                        stycke_nf(node, sub, proj, frag, live, satt_av=gov,
+                                  in_appendix=in_appendix),
                         node))
             case Lista():
                 out.append({"type": "lista", "id": None,
@@ -537,7 +550,8 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None):
                 blive = live and _in_force(node, proj.minter)
                 kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=blive)]
                 kids += project_children(node.children, sub if node_id else None,
-                                         proj, ctx, blive, satt_av=gov)
+                                         proj, ctx, blive, satt_av=gov,
+                                         in_appendix=True)
                 out.append({"type": "bilaga", "id": node_id,
                             **temporal_fields(node), "children": kids})
             case Konventionsbilaga():
@@ -644,10 +658,11 @@ def project_konventionsbilaga(node, frag, proj, live=True):
     }
 
 
-def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None):
+def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None,
+                     in_appendix=False):
     gov = graphics.governing_sfs(paragraf.children) or satt_av
     mode = begrepp.paragraf_mode([getattr(s, "text", "") or ""
-                                  for s in paragraf.children])
+                                  for s in paragraf.children], in_appendix)
     out = []
     for node in paragraf.children:
         gap = graphics.marker_gap(util.normalize_space(node.text))
@@ -655,7 +670,8 @@ def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None):
             out.append(grafik_node(proj, gap[0], gap[1] or gov))
             continue
         sub = extend(pairs, "S", position_ordinal(node, paragraf.children))
-        nf = stycke_nf(node, sub, proj, frag, live, mode=mode, satt_av=gov)
+        nf = stycke_nf(node, sub, proj, frag, live, mode=mode, satt_av=gov,
+                       in_appendix=in_appendix)
         if node is paragraf.children[0]:
             nf["beteckning"] = beteckning(paragraf)
         out.append(retype_editorial(nf, node))
@@ -669,15 +685,17 @@ def beteckning(paragraf):
     return b
 
 
-def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None, satt_av=None):
+def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None, satt_av=None,
+              in_appendix=False):
     node_id = proj.minter.mint(pairs, stycke)
     eff = node_id or frag
     text = util.normalize_space(stycke.text)
-    term = begrepp.defined_term(text, mode, "stycke") if mode else None
+    terms = (begrepp.defined_terms(text, mode, "stycke", in_appendix)
+             if mode else [])
     nf = {"type": "stycke", "id": node_id,
-          "text": proj.inline(text, eff, live, subject_term=term)}
+          "text": proj.inline(text, eff, live, subject_terms=terms)}
     # the old find_definitions stops recursing once a term is found in a subtree
-    submode = None if term else mode
+    submode = None if terms else mode
     items = []
     for child in stycke.children:
         if isinstance(child, Lista):
@@ -700,10 +718,10 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
         item_id = proj.minter.mint(sub, item)
         eff = item_id or frag
         text = util.normalize_space(item.text)
-        term = begrepp.defined_term(text, mode, "listelement") if mode else None
+        terms = begrepp.defined_terms(text, mode, "listelement") if mode else []
         out.append({"type": "punkt", "id": item_id, "ordinal": item.ordinal,
-                    "text": proj.inline(text, eff, live, subject_term=term)})
-        submode = None if term else mode
+                    "text": proj.inline(text, eff, live, subject_terms=terms)})
+        submode = None if terms else mode
         for sublist in item.children:
             out.extend(flatten_list(sublist, sub if item_id else None,
                                     proj, eff, live, mode=submode))
@@ -714,11 +732,11 @@ def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None):
     rows = []
     for row in tabell.rows:
         # only the first cell of a row can name a term
-        term = (begrepp.defined_term(util.normalize_space(row.cells[0]),
-                                     mode, "tabellrad")
-                if mode and row.cells else None)
+        terms = (begrepp.defined_terms(util.normalize_space(row.cells[0]),
+                                       mode, "tabellrad")
+                 if mode and row.cells else [])
         cells = [proj.inline(util.normalize_space(cell), context, live,
-                             subject_term=(term if i == 0 else None))
+                             subject_terms=(terms if i == 0 else []))
                  for i, cell in enumerate(row.cells)]
         rad = {"type": "rad", "cells": cells, **temporal_fields(row)}
         # a road-sign designator cell (2007:90) is the trace of a dropped sign
