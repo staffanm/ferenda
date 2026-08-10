@@ -23,10 +23,14 @@ __pycache__/
 /data/
 /.direnv/
 # Version-control .claude/ (hooks, settings, agents, skills) except the
-# genuinely machine-local files: personal permission overrides and the
-# scheduler's runtime lock.
+# genuinely machine-local files: personal permission overrides, the
+# scheduler's runtime lock, and Claude's own memory store — which lives at
+# ~/.claude/projects/<cwd>/memory/ and is read from there. A copy committed
+# here is never loaded as memory; the one we did carry sat frozen for two
+# months and a grep still surfaced its retired notes as if current.
 /.claude/settings.local.json
 /.claude/scheduled_tasks.lock
+/.claude/projects/
 /.env
 /mediawiki-db-backup-230502/
 /mediawiki-html-backup-230502/
