@@ -153,7 +153,12 @@ _EU_DESIGNATION = re.compile(
 
 def _eurlex(art):
     doctype = art.get("doctype")
-    title = art.get("title") or _local(art["uri"])
+    # the document's own title, when it has one. Much of the older case law
+    # carries none -- the legacy court pages open straight into the parties,
+    # with no line naming the document -- and the fallback must then be the
+    # document's identity, never the URI tail: `_local(uri)` stood in here, so
+    # 3 373 judgments were headed "ext/celex/61979CJ0155" instead of "C-155/79".
+    title = art.get("title") or ""
     label = art.get("label") or ""
     shortname, abbr = art.get("shortname"), art.get("abbr")
     named = "%s (%s)" % (shortname, abbr) if shortname and abbr else shortname
@@ -164,13 +169,14 @@ def _eurlex(art):
         short_id = re.sub(r"\s*\(.*\)$", "", label) or celex
         # an unnamed judgment stamps shortname == case number; no name to show
         short_title = named if named and named != short_id else ""
-        return Labels(short_id, short_title, title, label or short_id)
+        return Labels(short_id, short_title, title or short_id, label or short_id)
     if doctype == "treaty":
         # a founding/consolidated treaty carries no extractable short title -- the
         # raw CELEX is all the artifact holds -- so a curated Swedish name stands in
         # as both the short title and the official title (E1); short_id is the CELEX
         name = _treaty_names().get(_EU_TREATY_SUFFIX.sub("", celex))
-        return Labels(celex, name or "", name or title, name or title)
+        return Labels(celex, name or "", name or title or celex,
+                      name or title or celex)
     in_label = _EU_DESIGNATION.search(label)
     m = in_label or _EU_DESIGNATION.search(title)
     short_id = m.group(0) if m else (art.get("celex") or "")
@@ -193,7 +199,8 @@ def _eurlex(art):
     descriptive = ("%s %s" % (in_label.group(0), named)
                    if named and in_label else
                    (label or short_title or short_id))
-    return Labels(short_id, short_title, title, descriptive)
+    return Labels(short_id, short_title, title or short_title or short_id,
+                  descriptive)
 
 
 # --------------------------------------------------------------------------

@@ -65,6 +65,18 @@ def test_eurlex_unnamed_judgment_has_number_but_no_name():
     assert lb.official_title.startswith("Domstolens dom")
 
 
+def test_eurlex_titleless_judgment_falls_back_to_its_case_number():
+    # the legacy court pages open straight into the parties, so the artifact
+    # carries no title -- the name to show is then the case number, never the
+    # URI tail (which headed 3 373 judgments "ext/celex/61979CJ0155")
+    art = {"uri": "https://lagen.nu/ext/celex/61979CJ0155", "celex": "61979CJ0155",
+           "doctype": "judgment", "shortname": "C-155/79", "label": "C-155/79",
+           "title": ""}
+    lb = labels.document_labels("eurlex", art)
+    assert lb.short_id == lb.official_title == "C-155/79"
+    assert "ext/celex" not in lb.official_title
+
+
 def test_eurlex_named_judgment_splits_number_and_name():
     art = {"uri": "https://lagen.nu/ext/celex/62018CJ0311", "celex": "62018CJ0311",
            "doctype": "judgment", "shortname": "Schrems II",

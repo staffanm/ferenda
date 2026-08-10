@@ -8,6 +8,10 @@ have the same shape and feed the same `to_artifact` projection. Structural
 sub-lists (recitals, points, section headings) render as 2-column tables
 `marker | text`, which a left-cell-is-a-marker test separates from data tables.
 
+Case law is published by the courts themselves and carries none of those classes
+-- not even a title one -- so its title is read out of the header text instead
+(`case_title`), keyed on how a court names its own document.
+
 Older CELLAR HTML (pre-OJ-reformatting) is loosely-formatted text in a `<txt_te>`
 wrapper with no semantic classes; there structure is inferred from the text via
 the localized vocabulary in `lang` (Article/Artikel, TITLE/AVDELNING, ...).
@@ -52,6 +56,119 @@ _OJ_REF = re.compile(r"\s*(?:Europeiska (?:gemenskapernas|unionens) officiella "
 # candidate past this bound is misextraction, and no title (the page heading
 # falls back to the identifier) beats a page-long one.
 TITLE_MAX = 1000
+
+# how far into the document the case-law title scan looks. The title is the
+# document's opening line; a court name occurring deeper in is prose ("meddelar
+# DOMSTOLEN", a judgment quoting the decision under appeal), not a title.
+CASE_TITLE_SCAN = 30
+# the footnote marker the courts hang off the title's date line ("föredraget den
+# 18 juni 2026( 1 )", "17 September 2019 ( * )") -- not part of the title. Digits
+# and asterisks only, so a genuine trailing parenthetical survives ("DOMSTOLENS
+# DOM (femte avdelningen)").
+_TITLE_FOOTNOTE = re.compile(r"\(\s*\*?\s*\d*\s*\)\s*$")
+# a title line runs onto the next only while that next line is still title-shaped:
+# the judge's/advocate general's name, set upper-case on its own line
+_TITLE_CONT_MAX = 120
+_TITLE_CONT_LINES = 3
+
+# name particles, which a name keeps in lower case: "JEAN RICHARD DE LA TOUR" is
+# "Jean Richard de la Tour", the Court's own rendering. Language-neutral -- the
+# advocates general come from every member state, so a Swedish opinion carries
+# Dutch, Spanish and French names alike.
+_NAME_PARTICLES = frozenset((
+    "de", "del", "della", "den", "der", "des", "di", "da", "do", "dos", "du",
+    "la", "le", "van", "von", "y", "af", "ter", "ten", "in", "'t"))
+# a word of a name to case: letters only (a case number or an ordinal keeps its
+# own shape), and set in caps -- a name the court already rendered in mixed case
+# ("Saugmandsgaard Øe") is its own authority and is left alone.
+_NAME_WORD = re.compile(r"^[^\W\d_]+(?:-[^\W\d_]+)*$")
+
+
+def _name_word(word):
+    """One word of an upper-case name, in the Court's own case: "RIMVYDAS" ->
+    "Rimvydas", "SÁNCHEZ-BORDONA" -> "Sánchez-Bordona" (each hyphenated part is
+    a name of its own), "DE"/"LA" -> "de"/"la" (particles stay lower)."""
+    if not _NAME_WORD.match(word) or word.lower() == word:
+        return word
+    if word.lower() in _NAME_PARTICLES:
+        return word.lower()
+    return "-".join(part.capitalize() for part in word.split("-"))
+
+
+def normalize_case(title, voc):
+    """A court title in the Court's own case: the opening phrase in its canonical
+    spelling (`Vocab.decision_opener`) and, where a name follows it, that name in
+    name case --
+
+        FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT RIMVYDAS NORKUS föredraget den
+        18 juni 2026
+        -> Förslag till avgörande av generaladvokat Rimvydas Norkus föredraget
+           den 18 juni 2026
+
+    The courts set their header lines in caps, so a recovered title shouts where
+    the same court's modern OJ title ("Förslag till avgörande av generaladvokat
+    Kokott – Mål C-562/19 P kommissionen/Polen") does not, and one browse listing
+    showed both.
+
+    Recasing stops at the opener unless the opener is an advocate general's
+    (`Vocab.names_follow`), because only there is the rest of the title a person.
+    A court's title runs on into the parties, and recasing *those* is how the
+    Greek utility DEI became "Dei" and EU Research Projects "Eu Research
+    Projects". Only upper-case words are touched, so a title the court already
+    published in mixed case passes through unchanged; so does one opening with no
+    known phrase."""
+    opener = voc.decision_opener(title)
+    if opener is None:
+        return title
+    rest = title[len(opener):]
+    if voc.names_follow(opener):
+        rest = "".join(_name_word(w) for w in re.split(r"(\s+)", rest))
+    return opener + rest
+
+
+def case_title(paras, voc):
+    """The title of a court document from its opening lines, or '' -- the case-law
+    counterpart of the act-title recovery below.
+
+    The courts publish their own HTML (the `C36Centre`-style classes) with no
+    semantic title class at all, so the title has to be read out of the text: the
+    first header line naming the document as a judgment/order/opinion
+    (`Vocab.decision_opener`), plus the lines it runs onto -- the advocate
+    general's upper-case name and the date phrase that ends the title:
+
+        FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT | RIMVYDAS NORKUS |
+        föredraget den 18 juni 2026( 1 )
+        -> Förslag till avgörande av generaladvokat Rimvydas Norkus föredraget
+           den 18 juni 2026
+
+    Without this a case fell through to the act-title recovery, which scans for
+    the *act* shape (a number designation + a date) and, since a case has no
+    preamble to stop the scan at, ran the length of the document and took the
+    first act the opinion quoted -- so 62025CC0185 was titled, and named on its
+    own page, "Artikel 4 led 7 i … förordning (EU) 2016/679 … (allmän
+    dataskyddsförordning)".
+
+    Some legacy case law genuinely has no title line (the pre-2010 "Parter
+    Domskäl Domslut" pages open straight into the parties), hence ''. A case's
+    identity does not depend on this: it is its case number, stamped from
+    `lib.eucasenaming`."""
+    for i, text in enumerate(paras[:CASE_TITLE_SCAN]):
+        if len(text) > 200 or voc.decision_opener(text) is None:
+            continue
+        parts = [text]
+        if not voc.decision_date.search(text):
+            for nxt in paras[i + 1:i + 1 + _TITLE_CONT_LINES]:
+                if len(nxt) > _TITLE_CONT_MAX:
+                    break
+                if voc.decision_date.search(nxt):
+                    parts.append(nxt)
+                    break
+                if nxt.upper() != nxt or not any(c.isalpha() for c in nxt):
+                    break
+                parts.append(nxt)
+        return normalize_case(
+            _TITLE_FOOTNOTE.sub("", " ".join(parts)).strip(), voc)
+    return ""
 
 
 def _role(el):
@@ -147,7 +264,13 @@ def parse_html(markup, celex, lang):
         _flat(p) for p in body.find_all(class_=re.compile(r"^(oj-)?(doc-ti|ti-doc)$"))))
     if len(doc.title) > TITLE_MAX:
         doc.title = ""                       # title-classed non-title content
-    if not doc.title:
+    if not doc.title and doc.doctype in CASELAW:
+        # a case names itself on its opening line, and has no preamble the act
+        # recovery below could stop its scan at -- read it from the header text
+        doc.title = case_title(
+            [t for p in body.find_all("p")
+             if (t := normalize_space(_flat(p)))][:CASE_TITLE_SCAN], voc)
+    elif not doc.title:
         # legacy "Avis juridique important" HTML has no semantic title class -- the
         # title is the class-less header line carrying the act number + date. Scan
         # the header (paragraphs before the preamble opens) and take the first line

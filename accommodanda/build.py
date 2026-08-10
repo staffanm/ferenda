@@ -3759,9 +3759,13 @@ def _run_stage_gated(source, step, jobs, store):
     result = run_action(source, step, basefiles, jobs)
     report(source, step, result, len(basefiles), full_source=True)
     # only fingerprint a clean sweep: a failed doc leaves the source un-marked so
-    # the next run retries it (and re-surfaces the error) rather than skipping
-    if result.errors:
-        return True, False
+    # the next run retries it (and re-surfaces the error) rather than skipping.
+    # A dry run does no work at all, so it must not mark the source either --
+    # `lagen eurlex parse -n` after a parser edit printed a 64,004-document plan
+    # and then recorded the new recipe version, so the real run that followed
+    # answered "up to date -- skipped" over the whole stale artifact tree.
+    if result.errors or RUN.dry_run:
+        return bool(result.errors), False
     record_step(store, step, source.name, wm, pcode)
     return False, True
 

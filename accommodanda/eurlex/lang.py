@@ -15,6 +15,14 @@ DETTA DIREKTIV" (before the visas, as Formex's PREAMBLE.INIT) and closes with
 preamble at its first line, so every visa and recital of every non-Formex
 Swedish act was parsed as ordinary body text.
 
+`decision` is the other language-specific text cue: how a court document names
+itself on its opening line ("DOMSTOLENS DOM", "FÖRSLAG TILL AVGÖRANDE AV
+GENERALADVOKAT", "JUDGMENT OF THE GENERAL COURT"). The courts' own HTML marks
+that line with no semantic class, so it is the only handle on a case's title --
+see `parse_html.case_title`. The courts are enumerated rather than matched as
+"<something>s dom": a judgment's opening prose is full of lines that begin
+"Kommissionens beslut … av den …", which a shape test would take for the title.
+
 Out of scope here: reference *syntax* ("article 3(4)" vs "artikel 3.4"). That is
 the citation engine's concern (lib.lagrum) -- the parsers only emit text, which
 the engine then scans, so reference localization lives there, not here.
@@ -33,6 +41,21 @@ VOCAB = {
         "recital": ("whereas",),
         "recital_intro": ("whereas",),
         "signature": r"^Done at\b",
+        "decision": ("Judgment of the Court of First Instance",
+                     "Judgment of the Civil Service Tribunal",
+                     "Judgment of the General Court", "Judgment of the Court",
+                     "Order of the Court of First Instance",
+                     "Order of the Civil Service Tribunal",
+                     "Order of the General Court", "Order of the Court",
+                     "Opinion of the Court",
+                     "Opinion of Mr Advocate General",
+                     "Opinion of Mrs Advocate General",
+                     "Opinion of Ms Advocate General",
+                     "Opinion of Advocate General",
+                     "View of Advocate General",
+                     "Report for the Hearing"),
+        "decision_name": ("advocate general",),
+        "decision_date": r"\b\d{1,2} \w+ \d{4}\b",
     },
     "swe": {
         "article": "Artikel",
@@ -44,6 +67,21 @@ VOCAB = {
         "recital": ("av följande skäl", "med hänsyn till"),
         "recital_intro": ("med beaktande av följande", "av följande skäl"),
         "signature": r"^Utfärdat i\b",
+        "decision": ("Förslag till avgörande av generaladvokaten",
+                     "Förslag till avgörande av generaladvokat",
+                     "Generaladvokatens förslag till avgörande",
+                     "Förslag till avgörande",
+                     "Yttrande av generaladvokat",
+                     "Ställningstagande av generaladvokat",
+                     "EU-domstolens dom", "EU-domstolens beslut",
+                     "Domstolens dom", "Domstolens beslut",
+                     "Domstolens yttrande",
+                     "Tribunalens dom", "Tribunalens beslut",
+                     "Förstainstansrättens dom", "Förstainstansrättens beslut",
+                     "Personaldomstolens dom", "Personaldomstolens beslut",
+                     "Förhandlingsrapport"),
+        "decision_name": ("generaladvokat", "generaladvokaten"),
+        "decision_date": r"\b(?:den )?\d{1,2} \w+ \d{4}\b",
     },
 }
 
@@ -168,6 +206,22 @@ class Vocab:
         # footnotes and every annex after them (31986L0465's article 3 ran to
         # 193 710 characters over 6 143 paragraphs).
         self.signature = re.compile(spec["signature"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; signature is always str
+        # how a court document opens, in the *canonical spelling* ("Domstolens
+        # dom", "Opinion of Advocate General"), longest phrase first so
+        # `decision_opener` prefers "Förslag till avgörande av generaladvokat"
+        # over the "Förslag till avgörande" that is also in the list. Storing
+        # the spelling rather than a pattern is what lets the title the courts
+        # set in caps be rendered back in the Court's own case -- see
+        # `parse_html.case_title`.
+        self._decision = tuple(sorted(spec["decision"], key=len, reverse=True))
+        # the openers a *name* follows -- the ones ending in the advocate-general
+        # word. Only there is the rest of the title a person, so only there may
+        # it be recased; a judgment's title continues into the parties, where
+        # the same rule would have written the Greek utility DEI as "Dei".
+        self._decision_name = tuple(spec["decision_name"])
+        # the date phrase that closes such a title ("den 11 november 1997",
+        # "17 September 2019")
+        self.decision_date = re.compile(spec["decision_date"], re.I)  # ty: ignore[no-matching-overload]  # VOCAB values are str|list; decision_date is always str
         # the framing line that opens the recital list ("… och med beaktande av
         # följande:" / "Whereas:"); it is the *tail* of its line, because a
         # Swedish act runs it onto the last visa
@@ -175,6 +229,23 @@ class Vocab:
             r"(?:%s)\s*[:.,]?$" % "|".join(spec["recital_intro"]), re.I)
         self._visa = tuple(spec["visa"])
         self._recital = tuple(spec["recital"])
+
+    def decision_opener(self, text):
+        """The canonical spelling of the court-title phrase `text` opens with, or
+        None -- "FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT RIMVYDAS NORKUS" ->
+        "Förslag till avgörande av generaladvokat". The match is
+        case-insensitive because the courts set the same phrase in caps, in
+        title case and in sentence case across the decades."""
+        low = text.lower()
+        return next((p for p in self._decision if low.startswith(p.lower())),
+                    None)
+
+    def names_follow(self, opener):
+        """Whether what follows this opener is a person's name -- true for the
+        advocate-general openers ("Förslag till avgörande av generaladvokat
+        RIMVYDAS NORKUS"), false for a court's, whose title runs on into the
+        parties."""
+        return opener.lower().endswith(self._decision_name)
 
     def is_marker(self, text):
         """A short left-cell that signals a structural table row (heading /

@@ -5,7 +5,7 @@ old-flavour text-structure fallback."""
 from pathlib import Path
 
 from accommodanda.eurlex import lang as L
-from accommodanda.eurlex.parse_html import parse_html
+from accommodanda.eurlex.parse_html import normalize_case, parse_html
 
 FILES = Path(__file__).parent / "files/eurlex"
 
@@ -92,6 +92,89 @@ def test_legacy_classless_html_does_not_take_a_recital_as_title():
       <p>Artikel 1</p>
     </body>"""
     assert parse_html(html, "31990L0630", "swe").title == ""
+
+
+def test_opinion_title_is_the_courts_own_header_not_a_quoted_act():
+    # the courts' own HTML has no title class at all, so an opinion fell through
+    # to the act-title recovery -- which, with no preamble to stop its scan,
+    # ran the length of the document and took the first act the opinion quoted
+    # (62025CC0185 was titled "Artikel 4 led 7 i … förordning (EU) 2016/679 …")
+    html = """<body>
+      <p>Preliminär utgåva</p>
+      <p class="C36Centre">FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT</p>
+      <p class="C36Centre">RIMVYDAS NORKUS</p>
+      <p class="C36Centre">föredraget den 18 juni 2026( 1 )</p>
+      <p class="C38Centregrasgrandespacement">Mål C-185/25</p>
+      <p class="C01PointAltN">1. Förevarande mål gäller dataskydd.</p>
+      <p class="C02AlineaAltA">Artikel 4 led 7 i Europaparlamentets och rådets
+         förordning (EU) 2016/679 av den 27 april 2016 om skydd för fysiska
+         personer med avseende på behandling av personuppgifter</p>
+    </body>"""
+    doc = parse_html(html, "62025CC0185", "swe")
+    assert doc.title == ("Förslag till avgörande av generaladvokat "
+                         "Rimvydas Norkus föredraget den 18 juni 2026")
+
+
+def test_judgment_title_joins_its_date_line_and_drops_the_footnote_marker():
+    html = """<body>
+      <p class="C19Centre">JUDGMENT OF THE GENERAL COURT (First Chamber)</p>
+      <p class="C19Centre">17 September 2019 ( * )</p>
+      <p class="C02AlineaAltA">In Joined Cases T-129/07 and T-130/07,</p>
+    </body>"""
+    assert parse_html(html, "62007TJ0129", "eng").title == (
+        "Judgment of the General Court (First Chamber) 17 September 2019")
+
+
+def test_advocate_general_names_are_recased_particles_and_all():
+    # the courts set the header in caps; the title is rendered back in the
+    # Court's own case, and a name particle stays lower ("de la Tour") the way
+    # the Court itself writes it
+    for caps, expected in [
+        ("FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT JEAN RICHARD DE LA TOUR",
+         "Förslag till avgörande av generaladvokat Jean Richard de la Tour"),
+        ("FÖRSLAG TILL AVGÖRANDE AV GENERALADVOKAT MANUEL CAMPOS SÁNCHEZ-BORDONA",
+         "Förslag till avgörande av generaladvokat Manuel Campos Sánchez-Bordona"),
+        ("YTTRANDE AV GENERALADVOKAT TAMARA ĆAPETA",
+         "Yttrande av generaladvokat Tamara Ćapeta"),
+        ("DOMSTOLENS DOM (stora avdelningen)", "Domstolens dom (stora avdelningen)"),
+    ]:
+        assert normalize_case(caps, L.vocab("swe")) == expected
+    assert normalize_case("OPINION OF MR ADVOCATE GENERAL DARMON",
+                          L.vocab("eng")) == "Opinion of Mr Advocate General Darmon"
+
+
+def test_recasing_stops_at_the_opener_when_no_name_follows():
+    # a court's title runs on into the parties, where an acronym is not a name:
+    # recasing those wrote the Greek utility DEI as "Dei" and EU Research
+    # Projects as "Eu Research Projects"
+    assert normalize_case(
+        "Tribunalens dom (sjätte avdelningen) av den 20 september 2012 "
+        "– DEI mot kommissionen", L.vocab("swe")) == (
+        "Tribunalens dom (sjätte avdelningen) av den 20 september 2012 "
+        "– DEI mot kommissionen")
+
+
+def test_a_title_the_court_published_in_mixed_case_is_left_alone():
+    for title in ("Förslag till avgörande av generaladvokat Kokott – Mål "
+                  "C‑562/19 P kommissionen/Polen",
+                  "Domstolens dom (femte avdelningen) den 12 december 1996"):
+        assert normalize_case(title, L.vocab("swe")) == title
+    # no known opening phrase -> not a court title, nothing to normalize
+    assert normalize_case("REGULATION No 1", L.vocab("eng")) == "REGULATION No 1"
+
+
+def test_case_law_without_a_title_line_gets_no_title():
+    # the pre-2010 "Parter Domskäl Domslut" pages open straight into the parties
+    # -- there is no title to recover, and the case's identity is its case number
+    html = """<body>
+      <p>Parter Domskäl Domslut</p>
+      <p>I mål T-128/01,</p>
+      <p>angående en talan om ogiltigförklaring av kommissionens beslut
+         94/215/EKSG av den 16 februari 1994,</p>
+      <p>meddelar</p>
+      <p>FÖRSTAINSTANSRÄTTEN (fjärde avdelningen)</p>
+    </body>"""
+    assert parse_html(html, "62001TJ0128", "swe").title == ""
 
 
 def test_recital_and_point_tables_vs_data_table():

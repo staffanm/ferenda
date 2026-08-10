@@ -144,6 +144,27 @@ def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, caps
     assert (errs, recorded) == (False, True)
 
 
+def test_stage_gate_is_not_recorded_by_a_dry_run(tmp_path, monkeypatch, capsys):
+    """A dry run does no work, so it must not fingerprint the source. It did:
+    `lagen eurlex parse -n` after a parser edit printed a 64,004-document plan
+    and recorded the new recipe version, so the real run that followed answered
+    "up to date -- skipped" over the whole stale artifact tree."""
+    _, src = make_source(tmp_path)
+    _isolate_manifest(tmp_path, monkeypatch)
+    monkeypatch.setattr(build.RUN, "dry_run", True)
+    store = {}
+
+    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    assert (errs, recorded) == (False, False)                # planned, not marked
+    assert store == {}
+
+    monkeypatch.setattr(build.RUN, "dry_run", False)
+    capsys.readouterr()
+    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    assert (errs, recorded) == (False, True)                 # the real run still runs
+    assert "up to date -- skipped" not in capsys.readouterr().out
+
+
 def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
     """A full-source run drops error entries for basefiles the source no longer
     lists (orphans that fresh-skip healing can never reach); a targeted run must
