@@ -36,6 +36,23 @@ def test_eurlex_act_short_id_is_the_designation():
     assert lb.short_id == "(EU) 2016/679"
     assert lb.short_title == "dataskyddsförordningen (GDPR)"
     assert lb.official_title.startswith("Europaparlamentets och rådets förordning")
+    # the compact citing form names the act the way its own page's h1 does. It
+    # used to be the artifact's `label` ("… Allmän dataskyddsförordning"), so a
+    # rail and the page called one act two different things
+    assert lb.descriptive_label == "(EU) 2016/679 dataskyddsförordningen (GDPR)"
+
+
+def test_eurlex_citing_form_keeps_the_designation_it_can_read():
+    """The short name is only spliced onto a designation the *label* carries.
+    Rebuilding from `short_id` unconditionally would print raw CELEX
+    ("32003L0097") where the label already has "2003/97/EG"."""
+    art = {"uri": "https://lagen.nu/ext/celex/32003L0097", "celex": "32003L0097",
+           "doctype": "directive", "shortname": "Text av betydelse för EES.",
+           "title": "Europaparlamentets och rådets direktiv 2003/97/EG",
+           "label": "2003/97/EG Text av betydelse för EES."}
+    lb = labels.document_labels("eurlex", art)
+    assert lb.descriptive_label == "2003/97/EG Text av betydelse för EES."
+    assert "32003L0097" not in lb.descriptive_label
 
 
 def test_eurlex_unnamed_judgment_has_number_but_no_name():
