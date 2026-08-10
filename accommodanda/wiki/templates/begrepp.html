@@ -1,15 +1,35 @@
 {#- A concept (begrepp) page: the wiki description, or -- for a synthesized
-    stub with no wiki page yet -- an honest note that the value is the
-    aggregated inbound below it. -#}
+    stub with no wiki page yet -- the term's occurrences as the page itself. -#}
 {% extends "page.html" %}
 {% block body %}
-{%- if not has_description -%}
-{#- "Nedan" was a promise the page did not keep: what defines and uses the
-    concept is in the context rail beside the text, and on a phone behind the
-    Kontext button -- so a reader who looked below found the page had ended.
-    The affordance is named instead of a direction, because it is called the
-    same thing in both layouts. -#}
-<p class="stub-note">Det här begreppet har ännu ingen beskrivning. Under Kontext visas var i rättskällorna det definieras och används.</p>
-{%- endif -%}
+{%- if has_description -%}
 {{ structure }}
+{%- else -%}
+{#- No description is the normal case (568 of ~28,900 concepts have one), and it
+    does not mean the page is empty: the corpus itself is the content. A begrepp
+    page is an index of where a term is used, so the occurrences move out of the
+    context rail and into the reading column, every group open -- a reader who
+    arrives here came for exactly this list.
+
+    Leading with what is *there* rather than with what is missing: an earlier
+    note opened "Det här begreppet har ännu ingen beskrivning", which reads as a
+    defect on a page working as intended. An earlier one still said the sources
+    were shown "nedan", which promised a place the content was not. -#}
+{%- if uses -%}
+<p class="stub-lede">Termen förekommer i {{ uses }} dokument i rättskällorna.</p>
+{%- elif not groups -%}
+{#- 33 concepts have no occurrence at all: a term minted from a source that has
+    since been reparsed away. Say so plainly rather than print an empty list.
+    `uses` counts the rättskällor only, so a term reached solely from our own
+    commentary has uses == 0 *and* a listing -- it gets no lede rather than a
+    denial printed above its own occurrences. -#}
+<p class="stub-lede">Termen förekommer inte i något dokument i rättskällorna.</p>
+{%- endif -%}
+{%- for g in groups %}
+<section class="occurrences {{ g.key }}">
+<h2>{{ g.label }} <span class="c">{{ g.count }}</span></h2>
+{{ g.html }}
+</section>
+{%- endfor -%}
+{%- endif -%}
 {% endblock %}

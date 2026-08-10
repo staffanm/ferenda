@@ -1352,6 +1352,15 @@ def merge_rail_sections(sections):
     return list(merged.values())
 
 
+def ordered_sections(sections):
+    """The sections folded and ranked exactly as the rail shows them, for a page
+    that renders them somewhere else. The rail's own markup carries accordion
+    and scrollspy semantics (one row open, `data-sec` targets) that mean nothing
+    outside the margin, so a page rendering these in its reading column brings
+    its own markup and takes only the order."""
+    return sorted(merge_rail_sections(sections), key=_rail_rank)
+
+
 def render_rail_sections(sections):
     """A panel body: every section as an accordion row -- except the flat
     ones, shown inline -- with the highest-priority foldable row open and the
@@ -1396,6 +1405,9 @@ class Rail:
         # history from the SFSR register (amendment_index; render_sfs primes
         # it, every other vertical leaves it empty)
         self.amendment_index = {}
+        # what `add_document` built, so a page can render the same sections in
+        # its own body without paying for them a second time
+        self.doc_sections = []
 
     def add(self, nid, pinpoint="", extra=()):
         """Record node `nid`'s rail panel if it has commentary, anything cites it,
@@ -1462,16 +1474,14 @@ class Rail:
         for anchor in anchors:
             self.host_of[anchor] = host
 
-    def add_document(self, exclude_from=(), inbound=True):
-        """The document-level rail panel (key ''), shown when no single paragraph
-        is in focus (at the top of the document): the act's curated external links
-        (Externa länkar), any commentary on the document as a whole, and who cites
-        the document as such (S5 -- context on the document, exactly as a
-        paragraf's citations are context on the paragraf). `exclude_from` omits
-        citers the page shows in another role (a statute's own preparatory works);
-        `inbound=False` suppresses the citation sections on a page that is not the
-        citable document -- a historical consolidation, since citations always
-        target the current one."""
+    def document_sections(self, exclude_from=(), inbound=True):
+        """The document-level context as a section list: the act's curated
+        external links (Externa länkar), any commentary on the document as a
+        whole, and who cites the document as such. Split out from
+        `add_document` because a page can want this content in its *body*
+        rather than in the rail -- a begrepp page with no written description is
+        nothing but its occurrences, so putting them in the margin leaves the
+        reading column empty (see `wiki/render.py`)."""
         sections = (
             self._guidance(self.site.guidance.get(self.doc_uri))
             + self._commentary(None)
@@ -1483,6 +1493,23 @@ class Rail:
                            "Betänkandet"))
         if inbound:
             sections += document_inbound(self.site, self.doc_uri, exclude_from)
+        return sections
+
+    def add_document(self, exclude_from=(), inbound=True):
+        """The document-level rail panel (key ''), shown when no single paragraph
+        is in focus (at the top of the document) -- `document_sections` put in
+        the margin (S5 -- context on the document, exactly as a paragraf's
+        citations are context on the paragraf). `exclude_from` omits citers the
+        page shows in another role (a statute's own preparatory works);
+        `inbound=False` suppresses the citation sections on a page that is not
+        the citable document -- a historical consolidation, since citations
+        always target the current one."""
+        sections = self.document_sections(exclude_from, inbound)
+        # kept for a page that renders this content itself: `document_sections`
+        # runs a catalog query and builds every citer line, and a concept page
+        # with no description needs the same list in its body. Recomputing it
+        # there ran the whole thing twice for ~28,300 pages.
+        self.doc_sections = sections
         if sections:
             self.data[""] = self._panel("Om dokumentet", sections)
 

@@ -19,6 +19,7 @@ from accommodanda.eurlex import render as eurlex_render
 from accommodanda.forarbete import render as forarbete_render
 from accommodanda.foreskrift import render as foreskrift_render
 from accommodanda.sfs import render as sfs_render
+from accommodanda.wiki import render as wiki_render
 
 
 # a minimal SFS-shaped artifact: one paragraph whose stycke cites another law,
@@ -1453,6 +1454,22 @@ def test_document_page_includes_toc_and_anchors(tmp_path):
     assert ('<h2 id="K1" class="kaprubrik">1 kap. Inledande bestämmelser</h2>'
             in html)
     assert "1 kap.</h2>" not in html          # no bare-number duplicate heading
+    # the TOC opens with the document's own id, pointing at the frontmatter
+    assert '<a href="#top" class="lvl1 toc-top">SFS 2020:1</a>' in html
+    assert '<header class="frontmatter" id="top">' in html
+
+
+def test_mobile_bar_keeps_both_drawer_buttons(tmp_path):
+    # the bottom toolbar has the same three places on every document page: a
+    # page with no TOC greys its button rather than dropping it (scrollspy.js
+    # greys the Kontext one per section, so it ships disabled)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render(json.loads(json.dumps(LAW)), site)   # §6 only, no toc
+    assert '<nav class="toc">' not in html
+    assert '<button type="button" data-drawer="toc" aria-expanded="false" disabled>' \
+        in html
+    assert '<button type="button" data-drawer="rail" aria-expanded="false" disabled>' \
+        in html
 
 
 def test_chapter_heading_flattens_self_referencing_designator(tmp_path):
@@ -3278,3 +3295,87 @@ def test_pinpoint_label_refuses_prose_it_cannot_write():
     # same refusal lib.page makes for an SFS stycke pinpoint.
     assert pinpoint_label("5.3.S12") == "artikel 5.3 tolfte stycket"
     assert pinpoint_label("5.3.S30") == ""
+
+
+# --------------------------------------------------------------------------
+# begrepp: a concept page with no curated description
+# --------------------------------------------------------------------------
+
+CONCEPT = {"uri": "https://lagen.nu/begrepp/Dröjsmålsränta",
+           "type": "begrepp", "title": "Dröjsmålsränta", "body": []}
+
+# a statute that *defines* the term: the dcterms:subject link a parenthesised
+# legaldefinition mints (sfs/begrepp.term_to_subject), which is what a concept
+# page with no description is an index of
+DEFINING_LAW = {
+    "uri": "https://lagen.nu/1975:635",
+    "metadata": {"properties": {"dcterms:title": "Räntelag (1975:635)"}},
+    "structure": [
+        {"type": "paragraf", "id": "P6", "ordinal": "6", "children": [
+            {"type": "stycke", "id": "P6S1", "beteckning": "6 §", "text": [
+                "Ränta enligt denna lag utgår som ",
+                {"predicate": "dcterms:subject", "text": "dröjsmålsränta",
+                 "uri": "https://lagen.nu/begrepp/Dröjsmålsränta"}, "."]},
+        ]},
+    ],
+}
+
+
+def _concept_site(tmp_path):
+    """A catalog whose statute defines the concept, so its page has a real
+    occurrence to list."""
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps(DEFINING_LAW))
+    concept = tmp_path / "concept.json"
+    concept.write_text(json.dumps(CONCEPT))
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "begrepp", [concept])
+    return page.Site.from_catalog(catalog.connect(db))
+
+
+def test_concept_without_description_lists_its_occurrences_in_the_body(tmp_path):
+    """Only 568 of ~28,900 concepts carry a written description, and that is the
+    design: the page is an index of where a term is used. So the occurrences
+    render in the reading column, not in the context rail beside an empty one."""
+    site = _concept_site(tmp_path)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    assert '<section class="occurrences' in html
+    # the rail would otherwise print the same list a second time
+    assert 'id="lagen-context"' not in html
+    # ... and the page leads with what it holds, never with what it lacks
+    assert "ännu ingen beskrivning" not in html
+
+
+def test_concept_lede_never_denies_the_list_below_it(tmp_path):
+    """`uses` counts the rättskällor only, so a term reached solely from our own
+    commentary has uses == 0 while the listing is not empty. Branching the lede
+    on `uses` printed "förekommer inte i något dokument" directly above that
+    term's own occurrences."""
+    site = _concept_site(tmp_path)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    if '<section class="occurrences' in html:
+        assert "förekommer inte i" not in html
+
+
+def test_concept_page_names_the_statute_group_for_what_it_is(tmp_path):
+    # "Lagrumshänvisningar hit" describes the margin it was written for; in the
+    # body these rows are the acts that give the term a legal definition
+    site = _concept_site(tmp_path)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    assert "Lagrumshänvisningar hit" not in html
+
+
+def test_concept_stub_styles_are_reachable_css():
+    """The lede shipped unstyled once: a comment closed with `*/` and three more
+    prose lines followed, so CSS read them as a selector and swallowed the
+    `.stub-lede` rule that came after."""
+    css = (Path("accommodanda/lib/assets/style.css")).read_text()
+    depth, stray = 0, []
+    for i, line in enumerate(css.splitlines(), 1):
+        depth += line.count("/*") - line.count("*/")
+        if depth < 0:
+            stray.append(i)
+            depth = 0
+    assert not stray, "unbalanced CSS comment at line(s) %s" % stray
+    assert ".stub-lede {" in css

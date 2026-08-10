@@ -1229,3 +1229,24 @@ p.ruta:first-of-type, p:not(.ruta) + p.ruta { margin-top: 1.1rem; }
 figure.bild { margin: 1.4rem 0; text-align: center; }
 figure.bild img { max-width: 100%; height: auto; border: 1px solid var(--rule-soft);
                   border-radius: 3px; }
+
+/* A begrepp page with no written description: the term's occurrences ARE the
+   page, so they render in the reading column instead of the context rail (see
+   wiki/render.py). The rail's own list markup is reused inside each group, at
+   reading size rather than margin size, with every group open -- a reader who
+   opens a concept came for this list, so nothing is folded away.
+
+   The page keeps the ordinary three-column document grid even though it has no
+   TOC and no rail: every page's main content then sits at the same width, which
+   reads better across the site than widening this one to fill the space. */
+.stub-lede { color: var(--ink-3); font-style: italic; margin: 0 0 1.4rem; }
+section.occurrences { margin: 0 0 1.6rem; }
+section.occurrences > h2 { font-family: var(--serif); font-size: 1rem;
+         font-weight: 500; margin: 0 0 .4rem; padding-bottom: .25rem;
+         border-bottom: 1px solid var(--rule-soft); }
+section.occurrences > h2 .c { color: var(--ink-4); font-size: .8rem;
+         font-weight: 400; margin-left: .35rem; }
+section.occurrences ul { list-style: none; margin: 0; padding: 0; }
+section.occurrences li { margin: .3rem 0; line-height: 1.45; }
+section.occurrences details.more > summary { color: var(--ink-3);
+         font-size: .85rem; cursor: pointer; margin-top: .4rem; }
