@@ -1813,8 +1813,16 @@ inbound → render pipeline as the machine-extracted sources.
     dangling, and DV nyckelord become live links. A `RE_CONCEPT` name filter drops
     the formula/parenthetical junk the SFS extractor emits (`*/k/ …`,
     `(av personuppgifter)`) — on the real catalog **~5,690 clean stubs vs 520
-    rejected** (SFS-defined alone, before nyckelord). `wiki/render.py`'s `render` shows the
-    stub note + inbound; `generate_site` renders the path-less stub.
+    rejected** (SFS-defined alone, before nyckelord). `wiki/render.py`'s `render`
+    puts a description-less concept's occurrences in the **reading column**
+    rather than the context rail (2026-08-10): the page is an index of where the
+    term is used, not an article whose text is missing, so the rail would leave
+    the column empty beside it. The lede counts the rättskällor
+    (`EDITORIAL_KEYS` excludes our own commentary and other concept pages), the
+    statute group is headed **Legaldefinitioner** there (`GROUP_LABEL` — the
+    rail's "Lagrumshänvisningar hit" names the margin it was written for), and
+    the rail's JSON island is suppressed so the same list is not printed twice.
+    `generate_site` renders the path-less stub.
     `test/test_wiki.py`. **EU defined terms now promoted too**
     (`catalog.definition_links`): each Swedish EU act's definitions-article point
     that `defines` a term emits a `dcterms:subject` edge to `begrepp/<Name>`,
