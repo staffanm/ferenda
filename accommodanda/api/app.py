@@ -357,7 +357,8 @@ def search_endpoint(
     return SearchResponse(query=q, total=res["total"],
                           next_cursor=res["next_cursor"],
                           facets=_labelled_facets(res["facets"]),
-                          results=results)  # ty: ignore[invalid-argument-type]  # result/facet dicts are validated by pydantic at runtime
+                          # result/facet dicts are validated by pydantic at runtime
+                          results=results)
 
 
 def _labelled_facets(buckets):

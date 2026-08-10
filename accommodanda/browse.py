@@ -295,8 +295,11 @@ def render_landing(source, view, banner=""):
                             for c in (b["children"] or [])[:LANDING_CHILDREN]]}
               for b in view["buckets"]]
     heading = SOURCE_LABEL.get(source, source)
+    # the total counts the *buckets*, not the rendered rows: `groups` holds
+    # display values of several types, so summing one of its keys asks the type
+    # checker to pick an overload out of a union it cannot narrow
     body = LISTS.source_landing_body(
-        Markup(banner), heading, sum(g["count"] for g in groups), groups)
+        Markup(banner), heading, sum(b["count"] for b in view["buckets"]), groups)
     return page(heading, "Bläddra", "", body, solo=True,
                 body_class=" browse", own_h1=True)
 
