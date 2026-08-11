@@ -2722,6 +2722,7 @@ SOURCES["avg"] = Source("avg", avg_list, {
 
 RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
            PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
+           PKG / "rs" / "skv.py",
            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
            PKG / "lib" / "artifact.py")
 
@@ -2737,29 +2738,63 @@ def rs_record(basefile):
 
 
 def rs_inputs(basefile):
-    """The record JSON plus the document PDF -- re-downloading either re-stales
-    the parse. A repealed Konkurrensverket entry publishes no document, so the
-    PDF is an input only where there is one."""
+    """The record JSON plus the document -- the PDF six agencies published it
+    as, or Skatteverkets page. Re-downloading either re-stales the parse. A
+    repealed Konkurrensverket entry publishes no document, so the document is an
+    input only where there is one."""
     paths = [rs_record(basefile)]
-    pdf = rs_download.pdf_path(layout.RS_DOWNLOADED, basefile)
-    if compress.exists(pdf):
-        paths.append(pdf)
+    document = rs_download.body_path(layout.RS_DOWNLOADED, basefile)
+    if compress.exists(document):
+        paths.append(document)
     return paths + _patch_input("rs", basefile)
 
 
 def rs_harvest(scopes):
-    """Bulk harvest of the six agencies' rättsliga ställningstaganden (scopes =
-    agency codes; empty = all six). `--force` refetches every document; `--only
-    fk/2025:01` fetches a single ställningstagande (needs its agency scope)."""
+    """Bulk harvest of the agencies' rättsliga ställningstaganden (scopes =
+    agency codes; empty = every *non-browser* agency). Skatteverket is excluded
+    from the default sweep -- it needs the slow, serial DetachedChrome
+    transport, so it runs on its own schedule via `lagen rs browser-download`.
+    Naming it explicitly still harvests it. `--force` refetches every document;
+    `--only fk/2025:01` fetches a single ställningstagande (needs its agency
+    scope)."""
     _require_single_scope("rs", scopes, "agency",
                           "lagen rs download fk --only fk/2025:01")
+    if not scopes:
+        skipped = rs_agencies.BROWSER_ORGS
+        scopes = list(rs_agencies.DEFAULT_ORGS)
+        if skipped:
+            print("rs download: skipping %d browser-shielded agenc%s (%s) -- "
+                  "run `lagen rs browser-download` on its own schedule"
+                  % (len(skipped), "y" if len(skipped) == 1 else "ies",
+                     ", ".join(skipped)))
     if RUN.dry_run:
         print("rs download: would download %s into %s"
-              % (RUN.only or ", ".join(scopes) or " + ".join(rs_agencies.ORGS),
-                 layout.RS_DOWNLOADED))
+              % (RUN.only or ", ".join(scopes), layout.RS_DOWNLOADED))
         return
-    totals = rs_download.sync(layout.RS_DOWNLOADED, scopes=scopes or None,
-                              full=RUN.force, only=RUN.only)
+    totals = rs_download.sync(layout.RS_DOWNLOADED, scopes=scopes,
+                              full=RUN.force, only=RUN.only, limit=RUN.limit)
+    for org, (seen, new) in totals.items():
+        print("rs %s: %d seen, %d new" % (org, seen, new))
+
+
+def rs_browser_download(_basefiles):
+    """`lagen rs browser-download`: harvest only the browser-shielded agencies
+    (skv), which need the headful-Chrome transport and are kept off the default
+    sweep.
+
+    Skatteverkets register alone is 2,614 ställningstaganden, each one browser
+    navigation, so a first run takes hours and later runs cost the register plus
+    whatever moved. That cadence is a weekly job of its own, not part of the
+    nightly rs sweep."""
+    scopes = list(rs_agencies.BROWSER_ORGS)
+    if RUN.dry_run:
+        print("rs browser-download: would download %s into %s"
+              % (RUN.only or ", ".join(scopes), layout.RS_DOWNLOADED))
+        return
+    util.harvest_start("rs browser-download",
+                       "the headful-Chrome agency sites (%s)" % ", ".join(scopes))
+    totals = rs_download.sync(layout.RS_DOWNLOADED, scopes=scopes,
+                              full=RUN.force, only=RUN.only, limit=RUN.limit)
     for org, (seen, new) in totals.items():
         print("rs %s: %d seen, %d new" % (org, seen, new))
 
@@ -2841,15 +2876,22 @@ SOURCES["rs"] = Source("rs", rs_list, {
                           inputs=rs_inputs, code=RS_CODE),
 },
     harvest=rs_harvest,
+    actions={"browser-download": rs_browser_download},
     origin=rs_agencies.BY_ORG["fk"].listing,
     scopes=frozenset(rs_agencies.ORGS),
     notes="download flag: --only org/nummer (fetch one; needs its agency scope)\n"
           "scopes are the myndigheter: " + ", ".join(
               "%s (%s)" % (a.org, a.name) for a in rs_agencies.REGISTRY)
-          + "; empty = all\n"
+          + "; empty = all non-browser agencies\n"
+          "browser-download: harvest just the headful-Chrome agencies (skv), "
+          "kept off the default sweep for a separate weekly schedule\n"
           "identity is the agency's own number, not a diarienummer -- a "
           "ställningstagande is published as a numbered item in the agency's "
-          "series (IMYRS 2024:1, FKRS 2025:01, RS/028/2021)\n"
+          "series (IMYRS 2024:1, FKRS 2025:01, RS/028/2021). Skatteverket is "
+          "the exception: it numbers no series and cites its own positions by "
+          "dnr, so there the dnr is the identity\n"
+          "the skv scope is 2,614 documents published as web pages rather than "
+          "PDFs, behind the same F5/Shape challenge SKVFS sits behind\n"
           "the fk scope reads each document's Serienummer out of its PDF (the "
           "listing retypes it, and once wrongly), so a first run fetches every "
           "PDF and later runs reuse the number the record was filed under\n"
@@ -3567,6 +3609,16 @@ def cmd_relate(names, force=None):
     print("catalog: %s" % CATALOG)
 
 
+# sources whose catalog rows are internal registry, not reader-facing pages:
+# a kommentar's prose reaches the reader through the annotated act's comment
+# rail, and /kommentar/<id> serves no page -- so a search hit for one is a
+# dead link with a useless title ("Kommentar"). The rows stay in `documents`
+# (kommentar validate/relate read them), but the index holds no units for
+# them; a prior index's units are purged. Composed here, one layer above
+# lib/search, like SOURCE_RENDERERS (lib never branches on a source).
+UNSEARCHED = frozenset({"kommentar"})
+
+
 def cmd_index(names, jobs=1):
     """Sync the OpenSearch full-text index for each named source from the catalog
     + artifacts -- a whole-document unit plus one fragment per § node, the
@@ -3592,15 +3644,30 @@ def cmd_index(names, jobs=1):
     for name in names:
         if name not in ARTIFACTS:
             continue
+        # an unsearched source's step also fingerprints build.py, where
+        # UNSEARCHED lives -- so moving a source in or out of the set restales
+        # exactly that source's step (the recorded recipe no longer matches),
+        # instead of "up to date" leaving stale units indexed indefinitely
+        code = INDEX_CODE + ((PKG / "build.py",) if name in UNSEARCHED else ())
         wm = catalog.source_content_signature(con, name)
-        if index_present and up_to_date(store, "index", name, wm, INDEX_CODE):
+        if index_present and up_to_date(store, "index", name, wm, code):
             print("index %s: up to date (catalog unchanged) -- skipped" % name)
             _emit_segment("index", name, 0.0, ran=0, status="skipped")
+            continue
+        if name in UNSEARCHED:
+            t0 = time.perf_counter()
+            index.wait_for_task(index.delete_source_async(name),
+                                "purge %s" % name)
+            _emit_segment("index", name, time.perf_counter() - t0, total=0,
+                          ran=0, status="ok")
+            record_step(store, "index", name, wm, code)
+            dirty = True
+            print("index %s: not a search source -- stale units purged" % name)
             continue
 
         def progress(seen, total, current="", name=name):
             util.status(seen, total, "index %s  %s" % (name, current))
-        recode = code_changed(store, "index", name, INDEX_CODE)
+        recode = code_changed(store, "index", name, code)
         if recode and not RUN.force:
             print("index %s: index code changed -- reindexing all" % name)
         t0 = time.perf_counter()
@@ -3610,7 +3677,7 @@ def cmd_index(names, jobs=1):
         _emit_segment("index", name, time.perf_counter() - t0, total=docs,
                       ran=indexed, errors=len(errors), skipped_fresh=skipped,
                       status="errors" if errors else "ok")
-        record_step(store, "index", name, wm, INDEX_CODE)
+        record_step(store, "index", name, wm, code)
         dirty = True
         had_errors |= bool(errors)
         sys.stderr.write("\n")

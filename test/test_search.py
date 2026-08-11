@@ -103,6 +103,47 @@ def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
     assert frag["_source"]["doc_display"] == "Cyberresiliensförordningen (CRA)"
 
 
+def test_doc_actions_omits_the_identifier_when_the_label_is_prose():
+    """A lagrådsremiss has no official number, so `lib/regeringen.py:lr_identity`
+    files it under its own heading and its label IS its title (2,764 of 2,796
+    catalogued lagrådsremisser). `identifier^16` then boosts ordinary prose
+    sixteenfold: the live top hit for "olaga hot mot journalist" drew 43 of its
+    116 points from `identifier:mot` alone. Such a document indexes no identifier
+    -- its title still carries every word."""
+    title = "Skärpt syn på brott mot journalister och vissa andra samhällsnyttiga funktioner"
+    [lr] = list(search.doc_actions(
+        ("https://lagen.nu/lr/2023/skarpt-syn-pa-brott-mot-journalister",
+         "forarbete", "lr", title, title, ""), 0, version="v"))
+    assert "identifier" not in lr["_source"]
+    assert lr["_source"]["title"] == title        # still findable by every word
+    assert lr["_source"]["label"] == title        # the display identity is kept
+    # a concept page and a kommentar page are labelled the same way -- a name, or
+    # the bare word "Kommentar", which x16 would push over every real match for it
+    for row in (("https://lagen.nu/begrepp/Klander_av_stämmobeslut", "begrepp",
+                 "begrepp", "Klander av stämmobeslut", "Klander av stämmobeslut"),
+                ("https://lagen.nu/kommentar/2001:527", "kommentar", "kommentar",
+                 "Kommentar", "Kommentar")):
+        [unit] = list(search.doc_actions((*row, ""), 0, version="v"))
+        assert "identifier" not in unit["_source"]
+
+    # equal label and title is NOT enough to drop it: a court decision's citation
+    # IS its title (all 23,733 catalogued dv decisions), and that citation is
+    # exactly what the x16 boost is for. A number is what tells the two apart.
+    for label in ("Prop. 2022/23:106", "NJA 2005 s. 417", "31958R0001(01)"):
+        [unit] = list(search.doc_actions(
+            ("https://lagen.nu/x", "dv", "case", label, label, ""), 0, version="v"))
+        assert unit["_source"]["identifier"] == label
+    # ... and a label that differs from the title is always indexed
+    [prop] = list(search.doc_actions(
+        ("https://lagen.nu/prop/2022/23:106", "forarbete", "prop",
+         "Prop. 2022/23:106", title, ""), 0, version="v"))
+    assert prop["_source"]["identifier"] == "Prop. 2022/23:106"
+    # emitted units changed without any artifact changing, so the version prefix
+    # has to move for the incremental indexer to refresh them
+    assert search.INDEX_FORMAT == "6"
+    assert search._index_version("h1") == "6:h1"
+
+
 def test_doc_actions_no_fragments_carries_full_text(tmp_path):
     # a flat artifact (no id-bearing nodes) -> the single document unit holds the
     # whole body text, since there is no fragment to own it
@@ -240,6 +281,122 @@ def test_highlight_cap_stays_under_index_limit():
     assert 0 < offset <= 1_000_000
     body = search.query_body("mord")
     assert body["highlight"]["max_analyzer_offset"] == offset
+    # the cap has to ride every body that highlights, and the ranking query no
+    # longer does: `search` asks for the page's snippets separately
+    assert "highlight" not in search.query_body("mord", highlight=False)
+    for body in (search.document_highlight_body("mord", ["u1"]),
+                 search.fragment_query_body("mord", ["u1"])):
+        assert body["highlight"]["max_analyzer_offset"] == offset
+
+
+# the four steps of one real beredningskedja, as the live index holds their titles
+CHAIN = "Skärpt syn på brott mot journalister och vissa andra samhällsnyttiga funktioner"
+CHAIN_SOU = ("En skärpt syn på brott mot journalister och utövare av vissa "
+             "samhällsnyttiga funktioner")
+
+
+def test_same_project_groups_a_beredningskedja_but_not_its_neighbours():
+    """The lagrådsremiss, Bet. 2022/23:JuU27 and Prop. 2022/23:106 print the same
+    title; SOU 2022:2 rewords it (token overlap 0.71). Everything else in the live
+    top-50 for "olaga hot mot journalist" is a different project and must stay
+    separate -- including two whose titles share the word "mot"."""
+    def same(a, b):
+        return search.same_project(search.title_tokens(a), search.title_tokens(b))
+
+    assert same(CHAIN, CHAIN)                      # lr / bet / prop, verbatim
+    assert same(CHAIN, CHAIN_SOU)                  # SOU 2022:2, reworded
+    # word order and punctuation do not separate a project from itself
+    assert same("Vårdnad om barn m.m.", "om vårdnad om barn m.m.")
+
+    for other in ("Kraftsamling mot antiziganism",              # SOU 2016:44
+                  "Hemliga tvångsmedel mot allvarliga brott",   # SOU 2012:44
+                  "Ett starkare skydd för offentliganställda mot våld, hot "
+                  "och trakasserier m.m."):                     # a second lr
+        assert not same(CHAIN, other)
+        assert not same(CHAIN_SOU, other)
+    assert not same("Kraftsamling mot antiziganism",
+                    "Hemliga tvångsmedel mot allvarliga brott")
+    # an act must not merge with the props that amend it: 0.69 overlap, just under
+    # the threshold, measured live for the query "upphovsrätt"
+    assert not same(
+        "Lag (1960:729) om upphovsrätt till litterära och konstnärliga verk",
+        "om ändring i lagen (1960:729) om upphovsrätt till litterära och "
+        "konstnärliga verk")
+    # an untitled document is its own cluster, never one big cluster of them all
+    assert not search.same_project(search.title_tokens(""), search.title_tokens(""))
+
+
+def test_cap_title_clusters_keeps_the_two_best_and_backfills():
+    # the live candidate order for "olaga hot mot journalist": the chain takes
+    # ranks 1, 2, 4 and 5, with three unrelated documents between them
+    titles = [CHAIN,                                    # 0 lr
+              CHAIN,                                    # 1 bet
+              "Ett starkare skydd för offentliganställda mot våld, hot m.m.",
+              CHAIN_SOU,                                # 3 SOU 2022:2 -- capped
+              CHAIN,                                    # 4 prop -- capped
+              "Skydd mot avlyssning",
+              "Skadeståndsanspråk mot staten",
+              "Kraftsamling mot antiziganism"]
+    keep, used = search.cap_title_clusters(titles, limit=5)
+    assert keep == [0, 1, 2, 5, 6]        # two of the chain, then the next distinct
+    assert used == 7                      # ... and the page read that far to fill
+    # every candidate the page skipped is behind the cursor, so page 2 resumes
+    # after index 6 and never re-shows the two capped hits
+    assert [titles[i] for i in keep].count(CHAIN) == 2
+
+    # nothing to declutter -> the raw order, untouched
+    assert search.cap_title_clusters(titles[5:], limit=3) == ([0, 1, 2], 3)
+
+
+def test_cap_title_clusters_never_shortens_a_page():
+    # decluttering must not cost a reader a result: where the candidates run out
+    # before the page is full, the capped-out hits come back to fill it
+    keep, used = search.cap_title_clusters([CHAIN] * 4, limit=10)
+    assert keep == [0, 1, 2, 3] and used == 4
+    # ... and a full window still yields exactly the page asked for
+    keep, _ = search.cap_title_clusters([CHAIN] * 3 + ["Skydd mot avlyssning"] * 9,
+                                        limit=10)
+    assert len(keep) == 10
+
+
+def test_strip_stopword_highlights_keeps_content_words():
+    # the index has no Swedish stopword filter, so "mot" is matched and marked
+    # like any term: SOU 2016:44 came back as "Kraftsamling <em>mot</em>
+    # antiziganism", a snippet whose only mark is a function word
+    assert search.strip_stopword_highlights(
+        ["Kraftsamling <em>mot</em> antiziganism",
+         "dömdes för <em>olaga</em> <em>hot</em>"]) \
+        == ["dömdes för <em>olaga</em> <em>hot</em>"]
+    # the marks around content words stay, and no text is lost with the wrapper
+    assert search.strip_stopword_highlights(
+        ["olaga <em>hot</em> mot <em>journalist</em>"]) \
+        == ["olaga <em>hot</em> mot <em>journalist</em>"]
+    assert search.strip_stopword_highlights(
+        ["<em>hot</em> <em>mot</em> en <em>journalist</em> via Twitter"]) \
+        == ["<em>hot</em> mot en <em>journalist</em> via Twitter"]
+    # a word that merely starts with a stopword is a content word (the prefix
+    # branch marks "motiverade" for the query "mot")
+    assert search.strip_stopword_highlights(["som <em>motiverade</em> insatsen"]) \
+        == ["som <em>motiverade</em> insatsen"]
+    # an empty snippet reads as "no match in the body", so the last fragment
+    # survives even when its only mark is a function word
+    assert search.strip_stopword_highlights(["Kraftsamling <em>mot</em> antiziganism"]) \
+        == ["Kraftsamling mot antiziganism"]
+    assert search.strip_stopword_highlights([]) == []
+
+
+def test_parse_hit_strips_the_function_word_marks_it_returns():
+    hit = search.parse_hit({
+        "_source": {"doc_uri": "https://lagen.nu/sou/2016:44",
+                    "uri": "https://lagen.nu/sou/2016:44", "is_doc": True,
+                    "title": "Kraftsamling mot antiziganism", "source": "forarbete"},
+        "_score": 32.75,
+        "highlight": {"text": ["ska <em>motverka</em> hatbrott",
+                               "det ”<em>hot</em>” som <em>motiverade</em> styrkan",
+                               "brotten <em>mot</em> någons frid"]},
+    })
+    assert hit["highlight"] == ["ska <em>motverka</em> hatbrott",
+                                "det ”<em>hot</em>” som <em>motiverade</em> styrkan"]
 
 
 def test_parse_hit_fragment_representative():
@@ -312,6 +469,9 @@ def test_search_returns_cursor_and_merges_best_fragment():
         def search(self, index, body):
             self.calls += 1
             if self.calls == 1:
+                # the ranking query carries no highlight -- the snippets come from
+                # the two bounded follow-ups, for this page's documents only
+                assert "highlight" not in body
                 return {
                     "hits": {"total": {"value": 2, "relation": "eq"}, "hits": [{
                         "_source": {"doc_uri": "u1", "uri": "u1", "is_doc": True,
@@ -321,6 +481,12 @@ def test_search_returns_cursor_and_merges_best_fragment():
                     "aggregations": {field: {"values": {"buckets": []}}
                                      for field in ("source", "kind", "year")},
                 }
+            if self.calls == 2:
+                assert {"terms": {"uri": ["u1"]}} in body["query"]["bool"]["filter"]
+                return {"hits": {"hits": [{
+                    "_source": {"uri": "u1"},
+                    "highlight": {"title": ["<em>One</em>"]},
+                }]}}
             assert body["collapse"] == {"field": "doc_uri"}
             return {"hits": {"hits": [{
                 "_source": {"doc_uri": "u1", "uri": "u1#P1", "is_doc": False,
@@ -333,8 +499,89 @@ def test_search_returns_cursor_and_merges_best_fragment():
     index.client = Client()
     result = index.search("mord", limit=1)
     assert result["results"][0]["fragments"][0]["pinpoint"] == "P1"
+    # the fragment's snippet wins over the whole-document one
+    assert result["results"][0]["highlight"] == ["<em>mord</em>"]
     sort, seen = search.decode_cursor(result["next_cursor"])
     assert sort == [5.0, "u1"] and seen == 1
+
+
+def _clustered_client(sizes, froms=None):
+    """A client whose ranking query answers with one whole-document hit per title
+    of the audit's live candidate order, recording each requested `size` (and,
+    when `froms` is given, each request's `from` -- which must always be an int:
+    the offset-mode sentinel None reaching the body is an OpenSearch 400)."""
+    titles = [CHAIN, CHAIN, "Ett starkare skydd för offentliganställda",
+              CHAIN_SOU, CHAIN, "Skydd mot avlyssning", "Skadeståndsanspråk mot staten",
+              "Kraftsamling mot antiziganism", "Nya nätbrott", "Hemliga tvångsmedel"]
+
+    class Client:
+        def search(self, index, body):
+            if "aggs" in body:
+                sizes.append(body["size"])
+                if froms is not None:
+                    froms.append(body.get("from"))
+                return {"hits": {
+                    "total": {"value": 747, "relation": "eq"},
+                    "hits": [{"_source": {"doc_uri": "u%d" % i, "uri": "u%d" % i,
+                                          "is_doc": True, "title": title,
+                                          "source": "forarbete"},
+                              "_score": 100.0 - i, "sort": [100.0 - i, "u%d" % i]}
+                             for i, title in enumerate(titles[:body["size"]])]},
+                    "aggregations": {field: {"values": {"buckets": []}}
+                                     for field in ("source", "kind", "year")}}
+            return {"hits": {"hits": []}}          # no snippets, no fragments
+
+    index = object.__new__(search.SearchIndex)
+    index.index = "test"
+    index.client = Client()
+    return index
+
+
+def test_search_caps_one_project_per_page_and_keeps_the_cursor_coherent():
+    """Page 1 of "olaga hot mot journalist" was four steps of one legislative
+    project. At most CLUSTER_CAP of them show, the freed slots go to the next
+    distinct projects, and the cursor resumes after the last candidate the page
+    read -- so page 2 neither repeats those hits nor brings the capped ones back."""
+    sizes, froms = [], []
+    result = _clustered_client(sizes, froms).search("olaga hot mot journalist",
+                                                    limit=5)
+    assert sizes == [15]                     # 3x the page, ranked but not highlighted
+    assert froms == [0]                      # the None mode sentinel never reaches `from`
+    assert [r["title"] for r in result["results"]] == [
+        CHAIN, CHAIN, "Ett starkare skydd för offentliganställda",
+        "Skydd mot avlyssning", "Skadeståndsanspråk mot staten"]
+    assert len(result["results"]) == 5       # the cap costs the page nothing
+    assert result["total"] == 747            # the raw query's count, not the page's
+    sort, seen = search.decode_cursor(result["next_cursor"])
+    assert sort == [94.0, "u6"] and seen == 7    # the 7th candidate, not the 5th hit
+
+
+def test_search_leaves_offset_paging_uncapped():
+    # `offset` is bounded random access: page N must line up with `from`, so a cap
+    # there would re-show on page 2 the candidates page 1 consumed past its limit
+    sizes = []
+    result = _clustered_client(sizes).search("olaga hot mot journalist",
+                                            limit=5, offset=5)
+    assert sizes == [5]                                  # no candidate window
+    assert [r["title"] for r in result["results"]][:2] == [CHAIN, CHAIN]
+    assert len(result["results"]) == 5
+
+
+def test_search_explicit_offset_zero_is_the_raw_first_page():
+    """The mode signal is the offset's presence, not its value: a client walking
+    by offset starts at 0, and its first page must line up with its later raw
+    pages -- capped there, hits 3-4 would never show on any page and the
+    backfilled ones would repeat. Only the cursorless, offsetless first page
+    (the web UI's) is capped."""
+    sizes, froms = [], []
+    result = _clustered_client(sizes, froms).search("olaga hot mot journalist",
+                                                    limit=5, offset=0)
+    assert sizes == [5]                                  # no candidate window
+    assert froms == [0]
+    # raw candidate order: the four chain steps stay where they ranked
+    assert [r["title"] for r in result["results"]] == [
+        CHAIN, CHAIN, "Ett starkare skydd för offentliganställda",
+        CHAIN_SOU, CHAIN]
 
 
 def test_threaded_bulk_passes_the_retry_arguments_to_streaming_bulk(monkeypatch):

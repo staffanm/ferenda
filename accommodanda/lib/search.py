@@ -44,8 +44,11 @@ from . import catalog, compress, facets, layout, text
 INDEX = "lagen"
 # bump when emitted units change without artifact changes. 5: dropped the `all`
 # copy_to catch-all (see SEARCH_FIELDS) -- a mapping change, so the index has to
-# be recreated rather than migrated, and every unit re-emitted into it.
-INDEX_FORMAT = "5"
+# be recreated rather than migrated, and every unit re-emitted into it. 6: a
+# document whose label is its own title, with no number in it, no longer emits
+# `identifier` (see citation_identifier) -- emitted-unit change only, so an
+# ordinary incremental index pass refreshes the affected units.
+INDEX_FORMAT = "6"
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -232,6 +235,37 @@ HIGHLIGHT = {"fields": {"text": {}, "title": {}},
 # extraction -- artifact + catalog row -> bulk actions (pure)
 # --------------------------------------------------------------------------
 
+_LABEL_NUMBER = re.compile(r"\d")
+
+
+def citation_identifier(label, title):
+    """The `identifier` to index for a document -- or None when its label is not a
+    citation identity at all.
+
+    `identifier^16` (SEARCH_FIELDS) exists so a citation-shaped label like
+    "SFS 1962:700" or "Prop. 2022/23:106" dominates every other signal. A document
+    with no official number, though, is filed under its own heading -- a
+    lagrådsremiss by `lib/regeringen.py:lr_identity` -- so its label IS its title,
+    and the x16 boost lands on ordinary prose. The live top hit for "olaga hot mot
+    journalist" was a lagrådsremiss that drew 43 of its 116 points from
+    `identifier:mot` alone: the word "mot" in its title, counted a second time at
+    sixteen times the weight.
+
+    Equal label and title is not enough to tell the two apart, because a court
+    decision's citation is also its title: all 23,733 catalogued dv decisions have
+    label == title == "NJA 2005 s. 417", and so do 683 eurlex regulations (their
+    CELEX) and 286 propositioner filed under a bare "Prop. 1993/94:100". A number
+    is what separates them -- every one of those carries one, while 93% of the
+    2,764 lagrådsremisser with label == title do not, nor do 30,046 begrepp names
+    or the 204 kommentar pages labelled "Kommentar". So a label that repeats the
+    title and holds no number indexes no identifier, and the document stays fully
+    findable through `title` (measured: 11 of 12 sampled concept pages still lead
+    their own name, the twelfth at rank 3)."""
+    if (label or "").strip() != (title or "").strip():
+        return label                    # an identity of its own -- always indexed
+    return label if _LABEL_NUMBER.search(label or "") else None
+
+
 def doc_actions(row, inbound_count, version=None, expired=None):
     """Yield the index units for one catalogued document: one whole-document unit
     plus one unit per id-bearing fragment, all standalone (no join/routing) and
@@ -253,6 +287,12 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     year = facets.document_year(source, facet_row)
     shared = {"doc_uri": uri, "source": source, "kind": kind,
               "version": version, "inbound_count": inbound_count}
+    # identity fields for the whole-document unit: `label` is a keyword (an exact
+    # whole-value match, so a single word never hits it), `identifier` is the
+    # x16-boosted text field and is emitted only for a real citation identity
+    identity = {"label": label, "title": title}
+    if identifier := citation_identifier(label, title):
+        identity["identifier"] = identifier
     if year:
         shared["year"] = year
     if expired:
@@ -261,9 +301,8 @@ def doc_actions(row, inbound_count, version=None, expired=None):
         # a synthesized stub (e.g. a begrepp concept minted from references) has
         # no artifact on disk -- only its identity is searchable: one whole-doc
         # unit carrying its name, no body, no fragments
-        yield {"_id": uri, "_source": {**shared, "uri": uri, "is_doc": True,
-               "identifier": label, "title": title, "label": label,
-               "display": title}}
+        yield {"_id": uri, "_source": {**shared, **identity, "uri": uri,
+               "is_doc": True, "display": title}}
         return
     raw = compress.read_bytes(path)          # decompressed artifact bytes
     if not raw.strip():
@@ -287,11 +326,13 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     # querying the citation form finds the decision. Field-driven on the
     # metadata key; sources without one contribute nothing.
     alt = art.get("metadata", {}).get("officialReport")
-    doc = {**shared, "uri": uri, "is_doc": True,
-           "identifier": label, "title": title, "label": label,
+    doc = {**shared, **identity, "uri": uri, "is_doc": True,
            "display": display,
            "text": ((alt + "\n") if alt else "") + text.document_text(art)}
     yield {"_id": uri, "_source": doc}
+    # a fragment carries the document's label as `doc_label` -- index:false, so it
+    # is the hit's display identifier and never a scored field; the amplification
+    # citation_identifier removes cannot arise here
     for frag_uri, frag_text in frags:
         yield {"_id": frag_uri,
                "_source": {**shared, "uri": frag_uri, "is_doc": False,
@@ -358,13 +399,19 @@ def decode_cursor(cursor):
 
 
 def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
-               search_after=None):
+               search_after=None, highlight=True):
     """Search one whole-document unit per result.
 
     The stable ``(_score, doc_uri)`` sort supports ``search_after`` beyond the
     bounded result window, and ``track_total_hits`` gives an exact document
     total. ``fragment_query_body`` separately recovers the best pinpoint for the
     small set of documents on this page.
+
+    ``highlight=False`` drops the snippets, for a query that ranks more documents
+    than the page shows (``SearchIndex.search``'s candidate window): highlighting
+    is what a search costs -- 50 hits without it answer in 0.07-0.10s where 10
+    hits with it take 0.25-0.35s -- and ``document_highlight_body`` then gets the
+    snippets for the page alone.
     """
     filters = _facet_filters(source, kind, year)
 
@@ -400,17 +447,36 @@ def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
         }},
         "post_filter": {"bool": {"filter": filters}},
         "sort": [{"_score": "desc"}, {"doc_uri": "asc"}],
-        "highlight": HIGHLIGHT,
         "aggs": {
             "source": facet_agg("source"),
             "kind": facet_agg("kind"),
             "year": facet_agg("year"),
         },
     }
+    if highlight:
+        body["highlight"] = HIGHLIGHT
     if search_after is not None:
         body.pop("from")
         body["search_after"] = search_after
     return body
+
+
+def document_highlight_body(q, uris):
+    """Whole-document snippets for the documents on one returned result page.
+
+    Highlighting is per document -- one hit's snippet does not depend on the
+    others -- so taking it out of the ranking query and asking for exactly the
+    page's documents returns the same fragments for less work."""
+    return {
+        "size": len(uris),
+        "query": {"bool": {"must": _text_query(q),
+                           "filter": [{"term": {"is_doc": True}},
+                                      {"terms": {"uri": uris}}]}},
+        # identity only: the ranking query already returned each document's
+        # metadata, and a whole-document `_source` is its entire body
+        "_source": ["uri"],
+        "highlight": HIGHLIGHT,
+    }
 
 
 def fragment_query_body(q, doc_uris):
@@ -427,6 +493,45 @@ def fragment_query_body(q, doc_uris):
     }
 
 
+# Swedish function words whose highlight says nothing about relevance. The index
+# analyses `text`/`title` with the standard analyzer -- no Swedish stopword filter
+# (verified against the live index settings) -- so every query term is matched and
+# marked, and a query like "olaga hot mot journalist" came back with SOU 2016:44
+# "Kraftsamling <em>mot</em> antiziganism": a snippet whose only mark is the word
+# "mot". Removing the filter at index time would change what matches; this removes
+# only the <em> wrapper, at serve time, so what matched is unchanged and what the
+# reader sees is the content words. Curated, not derived: a stopword list belongs
+# to a language, and only these appear as bare marks in real snippets.
+HIGHLIGHT_STOPWORDS = frozenset(
+    "och i av på att som för med till mot om en ett den det de eller samt vid "
+    "under efter utan mellan genom".split())
+
+_EM = re.compile(r"<em>(.*?)</em>", re.DOTALL)
+
+
+def strip_stopword_highlights(fragments):
+    """Highlight fragments with the marks around bare function words removed --
+    the text itself is untouched, only the `<em>` wrapper goes. A fragment left
+    with no mark at all carried nothing but function-word matches and is dropped,
+    unless it is the only fragment there is (an empty snippet reads as "no match
+    in the body", which is worse than a weak one)."""
+    kept, marks_only = [], []
+    for fragment in fragments:
+        cleaned = _EM.sub(
+            lambda m: (m.group(1) if m.group(1).strip().lower()
+                       in HIGHLIGHT_STOPWORDS else m.group(0)), fragment)
+        (kept if "<em>" in cleaned else marks_only).append(cleaned)
+    return kept or marks_only[:1]
+
+
+def hit_highlight(h):
+    """The snippets to show for a hit -- the body's, or the title's where the body
+    has none -- with the function-word marks removed."""
+    hl = h.get("highlight", {})
+    return (strip_stopword_highlights(hl.get("text", []))
+            or strip_stopword_highlights(hl.get("title", [])))
+
+
 def parse_hit(h):
     """Shape either a document hit or a collapsed best-fragment hit.
 
@@ -437,7 +542,7 @@ def parse_hit(h):
     hl = h.get("highlight", {})
     fragments = ([] if src.get("is_doc") else
                  [{"uri": src["uri"], "pinpoint": src.get("pinpoint"),
-                   "highlight": hl.get("text", [])}])
+                   "highlight": strip_stopword_highlights(hl.get("text", []))}])
     return {
         "uri": src["doc_uri"],
         # the public page path, set here rather than by each consumer: the other
@@ -449,9 +554,83 @@ def parse_hit(h):
         "display": src.get("display") or src.get("doc_display"),
         "source": src.get("source"), "kind": src.get("kind"),
         "score": h.get("_score"), "inbound_count": src.get("inbound_count", 0),
-        "highlight": hl.get("text", []) or hl.get("title", []),
+        "highlight": hit_highlight(h),
         "fragments": fragments,
     }
+
+
+# --------------------------------------------------------------------------
+# presentation-side declutter (pure)
+# --------------------------------------------------------------------------
+
+# One legislative project prints the SAME title on every step of its
+# beredningskedja, and each step is its own document: "Skärpt syn på brott mot
+# journalister och vissa andra samhällsnyttiga funktioner" is the title of the
+# lagrådsremiss, of Bet. 2022/23:JuU27 and of Prop. 2022/23:106 alike, while
+# SOU 2022:2 words it "En skärpt syn på brott mot journalister och utövare av
+# vissa samhällsnyttiga funktioner". All four score alike, so all four take a
+# slot on page 1 and the reader sees one project four times.
+#
+# CLUSTER_CAP hits per project keeps the project visible without letting it own
+# the page. The candidate window is what the freed slots are filled from.
+CLUSTER_CAP = 2
+CLUSTER_WINDOW = 3           # candidates ranked per requested hit ...
+CLUSTER_WINDOW_MAX = 50      # ... and never more than this many in total
+# Token overlap (Jaccard) at which two titles are the same project. Measured over
+# the live top-50 of 20 queries: the SOU variant above sits at 0.71 against its
+# prop/bet/lr, and a distinct project reaches 0.69 at most -- "Lag (1960:729) om
+# upphovsrätt till litterära och konstnärliga verk" against the props that amend
+# it, or one agency's penningtvätt-föreskrifter against another's. So 0.7 admits
+# the reworded step of a chain and stops before an act merges with its own
+# preparatory works. Exact equality is the 1.0 case, and covers a title whose
+# words are merely reordered ("Vårdnad om barn m.m." / "om vårdnad om barn m.m.").
+CLUSTER_JACCARD = 0.7
+
+_TITLE_PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def title_tokens(title):
+    """A title's word tokens, lowercased and free of punctuation -- so "m.m." and
+    "m m" tokenise alike and a trailing comma never separates two clusters."""
+    return frozenset(_TITLE_PUNCT.sub(" ", (title or "").lower()).split())
+
+
+def same_project(a, b):
+    """Whether two titles -- as `title_tokens` sets -- name the same legislative
+    project (CLUSTER_JACCARD). A title with no words (an untitled document) matches
+    nothing, itself included -- otherwise every one of them would collapse into a
+    single cluster."""
+    if not a or not b:
+        return False
+    return len(a & b) / len(a | b) >= CLUSTER_JACCARD
+
+
+def cap_title_clusters(titles, limit, cap=CLUSTER_CAP):
+    """Which of `titles` -- one candidate hit each, best-scoring first -- to show
+    on a page of `limit`, and how many candidates that consumed.
+
+    Returns `(keep, used)`: `keep` is candidate indices in score order, at most
+    `cap` per project; `used` is how far into the candidates the page reached, so
+    the caller's cursor can advance past the ones it dropped. When the candidates
+    run out before the page is full the capped-out hits come back to fill it, so a
+    page is never shorter than the raw query would have made it -- decluttering
+    must not cost a reader a result."""
+    clusters, keep, capped, used = [], [], [], 0
+    for i, title in enumerate(titles):
+        if len(keep) == limit:
+            break
+        used = i + 1
+        tokens = title_tokens(title)
+        cluster = next((c for c in clusters if same_project(tokens, c[0])), None)
+        if cluster is None:
+            clusters.append([tokens, 1])
+            keep.append(i)
+        elif cluster[1] < cap:
+            cluster[1] += 1
+            keep.append(i)
+        else:
+            capped.append(i)
+    return sorted(keep + capped[:limit - len(keep)]), used
 
 
 # --------------------------------------------------------------------------
@@ -775,17 +954,42 @@ class SearchIndex:
             _retry(lambda: self.client.indices.refresh(index=self.index), "refresh")
         return len(rows), indexed, errors, missing, skipped, deleted
 
-    def search(self, q, source=None, kind=None, limit=10, offset=0, year=None,
-               cursor=None):
-        search_after, seen = decode_cursor(cursor) if cursor else (None, offset)
+    def search(self, q, source=None, kind=None, limit=10, offset=None,
+               year=None, cursor=None):
+        search_after, seen = (decode_cursor(cursor) if cursor
+                              else (None, offset or 0))
+        # A wider candidate window than the page, so the beredningskedja cap below
+        # has hits to fill the slots it frees. Only where the page reads the result
+        # stream forward: the cursorless first page, and every cursor page (the
+        # cursor advances past each candidate consumed, so the pages stay disjoint
+        # and nothing dropped here comes back later). `offset` paging is bounded
+        # random access, where page N must line up with `from` -- capping any of
+        # its pages would re-show on page 2 candidates page 1 consumed past its
+        # limit and never show the capped ones. The mode is the caller's explicit
+        # signal: offset given (0 included) is random access, raw on every page;
+        # offset absent (None) is the forward stream. An offset defaulting to 0
+        # made the two first pages indistinguishable and the offset walk
+        # incoherent.
+        offset_mode = offset is not None and not cursor
+        window = (limit if offset_mode else
+                  max(limit, min(limit * CLUSTER_WINDOW, CLUSTER_WINDOW_MAX)))
         res = _retry(lambda: self.client.search(
             index=self.index,
-            body=query_body(q, source, kind, limit, offset, year,
-                            search_after)), "search")
-        hits = res["hits"]["hits"]
+            # `from` must be an int: the mode sentinel None means "first page"
+            # here (a None reaching the body is an OpenSearch 400)
+            body=query_body(q, source, kind, window, offset or 0, year,
+                            search_after, highlight=False)), "search")
+        candidates = res["hits"]["hits"]
+        # `total` and the facet counts stay the raw query's throughout: the cap is
+        # presentation, not a filter -- the documents it holds back are still hits.
+        keep, used = (
+            (list(range(len(candidates))), len(candidates)) if offset_mode else
+            cap_title_clusters([hit["_source"].get("title") or ""
+                                for hit in candidates], limit))
+        hits = [candidates[i] for i in keep]
         aggregations = res.get("aggregations", {})
-        raw_total = res["hits"].get("total", len(hits))
-        total = raw_total.get("value", len(hits)) \
+        raw_total = res["hits"].get("total", len(candidates))
+        total = raw_total.get("value", len(candidates)) \
             if isinstance(raw_total, dict) else raw_total
 
         def buckets(field):
@@ -796,6 +1000,15 @@ class SearchIndex:
         results = [parse_hit(hit) for hit in hits]
         if results:
             doc_uris = [result["uri"] for result in results]
+            # snippets for the page's documents, which the ranking query above no
+            # longer carries (see query_body's `highlight`)
+            highlight_res = _retry(lambda: self.client.search(
+                index=self.index, body=document_highlight_body(q, doc_uris)),
+                "document highlight")
+            snippets = {hit["_source"]["uri"]: hit_highlight(hit)
+                        for hit in highlight_res["hits"]["hits"]}
+            for result in results:
+                result["highlight"] = snippets.get(result["uri"], [])
             fragment_res = _retry(lambda: self.client.search(
                 index=self.index, body=fragment_query_body(q, doc_uris)),
                 "fragment search")
@@ -807,9 +1020,12 @@ class SearchIndex:
                     result["fragments"] = fragment["fragments"]
                     result["highlight"] = fragment["highlight"]
 
-        consumed = seen + len(hits)
-        next_cursor = (encode_cursor(hits[-1]["sort"], consumed)
-                       if hits and consumed < total else None)
+        # the cursor resumes after the last candidate this page CONSUMED, not the
+        # last one it showed -- a capped-out hit is decluttered for good, and page 2
+        # picks up where page 1 stopped reading
+        consumed = seen + used
+        next_cursor = (encode_cursor(candidates[used - 1]["sort"], consumed)
+                       if used and consumed < total else None)
         return {"total": total,
                 "next_cursor": next_cursor,
                 "facets": {field: buckets(field)
