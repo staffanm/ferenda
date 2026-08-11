@@ -642,8 +642,7 @@ def _lines(spans):
     baseline while sitting at different tops; a top-only grouping would split them
     (and reflow e.g. '9 Författningskommentar' to 'Författningskommentar 9', which
     then fails heading detection). The line's `top` is the topmost of its spans;
-    its `size` the largest run's (superscript footnote markers ride along without
-    shrinking their line).
+    its `size` its dominant run's (see `line_from_runs`).
 
     The spans are walked in *baseline* order, not `top` order, for the same
     reason the grouping keys on it. Each span is only compared with the group
@@ -688,10 +687,23 @@ def line_from_runs(runs, top):
     # it the failure is a bare IndexError out of `runs[0].bold` (rule:fail-fast)
     assert runs, "line_from_runs needs at least one run"
     text, spans = _join_runs(runs)
+    # The line's size is the size *most of its characters* are set in, not its
+    # largest run's. Both readings keep a raised footnote marker from shrinking
+    # the line it rides on -- the marker is one or two characters -- but only
+    # this one keeps a marker from *growing* its note: a lagtext page sets the
+    # note number at body size over text two sizes smaller ("8" at 15 leading
+    # "Senaste lydelse 2021:173." at 12), and where the two share a baseline the
+    # largest run made the whole line body-sized. The footnote gate in every
+    # vertical's classifier reads this size, so the note came out a heading. A
+    # tie goes to the larger size, which is what `max` said.
+    weight = Counter()
+    for run in runs:
+        weight[run.size] += len(run.text)
     return Line(text, top,
                 all(r.bold for r in runs), runs[0].bold,
                 all(r.italic for r in runs),
-                max(r.size for r in runs), runs, spans)
+                max(weight, key=lambda size: (weight[size], size)),
+                runs, spans)
 
 
 def flat_lines(pdf_path, hidden=False):
@@ -1051,6 +1063,53 @@ def _strip_header_runs(runs, header_re):
     return kept
 
 
+HEAD_MARGIN_SHARE = 0.75   # of the page's width: where a margin header sits
+
+
+def _strip_split_header(lines, identifier):
+    """`lines` without a running-header identifier the typesetter set over two
+    baselines in the outer margin.
+
+    `_strip_header_runs` matches the identifier inside one line's text, so it
+    cannot see a header broken across lines: prop. 2025/26:77 prints "Prop." at
+    the height of its title's first line and "2025/26:77" at the second, both in
+    the right margin. Neither line contains the whole identifier, so nothing was
+    stripped and the title came out spliced -- "Anpassning av svensk rätt till
+    EU:s nya Prop. förordning om skyddade beteckningar på 2025/26:77
+    jordbruksprodukter och livsmedel".
+
+    Geometry has to decide it, because the text alone no longer can, and three
+    conditions together keep that off body prose. Every fragment stands as its
+    own run and reads as exactly one token of the identifier the caller named --
+    prose that mentions the document sets it inside a longer run. Every fragment
+    sits in the outer `HEAD_MARGIN_SHARE` of the page's width. And the fragments
+    joined are the identifier entire, in reading order: a lone "Prop." in the
+    margin is not a header and is left alone.
+
+    The single-line header stays with `_strip_header_runs`, which the reflow
+    below depends on for more than the strip -- it is what tells that function's
+    caller the page opened with a head."""
+    tokens = identifier.split() if identifier else []
+    if len(tokens) < 2:
+        return lines
+    edge = HEAD_MARGIN_SHARE * max((r.right for l in lines for r in l.runs),
+                                   default=0)
+    head = [[r for r in l.runs if r.left >= edge and r.text.strip() in tokens]
+            for l in lines]
+    if (sum(1 for rs in head if rs) < 2
+            or [r.text.strip() for rs in head for r in rs] != tokens):
+        return lines
+    kept = []
+    for l, rs in zip(lines, head, strict=True):
+        body_runs = [r for r in l.runs if r not in rs]
+        if not rs:
+            kept.append(l)
+        elif body_runs:
+            kept.append(line_from_runs(body_runs, l.top))
+        # a line that was nothing but header fragments is dropped whole
+    return kept
+
+
 # A whole line that is nothing but this page's number, in the forms Swedish
 # agencies set it: the bare number, "3 (12)" / "3(12)", and "Sida 3" /
 # "Sid 3 av 12". Every form is anchored to the page's *own* number, so a line
@@ -1406,6 +1465,9 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     so they keep the segmentation they had."""
     if sum(RE_DOTS.search(l.text) is not None for l in lines) >= 5:
         return []
+    # first the header no single line holds the whole of (`_strip_split_header`),
+    # then, per line, the one a line does
+    lines = _strip_split_header(lines, identifier)
     header_re = (re.compile(r"\s*".join(re.escape(t) for t in identifier.split()))
                  if identifier else None)
     kept, first_headed = [], False
@@ -1695,12 +1757,37 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
     return paras
 
 
+def line_body_support(lines):
+    """`(dominant font size, how many lines are set in it)` for a line
+    sequence, `(0, 0)` when the source carries no font info. Computed over
+    *lines* -- a sparse page's paragraphs are too few for a stable mode, its
+    lines are not.
+
+    The count is what says whether the mode means anything: a page of running
+    text settles on its size over forty lines, a part title "decides" it on
+    three.
+
+    A tie goes to the *smaller* size, because a heading is never more common
+    than the body it heads. `Counter.most_common` broke ties by insertion order,
+    which is the order poppler happened to emit the sizes in, and both outcomes
+    of reading the larger one as body are damaging: it widens the footnote test
+    until real body text is apparatus, and it hides every heading, since nothing
+    is larger than the body any more. Prop. 2025/26:24 p. 10 sets two lines of a
+    wrapped heading at 19 and two of body at 15 -- read as body 19, the heading
+    stopped being a heading, and the enacting sentence under it reflowed into it
+    ("om allmän löneavgift Härigenom föreskrivs att 6 § lagen (1994:1920) …" as a
+    level-2 rubrik)."""
+    sizes = Counter(l.size for l in lines if l.size)
+    if not sizes:
+        return 0, 0
+    size = min(sizes, key=lambda s: (-sizes[s], s))
+    return size, sizes[size]
+
+
 def line_body_size(lines):
     """The dominant (body) font size of a line sequence, 0 when the source
-    carries no font info. Computed over *lines* -- a sparse page's paragraphs
-    are too few for a stable mode, its lines are not."""
-    sizes = [l.size for l in lines if l.size]
-    return Counter(sizes).most_common(1)[0][0] if sizes else 0
+    carries no font info."""
+    return line_body_support(lines)[0]
 
 
 # The unnumbered subheading a förarbete sets in *italics* at body size --

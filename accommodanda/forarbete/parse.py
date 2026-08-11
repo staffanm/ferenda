@@ -34,6 +34,7 @@ from ..lib.pdftext import (
     bilaga_labels,
     is_italic_subheading,
     line_body_size,
+    line_body_support,
     page_number_candidates,
     page_paragraphs,
     pdf_figures,
@@ -90,6 +91,20 @@ RE_CAPTION = re.compile(r"^(?:Figur|Diagram|Tabell|Bild)\s+\d", re.IGNORECASE)
 # row was enough to teach prop. 2023/24:27 that Calibri -- the face of the very
 # axis labels this is meant to catch -- was one of its heading faces.
 RE_NUM_HEADING = re.compile(r"^\d+(?:\.\d+)*\s+[^\W\d_]")
+# A lagtext page's provenance footnote, "8 Senaste lydelse 2021:173." -- the
+# note that records which SFS last amended the paragraph printed above it. It is
+# the exact shape of a numbered heading, and the size gate that is supposed to
+# catch it cannot always see it: the note's raised number is set at body size
+# over text two sizes smaller, and where the two share a baseline the line
+# reads as body-sized. Nothing about "8 Senaste lydelse" is a title.
+RE_PROVENANCE_NOTE = re.compile(r"^\d+\s*Senaste lydelse\b")
+# A title does not end mid-word or mid-clause. Reflow leaves a wrapped line of
+# prose standing alone often enough -- a hanging-indent bullet's continuation,
+# a lydelse table's cell -- and where it opens with a number the line matches
+# `RE_NUM_TITLE` whole: "(EU) nr 1151/2012, i den ursprung-" ends in the soft
+# hyphen the typesetter set, "17 december 2013 om kvalitetsordningar för
+# jordbruksprodukter och," in a comma.
+RE_UNFINISHED = re.compile(r"(?:[a-zåäö]-|,)\s*$")
 
 # prop/skr front matter (the överlämnande on page 1): the handover sentence,
 # the ort/datum line ("Stockholm den 20 maj 2021", occasionally Harpsund), and
@@ -118,7 +133,11 @@ def classify(paras, page, body=0, levels=None, faces=None):
     lydelse 2008:1266." -- the lagtext provenance footnotes, previously read as
     level-1 rubriks), and a numbered rubrik must be bold or larger than the body
     (a body-sized table row "22 år 25 000 …" is not a heading). Size-less paras
-    (OCR/legacy) keep the permissive rules.
+    (OCR/legacy) keep the permissive rules. Two shapes are refused a numbered
+    heading whatever their size says, because the size cannot always see them:
+    the provenance footnote by its own words (`RE_PROVENANCE_NOTE`), and a line
+    that ends mid-word or mid-clause (`RE_UNFINISHED`) -- reflow leaves those
+    standing on their own, and a title does not end that way.
 
     `levels` maps a font size to the heading level the document's own numbered
     headings use it at (`heading_level_by_size`), which is what recognises the
@@ -163,7 +182,9 @@ def classify(paras, page, body=0, levels=None, faces=None):
             blocks.append(Block("paragraf", p.text, page,
                                 num=re.sub(r"\s+", "", mp.group(1)),
                                 spans=p.spans, top=p.top))
-        elif mt and len(p.text) < HEADING_MAX and heading_font:
+        elif (mt and len(p.text) < HEADING_MAX and heading_font
+              and not RE_PROVENANCE_NOTE.match(p.text)
+              and not RE_UNFINISHED.search(p.text)):
             blocks.append(Block("rubrik", p.text, page,
                                 mt.group(1).count(".") + 1, spans=p.spans, top=p.top))
         elif RE_CAPTION.match(p.text) or (captioned and faces and p.font
@@ -308,25 +329,40 @@ def _size_scheme(paras):
     return body, heading_level_by_size(paras, body), text_faces(paras)
 
 
-def running_text_size(page, document):
-    """The size a page's running text is set in: the smaller of the page's own
-    dominant size and the document's.
+PAGE_SIZE_SUPPORT = 5   # lines at a page's own mode before it is believed
+
+
+def running_text_size(page, support, document):
+    """The size a page's running text is set in: the page's own dominant size
+    where the page has enough lines set in it (`support`, from
+    `line_body_support`), else the smaller of that and the document's.
 
     `classify` calls anything `FOOTNOTE_DROP` below the running text a footnote,
-    so what counts as running text has to be read where the reader is. One
-    document-wide size gets two things wrong. A bilaga reproducing an EU
-    regulation at 12 against a body of 17 is not 1,861 footnotes, which is what
-    SOU 2025:115's annexes came out as. And where a document is split near-evenly
-    between two sizes the document-wide mode is a coin toss: SOU 2015:93 sets
-    1,392 paragraphs at 16 and 1,197 at 12, and a hundred paragraphs moving either
-    way flipped the mode and reclassified 1,269 blocks with it.
+    and anything above it a heading candidate, so what counts as running text has
+    to be read where the reader is. One document-wide size gets two things wrong.
+    A bilaga reproducing an EU regulation at 12 against a body of 17 is not
+    1,861 footnotes, which is what SOU 2025:115's annexes came out as. And where
+    a document is split near-evenly between two sizes the document-wide mode is a
+    coin toss: SOU 2015:93 sets 1,392 paragraphs at 16 and 1,197 at 12, and a
+    hundred paragraphs moving either way flipped the mode and reclassified 1,269
+    blocks with it.
 
-    The *smaller* of the two, not the page's alone, because the failure being
-    fixed is body text read as apparatus: the smaller size can only ever mark
-    fewer paragraphs as footnotes than either estimate by itself. That keeps a
-    page set entirely in display sizes -- a cover, a part title -- from declaring
-    everything beneath its heading a footnote, and it keeps a page that is mostly
-    notes from promoting them to body."""
+    A page that carries enough of its own evidence is therefore read on its own
+    terms, in *both* directions. Prop. 2025/26:77 reproduces the EU regulation it
+    implements over 45 of its 130 pages, set at 10 against a body of 15, so the
+    document-wide mode is 10 -- and every line of ordinary 15-point prose passed
+    `p.size > body` and stood as a heading candidate. Ten of them reached the
+    table of contents as headings ("17 december 2013 om upprättande av en samlad
+    marknadsordning för"), and the pages' own footnotes, being no smaller than
+    that 10, were read as body.
+
+    Without that evidence the *smaller* of the two, because there the failure to
+    avoid is body text read as apparatus: the smaller size can only ever mark
+    fewer paragraphs as footnotes than either estimate by itself. That is what
+    keeps a page set entirely in display sizes -- a cover, a part title, three
+    lines of it -- from declaring everything beneath its heading a footnote."""
+    if page and support >= PAGE_SIZE_SUPPORT:
+        return page
     return min(page, document) if page and document else (page or document)
 
 
@@ -397,14 +433,15 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
                     segs.append(("gtabell", gdata, grows))
         # The page's own body size, read off its *lines* rather than the
         # paragraphs it reflowed into -- a sparse page has too few paragraphs for
-        # a stable mode, and enough lines either way (`line_body_size`). These are
-        # the page's raw lines, so the running header, the folio and a lydelse
+        # a stable mode, and enough lines either way (`line_body_support`). These
+        # are the page's raw lines, so the running header, the folio and a lydelse
         # table's cells all vote; on a page dominated by a table that pulls the
-        # size below the prose's. `running_text_size` takes the smaller of this
-        # and the document's, so the error can only ever *narrow* the footnote
-        # test -- the safe direction, and the reason this is not worth the second
-        # reflow it would cost to measure the kept lines instead.
-        pages.append(((printed, bilaga), segs, line_body_size(lines)))
+        # size below the prose's -- which can only ever *narrow* the footnote
+        # test, the safe direction, and the reason this is not worth the second
+        # reflow it would cost to measure the kept lines instead. The line count
+        # rides along: `running_text_size` believes a page's own size only where
+        # enough of the page is set in it.
+        pages.append(((printed, bilaga), segs, line_body_support(lines)))
     body, levels, faces = _size_scheme(
         [p for _pg, segs, _sz in pages
          for kind, data, _x in segs if kind == "paras" for p in data])
@@ -413,13 +450,13 @@ def parse_pdf(pdf_path, identifier, patch_key=None):
     pageno_of = {printed_map[pageno][0]: pageno for pageno, _ in raw
                  if printed_map[pageno][0] is not None}
     blocks = []
-    for (printed, bilaga), segs, page_size in pages:
+    for (printed, bilaga), segs, (page_size, page_lines) in pages:
         on_page = []
         for kind, data, rows in segs:
             if kind == "paras":
                 on_page += classify(data, printed,
-                                    running_text_size(page_size, body), levels,
-                                    faces)
+                                    running_text_size(page_size, page_lines, body),
+                                    levels, faces)
             elif kind == "gtabell":
                 on_page.append(Block("tabell", "", printed, rows=list(rows or []),
                                      th=bool(data)))
@@ -525,12 +562,15 @@ def _paged_body(pages):
     body, levels, faces = _size_scheme(
         [p for _pageno, paras in pages for p in paras])
     # the page's own size off its paragraphs, which is all these routes have --
-    # `running_text_size` takes the smaller of the two anyway, so a page whose
-    # paragraphs are too few to settle on a size cannot widen the footnote test
-    return [b for pageno, paras in pages
-            for b in classify(paras, pageno,
-                              running_text_size(line_body_size(paras), body),
-                              levels, faces)]
+    # and a page whose paragraphs are too few to settle on a size falls back to
+    # the smaller of the two, so it cannot widen the footnote test
+    blocks = []
+    for pageno, paras in pages:
+        page_size, page_lines = line_body_support(paras)
+        blocks += classify(paras, pageno,
+                           running_text_size(page_size, page_lines, body),
+                           levels, faces)
+    return blocks
 
 
 def _legacy_pdf_body(pdf_path, identifier, patch_key=None):

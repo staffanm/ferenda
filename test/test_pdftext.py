@@ -35,6 +35,7 @@ from accommodanda.lib.pdftext import (
     is_italic_subheading,
     is_page_number,
     letterhead_footnotes,
+    line_body_support,
     line_from_runs,
     page_paragraphs,
     pdf_pages,
@@ -129,8 +130,54 @@ def test_lines_groups_spans_on_shared_baseline():
     out = _lines(spans)
     assert [l.text for l in out] == ["9 Författningskommentar"]
     assert out[0].top == 10 and out[0].bold
-    assert out[0].size == 20                     # the line takes the largest run's size
+    assert out[0].size == 15               # the size most of its characters are in
     assert [r.text for r in out[0].runs] == ["9", "Författningskommentar"]
+
+
+def test_a_short_marker_run_does_not_set_the_lines_size():
+    """A line's size is the size most of its characters are set in, not its
+    largest run's. Both readings keep a raised footnote marker from shrinking
+    the line it rides on, but only this one keeps a marker from *growing* its
+    note: prop. 2025/26:77 p. 8 sets the note number "8" at the body's 15 over
+    "Senaste lydelse 2021:173." at 12, on one baseline, and every vertical's
+    footnote gate reads the line's size -- so the note came out a heading.
+
+    Measured over 25 random förarbeten, every line whose leading number is set
+    larger than the text beside it is a footnote, a printer's colophon or a list
+    item. None is a display heading, which is what the old rule protected."""
+    spans = [(920, 56, 934, "8", False, False, 67, 15, "times"),
+             (920, 187, 932, "Senaste lydelse 2021:173.", False, False, 318, 12,
+              "times")]
+    [line] = _lines(spans)
+    assert line.text == "8 Senaste lydelse 2021:173."
+    assert line.size == 12
+    # a tie still goes to the larger size, which is what `max` said
+    tie = [(10, 0, 20, "AAAA", False, False, 40, 15, "times"),
+           (10, 50, 20, "BBBB", False, False, 90, 12, "times")]
+    assert _lines(tie)[0].size == 15
+
+
+def _at_size(size, n):
+    return [Line("rad %d" % i, 100 + 20 * i, False, False, False, size)
+            for i in range(n)]
+
+
+def test_line_body_support_counts_the_lines_behind_the_mode():
+    assert line_body_support(_at_size(15, 4) + _at_size(23, 2)) == (15, 4)
+    assert line_body_support([Line("x", 1, False, False, False, 0)]) == (0, 0)
+
+
+def test_line_body_support_breaks_a_tie_toward_the_smaller_size():
+    """A heading is never more common than the body it heads, and `most_common`
+    broke ties by the order poppler happened to emit the sizes in. Reading the
+    larger one as body both widens the footnote test until real body text is
+    apparatus and hides every heading, since nothing is larger than the body any
+    more: prop. 2025/26:24 p. 10 sets two lines of a wrapped heading at 19 and
+    two of body at 15, and the enacting sentence under the heading reflowed into
+    it ("om allmän löneavgift Härigenom föreskrivs att 6 § lagen (1994:1920) …"
+    as a level-2 rubrik)."""
+    assert line_body_support(_at_size(19, 2) + _at_size(15, 2)) == (15, 2)
+    assert line_body_support(_at_size(15, 2) + _at_size(19, 2)) == (15, 2)
 
 
 def test_wrapped_heading_folds_into_one_paragraph():

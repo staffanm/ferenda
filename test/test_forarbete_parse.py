@@ -231,6 +231,45 @@ def test_page_paragraphs_strips_margin_header_runs_keeps_prose_mentions():
         "Vidare gäller att beslutet står fast."]
 
 
+def _mrun(top, *placed, size=23):
+    """A line from (left, text) pairs at their real x, as the cover sets them."""
+    runs = [Run(left, left + 8 * len(t), t, False, False, size) for left, t in placed]
+    return Line(" ".join(t for _l, t in placed), top, False, False, False, size,
+                runs)
+
+
+def test_page_paragraphs_strips_an_identifier_set_over_two_baselines():
+    """Prop. 2025/26:77's cover prints "Prop." at the height of its title's first
+    line and "2025/26:77" at the second, both in the right margin. Neither line
+    holds the whole identifier, so the per-line strip could not see it and the
+    title came out spliced: "Anpassning av svensk rätt till EU:s nya Prop.
+    förordning om skyddade beteckningar på 2025/26:77 jordbruksprodukter och
+    livsmedel". Twelve of 27 sampled propositions carried that splice."""
+    lines = [_mrun(145, (79, "Anpassning av svensk rätt till EU:s nya"),
+                   (525, "Prop.")),
+             _mrun(170, (79, "förordning om skyddade beteckningar på"),
+                   (525, "2025/26:77")),
+             _mrun(196, (79, "jordbruksprodukter och livsmedel"))]
+    paras = page_paragraphs(lines, "Prop. 2025/26:77", 1)
+    assert [p.text for p in paras] == [
+        "Anpassning av svensk rätt till EU:s nya förordning om skyddade "
+        "beteckningar på jordbruksprodukter och livsmedel"]
+
+
+def test_page_paragraphs_keeps_a_margin_fragment_that_is_not_the_identifier():
+    """The fragments joined have to be the identifier entire. A lone "Prop." in
+    the margin -- or a right-hand column that merely opens with the year -- is
+    not a header, and deleting it would cost real text."""
+    lines = [_mrun(145, (79, "Anpassning av svensk rätt till EU:s nya"),
+                   (525, "Prop.")),
+             _mrun(170, (79, "förordning om skyddade beteckningar"),
+                   (525, "2019/20:112"))]
+    paras = page_paragraphs(lines, "Prop. 2025/26:77", 1)
+    assert [p.text for p in paras] == [
+        "Anpassning av svensk rätt till EU:s nya Prop. förordning om skyddade "
+        "beteckningar 2019/20:112"]
+
+
 def test_page_paragraphs_breaks_at_bold_marker():
     # a bold §-marker line starts its own paragraph even without a gap
     lines = [_line("slutet på föregående paragrafs kommentar.", 70),
@@ -366,6 +405,32 @@ def test_classify_font_size_gates_footnotes_and_fake_headings():
              Para("En vanlig brödtext här.", size=15)]
     assert [b.kind for b in classify(paras, 4, body=15)] == [
         "rubrik", "stycke", "fotnot", "stycke"]
+
+
+def test_classify_refuses_a_provenance_footnote_a_heading():
+    """"8 Senaste lydelse 2021:173." is the note recording which SFS last
+    amended the paragraph above it. It is the exact shape of a numbered heading,
+    and the size gate cannot always see it: prop. 2025/26:77 p. 8 sets the note's
+    raised number at the body's 15 over text at 12, on one baseline, so the line
+    reads body-sized. Nothing about "N Senaste lydelse" is a title."""
+    paras = [Para("8 Senaste lydelse 2021:173.", size=15),
+             Para("1 Senaste lydelse av lagens rubrik 2025:953.", size=15)]
+    assert [b.kind for b in classify(paras, 8, body=15)] == ["stycke", "stycke"]
+
+
+def test_classify_refuses_a_heading_that_ends_mid_word_or_mid_clause():
+    """Reflow leaves a wrapped line of prose standing on its own often enough --
+    a hanging-indent bullet's continuation, a lydelse cell -- and where it opens
+    with a number it matches the numbered-heading pattern whole. A title does not
+    end in a soft hyphen or a comma. Both examples are prop. 2025/26:77's, and
+    both were published as level-1 table-of-contents entries."""
+    paras = [Para("110/2008, i den ursprungliga lydel-", size=19),
+             Para("17 april 2019 om definition, beskrivning, presentation och,",
+                  size=19),
+             Para("17 december 2013 om upprättande av en samlad marknadsordning",
+                  size=19)]
+    assert [b.kind for b in classify(paras, 12, body=15)] == [
+        "stycke", "stycke", "rubrik"]        # the third one is a title in shape
 
 
 def test_classify_sizeless_paras_keep_permissive_rules():
@@ -809,21 +874,30 @@ def test_running_text_size_takes_the_page_over_the_document():
     """A bilaga reproducing an EU regulation at 10 against a body of 17 is not
     1,861 footnotes, which is what SOU 2025:115's annexes came out as while one
     document-wide size decided it for every page."""
-    assert fa_parse.running_text_size(10, 17) == 10
+    assert fa_parse.running_text_size(10, 40, 17) == 10
+
+
+def test_running_text_size_believes_a_page_set_larger_than_the_document():
+    """Prop. 2025/26:77 reproduces the EU regulation it implements over 45 of its
+    130 pages, at 10 against a body of 15, so the document-wide mode is 10 --
+    and on every ordinary page 15-point prose passed `p.size > body` and stood
+    as a heading candidate, while the page's own 12-point footnotes were read as
+    body. A page carrying 40 lines of its own size is read on its own terms."""
+    assert fa_parse.running_text_size(15, 40, 10) == 15
 
 
 def test_running_text_size_never_widens_the_footnote_test():
-    """The smaller of the two, so a page set entirely in display sizes -- a
-    cover, a part title -- cannot declare everything beneath its heading a
-    footnote."""
-    assert fa_parse.running_text_size(28, 17) == 17
+    """Without enough lines of its own to go on -- a cover, a part title, three
+    lines of it -- the page falls back to the smaller of the two, so it cannot
+    declare everything beneath its heading a footnote."""
+    assert fa_parse.running_text_size(28, 3, 17) == 17
 
 
 def test_running_text_size_falls_back_to_whichever_is_known():
     # a page (or a document) whose source carries no font info at all
-    assert fa_parse.running_text_size(0, 17) == 17
-    assert fa_parse.running_text_size(10, 0) == 10
-    assert fa_parse.running_text_size(0, 0) == 0
+    assert fa_parse.running_text_size(0, 0, 17) == 17
+    assert fa_parse.running_text_size(10, 2, 0) == 10
+    assert fa_parse.running_text_size(0, 0, 0) == 0
 
 
 # ---- what a font size means, learned from the document ----------------------

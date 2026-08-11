@@ -85,6 +85,7 @@ def test_footnotes_end_the_region_and_superscripts_drop():
 
 
 def test_full_width_prose_ends_the_region():
+    # closing prose still ends the region -- nothing two-column follows it
     lines = [
         HEADER,
         _line(352, (172, 388, "vänster cell"), (402, 618, "höger cell")),
@@ -93,6 +94,66 @@ def test_full_width_prose_ends_the_region():
     segs = split_page(lines)
     assert [s[0] for s in segs] == ["tabell", "lines"]
     assert segs[1][1][0].text.startswith("Denna lag träder i kraft")
+
+
+def test_a_full_width_lead_in_does_not_end_the_region():
+    """Prop. 2025/26:77 p. 9: a statutory paragraph sets its lead-in sentence
+    across both columns and only then diverges into two enumerations. The
+    lead-in starts at the left margin and crosses the boundary, exactly like the
+    ikraftträdande sentence that closes a table -- so reading it as the end of
+    the region discarded the pending header and reflowed the whole remaining
+    enumeration through the plain path, where the columns interleave line by
+    line ("2. Europaparlamentets och rådets 1. Europaparlamentets och").
+
+    The lead-in comes back as its own ("lines", …) chunk -- one chunk, so its
+    lines still reflow into one paragraph -- and the columns resume under it."""
+    lines = [
+        HEADER,
+        _line(318, (380, 423, "1 §")),                      # centered marker
+        _line(340, (185, 626, "Bestämmelserna i 8 kap. 3–8 §§ varumärkeslagen")),
+        _line(357, (172, 626, "(2010:1877) ska tillämpas vid intrång som")),
+        _line(374, (172, 232, "följer av")),                # the lead-in's tail
+        _line(391, (185, 390, "1. rådets förordning (EU)"),
+              (414, 620, "1. rådets förordning (EU)")),
+        _line(408, (172, 388, "2019/787 av den 17 april"),
+              (402, 618, "2024/1143 av den 11 april")),
+    ]
+    segs = split_page(lines)
+    assert [s[0] for s in segs] == ["lines", "lines", "tabell"]
+    assert segs[0][1] == [lines[1]]                         # the "1 §" marker
+    assert [l.text for l in segs[1][1]] == [
+        "Bestämmelserna i 8 kap. 3–8 §§ varumärkeslagen",
+        "(2010:1877) ska tillämpas vid intrång som",
+        "följer av"]
+    _kind, header, rows = segs[2]
+    assert header is HEADER                    # the header survived the lead-in
+    assert rows == [
+        ("1. rådets förordning (EU) 2019/787 av den 17 april",
+         "1. rådets förordning (EU) 2024/1143 av den 11 april")]
+
+
+def test_a_short_sub_item_stays_with_the_prose_around_it():
+    """Prop. 2025/26:207 p. 15 sets "a) anställning," between two full-width
+    lines of one enumeration. It is short enough to fall wholly left of the
+    boundary, so read as a left cell it became a one-cell table -- which also
+    took the region's header off the real table below it. What follows decides:
+    more full-width prose, or the columns resuming."""
+    lines = [
+        HEADER,
+        _line(340, (185, 626, "Tiden ska minskas med hänsyn till")),
+        _line(357, (185, 300, "a) anställning,")),          # left of the boundary
+        _line(374, (185, 626, "b) arbetsmarknadspolitiskt program, och")),
+        _line(391, (185, 390, "Tiden ska dessutom minskas"),
+              (414, 620, "Tiden ska dessutom minskas")),
+    ]
+    segs = split_page(lines)
+    assert [s[0] for s in segs] == ["lines", "tabell"]
+    assert [l.text for l in segs[0][1]] == [
+        "Tiden ska minskas med hänsyn till", "a) anställning,",
+        "b) arbetsmarknadspolitiskt program, och"]
+    assert segs[1][1] is HEADER
+    assert segs[1][2] == [("Tiden ska dessutom minskas",
+                           "Tiden ska dessutom minskas")]
 
 
 def test_indent_starts_new_cell_paragraph():

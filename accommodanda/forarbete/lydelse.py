@@ -14,9 +14,14 @@ come back as ordinary marker lines.
 ("lines", [Line]) for the normal reflow/classify path or
 ("tabell", header_line, rows) where rows pair the aligned cell paragraphs
 [(nuvarande, föreslagen)] ('' for a cell with no counterpart -- entirely new
-or deleted text). The table region ends at a full-width prose line (starts at
-the left margin, crosses the boundary), a footnote-sized line, or the page
-end; a continuation page repeats the header, so detection is per page."""
+or deleted text). Full-width prose *inside* the region -- the paragraph a
+statute sets across both columns before its enumeration diverges
+("Bestämmelserna i 8 kap. 3-8 §§ … varumärkeslagen (2010:1877) ska tillämpas
+vid intrång i den rätt till en beteckning som följer av") -- comes back as its
+own ("lines", …) chunk and the columns continue after it. The region ends at
+full-width prose with no two-column row below it, at a footnote-sized line, or
+at the page end; a continuation page repeats the header, so detection is per
+page."""
 
 import re
 
@@ -26,7 +31,7 @@ RE_LYDELSE = re.compile(r"\blydelse\b", re.IGNORECASE)
 
 COL_TOL = 8           # cell runs may protrude this far past the boundary
 CENTER_MARGIN = 60    # a crossing line starting this near the left margin is
-                      # full-width prose (region end), not a centered marker
+                      # full-width prose, not a centered kap/§ marker
 ROW_TOL = 10          # cell paragraphs starting within this many y-units of
                       # each other are the two sides of one row
 INDENT = 8            # a first-line indent this deep starts a cell paragraph
@@ -69,12 +74,15 @@ def _table_region(lines, i, header, split, body, margin):
     """Consume the table region opening at `lines[i]` (the line after its
     header): cell lines sort by the boundary; a page-centered "2 kap."/"28 §"
     marker flushes the rows gathered so far and re-enters the normal path as
-    its own line; a full-width prose line or a footnote-sized line ends the
+    its own line; so does a run of full-width prose lines, but only while a
+    two-column row still follows below them (`_kinds_below`). Full-width
+    prose with nothing two-column under it, or a footnote-sized line, ends the
     region (that line is left for the caller). Returns (segments, next_i);
     only the region's first table segment carries the header line (the PDF
     prints it once, not before every marker-separated chunk)."""
     segs, left, right = [], [], []
     pending_header = [header]
+    full = []            # the run of full-width lines currently open, if any
 
     def flush():
         if left or right:
@@ -83,6 +91,13 @@ def _table_region(lines, i, header, split, body, margin):
                          _rows(left, right)))
             left.clear()
             right.clear()
+
+    def close_full():
+        # one chunk, not one per line: these are the lines of a single
+        # paragraph, and reflow can only rejoin them inside one segment
+        if full:
+            segs.append(("lines", list(full)))
+            full.clear()
 
     def small(size):
         return body and size and size <= body - FOOTNOTE_DROP
@@ -102,20 +117,86 @@ def _table_region(lines, i, header, split, body, margin):
         lruns = [r for r in runs if r.right <= split]
         rruns = [r for r in runs if r.left >= split]
         if len(lruns) + len(rruns) == len(runs):
+            # A line wholly left of the boundary under open full-width prose is
+            # ambiguous: it is that paragraph's own short line ("följer av",
+            # "a) anställning,") or the nuvarande column's first item, which is
+            # equally free to be short. Two things answer it, and each catches
+            # what the other misses. A cell opens indented, the way a statute
+            # opens a stycke, so a line at the margin is the prose wrapping
+            # ("följer av"). An indented one is read from what comes next: more
+            # full-width prose, or the columns resuming.
+            if full and not rruns and (
+                    min(r.left for r in runs) <= margin + INDENT
+                    or _prose_continues(lines, i + 1, split, margin, small)):
+                full.append(l)
+                i += 1
+                continue
+            close_full()
             left += [(l.top, r) for r in lruns]
             right += [(l.top, r) for r in rruns]
             i += 1
             continue
-        # a run crossing the boundary: full-width prose ends the region; a
-        # centered "2 kap."/"28 §" marker is its own full-width line (both
-        # columns' anchor) and the table continues after it
-        if min(r.left for r in runs) <= margin + CENTER_MARGIN:
+        # a run crossing the boundary. A centered "2 kap."/"28 §" marker is its
+        # own full-width line (both columns' anchor) and the table continues
+        # after it.
+        if min(r.left for r in runs) > margin + CENTER_MARGIN:
+            close_full()
+            flush()
+            segs.append(("lines", [l]))
+            i += 1
+            continue
+        # full-width prose. Whether it opens the statute's paragraph or closes
+        # the table is decided by what is below, not by the line itself: the
+        # region goes on while a real two-column row still follows.
+        if "row" not in _kinds_below(lines, i + 1, split, margin, small):
             break
         flush()
-        segs.append(("lines", [l]))
+        full.append(l)
         i += 1
+    close_full()
     flush()
     return segs, i
+
+
+def _kinds_below(lines, i, split, margin, small):
+    """What each line of `lines[i:]` is, relative to the column boundary:
+    "row" (runs clear of it on both sides), "left"/"right" (wholly one side of
+    it), "prose" (crossing it from the left margin) or "marker" (crossing it,
+    page-centered). The page's footnote block and a second table's header both
+    end the sequence -- what follows them is not this region's.
+
+    Read twice, for the two questions a line's own geometry cannot answer."""
+    for l in lines[i:]:
+        if _header(l) is not None:
+            return
+        runs = [r for r in l.runs if not small(r.size)]
+        if not runs:
+            if len(l.text) > 3:
+                return
+            continue
+        lruns = [r for r in runs if r.right <= split]
+        rruns = [r for r in runs if r.left >= split]
+        if len(lruns) + len(rruns) == len(runs):
+            yield "row" if lruns and rruns else ("left" if lruns else "right")
+        elif min(r.left for r in runs) <= margin + CENTER_MARGIN:
+            yield "prose"
+        else:
+            yield "marker"
+
+
+def _prose_continues(lines, i, split, margin, small):
+    """Whether the full-width paragraph open above `lines[i]` runs on, i.e.
+    whether the next line that reaches the boundary at all is more full-width
+    prose rather than the columns resuming.
+
+    This is what tells a lettered sub-item of a full-width enumeration from the
+    nuvarande column's first item. Prop. 2025/26:207 p. 15 sets
+    "a) anställning," between two full-width lines of one enumeration -- read as
+    a cell it became a one-cell table that also stole the region's header --
+    while prop. 2025/26:77 p. 9 sets "1. Europaparlamentets och" as the left
+    column's first item, with a two-column row under it."""
+    return next((k for k in _kinds_below(lines, i, split, margin, small)
+                 if k != "left"), None) == "prose"
 
 
 def _paras(cells):
