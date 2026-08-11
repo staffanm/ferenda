@@ -27,11 +27,11 @@ un-fetched records. This module is the one hardened mechanism they share:
     the harvest record on disk. Rewriting a record that has not changed would
     re-stale the whole downstream parse for nothing, so every downloader
     compares before writing; this is that comparison, once.
-  * :func:`pdf_path` / :func:`select_pending` / :func:`walk_records` -- the
-    whole download half of a source whose upstream is a short, complete listing
-    of records that each name one PDF (edpb, rs): where the record and its
-    document go, how ``--only`` narrows the listing, and the walk that stores
-    both.
+  * :func:`pdf_path` / :func:`page_path` / :func:`select_pending` /
+    :func:`walk_records` -- the whole download half of a source whose upstream
+    is a short, complete listing of records that each name one document (edpb,
+    rs): where the record and its document go, how ``--only`` narrows the
+    listing, and the walk that stores both.
 
 A vertical supplies its own enumeration (how to list the upstream) and its own
 resolve (how to fetch + store one item) as callables, plus an ``item_key`` that
@@ -376,17 +376,21 @@ def store_record(path: Path, record: dict, *companions: Path,
 
 
 # --------------------------------------------------------------------------
-# a complete listing of records, each naming one PDF
+# a complete listing of records, each naming one document
 # --------------------------------------------------------------------------
 #
 # The shape a source has when its upstream is a short, fully enumerable listing
-# and every entry is one metadata record plus one PDF: the basefile's first
+# and every entry is one metadata record plus one document: the basefile's first
 # segment names the store subdirectory it is filed under ("fk/2025:01" ->
 # ``<root>/fk/``), and the walk visits every entry every run, storing what moved.
+#
+# The document is a PDF for most of these sources and a web page for the ones
+# that publish their documents as pages (rs's Skatteverket), so where it goes
+# and what it must be are the two parameters ``walk_records`` takes.
 
 #: one listing entry: the record to store, and how to fetch the document it
 #: names (None where it names none)
-Pending = tuple[dict, Callable[[], bytes] | None]
+Pending = tuple[dict, Callable[[], bytes | str] | None]
 
 
 def pdf_path(root: Path | str, basefile: str) -> Path:
@@ -396,8 +400,26 @@ def pdf_path(root: Path | str, basefile: str) -> Path:
             / (basefile_slug(basefile) + ".pdf"))
 
 
+def page_path(root: Path | str, basefile: str) -> Path:
+    """The document's own web page beside its harvest record ("skv/8-492402" ->
+    ``<root>/skv/skv-8-492402.html``), for a source whose publisher issues the
+    document *as* a page rather than as a PDF."""
+    return (Path(root) / basefile.split("/", 1)[0]
+            / (basefile_slug(basefile) + ".html"))
+
+
+def verify_pdf(data: bytes | str) -> None:
+    """Reject a body that is not a PDF -- a WAF challenge or an error page
+    served 200 under a ``.pdf`` URL. The default ``walk_records`` check."""
+    # a source whose body() hands back text is this package's own bug, and must
+    # not be logged as the upstream serving the wrong thing
+    assert isinstance(data, bytes), "a PDF body must be bytes, not text"
+    if document_extension(data) != ".pdf":
+        raise ValueError("served a non-PDF body; record left unwritten")
+
+
 def _record_json(root: Path | str, basefile: str) -> Path:
-    """The harvest record beside that PDF ("fk/2025:01" ->
+    """The harvest record beside that document ("fk/2025:01" ->
     ``<root>/fk/fk-2025-01.json``)."""
     return record_path(root, basefile.split("/", 1)[0], basefile)
 
@@ -419,27 +441,51 @@ def select_pending(pending: list[Pending], only: str | None,
     return picked
 
 
-def walk_records(root: Path | str, pending: list[Pending], *,
+def walk_records(root: Path | str, pending: Iterable[Pending], *,
                  delay: float, full: bool = False, limit: int | None = None,
-                 scope: str = "") -> tuple[int, int]:
+                 scope: str = "", total: int | None = None,
+                 document: Callable[[Path | str, str], Path] = pdf_path,
+                 verify: Callable[[bytes | str], None] = verify_pdf,
+                 refetch_when_changed: bool = False) -> tuple[int, int]:
     """Store a listing's records and the documents they name, through
     :func:`walk` with **no watermark**: the listing is enumerated whole on every
     run, so there is no depth to stop short of. Returns ``(seen, new)``.
 
-    `pending` items are ``(record, body)``, where `body` returns the document's
-    bytes -- one HTTP GET, a ZIP fetch and a member extraction, whatever the
-    source's route is -- or is None for a record that names no document at all
-    (a register entry: a repealed statement kept in a förteckning with its text
-    withdrawn).
+    `pending` items are ``(record, body)``, where `body` returns the document --
+    one HTTP GET, a ZIP fetch and a member extraction, a browser navigation,
+    whatever the source's route is -- or is None for a record that names no
+    document at all (a register entry: a repealed statement kept in a
+    förteckning with its text withdrawn).
+
+    `document` says where one basefile's document is stored and `verify` what it
+    must be: :func:`pdf_path` / :func:`verify_pdf` for a publisher that issues
+    PDFs, :func:`page_path` and the source's own check for one that issues web
+    pages.
+
+    `refetch_when_changed` says whether the *document* can change while keeping
+    its identity. For a publisher that issues PDFs it cannot -- a new document
+    gets a new number -- so an already-stored file is left alone and a listing
+    edit costs one record write. A publisher that issues web pages revises them
+    in place: Skatteverket adds "Detta ställningstagande ska inte längre
+    tillämpas" to the page it has withdrawn, and the register entry moves at the
+    same moment. Without this flag the record would take the new date and
+    currency while the stored page kept the superseded text.
+
+    `pending` is normally the whole listing as a list, and the progress line
+    counts against its length. A source that has to be able to *stop* mid-walk
+    -- a browser-transported one whose upstream starts refusing -- passes a
+    generator instead and states the `total` itself, so the walk simply runs out
+    of entries where the source decided to stop.
 
     ``is_downloaded`` is reported as "this record is already current on disk,
-    PDF and all" rather than "some file exists", so an unchanged entry costs
-    nothing while an upstream retitling *or a vanished PDF* is still picked up.
+    document and all" rather than "some file exists", so an unchanged entry
+    costs nothing while an upstream retitling *or a vanished document* is still
+    picked up.
 
     A document that cannot be stored raises, so :func:`walk` counts and logs it
     and the record is **not** written -- a stored record is the assertion that
     the document behind it is on disk, which is what lets a parse read an absent
-    PDF as "the publisher published none" rather than "the fetch broke". The
+    one as "the publisher published none" rather than "the fetch broke". The
     previous good record stays and the next run retries.
 
     ``limit`` is :func:`walk`'s: it caps documents actually *fetched or
@@ -451,25 +497,32 @@ def walk_records(root: Path | str, pending: list[Pending], *,
         bf = record["basefile"]
         return ItemKey(bf, record_unchanged(
             _record_json(root, bf), record,
-            *((pdf_path(root, bf),) if body else ())))
+            *((document(root, bf),) if body else ())))
 
     def resolve(item: Pending) -> bool:
         record, body = item
         bf = record["basefile"]
-        if body and (full or not compress.exists(pdf_path(root, bf))):
+        # resolve only runs for an entry `item_key` called not-current, so a
+        # mutable document is refetched exactly when its record moved
+        if body and (full or refetch_when_changed
+                     or not compress.exists(document(root, bf))):
             data = body()
             time.sleep(delay)
-            if document_extension(data) != ".pdf":
-                raise ValueError(
-                    "served a non-PDF body; record left unwritten")
-            compress.write_download(pdf_path(root, bf), data)
+            verify(data)
+            compress.write_download(document(root, bf), data)
         # no companion here: a record that has not changed is not rewritten
-        # just because its PDF was refetched above
+        # just because its document was refetched above
         return store_record(_record_json(root, bf), record, full=full)
 
+    if total is None:
+        # a generator listing has no length to count the progress line against,
+        # and losing the ETA silently is worse than saying so
+        assert isinstance(pending, list), \
+            "a %s listing that is not a list must state its own total" % scope
+        total = len(pending)
     result = walk(pending, resolve=resolve, item_key=item_key, watermark=None,
                   full=full, limit=limit, scope=scope, count_label="changed",
-                  total=len(pending))
+                  total=total)
     return result.seen, result.new
 
 

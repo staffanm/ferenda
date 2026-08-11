@@ -140,6 +140,7 @@ from ..lib.harvest import (
     HarvestWatermark,
     ItemKey,
     dispatch_scopes,
+    page_path,
     record_unchanged,
     store_record,
     walk,
@@ -466,7 +467,12 @@ def jk_listing(session):
 
 
 def jk_html_path(root, basefile):
-    return Path(root) / "jk" / (basefile_slug(basefile) + ".html")
+    """Where a JK decision's landing page -- which *is* the decision -- is
+    stored. The shared layout for a document published as a page rather than a
+    PDF (`lib.harvest.page_path`, which rs's Skatteverket harvest also uses);
+    the name stays because jk's callers read as "the landing page", not as "the
+    document"."""
+    return page_path(root, basefile)
 
 
 def jk_save(root, item, session, delay, full=False):

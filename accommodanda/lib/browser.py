@@ -29,6 +29,45 @@ def _sync_playwright():
     return sync_playwright()
 
 
+class WafRejected(RuntimeError):
+    """The site's bot defence refused this navigation.
+
+    Its own class so a caller can *tell it apart* from a navigation that merely
+    ran out of time, because the two want opposite responses: measured against
+    skatteverket.se, an F5/Shape front that has started rejecting keeps
+    rejecting for a while whatever the profile asks, so retrying is useless
+    while a longer settle is the fix for the other. What a harvester does with
+    that is its own policy (`rs.download.until_blocked` stops the run; the
+    föreskrift harvests do not, their agencies being tens of documents rather
+    than thousands). A raise, not an assert -- this is a remote condition, and
+    under ``python -O`` an assert would return the WAF's rejection page as the
+    document (rule:errors-drive-retry-use-raise)."""
+
+
+class IncompleteNavigation(RuntimeError):
+    """The navigation returned, but the page is not the finished document --
+    the JavaScript challenge is still running, or the content the caller named
+    never appeared. Distinct from :class:`WafRejected`: this one usually means
+    the settle time was too short, and retrying with a longer one is the fix."""
+
+
+def verify_document(url, html, body, marker):
+    """Raise unless the loaded page is the finished document the caller asked
+    for. Pure over what the browser read, so the three ways a protected
+    navigation ends short are testable without a browser.
+
+    The order matters: a WAF rejection also carries no marker, and calling that
+    an incomplete navigation would send a caller into a longer-settle retry
+    against a front that has stopped answering."""
+    if "requested url was rejected" in body.lower():
+        raise WafRejected("%s was rejected by its WAF" % url)
+    if "bobcmn" in html:
+        raise IncompleteNavigation("%s is still a JavaScript challenge" % url)
+    if marker not in body:
+        raise IncompleteNavigation(
+            "%s completed without expected marker %r" % (url, marker))
+
+
 class DetachedChrome:
     """One real Chrome session whose navigations happen without Playwright."""
 
@@ -183,7 +222,7 @@ class DetachedChrome:
             os.environ["DISPLAY"] = self._prev_display
         self.xvfb = None
 
-    def _navigate(self, url):
+    def _navigate(self, url, settle=None):
         command = self.command
         process = self.process
         assert command is not None and process is not None and process.poll() is None, \
@@ -195,18 +234,29 @@ class DetachedChrome:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        time.sleep(self.settle)
+        time.sleep(self.settle if settle is None else settle)
 
     @staticmethod
     def _page(browser, url):
         pages = [page for context in browser.contexts for page in context.pages
                  if page.url == url]
-        assert pages, "Google Chrome has no completed page for %s" % url
+        if not pages:
+            # the third way a protected navigation ends short, and the same kind
+            # of remote condition as the other two: Chrome is alive but the tab
+            # never settled on this URL. A caller counting failures has to see
+            # all three, or it walks a closed site to the end.
+            raise IncompleteNavigation(
+                "Google Chrome has no completed page for %s" % url)
         return pages[-1]
 
-    def html(self, url, marker):
-        """Navigate detached, then return a verified completed HTML document."""
-        self._navigate(url)
+    def html(self, url, marker, settle=None):
+        """Navigate detached, then return a verified completed HTML document.
+
+        ``settle`` overrides the session's own wait for this one navigation. A
+        site is rarely uniform: Skatteverkets register page renders 2,600 rows
+        and takes minutes, while each document page it links is done in seconds,
+        and paying the register's wait 2,600 times would cost days."""
+        self._navigate(url, settle)
         playwright = _sync_playwright().start()
         try:
             endpoint = self.endpoint
@@ -215,11 +265,8 @@ class DetachedChrome:
             page = self._page(browser, url)
             html = page.content()
             body = page.locator("body").inner_text()
-            assert "bobcmn" not in html, "%s is still a JavaScript challenge" % url
-            assert "requested url was rejected" not in body.lower(), \
-                "%s was rejected by its WAF" % url
-            assert marker in body, "%s completed without expected marker %r" % (url, marker)
             page.close()
+            verify_document(url, html, body, marker)
             return html
         finally:
             playwright.stop()
