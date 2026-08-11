@@ -97,7 +97,7 @@ def _runs(node, where, bold=False, italic=False, uri=None):
     for child in node.children:
         kind = child.type
         if kind == "text":
-            out.append(_run(child.content, bold, italic, False, uri))
+            out.append(_run(markdown.dashes(child.content), bold, italic, False, uri))
         elif kind == "code_inline":
             out.append(_run(child.content, bold, italic, True, uri))
         elif kind in ("softbreak", "hardbreak"):
@@ -173,7 +173,8 @@ def _text(node):
     Every leaf that holds characters counts: keeping only `text` tokens dropped
     a heading's code spans outright (``## The `foo` field`` -> "The  field"),
     which is the silent-loss failure this module exists to prevent."""
-    return "".join(t.content for t in node.walk()
+    return "".join(t.content if t.type == "code_inline"
+                   else markdown.dashes(t.content) for t in node.walk()
                    if t.type in ("text", "code_inline"))
 
 

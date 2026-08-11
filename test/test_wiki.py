@@ -140,6 +140,19 @@ def test_blocks_split_headings_and_paragraphs():
     assert markdown.blocks("\\# punkt") == [("stycke", "# punkt")]
 
 
+def test_blocks_render_the_spaced_dash_convention_as_a_dash():
+    # the content repo writes ` -- ` for a dash (E2); the reader sees the dash.
+    # Only the free-standing spaced form converts -- flags, rules and in-word
+    # hyphens stay as written
+    assert markdown.dashes("texterna i sig -- de finns -- publicerade") \
+        == "texterna i sig – de finns – publicerade"
+    assert markdown.dashes("kör --force eller a--b eller --- rad") \
+        == "kör --force eller a--b eller --- rad"
+    assert markdown.blocks("En rubrik\n\nEtt stycke -- med inskott.") == [
+        ("stycke", "En rubrik"),
+        ("stycke", "Ett stycke – med inskott.")]
+
+
 def test_blocks_reads_lists_as_lists():
     # the hand-rolled scanner this replaced kept the markers in the prose, so a
     # list printed as "* Fritt utnyttjande … * Begränsat utnyttjande …"

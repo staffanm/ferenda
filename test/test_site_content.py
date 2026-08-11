@@ -55,6 +55,18 @@ def test_about_parse_title_code_and_links():
     assert "https://lagen.nu/1960:729" in uris
 
 
+def test_spaced_dashes_convert_in_prose_but_never_in_code():
+    # the authored ` -- ` convention renders as a dash (E2); a code span keeps
+    # its hyphens -- the om pages document CLI flags
+    blocks = parse.blocks("## Rubrik -- med inskott\n\n"
+                          "texterna i sig -- de finns publicerade -- på "
+                          "andra håll, se `lagen --force`.", "om/x")
+    assert blocks[0].text == "Rubrik – med inskott"
+    runs = blocks[1].runs
+    assert runs[0] == "texterna i sig – de finns publicerade – på andra håll, se "
+    assert runs[1] == {"text": "lagen --force", "code": True}
+
+
 def test_about_parses_a_gfm_table_with_alignment():
     # the whole reason the site vertical parses with markdown-it rather than a
     # line scanner of its own: a pipe table used to fall through to a paragraph

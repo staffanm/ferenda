@@ -81,6 +81,19 @@ def strip_comments(text):
     return RE_HTML_COMMENT.sub("", text)
 
 
+# a free-standing spaced `--`, the content repo's authoring convention for a
+# dash. Whitespace (or the text edge) on both sides is required, so `--force`
+# flags, `---` rules and in-word hyphens stay as written.
+RE_SPACED_DASHES = re.compile(r"(?<!\S)--(?!\S)")
+
+
+def dashes(text):
+    """`text` with the authored ` -- ` convention rendered as the en dash the
+    reader should see. Both markdown parsers apply this to prose text runs only
+    (never code spans), so it lives here beside `strip_comments`."""
+    return RE_SPACED_DASHES.sub("–", text)
+
+
 def begrepp_uri(name):
     """A concept name -> its begrepp URI. MediaWiki upper-cases the first letter
     of a page title, so `[allmän handling](begrepp:allmän handling)` and the page
@@ -221,8 +234,8 @@ def _text(content):
     hash. The rest are left as written, because the raw text goes on to the link
     grammar in `to_runs` and unescaping a `\\[` there would mint a link the
     author escaped precisely to avoid."""
-    return " ".join(line.strip().replace("\\#", "#")
-                    for line in content.split("\n") if line.strip())
+    return dashes(" ".join(line.strip().replace("\\#", "#")
+                           for line in content.split("\n") if line.strip()))
 
 
 def blocks(body, where=None):
