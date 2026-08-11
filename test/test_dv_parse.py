@@ -13,6 +13,7 @@ from accommodanda.dv.parse import (
     decision_date_from_text,
     decision_dates_from_text,
     extract_footrefs,
+    is_heading,
     parse_api_record,
     parse_body,
     parse_innehall,
@@ -234,6 +235,34 @@ def test_entities_and_nbsp():
 def test_separator_dropped():
     assert parse_innehall("<p>______________</p>") == []
     assert parse_innehall("<p>&nbsp;</p>") == []
+
+
+def test_single_line_address_block_is_not_a_heading():
+    # an authority address printed on one line is short, capitalized and has no
+    # terminal punctuation -- everything the last heading rule looks for
+    assert is_heading("Riksåklagaren Box 5553 114 85 Stockholm") is False
+    blocks = parse_innehall("<p>Riksåklagaren Box 5553 114 85 Stockholm</p>")
+    assert len(blocks) == 1 and isinstance(blocks[0], Stycke)
+    # the postnummer form, with no box number to key on
+    assert is_heading("Samhällsbyggnadsnämnden i Botkyrka kommun 147 85 Tumba") \
+        is False
+    blocks = parse_innehall("<p>Samhällsbyggnadsnämnden i Botkyrka kommun "
+                            "147 85 Tumba</p>")
+    assert len(blocks) == 1 and isinstance(blocks[0], Stycke)
+
+
+def test_trailing_underscore_rule_is_stripped_from_prose():
+    assert parse_innehall("<p>Göta hovrätts dom 2025-02-07 i mål B 3811-24 "
+                          "__________</p>") == [
+        Stycke("Göta hovrätts dom 2025-02-07 i mål B 3811-24")]
+
+
+def test_divider_before_a_heading_does_not_block_it():
+    # the divider arrives in the heading's own paragraph, separated by a <br>;
+    # without removing it the embedded newline keeps the heading a stycke
+    assert parse_innehall("<p>___________________<br>HÖGSTA FÖRVALTNINGS"
+                          "DOMSTOLENS AVGÖRANDE</p>") == [
+        Rubrik("HÖGSTA FÖRVALTNINGSDOMSTOLENS AVGÖRANDE")]
 
 
 def test_document_order_preserved():

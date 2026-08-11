@@ -79,6 +79,20 @@ def clean_nyckelord(values):
     return [v for v in cleaned if v]
 RE_SEPARATOR = re.compile(r"^[\W_]+$")
 
+# a printed underscore divider ("_________"), alone in its paragraph or glued
+# onto the end of one. It is furniture, never text, so it is removed before the
+# whitespace collapse -- a paragraph that is nothing else then collapses to
+# empty and RE_SEPARATOR drops it.
+RE_UNDERSCORE_RULE = re.compile(r"[ \t]*_{3,}[ \t]*")
+
+# the composition of a postal address: a box number or a postnummer followed by
+# a place name. A party/authority address block printed as a single line
+# ("Riksåklagaren Box 5553 114 85 Stockholm") is short, capitalized and carries
+# no terminal punctuation, so is_heading's last rule would promote it to a
+# Rubrik. It is body text.
+RE_ADDRESS_LINE = re.compile(
+    r"\b(?i:box)\s+\d+\b|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäöA-ZÅÄÖ]+")
+
 # an end-of-document footnote definition (HD's 2023+ format): "[N] text", the
 # marker often a stray <sup>[N]</sup>N pair so the digit leaks in doubled
 RE_FOOTDEF = re.compile(r"^\[(\d{1,2})\]\s*(.*)", re.S)
@@ -102,6 +116,7 @@ COURT_DATE_ALIASES = {
 
 def collapse(text):
     text = text.replace("\xa0", " ")
+    text = RE_UNDERSCORE_RULE.sub(" ", text)
     # collapse runs of spaces/tabs but keep explicit newlines (from <br>)
     text = re.sub(r"[ \t]+", " ", text)
     return "\n".join(line.strip() for line in text.split("\n")).strip()
@@ -112,6 +127,8 @@ def is_heading(text):
     # heading ("Brödtext.[1]" is body, not a rubrik)
     text = re.sub(r"\[\d+\]", "", text).strip()
     if "\n" in text or len(text) > 80:
+        return False
+    if RE_ADDRESS_LINE.search(text):
         return False
     if text.lower().rstrip(".") in KNOWN_HEADINGS:
         return True
