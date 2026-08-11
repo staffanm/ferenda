@@ -166,7 +166,7 @@ accommodanda/
   icc/      International Criminal Court case-law vertical — download·model·parse
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
-  rs/       rättsliga-ställningstaganden vertical (6 myndigheter) — agencies·download·model·parse
+  rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
   edpb/     EDPB guidance vertical (riktlinjer·rekommendationer·WP29) — series·download·model·parse
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
@@ -2828,7 +2828,7 @@ A föreskrift is binding law issued under a bemyndigande; a beslut decides one
 ärende; a *rättsligt ställningstagande* binds nobody outside the agency and
 decides no case. It states, in advance and in general, how the agency reads a
 rule it administers where the courts have not yet answered — and every one of
-the six agencies says so in nearly the same words ("styrande för vår
+the agencies says so in nearly the same words ("styrande för vår
 verksamhet", "inte bindande för till exempel domstolar"). That is exactly why
 they are worth carrying: they are the published interpretation a reader of the
 statute will actually meet, and the citation scan puts each of them on the rail
@@ -2837,7 +2837,10 @@ of the paragraf it interprets.
 Six agencies in the first cut — **Försäkringskassan** (108, 2005–),
 **Migrationsverket** (104, via Lifos), **Kronofogden** (22),
 **Integritetsskyddsmyndigheten** (5), **Finansinspektionen** (7),
-**Konkurrensverket** (13).
+**Konkurrensverket** (13) — and **Skatteverket** (2,614 filed of 2,619
+register entries, 2004–) added
+afterwards, which is more than six times the other six together and is
+described on its own below.
 
 - **Identity is the agency's own number**, not a diarienummer — the one
   deliberate departure from `avg/model.py`, whose organs number nothing and
@@ -2847,9 +2850,13 @@ Six agencies in the first cut — **Försäkringskassan** (108, 2005–),
   = `rs/{org}/{nummer}`, the avg grammar. Only FK and IMY have published a short
   designation for their series, so the other four are cited the way their own
   page names them; nothing is invented for an agency that has coined nothing.
+  Skatteverket falls on the avg side of that line and for the avg reason: it
+  numbers no series at all, and names its own positions "Skatteverkets
+  ställningstagande 2026-07-06, dnr 8-207888-2026" — so there the dnr *is* the
+  published designation, and following the rule means using it.
 - **Currency is first-class.** Unlike a beslut, which is a fixed historical
   artifact, a ställningstagande is in force *until the agency withdraws it* —
-  and three of the six say so in the listing itself (FI's Status column,
+  and four of the seven say so in the listing itself (FI's Status column,
   Konkurrensverkets "(upphävt 20 oktober 2025)", Migrationsverkets version
   numbering). So `status`/`upphavd`/`ersatt_av`/`ersatter` are modelled rather
   than dropped: a withdrawn statement still has to be readable — it governed
@@ -2862,8 +2869,8 @@ Six agencies in the first cut — **Försäkringskassan** (108, 2005–),
   sync and the number is read from the PDF; `stored_numbers` remembers which
   number a record was filed under, so a later run costs one listing request
   rather than 108 downloads (Lifos reuses the same memo).
-- **One body reader, six configurations.** All six publish the statement as a
-  letterhead PDF, which is the shape `avg`'s IMY/KKV reading already knew. Its
+- **One body reader, six configurations.** The first six publish the statement
+  as a letterhead PDF, which is the shape `avg`'s IMY/KKV reading already knew. Its
   rules were promoted to `lib.pdftext.classify_letterhead` on this second
   reader (rule:second-use-goes-to-lib), emitting source-agnostic
   `(kind, text, level)` triples each vertical maps onto its own Block; `avg`
@@ -2921,12 +2928,66 @@ Six agencies in the first cut — **Försäkringskassan** (108, 2005–),
   beslutsdatum where the document states one and from the agency's own number
   otherwise — a Migrationsverket RS/028/2021 currently in version 3.0 belongs
   under the year that version was fastställd), the `myndrs` legacy feed alias,
-  the MCP source enum, `patchsource` (pdftohtml XML), frontpage entry and the
+  the MCP source enum, `patchsource` (pdftohtml XML; for skv the page itself),
+  frontpage entry and the
   `rs` inbound rail group. `/myndigheter/` now introduces all three — the rules
   a myndighet issues, the cases it decides and how it says it reads them.
-  `test/test_rs.py` (66 hermetic tests, fixtures under `test/files/rs/`), plus
+  `test/test_rs.py` (94 hermetic tests, fixtures under `test/files/rs/`), plus
   the AIA-chain safety cases in `test/test_net.py` and the feed-index wiring
   guard in `test/test_feeds.py`.
+
+**Skatteverket — the seventh agency, and the one that breaks every assumption
+above.** `rs/skv.py` + `rs.download.skv_sync`, on its own command
+`lagen rs browser-download`.
+
+- **It publishes web pages, not PDFs.** The ställningstagande *is* its page, the
+  way a JK-beslut is. So none of the letterhead machinery applies: `page_body`
+  reads the page's own markup — h2–h5 headings, paragraphs, list items as
+  stycken, the dated `div.update` notes Skatteverket sets at the head, and the
+  notes under the closing "Fotnot" heading. `agencies.page_body` is the flag
+  that routes it, so a second page-publishing agency is data rather than code.
+  Its stored page is also its patchable intermediate, normalised to one block
+  element per line in both `parse` and `patchsource` (the eurlex-HTML rule).
+- **The register is JSON hiding inside a slow page.** 121.html lists 2,619
+  entries and takes minutes to render, but Sitevision server-renders the whole
+  list into the page as the app's initial state — so `parse_index` reads that
+  payload rather than the rendered rows, located by shape (a `data.pages` list)
+  because the portlet id changes per deploy. It carries more than the page
+  shows: each entry's diarienummer, the document's *own* date (the rendered list
+  shows the day rättslig vägledning published it, which differs for 1,592
+  entries), the subject taxonomy ids, and the validity window.
+- **Currency comes out of that window, carefully.** There is no status column;
+  `latestVersion.endDate` is the only place the register says a position stopped
+  applying, and 980 filed documents carry one. A further 273 carry an `endDate` *equal
+  to* the start — those are the withdrawal notices themselves
+  ("Ställningstagandet Verksamhetsöverlåtelse ska inte längre tillämpas"), which
+  Skatteverket publishes with a single day's validity because their content is a
+  one-time announcement. Reading a zero-length window as a withdrawal would say
+  the agency withdrew its own withdrawal notice, so only a window that actually
+  closed later counts. What replaced a withdrawn position, and what it replaced,
+  come off the page: both are sentences in fixed words, and each names its
+  counterpart with a marked-up reference carrying the other document's dnr.
+- **Five entries name no dnr and are reported, not invented** — four pre-2000
+  RSV-skrivelser the register keys on their date, and one stray test page. The
+  reference id is otherwise hand-written and varies: 189 entries differ only in
+  case or stray whitespace, one drops the issuer, and five write the number
+  itself irregularly (an en dash for the year's hyphen, a space where a slash
+  belongs, a two-digit unit, a one-digit year). All of those are read.
+- **The pace is the design.** rattsligvagledning sits behind the F5/Shape
+  challenge SKVFS sits behind. So every navigation goes through detached headful
+  Chrome (`lib/browser`), one at a time. Measurement set the interval: ~30
+  navigations at 5-second spacing trip the front's rate defence. The front then
+  refuses every navigation for some 40 minutes, whatever profile asks — a fresh
+  Chrome profile is refused on its first try. So a document waits 20 seconds,
+  which held for 35 consecutive documents. A row of `SKV_BLOCK_LIMIT` refused or
+  unfinished navigations ends the run. The next run resumes exactly there,
+  because a record is only ever stored once its page is. A first harvest takes
+  ~15 hours, sliceable with `--limit`; a weekly run costs the register plus what
+  moved. That is why this agency has a command of its own rather than riding the
+  nightly rs sweep. `lib.browser` grew `WafRejected` and `IncompleteNavigation`
+  for it: a caller has to tell "the front said no" from "the page needed longer",
+  because the two want opposite responses. Both were `assert`s, which `python -O`
+  strips — and then the WAF's rejection page stores as the document.
 - **Not done, deliberately**: there is no citation *grammar* for a
   ställningstagande yet — the outbound direction works (an rs body's lagrum
   citations put it on the statute's rail, which is the value), but a

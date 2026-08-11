@@ -346,3 +346,12 @@ pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
 now skips the browser-shielded föreskrift agencies skvfs/mtfs), plus a weekly
 `lagen foreskrift browser-download` (Sundays) for those — the headful-Chrome
 transport is too slow and serial for the nightly sweep.
+
+`lagen rs browser-download` wants the same weekly slot, for the same reason and
+one more. Skatteverkets 2,614 ställningstaganden are one browser navigation
+each. The run paces them 20 seconds apart: at 5-second spacing the site's front
+refuses everything after about 30 navigations, and keeps refusing for some 40
+minutes. A weekly run costs the register plus what moved. The first run takes
+~15 hours, so slice it with `--limit N` and let the next run resume. Nothing is
+stranded — a run stores a record only once its page is on disk. Run both browser
+jobs **one at a time**: they share the process-global `DISPLAY`.
