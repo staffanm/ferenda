@@ -1,0 +1,917 @@
+[
+ {
+  "page": 5,
+  "lines": [
+   {
+    "top": 393,
+    "runs": [
+     {
+      "left": 129,
+      "right": 314,
+      "text": "1 Introduction ",
+      "bold": true,
+      "italic": false,
+      "size": 24,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 442,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "1 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 793,
+      "text": "The concept commonly referred to by the term blockchain addresses a technology that ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 460,
+    "runs": [
+     {
+      "left": 108,
+      "right": 792,
+      "text": "implements a distributed and consistent database without centralised management and its ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 479,
+    "runs": [
+     {
+      "left": 108,
+      "right": 789,
+      "text": "coordinated use by an open or predefined set of participants according to an agreed upon set ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 498,
+    "runs": [
+     {
+      "left": 108,
+      "right": 167,
+      "text": "of rules.",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 529,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "2 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 791,
+      "text": "Blockchain – or, in a more general manner, Distributed Ledger Technologies – can replace ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 548,
+    "runs": [
+     {
+      "left": 108,
+      "right": 800,
+      "text": "intermediation-based transactions. For instance, when using blockchains, financial ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 567,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "transactions are possible without the intermediation of banks or other financial intermediaries, ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 586,
+    "runs": [
+     {
+      "left": 108,
+      "right": 737,
+      "text": "since the ownership on an asset can be proven without the intermediation of a notary. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 617,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "3 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 565,
+      "text": "In practice, blockchains aim to exhibit the following properties: ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 649,
+    "runs": [
+     {
+      "left": 135,
+      "right": 143,
+      "text": "•",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "symbol"
+     },
+     {
+      "left": 143,
+      "right": 792,
+      "text": " distributed (data is replicated by multiple participants peer-to-peer and so stored in ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 670,
+    "runs": [
+     {
+      "left": 162,
+      "right": 299,
+      "text": "multiple locations) ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 692,
+    "runs": [
+     {
+      "left": 135,
+      "right": 143,
+      "text": "•",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "symbol"
+     },
+     {
+      "left": 143,
+      "right": 796,
+      "text": " disintermediated (validation of data added to the database does not need the ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 712,
+    "runs": [
+     {
+      "left": 162,
+      "right": 790,
+      "text": "endorsement of a trusted or central party, but rather the agreement of participants in ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 733,
+    "runs": [
+     {
+      "left": 162,
+      "right": 282,
+      "text": "the blockchain); ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 754,
+    "runs": [
+     {
+      "left": 135,
+      "right": 143,
+      "text": "•",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "symbol"
+     },
+     {
+      "left": 143,
+      "right": 790,
+      "text": " consistent and tamperproof (any update or removal of validated data can be detected) ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 776,
+    "runs": [
+     {
+      "left": 135,
+      "right": 143,
+      "text": "•",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "symbol"
+     },
+     {
+      "left": 143,
+      "right": 794,
+      "text": " transparent (access to data and its auditing is available to all participants in the ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 796,
+    "runs": [
+     {
+      "left": 162,
+      "right": 250,
+      "text": "blockchain) ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 826,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "4 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 790,
+      "text": "There is no unique implementation. A blockchain used in a processing could modify, extend, ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 844,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "or restrict these general properties in any way, for example, by restraining the public access ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 863,
+    "runs": [
+     {
+      "left": 108,
+      "right": 195,
+      "text": "to the data. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 894,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "5 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 790,
+      "text": "These guidelines concern the processing of personal data in connection with the use of the ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 913,
+    "runs": [
+     {
+      "left": 108,
+      "right": 774,
+      "text": "blockchain technology and use the term to refer to technologies with the above properties. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 944,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "6 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 791,
+      "text": "One of the main promises of blockchain technologies is that they can offer strong technical ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 963,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "guarantees in terms of integrity and availability due to the use of cryptographic tools (hashing ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 982,
+    "runs": [
+     {
+      "left": 108,
+      "right": 791,
+      "text": "and digital signatures) and decentralised storage. However, this is a general assumption; in ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 1001,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "practice, there may be no standardised or formal agreement on the level or quality of service ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 1020,
+    "runs": [
+     {
+      "left": 108,
+      "right": 180,
+      "text": "provided. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 1139,
+    "runs": [
+     {
+      "left": 108,
+      "right": 112,
+      "text": "2",
+      "bold": false,
+      "italic": false,
+      "size": 8,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 1139,
+    "runs": [
+     {
+      "left": 112,
+      "right": 788,
+      "text": " References to “Member States” made throughout this document should be understood as references to “EEA Member States”. ",
+      "bold": false,
+      "italic": false,
+      "size": 12,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 1191,
+    "runs": [
+     {
+      "left": 108,
+      "right": 181,
+      "text": "4 | Adopted ",
+      "bold": false,
+      "italic": false,
+      "size": 14,
+      "font": "arial"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "page": 6,
+  "lines": [
+   {
+    "top": 106,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "7 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 789,
+      "text": "Blockchains show a number of properties, that create specific non-compliance risks and risks ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 125,
+    "runs": [
+     {
+      "left": 108,
+      "right": 446,
+      "text": "for the rights and freedoms of natural persons3",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 449,
+      "right": 789,
+      "text": "when dealing with personal data. For example, ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 144,
+    "runs": [
+     {
+      "left": 108,
+      "right": 792,
+      "text": "once a transaction is recorded on the chain, it cannot individually be altered or removed ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 163,
+    "runs": [
+     {
+      "left": 108,
+      "right": 520,
+      "text": "without being detected as an inconsistency in the chain. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 194,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "8 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 790,
+      "text": "In addition, blockchains do not allow for a gradual adoption. Once introduced, they offer very ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 213,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "limited possibilities to step back as they do not have a default process to support the deletion ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 232,
+    "runs": [
+     {
+      "left": 108,
+      "right": 225,
+      "text": "of transactions. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 263,
+    "runs": [
+     {
+      "left": 66,
+      "right": 80,
+      "text": "9 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 108,
+      "right": 791,
+      "text": "There can be issues for the implementation of the data protection principles under Article 5 ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 282,
+    "runs": [
+     {
+      "left": 108,
+      "right": 789,
+      "text": "GDPR and data protection by design and default pursuant to Article 25 GDPR, as is discussed ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 301,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "in section 4 of these guidelines. Controllers should analyse thoroughly whether they comply ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 320,
+    "runs": [
+     {
+      "left": 108,
+      "right": 791,
+      "text": "with data protection law when using a blockchain. In particular, controllers must ensure the ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 339,
+    "runs": [
+     {
+      "left": 108,
+      "right": 792,
+      "text": "application of the principles of data minimisation and storage limitation, and the effective ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 358,
+    "runs": [
+     {
+      "left": 108,
+      "right": 558,
+      "text": "exercise of data subjects’ rights like erasure and rectification. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 389,
+    "runs": [
+     {
+      "left": 66,
+      "right": 790,
+      "text": "10 Finally, the use of decentralised technologies may trigger different compliance risks and risks ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 408,
+    "runs": [
+     {
+      "left": 108,
+      "right": 798,
+      "text": "to individuals' rights and freedoms due to potential international transfers, multiple ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 427,
+    "runs": [
+     {
+      "left": 699,
+      "right": 705,
+      "text": "4",
+      "bold": false,
+      "italic": false,
+      "size": 10,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 427,
+    "runs": [
+     {
+      "left": 108,
+      "right": 698,
+      "text": "stakeholders, new processing operations for maintenance of blockchain system",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     },
+     {
+      "left": 705,
+      "right": 791,
+      "text": ", allocation ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 446,
+    "runs": [
+     {
+      "left": 108,
+      "right": 556,
+      "text": "of responsibilities, and governance and management issues. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 491,
+    "runs": [
+     {
+      "left": 129,
+      "right": 573,
+      "text": "2 Context and Scope of Application ",
+      "bold": true,
+      "italic": false,
+      "size": 24,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 540,
+    "runs": [
+     {
+      "left": 66,
+      "right": 790,
+      "text": "11 Blockchain is a technology that can be used in various ways and for very different types and ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 559,
+    "runs": [
+     {
+      "left": 108,
+      "right": 789,
+      "text": "purposes of processing of personal data. Therefore, these guidelines will not study blockchain ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 577,
+    "runs": [
+     {
+      "left": 108,
+      "right": 794,
+      "text": "as a processing of personal data, but will rather analyse the interplay of the technical ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 597,
+    "runs": [
+     {
+      "left": 108,
+      "right": 790,
+      "text": "characteristics of this technology with the data protection principles. These guidelines aim to ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   },
+   {
+    "top": 615,
+    "runs": [
+     {
+      "left": 108,
+      "right": 696,
+      "text": "provide practical guidance to controllers planning to use blockchain technology. ",
+      "bold": false,
+      "italic": false,
+      "size": 17,
+      "font": "arial"
+     }
+    ]
+   }
+  ]
+ }
+]

@@ -20,6 +20,14 @@ handed to `page_paragraphs` as forced breaks, the same mechanism DV's bitmap
 paragraph numbers use. Each numbered paragraph then anchors on its own number,
 so a decision citing "punkt 27 i riktlinjer 05/2020" lands on the paragraph.
 
+Two of the documents print the number with **no period at all** -- riktlinjer
+02/2025 and 04/2020 hang a bare "1" in the margin at x=66 and set the prose
+beside it at the body's 108 -- and there the text says nothing: "1 The concept
+commonly …" reads like any sentence that opens with a quantity. So the number is
+recognised by its *column*, and by the column the document itself demonstrates
+(`punkt_margin`), never by a bare number wherever one turns up. Read as text it
+was 0 punkter in 02/2025 and its punkter 1-3 arrived as one block.
+
 A paragraph continued across a page break arrives as a block of its own with no
 number of its own, and is joined back onto the numbered paragraph it continues
 -- otherwise the sentence is split mid-clause, which loses both the reference
@@ -36,6 +44,7 @@ serienummer.
 
 import functools
 import re
+from collections import Counter
 
 from ..lib import compress, util
 from ..lib.datasets import NAMEDACTS
@@ -72,6 +81,17 @@ EDPB_PARSE_TYPES = [EULAGSTIFTNING, EURATTSFALL, VAGLEDNING]
 # the paragraph, because the number is set in its own column and the sequence
 # check below is what makes a bare number safe to trust.
 RE_PUNKT = re.compile(r"^(\d{1,4})\.\s+\S")
+# the same punkt with the period left off: "1 The concept commonly ...". Two
+# documents number this way (riktlinjer 02/2025 and 04/2020), and nothing in the
+# text says the leading number is a paragraph number rather than a quantity, so
+# this surface is trusted only where the *geometry* puts the number in the
+# document's own number column (`punkt_margin`). Three digits at most and never
+# followed by another -- a punkt runs to 137 here, while "12 000 kronor" opens a
+# paragraph with a number that is neither.
+RE_BARE_PUNKT = re.compile(r"^(\d{1,3})\s+(?!\d)\S")
+# a line fragment that is nothing but such a number: the shape `punkt_margin`
+# reads the document's number column off
+RE_NUMBER_ONLY = re.compile(r"^\d{1,3}$")
 
 # how much of a document its numbering must cover before the numbers are read
 # as punkter at all -- see `join_continuations` for what the two populations
@@ -182,33 +202,114 @@ def _fresh_parser(sprak):
 # the numbered punkt
 # --------------------------------------------------------------------------
 
-def numbered_breaks(pages):
+def body_column(pages):
+    """The x the document sets its body text at: the commonest line start.
+
+    Read over the whole document rather than per page, because a page whose text
+    is a cover, a version-history table or a table annex has no body column of
+    its own -- and the commonest start there is the table's, which puts the
+    running footer (riktlinjer 02/2025 sets "5 | Adopted" at the body margin)
+    out in the margin where the punkt numbers are. `None` where the source
+    carries no run geometry at all (the OCR/legacy routes)."""
+    starts = Counter(line.runs[0].left for _pageno, lines in pages
+                     for line in lines if line.runs)
+    return starts.most_common(1)[0][0] if starts else None
+
+
+def punkt_margin(pages):
+    """The x a document hangs its bare punkt numbers at, or None where it prints
+    none.
+
+    Learned from the lines that set the number *apart* -- a fragment of digits
+    alone, ending left of the body column, with the prose beginning at that
+    column ("1" at x=66, "The concept commonly …" at 108) -- because those are
+    the only ones whose geometry says so unambiguously. poppler emits a wider
+    two-digit number and the prose beside it as one fragment ("10  Finally, the
+    use of …", starting at 66), and such a line cannot be told from a table row
+    whose first column holds a number: riktlinjer 02/2022 sets four of those in
+    its annex ("2" at 59, "Artikel 60.2 – Den" at 91, "Vem" at 291). Trusting
+    only the column the document itself demonstrates keeps them out -- measured
+    over the corpus, a column is learned for exactly the two documents that
+    number this way, and the other 58 read the same punkter and the same blocks
+    as they did before."""
+    column = body_column(pages)
+    if column is None:
+        return None
+    lefts = Counter(
+        line.runs[0].left for _pageno, lines in pages for line in lines
+        if len(line.runs) > 1 and line.runs[0].right < column
+        and line.runs[1].left == column
+        and RE_NUMBER_ONLY.match(line.runs[0].text.strip()))
+    return lefts.most_common(1)[0][0] if lefts else None
+
+
+def line_punkt(line, margin):
+    """The punkt number `line` opens with, or None -- printed with its period, or
+    set bare in the number column `margin`."""
+    in_column = margin is not None and line.runs and line.runs[0].left == margin
+    match = RE_PUNKT.match(line.text) or (RE_BARE_PUNKT.match(line.text)
+                                          if in_column else None)
+    return match.group(1) if match else None
+
+
+def numbered_breaks(pages, margin):
     """``{pageno: {top, …}}`` -- the lines that open a numbered punkt.
 
     The number is trusted only where it is the one the document is *due*: the
     sequence starts at 1 and advances by one, so "2016." opening a line, an
     article number, or a numbered list inside a paragraph cannot pass for a
     paragraph number. A document that numbers nothing yields no breaks at all
-    and reads as the plain prose it is (the WP29 vägledningar)."""
+    and reads as the plain prose it is (the WP29 vägledningar).
+
+    `margin` is the document's own number column (`punkt_margin`) and `None`
+    where it prints its numbers with the period, which is all but two of them."""
     breaks, expected = {}, 1
     for pageno, lines in pages:
         tops = set()
         for line in lines:
-            match = RE_PUNKT.match(line.text)
-            if match and int(match.group(1)) == expected:
+            number = line_punkt(line, margin)
+            if number and int(number) == expected:
                 tops.add(line.top)
                 expected += 1
         breaks[pageno] = tops
     return breaks
 
 
-def punkt_of(text):
-    """The punkt number a block opens with, or None."""
-    match = RE_PUNKT.match(text)
+def punkt_of(text, bare):
+    """The punkt number a block opens with, or None. `bare` where the document
+    prints its numbers without the period."""
+    match = RE_PUNKT.match(text) or (RE_BARE_PUNKT.match(text) if bare else None)
     return match.group(1) if match else None
 
 
-def join_continuations(blocks):
+def block_punkter(blocks, bare):
+    """The punkt every block opens with, aligned with `blocks`.
+
+    A bare number is read here without the geometry that made it safe at the line
+    level -- `classify_letterhead` hands on text, not lines -- so the numbers have
+    to *climb*: a bilaga's own numbered list is otherwise a second run of
+    punkter, and riktlinjer 04/2020 closes with a nine-item list that read as
+    punkt 1-9 all over again, taking 90 paragraphs' worth of joins onto the wrong
+    punkt with it.
+
+    Climbing, and not the line level's "the number the document is due": measured
+    against the block stream that rule loses whole documents, because the blocks
+    do not number 1..N. Front matter takes punkt 1 with it in riktlinjer 09/2020
+    and punkt 9 goes missing in 03/2019, and the strict rule stops dead at the
+    first gap -- 8 of the 60 documents lose every punkt they have, 09/2020 all
+    47 of them."""
+    out, last = [], 0
+    for kind, text, _level in blocks:
+        punkt = punkt_of(text, bare) if kind == "stycke" else None
+        if bare and punkt and int(punkt) <= last:
+            punkt = None
+        if punkt:
+            last = int(punkt)
+        out.append(punkt)
+    return out
+
+
+def join_continuations(blocks, bare):
     """Join a block that continues the previous numbered punkt back onto it.
 
     Where a document numbers its punkter, every substantive paragraph carries a
@@ -226,17 +327,18 @@ def join_continuations(blocks):
     so a document below `PUNKT_COVERAGE_MIN` is read as the plain prose it is:
     nothing is joined, and its numbers anchor nothing, since a number that is
     not a punkt is not what a citation to a punkt means."""
-    styck = [text for kind, text, _level in blocks if kind == "stycke"]
-    numbered = sum(1 for text in styck if punkt_of(text))
-    if not styck or numbered / len(styck) < PUNKT_COVERAGE_MIN:
+    punkter = block_punkter(blocks, bare)
+    styck = [punkt for (kind, _text, _level), punkt
+             in zip(blocks, punkter, strict=True) if kind == "stycke"]
+    if not styck or sum(1 for p in styck if p) / len(styck) < PUNKT_COVERAGE_MIN:
         return [(kind, text, level, None) for kind, text, level in blocks]
     out = []
-    for kind, text, level in blocks:
+    for (kind, text, level), punkt in zip(blocks, punkter, strict=True):
         if (kind == "stycke" and out and out[-1][0] == "stycke"
-                and out[-1][3] and not punkt_of(text)):
+                and out[-1][3] and not punkt):
             out[-1] = (kind, "%s %s" % (out[-1][1], text), level, out[-1][3])
             continue
-        out.append((kind, text, level, punkt_of(text) if kind == "stycke" else None))
+        out.append((kind, text, level, punkt))
     return out
 
 
@@ -356,22 +458,26 @@ def wp_cover(paras, wp):
 # --------------------------------------------------------------------------
 
 def _paragraphs(path, patch_key):
-    """The PDF's paragraph stream, with the numbered punkter forced apart."""
+    """The PDF's paragraph stream with the numbered punkter forced apart, and
+    whether the document prints those numbers bare -- the block layer reads the
+    number off the text and has no geometry left to decide that for itself."""
     pages = list(pdf_pages(path, patch_key))
-    breaks = numbered_breaks(pages)
-    return [p for pageno, lines in pages
-            for p in page_paragraphs(lines, None, pageno,
-                                     force_break_tops=breaks[pageno])]
+    margin = punkt_margin(pages)
+    breaks = numbered_breaks(pages, margin)
+    paras = [p for pageno, lines in pages
+             for p in page_paragraphs(lines, None, pageno,
+                                      force_break_tops=breaks[pageno])]
+    return paras, margin is not None
 
 
-def body(paras, titel):
+def body(paras, titel, bare):
     """The document's text as typed blocks."""
     return [Block("stycke", text, punkt=punkt) if kind == "stycke"
             else Block("rubrik", text, level)
             for kind, text, level, punkt in join_continuations(
                 drop_repeated_title(
                     classify_letterhead(paras, RE_FRONT_MATTER, RE_MASTHEAD,
-                                        by_size=True), titel))]
+                                        by_size=True), titel), bare)]
 
 
 def footnotes(paras):
@@ -390,7 +496,7 @@ def parse(basefile, root):
     serie = basefile.split("/", 1)[0]
     assert serie in BY_KOD, "no EDPB series %r" % serie
     record = compress.read_json(record_path(root, serie, basefile))
-    paras = _paragraphs(pdf_path(root, basefile), ("edpb", basefile))
+    paras, bare = _paragraphs(pdf_path(root, basefile), ("edpb", basefile))
     fields = (wp_cover(paras, WP29_BY_SLUG[record["nummer"]]) if serie == "wp"
               else {"titel": titled(record, paras),
                     "antagen": record["antagen"]})
@@ -402,7 +508,7 @@ def parse(basefile, root):
         if serie == "wp" else None,
         konsultation_url=record.get("konsultation_url"),
         amnesord=list(record.get("amnesord") or []),
-        body=body(paras, fields["titel"]), fotnoter=footnotes(paras),
+        body=body(paras, fields["titel"], bare), fotnoter=footnotes(paras),
         source_url=record.get("source_url"),
         document_url=record.get("dokument_url"),
     ).to_artifact(_fresh_parser(record["sprak"]))

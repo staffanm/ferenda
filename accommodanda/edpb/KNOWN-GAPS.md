@@ -213,7 +213,7 @@ two versions are separate documents and a citation pins one of them.
 
 The numbered punkt is the citable unit and becomes the anchor (`#punkt27`).
 Many documents number nothing at all — Riktlinjer 2/2018, 3/2018, 8/2020,
-6/2020, 03/2022, 02/2025, most of the WP29 set — and read as plain prose with
+6/2020, 03/2022, most of the WP29 set — and read as plain prose with
 positional ids. That is the source's shape, not a parse failure: the
 running-sequence rule (`parse.numbered_breaks`) is deliberately conservative and
 finds no numbering where the document sets none.
@@ -223,8 +223,8 @@ documents that number their **sections** "1." and "2." and set plain prose under
 them. `join_continuations` assumed every substantive paragraph carried a number,
 so each section number swallowed everything until the next — **WP 250 was a
 single 46,000-character block, WP 248 a 33,000-character one**, and WP 244 and
-Riktlinjer 04/2020 the same in miniature. The premise is now tested before it is
-relied on (`parse.PUNKT_COVERAGE_MIN`): measured over the corpus a
+Riktlinjer 04/2020 the same in miniature (04/2020 has since left this population
+for the third one below). The premise is now tested before it is relied on (`parse.PUNKT_COVERAGE_MIN`): measured over the corpus a
 section-numbered document numbers at most 9 % of its paragraphs and a
 punkt-numbered one at least 29 %, so the two populations are separable with a
 wide margin. Below the threshold nothing is joined and the numbers anchor
@@ -236,6 +236,56 @@ parse differently — WP 250, WP 248, WP 244, Riktlinjer 04/2020 and
 Rekommendationer 1/2022 — and the other 46 byte-identically. Of the nine
 documents added at the same time, WP 263 has the same shape and would have had
 the same defect.
+
+### Two documents print the number with no period
+
+A third population was counted with the first until 2026-08-11: **Riktlinjer
+02/2025 and 04/2020 set the number bare**, in a column of its own in the left
+margin, where every other document prints "1." in the text. The conversion shows
+the two apart:
+
+> `<text top="442" left="66" width="14">1 </text>`
+> `<text top="442" left="108" …>The concept commonly referred to by …</text>`
+
+`RE_PUNKT` needs the period, so it matched nothing in either document, and both
+read as plain prose: 02/2025's punkter 1–3 arrived as **one block** with one
+positional id, and its punkter 4–6 as a second one behind the bullets. A decision
+citing "punkt 2 i riktlinjer 02/2025" had nothing to land on.
+
+The number is therefore read off its **geometry**, not its text, because the text
+says nothing — "1 The concept commonly …" reads like any sentence opening with a
+quantity. Two rules keep that safe, and both are measured rather than assumed:
+
+- The column is the one **the document itself demonstrates**
+  (`parse.punkt_margin`): a line whose leading fragment is digits alone, ending
+  left of the body column, with the prose beginning *at* that column. poppler
+  emits a wider two-digit number and the prose beside it as one fragment
+  ("`10  Finally, the use of …`", starting at the margin's 66), which cannot be
+  told from a table row whose first column holds a number — Riktlinjer 02/2022
+  sets four of those in its annex ("2" at 59, "Artikel 60.2 – Den" at 91). Only
+  the demonstrated column is trusted, so those rows pass for nothing.
+- The block layer reads the number off the text, with no geometry left, so there
+  the numbers have to **climb** (`parse.block_punkter`). Riktlinjer 04/2020 closes
+  with a nine-item numbered checklist, which read as punkt 1–9 all over again and
+  joined 90 paragraphs onto the wrong punkt. The line level's stricter rule — the
+  number the document is *due* — cannot be reused here: the block stream does not
+  number 1..N (front matter takes punkt 1 with it in Riktlinjer 09/2020, punkt 9
+  goes missing in 03/2019), and applied there it would cost 8 documents every
+  punkt they have, 09/2020 all 47.
+
+Measured over the 60-document corpus: a number column is learned for **exactly
+those two documents**, and the other 58 parse with the same punkter and the same
+blocks as before. 02/2025 goes from 0 punkter to **137** (a contiguous 1–137) and
+04/2020 from 0 to **49**, with the text unchanged to the character in both.
+04/2020 also leaves the section-numbered population above, where it sat for a
+reason that is now visible: the 9 % of its paragraphs that carried a number were
+its bilaga's checklist headings ("1. Sammanfattning", "2. Definitioner"), not
+punkter at all. Those still anchor nothing — the climb rejects them behind punkt
+49 — which is what a citation to a punkt means.
+
+Still glued, and a `lib` matter rather than an edpb one: consecutive bullets under
+a punkt ("• distributed …", "• disintermediated …") arrive as one stycke, since
+nothing but the marker separates them and `page_paragraphs` breaks on leading.
 
 ## Upstream data errors carried through
 

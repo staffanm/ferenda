@@ -40,7 +40,7 @@ from accommodanda.lib.lagrum import (
     LagrumParser,
     vagledning_slug,
 )
-from accommodanda.lib.pdftext import Para
+from accommodanda.lib.pdftext import Para, Run, line_from_runs, page_paragraphs
 
 FIXTURES = Path(__file__).parent / "files" / "edpb"
 
@@ -52,6 +52,17 @@ def fixture(name):
 def paras(name):
     return [Para(text=p["text"], bold=p["bold"], size=p["size"])
             for p in json.loads(fixture(name))]
+
+
+def lines(name):
+    """A recorded page stream: ``[(pageno, [Line])]``, every line rebuilt from
+    its runs through the constructor `lib.pdftext` itself uses, so its text,
+    geometry and style flags describe the same run set the real conversion
+    produced -- which is what the punkt column is read off."""
+    return [(page["page"],
+             [line_from_runs([Run(**run) for run in line["runs"]], line["top"])
+              for line in page["lines"]])
+            for page in json.loads(fixture(name))]
 
 
 # --------------------------------------------------------------------------
@@ -319,8 +330,8 @@ def test_the_identity_check_is_keyed_on_the_missing_number_not_a_present_title()
 # --------------------------------------------------------------------------
 
 class _Line:
-    def __init__(self, text, top):
-        self.text, self.top = text, top
+    def __init__(self, text, top, runs=()):
+        self.text, self.top, self.runs = text, top, runs
 
 
 def test_numbered_breaks_follow_the_running_sequence():
@@ -331,7 +342,7 @@ def test_numbered_breaks_follow_the_running_sequence():
                   _Line("2. Vidare gäller detta.", 300)]),
              (2, [_Line("4. Detta hoppar över ett nummer", 100),
                   _Line("3. Och detta är det som stod på tur.", 200)])]
-    breaks = edpb_parse.numbered_breaks(pages)
+    breaks = edpb_parse.numbered_breaks(pages, None)
     assert breaks[1] == {100, 300}
     assert breaks[2] == {200}       # 4 came too early and is not a break
 
@@ -339,7 +350,7 @@ def test_numbered_breaks_follow_the_running_sequence():
 def test_a_document_that_numbers_nothing_yields_no_breaks():
     pages = [(1, [_Line("Riktlinjer om öppenhet", 100),
                   _Line("Denna vägledning gäller.", 200)])]
-    assert edpb_parse.numbered_breaks(pages) == {1: set()}
+    assert edpb_parse.numbered_breaks(pages, None) == {1: set()}
 
 
 def test_the_number_column_is_what_keeps_two_paragraphs_apart():
@@ -348,7 +359,7 @@ def test_the_number_column_is_what_keeps_two_paragraphs_apart():
     boundary the citation scan needs."""
     blocks = edpb_parse.join_continuations(
         [("stycke", "16. I skäl 43 anges det tydligt att …", 0),
-         ("stycke", "17. Utan att det påverkar dessa överväganden …", 0)])
+         ("stycke", "17. Utan att det påverkar dessa överväganden …", 0)], False)
     assert [b[3] for b in blocks] == ["16", "17"]
 
 
@@ -357,7 +368,7 @@ def test_a_continuation_rejoins_the_punkt_it_continues():
         [("stycke", "11. Samtycke innebär varje slag av", 0),
          ("stycke", "frivillig, specifik och informerad viljeyttring.", 0),
          ("rubrik", "3.1 Fritt/frivilligt samtycke", 2),
-         ("stycke", "En rubrik avslutar sammanslagningen.", 0)])
+         ("stycke", "En rubrik avslutar sammanslagningen.", 0)], False)
     assert [b[1] for b in blocks[:1]] == [
         "11. Samtycke innebär varje slag av frivillig, specifik och "
         "informerad viljeyttring."]
@@ -394,7 +405,7 @@ def test_a_section_numbered_document_joins_nothing_and_anchors_nothing():
         [("stycke", "1. Anmälan till tillsynsmyndigheten", 0),
          *[("stycke", "Ett stycke som inte är numrerat alls.", 0)
            for _ in range(9)],
-         ("stycke", "2. Information till den registrerade", 0)])
+         ("stycke", "2. Information till den registrerade", 0)], False)
     assert len(blocks) == 11                    # nothing was joined
     assert all(b[3] is None for b in blocks)    # and nothing anchors a punkt
 
@@ -402,7 +413,7 @@ def test_a_section_numbered_document_joins_nothing_and_anchors_nothing():
 def test_body_reads_the_guideline_into_numbered_punkter():
     body = edpb_parse.body(paras("paras-riktlinjer-05-2020-sv.json"),
                            "Riktlinjer 05/2020 om samtycke enligt förordning "
-                           "(EU) 2016/679")
+                           "(EU) 2016/679", False)
     punkter = [b.punkt for b in body if b.kind == "stycke" and b.punkt]
     assert punkter[:7] == ["1", "2", "3", "4", "5", "6", "7"]
     # the version line, the version history and the adoption date are the
@@ -413,6 +424,106 @@ def test_body_reads_the_guideline_into_numbered_punkter():
     assert not body[0].text.startswith("Riktlinjer 05/2020 om samtycke")
     # the section headings survive as headings
     assert any(b.kind == "rubrik" and b.text == "1 INLEDNING" for b in body)
+
+
+# --------------------------------------------------------------------------
+# the punkt whose number carries no period, set bare in the margin
+# --------------------------------------------------------------------------
+
+BLOCKCHAIN = "Guidelines 02/2025 on processing of personal data through " \
+             "blockchain technologies"
+
+
+def bare_body(name, titel):
+    """`parse._paragraphs` and `parse.body` over a recorded page stream."""
+    pages = lines(name)
+    margin = edpb_parse.punkt_margin(pages)
+    breaks = edpb_parse.numbered_breaks(pages, margin)
+    return edpb_parse.body(
+        [p for pageno, page in pages
+         for p in page_paragraphs(page, None, pageno,
+                                  force_break_tops=breaks[pageno])],
+        titel, margin is not None)
+
+
+def test_the_number_column_is_read_off_the_lines_that_set_the_number_apart():
+    """Riktlinjer 02/2025 hangs its punkt numbers in the margin at x=66 and sets
+    the prose at the body's 108."""
+    pages = lines("lines-riktlinjer-02-2025-en.json")
+    assert edpb_parse.body_column(pages) == 108
+    assert edpb_parse.punkt_margin(pages) == 66
+
+
+def test_a_bare_punkt_number_breaks_the_paragraph_the_period_would_have():
+    """Regression: riktlinjer 02/2025 prints "1", not "1.", so `RE_PUNKT` matched
+    none of its 137 punkter -- punkter 1-3 arrived as one block with one
+    positional id, and a citation to punkt 2 had nothing to land on."""
+    body = bare_body("lines-riktlinjer-02-2025-en.json", BLOCKCHAIN)
+    punkter = [b.punkt for b in body if b.kind == "stycke" and b.punkt]
+    assert punkter == [str(n) for n in range(1, 12)]
+    assert [b.text[:24] for b in body if b.punkt in ("1", "2", "3")] == [
+        "1 The concept commonly r", "2 Blockchain – or, in a ",
+        "3 In practice, blockchai"]
+    # poppler emits the wider two-digit number and the prose beside it as one
+    # fragment ("10  Finally, the use of …", starting at the margin's 66), which
+    # is the second half of the same rule
+    assert next(b.text for b in body if b.punkt == "10").startswith(
+        "10 Finally, the use of decentralised technologies")
+
+
+def test_a_bare_number_out_of_sequence_starts_no_punkt():
+    """The running sequence guards the bare form exactly as it guards the dotted
+    one: a number the document is not due starts nothing, margin column or not.
+    Without it "2016 var året …" would open a punkt."""
+    def line(number, text, top):
+        return line_from_runs(
+            [Run(66, 80, "%s " % number, False, False, 17, "arial"),
+             Run(108, 790, text, False, False, 17, "arial")], top)
+    pages = [(1, [line(1, "The concept commonly referred to by the term …", 100),
+                  line(7, "Member States shall ensure that …", 200),
+                  line(2, "Blockchain – or, in a more general manner …", 300)])]
+    assert edpb_parse.numbered_breaks(pages, 66) == {1: {100, 300}}
+
+
+def test_a_bare_number_at_the_body_margin_is_not_a_punkt():
+    """The running footer of riktlinjer 02/2025 is "4 | Adopted", set at the body
+    margin rather than out in the number column -- and it is the *document's*
+    body column that says so, since on the version-history page the commonest
+    line start is the table's and leaves the footer looking like a margin
+    number."""
+    footer = line_from_runs([Run(108, 181, "4 | Adopted ", False, False, 14,
+                                "arial")], 1191)
+    assert edpb_parse.line_punkt(footer, 66) is None
+    assert edpb_parse.line_punkt(footer, 108) == "4"     # in the column it would
+
+
+def test_a_numbered_table_column_teaches_no_number_column():
+    """Riktlinjer 02/2022's annex sets a row number at x=59 with the row's first
+    cell at 91, which reads exactly like a margin number -- but its prose does
+    not begin at the body column, so the document demonstrates no punkt column
+    and its four rows pass for nothing."""
+    row = line_from_runs(
+        [Run(59, 67, "2", False, False, 17, "arial"),
+         Run(91, 210, "Artikel 60.2 – Den", False, False, 17, "arial"),
+         Run(291, 322, "Vem", False, False, 17, "arial")], 300)
+    body = line_from_runs([Run(106, 700, "Denna vägledning gäller.", False,
+                              False, 17, "arial")], 340)
+    assert edpb_parse.punkt_margin([(63, [row, body, body])]) is None
+
+
+def test_a_bilaga_that_numbers_its_own_list_starts_no_second_run_of_punkter():
+    """Regression: riktlinjer 04/2020 closes with a nine-item numbered list, and
+    read as text those items are punkt 1-9 all over again -- every following
+    paragraph joined onto the wrong punkt. A bare number counts only where it
+    climbs past the last one."""
+    blocks = edpb_parse.join_continuations(
+        [("stycke", "47 Den personuppgiftsansvarige måste …", 0),
+         ("stycke", "48 Världen befinner sig mitt uppe i …", 0),
+         ("stycke", "49 Styrelsen understryker att man inte …", 0),
+         ("rubrik", "BILAGA – Vägledande checklista", 2),
+         ("stycke", "1 Ansökan om personuppgiftsansvar …", 0),
+         ("stycke", "2 Kontaktspårningsappen bör vara …", 0)], True)
+    assert [b[3] for b in blocks] == ["47", "48", "49", None, None, None]
 
 
 # --------------------------------------------------------------------------
