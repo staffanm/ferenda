@@ -159,7 +159,8 @@ def test_icrc_eyebrow_is_the_acronym():
            "title": "Convention (III) relative to the Treatment of Prisoners of War."}
     lb = labels.document_labels("icrc", art)
     assert lb.short_id == "GK III"
-    assert lb.short_title == "tredje Genèvekonventionen (GK III)"
+    # the h1 capitalizes the curated running-text name, as _sfs does
+    assert lb.short_title == "Tredje Genèvekonventionen (GK III)"
 
 
 def test_untc_eyebrow_is_the_acronym():
@@ -168,7 +169,8 @@ def test_untc_eyebrow_is_the_acronym():
                     "Degrading Treatment or Punishment"}
     lb = labels.document_labels("untc", art)
     assert lb.short_id == "CAT"
-    assert lb.short_title == "tortyrkonventionen (CAT)"
+    # the h1 capitalizes the curated running-text name, as _sfs does
+    assert lb.short_title == "Tortyrkonventionen (CAT)"
 
 
 def test_icc_eyebrow_is_the_case_not_the_document():

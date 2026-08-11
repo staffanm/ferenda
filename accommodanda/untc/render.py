@@ -4,10 +4,28 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 
+import re
+
 from ..lib import labels, tpl
 from ..lib.page import Rail, doc_meta, page_context
 
 ENV = tpl.environment("accommodanda.untc")
+
+# the MTDSG's entry-into-force field is English prose ("16 November 1994, in
+# accordance with article 308(1)."); the meta row is a date row, so the date
+# is what it shows -- ISO, like the conclusionDate beside it
+_MONTHS = {m: i + 1 for i, m in enumerate(
+    ("January", "February", "March", "April", "May", "June", "July",
+     "August", "September", "October", "November", "December"))}
+_ENTRY_DATE = re.compile(r"(\d{1,2}) (%s) (\d{4})" % "|".join(_MONTHS))
+
+
+def _entry_into_force(text):
+    if not text:
+        return None
+    m = _ENTRY_DATE.match(text)
+    return ("%s-%02d-%02d" % (m.group(3), _MONTHS[m.group(2)], int(m.group(1)))
+            if m else text)
 
 
 # the consent-to-be-bound forms an MTDSG participation records, in Swedish
@@ -39,7 +57,7 @@ def render(art, site):
         ("Titel", lb.official_title if lb.official_title != lb.short_title else None),
         ("Referens", md.get("reference")),
         ("Antagen", "%s, %s" % (place, date) if place and date else date),
-        ("Ikraftträdande", md.get("entryIntoForce")),
+        ("Ikraftträdande", _entry_into_force(md.get("entryIntoForce"))),
         ("Registrering (UNTS)", md.get("registration")),
         ("Depositarie", md.get("depositary")),
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),

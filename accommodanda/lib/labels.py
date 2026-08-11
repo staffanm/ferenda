@@ -331,14 +331,19 @@ def _icrc(art):
     entry = treaty_names(datasets.ICRC_NAMES).get(art.get("number"), {})
     abbr, name = primary(entry.get("abbr")), _named(entry.get("label"), entry.get("abbr"))
     short_id = abbr or art.get("identifier") or ("ICRC " + (art.get("number") or ""))
-    return Labels(short_id, name, art.get("title") or short_id, name or short_id)
+    # the curated names keep their running-text case ("första Genèvekonventionen",
+    # "folkmordskonventionen") for the citing form; a page heading capitalizes,
+    # as _sfs does with a law's nickname
+    return Labels(short_id, name[:1].upper() + name[1:],
+                  art.get("title") or short_id, name or short_id)
 
 
 def _untc(art):
     entry = _untc_names().get(art.get("number"), {})
     abbr, name = primary(entry.get("abbr")), _named(entry.get("sv"), entry.get("abbr"))
     short_id = abbr or art.get("identifier") or ("MTDSG " + (art.get("number") or ""))
-    return Labels(short_id, name, art.get("title") or short_id, name or short_id)
+    return Labels(short_id, name[:1].upper() + name[1:],
+                  art.get("title") or short_id, name or short_id)
 
 
 # --------------------------------------------------------------------------
