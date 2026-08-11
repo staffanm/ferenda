@@ -53,8 +53,13 @@ def _heading(paragraph, text, styles):
     upper = text.upper()
     if upper in SKIP_EXACT:
         return None
+    # the OPINION test needs the all-caps guard: a separate-opinion heading is
+    # always set in caps ("JOINT DISSENTING OPINION OF JUDGES ..."), while
+    # running prose mentions "the opinion of the Ombudsperson" and the
+    # Convention's own "political or other opinion" constantly -- without the
+    # guard those paragraphs headed 17% of the corpus's rubrik nodes
     known = (upper in HEADING_EXACT or upper.startswith("FOR THESE REASONS")
-             or " OPINION" in upper)
+             or (uppercase and " OPINION" in upper))
     prefix = RE_HEADING_PREFIX.match(text)
     if not (toc_anchor or known or (uppercase and avoids_break)
             or (bold and prefix and len(text) < 180)):

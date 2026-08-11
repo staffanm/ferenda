@@ -6,7 +6,7 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 
 from markupsafe import Markup
 
-from ..lib import labels, tpl
+from ..lib import datasets, labels, tpl
 from ..lib.page import (
     doc_meta,
     document_body,
@@ -16,6 +16,15 @@ from ..lib.page import (
 )
 
 ENV = tpl.environment("accommodanda.hudoc")
+
+# how a judgment's article references name their treaty: the curated Swedish
+# short form ("artikel 8 EKMR"), not the Treaty Office's full official title
+TREATY_NAMES = labels.treaty_names(datasets.COE_NAMES)
+
+
+def _treaty_name(base):
+    entry = TREATY_NAMES.get(base.rsplit("/", 1)[-1], {})
+    return entry.get("abbr") or entry.get("label")
 
 
 def render(art, site):
@@ -37,5 +46,6 @@ def render(art, site):
                       if md.get("conclusions") else None),
         island=rail.island(),
         refs=Markup(ref_list(site, "Berörda konventionsartiklar",
-                              [ref["uri"] for ref in art.get("references", [])])),
+                              [ref["uri"] for ref in art.get("references", [])],
+                              name=_treaty_name)),
         structure=structure))

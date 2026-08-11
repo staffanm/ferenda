@@ -2141,7 +2141,7 @@ def _doc_title(site, uri):
     return row[0] if row else None
 
 
-def ref_link(site, uri, name_unknown=None):
+def ref_link(site, uri, name_unknown=None, name=None):
     """A link to a referenced document for a föreskrift's outbound metadata
     (bemyndigande -> SFS paragraf, genomför -> EU directive): the statute
     paragraf pinpointed and named, or the CELEX out to EUR-Lex; a plain span
@@ -2151,21 +2151,33 @@ def ref_link(site, uri, name_unknown=None):
     target falls back to `catalog.local`, i.e. its slug -- and a reader told
     that this regulation repeals "rpsfs/2011:16" has been shown the URL, not the
     citation. The caller supplies it because only the source knows how its own
-    designations are spelled (lib stays source-agnostic)."""
-    if _is_external(uri):
+    designations are spelled (lib stays source-agnostic).
+
+    `name` names a target the catalog *does* hold, overriding its title -- the
+    calling source's own compact form of a document it links constantly (hudoc
+    naming the convention "EKMR" rather than the treaty's full official title).
+
+    The external branch fires only for a target the site does not host: the
+    `ext/` namespace also holds documents we parse and serve (the CoE treaties),
+    and short-circuiting on the prefix alone rendered every hudoc judgment's
+    article references as raw fragment ids ("005#A8") linking out to the
+    Treaty Office instead of to our own article anchors."""
+    base, _, frag = uri.partition("#")
+    known = site.has(base)
+    if _is_external(uri) and not known:
         return Markup('<a class="ext" href="%s" rel="external">%s</a>') % (
             _external_href(uri), catalog.local(uri).rsplit("/", 1)[-1])
-    base, _, frag = uri.partition("#")
     pin = human_fragment(frag)
-    known = site.has(base)
-    name = _law_title(site, base) if known or not name_unknown \
-        else (name_unknown(base) or _law_title(site, base))
+    if known:
+        name = (name and name(base)) or _law_title(site, base)
+    else:
+        name = (name_unknown and name_unknown(base)) or _law_title(site, base)
     label = ("%s %s" % (pin, name)).strip() if pin else name
     return (Markup('<a href="%s">%s</a>') % (href(uri), label)
             if known
             else Markup('<span class="noref">%s</span>') % label)
 
 
-def ref_list(site, heading, uris, name_unknown=None):
-    return PANELS.ref_list(heading, [ref_link(site, u, name_unknown)
+def ref_list(site, heading, uris, name_unknown=None, name=None):
+    return PANELS.ref_list(heading, [ref_link(site, u, name_unknown, name)
                                      for u in uris or []])

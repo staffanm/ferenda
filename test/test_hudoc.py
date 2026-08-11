@@ -10,6 +10,7 @@ from accommodanda.lib import catalog, coe, facets, layout, render
 from accommodanda.lib.errors import SkipDocument
 from accommodanda.lib import page
 from accommodanda.coe import render as coe_render
+from accommodanda.hudoc import render as hudoc_render
 
 FIXTURES = Path(__file__).parent / "files" / "hudoc"
 
@@ -78,6 +79,30 @@ def test_toc_entries_are_removed_without_dropping_the_judgment_and_css_headings(
         ("rubrik", "A. Admissibility", 2),
         ("stycke", "The complaint is admissible.", 1),
     ]
+
+
+def test_opinion_in_running_prose_is_not_a_heading():
+    # the OPINION branch requires the paragraph to be all-caps: a separate
+    # opinion's title is, while prose quoting "political or other opinion" or
+    # citing "the opinion of the Ombudsperson" is not (X2, 001-188991)
+    html = """
+    <div>
+      <p>THE FACTS</p>
+      <p>1. It drew the Court's attention to the opinion of the Ombudsperson
+      and to the medical experts' opinions dated the same day.</p>
+      <p>JOINT DISSENTING OPINION OF JUDGES GROZEV AND O'LEARY</p>
+      <p>2. The rights shall be secured without discrimination on any ground
+      such as political or other opinion, national or social origin.</p>
+    </div>
+    """
+    blocks = parse.parse_body(html)
+    assert [(block.kind, block.level) for block in blocks] == [
+        ("rubrik", 1),
+        ("stycke", 1),
+        ("rubrik", 1),
+        ("stycke", 1),
+    ]
+    assert blocks[2].text == "JOINT DISSENTING OPINION OF JUDGES GROZEV AND O'LEARY"
 
 
 def test_restarted_judgment_numbering_gets_unique_stable_ids():
@@ -157,3 +182,10 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
     assert "Europadomstolens praxis" in html
     assert "CASE OF EXAMPLE v. SWEDEN" in html
     assert 'id="A8"' in html
+    # the citing side names the article, never the raw fragment id: the treaty
+    # lives under ext/ but is hosted here, so the reference links to our own
+    # article anchor with the curated short name (X3)
+    case_html = hudoc_render.render(case, site)
+    assert "artikel 8 EKMR" in case_html
+    assert ">005#A8<" not in case_html
+    assert '<a href="/coe/005#A8">' in case_html
