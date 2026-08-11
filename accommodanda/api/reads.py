@@ -29,11 +29,13 @@ class InboundUnavailable(RuntimeError):
 
 
 def search(index, query, *, source=None, kind=None, year=None, limit,
-           offset=0, cursor=None):
+           offset=None, cursor=None):
     """Full-text hits plus the pinned citation resolution:
-    {query, total, next_cursor, facets, results}. A client error (bad cursor,
-    bad field) raises ValueError; an unreachable cluster raises
-    SearchUnavailable."""
+    {query, total, next_cursor, facets, results}. `offset=None` is the
+    forward stream (title-cluster capped, cursor-paged); an explicit offset
+    (0 included) is raw bounded random access -- see SearchIndex.search.
+    A client error (bad cursor, bad field) raises ValueError; an unreachable
+    cluster raises SearchUnavailable."""
     try:
         res = index.search(query, source=source, kind=kind, year=year,
                            limit=limit, offset=offset, cursor=cursor)
@@ -44,7 +46,10 @@ def search(index, query, *, source=None, kind=None, year=None, limit,
     # the resolved target answers a citation-shaped query, so it leads; only on
     # the first page (it is one fixed target, not paginated), and a missing
     # catalog must not fail a full-text search (best-effort, no 503)
-    if offset == 0 and not cursor and not year and db.catalog_ready():
+    # only on the capped forward first page: an explicit offset (0 included) is
+    # a raw random-access walk, and prepending a pin there would push its last
+    # raw hit past the page boundary that offset=limit resumes from
+    if offset is None and not cursor and not year and db.catalog_ready():
         with db.connection() as con:
             pinned = pins.resolved_results(con, query, source, kind)
         results, total = pins.merge_pinned(pinned, results, total, limit)

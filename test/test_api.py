@@ -413,3 +413,16 @@ def test_search_pins_the_terse_law_first_pinpoint(client):
     frag = client.get("/api/v1/search", params={"q": "BrB 3:1"}) \
         .json()["results"][0]["fragments"][0]
     assert frag["pinpoint"] == "K3P1" and frag["label"] == "3 kap. 1 §"
+
+
+def test_search_explicit_offset_walks_raw_without_the_pin(client):
+    # an explicit offset -- 0 included -- is raw bounded random access: no
+    # pinned lead (it would push the page's last raw hit past the boundary
+    # offset=limit resumes from) and no related-hit cap. The offsetless first
+    # page keeps the pin.
+    q = {"q": "3 kap. 1 § brottsbalken"}
+    with_pin = client.get("/api/v1/search", params=q).json()
+    raw = client.get("/api/v1/search", params={**q, "offset": 0}).json()
+    assert with_pin["results"][0]["fragments"][0]["pinpoint"] == "K3P1"
+    # a pinned lead carries score None; the raw page is the index's hit alone
+    assert [r["score"] for r in raw["results"]] == [9.1]

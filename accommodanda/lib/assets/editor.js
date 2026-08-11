@@ -260,7 +260,11 @@
     host.appendChild(u); host.appendChild(pw); host.appendChild(go); host.appendChild(err);
     function submit() {
       j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
-        .then(function (r) { if (r.ok) location.assign('/ops/'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
+        // '/ops', not '/ops/': the dashboard is registered at the exact path, and
+        // the static site mounted at '/' matches the trailing-slash form before
+        // Starlette's redirect_slashes can fire (see api/app.py), so logging in
+        // landed on a 404
+        .then(function (r) { if (r.ok) location.assign('/ops'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
     }
     go.addEventListener('click', submit);
     pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });

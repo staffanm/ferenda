@@ -74,14 +74,17 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
 
-# FastAPI serves the interactive docs at exactly /docs and /redoc, and the
-# trailing-slash forms are different paths. Starlette's own redirect_slashes
-# never fires for them because serve() mounts the static site at "/", so every
-# such path matches something and /docs/ 404s instead -- which is what a reader
-# who types the directory-looking form gets. Redirect them by hand, ahead of
-# that mount. 308 rather than 307: these are permanent and GET-only.
+# FastAPI serves the interactive docs at exactly /docs and /redoc, and the ops
+# dashboard sits at exactly /ops; the trailing-slash forms are different paths.
+# Starlette's own redirect_slashes never fires for them because serve() mounts
+# the static site at "/", so every such path matches something and /docs/ 404s
+# instead -- which is what a reader who types the directory-looking form gets.
+# Redirect them by hand, ahead of that mount. 308 rather than 307: these are
+# permanent and GET-only. /ops/ joined them because the editor's own login sent
+# the user there, so every successful login ended on a 404 (assets/editor.js).
 app.add_route("/docs/", lambda request: RedirectResponse("/docs", 308))
 app.add_route("/redoc/", lambda request: RedirectResponse("/redoc", 308))
+app.add_route("/ops/", lambda request: RedirectResponse("/ops", 308))
 
 # the ops dashboard (/ops*), registered like /api/v1 -- before the SiteFiles
 # mount added in serve(), so its explicit routes win over the static catch-all
@@ -331,8 +334,10 @@ def search_endpoint(
         year: str | None = Query(None, pattern=r"^\d{4}$",
                                  description="restrict to a four-digit publication/decision year"),
         limit: int = Query(10, ge=1, le=100),
-        offset: int = Query(0, ge=0, le=9900,
-                            description="bounded random access; use cursor for deep paging"),
+        offset: int | None = Query(None, ge=0, le=9900,
+                            description="bounded random access, raw result "
+                            "stream (no related-hit decluttering); omit it "
+                            "and page by cursor for the decluttered stream"),
         cursor: str | None = Query(None, max_length=2048,
                                    description="opaque cursor returned by the previous page")):
     """Full-text search, with a citation-aware twist: when the query reads as a
@@ -342,7 +347,7 @@ def search_endpoint(
     can't do (the name appears nowhere in the text). The rest is the usual
     full-text ranking (relevance combined with citation count) with the matching
     §/article fragments and highlights."""
-    if cursor and offset:
+    if cursor and offset is not None:
         raise HTTPException(422, "cursor and offset are mutually exclusive")
     try:
         res = reads.search(_index, q, source=source, kind=kind, year=year,

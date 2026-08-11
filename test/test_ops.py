@@ -104,6 +104,16 @@ def test_unauthenticated_401(ledger):
     assert TestClient(api.app).get("/ops").status_code == 401
 
 
+def test_trailing_slash_redirects_to_the_dashboard(ledger):
+    # the dashboard is registered at exactly /ops, and serve() mounts the static
+    # site at "/", so Starlette's own redirect_slashes never fires and /ops/ 404s.
+    # editor.js sent the user to /ops/ after login, so every successful login
+    # ended on that 404; this is the server half of the fix.
+    r = TestClient(api.app).get("/ops/", follow_redirects=False)
+    assert r.status_code == 308
+    assert r.headers["location"] == "/ops"
+
+
 def test_editing_disabled_403(ledger, monkeypatch):
     # an unset editor_secret disables editing wholesale -- and the dashboard with it
     monkeypatch.setattr(config, "EDITOR_SECRET", None)
