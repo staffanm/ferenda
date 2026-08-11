@@ -1,12 +1,18 @@
-"""A harvested rs record + its PDF -> :class:`Stallningstagande` -> JSON artifact.
+"""A harvested rs record + its document -> :class:`Stallningstagande` -> JSON
+artifact.
 
-All six agencies publish a ställningstagande as a letterhead PDF -- a narrow
-margin column of labelled fields beside a wide body, structure marked by font
-alone -- which is the shape `lib.pdftext.classify_letterhead` reads. So there is
-one body reader here, configured per agency by two patterns: the margin column's
-own labels and bare values, and the footer masthead, which has to be removed *in
-place* because wherever a footer line shares a baseline with a body line the two
-arrive glued into one paragraph.
+Six of the seven agencies publish a ställningstagande as a letterhead PDF -- a
+narrow margin column of labelled fields beside a wide body, structure marked by
+font alone -- which is the shape `lib.pdftext.classify_letterhead` reads. So
+there is one body reader here, configured per agency by two patterns: the margin
+column's own labels and bare values, and the footer masthead, which has to be
+removed *in place* because wherever a footer line shares a baseline with a body
+line the two arrive glued into one paragraph.
+
+Skatteverket is the seventh and publishes no PDF at all: its ställningstagande
+*is* a web page, the way a JK-beslut is (`avg.parse`). That route needs none of
+the letterhead machinery -- the page marks its own headings, paragraphs and
+notes -- so it is read by `skv.page_body` and routed on `agencies.page_body`.
 
 What each agency has to be told, and nothing more, is therefore:
 
@@ -30,7 +36,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ..lib import compress
+from ..lib import compress, markup, patch
 from ..lib.lagrum import ALL_PARSE_TYPES, sfs_parser
 from ..lib.pdftext import (
     classify_letterhead,
@@ -45,8 +51,9 @@ from ..lib.util import (
     normalize_space,
     record_path,
 )
-from .agencies import BY_ORG
-from .download import labelled_value, pdf_path
+from . import skv
+from .agencies import BY_ORG, number_slug
+from .download import body_path, labelled_value
 from .model import Block, Fotnot, Stallningstagande
 
 RS_PARSE_TYPES = ALL_PARSE_TYPES
@@ -243,7 +250,7 @@ def body(record, root, patch_key=None):
     A document the agency published no PDF for -- a repealed Konkurrensverket
     entry, which keeps its förteckning row and nothing else -- has an empty
     body: the record is then the register entry, which is what it is."""
-    path = pdf_path(root, record["basefile"])
+    path = body_path(root, record["basefile"])
     if not compress.exists(path):
         # the other half of the harvest's invariant: a record is written only
         # once its document is on disk (`download._walk`), so an absent PDF here
@@ -276,7 +283,7 @@ def footnotes(record, root, patch_key=None):
     `lib.pdftext.letterhead_footnotes`. A ställningstagande grounds the
     references its prose makes down here, so discarding them costs exactly the
     citations that identify what the agency is reading."""
-    path = pdf_path(root, record["basefile"])
+    path = body_path(root, record["basefile"])
     if not compress.exists(path):
         return []
     reader = READERS[record["org"]]
@@ -290,32 +297,85 @@ def header_fields(record, root):
     """The page-1 fields the listing did not carry. Nothing here overwrites what
     the listing stated: the agency's own index is authoritative for what it
     publishes, and the PDF fills only the gaps it leaves."""
-    path = pdf_path(root, record["basefile"])
+    path = body_path(root, record["basefile"])
     if not compress.exists(path):
         return {}
     fields = READERS[record["org"]].header(pdf_first_page_text(path))
     return {k: v for k, v in fields.items() if v and not record.get(k)}
 
 
+# --------------------------------------------------------------------------
+# the one agency whose document is a web page
+# --------------------------------------------------------------------------
+
+def page_fields(record, root, basefile):
+    """The body, notes and chain a Skatteverket page carries, as the fields
+    :class:`Stallningstagande` takes.
+
+    Everything else -- identity, title, date, områden, currency -- the register
+    already stated, and nothing here overwrites it (the avg rule). What only the
+    page knows is the text itself and what this position replaced or was
+    replaced by, which Skatteverket writes in fixed words and marks up with the
+    other document's own diarienummer.
+
+    The stored page is the parse's intermediate, so a correction patch applies
+    here, the way jk's landing page takes one (`avg.parse`) -- normalised to one
+    block element per line first, so a hunk rewrites a paragraph rather than the
+    whole document (`patchsource` normalises identically). Every block this
+    reader emits is whitespace-normalised on its own, which is the precondition
+    `lib.markup` states for that transform."""
+    html = patch.apply("rs", basefile, markup.block_lines(
+        compress.read_text(body_path(root, record["basefile"]))))
+    # the page states its own dnr, and the dnr is this agency's identity -- so
+    # this is the store's proof that the page filed under a basefile is the
+    # document that basefile names. Compared as the slug both reduce to, which
+    # absorbs exactly the separator sloppiness Skatteverket prints (a space or
+    # an en dash where the other form has a slash or a hyphen).
+    printed = skv.dnr(skv.page_metadata(html).get("Dnr", ""))
+    if not printed or number_slug(printed) != number_slug(record["nummer"]):
+        # a raise, not an assert: under `python -O` an assert would strip and
+        # the wrong text would publish under a real identifier
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError(
+            "%s holds a page that names dnr %r -- the wrong document is filed "
+            "here" % (basefile, printed))
+    blocks, notes = skv.page_body(html)
+    return {
+        "body": drop_front_matter(
+            [Block(kind, text, level) for kind, text, level in blocks],
+            record["titel"]),
+        "fotnoter": [Fotnot(mark, text) for mark, text in notes],
+        **skv.page_relations(html),
+    }
+
+
 def parse(basefile, root):
-    """One basefile ("fk/2025:01", "kfm/1-23-VER", "migr/RS-028-2021") ->
-    artifact dict, body citation-scanned."""
+    """One basefile ("fk/2025:01", "kfm/1-23-VER", "migr/RS-028-2021",
+    "skv/8-193984-2026") -> artifact dict, body citation-scanned."""
     org = basefile.split("/", 1)[0]
     record = compress.read_json(record_path(root, org, basefile))
-    fields = {**record, **header_fields(record, root)}
+    patch_key = ("rs", basefile)
+    # where the text is, and what only the document itself can say: a letterhead
+    # PDF read under the agency's own margin/masthead patterns, or -- for the
+    # agency that publishes web pages -- the page's own markup
+    fields = {**record, **(page_fields(record, root, basefile)
+                           if BY_ORG[org].page_body
+                           else {"body": body(record, root, patch_key),
+                                 "fotnoter": footnotes(record, root, patch_key),
+                                 **header_fields(record, root)})}
     return Stallningstagande(
         org=org, nummer=record["nummer"], titel=record["titel"],
         beslutsdatum=fields.get("beslutsdatum"),
         diarienummer=fields.get("diarienummer"),
         sammanfattning=record.get("sammanfattning"),
         status=record.get("status") or "gällande",
-        upphavd=record.get("upphavd"), ersatt_av=record.get("ersatt_av"),
-        ersatter=record.get("ersatter"), version=record.get("version"),
+        upphavd=record.get("upphavd"),
+        ersatt_av=fields.get("ersatt_av"), ersatter=fields.get("ersatter"),
+        version=record.get("version"),
         foregaende_version=record.get("foregaende_version"),
         doktyp=record.get("doktyp") or "stallningstagande",
         nyckelord=list(record.get("nyckelord") or []),
-        body=body(record, root, ("rs", basefile)),
-        fotnoter=footnotes(record, root, ("rs", basefile)),
+        body=fields["body"], fotnoter=fields["fotnoter"],
         source_url=record.get("source_url"),
         document_url=record.get("dokument_url"),
         # the position's own date, so a bare law name resolves to the act in

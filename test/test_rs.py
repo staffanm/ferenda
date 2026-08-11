@@ -1,4 +1,4 @@
-"""rs vertical (myndigheternas rättsliga ställningstaganden): identity, the six
+"""rs vertical (myndigheternas rättsliga ställningstaganden): identity, the seven
 listing readers, page-1 header extraction, body classification, artifact
 projection and the layout/catalog/facets wiring.
 
@@ -7,18 +7,39 @@ Hermetic: the fixtures under ``test/files/rs/`` are trimmed captures of the live
 exercised against what the agencies actually publish without network or poppler.
 """
 
+import functools
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
 import requests
 
-from accommodanda.lib import catalog, compress, facets, labels, layout, util
+from accommodanda import patchsource
+from accommodanda.lib import (
+    catalog,
+    compress,
+    facets,
+    labels,
+    layout,
+    page,
+    util,
+)
+from accommodanda.lib import browser, harvest
 from accommodanda.lib.pdftext import Para, classify_letterhead
 from accommodanda.lib.util import record_path
 from accommodanda.rs import download as rs_download
 from accommodanda.rs import parse as rs_parse
-from accommodanda.rs.agencies import BY_ORG, ORGS, REGISTRY, number_slug
+from accommodanda.rs import render as rs_render
+from accommodanda.rs import skv
+from accommodanda.rs.agencies import (
+    BROWSER_ORGS,
+    BY_ORG,
+    DEFAULT_ORGS,
+    ORGS,
+    REGISTRY,
+    number_slug,
+)
 from accommodanda.rs.model import Block, Stallningstagande, rs_identifier, rs_uri
 
 FIXTURES = Path(__file__).parent / "files" / "rs"
@@ -45,6 +66,12 @@ def fixture(name):
      "Kronofogdens ställningstagande 1/23/VER"),
     ("migr", "RS/028/2021", "https://lagen.nu/rs/migr/RS-028-2021",
      "RS/028/2021"),
+    # Skatteverket numbers no series, so its own designation is the dnr -- and
+    # the pre-2020 dnr form reduces to a path segment the same way
+    ("skv", "8-193984-2026", "https://lagen.nu/rs/skv/8-193984-2026",
+     "Skatteverkets ställningstagande dnr 8-193984-2026"),
+    ("skv", "131 297826-13/111", "https://lagen.nu/rs/skv/131-297826-13-111",
+     "Skatteverkets ställningstagande dnr 131 297826-13/111"),
 ])
 def test_identity(org, nummer, uri, identifier):
     assert rs_uri(org, nummer) == uri
@@ -57,15 +84,32 @@ def test_number_slug_leaves_the_agency_number_readable():
 
 
 def test_registry_is_one_entry_per_agency():
-    assert len(REGISTRY) == len(ORGS) == len(BY_ORG) == 6
+    assert len(REGISTRY) == len(ORGS) == len(BY_ORG) == 7
     # every agency has a citable designation and a listing to walk
     for agency in REGISTRY:
         assert "%s" in agency.identifier
         assert agency.listing.startswith("https://")
 
 
+def test_skatteverket_is_kept_off_the_default_sweep():
+    """Its transport is one headful Chrome on the process-global DISPLAY, so it
+    cannot share a run with the HTTP agencies -- the föreskrift rule."""
+    assert BROWSER_ORGS == ("skv",)
+    assert set(DEFAULT_ORGS) | set(BROWSER_ORGS) == set(ORGS)
+    assert "skv" not in DEFAULT_ORGS
+
+
+@pytest.mark.parametrize("basefile,suffix", [
+    ("fk/2025:01", "fk-2025-01.pdf"),
+    # the one agency whose document is the page itself
+    ("skv/8-193984-2026", "skv-8-193984-2026.html"),
+])
+def test_body_path_follows_what_the_agency_publishes(basefile, suffix):
+    assert rs_download.body_path("/root", basefile).name == suffix
+
+
 # --------------------------------------------------------------------------
-# the six listing readers
+# the seven listing readers
 # --------------------------------------------------------------------------
 
 def test_imy_listing():
@@ -239,6 +283,128 @@ def test_swedish_date_comes_from_lib():
     assert not hasattr(rs_download, "SWEDISH_MONTHS")
     assert rs_download.swedish_date is util.swedish_date
     assert rs_download.swedish_date("28 maj 2025") == "2025-05-28"
+
+
+# --------------------------------------------------------------------------
+# Skatteverket -- the register, and the pages that are the documents
+# --------------------------------------------------------------------------
+
+def skv_register():
+    return skv.parse_index(fixture("skv-register.html"))
+
+
+def test_skv_register_states_identity_date_and_omraden():
+    """The register carries everything but the text: the dnr that names the
+    document, its own date (not the day rättslig vägledning published it), and
+    the top-level områden its taxonomy path is filed under."""
+    records, _unidentified = skv_register()
+    live = next(r for r in records if r["basefile"] == "skv/8-492402")
+    assert live["nummer"] == live["diarienummer"] == "8-492402"
+    assert live["titel"].startswith("Befrielse från betalningsskyldigheten")
+    # the register lists this one under 2020-10-05, the day it went up; the
+    # ställningstagande's own date, which its page prints as Datum, is earlier
+    assert live["beslutsdatum"] == "2020-09-29"
+    assert live["source_url"].endswith("/385060.html?date=2020-10-05")
+    assert live["nyckelord"] == ["Mervärdesskatt",
+                                 "Skattebetalning & borgenärsarbete"]
+
+
+def test_skv_register_states_the_withdrawal():
+    """A closed validity window is the only place the register says a position
+    no longer applies -- there is no status column."""
+    records, _ = skv_register()
+    withdrawn = next(r for r in records if r["basefile"] == "skv/8-1740076")
+    assert withdrawn["status"] == "upphävt"
+    assert withdrawn["upphavd"] == "2026-07-06"
+
+
+def test_skv_a_withdrawal_notice_is_not_itself_withdrawn():
+    """Skatteverket publishes "X ska inte längre tillämpas" as a document whose
+    validity is the single day it was issued. Reading that zero-length window as
+    a withdrawal would say the agency withdrew its own withdrawal notice."""
+    records, _ = skv_register()
+    notice = next(r for r in records if r["basefile"] == "skv/8-207888-2026")
+    assert notice["titel"].endswith("ska inte längre tillämpas")
+    assert notice["status"] == "gällande"
+    assert notice["upphavd"] is None
+
+
+@pytest.mark.parametrize("ref_id,nummer", [
+    ("skatteverket 8-193984-2026", "8-193984-2026"),
+    ("skatteverket 8-492402", "8-492402"),
+    # the register mistypes a handful of ids, each still a readable dnr: a
+    # capitalised issuer, a lost issuer, and an en dash for the year's hyphen
+    ("Skatteverket 131 253470-14/111", "131 253470-14/111"),
+    ("131 472246-16/111", "131 472246-16/111"),
+    ("skatteverket 131 576809–13", "131 576809-13"),
+    ("skatteverket 130 237238-5/111", "130 237238-5/111"),
+    # and a few name no dnr at all
+    ("skatteverket 1998-08-24", None),
+    ("Test", None),
+    ("", None),
+])
+def test_skv_dnr_is_read_where_there_is_one(ref_id, nummer):
+    assert skv.dnr(ref_id) == nummer
+
+
+def test_skv_register_reports_the_entries_it_cannot_file():
+    """A pre-2000 RSV-skrivelse the register keys on its date, and a stray test
+    page, have no identity to be filed under. Neither is invented, and neither
+    is dropped silently."""
+    records, unidentified = skv_register()
+    assert len(records) == 8
+    assert len(unidentified) == 2
+    assert any("1998-08-24" in entry for entry in unidentified)
+    assert any("Test" in entry for entry in unidentified)
+
+
+def test_skv_register_refuses_two_entries_claiming_one_dnr():
+    """The dnr is the identity, so a collision would file one document over the
+    other with no trace."""
+    doubled = fixture("skv-register.html").replace(
+        '"refId": "skatteverket 8-492402"', '"refId": "skatteverket 8-1740076"')
+    # a raise, not an assert: under `python -O` an assert would strip and one
+    # document would quietly overwrite the other (rule:errors-drive-retry-use-raise)
+    with pytest.raises(ValueError, match="8-1740076 twice"):
+        skv.parse_index(doubled)
+
+
+def test_skv_page_is_read_as_headings_paragraphs_and_notes():
+    html = fixture("skv-page.html")
+    assert skv.page_metadata(html) == {
+        "Områden": "Mervärdesskatt, Skattebetalning & borgenärsarbete",
+        "Datum": "2020-09-29", "Dnr": "8-492402"}
+    blocks, notes = skv.page_body(html)
+    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1)
+    assert [b[1] for b in blocks if b[0] == "rubrik"] == [
+        "1 Sammanfattning", "2 Frågeställning", "3 Gällande rätt m.m.",
+        "4 Bedömning", "Tillämpningsinformation"]
+    # the notes are lifted out of the body under their own heading, each keeping
+    # the marker the running text set as a superscript
+    assert notes == [("1", "Bostad med särskild service för vuxna enligt lagen "
+                      "(1993:387) om stöd och service till vissa "
+                      "funktionshindrade.")]
+    assert not any("Fotnot" in b[1] for b in blocks)
+    # the rule the editor sets above the notes is a separator, not a stycke
+    assert not any(b[1].startswith("___") for b in blocks)
+
+
+def test_skv_page_names_what_it_replaced():
+    assert skv.page_relations(fixture("skv-page.html")) == {
+        "ersatt_av": None, "ersatter": "8-346749"}
+
+
+def test_skv_page_names_what_replaced_it():
+    """A withdrawn position carries Skatteverkets own dated note, which names
+    the replacement with a marked-up reference to its dnr. The note stays in the
+    body as well: it is published text about this position, and it says things
+    no field carries."""
+    html = fixture("skv-page-upphavd.html")
+    assert skv.page_relations(html)["ersatt_av"] == "8-207888-2026"
+    blocks, _notes = skv.page_body(html)
+    assert blocks[0] == ("stycke", "Nytt: 2026-07-06", 1)
+    assert blocks[1][1].startswith("Detta ställningstagande ska inte längre "
+                                   "tillämpas.")
 
 
 # --------------------------------------------------------------------------
@@ -613,3 +779,275 @@ def test_parse_without_a_document(tmp_path):
     assert art["structure"] == []
     assert art["metadata"]["status"] == "upphävt"
     assert art["identifier"] == "Konkurrensverkets ställningstagande 2023:3"
+
+
+def store_skv(root, record, page_fixture):
+    """One Skatteverket ställningstagande in the store: its register record and
+    the page that is its text."""
+    basefile = record["basefile"]
+    compress.write_download(record_path(root, "skv", basefile),
+                            json.dumps(record, ensure_ascii=False))
+    compress.write_download(rs_download.body_path(root, basefile),
+                            fixture(page_fixture))
+    return basefile
+
+
+def test_skv_parses_from_its_page(tmp_path):
+    """End to end for the one agency with no PDF: the register record plus the
+    stored page parse to the ordinary ställningstagande artifact, citations
+    scanned, with the page's own chain fields folded in."""
+    records, _ = skv_register()
+    record = next(r for r in records if r["basefile"] == "skv/8-492402")
+    art = rs_parse.parse(store_skv(tmp_path, record, "skv-page.html"), tmp_path)
+    assert art["uri"] == "https://lagen.nu/rs/skv/8-492402"
+    assert art["identifier"] == "Skatteverkets ställningstagande dnr 8-492402"
+    assert art["metadata"]["publisher"] == "Skatteverket"
+    assert art["metadata"]["beslutsdatum"] == "2020-09-29"
+    assert art["metadata"]["diarienummer"] == "8-492402"
+    assert art["metadata"]["nyckelord"] == ["Mervärdesskatt",
+                                            "Skattebetalning & borgenärsarbete"]
+    # what only the page says: the position this one replaced
+    assert art["metadata"]["ersatter"] == "8-346749"
+    assert art["structure"][0] == {"type": "rubrik", "level": 1,
+                                   "text": ["1 Sammanfattning"]}
+    assert art["footnotes"][0]["mark"] == "1"
+    # the vertical's whole point: the body is on the rail of the paragraf it
+    # reads, so the opening summary's citation resolves
+    runs = art["structure"][1]["text"]
+    assert any(isinstance(r, dict) and r.get("uri", "").endswith("2011:1244#K60P1")
+               for r in runs), runs
+    # no separate document: the page *is* the ställningstagande
+    assert "document_url" not in art
+
+
+def test_skv_withdrawn_page_carries_its_fate(tmp_path):
+    """The register says a position stopped applying and when; the page says
+    what replaced it. Both reach the artifact, which is what lets the page read
+    as the historical statement it is."""
+    records, _ = skv_register()
+    record = next(r for r in records if r["basefile"] == "skv/8-1740076")
+    art = rs_parse.parse(
+        store_skv(tmp_path, record, "skv-page-upphavd.html"), tmp_path)
+    assert art["metadata"]["status"] == "upphävt"
+    assert art["metadata"]["upphavd"] == "2026-07-06"
+    assert art["metadata"]["ersattAv"] == "8-207888-2026"
+    assert labels.document_labels("rs", art).descriptive_label.endswith("(upphävt)")
+
+
+def test_skv_page_is_the_patchable_intermediate(tmp_path, monkeypatch):
+    """Skatteverkets page, not a PDF, is what a patch for this agency targets --
+    normalised to one block element per line, so a hunk rewrites a paragraph
+    rather than the whole document. `rs.parse` normalises identically before
+    applying the patch, which is what keeps an authored patch applying."""
+    records, _ = skv_register()
+    record = next(r for r in records if r["basefile"] == "skv/8-492402")
+    basefile = store_skv(tmp_path, record, "skv-page.html")
+    monkeypatch.setattr(layout, "RS_DOWNLOADED", tmp_path)
+    text, label = patchsource.intermediate("rs", basefile)
+    assert "web page" in label
+    lines = text.split("\n")
+    # every block on its own line, and a paragraph whole on one of them
+    assert len(lines) == 51
+    assert sum(1 for line in lines if line.startswith("<p ")) == 26
+    assert any(line.startswith('<p class="normal">Möjligheten till befrielse')
+               and line.endswith("</p>") for line in lines)
+
+
+def test_skv_refuses_a_page_filed_under_the_wrong_dnr(tmp_path):
+    """The dnr is this agency's identity and the page prints its own, so parse
+    checks the two agree -- the store's proof that the page under a basefile is
+    the document that basefile names."""
+    records, _ = skv_register()
+    record = next(r for r in records if r["basefile"] == "skv/8-1740076")
+    # the register entry for one ställningstagande, the page of another
+    basefile = store_skv(tmp_path, record, "skv-page.html")
+    # a raise, not an assert: under `python -O` an assert would strip and the
+    # wrong text would publish under a real identifier
+    with pytest.raises(ValueError, match="wrong document is filed here"):
+        rs_parse.parse(basefile, tmp_path)
+
+
+# --------------------------------------------------------------------------
+# render -- the withdrawal banner's sibling link
+# --------------------------------------------------------------------------
+
+def _site(known=()):
+    # a real Site, not a stub: a hand-rolled one goes stale silently every time
+    # the render context gains a field
+    con = sqlite3.connect(":memory:")
+    con.executescript(catalog.SCHEMA)
+    return page.Site(con, set(known))
+
+
+def test_a_sibling_is_linked_through_the_uri_its_number_mints():
+    """The banner names the replacement the way the agency printed it and links
+    it the way `model.rs_uri` addresses it -- which only agree by construction
+    once the number is slugged, and Skatteverkets printed dnr is not a path
+    segment."""
+    own = "https://lagen.nu/rs/skv/131-253470-14-111"
+    site = _site({"https://lagen.nu/rs/skv/8-2352573"})
+    assert rs_render._sibling_rs(site, "8-2352573", own) == {
+        "label": "8-2352573", "url": layout.page_url(
+            "https://lagen.nu/rs/skv/8-2352573")}
+    # the pre-2020 form: the label stays as printed, the url is the slug
+    site = _site({"https://lagen.nu/rs/skv/131-297826-13-111"})
+    sibling = rs_render._sibling_rs(site, "131 297826-13/111", own)
+    assert sibling["label"] == "131 297826-13/111"
+    assert sibling["url"] == "/rs/skv/131-297826-13-111"
+    # a statement the corpus does not hold keeps the label and loses the link
+    assert rs_render._sibling_rs(_site(), "2022:2",
+                                 "https://lagen.nu/rs/kkv/2019:1")["url"] is None
+
+
+def test_a_skv_page_renders(tmp_path):
+    """The whole chain once, on the one agency whose body never went through a
+    PDF: register record + stored page -> artifact -> the ställningstagandesida,
+    with the withdrawal said in the banner."""
+    records, _ = skv_register()
+    record = next(r for r in records if r["basefile"] == "skv/8-1740076")
+    art = rs_parse.parse(
+        store_skv(tmp_path, record, "skv-page-upphavd.html"), tmp_path)
+    html = rs_render.render(art, _site({art["uri"]}))
+    assert "Jämkningsskyldighet vid överlåtelse av fastighet" in html
+    assert "Skatteverkets ställningstagande dnr 8-1740076" in html
+    assert "8-207888-2026" in html            # what replaced it, in the banner
+    assert "1 Sammanfattning" in html
+
+
+def test_skv_stops_walking_once_the_front_closes():
+    """Skatteverkets front rejects everything for a while once it starts, so a
+    run that meets a row of rejections stops instead of knocking through the
+    remaining thousands. Nothing is stranded: a record is only ever stored once
+    its page is, so the next run resumes at exactly this document."""
+    rejected, said = [0], []
+
+    def walk(source):
+        return list(rs_download.until_blocked(source, lambda: rejected[0],
+                                              limit=3, log=said.append))
+
+    # a run the front answers throughout walks the whole listing
+    assert walk(range(100)) == list(range(100))
+    assert said == []
+
+    # one that starts failing part way stops there -- and only after a *row* of
+    # rejections, so a single bad page is still just one failed document
+    def closes_after(n):
+        for item in range(100):
+            if item >= n:
+                rejected[0] += 1
+            yield item
+
+    walked = walk(closes_after(10))
+    assert walked == list(range(12)), walked
+    assert "stopping" in said[0]
+
+
+def test_skv_verify_rejects_a_page_that_is_not_a_stallningstagande():
+    """The guard that decides whether a stored record has real text behind it.
+    `browser.html` has already ruled out a WAF rejection; what is left is that
+    the navigation landed on a document and not on some other page."""
+    for name in ("skv-page.html", "skv-page-upphavd.html"):
+        assert rs_download.skv_verify(fixture(name)) is None
+    with pytest.raises(ValueError, match="no ställningstagande page"):
+        rs_download.skv_verify(fixture("skv-register.html"))
+
+
+def _with_body_element(markup):
+    """The live page fixture with `markup` spliced in as the first block of the
+    document's own content div."""
+    page = fixture("skv-page.html")
+    anchor = '<div class="body searchable-content">\n<div>'
+    assert anchor in page, "the fixture's content container moved"
+    return page.replace(anchor, anchor + markup, 1)
+
+
+def test_skv_drops_the_empty_layout_tables():
+    """Five of the 51 sampled pages set an empty 2x2 table as a layout scaffold.
+    It carries no text, so it costs the document nothing."""
+    blocks, _notes = skv.page_body(_with_body_element(
+        "<table><tbody><tr><td width='50%'></td><td width='50%'></td></tr>"
+        "</tbody></table>"))
+    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1)
+
+
+def test_skv_body_text_in_an_unknown_element_is_reported():
+    """A table carrying text would otherwise come out as one run-together
+    stycke, its cells space-joined and its shape gone with no trace. The
+    document stops instead, so the first one that appears is visible."""
+    with pytest.raises(ValueError, match="<table>"):
+        skv.page_body(_with_body_element(
+            "<table><tbody><tr><td>Kolumn A</td><td>Kolumn B</td></tr>"
+            "</tbody></table>"))
+
+
+def test_skv_page_is_refetched_when_the_register_moves(tmp_path):
+    """Skatteverket revises a page in place: it adds "ska inte längre tillämpas"
+    to the page it withdraws, and the register entry closes its window at the
+    same moment. Leaving the stored page alone because the file exists would
+    publish the new date and currency over the superseded text."""
+    root = tmp_path / "rs"
+    record = {"basefile": "skv/8-1", "org": "skv", "nummer": "8-1",
+              "titel": "En position", "status": "gällande"}
+    served = [fixture("skv-page.html")]
+    pending = [(record, lambda: served[0])]
+    walk = functools.partial(
+        harvest.walk_records, root, delay=0, scope="skv",
+        document=harvest.page_path, verify=rs_download.skv_verify,
+        refetch_when_changed=True)
+
+    assert walk(pending) == (1, 1)
+    assert walk(pending) == (1, 0)              # nothing moved, nothing fetched
+
+    # the register closes the window: the record changes, so the page is refetched
+    served[0] = fixture("skv-page-upphavd.html")
+    moved = [({**record, "status": "upphävt", "upphavd": "2026-07-06"},
+              lambda: served[0])]
+    assert walk(moved) == (1, 1)
+    stored = compress.read_text(harvest.page_path(root, "skv/8-1"))
+    assert "ska inte längre tillämpas" in stored
+
+
+class _ClosedFront:
+    """A Skatteverket front that serves the register and then stops answering
+    every document page, in one of the ways `lib.browser` distinguishes."""
+
+    def __init__(self, error):
+        self.error = error
+        self.attempts = 0
+
+    def __call__(self, _profile, settle=None):     # stands in for DetachedChrome
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def html(self, url, _marker, settle=None):
+        if url == skv.INDEX_URL:
+            return fixture("skv-register.html")
+        self.attempts += 1
+        raise self.error
+
+
+@pytest.mark.parametrize("error", [
+    browser.WafRejected("rejected"),
+    # a front that holds its challenge open forever closes the site just as
+    # surely as one that answers with a rejection page, and a stop watching only
+    # for the rejection would spend fifteen hours failing every document
+    browser.IncompleteNavigation("still a JavaScript challenge"),
+])
+def test_skv_stops_once_the_front_stops_answering(tmp_path, monkeypatch, capsys,
+                                                  error):
+    front = _ClosedFront(error)
+    monkeypatch.setattr(rs_download, "DetachedChrome", front)
+    seen, new = rs_download.skv_sync(tmp_path)
+    assert new == 0
+    # the register holds 8 filable entries; the run gives up after a row of
+    # SKV_BLOCK_LIMIT and never reaches the rest
+    assert front.attempts == rs_download.SKV_BLOCK_LIMIT
+    assert seen < 8
+    assert "front has closed for now" in capsys.readouterr().out
+    # nothing is stored, so the next run resumes at the document it stopped on
+    assert not list(tmp_path.glob("skv/*.json*"))

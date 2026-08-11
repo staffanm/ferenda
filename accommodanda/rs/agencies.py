@@ -7,13 +7,15 @@ engine configured per agency rather than one pipeline per agency -- but the
 listings differ too much for the extraction itself to be table-driven: FI writes
 a hand-authored HTML table, Kronofogden a year-grouped document list,
 Försäkringskassan a per-year file widget, IMY a CMS page of info blocks,
-Konkurrensverket a table of links to per-document pages, and Migrationsverket
-publishes through the Lifos database's search UI. So each agency keeps a small
-listing reader in `download.py`, and what lives here is everything that is
-genuinely *data*: identity, naming and provenance.
+Konkurrensverket a table of links to per-document pages, Migrationsverket
+publishes through the Lifos database's search UI, and Skatteverket ships its
+whole register as one JSON payload inside a JavaScript-protected page. So each
+agency keeps a small listing reader (in `download.py`, or in `skv.py` for the
+one whose listing is big enough to own a module), and what lives here is
+everything that is genuinely *data*: identity, naming and provenance.
 
-Numbering. Every agency numbers its ställningstaganden in a series of its own,
-and four of the six do it in the familiar ``år:löpnummer`` form. Only two have
+Numbering. Six of the seven agencies number their ställningstaganden in a series
+of their own, and four do it in the familiar ``år:löpnummer`` form. Only two have
 published a short designation for the series -- Försäkringskassan writes "FKRS
 2020:2" in its own prose and IMY prints "IMYRS 2024:1" on the document -- so
 those are used verbatim and the rest are cited the way their own page names
@@ -23,7 +25,17 @@ agency that has coined no acronym does not get one here.
 The identity that names the document is the agency's own number, not a
 diarienummer: unlike a beslut (see `avg/model.py`) a ställningstagande is
 published *as* a numbered item in a series, which is how the agency itself and
-everyone citing it refers to it.
+everyone citing it refers to it. **Skatteverket is the one exception**, and it
+is the agency's own doing: it numbers no series at all and cites its own
+ställningstaganden by date and diarienummer ("Skatteverkets ställningstagande
+2026-07-06, dnr 8-207888-2026"), so there the dnr *is* the published
+designation and this rule points at it rather than away from it.
+
+Transport. Six agencies serve ordinary HTTP. Skatteverket sits behind the same
+F5/Shape JavaScript challenge the SKVFS föreskrift harvest meets, so it needs
+the detached headful-Chrome transport (`lib.browser`) -- slow, serial and
+process-global in its display, which is why `browser` splits it out of the
+default `lagen rs download` sweep and onto `lagen rs browser-download`.
 """
 
 import re
@@ -38,6 +50,8 @@ class Agency:
     listing: str                 # the page the harvest walks
     identifier: str              # citation form, %-formatted with the number
     note: str = ""               # what is peculiar about this agency's listing
+    browser: bool = False        # detached headful Chrome instead of HTTP (F5: skv)
+    page_body: bool = False      # the document is a web page, not a PDF (skv)
 
 
 REGISTRY = (
@@ -83,18 +97,37 @@ REGISTRY = (
            identifier="Konkurrensverkets ställningstagande %s",
            note="the förteckning keeps repealed and superseded entries, naming "
                 "what replaced them; a repealed one usually keeps no document"),
+    Agency(org="skv",
+           name="Skatteverket",
+           listing="https://www4.skatteverket.se/rattsligvagledning/121.html",
+           identifier="Skatteverkets ställningstagande dnr %s",
+           browser=True,
+           page_body=True,
+           note="by far the largest series (2,614 documents, 2004-) and the "
+                "only one with no series number: Skatteverket cites its own "
+                "positions by date and diarienummer, so the dnr is the "
+                "identity. Behind the F5/Shape challenge, and published as web "
+                "pages rather than PDFs"),
 )
 
 BY_ORG = {agency.org: agency for agency in REGISTRY}
 ORGS = tuple(agency.org for agency in REGISTRY)
+# The transport split. A browser agency drives headful Chrome on the
+# process-global DISPLAY, one navigation at a time, so it cannot share a run
+# with the HTTP agencies and is kept off the default sweep -- the föreskrift
+# `browser_scopes`/`default_scopes` rule, at rs scale.
+BROWSER_ORGS = tuple(agency.org for agency in REGISTRY if agency.browser)
+DEFAULT_ORGS = tuple(agency.org for agency in REGISTRY if not agency.browser)
 
 
 # A ställningstagande's number as it appears in a URI and a file name: the
 # agency's own designation with its separators reduced to what a path segment
-# takes. Two shapes occur -- "2025:01" (four agencies, the SFS-like år:löpnummer
-# these series follow) and the slash-separated "1/23/VER" / "RS/028/2021" -- and
-# only the slash has to go, the colon being what the whole site already spells
-# an author's number with (`2018:585`, `fffs/2013:10`).
+# takes. Three shapes occur -- "2025:01" (four agencies, the SFS-like
+# år:löpnummer these series follow), the slash-separated "1/23/VER" /
+# "RS/028/2021", and Skatteverkets diarienummer ("8-193984-2026", and before
+# 2020 "131 297826-13/111", whose space goes the same way as a slash) -- and
+# only the slash and the space have to go, the colon being what the whole site
+# already spells an author's number with (`2018:585`, `fffs/2013:10`).
 RE_UNSAFE = re.compile(r"[/\s]+")
 
 

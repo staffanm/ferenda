@@ -1,12 +1,12 @@
-"""Harvesters for the six agencies' rättsliga ställningstaganden.
+"""Harvesters for the seven agencies' rättsliga ställningstaganden.
 
-Every one of them publishes the document itself as a **PDF** and the metadata
-around it on a listing (and, for two agencies, a per-document page). So the
-harvest is the same three steps everywhere -- walk the listing, mint the
-identity from the agency's own number, fetch the PDF -- and what differs is only
-how the listing is read. None of the six paginates except Migrationsverket's,
-so the JK/ARN idiom applies throughout: one walk per run, fetching what is new
-or changed, no watermark.
+Six of them publish the document itself as a **PDF** and the metadata around it
+on a listing (and, for two agencies, a per-document page). So the harvest is the
+same three steps everywhere -- walk the listing, mint the identity from the
+agency's own number, fetch the document -- and what differs is only how the
+listing is read. None of the seven paginates except Migrationsverket's, so the
+JK/ARN idiom applies throughout: one walk per run, fetching what is new or
+changed, no watermark.
 
 **IMY** (imy.se, Optimizely/EPiServer): five ställningstaganden, each an info
 block naming the title and linking, as a ``/link/<guid>.aspx`` redirect, the
@@ -66,8 +66,17 @@ entry links a per-document page carrying the publication date, Konkurrensverkets
 own ingress and the PDF; a repealed one usually links nothing, and is stored
 from the förteckning row alone.
 
+**Skatteverket** (www4.skatteverket.se/rattsligvagledning): the seventh, and
+the odd one out on every axis -- 2,614 documents, no PDFs, no series number, and
+an F5/Shape JavaScript challenge in front of the lot. Its register and page
+semantics live in `skv.py`; what is here is the walk that drives them over the
+detached headful-Chrome transport. That transport is serial and owns the
+process-global DISPLAY, so this agency is kept off the default sweep and run on
+its own schedule by ``lagen rs browser-download``.
+
 Stored per ställningstagande under ``site/data/downloaded/rs/{org}/``: a
-``<slug>.json`` record and the ``<slug>.pdf`` document.
+``<slug>.json`` record and the document -- ``<slug>.pdf`` for six agencies,
+``<slug>.html`` for Skatteverket, whose page *is* the document.
 """
 
 import re
@@ -79,7 +88,14 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import dispatch_scopes, pdf_path, select_pending, walk_records
+from ..lib.browser import DetachedChrome, IncompleteNavigation, WafRejected
+from ..lib.harvest import (
+    dispatch_scopes,
+    page_path,
+    pdf_path,
+    select_pending,
+    walk_records,
+)
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, mount_aia_chain, request
 from ..lib.pdftext import pdf_first_page_text
@@ -90,7 +106,8 @@ from ..lib.util import (
     normalize_space,
     swedish_date,
 )
-from .agencies import BY_ORG, ORGS, number_slug
+from . import skv
+from .agencies import BY_ORG, DEFAULT_ORGS, number_slug
 
 # --------------------------------------------------------------------------
 # per-agency constants
@@ -169,6 +186,15 @@ LABEL_WINDOW = 120
 def basefile(org, nummer):
     """The harvest basefile of one ställningstagande ("fk/2025:01")."""
     return "%s/%s" % (org, number_slug(nummer))
+
+
+def body_path(root, bf):
+    """Where one ställningstagande's document is stored: the PDF six agencies
+    published it as, or -- for the one that publishes web pages -- the page
+    itself. Read off `agencies.REGISTRY` rather than branched on the org, so a
+    second page-publishing agency is a flag rather than a code change."""
+    return (page_path if BY_ORG[bf.split("/", 1)[0]].page_body
+            else pdf_path)(root, bf)
 
 
 def _walk(root, records, session, delay, full, limit, scope, fetch=True,
@@ -793,15 +819,120 @@ def kkv_sync(root, full=False, only=None, limit=None, delay=0.5):
 
 
 # --------------------------------------------------------------------------
+# Skatteverket (rättslig vägledning, behind the F5/Shape challenge)
+# --------------------------------------------------------------------------
+
+# The register renders 2,619 rows and is slow even for a real browser, so it is
+# given minutes. A document page is done in a few seconds -- but the *pace*, not
+# the page, is what the settle has to respect here: measured against the live
+# site, some 30 navigations at 5-second spacing trip the front's rate defence,
+# after which every navigation is rejected for a good while whatever profile
+# asks. So a document waits far longer than it needs to, which is affordable
+# precisely because this agency runs on a weekly schedule of its own: 20 seconds
+# apiece is roughly 15 hours for the whole register once, and a few minutes for
+# what a week adds.
+SKV_INDEX_SETTLE = 180.0
+SKV_PAGE_SETTLE = 20.0
+# Once the front starts rejecting, it keeps rejecting: knocking through the
+# remaining thousands of documents would be both useless and rude. The run stops
+# and says so, and because a stored record is only ever written with its page,
+# the next run resumes at exactly the document this one stopped on.
+SKV_BLOCK_LIMIT = 5
+
+
+def until_blocked(pending, blocked, limit=SKV_BLOCK_LIMIT, log=print):
+    """The pending entries, up to the point `blocked()` says the site has
+    stopped answering -- the walk then simply runs out of entries.
+
+    `blocked` reports how many navigations in a row the front has refused or
+    left unfinished. A
+    run of them means it has closed, and knocking through the thousands of
+    documents below would be both useless and rude. Nothing is stranded by
+    stopping: a record is only ever stored once its page is, so the next run
+    resumes at exactly this document."""
+    for entry in pending:
+        if blocked() >= limit:
+            log("skv: %d navigations rejected in a row -- Skatteverkets front "
+                "has closed for now; stopping. Re-run `lagen rs "
+                "browser-download` later and it resumes here." % blocked())
+            return
+        yield entry
+
+
+def skv_verify(html_text):
+    """Reject a page that is not a ställningstagande. `browser.html` has already
+    ruled out a WAF rejection and an unfinished challenge; what is left to check
+    is that this page carries the document -- so a store that reports a record
+    written always has the text behind it."""
+    if "referenceProperties" not in html_text or 'class="body' not in html_text:
+        raise ValueError("served no ställningstagande page; record left unwritten")
+
+
+def skv_sync(root, full=False, only=None, limit=None, delay=0.5):
+    """Harvest Skatteverkets ställningstaganden through detached headful Chrome.
+
+    One register navigation gives every document's identity, title, date,
+    områden and currency (`skv.parse_index`); each document then costs one more
+    navigation for the page that *is* its text. The register is walked whole
+    every run and the shared record walk fetches only what moved, so a weekly
+    run costs the register plus the handful of documents that moved -- but a
+    first run is 2,614 paced navigations, some fifteen hours, which is why this
+    agency has a command of its own. ``--limit N`` slices that backfill into
+    runs; a resumed run skips whatever is already stored.
+
+    `delay` is ignored: the browser's settle already paces every navigation, and
+    sleeping on top of it would only make a long backfill longer."""
+    profile = Path(root) / "skv" / ".browser-profile"
+    blocked = 0
+    with DetachedChrome(profile, settle=SKV_PAGE_SETTLE) as browser:
+        records, unidentified = skv.parse_index(
+            browser.html(skv.INDEX_URL, skv.INDEX_MARKER,
+                         settle=SKV_INDEX_SETTLE))
+        if unidentified:
+            print("skv: %d register entr%s name no diarienummer and cannot be "
+                  "filed: %s" % (len(unidentified),
+                                 "y" if len(unidentified) == 1 else "ies",
+                                 "; ".join(unidentified)), flush=True)
+
+        def fetch(url):
+            nonlocal blocked
+            try:
+                page = browser.html(url, skv.PAGE_MARKER)
+            except (WafRejected, IncompleteNavigation):
+                # counted, then re-raised: the walk still records this document
+                # as failed and leaves it unstored, and the count is what tells
+                # `until_blocked` the front has closed (rule:no-catch-log-continue
+                # -- this handler fixes nothing, it only measures).
+                # Both shapes count. A rejection is the front saying no; a run
+                # of navigations that never complete is the same front holding
+                # the challenge open, and a stop that watched only for the first
+                # would spend fifteen hours failing every document on the second.
+                blocked += 1
+                raise
+            blocked = 0
+            return page
+
+        pending = select_pending(
+            [(r, (lambda url=r["source_url"]: fetch(url))) for r in records],
+            only, "the register carries no ställningstagande %s")
+        return walk_records(
+            root, until_blocked(pending, lambda: blocked), delay=0, full=full,
+            limit=limit, scope="skv", total=len(pending), document=page_path,
+            verify=skv_verify, refetch_when_changed=True)
+
+
+# --------------------------------------------------------------------------
 # entry point
 # --------------------------------------------------------------------------
 
 SYNC = {"imy": imy_sync, "fi": fi_sync, "fk": fk_sync, "kfm": kfm_sync,
-        "migr": migr_sync, "kkv": kkv_sync}
+        "migr": migr_sync, "kkv": kkv_sync, "skv": skv_sync}
 
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
-    """Download the named agencies' ställningstaganden (default all six).
-    Returns {org: (seen, new)}."""
-    return dispatch_scopes(root, scopes, SYNC, ORGS, full=full, only=only,
-                           limit=limit, delay=delay)
+    """Download the named agencies' ställningstaganden. With no scopes named,
+    the six ordinary HTTP agencies -- Skatteverket needs the serial headful
+    browser and runs on its own schedule (`agencies.BROWSER_ORGS`), though
+    naming it explicitly still harvests it. Returns {org: (seen, new)}."""
+    return dispatch_scopes(root, scopes, SYNC, DEFAULT_ORGS, full=full,
+                           only=only, limit=limit, delay=delay)

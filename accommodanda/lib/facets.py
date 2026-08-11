@@ -510,8 +510,9 @@ SCHEMES = {
     ],
     "rs": [
         _Level("Myndighet", _catalog_kind, kind_axis=True,
-              order=_curated(["fk", "migr", "kfm", "imy", "fi", "kkv"]),
-              labels=({"fk": "Försäkringskassan (FKRS)",
+              order=_curated(["skv", "fk", "migr", "kfm", "imy", "fi", "kkv"]),
+              labels=({"skv": "Skatteverket",
+                                "fk": "Försäkringskassan (FKRS)",
                                 "migr": "Migrationsverket (RS/RK)",
                                 "kfm": "Kronofogdemyndigheten",
                                 "imy": "Integritetsskyddsmyndigheten (IMYRS)",

@@ -6,7 +6,7 @@ A ställningstagande is neither of the other two. A föreskrift is binding law
 issued under a bemyndigande; a beslut decides one ärende. A ställningstagande
 binds nobody outside the agency and decides no case: it states, in advance and
 in general, how the agency reads a rule it administers, in a question where the
-courts have not yet answered. Every one of the six agencies says so in almost
+courts have not yet answered. Every one of the agencies says so in almost
 the same words -- "styrande för vår verksamhet", "inte bindande för till exempel
 domstolar" -- and that is exactly what makes them worth carrying: they are the
 published interpretation a reader of the statute will actually meet, and the
@@ -20,20 +20,28 @@ The document model follows from that shape:
     everyone citing it names it. The diarienummer is metadata, kept where the
     document prints one. This is the one deliberate departure from `avg/model.py`,
     whose organs number nothing and where the dnr is all the identity there is.
+    Skatteverket falls on the avg side of that line and for the avg reason: it
+    numbers no series, and names its own positions "Skatteverkets
+    ställningstagande 2026-07-06, dnr 8-207888-2026". There the dnr *is* the
+    published designation, so following the rule means using it.
 
   * **Currency is a first-class fact.** Unlike a beslut, which is a fixed
     historical artifact, a ställningstagande is *in force until the agency
-    withdraws it* -- and three of the six say so in the listing itself (FI's
+    withdraws it* -- and four of the seven say so in the listing itself (FI's
     Status column, Konkurrensverkets "(upphävt 20 oktober 2025)",
-    Migrationsverkets version numbering). So `status` and `ersatt_av` are
+    Migrationsverkets version numbering, Skatteverkets closed validity
+    window). So `status` and `ersatt_av` are
     modelled rather than dropped: a repealed statement still has to be readable
     (it governed what the agency did while it stood) but must not read as
     current law.
 
-  * **The body is the document**, whatever the agency published it as -- a PDF
-    for five of them, a web page for IMY. Both arrive here as the same
-    rubrik/stycke block stream and leave as the shared artifact node shape, so
-    catalog/render/search reuse their generic walkers.
+  * **The body is the document**, whatever the agency published it as. Six
+    publish a letterhead PDF, and that is what those six parse -- including
+    IMY, which also sets the same text as a web page. Skatteverket publishes
+    the page and nothing else, so there the page is the body. Both routes
+    arrive here as the same rubrik/stycke block stream and leave as the shared
+    artifact node shape, so catalog/render/search reuse their generic walkers
+    and the model does not have to know which route a document came by.
 
 URI scheme: ``https://lagen.nu/rs/{org}/{nummer}`` (e.g.
 ``https://lagen.nu/rs/imy/2024:1``, ``https://lagen.nu/rs/kfm/1-23-VER``) -- the

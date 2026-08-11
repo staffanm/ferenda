@@ -35,7 +35,8 @@ from .foreskrift.parse import body_path as fs_body_path
 from .lib import compress, layout, markup, patch, pdftext
 from .lib.errors import SkipDocument
 from .lib.util import document_extension, record_path
-from .rs.download import pdf_path as rs_pdf_path
+from .rs.agencies import BY_ORG
+from .rs.download import body_path as rs_body_path
 from .sfs.extract import extract_body
 
 
@@ -192,14 +193,19 @@ def _edpb_intermediate(basefile):
 
 
 def _rs_intermediate(basefile):
-    """A rättsligt ställningstagande's PDF as pdftohtml XML. Every agency
-    publishes one, except for the repealed Konkurrensverket entries that keep
-    only their förteckning row -- and those have no text to patch."""
-    pdf = rs_pdf_path(layout.RS_DOWNLOADED, basefile)
-    if not compress.exists(pdf):
+    """A rättsligt ställningstagande's PDF as pdftohtml XML -- or, for the
+    agency that publishes web pages rather than PDFs (Skatteverket), the page
+    itself, normalised to one block element per line the way `rs.parse` does
+    before applying the patch. Every agency publishes a document, except for the
+    repealed Konkurrensverket entries that keep only their förteckning row --
+    and those have no text to patch."""
+    path = rs_body_path(layout.RS_DOWNLOADED, basefile)
+    if not compress.exists(path):
         raise SkipDocument("%s: the agency published no document for it"
                            % basefile)
-    return _pdf_xml(pdf)
+    if BY_ORG[basefile.split("/", 1)[0]].page_body:
+        return markup.block_lines(compress.read_text(path))
+    return _pdf_xml(path)
 
 
 def _remisser_intermediate(basefile):
@@ -220,7 +226,8 @@ _INTERMEDIATE = {
     "foreskrift": (_foreskrift_intermediate, "pdftohtml XML"),
     "avg": (_avg_intermediate,
             "pdftohtml XML (jk, and kkv's pre-2006 documents: HTML)"),
-    "rs": (_rs_intermediate, "pdftohtml XML"),
+    "rs": (_rs_intermediate,
+           "pdftohtml XML (skv: the ställningstagande's own web page)"),
     "edpb": (_edpb_intermediate, "pdftohtml XML"),
     "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }

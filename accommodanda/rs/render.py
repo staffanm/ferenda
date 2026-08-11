@@ -15,6 +15,7 @@ from ..lib.page import (
     page_context,
     render_toc,
 )
+from .agencies import number_slug
 
 ENV = tpl.environment("accommodanda.rs")
 
@@ -61,13 +62,17 @@ def render(art, site):
 
 def _sibling_rs(site, nummer, own_uri):
     """A ställningstagande an agency names by bare number ("upphävt genom
-    2022:2"), as {label, url?}. The sibling is *the same agency's*: a number is
-    unique only within one agency's series, so the number is resolved against
-    this document's own URI prefix. The url is dropped when the corpus does not
-    hold that document -- a förteckning names statements from before the harvest
-    reaches -- and the label alone still says what replaced this one."""
+    2022:2", "dnr 8-207888-2026"), as {label, url?}. The sibling is *the same
+    agency's*: a number is unique only within one agency's series, so the number
+    is resolved against this document's own URI prefix. The label is the number
+    the agency printed and the url is minted from it the way `model.rs_uri`
+    mints every rs address, which is what keeps the two agreeing for a number
+    whose printed form is not a path segment (Skatteverkets "131 297826-13/111").
+    The url is dropped when the corpus does not hold that document -- a
+    förteckning names statements from before the harvest reaches -- and the
+    label alone still says what replaced this one."""
     if not nummer:
         return None
-    uri = own_uri.rsplit("/", 1)[0] + "/" + nummer
+    uri = own_uri.rsplit("/", 1)[0] + "/" + number_slug(nummer)
     return {"label": nummer,
             "url": layout.page_url(uri) if uri in site.known else None}
