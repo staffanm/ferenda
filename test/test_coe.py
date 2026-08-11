@@ -193,7 +193,11 @@ def test_folkratt_lists_coe_alphabetically_with_nested_protocols(tmp_path):
     # the shared top-level Dokumenttyp selector carries a Fördrag bucket (the CoE
     # treaties), marked current on the landing
     assert '<h2 class="facet-axis">Dokumenttyp</h2>' in html
-    assert '<a href="/folkratt/" aria-current="page">Fördrag' in html
+    # the chip targets its own section on the landing rather than the page
+    # itself -- four of five chips used to be links back to where the reader
+    # already stood (K1)
+    assert '<a href="/folkratt/#coe" aria-current="page">Fördrag' in html
+    assert '<section class="folkratt-group" id="coe">' in html
     # EKMR is a central treaty (surfaced first); its protocol nests beneath it,
     # not as a sibling top-level entry
     assert "Centrala fördrag" in html and "Övriga fördrag" in html

@@ -37,8 +37,8 @@
 {%- macro folkratt_group(heading, entries) -%}
 <h3>{{ heading }}</h3><ul class="browse-list folkratt-treaties">{{ entries }}</ul>
 {%- endmacro -%}
-{%- macro folkratt_section(title, groups) -%}
-<section class="folkratt-group"><h2>{{ title }}</h2>{{ groups }}</section>
+{%- macro folkratt_section(anchor, title, groups) -%}
+<section class="folkratt-group" id="{{ anchor }}"><h2>{{ title }}</h2>{{ groups }}</section>
 {%- endmacro -%}
 {%- macro hudoc_section(reel) -%}
 <section class="folkratt-group"><h2>Europadomstolen</h2>

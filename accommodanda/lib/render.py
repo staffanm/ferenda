@@ -415,7 +415,7 @@ def _coe_listing(con):
             ("Centrala fördrag", [r for r in top if r["number"] in named]),
             ("Övriga fördrag", [r for r in top if r["number"] not in named]))
         if members)
-    return LISTS.folkratt_section("Europarådet", groups)
+    return LISTS.folkratt_section("coe", "Europarådet", groups)
 
 
 def _icrc_entry(row, named):
@@ -456,12 +456,12 @@ def _folkratt_group(heading, members, entry):
                                  Markup("").join(entry(r) for r in members))
 
 
-def _folkratt_section(title, groups):
+def _folkratt_section(anchor, title, groups):
     body = Markup("").join(group for group in groups if group)
-    return LISTS.folkratt_section(title, body) if body else ""
+    return LISTS.folkratt_section(anchor, title, body) if body else ""
 
 
-def _grouped_listing(title, rows, group_of, headings, entry, reverse=False):
+def _grouped_listing(anchor, title, rows, group_of, headings, entry, reverse=False):
     """A folkrätt listing bucketed by `group_of`, headed by the `headings` in
     their order then any trailing bucket, each group sorted by (date, title). ''
     when the source has no rows. The two flat sources (untc, icc) share this whole
@@ -479,7 +479,7 @@ def _grouped_listing(title, rows, group_of, headings, entry, reverse=False):
                          reverse=reverse)
         if members:
             groups.append(_folkratt_group(headings.get(key, key), members, entry))
-    return _folkratt_section(title, groups)
+    return _folkratt_section(anchor, title, groups)
 
 
 def _icrc_listing(con):
@@ -512,7 +512,7 @@ def _icrc_listing(con):
         if members:
             members = sorted(members, key=lambda r: (r["date"] or "", r["title"].lower()))
             groups.append(_folkratt_group(heading, members, entry))
-    return _folkratt_section("Internationell humanitär rätt (ICRC)", groups)
+    return _folkratt_section("icrc", "Internationell humanitär rätt (ICRC)", groups)
 
 
 @functools.lru_cache(maxsize=1)
@@ -543,7 +543,7 @@ def _untc_listing(con):
     subject (law of treaties/sea, human rights, refugees), each chronological."""
     curated = _untc_curated()
     return _grouped_listing(
-        "Förenta nationerna (FN)", _treaty_rows(con, "untc"),
+        "untc", "Förenta nationerna (FN)", _treaty_rows(con, "untc"),
         lambda row: (curated.get(row["number"]) or {}).get("group") or "Övriga",
         {group: group for group in UNTC_GROUP_ORDER},
         lambda row: _untc_entry(row, curated))
@@ -567,7 +567,7 @@ def _icc_listing(con):
     """The ICC half of the folkrätt page: the substantive decisions grouped by
     Rome-Statute decision type, each group newest first."""
     return _grouped_listing(
-        "Internationella brottmålsdomstolen (ICC)", _treaty_rows(con, "icc"),
+        "icc", "Internationella brottmålsdomstolen (ICC)", _treaty_rows(con, "icc"),
         lambda row: row["kind"], _icc_types(), _icc_entry, reverse=True)
 
 
@@ -596,13 +596,13 @@ def folkratt_axis(con):
     n = catalog.counts(con)
     entries = []
     if n.get("coe"):
-        entries.append(("coe", "Fördrag", "/folkratt/", n["coe"]))
+        entries.append(("coe", "Fördrag", "/folkratt/#coe", n["coe"]))
     if n.get("icrc"):
-        entries.append(("icrc", "IHL-fördrag", "/folkratt/", n["icrc"]))
+        entries.append(("icrc", "IHL-fördrag", "/folkratt/#icrc", n["icrc"]))
     if n.get("untc"):
-        entries.append(("untc", "FN-fördrag", "/folkratt/", n["untc"]))
+        entries.append(("untc", "FN-fördrag", "/folkratt/#untc", n["untc"]))
     if n.get("icc"):
-        entries.append(("icc", "ICC-avgöranden", "/folkratt/", n["icc"]))
+        entries.append(("icc", "ICC-avgöranden", "/folkratt/#icc", n["icc"]))
     if n.get("hudoc"):
         for b in facets.tree(con, "hudoc")["buckets"]:
             entries.append(("hudoc:" + b["slug"], b["label"],
