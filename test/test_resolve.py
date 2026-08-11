@@ -119,6 +119,42 @@ def test_eu_bare_shortname_is_the_act_root():
     assert resolve.resolve_eu("IPRED") == "https://lagen.nu/ext/celex/32004L0048"
 
 
+def test_eu_terse_article_pins_like_the_sfs_form():
+    # "GDPR 28" is the same law-first terseness as "avtalslagen 36" -- a reader
+    # used to the SFS form must not be silently downgraded to the act root (K4)
+    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    assert resolve.resolve_eu("GDPR 28") == gdpr + "#28"
+    assert resolve.resolve_eu("dataskyddsförordningen 28") == gdpr + "#28"
+    assert resolve.resolve_eu("gdpr 6.1") == gdpr + "#6.1"
+    # a tail with trailing words is not a pinpoint -- the act root, never a
+    # guessed article
+    assert resolve.resolve_eu("GDPR 2016 update") == gdpr
+
+
+# --- CoE: treaty short name + article ---------------------------------------
+
+def test_treaty_shortname_plus_article():
+    # "EKMR 6" means the convention's article 6 (/coe/005#A6), not 6 § of the
+    # incorporation act 1994:1219 -- an anchor that does not exist (K4)
+    ekmr = "https://lagen.nu/ext/coe/005"
+    assert resolve.resolve_treaty("EKMR 6") == ekmr + "#A6"
+    assert resolve.resolve_treaty("EKMR 6.3") == ekmr + "#A6P3"
+    assert resolve.resolve_treaty("Europakonventionen artikel 6") == ekmr + "#A6"
+
+
+def test_bare_treaty_name_stays_with_the_incorporation_act():
+    # without a pinpoint the treaty resolver stays silent; the SFS resolver
+    # keeps sending "EKMR" to the Swedish incorporation act
+    assert resolve.resolve_treaty("EKMR") is None
+    hits = resolve.resolve("EKMR")
+    assert [h["uri"] for h in hits] == ["https://lagen.nu/1994:1219"]
+
+
+def test_treaty_article_outranks_the_sfs_reading():
+    hits = resolve.resolve("EKMR 6")
+    assert hits[0] == {"uri": "https://lagen.nu/ext/coe/005#A6", "source": "coe"}
+
+
 def test_eu_unknown_does_not_resolve():
     assert resolve.resolve_eu("förordningen om något") is None
 

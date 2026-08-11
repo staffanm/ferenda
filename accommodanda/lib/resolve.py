@@ -30,6 +30,9 @@ import functools
 import re
 
 from . import datasets
+from .coe import treaty_uri
+from .coe_ids import article_fragment
+from .labels import treaty_names
 from .lagrum import (
     CELEX_BASE,
     LagrumParser,
@@ -165,19 +168,63 @@ def _named_acts():
                   key=lambda p: len(p[0]), reverse=True)
 
 
+# a bare article pinpoint after an act/treaty name -- the same terse law-first
+# form the SFS path accepts ("avtalslagen 36"), so "GDPR 28" pins the way
+# "GDPR art 28" does. Full-match only: a tail with trailing words is not a
+# pinpoint and must not mint a wrong article.
+_BARE_ART = re.compile(r"(\d+)(?:[.\s:]+(\d+))?")
+
+
 def resolve_eu(q):
     """An EU act URI for `q`, deep-linked to an article when the query names one
-    ("GDPR art 32" -> .../32016R0679#32), else the act root ("IPRED"). None when
-    no act short name leads the query."""
+    ("GDPR art 32" or the terse "GDPR 32" -> .../32016R0679#32), else the act
+    root ("IPRED"). None when no act short name leads the query."""
     low = q.lower()
     for label, celex in _named_acts():
         a = label.lower()
         if low.startswith(a) and (len(low) == len(a) or not low[len(a)].isalnum()):
             uri = CELEX_BASE + celex
-            m = _ART.match(q[len(label):].strip())
+            rest = q[len(label):].strip()
+            m = _ART.match(rest) or _BARE_ART.fullmatch(rest)
             if m:
                 uri += "#" + m.group(1) + ("." + m.group(2) if m.group(2) else "")
             return uri
+    return None
+
+
+# --------------------------------------------------------------------------
+# CoE -- treaty short name + article ("EKMR 6" -> ext/coe/005#A6)
+# --------------------------------------------------------------------------
+
+_TREATY_ART = re.compile(r"(?:art(?:ikel|icle)?\.?\s*)?(\d+)(?:[.\s:]+(\d+))?",
+                         re.IGNORECASE)
+
+
+@functools.cache
+def _named_treaties():
+    """(alias, treaty number) pairs from the curated CoE names, longest alias
+    first -- the same greedy leading-name matching the SFS and EU resolvers use."""
+    pairs = [(alias, number)
+             for number, entry in treaty_names(datasets.COE_NAMES).items()
+             for alias in (entry.get("abbr"), entry.get("label")) if alias]
+    return sorted(pairs, key=lambda p: len(p[0]), reverse=True)
+
+
+def resolve_treaty(q):
+    """A CoE treaty article URI when the query is a treaty short name plus an
+    article pinpoint ("EKMR 6", "Europakonventionen artikel 6.1" ->
+    ext/coe/005#A6 / #A6P1), else None. Only fires *with* a pinpoint: a bare
+    treaty name keeps resolving to the Swedish incorporation act (the SFS
+    resolver), but "EKMR 6" means the convention's article 6, not 6 § of lag
+    (1994:1219) -- an anchor that does not even exist there (K4)."""
+    low = q.lower()
+    for alias, number in _named_treaties():
+        a = alias.lower()
+        if low.startswith(a) and len(low) > len(a) and not low[len(a)].isalnum():
+            m = _TREATY_ART.fullmatch(q[len(alias):].strip())
+            if m:
+                return treaty_uri(number) + "#" + article_fragment(
+                    m.group(1), m.group(2))
     return None
 
 
@@ -203,14 +250,16 @@ def resolve_dv(q):
 
 def resolve(q):
     """Every resource the query resolves to as `{"uri", "source"}` (uri carries
-    its #fragment), in priority order SFS, EU, DV -- usually 0 or 1. Pure: the
-    caller confirms each uri against the catalog before surfacing it."""
+    its #fragment), in priority order CoE treaty, SFS, EU, DV -- usually 0 or
+    1. The treaty resolver leads because it only claims a query with an article
+    pinpoint, and there it must outrank the SFS reading of the same alias.
+    Pure: the caller confirms each uri against the catalog before surfacing it."""
     q = (q or "").strip()
     if not q:
         return []
     out = []
-    for source, fn in (("sfs", resolve_sfs), ("eurlex", resolve_eu),
-                       ("dv", resolve_dv)):
+    for source, fn in (("coe", resolve_treaty), ("sfs", resolve_sfs),
+                       ("eurlex", resolve_eu), ("dv", resolve_dv)):
         uri = fn(q)
         if uri and uri not in [o["uri"] for o in out]:
             out.append({"uri": uri, "source": source})
