@@ -64,6 +64,83 @@ def test_classify_paragraphs():
     assert debris and debris[0].kind == "stycke"
 
 
+def test_a_page_break_fragment_is_not_a_roman_numeral():
+    """The old head pattern was the set of letters a roman numeral is spelt
+    from, not a numeral: it matches "ICC" too, so a sentence a page break
+    dropped onto the court's abbreviation read as a section heading ("ICC. This
+    made the investigators' job particularly delicate and it", in
+    ICC-01/04-01/06-2842 and ICC-01/09-01/20-153)."""
+    for head in ("I. Introduction", "II. The Law", "IV. Overview",
+                 "IX. Disposition", "X. CONSCRIPTION AND ENLISTMENT",
+                 "XII. DISPOSITION"):
+        assert parse.RE_ROMAN_HEAD.match(head), head
+    for prose in ("ICC. This made the investigators' job particularly delicate "
+                  "and it", "ICC. The meeting ended when Mr Gicheru was calmed",
+                  "CCC. X", "IC. X", "VV. X"):
+        assert not parse.RE_ROMAN_HEAD.match(prose), prose
+    assert not parse._is_heading("ICC. This made the investigators' job "
+                                 "particularly delicate and it")
+
+
+def test_an_exhibit_id_is_not_a_heading():
+    """A scanned footnote leaves the evidence number behind as its own
+    paragraph. It holds no lowercase letter, so the all-caps test read it as a
+    heading (4 of them, in ICC-01/04-01/06-2842 and ICC-01/05-01/08-3343).
+    Counting capitals as *words* rather than as runs of capitals keeps it out:
+    "EVD-OTP-00570." is one token and not a word, where the old count read
+    "EVD" and "OTP" as two words.
+
+    A whole-line "a hyphen before a digit" guard would do it too, and costs more
+    than it saves: over 35 documents it rejected no exhibit id the word count
+    misses, and two real headings that name a year range ("B. FORCES PRESENT IN
+    THE CAR DURING THE 2002-2003 CAR OPERATION")."""
+    for exhibit in ("EVD-OTP-00570.", "EVD-T-OTP-00711/CAR-OTP-0017-0358.",
+                    "1664 HIV/AIDS."):
+        assert not parse._is_heading(exhibit), exhibit
+    for heading in ("TRIAL CHAMBER VI", "SEPARATE OPINION OF JUDGE ADRIAN FULFORD",
+                    "B. FORCES PRESENT IN THE CAR DURING THE 2002-2003 CAR OPERATION",
+                    "C. PILLAGING"):     # the enumerator counts as a word
+        assert parse._is_heading(heading), heading
+
+
+def test_a_heading_that_swallowed_its_paragraphs_is_split():
+    """The scans carry no bold or size signal, so `page_paragraphs` glues a
+    heading to the paragraphs under it wherever the gap below it is small, and
+    `_is_heading` then stamped the whole run a rubrik -- 1969 characters of it in
+    ICC-01/04-01/10-1, with every citation anchor inside lost. The run is cut at
+    the first paragraph number, so the numbered paragraph gets the anchor it is
+    cited by."""
+    blocks = parse._classify([
+        "I. Introduction 1. This decision of Pre-Trial Chamber I "
+        "(\"Chamber\") is with respect to the Prosecution's Application. "
+        "2. On 6 September 2010, the Chamber issued a decision.",
+    ])
+    assert [(b.kind, b.number) for b in blocks] == \
+        [("rubrik", None), ("stycke", "1")]
+    assert blocks[0].text == "I. Introduction"
+    assert blocks[1].text.startswith("This decision of Pre-Trial Chamber I")
+    # the split paragraph is anchored like any other numbered paragraph
+    structure = Decision(
+        doc_number="ICC-01/04-01/10-1", title="Decision",
+        case_name="The Prosecutor v. Callixte Mbarushimana",
+        case_number="ICC-01/04-01/10", decision_type="warrant",
+        body=blocks).to_artifact()["structure"]
+    assert [n["type"] for n in structure] == ["rubrik", "stycke"]
+    assert structure[1]["id"] == "P1" and structure[1]["ordinal"] == "1"
+
+
+def test_a_year_in_prose_does_not_split_a_paragraph():
+    """Only a run whose head is *itself* a heading is cut, which is what keeps
+    "… since early 2009. The Prosecutor further requests …" one paragraph."""
+    blocks = parse._classify([
+        "The Chamber recalls that the crimes were committed in the Kivu "
+        "Provinces since early 2009. The Prosecutor further requests the "
+        "Chamber to issue a warrant of arrest.",
+    ])
+    assert len(blocks) == 1 and blocks[0].kind == "stycke"
+    assert blocks[0].number is None
+
+
 def test_to_artifact_numbers_paragraphs_and_ids():
     decision = Decision(
         doc_number="ICC-01/04-02/06-2359", title="Judgment",
@@ -227,6 +304,28 @@ def test_blocks_reads_the_invisible_ocr_layer(monkeypatch):
     assert seen["patch_key"] == ("icc", "ICC-01/04-01/06-1432")
     assert [b.text for b in blocks] == [
         "Privateering is and remains abolished."]
+
+
+def test_a_sentence_split_by_a_page_break_is_rejoined(monkeypatch):
+    """A court record breaks mid-sentence on every page, and the two halves
+    arrived as two paragraphs. The running header has to be dropped *before* the
+    join: it is the first paragraph of every page, so leaving it in place puts a
+    filing stamp between the halves and nothing ever rejoins."""
+    def line(text, top):
+        return Line(text, top, False, False, False, 12)
+
+    def fake(path, patch_key=None, lang="swe"):
+        return [(1, [line("The witness was assumed to be from the", 10)]),
+                (2, [line("ICC-01/04-01/06-2842 14-03-2012 1/593 EO T", 5),
+                     line("office in Kinshasa. The Chamber notes that the", 300),
+                     line("evidence supports this account of the meeting.", 315),
+                     line("Nothing else in the record contradicts it.", 330)])]
+
+    monkeypatch.setattr(icc_parse, "pages_with_ocr", fake)
+    assert [b.text for b in icc_parse._blocks("/tmp/x.pdf", "ICC-01/04-01/06-2842")] \
+        == ["The witness was assumed to be from the office in Kinshasa. The "
+            "Chamber notes that the evidence supports this account of the "
+            "meeting. Nothing else in the record contradicts it."]
 
 
 def test_a_doubled_quotation_mark_is_collapsed_but_a_cut_title_is_left_alone():
