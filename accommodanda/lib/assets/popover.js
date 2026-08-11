@@ -120,7 +120,14 @@
 
   function fragLabel(el) {
     var n = el.querySelector('.paragraf-gutter .n, h2, h3, h4');
-    return n ? n.textContent.trim() : (el.id || '');
+    if (n) return n.textContent.trim();
+    // a target with no heading of its own (an övergångsbestämmelse section)
+    // is named by its enclosing ändring block's heading ("Ändring, SFS
+    // 1994:458"), never by its raw anchor id (E1)
+    var box = el.closest('.andring');
+    var h = box && box.querySelector('h2, h3, h4');
+    if (h) return h.textContent.trim();
+    return el.id || '';
   }
 
   // a display clone of the target: live-page furniture (permalink pilcrows)

@@ -216,13 +216,18 @@ dl.meta a { color: var(--accent); }
 /* -- Upphävd (repealed) författning -- a clear repeal callout, a subdued reading
    column, and a fixed watermark that stays in view at any scroll depth (so an
    anchor link deep into the text still reads as repealed). -- */
-.expired-banner { display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
+/* .note-banner (EDPB language/version notes, "text not held") shares the
+   callout shape; the flex gap is also what separates the strong label from
+   the note text, since the template butts them together */
+.expired-banner, .note-banner {
+                  display: flex; flex-wrap: wrap; align-items: baseline; gap: .55rem;
                   margin: 0 0 2.25rem; padding: .7rem 1rem; border: 1px solid var(--rule);
                   border-left: 3px solid var(--accent); border-radius: 5px;
                   background: var(--surf-2); font-size: .92rem; color: var(--ink-2); }
-.expired-banner strong { font-family: var(--serif); font-weight: 600; color: var(--accent);
+.expired-banner strong, .note-banner strong {
+                         font-family: var(--serif); font-weight: 600; color: var(--accent);
                          text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; }
-.expired-banner a { color: var(--accent); }
+.expired-banner a, .note-banner a { color: var(--accent); }
 body.expired .gr-main { color: var(--ink-3); }
 body.expired .gr-main h1, body.expired .kaprubrik, body.expired .rubrik,
 body.expired .artikel { color: var(--ink-2); }
@@ -892,6 +897,9 @@ body.browse .gr-body.solo { max-width: var(--page-max); }
                            border-radius: 2px; padding: 0 1px; }
 .search-refine { display: inline-flex; align-items: center; margin: .55rem .8rem .55rem 0;
                  flex: 0 0 auto; align-self: center;
+                 /* flex layout drops the whitespace text nodes around the
+                    count span; the gap is those word spaces */
+                 gap: .3em;
                  padding: .4rem .65rem; border-radius: 5px; white-space: nowrap;
                  color: var(--accent); font-family: var(--sans); font-size: .86rem;
                  font-weight: 600; text-decoration: none; background: var(--surf-2); }
@@ -1020,6 +1028,10 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .gr-body { display: block; }
   .gr-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 8rem; }
   .gr-main h1 { font-size: 1.9rem; }
+  /* a table wider than the screen (BrB 2:3's jurisdiction table, a prop's
+     unbreakable ELI URLs) scrolls inside its own box; left to overflow it
+     widens the layout viewport and the whole page zooms out to fit */
+  .gr-main table { display: block; overflow-x: auto; }
   /* no sticky masthead left to clear when jumping to an anchor */
   :root { --scroll-clear: .75rem; }
 
