@@ -346,12 +346,20 @@ def _blocks(element):
     if element.name == "blockquote":
         return [("stycke", _text(para), 1, [], False)
                 for para in element.find_all("p")]
-    # a div.update is Skatteverkets own dated note at the head of the document
-    # ("Nytt: 2026-07-06 / Detta ställningstagande ska inte längre tillämpas
-    # ..."). It is published text about this position, so it is body: the
-    # withdrawal *also* reaches the reader as a banner, off the register's own
-    # end date, but the note says things no field carries.
-    if element.name == "div" and "update" in (element.get("class") or ()):
+    # Skatteverkets own editorial notes about this position, and the only two
+    # div classes the register uses at this level (1,162 update in 952
+    # documents, one obsolete). Both are published text about the document, so
+    # both are body:
+    #   * update -- the dated note at the head ("Nytt: 2026-07-06 / Detta
+    #     ställningstagande ska inte längre tillämpas ..."). The withdrawal
+    #     *also* reaches the reader as a banner, off the register's own end
+    #     date, but the note says things no field carries.
+    #   * obsolete -- a passage's superseded wording, set beside the current one
+    #     under the agency's own "Tidigare:" marker. That marker is the first
+    #     paragraph and comes through with the rest, which is what keeps the old
+    #     wording from reading as the position Skatteverket holds now.
+    if element.name == "div" and {"update", "obsolete"} & set(
+            element.get("class") or ()):
         return [("stycke", _text(para), 1, [], False)
                 for para in element.find_all("p")]
     text = _text(element)

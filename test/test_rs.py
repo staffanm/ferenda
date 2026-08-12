@@ -40,7 +40,13 @@ from accommodanda.rs.agencies import (
     REGISTRY,
     number_slug,
 )
-from accommodanda.rs.model import Block, Stallningstagande, rs_identifier, rs_uri
+from accommodanda.rs.model import (
+    Block,
+    Stallningstagande,
+    rs_designation,
+    rs_identifier,
+    rs_uri,
+)
 
 FIXTURES = Path(__file__).parent / "files" / "rs"
 
@@ -1159,3 +1165,91 @@ def test_skv_a_half_numbered_note_section_is_reported():
         skv.page_body(_with_trailing_element(
             "<h2>Fotnot</h2><p>1 Den första noten.</p>"
             "<p>och dess andra stycke.</p>"))
+
+
+# --------------------------------------------------------------------------
+# how a ställningstagande names itself on a statute's context rail
+# --------------------------------------------------------------------------
+
+def test_the_compact_designation_drops_the_citation_frame():
+    """`descriptive` is the *short* citing form ("räntelagen", not "Räntelag
+    (1975:635)"). Four agencies have coined no designation, so `identifier`
+    frames their bare number into a sentence that reads in prose -- and a rail
+    row sits under a heading that has already said what these are, where
+    thirteen rows each opening on the same 33 characters of frame says nothing.
+    An agency whose citation form is already short keeps it."""
+    assert rs_designation("skv", "8-140522-2026") == "8-140522-2026"
+    assert rs_identifier("skv", "8-140522-2026") == \
+        "Skatteverkets ställningstagande dnr 8-140522-2026"
+    assert rs_designation("fk", "2025:01") == rs_identifier("fk", "2025:01")
+
+    art = artifact(org="skv", nummer="8-140522-2026",
+                   titel="Förutsättningar för att i folkbokföringen behandla "
+                         "uppgifter om personer som aldrig har varit "
+                         "folkbokförda i Sverige i vissa fall")
+    lb = labels.document_labels("rs", art)
+    assert lb.descriptive_label == "8-140522-2026"
+    # the eyebrow and any prose citation keep the citable form
+    assert lb.short_id == "Skatteverkets ställningstagande dnr 8-140522-2026"
+
+
+def test_a_rail_row_carries_the_title_behind_the_bare_number():
+    """A diarienummer names nothing on its own, so the document's own title
+    rides along -- the treatment `foreskrift` already gets for "MCFFS 2026:8"."""
+    assert "rs" in page.SUBTITLED_SOURCES
+    row = page._citer_subtitle("rs", "8-140522-2026",
+                               "Förutsättningar för att i folkbokföringen "
+                               "behandla uppgifter")
+    assert row == (' <span class="prov">Förutsättningar för att i '
+                   'folkbokföringen behandla uppgifter</span>')
+
+
+@pytest.mark.parametrize("status,upphavd,expired", [
+    ("gällande", None, None),
+    # the date the agency withdrew it -- what drops it off the rail
+    ("upphävt", "2021-06-23", "2021-06-23"),
+    # Konkurrensverket states two of its three withdrawals in prose and one not
+    # at all; this column is compared against an ISO date, and all three of
+    # those entries publish no document, so they carry no citation either way
+    ("upphävt", "20 oktober 2025", None),
+    ("upphävt", None, None),
+])
+def test_a_withdrawn_stallningstagande_declares_when_it_stopped(
+        status, upphavd, expired):
+    art = artifact(org="skv", nummer="8-1", titel="x", status=status,
+                   upphavd=upphavd)
+    assert catalog._expired_date(art) == expired
+
+
+def test_a_withdrawn_stallningstagande_leaves_the_context_rail(tmp_path):
+    """A ställningstagande is on a paragraf's rail because it says how the
+    agency reads that paragraf. A withdrawn one no longer says anything, so it
+    drops -- the rule the rail already applies to a repealed act (I3). Reading
+    folkbokföringslagen 1 § with thirteen ställningstaganden listed, twelve of
+    them "(upphävt)", is what this is for."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1991:481"
+    rows = [(law, "sfs", "lag", "SFS 1991:481", None),
+            ("https://lagen.nu/rs/skv/8-140522-2026", "rs", "skv",
+             "8-140522-2026", None),
+            ("https://lagen.nu/rs/skv/202-198967-18-111", "rs", "skv",
+             "202 198967-18/111 (upphävt)", "2021-06-23")]
+    for uri, source, kind, descriptive, expired in rows:
+        con.execute(
+            "INSERT INTO documents (uri, source, kind, label, title, "
+            "descriptive, path, expired) VALUES (?,?,?,?,?,?,?,?)",
+            (uri, source, kind, descriptive, "T", descriptive, "p", expired))
+        if source == "rs":
+            con.execute(
+                "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?,?,'dcterms:references',?,?)",
+                (uri, "S1", law + "#P1", law))
+    con.commit()
+    site = page.Site(con, {r[0] for r in rows},
+                     expired=catalog.expired_uris(con, "2026-08-12"))
+    sections = page._inbound_groups(site, [law + "#P1"])
+    rs_section = next(s for s in sections if s.key == "rs")
+    assert rs_section.count == 1, "only the position still in force is listed"
+    assert "8-140522-2026" in rs_section.html
+    assert "upphävt" not in rs_section.html
+    con.close()

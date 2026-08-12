@@ -49,6 +49,14 @@ class Agency:
     name: str                    # the myndighet, spelled out (dcterms:publisher)
     listing: str                 # the page the harvest walks
     identifier: str              # citation form, %-formatted with the number
+    # the compact form a listing row names a ställningstagande by, %-formatted
+    # with the number. Four agencies have coined no designation, so `identifier`
+    # frames their bare number into something citable in prose ("Kronofogdens
+    # ställningstagande 1/23/VER") -- which is right in prose and wrong in a
+    # rail row, where the group heading has already said what these are and the
+    # framing is the same 30 characters on every line. Defaults to `identifier`;
+    # an agency whose citation form is already short needs no second form.
+    designation: str | None = None
     note: str = ""               # what is peculiar about this agency's listing
     browser: bool = False        # detached headful Chrome instead of HTTP (F5: skv)
     page_body: bool = False      # the document is a web page, not a PDF (skv)
@@ -101,6 +109,7 @@ REGISTRY = (
            name="Skatteverket",
            listing="https://www4.skatteverket.se/rattsligvagledning/121.html",
            identifier="Skatteverkets ställningstagande dnr %s",
+           designation="%s",
            browser=True,
            page_body=True,
            note="by far the largest series (2,614 documents, 2004-) and the "

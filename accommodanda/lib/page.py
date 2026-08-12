@@ -619,12 +619,13 @@ def swedish_join(parts):
 
 # Sources whose descriptive citing form is a bare designation that names nothing
 # -- "MCFFS 2026:8" tells a reader neither the issuing agency's subject nor the
-# rule. For those, the document's own title rides along as a subtitle, the way
-# `_bemyndigande_margin` already writes it, so the panel says what the citer *is*
-# rather than only what it is called. A source whose citing form is itself
-# meaningful ("räntelagen", "NJA 2023 s. 560") stays bare: repeating the long
-# title behind a recognised citation is noise.
-SUBTITLED_SOURCES = ("foreskrift",)
+# rule, and "8-140522-2026" is a diarienummer and nothing else. For those, the
+# document's own title rides along as a subtitle, the way `_bemyndigande_margin`
+# already writes it, so the panel says what the citer *is* rather than only what
+# it is called. A source whose citing form is itself meaningful ("räntelagen",
+# "NJA 2023 s. 560") stays bare: repeating the long title behind a recognised
+# citation is noise.
+SUBTITLED_SOURCES = ("foreskrift", "rs")
 
 
 def _citer_subtitle(source, display, title):

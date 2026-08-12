@@ -56,8 +56,8 @@ from ..lib.artifact import footnote_nodes, scanned_nodes
 from ..lib.catalog import BASE
 from .agencies import BY_ORG, ORGS, number_slug
 
-__all__ = ["ORGS", "Block", "Fotnot", "Stallningstagande", "rs_identifier",
-           "rs_uri"]
+__all__ = ["ORGS", "Block", "Fotnot", "Stallningstagande", "rs_designation",
+           "rs_identifier", "rs_uri"]
 
 
 def rs_uri(org, nummer):
@@ -74,6 +74,18 @@ def rs_identifier(org, nummer):
     `agencies.REGISTRY` -- no acronym is invented for an agency that has not
     coined one."""
     return BY_ORG[org].identifier % nummer
+
+
+def rs_designation(org, nummer):
+    """The compact form a listing row names the document by -- the short
+    designation where the agency has coined one ("IMYRS 2024:1", "RS/028/2021"),
+    and the bare number where `rs_identifier` had to frame it into a sentence to
+    make it citable in prose ("8-140522-2026", not "Skatteverkets
+    ställningstagande dnr 8-140522-2026"). A rail row sits under a heading that
+    has already said these are ställningstaganden, and the frame repeated down
+    thirteen rows says nothing the heading did not."""
+    agency = BY_ORG[org]
+    return (agency.designation or agency.identifier) % nummer
 
 
 @dataclass
@@ -131,6 +143,10 @@ class Stallningstagande:
         return rs_identifier(self.org, self.nummer)
 
     @property
+    def designation(self):
+        return rs_designation(self.org, self.nummer)
+
+    @property
     def publisher(self):
         return BY_ORG[self.org].name
 
@@ -156,6 +172,7 @@ class Stallningstagande:
             metadata["nyckelord"] = self.nyckelord
         art = {"uri": self.uri, "type": "stallningstagande", "org": self.org,
                "doctype": self.doktyp, "identifier": self.identifier,
+               "designation": self.designation,
                "metadata": metadata, "structure": structure}
         if footnotes:
             art["footnotes"] = footnotes

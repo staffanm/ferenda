@@ -875,12 +875,33 @@ def icc_document(art, path):
             label, title, str(path))
 
 
+# the column `_expired_date` fills is compared against an ISO date, so only an
+# ISO date may go into it
+RE_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _expired_date(art: dict) -> str | None:
-    """The date a document's repeal takes effect, if its metadata declares one (a
-    statute's `rpubl:upphavandedatum`) -- else None. Stored on the documents row so
-    the browse listings can omit a statute once the date has passed (still reachable
-    by direct link and search)."""
-    return art.get("metadata", {}).get("properties", {}).get("rpubl:upphavandedatum")
+    """The date a document stopped stating law, if its metadata declares one --
+    else None. Stored on the documents row so the browse listings can omit it
+    once the date has passed (still reachable by direct link and search), and so
+    the context rail drops it (`page._inbound_groups`, the I3 rule).
+
+    Two kinds of document declare one, for the same reason. A statute names its
+    repeal date (`rpubl:upphavandedatum`). A rättsligt ställningstagande is in
+    force until the agency withdraws it, and a withdrawn one no longer says how
+    the agency reads the rule -- which is the only reason it was on that
+    paragraf's rail. Reading a paragraf whose rail listed thirteen
+    ställningstaganden, twelve of them withdrawn, is what this covers.
+
+    Only an ISO date counts, because this column is compared against one.
+    Konkurrensverket states its withdrawals in prose ("20 oktober 2025") and for
+    one entry not at all -- all three of those publish no document at all, so
+    they carry no citation and reach no rail either way."""
+    metadata = art.get("metadata", {})
+    if metadata.get("status") == "upphävt":
+        withdrawn = metadata.get("upphavd") or ""
+        return withdrawn if RE_ISO_DATE.match(withdrawn) else None
+    return metadata.get("properties", {}).get("rpubl:upphavandedatum")
 
 
 def document_date(art: dict) -> str | None:

@@ -383,13 +383,20 @@ def _avg(art):
 def _rs(art):
     # short_id is the citation form the agency itself uses ("FKRS 2025:01",
     # "Konkurrensverkets ställningstagande 2025:1"); the title is the subject.
+    # The *descriptive* label is the compact citing form a listing row carries,
+    # which is the source's own `designation` where it publishes one:
+    # Skatteverkets citation form frames its dnr into a sentence so it reads in
+    # prose, and thirteen rows each opening on the same 33 characters of frame
+    # is exactly what this field exists to avoid (I1, "räntelagen" not
+    # "Räntelag (1975:635)").
     # A withdrawn ställningstagande says so wherever it is named in prose --
     # it still governed what the agency did while it stood, but a reader must
     # not take it for the agency's current reading.
     md = art.get("metadata", {})
     ident = art.get("identifier") or _local(art["uri"])
     title = md.get("title") or ident
-    described = ident if md.get("status") != "upphävt" else "%s (upphävt)" % ident
+    short = art.get("designation") or ident
+    described = short if md.get("status") != "upphävt" else "%s (upphävt)" % short
     return Labels(ident, title, title, described)
 
 
