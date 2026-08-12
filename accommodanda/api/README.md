@@ -340,6 +340,33 @@ curl -G http://127.0.0.1:8001/api/v1/document/outbound \
 ]
 ```
 
+### `GET /api/v1/pdf` — dokumentet som PDF
+
+En genererad sida omrenderad för papper: A4, löpande sidhuvud, sidfot av
+formen "3 (12)" (sida/antal sidor), PDF-bokmärken — samma `style.css`-
+utskriftsblock som webbläsarens egen Skriv ut, plus det sidbrytningslager
+(`@page`, `string-set`, `target-counter()`) webbläsare inte implementerar.
+Renderas av WeasyPrint (`api/pdf.py`); understilar och bilder hämtas i
+processen, aldrig över nätet. Resultatet cachas på disk
+(`cache/pdfexport/`, LRU, 2 GiB tak) med sidans *innehåll* och stilmallens
+text i nyckeln — en stor balk tar över en minut första gången, sedan
+millisekunder. En sida som ändrats (ny lydelse, ändrad patchfil, ny
+stilmall) träffar aldrig en gammal post; en kopiering av identiska bytes
+behåller cacheträffen.
+
+| Parameter | Typ | Förklaring |
+|---|---|---|
+| `path` | sträng (obligatorisk) | sidans publika sökväg, t.ex. `/1998:204` eller `/prop/2020/21:22` |
+| `toc` | bool (standard `false`) | lägg till sidans egen innehållsförteckning med utlästa sidnummer |
+| `kontext` | sträng | kommaseparerad lista kontextslag att skriva ut under varje paragraf/artikel (rälsens sektionsnamn, t.ex. `kommentar,dv,forarbete`), eller `alla`; standard: ingen kontext |
+| `download` | bool (standard `false`) | servera som bifogad fil (nedladdning) i stället för inline (visning) |
+
+```sh
+curl -G http://127.0.0.1:8001/api/v1/pdf \
+     --data-urlencode "path=/1998:204" --data-urlencode "toc=true" \
+     --data-urlencode "kontext=forarbete,dv" -o forvaltningslagen.pdf
+```
+
 ### `GET /api/v1/sources` — källor och antal
 
 ```sh
