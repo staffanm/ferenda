@@ -187,6 +187,57 @@ nav.toc a.active { color: var(--accent); border-left-color: var(--accent);
    only top-level entries (plus the open branch) show; no-JS keeps all visible */
 nav.toc a.toc-collapsed { display: none; }
 
+/* -- "Spara som PDF" (pdf.js): the printer icon riding the short-id row
+   at the top right of the TOC rail, and its options dialog. Screen chrome
+   only -- the print block hides the icon, and api/pdf.py drops the whole
+   column. The toc-top row reserves its width so a long id never runs
+   under it. -- */
+.toc-list { position: relative; }
+nav.toc a.toc-top { padding-right: 2.6rem; }
+.pdf-open { position: absolute; top: .05rem; right: .9rem;
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: .2rem; border: 0; border-radius: 4px;
+            background: none; color: var(--ink-3); cursor: pointer; }
+.pdf-open:hover { color: var(--accent); background: var(--surf-2); }
+.pdf-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.pdf-dialog { border: 1px solid var(--rule); border-radius: 8px;
+              background: var(--surf); color: var(--ink);
+              padding: 1.25rem 1.5rem; width: min(26rem, 90vw);
+              box-shadow: 0 12px 40px var(--shadow-modal);
+              font: 400 .9rem/1.5 var(--sans); }
+.pdf-dialog::backdrop { background: var(--overlay); }
+.pdf-dialog h2 { font: 600 1.05rem var(--sans); margin: 0 0 .9rem; }
+.pdf-dialog .pdf-row { display: block; margin: .45rem 0; }
+.pdf-kinds { border: 0; margin: .2rem 0 .2rem 1.55rem; padding: 0;
+             display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .8rem; }
+.pdf-kinds[disabled] { opacity: .45; }
+/* checkbox + label as two columns, so a long kind name ("Rättsliga
+   ställningstaganden") wraps under its own text, not under the box */
+.pdf-kinds label { display: grid; grid-template-columns: auto 1fr;
+                   gap: .4rem; align-items: baseline; font-size: .82rem; }
+.pdf-dialog .pdf-mode { display: flex; gap: 1.2rem; margin-top: .7rem; }
+.pdf-hint { color: var(--ink-4); font-size: .78rem; margin: .8rem 0 0; }
+.pdf-actions { display: flex; justify-content: flex-end; gap: .6rem;
+               margin-top: 1rem; }
+.pdf-actions button { font: 500 .82rem var(--sans); border-radius: 5px;
+                      padding: .4rem .9rem; cursor: pointer;
+                      border: 1px solid var(--rule); background: var(--surf-2);
+                      color: var(--ink-2); }
+.pdf-actions button:hover { background: var(--surf-3); color: var(--ink); }
+.pdf-actions .pdf-go { background: var(--accent); border-color: var(--accent);
+                       color: var(--on-accent); }
+/* the in-flight state: a small ring ahead of "Skapar PDF …" -- a first
+   render of a large statute takes a minute or more */
+.pdf-actions .pdf-go.busy::before { content: ""; display: inline-block;
+                       width: .75em; height: .75em; margin-right: .45rem;
+                       vertical-align: -.08em; border-radius: 50%;
+                       border: 2px solid var(--on-accent);
+                       border-right-color: transparent;
+                       animation: pdf-spin .8s linear infinite; }
+@keyframes pdf-spin { to { transform: rotate(360deg); } }
+.pdf-err { color: var(--danger); font-size: .82rem; margin: .8rem 0 0; }
+
 /* -- Frontmatter -- */
 /* #top -- the TOC's first entry jumps here, so it clears the sticky masthead
    like every other anchor target */
@@ -1111,14 +1162,6 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .full-search-facets { grid-template-columns: 1fr; }
 }
 
-/* -- Print -- */
-@media print {
-  .masthead, .toc-col, .rail { display: none; }
-  .gr-body { display: block; }
-  .gr-main { max-width: none; padding: 0; }
-  .kaprubrik { border-color: #999; }
-}
-
 /* ---------------------------------------------------------------- statistik
    The /statistik page and its figures. Marks are single-series throughout --
    the corpus has one value per year, per bin, per law -- so identity is never
@@ -1262,3 +1305,154 @@ section.occurrences ul { list-style: none; margin: 0; padding: 0; }
 section.occurrences li { margin: .3rem 0; line-height: 1.45; }
 section.occurrences details.more > summary { color: var(--ink-3);
          font-size: .85rem; cursor: pointer; margin-top: .4rem; }
+
+/* ------------------------------------------------------------------- print
+   One print design, two consumers: the browser's own Skriv ut, and the PDF
+   export (api/pdf.py), which renders the same page through WeasyPrint. Both
+   read this block; WeasyPrint additionally honours the paged-media features
+   browsers skip (string-set running headers, target-counter() page numbers,
+   leader() dots, bookmark-*), all of which degrade silently on the ones
+   that don't. `.print-toc` / `.print-kontext` markup exists only in the
+   PDF export -- api/pdf.py injects it -- so those rules are inert on the
+   live page and under Ctrl+P.
+
+   The design: the reading column alone, as a book page. All chrome and
+   every interactive widget disappears; the text moves to the serif,
+   justified with Swedish hyphenation; ink is black on true white in both
+   themes; A4 with the document's identifier as a running header and
+   "n (total)" folios from page two. */
+@media print {
+  /* paper tokens -- restated for the explicit dark theme too, so a
+     dark-mode reader still prints a light page. The prefers-color-scheme
+     fallback earlier in the file loses to these by order. */
+  :root, :root[data-theme="dark"], :root:not([data-theme]) {
+    --bg:#fff; --surf:#fff; --surf-2:#fff; --surf-3:#fff;
+    --ink:#000; --ink-2:#1c1c1c; --ink-3:#3d3d3d; --ink-4:#6a6a6a;
+    --rule:#8a8a8a; --rule-soft:#c2c2c2;
+    --accent:#7c2d1c; --case:#6d431f; --forarbete:#443b68; --kommentar:#762b48;
+    --fk-bg:#fff; --fk-border:#9a9a9a;
+    --diff-ins-bg:#e8e8e8; --diff-del-bg:#f2f2f2;
+    --mark:#e8e0b0; --danger:#7c2d1c; --on-accent:#fff;
+    --senti-neg:#5d2417; --senti-pos:#254f35;
+    --viz-mark:#7c2d1c; --viz-grid:#c2c2c2; --viz-on-heat:#fff;
+    color-scheme: light;
+  }
+
+  @page {
+    size: A4;
+    margin: 22mm 20mm 24mm;
+    @top-center { content: string(doc-id);
+                  font: italic 9pt "Source Serif 4", Georgia, serif;
+                  color: #3d3d3d; letter-spacing: .04em; }
+    @bottom-center { content: counter(page) " (" counter(pages) ")";
+                     font: 8.5pt "Inter", system-ui, sans-serif;
+                     font-variant-numeric: tabular-nums; color: #3d3d3d; }
+    @bottom-left { content: "lagen.nu";
+                   font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                   color: #6a6a6a; }
+  }
+  /* the first page carries the document's own title block; no running head */
+  @page :first {
+    @top-center { content: none; }
+  }
+  .frontmatter .eyebrow { string-set: doc-id content(text); }
+
+  /* chrome and widgets: nothing a finger can operate belongs on paper */
+  .masthead, .mobile-bar, .toc-col, .rail, .drawer-scrim, .search-overlay,
+  .theme-toggle, a.pilcrow, .fn-back, details.lydelser,
+  .ed-tools, .ed-panel, .ed-overlay, .ed-btn-top, .admin-panel,
+  .pdf-open { display: none; }
+  /* an open fold prints its content as plain text, without the summary
+     widget. A closed fold keeps only its "+N till" line -- an honest note
+     that paper is missing something the page has. The PDF export opens
+     every fold (api/pdf.py), so there the content always prints. */
+  details[open].more > summary,
+  details[open].forarbeten-mer > summary { display: none; }
+  /* the printed-page marker stays -- citations point at printed pages --
+     but as a plain caption, and its facsimile-opener button goes */
+  .sid button[data-fax] { display: none; }
+  .sid-nr, .sid button { border: 0; padding: 0; background: none;
+                         color: var(--ink-4); }
+
+  /* the reading column, full measure */
+  .gr-body { display: block; max-width: none; }
+  .gr-body.solo { max-width: none; }
+  .gr-main { max-width: none; padding: 0; }
+  body.parallel-appendix .gr-main { max-width: none; }
+
+  /* book typography: serif, justified, hyphenated. 1rem = 10.5pt scales
+     every rem-sized component in the sheet to paper proportions at once. */
+  html { font-size: 10.5pt; }
+  body { font-family: var(--serif); font-size: 1rem; line-height: 1.55;
+         letter-spacing: 0; background: #fff; transition: none; }
+  /* the ASCII hyphen: the self-hosted woff2 subsets carry no U+2010, which
+     otherwise renders as .notdef boxes at every break WeasyPrint hyphenates */
+  .gr-main p { text-align: justify; hyphens: auto; hyphenate-character: "-"; }
+  /* prose set small on screen reads fine at paper's higher resolution --
+     lift the floors a touch */
+  .paragraf-body { line-height: 1.55; }
+
+  /* the title block */
+  .gr-main h1 { font-size: 2.1rem; line-height: 1.1; }
+  .frontmatter { border-bottom-color: var(--ink); margin-bottom: 1.6rem; }
+  dl.meta { row-gap: .15rem; }
+
+  /* breaks: no orphaned headings, no severed §§, register entries whole */
+  h1, h2, h3, h4, h5, h6, .kaprubrik, .rubrik, .artikel,
+  .instans-rubrik, .delmal-rubrik { break-after: avoid; break-inside: avoid; }
+  section.paragraf, .andring, figure, blockquote, .expired-banner,
+  .note-banner, .version-banner, p.ruta { break-inside: avoid; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+  p { orphans: 3; widows: 3; }
+  /* the amendment register is an appendix: start it on its own page */
+  section.andringar { break-before: page; margin-top: 0; }
+  .andring { border-color: var(--rule-soft); background: none; }
+
+  /* links: ink, not paint -- the citation text is the reference on paper.
+     The § numerals and inline number markers keep the accent. The extra
+     selectors outgun the screen's category-coloured link rules
+     (section.forarbeten a, .rail-sec.forarbete a, ...). */
+  .gr-main a, section.forarbeten a, .print-kontext .rail-sec a,
+  .print-kontext .rail-sec .prov a { color: inherit; text-decoration: none; }
+  a.term { border-bottom: 0; }
+  .paragraf-gutter .n, .num { color: var(--accent); }
+
+  /* the § gutter at paper scale: "3 b §" must not wrap */
+  section.paragraf { grid-template-columns: 4rem minmax(0, 1fr); }
+
+  img, .grafik-img { max-width: 100%; }
+
+  /* --- PDF export only (api/pdf.py injects the markup) --- */
+  /* the outline panel of the exported PDF: WeasyPrint's UA sheet bookmarks
+     h1-h6; keep the injected apparatus out of it */
+  .print-toc h2, .print-kontext h4 { bookmark-level: none; }
+
+  /* Innehåll with leader dots and resolved page numbers */
+  .print-toc { margin: 1.8rem 0 0; break-after: page; }
+  .print-toc h2 { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
+                  margin: 0 0 .7rem; }
+  .print-toc ol { list-style: none; margin: 0; padding: 0; }
+  .print-toc li { margin: .18rem 0; }
+  .print-toc li.lvl2 { padding-left: 1.4rem; }
+  .print-toc li.lvl3 { padding-left: 2.8rem; font-size: .88rem; }
+  .print-toc a { color: inherit; text-decoration: none; }
+  .print-toc a::after { content: leader(dotted) " " target-counter(attr(href), page);
+                        font-variant-numeric: tabular-nums; }
+
+  /* the context apparatus under a provision: editorial voice (sans, small,
+     half-tone) set clearly apart from the document's own text */
+  .print-kontext { font-family: var(--sans); font-size: .78rem; line-height: 1.45;
+                   color: var(--ink-2); margin: .9rem 0 1.6rem;
+                   padding-left: .9rem; border-left: 2px solid var(--rule-soft); }
+  section.paragraf + .print-kontext { margin-left: 5rem; }
+  .print-kontext .rail-h { font-weight: 600; font-size: .72rem;
+                           text-transform: uppercase; letter-spacing: .06em;
+                           color: var(--ink-3); margin: 0 0 .35rem; }
+  .print-kontext h4 { font-size: .78rem; font-weight: 600; margin: .6rem 0 .2rem; }
+  .print-kontext h4 .n { color: var(--ink-4); font-weight: 400; margin-left: .3rem; }
+  .print-kontext ul { list-style: none; margin: 0 0 .4rem; padding: 0; }
+  .print-kontext li { margin: .12rem 0; break-inside: avoid; }
+  .print-kontext .prov { color: var(--ink-4); }
+  .print-kontext .q { font-family: var(--serif); font-style: italic; }
+}
