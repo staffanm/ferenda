@@ -163,3 +163,83 @@ def test_source_landing_caps_the_children_it_lists():
     html = browse.render_landing("eurlex", view)
     assert html.count("<li>") == browse.LANDING_CHILDREN
     assert ">2026<" in html and ">1990<" not in html   # newest kept, tail dropped
+
+
+# --------------------------------------------------------------------------
+# the year split: a bucket small enough to read at once is one page (F3/F4)
+# --------------------------------------------------------------------------
+
+class _FakeClient:
+    """Stands in for the API: `generate_browse` asks it for one browse view."""
+
+    def __init__(self, view):
+        self.view = view
+
+    def get(self, _path, params=None):
+        return self
+
+    def json(self):
+        return self.view
+
+
+def _agency_view(source, level, buckets):
+    """A two-level browse view: one primary bucket per agency, each split by
+    year, in the shape `/api/v1/browse` returns."""
+    return {"source": source, "levels": [level, "År"], "default": [],
+            "buckets": [
+                {"key": key, "slug": key, "label": key.upper(),
+                 "count": sum(years.values()),
+                 "children": [
+                     {"key": y, "slug": y, "label": y, "count": n,
+                      "children": None,
+                      "documents": [{"url": "/%s/%s/%d" % (key, y, i),
+                                     "short_id": "%s %s:%d" % (key, y, i),
+                                     "short_title": "T"}
+                                    for i in range(n)]}
+                     for y, n in years.items()]}
+                for key, years in buckets.items()]}
+
+
+def _written_dirs(out_root, source):
+    return sorted(str(p.relative_to(out_root / source).as_posix())
+                  for p in (out_root / source).rglob("*")
+                  if p.is_dir())
+
+
+def test_a_small_agency_lists_on_one_page(tmp_path):
+    """A myndighet whose whole output fits on a screen should not be spread over
+    a year selector: Kronofogdens 22 ställningstaganden across 11 years is two
+    entries a page and eleven clicks to read the corpus."""
+    view = _agency_view("rs", "Myndighet",
+                        {"kfm": {"2019": 8, "2020": 7, "2021": 7}})
+    browse.generate_browse(_FakeClient(view), "rs", tmp_path)
+    assert _written_dirs(tmp_path, "rs") == ["kfm"], "no year pages"
+    page = _page_text(tmp_path / "rs" / "kfm")
+    for year in ("2019", "2020", "2021"):
+        assert "kfm %s:0" % year in page, "every year's documents on the one page"
+    # the heading names the bucket, with no year to append
+    assert "<h1>KFM <span" in page
+    # and no year is offered anywhere: a link to a page this run did not write
+    assert "/rs/kfm/2019/" not in page
+
+
+def test_a_large_agency_keeps_its_year_pages(tmp_path):
+    """Past the threshold the list is too long to scan, so the year axis earns
+    its click and rides as a banner on each page."""
+    view = _agency_view("avg", "Organ",
+                        {"jo": {"2024": browse.YEAR_SPLIT_MIN, "2025": 10}})
+    browse.generate_browse(_FakeClient(view), "avg", tmp_path)
+    assert _written_dirs(tmp_path, "avg") == ["jo", "jo/2024", "jo/2025"]
+    # the year selector is on the page, which is what makes the split navigable
+    assert "2025" in _page_text(tmp_path / "avg" / "jo" / "2024")
+
+
+def test_the_split_applies_to_what_a_myndighet_issues(tmp_path):
+    """One policy, three sources -- föreskrifter, avgöranden and rättsliga
+    ställningstaganden. Every other faceted source keeps paging by year: the
+    rule is a display policy, and widening it would change addresses that
+    already exist."""
+    assert browse.YEAR_SPLIT_SOURCES == {"foreskrift", "avg", "rs"}
+    view = _agency_view("dv", "Domstol", {"nja": {"2024": 3, "2025": 2}})
+    browse.generate_browse(_FakeClient(view), "dv", tmp_path)
+    assert _written_dirs(tmp_path, "dom") == ["nja", "nja/2024", "nja/2025"]

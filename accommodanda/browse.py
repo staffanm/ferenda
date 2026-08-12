@@ -123,15 +123,16 @@ def _facet_nav(source, view, active_keys, primary_in_banner=False):
     carries a cross-source selector that already lists the same buckets
     (`primary_in_banner`): eurlex's document types and edpb's series appear in
     the EU-rätt banner above, and a rail repeating them below is the same
-    choice offered twice. The föreskrift years never list here either: a large
-    samling's year axis rides on top of the list (F4), a small one has no year
-    split at all (F3)."""
+    choice offered twice. The years of what a myndighet issues never list here
+    either (`YEAR_SPLIT_SOURCES`): a large bucket's year axis rides on top of
+    the list (F4), and a small one has no year split at all (F3) -- listing them
+    here would offer a reader years that are not pages."""
     levels, buckets = view["levels"], view["buckets"]
     parts = ([{"axis": levels[0]},
               {"axis": None,
                "links": _facet_links(source, buckets, [], active_keys, 0)}]
              if len(buckets) > 1 and not primary_in_banner else [])
-    if len(levels) > 1 and source != "foreskrift":
+    if len(levels) > 1 and source not in YEAR_SPLIT_SOURCES:
         cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
         if cur and cur["children"]:
             parts.append({"axis": _secondary_axis(source, active_keys[0],
@@ -154,8 +155,12 @@ def _bucket_heading(source, levels, nodes):
     'NJA – Högsta domstolen 2024', 'Förordningar 2016'. The eurlex Fördrag family
     label is self-describing, so it stands alone rather than trailing 'Fördrag'.
     A författningssamling heads by its official name + designation --
-    'Åklagarmyndighetens författningssamling (ÅFS)' (F2) -- with the year
-    appended only where the samling is year-partitioned."""
+    'Åklagarmyndighetens författningssamling (ÅFS)' (F2).
+
+    The year is appended only where the bucket *is* year-partitioned. A bucket
+    small enough to list whole has no year to name (`YEAR_SPLIT_SOURCES`), and a
+    heading is built from the nodes the page actually stands on rather than from
+    the depth of the scheme."""
     if source == "foreskrift":
         info = facets.fs_series_info(nodes[0]["key"])
         series = ("%s (%s)" % (info["title"], info["designation"]) if info
@@ -165,7 +170,7 @@ def _bucket_heading(source, levels, nodes):
         return "%s som börjar på %s" % (SOURCE_LABEL.get(source, source), nodes[0]["key"])
     if source == "eurlex" and nodes[0]["key"] == "treaty":
         return nodes[1]["label"]
-    return "%s %s" % (nodes[0]["label"], nodes[1]["label"])
+    return " ".join(n["label"] for n in nodes)
 
 
 def _fs_bucket_slugs(prim):
@@ -387,25 +392,41 @@ def _reap_browse(out_root, source, written):
     return reaped
 
 
-# a författningssamling with fewer documents than this (amendments included)
+# A primary bucket with fewer documents than this (nested amendments included)
 # lists on one page (F3); at or above it, one page per year with the year axis
-# on top of the list (F4)
-FS_YEAR_SPLIT_MIN = 200
+# on top of the list (F4).
+#
+# The year axis costs a click and a page load, and it buys nothing until the
+# list is too long to scan. Splitting below this leaves pages like
+# Kronofogdens 22 ställningstaganden over 11 years -- two entries a page, eleven
+# clicks to read a corpus that fits on a screen.
+YEAR_SPLIT_MIN = 200
+
+# The sources that collapse a small primary bucket, rather than always paging by
+# year: what a myndighet issues (its föreskrifter, its avgöranden, its rättsliga
+# ställningstaganden), where a small agency's whole output is a short list.
+# Every other faceted source is left paging as it does today -- the rule is a
+# display policy, and widening it changes URLs that already exist.
+YEAR_SPLIT_SOURCES = frozenset({"foreskrift", "avg", "rs"})
 
 
-def _fs_docs(sec):
-    """A year bucket's total listing size: its entries plus their nested
-    ändringsförfattningar -- what decides whether a samling needs year pages."""
+def _listed(sec):
+    """A year bucket's total listing size: its entries plus any nested rows --
+    a föreskrifts ändringsförfattningar fold under their base regulation, and
+    they are lines on the page like any other. This is what decides whether the
+    bucket needs year pages."""
     docs = sec.get("documents") or []
     return len(docs) + sum(len(d.get("amendments") or []) for d in docs)
 
 
-def _fs_year_axis(source, prim):
-    """The year selector of one samling, as a one-group cross-axis (F4)."""
-    return [("År", [(sec["key"], sec["label"],
-                     browse_url(source, [prim["slug"], sec["slug"]]),
-                     sec["count"])
-                    for sec in prim["children"]])]
+def _year_axis(source, view, prim):
+    """The secondary-axis selector of one primary bucket, as a one-group
+    cross-axis (F4). Named by the scheme's own second level, which is "År" for
+    every source that reaches here."""
+    return [(view["levels"][1], [(sec["key"], sec["label"],
+                                  browse_url(source, [prim["slug"], sec["slug"]]),
+                                  sec["count"])
+                                 for sec in prim["children"]])]
 
 
 def generate_browse(client, source, out_root, cross_axis=None):
@@ -424,9 +445,10 @@ def generate_browse(client, source, out_root, cross_axis=None):
     rail beside the listing leaves them to it rather than offering the same
     choice twice.
 
-    A small författningssamling collapses its year buckets into one listing
-    (F3); a large one keeps year pages, with the year selector as a top banner
-    on each (F4)."""
+    A small primary bucket collapses its year buckets into one listing (F3); a
+    large one keeps year pages, with the year selector as a top banner on each
+    (F4). That holds for what a myndighet issues -- föreskrifter, avgöranden,
+    rättsliga ställningstaganden (`YEAR_SPLIT_SOURCES`)."""
     resp = client.get("/api/v1/browse", params={"source": source})
     view = resp.json()
     root_html = None
@@ -435,13 +457,13 @@ def generate_browse(client, source, out_root, cross_axis=None):
         banner = (cross_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
                   if cross_axis else "")
         year_axis = None
-        if source == "foreskrift" and prim["children"]:
-            if sum(_fs_docs(sec) for sec in prim["children"]) < FS_YEAR_SPLIT_MIN:
+        if source in YEAR_SPLIT_SOURCES and prim["children"]:
+            if sum(_listed(sec) for sec in prim["children"]) < YEAR_SPLIT_MIN:
                 prim = dict(prim, children=None,
                             documents=[d for sec in prim["children"]
                                        for d in sec.get("documents") or []])
             else:
-                year_axis = _fs_year_axis(source, prim)
+                year_axis = _year_axis(source, view, prim)
         leaves = [[prim, sec] for sec in prim["children"]] if prim["children"] \
             else [[prim]]
         for i, nodes in enumerate(leaves):
