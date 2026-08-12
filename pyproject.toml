@@ -79,6 +79,11 @@ dependencies = [
     "ruamel-yaml>=0.19.1",
     "urllib3",
     "uvicorn",
+    # HTML+CSS -> PDF for the /api/v1/pdf export (api/pdf.py): renders the
+    # generated page through the same style.css print rules the browser uses,
+    # and adds what browsers don't implement -- @page margin boxes, string-set
+    # running headers, target-counter() TOC page numbers, PDF bookmarks.
+    "weasyprint>=63",
 ]
 
 [project.optional-dependencies]

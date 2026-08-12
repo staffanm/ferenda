@@ -30,6 +30,11 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+# the PDF export's subresource fetches (facsimile images) run through the app
+# itself in-process -- the same idiom browse.py generates the static browse
+# pages with
+from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 # StaticFiles.get_response raises Starlette's HTTPException (FastAPI's is a
@@ -53,7 +58,7 @@ from ..lib import (
     search,
 )
 from ..lib.util import basefile_slug
-from . import analytics, auth, db, edit, errors, ops, patch, reads
+from . import analytics, auth, db, edit, errors, ops, patch, pdf, reads
 from . import mcp as mcp_server
 from .db import get_con
 
@@ -879,6 +884,52 @@ def dv_verdict_endpoint(
         raise HTTPException(404, "verdict pdf not found")
     return FileResponse(path, media_type="application/pdf",
                         headers={"Content-Disposition": 'inline; filename="%s"' % name})
+
+
+@app.get("/api/v1/pdf", tags=["document"],
+         responses={200: {"content": {"application/pdf": {}}}})
+def pdf_endpoint(
+        path: str = Query(..., description="public page path, e.g. /1998:204 "
+                          "or /prop/2020/21:22"),
+        toc: bool = Query(False, description="prepend an Innehåll section "
+                          "whose entries carry printed page numbers"),
+        kontext: str = Query("", description="comma-separated context kinds to "
+                             "print under each provision/section (the rail's "
+                             "slugs, e.g. kommentar,dv,forarbete), or 'alla'"),
+        download: bool = Query(False, description="serve as attachment "
+                               "(download) instead of inline (display)")):
+    """The page typeset for paper as a PDF: A4, running headers, "n (total)"
+    folios, a PDF outline -- the same print stylesheet the browser uses, plus
+    the paged-media layer browsers skip. `toc` adds the page's own TOC with
+    resolved page numbers; `kontext` prints the chosen context kinds under
+    each provision, the way the screen page shows them in the rail."""
+    try:
+        kinds = pdf.parse_kinds(kontext)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    rel = layout.url_to_relpath(path)
+    if rel is None:
+        raise HTTPException(404, "no such page: %r" % path)
+    client = TestClient(app)
+
+    def subresource(path_qs):
+        r = client.get(path_qs)
+        if r.status_code != 200:
+            raise ValueError("subresource %s -> %d" % (path_qs, r.status_code))
+        return r.content, r.headers.get("content-type", "")
+
+    try:
+        data = pdf.export(config.DATA / "generated" / rel, toc=toc,
+                          kinds=kinds, subresource=subresource)
+    except FileNotFoundError:
+        raise HTTPException(404, "no generated page at %r" % path) from None
+    except pdf.SubresourceUnavailable as exc:
+        # a degraded PDF is never served or cached; the failure is usually
+        # transient (facsimile render, NFS), so the client should retry
+        raise HTTPException(503, "subresource failed: %s" % exc) from None
+    return Response(data, media_type="application/pdf", headers={
+        "Content-Disposition": '%s; filename="%s"' % (
+            "attachment" if download else "inline", pdf.filename_for(path))})
 
 
 # the legacy path grammar in its two arities: riksmöte-numbered förarbeten and
