@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from ..lib import compress, patch
 from ..lib.errors import SkipDocument
 from ..lib.util import normalize_space
+from . import summaries
 from .download import body_path, record_path
 from .model import Block, HudocCase
 
@@ -124,11 +125,19 @@ def _split(value):
     return [item.strip() for item in (value or "").split(";") if item.strip()]
 
 
-def parse_record(record, html_text):
+def parse_record(record, html_text, summary=None):
     body = parse_body(html_text)
-    if not any(block.number for block in body):
-        raise SkipDocument("%s: HUDOC judgment body contains no numbered paragraphs"
-                           % record["itemid"])
+    # An unusable body is one with no structure at all: HUDOC's language and
+    # cover stubs are a single sentence ("The text of this judgment is available
+    # in French only.") with neither a numbered paragraph nor a heading. The
+    # test cannot be "no numbered paragraph" alone -- a judgment numbers its
+    # paragraphs, but a decision states its facts and its reasoning under
+    # headings and numbers nothing, and 259 of 400 sampled decisions are
+    # unnumbered while every one of them carries a heading.
+    if not any(block.number or block.kind == "rubrik" for block in body):
+        raise SkipDocument(
+            "%s: HUDOC body carries neither a numbered paragraph nor a heading"
+            % record["itemid"])
     return HudocCase(
         itemid=record["itemid"],
         title=normalize_space(record.get("docname")),
@@ -143,6 +152,7 @@ def parse_record(record, html_text):
         article_codes=_split(record.get("article")),
         conclusions=_split(record.get("conclusion")),
         body=body,
+        summary=summary,
     )
 
 
@@ -150,4 +160,5 @@ def parse(basefile, root):
     record = compress.read_json(record_path(root, basefile))
     html = patch.apply("hudoc", basefile,
                        compress.read_text(body_path(root, basefile)))
-    return parse_record(record, html).to_artifact()
+    return parse_record(record, html,
+                        summaries.read_sidecar(root, basefile)).to_artifact()

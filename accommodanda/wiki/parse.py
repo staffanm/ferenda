@@ -28,9 +28,9 @@ import glob
 import re
 from pathlib import Path
 
-from ..lib import markdown
+from ..lib import layout, markdown
 from ..lib.eu_structure import anchored_blocks
-from ..lib.lagrum import ALL_PARSE_TYPES, CELEX_BASE, sfs_parser
+from ..lib.lagrum import ALL_PARSE_TYPES, CELEX_BASE, ECHR_BASE, sfs_parser
 
 PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -121,11 +121,14 @@ def _read(path):
 
 
 def host_uri(annotates):
-    """The annotated act's uri from an `annotates:` value. An SFS number
-    ("2009:400") is a lagen.nu top-level page; a CELEX ("32024R2847", no colon) is
+    """The annotated document's uri from an `annotates:` value. An SFS number
+    ("2009:400") is a lagen.nu top-level page; a HUDOC item id ("001-159324") is
+    a Strasbourg judgment or decision; a CELEX ("32024R2847", no colon) is
     the ext/celex act the eurlex source publishes -- so a single annotation layer
     serves any host (PRD Step 2)."""
     a = str(annotates)
+    if layout.HUDOC_ITEMID.match(a):
+        return ECHR_BASE + a
     return "https://lagen.nu/" + a if ":" in a \
         else CELEX_BASE + a
 
@@ -276,8 +279,9 @@ def _wiki_dir(root, sub):
 @functools.cache
 def kommentar_index(root):
     """basefile -> path, over commentary/**/*.md, keyed on `annotates:` (an SFS
-    number or a CELEX). The commentary/guidance is filed under the source it
-    annotates -- `commentary/sfs/1915/218.md`, `commentary/eurlex/2024/32024R2847.md`
+    number, a CELEX or a HUDOC item id). The commentary/guidance is filed under
+    the source it annotates -- `commentary/sfs/1915/218.md`,
+    `commentary/eurlex/2024/32024R2847.md`, `commentary/hudoc/001-159324.md`
     -- via that source's basefile->path rule; the frontmatter basefile stays
     authoritative, the path is the source-scoped storage location."""
     out = {}

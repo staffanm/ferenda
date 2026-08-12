@@ -4,19 +4,45 @@ HUDOC does not advertise a bulk dump.  Its own result UI, however, pages over
 ``/app/query/results`` and retrieves the selected document from
 ``/app/conversion/docx/html/body``.  This module uses those same read-only
 interfaces, newest first, and stores one metadata record plus one HTML body per
-HUDOC item id.  Scope: Grand Chamber and Chamber judgments in the selected
-languages (English by default -- 524 + 21,137 documents); Committee judgments,
-decisions, advisory opinions, legal summaries, resolutions and communicated
-cases are not harvested (``--only <itemid>`` can still fetch one deliberately).
-Body downloads are the whole cost of a run --
+HUDOC item id.  Body downloads are the whole cost of a run --
 the result pages are two orders of magnitude fewer -- so a small worker pool
 keeps ``WORKERS`` body fetches in flight ahead of the walk, each worker pacing
 itself by ``delay``.
+
+**Scope** is two collections, harvested as two scopes (``lagen hudoc download
+judgments|decisions``, both by default), in the selected languages (English by
+default): the Court's Grand Chamber and Chamber ``judgments`` (21,672) and its
+``decisions`` (33,633).  A decision is where the Court says why a complaint
+never reaches the merits -- domestic remedies not exhausted, the time limit
+missed, a fourth-instance appeal -- so it answers the question a reader asks
+before they ever have a judgment to read.  It is also where most of the Court's
+Swedish output lives: 166 Swedish judgments against 922 Swedish decisions.
+Committee judgments, advisory opinions, legal summaries, resolutions and
+communicated cases stay out (``--only <itemid>`` can still fetch one
+deliberately); a Committee judgment in particular applies settled law to a
+repetitive violation, and not one of the 7,541 is against Sweden.
+
+**The walk is sliced by year**, newest year first, because HUDOC serves no
+result past ``start=10000`` -- it keeps reporting the true ``resultcount`` and
+returns an empty page.  An unsliced judgments walk therefore stopped dead at
+the 10,000th document, which is why the store reached back only to
+2009-09-22 and held 7,060 of 21,672 judgments.  A year is at most 1,623
+documents (judgments, 2009), so one year is always a whole slice; a year that
+outgrows the cap raises rather than silently truncating, and the enumeration
+of a whole collection checks its summed year counts against the collection
+total (verified equal for both collections, so no document falls outside
+``FIRST_YEAR``..today).
+
+Each collection walks under its **own** watermark.  Their streams would
+otherwise interleave -- a judgment and a decision from the same year arrive in
+no common date order -- and the first collection's date stop would end the walk
+before the second was reached.
 """
 
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 from pathlib import Path
 
 from ..lib import compress
@@ -47,25 +73,58 @@ def body_path(root, itemid):
     return Path(root) / (itemid + ".html")
 
 
-def query_for(languages=DEFAULT_LANGUAGES, itemid=None):
+# the harvested collections, each its own download scope and its own watermark.
+# GRANDCHAMBER is a subset of CHAMBER in HUDOC's collections; both are spelled
+# out so the intended scope is readable. COMMITTEE is disjoint from CHAMBER and
+# stays out, as do the remaining non-judgment collections.
+COLLECTIONS = {
+    "judgments": ('documentcollectionid2:"JUDGMENTS"'
+                  ' AND (documentcollectionid2:"GRANDCHAMBER"'
+                  ' OR documentcollectionid2:"CHAMBER")'),
+    "decisions": 'documentcollectionid2:"DECISIONS"',
+}
+DEFAULT_COLLECTIONS = ("judgments", "decisions")
+SUMMARIES = "summaries"
+# every filter the year-sliced walk can run, which is the document collections
+# plus the Court's own Case-Law Information Notes. A summary is not a document
+# of ours -- it says what the judgment says -- so it is harvested as metadata
+# and linked from the document it summarises (`summaries.py`), never stored as a
+# document, which is why it is no download scope.
+FILTERS = COLLECTIONS | {SUMMARIES: 'documentcollectionid2:"CLIN"'}
+# the oldest kpdate either collection carries -- Commission-era decisions reach
+# back further than the Court's first judgment (Lawless, 1960). The enumeration
+# proves this floor rather than trusting it: the summed year counts must equal
+# the collection total.
+FIRST_YEAR = 1955
+# HUDOC returns an empty page past this offset while still reporting the true
+# resultcount, so a slice larger than this loses documents silently
+PAGING_CAP = 10000
+
+
+def watermark_path(root, collection):
+    return Path(root) / (".watermark-%s.json" % collection)
+
+
+def year_filter(year):
+    return ("kpdate:[%d-01-01T00:00:00.0Z TO %d-12-31T23:59:59.0Z]"
+            % (year, year))
+
+
+def query_for(languages=DEFAULT_LANGUAGES, itemid=None, collection="judgments",
+              year=None):
     if itemid:
         return 'itemid:"%s"' % itemid
     language = " OR ".join('languageisocode:"%s"' % lang.upper()
                            for lang in languages)
-    # GRANDCHAMBER is a subset of CHAMBER in HUDOC's collections; both are
-    # spelled out so the intended scope is readable. COMMITTEE is disjoint
-    # from CHAMBER and stays out, as do all non-judgment collections.
-    return ('documentcollectionid2:"CASELAW"'
-            ' AND documentcollectionid2:"JUDGMENTS"'
-            ' AND (documentcollectionid2:"GRANDCHAMBER"'
-            ' OR documentcollectionid2:"CHAMBER")'
-            ' AND (%s)' % language)
+    query = ('documentcollectionid2:"CASELAW" AND %s AND (%s)'
+             % (FILTERS[collection], language))
+    return "%s AND %s" % (query, year_filter(year)) if year else query
 
 
 def search_page(session, start, languages=DEFAULT_LANGUAGES, itemid=None,
-                page_size=PAGE_SIZE):
+                page_size=PAGE_SIZE, collection="judgments", year=None):
     return request(session, "GET", QUERY_ENDPOINT, parse_json=True, timeout=120,
-                   params={"query": query_for(languages, itemid),
+                   params={"query": query_for(languages, itemid, collection, year),
                            "select": ",".join(FIELDS),
                            "sort": "kpdate Descending", "start": str(start),
                            "length": str(page_size),
@@ -80,20 +139,66 @@ def result_record(result):
     return record
 
 
-def enumerate_records(session, languages=DEFAULT_LANGUAGES, page_size=PAGE_SIZE,
-                      delay=0.2):
-    """Yield every selected result newest first. A failed result page raises;
-    walk's guarded_enumerate turns that into a Skip and a dirty (retried) run."""
+def _enumerate_year(session, languages, collection, year, page_size, delay):
+    """Yield one year of `collection`, newest first, and return how many the
+    year held. Raises when the year outgrows what HUDOC will page over -- past
+    `PAGING_CAP` the endpoint answers with an empty page instead of an error, so
+    an unchecked slice loses its tail without a trace."""
     start = 0
     while True:
-        envelope = search_page(session, start, languages, page_size=page_size)
+        envelope = search_page(session, start, languages, page_size=page_size,
+                               collection=collection, year=year)
+        count = int(envelope["resultcount"])
+        if count > PAGING_CAP:
+            raise ValueError(
+                "HUDOC %s %d holds %d documents, past the %d HUDOC will page "
+                "over -- the year needs splitting into smaller slices"
+                % (collection, year, count, PAGING_CAP))
         results = envelope.get("results") or []
         for result in results:
             yield result_record(result)
         start += len(results)
-        if not results or start >= int(envelope["resultcount"]):
+        if not results or start >= count:
             return
         time.sleep(delay)
+
+
+def enumerate_records(session, languages=DEFAULT_LANGUAGES,
+                      collection="judgments", page_size=PAGE_SIZE, delay=0.2,
+                      first_year=FIRST_YEAR, last_year=None):
+    """Yield every record in `collection` newest first, one year at a time.
+
+    The year slices are what makes the walk complete: HUDOC pages over at most
+    `PAGING_CAP` results per query, well under either collection's size. Years
+    descend, and each year's page descends by date, so the stream is globally
+    newest-first and `walk`'s watermark stop keeps working unchanged.
+
+    An exhausted enumeration checks itself: the years must account for every
+    document the collection reports. A mismatch means documents sit outside
+    `first_year`..`last_year` (or a page went missing), which would otherwise
+    read as a complete harvest. The count is read again at the end because the
+    walk takes hours: a collection that grew or shrank under it explains a
+    mismatch that is nobody's bug, and the message has to let the two apart. A
+    failed result page raises; walk's guarded_enumerate turns either into a Skip
+    and a dirty (retried) run."""
+    last_year = last_year or date.today().year
+    expected = int(search_page(session, 0, languages, page_size=1,
+                               collection=collection)["resultcount"])
+    covered = 0
+    for year in range(last_year, first_year - 1, -1):
+        for record in _enumerate_year(session, languages, collection, year,
+                                      page_size, delay):
+            covered += 1
+            yield record
+        time.sleep(delay)
+    if covered != expected:
+        raise ValueError(
+            "HUDOC %s: walked %d documents over %d..%d, but the collection held "
+            "%d when the walk started and holds %d now -- either some fall "
+            "outside the harvested years, or it changed under the walk"
+            % (collection, covered, first_year, last_year, expected,
+               int(search_page(session, 0, languages, page_size=1,
+                               collection=collection)["resultcount"])))
 
 
 def _date(record):
@@ -141,8 +246,9 @@ def list_basefiles(root):
     return compress.list_stems(root)                    # skips .watermark.json
 
 
-def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES, limit=None,
-         delay=0.2, workers=WORKERS, log=print):
+def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES,
+         collections=DEFAULT_COLLECTIONS, limit=None, delay=0.2, workers=WORKERS,
+         log=print):
     root = Path(root)
     session = make_session(USER_AGENT)
     pool = ThreadPoolExecutor(max_workers=workers)
@@ -155,6 +261,15 @@ def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES, limit=None,
             return None
         return pool.submit(fetch_body, session, itemid, delay)
 
+    def item_key(pair):
+        record, _ = pair
+        if _placeholder(record):
+            return None
+        itemid = record["itemid"]
+        downloaded = (compress.exists(record_path(root, itemid))
+                      and compress.exists(body_path(root, itemid)))
+        return ItemKey(itemid, downloaded, _date(record))
+
     try:
         if only:
             envelope = search_page(session, 0, languages, itemid=only, page_size=1)
@@ -164,32 +279,31 @@ def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES, limit=None,
             record = result_record(results[0])
             return 1, int(save_record(root, record, submit(record)))
 
-        watermark = HarvestWatermark(root / ".watermark.json",
-                                     lookahead_limit=100, safety_days=30)
-        items = _prefetched(enumerate_records(session, languages, delay=delay),
-                            submit, depth=workers * 2)
-
-        def item_key(pair):
-            record, _ = pair
-            if _placeholder(record):
-                return None
-            itemid = record["itemid"]
-            downloaded = (compress.exists(record_path(root, itemid))
-                          and compress.exists(body_path(root, itemid)))
-            return ItemKey(itemid, downloaded, _date(record))
-
-        result = walk(
-            items,
-            resolve=lambda pair: save_record(root, pair[0], pair[1]),
-            item_key=item_key,
-            watermark=watermark,
-            full=full,
-            only=only,
-            limit=limit,
-            scope="hudoc",
-            count_label="changed",
-            log=log,
-        )
-        return result.seen, result.new
+        seen = new = 0
+        for collection in collections:
+            watermark = HarvestWatermark(watermark_path(root, collection),
+                                         lookahead_limit=100, safety_days=30)
+            items = _prefetched(
+                enumerate_records(session, languages, collection, delay=delay),
+                submit, depth=workers * 2)
+            result = walk(
+                items,
+                resolve=lambda pair: save_record(root, pair[0], pair[1]),
+                item_key=item_key,
+                watermark=watermark,
+                full=full,
+                only=only,
+                # a limit is the run's whole budget, not each collection's, so
+                # what the earlier collections already spent comes off it
+                limit=None if limit is None else limit - new,
+                scope="hudoc %s" % collection,
+                count_label="changed",
+                log=log,
+            )
+            seen += result.seen
+            new += result.new
+            if limit is not None and new >= limit:
+                break
+        return seen, new
     finally:
         pool.shutdown(wait=False, cancel_futures=True)

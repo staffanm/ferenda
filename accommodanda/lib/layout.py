@@ -77,7 +77,7 @@ FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
 RS_DOWNLOADED = DOWNLOADED / "rs"                   # <org>/<slug>.{json,pdf}
 EDPB_DOWNLOADED = DOWNLOADED / "edpb"               # <serie>/<slug>.{json,pdf}
-HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html}
+HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html} + clin/<itemid>.json
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
 UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <mtdsg_no>.html (MTDSG status page)
@@ -120,11 +120,14 @@ def kommentar_host(basefile: str) -> str:
     the content repo's `commentary/<source>/…` layout and, crucially, reusing the
     host's own path transform so two sources can never collide on one flat name.
     The split is the same one `wiki.host_uri` makes: an FS id / förarbete id first
-    (they carry a `/`), then a colon means SFS, else a bare CELEX (eurlex)."""
+    (they carry a `/`), then a colon means SFS, a HUDOC item id means the
+    Strasbourg case law, else a bare CELEX (eurlex)."""
     if _FORESKRIFT_LOC.match(basefile):
         return "foreskrift"
     if basefile.startswith(FORARBETE):
         return "forarbete"
+    if HUDOC_ITEMID.match(basefile):
+        return "hudoc"
     return "sfs" if ":" in basefile else "eurlex"
 
 
@@ -790,6 +793,9 @@ def url_to_relpath(path: str) -> str | None:
 # foreskrift.agencies.REGISTRY (layout cannot import the vertical itself)
 _FS_SLUG = r"(?:[a-zåäö]+fs|bfnar|rams)"
 _FORESKRIFT_LOC = re.compile(r"^%s/\d{4}:\d+$" % _FS_SLUG)
+# a HUDOC item id ("001-159324"): the identity the Strasbourg case law is filed
+# under, and so also the `annotates:` of a commentary on one
+HUDOC_ITEMID = re.compile(r"^\d{3}-\d+$")
 # a föreskrift *page* address: the document itself or its /grund view (the
 # as-enacted base text beside a presented consolidation). Distinct from
 # _FORESKRIFT_LOC, which stays the strict basefile/identity grammar.

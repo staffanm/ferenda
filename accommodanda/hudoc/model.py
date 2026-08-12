@@ -3,14 +3,17 @@
 from dataclasses import dataclass, field
 
 from ..lib.artifact import numbered_nodes
-from ..lib.catalog import BASE
 from ..lib.coe import hudoc_articles
+from ..lib.lagrum import ECHR_BASE
 
 COURT = "European Court of Human Rights"
+# HUDOC's own address for one item -- the case, its Swedish translation and the
+# Court's summary of it are all items, so all three are named this way
+ITEM_URL = "https://hudoc.echr.coe.int/eng?i=%s"
 
 
 def case_uri(itemid):
-    return "%sdom/echr/%s" % (BASE, itemid)
+    return ECHR_BASE + itemid
 
 
 def document_kind(collection):
@@ -51,6 +54,10 @@ class HudocCase:
     article_codes: list[str] = field(default_factory=list)
     conclusions: list[str] = field(default_factory=list)
     body: list[Block] = field(default_factory=list)
+    # the Court's own Case-Law Information Note on this case, as the
+    # `{"itemid", "docname"}` sidecar `summaries.store` writes -- a link, not a
+    # document of ours
+    summary: dict[str, str] | None = None
 
     @property
     def uri(self):
@@ -104,8 +111,14 @@ class HudocCase:
             "metadata": metadata,
             "references": references,
             "structure": structure,
-            "source_url": "https://hudoc.echr.coe.int/eng?i=%s" % self.itemid,
+            "source_url": ITEM_URL % self.itemid,
         }
         if self.ecli:
             art["ecli"] = self.ecli
+        if self.summary:
+            # both keys are an invariant of the sidecar `summaries.store` writes;
+            # reading them straight makes a sidecar-shape change fail loudly
+            art["summary"] = {"itemid": self.summary["itemid"],
+                              "title": self.summary["docname"],
+                              "url": ITEM_URL % self.summary["itemid"]}
         return art

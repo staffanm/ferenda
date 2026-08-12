@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.hudoc import download, parse
-from accommodanda.lib import catalog, coe, facets, layout, render
-from accommodanda.lib.errors import SkipDocument
-from accommodanda.lib import page
 from accommodanda.coe import render as coe_render
+from accommodanda.hudoc import download, parse, summaries, translations
 from accommodanda.hudoc import render as hudoc_render
+from accommodanda.lib import catalog, coe, facets, layout, page
+from accommodanda.lib.errors import SkipDocument
+from accommodanda.wiki import parse as wiki_parse
 
 FIXTURES = Path(__file__).parent / "files" / "hudoc"
 
@@ -36,6 +36,197 @@ def test_query_is_chamber_judgments_and_language_bounded():
     assert 'languageisocode:"ENG"' in query
     assert 'languageisocode:"FRE"' in query
     assert download.query_for(itemid="001-123456") == 'itemid:"001-123456"'
+
+
+def test_decisions_are_their_own_collection_scope():
+    query = download.query_for(("ENG",), collection="decisions")
+    assert 'documentcollectionid2:"DECISIONS"' in query
+    assert 'documentcollectionid2:"JUDGMENTS"' not in query
+    assert download.watermark_path("/root", "decisions").name \
+        != download.watermark_path("/root", "judgments").name
+
+
+def test_year_slice_bounds_the_query():
+    query = download.query_for(("ENG",), year=2011)
+    assert "kpdate:[2011-01-01T00:00:00.0Z TO 2011-12-31T23:59:59.0Z]" in query
+    assert "kpdate" not in download.query_for(("ENG",))
+
+
+def _fake_hudoc(monkeypatch, by_year, total=None):
+    """Stand in for the result endpoint over a `{year: [itemid, ...]}` corpus,
+    paging two at a time so the slice logic has to page."""
+    pages = []
+
+    def search_page(session, start, languages=download.DEFAULT_LANGUAGES,
+                    itemid=None, page_size=download.PAGE_SIZE,
+                    collection="judgments", year=None):
+        if year is None:                      # the collection-total probe
+            return {"resultcount": str(sum(len(v) for v in by_year.values())
+                                       if total is None else total),
+                    "results": []}
+        items = by_year.get(year, [])
+        window = items[start:start + 2]
+        pages.append((year, start))
+        return {"resultcount": str(len(items)),
+                "results": [{"columns": {"itemid": i}} for i in window]}
+
+    monkeypatch.setattr(download, "search_page", search_page)
+    return pages
+
+
+def test_enumeration_walks_year_by_year_newest_first(monkeypatch):
+    by_year = {2026: ["a", "b", "c"], 2025: [], 2024: ["d"]}
+    pages = _fake_hudoc(monkeypatch, by_year)
+    got = list(download.enumerate_records(None, delay=0, first_year=2024,
+                                          last_year=2026))
+    assert [r["itemid"] for r in got] == ["a", "b", "c", "d"]
+    # years descend, and a year longer than one page is paged through
+    assert pages == [(2026, 0), (2026, 2), (2025, 0), (2024, 0)]
+
+
+def test_a_year_past_the_paging_cap_raises_instead_of_losing_its_tail(monkeypatch):
+    """HUDOC answers past start=10000 with an empty page, not an error -- which
+    is how the store came to hold judgments back to 2009 and no further."""
+    monkeypatch.setattr(download, "search_page",
+                        lambda *a, year=None, **kw: {
+                            "resultcount": str(download.PAGING_CAP + 1),
+                            "results": [{"columns": {"itemid": "x"}}]}
+                        if year else {"resultcount": "1", "results": []})
+    with pytest.raises(ValueError, match="page over"):
+        list(download.enumerate_records(None, delay=0, first_year=2026,
+                                        last_year=2026))
+
+
+def test_a_document_outside_the_harvested_years_raises(monkeypatch):
+    _fake_hudoc(monkeypatch, {2026: ["a"]}, total=2)
+    with pytest.raises(ValueError, match="outside the harvested years"):
+        list(download.enumerate_records(None, delay=0, first_year=2026,
+                                        last_year=2026))
+
+
+def _store(tmp_path, records):
+    for record in records:
+        download.record_path(tmp_path, record["itemid"]).write_text(
+            json.dumps(record), encoding="utf-8")
+    return tmp_path
+
+
+def test_a_summary_joins_its_case_on_application_number_and_date(tmp_path):
+    """HUDOC gives a Case-Law Information Note no pointer to the case it
+    summarises -- no ECLI, no item id -- so the join is the case's own
+    application numbers plus its date."""
+    root = _store(tmp_path, [
+        {"itemid": "001-1", "appno": "47143/06", "kpdate": "2015-12-04T00:00:00"},
+        {"itemid": "001-2", "appno": "9154/10;17249/12",
+         "kpdate": "2015-12-15T00:00:00"},
+    ])
+    matched, unmatched = summaries.resolve(root, [
+        {"itemid": "002-a", "docname": "Roman Zakharov", "appno": "47143/06",
+         "kpdate": "2015-12-04T00:00:00"},
+        # one application of a multi-application case is enough to identify it
+        {"itemid": "002-b", "docname": "Szafranski", "appno": "17249/12",
+         "kpdate": "2015-12-15T00:00:00"},
+        # right application, wrong date: a different case of the same applicant
+        {"itemid": "002-c", "docname": "elsewhere", "appno": "47143/06",
+         "kpdate": "2011-01-01T00:00:00"},
+    ], log=lambda _: None)
+    assert {b: r["itemid"] for b, r in matched.items()} == {"001-1": "002-a",
+                                                            "001-2": "002-b"}
+    assert unmatched == 1
+
+
+def test_two_cases_on_one_application_and_date_refuse_to_index(tmp_path):
+    root = _store(tmp_path, [
+        {"itemid": "001-1", "appno": "1/11", "kpdate": "2015-12-04T00:00:00"},
+        {"itemid": "001-2", "appno": "1/11", "kpdate": "2015-12-04T00:00:00"},
+    ])
+    with pytest.raises(ValueError, match="holds two language expressions"):
+        summaries.held_index(root)
+
+
+def test_a_withdrawn_summary_takes_its_link_off_the_case(tmp_path):
+    """A Note the Court withdraws, or re-matches to another case, would keep its
+    link on the page forever if the sync only ever wrote."""
+    one = {"itemid": "002-a", "docname": "A v. State"}
+    two = {"itemid": "002-b", "docname": "B v. State"}
+    quiet = {"log": lambda _: None}
+    assert summaries.store(tmp_path, {"001-1": one, "001-2": two}, **quiet) == (2, 0)
+    assert summaries.read_sidecar(tmp_path, "001-1") == one
+    # the same match again writes nothing, so the cases' parses stay fresh
+    assert summaries.store(tmp_path, {"001-1": one, "001-2": two}, **quiet) == (0, 0)
+    # ... and a run that no longer matches the second takes its sidecar away
+    assert summaries.store(tmp_path, {"001-1": one}, **quiet) == (0, 1)
+    assert summaries.read_sidecar(tmp_path, "001-1") == one
+    assert summaries.read_sidecar(tmp_path, "001-2") is None
+
+
+def test_matching_nothing_at_all_refuses_to_reap_every_link(tmp_path):
+    """The completeness guard cannot tell an empty answer from a real one, so
+    the reap must: an endpoint that returns nothing would otherwise take the
+    Court's summary off every case page at once."""
+    summaries.store(tmp_path, {"001-1": {"itemid": "002-a", "docname": "A"}},
+                    log=lambda _: None)
+    with pytest.raises(ValueError, match="matched no summary at all"):
+        summaries.store(tmp_path, {}, log=lambda _: None)
+    assert summaries.read_sidecar(tmp_path, "001-1") is not None
+
+
+def test_a_stored_summary_becomes_a_link_on_the_case(tmp_path):
+    record = json.loads((FIXTURES / "001-123456.json").read_text())
+    html = (FIXTURES / "001-123456.html").read_text()
+    plain = parse.parse_record(record, html).to_artifact()
+    assert "summary" not in plain
+    linked = parse.parse_record(record, html, {
+        "itemid": "002-10954", "docname": "Roman Zakharov v. Russia [GC]",
+    }).to_artifact()
+    assert linked["summary"] == {
+        "itemid": "002-10954", "title": "Roman Zakharov v. Russia [GC]",
+        "url": "https://hudoc.echr.coe.int/eng?i=002-10954"}
+    # ... and reaches the page as an outbound link, not as body text
+    assert "hudoc.echr.coe.int/eng?i=002-10954" in \
+        hudoc_render._summary_link(linked["summary"])
+    assert hudoc_render._summary_link(None) is None
+
+
+def test_a_translation_annotates_the_judgment_it_translates():
+    """The Swedish translation is commentary on the judgment, the way an English
+    translation of a Swedish statute is commentary on the statute."""
+    assert layout.kommentar_host("001-159324") == "hudoc"
+    assert wiki_parse.host_uri("001-159324") == \
+        "https://lagen.nu/dom/echr/001-159324"
+    assert translations.commentary_path("/w", "001-159324") == \
+        Path("/w/commentary/hudoc/001-159324.md")
+    draft = translations.draft("001-159324", {"itemid": "001-167574"})
+    assert "annotates: 001-159324" in draft
+    assert "https://hudoc.echr.coe.int/eng?i=001-167574" in draft
+    assert "Domstolsverket" in draft
+
+
+def test_a_translation_of_an_unheld_case_is_reported_not_guessed(tmp_path,
+                                                                 monkeypatch):
+    root = _store(tmp_path, [{"itemid": "001-1", "ecli": "ECLI:HELD"}])
+    monkeypatch.setattr(translations, "translation_records", lambda *a, **kw: [
+        {"itemid": "001-swe", "ecli": "ECLI:HELD",
+         "docname": "CASE OF A v. B - [Swedish Translation] by %s"
+                    % translations.TRANSLATOR},
+        {"itemid": "001-orphan", "ecli": "ECLI:MISSING",
+         "docname": "CASE OF C v. D - [Swedish Translation] by %s"
+                    % translations.TRANSLATOR},
+    ])
+    matched, unmatched, doubled = translations.proposals(None, root)
+    assert [b for b, _ in matched] == ["001-1"]
+    assert [r["itemid"] for r in unmatched] == ["001-orphan"]
+    assert doubled == []
+
+
+def test_an_unexpected_translator_stops_the_draft(tmp_path, monkeypatch):
+    root = _store(tmp_path, [{"itemid": "001-1", "ecli": "ECLI:HELD"}])
+    monkeypatch.setattr(translations, "translation_records", lambda *a, **kw: [
+        {"itemid": "001-swe", "ecli": "ECLI:HELD",
+         "docname": "CASE OF A v. B - [Swedish Translation] by Someone Else"},
+    ])
+    with pytest.raises(ValueError, match="names translator"):
+        translations.proposals(None, root)
 
 
 def test_parse_hudoc_fixture_to_artifact():
@@ -120,8 +311,29 @@ def test_restarted_judgment_numbering_gets_unique_stable_ids():
 def test_unusable_hudoc_body_is_deliberately_skipped():
     record = json.loads((FIXTURES / "001-123456.json").read_text())
     html = "<p>The text of this judgment is available in French only.</p>"
-    with pytest.raises(SkipDocument, match="contains no numbered paragraphs"):
+    with pytest.raises(SkipDocument, match="neither a numbered paragraph nor"):
         parse.parse_record(record, html)
+
+
+def test_an_unnumbered_decision_is_a_document_not_an_empty_artifact():
+    """A decision states its facts and its reasoning under headings and numbers
+    nothing (this one strikes an Article 3 complaint out of the list). The skip
+    guard used to test for a numbered paragraph, which is a judgment's shape, so
+    62% of the decisions collection parsed to a zero-byte artifact."""
+    record = json.loads((FIXTURES / "001-212739.json").read_text())
+    html = (FIXTURES / "001-212739.html").read_text()
+    body = parse.parse_body(html)
+    assert not any(block.number for block in body)   # nothing is numbered ...
+    assert any(block.kind == "rubrik" for block in body)  # ... but it has structure
+
+    art = parse.parse_record(record, html).to_artifact()
+    assert art["uri"] == "https://lagen.nu/dom/echr/001-212739"
+    assert art["doctype"] == "decision"
+    assert art["title"] == "DOBRE v. ROMANIA"
+    assert len(art["structure"]) == len(body)
+    # the unnumbered blocks still get stable anchors to link and cite
+    assert [n["id"] for n in art["structure"][1:4]] == ["S1", "S2", "S3"]
+    assert "FOURTH SECTION" in art["structure"][0]["text"][0]
 
 
 def test_hudoc_layout_and_catalog():

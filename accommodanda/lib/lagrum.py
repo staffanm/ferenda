@@ -65,6 +65,14 @@ from .util import fold_swedish
 CELEX_LOCAL = 'ext/celex/'
 CELEX_BASE = 'https://lagen.nu/' + CELEX_LOCAL
 
+# the Strasbourg case-law namespace, spelled once for the same reason: a case's
+# uri is ECHR_BASE + its HUDOC item id. The hudoc source mints these, and the
+# wiki resolves a commentary's `annotates:` onto them, so neither side can own
+# the constant (a source never imports a sibling source) and both would
+# otherwise hand-write it -- with the annotation silently matching no host if
+# either copy moved.
+ECHR_BASE = 'https://lagen.nu/dom/echr/'
+
 # printed författningssamling designation -> the slug its documents live under
 # ("ÅFS" -> aafs, "ELSÄK-FS" -> elsakfs). The hand-edited registry
 # (foreskrift/data/series.json via lib.datasets) is the one source: the grammar

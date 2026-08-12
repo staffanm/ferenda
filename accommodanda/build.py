@@ -98,6 +98,8 @@ from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
 from .hudoc import download as hudoc_download
 from .hudoc import parse as hudoc_parse
 from .hudoc import render as hudoc_render
+from .hudoc import summaries as hudoc_summaries
+from .hudoc import translations as hudoc_translations
 from .icc import download as icc_download
 from .icc import parse as icc_parse
 from .icc import render as icc_render
@@ -284,16 +286,16 @@ def _parse_stage(name, parse_fn, root, *, inputs, code):
 
 
 def _simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
-                   notes, dry_label, sync_extra=None):
+                   notes, dry_label):
     """A source whose whole chain is the common shape: one bulk
     ``sync(root, full=, only=, limit=, delay=)`` over a publisher's own list of
     instruments, and a parse that reads the stored record(s) into an artifact in
     one call. No sub-scopes, no per-document download stage, no extra actions.
 
-    `dry_label` names what a `--dry-run` would fetch; `sync_extra` supplies the
-    one keyword a source's sync takes beyond the shared five (hudoc's
-    `languages`). A source that needs more than that keeps its own registration
-    -- this is a shape shared by several sources, not a base class to bend."""
+    `dry_label` names what a `--dry-run` would fetch. A source whose sync takes
+    anything beyond the shared five keeps its own registration (hudoc does, for
+    its `--lang` and its two collection scopes) -- this is a shape shared by
+    several sources, not a base class to bend."""
 
     def harvest(_scopes):
         if RUN.dry_run:
@@ -302,7 +304,7 @@ def _simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
             return
         seen, changed = download_mod.sync(
             root, full=RUN.force, only=RUN.only, limit=RUN.limit,
-            delay=POLITENESS, **(sync_extra() if sync_extra else {}))
+            delay=POLITENESS)
         print("%s download: %d seen, %d changed" % (name, seen, changed))
 
     return Source(name, lambda: download_mod.list_basefiles(root),
@@ -2309,6 +2311,7 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 # --------------------------------------------------------------------------
 
 HUDOC_CODE = (PKG / "hudoc" / "parse.py", PKG / "hudoc" / "model.py",
+              PKG / "hudoc" / "summaries.py",
               PKG / "lib" / "coe.py", PKG / "lib" / "artifact.py")
 COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
             PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py",
@@ -2316,8 +2319,12 @@ COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
 
 
 def hudoc_inputs(basefile):
+    # the summary sidecar is a parse input, and one file per case rather than a
+    # shared index precisely so a summary harvest re-stales only the cases whose
+    # summary moved
     return [hudoc_download.record_path(layout.HUDOC_DOWNLOADED, basefile),
-            hudoc_download.body_path(layout.HUDOC_DOWNLOADED, basefile)] \
+            hudoc_download.body_path(layout.HUDOC_DOWNLOADED, basefile),
+            hudoc_summaries.sidecar_path(layout.HUDOC_DOWNLOADED, basefile)] \
         + _patch_input("hudoc", basefile)
 
 
@@ -2329,14 +2336,68 @@ def _hudoc_languages():
             if RUN.lang else hudoc_download.DEFAULT_LANGUAGES}
 
 
-SOURCES["hudoc"] = _simple_source(
-    "hudoc", hudoc_download, hudoc_parse.parse, layout.HUDOC_DOWNLOADED,
-    HUDOC_CODE, inputs=hudoc_inputs, origin=_origin(hudoc_download.BASE),
-    dry_label="HUDOC case law", sync_extra=_hudoc_languages,
+def hudoc_sync_summaries(_basefiles):
+    """`lagen hudoc sync-summaries` -- refresh the sidecar that links the
+    Court's own Case-Law Information Note from the case it summarises. Metadata
+    only: no summary is stored as a document."""
+    if RUN.dry_run:
+        print("hudoc sync-summaries: would match the Court's summaries against "
+              "the stored cases under %s" % layout.HUDOC_DOWNLOADED)
+        return
+    hudoc_summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS)
+
+
+def hudoc_propose_translations(_basefiles):
+    """`lagen hudoc propose-translations` -- draft `commentary/hudoc/<itemid>.md`
+    for each of Domstolsverket's 87 Swedish translations, linking the
+    translation from the page of the judgment it translates. Writes into the
+    content repo and stops; the editor reviews the diff and owns the prose."""
+    hudoc_translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT,
+                               dry_run=RUN.dry_run)
+
+
+def hudoc_harvest(scopes):
+    """Harvest the named collections -- `lagen hudoc download decisions`, or no
+    scope for both. Each walks under its own watermark, so naming one leaves the
+    other's harvest state untouched."""
+    collections = tuple(scopes) or hudoc_download.DEFAULT_COLLECTIONS
+    if RUN.dry_run:
+        print("hudoc download: would download %s into %s"
+              % (RUN.only or "HUDOC %s" % "/".join(collections),
+                 layout.HUDOC_DOWNLOADED))
+        return
+    seen, changed = hudoc_download.sync(
+        layout.HUDOC_DOWNLOADED, full=RUN.force, only=RUN.only, limit=RUN.limit,
+        delay=POLITENESS, collections=collections, **_hudoc_languages())
+    print("hudoc download: %d seen, %d changed" % (seen, changed))
+
+
+SOURCES["hudoc"] = Source(
+    "hudoc", lambda: hudoc_download.list_basefiles(layout.HUDOC_DOWNLOADED), {
+        "parse": _parse_stage("hudoc", hudoc_parse.parse,
+                              layout.HUDOC_DOWNLOADED,
+                              inputs=hudoc_inputs, code=HUDOC_CODE),
+    },
+    harvest=hudoc_harvest, origin=_origin(hudoc_download.BASE),
+    scopes=frozenset(hudoc_download.COLLECTIONS),
+    actions={"sync-summaries": hudoc_sync_summaries,
+             "propose-translations": hudoc_propose_translations},
     notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"
-          "scope: Grand Chamber + Chamber judgments; default language is ENG;\n"
-          "--force refreshes stored metadata and bodies; bodies are fetched\n"
-          "by a small worker pool (4 in flight)")
+          "scopes are the collections: judgments (Grand Chamber + Chamber, "
+          "21,672), decisions (33,633); empty = both\n"
+          "default language is ENG; --force refreshes stored metadata and "
+          "bodies; bodies are fetched by a small worker pool (4 in flight)\n"
+          "the walk is sliced by year because HUDOC serves no result past "
+          "start=10000 -- an unsliced walk stopped at 2009 and left two thirds "
+          "of the judgments unharvested\n"
+          "a decision is where the Court says why a complaint never reaches "
+          "the merits; 922 of the 1,088 Swedish cases are decisions\n"
+          "sync-summaries: link the Court's own Case-Law Information Note "
+          "(6,505 in English) from the case it summarises -- metadata only, "
+          "joined on (application number, date)\n"
+          "propose-translations: draft the commentary that links "
+          "Domstolsverkets 87 Swedish translations from the judgments they "
+          "translate (writes into the content repo, --dry-run to preview)")
 
 
 def coe_inputs(basefile):

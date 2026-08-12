@@ -10,6 +10,7 @@ from ..lib import datasets, labels, tpl
 from ..lib.page import (
     doc_meta,
     document_body,
+    ext_link,
     page_context,
     ref_list,
     render_toc,
@@ -27,6 +28,16 @@ def _treaty_name(base):
     return entry.get("abbr") or entry.get("label")
 
 
+def _summary_link(summary):
+    """The Court's own Case-Law Information Note on this case, as an outbound
+    link. The note is a page of plain account where the judgment is forty pages
+    of reasoning, so it is the reader's way in -- but it says what this page
+    already says, so it is a link and not a document (`summaries.py`)."""
+    if not summary:
+        return None
+    return ext_link(summary["url"], "Europadomstolens egen sammanfattning")
+
+
 def render(art, site):
     md = art.get("metadata", {})
     lb = labels.document_labels("hudoc", art)
@@ -36,6 +47,7 @@ def render(art, site):
         ("Avgörandedatum", art.get("avgorandedatum")),
         ("ECLI", art.get("ecli")),
         ("Artiklar", ", ".join(md.get("articles", [])) or None),
+        ("Sammanfattning", _summary_link(art.get("summary"))),
     ]
     structure, toc, rail = document_body(art, site)
     return ENV.get_template("hudoc.html").render(page_context(
