@@ -159,7 +159,7 @@ accommodanda/
   dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
   forarbete/ preparatory-works vertical — download·propkb·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·correspond·definitions·parse·parse_html·parse_pdf·structure·lang·model
-  hudoc/    ECHR case-law vertical — download·model·parse
+  hudoc/    ECHR case-law vertical — download·model·parse·summaries·translations
   coe/      Council of Europe Treaty Office vertical — download·model·parse
   icrc/     ICRC international humanitarian law treaty vertical — download·model·parse
   untc/     UN Treaty Collection (MTDSG status) vertical — download·model·parse
@@ -3548,13 +3548,35 @@ Five verticals sharing one folkrätt (international law) landing page:
 
 - **`accommodanda/hudoc/`** harvests the public JSON endpoint used by HUDOC's
   own result UI (`/app/query/results`) and the selected document's converted
-  Word HTML (`/app/conversion/docx/html/body`). Scope: Grand Chamber and
-  Chamber judgments only (524 + 21,137 English documents at implementation
-  time — Committee judgments, decisions, legal summaries, advisory opinions,
-  resolutions and communicated cases are excluded; `--only <itemid>` can still
-  fetch one deliberately). The bulk walk is newest-first and
-  watermark-bounded; English is the default expression, with `--lang ENG,FRE`,
-  `--only <itemid>` and `--limit`. Body downloads are the cost of a run, so a
+  Word HTML (`/app/conversion/docx/html/body`). Scope: two collections, each a
+  download scope with its own watermark — Grand Chamber and Chamber
+  **judgments** (21,672 English) and **decisions** (33,633). A decision is
+  where the Court says why a complaint never reaches the merits, and it is
+  where most of its Swedish output lives: 166 Swedish judgments against 922
+  Swedish decisions. Committee judgments (7,541, none against Sweden, none
+  carrying an importance level — settled law applied to repetitive
+  violations), legal summaries, resolutions and communicated cases stay out;
+  `--only <itemid>` can still fetch one deliberately. The bulk walk is
+  newest-first and watermark-bounded, and **sliced by year**: HUDOC serves no
+  result past `start=10000` while still reporting the true `resultcount`, so
+  the original unsliced walk stopped dead at the 10,000th document and the
+  store held 7,060 of 21,672 judgments, reaching back only to 2009-09-22
+  (Handyside and Golder were unreachable). Years descend and each year's page
+  descends by date, so the stream stays globally newest-first and the watermark
+  stop is unchanged; the largest year is 1,623 documents, a year past the cap
+  raises, and an exhausted enumeration checks its summed year counts against
+  the collection total. English is the default expression, with `--lang
+  ENG,FRE`, `--only <itemid>` and `--limit`.
+
+  Two things the Court publishes *about* a case are linked from it rather than
+  republished. `summaries.py` (`lagen hudoc sync-summaries`) attaches the
+  Court's own Case-Law Information Note — its plain account of what the case
+  decided, 6,505 in English — joined on `(application number, date)`, which is
+  unique across the store. `translations.py` (`lagen hudoc propose-translations`)
+  drafts `commentary/hudoc/<itemid>.md` for each of Domstolsverkets 87 Swedish
+  translations, joined on the ECLI: the translation says what the judgment
+  says, so it is commentary on the judgment, the inverse of the
+  English-translation link an SFS commentary opens with. Body downloads are the cost of a run, so a
   small `ThreadPoolExecutor` (`WORKERS=4`) keeps fetches in flight ahead of the
   walk (~0.15s/doc measured, vs ~0.33s sequential — the full English harvest
   runs in about an hour). `HudocCase` projects the metadata and
@@ -4136,6 +4158,28 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **hudoc** (2026-08-12) — the source could never reach past its 10,000th
+  document. HUDOC answers a query past `start=10000` with an empty page while
+  still reporting the true `resultcount`, so the unsliced walk stopped there
+  and the store held 7,060 of 21,672 judgments, reaching back only to
+  2009-09-22 — Handyside and Golder were unreachable. The walk is now sliced by
+  year, newest year first, so the stream stays globally newest-first and the
+  watermark stop is unchanged; a year past the cap raises, and an exhausted
+  enumeration checks its summed year counts against the collection total. The
+  **decisions** collection (33,633) joins judgments as a second download scope
+  with its own watermark: a decision is where the Court says why a complaint
+  never reaches the merits, and 922 of the 1,088 Swedish cases are decisions.
+  Admitting it exposed a judgment-shaped invariant in `parse.py` — the skip
+  guard tested for a numbered paragraph, which a decision does not have, so 62%
+  of the collection parsed to an empty artifact; the guard now tests for a body
+  with neither a numbered paragraph nor a heading (0% of 400 sampled decisions
+  and 400 judgments skip). Two things the Court publishes *about* a case are
+  linked rather than republished: its own Case-Law Information Note
+  (`summaries.py`, joined on application number + date) and Domstolsverkets 87
+  Swedish translations, which become commentary on the judgment they translate
+  (`translations.py`, joined on ECLI). The harvest itself is only part-run:
+  judgments are complete, decisions stand at ~7,800 of 33,633.
 
 - **foreskrift/forarbete/icc/icrc** (2026-08-09) — four extraction fixes found
   by the UX audit, each measured over the corpus rather than eyeballed.
