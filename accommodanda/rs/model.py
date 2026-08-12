@@ -78,9 +78,15 @@ def rs_identifier(org, nummer):
 
 @dataclass
 class Block:
-    kind: str            # "rubrik" | "stycke"
+    kind: str            # "rubrik" | "stycke" | "tabell"
     text: str
     level: int = 1       # rubrik nesting (1 section, 2 subsection)
+    # a tabell carries its cells instead of text: rows of cell strings, each
+    # citation-scanned on its own (`lib.artifact.scanned_nodes`). Only
+    # Skatteverket publishes tables -- the six letterhead PDFs come through
+    # `lib.pdftext`, which has no table reader.
+    rows: list[list[str]] = field(default_factory=list)
+    th: bool = False     # the first row is a header row the source marked <th>
 
 
 @dataclass

@@ -342,7 +342,8 @@ def page_fields(record, root, basefile):
     blocks, notes = skv.page_body(html)
     return {
         "body": drop_front_matter(
-            [Block(kind, text, level) for kind, text, level in blocks],
+            [Block(kind, text, level, rows, th)
+             for kind, text, level, rows, th in blocks],
             record["titel"]),
         "fotnoter": [Fotnot(mark, text) for mark, text in notes],
         **skv.page_relations(html),

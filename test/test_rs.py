@@ -375,7 +375,7 @@ def test_skv_page_is_read_as_headings_paragraphs_and_notes():
         "Områden": "Mervärdesskatt, Skattebetalning & borgenärsarbete",
         "Datum": "2020-09-29", "Dnr": "8-492402"}
     blocks, notes = skv.page_body(html)
-    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1)
+    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1, [], False)
     assert [b[1] for b in blocks if b[0] == "rubrik"] == [
         "1 Sammanfattning", "2 Frågeställning", "3 Gällande rätt m.m.",
         "4 Bedömning", "Tillämpningsinformation"]
@@ -402,7 +402,7 @@ def test_skv_page_names_what_replaced_it():
     html = fixture("skv-page-upphavd.html")
     assert skv.page_relations(html)["ersatt_av"] == "8-207888-2026"
     blocks, _notes = skv.page_body(html)
-    assert blocks[0] == ("stycke", "Nytt: 2026-07-06", 1)
+    assert blocks[0] == ("stycke", "Nytt: 2026-07-06", 1, [], False)
     assert blocks[1][1].startswith("Detta ställningstagande ska inte längre "
                                    "tillämpas.")
 
@@ -952,6 +952,33 @@ def test_skv_verify_rejects_a_page_that_is_not_a_stallningstagande():
         rs_download.skv_verify(fixture("skv-register.html"))
 
 
+def _artifact_from(fixture_name, root):
+    """The artifact a stored page parses to, through the whole scanned
+    projection -- so a node shape is checked as the catalog and renderer see it,
+    not as the reader emits it. The record follows the page's own dnr, which is
+    what `parse` checks the two agree on."""
+    html = fixture(fixture_name)
+    nummer = skv.dnr(skv.page_metadata(html)["Dnr"])
+    basefile = "skv/" + number_slug(nummer)
+    compress.write_download(
+        record_path(root, "skv", basefile),
+        json.dumps({"basefile": basefile, "org": "skv", "nummer": nummer,
+                    "titel": "x", "status": "gällande"}, ensure_ascii=False))
+    compress.write_download(rs_download.body_path(root, basefile), html)
+    return rs_parse.parse(basefile, root)
+
+
+def _with_trailing_element(markup):
+    """A live page fixture with `markup` appended as the last block of the
+    document's own content div -- where a note section sits. The withdrawn
+    document is the base, because it is the one that publishes no notes of its
+    own for a spliced section to run into."""
+    page = fixture("skv-page-upphavd.html")
+    closing = "</div></div>\n</main>"
+    assert closing in page, "the fixture's content container moved"
+    return page.replace(closing, markup + closing, 1)
+
+
 def _with_body_element(markup):
     """The live page fixture with `markup` spliced in as the first block of the
     document's own content div."""
@@ -962,22 +989,54 @@ def _with_body_element(markup):
 
 
 def test_skv_drops_the_empty_layout_tables():
-    """Five of the 51 sampled pages set an empty 2x2 table as a layout scaffold.
-    It carries no text, so it costs the document nothing."""
+    """Some pages set an empty 2x2 table as a layout scaffold. It carries no
+    text, so it costs the document nothing."""
     blocks, _notes = skv.page_body(_with_body_element(
         "<table><tbody><tr><td width='50%'></td><td width='50%'></td></tr>"
         "</tbody></table>"))
-    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1)
+    assert blocks[0] == ("rubrik", "1 Sammanfattning", 1, [], False)
+
+
+def test_skv_reads_a_table_as_a_table():
+    """206 tables across the register, and a first cut squashed each one into a
+    single run-together stycke with its cells space-joined. They project onto
+    the corpus-wide tabell/rad/cells node the renderer already draws."""
+    blocks, _notes = skv.page_body(fixture("skv-page-tabell.html"))
+    tables = [b for b in blocks if b[0] == "tabell"]
+    assert len(tables) == 2
+    _kind, _text, _level, rows, th = tables[0]
+    assert th is True                       # this one marks its header row <th>
+    assert rows[0] == ["Månad", "Dagar i Sverige", "Dagar i Danmark", "Summa"]
+    assert len(rows) == 6
+
+
+def test_skv_table_cells_are_citation_scanned(tmp_path):
+    """A cell is text like any other, so a lagrum named inside a table still
+    links -- which reading the table as one opaque block would lose."""
+    art = _artifact_from("skv-page-tabell.html", tmp_path)
+    tabell = next(n for n in art["structure"] if n["type"] == "tabell")
+    assert [c for c in tabell["children"][0]["cells"]] == [
+        ["Månad"], ["Dagar i Sverige"], ["Dagar i Danmark"], ["Summa"]]
+    assert tabell["children"][0]["th"] is True
+
+
+def test_skv_reads_a_quoted_passage_as_its_paragraphs():
+    """47 blockquotes across the register -- a skatteavtal article, the OECD
+    commentary on it. They flatten to stycken, as the `p.indented` Skatteverket
+    quotes with elsewhere already does."""
+    blocks, _notes = skv.page_body(fixture("skv-page-tabell.html"))
+    quoted = [b[1] for b in blocks if b[1].startswith(
+        "1. Om en person med hemvist i en avtalsslutande stat")]
+    assert len(quoted) == 1, "the quoted treaty article is one stycke of its own"
 
 
 def test_skv_body_text_in_an_unknown_element_is_reported():
-    """A table carrying text would otherwise come out as one run-together
-    stycke, its cells space-joined and its shape gone with no trace. The
-    document stops instead, so the first one that appears is visible."""
-    with pytest.raises(ValueError, match="<table>"):
-        skv.page_body(_with_body_element(
-            "<table><tbody><tr><td>Kolumn A</td><td>Kolumn B</td></tr>"
-            "</tbody></table>"))
+    """The reader knows p, h1-h5, ul, ol, div.update, table and blockquote --
+    the whole census over the register. Anything else stops the document rather
+    than being squashed into one run-together stycke, which is how the tables
+    were found in the first place."""
+    with pytest.raises(ValueError, match="<pre>"):
+        skv.page_body(_with_body_element("<pre>Ett kodblock</pre>"))
 
 
 def test_skv_page_is_refetched_when_the_register_moves(tmp_path):
@@ -1051,3 +1110,52 @@ def test_skv_stops_once_the_front_stops_answering(tmp_path, monkeypatch, capsys,
     assert "front has closed for now" in capsys.readouterr().out
     # nothing is stored, so the next run resumes at the document it stopped on
     assert not list(tmp_path.glob("skv/*.json*"))
+
+
+# --------------------------------------------------------------------------
+# the notes, and where the note section ends
+# --------------------------------------------------------------------------
+
+def test_skv_notes_may_be_numbered_by_the_list_that_holds_them(tmp_path):
+    """Skatteverket sets its notes two ways: paragraphs each opening with the
+    marker the running text set as a superscript, or an ordered list whose
+    numbering *is* the marker. Reading only the first failed 13 documents,
+    because a list item carries no leading digit."""
+    _blocks, notes = skv.page_body(fixture("skv-page-noter.html"))
+    assert notes[0][0] == "1"
+    assert notes[0][1].startswith("Med privatbostad avses ett småhus")
+
+
+def test_skv_the_note_section_ends_at_the_next_heading():
+    """Two documents close on a "Tillämpningsinformation" section *after* their
+    notes. Reading the notes to the end of the document swallowed it -- a silent
+    loss of body text, not only a crash."""
+    blocks, _notes = skv.page_body(fixture("skv-page-noter.html"))
+    headings = [b[1] for b in blocks if b[0] == "rubrik"]
+    assert "Fotnoter" not in headings          # the heading itself is not body
+    assert any(h.startswith("Tillämpningsinformation") for h in headings), \
+        "the section after the notes is body, and must survive them"
+    # and its paragraphs came through with it
+    assert any(b[1].startswith("Detta ställningstagande ska tillämpas från")
+               for b in blocks)
+
+
+def test_skv_a_single_unnumbered_note_is_numbered_by_position():
+    """One document in the register prints its only note with no marker at all
+    -- one note needs no number. It takes its position, the same rule the
+    ordered list follows."""
+    _blocks, notes = skv.page_body(_with_trailing_element(
+        "<h2>Fotnot</h2><p>Europaparlamentets och rådets förordning (EU) "
+        "nr 952/2013.</p>"))
+    assert notes == [("1", "Europaparlamentets och rådets förordning (EU) "
+                      "nr 952/2013.")]
+
+
+def test_skv_a_half_numbered_note_section_is_reported():
+    """No document in the register mixes the two ways, so a section that does is
+    far more likely to be a note running to a second paragraph -- which
+    positional numbering would misnumber."""
+    with pytest.raises(ValueError, match="numbers some notes and not others"):
+        skv.page_body(_with_trailing_element(
+            "<h2>Fotnot</h2><p>1 Den första noten.</p>"
+            "<p>och dess andra stycke.</p>"))

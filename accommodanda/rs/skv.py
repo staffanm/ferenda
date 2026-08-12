@@ -100,8 +100,10 @@ STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 # the page's own metadata box: labelled fields above the body
 PAGE_LABELS = ("Områden", "Datum", "Dnr")
-# a ställningstagande's headings run h2 (section) to h5; h2 is its top level
-HEADINGS = ("h2", "h3", "h4", "h5")
+# a ställningstagande's headings run h2 (section) to h5, and the CMS leaves 19
+# empty h1 behind. Index 1 is the document's own top level, so h1 and h2 share
+# it rather than every section being renumbered under an h1 that is always empty.
+HEADINGS = ("h1", "h2", "h3", "h4", "h5")
 # the last section of a document that has notes, and what stands in each note's
 # place in the running text
 FOOTNOTE_HEADINGS = ("fotnot", "fotnoter")
@@ -300,32 +302,58 @@ def _content(html):
     return inner
 
 
-def _blocks(element):
-    """One page block element as (kind, text, level) triples -- a heading, a
-    paragraph, or one entry per list item. A list item is its own stycke: the
-    artifact convention these documents share with every other prose source has
-    rubrik and stycke and nothing else.
+def _rows(table):
+    """A table's rows as lists of cell strings. A cell sets its text in one or
+    more ``p``; its own flattening is what keeps the cells apart, which reading
+    the table as one element would not."""
+    return [[_text(cell) for cell in row.find_all(("td", "th"), recursive=False)]
+            for row in table.find_all("tr")]
 
-    An element of a kind this reader does not know is *reported*, not squashed
-    into one run-together stycke -- which is what a table would come out as.
-    Measured over the 51 sampled pages, the only kinds that occur are these
-    plus ``table``, and every one of those five tables is an empty 2x2 layout
-    scaffold carrying no text, which is why an empty unknown element is dropped
-    silently and only a content-bearing one stops the document."""
+
+def _blocks(element):
+    """One page block element as ``Block``-shaped tuples: (kind, text, level,
+    rows, th). A heading keeps its depth, a paragraph and each list item is a
+    stycke, and a table keeps its cells.
+
+    Measured over the whole register (1,869 documents harvested), the kinds that
+    occur at this level are ``p``, ``h1``-``h5``, ``ul``, ``ol``, ``div.update``,
+    ``table`` (206) and ``blockquote`` (47) -- and nothing else. An element of a
+    kind this reader does not know is *reported* rather than squashed into one
+    run-together stycke, which is how the tables were found: a 51-page sample
+    saw only empty layout scaffolds and would have shipped the rest flattened.
+    An empty unknown element is still dropped, because a page's leftover layout
+    scaffolding carries no text to lose."""
     if element.name in HEADINGS:
-        return [("rubrik", _text(element), HEADINGS.index(element.name) + 1)]
+        # h2 is the top level Skatteverket writes; the 19 empty h1 the CMS
+        # leaves behind are dropped below, and one that ever carries text is a
+        # heading above those -- rendered at the same depth rather than
+        # renumbering every document's sections under it
+        return [("rubrik", _text(element),
+                 max(1, HEADINGS.index(element.name)), [], False)]
     if element.name == "p":
-        return [("stycke", _text(element), 1)]
+        return [("stycke", _text(element), 1, [], False)]
     if element.name in ("ul", "ol"):
-        return [("stycke", _text(item), 1)
+        return [("stycke", _text(item), 1, [], False)
                 for item in element.find_all("li", recursive=False)]
+    if element.name == "table":
+        rows = [row for row in _rows(element) if any(cell for cell in row)]
+        return [("tabell", "", 1, rows, bool(element.find("th")))] if rows else []
+    # a quoted passage -- a skatteavtal article, the OECD commentary on it --
+    # set as its own paragraphs. They flatten to stycken, which is what the
+    # `p.indented` Skatteverket quotes with elsewhere already does; the corpus
+    # has no quotation node to project onto, and inventing one here would be a
+    # node type only this source emits.
+    if element.name == "blockquote":
+        return [("stycke", _text(para), 1, [], False)
+                for para in element.find_all("p")]
     # a div.update is Skatteverkets own dated note at the head of the document
     # ("Nytt: 2026-07-06 / Detta ställningstagande ska inte längre tillämpas
     # ..."). It is published text about this position, so it is body: the
     # withdrawal *also* reaches the reader as a banner, off the register's own
     # end date, but the note says things no field carries.
     if element.name == "div" and "update" in (element.get("class") or ()):
-        return [("stycke", _text(para), 1) for para in element.find_all("p")]
+        return [("stycke", _text(para), 1, [], False)
+                for para in element.find_all("p")]
     text = _text(element)
     if not text:
         return []
@@ -334,31 +362,68 @@ def _blocks(element):
         "no shape for: %r" % (element.name, text[:120]))
 
 
+def _notes(elements):
+    """The notes under a "Fotnot" heading, as (mark, text) pairs.
+
+    Skatteverket numbers them two ways, and which way is a property of the
+    section rather than of one note. Either every note prints the marker the
+    running text set as a superscript ("1 Bostad med särskild service …"), or
+    none does and the numbering is positional -- an ``ol``, or the one document
+    whose single note needs no number. Measured over the 71 note sections in the
+    register: 70 print every marker, one prints none, and none mixes the two.
+
+    A *mixed* section is therefore not a shape Skatteverket writes, and is far
+    more likely to be a note running to a second paragraph -- which positional
+    numbering would misnumber. That still stops the document rather than
+    guessing."""
+    texts = []
+    for element in elements:
+        if element.name == "ol":
+            texts += [_text(item) for item
+                      in element.find_all("li", recursive=False) if _text(item)]
+            continue
+        texts += [block[1] for block in _blocks(element)
+                  if block[1] and not RE_RULE_ONLY.match(block[1])]
+    marked = [(text, RE_FOOTNOTE_MARK.match(text)) for text in texts]
+    unmarked = [text for text, mark in marked if mark is None]
+    if len(unmarked) == len(marked):
+        return [(str(n), text) for n, text in enumerate(texts, 1)]
+    if unmarked:
+        raise ValueError(
+            "a Skatteverket note section numbers some notes and not others, so "
+            "a note may run to a second paragraph: %r"
+            % [text[:40] for text in unmarked])
+    return [(mark.group(1), text[mark.end():])
+            for text, mark in marked if mark is not None]
+
+
 def page_body(html):
-    """The page's prose as (kind, text, level) triples plus its footnotes as
+    """The page's prose as ``Block``-shaped tuples plus its footnotes as
     (mark, text) pairs.
 
-    The document ends where its notes begin: a document that has any closes on a
-    "Fotnot" heading, and the paragraphs below it each open with the marker the
-    running text set as a superscript. Dropping them would cost exactly the
-    references that say what Skatteverket is reading."""
-    body, footnotes, in_footnotes = [], [], False
+    A document that has notes sets them under a "Fotnot" heading. That section
+    ends at the next heading of the same depth or shallower -- two documents
+    close on a "Tillämpningsinformation" section *after* their notes, and
+    reading the notes to the end of the document swallowed it. Dropping the
+    notes themselves would cost exactly the references that say what
+    Skatteverket is reading."""
+    body, notes, notes_depth = [], [], None
     for element in _content(html).find_all(True, recursive=False):
-        if element.name in HEADINGS and _text(element).lower() in FOOTNOTE_HEADINGS:
-            in_footnotes = True
+        if element.name in HEADINGS:
+            depth = HEADINGS.index(element.name)
+            if _text(element).lower() in FOOTNOTE_HEADINGS:
+                notes_depth = depth
+                continue
+            if notes_depth is not None and depth <= notes_depth:
+                notes_depth = None          # the notes ended; this is body again
+        if notes_depth is not None:
+            notes.append(element)
             continue
-        for kind, text, level in _blocks(element):
-            if not text or RE_RULE_ONLY.match(text):
+        for kind, text, level, rows, th in _blocks(element):
+            if kind != "tabell" and (not text or RE_RULE_ONLY.match(text)):
                 continue
-            if not in_footnotes:
-                body.append((kind, text, level))
-                continue
-            mark = RE_FOOTNOTE_MARK.match(text)
-            if mark is None:
-                raise ValueError("a Skatteverket footnote opens with no "
-                                 "marker: %r" % text[:80])
-            footnotes.append((mark.group(1), text[mark.end():]))
-    return body, footnotes
+            body.append((kind, text, level, rows, th))
+    return body, _notes(notes)
 
 
 def _referenced_dnr(paragraph):

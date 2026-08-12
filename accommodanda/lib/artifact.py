@@ -45,9 +45,24 @@ def scanned_nodes(blocks, scanner, anchor=_serial_anchor):
     """`blocks` (kind/text/level) as citation-scanned structure nodes: a rubrik
     keeps its nesting level, a stycke gets an anchor from `anchor(block, serial)`
     -- the running stycke count, unless the source's own numbering names a
-    better one."""
+    better one.
+
+    A ``tabell`` block carries `rows` (a list of rows, each a list of cell
+    strings) instead of text, and projects onto the corpus-wide table node the
+    renderer already draws -- the same ``tabell``/``rad``/``cells`` shape
+    `forarbete.parse` emits. Every cell is scanned like any other text, so a
+    lagrum named inside a table still links. `th` marks a header row where the
+    source published one."""
     out, serial = [], 0
     for block in blocks:
+        if block.kind == "tabell":
+            out.append({"type": "tabell", "children": [
+                {"type": "rad",
+                 "cells": [interleave(cell, scanner.parse_text(cell, context={}))
+                           for cell in row]}
+                | ({"th": True} if block.th and i == 0 else {})
+                for i, row in enumerate(block.rows)]})
+            continue
         runs = interleave(block.text, scanner.parse_text(block.text, context={}))
         if block.kind == "rubrik":
             out.append({"type": "rubrik", "level": block.level, "text": runs})
