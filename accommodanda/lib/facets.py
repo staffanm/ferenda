@@ -805,8 +805,11 @@ def _keep_latest_eu_revision(rows):
 
 def _rows(con, source):
     """The catalog rows of `source` that belong in the browse, as `Row`s. A
-    repealed statute whose repeal date has passed is omitted (still reachable by
-    direct link and search) -- the listing shows only law in force."""
+    document whose declared expiry has passed is omitted -- a repealed statute,
+    a withdrawn rättsligt ställningstagande -- so the listing shows only what
+    still states law. It stays reachable by direct link; search omits it too
+    (`search.REPEALED_IN_FORCE`), which is where an advanced "search expired"
+    would put it back."""
     expired = catalog.expired_uris(con, date.today().isoformat())
     rows = [Row(uri, local, kind, label, title, display, doc_date,
                 short_id, short_title, description)

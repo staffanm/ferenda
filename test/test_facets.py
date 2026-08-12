@@ -1,6 +1,8 @@
 """The faceted-navigation data layer (accommodanda/lib/facets.py): per-source
 bucket-key extraction and the tree/group scans over a hand-built catalog."""
 
+import json
+
 from accommodanda.lib import catalog, facets
 from accommodanda.lib.facets import Row
 
@@ -337,3 +339,35 @@ def test_fold_fs_versions_leaves_a_bucket_with_no_base_versions_alone():
             label="AFS 2020:1", title="T", display="T", date="2020-01-01")]}
     refolded, consolidated = facets._fold_fs_versions(grouped)
     assert len(refolded[("AFS", "2020")]) == 1 and consolidated == set()
+
+
+def test_an_expired_document_leaves_the_browse(tmp_path):
+    """The browse shows what still states law. The rule is the catalog's
+    `expired` column and so is general -- it was written for repealed statutes
+    and holds unchanged for a withdrawn rättsligt ställningstagande, which no
+    longer says how the agency reads the rule."""
+    def store(name, uri, status, upphavd=None):
+        path = tmp_path / name
+        md = {"title": name, "publisher": "Skatteverket", "nummer": name,
+              "status": status, "beslutsdatum": "2024-01-01"}
+        if upphavd:
+            md["upphavd"] = upphavd
+        path.write_text(json.dumps({
+            "uri": uri, "type": "stallningstagande", "org": "skv",
+            "identifier": name, "designation": name,
+            "metadata": md, "structure": []}))
+        return path
+
+    db = tmp_path / "catalog.sqlite"
+    catalog.rebuild(db, "rs", [
+        store("gallande", "https://lagen.nu/rs/skv/8-1", "gällande"),
+        store("upphavt", "https://lagen.nu/rs/skv/8-2", "upphävt", "2025-06-01"),
+        # a withdrawal the agency has announced but dated in the future still
+        # states law today, exactly as a not-yet-in-force repeal does
+        store("kommande", "https://lagen.nu/rs/skv/8-3", "upphävt", "2099-01-01"),
+    ])
+    con = catalog.connect(db)
+    listed = {r.uri for r in facets._rows(con, "rs")}
+    assert listed == {"https://lagen.nu/rs/skv/8-1",
+                      "https://lagen.nu/rs/skv/8-3"}, listed
+    con.close()

@@ -882,9 +882,14 @@ RE_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 def _expired_date(art: dict) -> str | None:
     """The date a document stopped stating law, if its metadata declares one --
-    else None. Stored on the documents row so the browse listings can omit it
-    once the date has passed (still reachable by direct link and search), and so
-    the context rail drops it (`page._inbound_groups`, the I3 rule).
+    else None. Stored on the documents row so that once the date has passed the
+    document drops out of every *listing* of the corpus -- the browse trees
+    (`facets._rows`), the feeds (`feeds.entries`) and search results
+    (`search.REPEALED_IN_FORCE`) -- and off the context rail
+    (`page._inbound_groups`, the I3 rule). It stays reachable by direct link,
+    and stays *in* the search index carrying this date, so the query filter is
+    the only thing between it and a reader: an advanced "search expired" option
+    is a query change, not a reindex.
 
     Two kinds of document declare one, for the same reason. A statute names its
     repeal date (`rpubl:upphavandedatum`). A rättsligt ställningstagande is in

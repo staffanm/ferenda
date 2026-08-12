@@ -9,7 +9,7 @@ live query-parameter endpoints.
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from html import escape
 from urllib.parse import urlencode
 
@@ -130,8 +130,17 @@ def _matches(item, row, rdf_type=None,
 
 def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
             dcterms_publisher=None, limit=LIMIT):
-    """Newest entries for a dataset and its legacy facet parameters."""
+    """Newest entries for a dataset and its legacy facet parameters.
+
+    A document whose declared expiry has passed is omitted, the same rule the
+    browse listings and search apply: a repealed act and a withdrawn rättsligt
+    ställningstagande no longer state law, and a feed of a corpus is a listing
+    of it. Ordering by artifact mtime is what made this urgent -- a re-parse
+    bumps every document it touches to the top, so re-parsing a corpus with 699
+    withdrawn positions in it would have put all 699 above the newest one that
+    still applies."""
     root = catalog.data_root(con)
+    expired = catalog.expired_uris(con, date.today().isoformat())
     rows = con.execute(
         "SELECT uri, source, kind, label, title, path, display, date, art_mtime_ns, "
         "publisher "
@@ -140,6 +149,8 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
         (item.source,))
     out = []
     for row in rows:
+        if row[0] in expired:
+            continue
         if not _matches(item, row, rdf_type, rpubl_rattsfallspublikation,
                         dcterms_publisher):
             continue

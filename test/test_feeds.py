@@ -186,3 +186,42 @@ def test_document_date_covers_every_source_field_with_stable_precedence():
                                     "rpubl:beslutsdatum": "2024-07-07"}}}
     assert catalog.document_date(everything) == "2024-01-01"
     assert catalog.document_date({"metadata": {"properties": {}}}) is None
+
+
+def test_an_expired_document_leaves_the_feed(tmp_path):
+    """A feed of a corpus is a listing of it, so the rule the browse trees and
+    search already apply holds here too: a repealed act and a withdrawn
+    rättsligt ställningstagande no longer state law.
+
+    The ordering is what made this urgent. Entries sort by artifact mtime, so a
+    re-parse lifts every document it touched to the top -- re-parsing an rs
+    corpus holding 699 withdrawn positions would have put all 699 above the
+    newest one that still applies."""
+    db = tmp_path / "catalog.sqlite"
+    live = tmp_path / "live.json"
+    live.write_text(json.dumps({
+        "uri": "https://lagen.nu/rs/skv/8-1", "type": "stallningstagande",
+        "org": "skv", "identifier": "Skatteverkets ställningstagande dnr 8-1",
+        "designation": "8-1",
+        "metadata": {"title": "Gällande", "publisher": "Skatteverket",
+                     "nummer": "8-1", "status": "gällande",
+                     "beslutsdatum": "2024-01-01"},
+        "structure": []}))
+    withdrawn = tmp_path / "withdrawn.json"
+    withdrawn.write_text(json.dumps({
+        "uri": "https://lagen.nu/rs/skv/8-2", "type": "stallningstagande",
+        "org": "skv", "identifier": "Skatteverkets ställningstagande dnr 8-2",
+        "designation": "8-2",
+        "metadata": {"title": "Upphävt", "publisher": "Skatteverket",
+                     "nummer": "8-2", "status": "upphävt",
+                     "upphavd": "2025-06-01", "beslutsdatum": "2024-01-01"},
+        "structure": []}))
+    # the withdrawn one is the more recently re-parsed, so without the filter it
+    # would head the feed
+    os.utime(live, ns=(1_700_000_001_000_000_000,) * 2)
+    os.utime(withdrawn, ns=(1_700_000_002_000_000_000,) * 2)
+    catalog.rebuild(db, "rs", [live, withdrawn])
+    con = catalog.connect(db)
+    got = [e.title for e in feeds.entries(con, feeds.BY_SOURCE["rs"])]
+    assert got == ["Gällande"], got
+    con.close()
