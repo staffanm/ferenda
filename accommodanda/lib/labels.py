@@ -430,11 +430,23 @@ def _icc(art):
     return Labels(short_id, title, title, md.get("documentNumber") or short_id)
 
 
+def _icj(art):
+    # the eyebrow is the case's General List number as the Court cites it
+    # ("ICJ 70"), not the decision's filename stem: the page is one decision in
+    # a case, and the case is what a reader recognises. The caption is the case
+    # name, which is how every citation to it reads.
+    md = art.get("metadata", {})
+    short_id = "ICJ %s" % md.get("caseNumber") if md.get("caseNumber") \
+        else _local(art["uri"])
+    title = art.get("title") or short_id
+    return Labels(short_id, title, title, art.get("identifier") or short_id)
+
+
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
              "avg": _avg, "rs": _rs, "edpb": _edpb,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
-             "untc": _untc, "icc": _icc, "begrepp": _begrepp,
+             "untc": _untc, "icc": _icc, "icj": _icj, "begrepp": _begrepp,
              "kommentar": _kommentar}
 
 

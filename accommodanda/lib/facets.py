@@ -491,6 +491,15 @@ def _slug(key):
     return re.sub(r"[^0-9a-zåäö]+", "-", key.lower()).strip("-") or "-"
 
 
+# The ICJ's three decision kinds and their display order, named here because
+# the facet axis below and the folkrätt landing both need them and a second
+# copy of the labels drifted the day it was written.
+ICJ_KIND_ORDER = ["dom", "rådgivande yttrande", "beslut"]
+ICJ_KIND_LABELS = {"dom": "Domar",
+                   "rådgivande yttrande": "Rådgivande yttranden",
+                   "beslut": "Interimistiska beslut"}
+
+
 SCHEMES = {
     "sfs": [_Level("Bokstav", _sfs_initial, _by_letter)],
     "begrepp": [_Level("Bokstav", _begrepp_initial, _by_letter)],
@@ -559,6 +568,18 @@ SCHEMES = {
               labels=({"treaty": "Fördrag", "protocol": "Protokoll"})),
         _Level("År", _dated_year, _by_year_desc),
     ],
+    "icj": [
+        # the Court's three decision kinds, in the order a reader wants them:
+        # the binding judgments first, then the advisory opinions, then the
+        # provisional-measures orders. Declared once here -- the folkrätt
+        # landing reads it back through `scheme_kind_labels` rather than
+        # keeping the second copy that used to sit in `lib/render`
+        # (rule:second-use-goes-to-lib)
+        _Level("Typ", _catalog_kind, kind_axis=True,
+              order=_curated(ICJ_KIND_ORDER),
+              labels=ICJ_KIND_LABELS),
+        _Level("År", _dated_year, _by_year_desc),
+    ],
     "icc": [
         _Level("Typ", _catalog_kind, kind_axis=True,
               order=_curated(["judgment", "sentence", "confirmation", "arrest-warrant",
@@ -622,7 +643,7 @@ def sources():
 # browse.py, so there is one authority for which schemes become pages (the two
 # used to disagree: the API answered /browse for four sources whose pages were
 # never generated).
-UNGENERATED = frozenset({"coe", "icrc", "untc", "icc"})
+UNGENERATED = frozenset({"coe", "icrc", "untc", "icc", "icj"})
 assert UNGENERATED <= set(SCHEMES), "UNGENERATED names a source with no scheme"
 
 
@@ -650,6 +671,7 @@ SOURCE_LABELS = {
     "hudoc": "Europadomstolens praxis", "coe": "Europarådets fördrag",
     "icrc": "Internationell humanitär rätt", "untc": "FN-fördrag",
     "icc": "Internationella brottmålsdomstolen",
+    "icj": "Internationella domstolen",
     "kommentar": "Lagkommentarer", "begrepp": "Begrepp",
     "remisser": "Remissvar",
 }
@@ -668,6 +690,17 @@ _KIND_SINGULAR = {
     "rekommendationer": "Rekommendation", "declaration": "Deklaration",
     "sentence": "Straffmätningsbeslut", "reparations": "Gottgörelsebeslut",
 }
+
+
+def scheme_kind_labels(source):
+    """{catalog kind: reader-facing label} for one source's kind axis, in the
+    axis's own display order. `kind_labels()` above merges every source's axis
+    into one flat map for the corpus-wide search facets; this answers for a
+    single source, which is what a bespoke landing listing needs."""
+    for level in SCHEMES[source]:
+        if level.kind_axis:
+            return dict(level.labels or {})
+    raise ValueError("facets: %s has no kind axis" % source)
 
 
 def kind_labels(singular=False):

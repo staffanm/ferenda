@@ -103,6 +103,9 @@ from .hudoc import translations as hudoc_translations
 from .icc import download as icc_download
 from .icc import parse as icc_parse
 from .icc import render as icc_render
+from .icj import download as icj_download
+from .icj import parse as icj_parse
+from .icj import render as icj_render
 from .icrc import download as icrc_download
 from .icrc import parse as icrc_parse
 from .icrc import render as icrc_render
@@ -2482,6 +2485,32 @@ SOURCES["icc"] = _simple_source(
           "scope: substantive Rome-Statute decisions; text via the ICC Legal Tools API")
 
 
+# ICJ decisions: the Court's /decisions view scopes the harvest to judgments,
+# advisory opinions and provisional-measures orders; each decision's page range
+# from the printed I.C.J. Reports is the body. The OCR vocabulary is a recipe
+# input -- rebuilding it (tools/icj_vocabulary.py) changes how every scanned
+# decision reads.
+ICJ_CODE = (PKG / "icj" / "parse.py", PKG / "icj" / "model.py",
+            PKG / "icj" / "ocr.py", PKG / "icj" / "data" / "vocabulary.txt",
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "artifact.py")
+
+
+def icj_inputs(basefile):
+    return [icj_download.record_path(layout.ICJ_DOWNLOADED, basefile),
+            icj_download.body_path(layout.ICJ_DOWNLOADED, basefile),
+            PKG / "icj" / "data" / "vocabulary.txt"] \
+        + _patch_input("icj", basefile)
+
+
+SOURCES["icj"] = _simple_source(
+    "icj", icj_download, icj_parse.parse, layout.ICJ_DOWNLOADED, ICJ_CODE,
+    inputs=icj_inputs, origin=_origin(icj_download.ICJ),
+    dry_label="the ICJ's judgments, advisory opinions and provisional-measures orders",
+    notes="download flags: --only <decision stem, e.g. 070-19860627-JUD-01-00>, --limit N\n"
+          "scope: 255 of the Court's 877 decisions; the ~620 time-limit orders are out\n"
+          "the PDFs are Cloudflare-walled and fetched through headful Chrome")
+
+
 # --------------------------------------------------------------------------
 # föreskrift source (agency regulations: FFFS, … -- per-fs subtrees, PDF body)
 # --------------------------------------------------------------------------
@@ -3503,7 +3532,7 @@ api_patch.set_reparse(reparse_one)
 ARTIFACTS = {name: functools.partial(layout.artifacts, name)
              for name in ("sfs", "dv", "forarbete", "kommentar", "begrepp",
                           "eurlex", "foreskrift", "avg", "rs", "edpb",
-                          "hudoc", "coe", "icrc", "untc", "icc")}
+                          "hudoc", "coe", "icrc", "untc", "icc", "icj")}
 
 
 # relate's per-source extraction (the documents/links it derives per artifact)
@@ -4007,6 +4036,7 @@ SOURCE_RENDERERS = {
     "icrc": icrc_render.render,
     "untc": untc_render.render,
     "icc": icc_render.render,
+    "icj": icj_render.render,
 }
 
 

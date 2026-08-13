@@ -104,4 +104,4 @@ def test_ungenerated_schemes_are_declared_in_facets_not_in_browse():
     assert facets.UNGENERATED <= set(facets.SCHEMES)
     assert set(facets.browsable()) == set(facets.SCHEMES) - facets.UNGENERATED
     # the folkrätt landing lists these in full; that is why they are here
-    assert facets.UNGENERATED == {"coe", "icrc", "untc", "icc"}
+    assert facets.UNGENERATED == {"coe", "icrc", "untc", "icc", "icj"}

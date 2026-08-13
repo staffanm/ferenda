@@ -56,7 +56,7 @@ SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
               "rs": "rs", "edpb": "edpb",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
-              "icc": "icc",
+              "icc": "icc", "icj": "icj",
               "remisser": "remisser", "kommentar": "kommentar",
               "begrepp": "begrepp", "site": "site", "stats": "stats"}
 
@@ -82,6 +82,7 @@ COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
 UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <mtdsg_no>.html (MTDSG status page)
 ICC_DOWNLOADED = DOWNLOADED / "icc"                 # <doc-number>.{json,pdf} (Legal Tools record + PDF)
+ICJ_DOWNLOADED = DOWNLOADED / "icj"                 # <decision-stem>.{json,pdf} (index row + Reports PDF)
 
 # remisser's ärende records + answer PDFs share one download tree (see remisser_arende)
 REMISSER_DOWNLOADED = DOWNLOADED / "remisser"
@@ -157,7 +158,7 @@ def relpath(source: str, basefile: str) -> Path:
         # EDPB's own series number: "riktlinjer/05-2020", "wp/248"
         org, rest = basefile.split("/", 1)
         return Path(org) / rest.replace("/", "-").replace(":", "-")
-    if source in ("hudoc", "coe", "icrc", "untc", "icc"):
+    if source in ("hudoc", "coe", "icrc", "untc", "icc", "icj"):
         return Path(basefile)
     if source == "remisser":
         # "<typ>/<referred document id>/<org-slug>" -- the ärende is keyed on the
@@ -653,7 +654,8 @@ _EXT_NS = {"celex": ("eurlex", lambda rest: rest.replace("/", "_")),
            "coe": ("coe", _alnum_slug),
            "icrc": ("icrc", _alnum_slug),
            "untc": ("untc", _alnum_slug),
-           "icc": ("icc", _alnum_slug)}
+           "icc": ("icc", _alnum_slug),
+           "icj": ("icj", _alnum_slug)}
 
 
 # --------------------------------------------------------------------------

@@ -875,6 +875,17 @@ def icc_document(art, path):
             label, title, str(path))
 
 
+def icj_document(art, path):
+    # kind is the decision type (judgment/advisory opinion/order); label is the
+    # Court's own citing form ("ICJ 70 (Judgment, 1986-06-27)"), where labels'
+    # short_id is the bare case number the page eyebrow shows. Title is the
+    # case name, which is how every citation to an ICJ decision reads.
+    label = art.get("identifier") or local(art["uri"])
+    title = art.get("title") or label
+    return (art["uri"], "icj", art.get("doctype", "dom"),
+            label, title, str(path))
+
+
 # the column `_expired_date` fills is compared against an ISO date, so only an
 # ISO date may go into it
 RE_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -972,6 +983,7 @@ _DOCUMENT_BUILDERS = {
     "dv": dv_document, "eurlex": _eurlex_document,
     "foreskrift": _foreskrift_document, "hudoc": hudoc_document,
     "icrc": icrc_document, "untc": untc_document, "icc": icc_document,
+    "icj": icj_document,
 }
 
 

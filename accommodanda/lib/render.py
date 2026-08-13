@@ -253,7 +253,8 @@ def render_document(art, source, site, renderers):
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
-                "eurlex", "edpb", "coe", "icrc", "untc", "icc", "begrepp")
+                "eurlex", "edpb", "coe", "icrc", "untc", "icc", "icj",
+                "begrepp")
 # the reader-facing source names, defined once in `facets` (which this module
 # imports; the reverse would cycle) and re-exported here under the name the
 # render layer has always used
@@ -262,7 +263,7 @@ SOURCE_LABEL = facets.SOURCE_LABELS
 # (/folkratt/): a bespoke alphabetical treaty listing (coe) beside the faceted
 # case browse (hudoc), which relocates under /folkratt/hudoc/. coe has no faceted
 # browse tree of its own -- its whole listing lives on the landing page.
-FOLKRATT_SOURCES = ("hudoc", "coe", "icrc", "untc", "icc")
+FOLKRATT_SOURCES = ("hudoc", "coe", "icrc", "untc", "icc", "icj")
 FOLKRATT_LABEL = "Folkrätt"
 # edpb browses under the EU-rätt masthead entry it shares with eurlex, the way
 # hudoc browses under folkrätt: the guidance belongs beside the rättsakt it
@@ -557,7 +558,11 @@ def _icc_types():
             for t in json.loads(datasets.ICC_DECISION_TYPES.read_text("utf-8"))["types"]}
 
 
-def _icc_entry(row):
+def _case_entry(row):
+    """One case-law row on the folkrätt landing: the case name over its citing
+    form and date. Shared by the two international courts -- they list the same
+    three columns, and two copies of it drifted apart the day the second was
+    written (rule:second-use-goes-to-lib)."""
     return LISTS.treaty_li(
         href(row["uri"]), row["title"] or row["identifier"],
         ", ".join(part for part in (row["identifier"], row["date"]) if part))
@@ -568,7 +573,16 @@ def _icc_listing(con):
     Rome-Statute decision type, each group newest first."""
     return _grouped_listing(
         "icc", "Internationella brottmålsdomstolen (ICC)", _treaty_rows(con, "icc"),
-        lambda row: row["kind"], _icc_types(), _icc_entry, reverse=True)
+        lambda row: row["kind"], _icc_types(), _case_entry, reverse=True)
+
+
+def _icj_listing(con):
+    """The ICJ half of the folkrätt page: the Court's decisions grouped by kind,
+    each group newest first."""
+    return _grouped_listing(
+        "icj", "Internationella domstolen (ICJ)", _treaty_rows(con, "icj"),
+        lambda row: row["kind"], facets.scheme_kind_labels("icj"), _case_entry,
+        reverse=True)
 
 
 def _hudoc_section(con):
@@ -603,6 +617,8 @@ def folkratt_axis(con):
         entries.append(("untc", "FN-fördrag", "/folkratt/#untc", n["untc"]))
     if n.get("icc"):
         entries.append(("icc", "ICC-avgöranden", "/folkratt/#icc", n["icc"]))
+    if n.get("icj"):
+        entries.append(("icj", "ICJ-avgöranden", "/folkratt/#icj", n["icj"]))
     if n.get("hudoc"):
         for b in facets.tree(con, "hudoc")["buckets"]:
             entries.append(("hudoc:" + b["slug"], b["label"],
@@ -650,7 +666,7 @@ def render_folkratt(con):
     body = Markup("").join(
         part for part in (_coe_listing(con), _icrc_listing(con),
                           _untc_listing(con), _icc_listing(con),
-                          _hudoc_section(con)) if part)
+                          _icj_listing(con), _hudoc_section(con)) if part)
     if body:
         body = cross_nav(folkratt_axis(con), "coe") + body
     return page("Folkrätt", "Folkrätt", "", body or LISTS.empty(),

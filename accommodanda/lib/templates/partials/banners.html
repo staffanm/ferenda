@@ -61,6 +61,16 @@
 {%- if source_url %} — den finns hos <a class="ext" href="{{ source_url }}" rel="external">{{ source_name }}</a>{% endif -%}
 .</span></div>
 {%- endmacro -%}
+{%- macro icj_ocr_banner(pdf_url) -%}
+{#- an ICJ decision from before ~2002. The Court publishes those as a scan of
+    the printed I.C.J. Reports with an OCR text layer, and says itself that the
+    printed version is the official one. The reader is looking at machine-read
+    text, and a word may be misread; say so where it matters rather than after
+    they have quoted it. -#}
+<div class="note-banner"><strong>Inläst text</strong><span>Internationella domstolen publicerar detta avgörande som en inskanning av den tryckta serien <i>I.C.J. Reports</i>. Texten nedan är maskinellt inläst och enstaka ord kan vara felaktiga. Domstolen anger själv att den tryckta versionen är den officiella
+{%- if pdf_url %} — jämför med <a class="ext" href="{{ pdf_url }}" rel="external">domstolens egen PDF</a>{% endif -%}
+.</span></div>
+{%- endmacro -%}
 {%- macro foreskrift_repealed_banner(links) -%}
 <div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
 {%- endmacro -%}
