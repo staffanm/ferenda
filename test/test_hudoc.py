@@ -340,6 +340,39 @@ def test_unusable_hudoc_body_is_deliberately_skipped():
         parse.parse_record(record, html)
 
 
+class _Answer:
+    """The two answers the body endpoint gives: a 204 for an item HUDOC holds
+    as metadata only, and a 200 whose payload is not markup."""
+
+    def __init__(self, status_code, text):
+        self.status_code, self.text = status_code, text
+
+
+def test_an_item_hudoc_holds_no_text_for_is_stored_not_refetched(monkeypatch):
+    """HUDOC answers 204 No Content for an item it holds as metadata only --
+    GREECE v. THE UNITED KINGDOM (1956) and the other pre-1980 Commission
+    decisions. The empty body is stored, because that is what makes the item
+    count as downloaded; raising instead left 11 records with no body, refetched
+    on every run and failing `lagen hudoc parse` forever."""
+    answers = iter([_Answer(204, ""), _Answer(200, "not markup")])
+    monkeypatch.setattr(download, "request", lambda *a, **kw: next(answers))
+    assert download.fetch_body(None, "001-1", 0).text == ""
+    # a 200 that is not markup is still a broken fetch, and still raises
+    with pytest.raises(ValueError, match="empty HTML body"):
+        download.fetch_body(None, "001-2", 0)
+
+
+def test_an_empty_body_is_skipped_as_having_no_text(tmp_path):
+    record = json.loads((FIXTURES / "001-123456.json").read_text())
+    with pytest.raises(SkipDocument, match="holds no text for this item"):
+        parse.parse_record(record, "")
+    # ... and the stored empty body reaches parse as exactly that
+    download.record_path(tmp_path, "001-1").write_text(json.dumps(record))
+    download.body_path(tmp_path, "001-1").write_text("")
+    with pytest.raises(SkipDocument, match="holds no text for this item"):
+        parse.parse("001-1", tmp_path)
+
+
 def test_an_unnumbered_decision_is_a_document_not_an_empty_artifact():
     """A decision states its facts and its reasoning under headings and numbers
     nothing (this one strikes an Article 3 complaint out of the list). The skip

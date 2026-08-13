@@ -56,6 +56,7 @@ QUERY_ENDPOINT = BASE + "/app/query/results"
 BODY_ENDPOINT = BASE + "/app/conversion/docx/html/body"
 PAGE_SIZE = 500
 WORKERS = 4
+HTTP_NO_CONTENT = 204
 RANKING_MODEL = "11111111-0000-0000-0000-000000000000"
 DEFAULT_LANGUAGES = ("ENG",)
 FIELDS = (
@@ -214,7 +215,15 @@ def _placeholder(record):
 def fetch_body(session, itemid, delay):
     response = request(session, "GET", BODY_ENDPOINT, timeout=180,
                        params={"library": "ECHR", "id": itemid})
-    if "<" not in response.text:
+    # 204 is HUDOC stating that this item has no convertible text at all, which
+    # is a fact about the document, not a failed fetch: mostly pre-1980
+    # Commission decisions it holds as metadata only (GREECE v. THE UNITED
+    # KINGDOM, 1956). The empty body is stored as the faithful record of that
+    # answer -- the same convention as dv's zero-byte .doc files. Raising here
+    # instead would store the metadata record, never a body, and leave the item
+    # looking un-downloaded: it would be re-fetched on every run and fail
+    # `parse` forever, which is what 11 documents were doing.
+    if response.status_code != HTTP_NO_CONTENT and "<" not in response.text:
         raise ValueError("%s: HUDOC returned an empty HTML body" % itemid)
     time.sleep(delay)                       # per-worker pacing
     return response

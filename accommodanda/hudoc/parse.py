@@ -126,6 +126,13 @@ def _split(value):
 
 
 def parse_record(record, html_text, summary=None):
+    # HUDOC answers 204 No Content for an item it holds as metadata only -- the
+    # pre-1980 Commission decisions, mostly -- and `download.fetch_body` stores
+    # that answer as an empty body. There is no document to publish, and saying
+    # so is not the same statement as "the body did not parse".
+    if not html_text.strip():
+        raise SkipDocument("%s: HUDOC holds no text for this item"
+                           % record["itemid"])
     body = parse_body(html_text)
     # An unusable body is one with no structure at all: HUDOC's language and
     # cover stubs are a single sentence ("The text of this judgment is available
