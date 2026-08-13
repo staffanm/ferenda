@@ -135,13 +135,38 @@ def test_a_summary_joins_its_case_on_application_number_and_date(tmp_path):
     assert unmatched == 1
 
 
-def test_two_cases_on_one_application_and_date_refuse_to_index(tmp_path):
+def test_a_key_two_cases_claim_identifies_neither(tmp_path):
+    """HUDOC stores some decisions twice and mints one ECLI for decisions taken
+    together, so a key can reach two stored cases. It then identifies no case,
+    and saying so beats attaching the Court's summary of one case to another.
+    (Measured: 10 ECLIs and 121 application/date pairs over 39,046 records.)"""
     root = _store(tmp_path, [
-        {"itemid": "001-1", "appno": "1/11", "kpdate": "2015-12-04T00:00:00"},
-        {"itemid": "001-2", "appno": "1/11", "kpdate": "2015-12-04T00:00:00"},
+        {"itemid": "001-1", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:SHARED"},
+        {"itemid": "001-2", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:SHARED"},
+        {"itemid": "001-3", "appno": "2/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:OWN"},
     ])
-    with pytest.raises(ValueError, match="holds two language expressions"):
-        summaries.held_index(root)
+    assert summaries.held_index(root, log=lambda _: None) == {
+        ("2/11", "2015-12-04"): "001-3"}
+    assert translations.held_by_ecli(root, log=lambda _: None) == {
+        "ECLI:OWN": "001-3"}
+
+
+def test_two_language_versions_of_one_case_refuse_to_index(tmp_path):
+    """The other cause of a shared key: a store harvested with --lang ENG,FRE
+    holds every case twice, and no join can tell the two apart."""
+    root = _store(tmp_path, [
+        {"itemid": "001-1", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "ENG", "ecli": "ECLI:SAME"},
+        {"itemid": "001-2", "appno": "1/11", "kpdate": "2015-12-04T00:00:00",
+         "languageisocode": "FRE", "ecli": "ECLI:SAME"},
+    ])
+    with pytest.raises(ValueError, match="in different languages"):
+        summaries.held_index(root, log=lambda _: None)
+    with pytest.raises(ValueError, match="in different languages"):
+        translations.held_by_ecli(root, log=lambda _: None)
 
 
 def test_a_withdrawn_summary_takes_its_link_off_the_case(tmp_path):

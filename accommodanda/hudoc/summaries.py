@@ -1,5 +1,5 @@
-"""`lagen hudoc sync-summaries` -- link the Court's own summary of a case from
-the page of the case.
+"""Link the Court's own summary of a case from the page of the case -- one of
+the two smaller harvests `lagen hudoc download` runs after the collections.
 
 The Court writes a *Case-Law Information Note* for the judgments and decisions
 it considers worth reading: its own account of what the case decided, a page
@@ -14,11 +14,11 @@ holding the summary's item id and title.
 
 The join is `(application number, date)`. HUDOC gives a summary no pointer to
 the case it summarises -- no ECLI, no item id -- but it repeats the case's
-application numbers and carries the case's own date, and that pair is unique:
-over the whole store no two documents share it, and no summary matches more
-than one document. A summary whose case the store does not hold is counted and
-dropped; today that is mostly summaries of French-original judgments, which the
-English-only scope leaves out.
+application numbers and carries the case's own date, and that pair identifies
+one case in all but 121 of 91,084 (`download.unique_index` drops those and says
+so). A summary whose case the store does not hold is counted and dropped; today
+that is mostly summaries of decisions the harvest has not reached and of
+French-original judgments, which the English-only scope leaves out.
 
 Sidecars live under `<downloaded>/hudoc/clin/<itemid>.json`, one per summarised
 case, so a re-run re-stales only the parses whose summary actually moved -- a
@@ -26,10 +26,9 @@ single shared index file would re-stale all 55,000.
 """
 
 import json
-import sys
 from pathlib import Path
 
-from ..lib import compress, util
+from ..lib import compress
 from ..lib.net import make_session
 from . import download
 
@@ -58,30 +57,12 @@ def _key(record):
 
 
 def held_index(root, log=print):
-    """`(appno, date)` -> item id over the harvested records. Two documents on
-    one pair would make the join ambiguous, so that raises rather than
-    attaching the Court's summary of one case to another.
-
-    That is the join's precondition: every language expression of a case repeats
-    its application numbers and its date, so a store harvested with `--lang
-    ENG,FRE` trips this on the first bilingual case. Choosing a language for the
-    summary to hang on is a rule nobody has written yet."""
-    basefiles = download.list_basefiles(root)
-    index = {}
-    for done, basefile in enumerate(basefiles, 1):
-        util.status(done, len(basefiles), "hudoc  indexing stored cases")
-        record = compress.read_json(download.record_path(root, basefile))
-        for key in _key(record):
-            if key in index:
-                raise ValueError(
-                    "%s and %s share application %s of %s -- either the store "
-                    "holds two language expressions of one case (see the "
-                    "download's --lang), or the pair no longer identifies a case"
-                    % (index[key], basefile, key[0], key[1]))
-            index[key] = basefile
-    sys.stderr.write("\n")             # close the live counter's line
-    log("  indexed %d stored cases" % len(basefiles))
-    return index
+    """`(appno, date)` -> item id over the harvested records. A pair claimed by
+    two stored cases identifies neither and is dropped; see
+    `download.unique_index` for why that is the honest answer and when it
+    raises instead."""
+    return download.unique_index(root, _key, "application number and date",
+                                 log=log)
 
 
 def summary_records(session, delay=0.2):
@@ -157,7 +138,7 @@ def sync(root, delay=0.2, log=print):
     matched, unmatched = resolve(
         root, summary_records(session, delay=delay), log=log)
     changed, removed = store(root, matched, log=log)
-    log("hudoc sync-summaries: %d matched, %d written or updated, %d removed, "
+    log("hudoc summaries: %d matched, %d written or updated, %d removed, "
         "%d without a stored case"
         % (len(matched), changed, removed, unmatched))
     return len(matched), changed

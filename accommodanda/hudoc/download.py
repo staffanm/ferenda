@@ -39,13 +39,14 @@ no common date order -- and the first collection's date stop would end the walk
 before the second was reached.
 """
 
+import sys
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
-from ..lib import compress
+from ..lib import compress, util
 from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
@@ -244,6 +245,56 @@ def _prefetched(records, submit, depth):
 
 def list_basefiles(root):
     return compress.list_stems(root)                    # skips .watermark.json
+
+
+def unique_index(root, key_of, label, log=print):
+    """``key -> basefile`` over the harvested records -- the shared half of both
+    joins that have to find one stored case from a key some other document
+    repeats (`summaries.py` on application number and date, `translations.py` on
+    the ECLI).
+
+    Two records under one key have two causes, and neither join can act without
+    being told which:
+
+      * **different languages** -- the store was harvested with ``--lang
+        ENG,FRE``, and every expression of a case repeats its identity, its
+        dates and its ECLI. Nothing distinguishes them and no join is possible,
+        so this raises.
+      * **the same language** -- HUDOC's own data. It stores some decisions
+        twice under two item ids (GRACZYK MARIAN v. POLAND is both 001-81024 and
+        001-103335), and it mints one ECLI for decisions taken together
+        (RORISON, LINDOW, HENNIS and STEVENSON v. THE UNITED KINGDOM share
+        ECLI:CE:ECHR:2008:0429DEC006187800). Such a key identifies no single
+        case, so it is dropped and counted: a summary or a translation reaching
+        only that key finds no host, which is the true answer.
+
+    Measured over 39,046 stored records: 10 ECLIs and 121 (application number,
+    date) pairs are claimed by more than one case, every one of them
+    same-language, costing 51 cases their key. The judgments-only store this
+    started from had none, which is why both joins first assumed uniqueness."""
+    basefiles = list_basefiles(root)
+    index, languages, ambiguous = {}, {}, set()
+    for done, basefile in enumerate(basefiles, 1):
+        util.status(done, len(basefiles), "hudoc  indexing stored cases")
+        record = compress.read_json(record_path(root, basefile))
+        language = record.get("languageisocode")
+        for key in key_of(record):
+            if key not in index:
+                index[key], languages[key] = basefile, language
+            elif language != languages[key]:
+                raise ValueError(
+                    "%s and %s share %s %s in different languages -- the store "
+                    "holds more than one expression of this case, and no join "
+                    "can tell them apart (see --lang)"
+                    % (index[key], basefile, label, key))
+            else:
+                ambiguous.add(key)
+    sys.stderr.write("\n")                 # close the live counter's line
+    for key in ambiguous:
+        del index[key]
+    log("  indexed %d stored cases; %d %s claimed by more than one case "
+        "identify none" % (len(basefiles), len(ambiguous), label))
+    return index
 
 
 def sync(root, full=False, only=None, languages=DEFAULT_LANGUAGES,

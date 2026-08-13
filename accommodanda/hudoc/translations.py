@@ -1,5 +1,6 @@
-"""`lagen hudoc propose-translations` -- draft the commentary that puts a
-Strasbourg judgment's Swedish translation on the page of the judgment itself.
+"""Draft the commentary that puts a Strasbourg judgment's Swedish translation on
+the page of the judgment itself -- one of the two smaller harvests `lagen hudoc
+download` runs after the collections.
 
 Domstolsverket translated 87 Strasbourg judgments and decisions into Swedish
 between 2014-01-14 and 2015-12-15, and HUDOC hosts each translation as an item
@@ -17,15 +18,16 @@ the match is exact and needs no title or date heuristics. A translation whose
 original is not in the store is reported, never guessed at: 8 of the 87 translate
 *decisions*, which the store gained only with the decisions collection.
 
-This writes drafts into the git-backed content repo (WIKI_ROOT) and stops there
--- the same division `kommentar discover-guidance` keeps. A file that already
-exists is never overwritten: the editor owns the prose from that point on.
+This writes drafts into the git-backed content repo (WIKI_ROOT) and stops there:
+`kommentar parse` turns them into artifacts, and the editor reviews them as an
+ordinary diff in that repo. A file that already exists is never overwritten --
+the editor owns the prose from the first hand edit on -- so a re-run is a no-op
+unless the harvest has matched a translation it could not match before.
 """
 
-import sys
 from pathlib import Path
 
-from ..lib import compress, layout, util
+from ..lib import layout
 from ..lib.net import make_session, request
 from . import download
 from .model import ITEM_URL
@@ -69,35 +71,19 @@ def translation_records(session):
     return records
 
 
-def held_by_ecli(root, log=print):
-    """ECLI -> item id over the harvested records. A record's ECLI names the
-    case; the item id names one language version of it, which is exactly the
-    direction the join needs.
+def _ecli(record):
+    """The record's ECLI as a one- or zero-element key list. An ECLI names the
+    case, and the item id names one language version of it, which is exactly the
+    direction the join needs."""
+    return [record["ecli"]] if record.get("ecli") else []
 
-    That is also the join's precondition: an ECLI is shared by every language
-    expression of a case, so a store harvested with `--lang ENG,FRE` holds two
-    records under one ECLI and the join has no ground to prefer either. It
-    raises rather than annotating whichever the store listed first; making the
-    Swedish translation attach to one chosen language version is a rule nobody
-    has written yet."""
-    basefiles = download.list_basefiles(root)
-    index = {}
-    for done, basefile in enumerate(basefiles, 1):
-        util.status(done, len(basefiles), "hudoc  indexing stored cases by ECLI")
-        ecli = compress.read_json(
-            download.record_path(root, basefile)).get("ecli")
-        if not ecli:
-            continue                       # a placeholder-era record carries none
-        if ecli in index:
-            raise ValueError(
-                "%s is the ECLI of both %s and %s -- the store holds more than "
-                "one language expression of this case, and the join has no rule "
-                "for choosing between them (see the download's --lang)"
-                % (ecli, index[ecli], basefile))
-        index[ecli] = basefile
-    sys.stderr.write("\n")             # close the live counter's line
-    log("  indexed %d stored cases by ECLI" % len(index))
-    return index
+
+def held_by_ecli(root, log=print):
+    """ECLI -> item id over the harvested records. An ECLI claimed by two stored
+    cases identifies neither and is dropped; see `download.unique_index` for why
+    that is the honest answer and when it raises instead. None of the 87
+    translations reaches such an ECLI today."""
+    return download.unique_index(root, _ecli, "ECLI", log=log)
 
 
 def _translator(record):
@@ -170,11 +156,11 @@ def propose(root, wiki_root, dry_run=False, log=print):
         log("  %s also translates %s; the newer item is linked"
             % (record["itemid"], host))
     if dry_run:
-        log("hudoc propose-translations: would draft %d commentary file(s), "
+        log("hudoc translations: would draft %d commentary file(s), "
             "%d translation(s) have no stored original"
             % (len(matched), len(unmatched)))
         return 0, 0
     written, kept = write_drafts(wiki_root, matched, log=log)
-    log("hudoc propose-translations: %d drafted, %d already written, "
+    log("hudoc translations: %d drafted, %d already written, "
         "%d without a stored original" % (written, kept, len(unmatched)))
     return written, kept

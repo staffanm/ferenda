@@ -2336,40 +2336,43 @@ def _hudoc_languages():
             if RUN.lang else hudoc_download.DEFAULT_LANGUAGES}
 
 
-def hudoc_sync_summaries(_basefiles):
-    """`lagen hudoc sync-summaries` -- refresh the sidecar that links the
-    Court's own Case-Law Information Note from the case it summarises. Metadata
-    only: no summary is stored as a document."""
-    if RUN.dry_run:
-        print("hudoc sync-summaries: would match the Court's summaries against "
-              "the stored cases under %s" % layout.HUDOC_DOWNLOADED)
-        return
-    hudoc_summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS)
-
-
-def hudoc_propose_translations(_basefiles):
-    """`lagen hudoc propose-translations` -- draft `commentary/hudoc/<itemid>.md`
-    for each of Domstolsverket's 87 Swedish translations, linking the
-    translation from the page of the judgment it translates. Writes into the
-    content repo and stops; the editor reviews the diff and owns the prose."""
-    hudoc_translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT,
-                               dry_run=RUN.dry_run)
-
-
 def hudoc_harvest(scopes):
     """Harvest the named collections -- `lagen hudoc download decisions`, or no
     scope for both. Each walks under its own watermark, so naming one leaves the
-    other's harvest state untouched."""
+    other's harvest state untouched.
+
+    Two smaller harvests ride along, because both read the same endpoint and
+    both produce inputs a later stage needs: the Court's own Case-Law
+    Information Notes become the `clin/` sidecars `hudoc parse` folds into each
+    case's artifact, and Domstolsverkets Swedish translations become the
+    `commentary/hudoc/` drafts `kommentar parse` reads. Each costs one index
+    walk and no body fetch, so they belong in the ordinary download rather than
+    in a command someone has to remember (the expensive `ai-*` passes are the
+    ones that stay explicit).
+
+    A bounded run skips them: `--only` fetches one document, and `--limit` says
+    to do a bounded amount of work, while both of these walk their whole index.
+    Neither is bounded and neither would honour the cap."""
     collections = tuple(scopes) or hudoc_download.DEFAULT_COLLECTIONS
+    bounded = bool(RUN.only or RUN.limit)
     if RUN.dry_run:
         print("hudoc download: would download %s into %s"
               % (RUN.only or "HUDOC %s" % "/".join(collections),
                  layout.HUDOC_DOWNLOADED))
+        if not bounded:
+            hudoc_translations.propose(layout.HUDOC_DOWNLOADED,
+                                       layout.WIKI_ROOT, dry_run=True)
         return
     seen, changed = hudoc_download.sync(
         layout.HUDOC_DOWNLOADED, full=RUN.force, only=RUN.only, limit=RUN.limit,
         delay=POLITENESS, collections=collections, **_hudoc_languages())
     print("hudoc download: %d seen, %d changed" % (seen, changed))
+    if bounded:
+        print("hudoc download: bounded run -- the Court's summaries and the "
+              "Swedish translations are left for an unbounded one")
+        return
+    hudoc_summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS)
+    hudoc_translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT)
 
 
 SOURCES["hudoc"] = Source(
@@ -2380,8 +2383,6 @@ SOURCES["hudoc"] = Source(
     },
     harvest=hudoc_harvest, origin=_origin(hudoc_download.BASE),
     scopes=frozenset(hudoc_download.COLLECTIONS),
-    actions={"sync-summaries": hudoc_sync_summaries,
-             "propose-translations": hudoc_propose_translations},
     notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"
           "scopes are the collections: judgments (Grand Chamber + Chamber, "
           "21,672), decisions (33,633); empty = both\n"
@@ -2392,12 +2393,14 @@ SOURCES["hudoc"] = Source(
           "of the judgments unharvested\n"
           "a decision is where the Court says why a complaint never reaches "
           "the merits; 922 of the 1,088 Swedish cases are decisions\n"
-          "sync-summaries: link the Court's own Case-Law Information Note "
-          "(6,505 in English) from the case it summarises -- metadata only, "
-          "joined on (application number, date)\n"
-          "propose-translations: draft the commentary that links "
-          "Domstolsverkets 87 Swedish translations from the judgments they "
-          "translate (writes into the content repo, --dry-run to preview)")
+          "an unbounded download also links the Court's own Case-Law "
+          "Information Note from each case it summarises (metadata only, "
+          "joined on application number + date) and drafts the "
+          "commentary/hudoc/ files that link Domstolsverkets 87 Swedish "
+          "translations from the judgments they translate; --only and --limit "
+          "skip both, and --dry-run previews the drafts\n"
+          "both joins need a single-language store: every language expression "
+          "of a case repeats its application numbers, its date and its ECLI")
 
 
 def coe_inputs(basefile):

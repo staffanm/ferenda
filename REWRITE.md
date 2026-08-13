@@ -3569,14 +3569,23 @@ Five verticals sharing one folkrätt (international law) landing page:
   ENG,FRE`, `--only <itemid>` and `--limit`.
 
   Two things the Court publishes *about* a case are linked from it rather than
-  republished. `summaries.py` (`lagen hudoc sync-summaries`) attaches the
-  Court's own Case-Law Information Note — its plain account of what the case
-  decided, 6,505 in English — joined on `(application number, date)`, which is
-  unique across the store. `translations.py` (`lagen hudoc propose-translations`)
-  drafts `commentary/hudoc/<itemid>.md` for each of Domstolsverkets 87 Swedish
-  translations, joined on the ECLI: the translation says what the judgment
-  says, so it is commentary on the judgment, the inverse of the
-  English-translation link an SFS commentary opens with. Body downloads are the cost of a run, so a
+  republished, and both ride along on an unbounded download — each is one index
+  walk with no body fetch, and each produces an input a later stage needs, so
+  neither is a command anyone has to remember (the expensive `ai-*` passes are
+  the ones that stay explicit; `--only` and `--limit` skip both). `summaries.py`
+  attaches the Court's own Case-Law Information Note — its plain account of what
+  the case decided, 6,505 in English — joined on `(application number, date)`,
+  and `hudoc parse` folds the resulting `clin/` sidecar into the artifact.
+  `translations.py` drafts `commentary/hudoc/<itemid>.md` for each of
+  Domstolsverkets 87 Swedish translations, joined on the ECLI, for `kommentar
+  parse` to pick up: the translation says what the judgment says, so it is
+  commentary on the judgment, the inverse of the English-translation link an SFS
+  commentary opens with. Both joins share `download.unique_index`, which tells
+  apart the two reasons two cases claim one key — HUDOC's own duplicate items
+  and shared ECLIs (the key identifies no case, so it is dropped and counted:
+  10 ECLIs and 121 application/date pairs over 39,046 records) from a store
+  harvested in two languages, where every expression of a case repeats its
+  identity and no join is possible at all (that raises). Body downloads are the cost of a run, so a
   small `ThreadPoolExecutor` (`WORKERS=4`) keeps fetches in flight ahead of the
   walk (~0.15s/doc measured, vs ~0.33s sequential — the full English harvest
   runs in about an hour). `HudocCase` projects the metadata and
@@ -4178,8 +4187,13 @@ in `git log`. This document is the forest-level status; section markers
   linked rather than republished: its own Case-Law Information Note
   (`summaries.py`, joined on application number + date) and Domstolsverkets 87
   Swedish translations, which become commentary on the judgment they translate
-  (`translations.py`, joined on ECLI). The harvest itself is only part-run:
-  judgments are complete, decisions stand at ~7,800 of 33,633.
+  (`translations.py`, joined on ECLI). Both ride along on an unbounded
+  download rather than being commands of their own, since each costs one index
+  walk and no body fetch. Both joins first assumed a key identifies one case,
+  which held for the judgments-only store and not for decisions: HUDOC stores
+  some decisions twice and mints one ECLI for decisions taken together, so
+  `download.unique_index` now drops such a key and counts it, and reserves
+  raising for the store that holds two language expressions of a case.
 
 - **foreskrift/forarbete/icc/icrc** (2026-08-09) — four extraction fixes found
   by the UX audit, each measured over the corpus rather than eyeballed.
