@@ -1408,6 +1408,26 @@ _SENTENCE_END = re.compile(r"[.!?:;»”\"')\]]\s*$")
 _RE_COORDINATION = re.compile(r"(?:och|eller|samt)\b")
 
 
+def paragraph_texts(pages, drop=None):
+    """`[(pageno, [Line])]` -> the reflowed paragraph text of each page, as the
+    per-page lists `join_across_pages` consumes.
+
+    Both courts' page-range parsers wanted the same five lines, so they live
+    here (rule:second-use-goes-to-lib). `remisser/parse.py` reads pages the same
+    way but keeps its own copy on purpose: it takes `Para.text` unnormalised,
+    and routing it through here would change what a referral answer parses to.
+
+    `drop` is an optional predicate over the normalized text, applied *before*
+    the join. That order is load-bearing for both courts: their running header
+    is the first paragraph of every page, so leaving it in place puts a filing
+    stamp between the two halves of every sentence a page break split and
+    nothing ever rejoins."""
+    return [[text for text in (normalize_space(para.text)
+                               for para in page_paragraphs(lines, None, pageno))
+             if text and not (drop and drop(text))]
+            for pageno, lines in pages]
+
+
 def join_across_pages(per_page):
     """`[[str]]` (a page's paragraph texts, in order) -> one flat [str] with
     paragraphs that a page break split rejoined. A page's last paragraph and the

@@ -9,7 +9,7 @@ resolve stays metadata-only (empty structure), like a status record.
 import re
 
 from ..lib import compress
-from ..lib.pdftext import join_across_pages, page_paragraphs, pages_with_ocr
+from ..lib.pdftext import join_across_pages, pages_with_ocr, paragraph_texts
 from ..lib.util import normalize_space
 from .download import _iso, body_path, record_path
 from .model import RE_CASE, Block, Decision
@@ -129,12 +129,9 @@ def _blocks(path, basefile):
     header has to go *before* the join -- it is the first paragraph of every
     page, so leaving it in place puts a filing stamp between the two halves of
     every sentence and nothing ever rejoins."""
-    return _classify(join_across_pages(
-        [[text for text in (normalize_space(para.text)
-                            for para in page_paragraphs(lines, None, page))
-          if text and not RE_HEADER.match(text)]
-         for page, lines in pages_with_ocr(str(path), ("icc", basefile),
-                                           lang="eng")]))
+    return _classify(join_across_pages(paragraph_texts(
+        pages_with_ocr(str(path), ("icc", basefile), lang="eng"),
+        drop=RE_HEADER.match)))
 
 
 def parse(basefile, root):
