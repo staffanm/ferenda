@@ -234,8 +234,8 @@ nav.toc a.toc-top { padding-right: 2.6rem; }
                        vertical-align: -.08em; border-radius: 50%;
                        border: 2px solid var(--on-accent);
                        border-right-color: transparent;
-                       animation: pdf-spin .8s linear infinite; }
-@keyframes pdf-spin { to { transform: rotate(360deg); } }
+                       animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .pdf-err { color: var(--danger); font-size: .82rem; margin: .8rem 0 0; }
 
 /* -- Frontmatter -- */
@@ -928,6 +928,13 @@ body.browse .gr-body.solo { max-width: var(--page-max); }
 .search-box .search-note { padding: .9rem 1.25rem; border-top: 1px solid var(--rule);
                            font-family: var(--serif); font-style: italic;
                            color: var(--ink-3); font-size: .9rem; }
+/* the API round-trip past 400 ms (a cold prod OpenSearch takes 10+ s on the
+   first search after idle): a ring at the input's right edge, unhidden by
+   search.js waitOn/waitOff so the warm ~100 ms path never flashes it */
+.search-spin { align-self: center; flex: none; width: .8em; height: .8em;
+               margin-right: 1.1rem; border-radius: 50%;
+               border: 2px solid var(--ink-3); border-right-color: transparent;
+               animation: spin .8s linear infinite; }
 .search-results:not(:empty) { border-top: 1px solid var(--rule);
                               max-height: 60vh; overflow-y: auto; }
 /* keystroke in flight: the prior hits stay put but dim, so the list doesn't

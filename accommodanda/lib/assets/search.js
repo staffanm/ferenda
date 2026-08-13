@@ -11,6 +11,7 @@
    the top hits as links to each document's matching paragraph. */
 (function () {
   var overlay = null, results = null, refine = null, timer = null, seq = 0, sel = 0;
+  var spin = null, spinTimer = null, slowTimer = null;
 
   // the API returns raw field values (correct for an API); the indexed text is
   // parsed remote content, so everything interpolated into innerHTML is escaped
@@ -191,8 +192,31 @@
     window.location.href = hs[sel].getAttribute('href');
     return true;
   }
+  /* -- in-flight feedback: the first search after prod has sat idle can take
+     10+ s (OpenSearch reads a 31 GB index back off a slow disk into a page
+     cache it doesn't fit in). A ring at the input's right edge after 400 ms
+     says work is happening; a note after 2 s says it is slower than usual, so
+     the reader waits instead of concluding the dialog is broken. The 400 ms
+     grace keeps the warm path (~100 ms) spinner-free. */
+  function waitOn(mine) {
+    spinTimer = setTimeout(function () {
+      if (mine === seq && spin) spin.hidden = false;
+    }, 400);
+    slowTimer = setTimeout(function () {
+      if (mine === seq && results)
+        results.insertAdjacentHTML('beforeend', '<div class="search-note ' +
+          'search-slow">Det här tar längre tid än vanligt – ett ögonblick …</div>');
+    }, 2000);
+  }
+  function waitOff() {
+    clearTimeout(spinTimer); clearTimeout(slowTimer);
+    if (spin) spin.hidden = true;
+    var note = results && results.querySelector('.search-slow');
+    if (note) note.remove();
+  }
   function run(q, andGo) {
     var mine = ++seq;
+    waitOff();
     if (!q.trim()) {
       if (results) results.innerHTML = '';
       if (refine) refine.hidden = true;
@@ -206,14 +230,16 @@
     if (local.length) render(local, [], null, q);
     else if (results) results.classList.add('loading');
     if (andGo && local.length) { go(); return; }
+    waitOn(mine);
     fetch('/api/v1/search?limit=8&q=' + encodeURIComponent(q))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (mine === seq) { results.classList.remove('loading'); render(local, d.results || [], d.total || 0, q); if (andGo) go(); } })
+      .then(function (d) { if (mine === seq && results) { waitOff(); results.classList.remove('loading'); render(local, d.results || [], d.total || 0, q); if (andGo) go(); } })
       .catch(function () {
         // local hits (already painted) survive, but the outage must show:
         // silently degrading to same-page pinpoints would hide that corpus
         // search is down
         if (mine === seq && results) {
+          waitOff();
           results.classList.remove('loading');
           refine.hidden = true;
           results.insertAdjacentHTML('beforeend',
@@ -228,11 +254,13 @@
     // the refine link sits to the *right* of the input (S2)
     overlay.innerHTML = '<div class="search-box"><div class="search-input-row">' +
       '<input autofocus placeholder="Sök lag, paragraf, rättsfall…">' +
+      '<span class="search-spin" hidden></span>' +
       '<a class="search-refine" href="/sok/" hidden></a></div>' +
       '<div class="search-results"></div></div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     var input = overlay.querySelector('input');
+    spin = overlay.querySelector('.search-spin');
     refine = overlay.querySelector('.search-refine');
     results = overlay.querySelector('.search-results');
     // a local hit is a same-page jump: scroll + flash instead of a hash
@@ -268,7 +296,12 @@
     input.focus();
   }
   function close() {
-    if (overlay) { overlay.remove(); overlay = null; results = null; refine = null; }
+    if (!overlay) return;
+    waitOff();
+    seq++;              // retire any in-flight fetch: a response landing after
+                        // a close+reopen must not paint the old query's hits
+    overlay.remove();
+    overlay = null; results = null; refine = null; spin = null;
   }
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); open(); }
