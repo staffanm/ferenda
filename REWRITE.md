@@ -164,6 +164,7 @@ accommodanda/
   icrc/     ICRC international humanitarian law treaty vertical — download·model·parse
   untc/     UN Treaty Collection (MTDSG status) vertical — download·model·parse
   icc/      International Criminal Court case-law vertical — download·model·parse
+  icj/      International Court of Justice case-law vertical — download·model·parse·ocr
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
   rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
@@ -3542,9 +3543,9 @@ the markdown is the source of truth thereafter.
   query-parameter URLs live off the catalog. `/dataset/sitenews` is the
   all-feeds directory page.
 
-### 7j. HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law ✅ (first cut)
+### 7j. HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC and ICJ case law ✅ (first cut)
 
-Five verticals sharing one folkrätt (international law) landing page:
+Six verticals sharing one folkrätt (international law) landing page:
 
 - **`accommodanda/hudoc/`** harvests the public JSON endpoint used by HUDOC's
   own result UI (`/app/query/results`) and the selected document's converted
@@ -3702,6 +3703,98 @@ Five verticals sharing one folkrätt (international law) landing page:
   PDF binary. A real download+parse+relate+generate harvest has run: all
   269 curated decisions are live on `/folkratt/` and
   `/icc/{doc-number}`.
+- **`accommodanda/icj/`** harvests International Court of Justice case law —
+  255 of the Court's 877 decisions: 158 judgments, 31 advisory opinions and
+  the 66 orders that indicate provisional measures. The ~620 docket orders
+  that fix and extend time-limits for the Memorial and the Counter-Memorial
+  are deliberately out; they are bookkeeping, not a reader's document.
+  Written and oral pleadings are out for the same reason the remissvar are:
+  they are the parties' word, not the Court's. The PCIJ series (1922–1946)
+  is a different harvest, not a bigger one — mostly French, with pleadings
+  mixed into the judgment files and no consistent language code.
+
+  **Why it was worth adding, given that no Swedish court cites it.** Two
+  reasons, both measured. The corpus already held the treaties the ICJ
+  interprets — the Genocide Convention, the VCLT, UNCLOS, the ICCPR and CAT
+  in `untc`, the Hague Regulations and Geneva Conventions in `icrc` — and
+  those 125 pages had **zero** inbound links: nothing in 296,240 documents
+  cited them. And the corpus already cites the Court itself and resolves
+  nothing: 1,669 hits for "Internationella domstolen" (1,525 of them in
+  förarbeten, 41 in SFS) and 403 for the official "ICJ Reports" citation
+  form (294 from `hudoc`, where the Strasbourg court cites The Hague).
+  Sweden is also a party in three ICJ cases, one of them squarely Swedish
+  law: *Guardianship of Infants* (Netherlands v. Sweden, 1958) turned on a
+  barnavårdsnämnd's skyddsuppfostran against a Dutch guardianship order.
+
+  **Transport.** One index, two routes. The Drupal view at
+  `icj-cij.org/decisions` answers ordinary HTTP and returns the whole
+  877-row history in one request with `from=1946` — its default is
+  `from=2023`, which shows 87, and it does not paginate. No `to` is sent:
+  the select only offers years up to the current one and answers an
+  out-of-range year with an empty result page under a 200, so pinning an
+  upper year would harvest nothing the first January after it went stale.
+  The decision PDFs are behind a Cloudflare challenge that no header or
+  cookie from the index clears, so they come through
+  `lib.browser.DetachedChrome` — the headful transport `rs` and
+  `foreskrift` already use — at about 9 s per document.
+
+  **Reading the printed Reports.** The Court publishes each decision as its
+  page range from the bound *I.C.J. Reports*, so every PDF opens with the
+  publisher's front matter (a bilingual cover, the official-citation page,
+  and since 2012 a table of contents) before the decision starts.
+  `body_pages` cuts at the Court's own letterhead over a `YEAR` line;
+  keying on the letterhead alone starts at page 1 and keeps the French.
+  Everything before ~mid-2004 is a scan with an OCR text layer — the split
+  is not a date but a measurement (a scanned page range carries a raster
+  image on every page, 0.95–1.00 of them, against 0.00–0.03 for a typeset
+  one), and a date rule would have been wrong: the July 2004 Wall opinion
+  is a scan and the December 2004 judgment in the same volume is not.
+
+  `icj/ocr.py` repairs that layer's systematic confusions, measured at
+  ~0.43% of tokens over ten decisions and dominated by `l` read as `1`
+  ("al1" for all, 400 occurrences) and `m` split into `rn` ("Judgrnent",
+  "Charnber", 235). The repair is dictionary-guided rather than a list of
+  known bad words: a token is rewritten only when one confusion turns it
+  into a word the Court itself uses and it is not already one, and two
+  candidate readings mean no rewrite. The vocabulary
+  (`icj/data/vocabulary.txt`, `tools/icj_vocabulary.py`) comes from the
+  born-digital decisions, which need no repair — so the corpus defining "a
+  word" never depends on the repair being right.
+
+  **The paragraph is the citation anchor.** The Reports set a numbered
+  paragraph flush with the one above it, so `page_paragraphs` hands back a
+  whole run of reasoning as one block (4,900 characters holding paragraphs
+  1–5 of the 2024 Gaza order). `paragraph_chain` cuts those runs by finding
+  the Court's own numbering among every number in the text: it takes every
+  candidate in reading order and keeps the longest chain that counts up in
+  steps of at most four, provided the chain either opens at the Court's
+  first paragraph or is long enough that its length is itself the
+  evidence. That is what tells the Court's "5." from "Article 5. The
+  Parties" and from an ICTY paragraph 531 the Court block-quotes inside
+  its own paragraph 309, what keeps one hole from costing every paragraph
+  after it, and what stops a lone stray number from becoming a citation
+  anchor. A separate or dissenting opinion restarts at 1 and forms its own
+  shorter chain, so only the Court's own reasoning is anchored.
+
+  Where the repair count reaches five the page carries a banner saying the text
+  saying the text was read off the printed Reports and that the Court
+  states the printed version is the official one — evidence from a real
+  count, not a guess from the date. Reuse is under the ICJ's non-commercial condition, which
+  lagen.nu meets; this is not the 2 § URL freedom SFS and propositioner
+  have, and it was weighed before the work started. Artifacts live at
+  `/ext/icj/{stem}`, keyed on the Court's own decision filename
+  (`070-19860627-JUD-01-00` = case, date, kind, part); the grammar stays
+  local to the vertical (rule:second-use-goes-to-lib). The folkrätt landing
+  lists the decisions grouped by kind (Domar / Rådgivande yttranden /
+  Interimistiska beslut), newest first per group, under "Internationella
+  domstolen (ICJ)"; like coe/icrc/untc/icc it has no faceted browse tree of
+  its own. Wired through `build.py`, `layout`, `catalog`, `facets` and
+  `render`. `test/test_icj.py` runs off a stored-record fixture, pure unit
+  tests of the OCR repair and the paragraph chain, and three
+  `lines-*.json` fixtures that freeze what `pages_with_ocr` really returns
+  for a page range of a stored decision. That last group exists because
+  every test written against hand-made strings passed while the corpus
+  carried three separate defects (rule:lock-in-with-fixture).
 - **Identity and graph:** `lib/coe.py` is the second-use shared seam. HUDOC's
   article facet codes (`8`, `6-3-d`, `P1-1`, `P7-4`) map protocol numbers to
   their Treaty Office ETS/CETS instruments and mint exactly the provision URI
@@ -4024,6 +4117,7 @@ rewrite work.
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
 | `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
+| `accommodanda/icj/` | **International Court of Justice case-law vertical**: the `icj-cij.org/decisions` Drupal view (one request with `from=1946` returns all 877 rows) scopes the harvest to 255 decisions — judgments, advisory opinions and provisional-measures orders; the PDFs are Cloudflare-walled and fetched through `lib.browser.DetachedChrome`. `parse.py` cuts the printed Reports' front matter at the Court's **dateline** (the letterhead words do not survive OCR) and recovers the numbered paragraphs with `paragraph_chain` — the longest chain counting up in steps of at most four, which must also open at the Court's first paragraph or be long enough that its length is the evidence, so a quoted ICTY paragraph and an annex's page numbers both join none; `ocr.py` repairs the pre-2004 scans' systematic character confusions against a vocabulary harvested from the born-digital decisions |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN/IMY/KKV-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; IMY tillsyn pages, whose diarienummer is read out of the attached PDFs and the documents regrouped by it, plus the praxisbeslut/sanktionsavgift overlay; KKV the diarium narrowed by `KKV_CASETYPES` joined with the curated ärendelista on the dnr; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`imy_pdf_path`/`kkv_body_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN/IMY/KKV PDF via `lib/pdftext`, JK landing HTML, KKV also FrontPage-era windows-1252 HTML and Word; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary); `KNOWN-GAPS.md` records the two documents `avg parse` has ever failed on, both since resolved |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine; `clean_title`/`title_from_body` fall back to the PDF's own opening rubric when the harvest title is link chrome), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors), `data/series.json` (hand-edited designation/official-title/successor registry, `lib/datasets.FS_SERIES` — drives the browse's headings, Swedish ordering and succession folding, `lib/facets.py`). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
@@ -4167,6 +4261,82 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **icj** (2026-08-13) — a sixth folkrätt source, §7j: `icj/` harvests
+  International Court of Justice case law. Scope is the Court's own word
+  on the law — 255 of its 877 decisions: 158 judgments, 31 advisory
+  opinions and the 66 orders indicating provisional measures. The ~620
+  docket orders that fix and extend time-limits are out, as are the
+  parties' written and oral pleadings and the PCIJ series.
+
+  The reason was measured before the code. `untc`'s 14 treaties and
+  `icrc`'s 111 had **zero** inbound links: nothing in 296,240 documents
+  cited the Genocide Convention, the VCLT, UNCLOS, the ICCPR or CAT,
+  though the corpus holds them all. An ICJ judgment is the document that
+  does. The corpus also already cites the Court and resolves nothing —
+  1,669 hits for "Internationella domstolen" (1,525 in förarbeten, 41 in
+  SFS) and 403 for "ICJ Reports" (294 of them from `hudoc`). Sweden is a
+  party in three ICJ cases, one squarely Swedish law: *Guardianship of
+  Infants* (Netherlands v. Sweden, 1958), on a barnavårdsnämnd's
+  skyddsuppfostran against a Dutch guardianship order. `icj/treaties.py`
+  emits the treaty-level `dcterms:references` that make the join, matched
+  on each instrument's authoritative English title and the short form the
+  Court uses ("the Genocide Convention"); the bare word "Convention"
+  deliberately cites nothing, since it names whichever instrument the
+  decision is about.
+
+  Two transports for one index. `icj-cij.org/decisions` answers ordinary
+  HTTP and returns all 877 rows in one request with `from=1946` — its
+  default is `from=2023`, which shows 87, and it does not paginate. No
+  `to` is sent: the select offers only years up to the current one and
+  answers an out-of-range year with an empty page under a 200. The
+  decision PDFs sit behind a Cloudflare challenge no header or cookie
+  from the index clears, so they come through
+  `lib.browser.DetachedChrome`, the headful transport `rs` and
+  `foreskrift` already use — one session for the whole run, ~9 s per
+  document, 40 minutes for the 255.
+
+  Each decision is its page range from the printed *I.C.J. Reports*, so
+  the PDF opens with the publisher's bilingual front matter; `body_pages`
+  cuts at the Court's letterhead over a `YEAR` line. 138 of the 255 are
+  scans with an OCR layer — a measurement, not a date: a scanned page
+  range carries a raster image on every page (0.95–1.00) against
+  0.00–0.03 for a typeset one, and a date rule would have been wrong,
+  since the July 2004 Wall opinion is a scan and the December 2004
+  judgment in the same volume is not. `icj/ocr.py` repairs that layer's
+  systematic confusions — `l` read as `1` ("al1", 400 occurrences), `m`
+  split into `rn` ("Judgrnent", "Charnber", 235), ~0.43% of tokens —
+  dictionary-guided against a vocabulary harvested from the born-digital
+  decisions, so the corpus defining "a word" never depends on the repair
+  being right. A token of pure digits is never touched: rewriting "111."
+  to "iii." ended one judgment's paragraph sequence at 110. The page says
+  so where the repair count reaches five, a threshold read off the corpus:
+  the 138 scans repair a median of 19 words and the 117 typeset decisions a
+  median of 0, but 27 typeset ones repair 1–8, so a "nonzero" test would
+  tell 27 readers their text was machine-read when it was not.
+
+  The numbered paragraph is the citation anchor, and the Reports set each
+  one flush with the paragraph above it, so `page_paragraphs` returns a
+  whole run of reasoning as one block. `paragraph_chain` cuts those runs
+  by taking every number in reading order and keeping the longest chain
+  that counts up, stepping over as many as three numbers the scan lost. That tells the
+  Court's "5." from "Article 5. The Parties" and from an ICTY paragraph
+  531 quoted inside the Court's own paragraph 309. Three earlier designs
+  each failed measurably: walking forward from "the next number I expect"
+  stopped at the first hole (paragraph 74 of 524 in Croatia v. Serbia);
+  rejecting a whole block that held the printer's imposition stamp lost
+  paragraphs 75–524 of the same judgment; requiring a step of exactly one
+  split a decision into two chains and kept only the longer.
+
+  A real harvest has run: 255 downloaded, 255 parsed, 0 errors, 56,609
+  blocks and 23,579 numbered paragraphs. 162 decisions (64%) carry at
+  least one treaty reference — 327 in total onto 12 of untc's 14
+  instruments, which had none at all before. A random sample of 14
+  decisions was checked span by span: 19 of 19 references land on a real
+  mention of the named instrument. Reuse is under the ICJ's
+  non-commercial condition, which lagen.nu meets; this is not the 2 § URL
+  freedom SFS and propositioner have, and it was weighed before the work
+  started.
 
 - **hudoc** (2026-08-12) — the source could never reach past its 10,000th
   document. HUDOC answers a query past `start=10000` with an empty page while

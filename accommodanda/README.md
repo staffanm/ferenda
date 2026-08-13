@@ -295,7 +295,17 @@ build's chrome indefinitely.
 | `data/decision_types.json` | the curated Rome-Statute decision types (one harvest engine over all, rule:configured-by-data) — Art 74 verdicts, 76 sentences, 61 confirmation, 58 arrest warrants, 81/82/82.4 appeal judgments, 75 reparations, 15/18-19/53.3/110 — each with the icc-cpi.int facet id, the catalog/facet `kind`, and the Swedish heading it files under on the folkrätt landing; deliberately excludes the ~10k procedural Decision/Order mass |
 | `render.py` | the ICC-sida: the decision and its case metadata. Registered as this source's page renderer in `build.SOURCE_RENDERERS`; `render(art, site) -> str`, built on the `lib/page` kit, with its own page template in `templates/` |
 
-`coe`, `hudoc`, `icrc`, `untc` and `icc` share one masthead entry, **Folkrätt**
+**icj vertical (International Court of Justice case law)**
+| File | What |
+|---|---|
+| `download.py` | one index, two transports. The Drupal view at `icj-cij.org/decisions` answers ordinary HTTP, and a single request with `from=1946` returns every decision the Court has ever issued (877 rows) — its default is `from=2023`, which shows 87, and it does not paginate (`?page=1` repeats page 1). No `to` is sent: the select only offers years up to the current one and answers an out-of-range year with an empty page under a 200. `in_scope` keeps the Court's own word on the law — 158 judgments, 31 advisory opinions and the 66 orders that indicate provisional measures — and drops the ~620 docket orders that fix and extend time-limits. The decision PDFs are behind a Cloudflare challenge no header or cookie from the index satisfies, so they are fetched through `lib.browser.DetachedChrome` (one session for the whole run, ~9 s per document); incremental via a date watermark, `--only <decision stem>`, `--limit` |
+| `model.py` | typed `Decision`/`Block`; the Court's own decision filename is the identity (`070-19860627-JUD-01-00` = case, date, kind, part), normalised across the one file that separates with `_`; `to_artifact()` turns the numbered paragraphs into the citation-unit tree (`P<n>` ids); canonical `ext/icj/{stem}` kept local to the vertical (rule:second-use-goes-to-lib) |
+| `parse.py` | the decision's page range from the printed *I.C.J. Reports* → artifact. `body_pages` cuts the Reports' bilingual front matter at the Court's **dateline** ("YEAR 1986"), which survives OCR where the letterhead does not — the 1949 scan prints "INTERNATIONAL COUI2T OF JUSTICE" — with the letterhead as fallback and a raise when neither is there. `clean` removes the Reports' running head and the printer's imposition stamp, cutting them out of the block rather than rejecting it (rejecting the block cost one judgment 450 paragraphs). `paragraph_chain` picks the Court's own numbering out of every number in the text: the longest chain that counts up in steps of at most four, which must open at the Court's first paragraph and hold at least three members — so a quoted ICTY paragraph joins no chain, an OCR hole is stepped over, and a decision the Reports never numbered gets no anchors rather than invented ones |
+| `ocr.py` | dictionary-guided repair of the pre-2002 Reports scans' OCR layer, whose systematic confusions (`al1` for all, `Judgrnent` for Judgment) run at ~0.43% of tokens. A token is rewritten only when one known confusion turns it into a word the Court itself uses and it is not already one; two readings mean no rewrite, and a token of pure digits is never touched (rewriting "111." to "iii." ended a judgment's paragraph sequence) |
+| `data/vocabulary.txt` | the Court's own words, harvested by `tools/icj_vocabulary.py` from the decisions it published born-digital — identified by measurement (a scan carries a raster image on every page, a typeset volume only where a sketch-map is), so the corpus that defines "a word" never depends on the repair being right. French is in the list and cannot be cut out: the Court's English text quotes it constantly, every I.C.J. citation carries "Recueil". It is harmless because a repair fires only where a *confusion* turns an English token into one of those words, which over 500 measured repairs never happened |
+| `render.py` | the ICJ-sida: the decision, its case metadata, and — where the repair count reaches `SCAN_REPAIRS` — the banner saying the text was read off the printed Reports, which the Court states is the official version. The threshold is measured, not assumed: the 138 scans repair a median of 19 words and the 117 typeset decisions a median of 0, but 27 typeset ones repair 1–8, so a "nonzero" test would tell 27 readers something false. Registered in `build.SOURCE_RENDERERS` |
+
+`coe`, `hudoc`, `icrc`, `untc`, `icc` and `icj` share one masthead entry, **Folkrätt**
 (`/folkratt/`, an international-law umbrella for the later ICJ sources). The
 bespoke `render.render_folkratt` landing lists every CoE instrument
 alphabetically by its significant title (`lib.coe.significant_title`, the SFS
@@ -661,6 +671,8 @@ uv run python -m accommodanda.build untc download                # the 14 curate
 uv run python -m accommodanda.build untc parse                   # status page -> metadata + participation artifact
 uv run python -m accommodanda.build icc download                 # the curated ICC substantive decisions
 uv run python -m accommodanda.build icc parse                    # Legal Tools metadata + PDF -> article artifacts
+uv run python -m accommodanda.build icj download                 # judgments, advisory opinions, provisional-measures orders
+uv run python -m accommodanda.build icj parse                    # I.C.J. Reports PDF -> numbered-paragraph artifacts
 uv run python -m accommodanda.build all relate                   # joins HUDOC cases to CoE articles
 ```
 
@@ -687,7 +699,16 @@ facet-scrapes icc-cpi.int `/decisions` for the curated Rome-Statute decision
 types to get each record's document number, then resolves that number
 against the ICC Legal Tools API (`legal-tools.org/api/ltdDocs`) for metadata
 and the decision PDF, so `icc parse` reads the stored Legal Tools record and
-PDF text and never touches the network either.
+PDF text and never touches the network either. `icj download` is the one
+folkrätt harvest that needs a browser: the `/decisions` index answers ordinary
+HTTP, but every decision PDF under `/sites/default/files/case-related/` returns
+a Cloudflare challenge that no header or cookie from the index clears, so the
+bodies come through `lib.browser.DetachedChrome` — one headful session for the
+whole run, about 9 s per document, ~40 minutes for the 255 in scope. Rerun
+`tools/icj_vocabulary.py` after a harvest that adds a year of decisions: it
+rebuilds `icj/data/vocabulary.txt`, the word list that guides the OCR repair of
+the pre-2002 scans, and the file is a recipe input so a rebuild re-stales every
+scanned decision.
 
 **remisser — regeringen.se referral responses** (keyed on the referred
 document, not the regeringen.se case-page slug; operates on
@@ -933,6 +954,7 @@ site/data/downloaded/coe/                     # Treaty Office records + official
 site/data/downloaded/icrc/                    # ICRC JSON:API treaty envelopes (metadata + authentic text, no PDF)
 site/data/downloaded/untc/                    # MTDSG status pages (metadata + participation, no treaty text)
 site/data/downloaded/icc/                     # ICC Legal Tools records (metadata) + decision PDFs
+site/data/downloaded/icj/                     # ICJ index rows (metadata) + I.C.J. Reports decision PDFs
 site/data/downloaded/forarbete/<type>/<year>/ # regeringen.se harvest + frozen-import records (prop/sou/ds/pm/dir/fm/skr/so/lr), year-segmented (pm buckets under `_`)
 site/data/downloaded/forarbete/bet/<year>/    # data.riksdagen.se harvest (utskottsbetänkanden; record json + PDF, no HTML landing page)
 site/data/downloaded/forarbete/rskr/<year>/   # data.riksdagen.se harvest (riksdagsskrivelser; record json + HTML body, no PDF)
@@ -1112,10 +1134,10 @@ skipped rather than published (`sfs.versions.build`). Patches live committed in 
 the artifact tree (`layout.patch`); they are folded into every patchable source's
 parse freshness inputs so editing one re-stales its document.
 
-The five folkrätt sources — `hudoc`, `coe`, `icrc`, `untc`, `icc` — apply a patch
+The six folkrätt sources — `hudoc`, `coe`, `icrc`, `untc`, `icc`, `icj` — apply a patch
 at parse time the same way (`patch.apply` on the stored record/HTML text for
 `hudoc`/`icrc`/`untc`, a `patch_key` threaded into `lib.pdftext.pdf_pages` for the
-PDF-bodied `coe`/`icc`), but none has a `patchsource.py` `_INTERMEDIATE` entry, so
+PDF-bodied `coe`/`icc`/`icj`), but none has a `patchsource.py` `_INTERMEDIATE` entry, so
 `mkpatch`/the web editor cannot generate a pristine intermediate to diff against
 for them — only a hand-written diff against the stored source text applies.
 
