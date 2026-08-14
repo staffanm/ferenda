@@ -4,8 +4,13 @@ A query that reads the right rows the wrong way is still correct, so nothing
 else in the suite notices it -- and on dev's NVMe nothing notices it at runtime
 either. Prod's disk does ~100 random IOPS, where the inbound-citation count took
 190 s cold for as long as its index was not covering.
+
+The corpus-wide anchor audit (`dangling_anchors`) sits here too: it is the
+same shape of defect -- a query whose result nothing else in the suite can
+see, because a link with a dead fragment counts as a link everywhere else.
 """
 
+import json
 import sqlite3
 
 import pytest
@@ -139,4 +144,62 @@ def test_a_failed_widening_leaves_the_old_index_in_place(tmp_path, monkeypatch):
     con = sqlite3.connect(path)
     assert tuple(row[2] for row in con.execute(
         "PRAGMA index_info(idx_links_to_root)")) == ("to_root",)
+    con.close()
+
+
+# --------------------------------------------------------------------------
+# the corpus-wide anchor audit
+# --------------------------------------------------------------------------
+
+def _corpus(tmp_path, target_ids, cited_anchor):
+    """A two-document corpus: one artifact holding `target_ids`, one citing it
+    at `cited_anchor`. `rebuild` records the artifacts' paths, so the audit
+    reads the real files back the way it does on the corpus."""
+    art = tmp_path / "artifact"
+    art.mkdir()
+    target = art / "target.json"
+    target.write_text(json.dumps({
+        "uri": "https://lagen.nu/ext/icrc/195",
+        "metadata": {"properties": {"dcterms:title": "Hague Convention (IV)"}},
+        "structure": [{"type": "artikel", "id": nid, "text": ["Text."]}
+                      for nid in target_ids]}))
+    citing = art / "citing.json"
+    citing.write_text(json.dumps({
+        "uri": "https://lagen.nu/ext/icc/0001",
+        "metadata": {"properties": {"dcterms:title": "A decision"}},
+        "structure": [{"type": "stycke", "id": "S1", "text": [
+            "See ", {"uri": "https://lagen.nu/ext/icrc/195#" + cited_anchor,
+                     "text": "article 42"}, "."]}]}))
+    path = tmp_path / "catalog.sqlite"
+    catalog.rebuild(path, "icrc", [target, citing])
+    return catalog.connect(path)
+
+
+def test_a_source_outside_the_audit_is_not_read_at_all(tmp_path):
+    """The audit is only answerable for a source whose page offers exactly the
+    anchors its artifact carries. sfs mints a change-act anchor per amendment,
+    eurlex a stycke alias, forarbete a page marker, and `Toc` a generated
+    anchor for any heading with no id -- none of them a `structure` node. Asked
+    of every source the audit calls 1 612 832 live links broken, so the caller
+    names what it can answer for."""
+    con = _corpus(tmp_path, ["Annex42"], "A42")
+    assert catalog.dangling_anchors(con, ("sfs", "eurlex")) == []
+    assert catalog.dangling_anchors(con, ("icrc",))
+    con.close()
+
+
+def test_an_anchor_the_target_does_not_hold_is_reported(tmp_path):
+    """The failure a link count cannot show: the link exists, the target
+    exists, and the anchor goes nowhere. 126 treaty references pointed at an
+    `#A42` on a convention that anchors its Regulations' articles under
+    `#Annex42`, and every count involved looked healthy."""
+    con = _corpus(tmp_path, ["Annex42"], "A42")
+    assert catalog.dangling_anchors(con, ("icrc",)) == [
+        ("https://lagen.nu/ext/icc/0001", "https://lagen.nu/ext/icrc/195#A42", 1)]
+    con.close()
+
+
+def test_an_anchor_the_target_holds_is_not_reported(tmp_path):
+    con = _corpus(tmp_path, ["Annex42"], "Annex42")
+    assert catalog.dangling_anchors(con, ("icrc",)) == []
     con.close()

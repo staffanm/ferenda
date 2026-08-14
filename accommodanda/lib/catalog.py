@@ -15,6 +15,7 @@ uniformly across SFS and DV, and both verticals mint the same
 the edges from either source.
 """
 
+import collections
 import hashlib
 import json
 import re
@@ -1586,6 +1587,68 @@ def dangling_targets(con, prefix):
         "WHERE l.to_root LIKE ? AND d.uri IS NULL "
         "GROUP BY l.to_root ORDER BY COUNT(*) DESC, l.to_root",
         (prefix.replace("%", "") + "%",)).fetchall()
+
+
+def dangling_anchors(con, sources):
+    """Links whose *fragment* names no node in the document they point at:
+    `(from_uri, to_uri, count)`, most-cited first, over targets whose `source`
+    is in `sources`.
+
+    `dangling_targets` above answers the other half -- a document the corpus
+    cites and does not hold. This one is about a document it *does* hold, cited
+    at a provision that is not in it, which is the failure a link count cannot
+    show: the link exists, the target exists, and the anchor goes nowhere.
+
+    It generalises `wiki.parse.dangling_anchors` (which asks the same question
+    of one kommentar and its host act) to the whole citation graph, because the
+    same defect turned up far from the commentary layer: 126 treaty references
+    pointed at an `#A42` on a Hague Convention that anchors its Regulations'
+    articles under `#Annex42`, and every count involved looked healthy. (The
+    curated table now targets the 1907 Convention, `ext/icrc/195`, so that exact
+    uri no longer occurs -- the shape of the failure is the point.)
+
+    `sources` is not a convenience filter: the audit is only *answerable* for a
+    source whose page offers exactly the anchors its artifact carries. The
+    others mint anchors at render time that no `structure` node holds -- sfs a
+    change-act anchor per amendment (`1999:1229#L2007:1419`), eurlex an article
+    and stycke alias (`32009R1107#29.6`), forarbete a page marker
+    (`prop/1975:103#sid355`), coe a sub-paragraph pinpoint (`coe/005#A5P1Ld`),
+    and `Toc` a generated anchor for a heading with no id -- and asked of every
+    source it returns 1 612 832 pairs, a number nobody can act on rather than a
+    finding. The caller names the sources it can answer for
+    (`build.ANCHOR_EXACT`), which is also what keeps the pass cheap: only those
+    targets' artifacts are read, each once.
+    """
+    root = data_root(con)
+    # streamed, not fetched: the join covers every anchored link in the corpus
+    # (6.9 million of them here), and materialising them costs gigabytes for a
+    # loop that reads each row once and keeps only the misses
+    nodes, out = {}, collections.Counter()
+    for from_uri, to_uri, path in con.execute(
+            "SELECT l.from_uri, l.to_uri, d.path FROM links l "
+            "JOIN documents d ON d.uri = l.to_root "
+            "WHERE instr(l.to_uri, '#') > 0 AND d.path <> '' "
+            "AND d.source IN (%s)" % ",".join("?" * len(sources)),
+            tuple(sources)):
+        if path not in nodes:
+            nodes[path] = _node_ids(compress.read_json(root / path))
+        if to_uri.split("#", 1)[1] not in nodes[path]:
+            out[(from_uri, to_uri)] += 1
+    return [(from_uri, to_uri, count)
+            for (from_uri, to_uri), count
+            in sorted(out.items(), key=lambda item: (-item[1], item[0]))]
+
+
+def _node_ids(art):
+    """Every anchor a document offers, at any depth."""
+    found = set()
+    stack = list(art.get("structure") or [])
+    while stack:
+        node = stack.pop()
+        if node.get("id"):
+            found.add(node["id"])
+        stack.extend(node.get("children") or [])
+    return found
 
 
 def genomfor_for(con, sfs_uri, anchor):
