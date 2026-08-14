@@ -448,8 +448,8 @@ def describe_citer(from_uri, anchor, label, title, source):
 # The inbound rail's accordion rows, in display order. Ranking lives in
 # RAIL_SECTION_ORDER, keyed by these same slugs.
 INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "edpb",
-                 "hudoc", "icc", "eu-caselaw", "eu-forslag", "eurlex", "coe",
-                 "icrc", "untc", "begrepp")
+                 "hudoc", "icc", "icj", "eu-caselaw", "eu-forslag", "eurlex",
+                 "coe", "icrc", "untc", "begrepp")
 
 # What a group is called where that is *not* simply what the source is called
 # (`facets.SOURCE_LABELS`). Three of them differ because these are **inbound** --
@@ -1324,7 +1324,8 @@ class RailSection:
 # the first section present opens; the rest stay one click away (C3). A key not
 # listed here (a source with no assigned rank) sorts last, by label.
 RAIL_SECTION_ORDER = (
-    "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "eu-caselaw", "eu-forslag",
+    "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "icj", "eu-caselaw",
+    "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "edpb", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")

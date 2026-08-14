@@ -95,6 +95,7 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift import render as foreskrift_render
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
+from .hudoc import casenames as hudoc_casenames_mod
 from .hudoc import download as hudoc_download
 from .hudoc import parse as hudoc_parse
 from .hudoc import render as hudoc_render
@@ -127,6 +128,7 @@ from .lib import (
     text,
     util,
 )
+from .lib.datasets import EMD_CASES as EMD_CASES_JSON
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDEUCASES as NAMEDEUCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
@@ -1794,7 +1796,12 @@ FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
            PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py")
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           # the data the citation engine's treaty matching is configured by:
+           # a new Swedish treaty name re-stales the parse like a grammar edit
+           PKG / "lib" / "treaty_ids.py",
+           PKG / "lib" / "data" / "treaty_names.json",
+           PKG / "coe" / "data" / "names.json")
 
 
 def fa_record(basefile):
@@ -2314,7 +2321,7 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 # --------------------------------------------------------------------------
 
 HUDOC_CODE = (PKG / "hudoc" / "parse.py", PKG / "hudoc" / "model.py",
-              PKG / "hudoc" / "summaries.py",
+              PKG / "hudoc" / "summaries.py", PKG / "hudoc" / "citations.py",
               PKG / "lib" / "coe.py", PKG / "lib" / "artifact.py")
 COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
             PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py",
@@ -2378,12 +2385,27 @@ def hudoc_harvest(scopes):
     hudoc_translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT)
 
 
+def hudoc_casenames(args=()):
+    """Refresh the ECHR case snapshot (`lagen hudoc casenames`): rewrite
+    hudoc/data/casenames.json from the records on disk, the join surface the
+    citation engine resolves "Osman mot Förenade kungariket" through. No
+    network -- run it after a harvest that changed the corpus."""
+    if RUN.dry_run:
+        print("hudoc casenames: would rebuild %s from %s"
+              % (EMD_CASES_JSON, layout.HUDOC_DOWNLOADED))
+        return
+    cases, appnos = hudoc_casenames_mod.write(layout.HUDOC_DOWNLOADED)
+    print("hudoc casenames: %d case names, %d application numbers -> %s"
+          % (cases, appnos, EMD_CASES_JSON))
+
+
 SOURCES["hudoc"] = Source(
     "hudoc", lambda: hudoc_download.list_basefiles(layout.HUDOC_DOWNLOADED), {
         "parse": _parse_stage("hudoc", hudoc_parse.parse,
                               layout.HUDOC_DOWNLOADED,
                               inputs=hudoc_inputs, code=HUDOC_CODE),
     },
+    actions={"casenames": hudoc_casenames},
     harvest=hudoc_harvest, origin=_origin(hudoc_download.BASE),
     scopes=frozenset(hudoc_download.COLLECTIONS),
     notes="download flags: --lang ENG[,FRE], --only <HUDOC-itemid>, --limit N\n"
@@ -2466,7 +2488,10 @@ SOURCES["untc"] = _simple_source(
 # Legal Tools resolves each to metadata + PDF; the stored record + PDF are the
 # parse inputs, and the curated decision-type list is a recipe input.
 ICC_CODE = (PKG / "icc" / "parse.py", PKG / "icc" / "model.py",
+            PKG / "icc" / "treaties.py",
             PKG / "icc" / "data" / "decision_types.json",
+            PKG / "lib" / "treatyref.py", PKG / "lib" / "treaty_ids.py",
+            PKG / "lib" / "data" / "treaty_names.json",
             PKG / "lib" / "pdftext.py", PKG / "lib" / "artifact.py")
 
 
@@ -2491,7 +2516,10 @@ SOURCES["icc"] = _simple_source(
 # input -- rebuilding it (tools/icj_vocabulary.py) changes how every scanned
 # decision reads.
 ICJ_CODE = (PKG / "icj" / "parse.py", PKG / "icj" / "model.py",
-            PKG / "icj" / "ocr.py", PKG / "icj" / "data" / "vocabulary.txt",
+            PKG / "icj" / "ocr.py", PKG / "icj" / "treaties.py",
+            PKG / "icj" / "reports.py", PKG / "icj" / "data" / "vocabulary.txt",
+            PKG / "lib" / "treatyref.py", PKG / "lib" / "treaty_ids.py",
+            PKG / "lib" / "data" / "treaty_names.json",
             PKG / "lib" / "pdftext.py", PKG / "lib" / "artifact.py")
 
 
@@ -3216,6 +3244,23 @@ def begrepp_parse_run(basefile):
     write_artifact("begrepp", basefile, art)
 
 
+# how many dangling anchors relate names individually before the count stands
+# alone; a systematic break shows itself in the first few
+DANGLING_REPORT = 20
+# The sources the anchor audit can answer for -- named by the document a link
+# points *at*, not by the one citing it. Both render every provision through
+# `page.provision_section`, which anchors on the artifact's own node id, so a
+# fragment that names no node really is a dead link. No other source is on this
+# list, because every other one mints anchors at render time that no `structure`
+# node holds: sfs a change-act anchor per amendment (`1999:1229#L2007:1419`),
+# eurlex an article and stycke alias (`32009R1107#29.6`), forarbete a page
+# marker (`prop/1975:103#sid355`), coe a sub-paragraph pinpoint
+# (`coe/005#A5P1Ld`), and `page.Toc` a generated anchor for any heading with no
+# id at all. Asked of every source the audit reports 1 612 832 live links as
+# broken. Adding a source here is a claim about its renderer -- read it first.
+ANCHOR_EXACT = ("icrc", "untc")
+
+
 def kommentar_anchor_warnings(con, basefiles=()):
     """Section anchors in kommentar artifacts that resolve to no node in the act
     they annotate -- a mistyped `## Artikel N` / `## N kap M §` whose commentary
@@ -3669,6 +3714,20 @@ def cmd_relate(names, force=None):
         # föreskrift), so it runs here rather than per source.
         chain = catalog.rebuild_norm_chain(con)
         anchor_warnings = kommentar_anchor_warnings(con)
+        # The same question `kommentar_anchor_warnings` asks of one commentary
+        # and its host act, asked of the whole citation graph: a link whose
+        # fragment names no node in the document it points at. Its home is here
+        # because relate is what writes the `links` rows -- the graph exists for
+        # the first time, and the catalog is already open.
+        #
+        # Worth the pass: run by hand it found 126 treaty references pointing
+        # at an `#A42` on a Hague Convention that anchors its Regulations'
+        # articles under `#Annex42`, and every count involved -- links written,
+        # documents related -- looked healthy throughout.
+        # one pass, not two: the scan reads every anchored link and parses each
+        # distinct target artifact, so calling it again only to count them cost
+        # the whole walk twice inside the nightly build
+        dangling = catalog.dangling_anchors(con, ANCHOR_EXACT)
         con.close()
         _emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
         record_fingerprint(store, "relate", "__corr__", corr_wm)
@@ -3688,6 +3747,12 @@ def cmd_relate(names, force=None):
             print("relate: WARNING kommentar %s annotates %s but has no matching "
                   "node for %s -- check the heading numbering"
                   % (bf, host, ", ".join(anchors)))
+        print("relate: %d link(s) point at an anchor their target does not "
+              "have (%s -- the sources whose pages offer exactly their "
+              "artifact's anchors)" % (len(dangling), ", ".join(ANCHOR_EXACT)))
+        for from_uri, to_uri, count in dangling[:DANGLING_REPORT]:
+            print("relate: WARNING %s -> %s (%d) -- the document is held, the "
+                  "anchor is not in it" % (from_uri, to_uri, count))
     else:
         print("relate: nothing changed -- cross-document passes skipped")
         _emit_segment("relate", "__corr__", 0.0, status="skipped")

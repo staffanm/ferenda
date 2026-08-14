@@ -26,6 +26,7 @@ ENV = tpl.environment("accommodanda.forarbete")
 
 FA_TYPE_LABEL = {"prop": "Proposition", "sou": "SOU", "ds": "Ds",
                  "pm": "Promemoria", "bet": "Betänkande",
+                 "rskr": "Riksdagsskrivelse",
                  "dir": "Kommittédirektiv", "fm": "Förordningsmotiv",
                  "skr": "Skrivelse", "lr": "Lagrådsremiss",
                  "so": "Sveriges internationella överenskommelser"}
