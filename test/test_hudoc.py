@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from accommodanda.coe import render as coe_render
-from accommodanda.hudoc import download, parse, summaries, translations
+from accommodanda.hudoc import citations, download, parse, summaries, translations
 from accommodanda.hudoc import render as hudoc_render
 from accommodanda.lib import catalog, coe, facets, layout, page
 from accommodanda.lib.errors import SkipDocument
@@ -459,3 +459,83 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
     assert "artikel 8 EKMR" in case_html
     assert ">005#A8<" not in case_html
     assert '<a href="/coe/005#A8">' in case_html
+
+
+# --- case-law cross-references (hudoc.citations) ---
+
+def _record(tmp_path, itemid, docname, appno, collection, date):
+    (tmp_path / ("%s.json" % itemid)).write_text(json.dumps({
+        "itemid": itemid, "docname": docname, "appno": appno,
+        "documentcollectionid2": collection, "kpdate": date}))
+
+
+def _corpus(tmp_path):
+    _record(tmp_path, "001-1", "CASE OF KEENAN v. THE UNITED KINGDOM",
+            "27229/95", "CASELAW;JUDGMENTS;CHAMBER;ENG", "2001-04-03T00:00:00")
+    _record(tmp_path, "001-2", "KEENAN v. THE UNITED KINGDOM",
+            "27229/95", "CASELAW;DECISIONS;ADMISSIBILITY;ENG",
+            "1998-05-12T00:00:00")
+    _record(tmp_path, "001-3", "CASE OF DODOV v. BULGARIA",
+            "59548/00", "CASELAW;JUDGMENTS;CHAMBER;ENG", "2008-01-17T00:00:00")
+    _record(tmp_path, "001-4", "CASE OF OBERSCHLICK v. AUSTRIA (No. 2)",
+            "20834/92", "CASELAW;JUDGMENTS;CHAMBER;ENG", "1997-07-01T00:00:00")
+    # the same application number twice as judgment: chamber, then Grand
+    # Chamber -- only a date can tell a citation's target apart
+    _record(tmp_path, "001-5", "CASE OF ELSHOLZ v. GERMANY",
+            "25735/94", "CASELAW;JUDGMENTS;CHAMBER;ENG", "1999-03-02T00:00:00")
+    _record(tmp_path, "001-6", "CASE OF ELSHOLZ v. GERMANY",
+            "25735/94", "CASELAW;JUDGMENTS;GRANDCHAMBER;ENG",
+            "2000-07-13T00:00:00")
+    citations.index.cache_clear()
+    return citations
+
+
+def test_appno_citation_links_the_sole_judgment(tmp_path):
+    citations = _corpus(tmp_path)
+    refs = citations.refs("see Keenan v. the United Kingdom, no. 27229/95, "
+                          "§ 111", "001-9", tmp_path)
+    assert [(r.text, r.uri[-5:]) for r in refs] \
+        == [("Keenan v. the United Kingdom", "001-1"),
+            ("27229/95", "001-1")]
+    citations.index.cache_clear()
+
+
+def test_an_ambiguous_appno_links_only_with_a_date(tmp_path):
+    """Two held judgments share 25735/94 (chamber and Grand Chamber). A bare
+    citation stays unlinked -- a guess would mislink the version cited -- but
+    the date the citation itself prints picks one."""
+    citations = _corpus(tmp_path)
+    assert citations.refs("see no. 25735/94, § 66", "001-9", tmp_path) == []
+    refs = citations.refs("Elsholz v. Germany, no. 25735/94, § 66, "
+                          "13 July 2000", "001-9", tmp_path)
+    assert {r.uri[-5:] for r in refs} == {"001-6"}
+    citations.index.cache_clear()
+
+
+def test_a_serial_suffix_is_part_of_the_case_identity(tmp_path):
+    citations = _corpus(tmp_path)
+    refs = citations.refs("as held in Oberschlick v. Austria (no. 2), "
+                          "1 July 1997", "001-9", tmp_path)
+    assert [(r.text, r.uri[-5:]) for r in refs] \
+        == [("Oberschlick v. Austria (no. 2)", "001-4")]
+    # without the serial there is no held case named plain "Oberschlick"
+    assert citations.refs("as held in Oberschlick v. Austria itself",
+                          "001-9", tmp_path) == []
+    citations.index.cache_clear()
+
+
+def test_the_documents_own_identity_never_links(tmp_path):
+    """The cover sheet prints the document's own name and application number
+    ("Application no. 27229/95") -- self-description, not citation, and
+    linking it reached whichever sibling survived the self-exclusion."""
+    citations = _corpus(tmp_path)
+    assert citations.refs("KEENAN v. THE UNITED KINGDOM Application "
+                          "no. 27229/95", "001-1", tmp_path) == []
+    citations.index.cache_clear()
+
+
+def test_an_unknown_case_name_matches_nothing(tmp_path):
+    citations = _corpus(tmp_path)
+    assert citations.refs("compare Nobody v. Ruritania, no. 99999/99, § 1",
+                          "001-9", tmp_path) == []
+    citations.index.cache_clear()

@@ -45,7 +45,27 @@ ICC_DECISION_TYPES = _PKG / "icc" / "data" / "decision_types.json"
 TREATY_NAMES = _PKG / "lib" / "data" / "treaty_names.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
 NAMEDEUCASES = _PKG / "eurlex" / "data" / "casenames.json"
+# ECHR cases by party names and application number, for the citation engine's
+# "Osman mot Förenade kungariket" resolution. Auto-generated from the stored
+# HUDOC records (hudoc.casenames), committed as the shipped snapshot.
+EMD_CASES = _PKG / "hudoc" / "data" / "casenames.json"
+# the Swedish names of the respondent states, mapped onto the snapshot's own
+# normalized respondent keys ("Förenade kungariket" -> ["united kingdom"]).
+# Hand-edited; a state whose English key shifted over the corpus's lifetime
+# maps to every key it has borne ("Turkiet" -> ["turkey", "türkiye"]).
+EMD_RESPONDENTS = _PKG / "hudoc" / "data" / "respondents_sv.json"
 FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
+
+
+def load_emd_cases(path=EMD_CASES):
+    """The ECHR case snapshot: {"cases": {"applicant|respondent|serial":
+    [[kind, date, itemid], …]}, "appnos": {…}} -- candidates, not pre-picked
+    winners, because only the citation's own context (a printed date) can tell
+    a chamber judgment from the Grand Chamber's. Pure JSON load with no source
+    dependency. Empty if not generated yet."""
+    if not path.exists():
+        return {"cases": {}, "appnos": {}}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_fs_series(path=FS_SERIES):

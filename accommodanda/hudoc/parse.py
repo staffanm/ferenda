@@ -1,16 +1,15 @@
 """HUDOC metadata + converted Word HTML to :class:`HudocCase` artifacts."""
 
 import re
-from datetime import datetime
 
 from bs4 import BeautifulSoup
 
 from ..lib import compress, patch
 from ..lib.errors import SkipDocument
 from ..lib.util import normalize_space
-from . import summaries
+from . import citations, summaries
 from .download import body_path, record_path
-from .model import Block, HudocCase
+from .model import Block, HudocCase, record_date
 
 RE_NUMBERED = re.compile(r"^(\d+)\.\s+(.*)$", re.DOTALL)
 RE_HEADING_PREFIX = re.compile(r"^(?:[IVXLCDM]+|[A-Z]|\d+)\.\s+")
@@ -111,14 +110,9 @@ def parse_body(html_text):
     return blocks
 
 
-def _date(record):
-    for key in ("judgementdate", "decisiondate", "kpdate"):
-        value = record.get(key) or ""
-        if re.match(r"\d{4}-\d{2}-\d{2}", value):
-            return value[:10]
-        if value:
-            return datetime.strptime(value[:10], "%d/%m/%Y").date().isoformat()
-    return None
+# record_date lives in model.py: `citations` needs it for the corpus index it
+# builds, and importing it from here would cycle (parse imports citations)
+_date = record_date
 
 
 def _split(value):
@@ -168,4 +162,5 @@ def parse(basefile, root):
     html = patch.apply("hudoc", basefile,
                        compress.read_text(body_path(root, basefile)))
     return parse_record(record, html,
-                        summaries.read_sidecar(root, basefile)).to_artifact()
+                        summaries.read_sidecar(root, basefile)).to_artifact(
+        refs_for=lambda text: citations.refs(text, basefile, root))

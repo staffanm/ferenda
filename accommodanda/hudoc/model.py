@@ -1,6 +1,8 @@
 """Typed HUDOC case model and its artifact projection."""
 
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from ..lib.artifact import numbered_nodes
 from ..lib.coe import hudoc_articles
@@ -14,6 +16,21 @@ ITEM_URL = "https://hudoc.echr.coe.int/eng?i=%s"
 
 def case_uri(itemid):
     return ECHR_BASE + itemid
+
+
+def record_date(record):
+    """The decision date of a raw HUDOC record, ISO-formatted. HUDOC spells it
+    three ways across its collections; kpdate is the fallback that always
+    exists. Shared by `parse` (the artifact's avgorandedatum) and `citations`
+    (the corpus index that dates apart a case's chamber and Grand Chamber
+    judgments)."""
+    for key in ("judgementdate", "decisiondate", "kpdate"):
+        value = record.get(key) or ""
+        if re.match(r"\d{4}-\d{2}-\d{2}", value):
+            return value[:10]
+        if value:
+            return datetime.strptime(value[:10], "%d/%m/%Y").date().isoformat()
+    return None
 
 
 def document_kind(collection):
@@ -67,8 +84,8 @@ class HudocCase:
     def kind(self):
         return document_kind(self.collection)
 
-    def to_artifact(self):
-        structure = numbered_nodes(self.body)
+    def to_artifact(self, refs_for=None):
+        structure = numbered_nodes(self.body, refs_for)
         # HUDOC sets a judgment's footnotes as ordinary paragraphs inside an
         # `_ftn` container, so they arrive as blocks of their own; the tag rides
         # along on the node so the page can tell them from the running text. One
