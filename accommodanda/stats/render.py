@@ -30,7 +30,7 @@ def _as_measure(d):
     than in `charts` so the figure code never sees the on-disk shape."""
     return Measure(
         id=d["id"], group=d["group"], title=d["title"], kind=d["kind"],
-        unit=d.get("unit", ""), lede=d.get("lede", ""), note=d.get("note", ""),
+        unit=d.get("unit", ""), lede=d.get("lede", ""),
         value=d.get("value"), display=d.get("display", ""),
         rows=[Row(**r) for r in d.get("rows", [])],
         points=[Point(**p) for p in d.get("points", [])],

@@ -1,4 +1,4 @@
-# PRD: `stats` — 54 mätvärden om korpuset
+# PRD: `stats` — 52 mätvärden om korpuset
 
 En idékatalog för en `stats`-källa som räknar fram roliga och intressanta
 siffror om lagen.nu-korpuset och lägger dem på en sida (`/statistik`).
@@ -21,9 +21,12 @@ Alla mätta siffror är från korpusen som den såg ut 2026-07-27.
 > **Status: byggd.** `accommodanda/stats/` (`model`·`scan`·`compute`·`charts`
 > ·`render`) renderar `/statistik`; se REWRITE.md §7k.
 >
-> Sidan har **54 mätvärden**, inte 51: fyra nya tillkom under bygget (längsta
-> EU-artikeln, lagar med äldst kvarvarande text, vilken dag lagar träder i
-> kraft, avgöranden per år) och post 36 delades i två. **Två av katalogens
+> Sidan har **52 mätvärden**, inte 51: fem nya tillkom under och efter bygget
+> (längsta EU-artikeln, lagar med äldst kvarvarande text, vilken dag lagar
+> träder i kraft, avgöranden per år, rubriklängd i EU-rätten), post 36
+> delades i två, och tre försvann i sammanslagningar 2026-08-14 — längsta +
+> kortaste lagarna + längdfördelningen blev en rangprofil (sidans mått 1),
+> och längst + kortast levande upphävda lagar blev en (sidans mått 22). **Två av katalogens
 > poster är ännu inte byggda: 45 (namngivna rättsfall) och 48
 > (bemyndigandekedjan).** Numreringen på sidan följer sidans egen ordning och
 > är därför förskjuten mot numren här.
@@ -174,6 +177,19 @@ Anslutningsakten 12003T/TXT har 86 artiklar numrerade 1, 2, 3, sedan 1, 2, 3,
 helhet, allt i ett dokument. Där är artikelrubrikerna äkta; det som saknas är
 att de hör till olika instrument. Se förslag R5.
 
+Sedan 2026-08-14 mäter sidans mått 4 därför bara egna artiklar: den svenska
+språkversionen, inga ändringsakter (deras artiklar citerar den ändrade aktens
+text — CRR2:s "artikel 1" är 680 000 tecken citerad CRR), inga artiklar med
+sidhuvud eller signaturblock i texten (kvarvarande inläsningsfel i äldre
+skikt) och inga flerinstrumentsdokument. Kvar blir 133 153 av 214 978
+artiklar; rekordhållaren är driftskodens definitionsartikel (32017R1485
+art 3, ~37 000 tecken). Ledet räknar upp varje undantag med sin siffra —
+43 073 i ändringsakter, 23 945 i flerinstrumentsdokument, 10 645 i andra
+språkversioner, 3 898 med sidhuvud eller signaturblock och 264 utan text —
+eftersom ett led som nämner två av fem undantag läses som om de tre andra
+inte fanns. De 3 898 är vårt fel, inte korpusens form: artiklarna ligger kvar
+på sidorna.
+
 **5. Fördelningen av lagars längd** ○
 Histogram över alla 11 210 gällande författningar. Poängen är formen: den
 är extremt sned — några få jättar och en lång svans av
@@ -194,6 +210,27 @@ Två fällor: sex SFS-rubriker inleds med renderingsmarkörer
 katalogens `short_title` ger 6 tecken för Ellagen i stället för 5 eftersom
 den byter till det etablerade namnformen ("Ellagen") för namngivna lagar.
 Använd rå rubrik minus beteckning minus markörer.
+
+På sidan heter måttet numera *Rubriklängd i svenska författningar* och
+visar en rangprofil — varje stapel är en rubriks egen längd, längst först,
+samplad till ~120 staplar — följd av de 5 längsta och 5 kortaste som ren
+lista.
+
+*EU-rubrikerna* ✔ (sidans mått 6, *Rubriklängd i EU-rätten*) — samma
+form för eurlex-akterna, där rubriken är hela den officiella titeln.
+Populationen är mått 4:s, utom ändringsakterna: en ändringsakt har en helt
+vanlig rubrik även om dess artiklar citerar den akt den ändrar. Alltså akter i
+ett instrument vars artiklar går att mäta, i den svenska språkversionen —
+**26 574 akter, median 234 tecken**. Språkregeln är mått 4:s egen och gäller av
+samma skäl: ett teckenmått över blandade språk jämför ingenting, och ledet
+jämför medianen med den svenska medianrubriken. Med de 1 653 engelska
+manifestationerna kvar var siffran 28 227 akter och median 231. Utan den avgränsningen var den korta änden
+parse-fel, inte korta titlar. Två fel hittades och fixades 2026-08-14 —
+den nyare aktvisa Formexformen delar titeln i `TI` + `STI` och parsern
+läste bara `TI` (11 svenska akter har båda: 6 får sin undertitel, 5 har
+EES-noten i `STI` och den hör inte till titeln), och i 8 dokument sorterade en bilagefil före
+själva akten i zipen så hela dokumentet leddes av bilagan ("BILAGA VII"
+som titel; `formex_members` lyfter nu huvuddokumentet först).
 
 **7. Lagar med eget namn** ○
 Andelen författningar med en `dcterms:alternate` (BrB, RB, ABL, IL …) och

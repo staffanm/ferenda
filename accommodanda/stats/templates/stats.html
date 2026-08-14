@@ -28,177 +28,173 @@
 {% block body %}
 {% set group_A %}
 {{ stat(1,
-        "De längsta lagarna",
-        lede="Kroppstext i tecken, per konsoliderad författning.") }}
+        "Lagars längd",
+        lede="Kroppstext i tecken, per konsoliderad författning. Formen är poängen: några få jättar och en mycket lång svans av tvåparagrafsförordningar.") }}
 {{ stat(2,
-        "De kortaste lagarna",
-        lede="Samma mått, andra änden.") }}
-{{ stat(3,
-        "Flest paragrafer",
+        "Antal paragrafer",
         lede="Antal § per författning; kapitelantalet står som detalj.") }}
+{{ stat(3,
+        "Paragraflängd i svenska författningar",
+        computed_lede=true) }}
 {{ stat(4,
-        "Längsta och kortaste paragrafen",
-        computed_lede=true) }}
+        "Artikellängd i EU-rätten",
+        computed_lede=true,
+        note="Artiklarna med inläst sidhuvud eller signaturblock är kända inläsningsfel i det äldsta källskiktet — de står kvar på sidorna, men de mäter inte artikelns egen längd.") }}
 {{ stat(5,
-        "Längsta och kortaste EU-artikeln",
-        computed_lede=true) }}
-{{ stat(6,
-        "Fördelningen av lagars längd",
-        lede="Formen är poängen: några få jättar och en mycket lång svans av tvåparagrafsförordningar.") }}
-{{ stat(7,
-        "Längsta och kortaste rubriken",
+        "Rubriklängd i svenska författningar",
         lede="Beteckningen räknas inte med — ”Ellag (1997:857)” är en rubrik på fem tecken, inte sexton.") }}
-{{ stat(8,
+{{ stat(6,
+        "Rubriklängd i EU-rätten",
+        computed_lede=true,
+        note="Bara den svenska språkversionen av akter vars artiklar går att mäta räknas; ett CELEX-dokument som buntar flera instrument (fördragspaketen) står utanför.") }}
+{{ stat(7,
         "Lagar med eget namn",
         lede="Författningar som bär en etablerad förkortning (BrB, RB, ABL, IL) — kända nog att ha ett smeknamn.") }}
-{{ stat(9,
+{{ stat(8,
         "Författningar per departement",
         lede="Vem som äger regelmassan.") }}
-{{ stat(10,
+{{ stat(9,
         "Hela svensk författningssamling i siffror",
         computed_lede=true) }}
 {% endset %}
 {% set group_B %}
-{{ stat(11,
+{{ stat(10,
         "De mest ändrade lagarna",
         lede="Antal ändringsförfattningar i registret.") }}
-{{ stat(12,
+{{ stat(11,
         "”Lag om ändring i lagen om ändring i lagen om…”",
         lede="En ändringsförfattning kan ändra en ändringsförfattning som ändrar en annan. De längsta kedjorna i registret, räknat i led.") }}
-{{ stat(13,
+{{ stat(12,
         "Ändringsförfattningen som rör flest lagar samtidigt",
         lede="En enda författning kan skriva om hela regelmassan på en gång.") }}
-{{ stat(14,
+{{ stat(13,
         "Lagar som aldrig har ändrats",
         lede="Aldrig en enda ändring sedan de utfärdades.") }}
-{{ stat(15,
+{{ stat(14,
         "Ändringar per år",
         lede="Takten har legat stadigt kring tusen till tvåtusen ikraftträdda ändringar om året sedan 1970-talet.") }}
-{{ stat(16,
+{{ stat(15,
         "Snabbast ändrade lag",
         lede="Tiden från att lagen trädde i kraft till att den första ändringen gjorde det.") }}
-{{ stat(17,
+{{ stat(16,
         "Lagar med äldst kvarvarande text",
         lede="Gällande författningar vars senaste ändring ligger längst tillbaka — regelmassans orörda botten.") }}
-{{ stat(18,
+{{ stat(17,
         "Lagtextens medelålder",
         computed_lede=true) }}
-{{ stat(19,
+{{ stat(18,
         "Den mest omskrivna enskilda paragrafen",
         lede="Hur många gånger en och samma paragraf har fått ny lydelse.") }}
-{{ stat(20,
+{{ stat(19,
         "Vad ändringar faktiskt gör",
         lede="Fördelningen av registrets omfattningstext i kategorier. En ändringsförfattning kan göra flera saker och räknas då i flera.") }}
-{{ stat(21,
+{{ stat(20,
         "Tidsmaskinens djup",
         computed_lede=true) }}
 {% endset %}
 {% set group_C %}
-{{ stat(22,
+{{ stat(21,
         "Äldsta lagar som fortfarande gäller",
         lede="Regelmassans äldsta lager, fortfarande i kraft.") }}
+{{ stat(22,
+        "Livslängd för upphävda lagar",
+        lede="Tiden från utfärdande till upphävande. Somliga författningar överlever sekler; andra hinner knappt träda i kraft innan de avskaffas.") }}
 {{ stat(23,
-        "Längst levande upphävda lagar",
-        lede="Från utfärdande till upphävande.") }}
-{{ stat(24,
-        "Kortast levande lagar",
-        lede="Författningar som knappt hann träda i kraft.") }}
-{{ stat(25,
         "Upphävanden per år",
         lede="Hur mycket regelmassa som avvecklas varje år.") }}
-{{ stat(26,
+{{ stat(24,
         "Överlevnadskurva",
         lede="Av alla författningar utfärdade år X — hur stor andel gäller fortfarande idag? Kurvan är svensk lagstiftnings halveringstid.") }}
-{{ stat(27,
+{{ stat(25,
         "Vilken dag träder svensk lag i kraft?",
         lede="Ikraftträdandedatumen samlade på månad. Svensk lagstiftning har två hjärtslag om året — 1 januari och 1 juli — och nästan ingenting däremellan.") }}
-{{ stat(28,
+{{ stat(26,
         "Hur långt varsel får en ny lag?",
         computed_lede=true) }}
-{{ stat(29,
+{{ stat(27,
         "Framtiden som redan är skriven",
         lede="Ändringar som är beslutade men ännu inte i kraft — lagstiftning som redan finns men inte gäller.") }}
-{{ stat(30,
+{{ stat(28,
         "Nya författningar per decennium",
         lede="Bland dem som fortfarande gäller — vilket visar hur snabbt äldre lager tunnas ut snarare än hur mycket som skrevs.") }}
 {% endset %}
 {% set group_D %}
-{{ stat(31,
+{{ stat(29,
         "Korpuset i siffror",
         computed_lede=true) }}
-{{ stat(32,
+{{ stat(30,
         "Mest hänvisade dokument",
         lede="Inkommande länkar från hela korpuset.") }}
-{{ stat(33,
+{{ stat(31,
         "Mest hänvisade enskilda paragraf",
         lede="Ner på paragrafnivå — vilken enskild regel korpuset faktiskt talar om.") }}
-{{ stat(34,
+{{ stat(32,
         "Dokument med flest utgående hänvisningar",
         lede="Vilka dokument som citerar mest — utredningar, i praktiken.") }}
-{{ stat(35,
+{{ stat(33,
         "Vem citerar vem",
         lede="Hänvisningsmatrisen mellan källor. Förarbetenas hänvisningar till SFS dominerar allt annat.") }}
-{{ stat(36,
+{{ stat(34,
         "Hur många hänvisar till en lag?",
         computed_lede=true) }}
-{{ stat(37,
+{{ stat(35,
         "Den mest självrefererande texten",
         lede="Hänvisningar från ett dokument till sig självt.") }}
-{{ stat(38,
+{{ stat(36,
         "Mest omtalade begrepp",
         lede="Begreppen rankade på inkommande länkar — vad korpuset bråkar om.") }}
 {% endset %}
 {% set group_E %}
-{{ stat(39,
+{{ stat(37,
         "Förarbeten per typ",
         computed_lede=true) }}
-{{ stat(40,
+{{ stat(38,
         "Förarbeten per år",
         lede="Utgivningstakten, alla typer sammanslagna.") }}
-{{ stat(41,
+{{ stat(39,
         "Tjockaste utredningen",
         lede="Teckenantal per SOU.") }}
-{{ stat(42,
+{{ stat(40,
         "Propositionen som ändrade flest lagar",
         lede="En proposition kan skriva om hundratals lagar på en gång.") }}
-{{ stat(43,
+{{ stat(41,
         "Från förslag till lag",
         computed_lede=true) }}
-{{ stat(44,
+{{ stat(42,
         "Volymen författningskommentar",
         computed_lede=true) }}
-{{ stat(45,
+{{ stat(43,
         "Paragrafmotsvarigheter",
         lede="De spårade ”motsvarar / överförd från”-relationerna mellan gammal och ny lagtext — hur mycket av en ny lag som egentligen är gammal.") }}
 {% endset %}
 {% set group_F %}
-{{ stat(46,
+{{ stat(44,
         "Avgöranden per domstol",
         lede="Fördelningen över domstolar, avläst på referatbeteckningen.") }}
-{{ stat(47,
+{{ stat(45,
         "Avgöranden per år",
         lede="Publiceringstakten för refererad praxis.") }}
-{{ stat(48,
+{{ stat(46,
         "Mest hänvisade rättsfall",
         lede="Prejudikaten som faktiskt bär praxis.") }}
-{{ stat(49,
+{{ stat(47,
         "Vilka lagrum domstolarna citerar mest",
         lede="Bara hänvisningar som går från en dom till en författning.") }}
-{{ stat(50,
+{{ stat(48,
         "Längsta och kortaste avgörandet",
         computed_lede=true) }}
 {% endset %}
 {% set group_G %}
-{{ stat(51,
+{{ stat(49,
         "Föreskrifter per myndighet",
         computed_lede=true) }}
-{{ stat(52,
+{{ stat(50,
         "Direktiven som satt djupast spår i svensk rätt",
         lede="Antal svenska paragrafer som genomför direktivets artiklar.") }}
-{{ stat(53,
+{{ stat(51,
         "Europakonventionen i svensk rätt",
         lede="Vilka konventionsartiklar som faktiskt används.") }}
-{{ stat(54,
+{{ stat(52,
         "Remissvaren",
         computed_lede=true) }}
 {% endset %}

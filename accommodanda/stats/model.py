@@ -10,13 +10,19 @@ also what picks the chart form, so the renderer never has to guess:
   ``series``     an ordered run over time -- line
   ``histogram``  a distribution over bins -- vertical bars
   ``bars``       unordered categories compared -- vertical bars
+  ``profile``    every value drawn at its rank, largest first -- vertical
+                 bars sampled over rank, so each bar is a real thing's own
+                 size rather than a bucket count
   ``matrix``     two categorical axes with a magnitude -- heatmap
   ``table``      rows that are read, not compared (no useful chart form)
 
-`note` is where a measurement admits what it cannot say -- which population it
-covers, what it had to exclude, why a number is smaller than it looks. It
-renders under the figure, never as a footnote nobody reads: a measure whose
-caveat is invisible is a measure that misleads.
+A measurement has to admit what it cannot say -- which population it covers,
+what it had to exclude, why a number is smaller than it looks. Two places carry
+that, and neither is a footnote nobody reads: a `lede` that embeds measured
+numbers (`computed_lede` in the page template) states the exclusions with their
+counts, and the template's own `note=` renders under the figure for the caveat
+that is prose rather than arithmetic. A measure whose caveat is invisible is a
+measure that misleads.
 """
 
 from dataclasses import asdict, dataclass, field
@@ -59,10 +65,9 @@ class Measure:
     group: str                  # "A".."G", the PRD's grouping
     title: str
     kind: str                   # scalar | toplist | series | histogram | bars
-                                # | matrix | table
+                                # | profile | matrix | table
     unit: str = ""              # what one unit of `value`/`y` is ("tecken")
     lede: str = ""              # the sentence that says what the number means
-    note: str = ""              # the caveat: population, exclusions, limits
     value: float | None = None          # scalar
     display: str = ""                   # scalar: pre-formatted, when the raw
                                         # number is not what should be read
@@ -81,7 +86,7 @@ class Report:
     def to_artifact(self):
         """The on-disk shape: empty fields dropped, so a measure's JSON says only
         what that measure has. `asdict` would write every one of the twelve keys
-        on all 54, which makes the artifact three times its size and makes a diff
+        on all 52, which makes the artifact three times its size and makes a diff
         between two builds unreadable -- and the diff is the point of storing it."""
         return {"generated": self.generated,
                 "measures": [_prune(asdict(m)) for m in self.measures]}

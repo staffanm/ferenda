@@ -10,7 +10,9 @@
 {%- endmacro -%}
 {%- macro toplist(unit, items) -%}
 {#- ranked rows as a bar table; a `split` item is a group divider. The bar
-    is a background width on the value cell (--w). -#}
+    is a background width on the value cell (--w); an item without `width`
+    renders as a plain row -- the form a histogram's named extremes take,
+    where the distribution above already did the comparing. -#}
 <table class="viz-bars"><thead><tr><th scope="col">Vad</th><th scope="col" class="num">{{ unit }}</th></tr></thead><tbody>
 {%- for it in items -%}
 {%- if it.split -%}
@@ -18,7 +20,7 @@
 {%- else -%}
 <tr><th scope="row">{% if it.href %}<a href="{{ it.href }}">{{ it.label }}</a>{% else %}{{ it.label }}{% endif %}
 {%- if it.detail %} <span class="viz-detail">{{ it.detail }}</span>{% endif -%}
-</th><td class="num"><span class="viz-bar" style="--w:{{ it.width }}%"></span><span class="viz-val">{{ it.val }}</span></td></tr>
+</th><td class="num">{% if it.width %}<span class="viz-bar" style="--w:{{ it.width }}%"></span>{% endif %}<span class="viz-val">{{ it.val }}</span></td></tr>
 {%- endif -%}
 {%- endfor -%}
 </tbody></table>

@@ -134,6 +134,81 @@ def test_restarting_article_numbers_mark_a_multi_instrument_act():
     assert scan._restarts(["1", "1a", "2"]) is True     # "1a" reads as 1
 
 
+def test_an_amending_act_and_a_runaway_article_are_flagged(tmp_path):
+    # CRR2's "Article 1" is 680 000 characters of quoted CRR: an ändringsakt's
+    # articles measure the amended act, not their own, so the document is
+    # flagged whole. An article whose text contains the OJ running head or the
+    # signature block swallowed page furniture (the older tiers' runaway
+    # defect) and loses its `clean` flag.
+    def act(name, articles):
+        return write_artifact(tmp_path, name, {
+            "celex": "32019R0876", "doctype": "regulation", "lang": "swe",
+            "title": "Testförordning", "date": "2019-05-20",
+            "structure": [{"type": "article", "num": str(i + 1),
+                           "children": [{"type": "stycke", "text": body}]}
+                          for i, body in enumerate(articles)]})
+
+    amending = scan.scan_eurlex(act("amending.json", [
+        "Förordning (EU) nr 575/2013 ska ändras på följande sätt: …",
+        "Denna förordning träder i kraft…"]))
+    assert amending["amending"] is True
+
+    runaway = scan.scan_eurlex(act("runaway.json", [
+        "En vanlig artikel om tillsyn.",
+        "Detta beslut riktar sig till medlemsstaterna. "
+        "Utfärdat i Bryssel den 18 juli 2005. …"]))
+    assert runaway["amending"] is False
+    assert [(n, clean) for _, n, clean in runaway["lengths"]] \
+        == [("1", True), ("2", False)]
+
+    # every stray branch also has a legitimate-prose lookalike that must NOT
+    # flag: "i detta sammanhang" contains ANHANG, "intyg utfärdat i en annan
+    # medlemsstat" contains "utfärdat i" -- only the signature's full
+    # "i <Place> den <day>" shape is the tell
+    prose = scan.scan_eurlex(act("prose.json", [
+        "Medlemsstaterna ska i detta sammanhang godta ett intyg utfärdat i "
+        "en annan medlemsstat, även ett intyg utfärdat i Frankrike."]))
+    assert [clean for _, _, clean in prose["lengths"]] == [True]
+
+    # the addressing formula is a decision's final sentence: a long tail
+    # after it is swallowed content (31998D0490 carries 205k characters of
+    # its own reasoning there, with no furniture for the patterns to see),
+    # while the ordinary short closer stays clean
+    addressed = scan.scan_eurlex(act("addressed.json", [
+        "Detta beslut riktar sig till medlemsstaterna. "
+        "Det ska tillämpas från och med den 1 januari 2006.",
+        "Detta beslut riktar sig till Franska republiken. " + "x" * 300]))
+    assert [clean for _, _, clean in addressed["lengths"]] \
+        == [True, False]
+
+    # 31986L0431's text is mojibake ("Utfรคrdat i Bryssel"), so the plain
+    # signature pattern misses it -- the Thai codepoint is the tell
+    mojibake = scan.scan_eurlex(act("mojibake.json", [
+        "Detta direktiv riktar sig till medlemsstaterna. Utfรคrdat "
+        "i Bryssel den 24 juni 1986. ANEXO I …"]))
+    assert [clean for _, _, clean in mojibake["lengths"]] == [False]
+
+    # the bare OJ phrase is NOT furniture -- nearly every act's
+    # entry-into-force article says it legitimately; only the running head's
+    # dotted issue date right after the phrase marks a swallowed page
+    ikraft = scan.scan_eurlex(act("ikraft.json", [
+        "Denna förordning träder i kraft den tjugonde dagen efter det att "
+        "den har offentliggjorts i Europeiska unionens officiella tidning."]))
+    assert [clean for _, _, clean in ikraft["lengths"]] == [True]
+    head = scan.scan_eurlex(act("head.json", [
+        "2. När det hänvisas till denna punkt L 400/98 SV Europeiska "
+        "unionens officiella tidning 30.12.2006 ska artiklarna…"]))
+    assert [clean for _, _, clean in head["lengths"]] == [False]
+
+    # a förordning signs "Utfärdad", a beslut/direktiv "Utfärdat" -- both
+    # forms mark a swallowed signature (31987R0678's 32k ikraft article)
+    signed = scan.scan_eurlex(act("signed.json", [
+        "Denna förordning träder i kraft den tredje dagen efter det att den "
+        "har offentliggjorts i Europeiska gemenskapens officiella tidning. "
+        "Utfärdad i Bryssel den 26 januari 1987. …"]))
+    assert [clean for _, _, clean in signed["lengths"]] == [False]
+
+
 def test_the_artifact_drops_a_measure_s_empty_fields():
     # writing all twelve keys on every measure triples the artifact and makes a
     # diff between two builds unreadable -- and the diff is why it is stored
@@ -232,15 +307,54 @@ def test_the_page_shows_only_the_groups_that_were_measured():
     # group with none measured disappears whole -- heading and nav entry alike.
     html = render.render_stats({
         "generated": "2026-07-28",
-        "measures": [{"id": 22, "group": "C", "title": "Artefaktens egen titel",
+        "measures": [{"id": 21, "group": "C", "title": "Artefaktens egen titel",
                       "kind": "scalar", "value": 42}]})
     assert 'id="gC"' in html and 'id="gA"' not in html    # A measured nothing
     assert 'href="#gC"' in html and 'href="#gA"' not in html   # nav follows suit
-    assert 'id="m22"' in html and 'id="m23"' not in html  # only measured ids
+    assert 'id="m21"' in html and 'id="m22"' not in html  # only measured ids
     # the template's prose renders, not the artifact's presentation stamps
     assert "Äldsta lagar som fortfarande gäller" in html
     assert "Artefaktens egen titel" not in html
     assert "</p>'" not in html
+
+
+def test_the_eu_title_measure_renders_beside_its_swedish_twin():
+    # measure 6 is measure 5 asked of the EU acts, placed right after it.
+    # Both are rank profiles -- each column a real title's own length at its
+    # rank -- whose named extremes render as a plain list: the columns did
+    # the comparing, so the rows carry no bars. Measure 6's lede is computed
+    # -- the artifact's numbers, never frozen prose.
+    html = render.render_stats({
+        "generated": "2026-08-14",
+        "measures": [
+            {"id": 5, "group": "A", "title": "", "kind": "profile",
+             "unit": "tecken", "xlabel": "plats i längdordning",
+             "points": [{"x": "1", "y": 385}, {"x": "2 663", "y": 63},
+                        {"x": "5 326", "y": 5}],
+             "rows": [{"label": "Kungörelse om tillämpning av …", "value": 385,
+                       "group": "Längst"},
+                      {"label": "Ellag", "value": 5, "group": "Kortast"}]},
+            {"id": 6, "group": "A", "title": "", "kind": "profile",
+             "unit": "tecken", "xlabel": "plats i längdordning",
+             "lede": "Medianen bland 28 227 akter är 231 tecken.",
+             "points": [{"x": "1", "y": 1361}, {"x": "14 114", "y": 231},
+                        {"x": "28 227", "y": 56}],
+             "rows": [{"label": "Kommissionens genomförandeförordning …",
+                       "value": 1361, "group": "Längst",
+                       "uri": "https://lagen.nu/ext/celex/32020R0421"},
+                      {"label": "Rådets direktiv 75/442/EEG … om avfall",
+                       "value": 56, "group": "Kortast",
+                       "uri": "https://lagen.nu/ext/celex/31975L0442"}]}]})
+    assert html.index('id="m5"') < html.index('id="m6"')
+    assert "Rubriklängd i svenska författningar" in html
+    assert "Rubriklängd i EU-rätten" in html
+    assert "Medianen bland 28 227 akter är 231 tecken." in html
+    # the extremes list is plain -- titles and values, no second bar chart
+    assert "om avfall" in html and "Ellag" in html
+    assert 'class="viz-bar"' not in html
+    # both profiles drew their columns, and the extremes' unit column says tecken
+    assert html.count('class="viz-col"') == 6
+    assert ">tecken</th>" in html
 
 
 def test_the_snapshot_path_is_keyed_on_the_report_date():

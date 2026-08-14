@@ -218,10 +218,61 @@ def scan_sfs_register(path):
 # different population, and including it measures the parser rather than the law.
 EU_SECTORS = ("1", "3")
 
+# The opening formula of an amendment article ("Förordning (EU) nr 575/2013
+# ska ändras på följande sätt:"). A document with one is an ändringsakt: its
+# articles are quotes from the act it amends plus boilerplate, so an
+# article-length measure that counts them measures the amended act twice --
+# CRR2's "Article 1" is 680 000 characters of quoted CRR.
+RE_AMEND = re.compile(r"ändras (?:på följande|i enlighet med|härmed)"
+                      r"|amended as follows|ersättas med följande"
+                      r"|replaced by the following", re.I)
+# Text that never belongs inside a clean article: the OJ running head, the
+# signature block, another language's annex header (a swallowed multilingual
+# annex block), or a Thai codepoint -- the tell of mojibake, whose "length" is
+# a fact about a broken decode, not about the law (31986L0431 reads "Utfรคrdat
+# i Bryssel", which is also why the plain signature pattern cannot be the only
+# guard). Their presence marks a runaway or corrupted article -- the older
+# tiers' known parse defects.
+#
+# Each branch is anchored to the stray text's real shape, because the naive
+# form of every one of them also matches legitimate prose:
+# - the running head is the phrase *with its dotted issue date* ("officiella
+#   tidning 30.12.2006") -- the bare phrase is in nearly every act's
+#   entry-into-force article ("...har offentliggjorts i Europeiska unionens
+#   officiella tidning");
+# - the signature is "Utfärdad/Utfärdat i <Place> den <day>" -- a bare
+#   "utfärdat i" is in "intyg utfärdat i en annan medlemsstat";
+# - the annex headers are caps-only ("ANHANG" case-insensitively is inside
+#   "sammanhang", routine EU legalese).
+RE_STRAY = re.compile(
+    r"(?i:officiella tidning(?:en)?|Official Journal of the European "
+    r"(?:Union|Communities))\s*[,.]?\s+\d{1,2}\s*\.\s*\d{1,2}\s*\.\s*\d{1,4}"
+    r"|Utfärda[dt] i [A-ZÅÄÖ][a-zåäö]+ den \d"
+    r"|Done at [A-Z][a-z]+\s*,\s*\d|ANEXO|ANHANG|[ก-๛]")
+# The addressing formula is always a decision's *final* sentence, so
+# substantial text after it means the article swallowed whatever followed --
+# 31998D0490's last article carries 205 000 characters of the decision's own
+# reasoning after "Detta beslut riktar sig till Franska republiken.", with
+# no furniture or signature anywhere in it for RE_STRAY to see.
+RE_ADDRESSEE = re.compile(
+    r"(?:riktar sig till|is addressed to)[^.]{0,120}\.")
+_ADDRESSEE_TAIL = 200
+
+
+def _stray(body):
+    """Whether an article's text carries something that is not its own:
+    furniture/signature/mojibake by shape, or a swallowed tail after the
+    addressing formula."""
+    if RE_STRAY.search(body):
+        return True
+    m = RE_ADDRESSEE.search(body)
+    return bool(m) and len(body) - m.end() > _ADDRESSEE_TAIL
+
 
 def scan_eurlex(path):
     """One EU act -> its article lengths. Returns None for anything outside
-    sectors 1 and 3."""
+    sectors 1 and 3. Each length row carries a `clean` flag (no swallowed
+    furniture); `amending` marks the whole document as an ändringsakt."""
     art = load(path)
     if art is None:
         return None
@@ -230,12 +281,16 @@ def scan_eurlex(path):
         return None
     lengths = []
     nums = []
+    amending = False
 
     def walk(node):
+        nonlocal amending
         if node.get("type") == "article":
-            body = " ".join(_subtree_text(c) for c in node.get("children") or [])
-            lengths.append((len(body.strip()), node.get("num")))
+            body = " ".join(_subtree_text(c)
+                            for c in node.get("children") or []).strip()
+            lengths.append((len(body), node.get("num"), not _stray(body)))
             nums.append(node.get("num"))
+            amending = amending or bool(RE_AMEND.search(body[:200]))
             return
         for child in node.get("children") or []:
             walk(child)
@@ -244,7 +299,8 @@ def scan_eurlex(path):
         walk(block)
     return {"celex": celex, "doctype": art.get("doctype"),
             "title": art.get("title") or "", "date": art.get("date"),
-            "lengths": lengths,
+            "lang": art.get("lang"), "lengths": lengths,
+            "amending": amending,
             "multi_instrument": _restarts(nums)}
 
 

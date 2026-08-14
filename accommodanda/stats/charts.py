@@ -9,7 +9,9 @@ Form follows the measure's job, which is what `kind` records:
       CSS width, and the accessible table view is the chart rather than an
       alternative to it.
   ``series``    -> an SVG line. Ordered runs over time.
-  ``histogram``/``bars`` -> SVG columns.
+  ``histogram``/``bars``/``profile`` -> SVG columns. A profile's columns are
+      values at sampled ranks (largest first), so each column is a real
+      thing's own size, not a bucket count.
   ``matrix``    -> an HTML heat table (same label argument as toplist).
   ``scalar``    -> a hero number, no plot.
 
@@ -70,14 +72,17 @@ def _nice_max(value):
 # HTML forms
 # --------------------------------------------------------------------------
 
-def toplist_html(measure):
+def toplist_html(measure, bars=True):
     """Ranked rows as a bar table: label, bar, value (stats.html `toplist`).
     The bar scale is per group, so a measure showing both ends of a range
     does not draw its short end as an invisible sliver against the long
-    end's maximum."""
+    end's maximum. `bars=False` drops the bars -- the plain-list form a
+    profile's named extremes take, where drawing bars again would only
+    repeat the columns above."""
     rows = measure.rows
     if not rows:
         return TPL.empty()
+    unit = measure.unit or "värde"
     tops = {}
     for r in rows:
         tops[r.group] = max(tops.get(r.group, 0), abs(r.value))
@@ -91,9 +96,10 @@ def toplist_html(measure):
                       "href": _href(r.uri) if r.uri else None,
                       "label": r.label, "detail": r.detail,
                       "width": "%.2f" % (100.0 * abs(r.value)
-                                         / (tops[r.group] or 1)),
-                      "val": _fmt(r.value, measure.unit)})
-    return TPL.toplist(measure.unit or "värde", items)
+                                         / (tops[r.group] or 1)) if bars
+                      else None,
+                      "val": _fmt(r.value, unit)})
+    return TPL.toplist(unit, items)
 
 
 def matrix_html(measure):
@@ -136,11 +142,11 @@ W, H = 720, 260
 PAD_L, PAD_R, PAD_T, PAD_B = 56, 12, 16, 40
 
 
-def _axes(maximum, xlabel, ylabel):
+def _axes(maximum, xlabel, ylabel, pad_b=PAD_B):
     """Four recessive gridlines with their values, plus the axis captions."""
     parts = []
     for i in range(5):
-        y = PAD_T + (H - PAD_T - PAD_B) * (1 - i / 4)
+        y = PAD_T + (H - PAD_T - pad_b) * (1 - i / 4)
         value = maximum * i / 4
         parts.append('<line class="viz-grid" x1="%d" y1="%.1f" x2="%d" y2="%.1f"/>'
                      % (PAD_L, y, W - PAD_R, y))
@@ -205,16 +211,20 @@ def series_svg(measure):
 
 def bars_svg(measure):
     """Vertical columns for a distribution or a category comparison. Rounded
-    data-ends, anchored to the baseline; a 2px surface gap between neighbours."""
+    data-ends, anchored to the baseline; a 2px surface gap between neighbours.
+    A dense run (a sampled profile's ~120 columns) gets a deeper bottom pad,
+    so the axis caption clears the rotated rank ticks instead of printing
+    through them."""
     points = measure.points
     if not points:
         return '<p class="viz-empty">Inga värden.</p>'
     maximum = _nice_max(max(p.y for p in points))
-    plot_w, plot_h = W - PAD_L - PAD_R, H - PAD_T - PAD_B
+    pad_b = PAD_B + 14 if len(points) > 30 else PAD_B
+    plot_w, plot_h = W - PAD_L - PAD_R, H - PAD_T - pad_b
     slot = plot_w / len(points)
     width = max(slot - 2, 2)                     # the 2px surface gap
 
-    body = [_axes(maximum, measure.xlabel, measure.ylabel)]
+    body = [_axes(maximum, measure.xlabel, measure.ylabel, pad_b)]
     for i, p in enumerate(points):
         height = plot_h * p.y / maximum
         x = PAD_L + slot * i + 1
@@ -222,12 +232,18 @@ def bars_svg(measure):
                     'height="%.1f" rx="4"><title>%s: %s</title></rect>'
                     % (x, PAD_T + plot_h - height, width, max(height, 0),
                        escape(p.x), _fmt(p.y, measure.unit)))
-        label = p.x if len(points) <= 14 else (p.x if i % 2 == 0 else "")
+        # every label up to 14 columns, every other up to 30, and past that
+        # (a sampled profile's ~120) a handful plus the last -- the endpoints
+        # are the anchors a rank axis is read by
+        step = 1 if len(points) <= 14 else 2 if len(points) <= 30 \
+            else max(2, len(points) // 8)
+        label = p.x if i % step == 0 \
+            or (len(points) > 30 and i == len(points) - 1) else ""
         if label:
             body.append('<text class="viz-tick" x="%.1f" y="%d" '
                         'text-anchor="end" transform="rotate(-35 %.1f %d)">%s</text>'
-                        % (x + width / 2, H - PAD_B + 16, x + width / 2,
-                           H - PAD_B + 16, escape(label[:22])))
+                        % (x + width / 2, H - pad_b + 16, x + width / 2,
+                           H - pad_b + 16, escape(label[:22])))
     return _svg("".join(body), measure.title)
 
 
@@ -246,14 +262,18 @@ def _href(uri):
 
 _FORMS = {"toplist": toplist_html, "matrix": matrix_html,
           "scalar": hero_html, "series": series_svg,
-          "histogram": bars_svg, "bars": bars_svg}
+          "histogram": bars_svg, "bars": bars_svg, "profile": bars_svg}
 
 
 def figure(measure):
     """The measure's figure, plus -- for the plotted forms -- the table view the
     accessibility pass requires and the low-contrast marks oblige."""
     html = Markup(_FORMS[measure.kind](measure))
-    if measure.kind in ("series", "histogram", "bars") and measure.points:
+    # a profile may carry named extremes; render them as a plain list under
+    # the curve -- the columns did the comparing, so the rows get no bars
+    if measure.kind == "profile" and measure.rows:
+        html += toplist_html(measure, bars=False)
+    if measure.kind in ("series", "histogram", "bars", "profile") and measure.points:
         html += TPL.data_table(measure.xlabel or "kategori",
                                measure.unit or "värde",
                                [{"x": p.x, "y": _fmt(p.y, measure.unit)}
