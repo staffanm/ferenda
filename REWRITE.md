@@ -3657,13 +3657,78 @@ Six verticals sharing one folkrätt (international law) landing page:
   same "Participant" header; footnote `<sup>`s are stripped, and each
   participant's consent form (accession/succession/formal
   confirmation/acceptance/ratification) is read off a case-sensitive trailing
-  marker. `Treaty` artifacts live at `/ext/untc/{mtdsg_no}`; the URI grammar
+  marker. `Treaty` artifacts live at `/ext/untc/{unts}` -- the UNTS
+  registration number, not the MTDSG id (see the text half below); the URI grammar
   stays local to the vertical (rule:second-use-goes-to-lib). The folkrätt
   landing's UN half groups the curated instruments by subject (Traktaträtt
   och havsrätt / Mänskliga rättigheter / Flyktingrätt), each group
   chronological — the same landing-only pattern as coe/icrc, no faceted
-  browse tree of its own. Bespoke per-treaty text ingest (parsing the UNTS
-  PDFs) is a deliberate follow-up, not v1.
+  browse tree of its own.
+
+  **The text half (2026-08-13).** The MTDSG carries status and no treaty
+  text, so these artifacts shipped six metadata rows and an empty
+  structure — nothing for a citation to land on, which is why the 327 ICJ
+  references could only name the instrument and not its article. Each
+  treaty is now fetched twice: the status from the MTDSG, the authentic
+  text from its own depositary. **Not from the UNTS**, which reproduces
+  each instrument as registered and so is a scanned corpus — volume 999
+  carries the ICCPR over 92 pages with an image on all 92, volume 1161 the
+  Berne Convention over 44 of 44, and there is no API. `text.py` reads
+  OHCHR's HTML for twelve and a born-digital PDF for VCLT and UNCLOS,
+  giving 1,020 articles over 1,043 nodes (14 preambles, 9 annex headings)
+  with every anchor unique — `unique_id` has nothing left to disambiguate.
+  The count is exact against the instrument itself for all fourteen
+  (Genocide 19, ICCPR 53, VCLT 85, CRC 54, CMW 93, UNCLOS 320 plus 125
+  over its nine annexes).
+
+  A published PDF is not only the treaty, and four rules earn their place
+  from what that costs (2026-08-14). **A contents block is cut whole, not
+  line by line**: UNCLOS opens with 33 pages of contents that set each
+  entry's `Article N.` and `ANNEX I.` on lines of their own, with the
+  dotted leader only on the title beside them — dropping the leader lines
+  alone counted 885 articles against 320 and filed 444 provisions under
+  Annex IX. **A leader is five dots**, because three is the ellipsis the
+  Refugee Protocol sets inside its article 1(2), and reading that as a
+  contents entry dropped the paragraph defining who the Protocol covers.
+  **A second contents block ends the treaty**: the same PDF prints the
+  conference's Final Act after the Convention, whose Annexes I, II and VI
+  would otherwise claim the anchors of the Convention's own. An annex both
+  scopes the articles under it (UNCLOS restarts at Article 1 nine times)
+  and is a provision itself, since Annex I is a list of 17 species with no
+  article at all — it used to print under article 320, "Authentic texts".
+  **A contents block is at least five leader lines**: one dotted line is a
+  line of the treaty — a schedule row, a tariff table, a signature page —
+  and cutting at it drops every article above it and publishes the rest
+  green. The whole mechanism is calibrated on the one PDF in the corpus
+  that has a contents block at all, so the guard is for the fifteenth
+  treaty. Two invariants back it: an article heading with no text under it
+  is a contents entry, not an article (it would take the plain `#A5`
+  anchor and leave the real article 5 with a `unique_id` suffix), and each
+  curated entry carries the treaty's own article count, which the parse
+  must match or raise.
+
+  The page renders that text through the same `page.provision_section`
+  walk `icrc` uses, so `/untc/I-31363#A74` now lands on Article 74; until
+  2026-08-14 the renderer read only the participation table and every
+  article anchor the ICJ and ICC references mint was a link to nothing.
+  **Open:** the two PDF treaties keep one paragraph per source line, where
+  the twelve OHCHR ones carry whole paragraphs. A join-unfinished-lines
+  reflow was measured and withdrawn: it reads an article's rubric as the
+  first sentence of its body (UNCLOS article 192 became "General
+  obligation States have the obligation to protect…"), so the rubric needs
+  handling of its own before any reflow lands.
+
+  **The identity is now the UNTS registration number** in the UN's own
+  form (`I-14668`, as in `volume-999-I-14668-English.pdf`), replacing the
+  MTDSG chapter id: it is what the UNTS cites itself by, and it survives
+  for an instrument whose depositary is not the UN, where an MTDSG id does
+  not exist. The 14 stored pages were relocated rather than re-fetched.
+
+  **Standing scope goal**: a convention is in scope if any Swedish
+  förarbete or eurlex document cites it — measured from the corpus, not
+  curated by hand — and its text comes from its depositary (WIPO Lex for
+  Berne and the IP treaties, HCCH, ILO NORMLEX), keyed on its UNTS number.
+  The curated 14 are the first cut, not the target.
 - **`accommodanda/icc/`** harvests International Criminal Court case law —
   the curated ~269-decision substantive set (Rome-Statute verdicts,
   sentences, confirmation, arrest warrants, appeal judgments, reparations,
@@ -3697,11 +3762,12 @@ Six verticals sharing one folkrätt (international law) landing page:
   decision type, newest first per group, under "Internationella
   brottmålsdomstolen (ICC)"; like coe/icrc/untc it has no faceted browse
   tree of its own. Wired through `build.py`, `layout`, `catalog`,
-  `facets`, `datasets` and `render`. `test/test_icc.py` (11 tests) runs
+  `facets`, `datasets` and `render`. `test/test_icc.py` (20 tests) runs
   off a stored-record fixture (`test/files/icc/ICC-01_04-02_06-2359.json`)
-  plus pure unit tests of the PDF-paragraph classifier — no network, no
-  PDF binary. A real download+parse+relate+generate harvest has run: all
-  269 curated decisions are live on `/folkratt/` and
+  plus pure unit tests of the PDF-paragraph classifier, the Legal Tools
+  footer furniture rules and the sibling-filing citation matcher — no
+  network, no PDF binary. A real download+parse+relate+generate harvest has
+  run: all 269 curated decisions are live on `/folkratt/` and
   `/icc/{doc-number}`.
 - **`accommodanda/icj/`** harvests International Court of Justice case law —
   255 of the Court's 877 decisions: 158 judgments, 31 advisory opinions and
@@ -3795,6 +3861,119 @@ Six verticals sharing one folkrätt (international law) landing page:
   for a page range of a stored decision. That last group exists because
   every test written against hand-made strings passed while the corpus
   carried three separate defects (rule:lock-in-with-fixture).
+- **Treaty citations (2026-08-14):** `lib/treatyref.py` is the second-use
+  shared seam for the two international courts, reading its curated names
+  from `lib/data/treaty_names.json` through `lib.datasets` so no source is
+  imported. Before it, `icc`'s 269 decisions carried an empty `references`
+  and the whole `icrc` corpus -- the Rome Statute among it -- had **zero**
+  inbound links, while the decisions were made of those citations: 13,887
+  "article N ... of the Statute" forms across 244 of the 269. The matcher
+  now yields 2,867 references from 250 ICC decisions (2,431 article-level,
+  2,307 onto the Rome Statute) and 1,050 from 163 ICJ ones (669
+  article-level), over 21 instruments.
+
+  Five rules earn their place, each from a measured failure: an article
+  binds to the **nearest** instrument named, not to every one in range
+  (binding to all read "article 3 common to the Geneva Conventions" as
+  Rome Statute article 3); a name that **follows** the article beats a
+  nearer one before it, because `article N of X` has a direction; an
+  article followed by "of \<Instrument\>" never binds **backwards**, so an
+  instrument the corpus lacks yields nothing rather than a wrong guess
+  (the ICC writes "Covenant *of* Civil and Political Rights" where the
+  curated name says "on", and article 9 was being filed against the Rome
+  Statute); and **roman** article numbers resolve, since the Genocide
+  Convention runs Article I to XIX and the ICJ cites it that way -- an
+  Arabic-only pattern missed the corpus's most-cited instrument; and an
+  **enumeration** cites every article it names, "articles 15, 53, 54, 58
+  and 61 (5) of the Statute" being five citations and a range ("articles 6
+  to 8") three, where reading the first two left 568 article numbers
+  across 120 ICC decisions unlinked. A bare comma does not join a list:
+  "Article 58, 10 February 2006" is an article and a date, so a list is
+  only read where it closes with "and", "or" or "to". A name shared by
+  several instruments resolves to all of them: common article 3 really is
+  an article of each of the four Geneva Conventions.
+
+  **The anchor audit** (`catalog.dangling_anchors`, run at the end of
+  `relate`) is what would have caught the defect that started this: 126
+  treaty references pointed at an `#A42` on a Hague Convention that
+  anchors its Regulations' articles under `#Annex42`, and every count
+  involved -- links written, documents related -- looked healthy. It is
+  scoped by the source of the document a link points *at*
+  (`build.ANCHOR_EXACT`), and that scope is load-bearing rather than a
+  convenience: only `icrc` and `untc` render every provision through
+  `page.provision_section`, which anchors on the artifact's own node id.
+  Every other source mints anchors at render time that no `structure` node
+  holds -- sfs a change-act anchor per amendment, eurlex a stycke alias,
+  förarbete a page marker, coe a sub-paragraph pinpoint -- so asked of the
+  whole corpus the audit reports 1 612 832 live links as broken, in 72 s.
+  Scoped it costs 0.1 s.
+
+- **Inline citations (2026-08-14):** the references above landed as
+  document-level `references` only -- a citation in the rail, not a link
+  where the reader meets it in the text. `lib/artifact.py`'s
+  `numbered_nodes` now takes an optional `refs_for` (text -> `[lagrum.Ref]`)
+  scanner, so a source that can resolve some of its own English prose gets
+  those spans as inline links in its runs; `treatyref.spans()` is the
+  `(start, end, uri)` projection `references()` was missing for it. `icc`
+  and `icj` wire it through `treaties.refs`, and `icc` adds one thing
+  `treatyref` cannot know locally: a decision cites its siblings by filing
+  number ("ICC-02/11-01/11-129") on nearly every page, and 1,687 of those
+  point at a decision the corpus holds (resolved through whichever variant
+  -- a `-Red` redaction, a `-Corr` -- is actually on disk). The pure leaf
+  grammar the two modules share (`arabic`/`roman`/`article_fragment`) moved
+  out to `lib/treaty_ids.py`, on the same rule as `lib/coe_ids.py`: `lagrum`
+  needs the anchor grammar too (below) and importing `treatyref` itself
+  would close `lagrum -> treatyref -> catalog -> markdown -> lagrum`.
+
+  Two more citation grammars joined the same seam, each source's own.
+  `hudoc/citations.py` resolves a judgment's case-law citations -- "Keenan
+  v. the United Kingdom, no. 27229/95" -- against the held corpus's own
+  metadata: 88% of the ~175,000 application-number citations across 13,567
+  judgments name a document already held, plus the named-case form for a
+  citation with no number. Both refuse rather than guess where a number or
+  name is borne by more than one held document and no printed date or
+  document-kind test picks a single one -- a chamber and a Grand Chamber
+  judgment of the same case are different documents (rule:fail-fast).
+  `hudoc/casenames.py` turns that same index into a committed join surface
+  for the *other* direction -- a Swedish förarbete naming "Osman mot
+  Förenade kungariket" -- since `lib` cannot read a vertical's stored
+  records (rule:second-use-goes-to-lib) the way `dv`'s and `eurlex`'s own
+  named-case snapshots ship theirs: `lagen hudoc casenames` writes
+  `hudoc/data/casenames.json` (37,544 case names, 93,781 application
+  numbers, every `[kind, date, itemid]` candidate rather than one picked
+  winner, keyed on `citations`' own normalized `applicant|respondent|serial`
+  and on the appno), read back by `lib.datasets.load_emd_cases`. A
+  hand-edited `hudoc/data/respondents_sv.json` maps the Swedish respondent
+  names onto the snapshot's normalized respondent keys. The `lagrum` parse
+  type that resolves a Swedish citation through it is designed, not yet
+  written.
+  `icj/reports.py` reads the Court's own citation grammar, "I.C.J. Reports
+  1990, p. 92": each decision's official citation sits on its own PDF cover
+  sheet (227 of the 255 held covers yield one -- `pdftotext` first, the OCR
+  route only where that fails) and is stored as `metadata.reportsCitation`;
+  a body citation whose (year, page) is a held decision's own *start* page
+  links to it. Pinpoint cites (a page reaching into a decision, not its
+  first) stay unlinked on purpose: with 255 of the Court's 877 decisions
+  held, the gap between two held start pages says nothing about the unheld
+  decisions between them, and attributing a pinpoint to the nearest held
+  start would mislink it (rule:fail-fast).
+
+  `lib/lagrum.py`'s FORARBETEN grammar picked up four fixes alongside this:
+  kommittédirektiv ("dir. 2016:73" -> `/dir/2016:73`); the dot-dropped
+  prop./rskr. forms tables print ("prop 1999/2000:111"); a four-digit
+  second riksmöte year within the same century ("2008/2009") folding to the
+  corpus's "2008/09" (leaving "1999/2000", the one riksmöte that genuinely
+  crosses a century, alone); and Swedish treaty names ("artikel 24 i
+  barnkonventionen") linking `untc`/`icrc` targets with a correct article
+  anchor, read from `treaty_names.json`'s `names_sv` through the same
+  `treaty_ids.article_fragment` grammar `treatyref` anchors on. A fifth fix
+  is unrelated to treaties: the EU akttyp terminals (DIREKTIV, FORORDNING,
+  ...) now match the definite form too ("förordningen"), closing a mislink
+  where "artikel 30 i förordningen (EG) nr 765/2008" fell through to the
+  anaphora branch and pinned the article on whichever act was last in
+  focus, because the definite noun didn't parse as naming its own act
+  (observed in SOU 2021:44).
+
 - **Identity and graph:** `lib/coe.py` is the second-use shared seam. HUDOC's
   article facet codes (`8`, `6-3-d`, `P1-1`, `P7-4`) map protocol numbers to
   their Treaty Office ETS/CETS instruments and mint exactly the provision URI
@@ -3823,17 +4002,18 @@ that a HUDOC Article 8 edge appears inbound on ETS 005 `#A8`. `icrc` and
 `lib/render.py`'s folkrätt landing); `test/test_icrc.py` (10 tests) runs off a
 trimmed real Geneva Convention I JSON:API envelope fixture
 (`test/files/icrc/365.json`); `test/test_untc.py` (10 tests) runs off a
-synthetic trimmed MTDSG fixture (`test/files/untc/XXIII-1.html`) — both no
-network. `untc` has run a real download+parse+relate+generate harvest: all 14
-curated treaties are live on `/folkratt/` and `/untc/{mtdsg_no}`. `icc` is
+synthetic trimmed MTDSG fixture (`test/files/untc/I-18232.html`) plus the
+depositary's own VCLT PDF, whole, because the article count is an invariant —
+both no network. `untc` has run a real download+parse+relate+generate harvest:
+all 14 curated treaties are live on `/folkratt/` and `/untc/{unts}`. `icc` is
 wired the same way; see its own bullet above for its test/harvest status.
 
-### 7k. stats vertical — 54 measurements of the corpus ✅ (first cut)
+### 7k. stats vertical — 52 measurements of the corpus ✅ (first cut)
 
 `accommodanda/stats/` inverts every other vertical's direction: there is
 nothing to download and no document to parse, because the corpus *is* the
 input. It reads the finished catalog and artifact trees, writes one artifact
-holding 54 measurements, and renders that to `/statistik`. The measurement
+holding 52 measurements, and renders that to `/statistik`. The measurement
 catalog — each number with its provenance and its status — is
 [`docs/prd-stats.md`](docs/prd-stats.md).
 
@@ -3893,7 +4073,7 @@ catalog — each number with its provenance and its status — is
   **provenance markers and renumbering stubs do not** (counted naively, "*Lag
   (2011:590).*" is the shortest rule in Swedish law). It also reads
   `downloaded/sfs/` for change-act titles, which the artifact does not carry.
-- **`compute.py`** — the 54 measures in seven groups (A–G), preferring catalog
+- **`compute.py`** — the 52 measures in seven groups (A–G), preferring catalog
   SQL over the scan wherever the data is in the catalog. That preference is also
   the roadmap: every measure reaching for `scan` today is one `relate` could
   serve from SQL tomorrow (the PRD's R1–R3). Three measures the first cut left
@@ -4113,10 +4293,10 @@ rewrite work.
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `volumes` (which of a multi-PDF record's `files` are the body and in what order, read from the record's provenance and the landing page's own link text — drops errata/summaries/kortversioner/reprinted-directive/remisslista siblings, collapses a "hela dokumentet" edition published beside its own parts), `jamforelse` (extracts a re-enacting prop's jämförelsetabell/paragrafnyckel bilaga tables into old↔new provision pairs from per-run coordinates; consumed by `sfs/correspond.table_correspond`), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery; a multi-part Formex manifestation fetched whole, as one zip; `lagen eurlex backfill` downloads the acts the corpus cites but does not hold, ranked by `catalog.dangling_targets`), `bulk` (dump import), `correspond` (the EU-act **lineage**: a recast's own jämförelsetabell annex → article↔article pairs, mechanical, extracted by `parse` into the artifact's `correspondence` key; `catalog._index_document` writes them into `directive_correspondence` as it indexes each act, walked transitively by `catalog.predecessor_atoms` under `catalog.caselaw_anchored`, the statute-wide pinpoint-precise case-law rail assignment), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_act_body` descends through Formex's `GENERAL`/`GR.SEQ` wrappers so a multi-file act (2004/18, the Charter) parses through the same walker as an ordinary `ACT` root; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure, `parse.parse_hearing_report` a `REPORT.HEARING` -- for the oldest ECR cases the hearing report is the only text CELLAR holds; judgment paragraphs are read from both the pre-2012 plain `NP` and the later `NP.ECR` shapes; citation scanning is per-language -- `_refparser(lang)` loads the English EULAGSTIFTNING surface for the pre-accession case law that exists in no Swedish version), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
-| `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions |
+| `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions, `citations` (case-law cross-reference matcher), `casenames` (`lagen hudoc casenames`, writes the committed `data/casenames.json` join surface the Swedish `lagrum` matcher will read) |
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
-| `accommodanda/untc/` | **UN Treaty Collection (MTDSG status) vertical**: one static-HTML fetch per curated treaty, typed `Treaty`/`Party` model with an empty `structure` (the MTDSG carries status only — text lives in per-treaty UNTS PDFs, out of scope), offline participation-grid parser; canonical `ext/untc/{mtdsg_no}` targets, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
+| `accommodanda/untc/` | **UN Treaty Collection vertical**: two fetches per curated treaty — the MTDSG status page, which carries no treaty text at all, and the authentic text from the instrument's own depositary (OHCHR HTML for twelve, a born-digital PDF for VCLT and UNCLOS; never the UNTS's own volumes, which are scans). Typed `Treaty`/`Party`/`Provision` model, offline participation-grid parser plus `text.py`'s article splitter (1,020 articles over 1,043 nodes, checked against each entry's curated article count); canonical `ext/untc/{unts}` targets keyed on the UNTS registration number, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icj/` | **International Court of Justice case-law vertical**: the `icj-cij.org/decisions` Drupal view (one request with `from=1946` returns all 877 rows) scopes the harvest to 255 decisions — judgments, advisory opinions and provisional-measures orders; the PDFs are Cloudflare-walled and fetched through `lib.browser.DetachedChrome`. `parse.py` cuts the printed Reports' front matter at the Court's **dateline** (the letterhead words do not survive OCR) and recovers the numbered paragraphs with `paragraph_chain` — the longest chain counting up in steps of at most four, which must also open at the Court's first paragraph or be long enough that its length is the evidence, so a quoted ICTY paragraph and an annex's page numbers both join none; `ocr.py` repairs the pre-2004 scans' systematic character confusions against a vocabulary harvested from the born-digital decisions |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
 | `accommodanda/avg/` | **JO/JK/ARN/IMY/KKV-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; IMY tillsyn pages, whose diarienummer is read out of the attached PDFs and the documents regrouped by it, plus the praxisbeslut/sanktionsavgift overlay; KKV the diarium narrowed by `KKV_CASETYPES` joined with the curated ärendelista on the dnr; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`imy_pdf_path`/`kkv_body_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN/IMY/KKV PDF via `lib/pdftext`, JK landing HTML, KKV also FrontPage-era windows-1252 HTML and Word; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary); `KNOWN-GAPS.md` records the two documents `avg parse` has ever failed on, both since resolved |
@@ -4261,6 +4441,52 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **icc/icj/hudoc/lib** (2026-08-14) — the three international-law sources'
+  own citations start resolving to links, §7j. `icc`'s 269 decisions
+  carried an empty `references` and the whole `icrc` corpus — the Rome
+  Statute among it — had zero inbound links, though the decisions are made
+  of those citations: 13,887 "article N … of the Statute" forms across 244
+  of the 269. `lib/treatyref.py` is the shared matcher (curated names from
+  `lib/data/treaty_names.json`); five rules earn their place, each from a
+  measured failure — nearest-instrument binding, forward-only direction,
+  no backward binding past an unmatched "of \<Instrument\>", roman
+  numerals (the Genocide Convention runs Article I–XIX), and enumeration
+  ("articles 15, 53, 54, 58 and 61 (5)" is five citations). It now yields
+  2,867 references from 250 ICC decisions and 1,050 from 163 ICJ ones,
+  over 21 instruments. `catalog.dangling_anchors`, run at the end of
+  `relate` and scoped to the sources whose pages anchor exactly their
+  artifact's nodes (`icrc`, `untc`), caught the defect that started this
+  effort: 126 references pointing at `#A42` on a Hague Convention that
+  anchors its Regulations under `#Annex42`.
+
+  A second pass put those citations where the reader meets them, not only
+  in the rail: `lib/artifact.py`'s `numbered_nodes` takes an optional
+  `refs_for` scanner, so `hudoc`, `icc` and `icj` can wire their own
+  citation grammars as inline links. `hudoc/citations.py` resolves a
+  judgment's case-law citations against the held corpus's own metadata —
+  88% of ~175,000 application-number citations across 13,567 judgments
+  name a document already held. `icj/reports.py` reads the Court's own
+  "I.C.J. Reports 1990, p. 92" grammar off each decision's cover sheet
+  (227 of 255 held covers yield one) and links a body citation whose
+  (year, page) is a held decision's own start page — never a pinpoint
+  past it, since with 255 of 877 decisions held a gap between two start
+  pages says nothing about the unheld decisions in it (rule:fail-fast).
+  `icc/treaties.py` adds the Court's own filing-number citations, 1,687 of
+  which point at a sibling decision the corpus holds, and `icc/parse.py`
+  drops the Legal Tools download's own footer furniture (3,116 "PURL:
+  https://www.legal-tools.org/…" stamps across 92 decisions) that had been
+  sitting in the rendered body text. The shared arabic/roman
+  article-fragment grammar moved out to `lib/treaty_ids.py`
+  (rule:second-use-goes-to-lib), the UN/IHL twin of `lib/coe_ids.py`, so
+  `lib/lagrum.py` can use it without closing `lagrum -> treatyref ->
+  catalog -> markdown -> lagrum`. Riding along in `lagrum.py`: Swedish
+  treaty names ("artikel 24 i barnkonventionen") now link `untc`/`icrc`
+  targets, kommittédirektiv and the dot-dropped prop./rskr. forms parse,
+  a four-digit riksmöte year folds to the corpus form, and a mislink is
+  fixed where "artikel 30 i förordningen (EG) nr 765/2008" fell through
+  to the anaphora branch because the definite noun form didn't parse as
+  naming its own act.
 
 - **icj** (2026-08-13) — a sixth folkrätt source, §7j: `icj/` harvests
   International Court of Justice case law. Scope is the Court's own word
