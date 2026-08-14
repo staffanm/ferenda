@@ -498,18 +498,18 @@ def test_a_decision_cites_the_treaties_it_applies():
         "Punishment of the Crime of Genocide and Article 31 of the Vienna "
         "Convention on the Law of Treaties. See also UNCLOS.")
     assert [r["uri"] for r in refs] == [
-        "https://lagen.nu/ext/untc/IV-1",
-        "https://lagen.nu/ext/untc/XXI-6",
-        "https://lagen.nu/ext/untc/XXIII-1"]
+        "https://lagen.nu/ext/untc/I-1021",     # Genocide Convention
+        "https://lagen.nu/ext/untc/I-18232",    # VCLT
+        "https://lagen.nu/ext/untc/I-31363"]    # UNCLOS
     assert all(r["predicate"] == "dcterms:references" for r in refs)
-    assert refs[1]["text"] == "UNCLOS"
+    assert refs[2]["text"] == "UNCLOS"
 
 
 def test_the_court_s_own_short_form_counts():
     """The Court names an instrument in full once and by its short form after
     that, so matching the title alone would miss most of a judgment."""
     refs = treaties.references("Israel is bound by the Genocide Convention.")
-    assert [r["uri"] for r in refs] == ["https://lagen.nu/ext/untc/IV-1"]
+    assert [r["uri"] for r in refs] == ["https://lagen.nu/ext/untc/I-1021"]
 
 
 def test_the_bare_word_convention_cites_nothing():
@@ -539,10 +539,10 @@ def test_references_reach_the_artifact():
         body=[Block("stycke", "Text.", number="1")])
     art = decision.to_artifact()
     assert [r["uri"] for r in art["references"]] == \
-        ["https://lagen.nu/ext/untc/IV-1"]
+        ["https://lagen.nu/ext/untc/I-1021"]
     # and the catalog's generic reference contract picks them up as links
     assert [run["uri"] for _anchor, _page, run in catalog.artifact_links(art)] == \
-        ["https://lagen.nu/ext/untc/IV-1"]
+        ["https://lagen.nu/ext/untc/I-1021"]
 
 
 # --------------------------------------------------------------------------

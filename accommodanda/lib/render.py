@@ -518,10 +518,12 @@ def _icrc_listing(con):
 
 @functools.lru_cache(maxsize=1)
 def _untc_curated():
-    """The curated UN Treaty Collection list as {mtdsg_no: entry} -- the Swedish
-    name/acronym and subject group the catalog does not carry. Cached: the
-    folkrätt page rebuilds often (as with `labels.treaty_names`)."""
-    return {t["mtdsg_no"]: t
+    """The curated UN Treaty Collection list as {UNTS number: entry} -- the
+    Swedish name/acronym and subject group the catalog does not carry. Keyed on
+    the UNTS registration because that is what the catalog row's `number`
+    carries, the identity `untc` mints its URIs from. Cached: the folkrätt page
+    rebuilds often (as with `labels.treaty_names`)."""
+    return {t["unts"]: t
             for t in json.loads(datasets.UNTC_TREATIES.read_text("utf-8"))["treaties"]}
 
 
@@ -536,7 +538,10 @@ def _untc_entry(row, curated):
     named = {row["number"]: {"label": entry.get("sv"), "abbr": entry.get("abbr")}}
     return LISTS.treaty_li(
         href(row["uri"]), row["title"],
-        _treaty_parenthetical(row, named, "MTDSG %s" % row["number"]))
+        # the UNTS registration, which is what the treaty is filed and cited
+        # under; the MTDSG chapter id is a depositary detail and lives on the
+        # treaty's own page
+        _treaty_parenthetical(row, named, "UNTS %s" % row["number"]))
 
 
 def _untc_listing(con):

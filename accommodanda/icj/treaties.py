@@ -57,7 +57,18 @@ ACRONYMS = {"UNCLOS": "XXI-6", "ICCPR": "IV-4", "ICESCR": "IV-3",
 
 
 def treaty_uri(mtdsg_no):
-    return "%sext/untc/%s" % (BASE, mtdsg_no)
+    """The instrument's page. Keyed on its UNTS registration number, which is
+    `untc`'s identity -- the curated list maps the MTDSG id this module keys its
+    patterns by onto it."""
+    return "%sext/untc/%s" % (BASE, _unts()[mtdsg_no])
+
+
+@functools.lru_cache(maxsize=1)
+def _unts():
+    """{mtdsg_no: UNTS number}, read through `lib.datasets` rather than by
+    importing the sibling source (rule:lib-never-imports-vertical)."""
+    return {t["mtdsg_no"]: t["unts"]
+            for t in json.loads(datasets.UNTC_TREATIES.read_text("utf-8"))["treaties"]}
 
 
 @functools.lru_cache(maxsize=1)
@@ -93,4 +104,7 @@ def references(text):
         if match:
             seen[number] = {"uri": treaty_uri(number), "predicate": PREDICATE,
                             "text": match.group(0) if name.isupper() else name}
-    return [seen[number] for number in sorted(seen)]
+    # ordered by the URI the consumer sees, not by the MTDSG id this module
+    # keys its patterns on -- that key is internal, and sorting on it put the
+    # references in an order nothing downstream could predict
+    return sorted(seen.values(), key=lambda reference: reference["uri"])

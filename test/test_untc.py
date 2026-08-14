@@ -9,17 +9,17 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog, compress, facets, layout, render
+from accommodanda.lib import catalog, compress, facets, layout, page, render
 from accommodanda.untc import download, parse
-from accommodanda.untc.model import Treaty, load_treaties, treaty_uri
-from accommodanda.lib import page
 from accommodanda.untc import render as untc_render
+from accommodanda.untc import text as untc_text
+from accommodanda.untc.model import Provision, Treaty, load_treaties, treaty_uri
 
 FIXTURES = Path(__file__).parent / "files" / "untc"
 
 
 def _vclt():
-    return parse.parse("XXIII-1", FIXTURES)
+    return parse.parse("I-18232", FIXTURES)
 
 
 # --------------------------------------------------------------------------
@@ -27,22 +27,28 @@ def _vclt():
 # --------------------------------------------------------------------------
 
 def test_treaty_uri_and_kind():
-    assert treaty_uri("XXIII-1") == "https://lagen.nu/ext/untc/XXIII-1"
-    assert Treaty("XXIII-1", "23", "Vienna Convention on the Law of Treaties").kind \
+    assert treaty_uri("I-18232") == "https://lagen.nu/ext/untc/I-18232"
+    assert Treaty("XXIII-1", "I-18232", "23",
+                  "Vienna Convention on the Law of Treaties").kind \
         == "treaty"
-    assert Treaty("V-5", "5", "Protocol relating to the Status of Refugees").kind \
+    assert Treaty("V-5", "I-8791", "5",
+                  "Protocol relating to the Status of Refugees").kind \
         == "protocol"
 
 
 def test_curated_list_is_complete_and_well_formed():
     treaties = load_treaties()
     # the anchors the whole build hangs on
-    assert treaties["XXIII-1"]["title"] == "Vienna Convention on the Law of Treaties"
-    assert treaties["XXI-6"]["title"] == \
+    assert treaties["I-18232"]["title"] == "Vienna Convention on the Law of Treaties"
+    assert treaties["I-31363"]["title"] == \
         "United Nations Convention on the Law of the Sea"
     # every curated entry carries the fields the harvest/listing need
-    for mtdsg, entry in treaties.items():
-        assert entry["mtdsg_no"] == mtdsg
+    for unts, entry in treaties.items():
+        assert entry["unts"] == unts
+        # every treaty names where its authentic text really lives: the MTDSG
+        # carries status only, and the UNTS's own volumes are scans
+        assert entry["text"]["reader"] in ("ohchr", "pdf")
+        assert entry["text"]["url"].startswith("https://")
         assert entry["chapter"] and entry["title"] and entry["group"]
 
 
@@ -52,10 +58,10 @@ def test_curated_list_is_complete_and_well_formed():
 
 def test_parse_metadata():
     art = _vclt()
-    assert art["uri"] == "https://lagen.nu/ext/untc/XXIII-1"
+    assert art["uri"] == "https://lagen.nu/ext/untc/I-18232"
     assert art["type"] == "internationell-overenskommelse"
     assert art["doctype"] == "treaty"
-    assert art["number"] == "XXIII-1"
+    assert art["number"] == "I-18232"
     assert art["date"] == "1969-05-23"
     md = art["metadata"]
     assert md["conclusionPlace"] == "Vienna"
@@ -63,7 +69,14 @@ def test_parse_metadata():
     assert md["entryIntoForce"].startswith("27 January 1980")
     assert md["registration"] == "27 January 1980, No. 18232"
     assert md["depositary"] == "UN Secretary-General"      # not a state -- the UN SG
-    assert art["structure"] == []                          # MTDSG carries status, not text
+    # the MTDSG carries status and no text; the articles come from the
+    # depositary's own publication, so a treaty page is the two halves joined
+    articles = [n for n in art["structure"] if n.get("ordinal")]
+    assert articles, "the treaty text should reach the artifact"
+    assert art["structure"][0]["id"] == "Preamble"
+    assert [n["id"] for n in articles][:3] == ["A4", "A5", "A6"]
+    assert art["metadata"]["reference"] == "UNTS I-18232"
+    assert art["metadata"]["mtdsg"] == "XXIII-1"
     assert art["source_url"] == (
         "https://treaties.un.org/pages/ViewDetailsIII.aspx"
         "?src=TREATY&mtdsg_no=XXIII-1&chapter=23&clang=_en")
@@ -104,7 +117,7 @@ def test_parse_fails_loudly_on_control_drift():
             '<td>Ratification</td></tr>'
             '<tr><td>Sweden</td><td></td><td>5 Dec 1972</td></tr></table>'
             '</body></html>')                     # no rptTreaty_ctl00_tcText
-    entry = {"mtdsg_no": "XXIII-1", "chapter": "23", "title": "…"}
+    entry = {"mtdsg_no": "XXIII-1", "unts": "I-18232", "chapter": "23", "title": "…"}
     with pytest.raises(ValueError, match="no conclusion date"):
         parse.parse_page(entry, html)
 
@@ -114,8 +127,86 @@ def test_parse_fails_loudly_on_control_drift():
 # --------------------------------------------------------------------------
 
 def test_page_path_and_list_basefiles(tmp_path):
-    compress.write_download(download.page_path(tmp_path, "XXIII-1"), "<html></html>")
-    assert download.list_basefiles(tmp_path) == ["XXIII-1"]
+    compress.write_download(download.page_path(tmp_path, "I-18232"), "<html></html>")
+    # the text file sits beside the status page and must not read as a document
+    compress.write_download(tmp_path / "I-18232.text.html", "<html></html>")
+    assert download.list_basefiles(tmp_path) == ["I-18232"]
+
+
+# --------------------------------------------------------------------------
+# the authentic text: the half the MTDSG does not carry
+# --------------------------------------------------------------------------
+
+def test_the_three_article_heading_shapes():
+    """The fourteen are published by three depositaries and write the rubric
+    three ways. Each shape below is taken from a real page; missing one cost
+    the CRPD its article 20 and the Refugee Protocol its article 11."""
+    for line, want in (("Article 5", "A5"),
+                       ("Article II", "AII"),
+                       ("Article 12 bis", "A12BIS"),
+                       ("Article 1 - Definition of the term \"refugee\"", "A1"),
+                       ("Article 11. Deposit in the archives", "A11"),
+                       ("Article 20 Personal mobility", "A20")):
+        match = untc_text.RE_ARTICLE.match(line)
+        assert match, line
+        assert untc_text.fragment(match.group(1)) == want, line
+    # and the prose of every treaty must not read as a heading
+    for prose in ("Article 5 shall apply mutatis mutandis to the present Protocol",
+                  "in accordance with article XIII",
+                  "The Contracting Parties confirm that genocide is a crime"):
+        assert not untc_text.RE_ARTICLE.match(prose), prose
+
+
+def test_the_table_of_contents_is_not_the_treaty():
+    """UNCLOS's PDF opens with 33 pages of contents, each entry an "Article N."
+    line of its own. Counting them gave 885 articles against the Convention's
+    320: a contents entry is a heading with nothing under it, its title having
+    gone with the dotted leader."""
+    lines = ["Article 3.", "Breadth of the territorial sea . . . . . . . 12",
+             "Article 4.", "Outer limit . . . . . . . . . . . . . . . . . 12",
+             "Article 3.", "The breadth of the territorial sea shall not exceed",
+             "12 nautical miles."]
+    provisions = untc_text.provisions(lines)
+    assert [p[0] for p in provisions] == ["A3"]
+    assert provisions[0][2] == ["The breadth of the territorial sea shall not exceed",
+                                "12 nautical miles."]
+
+
+def test_an_annex_restarts_the_numbering_and_is_scoped():
+    """UNCLOS numbers an Article 1 in the body and again in each of nine
+    annexes, so 159 of its anchors named more than one provision. The heading
+    is "ANNEX I." and the prose that cites it is "Annex III, article 11." --
+    reading the second as a heading would reset the scope mid-body."""
+    lines = ["Article 1", "The body's first article.",
+             "Annex III, article 11.", "Still the body.",
+             "ANNEX I.", "Article 1", "The annex's first article."]
+    fragments = [p[0] for p in untc_text.provisions(lines)]
+    assert fragments == ["A1", "AnnexI_A1"]
+
+
+def test_every_anchor_is_unique(): 
+    """Scoping names the annexes it can; `unique_id` closes what is left. An
+    ambiguous anchor is an unreachable article."""
+    treaty = Treaty("XXIII-1", "I-18232", "23", "T", provisions=[
+        Provision("A1", "Article 1", ["Body."]),
+        Provision("A1", "Article 1", ["An annex the reader could not name."]),
+        Provision("A1", "Article 1", ["And a third."])])
+    ids = [n["id"] for n in treaty.to_artifact()["structure"]]
+    assert ids == ["A1", "A1-2", "A1-3"]
+    assert len(set(ids)) == len(ids)
+
+
+def test_a_status_page_without_its_text_raises():
+    """The downloader writes the text before a treaty counts as downloaded, so
+    this is a half-finished store -- not a treaty nobody publishes. Parsing it
+    to an empty structure is what the source used to do, and it published six
+    metadata rows with nothing to cite."""
+    try:
+        parse.read_provisions(load_treaties()["I-1021"], FIXTURES, "I-1021")
+    except ValueError as exc:
+        assert "stored without its text" in str(exc)
+    else:
+        raise AssertionError("a status page with no text must not parse")
 
 
 # --------------------------------------------------------------------------
@@ -123,13 +214,13 @@ def test_page_path_and_list_basefiles(tmp_path):
 # --------------------------------------------------------------------------
 
 def test_untc_layout_round_trips_and_catalog_row():
-    uri = "https://lagen.nu/ext/untc/XXIII-1"
-    assert layout.page_url(uri) == "/untc/XXIII-1"
-    assert layout.page_relpath(uri) == "untc/XXIII_1.html"
-    assert str(layout.url_to_relpath("/untc/XXIII-1")) == "untc/XXIII_1.html"
-    assert layout.relpath("untc", "XXIII-1") == Path("XXIII-1")
+    uri = "https://lagen.nu/ext/untc/I-18232"
+    assert layout.page_url(uri) == "/untc/I-18232"
+    assert layout.page_relpath(uri) == "untc/I_18232.html"
+    assert str(layout.url_to_relpath("/untc/I-18232")) == "untc/I_18232.html"
+    assert layout.relpath("untc", "I-18232") == Path("I-18232")
     assert "untc" in facets.sources()
-    row = catalog.untc_document(_vclt(), "artifact/untc/XXIII-1.json")
+    row = catalog.untc_document(_vclt(), "artifact/untc/I-18232.json")
     assert row[:3] == (uri, "untc", "treaty")
     assert row[3] == "Vienna Convention on the Law of Treaties"
 
@@ -138,8 +229,8 @@ def test_untc_layout_round_trips_and_catalog_row():
 # folkrätt landing + treaty page
 # --------------------------------------------------------------------------
 
-def _stub(mtdsg, title, date):
-    return {"uri": treaty_uri(mtdsg), "number": mtdsg, "doctype": "treaty",
+def _stub(unts, title, date):
+    return {"uri": treaty_uri(unts), "number": unts, "doctype": "treaty",
             "type": "internationell-overenskommelse", "identifier": title,
             "title": title, "date": date,
             "metadata": {"statesParties": 0}, "references": [], "structure": [],
@@ -148,9 +239,9 @@ def _stub(mtdsg, title, date):
 
 def test_folkratt_lists_untc_grouped_by_subject(tmp_path):
     vclt = _vclt()                                            # Traktaträtt och havsrätt
-    iccpr = _stub("IV-4", "International Covenant on Civil and Political Rights",
+    iccpr = _stub("I-14668", "International Covenant on Civil and Political Rights",
                   "1966-12-16")                               # Mänskliga rättigheter
-    refugees = _stub("V-2", "Convention relating to the Status of Refugees",
+    refugees = _stub("I-2545", "Convention relating to the Status of Refugees",
                      "1951-07-28")                            # Flyktingrätt
     paths = []
     for art in (vclt, iccpr, refugees):
@@ -169,9 +260,10 @@ def test_folkratt_lists_untc_grouped_by_subject(tmp_path):
     assert "Flyktingrätt" in html
     assert (html.index("Traktaträtt") < html.index("Mänskliga rättigheter")
             < html.index("Flyktingrätt"))
-    # the gloss folds the Swedish name, acronym and MTDSG id
-    assert "(Wienkonventionen om traktaträtten, VCLT, MTDSG XXIII-1)" in html
-    assert 'href="/untc/XXIII-1"' in html
+    # the gloss folds the Swedish name, acronym and the UNTS registration the
+    # treaty is cited under
+    assert "(Wienkonventionen om traktaträtten, VCLT, UNTS I-18232)" in html
+    assert 'href="/untc/I-18232"' in html
     # the shared Dokumenttyp selector gains an FN-fördrag bucket
     assert "FN-fördrag" in html
 

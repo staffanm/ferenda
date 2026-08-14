@@ -1,19 +1,187 @@
 {
-  "_comment": "Curated UN Treaty Collection (MTDSG) instruments, one harvest engine over all of them (rule:configured-by-data). Keyed by mtdsg_no; `chapter` completes the ViewDetailsIII.aspx query, `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkrätt listing, `group` is the Swedish subject heading it files under. The MTDSG holds status only -- these instruments' authentic text lives in per-treaty UNTS PDFs, out of this uniform scrape.",
+  "_comment": "Curated UN Treaty Collection instruments, one harvest engine over all of them (rule:configured-by-data). `unts` is the identity: the UNTS registration number in the UN's own form (I-14668), which is what the UNTS cites itself by and what survives when an instrument's depositary is not the UN. `mtdsg_no`/`chapter` complete the ViewDetailsIII.aspx status query, which carries ratifications but NO treaty text. `text` names where the authentic text really lives: the UNTS's own volumes are scans (volume 999 is 92 pages with an image on all 92), so the text comes from the depositary instead -- OHCHR for the human-rights core, legal.un.org and un.org/depts/los for the two born-digital PDFs. `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkratt listing, `group` is the Swedish subject heading it files under.",
   "treaties": [
-    {"mtdsg_no": "XXIII-1", "chapter": "23", "title": "Vienna Convention on the Law of Treaties", "sv": "Wienkonventionen om traktaträtten", "abbr": "VCLT", "group": "Traktaträtt och havsrätt"},
-    {"mtdsg_no": "XXI-6", "chapter": "21", "title": "United Nations Convention on the Law of the Sea", "sv": "FN:s havsrättskonvention", "abbr": "UNCLOS", "group": "Traktaträtt och havsrätt"},
-    {"mtdsg_no": "IV-1", "chapter": "4", "title": "Convention on the Prevention and Punishment of the Crime of Genocide", "sv": "folkmordskonventionen", "abbr": null, "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-2", "chapter": "4", "title": "International Convention on the Elimination of All Forms of Racial Discrimination", "sv": "rasdiskrimineringskonventionen", "abbr": "ICERD", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-3", "chapter": "4", "title": "International Covenant on Economic, Social and Cultural Rights", "sv": "konventionen om ekonomiska, sociala och kulturella rättigheter", "abbr": "ICESCR", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-4", "chapter": "4", "title": "International Covenant on Civil and Political Rights", "sv": "konventionen om medborgerliga och politiska rättigheter", "abbr": "ICCPR", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-8", "chapter": "4", "title": "Convention on the Elimination of All Forms of Discrimination against Women", "sv": "kvinnokonventionen", "abbr": "CEDAW", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-9", "chapter": "4", "title": "Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment", "sv": "tortyrkonventionen", "abbr": "CAT", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-11", "chapter": "4", "title": "Convention on the Rights of the Child", "sv": "barnkonventionen", "abbr": "CRC", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-13", "chapter": "4", "title": "International Convention on the Protection of the Rights of All Migrant Workers and Members of Their Families", "sv": "konventionen om migrantarbetares rättigheter", "abbr": "CMW", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-15", "chapter": "4", "title": "Convention on the Rights of Persons with Disabilities", "sv": "funktionsrättskonventionen", "abbr": "CRPD", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "IV-16", "chapter": "4", "title": "International Convention for the Protection of All Persons from Enforced Disappearance", "sv": "konventionen mot påtvingade försvinnanden", "abbr": "CED", "group": "Mänskliga rättigheter"},
-    {"mtdsg_no": "V-2", "chapter": "5", "title": "Convention relating to the Status of Refugees", "sv": "flyktingkonventionen", "abbr": null, "group": "Flyktingrätt"},
-    {"mtdsg_no": "V-5", "chapter": "5", "title": "Protocol relating to the Status of Refugees", "sv": "flyktingprotokollet", "abbr": null, "group": "Flyktingrätt"}
+    {
+      "mtdsg_no": "XXIII-1",
+      "chapter": "23",
+      "title": "Vienna Convention on the Law of Treaties",
+      "sv": "Wienkonventionen om traktaträtten",
+      "abbr": "VCLT",
+      "group": "Traktaträtt och havsrätt",
+      "unts": "I-18232",
+      "text": {
+        "reader": "pdf",
+        "url": "https://legal.un.org/ilc/texts/instruments/english/conventions/1_1_1969.pdf"
+      }
+    },
+    {
+      "mtdsg_no": "XXI-6",
+      "chapter": "21",
+      "title": "United Nations Convention on the Law of the Sea",
+      "sv": "FN:s havsrättskonvention",
+      "abbr": "UNCLOS",
+      "group": "Traktaträtt och havsrätt",
+      "unts": "I-31363",
+      "text": {
+        "reader": "pdf",
+        "url": "https://www.un.org/depts/los/convention_agreements/texts/unclos/unclos_e.pdf"
+      }
+    },
+    {
+      "mtdsg_no": "IV-1",
+      "chapter": "4",
+      "title": "Convention on the Prevention and Punishment of the Crime of Genocide",
+      "sv": "folkmordskonventionen",
+      "abbr": null,
+      "group": "Mänskliga rättigheter",
+      "unts": "I-1021",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-prevention-and-punishment-crime-genocide"
+      }
+    },
+    {
+      "mtdsg_no": "IV-2",
+      "chapter": "4",
+      "title": "International Convention on the Elimination of All Forms of Racial Discrimination",
+      "sv": "rasdiskrimineringskonventionen",
+      "abbr": "ICERD",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-9464",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-elimination-all-forms-racial"
+      }
+    },
+    {
+      "mtdsg_no": "IV-3",
+      "chapter": "4",
+      "title": "International Covenant on Economic, Social and Cultural Rights",
+      "sv": "konventionen om ekonomiska, sociala och kulturella rättigheter",
+      "abbr": "ICESCR",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-14531",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-covenant-economic-social-and-cultural-rights"
+      }
+    },
+    {
+      "mtdsg_no": "IV-4",
+      "chapter": "4",
+      "title": "International Covenant on Civil and Political Rights",
+      "sv": "konventionen om medborgerliga och politiska rättigheter",
+      "abbr": "ICCPR",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-14668",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-covenant-civil-and-political-rights"
+      }
+    },
+    {
+      "mtdsg_no": "IV-8",
+      "chapter": "4",
+      "title": "Convention on the Elimination of All Forms of Discrimination against Women",
+      "sv": "kvinnokonventionen",
+      "abbr": "CEDAW",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-20378",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-elimination-all-forms-discrimination-against-women"
+      }
+    },
+    {
+      "mtdsg_no": "IV-9",
+      "chapter": "4",
+      "title": "Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment",
+      "sv": "tortyrkonventionen",
+      "abbr": "CAT",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-24841",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-against-torture-and-other-cruel-inhuman-or-degrading"
+      }
+    },
+    {
+      "mtdsg_no": "IV-11",
+      "chapter": "4",
+      "title": "Convention on the Rights of the Child",
+      "sv": "barnkonventionen",
+      "abbr": "CRC",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-27531",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-rights-child"
+      }
+    },
+    {
+      "mtdsg_no": "IV-13",
+      "chapter": "4",
+      "title": "International Convention on the Protection of the Rights of All Migrant Workers and Members of Their Families",
+      "sv": "konventionen om migrantarbetares rättigheter",
+      "abbr": "CMW",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-39481",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-protection-rights-all-migrant-workers"
+      }
+    },
+    {
+      "mtdsg_no": "IV-15",
+      "chapter": "4",
+      "title": "Convention on the Rights of Persons with Disabilities",
+      "sv": "funktionsrättskonventionen",
+      "abbr": "CRPD",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-44910",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-rights-persons-disabilities"
+      }
+    },
+    {
+      "mtdsg_no": "IV-16",
+      "chapter": "4",
+      "title": "International Convention for the Protection of All Persons from Enforced Disappearance",
+      "sv": "konventionen mot påtvingade försvinnanden",
+      "abbr": "CED",
+      "group": "Mänskliga rättigheter",
+      "unts": "I-48088",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-protection-all-persons-enforced"
+      }
+    },
+    {
+      "mtdsg_no": "V-2",
+      "chapter": "5",
+      "title": "Convention relating to the Status of Refugees",
+      "sv": "flyktingkonventionen",
+      "abbr": null,
+      "group": "Flyktingrätt",
+      "unts": "I-2545",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-relating-status-refugees"
+      }
+    },
+    {
+      "mtdsg_no": "V-5",
+      "chapter": "5",
+      "title": "Protocol relating to the Status of Refugees",
+      "sv": "flyktingprotokollet",
+      "abbr": null,
+      "group": "Flyktingrätt",
+      "unts": "I-8791",
+      "text": {
+        "reader": "ohchr",
+        "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/protocol-relating-status-refugees"
+      }
+    }
   ]
 }

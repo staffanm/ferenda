@@ -80,7 +80,7 @@ EDPB_DOWNLOADED = DOWNLOADED / "edpb"               # <serie>/<slug>.{json,pdf}
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html} + clin/<itemid>.json
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
-UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <mtdsg_no>.html (MTDSG status page)
+UNTC_DOWNLOADED = DOWNLOADED / "untc"               # <UNTS-no>.{html,text.html|pdf} (status page + authentic text)
 ICC_DOWNLOADED = DOWNLOADED / "icc"                 # <doc-number>.{json,pdf} (Legal Tools record + PDF)
 ICJ_DOWNLOADED = DOWNLOADED / "icj"                 # <decision-stem>.{json,pdf} (index row + Reports PDF)
 

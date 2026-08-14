@@ -164,7 +164,9 @@ def test_icrc_eyebrow_is_the_acronym():
 
 
 def test_untc_eyebrow_is_the_acronym():
-    art = {"uri": "https://lagen.nu/ext/untc/IV-9", "number": "IV-9",
+    # keyed on the UNTS registration, which is what an untc artifact's `number`
+    # carries since the identity moved off the MTDSG chapter id
+    art = {"uri": "https://lagen.nu/ext/untc/I-24841", "number": "I-24841",
            "title": "Convention against Torture and Other Cruel, Inhuman or "
                     "Degrading Treatment or Punishment"}
     lb = labels.document_labels("untc", art)

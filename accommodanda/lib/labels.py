@@ -101,9 +101,13 @@ def treaty_names(path):
 
 @functools.lru_cache(maxsize=1)
 def _untc_names():
-    """MTDSG id ("IV-9") -> {sv, abbr} (tortyrkonventionen / CAT)."""
+    """UNTS number ("I-24841") -> {sv, abbr} (tortyrkonventionen / CAT).
+
+    Keyed on the UNTS registration, which is what the artifact's `number`
+    carries: it is `untc`'s identity, and an instrument whose depositary is not
+    the UN has no MTDSG id to key on at all."""
     data = json.loads(datasets.UNTC_TREATIES.read_text(encoding="utf-8"))
-    return {e["mtdsg_no"]: e for e in data["treaties"] if e.get("mtdsg_no")}
+    return {e["unts"]: e for e in data["treaties"] if e.get("unts")}
 
 
 # a CELEX revision '(NN)' or corrigendum 'R(NN)' suffix -- stripped to the stem
@@ -341,7 +345,7 @@ def _icrc(art):
 def _untc(art):
     entry = _untc_names().get(art.get("number"), {})
     abbr, name = primary(entry.get("abbr")), _named(entry.get("sv"), entry.get("abbr"))
-    short_id = abbr or art.get("identifier") or ("MTDSG " + (art.get("number") or ""))
+    short_id = abbr or art.get("identifier") or ("UNTS " + (art.get("number") or ""))
     return Labels(short_id, name[:1].upper() + name[1:],
                   art.get("title") or short_id, name or short_id)
 
