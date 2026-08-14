@@ -13,7 +13,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from accommodanda.icj import download, ocr, parse, treaties
+from accommodanda.icj import download, reports, ocr, parse, treaties
 from accommodanda.icj import render as icj_render
 from accommodanda.icj.model import (
     Block,
@@ -640,7 +640,6 @@ def test_reports_citation_grammar_reads_cover_and_body_forms():
     """The cover block, as OCR actually spells it, and the running-text form.
     Resolution is exact-start-page only: a pinpoint into a decision the corpus
     does not hold must not bind to the nearest held neighbour."""
-    from accommodanda.icj import reports
     m = reports.RE_OFFICIAL.search(
         "Officia1 citation : Land, Island and Maritime Frontier Dispute "
         "(El Salvador/Honduras), Application to Zntewene, Judgment, "
@@ -657,3 +656,34 @@ def test_reports_citation_grammar_reads_cover_and_body_forms():
         "as the Court held (I.C.J. Reports 1996 (I), p. 226)")
     assert (m.group("year"), m.group("volume"), m.group("page")) \
         == ("1996", "I", "226")
+
+
+def test_reports_resolution_is_exact_start_page_only(tmp_path, monkeypatch):
+    """The index maps each held decision's cover key; a citation links only a
+    held decision's exact start page, never itself, and the volume half is
+    part of the key (the halves paginate independently). A key two covers
+    claim is an OCR misread and drops whole -- unlinked over mislinked."""
+    covers = {"A-1": ("1950", "", "65"),
+              "B-1": ("1996", "I", "226"),
+              "B-2": ("1996", "II", "226"),
+              # two covers claiming one key: the collision must vanish
+              "C-1": ("1980", "", "3"), "C-2": ("1980", "", "3")}
+    for stem in covers:
+        (tmp_path / ("%s.pdf" % stem)).write_bytes(b"")
+    monkeypatch.setattr(reports, "_cover_citation",
+                        lambda _pdf, basefile: covers[basefile])
+    reports.index.cache_clear()
+    assert reports.index(tmp_path) == {("1950", "", "65"): "A-1",
+                                       ("1996", "I", "226"): "B-1",
+                                       ("1996", "II", "226"): "B-2"}
+    text = ("as held in I.C.J. Reports 1950, p. 65, discussed at I.C.J. "
+            "Reports 1950, p. 71, and in I.C.J. Reports 1996 (II), p. 226")
+    got = [(r.text, r.uri.rsplit("/", 1)[1])
+           for r in reports.refs(text, "X-9", tmp_path)]
+    # p. 65 is a held start page; p. 71 is a pinpoint into it and stays
+    # unlinked; the (II) half reaches B-2, not B-1
+    assert got == [("I.C.J. Reports 1950, p. 65", "A-1"),
+                   ("I.C.J. Reports 1996 (II), p. 226", "B-2")]
+    # a decision quoting its own cover form does not cite itself
+    assert reports.refs("I.C.J. Reports 1950, p. 65", "A-1", tmp_path) == []
+    reports.index.cache_clear()

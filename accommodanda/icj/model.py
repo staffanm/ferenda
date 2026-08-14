@@ -99,6 +99,10 @@ class Decision:
     # count of real repairs, not a guess at the PDF's provenance.
     ocr_repairs: int = 0
     pdf_url: str | None = None   # the Court's own PDF, the official text
+    # the decision's own official citation off its cover sheet ("I.C.J.
+    # Reports 1990, p. 92") -- the citable form, and the key other decisions
+    # cite it by (`icj.reports`). None until a printed volume exists.
+    reports_citation: str | None = None
     # the curated treaties this decision applies (`icj.treaties`), as
     # document-level relations rather than literal body spans
     references: list[dict] = field(default_factory=list)
@@ -119,7 +123,7 @@ class Decision:
         return "ICJ %d (%s, %s)" % (int(self.case), self.kind.capitalize(),
                                     self.date)
 
-    def to_artifact(self):
+    def to_artifact(self, refs_for=None):
         metadata = {
             "title": self.title,
             "publisher": COURT_EN,
@@ -129,6 +133,7 @@ class Decision:
             "procedure": self.procedure,
             "ocrRepairs": self.ocr_repairs,
             "pdfUrl": self.pdf_url,
+            "reportsCitation": self.reports_citation,
         }
         return {
             "uri": self.uri,
@@ -141,6 +146,6 @@ class Decision:
             "avgorandedatum": self.date,
             "metadata": metadata,
             "references": self.references,
-            "structure": numbered_nodes(self.body),
+            "structure": numbered_nodes(self.body, refs_for),
             "source_url": self.source_url,
         }

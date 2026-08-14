@@ -21,6 +21,7 @@ artifact as OCR-derived.
 import re
 
 from ..lib import compress
+from ..lib.lagrum import yield_overlaps
 from ..lib.pdftext import (
     join_across_pages,
     pages_with_ocr,
@@ -28,7 +29,7 @@ from ..lib.pdftext import (
     strip_page_furniture,
 )
 from ..lib.util import normalize_space
-from . import ocr, treaties
+from . import ocr, reports, treaties
 from .download import body_path, record_path
 from .model import Block, Decision
 
@@ -369,4 +370,16 @@ def parse(basefile, root):
         references=treaties.references(
             " ".join(block.text for block in blocks)),
         body=blocks,
-    ).to_artifact()
+        reports_citation=reports.own_citation(body, basefile),
+    ).to_artifact(refs_for=lambda text: _refs(text, basefile, root))
+
+
+def _refs(text, basefile, root):
+    """One block's inline citation spans: the Reports self-citations, plus
+    every treaty span not overlapping one. The two grammars cannot overlap
+    today, but interleave requires disjoint spans and the treaty side rests
+    on curated name data -- so the merge filters like every other two-list
+    caller, with the Reports form (the Court's own identity) winning."""
+    rep = reports.refs(text, basefile, root)
+    return sorted(rep + yield_overlaps(treaties.refs(text), rep),
+                  key=lambda ref: ref.start)
