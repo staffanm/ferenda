@@ -1,0 +1,7 @@
+Utredningen tillsattes genom kommittédirektiv (dir. 2016:73). Se även Dir. 2024:110 och dir. 2007:08.
+
+<list>
+  <Link uri="https://lagen.nu/dir/2016:73">dir. 2016:73</Link>
+  <Link uri="https://lagen.nu/dir/2024:110">Dir. 2024:110</Link>
+  <Link uri="https://lagen.nu/dir/2007:8">dir. 2007:08</Link>
+</list>

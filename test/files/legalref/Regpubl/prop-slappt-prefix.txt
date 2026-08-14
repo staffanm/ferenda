@@ -1,0 +1,7 @@
+Regeringen överlämnade propositionen (prop 1999/2000:111) till riksdagen (rskr 2017/18:101). Jämför prop. 2008/2009:158 s. 97.
+
+<list>
+  <Link uri="https://lagen.nu/prop/1999/2000:111">prop 1999/2000:111</Link>
+  <Link uri="https://lagen.nu/rskr/2017/18:101">rskr 2017/18:101</Link>
+  <Link uri="https://lagen.nu/prop/2008/09:158#sid97">prop. 2008/2009:158 s. 97</Link>
+</list>

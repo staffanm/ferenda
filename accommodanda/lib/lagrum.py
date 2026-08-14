@@ -44,6 +44,7 @@ from lark.exceptions import UnexpectedInput
 
 from . import datasets
 from .coe_ids import article_fragment as coe_article_fragment
+from .treaty_ids import article_fragment as treaty_article_fragment
 from .util import fold_swedish
 
 # --- parse-type configuration ---------------------------------------
@@ -404,10 +405,15 @@ SKAL.3: /[Ss]käl(?:et|en)?/
 RADETS: /rådets/
 EP_RADETS: /Europaparlamentets och rådets/
 KOMMISSIONENS: /kommissionens/
-DIREKTIV: /direktiv/
-FORORDNING: /förordning/
-REKOMMENDATION: /rekommendation/
-BESLUT: /beslut/
+// the definite form matters: "artikel 30 i förordningen (EG) nr 765/2008"
+// names its act, and a terminal that only matched "förordning" made the
+// named parse fail -- the anaphoric eu_generic then consumed the noun and
+// pinned article 30 on whatever act was last in focus (a mislink observed
+// in SOU 2021:44). The definite suffix is folded away where akttyp is read.
+DIREKTIV: /direktiv(?:et)?/
+FORORDNING: /förordning(?:en)?/
+REKOMMENDATION: /rekommendation(?:en)?/
+BESLUT: /beslut(?:et)?/
 SAMARBETE: /EEG|EG|EU/
 AV: /av/
 DEN: /den/
@@ -479,9 +485,9 @@ RF_SEP: /[ -](?:ref|nr)\.? ?| ?[-:] ?/
 """
 
 # FORARBETEN (preparatory works: propositioner, betänkanden,
-# riksdagsskrivelser, SOU, Ds, plus CELEX numbers) -- the old
-# forarbeten.ebnf. A document ref (prop./bet./rskr./SOU/Ds/celex) may be
-# followed by a page list ("s. 51 och 62"); each page becomes its own
+# riksdagsskrivelser, SOU, Ds, kommittédirektiv, plus CELEX numbers) -- the
+# old forarbeten.ebnf. A document ref (prop./bet./rskr./SOU/Ds/dir./celex) may
+# be followed by a page list ("s. 51 och 62"); each page becomes its own
 # .../doc#sid{n} link sharing the document. "a. prop." ("anförd
 # proposition") resolves to the last proposition seen (document state).
 # "avsnitt N" links into the current document (from context), or into the
@@ -495,7 +501,7 @@ anon_prop_refs.5: A_PROP sidor
 avsnitt_external.6: avsnitt_list _W I_KOMM
 avsnitt_list.3: AVSNITT _W avsnitt_ref_id ((COMMA _W | _W_AND_OR_W) avsnitt_ref_id)*
 
-forarb_doc: prop_ref | bet_ref | skrivelse_ref | sou_ref | ds_ref | celex_ref
+forarb_doc: prop_ref | bet_ref | skrivelse_ref | sou_ref | ds_ref | dir_ref | celex_ref
 prop_ref: PROP_PREFIX _W? prop_body
 ?prop_body: prop_std | prop_x | prop_y | prop_z
 prop_std: riksmote_ref_id COLON _W? lopnr_ref_id
@@ -506,6 +512,7 @@ bet_ref: BET_PREFIX _W riksmote_ref_id COLON bet_no_ref_id
 skrivelse_ref: SKR_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 sou_ref: SOU_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 ds_ref: DS_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
+dir_ref: DIR_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 celex_ref: CELEX
 
 riksmote_ref_id: NUMBER (SLASH NUMBER)?
@@ -518,11 +525,12 @@ sidor: sida (HYP sida_num)? ((COMMA _W | _W_AND_OR_W) sida_num (HYP sida_num)?)*
 sida: COMMA? _W SID _W sida_num
 sida_num: NUMBER
 
-PROP_PREFIX: /[Pp]rop\./
+PROP_PREFIX: /[Pp]rop\.|[Pp]rop(?= \d{4}\/\d)/
 BET_PREFIX: "bet."
-SKR_PREFIX: "rskr."
+SKR_PREFIX: /rskr\.|rskr(?= \d{4}\/\d)/
 SOU_PREFIX: "SOU"
 DS_PREFIX: "Ds"
+DIR_PREFIX: /[Dd]ir\./
 A_PROP: /a\. prop\./
 AVSNITT: "avsnitt"
 I_KOMM: /i kommitténs betänkande/
@@ -765,10 +773,13 @@ RATTSFALL_TRIGGER_SRC = r"""
 
 FORARBETEN_TRIGGER_SRC = r"""
     \b[Pp]rop\.                                # propositions
+  | \b[Pp]rop\ \d{4}/\d                        # dot dropped ("prop 1999/2000:111")
   | \bbet\.                                    # utskottsbetänkanden
   | \brskr\.                                   # riksdagsskrivelser
+  | \brskr\ \d{4}/\d                           # dot dropped ("rskr 2017/18:101")
   | \bSOU\                                     # statens offentliga utredningar
   | \bDs\                                      # departementsserien
+  | \b[Dd]ir\.                                 # kommittédirektiv
   | \ba\.\ prop\.                              # "a. prop." (anförd proposition)
   | \bavsnitt\ \d                              # section ref
   | \b3\d\d(?:\d\d)?L\d{4}\b                   # bare CELEX (392L0100)
@@ -952,10 +963,11 @@ def interleave(text, refs, styles=()):
     it, since a half-italic citation would otherwise have to become two
     separate links, which is worse than losing the emphasis on it.
 
-    Spans must be disjoint -- parse_text consumes matched spans, and the
-    one caller merging two ref lists (eurlex cites + term uses) filters
-    overlaps first -- so an overlap is an upstream bug, not a case to
-    resolve silently by dropping a link (rule:fail-fast)."""
+    Spans must be disjoint -- parse_text consumes matched spans, and every
+    caller merging two ref lists (eurlex cites + term uses; the courts'
+    case-law + treaty spans) filters overlaps first via `yield_overlaps` --
+    so an overlap is an upstream bug, not a case to resolve silently by
+    dropping a link (rule:fail-fast)."""
     out, pos = [], 0
     for ref in sorted(refs, key=lambda r: r.start):
         assert ref.start >= pos, (
@@ -1221,13 +1233,15 @@ def load_namedacts(path):
     return out
 
 
-def load_treaties(namedacts_path, coe_path):
-    """Map each EU/European primary-law instrument name (lower-cased) to the
+def load_treaties(namedacts_path, coe_path, treaty_names_path):
+    """Map each treaty/primary-law instrument name (lower-cased) to the
     ext-relative path of its consolidated text: the EU treaties and the Charter
     from the *sector-1* entries of the named-act dataset (-> ``celex/<CELEX>``),
-    the ECHR from the Council-of-Europe names dataset (-> ``coe/<number>``). These
-    link everywhere -- not gated on caller-supplied acts -- so lagrum loads them
-    itself into TREATIES rather than taking them as a parser argument."""
+    the ECHR from the Council-of-Europe names dataset (-> ``coe/<number>``), and
+    the UN/IHL instruments from the curated treaty-name dataset's ``names_sv``
+    ("artikel 24 i barnkonventionen" -> ``untc/I-27531``). These link everywhere
+    -- not gated on caller-supplied acts -- so lagrum loads them itself into
+    TREATIES rather than taking them as a parser argument."""
     out = {}
     for celex, entry in json.loads(Path(namedacts_path).read_text('utf-8')).items():
         if isinstance(entry, dict) and celex.startswith("1"):
@@ -1237,6 +1251,9 @@ def load_treaties(namedacts_path, coe_path):
         if isinstance(entry, dict):
             for alias in _act_aliases(entry):
                 out[alias] = "coe/" + number
+    for entry in json.loads(Path(treaty_names_path).read_text('utf-8'))["instruments"]:
+        for name in entry.get("names_sv", ()):
+            out[name.lower()] = entry["target"]
     return out
 
 
@@ -1353,7 +1370,15 @@ EU_ADJ: "allmänna" | "allmän"
 # pages for the EU treaties/Charter yet, so those render as external EUR-Lex links.
 # The name<->path data is hand-edited in the datasets (namedacts.json sector-1 +
 # coe/data/names.json), loaded once here since it links in every vertical.
-TREATIES = load_treaties(datasets.NAMEDACTS, datasets.COE_NAMES)
+TREATIES = load_treaties(datasets.NAMEDACTS, datasets.COE_NAMES,
+                         datasets.TREATY_NAMES)
+
+# per-instrument anchor metadata for the UN/IHL targets, read from the same
+# curated dataset: which prefix and numeral form the artifact mints its
+# article anchors in, and the highest article it actually carries
+TREATY_PIN = {entry["target"]: entry
+              for entry in json.loads(
+                  Path(datasets.TREATY_NAMES).read_text('utf-8'))["instruments"]}
 
 # EU-reference rules that link *everywhere* (not gated on caller-supplied acts,
 # the way EU_NAMNAKT is), whenever EULAGSTIFTNING is active:
@@ -1467,8 +1492,14 @@ def _token_text(tree):
 
 
 def _riksmote_str(node):
-    """Riksmöte id keeping the slash form ("1996/97", "1971")."""
-    return '/'.join(t.value for t in _tree_tokens(node) if t.type == 'NUMBER')
+    """Riksmöte id keeping the slash form ("1996/97", "1971"). A four-digit
+    second year within the same century ("2008/2009") folds to the two-digit
+    form the corpus keys ("2008/09"); "1999/2000" crosses the century and is
+    the one riksmöte correctly written with four."""
+    nums = [t.value for t in _tree_tokens(node) if t.type == 'NUMBER']
+    if len(nums) == 2 and len(nums[1]) == 4 and nums[1][:2] == nums[0][:2]:
+        nums[1] = nums[1][2:]
+    return '/'.join(nums)
 
 
 def _avg_ids(node, name):
@@ -2129,6 +2160,17 @@ class LagrumParser:
             # stycke form, so a stycke pinpoint lands on the article.
             return uri + '#' + coe_article_fragment(pin.artikel, pin.underartikel,
                                                     pin.punkt)
+        if path.startswith(('untc/', 'icrc/')):
+            # a UN/IHL treaty anchors per article only, under the prefix and
+            # numeral form its artifact mints (#A24, #AII for the Genocide
+            # Convention, #Annex42 for the Hague Regulations) -- the curated
+            # entry carries all three. An article the instrument does not have
+            # is a misbinding: name the instrument rather than link to nothing.
+            entry = TREATY_PIN[path]
+            if not 1 <= int(pin.artikel) <= entry["last_article"]:
+                return uri
+            return uri + '#' + treaty_article_fragment(
+                pin.artikel, entry.get("anchor", "A"), entry["numerals"])
         return uri + '#' + eu_fragment(pin)
 
     def _article_specs(self, node):
@@ -2272,6 +2314,16 @@ class LagrumParser:
         # act, else anaphora-links the last named act
         bare = parts <= BARE_PARTS
         if 'eu_generic' in parts or bare:
+            # the generic noun refers back only when no act identifier follows:
+            # in "artikel 30 i förordningen (EG) nr 765/2008" the noun *names*
+            # its act, and if that longer parse failed to consume it, pinning
+            # the article on the act in focus is a mislink. Unlinked over
+            # mis-pinned (rule:fail-fast).
+            if 'eu_generic' in parts:
+                tail = self._scan_text[self._scan_base + _node_span(node)[1]:][:16]
+                if re.match(r"\s*\((?:EEG|EG|EU|Euratom)\)"
+                            r"|\s*(?:nr\s*)?\d{2,4}/\d", tail):
+                    raise NoLink()
             # a bare article only anaphora-links when it stands alone: a coordination
             # ("artikel 7 och 8.1 ...") or a trailing "i <instrument>" past the part
             # we matched may belong to a *different*, unrecognised act, so we refuse
@@ -2280,8 +2332,14 @@ class LagrumParser:
             # förordning (EG) nr 45/2001. ... artikel N i förordningen").
             if bare:
                 tail = self._scan_text[self._scan_base + _node_span(node)[1]:][:14]
-                guard = (r"\s*(?:,|and|or)\s*\d|\s+of\s" if self.lang == "eng"
-                         else r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s")
+                # the akttyp words extend the of-guard: "artikel 30.3
+                # förordning (EG) nr 765/2008" (the "i" lost to OCR) names its
+                # act, and anaphora-linking the bare article mis-pins it
+                guard = (r"\s*(?:,|and|or)\s*\d|\s+of\s"
+                         r"|\s+(?:[Rr]egulation|[Dd]irective)\b"
+                         if self.lang == "eng"
+                         else r"\s*(?:,|och|eller|samt)\s*\d|\s+i\s"
+                              r"|\s+(?:förordning|direktiv)")
                 if re.match(guard, tail):
                     raise NoLink()
             target = (self.state.self_eu_act if bare else None) \
@@ -2302,7 +2360,9 @@ class LagrumParser:
         tokens = _tree_tokens(node)
         for t in tokens:
             if t.type in ('DIREKTIV', 'FORORDNING', 'REKOMMENDATION', 'BESLUT'):
-                attrs['akttyp'] = t.value
+                # fold the definite suffix ("förordningen" -> "förordning") --
+                # celex_uri keys its descriptor letter on the base form
+                attrs['akttyp'] = t.value.removesuffix('en').removesuffix('et')
         if 'akttyp' not in attrs:  # bare "95/46/EG" / "(EEG) nr 2092/91"
             if 'direktiv_part' in parts:
                 attrs['akttyp'] = 'direktiv'
@@ -2414,7 +2474,8 @@ class LagrumParser:
             out.append({'_uri': '%s#%s' % (base, frag)})
 
     DOC_PREFIX = {'prop_ref': 'prop', 'bet_ref': 'bet',
-                  'skrivelse_ref': 'rskr', 'sou_ref': 'sou', 'ds_ref': 'ds'}
+                  'skrivelse_ref': 'rskr', 'sou_ref': 'sou', 'ds_ref': 'ds',
+                  'dir_ref': 'dir'}
 
     def forarb_doc_uri(self, inner):
         """Base URI (no fragment) for a forarb_doc's inner ref subtree."""
@@ -2429,6 +2490,8 @@ class LagrumParser:
         riksmote = _riksmote_str(subtree(inner, 'riksmote_ref_id'))
         no = _token_text(subtree(inner, 'bet_no_ref_id') if inner.data == 'bet_ref'
                         else subtree(inner, 'lopnr_ref_id'))
+        if inner.data == 'dir_ref':
+            no = str(int(no))  # sources print "dir. 2007:08"; the corpus keys 2007:8
         return '%s%s/%s:%s' % (self.base, self.DOC_PREFIX[inner.data],
                                riksmote, no)
 
