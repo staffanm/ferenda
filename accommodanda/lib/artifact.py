@@ -72,21 +72,25 @@ def scanned_nodes(blocks, scanner, anchor=_serial_anchor):
     return out
 
 
-def numbered_nodes(blocks):
+def numbered_nodes(blocks, refs_for=None):
     """`blocks` (kind/text/level/number) as structure nodes anchored on the
     document's own paragraph numbers: ``P42`` where the block printed one (kept
     as ``ordinal`` too, so the renderer can set it in the gutter), the running
-    stycke count otherwise. Text is one unscanned run -- these are the
-    English-language international sources, whose prose the Swedish citation
-    grammar has nothing to say about."""
+    stycke count otherwise. These are the English-language international
+    sources, whose prose the Swedish citation grammar has nothing to say about
+    -- so text is one unscanned run, unless the source hands in its own
+    `refs_for` (text -> [lagrum.Ref]) for the citations it *can* resolve
+    (treaty articles, sibling filings), and the runs then carry those links."""
+    def runs(text):
+        return interleave(text, refs_for(text)) if refs_for else [text]
     out, serial, ids = [], 0, {}
     for block in blocks:
         if block.kind == "rubrik":
             out.append({"type": "rubrik", "level": block.level,
-                        "text": [block.text]})
+                        "text": runs(block.text)})
             continue
         serial += 1
-        node = {"type": "stycke", "text": [block.text],
+        node = {"type": "stycke", "text": runs(block.text),
                 "id": unique_id("P%s" % block.number if block.number
                                 else "S%d" % serial, ids)}
         if block.number:

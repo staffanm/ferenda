@@ -7,7 +7,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from accommodanda.icc import download, parse
+from accommodanda.icc import download, parse, treaties
 from accommodanda.icc import parse as icc_parse
 from accommodanda.icc import render as icc_render
 from accommodanda.icc.model import (
@@ -339,3 +339,44 @@ def test_a_doubled_quotation_mark_is_collapsed_but_a_cut_title_is_left_alone():
         == 'entitled "Décision sur x"'
     cut = 'entitled "Decision on the consequences of non-disclosure [ ... ]'
     assert icc_parse.RE_DOUBLED_QUOTE.sub('"', cut) == cut
+
+
+def test_legal_tools_footer_is_furniture():
+    """The Legal Tools download stamps "No: ICC-… 3/40 PURL: …" under every
+    page -- 3,116 fragments sat in rendered body text across 92 decisions.
+    Furniture needs two rules: a footer that is its own paragraph drops whole;
+    one glued onto a footnote strips, leaving the footnote's own legal-tools
+    citation (a plain url, no PURL stamp) alone."""
+    assert icc_parse.RE_FOOTER.match(
+        "No: ICC-02/11-01/11 OA 2 3/40 "
+        "PURL: https://www.legal-tools.org/doc/649ff5/")
+    assert icc_parse.RE_FOOTER.match(
+        "PURL: https://www.legal-tools.org/doc/649ff5/")
+    glued = ("^ ICC-02/11-01/11-153 <http://www.legal-tools.org/doc/829d3f/>. "
+             "No: ICC-02/11-01/11 OA 2 4/40 "
+             "PURL: https://www.legal-tools.org/doc/649ff5/")
+    assert icc_parse.RE_FOOTER_EDGE.sub("", glued).strip() \
+        == "^ ICC-02/11-01/11-153 <http://www.legal-tools.org/doc/829d3f/>."
+    mid = ("paras 155-165. No: ICC-02/11-01/11 OA 2 34/40 "
+           "PURL: https://www.legal-tools.org/doc/649ff5/ ^ ^ alleged violation")
+    assert "PURL" not in icc_parse.RE_FOOTER_EDGE.sub("", mid)
+
+
+def test_sibling_filing_citations_link_held_decisions(tmp_path):
+    """An ICC decision cites its siblings by document number. A held sibling
+    links (through the variant on disk where only a -Red is held), an unheld
+    number and the decision's own number stay plain, and the treaty citations
+    ride along in the same span list."""
+    (tmp_path / "ICC-01_04-01_07-1788.json").write_text("{}")
+    (tmp_path / "ICC-01_04-01_07-55-Red.json").write_text("{}")
+    treaties._held.cache_clear()
+    text = ("as decided in ICC-01/04-01/07-1788 and ICC-01/04-01/07-55, "
+            "but not ICC-01/04-01/07-9999 nor ICC-01/04-01/07-2288, "
+            "applying article 74 of the Statute")
+    refs = treaties.refs(text, "ICC-01/04-01/07-2288", tmp_path)
+    uris = [r.uri.replace("https://lagen.nu/ext/", "") for r in refs]
+    assert "icc/ICC-01_04-01_07-1788" in uris
+    assert "icc/ICC-01_04-01_07-55-Red" in uris
+    assert not any(u.endswith("9999") or u.endswith("2288") for u in uris)
+    assert "icrc/585#A74" in uris
+    treaties._held.cache_clear()

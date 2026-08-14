@@ -17,7 +17,7 @@ import functools
 from pathlib import Path
 
 from ..lib import treatyref
-from ..lib.lagrum import Ref
+from ..lib.lagrum import Ref, yield_overlaps
 from .model import RE_DOC_BASE, decision_uri
 
 ROME_STATUTE = "icrc/585"
@@ -56,12 +56,19 @@ def refs(text, doc_number, root):
     document number ("ICC-02/11-01/11-129") on nearly every page, and 1,687
     of those citations point at decisions the corpus holds."""
     own = RE_DOC_BASE.match(doc_number)
-    out = [Ref(start, end, text[start:end], treatyref.PREDICATE, uri)
-           for start, end, uri in treatyref.spans(text, extra=SHORT_FORMS)]
+    numbers = []
     for m in RE_DOC_BASE.finditer(text):
         base = m.group(0)
         if (own and base == own.group(0)) or base not in _held(root):
             continue
-        out.append(Ref(m.start(), m.end(), base, treatyref.PREDICATE,
-                       decision_uri(_held(root)[base])))
-    return sorted(out, key=lambda ref: ref.start)
+        numbers.append(Ref(m.start(), m.end(), base, treatyref.PREDICATE,
+                           decision_uri(_held(root)[base])))
+    # the two grammars cannot overlap today, but interleave requires
+    # disjoint spans and the treaty side rests on curated name data -- so
+    # the merge filters like every other two-list caller, the filing
+    # number (the Court's own identity) winning
+    treaty = yield_overlaps(
+        [Ref(start, end, text[start:end], treatyref.PREDICATE, uri)
+         for start, end, uri in treatyref.spans(text, extra=SHORT_FORMS)],
+        numbers)
+    return sorted(numbers + treaty, key=lambda ref: ref.start)
