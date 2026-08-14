@@ -281,7 +281,8 @@ dl.meta a { color: var(--accent); }
 .expired-banner a, .note-banner a { color: var(--accent); }
 body.expired .gr-main { color: var(--ink-3); }
 body.expired .gr-main h1, body.expired .kaprubrik, body.expired .rubrik,
-body.expired .artikel { color: var(--ink-2); }
+body.expired h3.artikel,
+body.expired section.artikel > h2 { color: var(--ink-2); }
 body.expired::before { content: "Upphävd författning"; position: fixed;
                        top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg);
                        font-family: var(--serif); font-weight: 600; white-space: nowrap;
@@ -357,8 +358,16 @@ section.andringar { margin-top: 4rem; }
              text-wrap: balance; scroll-margin-top: var(--scroll-clear); }
 .rubrik { font-family: var(--serif); font-weight: 600; font-size: 1.2rem;
           letter-spacing: -.015em; margin: 2.25rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
-.artikel { font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
+/* One class, two structures: eurlex sets an article heading as `h3.artikel`,
+   while a treaty article is a `section.artikel` wrapping its heading *and* its
+   paragraphs (nodes.html `eu_article` / `artikel_section`). Typography has to
+   sit on the heading -- on the container it inherits into every paragraph, and
+   the whole of every coe/icrc/untc treaty rendered semi-bold. */
+h3.artikel, section.artikel > h2 {
+           font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
            margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
+section.artikel { margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
+section.artikel > h2 { margin-top: 0; }
 
 /* -- Paragraphs (SFS § with hanging numeral) -- */
 section.paragraf { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
@@ -1405,7 +1414,11 @@ section.occurrences details.more > summary { color: var(--ink-3);
   dl.meta { row-gap: .15rem; }
 
   /* breaks: no orphaned headings, no severed §§, register entries whole */
-  h1, h2, h3, h4, h5, h6, .kaprubrik, .rubrik, .artikel,
+  /* `.artikel` is not in this list: both article headings are already here as
+     `h2`/`h3`, and the class also names the `section.artikel` *container* --
+     a whole treaty article, 25 400 characters at coe/026#A11, which
+     `break-inside: avoid` would demand fit on one printed page */
+  h1, h2, h3, h4, h5, h6, .kaprubrik, .rubrik,
   .instans-rubrik, .delmal-rubrik { break-after: avoid; break-inside: avoid; }
   section.paragraf, .andring, figure, blockquote, .expired-banner,
   .note-banner, .version-banner, p.ruta { break-inside: avoid; }

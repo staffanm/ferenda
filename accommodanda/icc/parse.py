@@ -11,12 +11,28 @@ import re
 from ..lib import compress
 from ..lib.pdftext import join_across_pages, pages_with_ocr, paragraph_texts
 from ..lib.util import normalize_space
+from . import treaties
 from .download import _iso, body_path, record_path
 from .model import RE_CASE, Block, Decision
 
 # the running header the ICC stamps on every court-record page, e.g.
 # "ICC-01/04-02/06-2659 08-03-2021 5/97 RH"
 RE_HEADER = re.compile(r"^ICC-\S+\s+\d\d-\d\d-\d{4}\s+\d+/\d+\s+[A-Z]{1,3}\b")
+# the per-page footer a Legal Tools download stamps under the court record:
+# "No: ICC-02/11-01/11 OA 2 3/40 PURL: https://www.legal-tools.org/doc/649ff5/"
+# -- 3,116 of these sat inside the rendered body text across 92 decisions.
+# Furniture needs two rules: a footer that is its own extracted paragraph is
+# *dropped* whole (RE_FOOTER, full match), and one the extractor glued onto a
+# footnote's text is *stripped* off either end (RE_FOOTER_EDGE).
+_PURL = r"PURL:\s*https?://www\.legal-tools\.org/\S*"
+_FOOTER = r"(?:No[.:]?\s*ICC-\S+(?:\s+OA\s?\d*)?\s+\d+/\d+\s+)?" + _PURL
+RE_FOOTER = re.compile(r"^%s$" % _FOOTER)
+# the full No:-prefixed form is distinctive enough to cut mid-paragraph (a
+# footnote's own legal-tools url carries no "No: … 5/40 PURL:" stamp); the
+# bare "PURL: …" tail only at an edge, where nothing else can have put it
+RE_FOOTER_EDGE = re.compile(
+    r"\s*No[.:]?\s*ICC-\S+(?:\s+OA\s?\d*)?\s+\d+/\d+\s+%s|^%s\s*|\s*%s$"
+    % (_PURL, _PURL, _PURL))
 RE_NUMBERED = re.compile(r"^(\d{1,4})\.\s+(.*)$", re.DOTALL)
 # A roman-numeral section head ("III. THE CHARGES"), written as the numeral
 # grammar and not as the set of letters a numeral is spelt from: "[IVXLC]+"
@@ -129,9 +145,15 @@ def _blocks(path, basefile):
     header has to go *before* the join -- it is the first paragraph of every
     page, so leaving it in place puts a filing stamp between the two halves of
     every sentence and nothing ever rejoins."""
-    return _classify(join_across_pages(paragraph_texts(
+    per_page = paragraph_texts(
         pages_with_ocr(str(path), ("icc", basefile), lang="eng"),
-        drop=RE_HEADER.match)))
+        drop=lambda text: RE_HEADER.match(text) or RE_FOOTER.match(text))
+    # the glued form survives the drop (it is half footnote), so strip it;
+    # a paragraph that was all footer after all leaves nothing behind
+    per_page = [[stripped for text in page
+                 if (stripped := RE_FOOTER_EDGE.sub("", text).strip())]
+                for page in per_page]
+    return _classify(join_across_pages(per_page))
 
 
 def parse(basefile, root):
@@ -141,6 +163,7 @@ def parse(basefile, root):
     base = record["base"]
     body = body_path(root, basefile)
     case = RE_CASE.search(base)
+    blocks = _blocks(body, basefile) if compress.exists(body) else []
     return Decision(
         doc_number=base,
         title=RE_DOUBLED_QUOTE.sub('"', lt.get("title")
@@ -151,5 +174,7 @@ def parse(basefile, root):
         date=(lt.get("dateCreated") or "")[:10] or _iso(icc.get("date")),
         chamber=icc.get("chamber") or lt.get("source"),
         slug=lt.get("slug"),
-        body=_blocks(body, basefile) if compress.exists(body) else [],
-    ).to_artifact()
+        body=blocks,
+        references=treaties.references(
+            " ".join(block.text for block in blocks)),
+    ).to_artifact(refs_for=lambda text: treaties.refs(text, base, root))

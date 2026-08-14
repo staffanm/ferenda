@@ -62,6 +62,9 @@ class Decision:
     chamber: str | None = None   # "Trial Chamber VI", "Appeals Chamber"
     slug: str | None = None      # Legal Tools slug (source of the PDF)
     body: list[Block] = field(default_factory=list)
+    # the instruments this decision applies (`icc.treaties`), article-level
+    # where it names one -- document relations, not literal body spans
+    references: list[dict] = field(default_factory=list)
 
     @property
     def uri(self):
@@ -73,8 +76,8 @@ class Decision:
         # meet Cloudflare there), keyed by the lower-cased document number
         return "%s/court-record/%s" % (SITE, self.doc_number.lower())
 
-    def to_artifact(self):
-        structure = numbered_nodes(self.body)
+    def to_artifact(self, refs_for=None):
+        structure = numbered_nodes(self.body, refs_for)
         metadata = {
             "title": self.title,
             "publisher": COURT,
@@ -94,7 +97,7 @@ class Decision:
             "title": self.case_name,
             "avgorandedatum": self.date,
             "metadata": metadata,
-            "references": [],
+            "references": self.references,
             "structure": structure,
             "source_url": self.source_url,
         }

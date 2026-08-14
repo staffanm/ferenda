@@ -38,6 +38,11 @@ COE_NAMES = _PKG / "coe" / "data" / "names.json"
 ICRC_NAMES = _PKG / "icrc" / "data" / "names.json"
 UNTC_TREATIES = _PKG / "untc" / "data" / "treaties.json"
 ICC_DECISION_TYPES = _PKG / "icc" / "data" / "decision_types.json"
+# the English names an international court cites a treaty by, mapped onto the
+# corpus document carrying its text. Lives in lib/data, not in a source's, because
+# it spans three corpora (icrc/untc/coe) and two readers (icj/icc) -- no vertical
+# owns it (rule:lib-never-imports-vertical)
+TREATY_NAMES = _PKG / "lib" / "data" / "treaty_names.json"
 NAMEDCASES = _PKG / "dv" / "data" / "namedcases.json"
 NAMEDEUCASES = _PKG / "eurlex" / "data" / "casenames.json"
 FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"

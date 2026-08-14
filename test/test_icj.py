@@ -492,15 +492,17 @@ def test_record_metadata_reaches_the_artifact():
 
 def test_a_decision_cites_the_treaties_it_applies():
     """The corpus already held these instruments and nothing cited them: untc's
-    14 treaties had zero inbound links before this source existed."""
+    14 treaties had zero inbound links before this source existed. Since untc
+    gained its text the reference lands on the *article*, which is what a
+    citation to "Article II of the Genocide Convention" actually means."""
     refs = treaties.references(
         "The Court recalls Article II of the Convention on the Prevention and "
         "Punishment of the Crime of Genocide and Article 31 of the Vienna "
         "Convention on the Law of Treaties. See also UNCLOS.")
     assert [r["uri"] for r in refs] == [
-        "https://lagen.nu/ext/untc/I-1021",     # Genocide Convention
-        "https://lagen.nu/ext/untc/I-18232",    # VCLT
-        "https://lagen.nu/ext/untc/I-31363"]    # UNCLOS
+        "https://lagen.nu/ext/untc/I-1021#AII",     # Genocide Convention art. II
+        "https://lagen.nu/ext/untc/I-18232#A31",    # VCLT art. 31
+        "https://lagen.nu/ext/untc/I-31363"]        # UNCLOS, no article named
     assert all(r["predicate"] == "dcterms:references" for r in refs)
     assert refs[2]["text"] == "UNCLOS"
 
@@ -535,7 +537,7 @@ def test_references_reach_the_artifact():
         basefile="192-20240126-ORD-01-00", case="192",
         case_name="Application of the Genocide Convention in the Gaza Strip",
         kind="order", title="Order of 26 January 2024", date="2024-01-26",
-        references=treaties.references("Article II of the Genocide Convention"),
+        references=treaties.references("the Genocide Convention"),
         body=[Block("stycke", "Text.", number="1")])
     art = decision.to_artifact()
     assert [r["uri"] for r in art["references"]] == \
@@ -632,3 +634,26 @@ def test_folkratt_lists_icj_grouped_by_decision_kind(tmp_path):
     assert html.index("Domar") < html.index("Rådgivande yttranden")
     assert 'href="/icj/070-19860627-JUD-01-00"' in html
     assert "ICJ-avgöranden" in html                   # the shared Dokumenttyp bucket
+
+
+def test_reports_citation_grammar_reads_cover_and_body_forms():
+    """The cover block, as OCR actually spells it, and the running-text form.
+    Resolution is exact-start-page only: a pinpoint into a decision the corpus
+    does not hold must not bind to the nearest held neighbour."""
+    from accommodanda.icj import reports
+    m = reports.RE_OFFICIAL.search(
+        "Officia1 citation : Land, Island and Maritime Frontier Dispute "
+        "(El Salvador/Honduras), Application to Zntewene, Judgment, "
+        "I.C.J. Reports 1990, p. 92")
+    assert (m.group("year"), m.group("volume"), m.group("page")) \
+        == ("1990", None, "92")
+    # the OCR-mangled French twin still yields the same key
+    m = reports.RE_OFFICIAL.search(
+        "Mode officiel de citation : Différend frontalier, "
+        "C.Z.J. Recueil 1990, p. 92")
+    assert (m.group("year"), m.group("page")) == ("1990", "92")
+    # a split-volume year keeps its half: the halves paginate independently
+    m = reports.RE_CITE.search(
+        "as the Court held (I.C.J. Reports 1996 (I), p. 226)")
+    assert (m.group("year"), m.group("volume"), m.group("page")) \
+        == ("1996", "I", "226")

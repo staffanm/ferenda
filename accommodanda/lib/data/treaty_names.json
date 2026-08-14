@@ -1,0 +1,357 @@
+{
+  "_comment": "English names of the instruments an international court cites, mapped onto the corpus document that carries their text (rule:configured-by-data). Keyed by target URI local part; `source` names the corpus half it lives in. `names` are the forms a court actually writes, longest-first at match time so a full title beats a short form that prefixes it. `articles` says whether the target's artifact carries per-article anchors, which decides whether a citation can be pinned to `#A<n>` or only to the instrument. `names_sv` are the Swedish citation forms the lagrum engine matches in Swedish body text (\"artikel 24 i barnkonventionen\"); reader-facing Swedish labels stay in each source's own names.json and may differ. coe/005 carries no names_sv because coe/data/names.json already feeds the Swedish matcher. A name may be shared by several instruments: \"the Geneva Conventions\" names all four, and common article 3 really is an article of each, so it resolves to four references rather than to a guess at which one was meant. `anchor` is the prefix the target's artifact mints an article under, \"A\" unless stated: the Hague Regulations are an *annex* to Convention (IV), so their article 42 is #Annex42 and pointing at #A42 dangles. `last_article` is the highest article the target actually carries, read off its artifact: a citation past it is a misbinding, not a provision, and falls back to naming the instrument. `numerals` is the form the target anchors its articles in: the Genocide Convention runs Article I to XIX and a citation written \"article 1\" must still reach #AI, where minting #A1 pointed at nothing.",
+  "instruments": [
+    {
+      "target": "icrc/585",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Rome Statute of the International Criminal Court",
+        "Rome Statute"
+      ],
+      "names_sv": [
+        "Romstadgan för Internationella brottmålsdomstolen",
+        "Romstadgan"
+      ],
+      "last_article": 128,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/365",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "First Geneva Convention",
+        "Geneva Convention I",
+        "Convention (I) for the Amelioration of the Condition of the Wounded and Sick in Armed Forces in the Field",
+        "Geneva Conventions"
+      ],
+      "names_sv": [
+        "första Genèvekonventionen"
+      ],
+      "last_article": 64,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/370",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Second Geneva Convention",
+        "Geneva Convention II",
+        "Geneva Conventions"
+      ],
+      "names_sv": [
+        "andra Genèvekonventionen"
+      ],
+      "last_article": 63,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/375",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Third Geneva Convention",
+        "Geneva Convention III",
+        "Convention (III) relative to the Treatment of Prisoners of War",
+        "Geneva Conventions"
+      ],
+      "names_sv": [
+        "tredje Genèvekonventionen"
+      ],
+      "last_article": 143,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/380",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Fourth Geneva Convention",
+        "Geneva Convention IV",
+        "Convention (IV) relative to the Protection of Civilian Persons in Time of War",
+        "Geneva Conventions"
+      ],
+      "names_sv": [
+        "fjärde Genèvekonventionen"
+      ],
+      "last_article": 159,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/470",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Additional Protocol I",
+        "First Additional Protocol",
+        "Protocol Additional I",
+        "Additional Protocols"
+      ],
+      "names_sv": [
+        "tilläggsprotokoll I till Genèvekonventionerna"
+      ],
+      "last_article": 102,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/475",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Additional Protocol II",
+        "Second Additional Protocol",
+        "Additional Protocols"
+      ],
+      "names_sv": [
+        "tilläggsprotokoll II till Genèvekonventionerna"
+      ],
+      "last_article": 28,
+      "numerals": "arabic"
+    },
+    {
+      "target": "icrc/195",
+      "source": "icrc",
+      "articles": true,
+      "names": [
+        "Hague Regulations",
+        "Regulations concerning the Laws and Customs of War on Land",
+        "Regulations Respecting the Laws and Customs of War on Land"
+      ],
+      "names_sv": [
+        "lantkrigsreglementet"
+      ],
+      "anchor": "Annex",
+      "last_article": 56,
+      "numerals": "arabic",
+      "note": "The 1899 Convention (II) annexes Regulations with the same title (icrc/150), so no name here tells the two apart. The 1907 text is the target because it is the one in force and the one the courts cite: of 72 mentions across the ICC and ICJ corpora, 32 write \"1907\" and 40 name the Regulations alone. None writes \"1899\". A decision that does needs its own entry against icrc/150 -- naming both, the way \"the Geneva Conventions\" names four, would file 40 citations against a convention no court in this corpus applied."
+    },
+    {
+      "target": "untc/I-18232",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Vienna Convention on the Law of Treaties"
+      ],
+      "names_sv": [
+        "Wienkonventionen om traktaträtten"
+      ],
+      "last_article": 85,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-1021",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention on the Prevention and Punishment of the Crime of Genocide",
+        "Genocide Convention"
+      ],
+      "names_sv": [
+        "folkmordskonventionen",
+        "konventionen om förebyggande och bestraffning av brottet folkmord"
+      ],
+      "last_article": 19,
+      "numerals": "roman"
+    },
+    {
+      "target": "untc/I-14668",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "International Covenant on Civil and Political Rights",
+        "International Covenant of Civil and Political Rights"
+      ],
+      "names_sv": [
+        "konventionen om medborgerliga och politiska rättigheter",
+        "internationella konventionen om medborgerliga och politiska rättigheter",
+        "FN:s konvention om medborgerliga och politiska rättigheter"
+      ],
+      "last_article": 53,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-14531",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "International Covenant on Economic, Social and Cultural Rights"
+      ],
+      "names_sv": [
+        "konventionen om ekonomiska, sociala och kulturella rättigheter",
+        "internationella konventionen om ekonomiska, sociala och kulturella rättigheter"
+      ],
+      "last_article": 31,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-27531",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention on the Rights of the Child"
+      ],
+      "names_sv": [
+        "barnkonventionen",
+        "konventionen om barnets rättigheter",
+        "FN:s konvention om barnets rättigheter"
+      ],
+      "last_article": 54,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-24841",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention against Torture"
+      ],
+      "names_sv": [
+        "tortyrkonventionen",
+        "FN:s konvention mot tortyr",
+        "konventionen mot tortyr och annan grym, omänsklig eller förnedrande behandling eller bestraffning"
+      ],
+      "last_article": 33,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-9464",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "International Convention on the Elimination of All Forms of Racial Discrimination",
+        "Convention on the Elimination of All Forms of Racial Discrimination"
+      ],
+      "names_sv": [
+        "rasdiskrimineringskonventionen",
+        "konventionen om avskaffande av alla former av rasdiskriminering"
+      ],
+      "last_article": 25,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-20378",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention on the Elimination of All Forms of Discrimination against Women",
+        "Convention on the Elimination of Discrimination against Women"
+      ],
+      "names_sv": [
+        "kvinnokonventionen",
+        "konventionen om avskaffande av all slags diskriminering av kvinnor"
+      ],
+      "last_article": 30,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-31363",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "United Nations Convention on the Law of the Sea",
+        "Law of the Sea Convention"
+      ],
+      "names_sv": [
+        "havsrättskonventionen",
+        "FN:s havsrättskonvention",
+        "Förenta nationernas havsrättskonvention"
+      ],
+      "last_article": 320,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-2545",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention relating to the Status of Refugees",
+        "1951 Refugee Convention"
+      ],
+      "names_sv": [
+        "flyktingkonventionen",
+        "konventionen angående flyktingars rättsliga ställning",
+        "1951 års flyktingkonvention"
+      ],
+      "last_article": 46,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-8791",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Protocol relating to the Status of Refugees"
+      ],
+      "names_sv": [
+        "flyktingprotokollet",
+        "protokollet angående flyktingars rättsliga ställning"
+      ],
+      "last_article": 11,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-39481",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "International Convention on the Protection of the Rights of All Migrant Workers and Members of Their Families"
+      ],
+      "names_sv": [
+        "konventionen om migrantarbetares rättigheter"
+      ],
+      "last_article": 93,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-44910",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "Convention on the Rights of Persons with Disabilities"
+      ],
+      "names_sv": [
+        "funktionsrättskonventionen",
+        "konventionen om rättigheter för personer med funktionsnedsättning"
+      ],
+      "last_article": 50,
+      "numerals": "arabic"
+    },
+    {
+      "target": "untc/I-48088",
+      "source": "untc",
+      "articles": true,
+      "names": [
+        "International Convention for the Protection of All Persons from Enforced Disappearance",
+        "Convention for the Protection of All Persons from Enforced Disappearance"
+      ],
+      "names_sv": [
+        "konventionen mot påtvingade försvinnanden",
+        "konventionen till skydd för alla människor mot påtvingade försvinnanden"
+      ],
+      "last_article": 45,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/005",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "European Convention on Human Rights",
+        "Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 59,
+      "numerals": "arabic"
+    }
+  ],
+  "acronyms": {
+    "UNCLOS": "untc/I-31363",
+    "ICCPR": "untc/I-14668",
+    "ICESCR": "untc/I-14531",
+    "CERD": "untc/I-9464",
+    "CEDAW": "untc/I-20378",
+    "CRPD": "untc/I-44910",
+    "ECHR": "coe/005"
+  }
+}
