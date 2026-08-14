@@ -14,6 +14,7 @@ from accommodanda.eurlex.parse import (
     content_file,
     doctype,
     flatten,
+    formex_members,
     load_formex,
     notice_work_date,
     parse_dir,
@@ -101,6 +102,46 @@ def test_parse_act_metadata_and_title():
     assert doc.date == "20221214"
     assert doc.oj == "L 333"
     assert doc.title == "Direktiv (EU) 2022/2555 om cybersäkerhet"
+
+
+def test_parse_act_title_joins_ti_and_sti():
+    # the OJ's newer act-by-act Formex (32025R0390) splits the title: TI holds
+    # only the designation, STI the date and subject -- reading TI alone
+    # published "Rådets förordning (EU) 2025/390" as the whole title
+    xml = """<ACT>
+      <TITLE><TI><P><HT TYPE="UC">Rådets förordning (EU) 2025/390</HT></P></TI>
+      <STI><P>av den <DATE ISO="20250224">24 februari 2025</DATE></P>
+      <P>om ändring av förordning (EU) nr 269/2014</P></STI></TITLE>
+      <ENACTING.TERMS/>
+    </ACT>"""
+    doc = parse_formex(ET.fromstring(xml), "32025R0390", "swe")
+    assert doc.title == ("Rådets förordning (EU) 2025/390 av den "
+                         "24 februari 2025 om ändring av förordning "
+                         "(EU) nr 269/2014")
+
+
+def test_an_eea_relevance_marker_in_sti_is_not_the_title():
+    """Five acts -- 32020R0697, 32020R0699, 32020R0873, 32020R1043 and
+    32021R0557 -- set the EEA-relevance notice in STI, where the join glued it
+    onto the act's name in the catalog, the listings and search. A parenthesis
+    alone does not tell it from a subtitle: 32020H1366's English manifestation
+    sets "(Migration Preparedness and Crisis Blueprint)" in STI, and that is
+    the recommendation's own short name. The Swedish shape below is built from
+    the English one, because the Swedish manifestation carries no STI at
+    all -- it prints the short name inside TI."""
+    xml = """<ACT>
+      <TITLE><TI><P>Rådets förordning (EU) 2020/699 av den 25 maj 2020 om
+      tillfälliga åtgärder avseende stämmor i europabolag</P></TI>
+      <STI><P>(Text av betydelse för EES)</P></STI></TITLE>
+      <ENACTING.TERMS/>
+    </ACT>"""
+    doc = parse_formex(ET.fromstring(xml), "32020R0699", "swe")
+    assert doc.title.endswith("stämmor i europabolag")
+    assert "EES" not in doc.title
+    named = xml.replace("(Text av betydelse för EES)",
+                        "(beredskaps- och krisplan för migration)")
+    assert parse_formex(ET.fromstring(named), "32020H1366", "swe").title.endswith(
+        "(beredskaps- och krisplan för migration)")
 
 
 def test_parse_act_body_structure():
@@ -854,6 +895,39 @@ def test_load_formex_rejects_zip_without_formex_member(tmp_path):
         zf.writestr("L_2016001SV.doc.xml", "<wrapper/>")
     with pytest.raises(ValueError, match="no Formex member"):
         load_formex(bundle)
+
+
+def test_formex_members_promotes_the_main_act_over_a_leading_annex(tmp_path):
+    # filename order is OJ page order, and in 8 documents (32015R0228 among
+    # them) an annex prints on an earlier page than the act itself -- the sort
+    # alone led the whole parse with the annex ("BILAGA VII" for a title)
+    bundle = tmp_path / "swe.fmx4.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("L_2015049SV.01000101.xml",
+                    '<ANNEX><TITLE><TI><P>BILAGA VII</P></TI></TITLE></ANNEX>')
+        zf.writestr("L_2015049SV.01000301.xml",
+                    '<?xml version="1.0"?><!DOCTYPE ACT SYSTEM "formex.dtd">'
+                    '<ACT><TITLE><TI><P>Förordning (EU) 2015/228</P></TI>'
+                    '</TITLE><ENACTING.TERMS/></ACT>')
+        zf.writestr("L_2015049SV.01001201.xml",
+                    '<ANNEX><TITLE><TI><P>BILAGA I</P></TI></TITLE></ANNEX>')
+    names = [name for name, _ in formex_members(bundle)]
+    assert names == ["L_2015049SV.01000301.xml",      # the act leads ...
+                     "L_2015049SV.01000101.xml",      # ... annexes keep
+                     "L_2015049SV.01001201.xml"]      # page order
+    doc = parse_document(load_formex(bundle), "32015R0228", "swe")
+    assert doc.title == "Förordning (EU) 2015/228"
+
+
+def test_formex_members_leaves_a_corrigendum_manifestation_alone(tmp_path):
+    # a corrigendum manifestation leads with its CORR member by design; only
+    # ANNEX members are ever demoted
+    bundle = tmp_path / "swe.fmx4.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("L_2004229SV.01003501.xml", "<CORR><CONTENTS/></CORR>")
+        zf.writestr("L_2004229SV.01003601.xml", "<ACT><ENACTING.TERMS/></ACT>")
+    assert [name for name, _ in formex_members(bundle)] \
+        == ["L_2004229SV.01003501.xml", "L_2004229SV.01003601.xml"]
 
 
 # both notice shapes: the live path's synthesized n-triples and the bulk

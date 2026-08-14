@@ -85,6 +85,23 @@ _ITEM_SKIP = _LEAD_SKIP | {"NO.P"}
 # loading the Formex source (single file or the main act of a zip bundle)
 # --------------------------------------------------------------------------
 
+RE_ROOT_TAG = re.compile(rb"<(?!\?|!)([A-Za-z][\w.]*)")
+
+
+def _root_tag(data):
+    """The root element name of a Formex member, read off the raw bytes (the
+    first tag that is not the XML declaration, a doctype or a comment).
+
+    Every one of the 17 067 zip manifestations has its root tag inside the
+    first 4 096 bytes. A member without one is not XML this parser can read, so
+    it raises rather than reading as the main act -- which is what an empty
+    string did, `"" != "ANNEX"` (rule:fail-fast)."""
+    m = RE_ROOT_TAG.search(data[:4096])
+    if m is None:
+        raise ValueError("Formex member has no root tag in its first 4 096 bytes")
+    return m.group(1).decode("ascii", "replace")
+
+
 def formex_members(path):
     """The raw Formex members of a downloaded manifestation as ``(name, bytes)``
     in document order (main act/judgment first, then annexes) -- a single
@@ -92,16 +109,32 @@ def formex_members(path):
     ``.doc.xml`` wrappers skipped). The byte-level split that `load_formex`
     parses and the patch/editor path reads the main act's source XML from.
     Reads through `compress` (a bare ``.fmx4`` is brotli-compressed on disk; a
-    ``.fmx4.zip`` is stored plain, but is checked by content, not suffix)."""
+    ``.fmx4.zip`` is stored plain, but is checked by content, not suffix).
+
+    Filename order is OJ page order, and in 8 documents (32015R0228 among them)
+    an annex is printed on an earlier page than the act itself, so the sort
+    alone would lead with the annex -- the whole parse then reads the document
+    *as* that annex ("BILAGA VII" for a title, the real act walked as embedded
+    content). The first member that is not an ANNEX is promoted to the front;
+    everything else keeps page order, so a corrigendum manifestation (CORR
+    first, by design) and every already-ordered zip return byte-identically."""
     path = Path(path)
     data = compress.read_bytes(path)
     if zipfile.is_zipfile(io.BytesIO(data)):
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            members = sorted(n for n in zf.namelist()
-                             if n.endswith(".xml") and not n.endswith(".doc.xml"))
-            if not members:
+            names = sorted(n for n in zf.namelist()
+                           if n.endswith(".xml") and not n.endswith(".doc.xml"))
+            if not names:
                 raise ValueError("%s: zip has no Formex member" % path)
-            return [(m, zf.read(m)) for m in members]
+            members = [(m, zf.read(m)) for m in names]
+        main = next((i for i, (_, d) in enumerate(members)
+                     if _root_tag(d) != "ANNEX"), None)
+        # a bundle of annexes and no act is a download that lost its main
+        # member; leading with an annex is the failure this promotion exists to
+        # prevent, so it raises instead (0 of 17 067 today)
+        if main is None:
+            raise ValueError("%s: every Formex member is an ANNEX" % path)
+        return [members[main]] + members[:main] + members[main + 1:]
     return [(path.name, data)]
 
 
@@ -479,6 +512,18 @@ def parse_preamble(preamble, blocks):
                                     num=marker or None))
 
 
+# The EEA-relevance marker is a notice printed under the title, not part of it.
+# Formex normally sets it in an element of its own; in five acts it lands in
+# STI instead -- 32020R0697, 32020R0699, 32020R0873, 32020R1043 and 32021R0557,
+# the COVID batch -- and joining it named 32020R0699 "Rådets förordning (EU)
+# 2020/699 av den 25 maj 2020 om tillfälliga åtgärder ... (Text av betydelse
+# för EES)" in the catalog, the listings and search. A parenthesis alone does
+# not tell the two apart: 32020H1366's "(Migration Preparedness and Crisis
+# Blueprint)" is the recommendation's own short name and belongs in the title.
+RE_EEA_RELEVANCE = re.compile(
+    r"\(Text (av betydelse för EES|with EEA relevance)\)$")
+
+
 def parse_act_body(elem, blocks):
     """An act's body blocks from `elem`'s children, descending through the
     sequence wrappers Formex nests them in.
@@ -505,7 +550,16 @@ def parse_act_body(elem, blocks):
 
 
 def parse_act(root, blocks):
-    title = _text(root.find("TITLE"), "TI", "P") or _text(root, "TITLE")
+    node = root.find("TITLE")
+    # the OJ's newer act-by-act Formex splits the title: TI holds only the
+    # designation ("Rådets förordning (EU) 2025/390"), STI the date and
+    # subject ("av den ... om ändring av ..."). The older shape keeps it all
+    # in TI's P children, where flatten already joins them.
+    subtitle = _text(node, "STI")
+    if subtitle and RE_EEA_RELEVANCE.match(subtitle):
+        subtitle = None
+    title = " ".join(t for t in (_text(node, "TI"), subtitle) if t) \
+        or _text(node, "P") or _text(root, "TITLE")
     body = root.find("CONTENTS") if root.tag == "GENERAL" else root
     if body is None:
         # a recorded per-document parse failure, not a broken program: raise so
