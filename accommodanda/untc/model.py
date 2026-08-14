@@ -21,6 +21,7 @@ the UN, where an MTDSG chapter number does not exist at all.
 
 import functools
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -35,6 +36,10 @@ SITE = "https://treaties.un.org"
 DETAIL = (SITE + "/pages/ViewDetailsIII.aspx"
           "?src=TREATY&mtdsg_no=%s&chapter=%s&clang=_en")
 TREATIES = Path(__file__).resolve().parent / "data" / "treaties.json"
+# An article fragment's number, for the artifact's `ordinal`: "A5" -> 5, "AII"
+# -> II, "A12BIS" -> 12BIS. An annex that carries text of its own is a
+# provision named "AnnexI", and it numbers nothing -- this does not match it.
+RE_ORDINAL = re.compile(r"^A(\d+(?:BIS|TER|QUATER)?|[IVXLC]+)$")
 
 
 def load_treaties():
@@ -112,10 +117,10 @@ class Treaty:
         on its fragment (``A5``, ``AII``) over one ``stycke`` per paragraph.
 
         Anchors run through `unique_id` because a treaty numbers Article 1 more
-        than once: UNCLOS restarts at 1 in each of its nine annexes and again in
-        the 1994 Part XI Agreement bound with it. `text.provisions` scopes the
-        annexes it can name, and this closes what is left -- 39 of UNCLOS's 593
-        anchors were still ambiguous, which is one unreachable article each."""
+        than once: UNCLOS restarts at 1 in each of its nine annexes.
+        `text.provisions` scopes every annex it reads, so no anchor in the
+        fourteen needs a suffix today; this stays as the net, because an
+        ambiguous anchor is one unreachable article."""
         structure, ids = [], {}
         for provision in self.provisions:
             base = provision.fragment or "Preamble"
@@ -125,8 +130,12 @@ class Treaty:
                         for index, paragraph in enumerate(provision.paragraphs, 1)]
             node = {"type": "artikel", "id": anchor,
                     "text": [provision.heading], "children": children}
-            if provision.fragment:
-                node["ordinal"] = provision.fragment.rsplit("_", 1)[-1][1:]
+            # only an article has an ordinal; an annex that carries text of its
+            # own ("AnnexI", UNCLOS's list of highly migratory species) is a
+            # provision under its own name and numbers nothing
+            match = RE_ORDINAL.match((provision.fragment or "").rsplit("_", 1)[-1])
+            if match:
+                node["ordinal"] = match.group(1)
             structure.append(node)
         return structure
 

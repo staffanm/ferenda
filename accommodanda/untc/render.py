@@ -1,13 +1,27 @@
-"""FN-fördragssidan: the instrument and its parties.
+"""FN-fördragssidan: the instrument, its text and its parties.
 
 Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 `render` is the `(art, site) -> str` the generate driver calls.
+
+The text comes from the depositary and the participation from the MTDSG, so
+the page is the two halves in that order: the articles a citation lands on,
+then the states bound by them.
 """
 
 import re
 
+from markupsafe import Markup
+
 from ..lib import labels, tpl
-from ..lib.page import Rail, doc_meta, page_context
+from ..lib.page import (
+    Rail,
+    Toc,
+    article_label,
+    doc_meta,
+    page_context,
+    provision_section,
+    render_toc,
+)
 
 ENV = tpl.environment("accommodanda.untc")
 
@@ -38,8 +52,7 @@ UNTC_ACTIONS_SV = {
 
 def _untc_parties(parties):
     """The participation-table rows -- each state's signature and its binding
-    consent (form + date), display-ready for the untc template. The MTDSG
-    carries no treaty text, so this table is the page's body."""
+    consent (form + date), display-ready for the untc template."""
     return [{"country": party["country"],
              "signature": party.get("signature") or "",
              "consent": ("%s (%s)" % (party.get("actionDate") or "",
@@ -62,9 +75,18 @@ def render(art, site):
         ("Depositarie", md.get("depositary")),
         ("Antal parter", str(md["statesParties"]) if md.get("statesParties") else None),
     ]
+    toc = Toc()
     rail = Rail(site, art["uri"])
+    # every node the model emits is an `artikel` -- an article, an annex
+    # heading, or the preamble -- so one walk serves the whole treaty
+    parts = [provision_section(node, site, art["uri"], toc, rail,
+                               article_label(node))
+             for node in art.get("structure", [])]
+    toc.add("parter", "Parter", 1)
     rail.add_document()
     return ENV.get_template("untc.html").render(page_context(
         lb.short_title or lb.official_title, "FN-fördrag",
-        doc_meta(meta, art.get("source_url")), eyebrow=lb.short_id,
-        island=rail.island(), parties=_untc_parties(art.get("parties") or [])))
+        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
+        eyebrow=lb.short_id, island=rail.island(),
+        structure=Markup("".join(parts)),
+        parties=_untc_parties(art.get("parties") or [])))

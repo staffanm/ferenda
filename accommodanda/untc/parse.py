@@ -135,8 +135,18 @@ def read_provisions(entry, root, basefile):
     lines = (treaty_text.pdf_lines(path) if entry["text"]["reader"] == "pdf"
              else treaty_text.html_lines(
                  patch.apply("untc", basefile + ".text", compress.read_text(path))))
+    parsed = treaty_text.provisions(lines)
+    # The curated count is the treaty's own (rule:configured-by-data). A
+    # depositary that re-publishes the text in a shape this reader cuts wrong
+    # -- a contents block it does not recognise takes every article above it --
+    # otherwise parses green and publishes a treaty missing its first half.
+    count = treaty_text.article_count(parsed)
+    if count != entry["articles"]:
+        raise ValueError("%s: read %d articles from %s, the curated count is %d"
+                         % (basefile, count, entry["text"]["url"],
+                            entry["articles"]))
     return [Provision(fragment, heading, paragraphs)
-            for fragment, heading, paragraphs in treaty_text.provisions(lines)]
+            for fragment, heading, paragraphs in parsed]
 
 
 def parse(basefile, root):

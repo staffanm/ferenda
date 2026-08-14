@@ -1760,6 +1760,16 @@ def _toc_label(versions, languages):
     return plain((versions.get("sv") or versions[languages[-1]]).get("text", []))
 
 
+def article_label(node):
+    """A treaty provision's rail label: "Artikel 5", or the provision's own
+    heading where it has no ordinal. An unnumbered provision is real -- a
+    preamble, a final clause, and UNCLOS's Annex I, which is a list of 17
+    species and no article at all -- and the heading is then all that names it.
+    `coe` labels its own, because it tells an artikel from a sektion."""
+    ordinal = node.get("ordinal")
+    return "Artikel %s" % ordinal if ordinal else plain(node.get("text", []))
+
+
 def provision_section(node, site, doc_uri, toc, rail, label):
     """One treaty provision as an addressable section: its heading enters the TOC
     and the rail (under `label`, the only thing that differs between the

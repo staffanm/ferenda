@@ -1,8 +1,11 @@
-{#- A UN Treaty Collection (MTDSG) treaty page. The MTDSG carries no treaty
-    text, so the participation table -- each state's signature and binding
-    consent -- is the page's body. -#}
+{#- A UN Treaty Collection treaty page, in the order the two halves were
+    fetched: the authentic text from the depositary (articles pre-rendered
+    through the node walk, which wires the TOC and the context rail), then
+    the MTDSG's participation table -- each state's signature and binding
+    consent. -#}
 {% extends "page.html" %}
 {% block body %}
+{{- structure }}
 {%- if parties -%}
 <h2 id="parter">Parter</h2>
 <table class="untc-parties"><thead><tr><th>Stat</th><th>Undertecknande</th><th>Bindande samtycke</th></tr></thead>

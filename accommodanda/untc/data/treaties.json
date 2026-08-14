@@ -1,5 +1,5 @@
 {
-  "_comment": "Curated UN Treaty Collection instruments, one harvest engine over all of them (rule:configured-by-data). `unts` is the identity: the UNTS registration number in the UN's own form (I-14668), which is what the UNTS cites itself by and what survives when an instrument's depositary is not the UN. `mtdsg_no`/`chapter` complete the ViewDetailsIII.aspx status query, which carries ratifications but NO treaty text. `text` names where the authentic text really lives: the UNTS's own volumes are scans (volume 999 is 92 pages with an image on all 92), so the text comes from the depositary instead -- OHCHR for the human-rights core, legal.un.org and un.org/depts/los for the two born-digital PDFs. `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkratt listing, `group` is the Swedish subject heading it files under.",
+  "_comment": "Curated UN Treaty Collection instruments, one harvest engine over all of them (rule:configured-by-data). `unts` is the identity: the UNTS registration number in the UN's own form (I-14668), which is what the UNTS cites itself by and what survives when an instrument's depositary is not the UN. `mtdsg_no`/`chapter` complete the ViewDetailsIII.aspx status query, which carries ratifications but NO treaty text. `text` names where the authentic text really lives: the UNTS's own volumes are scans (volume 999 is 92 pages with an image on all 92), so the text comes from the depositary instead -- OHCHR for the human-rights core, legal.un.org and un.org/depts/los for the two born-digital PDFs. `title` is the authoritative English name (the page headline is generic), `sv`/`abbr` drive the folkratt listing, `group` is the Swedish subject heading it files under. `articles` is the treaty's own article count, counted off the authentic text: a concluded treaty does not gain or lose one, so a parse that disagrees is this reader failing on a re-published page, not the instrument changing.",
   "treaties": [
     {
       "mtdsg_no": "XXIII-1",
@@ -9,6 +9,7 @@
       "abbr": "VCLT",
       "group": "Traktaträtt och havsrätt",
       "unts": "I-18232",
+      "articles": 85,
       "text": {
         "reader": "pdf",
         "url": "https://legal.un.org/ilc/texts/instruments/english/conventions/1_1_1969.pdf"
@@ -22,6 +23,7 @@
       "abbr": "UNCLOS",
       "group": "Traktaträtt och havsrätt",
       "unts": "I-31363",
+      "articles": 445,
       "text": {
         "reader": "pdf",
         "url": "https://www.un.org/depts/los/convention_agreements/texts/unclos/unclos_e.pdf"
@@ -35,6 +37,7 @@
       "abbr": null,
       "group": "Mänskliga rättigheter",
       "unts": "I-1021",
+      "articles": 19,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-prevention-and-punishment-crime-genocide"
@@ -48,6 +51,7 @@
       "abbr": "ICERD",
       "group": "Mänskliga rättigheter",
       "unts": "I-9464",
+      "articles": 25,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-elimination-all-forms-racial"
@@ -61,6 +65,7 @@
       "abbr": "ICESCR",
       "group": "Mänskliga rättigheter",
       "unts": "I-14531",
+      "articles": 31,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-covenant-economic-social-and-cultural-rights"
@@ -74,6 +79,7 @@
       "abbr": "ICCPR",
       "group": "Mänskliga rättigheter",
       "unts": "I-14668",
+      "articles": 53,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-covenant-civil-and-political-rights"
@@ -87,6 +93,7 @@
       "abbr": "CEDAW",
       "group": "Mänskliga rättigheter",
       "unts": "I-20378",
+      "articles": 30,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-elimination-all-forms-discrimination-against-women"
@@ -100,6 +107,7 @@
       "abbr": "CAT",
       "group": "Mänskliga rättigheter",
       "unts": "I-24841",
+      "articles": 33,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-against-torture-and-other-cruel-inhuman-or-degrading"
@@ -113,6 +121,7 @@
       "abbr": "CRC",
       "group": "Mänskliga rättigheter",
       "unts": "I-27531",
+      "articles": 54,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-rights-child"
@@ -126,6 +135,7 @@
       "abbr": "CMW",
       "group": "Mänskliga rättigheter",
       "unts": "I-39481",
+      "articles": 93,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-protection-rights-all-migrant-workers"
@@ -139,6 +149,7 @@
       "abbr": "CRPD",
       "group": "Mänskliga rättigheter",
       "unts": "I-44910",
+      "articles": 50,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-rights-persons-disabilities"
@@ -152,6 +163,7 @@
       "abbr": "CED",
       "group": "Mänskliga rättigheter",
       "unts": "I-48088",
+      "articles": 45,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/international-convention-protection-all-persons-enforced"
@@ -165,6 +177,7 @@
       "abbr": null,
       "group": "Flyktingrätt",
       "unts": "I-2545",
+      "articles": 46,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/convention-relating-status-refugees"
@@ -178,6 +191,7 @@
       "abbr": null,
       "group": "Flyktingrätt",
       "unts": "I-8791",
+      "articles": 11,
       "text": {
         "reader": "ohchr",
         "url": "https://www.ohchr.org/en/instruments-mechanisms/instruments/protocol-relating-status-refugees"

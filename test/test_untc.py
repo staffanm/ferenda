@@ -1,7 +1,9 @@
 """UN Treaty Collection (MTDSG) scraping, artifact projection, folkrätt wiring.
 
 Runs off a committed synthetic MTDSG fixture (a trimmed Vienna Convention page)
-plus small dicts -- no network.
+and the depositary's own VCLT PDF, whole -- the article count is an invariant,
+so a fixture missing the first three articles cannot stand in for the text.
+Small dicts otherwise, no network.
 """
 
 import json
@@ -74,7 +76,10 @@ def test_parse_metadata():
     articles = [n for n in art["structure"] if n.get("ordinal")]
     assert articles, "the treaty text should reach the artifact"
     assert art["structure"][0]["id"] == "Preamble"
-    assert [n["id"] for n in articles][:3] == ["A4", "A5", "A6"]
+    # the fixture PDF is the depositary's whole publication, so the count the
+    # curated entry carries is checked here as it is on the real corpus
+    assert [n["id"] for n in articles][:3] == ["A1", "A2", "A3"]
+    assert len(articles) == load_treaties()["I-18232"]["articles"] == 85
     assert art["metadata"]["reference"] == "UNTS I-18232"
     assert art["metadata"]["mtdsg"] == "XXIII-1"
     assert art["source_url"] == (
@@ -160,10 +165,15 @@ def test_the_three_article_heading_shapes():
 def test_the_table_of_contents_is_not_the_treaty():
     """UNCLOS's PDF opens with 33 pages of contents, each entry an "Article N."
     line of its own. Counting them gave 885 articles against the Convention's
-    320: a contents entry is a heading with nothing under it, its title having
-    gone with the dotted leader."""
-    lines = ["Article 3.", "Breadth of the territorial sea . . . . . . . 12",
+    320. The whole run of leader lines is cut, not each leader line: the
+    contents set their "Article N." and "ANNEX I." lines with no leader of
+    their own, and honouring those filed 444 provisions under Annex IX."""
+    lines = ["CONTENTS",
+             "Article 1.", "Use of terms . . . . . . . . . . . . . . . . . 3",
+             "Article 2.", "Legal status of the territorial sea . . . . . 4",
+             "Article 3.", "Breadth of the territorial sea . . . . . . . 12",
              "Article 4.", "Outer limit . . . . . . . . . . . . . . . . . 12",
+             "ANNEX I.", "HIGHLY MIGRATORY SPECIES . . . . . . . . . . 143",
              "Article 3.", "The breadth of the territorial sea shall not exceed",
              "12 nautical miles."]
     provisions = untc_text.provisions(lines)
@@ -172,16 +182,101 @@ def test_the_table_of_contents_is_not_the_treaty():
                                 "12 nautical miles."]
 
 
+def test_a_three_dot_ellipsis_is_prose_not_a_contents_entry():
+    """A leader needs five dots. The Refugee Protocol sets a three-dot ellipsis
+    inside its article 1(2), and reading that line as a contents entry dropped
+    the paragraph that defines who the Protocol covers."""
+    lines = ["Article 1", "Article 1", "2. the term \"refugee\" shall . . . mean any person"]
+    assert untc_text.provisions(lines)[-1][2] == [
+        "2. the term \"refugee\" shall . . . mean any person"]
+
+
 def test_an_annex_restarts_the_numbering_and_is_scoped():
     """UNCLOS numbers an Article 1 in the body and again in each of nine
     annexes, so 159 of its anchors named more than one provision. The heading
-    is "ANNEX I." and the prose that cites it is "Annex III, article 11." --
-    reading the second as a heading would reset the scope mid-body."""
+    prints its title on the same line ("ANNEX I. HIGHLY MIGRATORY SPECIES");
+    the prose that cites an annex is "Annex III, article 11.", and reading that
+    as a heading would restart the scope mid-body."""
     lines = ["Article 1", "The body's first article.",
              "Annex III, article 11.", "Still the body.",
-             "ANNEX I.", "Article 1", "The annex's first article."]
-    fragments = [p[0] for p in untc_text.provisions(lines)]
-    assert fragments == ["A1", "AnnexI_A1"]
+             "ANNEX I. HIGHLY MIGRATORY SPECIES", "1. Albacore tuna.",
+             "ANNEX II. COMMISSION ON THE LIMITS", "Article 1",
+             "The annex's first article."]
+    provisions = untc_text.provisions(lines)
+    assert [p[0] for p in provisions] == ["A1", "AnnexI", "AnnexII", "AnnexII_A1"]
+    # an annex may carry text and no article at all, and it keeps that text
+    assert provisions[1][2] == ["1. Albacore tuna."]
+
+
+def test_a_second_contents_block_ends_the_treaty():
+    """The UNCLOS PDF prints the Final Act of the conference after the
+    Convention, with its own contents and its own Annexes I, II and VI. Those
+    would claim the anchors of the Convention's own annexes."""
+    # the two blocks must sit further apart than LEADER_GAP, as the real ones
+    # do: 8 027 lines of Convention separate them -- and each must run at least
+    # MIN_LEADER_LINES, as the real ones do at 500 and 7
+    lines = (["Contents . . . . . . . . . . . . . . . . . . . . 1"] * 5
+             + ["Article 1", "The Convention's own article."]
+             + ["A line of the Convention."] * (untc_text.LEADER_GAP + 1)
+             + ["Final Act of the Conference", "Page"]
+             + ["Annex I . . . . . . . . . . . . . . . . . . . . 195"] * 5
+             + ["ANNEX I", "RESOLUTION I", "Not the Convention."])
+    provisions = untc_text.provisions(lines)
+    assert [p[0] for p in provisions] == ["A1"]
+    assert "Not the Convention." not in provisions[0][2]
+
+
+def test_one_dotted_line_is_not_a_contents_block():
+    """A contents block lists a document. One line of dots is a line of the
+    treaty -- a schedule row, a tariff table, a signature page -- and cutting
+    at it drops every article above it. The whole mechanism is calibrated on
+    the one PDF in the corpus that has a contents block at all, so the
+    fifteenth treaty is the one this protects."""
+    lines = ["Article 1", "The first article.",
+             "Article 2", "Tariff heading 24.02 . . . . . . . . . . . 15 %",
+             "Article 3", "The third article."]
+    assert [p[0] for p in untc_text.provisions(lines)] == ["A1", "A2", "A3"]
+
+
+def test_an_article_heading_with_no_text_is_not_an_article():
+    """A contents entry that reaches `provisions` would take the plain "#A5"
+    anchor and leave the real article 5 with a `unique_id` suffix -- the anchor
+    every citation to it mints, landing on a heading with nothing under it. An
+    annex heading is empty on purpose: three of UNCLOS's nine print their title
+    and go straight to their first article."""
+    lines = ["Article 5", "Article 5", "The real article 5.",
+             "ANNEX I. HIGHLY MIGRATORY SPECIES", "Article 1", "The annex's."]
+    provisions = untc_text.provisions(lines)
+    assert [p[0] for p in provisions] == ["A5", "AnnexI", "AnnexI_A1"]
+    assert provisions[0][2] == ["The real article 5."]
+
+
+def test_the_curated_article_count_is_the_invariant():
+    """The authentic text of a concluded treaty does not gain or lose an
+    article, so the count is curated with it. Every one of the fourteen carries
+    it, and a parse that disagrees raises rather than publishing a treaty
+    missing its first half."""
+    for unts, entry in load_treaties().items():
+        assert isinstance(entry["articles"], int) and entry["articles"] > 0, unts
+    assert load_treaties()["I-31363"]["articles"] == 445    # 320 + nine annexes
+    assert load_treaties()["I-8791"]["articles"] == 11
+    # the ordinal grammar is `model.RE_ORDINAL`, the one the artifact reads a
+    # provision's ordinal with, so an "Article 5 bis" counts as the article it is
+    assert untc_text.article_count(
+        [(None, "Preamble", ["..."]), ("A1", "Article 1", ["."]),
+         ("AnnexI", "ANNEX I", ["."]), ("AnnexVI_A31", "Article 31", ["."]),
+         ("A5BIS", "Article 5 bis", ["."])]) == 3
+
+
+def test_a_lowercase_l_set_for_the_digit_one_still_anchors():
+    """The UNCLOS PDF sets "Article 3l" and "Article 4l" with a lowercase L for
+    the 1, which left Annex VI articles 31 and 41 with no anchor and printed
+    their text under articles 30 and 40. A number of digits alone is never
+    rewritten, and a run with no digit is not an article heading at all."""
+    assert untc_text.fragment("3l") == "A31"
+    assert untc_text.fragment("41") == "A41"
+    assert untc_text.RE_ARTICLE.match("Article 3l")
+    assert not untc_text.RE_ARTICLE.match("Article ll")
 
 
 def test_every_anchor_is_unique(): 
@@ -279,6 +374,10 @@ def test_render_treaty_page_shows_status_and_participation(tmp_path):
     assert '<a href="/folkratt/" class="on">Folkrätt</a>' in html   # masthead current
     assert "UN Secretary-General" in html and "Depositarie" in html
     assert "Registrering" in html
+    # the treaty text is the page's body: an article a citation names has to be
+    # an anchor on the page, or the depositary half bought nothing
+    assert 'id="A5"' in html and 'id="Preamble"' in html
+    assert "Article 5" in html                               # its heading, as printed
     # the participation table renders each state's binding consent in Swedish
     assert "Bindande samtycke" in html
     assert "anslutning" in html                              # accession -> anslutning

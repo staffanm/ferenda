@@ -11,22 +11,15 @@ from ..lib.page import (
     BANNERS,
     Rail,
     Toc,
+    article_label,
     doc_meta,
     page_context,
-    plain,
     provision_section,
     render_node,
     render_toc,
 )
 
 ENV = tpl.environment("accommodanda.icrc")
-
-
-def _icrc_label(node):
-    """A provision's rail label: an unnumbered provision (a preamble, a final
-    clause) has only its own heading to go by."""
-    ordinal = node.get("ordinal")
-    return "Artikel %s" % ordinal if ordinal else plain(node.get("text", []))
 
 
 def render(art, site):
@@ -49,7 +42,7 @@ def render(art, site):
     for node in art.get("structure", []):
         if node.get("type") == "artikel":
             parts.append(provision_section(node, site, art["uri"], toc, rail,
-                                              _icrc_label(node)))
+                                              article_label(node)))
         else:
             parts.append(render_node(node, site, art["uri"], toc, rail))
     rail.add_document()
