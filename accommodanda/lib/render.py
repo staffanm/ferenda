@@ -64,6 +64,20 @@ def _render_search_page():
         "Sök", "Sök", "", solo=True))
 
 
+def _render_graph_page():
+    """Static shell for the citation-graph explorer at ``/hanvisningar/`` --
+    graf.js draws it from ``/api/v1/graph``."""
+    return ENV.get_template("hanvisningar.html").render(page_context(
+        "Hänvisningsgrafen", "Hänvisningar", "", solo=True,
+        body_class=" graf-wide",
+        eyebrow="Utforska korpusens hänvisningar",
+        subtitle="Varje dokument är en nod; varje hänvisning en kant. "
+                 "Välj en startpunkt och följ graferna åt båda hållen.",
+        # the legend/filter vocabulary comes from the page, not a hand-synced
+        # copy in graf.js -- a group added to facets joins the filter here
+        flow_groups=json.dumps(facets.FLOW_GROUP_NAMES)))
+
+
 def _render_admin_page():
     """Static shell for the editor login at ``/admin/``. The sign-in affordance
     lives here, not in the masthead -- editor.js mounts the credential form (or,
@@ -1020,6 +1034,10 @@ def write_assets(out_root):
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     compress.write_text(out_root / SCRIPT_BUNDLE, _bundled_script())
+    # the graph explorer's script: one page needs it, so it ships as its own
+    # file instead of riding the every-page bundle
+    compress.write_text(out_root / "graf.js",
+                        (ASSETS / "graf.js").read_text(encoding="utf-8"))
     compress.write_text(out_root / "robots.txt",
                         (ASSETS / "robots.txt").read_text(encoding="utf-8"))
     # style.css ships the self-hosted @font-face set first (assets/fonts/,
@@ -1068,6 +1086,9 @@ def render_aggregates(con, out_root, write_index=True):
     search_dir = out_root / "sok"
     search_dir.mkdir(parents=True, exist_ok=True)
     compress.write_text(search_dir / "index.html", _render_search_page())
+    graph_dir = out_root / "hanvisningar"
+    graph_dir.mkdir(parents=True, exist_ok=True)
+    compress.write_text(graph_dir / "index.html", _render_graph_page())
     admin_dir = out_root / "admin"
     admin_dir.mkdir(parents=True, exist_ok=True)
     compress.write_text(admin_dir / "index.html", _render_admin_page())

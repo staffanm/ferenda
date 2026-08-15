@@ -203,3 +203,42 @@ def test_an_anchor_the_target_holds_is_not_reported(tmp_path):
     con = _corpus(tmp_path, ["Annex42"], "Annex42")
     assert catalog.dangling_anchors(con, ("icrc",)) == []
     con.close()
+
+
+def test_anchor_glob_covers_both_fragment_grammars(tmp_path):
+    """`graph_anchor_*` must count a unit's subdivisions in both grammars the
+    corpus writes -- letter-opened (K4P7S2) and the EU acts' dot-joined
+    (6.1.c) -- and must not leak a sibling whose id merely extends the
+    digits (K4P70, 6.10). The dot grammar held 299 060 point/stycke-level
+    link targets when the miss was found."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law, eu = "https://lagen.nu/x", "https://lagen.nu/ext/celex/32016R0679"
+    citer = "https://lagen.nu/citer"
+    for uri in (law, eu, citer):
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, 'sfs', 'law', 'L', 'T', '')", (uri,))
+    for target in ("#K4P7", "#K4P7S2", "#K4P70"):
+        con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                    "to_uri, to_root) VALUES (?, 'P1', 'dcterms:references', "
+                    "?, ?)", (citer, law + target, law))
+    for target in ("#6.1", "#6.1.c", "#6.10"):
+        con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                    "to_uri, to_root) VALUES (?, 'P1', 'dcterms:references', "
+                    "?, ?)", (citer, eu + target, eu))
+    # outbound from a dot-grammar subdivision must count under its unit
+    con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?, '6.1.c', 'dcterms:references', ?, ?)",
+                (eu, law, law))
+    # ...and an unresolved target still counts in the anchor-level totals
+    con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?, '6.1', 'dcterms:references', "
+                "'https://lagen.nu/ext/celex/39999R9999', "
+                "'https://lagen.nu/ext/celex/39999R9999')", (eu,))
+
+    rows = catalog.graph_anchor_inbound(con, law, "K4P7")
+    assert [(r[0], r[1]) for r in rows] == [(citer, 2)]     # not the K4P70 row
+    rows = catalog.graph_anchor_inbound(con, eu, "6.1")
+    assert [(r[0], r[1]) for r in rows] == [(citer, 2)]     # not the 6.10 row
+    rows = catalog.graph_anchor_outbound(con, eu, "6.1")
+    assert [(r[0], r[1]) for r in rows] == [(law, 1)]
+    assert catalog.graph_anchor_out_totals(con, eu, "6.1") == (2, 2)

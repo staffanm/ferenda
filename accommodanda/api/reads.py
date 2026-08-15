@@ -11,9 +11,12 @@ own presentation (pydantic models and facet labels on REST, search-hit `id`s
 on MCP) and its own error idiom for the typed failures raised here.
 """
 
+import collections
+
 from opensearchpy.exceptions import OpenSearchException
 
-from ..lib import catalog, inbound, pins
+from ..lib import catalog, facets, inbound, pins
+from ..lib.pinpoint import is_change_marker, pinpoint_label, unit_anchor
 from . import db
 
 
@@ -121,3 +124,90 @@ def sources(con):
     """The corpus' sources and their document counts."""
     return [{"source": s, "documents": n}
             for s, n in sorted(catalog.counts(con).items())]
+
+
+# how much of a document's internal citation graph one reply carries: enough
+# for every statute but brottsbalken-class codes, whose long tail of one-off
+# cross-references is noise at graph scale (the reply says how much it cut)
+INTERNAL_EDGE_CAP = 600
+
+
+def _graph_side(rows, groups, limit):
+    """One direction of a node's neighborhood: the catalog's aggregated rows
+    shaped and group-filtered, totals counted over the *filtered* set so the
+    reply's numbers describe what its list is drawn from."""
+    kept = []
+    for uri, n, label, title, source, kind, descriptive in rows:
+        group = facets.flow_group(source, kind)
+        if groups and group not in groups:
+            continue
+        kept.append({"uri": uri, "label": label, "title": title,
+                     "descriptive": descriptive, "source": source,
+                     "kind": kind, "group": group, "n": n})
+    return {"total_links": sum(r["n"] for r in kept), "total_docs": len(kept),
+            "top": kept[:limit]}
+
+
+def _graph_internal(con, root, focus_unit):
+    """The document's internal citation graph at unit (§/article) level:
+    {nodes, edges, truncated}. Change-marker anchors (L1988:942) are the
+    change-entry lists, not provisions a reader navigates, and are dropped."""
+    edges = collections.Counter()
+    for from_anchor, to_uri, n in catalog.graph_internal(con, root):
+        a = unit_anchor(from_anchor)
+        b = unit_anchor(catalog.fragment(to_uri) or "")
+        if not a or not b or a == b or is_change_marker(a) \
+                or is_change_marker(b):
+            continue
+        edges[(a, b)] += n
+    ranked = edges.most_common()
+    kept, dropped = ranked[:INTERNAL_EDGE_CAP], ranked[INTERNAL_EDGE_CAP:]
+    units = {u for (a, b), _n in kept for u in (a, b)}
+    units.add(focus_unit)
+    degree = collections.Counter()
+    for (a, b), n in kept:
+        degree[a] += n
+        degree[b] += n
+    return {"nodes": [{"anchor": u, "label": pinpoint_label(u) or u,
+                       "n": degree[u]} for u in sorted(units)],
+            "edges": [[a, b, n] for (a, b), n in kept],
+            "truncated": len(dropped)}
+
+
+def graph(con, uri, *, direction="both", groups=None, limit=20):
+    """One node's neighborhood in the citation graph, ready to draw -- or None
+    when the catalog has no such document. `uri` may name a document or a
+    provision (`...#K4P7`): a provision answers with the citers/targets of
+    that unit alone, plus the whole document's internal unit graph."""
+    root, _, frag = uri.partition("#")
+    row = catalog.document(con, root)
+    if not row:
+        return None
+    _uri, source, kind, label, title, _path = row
+    unit = unit_anchor(frag) if frag else None
+    if frag:
+        # keyed on the *unit*, not the raw fragment: a deep arrival anchor
+        # (#K4P7S2) answers for the § the reply's `pinpoint` names
+        in_rows = catalog.graph_anchor_inbound(con, root, unit)
+        out_rows = catalog.graph_anchor_outbound(con, root, unit)
+        raw_links, _raw_docs = catalog.graph_anchor_out_totals(con, root, unit)
+    else:
+        in_rows = catalog.graph_inbound(con, root)
+        out_rows = catalog.graph_outbound(con, root)
+        raw_links, _raw_docs = catalog.graph_out_totals(con, root)
+    unresolved = raw_links - sum(r[1] for r in out_rows)
+    result = {
+        "uri": uri, "root": root, "anchor": frag or None, "unit": unit,
+        "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
+        "label": label, "title": title, "source": source, "kind": kind,
+        "group": facets.flow_group(source, kind),
+        "inbound": None, "outbound": None, "internal": None,
+    }
+    if direction in ("in", "both"):
+        result["inbound"] = _graph_side(in_rows, groups, limit)
+    if direction in ("out", "both"):
+        result["outbound"] = _graph_side(out_rows, groups, limit)
+        result["outbound"]["unresolved"] = unresolved
+    if frag:
+        result["internal"] = _graph_internal(con, root, unit)
+    return result

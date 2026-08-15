@@ -1,0 +1,38 @@
+{#- The static shell for the citation-graph explorer at /hanvisningar/;
+    graf.js draws the canvas and panel from /api/v1/graph. The default center
+    is article 6 ECHR -- the corpus' most-cited single provision. -#}
+{% extends "page.html" %}
+{% block body %}
+<div class="graf" data-default-uri="https://lagen.nu/ext/coe/005#A6"
+     data-flow-groups="{{ flow_groups }}">
+<div class="graf-bar">
+  <div class="graf-search">
+    <input type="search" autocomplete="off" spellcheck="false"
+           placeholder="Byt startpunkt — lag, paragraf, rättsfall …"
+           aria-label="Sök en startpunkt">
+    <div class="graf-hits" hidden></div>
+  </div>
+  <div class="graf-seg" role="group" aria-label="Riktning">
+    <button type="button" data-dir="both" class="on">Båda</button>
+    <button type="button" data-dir="in">Hänvisar hit</button>
+    <button type="button" data-dir="out">Hänvisar vidare</button>
+  </div>
+  <div class="graf-steps" role="group" aria-label="Antal led">
+    <button type="button" data-step="-1" aria-label="Ett led färre">−</button>
+    <span class="graf-depth" aria-live="polite">1 led</span>
+    <button type="button" data-step="1" aria-label="Ett led till">+</button>
+  </div>
+</div>
+<div class="graf-stage">
+  <canvas aria-label="Hänvisningsgraf"></canvas>
+  <div class="graf-legend" role="group" aria-label="Källtyper"></div>
+  <div class="graf-hint">klicka: detaljer · dubbelklicka: byt mittpunkt ·
+    scrolla: zooma (utzoomat hämtas ett led till)</div>
+  <aside class="graf-panel" hidden>
+    <button type="button" class="graf-close" aria-label="Stäng">×</button>
+    <div class="graf-panel-body"></div>
+  </aside>
+</div>
+</div>
+<script src="/graf.js" defer></script>
+{% endblock %}

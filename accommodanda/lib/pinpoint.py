@@ -89,3 +89,39 @@ def pinpoint_label(frag):
     if _EU_ARTICLE.fullmatch(frag or ""):
         return eu_article_label(frag)
     return human_fragment(frag)
+
+
+# the article part of a CoE fragment ("A6P1" -> "A6", "A5-2" kept whole so a
+# repeated article stays distinct from its base). A bis-article's suffix
+# letter ("A15A") is never followed by a digit or a lowercase letter --
+# without the lookahead it would swallow a following segment opener
+# ("A6P1" -> "A6P", and a lettered point "A3Lh" -> "A3L")
+_COE_ARTICLE = re.compile(
+    r"A(?:\d+(?:[A-Za-z](?![0-9a-z]))?|[IVXLCDM]+)(?:\.\d+)?(?:-\d+)?")
+
+# an SFS change-marker anchor ("L1988:942"): the change-entry list's own id,
+# not a provision a reader navigates
+_CHANGE_MARKER = re.compile(r"L\d{4}(?:_\d+)?:\S+")
+
+
+def is_change_marker(frag):
+    """True for a change-marker anchor -- a citation graph over provisions
+    drops these rather than drawing a node no reader can name."""
+    return bool(_CHANGE_MARKER.fullmatch(frag or ""))
+
+
+def unit_anchor(frag):
+    """A fragment id -> the pinpointable *unit* it belongs to -- the node the
+    citation graph draws. "K2P16S5" -> "K2P16" (the §), "A6P1" -> "A6" (the
+    article), "9.2.S2" -> "9.2". A fragment with no finer typed tail (a page
+    "sid39", a change marker "L1988:942") is its own unit."""
+    m = _EU_ARTICLE.fullmatch(frag or "")
+    if m:
+        return m.group(1)
+    m = _COE_ARTICLE.match(frag or "")
+    if m:
+        return m.group(0)
+    segs = _FRAG_SEG.findall(frag or "")
+    unit = "".join(letter + val for letter, val in segs
+                   if letter in ("K", "P", "O"))
+    return unit or frag

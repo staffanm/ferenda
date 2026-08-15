@@ -426,3 +426,41 @@ def test_search_explicit_offset_walks_raw_without_the_pin(client):
     assert with_pin["results"][0]["fragments"][0]["pinpoint"] == "K3P1"
     # a pinned lead carries score None; the raw page is the index's hit alone
     assert [r["score"] for r in raw["results"]] == [9.1]
+
+
+def test_graph_neighborhood_and_pinpoint(client):
+    # doc level: fl cites bb once, aggregated per neighbor with flow groups
+    r = client.get("/api/v1/graph", params={"uri": "https://lagen.nu/1962:700"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["group"] == "Författningar" and d["anchor"] is None
+    assert [n["uri"] for n in d["inbound"]["top"]] \
+        == ["https://lagen.nu/2018:585"]
+    assert d["inbound"]["total_links"] == 1
+    assert d["internal"] is None
+
+    # a fragment uri answers for that provision alone and adds the (here
+    # empty) internal unit graph, with the reader-facing pinpoint label --
+    # and a deep arrival anchor (#K3P1S2) answers for the § its `pinpoint`
+    # names, not the stycke subtree alone
+    for frag in ("K3P1", "K3P1S2"):
+        d = client.get("/api/v1/graph",
+                       params={"uri": "https://lagen.nu/1962:700#" + frag}).json()
+        assert d["pinpoint"] == "3 kap. 1 §" and d["unit"] == "K3P1"
+        assert [n["uri"] for n in d["inbound"]["top"]] \
+            == ["https://lagen.nu/2018:585"]
+        assert d["internal"]["edges"] == []
+
+    # direction excludes a side; the group filter narrows the neighbor set;
+    # unknown uris and unknown groups fail visibly
+    d = client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700", "direction": "out"}).json()
+    assert d["inbound"] is None and d["outbound"]["total_links"] == 0
+    assert client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700",
+        "groups": "Rättsfall"}).json()["inbound"]["top"] == []
+    assert client.get("/api/v1/graph",
+                      params={"uri": "https://lagen.nu/x"}).status_code == 404
+    assert client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700",
+        "groups": "Nonsens"}).status_code == 422

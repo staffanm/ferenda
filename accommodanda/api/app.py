@@ -670,6 +670,84 @@ def sources_endpoint(con: sqlite3.Connection = Depends(get_con)):
     return [SourceInfo(**row) for row in reads.sources(con)]
 
 
+class GraphNeighbor(BaseModel):
+    uri: str
+    label: str | None = None
+    title: str | None = None
+    descriptive: str | None = None  # the compact citing form (I1) -- the node label
+    source: str
+    kind: str | None = None
+    group: str                      # the flow-group node name (facets.flow_group)
+    n: int                          # links between the two documents
+
+
+class GraphSide(BaseModel):
+    total_links: int                # over the resolved, group-filtered set
+    total_docs: int
+    unresolved: int = 0             # outbound only: targets outside the corpus
+    top: list[GraphNeighbor]
+
+
+class GraphUnit(BaseModel):
+    anchor: str                     # the unit's fragment id ("K4P7", "A6")
+    label: str                      # its reader form ("4 kap. 7 §")
+    n: int                          # internal links touching the unit
+
+
+class GraphInternal(BaseModel):
+    nodes: list[GraphUnit]
+    edges: list[tuple[str, str, int]]   # (citing unit, cited unit, links)
+    truncated: int                  # unit pairs cut by the edge cap
+
+
+class GraphResponse(BaseModel):
+    uri: str
+    root: str                       # `uri` without its fragment
+    anchor: str | None = None       # the fragment as asked
+    unit: str | None = None         # the pinpointable unit it belongs to
+    pinpoint: str | None = None     # that unit's reader form
+    label: str | None = None
+    title: str | None = None
+    source: str
+    kind: str | None = None
+    group: str
+    inbound: GraphSide | None = None    # None when direction excluded it
+    outbound: GraphSide | None = None
+    internal: GraphInternal | None = None   # only for a fragment uri
+
+
+@app.get("/api/v1/graph", response_model=GraphResponse, tags=["document"])
+def graph_endpoint(uri: str = Query(..., description="document or fragment uri"),
+                   direction: str = Query(
+                       "both", pattern="^(in|out|both)$",
+                       description="which sides of the neighborhood to answer"),
+                   groups: str | None = Query(
+                       None, description="comma-separated flow-group filter "
+                                         "(Författningar, Rättsfall, …)"),
+                   limit: int = Query(20, ge=1, le=60),
+                   con: sqlite3.Connection = Depends(get_con)):
+    """One node's neighborhood in the citation graph, aggregated per neighbor
+    document and ready to draw -- what the /hanvisningar/ explorer walks.
+
+    Each neighbor row is a distinct document with the link count between the
+    two; `/document/inbound` has the same facts one citation per row. A
+    fragment uri (`...#K4P7`) answers for that provision alone and adds
+    `internal`: the whole document's provision-to-provision citation graph at
+    unit (§/article) level."""
+    wanted = None
+    if groups:
+        wanted = {g.strip() for g in groups.split(",") if g.strip()}
+        unknown = wanted - set(facets.FLOW_GROUP_NAMES)
+        if unknown:
+            raise HTTPException(422, "unknown flow group(s): %s"
+                                % ", ".join(sorted(unknown)))
+    data = reads.graph(con, uri, direction=direction, groups=wanted,
+                       limit=limit)
+    if data is None:
+        raise HTTPException(404, "no document %r in the catalog" % uri)
+    return GraphResponse(**data)
+
+
 # --------------------------------------------------------------------------
 # page facsimiles: an on-demand PNG of one source-PDF page (lib/facsimile),
 # rendered lazily at retina resolution and cached to disk. Reached both as

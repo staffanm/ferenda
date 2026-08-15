@@ -314,7 +314,13 @@ def connect_ro(path: Path | str) -> sqlite3.Connection:
             if path not in _ro_migrated:
                 connect(path).close()
                 _ro_migrated.add(path)
-    return sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+    # check_same_thread=False: FastAPI runs a sync dependency and its sync
+    # endpoint in the threadpool, and under concurrent load they land on
+    # *different* worker threads -- the default check then 500s a request
+    # whose connection was handed across. The per-request connection is still
+    # used by one thread at a time, which is the hazard the check guards.
+    return sqlite3.connect("file:%s?mode=ro" % path, uri=True,
+                           check_same_thread=False)
 
 
 def local(uri: str) -> str:
@@ -2012,6 +2018,103 @@ def outbound(con, uri):
         "       d.label, d.title, d.source "
         "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
         "WHERE l.from_uri = ? ORDER BY l.from_anchor, l.to_uri", (uri,)).fetchall()
+
+
+# --------------------------------------------------------------------------
+# graph neighborhood -- the aggregated per-document view /api/v1/graph serves
+# --------------------------------------------------------------------------
+
+def graph_outbound(con, uri):
+    """The distinct documents `uri` cites, largest first: (to_root, n, label,
+    title, source, kind). The inner join drops targets outside the corpus --
+    `graph_out_totals` still counts them -- and self-citations are the
+    document's internal structure, `graph_internal`'s answer, not a
+    neighbor."""
+    return con.execute(
+        "SELECT l.to_root, count(*) n, d.label, d.title, d.source, d.kind, "
+        "       d.descriptive "
+        "FROM links l JOIN documents d ON d.uri = l.to_root "
+        "WHERE l.from_uri = ? AND l.to_root != l.from_uri "
+        "GROUP BY l.to_root ORDER BY n DESC", (uri,)).fetchall()
+
+
+def graph_inbound(con, uri):
+    """The distinct documents citing `uri`, largest first -- the mirror of
+    `graph_outbound`, walking idx_links_to_root."""
+    return con.execute(
+        "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
+        "       d.descriptive "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_root = ? AND l.from_uri != l.to_root "
+        "GROUP BY l.from_uri ORDER BY n DESC", (uri,)).fetchall()
+
+
+def graph_out_totals(con, uri):
+    """(links, distinct targets) for everything `uri` cites beyond itself,
+    targets outside the corpus included."""
+    return con.execute(
+        "SELECT count(*), count(DISTINCT to_root) FROM links "
+        "WHERE from_uri = ? AND to_root != from_uri", (uri,)).fetchone()
+
+
+# a fragment plus its subdivisions, in both fragment grammars the corpus
+# writes: a letter-opened tail ("K4P7" matches K4P7S2 but not K4P70; "A6"
+# matches A6P1) and the EU acts' dot-joined tail ("6.1" matches 6.1.c and
+# 6.1.S2 but not 6.10, whose next character is a digit). GLOB's specials
+# (*?[]) do not occur in document uris or fragment ids.
+def _frag_globs(frag):
+    return (frag + "[A-Z]*", frag + ".*")
+
+
+def graph_anchor_inbound(con, uri, frag):
+    """The documents citing one provision -- rows naming `uri#frag` or a
+    subdivision of it -- largest first."""
+    letter, dot = _frag_globs(uri + "#" + frag)
+    return con.execute(
+        "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
+        "       d.descriptive "
+        "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
+        "                         OR l.to_uri GLOB ?) "
+        "AND l.from_uri != l.to_root "
+        "GROUP BY l.from_uri ORDER BY n DESC",
+        (uri, uri + "#" + frag, letter, dot)).fetchall()
+
+
+def graph_anchor_outbound(con, uri, frag):
+    """The documents one provision cites: links leaving `uri` from the
+    fragment or a subdivision of it, largest first."""
+    letter, dot = _frag_globs(frag)
+    return con.execute(
+        "SELECT l.to_root, count(*) n, d.label, d.title, d.source, d.kind, "
+        "       d.descriptive "
+        "FROM links l JOIN documents d ON d.uri = l.to_root "
+        "WHERE l.from_uri = ? AND (l.from_anchor = ? OR l.from_anchor GLOB ? "
+        "                          OR l.from_anchor GLOB ?) "
+        "AND l.to_root != l.from_uri "
+        "GROUP BY l.to_root ORDER BY n DESC",
+        (uri, frag, letter, dot)).fetchall()
+
+
+def graph_anchor_out_totals(con, uri, frag):
+    """(links, distinct targets) for everything one provision cites beyond
+    its own document, targets outside the corpus included -- the anchor-level
+    mirror of `graph_out_totals`."""
+    letter, dot = _frag_globs(frag)
+    return con.execute(
+        "SELECT count(*), count(DISTINCT to_root) FROM links "
+        "WHERE from_uri = ? AND (from_anchor = ? OR from_anchor GLOB ? "
+        "                        OR from_anchor GLOB ?) "
+        "AND to_root != from_uri", (uri, frag, letter, dot)).fetchone()
+
+
+def graph_internal(con, uri):
+    """A document's internal citation graph, one row per (citing anchor,
+    cited fragment): the self-citations both neighbor queries exclude."""
+    return con.execute(
+        "SELECT l.from_anchor, l.to_uri, count(*) n FROM links l "
+        "WHERE l.from_uri = ? AND l.to_root = ? AND l.from_anchor IS NOT NULL "
+        "GROUP BY 1, 2", (uri, uri)).fetchall()
 
 
 _EMPTY_SIDE = hashlib.sha256().hexdigest()   # digest of zero inbound/outbound rows
