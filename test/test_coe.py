@@ -233,3 +233,41 @@ def test_body_links_the_sibling_treaty_it_names_but_not_itself():
     links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
     assert links == [("Convention for the Protection of Human Rights and "
                       "Fundamental Freedoms", "https://lagen.nu/ext/coe/005")]
+
+
+def test_body_links_its_own_articles_but_only_ones_it_holds():
+    """A bare "Article N" in a treaty's text cites the sibling provision --
+    the internal graph the /hanvisningar/ explorer draws for a pinpoint. An
+    article's own heading stays plain, and an ordinal the instrument does not
+    hold (a mention of another treaty's article) does not bind."""
+    art = parse.parse_record(
+        {"number": "005", "title": "Convention …"},
+        [("Article 1 – Obligation", False),
+         ("Everyone may rely on Article 2 of this Convention, but not "
+          "on Article 99.", False),
+         ("Article 2 – Right to life", False),
+         ("No one shall be deprived of his life.", False)])
+    runs = art["structure"][0]["children"][0]["text"]
+    links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
+    assert links == [("Article 2", "https://lagen.nu/ext/coe/005#A2")]
+    # the heading of article 2 itself carries no link
+    heading = art["structure"][1]["text"]
+    assert all(isinstance(run, str) for run in heading)
+
+
+def test_external_article_citation_wins_over_the_bare_internal_match():
+    """"Article 6 of the Convention" in a protocol is a citation of the
+    Convention's article, not of the protocol's own sixth article -- the
+    external matcher's article span wins the overlap, so the bare internal
+    match never binds "Article 6" to the protocol's #A6."""
+    art = parse.parse_record(
+        {"number": "117", "title": "Protocol No. 7 …"},
+        [("Article 6 – Territorial application", False),
+         ("This provision extends Article 6 of the Convention for the "
+          "Protection of Human Rights and Fundamental Freedoms.", False)])
+    runs = art["structure"][0]["children"][0]["text"]
+    links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
+    assert links == [
+        ("Article 6", "https://lagen.nu/ext/coe/005#A6"),
+        ("Convention for the Protection of Human Rights and Fundamental "
+         "Freedoms", "https://lagen.nu/ext/coe/005")]

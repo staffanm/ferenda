@@ -10,7 +10,7 @@ import re
 from ..lib import compress, treatyref
 from ..lib.artifact import unique_id
 from ..lib.coe import article_fragment, treaty_number, treaty_uri
-from ..lib.lagrum import interleave
+from ..lib.lagrum import Ref, interleave, yield_overlaps
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import normalize_space
 from .download import body_path, record_path
@@ -134,14 +134,44 @@ def build_structure(paragraphs, refs_for=None):
     return root
 
 
+# a bare "Article N" in a treaty's own text cites a sibling provision (the
+# ECHR names Article 34 eight times outside its heading). Only ordinals the
+# instrument itself holds bind -- "Article 6 of the Convention" in a protocol
+# is the external matcher's, and wins overlaps. An enumeration ("Articles 2
+# to 5") links its first member only.
+RE_INTERNAL_ARTICLE = re.compile(
+    r"\bArticles?\s+((?:\d+[A-Z]?|[IVXLCDM]+)(?:\.\d+)?)\b")
+
+
+def internal_refs(text, own, articles):
+    heading = RE_ARTICLE.match(text)
+    refs = []
+    for m in RE_INTERNAL_ARTICLE.finditer(text):
+        if heading and m.start() == 0:
+            continue                     # the provision naming itself
+        fragment = article_fragment(m.group(1).lstrip("0"))
+        if fragment in articles:
+            refs.append(Ref(m.start(), m.end(), m.group(0),
+                            treatyref.PREDICATE, own + "#" + fragment))
+    return refs
+
+
 def parse_record(record, paragraphs):
     # the sibling treaties this text names, linked inline; the treaty's own
     # name is self-description, not a citation (a protocol's title page spells
     # the full title the curated table maps to it)
     own = treaty_uri(treaty_number(record["number"]))
+    # a skeleton pass first: internal article references bind only to
+    # provisions the instrument actually holds
+    articles = {node["id"] for node in build_structure(paragraphs)
+                if node.get("type") == "artikel"}
 
     def refs_for(text):
-        return treatyref.refs(text, exclude=own)
+        external = treatyref.refs(text, exclude=own)
+        return sorted(
+            external + yield_overlaps(internal_refs(text, own, articles),
+                                      external),
+            key=lambda ref: ref.start)
 
     treaty = Treaty(
         number=record["number"], title=record["title"],
