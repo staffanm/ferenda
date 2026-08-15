@@ -13,7 +13,6 @@ an ICC decision mean the Rome Statute and `icc.treaties` says so.
 """
 
 from ..lib import treatyref
-from ..lib.lagrum import Ref
 
 
 def references(text):
@@ -31,5 +30,4 @@ def refs(text):
     the artifact structure stores -- so "Article II of the Genocide
     Convention" is a link where the reader meets it, not only a relation in
     the rail."""
-    return [Ref(start, end, text[start:end], treatyref.PREDICATE, uri)
-            for start, end, uri in treatyref.spans(text)]
+    return treatyref.refs(text)

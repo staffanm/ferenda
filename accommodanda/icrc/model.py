@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..lib.catalog import BASE
+from ..lib.lagrum import interleave
 
 PUBLISHER = "International Committee of the Red Cross"
 SITE = "https://ihl-databases.icrc.org"
@@ -118,7 +119,9 @@ class Treaty:
     def source_url(self):
         return SITE + "/en" + self.slug if self.slug else None
 
-    def _structure(self):
+    def _structure(self, refs_for=None):
+        def runs(text):
+            return interleave(text, refs_for(text)) if refs_for else [text]
         structure = []
         for prov in self.provisions:
             if prov.kind == "rubrik":
@@ -126,7 +129,7 @@ class Treaty:
                                   "text": [prov.heading]})
                 continue
             children = [{"type": "stycke", "id": "%sS%d" % (prov.fragment, i),
-                         "text": [para]}
+                         "text": runs(para)}
                         for i, para in enumerate(prov.paragraphs, 1)]
             node = {"type": "artikel", "id": prov.fragment,
                     "text": [prov.heading], "children": children}
@@ -135,7 +138,7 @@ class Treaty:
             structure.append(node)
         return structure
 
-    def to_artifact(self):
+    def to_artifact(self, refs_for=None, references=()):
         metadata = {
             "title": self.title,
             "publisher": PUBLISHER,
@@ -158,8 +161,8 @@ class Treaty:
             "title": self.title,
             "date": self.adoption_date,
             "metadata": metadata,
-            "references": [],
-            "structure": self._structure(),
+            "references": list(references),
+            "structure": self._structure(refs_for),
             "parties": [party.to_dict() for party in self.parties],
         }
         if self.summary:

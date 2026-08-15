@@ -26,6 +26,7 @@ import re
 
 from . import datasets
 from .catalog import BASE
+from .lagrum import Ref
 from .treaty_ids import arabic as _arabic
 from .treaty_ids import article_fragment
 
@@ -73,6 +74,20 @@ ARTICLE_WINDOW = 40
 # curated name says "on", and article 9 was filed as article 9 of the Rome
 # Statute.
 RE_OF_INSTRUMENT = re.compile(r"\s*(?:of|in|under)\s+(?:the\s+)?[A-Z]")
+# How far around a *generic* name its anchoring context may sit. Every treaty
+# family numbers its protocols -- the corpus holds a "Second Additional
+# Protocol" to the European Conventions on extradition (coe/098), mutual
+# assistance (coe/182) and cybercrime (coe/224) -- so an ordinal name binds to
+# a Geneva instrument only where the family is named beside it: "Additional
+# Protocol II to the Geneva Conventions" binds, "the Second Additional
+# Protocol to this Convention" on a CoE page stays unlinked. 150 characters
+# is about one sentence: it spans the full official citation, which puts the
+# whole relating-to clause between the family name and the short form
+# ("Protocol Additional to the Geneva Conventions of 12 August 1949, and
+# relating to the Protection of Victims of International Armed Conflicts
+# (Protocol I)"), while the family name is what carries the safety -- no
+# other family's text names the Geneva Conventions beside its own protocols.
+CONTEXT_WINDOW = 150
 
 
 def treaty_uri(target):
@@ -129,25 +144,39 @@ def instruments():
     return {entry["target"]: entry for entry in _curated()["instruments"]}
 
 
+@functools.lru_cache(maxsize=8)
 def patterns(extra=()):
-    """(compiled pattern, target) for every curated name plus the caller's own,
-    longest name first so a full title beats a short form that prefixes it.
+    """(compiled pattern, target, label, context) for every curated name plus
+    the caller's own, longest label first so a full title beats a short form
+    that prefixes it. `context` is None for a name that binds on its own; a
+    `generic_names` entry carries its instrument's compiled `generic_context`,
+    which `_named` requires within `CONTEXT_WINDOW` of the match.
 
-    `extra` is [(name, target)] -- a short form only that caller can read
-    without ambiguity.
+    `extra` is ((name, target), ...) -- a short form only that caller can read
+    without ambiguity. A name given as a compiled pattern is used as written
+    (its own guards included) instead of being escaped: hudoc reads "the
+    Convention" as the ECHR only where no longer title continues it.
     """
-    named = [(name, entry["target"])
+    named = [(name, entry["target"], None)
              for entry in _curated()["instruments"] for name in entry["names"]]
-    named += [(name, target) for name, target in extra]
-    out = [(re.compile(r"\b%s\b" % re.escape(name), re.I), target, name)
-           for name, target in named]
+    named += [(name, entry["target"],
+               re.compile(entry["generic_context"], re.I))
+              for entry in _curated()["instruments"]
+              for name in entry.get("generic_names", ())]
+    named += [(name, target, None) for name, target in extra]
+    # a compiled extra carries no canonical label (label None); `_named` then
+    # labels each of its matches with the matched text itself
+    out = [(name, target, None, context)
+           if isinstance(name, re.Pattern) else
+           (re.compile(r"\b%s\b" % re.escape(name), re.I), target, name, context)
+           for name, target, context in named]
     # an acronym is matched case-sensitively, because a court sets one in
     # capitals and the lower-cased form of a short acronym is often an ordinary
     # word -- which is also why "CAT" and "CRC" are deliberately not in the
     # table, where "UNCLOS" and "ICESCR" are safe
-    out += [(re.compile(r"\b%s\b" % acronym), target, acronym)
+    out += [(re.compile(r"\b%s\b" % acronym), target, acronym, None)
             for acronym, target in _curated()["acronyms"].items()]
-    return sorted(out, key=lambda entry: -len(entry[2]))
+    return sorted(out, key=lambda entry: -len(entry[2] or entry[0].pattern))
 
 
 def _named(text, extra):
@@ -160,13 +189,19 @@ def _named(text, extra):
     at which one was meant.
     """
     found = []
-    for pattern, target, name in patterns(extra):
+    for pattern, target, name, context in patterns(tuple(extra)):
         for match in pattern.finditer(text):
+            # a generic name (an ordinal protocol) binds only beside its
+            # family's own context -- see CONTEXT_WINDOW
+            if context and not context.search(
+                    text, max(0, match.start() - CONTEXT_WINDOW),
+                    match.end() + CONTEXT_WINDOW):
+                continue
             span = (match.start(), match.end())
             if any(start <= span[0] and span[1] <= end and (start, end) != span
                    for start, end, _t, _n in found):
                 continue
-            found.append((span[0], span[1], target, name))
+            found.append((span[0], span[1], target, name or match.group(0)))
     return sorted(found)
 
 
@@ -307,3 +342,14 @@ def spans(text, extra=(), article_level=True):
             continue
         out.append((start, end, treaty_uri(target)))
     return sorted(out)
+
+
+def refs(text, extra=(), exclude=None):
+    """The `spans` projection as inline `lagrum.Ref`s -- the shape every
+    caller's `refs_for` scanner hands to `interleave`. `exclude` drops a
+    document's own uri (and its fragments): a treaty naming itself is
+    self-description, not a citation."""
+    return [Ref(start, end, text[start:end], PREDICATE, uri)
+            for start, end, uri in spans(text, extra=extra)
+            if exclude is None
+            or not (uri == exclude or uri.startswith(exclude + "#"))]

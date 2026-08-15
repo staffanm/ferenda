@@ -11,7 +11,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress, patch
+from ..lib import compress, patch, treatyref
 from ..lib.util import normalize_space
 from .download import record_path
 from .model import (
@@ -184,7 +184,27 @@ def parse_envelope(envelope):
     )
 
 
+def artifact(treaty):
+    """The treaty as an artifact, its cross-treaty citations resolved: the
+    sibling instruments this treaty's own text names -- an Additional
+    Protocol's preamble cites the four 1949 Conventions, the Rome Statute's
+    article 8 cites them per grave-breaches clause. The treaty's own name is
+    self-description, not a citation. Inline spans link where one target is
+    unambiguous; `references` also carries the family names ("the Geneva
+    Conventions") that resolve to several instruments and so link nothing."""
+    own = treaty.uri
+
+    def refs_for(text):
+        return treatyref.refs(text, exclude=own)
+
+    body = "\n".join(para for prov in treaty.provisions
+                     for para in prov.paragraphs)
+    references = [ref for ref in treatyref.references(body)
+                  if ref["uri"] != own and not ref["uri"].startswith(own + "#")]
+    return treaty.to_artifact(refs_for=refs_for, references=references)
+
+
 def parse(basefile, root):
     text = patch.apply("icrc", basefile,
                        compress.read_text(record_path(root, basefile)))
-    return parse_envelope(json.loads(text)).to_artifact()
+    return artifact(parse_envelope(json.loads(text)))

@@ -7,9 +7,10 @@ pdftohtml -> page_paragraphs -> :func:`build_structure`.
 
 import re
 
-from ..lib import compress
+from ..lib import compress, treatyref
 from ..lib.artifact import unique_id
-from ..lib.coe import article_fragment
+from ..lib.coe import article_fragment, treaty_number, treaty_uri
+from ..lib.lagrum import interleave
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import normalize_space
 from .download import body_path, record_path
@@ -33,10 +34,6 @@ def pdf_paragraphs(path, patch_key=None):
             for page, lines in pdf_pages(str(path), patch_key)
             for para in page_paragraphs(lines, None, page)
             if normalize_space(para.text)]
-
-
-def _runs(text):
-    return [text]
 
 
 def _section_structure(root, ids):
@@ -65,8 +62,14 @@ def _section_structure(root, ids):
     return out
 
 
-def build_structure(paragraphs):
-    """Classified paragraphs to a tree with stable article/subarticle ids."""
+def build_structure(paragraphs, refs_for=None):
+    """Classified paragraphs to a tree with stable article/subarticle ids.
+
+    `refs_for` (text -> [lagrum.Ref]) links the sibling treaties a text names
+    -- a protocol cites the instrument it extends by full title -- and the
+    runs then carry those links."""
+    def _runs(text):
+        return interleave(text, refs_for(text)) if refs_for else [text]
     root = []
     ids = {}
     article = paragraph = None
@@ -132,6 +135,14 @@ def build_structure(paragraphs):
 
 
 def parse_record(record, paragraphs):
+    # the sibling treaties this text names, linked inline; the treaty's own
+    # name is self-description, not a citation (a protocol's title page spells
+    # the full title the curated table maps to it)
+    own = treaty_uri(treaty_number(record["number"]))
+
+    def refs_for(text):
+        return treatyref.refs(text, exclude=own)
+
     treaty = Treaty(
         number=record["number"], title=record["title"],
         opening_date=record.get("opening_date"),
@@ -139,7 +150,7 @@ def parse_record(record, paragraphs):
         entry_into_force=record.get("entry_into_force"),
         reference=record.get("reference"), summary=record.get("summary"),
         source_url=record.get("source_url"),
-        structure=build_structure(paragraphs),
+        structure=build_structure(paragraphs, refs_for),
     )
     return treaty.to_artifact()
 

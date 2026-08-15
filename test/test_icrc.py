@@ -307,3 +307,33 @@ def test_a_textless_unlabelled_block_between_articles_is_a_heading():
         ("artikel", "Heading 1"),
         ("rubrik", "Final provisions"),
         ("artikel", "Heading 2")]
+
+
+def test_cross_treaty_citations_link_and_self_is_excluded():
+    """R4: AP II article 1 cites common article 3 and its sibling protocol by
+    the full official citation. The family reference lands in `references`
+    (four instruments, no inline guess); the parenthesised short form links
+    inline because the family is named beside it (generic-name context rule)."""
+    from accommodanda.icrc.model import Provision
+    treaty = Treaty(
+        number="475", title="Protocol Additional (II) …",
+        treaty_type="additional_protocols",
+        provisions=[Provision(
+            "artikel", "Article", "Article 1", fragment="A1", ordinal="1",
+            paragraphs=["This Protocol, which develops and supplements "
+                        "Article 3 common to the Geneva Conventions of "
+                        "12 August 1949; and the Protocol Additional to the "
+                        "Geneva Conventions of 12 August 1949, and relating "
+                        "to the Protection of Victims of International Armed "
+                        "Conflicts (Protocol I) …"])])
+    art = parse.artifact(treaty)
+    # the first "Geneva Conventions" is bound by common article 3; the second
+    # (inside the Protocol I citation) is unbound and references the family
+    assert sorted(r["uri"].replace("https://lagen.nu/ext/", "")
+                  for r in art["references"]) == \
+        ["icrc/365", "icrc/365#A3", "icrc/370", "icrc/370#A3",
+         "icrc/375", "icrc/375#A3", "icrc/380", "icrc/380#A3", "icrc/470"]
+    runs = art["structure"][0]["children"][0]["text"]
+    assert [(run["text"], run["uri"].replace("https://lagen.nu/ext/", ""))
+            for run in runs if isinstance(run, dict)] == \
+        [("Protocol I", "icrc/470")]

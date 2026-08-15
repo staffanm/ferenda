@@ -6,8 +6,9 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, patch
 from ..lib.errors import SkipDocument
+from ..lib.lagrum import yield_overlaps
 from ..lib.util import normalize_space
-from . import citations, summaries
+from . import citations, summaries, treaties
 from .download import body_path, record_path
 from .model import Block, HudocCase, record_date
 
@@ -157,10 +158,20 @@ def parse_record(record, html_text, summary=None):
     )
 
 
+def _refs(text, basefile, root):
+    """One block's inline citations: the case-law spans plus the Convention/
+    protocol treaty spans, a case-law span winning any overlap -- the cited
+    case's own name may spell out an instrument's words, the filing identity
+    is the stronger read."""
+    case = citations.refs(text, basefile, root)
+    treaty = yield_overlaps(treaties.refs(text), case)
+    return sorted(case + treaty, key=lambda ref: ref.start)
+
+
 def parse(basefile, root):
     record = compress.read_json(record_path(root, basefile))
     html = patch.apply("hudoc", basefile,
                        compress.read_text(body_path(root, basefile)))
     return parse_record(record, html,
                         summaries.read_sidecar(root, basefile)).to_artifact(
-        refs_for=lambda text: citations.refs(text, basefile, root))
+        refs_for=lambda text: _refs(text, basefile, root))

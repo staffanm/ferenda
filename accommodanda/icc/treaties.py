@@ -67,8 +67,5 @@ def refs(text, doc_number, root):
     # disjoint spans and the treaty side rests on curated name data -- so
     # the merge filters like every other two-list caller, the filing
     # number (the Court's own identity) winning
-    treaty = yield_overlaps(
-        [Ref(start, end, text[start:end], treatyref.PREDICATE, uri)
-         for start, end, uri in treatyref.spans(text, extra=SHORT_FORMS)],
-        numbers)
+    treaty = yield_overlaps(treatyref.refs(text, extra=SHORT_FORMS), numbers)
     return sorted(numbers + treaty, key=lambda ref: ref.start)

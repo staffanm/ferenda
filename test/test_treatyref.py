@@ -98,8 +98,10 @@ def test_an_article_the_instrument_lacks_is_not_a_provision():
     """"the Additional Protocols, article 85" binds to both, but Protocol II
     ends at article 28. Naming the instrument is the honest answer where #A85
     was a link to nothing: 97 references pointed at an absent anchor before the
-    range check."""
-    refs = _refs("article 85 of the Additional Protocols")
+    range check. (The family name beside it is what lets the generic ordinal
+    name bind at all -- see the generic-context tests below.)"""
+    refs = _refs("article 85 of the Additional Protocols "
+                 "to the Geneva Conventions")
     assert ("icrc/470#A85", "Additional Protocols, article 85") in refs
     assert ("icrc/475", "Additional Protocols") in refs
     assert not any(uri == "icrc/475#A85" for uri, _ in refs)
@@ -181,3 +183,42 @@ def test_spans_skip_a_range_interior_and_an_ambiguous_binding():
             if "#" in r["uri"]] == ["A6", "A7", "A8"]
     ambiguous = "common article 3 of the Geneva Conventions"
     assert treatyref.spans(ambiguous) == []
+
+
+def test_a_generic_name_needs_its_family_named_beside_it():
+    """Every treaty family numbers its protocols: the corpus holds a "Second
+    Additional Protocol" to the European Conventions on extradition (coe/098),
+    mutual assistance (coe/182) and cybercrime (coe/224). So an ordinal name
+    binds to a Geneva instrument only where the family is named within
+    `CONTEXT_WINDOW` -- the phrase on coe/182's own page must stay unlinked."""
+    assert _refs("the Second Additional Protocol to this Convention, "
+                 "done at Strasbourg") == []
+    assert _refs("grave breaches of Additional Protocol II to the Geneva "
+                 "Conventions of 12 August 1949") == \
+        [("icrc/365", "Geneva Conventions"), ("icrc/370", "Geneva Conventions"),
+         ("icrc/375", "Geneva Conventions"), ("icrc/380", "Geneva Conventions"),
+         ("icrc/475", "Additional Protocol II")]
+
+
+def test_the_full_official_citation_carries_its_own_context():
+    """AP II article 1 names its sibling by the full title with the short form
+    parenthesised at the end -- the relating-to clause puts ~90 characters
+    between "12 August 1949" and "(Protocol I)", which is why CONTEXT_WINDOW
+    spans a sentence rather than a phrase."""
+    text = ("Article 1 of the Protocol Additional to the Geneva Conventions "
+            "of 12 August 1949, and relating to the Protection of Victims of "
+            "International Armed Conflicts (Protocol I)")
+    assert ("icrc/470", "Protocol I") in _refs(text)
+
+
+def test_a_caller_s_short_form_may_be_a_guarded_pattern():
+    """hudoc reads "the Convention" as the ECHR -- but only where no longer
+    title continues it, which a plain escaped name cannot express."""
+    import re
+    extra = ((re.compile(r"\b[Tt]he Convention\b"
+                         r"(?!\s+(?:on|for|against|of|relating|concerning|to)"
+                         r"\b)"), "coe/005"),)
+    assert _refs("a violation of Article 8 of the Convention", extra) == \
+        [("coe/005#A8", "the Convention, article 8")]
+    assert _refs("under the Convention on the Rights of the Child", extra) == \
+        [("untc/I-27531", "Convention on the Rights of the Child")]

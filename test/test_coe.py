@@ -216,3 +216,20 @@ def test_folkratt_lists_coe_alphabetically_with_nested_protocols(tmp_path):
     # Extradition (name 'E') sits under Övriga, after the nested protocol block
     assert "Extradition" in html
     assert html.index("Protocol No. 4") < html.index("Extradition")
+
+
+def test_body_links_the_sibling_treaty_it_names_but_not_itself():
+    """R4: a protocol's text cites the instrument it extends by full title,
+    and that links; its own title on the same page is self-description and
+    stays plain."""
+    art = parse.parse_record(
+        {"number": "009", "title": "Protocol to the Convention …"},
+        [("Article 1 – Scope", False),
+         ("The Parties recall the Convention for the Protection of Human "
+          "Rights and Fundamental Freedoms and the Protocol to the Convention "
+          "for the Protection of Human Rights and Fundamental Freedoms.",
+          False)])
+    runs = art["structure"][0]["children"][0]["text"]
+    links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
+    assert links == [("Convention for the Protection of Human Rights and "
+                      "Fundamental Freedoms", "https://lagen.nu/ext/coe/005")]

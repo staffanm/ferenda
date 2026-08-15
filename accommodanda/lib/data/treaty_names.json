@@ -1,5 +1,5 @@
 {
-  "_comment": "English names of the instruments an international court cites, mapped onto the corpus document that carries their text (rule:configured-by-data). Keyed by target URI local part; `source` names the corpus half it lives in. `names` are the forms a court actually writes, longest-first at match time so a full title beats a short form that prefixes it. `articles` says whether the target's artifact carries per-article anchors, which decides whether a citation can be pinned to `#A<n>` or only to the instrument. `names_sv` are the Swedish citation forms the lagrum engine matches in Swedish body text (\"artikel 24 i barnkonventionen\"); reader-facing Swedish labels stay in each source's own names.json and may differ. coe/005 carries no names_sv because coe/data/names.json already feeds the Swedish matcher. A name may be shared by several instruments: \"the Geneva Conventions\" names all four, and common article 3 really is an article of each, so it resolves to four references rather than to a guess at which one was meant. `anchor` is the prefix the target's artifact mints an article under, \"A\" unless stated: the Hague Regulations are an *annex* to Convention (IV), so their article 42 is #Annex42 and pointing at #A42 dangles. `last_article` is the highest article the target actually carries, read off its artifact: a citation past it is a misbinding, not a provision, and falls back to naming the instrument. `numerals` is the form the target anchors its articles in: the Genocide Convention runs Article I to XIX and a citation written \"article 1\" must still reach #AI, where minting #A1 pointed at nothing.",
+  "_comment": "English names of the instruments an international court cites, mapped onto the corpus document that carries their text (rule:configured-by-data). Keyed by target URI local part; `source` names the corpus half it lives in. `names` are the forms a court actually writes, longest-first at match time so a full title beats a short form that prefixes it. `articles` says whether the target's artifact carries per-article anchors, which decides whether a citation can be pinned to `#A<n>` or only to the instrument. `names_sv` are the Swedish citation forms the lagrum engine matches in Swedish body text (\"artikel 24 i barnkonventionen\"); reader-facing Swedish labels stay in each source's own names.json and may differ. coe/005 carries no names_sv because coe/data/names.json already feeds the Swedish matcher. A name may be shared by several instruments: \"the Geneva Conventions\" names all four, and common article 3 really is an article of each, so it resolves to four references rather than to a guess at which one was meant. `anchor` is the prefix the target's artifact mints an article under, \"A\" unless stated: the Hague Regulations are an *annex* to Convention (IV), so their article 42 is #Annex42 and pointing at #A42 dangles. `last_article` is the highest article the target actually carries, read off its artifact: a citation past it is a misbinding, not a provision, and falls back to naming the instrument. `numerals` is the form the target anchors its articles in: the Genocide Convention runs Article I to XIX and a citation written \"article 1\" must still reach #AI, where minting #A1 pointed at nothing. `generic_names` are forms too generic to name an instrument on their own -- every treaty family numbers its protocols, and the corpus holds a 'Second Additional Protocol' in three of them -- so a generic name only matches where `generic_context` (a regex) also occurs within lib.treatyref.CONTEXT_WINDOW characters of it: 'Additional Protocol II to the Geneva Conventions' binds, the bare 'Second Additional Protocol to this Convention' on a CoE page does not.",
   "instruments": [
     {
       "target": "icrc/585",
@@ -83,12 +83,15 @@
       "target": "icrc/470",
       "source": "icrc",
       "articles": true,
-      "names": [
+      "names": [],
+      "generic_names": [
         "Additional Protocol I",
         "First Additional Protocol",
         "Protocol Additional I",
+        "Protocol I",
         "Additional Protocols"
       ],
+      "generic_context": "Geneva Convention|12 August 1949|8 June 1977",
       "names_sv": [
         "tilläggsprotokoll I till Genèvekonventionerna"
       ],
@@ -99,11 +102,14 @@
       "target": "icrc/475",
       "source": "icrc",
       "articles": true,
-      "names": [
+      "names": [],
+      "generic_names": [
         "Additional Protocol II",
         "Second Additional Protocol",
+        "Protocol II",
         "Additional Protocols"
       ],
+      "generic_context": "Geneva Convention|12 August 1949|8 June 1977",
       "names_sv": [
         "tilläggsprotokoll II till Genèvekonventionerna"
       ],
@@ -342,6 +348,88 @@
         "Convention for the Protection of Human Rights and Fundamental Freedoms"
       ],
       "last_article": 59,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/009",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 1 to the Convention for the Protection of Human Rights and Fundamental Freedoms",
+        "Protocol to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 6,
+      "numerals": "arabic",
+      "note": "ETS 009's official title carries no number -- the Court's own texts call it Protocol No. 1, and hudoc adds that short form as a caller extra."
+    },
+    {
+      "target": "coe/046",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 4 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 7,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/114",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 6 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 9,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/117",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 7 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 10,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/177",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 12 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 6,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/187",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 13 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 8,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/194",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 14 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 22,
+      "numerals": "arabic"
+    },
+    {
+      "target": "coe/214",
+      "source": "coe",
+      "articles": true,
+      "names": [
+        "Protocol No. 16 to the Convention for the Protection of Human Rights and Fundamental Freedoms"
+      ],
+      "last_article": 11,
       "numerals": "arabic"
     }
   ],

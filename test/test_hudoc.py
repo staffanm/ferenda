@@ -539,3 +539,20 @@ def test_an_unknown_case_name_matches_nothing(tmp_path):
     assert citations.refs("compare Nobody v. Ruritania, no. 99999/99, § 1",
                           "001-9", tmp_path) == []
     citations.index.cache_clear()
+
+
+def test_treaty_short_forms_link_convention_and_protocols():
+    """R4: "the Convention" and "Protocol No. N" are the Court's own shorthand
+    and safe only inside an ECHR text, so they are hudoc's caller extras. The
+    article pinpoints anchor because the targets are curated instruments."""
+    from accommodanda.hudoc import treaties
+    text = ("a violation of Article 8 of the Convention "
+            "and of Article 1 of Protocol No. 1")
+    assert [(r.text, r.uri.replace("https://lagen.nu/ext/", "")) for r in
+            treaties.refs(text)] == [
+        ("Article 8", "coe/005#A8"), ("the Convention", "coe/005"),
+        ("Article 1", "coe/009#A1"), ("Protocol No. 1", "coe/009")]
+    # a longer title keeps naming its own instrument: the guard pattern
+    # stands down before "Convention on ..."
+    crc = treaties.refs("relying on the Convention on the Rights of the Child")
+    assert [r.uri for r in crc] == ["https://lagen.nu/ext/untc/I-27531"]
