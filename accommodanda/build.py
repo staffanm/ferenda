@@ -972,10 +972,19 @@ def save_fingerprints(store):
 # --------------------------------------------------------------------------
 
 PKG = Path(__file__).parent
+# The data snapshots the citation scan reads: emdref's ECHR case registry and
+# the JO ämbetsberättelse page table. A refreshed snapshot changes parse
+# output exactly like a grammar edit, so it rides every recipe that carries
+# lagrum.py/emdref.py -- the same policy treaty_names.json gets on the
+# treaty-linking recipes.
+CITATION_DATA = (PKG / "hudoc" / "data" / "casenames.json",
+                 PKG / "hudoc" / "data" / "respondents_sv.json",
+                 PKG / "avg" / "data" / "arsberattelse.json")
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
     "parallelappendix", "register", "begrepp", "bemyndigande",
-    "graphics")) + (PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",)
+    "graphics")) + (PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+                    *CITATION_DATA)
 
 
 @functools.cache
@@ -1541,7 +1550,8 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
            PKG / "lib" / "poi_worker.py", PKG / "lib" / "pdftext.py",
-           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "emdref.py", *CITATION_DATA,
            # the innehåll is normalised through this before a patch is applied
            # to it, so it decides what a patched document parses from
            PKG / "lib" / "markup.py")
@@ -1798,7 +1808,8 @@ FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
            PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "emdref.py", *CITATION_DATA,
            # the data the citation engine's treaty matching is configured by:
            # a new Swedish treaty name re-stales the parse like a grammar edit
            PKG / "lib" / "treaty_ids.py",
@@ -2129,7 +2140,8 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                # a patched act's Formex/OJ markup is normalised through this
                # before the patch is applied, so it decides what it parses from
                PKG / "lib" / "markup.py",
-               PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py")
+               PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+               *CITATION_DATA)
 
 
 @functools.cache
@@ -2658,7 +2670,8 @@ def foreskrift_reap(basefiles):
 FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
                    PKG / "foreskrift" / "model.py",
                    PKG / "foreskrift" / "structure.py",
-                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                   PKG / "lib" / "emdref.py", *CITATION_DATA,
                    # picks the presented consolidation, which decides whether
                    # the parse run emits a .grund.json sidecar
                    PKG / "lib" / "text.py")
@@ -2753,7 +2766,8 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 
 AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
             PKG / "avg" / "download.py",
-            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+            PKG / "lib" / "emdref.py", *CITATION_DATA,
             PKG / "lib" / "artifact.py")
 
 
@@ -2872,7 +2886,8 @@ SOURCES["avg"] = Source("avg", avg_list, {
 RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
            PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
            PKG / "rs" / "skv.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "emdref.py", *CITATION_DATA,
            PKG / "lib" / "artifact.py")
 
 
@@ -2954,7 +2969,8 @@ def rs_browser_download(_basefiles):
 
 EDPB_CODE = (PKG / "edpb" / "parse.py", PKG / "edpb" / "model.py",
              PKG / "edpb" / "series.py", PKG / "edpb" / "download.py",
-             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+             PKG / "lib" / "emdref.py", *CITATION_DATA,
              PKG / "lib" / "artifact.py")
 
 
@@ -3251,7 +3267,8 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
 
 WIKI_ROOT = layout.WIKI_ROOT
 WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "markdown.py",
-             PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py", PKG / "lib" / "eu_structure.py")
+             PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+             *CITATION_DATA, PKG / "lib" / "eu_structure.py")
 
 
 def kommentar_record(basefile):
