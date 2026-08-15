@@ -30,6 +30,7 @@ from accommodanda.lib.datasets import NAMEDACTS
 from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from accommodanda.lib.lagrum import (
     ALL_PARSE_TYPES,
+    EMDRATTSFALL,
     ENKLALAGRUM,
     EULAGSTIFTNING,
     EURATTSFALL,
@@ -39,6 +40,7 @@ from accommodanda.lib.lagrum import (
     LAGRUM,
     MYNDIGHETSBESLUT,
     RATTSFALL,
+    STALLNINGSTAGANDE,
     LagrumParser,
     Ref,
     build_trigger,
@@ -129,6 +131,110 @@ def test_short(path):
 def test_rattsfall(path):
     got, want = run_testfile(path, parse_types=[RATTSFALL])
     assert got == want
+
+
+def test_emdrattsfall_swedish_surface():
+    # ECHR citations in Swedish text resolve through the committed
+    # casenames snapshot (2026-08-15 audit, R5). Disambiguation is
+    # hudoc.citations' rule: a nearby date wins, else the sole judgment;
+    # two judgments and no date stay unlinked rather than guessed.
+    parser = LagrumParser({}, basefile="x",
+                          parse_types=[EMDRATTSFALL, RATTSFALL])
+    refs = parser.parse_text(
+        "i sin dom den 28 oktober 1998, Osman mot Förenade kungariket, p. 115")
+    assert [(r.text, r.uri) for r in refs] == [
+        ("Osman mot Förenade kungariket",
+         "https://lagen.nu/dom/echr/001-58257")]
+    refs = parser.parse_text("avgörandet, ansökan nr 23452/94, i samma mål")
+    assert [r.uri for r in refs] == ["https://lagen.nu/dom/echr/001-58257"]
+    # ordinary prose around "mot", and a riksmöte after "nr", stay plain
+    assert parser.parse_text("kampen mot Sverige har hårdnat") == []
+    assert parser.parse_text("enligt skrivelse med ansökan nr 1994/95") == []
+    # chamber + Grand Chamber (or merits + just-satisfaction) with no date
+    # printed: refuse to guess
+    assert parser.parse_text("se Von Hannover mot Tyskland, p. 57") == []
+
+
+def test_ecj_letterless_form_is_year_bounded():
+    # the letterless CJEU numbering ended 1989: "mål 23452/94" is an ECHR
+    # application number wearing the same shape, and used to mint the
+    # nonexistent celex 61994CJ23452 (2026-08-15 audit). The genuine old
+    # form and the lettered form are unaffected.
+    parser = LagrumParser({}, basefile="x",
+                          parse_types=[EURATTSFALL, EMDRATTSFALL])
+    refs = parser.parse_text(
+        "i mål 23452/94 den 28 oktober 1998, Osman mot Förenade kungariket")
+    assert [r.uri for r in refs] == ["https://lagen.nu/dom/echr/001-58257"]
+    refs = parser.parse_text("se mål 31/87 om offentlig upphandling")
+    assert [r.uri for r in refs] == [
+        "https://lagen.nu/ext/celex/61987CJ0031"]
+
+
+def test_jo_arsberattelse_form_resolves_via_snapshot():
+    # "JO 2003/04 s. 450" standing alone resolves through the committed
+    # avg/data/arsberattelse.json; the dnr-carrying form keeps linking the
+    # dnr (jo_refs), and a page the snapshot lacks mints nothing
+    # (2026-08-15 audit, R7).
+    parser = LagrumParser({}, basefile="avg", parse_types=[MYNDIGHETSBESLUT])
+    refs = parser.parse_text("principen (se JO 2003/04 s. 450, i huvudsak)")
+    assert [(r.text, r.uri) for r in refs] == [
+        ("JO 2003/04 s. 450", "https://lagen.nu/avg/jo/3166-2001")]
+    refs = parser.parse_text("se JO 2003/04 s. 450, dnr 3166-2001, om detta")
+    assert [r.uri for r in refs] == ["https://lagen.nu/avg/jo/3166-2001"]
+    assert parser.parse_text("jämför JO 1877/78 s. 999 om telegraf") == []
+
+
+def test_stallningstagande_dnr_forms():
+    # Skatteverkets ställningstaganden cite each other by diarienummer;
+    # both series shapes mint rs/skv/ uris, and the JO/JK/ARN group shapes
+    # stay with their own productions (2026-08-15 audit, R8).
+    parser = LagrumParser({}, basefile="rs",
+                          parse_types=[STALLNINGSTAGANDE, MYNDIGHETSBESLUT])
+    cases = [
+        ("se ställningstagandet 2024-02-02, dnr 8-2749853 , ”Uppdelning”",
+         ["https://lagen.nu/rs/skv/8-2749853"]),
+        ("med stöd av ställningstagande med dnr 131 666779-12/111?",
+         ["https://lagen.nu/rs/skv/131-666779-12-111"]),
+        ("daterat den 20 maj 2026, dnr 8-396736-2025 .",
+         ["https://lagen.nu/rs/skv/8-396736-2025"]),
+        ("Justitiekanslerns beslut, dnr 5174-06-41, i vilket",
+         ["https://lagen.nu/avg/jk/5174-06-41"]),
+    ]
+    for text, want in cases:
+        assert [r.uri for r in parser.parse_text(text)] == want, text
+
+
+def test_rattsfall_narrow_nbsp():
+    # HD's 2016-2020 referat typography sets U+202F before the page number
+    # ("NJA 1991 s. 567"); the scan normalizes it, the link text keeps
+    # it. Direct test, not a DV/*.txt fixture: run_testfile normalize_spaces
+    # its input, which would collapse the character under test.
+    parser = LagrumParser({}, basefile="dom", parse_types=[RATTSFALL])
+    refs = parser.parse_text(
+        "HD har i rättsfallet NJA 1991 s. 567 uttalat, "
+        "jfr NJA 2012 s. 725.")
+    assert [r.uri for r in refs] == [
+        "https://lagen.nu/dom/nja/1991s567",
+        "https://lagen.nu/dom/nja/2012s725",
+    ]
+    assert refs[0].text == "NJA 1991 s. 567"
+    # the ordinary NBSP (U+00A0) rides the same normalization -- PDF
+    # extraction sets it inside citations just as often
+    refs = parser.parse_text("se NJA 2005 s. 462.")
+    assert [r.uri for r in refs] == ["https://lagen.nu/dom/nja/2005s462"]
+    assert refs[0].text == "NJA 2005 s. 462"
+
+
+def test_so_ref_links_sveriges_overenskommelser():
+    # "se SÖ 1982:50" in SOU 2025:49 -- the treaty-series citation the
+    # 2026-08-15 audit found unlinked ~20,000 times (R9)
+    parser = LagrumParser({}, basefile="x", parse_types=[FORARBETEN])
+    refs = parser.parse_text("den europeiska utlämningskonventionen "
+                             "(se SÖ 1982:50 och SÖ 1959:65).")
+    assert [(r.text, r.uri) for r in refs] == [
+        ("SÖ 1982:50", "https://lagen.nu/so/1982:50"),
+        ("SÖ 1959:65", "https://lagen.nu/so/1959:65"),
+    ]
 
 
 @pytest.mark.parametrize("path", make_params("Regpubl"))

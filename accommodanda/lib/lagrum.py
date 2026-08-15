@@ -42,10 +42,10 @@ from typing import NamedTuple
 from lark import Lark, Token, Tree
 from lark.exceptions import UnexpectedInput
 
-from . import datasets
+from . import datasets, emdref
 from .coe_ids import article_fragment as coe_article_fragment
 from .treaty_ids import article_fragment as treaty_article_fragment
-from .util import fold_swedish
+from .util import fold_swedish, number_slug
 
 # --- parse-type configuration ---------------------------------------
 #
@@ -83,6 +83,14 @@ FS_SLUG = {entry["designation"]: slug
            for slug, entry in datasets.load_fs_series().items()}
 FS_DESIGNATIONS = sorted(FS_SLUG)
 
+# Width-preserving whitespace normalization for the citation scan: HD's
+# 2016-2020 referat typography sets "NJA 1991 s. 567" with U+202F (narrow
+# no-break space) before the page number -- 1 339 occurrences across the dv
+# corpus (2026-08-15) that no grammar production could reach, since every
+# terminal spells the ASCII space. Both characters are one code point wide,
+# so spans computed on the normalized text index the original unchanged.
+_SPACE_NORM = str.maketrans({' ': ' ', ' ': ' '})
+
 LAGRUM = 'LAGRUM'                  # SFS references ("3 kap. 2 § lagen …")
 KORTLAGRUM = 'KORTLAGRUM'          # abbreviated SFS refs ("3 § MBL", "JB 22:2")
 EULAGSTIFTNING = 'EULAGSTIFTNING'  # EU treaties/regulations/directives
@@ -92,13 +100,20 @@ EURATTSFALL = 'EURATTSFALL'        # CJEU case law ("mål C-176/09")
 MYNDIGHETSBESLUT = 'MYNDIGHETSBESLUT'  # JO/JK/ARN decisions (by diarienummer)
 VAGLEDNING = 'VAGLEDNING'          # EDPB guidance ("Riktlinjer 05/2020", "WP 248")
 FORESKRIFT = 'FORESKRIFT'          # agency regulations ("PMFS 2022:1", "ELSÄK-FS 2008:1")
+STALLNINGSTAGANDE = 'STALLNINGSTAGANDE'  # Skatteverket ställningstaganden (by dnr)
+# ECHR case law in Swedish text ("Osman mot Förenade kungariket", "ansökan nr
+# 23452/94"). Not a grammar type: the applicant vocabulary is the whole held
+# corpus, so lib.emdref matches it over the committed snapshot and parse_text
+# merges those spans beside the grammar's (grammar wins overlaps).
+EMDRATTSFALL = 'EMDRATTSFALL'
 ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 
 # deterministic assembly order; kortlagrum first so its roots take
 # precedence in the ?ref alternation (an abbreviated form must win over a
 # bare generic ref that would leave the abbreviation unconsumed)
 TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
-              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING, FORESKRIFT]
+              FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING, FORESKRIFT,
+              STALLNINGSTAGANDE]
 
 # The "everything" configuration for verticals that link every reference
 # flavour (dv, forarbete, avg, wiki): all parse types except ENKLALAGRUM,
@@ -106,7 +121,7 @@ TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
 # combined with it. Import this instead of copying the list.
 ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
                    FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING,
-                   FORESKRIFT]
+                   FORESKRIFT, STALLNINGSTAGANDE, EMDRATTSFALL]
 
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
@@ -123,9 +138,10 @@ ROOTS = {
     FORARBETEN: ['forarb_refs', 'anon_prop_refs', 'avsnitt_external',
                  'avsnitt_list', 'forarb_doc'],
     EURATTSFALL: ['ecj_ref'],
-    MYNDIGHETSBESLUT: ['arn_refs', 'jo_refs', 'jk_refs'],
+    MYNDIGHETSBESLUT: ['arn_refs', 'jo_refs', 'jo_arsb_ref', 'jk_refs'],
     VAGLEDNING: ['riktlinje_ref', 'rekommendation_ref', 'wp_ref'],
     FORESKRIFT: ['foreskrift_ref'],
+    STALLNINGSTAGANDE: ['skv_st_refs'],
     # absolute SFS forms only -- a bare relative ref ("3 §") has no root,
     # so it stays unlinked (the point of the förarbete-safe subset)
     ENKLALAGRUM: ['external_refs', 'external_ref', 'named_external_law_ref',
@@ -501,7 +517,7 @@ anon_prop_refs.5: A_PROP sidor
 avsnitt_external.6: avsnitt_list _W I_KOMM
 avsnitt_list.3: AVSNITT _W avsnitt_ref_id ((COMMA _W | _W_AND_OR_W) avsnitt_ref_id)*
 
-forarb_doc: prop_ref | bet_ref | skrivelse_ref | sou_ref | ds_ref | dir_ref | celex_ref
+forarb_doc: prop_ref | bet_ref | skrivelse_ref | sou_ref | ds_ref | dir_ref | so_ref | celex_ref
 prop_ref: PROP_PREFIX _W? prop_body
 ?prop_body: prop_std | prop_x | prop_y | prop_z
 prop_std: riksmote_ref_id COLON _W? lopnr_ref_id
@@ -513,6 +529,9 @@ skrivelse_ref: SKR_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 sou_ref: SOU_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 ds_ref: DS_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 dir_ref: DIR_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
+// Sveriges internationella överenskommelser ("SÖ 1982:50"), published under
+// so/ beside the förarbeten
+so_ref: SO_PREFIX _W riksmote_ref_id COLON lopnr_ref_id
 celex_ref: CELEX
 
 riksmote_ref_id: NUMBER (SLASH NUMBER)?
@@ -531,6 +550,7 @@ SKR_PREFIX: /rskr\.|rskr(?= \d{4}\/\d)/
 SOU_PREFIX: "SOU"
 DS_PREFIX: "Ds"
 DIR_PREFIX: /[Dd]ir\./
+SO_PREFIX: "SÖ"
 A_PROP: /a\. prop\./
 AVSNITT: "avsnitt"
 I_KOMM: /i kommitténs betänkande/
@@ -579,6 +599,12 @@ arn_ref_id: ARN_ID
 jo_refs.5: jo_pre JO_DNR (jo_ref_id _W_AND_OR_W)* jo_ref_id
 ?jo_pre: JO_LABEL NUMBER SLASH NUMBER JO_SID NUMBER | JO_BESLUT DATUM
 jo_ref_id: JO_ID
+
+// the ämbetsberättelse form standing alone ("JO 2003/04 s. 450" with no
+// trailing dnr): resolved through the committed avg/data/arsberattelse.json
+// snapshot. Lower priority than jo_refs, whose dnr-carrying parse covers a
+// longer window and wins wherever both could match.
+jo_arsb_ref.4: JO_LABEL NUMBER SLASH NUMBER JO_SID NUMBER
 
 jk_refs.5: jk_marker (jk_ref_id _W_AND_OR_W)* jk_ref_id
 ?jk_marker: DNR_W | ARENDE_NR
@@ -657,6 +683,26 @@ foreskrift_ref.6: FS_DESIGNATION _W? FS_NUMBER
 FS_NUMBER: /\d{4}:\d+/
 """
 
+# STALLNINGSTAGANDE (Skatteverkets rättsliga ställningstaganden) -- cited by
+# diarienummer: "Skatteverkets ställningstagande 2024-02-02, dnr 8-2749853",
+# "ställningstagandet med dnr 131 666779-12/111". The "dnr" marker anchors the
+# reference, but a title or date routinely separates it from the word
+# "ställningstagande", so only the marker + number shape can carry the match.
+# That is safe because Skatteverket's two diarienummer series are shaped like
+# nothing else the grammar knows: the taxeringsserie ends in "/111"-style
+# suffixes ("131 599911-10/111") and the newer serie leads with a single digit
+# and a 5-7 digit number ("8-2749853", "8-396736-2025"). A JO dnr
+# ("2042-2004"), an ARN änr ("1997-2184") and a JK dnr ("5174-06-41") all
+# keep their own group shapes and match neither alternative. The URI tail is
+# lib.util.number_slug of the number -- the same function rs mints the page
+# address with, so the two cannot drift.
+STALLNINGSTAGANDE_RULES = r"""
+skv_st_refs.5: SKV_DNR_W skv_st_ref_id ((COMMA _W | _W_AND_OR_W) SKV_DNR_W? skv_st_ref_id)*
+skv_st_ref_id: SKV_DNR_ID
+SKV_DNR_W.5: /[Dd]nr\.? /
+SKV_DNR_ID: /(?:\d{1,3} )?\d{3,6}-\d{2}\/\d{3,4}|\d-\d{5,7}(?:-\d{4})?/
+"""
+
 # fires at a registered designation followed by a number. Built from the same
 # registry as the grammar terminal, longest-first so a designation is not
 # shadowed by a shorter one it starts with. Spelling the shape by hand instead
@@ -676,7 +722,8 @@ RULES = {LAGRUM: LAGRUM_RULES, EULAGSTIFTNING: EU_RULES,
          FORARBETEN: FORARBETEN_RULES, EURATTSFALL: EURATTSFALL_RULES,
          MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_RULES,
          VAGLEDNING: VAGLEDNING_RULES,
-         FORESKRIFT: FORESKRIFT_RULES}
+         FORESKRIFT: FORESKRIFT_RULES,
+         STALLNINGSTAGANDE: STALLNINGSTAGANDE_RULES}
 
 # words ending in a law suffix that are not law names (ported verbatim)
 NOLAW = {
@@ -780,6 +827,7 @@ FORARBETEN_TRIGGER_SRC = r"""
   | \bSOU\                                     # statens offentliga utredningar
   | \bDs\                                      # departementsserien
   | \b[Dd]ir\.                                 # kommittédirektiv
+  | \bSÖ\ \d{4}:                               # internationella överenskommelser
   | \ba\.\ prop\.                              # "a. prop." (anförd proposition)
   | \bavsnitt\ \d                              # section ref
   | \b3\d\d(?:\d\d)?L\d{4}\b                   # bare CELEX (392L0100)
@@ -819,6 +867,13 @@ VAGLEDNING_TRIGGER_SRC = r"""
   | \bWP\ ?\d{2,3}
 """
 
+# fires at "dnr" followed by a Skatteverket-shaped diarienummer (see
+# STALLNINGSTAGANDE_RULES for why the shapes alone are distinctive)
+STALLNINGSTAGANDE_TRIGGER_SRC = r"""
+    \b[Dd]nr\.?\ (?:\d{1,3}\ )?\d{3,6}-\d{2}/\d{3,4}
+  | \b[Dd]nr\.?\ \d-\d{5,7}\b
+"""
+
 TRIGGER_SRC = {LAGRUM: LAGRUM_TRIGGER_SRC, EULAGSTIFTNING: EU_TRIGGER_SRC,
                FORESKRIFT: FORESKRIFT_TRIGGER_SRC,
                KORTLAGRUM: KORTLAGRUM_TRIGGER_SRC,
@@ -826,7 +881,8 @@ TRIGGER_SRC = {LAGRUM: LAGRUM_TRIGGER_SRC, EULAGSTIFTNING: EU_TRIGGER_SRC,
                FORARBETEN: FORARBETEN_TRIGGER_SRC,
                EURATTSFALL: EURATTSFALL_TRIGGER_SRC,
                MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_TRIGGER_SRC,
-               VAGLEDNING: VAGLEDNING_TRIGGER_SRC}
+               VAGLEDNING: VAGLEDNING_TRIGGER_SRC,
+               STALLNINGSTAGANDE: STALLNINGSTAGANDE_TRIGGER_SRC}
 
 
 def _expand_types(types):
@@ -1543,6 +1599,16 @@ RE_OTHER_ISSUER = re.compile(
     r'(?:s|:s)\s+$'                               # ... in the genitive, last
     % '|'.join(re.escape(n) for n in EDPB_NAMES))
 
+# The EDPB under its own name in running text, where Swedish lower-cases it:
+# "I dataskyddsstyrelsens riktlinjer 05/2020" otherwise reads as another
+# issuer, because the sentence-initial "I" passes for a capitalised head word
+# with "dataskyddsstyrelsens" as its genitive tail. Checked before
+# RE_OTHER_ISSUER may reject: the word actually carrying the genitive wins
+# over whatever capitalised word starts the sentence.
+RE_EDPB_SELF = re.compile(
+    r'(?<![\wåäöÅÄÖ])(?:%s)(?:s|:s)?\s+$'
+    % '|'.join(re.escape(n) for n in EDPB_NAMES), re.IGNORECASE)
+
 # the same body under its full name: "artikel 29-gruppen" / "artikel
 # 29-arbetsgruppen", which is a *body*, not a reference to artikel 29
 ARTICLE29 = '29'
@@ -1640,6 +1706,10 @@ class LagrumParser:
         self.enkla = ENKLALAGRUM in requested and LAGRUM not in requested
         abbrevs = tuple(sorted(self.abbreviations, key=len, reverse=True))
         eu_acts = tuple(sorted(self.named_acts, key=len, reverse=True))
+        # EMDRATTSFALL has no grammar half (see the constant) -- the ROOTS /
+        # TRIGGER_SRC assembly skips it by absence from TYPE_ORDER; the flag
+        # turns on the emdref merge in parse_text
+        self.emd = EMDRATTSFALL in requested
         self.lark = parser(requested, self.parse_types,
                            abbrevs if KORTLAGRUM in self.parse_types else (),
                            eu_acts if EULAGSTIFTNING in self.parse_types else (),
@@ -1672,6 +1742,10 @@ class LagrumParser:
         if context is None:
             context = _fragment_context(self.basefile, fragment)
         self.nobaseuri = not context
+        # scan a normalized copy (see _SPACE_NORM), but slice each Ref's
+        # text from the original so the link keeps the source's typography
+        orig = text
+        text = text.translate(_SPACE_NORM)
         refs = []
         pos = 0
         while True:
@@ -1706,12 +1780,19 @@ class LagrumParser:
                             if 'law' in attrs:
                                 self._learn_abbrev(text, base + e, attrs)
                         refs.append(Ref(base + s, base + e,
-                                        text[base + s:base + e], predicate, uri))
+                                        orig[base + s:base + e], predicate, uri))
                 except NoLink:
                     pass
                 pos = m.start() + length
             else:
                 pos = m.start() + 1
+        if self.emd:
+            # ECHR citations from the snapshot matcher (see EMDRATTSFALL);
+            # a span overlapping a grammar match yields to it
+            emd = [Ref(s, e, orig[s:e], predicate, uri)
+                   for s, e, uri in emdref.spans(text, self.base)]
+            refs = sorted(refs + yield_overlaps(emd, refs),
+                          key=lambda r: r.start)
         return refs
 
     def link_spans(self, attrlist, tree, length):
@@ -1785,6 +1866,7 @@ class LagrumParser:
         # another authority's numbered guidance is not the EDPB's
         if (isinstance(node, Tree)
                 and node.data in ('riktlinje_ref', 'rekommendation_ref')
+                and not RE_EDPB_SELF.search(text[:start])
                 and RE_OTHER_ISSUER.search(text[:start])):
             return False
         # "artikel 29-gruppen" is the body the article established, not the
@@ -2475,7 +2557,7 @@ class LagrumParser:
 
     DOC_PREFIX = {'prop_ref': 'prop', 'bet_ref': 'bet',
                   'skrivelse_ref': 'rskr', 'sou_ref': 'sou', 'ds_ref': 'ds',
-                  'dir_ref': 'dir'}
+                  'dir_ref': 'dir', 'so_ref': 'so'}
 
     def forarb_doc_uri(self, inner):
         """Base URI (no fragment) for a forarb_doc's inner ref subtree."""
@@ -2534,6 +2616,12 @@ class LagrumParser:
         year = _token_text(subtree(node, 'ecj_year'))
         if len(year) == 2:  # two-digit year: <54 -> 20xx else 19xx
             year = ('20' if int(year) < 54 else '19') + year
+        # the letterless form ended with 1989 (the T-/C- split): a later
+        # "mål 23452/94" is an ECHR application number wearing the same
+        # shape, and minting 61994CJ23452 fabricated a case that does not
+        # exist (2026-08-15 audit)
+        if decision_node is None and not 1954 <= int(year) <= 1989:
+            raise NoLink()
         celex = '6%sC%s%04d' % (year, self.ECJ_DESCRIPTOR[decision],
                                 int(serial))
         out.append({'_uri': self.base + 'ext/celex/' + celex})
@@ -2560,10 +2648,33 @@ class LagrumParser:
         for dnr, span in _avg_ids(node, 'jo_ref_id'):
             out.append({'_uri': self.base + 'avg/jo/' + dnr, '_span': span})
 
+    def fmt_jo_arsb_ref(self, node, match, out, context):
+        """"JO 2003/04 s. 450" (no trailing dnr) -> the decision the committed
+        ämbetsberättelse snapshot maps that page to. A page that maps to more
+        than one decision names neither uniquely and stays unlinked; a page
+        the snapshot lacks mints nothing (unlike WP numbers, the mapping is
+        not derivable from the citation itself)."""
+        y1, y2, page = [t.value for t in _tree_tokens(node)
+                        if t.type == 'NUMBER']
+        if len(y1) == 2:            # "JO 91/92 s. 48" -- legacy spelling
+            y1 = '19' + y1
+        dnrs = _jo_arsberattelse().get('%s/%s s. %s' % (y1, y2, page), ())
+        if len(dnrs) == 1:
+            out.append({'_uri': self.base + 'avg/jo/' + dnrs[0]})
+
     def fmt_jk_refs(self, node, match, out, context):
         for dnr, span in _avg_ids(node, 'jk_ref_id'):
             if not _jk_is_date(dnr):  # a plausible date is not a diarienummer
                 out.append({'_uri': self.base + 'avg/jk/' + dnr, '_span': span})
+
+    # --- STALLNINGSTAGANDE (Skatteverkets rättsliga ställningstaganden) ---
+
+    def fmt_skv_st_refs(self, node, match, out, context):
+        """"dnr 131 599911-10/111" -> ``rs/skv/131-599911-10-111``, via the
+        same `lib.util.number_slug` rs mints the page address with."""
+        for dnr, span in _avg_ids(node, 'skv_st_ref_id'):
+            out.append({'_uri': self.base + 'rs/skv/' + number_slug(dnr),
+                        '_span': span})
 
     # --- VAGLEDNING (EDPB / artikel 29-gruppens guidance) ---
 
@@ -2590,6 +2701,12 @@ class LagrumParser:
 # --------------------------------------------------------------------------
 # the shared SFS-vocabulary parser
 # --------------------------------------------------------------------------
+
+@functools.cache
+def _jo_arsberattelse():
+    """The JO ämbetsberättelse snapshot, read once (see fmt_jo_arsb_ref)."""
+    return datasets.load_jo_arsberattelse()
+
 
 @functools.cache
 def _sfs_vocabulary():

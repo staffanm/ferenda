@@ -38,8 +38,9 @@ process-global in its display, which is why `browser` splits it out of the
 default `lagen rs download` sweep and onto `lagen rs browser-download`.
 """
 
-import re
 from dataclasses import dataclass
+
+from ..lib.util import number_slug as _number_slug
 
 
 @dataclass(frozen=True)
@@ -137,9 +138,7 @@ DEFAULT_ORGS = tuple(agency.org for agency in REGISTRY if not agency.browser)
 # 2020 "131 297826-13/111", whose space goes the same way as a slash) -- and
 # only the slash and the space have to go, the colon being what the whole site
 # already spells an author's number with (`2018:585`, `fffs/2013:10`).
-RE_UNSAFE = re.compile(r"[/\s]+")
-
-
-def number_slug(number):
-    """The URI/file form of an agency's own number ("1/23/VER" -> "1-23-VER")."""
-    return RE_UNSAFE.sub("-", number.strip()).strip("-")
+# the URI/file form of an agency's own number lives in lib (the citation
+# engine's STALLNINGSTAGANDE formatter mints the same address); re-exported
+# here because this module is where every rs consumer looks for it
+number_slug = _number_slug

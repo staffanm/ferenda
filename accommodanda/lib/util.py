@@ -25,6 +25,18 @@ def text_slug(text: str, *, sep: str = "-", maxlen: int | None = None) -> str:
     return slug[:maxlen].strip(sep) if maxlen else slug
 
 
+RE_NUMBER_UNSAFE = re.compile(r"[/\s]+")
+
+
+def number_slug(number: str) -> str:
+    """The URI/file form of an agency's own number ("1/23/VER" -> "1-23-VER",
+    "131 599911-10/111" -> "131-599911-10-111"). One implementation for the
+    minter (`rs.agencies`) and the citation engine's STALLNINGSTAGANDE
+    formatter, so the address a citation resolves to cannot drift from the
+    address the page is published under."""
+    return RE_NUMBER_UNSAFE.sub("-", number.strip()).strip("-")
+
+
 def write_atomic(path: Path | str, data: bytes | str) -> None:
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
     atomic rename, so an interrupted run never leaves a partial file behind.

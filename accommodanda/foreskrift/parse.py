@@ -31,7 +31,14 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib.lagrum import EULAGSTIFTNING, FORESKRIFT, LAGRUM, interleave, sfs_parser
+from ..lib.lagrum import (
+    EULAGSTIFTNING,
+    FORESKRIFT,
+    KORTLAGRUM,
+    LAGRUM,
+    interleave,
+    sfs_parser,
+)
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
 from ..lib.util import MONTHS, approximate_date, fold_swedish
 from .agencies import AAFS_SERIES, REGISTRY
@@ -42,8 +49,11 @@ from .structure import nest
 # implements) and its siblings -- an agency's regulations cross-refer constantly
 # ("Utöver denna föreskrift gäller MSBFS 2020:7"), and the metadata relations
 # (upphäver/ändrar, RE_FS_REF below) only ever capture the masthead's, never one
-# in the operative text. It does not cite case law or förarbeten.
-PARSE_TYPES = [LAGRUM, EULAGSTIFTNING, FORESKRIFT]
+# in the operative text. It does not cite case law or förarbeten. KORTLAGRUM
+# links pinpointed abbreviation refs ("32 § LVU", the corpus's densest
+# pinpointed-abbreviation seam); its trigger requires the pinpoint, so a bare
+# "enligt LVU" -- which names no provision -- stays plain text by design.
+PARSE_TYPES = [LAGRUM, EULAGSTIFTNING, FORESKRIFT, KORTLAGRUM]
 
 RE_RUBRIK_NUM = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")     # "2.1 Heading"
 RE_LIST_ITEM = re.compile(r"^(?:\d+[.)]|[-–—•])\s")       # "1." / "– " list rows

@@ -49,6 +49,7 @@ from collections import Counter
 from ..lib import compress, util
 from ..lib.datasets import NAMEDACTS
 from ..lib.lagrum import (
+    EMDRATTSFALL,
     EULAGSTIFTNING,
     EURATTSFALL,
     VAGLEDNING,
@@ -75,7 +76,7 @@ from .series import BY_KOD, WP29_BY_SLUG
 # interprets, by article), the EU courts, and the EDPB's and artikel
 # 29-gruppens own guidance. It cites no Swedish statute at all, so the SFS
 # machinery is not requested -- a smaller grammar and no false "3 §" matches.
-EDPB_PARSE_TYPES = [EULAGSTIFTNING, EURATTSFALL, VAGLEDNING]
+EDPB_PARSE_TYPES = [EULAGSTIFTNING, EURATTSFALL, VAGLEDNING, EMDRATTSFALL]
 
 # a numbered punkt opening a line: "1. ", "27. ". Matched against the line, not
 # the paragraph, because the number is set in its own column and the sequence

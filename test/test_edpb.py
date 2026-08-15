@@ -810,6 +810,11 @@ def test_another_authority_numbered_guidance_is_not_the_edpbs(refparser):
     # the bare form, which is what the guidance itself and IMY both write once
     # the board has been named
     ("Se riktlinjer 05/2020.", "https://lagen.nu/edpb/riktlinjer/05-2020"),
+    # sentence-initial: the capitalised "I" used to read as another issuer's
+    # name because the exemption list was case-sensitive (RE_EDPB_SELF,
+    # 2026-08-15 audit R9)
+    ("I dataskyddsstyrelsens riktlinjer 05/2020 anges vidare",
+     "https://lagen.nu/edpb/riktlinjer/05-2020"),
 ])
 def test_the_edpbs_own_names_still_link(refparser, text, expected):
     refparser.reset()

@@ -55,6 +55,10 @@ EMD_CASES = _PKG / "hudoc" / "data" / "casenames.json"
 # maps to every key it has borne ("Turkiet" -> ["turkey", "türkiye"]).
 EMD_RESPONDENTS = _PKG / "hudoc" / "data" / "respondents_sv.json"
 FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
+# JO ämbetsberättelse pages ("2005/06 s. 171") mapped onto the diarienummer
+# that mints the decision's URI. Auto-generated from the JO artifacts
+# (avg.arsberattelse), committed as the shipped snapshot.
+JO_ARSBERATTELSE = _PKG / "avg" / "data" / "arsberattelse.json"
 
 
 def load_emd_cases(path=EMD_CASES):
@@ -65,6 +69,24 @@ def load_emd_cases(path=EMD_CASES):
     dependency. Empty if not generated yet."""
     if not path.exists():
         return {"cases": {}, "appnos": {}}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_emd_respondents(path=EMD_RESPONDENTS):
+    """The Swedish respondent-state names, mapped onto the casenames
+    snapshot's own normalized respondent keys ("Förenade kungariket" ->
+    ["united kingdom"]). Pure JSON load with no source dependency."""
+    return {sv: keys
+            for sv, keys in json.loads(path.read_text(encoding="utf-8")).items()
+            if not sv.startswith("_")}
+
+
+def load_jo_arsberattelse(path=JO_ARSBERATTELSE):
+    """The JO ämbetsberättelse snapshot: {"2005/06 s. 171": ["2042-2004"], …}
+    (values are lists -- two decisions can start on one page). Pure JSON load
+    with no source dependency. The snapshot is committed, so a missing file is
+    a broken checkout and raises rather than silently unlinking every
+    ämbetsberättelse citation (rule:fail-fast)."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 

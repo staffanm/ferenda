@@ -113,6 +113,16 @@ def test_dedupe_bemyndigande_prefers_paragraf_over_bare_law():
         "https://lagen.nu/2001:100#P5", "https://lagen.nu/2013:587#P4"]
 
 
+def test_pinpointed_abbreviation_links_bare_mention_does_not():
+    # KORTLAGRUM is enabled for föreskrifter (2026-08-15): "32 § LVU" names
+    # a provision and links; a bare "enligt LVU" says nothing about the law
+    # and stays plain text (its trigger requires the pinpoint).
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    refs = parser.parse_text("Läkarundersökning enligt 32 § LVU ska ske.")
+    assert [r.uri for r in refs] == ["https://lagen.nu/1990:52#P32"]
+    assert parser.parse_text("Vård enligt LVU skall beredas den unge.") == []
+
+
 def test_body_start_skips_the_masthead_to_the_first_marker():
     blocks = [("rubrik", "Finansinspektionens författningssamling", 1, None),
               ("stycke", "beslutade den 25 juni 2013. … föreskriver följande", 1, None),
