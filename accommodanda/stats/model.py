@@ -14,6 +14,7 @@ also what picks the chart form, so the renderer never has to guess:
                  bars sampled over rank, so each bar is a real thing's own
                  size rather than a bucket count
   ``matrix``     two categorical axes with a magnitude -- heatmap
+  ``sankey``     volume moving between the same categories -- flow diagram
   ``table``      rows that are read, not compared (no useful chart form)
 
 A measurement has to admit what it cannot say -- which population it covers,
@@ -54,6 +55,8 @@ class Point:
 
 @dataclass
 class Cell:
+    """One (row, col) magnitude. A matrix reads it as a grid position; a sankey
+    reads the same pair as a flow from `row` to `col`."""
     row: str
     col: str
     value: float
@@ -65,7 +68,7 @@ class Measure:
     group: str                  # "A".."G", the PRD's grouping
     title: str
     kind: str                   # scalar | toplist | series | histogram | bars
-                                # | profile | matrix | table
+                                # | profile | matrix | sankey | table
     unit: str = ""              # what one unit of `value`/`y` is ("tecken")
     lede: str = ""              # the sentence that says what the number means
     value: float | None = None          # scalar
@@ -73,7 +76,7 @@ class Measure:
                                         # number is not what should be read
     rows: list[Row] = field(default_factory=list)        # toplist | table
     points: list[Point] = field(default_factory=list)    # series | histogram | bars
-    cells: list[Cell] = field(default_factory=list)      # matrix
+    cells: list[Cell] = field(default_factory=list)      # matrix | sankey
     xlabel: str = ""
     ylabel: str = ""
 

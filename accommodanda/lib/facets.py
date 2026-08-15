@@ -19,7 +19,7 @@ import re
 from collections import namedtuple
 from datetime import date
 
-from . import catalog, datasets, labels, lagrum, layout
+from . import catalog, datasets, eu_structure, labels, lagrum, layout
 
 # a catalog row reduced to what facet-key extraction needs (its host-stripped
 # local id is precomputed once, since most extractors slice it)
@@ -1073,3 +1073,59 @@ def browse_view(con, source):
 
     attach(view["buckets"], ())
     return view
+
+
+# --------------------------------------------------------------------------
+# flow groups -- the citation graph's node vocabulary
+# --------------------------------------------------------------------------
+
+# What one node of a cross-source citation view is (the stats flow diagram and
+# the /hanvisningar/ graph explorer both). Mostly the source itself, but two
+# places where the source is the wrong unit:
+#
+# * eurlex holds three kinds of law that behave differently and cite each other
+#   -- the founding treaties, the acts made under them, and the Court's case law
+#   -- so it splits three ways (`flow_group`).
+# * the international-law sources are one kind of thing each: coe/icrc/untc are
+#   all treaty text, hudoc/icj/icc are all case law, so they merge two ways.
+#
+# The labels are shorter than the browse headings on purpose: these are node
+# labels beside a mark, not headings ("Föreskrifter", not
+# "Myndighetsföreskrifter"). A source missing here is a hard error rather than
+# an "övrigt" bucket -- a new source belongs on one side of this map, and
+# silently pooling it would make a flow view lie about what cites what.
+FLOW_GROUPS = {
+    "sfs": "Författningar", "forarbete": "Förarbeten", "dv": "Rättsfall",
+    "foreskrift": "Föreskrifter", "avg": "Myndighetsavgöranden",
+    "rs": "Ställningstaganden", "kommentar": "Lagkommentarer",
+    "begrepp": "Begrepp", "edpb": "EU-vägledning",
+    "coe": "Konventioner", "icrc": "Konventioner", "untc": "Konventioner",
+    "hudoc": "Folkrättslig praxis", "icj": "Folkrättslig praxis",
+    "icc": "Folkrättslig praxis",
+}
+
+
+# every flow node there is, in presentation order (the graph explorer's legend
+# and filter): the Swedish material first, the EU's three, the guidance, then
+# international law
+FLOW_GROUP_NAMES = (
+    "Författningar", "Förarbeten", "Rättsfall", "Föreskrifter",
+    "Myndighetsavgöranden", "Ställningstaganden", "Lagkommentarer", "Begrepp",
+    "EU-rättsakter", "EU-domar", "EU-fördrag", "EU-vägledning",
+    "Konventioner", "Folkrättslig praxis")
+
+
+def flow_group(source, kind):
+    """The flow node a document belongs to, from its catalog (source, kind).
+
+    eurlex's three: `eu_structure.CASELAW` is the Court's own set (judgment,
+    opinion *and* order -- a hand-written pair here read an order as
+    legislation), sector 1 is the treaties, and everything the Union enacts
+    under them is one act group (regulation, directive, decision, and the
+    `act` residual the recommendations carry)."""
+    if source == "eurlex":
+        return "EU-domar" if kind in eu_structure.CASELAW \
+            else "EU-fördrag" if kind == "treaty" else "EU-rättsakter"
+    assert source in FLOW_GROUPS, \
+        "no flow group for source %r -- add it to FLOW_GROUPS" % source
+    return FLOW_GROUPS[source]

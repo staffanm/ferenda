@@ -121,7 +121,8 @@
 {% set group_D %}
 {{ stat(29,
         "Korpuset i siffror",
-        computed_lede=true) }}
+        computed_lede=true,
+        note="Bandets tjocklek är antalet hänvisningar, rakt av — men ett band som blir tunnare än en linje ritas som en linje, annars syns det inte alls. Ett flöde under 0,01 % av totalen ritas inte; siffran vid varje grupp räknar ändå med det, och tabellen visar det. Konventionstexterna hänvisar nästan aldrig vidare till något vi har, och står därför bara på höger sida.") }}
 {{ stat(30,
         "Mest hänvisade dokument",
         lede="Inkommande länkar från hela korpuset.") }}

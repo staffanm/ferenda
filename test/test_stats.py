@@ -7,9 +7,12 @@ page looks exactly like a right one.
 """
 
 import json
+import re
 import sqlite3
 
-from accommodanda.lib import layout
+import pytest
+
+from accommodanda.lib import facets, layout
 from accommodanda.stats import charts, compute, render, scan
 from accommodanda.stats.model import Cell, Measure, Point, Report, Row
 
@@ -238,6 +241,102 @@ def test_the_heat_table_flips_its_ink_on_the_dark_steps():
     # rounded to the lightest step's neighbour
     assert charts.HEAT[0] in html and charts.HEAT[-1] in html
     assert html.count("on-dark") == 1
+
+
+def test_a_flow_group_splits_eurlex_and_merges_the_folkratt_sources():
+    # the three EU document families cite each other and behave differently, so
+    # they are three nodes; the international-law sources are two kinds of thing
+    # between them, treaty text and case law, so they are two
+    assert facets.flow_group("eurlex", "treaty") == "EU-fördrag"
+    assert facets.flow_group("eurlex", "judgment") == "EU-domar"
+    assert facets.flow_group("eurlex", "opinion") == "EU-domar"
+    assert facets.flow_group("eurlex", "regulation") == "EU-rättsakter"
+    assert facets.flow_group("eurlex", "act") == "EU-rättsakter"
+    assert {facets.flow_group(s, "treaty") for s in ("coe", "icrc", "untc")} \
+        == {"Konventioner"}
+    assert {facets.flow_group(s, "judgment") for s in ("hudoc", "icj", "icc")} \
+        == {"Folkrättslig praxis"}
+    # an order (CO/TO/FO) is the Court's too -- a hand-written judgment/opinion
+    # pair drew it as legislation, which is why the set comes from lib
+    assert facets.flow_group("eurlex", "order") == "EU-domar"
+    # a source nobody has placed is a hard error: pooling it into an "övrigt"
+    # bucket would make the diagram lie about what cites what
+    with pytest.raises(AssertionError, match="nysource"):
+        facets.flow_group("nysource", "kind")
+
+
+def test_the_flow_query_groups_across_the_join_and_drops_a_dangling_target():
+    # the flow is measured over the catalog, so the grouping has to survive the
+    # join: two eurlex kinds on one side become two different nodes, three
+    # folkrätt sources become one. A reference whose target the corpus does not
+    # hold has no cited group and cannot be drawn -- it is counted by 29's own
+    # second query instead, which is why that number is not `links - flows`.
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE documents (uri TEXT, source TEXT, kind TEXT)")
+    con.execute("CREATE TABLE links (from_uri TEXT, to_root TEXT)")
+    con.executemany("INSERT INTO documents VALUES (?, ?, ?)", [
+        ("prop", "forarbete", "prop"), ("sfs", "sfs", "lag"),
+        ("reg", "eurlex", "regulation"), ("dom", "eurlex", "judgment"),
+        ("echr", "hudoc", "judgment"), ("coe", "coe", "treaty"),
+        ("icrc", "icrc", "protocol"),
+    ])
+    con.executemany("INSERT INTO links VALUES (?, ?)", [
+        ("prop", "sfs"), ("prop", "sfs"), ("prop", "reg"),
+        ("dom", "reg"), ("echr", "coe"), ("echr", "icrc"),
+        ("prop", "borta"),                      # target not in the catalog
+    ])
+    # largest first, which is the order the drawing and the table both read
+    assert [(c.row, c.col, c.value) for c in compute._flows(con)] == [
+        ("Förarbeten", "Författningar", 2),
+        ("Folkrättslig praxis", "Konventioner", 2),   # coe + icrc are one node
+        ("EU-domar", "EU-rättsakter", 1),       # not folded into EU-rättsakter
+        ("Förarbeten", "EU-rättsakter", 1),
+    ]
+
+
+def test_a_node_bar_is_the_sum_of_the_ribbons_actually_drawn():
+    # 1 000 000 + 200 000 drawn, and a 40-flow that falls under the threshold.
+    # The bar has to be the ribbons as drawn, floor included, or the picture
+    # contradicts itself where the floor lifts a hairline.
+    m = Measure(29, "D", "Flöde", "sankey", unit="hänvisningar", value=1200040,
+                display="1 200 040 hänvisningar mellan 300 dokument",
+                cells=[Cell("Förarbeten", "Författningar", 1000000),
+                       Cell("Förarbeten", "Förarbeten", 200000),
+                       Cell("Begrepp", "Begrepp", 40)])
+    svg = charts.sankey_svg(m)
+    heights = [float(h) for h in re.findall(
+        r'class="viz-node"[^>]*height="([\d.]+)"', svg)]
+    ribbons = svg.count('class="viz-flow"')
+    assert ribbons == 2                      # the 40-flow is under SK_SHARE
+    assert "Begrepp" not in svg              # and so is its group, both sides
+    # left: one bar over both ribbons; right: one per cited group
+    assert heights[0] == pytest.approx(charts.SK_STACK, abs=0.01)
+    assert sum(heights[1:]) == pytest.approx(charts.SK_STACK, abs=0.01)
+
+
+def test_a_flow_too_thin_to_draw_is_still_counted_and_still_listed():
+    m = Measure(29, "D", "Flöde", "sankey", unit="hänvisningar", value=1000040,
+                display="1 000 040 hänvisningar mellan 300 dokument",
+                cells=[Cell("Förarbeten", "Författningar", 1000000),
+                       Cell("Förarbeten", "Begrepp", 40)])
+    html = charts.figure(m)
+    # the citing group's number counts the undrawn flow (1 000 000 + 40), so a
+    # node label never states less traffic than the group has...
+    assert re.findall(r'class="viz-nodeval"[^>]*>([^<]+)<', html)[0] \
+        == charts._fmt(1000040)
+    # ...and the table under the figure carries the flow the drawing dropped
+    assert "Förarbeten → Begrepp" in html and "Visa som tabell" in html
+
+
+def test_the_flow_diagram_opens_on_the_number_it_decomposes():
+    html = charts.figure(Measure(
+        29, "D", "Flöde", "sankey", unit="hänvisningar", value=1200000,
+        display="1 200 000 hänvisningar mellan 300 dokument",
+        cells=[Cell("Förarbeten", "Författningar", 1000000),
+               Cell("Rättsfall", "Författningar", 200000)]))
+    assert html.index("viz-hero") < html.index("<svg") < html.index("viz-data")
+    # both sides in one node order, so a group can be followed across
+    assert html.count("viz-nodelabel") == 3       # 2 citing + 1 cited
 
 
 def test_a_plotted_measure_carries_its_table_view():

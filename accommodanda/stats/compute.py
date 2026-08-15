@@ -31,6 +31,7 @@ import statistics
 from concurrent.futures import ProcessPoolExecutor
 
 from ..lib import catalog, layout, util
+from ..lib.facets import flow_group
 from ..lib.pinpoint import human_fragment
 from . import scan
 from .model import Cell, Measure, Point, Report, Row
@@ -713,19 +714,52 @@ def _ikraft_months(laws):
 # D. the citation graph (29-36)
 # ==========================================================================
 
+def _flows(con):
+    """Every reference counted by (citing group, cited group), largest first.
+
+    The catalog answers per (source, kind) -- 1 900 rows -- and the grouping
+    is `facets.flow_group`, shared with the /hanvisningar/ graph API, so one
+    map says what a node is. References to a document the corpus does not hold
+    have no cited group and are not counted; 29's lede says how many that is."""
+    flows = collections.Counter()
+    for src, kind, to_src, to_kind, n in _q(
+            con, "SELECT d1.source, d1.kind, d2.source, d2.kind, count(*) "
+                 "FROM links l JOIN documents d1 ON d1.uri = l.from_uri "
+                 "JOIN documents d2 ON d2.uri = l.to_root GROUP BY 1,2,3,4"):
+        flows[(flow_group(src, kind), flow_group(to_src, to_kind))] += n
+    return [Cell(a, b, n)
+            for (a, b), n in sorted(flows.items(), key=lambda t: -t[1])]
+
+
 def _group_d(con, s):
     docs = _q(con, "SELECT count(*) FROM documents")[0][0]
     links = _q(con, "SELECT count(*) FROM links")[0][0]
     paged = _q(con, "SELECT count(*) FROM links WHERE from_page IS NOT NULL")[0][0]
+    flows = _flows(con)
+    # both numbers measured, neither inferred from the other: a reference the
+    # flow leaves out because its target is missing is counted by its own query.
+    # "links - landed" would say the same thing only while every citing document
+    # is itself in the catalog, which nothing here states or checks.
+    unresolved = _q(con, "SELECT count(*) FROM links l LEFT JOIN documents d "
+                         "ON d.uri = l.to_root WHERE d.uri IS NULL")[0][0]
     yield Measure(
-        29, "D", "Korpuset i siffror", "scalar", unit="hänvisningar",
+        29, "D", "Korpuset i siffror", "sankey", unit="hänvisningar",
         value=links,
         display="%s hänvisningar mellan %s dokument"
                 % ("{:,}".format(links).replace(",", " "),
                    "{:,}".format(docs).replace(",", " ")),
+        # no characterisation of what the unresolved targets are: measured, they
+        # are EU-domar 33 %, äldre författningar 22 %, EU-rättsakter 18 % and a
+        # long tail, and any short phrase for that reads as a ranking the page
+        # does not compute
         lede="Varje hänvisning är upplöst till ett dokument och, där källan har "
-             "sidor, till sidan den står på (%s av dem)."
-             % "{:,}".format(paged).replace(",", " "))
+             "sidor, till sidan den står på (%s av dem). Flödet visar de %s "
+             "hänvisningar som går mellan två dokument i korpuset. Ytterligare "
+             "%s pekar på ett dokument som korpuset inte har."
+             % ("{:,}".format(paged).replace(",", " "),
+                "{:,}".format(sum(c.value for c in flows)).replace(",", " "),
+                "{:,}".format(unresolved).replace(",", " ")),
+        cells=flows)
 
     yield Measure(
         30, "D", "Mest hänvisade dokument", "toplist", unit="hänvisningar",
