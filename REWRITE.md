@@ -1417,7 +1417,9 @@ to a future per-doc incremental generate.
     a law answers for itself *and every provision in it*, served from the
     per-document files `generate` writes rather than a live catalog query; see
     `lib/inbound.py`),
-    `document/outbound` (`hosted` flag for un-parsed targets), `sources`, `dumps`.
+    `document/outbound` (`hosted` flag for un-parsed targets), `graph` (a node's
+    neighborhood aggregated per neighbor document, grouped by `lib/facets.flow_group`
+    — what the `/hanvisningar/` explorer draws), `sources`, `dumps`.
     Auto `/openapi.json` + `/docs`. CORS-open (read-only public data) so the
     static site reaches it cross-origin. Verified live against the **real
     1.5 GB catalog**: Brottsbalk inbound 5,153, räntelagen §6 ← 2,783 citers.
@@ -1454,6 +1456,26 @@ to a future per-doc incremental generate.
     helpers scrollspy/search/popover all build on, so "the page's own
     anchor" means the same thing everywhere once several documents share
     one DOM.
+  - ✅ **Graph explorer** (`/hanvisningar/`, `lib/templates/hanvisningar.html` +
+    `lib/assets/graf.js`, over `GET /api/v1/graph`) — the citation graph as a
+    page a reader can walk rather than a number in a rail. `catalog.py`'s new
+    `graph_*` queries answer per *neighbor document* (one row per citer/target
+    with its link count) instead of per citation, grouped by the same
+    `lib/facets.flow_group` map the stats sankey (§7k) uses, so both surfaces
+    agree on what a node is. `graf.js` draws a force-directed canvas layout
+    from that JSON: a degree stepper widens the walk outward, scrolling out
+    past the current degree fetches the next one, a direction toggle
+    (in/out/both) and a legend that doubles as a flow-group filter narrow the
+    view. A fragment uri (`…#K4P7`, `…#A6`) switches to **pinpoint mode**:
+    the neighborhood of that one provision, plus `internal` — the document's
+    own §/article-to-§/article graph from `graph_internal`, unit ids
+    collapsed by `pinpoint.unit_anchor` so a stycke-level citation lands on
+    its § rather than fragmenting the view. Default center is
+    `https://lagen.nu/ext/coe/005#A6`, ECHR article 6 — the corpus' most-cited
+    single provision. `coe/parse.py` gained inline linking of bare "Article N"
+    references to the instrument's own provisions (only ordinals it holds; an
+    external treaty citation wins the overlap) so the ECHR's internal graph
+    has edges to draw — 29 links recovered on that one treaty.
   - ✅ **NDJSON bulk dumps** (`lib/dump.py`, `lagen <src> dump`) — every
     `artifact/<source>/**.json` re-serialised one-per-line, gzipped, to
     `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
@@ -4113,7 +4135,7 @@ catalog — each number with its provenance and its status — is
   cannot join the parse loop, which runs before `relate`. Gated on
   whole-corpus runs only, so a single-source rebuild does not pay for it.
 - **`model.py`** — `Measure`, whose `kind` (`scalar`/`toplist`/`series`/
-  `histogram`/`bars`/`matrix`/`table`) is the on-disk discriminator the renderer
+  `histogram`/`bars`/`matrix`/`sankey`/`table`) is the on-disk discriminator the renderer
   dispatches on, chosen by *what the data's job is* so the renderer never guesses
   a chart form. `Report.to_artifact()` prunes a measure's empty fields — writing
   all twelve keys on all 51 triples the artifact and makes a diff unreadable, and
@@ -4167,9 +4189,21 @@ catalog — each number with its provenance and its status — is
   which makes the accessible table view *be* the chart rather than an alternative
   to it. Series and distributions are SVG; the matrix is a log-scaled heat table
   (its largest cell is four orders of magnitude above its smallest, and on a
-  linear ramp every cell but one reads as empty). Every chart is single-series —
-  the corpus has one value per year, per bin, per law — so nothing encodes
-  identity by colour and there is no categorical palette or legend.
+  linear ramp every cell but one reads as empty). Measure 29 is a `sankey`: the
+  citation graph as volume, citing group on the left, cited group on the right,
+  the same groups standing on both sides so a source citing itself is a ribbon
+  like any other. The map holds fourteen groups; a group with no traffic above
+  the drawing threshold on one side simply does not appear there, which is how
+  Konventioner (1.6 M references in, 437 out) reads as the dead end it is. Its
+  groups are mostly the source itself, except eurlex (three
+  nodes: treaties, acts, case law — they behave differently) and the
+  international-law sources (two: treaty text, case law). Ribbon thickness is
+  linear in the count, with a floor, because the corpus spans four orders of
+  magnitude; a node bar is the sum of its ribbons *as drawn*, and the number
+  beside it is the group's whole volume. Every chart is single-series — the
+  corpus has one value per year, per bin, per law, and a ribbon is named at both
+  ends — so nothing encodes identity by colour and there is no categorical
+  palette or legend.
 - Absent from `ARTIFACTS` like `site` and `remisser`: no citation graph, so never
   `relate`d, indexed or dumped. `test/test_stats.py` locks in the scan rules, the
   artifact pruning and the page projection.
@@ -4500,6 +4534,19 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib/api/coe** (2026-08-15) — a corpus-wide graph explorer,
+  `/hanvisningar/` (`lib/templates/hanvisningar.html`, `lib/assets/graf.js`)
+  over a new `GET /api/v1/graph` (`api/reads.graph`, `catalog.py`'s
+  `graph_*` queries). Aggregated per neighbor document rather than per
+  citation, grouped by a node vocabulary (`lib/facets.FLOW_GROUPS`/
+  `flow_group`) moved out of `stats/compute.py` so the graph explorer and
+  the stats sankey (§7k) share one map of what a node is; `pinpoint.py`
+  gained `unit_anchor` to collapse a fragment to its pinpointable §/article
+  for the per-document internal-graph view a fragment uri asks for.
+  `coe/parse.py` now links a bare "Article N" in a treaty's own text to the
+  sibling provision it names (only ordinals the instrument holds; an
+  external treaty citation wins the overlap), giving the ECHR — the
+  explorer's default center, article 6 — 29 internal article links to draw.
 - **hudoc/coe/icrc/avg/lib** (2026-08-15) — §7j's citation work continues:
   `lib/emdref.py` is EMDRATTSFALL, the Swedish-text ECHR-citation matcher the
   previous entry left designed but unwritten ("Osman mot Förenade

@@ -340,6 +340,62 @@ curl -G http://127.0.0.1:8001/api/v1/document/outbound \
 ]
 ```
 
+### `GET /api/v1/graph` — ett dokuments grannskap i grafen, ritfärdigt
+
+Samma fakta som `inbound`/`outbound`, men aggregerat per granndokument (en
+rad per granne med länkantal) och grupperat med samma flödesgrupper som
+statistiksidans flödesdiagram (`lib/facets.flow_group`). Det är vad
+`/hanvisningar/`-utforskaren ritar. `direction=in|out|both` väljer sida,
+`groups=` filtrerar på flödesgrupp, `limit` sätter topplistans längd.
+
+En fragment-URI (`…#K4P7`, `…#A6`) svarar för den enheten ensam och lägger
+till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå
+(§/artikel), med läsbara etiketter ("4 kap. 7 §").
+
+```sh
+curl -G http://127.0.0.1:8001/api/v1/graph \
+     --data-urlencode "uri=https://lagen.nu/ext/coe/005#A6" \
+     --data-urlencode "groups=Rättsfall,Förarbeten"
+```
+
+```json
+{
+  "uri": "https://lagen.nu/ext/coe/005#A6",
+  "root": "https://lagen.nu/ext/coe/005",
+  "anchor": "A6",
+  "unit": "A6",
+  "pinpoint": "artikel 6",
+  "label": "ETS No. 005",
+  "title": "Convention for the Protection of Human Rights and Fundamental Freedoms",
+  "source": "coe",
+  "kind": "treaty",
+  "group": "Konventioner",
+  "inbound": {
+    "total_links": 4350,
+    "total_docs": 1634,
+    "unresolved": 0,
+    "top": [
+      {
+        "uri": "https://lagen.nu/lr/2002/administrativa-avgifter-pa-skatte-och-tullomradet-fi2002-112",
+        "label": "Administrativa avgifter på skatte- och tullområdet, Fi2002/1122",
+        "title": "Administrativa avgifter på skatte- och tullområdet, Fi2002/1122",
+        "descriptive": "Administrativa avgifter på skatte- och tullområdet, Fi2002/1122",
+        "source": "forarbete",
+        "kind": "lr",
+        "group": "Förarbeten",
+        "n": 34
+      }
+    ]
+  },
+  "outbound": {"total_links": 0, "total_docs": 0, "unresolved": 0, "top": []},
+  "internal": {
+    "nodes": [{"anchor": "A6", "label": "artikel 6", "n": 0}],
+    "edges": [],
+    "truncated": 0
+  }
+}
+```
+
 ### `GET /api/v1/pdf` — dokumentet som PDF
 
 En genererad sida omrenderad för papper: A4, löpande sidhuvud, sidfot av
