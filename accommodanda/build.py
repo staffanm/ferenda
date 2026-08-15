@@ -53,6 +53,7 @@ from .api import app as api_app
 from .api import edit as api_edit
 from .api import errors as api_errors
 from .api import patch as api_patch
+from .avg import arsberattelse as avg_arsberattelse_mod
 from .avg import download as avg_download
 from .avg import model as avg_model
 from .avg import parse as avg_parse
@@ -129,6 +130,7 @@ from .lib import (
     util,
 )
 from .lib.datasets import EMD_CASES as EMD_CASES_JSON
+from .lib.datasets import JO_ARSBERATTELSE as JO_ARSBERATTELSE_JSON
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
 from .lib.datasets import NAMEDEUCASES as NAMEDEUCASES_JSON
 from .lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
@@ -973,7 +975,7 @@ PKG = Path(__file__).parent
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
     "parallelappendix", "register", "begrepp", "bemyndigande",
-    "graphics")) + (PKG / "lib" / "lagrum.py",)
+    "graphics")) + (PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",)
 
 
 @functools.cache
@@ -1539,7 +1541,7 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "structure.py", PKG / "dv" / "identity.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
            PKG / "lib" / "poi_worker.py", PKG / "lib" / "pdftext.py",
-           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
            # the innehåll is normalised through this before a patch is applied
            # to it, so it decides what a patched document parses from
            PKG / "lib" / "markup.py")
@@ -1796,7 +1798,7 @@ FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
            PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
            # the data the citation engine's treaty matching is configured by:
            # a new Swedish treaty name re-stales the parse like a grammar edit
            PKG / "lib" / "treaty_ids.py",
@@ -2127,7 +2129,7 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                # a patched act's Formex/OJ markup is normalised through this
                # before the patch is applied, so it decides what it parses from
                PKG / "lib" / "markup.py",
-               PKG / "lib" / "lagrum.py")
+               PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py")
 
 
 @functools.cache
@@ -2322,8 +2324,13 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
 
 HUDOC_CODE = (PKG / "hudoc" / "parse.py", PKG / "hudoc" / "model.py",
               PKG / "hudoc" / "summaries.py", PKG / "hudoc" / "citations.py",
+              PKG / "hudoc" / "treaties.py",
+              PKG / "lib" / "treatyref.py", PKG / "lib" / "treaty_ids.py",
+              PKG / "lib" / "data" / "treaty_names.json",
               PKG / "lib" / "coe.py", PKG / "lib" / "artifact.py")
 COE_CODE = (PKG / "coe" / "parse.py", PKG / "coe" / "model.py",
+            PKG / "lib" / "treatyref.py", PKG / "lib" / "treaty_ids.py",
+            PKG / "lib" / "data" / "treaty_names.json",
             PKG / "lib" / "coe.py", PKG / "lib" / "pdftext.py",
             PKG / "lib" / "artifact.py")
 
@@ -2448,7 +2455,9 @@ SOURCES["coe"] = _simple_source(
 # international humanitarian law treaties (ICRC): the stored record is the whole
 # JSON:API envelope (metadata + authentic text + states parties), so parse is
 # offline and needs no separate body -- the parser/model are the only recipe.
-ICRC_CODE = (PKG / "icrc" / "parse.py", PKG / "icrc" / "model.py")
+ICRC_CODE = (PKG / "icrc" / "parse.py", PKG / "icrc" / "model.py",
+             PKG / "lib" / "treatyref.py", PKG / "lib" / "treaty_ids.py",
+             PKG / "lib" / "data" / "treaty_names.json")
 
 
 def icrc_inputs(basefile):
@@ -2649,7 +2658,7 @@ def foreskrift_reap(basefiles):
 FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
                    PKG / "foreskrift" / "model.py",
                    PKG / "foreskrift" / "structure.py",
-                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
                    # picks the presented consolidation, which decides whether
                    # the parse run emits a .grund.json sidecar
                    PKG / "lib" / "text.py")
@@ -2744,8 +2753,26 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 
 AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
             PKG / "avg" / "download.py",
-            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
             PKG / "lib" / "artifact.py")
+
+
+def avg_arsberattelse(args=()):
+    """Refresh the JO ämbetsberättelse snapshot (`lagen avg arsberattelse`):
+    sweep the JO artifacts' officialReport pages and rewrite
+    avg/data/arsberattelse.json, which the citation engine reads to resolve
+    "JO 2003/04 s. 450" onto the decision's dnr URI. Reads artifacts already
+    on disk -- no network, no per-document chain."""
+    if RUN.dry_run:
+        print("avg arsberattelse: would sweep JO artifacts -> %s"
+              % JO_ARSBERATTELSE_JSON)
+        return
+    pages, unparseable = avg_arsberattelse_mod.harvest()
+    ambiguous = sum(1 for v in pages.values() if len(v) > 1)
+    print("avg arsberattelse: %d pages (%d ambiguous, left unlinked) -> %s"
+          % (len(pages), ambiguous, JO_ARSBERATTELSE_JSON))
+    for report in unparseable:
+        print("  !! unparseable officialReport: %r" % report)
 
 
 def avg_list():
@@ -2817,6 +2844,7 @@ SOURCES["avg"] = Source("avg", avg_list, {
     "parse": _parse_stage("avg", avg_parse.parse, layout.AVG_DOWNLOADED,
                           inputs=avg_inputs, code=AVG_CODE),
 },
+    actions={"arsberattelse": avg_arsberattelse},
     harvest=avg_harvest,
     origin="https://www.jo.se/",
     scopes=frozenset(avg_model.ORGS),
@@ -2844,7 +2872,7 @@ SOURCES["avg"] = Source("avg", avg_list, {
 RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
            PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
            PKG / "rs" / "skv.py",
-           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+           PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
            PKG / "lib" / "artifact.py")
 
 
@@ -2926,7 +2954,7 @@ def rs_browser_download(_basefiles):
 
 EDPB_CODE = (PKG / "edpb" / "parse.py", PKG / "edpb" / "model.py",
              PKG / "edpb" / "series.py", PKG / "edpb" / "download.py",
-             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
              PKG / "lib" / "artifact.py")
 
 
@@ -3223,7 +3251,7 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
 
 WIKI_ROOT = layout.WIKI_ROOT
 WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "markdown.py",
-             PKG / "lib" / "lagrum.py", PKG / "lib" / "eu_structure.py")
+             PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py", PKG / "lib" / "eu_structure.py")
 
 
 def kommentar_record(basefile):
@@ -5060,6 +5088,12 @@ def _dispatch(args, p, jobs):
             _emit_segment(args.action, name, time.perf_counter() - t0, status="ok")
             continue
         if args.action not in source.stages:
+            # an "all" sweep visits every source; one that lacks the action
+            # simply has nothing to do (stats has only compute, two sources
+            # have browser-download) -- same shortcut the download branch
+            # takes above. A *named* source keeps the hard error.
+            if args.source == "all":
+                continue
             p.error("source %r has no action %r (have: %s)"
                     % (name, args.action,
                        ", ".join([*source.stages, *source.actions])))
