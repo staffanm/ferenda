@@ -3944,9 +3944,9 @@ Six verticals sharing one folkrätt (international law) landing page:
   winner, keyed on `citations`' own normalized `applicant|respondent|serial`
   and on the appno), read back by `lib.datasets.load_emd_cases`. A
   hand-edited `hudoc/data/respondents_sv.json` maps the Swedish respondent
-  names onto the snapshot's normalized respondent keys. The `lagrum` parse
-  type that resolves a Swedish citation through it is designed, not yet
-  written.
+  names onto the snapshot's normalized respondent keys. `lib/emdref.py` (2026-08-15)
+  is the `lagrum` parse type (EMDRATTSFALL) that resolves a Swedish citation
+  through it -- see below.
   `icj/reports.py` reads the Court's own citation grammar, "I.C.J. Reports
   1990, p. 92": each decision's official citation sits on its own PDF cover
   sheet (227 of the 255 held covers yield one -- `pdftotext` first, the OCR
@@ -3973,6 +3973,64 @@ Six verticals sharing one folkrätt (international law) landing page:
   anaphora branch and pinned the article on whichever act was last in
   focus, because the definite noun didn't parse as naming its own act
   (observed in SOU 2021:44).
+
+- **Swedish ECHR citations, sibling-treaty citations, and three more
+  grammar productions (2026-08-15):** `lib/emdref.py` is EMDRATTSFALL, the
+  matcher the previous entry left "designed, not yet written" -- ECHR case
+  law in *Swedish* text ("Osman mot Förenade kungariket", "ansökan nr
+  23452/94") over the committed `hudoc/data/casenames.json` snapshot joined
+  through `respondents_sv.json`, with `hudoc/citations.py`'s disambiguation
+  ported verbatim (a printed date wins; else the sole judgment; several
+  candidates and no date stay unlinked). It has no grammar half, so
+  `LagrumParser.parse_text` merges its spans beside the Lark tree's,
+  grammar winning any overlap.
+
+  `hudoc/treaties.py` links a judgment's own Convention/protocol short
+  forms ("Article 8 of the Convention", "Article 1 of Protocol No. 1") over
+  `lib.treatyref`, with the local knowledge only an ECHR text can supply:
+  "the Convention" is the ECHR (guarded so "the Convention on the Rights of
+  the Child" keeps naming the CRC) and "Protocol No. N" numbers the ECHR
+  protocol series specifically, since the same words number a different
+  family on a CoE treaty page. `hudoc/parse.py`'s `refs_for` now merges it
+  with `citations.refs`, case law winning an overlap. `coe/parse.py`'s
+  `build_structure` and `icrc/parse.py`'s new `artifact()` wrapper both gained
+  the same `refs_for` shape for the sibling instruments a treaty's own text
+  names (a protocol citing the Conventions it amends, an Additional
+  Protocol's preamble citing the four 1949 Conventions) -- self-citations
+  excluded, since a treaty's own title is a description, not a citation.
+  `lib/treatyref.py` gained `generic_names`/`generic_context`: every treaty
+  family numbers its protocols ("Second Additional Protocol"), so a bare
+  ordinal name now binds only within `CONTEXT_WINDOW` (150 chars) of its
+  family's own name being present -- "Additional Protocol II to the Geneva
+  Conventions" binds, the bare "Second Additional Protocol to this
+  Convention" on a CoE page does not. `treaty_names.json` gained the eight
+  ECHR protocols carrying their own articles (coe/009/046/114/117/177/187/194/214)
+  as curated targets.
+
+  Three more `lagrum` productions, all measured against the held corpus:
+  STALLNINGSTAGANDE links Skatteverket rättsliga ställningstaganden by their
+  diarienummer shape alone ("dnr 131 599911-10/111" → `rs/skv/131-599911-10-111`),
+  since a title or date routinely separates the dnr from the word
+  "ställningstagande" and the shape itself is unlike any other agency's dnr;
+  `jo_arsb_ref` resolves the printed-ämbetsberättelse citation form ("JO
+  2003/04 s. 450", no dnr) through a new committed snapshot,
+  `avg/data/arsberattelse.json` (`avg/arsberattelse.py`, `lagen avg
+  arsberattelse`, sweeping the JO artifacts' own `officialReport` field --
+  1,607 of 1,608 artifacts at the 2026-08-15 census, the one leftover
+  reported rather than mapped); `so_ref` reads "SÖ 1982:50" (Sveriges
+  internationella överenskommelser) as a förarbete-shaped document ref.
+  Alongside them, two corpus-measured fixes: the citation scan now runs over
+  a width-preserving whitespace normalization (U+202F/U+00A0 → space) that
+  recovers 1,339 "NJA 1991 s. 567"-shaped citations HD's 2016-2020 referat
+  typography had put out of the grammar's reach, and the letterless CJEU
+  case form is now year-bounded to 1954-1989 (the T-/C- split) so "i mål
+  23452/94" -- an ECHR application number wearing the same shape -- no
+  longer mints a celex that does not exist.
+
+  `build.py` gained the `avg arsberattelse` action, and a `lagen all
+  <action>` sweep now skips (rather than hard-errors on) a source that has
+  no such stage/action, the same shortcut the download branch already took
+  -- a *named* source still gets the hard error.
 
 - **Identity and graph:** `lib/coe.py` is the second-use shared seam. HUDOC's
   article facet codes (`8`, `6-3-d`, `P1-1`, `P7-4`) map protocol numbers to
@@ -4293,13 +4351,13 @@ rewrite work.
 | `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `volumes` (which of a multi-PDF record's `files` are the body and in what order, read from the record's provenance and the landing page's own link text — drops errata/summaries/kortversioner/reprinted-directive/remisslista siblings, collapses a "hela dokumentet" edition published beside its own parts), `jamforelse` (extracts a re-enacting prop's jämförelsetabell/paragrafnyckel bilaga tables into old↔new provision pairs from per-run coordinates; consumed by `sfs/correspond.table_correspond`), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery; a multi-part Formex manifestation fetched whole, as one zip; `lagen eurlex backfill` downloads the acts the corpus cites but does not hold, ranked by `catalog.dangling_targets`), `bulk` (dump import), `correspond` (the EU-act **lineage**: a recast's own jämförelsetabell annex → article↔article pairs, mechanical, extracted by `parse` into the artifact's `correspondence` key; `catalog._index_document` writes them into `directive_correspondence` as it indexes each act, walked transitively by `catalog.predecessor_atoms` under `catalog.caselaw_anchored`, the statute-wide pinpoint-precise case-law rail assignment), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_act_body` descends through Formex's `GENERAL`/`GR.SEQ` wrappers so a multi-file act (2004/18, the Charter) parses through the same walker as an ordinary `ACT` root; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure, `parse.parse_hearing_report` a `REPORT.HEARING` -- for the oldest ECR cases the hearing report is the only text CELLAR holds; judgment paragraphs are read from both the pre-2012 plain `NP` and the later `NP.ECR` shapes; citation scanning is per-language -- `_refparser(lang)` loads the English EULAGSTIFTNING surface for the pre-accession case law that exists in no Swedish version), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
-| `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions, `citations` (case-law cross-reference matcher), `casenames` (`lagen hudoc casenames`, writes the committed `data/casenames.json` join surface the Swedish `lagrum` matcher will read) |
+| `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions, `citations` (case-law cross-reference matcher), `treaties` (the Convention/protocol short forms a judgment cites, over `lib.treatyref`), `casenames` (`lagen hudoc casenames`, writes the committed `data/casenames.json` join surface `lib/emdref.py`, the Swedish `lagrum` matcher, reads) |
 | `accommodanda/coe/` | **Council of Europe Treaty Office vertical**: complete-list/detail/official-text harvest, treaty model, HTML/PDF article parser; canonical `ext/coe/{number}#A…` targets shared with HUDOC |
 | `accommodanda/icrc/` | **ICRC international humanitarian law treaty vertical**: anonymous Drupal JSON:API list+detail harvest (no PDF — the envelope carries the authentic text), typed `Treaty` model, offline article-tree parser; canonical `ext/icrc/{number}` targets, curated `data/names.json` for the Geneva Conventions/Additional Protocols |
 | `accommodanda/untc/` | **UN Treaty Collection vertical**: two fetches per curated treaty — the MTDSG status page, which carries no treaty text at all, and the authentic text from the instrument's own depositary (OHCHR HTML for twelve, a born-digital PDF for VCLT and UNCLOS; never the UNTS's own volumes, which are scans). Typed `Treaty`/`Party`/`Provision` model, offline participation-grid parser plus `text.py`'s article splitter (1,020 articles over 1,043 nodes, checked against each entry's curated article count); canonical `ext/untc/{unts}` targets keyed on the UNTS registration number, curated `data/treaties.json` (14 instruments: VCLT, UNCLOS, Genocide Convention, the core human-rights treaties, the Refugee Convention + Protocol) |
 | `accommodanda/icj/` | **International Court of Justice case-law vertical**: the `icj-cij.org/decisions` Drupal view (one request with `from=1946` returns all 877 rows) scopes the harvest to 255 decisions — judgments, advisory opinions and provisional-measures orders; the PDFs are Cloudflare-walled and fetched through `lib.browser.DetachedChrome`. `parse.py` cuts the printed Reports' front matter at the Court's **dateline** (the letterhead words do not survive OCR) and recovers the numbered paragraphs with `paragraph_chain` — the longest chain counting up in steps of at most four, which must also open at the Court's first paragraph or be long enough that its length is the evidence, so a quoted ICTY paragraph and an annex's page numbers both join none; `ocr.py` repairs the pre-2004 scans' systematic character confusions against a vocabulary harvested from the born-digital decisions |
 | `accommodanda/icc/` | **International Criminal Court case-law vertical**: two-source harvest — icc-cpi.int `/decisions` facet scrape (curated Rome-Statute decision types, `data/decision_types.json`) scopes the set and yields document numbers, the Legal Tools API (legal-tools.org) resolves metadata + PDF; HUDOC-shaped `Decision`/`Block` model, `pdftext`-based article parser with numbered-paragraph/heading classification; canonical `ext/icc/{doc-number}` targets kept local to the vertical (rule:second-use-goes-to-lib) |
-| `accommodanda/avg/` | **JO/JK/ARN/IMY/KKV-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; IMY tillsyn pages, whose diarienummer is read out of the attached PDFs and the documents regrouped by it, plus the praxisbeslut/sanktionsavgift overlay; KKV the diarium narrowed by `KKV_CASETYPES` joined with the curated ärendelista on the dnr; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`imy_pdf_path`/`kkv_body_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN/IMY/KKV PDF via `lib/pdftext`, JK landing HTML, KKV also FrontPage-era windows-1252 HTML and Word; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary); `KNOWN-GAPS.md` records the two documents `avg parse` has ever failed on, both since resolved |
+| `accommodanda/avg/` | **JO/JK/ARN/IMY/KKV-decisions vertical**: `model` (`Beslut`; URI = the citation-minted `avg/{org}/{dnr}`), `download` (JO WordPress admin-ajax API + PDFs; JK one-shot listing + landing pages, `jk_canonical` dnr normalization; ARN one-page vägledande-beslut listing; IMY tillsyn pages, whose diarienummer is read out of the attached PDFs and the documents regrouped by it, plus the praxisbeslut/sanktionsavgift overlay; KKV the diarium narrowed by `KKV_CASETYPES` joined with the curated ärendelista on the dnr; also the store-path helpers `arn_pdf_path`/`jo_pdf_path`/`imy_pdf_path`/`kkv_body_path`/`jo_officialreport_path`/`RE_ARN_DNR`, moved here from the deleted `legacy.py`, §7g teardown 2026-07-19), `parse` (JO/ARN/IMY/KKV PDF via `lib/pdftext`, JK landing HTML, KKV also FrontPage-era windows-1252 HTML and Word; DV parse-type citation scan; an ARN referat's "title" is its preamble paragraph, so the page heads on `lib/labels.first_sentence` of it while the whole preamble still renders as the summary); `arsberattelse` (`lagen avg arsberattelse`, sweeps the JO artifacts' `officialReport` pages into the committed `data/arsberattelse.json` snapshot `lib.lagrum`'s `jo_arsb_ref` production resolves through); `KNOWN-GAPS.md` records the two documents `avg parse` has ever failed on, both since resolved |
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine; `clean_title`/`title_from_body` fall back to the PDF's own opening rubric when the harvest title is link chrome), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors), `data/series.json` (hand-edited designation/official-title/successor registry, `lib/datasets.FS_SERIES` — drives the browse's headings, Swedish ordering and succession folding, `lib/facets.py`). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss` keyed on the *referred document's* own identity, `basefile = "<typ>/<identifier>"` — not the regeringen.se ärende-page slug, kept in `url` — plus `Remissinstans`/`Remissvar`, `org_slug`, `Remiss.externt_dokument`), `download` (regeringen.se `/remisser/` sync over the AJAX filter listing (`REMISS_CATEGORY`, not the decorative `?p=N`); `parse_arende` raises rather than minting a stub identity when an ärende remits a regeringen-published document of an unrecognised doctype; `pm`/`lr` cross-refs resolved via `lib.regeringen`'s shared identity rules; the examined-ärende index `layout.REMISSER_SEEN` — keyed by URL slug, since only the ärende page names the remitted document — drives the sweep, `until` = deadline + grace period; `sync`'s shared `_poll` step + `sync_one`/`--only`, both gated by `externt_dokument` for ärenden whose remitted document regeringen didn't publish), `parse` (answer → `Remissvar`; `_body_text` dispatches on the file's magic bytes rather than trusting its stored `.pdf` name — `lib/pdftext` with no fixed header for a real PDF, `lib.poi` for the 4 answers actually stored as Word; since 2026-08-04 the shared `pdftext` pipeline also strips running furniture found by shape, drops footnotes, rejoins page-break-split sentences and strips the letter's addressing apparatus before flattening to paragraph text — the whole corpus, 79,982 answers, was reparsed), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`, joined to forarbete via `layout.resolve_basefile`; a basefile may now name a whole ärende, expanded to every fetched answer still lacking a layer; each quote carries a `quote_type` (`grund`/`standpunkt`) so a stated non-answer is not confused with an invented ground, and a reworded quote is snapped back to the answer's own wording (`snap_to_source`) rather than only rejected; `--update` re-analyses every ärende already covered whose remissperiod has not closed — the same deadline + grace the download side re-polls by (`download.still_open`) — picking up answers that arrived after the first analysis, with a `.ann.watch` marker per ärende so one analysed before its first answer arrived is still tracked; never part of a rebuild). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `page._remiss_indexes`; `KNOWN-GAPS.md` records the corpus's outstanding non-self-healing gaps; `tools/remisser-eval/` scores `ai-analyze` output against a hand-built `.ann.key` answer key |
@@ -4441,6 +4499,33 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **hudoc/coe/icrc/avg/lib** (2026-08-15) — §7j's citation work continues:
+  `lib/emdref.py` is EMDRATTSFALL, the Swedish-text ECHR-citation matcher the
+  previous entry left designed but unwritten ("Osman mot Förenade
+  kungariket", "ansökan nr 23452/94"), over the committed
+  `hudoc/data/casenames.json` snapshot with `hudoc/citations.py`'s
+  disambiguation ported verbatim. `hudoc/treaties.py` links a judgment's own
+  Convention/protocol short forms ("Article 8 of the Convention") over
+  `lib.treatyref`, merged into `hudoc/parse.py`'s inline citations beside
+  the case-law spans; `coe/parse.py` and `icrc/parse.py` gained the same
+  `refs_for` shape for the sibling treaties a text names (self-citations
+  excluded). `lib/treatyref.py` gained `generic_names`/`generic_context`
+  (a `CONTEXT_WINDOW` of 150 chars) so an ordinal protocol name binds only
+  beside its family's own name, and `treaty_names.json` gained the eight
+  ECHR protocols that carry their own articles. Three more `lagrum`
+  productions: STALLNINGSTAGANDE (Skatteverket ställningstaganden by dnr
+  shape → `rs/skv/…`), `jo_arsb_ref` ("JO 2003/04 s. 450" → the JO decision
+  it names, through a new committed snapshot `avg/data/arsberattelse.json`
+  that `avg/arsberattelse.py`/`lagen avg arsberattelse` writes off the JO
+  artifacts' own `officialReport` field, 1,607 of 1,608 at census), and
+  `so_ref` ("SÖ 1982:50"). Plus two corpus-measured fixes: a
+  width-preserving whitespace normalization recovers 1,339 "NJA … s. …"
+  citations HD's 2016-2020 referat typography had put out of reach, and the
+  letterless CJEU form is now year-bounded to 1954-1989 so an ECHR
+  application number of the same shape stops minting a celex that doesn't
+  exist. `lagen all <action>` now skips a source lacking the requested
+  action instead of hard-erroring, same as the download branch.
 
 - **icc/icj/hudoc/lib** (2026-08-14) — the three international-law sources'
   own citations start resolving to links, §7j. `icc`'s 269 decisions
