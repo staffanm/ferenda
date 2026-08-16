@@ -706,6 +706,8 @@ class GraphResponse(BaseModel):
     anchor: str | None = None       # the fragment as asked
     unit: str | None = None         # the pinpointable unit it belongs to
     pinpoint: str | None = None     # that unit's reader form
+    descriptive: str | None = None  # the compact citing name of the document
+    citation: str                   # the whole node as a citation ("Artikel 6 EKMR")
     label: str | None = None
     title: str | None = None
     source: str
@@ -724,7 +726,7 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
                    groups: str | None = Query(
                        None, description="comma-separated flow-group filter "
                                          "(Författningar, Rättsfall, …)"),
-                   limit: int = Query(20, ge=1, le=60),
+                   limit: int = Query(20, ge=1, le=300),
                    con: sqlite3.Connection = Depends(get_con)):
     """One node's neighborhood in the citation graph, aggregated per neighbor
     document and ready to draw -- what the /hanvisningar/ explorer walks.

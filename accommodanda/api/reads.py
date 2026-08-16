@@ -16,7 +16,13 @@ import collections
 from opensearchpy.exceptions import OpenSearchException
 
 from ..lib import catalog, facets, inbound, pins
-from ..lib.pinpoint import is_change_marker, pinpoint_label, unit_anchor
+from ..lib.pinpoint import (
+    citation_label,
+    is_change_marker,
+    pinpoint_label,
+    short_name,
+    unit_anchor,
+)
 from . import db
 
 
@@ -79,7 +85,7 @@ def document(con, uri):
     row = catalog.document(con, uri)
     if not row:
         return None
-    uri, source, kind, label, title, path = row
+    uri, source, kind, label, title, path, _descriptive = row
     # synthesized begrepp stubs are real catalog rows with no artifact file
     # (path='') -- served as an empty artifact, like the rendered shell pages
     art = catalog.load_artifact(catalog.data_root(con), path)
@@ -183,7 +189,7 @@ def graph(con, uri, *, direction="both", groups=None, limit=20):
     row = catalog.document(con, root)
     if not row:
         return None
-    _uri, source, kind, label, title, _path = row
+    _uri, source, kind, label, title, _path, descriptive = row
     unit = unit_anchor(frag) if frag else None
     if frag:
         # keyed on the *unit*, not the raw fragment: a deep arrival anchor
@@ -199,6 +205,12 @@ def graph(con, uri, *, direction="both", groups=None, limit=20):
     result = {
         "uri": uri, "root": root, "anchor": frag or None, "unit": unit,
         "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
+        # what to *call* this node: the catalog's compact citing name, and the
+        # whole citation a reader recognises. "ETS No. 005" is the Treaty
+        # Office's filing number, not a name -- the center of the graph read
+        # "artikel 6 · ETS No. 005" where a lawyer writes "Artikel 6 EKMR".
+        "descriptive": descriptive or None,
+        "citation": citation_label(short_name(descriptive) or label, unit or ""),
         "label": label, "title": title, "source": source, "kind": kind,
         "group": facets.flow_group(source, kind),
         "inbound": None, "outbound": None, "internal": None,

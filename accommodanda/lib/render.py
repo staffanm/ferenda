@@ -70,9 +70,9 @@ def _render_graph_page():
     return ENV.get_template("hanvisningar.html").render(page_context(
         "Hänvisningsgrafen", "Hänvisningar", "", solo=True,
         body_class=" graf-wide",
-        eyebrow="Utforska korpusens hänvisningar",
-        subtitle="Varje dokument är en nod; varje hänvisning en kant. "
-                 "Välj en startpunkt och följ graferna åt båda hållen.",
+        # the title stands at the head of the left rail, above the controls it
+        # belongs to, so the stage keeps the whole viewport height
+        own_h1=True,
         # the legend/filter vocabulary comes from the page, not a hand-synced
         # copy in graf.js -- a group added to facets joins the filter here
         flow_groups=json.dumps(facets.FLOW_GROUP_NAMES)))

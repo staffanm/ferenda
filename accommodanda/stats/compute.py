@@ -32,7 +32,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from ..lib import catalog, layout, util
 from ..lib.facets import flow_group
-from ..lib.pinpoint import human_fragment
+from ..lib.pinpoint import citation
 from . import scan
 from .model import Cell, Measure, Point, Report, Row
 
@@ -115,27 +115,6 @@ def _paragraf_uri(t):
     paragraf, so the link has to land on it. The anchor is the node id the
     renderer already emits as the element's `id` (scan.py carries it)."""
     return "%s#%s" % (t[3]["uri"], t[1]) if t[1] else t[3]["uri"]
-
-
-def _pinpoint(uri, descriptive, source):
-    """A cited lagrum as a lawyer would write it: ``6 § räntelagen``,
-    ``8 kap. 7 § regeringsformen``, ``artikel 6 Europakonventionen (EKMR)``.
-
-    The raw ``1975:635#P6`` a link carries is a machine address -- readable only
-    if you already know which act 1975:635 is, which is the opposite of what a
-    "most-cited paragraf" list is for. `human_fragment` turns the anchor into a
-    pinpoint (it is the same rendering the site puts on inbound links), and the
-    catalog's `descriptive` column is the act's compact citing name.
-
-    EU anchors are the bare article number, which `human_fragment` cannot type
-    on its own -- an eurlex fragment is always an article, so say so. Anything
-    still unnamed falls back to the raw path rather than inventing a name."""
-    root, _, frag = uri.partition("#")
-    name = descriptive or root.replace(BASE, "")
-    where = human_fragment(frag)
-    if not where and frag:
-        where = "artikel %s" % frag if source == "eurlex" else frag
-    return "%s %s" % (where, name) if where else name
 
 
 # ==========================================================================
@@ -772,7 +751,7 @@ def _group_d(con, s):
     yield Measure(
         31, "D", "Mest hänvisade enskilda paragraf", "toplist", unit="hänvisningar",
         lede="Ner på paragrafnivå — vilken enskild regel korpuset faktiskt talar om.",
-        rows=[Row(_pinpoint(u, desc, src), c, u) for u, desc, src, c in
+        rows=[Row(citation(u, desc), c, u) for u, desc, _src, c in
               _q(con, "SELECT l.to_uri, d.descriptive, d.source, count(*) c "
                       "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
                       "WHERE l.to_uri LIKE '%#%' "
@@ -970,7 +949,7 @@ def _group_f(con, s):
         47, "F", "Vilka lagrum domstolarna citerar mest", "toplist",
         unit="hänvisningar",
         lede="Bara hänvisningar som går från en dom till en författning.",
-        rows=[Row(_pinpoint(u, desc, src), c, u) for u, desc, src, c in
+        rows=[Row(citation(u, desc), c, u) for u, desc, _src, c in
               _q(con, "SELECT l.to_uri, t.descriptive, t.source, count(*) c "
                       "FROM links l JOIN documents d ON d.uri = l.from_uri "
                       "LEFT JOIN documents t ON t.uri = l.to_root "

@@ -1,11 +1,27 @@
 """Fragment id -> the human pinpoint a reader recognises ("K2P16S5" -> "2 kap.
-16 § 5 st").
+16 § 5 st"), and that pinpoint -> the whole citation ("6 § räntelagen").
 
 Factored out of ``lib/page`` so the serving layer can name a pinpoint without
 importing the renderer: ``lib/pins`` labels a citation-resolved search hit with
 the provision it points at, and pulling all of page.py (and markupsafe) into the
 API's search path for one string transform is weight the endpoint should not
-carry. The same split ``lib/coe_ids`` makes for the CoE article grammar.
+carry. The same split ``lib/coe_ids`` makes for the CoE article grammar. It
+stays a leaf for that reason -- it imports nothing of ours, so no caller pays
+for a name.
+
+Four functions, in two layers. The first three answer *where in a document*,
+from the fragment alone; the fourth adds *which document*:
+
+  * ``human_fragment`` -- the Swedish, CoE and page-number fragment grammars:
+    "K2P16S5" -> "2 kap. 16 § 5 st", "A6P1" -> "artikel 6 punkt 1",
+    "sid39" -> "s. 39".
+  * ``eu_article_label`` -- the EU act's own grammar, where an anchor is a bare
+    number: "9.2.S2" -> "artikel 9.2 andra stycket".
+  * ``pinpoint_label`` -- **the one to call.** It picks between the two by the
+    fragment's shape. Calling ``human_fragment`` directly on an EU anchor reads
+    the "S2" inside "9.2.S2" as a Swedish stycke segment and answers "2 st".
+  * ``citation_label`` / ``citation`` -- the pinpoint plus the document's name,
+    which is what a reader can actually look up: "Artikel 6 EKMR", not "A6".
 """
 
 import re
@@ -89,6 +105,55 @@ def pinpoint_label(frag):
     if _EU_ARTICLE.fullmatch(frag or ""):
         return eu_article_label(frag)
     return human_fragment(frag)
+
+
+# the acronym a composed descriptive label carries at its end -- the inverse of
+# `labels._named`, which writes "Europakonventionen (EKMR)" from a curated
+# label and abbr. All caps and short, so an ordinary parenthetical ("lag om
+# ändring i ...(1994:1219)") is not read as one.
+_ACRONYM = re.compile(r".+\s\(([A-ZÅÄÖ][A-ZÅÄÖ0-9 .-]{1,15})\)$")
+
+
+def short_name(descriptive):
+    """The shortest name for a document that a reader still recognises: the
+    acronym its descriptive label ends in, or the label itself.
+
+    "Europakonventionen (EKMR)" -> "EKMR"; "räntelagen" -> "räntelagen"."""
+    m = _ACRONYM.fullmatch(descriptive or "")
+    return m.group(1) if m else (descriptive or "")
+
+
+def citation_label(name, frag):
+    """A cited provision written as a lawyer would cite it: "6 § räntelagen",
+    "8 kap. 7 § regeringsformen", "Artikel 6 EKMR".
+
+    The raw "1975:635#P6" a link carries is a machine address -- readable only
+    if you already know which act 1975:635 is, which is the opposite of what a
+    "most-cited paragraf" list, or the middle of a citation graph, is for.
+    `name` is the document's own citing name (the catalog's `descriptive`
+    column, or `short_name` of it where the space is tight) and
+    `pinpoint_label` turns the anchor into the pinpoint.
+
+    The first letter is raised, because this is a citation standing on its own
+    -- a heading, a row in a table -- and not a phrase inside a sentence. A
+    name that starts with its number ("6 § räntelagen") is unaffected."""
+    where = pinpoint_label(frag)
+    out = "%s %s" % (where, name) if where and name else (where or name or "")
+    return out[:1].upper() + out[1:]
+
+
+def citation(uri, descriptive):
+    """`citation_label` for a whole uri and the catalog's `descriptive` name of
+    the document it addresses: "https://lagen.nu/1975:635#P6" -> "6 §
+    räntelagen".
+
+    A document the catalog cannot name descriptively falls back to its own
+    local path ("ext/coe/005"), never to an invented name: the reader is then
+    shown an address, and knows it. The host is stripped here rather than
+    against `catalog.BASE`, so this module keeps importing nothing."""
+    root, _, frag = uri.partition("#")
+    local = root.split("//", 1)[-1].partition("/")[2] if "//" in root else root
+    return citation_label(descriptive or local, frag)
 
 
 # the article part of a CoE fragment ("A6P1" -> "A6", "A5-2" kept whole so a

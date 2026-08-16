@@ -17,30 +17,43 @@
   /* ---------------- constants ---------------- */
   const DEFAULT_URI = mount.dataset.defaultUri;
   const MAX_DEPTH = 3;
-  const CENTER_LIMIT = 22;         // hop-1 nodes per side
+  const CENTER_LIMIT = 120;        // hop-1 nodes per side
+  const LABEL_BUDGET = 26;         // neighbour labels drawn at scale 1
   const EXPAND_SIDE = 7;           // frontier nodes expanded per side per level
   const EXPAND_LIMIT = [0, 0, 6, 4];   // neighbors added per expanded node, by depth
   const MAX_UNITS = 280;           // internal § nodes drawn (panel says the rest)
+  const NARROW = 860;              // the stylesheet's stacking breakpoint
   // the group *list* is the page's (facets.FLOW_GROUP_NAMES via the template),
   // so the legend and filter always carry every group the API knows; only the
   // hues are client-side, and a group without one falls back to grey rather
   // than falling out of the filter
   const GROUPS = JSON.parse(mount.dataset.flowGroups);
-  const GROUP_COLOR = {            // site-family hues per flow group
-    "Författningar": "#8f3524",
-    "Förarbeten": "#544a80",
-    "Rättsfall": "#9a5a2a",
-    "Föreskrifter": "#7d6a2e",
-    "Myndighetsavgöranden": "#2f6b46",
-    "Ställningstaganden": "#3f7a70",
-    "Lagkommentarer": "#933659",
-    "Begrepp": "#6b7f3f",
-    "EU-rättsakter": "#2d5f8a",
-    "EU-domar": "#5677a8",
-    "EU-fördrag": "#1f4d68",
-    "EU-vägledning": "#4d7291",
-    "Konventioner": "#4f4a68",
-    "Folkrättslig praxis": "#87423e",
+  /* One hue per flow group. The four that carry the corpus -- författningar,
+   * förarbeten, rättsfall, EU-rättsakter -- sit a quarter-turn apart (red,
+   * violet, amber, blue) so a 6px dot tells them apart at a glance; the first
+   * three keep the site's own identity colours (--accent, --forarbete,
+   * --case), the fourth takes the blue the EU family already reads in. Every
+   * hue before this sat between 10° and 60° of every other, and författningar
+   * against rättsfall was two browns.
+   *
+   * The smaller groups fill the wheel between them, and the two families that
+   * always appear together stay families: EU is four steps of one blue, the
+   * international pair is plum and orchid. */
+  const GROUP_COLOR = {
+    "Författningar": "#a63a29",        // oxblood -- the site accent
+    "Förarbeten": "#5a4fa0",           // blue-violet -- --forarbete
+    "Rättsfall": "#c17d17",            // amber -- --case, brightened
+    "Föreskrifter": "#7f8a26",         // olive
+    "Myndighetsavgöranden": "#2c8455", // green
+    "Ställningstaganden": "#17807f",   // teal
+    "Lagkommentarer": "#b03a6b",       // magenta -- --kommentar
+    "Begrepp": "#cc6f93",              // rose
+    "EU-rättsakter": "#1c6fae",        // blue
+    "EU-domar": "#4f97cf",             // light blue
+    "EU-fördrag": "#10476e",           // navy
+    "EU-vägledning": "#8bb0c9",        // steel
+    "Konventioner": "#7a3f86",         // plum
+    "Folkrättslig praxis": "#b06fae",  // orchid
   };
   const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fmt = n => n.toLocaleString("sv-SE");
@@ -90,6 +103,11 @@
   let depth = 1, direction = "both";
   let active = new Set(GROUPS);   // legend filter
   let selected = null, hovered = null, alpha = 0, generation = 0;
+  // the legend states how many of each group are on the stage, so it has to be
+  // rewritten whenever the node set changes -- including the rings that arrive
+  // one fetch at a time. The flag is flushed once per frame rather than at
+  // every addNode, which would rewrite 14 rows per node.
+  let legendDirty = true;
   let particles = [];
   const cache = new Map();         // uri|dir|groups -> Promise(payload)
 
@@ -123,12 +141,18 @@
     dpr = devicePixelRatio || 1;
     W = canvas.clientWidth; H = canvas.clientHeight;
     canvas.width = W * dpr; canvas.height = H * dpr;
+    // the center is pinned to the middle of the stage, so a stage that just
+    // changed size has to move it -- otherwise the graph keeps hanging off the
+    // side it was laid out against
+    for (const n of nodes.values())
+      if (n.hop === 0 && n.pin) n.pin = [W / 2, H / 2];
   }
   addEventListener("resize", () => { resize(); reheat(.3); });
   const toWorld = (sx, sy) => [(sx - tx) / scale, (sy - ty) / scale];
   function reheat(v) { alpha = Math.max(alpha, v); }
 
   function addNode(id, props) {
+    legendDirty = true;
     let n = nodes.get(id);
     if (!n) {
       const a = Math.random() * Math.PI * 2,
@@ -225,11 +249,30 @@
     placeUnits(center, c);
     scale = 1; tx = 0; ty = 0;
     seedParticles(); reheat(1);
+    showCapNote();
     select(uri);
     for (let level = 2; level <= depth; level++) {
       await expandFrontier(gen, level);
       if (gen !== generation) return;
     }
+  }
+  /* What the stage is *not* showing. The center's neighbourhood is cut to
+   * CENTER_LIMIT documents a side, and article 6 ECHR has 31,996 citers -- a
+   * graph that draws 120 of them and says nothing reads as the whole picture.
+   * Both counts come from the payload's own totals, which `_graph_side`
+   * computes over the group-filtered set, so the note describes the same
+   * population the stage does. */
+  const capNote = mount.querySelector(".graf-cap");
+  function showCapNote() {
+    let docs = 0, links = 0;
+    for (const side of [center.inbound, center.outbound]) {
+      if (!side) continue;
+      docs += side.total_docs - side.top.length;
+      links += side.total_links - side.top.reduce((sum, r) => sum + r.n, 0);
+    }
+    capNote.hidden = docs <= 0;
+    capNote.textContent = fmt(links) + " hänvisningar från " + fmt(docs) +
+      " dokument visas inte av prestandaskäl";
   }
   const hint = mount.querySelector(".graf-hint");
   const hintText = hint.textContent;
@@ -384,12 +427,29 @@
       }
     }
 
+    /* Labels thin out as the graph grows. With 120 neighbours a side every
+     * circle carried its case name and the stage was a mat of overlapping
+     * text -- so only the most-cited keep a standing label, and zooming in
+     * raises the budget (the same bargain the node radius already makes).
+     * The center, the selection, what the pointer is over and anything joined
+     * to it are always named: those are the reader's own question. */
+    const ranked = [...nodes.values()]
+      .filter(n => n.type === "doc" && n.hop !== 0)
+      .sort((a, b) => b.r - a.r);
+    const budget = Math.round(LABEL_BUDGET * Math.max(1, scale));
+    const cutoff = ranked.length > budget ? ranked[budget - 1].r : 0;
+    // "joined to the focus" names a small set for a selected neighbour, and
+    // the entire graph when the focus is the center -- every hop-1 node is
+    // joined to it by construction. Naming all of them is what the budget is
+    // there to prevent.
+    const spoke = focus && center && focus === center.uri;
     ctx.textAlign = "center";
     for (const n of nodes.values()) {
-      const linked = focus && (edges.has(focus + "→" + n.id) ||
-                               edges.has(n.id + "→" + focus));
+      const linked = focus && !spoke &&
+        (edges.has(focus + "→" + n.id) || edges.has(n.id + "→" + focus));
       const show = n.hop === 0 || n.id === selected || n.id === hovered ||
-        linked || (n.type === "unit" ? scale > 1.5 : scale * n.r > 8.5);
+        linked || (n.type === "unit" ? scale > 1.5
+                                     : n.r >= cutoff && scale * n.r > 8.5);
       if (!show) continue;
       const unit = n.type === "unit";
       const size = (unit ? 9.5 : n.hop === 0 ? 13 : 11) / Math.sqrt(scale);
@@ -404,7 +464,10 @@
       ctx.fillText(text, n.x, y);
     }
   }
-  function frame(now) { tick(); draw(now); requestAnimationFrame(frame); }
+  function frame(now) {
+    if (legendDirty) { legendDirty = false; syncLegendCounts(); }
+    tick(); draw(now); requestAnimationFrame(frame);
+  }
 
   /* ---------------- interaction ---------------- */
   let dragNode = null, panning = false, sx = 0, sy = 0, moved = 0;
@@ -485,6 +548,7 @@
         if (n.hop > depth) nodes.delete(id);
       for (const [key, e] of [...edges])
         if (!nodes.has(e.a) || !nodes.has(e.b)) edges.delete(key);
+      legendDirty = true;
       seedParticles(); reheat(.4);
     } else {
       depth = d;
@@ -508,26 +572,86 @@
   function buildLegend() {
     legend.innerHTML = "";
     for (const name of GROUPS) {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "chip" + (active.has(name) ? "" : " off");
-      chip.innerHTML = '<span class="dot" style="background:' + colorOf(name) +
-                       '"></span>' + esc(name);
-      chip.addEventListener("click", () => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "graf-src";
+      row.dataset.group = name;
+      row.setAttribute("role", "switch");
+      row.setAttribute("aria-checked", active.has(name) ? "true" : "false");
+      row.style.setProperty("--c", colorOf(name));
+      row.innerHTML = '<span class="sw"></span><span class="dot"></span>' +
+        '<span class="nm">' + esc(name) + '</span><span class="cnt"></span>';
+      row.addEventListener("click", () => {
         if (active.has(name)) active.delete(name);
         else active.add(name);
+        // filtering every group away leaves nothing to draw, so the last one
+        // off means "all of them" rather than an empty stage
         if (!active.size) active = new Set(GROUPS);
+        buildLegend();
         rebuildFiltered();
       });
-      legend.appendChild(chip);
+      legend.appendChild(row);
+    }
+    legendDirty = true;
+  }
+  /* How many documents of one group are drawn, per direction. With "Båda" the
+   * two sides are separate statements -- "→42, 5→" is 42 documents citing the
+   * center and 5 it cites -- because one number over a two-sided graph says
+   * nothing about which side the reader is looking at. The center is the
+   * startpunkt, not a neighbour, so it counts on neither side. */
+  function countText(inbound, outbound) {
+    if (direction === "in") return inbound ? fmt(inbound) : "";
+    if (direction === "out") return outbound ? fmt(outbound) : "";
+    return [inbound ? "→" + fmt(inbound) : "",
+            outbound ? fmt(outbound) + "→" : ""].filter(Boolean).join(", ");
+  }
+  function syncLegendCounts() {
+    const inb = new Map(), out = new Map();
+    for (const n of nodes.values()) {
+      if (n.type !== "doc" || !n.side) continue;
+      const side = n.side < 0 ? inb : out;
+      side.set(n.group, (side.get(n.group) || 0) + 1);
+    }
+    for (const row of legend.children) {
+      const name = row.dataset.group;
+      row.querySelector(".cnt").textContent = active.has(name)
+        ? countText(inb.get(name) || 0, out.get(name) || 0) : "";
     }
   }
 
-  /* ---------------- panel ---------------- */
-  const panel = mount.querySelector(".graf-panel"),
-        panelBody = panel.querySelector(".graf-panel-body");
-  panel.querySelector(".graf-close").addEventListener("click", closePanel);
-  function closePanel() { panel.hidden = true; selected = null; }
+  /* ---------------- the rails, rolled up and down ----------------
+   * The rails stand over the stage, so folding one changes no layout the
+   * canvas can see -- the stage is always the whole page, and what folding
+   * buys the reader is sight of the graph the card was covering. */
+  function fold(rail, folded) {
+    rail.classList.toggle("folded", folded);
+    rail.querySelector(".graf-fold")
+        .setAttribute("aria-expanded", folded ? "false" : "true");
+  }
+  mount.querySelectorAll(".graf-rail").forEach(rail => {
+    // the whole head takes the click, not just the chevron: a 7px target for
+    // a card this size is a target you have to aim at
+    rail.querySelector(".graf-railhead").addEventListener("click",
+      () => fold(rail, !rail.classList.contains("folded")));
+    // on a phone the two cards would cover the stage between them, so both
+    // start rolled up and the reader opens the one they want
+    if (innerWidth <= NARROW) fold(rail, true);
+  });
+
+  /* ---------------- panel (the right rail's body) ---------------- */
+  const panelRail = mount.querySelector(".graf-rail-r"),
+        railTitle = panelRail.querySelector(".graf-railtitle"),
+        panelBody = panelRail.querySelector(".graf-panel-body");
+  const EMPTY_PANEL = '<div class="g-empty">Klicka på en nod för att se '
+    + "dess hänvisningar.</div>";
+  // clicking past every node clears the selection; the rail stays where the
+  // reader put it, because folding is now their own affordance, not a
+  // side effect of a stray click
+  function closePanel() {
+    selected = null;
+    railTitle.textContent = "Detaljer";
+    panelBody.innerHTML = EMPTY_PANEL;
+  }
   const pagePath = uri => uri.replace("https://lagen.nu", "") || "/";
   function rowHtml(nb) {
     return '<li data-uri="' + esc(nb.uri) + '"><span class="dot" style="background:'
@@ -535,14 +659,21 @@
       + esc(nb.descriptive || nb.label || nb.uri) + '</span><span class="ti">'
       + esc(nb.title || "") + '</span><span class="n">' + fmt(nb.n) + "</span></li>";
   }
+  /* One direction's neighbours: the heading, how many documents are behind it,
+   * and the rows the API's cap left room for. */
   function sideHtml(heading, side) {
     if (!side) return "";
     const more = side.total_docs - side.top.length;
-    return "<h3>" + heading + "</h3><ul>" + side.top.map(rowHtml).join("") +
-      "</ul>" + (more > 0 ? '<div class="g-more">+ ' + fmt(more) +
-                 " dokument till</div>" : "") +
-      (side.unresolved ? '<div class="g-more">' + fmt(side.unresolved) +
+    return "<h3>" + heading + '<span class="n">' + fmt(side.total_docs)
+      + "</span></h3><ul>" + side.top.map(rowHtml).join("") + "</ul>"
+      + (more > 0 ? '<div class="g-more">+ ' + fmt(more) +
+                 " dokument till</div>" : "")
+      + (side.unresolved ? '<div class="g-more">' + fmt(side.unresolved) +
        " hänvisningar pekar utanför korpuset</div>" : "");
+  }
+  function sidesHtml(inb, out) {
+    return sideHtml("Hänvisar hit", inb)
+      + sideHtml("Hänvisar vidare till", out);
   }
   function select(id) {
     selected = id;
@@ -553,10 +684,14 @@
     fetchGraph(id, "both", 12).then(d => {
       if (selected === id) openDocPanel(d); });
   }
+  /* The node's name goes in the rail's *head*, not its body: rolled up, the
+   * card still says which node it stands for. The body opens on the flow
+   * group and the document's own title. */
   function panelFrame(d, headline, sub) {
+    railTitle.textContent = headline || "";
     return '<div class="eyebrow"><span class="dot" style="background:'
-      + colorOf(d.group) + '"></span>' + esc(d.group) + "</div><h2>"
-      + esc(headline) + '</h2><div class="g-title">' + esc(sub || "") + "</div>";
+      + colorOf(d.group) + '"></span>' + esc(d.group)
+      + '</div><div class="g-title">' + esc(sub || "") + "</div>";
   }
   function numsHtml(d) {
     const inb = d.inbound, out = d.outbound;
@@ -576,7 +711,7 @@
       "Öppna dokumentet ↗</a></div>";
   }
   function wire() {
-    panel.hidden = false;
+    panelRail.querySelector(".graf-railbody").scrollTop = 0;
     panelBody.querySelectorAll("li[data-uri]").forEach(li =>
       li.addEventListener("click", () => {
         const uri = li.dataset.uri;
@@ -587,8 +722,6 @@
   }
   function openCenterPanel() {
     const d = center;
-    const headline = d.pinpoint
-      ? d.pinpoint + " · " + (d.label || "") : (d.label || d.uri);
     let internalNote = "";
     if (d.internal && d.internal.edges.length) {
       const shown = Math.min(MAX_UNITS, d.internal.nodes.length);
@@ -597,26 +730,25 @@
         " enheter" + (shown < d.internal.nodes.length
           ? " (de " + fmt(shown) + " mest sammanlänkade ritas)" : "") + "</div>";
     }
-    panelBody.innerHTML = panelFrame(d, headline, d.title) + numsHtml(d) +
+    panelBody.innerHTML = panelFrame(d, d.citation, d.title) + numsHtml(d) +
       internalNote +
-      sideHtml("Hänvisar hit", direction === "out" ? null : d.inbound) +
-      sideHtml("Hänvisar vidare till", direction === "in" ? null : d.outbound) +
+      sidesHtml(direction === "out" ? null : d.inbound,
+                direction === "in" ? null : d.outbound) +
       actionsHtml(d, true);
     wire();
   }
   function openDocPanel(d) {
-    panelBody.innerHTML = panelFrame(d, d.label || d.uri, d.title) + numsHtml(d) +
-      sideHtml("Hänvisar hit", d.inbound) +
-      sideHtml("Hänvisar vidare till", d.outbound) + actionsHtml(d, false);
+    panelBody.innerHTML = panelFrame(d, d.citation, d.title) + numsHtml(d) +
+      sidesHtml(d.inbound, d.outbound) + actionsHtml(d, false);
     wire();
   }
   function openUnitPanel(n) {
     fetchGraph(center.root + "#" + n.anchor, "both", 12).then(d => {
       if (selected !== n.id) return;
       panelBody.innerHTML =
-        panelFrame(d, (d.pinpoint || n.label) + " · " + (d.label || ""), d.title)
-        + numsHtml(d) + sideHtml("Hänvisar hit", d.inbound)
-        + sideHtml("Hänvisar vidare till", d.outbound) + actionsHtml(d, false);
+        panelFrame(d, d.citation, d.title)
+        + numsHtml(d) + sidesHtml(d.inbound, d.outbound)
+        + actionsHtml(d, false);
       wire();
     });
   }
@@ -677,6 +809,7 @@
   /* ---------------- boot ---------------- */
   refreshTokens();
   resize();
+  closePanel();
   // the hash is untrusted reader input: a malformed escape or a uri the
   // catalog lacks falls back to the default center rather than a blank stage
   let startUri = DEFAULT_URI;

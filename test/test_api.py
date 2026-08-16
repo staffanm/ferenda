@@ -447,6 +447,10 @@ def test_graph_neighborhood_and_pinpoint(client):
         d = client.get("/api/v1/graph",
                        params={"uri": "https://lagen.nu/1962:700#" + frag}).json()
         assert d["pinpoint"] == "3 kap. 1 §" and d["unit"] == "K3P1"
+        # `citation` names the document as well as the place: "3 kap. 1 §"
+        # alone is a pinpoint into nothing, and the graph's center is drawn
+        # from it
+        assert d["citation"] == "3 kap. 1 § brottsbalken"
         assert [n["uri"] for n in d["inbound"]["top"]] \
             == ["https://lagen.nu/2018:585"]
         assert d["internal"]["edges"] == []
@@ -464,3 +468,10 @@ def test_graph_neighborhood_and_pinpoint(client):
     assert client.get("/api/v1/graph", params={
         "uri": "https://lagen.nu/1962:700",
         "groups": "Nonsens"}).status_code == 422
+    # the neighbourhood cap. The explorer asks for 120 a side -- article 6 ECHR
+    # has 31,996 citers, and 22 of them was a keyhole -- so the ceiling is well
+    # past that, and past it the request fails rather than being clamped
+    assert client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700", "limit": 300}).status_code == 200
+    assert client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700", "limit": 301}).status_code == 422

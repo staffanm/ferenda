@@ -1925,21 +1925,27 @@ def concept_aliases(con: sqlite3.Connection) -> dict[str, str]:
 
 
 def document(con: sqlite3.Connection, uri: str) -> dict | None:
-    """A document's catalog row (uri, source, kind, label, title, path), or
-    None -- the metadata behind an API /document lookup."""
+    """A document's catalog row (uri, source, kind, label, title, path,
+    descriptive), or None -- the metadata behind an API /document lookup.
+
+    `descriptive` sits last so the positional reads of the first six (path is
+    `row[5]` in three callers) keep their places."""
     return con.execute(
-        "SELECT uri, source, kind, label, title, path FROM documents "
-        "WHERE uri = ?", (uri,)).fetchone()
+        "SELECT uri, source, kind, label, title, path, descriptive "
+        "FROM documents WHERE uri = ?", (uri,)).fetchone()
 
 
 def document_by_prefix(con, uri_prefix):
     """The one document whose uri extends `uri_prefix`, or None when nothing
     or several match. GLOB, not LIKE, so the literal '_'/'.' in lagen.nu URIs
     match themselves -- how a bare page-number SFS id resolves ("...1904:48"
-    + "_s." -> the 1904:48_s.1 row) when only the catalog knows the page."""
+    + "_s." -> the 1904:48_s.1 row) when only the catalog knows the page.
+
+    The same columns `document` answers with, in the same order: `pins` takes
+    whichever of the two returns a row and unpacks it one way."""
     rows = con.execute(
-        "SELECT uri, source, kind, label, title, path FROM documents "
-        "WHERE uri GLOB ?", (uri_prefix + "*",)).fetchall()
+        "SELECT uri, source, kind, label, title, path, descriptive "
+        "FROM documents WHERE uri GLOB ?", (uri_prefix + "*",)).fetchall()
     return rows[0] if len(rows) == 1 else None
 
 
