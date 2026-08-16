@@ -8,6 +8,17 @@
 {%- macro hero(display) -%}
 <p class="viz-hero">{{ display }}</p>
 {%- endmacro -%}
+{%- macro tiles(items) -%}
+{#- the KPI row a scalar takes when it answers with several numbers: each
+    figure at display size with its unit under it, rather than all of them
+    run together in one hero line. A <dl>, because that is what this is --
+    a caption and the value it names. -#}
+<dl class="viz-tiles">
+{%- for it in items -%}
+<div class="viz-tile"><dd class="viz-tile-val">{{ it.value }}</dd><dt class="viz-tile-cap">{{ it.caption }}</dt></div>
+{%- endfor -%}
+</dl>
+{%- endmacro -%}
 {%- macro toplist(unit, items) -%}
 {#- ranked rows as a bar table; a `split` item is a group divider. The bar
     is a background width on the value cell (--w); an item without `width`

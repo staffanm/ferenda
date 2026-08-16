@@ -54,6 +54,20 @@ class Point:
 
 
 @dataclass
+class Tile:
+    """One headline number in a scalar's KPI row: the figure as it should be
+    read, and the caption saying what one unit of it is.
+
+    A scalar that answers with several numbers at once ("så här många tecken,
+    så här många ord, så här många dygns högläsning") cannot be one hero line
+    -- three display-size figures set in a row of prose wrap into an unreadable
+    block. Each number gets its own tile instead, and `caption` carries the unit
+    at reading size, where a unit belongs."""
+    value: str
+    caption: str
+
+
+@dataclass
 class Cell:
     """One (row, col) magnitude. A matrix reads it as a grid position; a sankey
     reads the same pair as a flow from `row` to `col`."""
@@ -74,6 +88,10 @@ class Measure:
     value: float | None = None          # scalar
     display: str = ""                   # scalar: pre-formatted, when the raw
                                         # number is not what should be read
+    tiles: list[Tile] = field(default_factory=list)      # scalar: a KPI row,
+                                        # when the answer is several numbers
+                                        # rather than one (`display` is then
+                                        # the fallback for a reader with no CSS)
     rows: list[Row] = field(default_factory=list)        # toplist | table
     points: list[Point] = field(default_factory=list)    # series | histogram | bars
     cells: list[Cell] = field(default_factory=list)      # matrix | sankey

@@ -16,7 +16,7 @@ document.
 from ..lib import compress, layout
 from ..lib.page import page_context
 from . import charts
-from .model import Cell, Measure, Point, Row
+from .model import Cell, Measure, Point, Row, Tile
 
 ARTIFACT_BASEFILE = "statistik"
 
@@ -32,6 +32,7 @@ def _as_measure(d):
         id=d["id"], group=d["group"], title=d["title"], kind=d["kind"],
         unit=d.get("unit", ""), lede=d.get("lede", ""),
         value=d.get("value"), display=d.get("display", ""),
+        tiles=[Tile(**t) for t in d.get("tiles", [])],
         rows=[Row(**r) for r in d.get("rows", [])],
         points=[Point(**p) for p in d.get("points", [])],
         cells=[Cell(**c) for c in d.get("cells", [])],

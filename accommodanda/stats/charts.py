@@ -134,6 +134,10 @@ def matrix_html(measure):
 
 
 def hero_html(measure):
+    """One display-size number, or -- when the measure answers with several at
+    once -- a row of tiles, each number with its own unit under it."""
+    if measure.tiles:
+        return TPL.tiles(measure.tiles)
     return TPL.hero(measure.display or _fmt(measure.value or 0, measure.unit))
 
 
@@ -142,7 +146,10 @@ def hero_html(measure):
 # --------------------------------------------------------------------------
 
 W, H = 720, 260
-PAD_L, PAD_R, PAD_T, PAD_B = 56, 12, 16, 40
+# PAD_T leaves a line's room above the top gridline for the y-axis caption. At
+# 16 the caption sat on the same baseline as the topmost tick value and printed
+# straight through it -- "TECKEN" over "1 000 000"
+PAD_L, PAD_R, PAD_T, PAD_B = 56, 12, 28, 40
 
 
 def _axes(maximum, xlabel, ylabel, pad_b=PAD_B):
@@ -157,7 +164,7 @@ def _axes(maximum, xlabel, ylabel, pad_b=PAD_B):
                      % (PAD_L - 8, y + 4, _fmt(value)))
     if ylabel:
         parts.append('<text class="viz-axis" x="%d" y="%d" text-anchor="start">%s</text>'
-                     % (PAD_L - 48, PAD_T - 4, escape(ylabel)))
+                     % (PAD_L - 48, PAD_T - 12, escape(ylabel)))
     if xlabel:
         parts.append('<text class="viz-axis" x="%d" y="%d" text-anchor="end">%s</text>'
                      % (W - PAD_R, H - 4, escape(xlabel)))
@@ -190,13 +197,17 @@ def series_svg(measure):
     trough = min(range(len(points)), key=lambda i: points[i].y)
     for i in {0, len(points) - 1, peak, trough}:
         body.append('<circle class="viz-dot" cx="%.1f" cy="%.1f" r="4.5">'
-                    "<title>%s: %s</title></circle>"
+                    "<title>%s — %s</title></circle>"
                     % (xs[i], ys[i], escape(points[i].x),
                        _fmt(points[i].y, measure.unit)))
+    # the peak label names its unit and separates the two numbers with a dash,
+    # never a colon: on a per-year series "1994: 1 210" reads as an SFS number,
+    # which is the one thing every label on this site must not do by accident
     body.append('<text class="viz-peak" x="%.1f" y="%.1f" text-anchor="%s">%s</text>'
                 % (xs[peak], ys[peak] - 10,
                    "start" if peak < len(points) / 2 else "end",
-                   escape("%s: %s" % (points[peak].x, _fmt(points[peak].y)))))
+                   escape("%s — %s %s" % (points[peak].x,
+                                          _fmt(points[peak].y), measure.unit))))
     # x ticks: first, last and a handful between, never all of them
     step = max(1, len(points) // 8)
     for i in range(0, len(points), step):
@@ -205,7 +216,7 @@ def series_svg(measure):
     # an invisible hit target per point, so the whole column is hoverable
     for i, p in enumerate(points):
         body.append('<rect class="viz-hit" x="%.1f" y="%d" width="%.1f" height="%d">'
-                    "<title>%s: %s</title></rect>"
+                    "<title>%s — %s</title></rect>"
                     % (xs[i] - plot_w / len(points) / 2, PAD_T,
                        max(plot_w / len(points), 1), plot_h,
                        escape(p.x), _fmt(p.y, measure.unit)))
@@ -232,16 +243,22 @@ def bars_svg(measure):
         height = plot_h * p.y / maximum
         x = PAD_L + slot * i + 1
         body.append('<rect class="viz-col" x="%.1f" y="%.1f" width="%.1f" '
-                    'height="%.1f" rx="4"><title>%s: %s</title></rect>'
+                    'height="%.1f" rx="4"><title>%s — %s</title></rect>'
                     % (x, PAD_T + plot_h - height, width, max(height, 0),
                        escape(p.x), _fmt(p.y, measure.unit)))
         # every label up to 14 columns, every other up to 30, and past that
         # (a sampled profile's ~120) a handful plus the last -- the endpoints
-        # are the anchors a rank axis is read by
+        # are the anchors a rank axis is read by. The forced last label wins its
+        # slot outright: where the stepped run lands within half a step of the
+        # end, its label and the last one printed through each other ("2 955"
+        # over "7 873")
         step = 1 if len(points) <= 14 else 2 if len(points) <= 30 \
             else max(2, len(points) // 8)
-        label = p.x if i % step == 0 \
-            or (len(points) > 30 and i == len(points) - 1) else ""
+        last = len(points) - 1
+        forced = len(points) > 30
+        label = p.x if (i % step == 0
+                        and not (forced and 0 < last - i < step * 0.75)) \
+            or (forced and i == last) else ""
         if label:
             body.append('<text class="viz-tick" x="%.1f" y="%d" '
                         'text-anchor="end" transform="rotate(-35 %.1f %d)">%s</text>'
@@ -435,7 +452,13 @@ def figure(measure):
     # the curve -- the columns did the comparing, so the rows get no bars
     if measure.kind == "profile" and measure.rows:
         html += toplist_html(measure, bars=False)
-    if measure.kind in ("series", "histogram", "bars", "profile") and measure.points:
+    # a profile gets no table view, and is the one plotted form that loses
+    # nothing by it: its rows are 100 lines of "plats 1 743 -> 214 tecken",
+    # naming no thing a reader can look up, where a histogram's or a series'
+    # rows name a bin and a year. What the profile *does* name -- the record
+    # holders at each end -- is the row list above, and every column still
+    # carries its own <title> for the pointer and the screen reader
+    if measure.kind in ("series", "histogram", "bars") and measure.points:
         html += TPL.data_table(measure.xlabel or "kategori",
                                measure.unit or "värde",
                                [{"x": p.x, "y": _fmt(p.y, measure.unit)}

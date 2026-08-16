@@ -1244,6 +1244,18 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
 .viz-hero { font:600 2.4rem/1.15 var(--sans); color:var(--viz-mark);
   margin:.2rem 0 .6rem; letter-spacing:-.01em; }
 
+/* the KPI row: several headline numbers side by side, each over its unit.
+   Wraps to one tile per line on a narrow screen, so a 10-digit figure never
+   shrinks to fit. Proportional figures, not tabular -- nothing aligns
+   vertically here, and tabular digits read loose at display size. */
+.viz-tiles { display:flex; flex-wrap:wrap; gap:.4rem 2.5rem;
+  margin:.2rem 0 .6rem; }
+.viz-tile { display:flex; flex-direction:column-reverse; gap:.15rem; }
+.viz-tile-val { font:600 2.1rem/1.1 var(--sans); color:var(--viz-mark);
+  margin:0; letter-spacing:-.01em; }
+.viz-tile-cap { font:600 .72rem/1.3 var(--sans); color:var(--ink-4);
+  text-transform:uppercase; letter-spacing:.05em; }
+
 .viz-scroll { overflow-x:auto; max-width:100%; }
 .viz-svg { width:100%; height:auto; min-width:34rem; display:block; }
 .viz-grid { stroke:var(--viz-grid); stroke-width:1; }
@@ -1275,12 +1287,17 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
    scrolls sideways in .viz-scroll rather than shrinking the labels away */
 .viz-sankey { min-width:30rem; }
 
+/* 14 columns against a 52rem text column, so the cell padding is the whole
+   budget: at .5rem a side the table could not fit and every figure wrapped
+   mid-number. The 2px border-spacing stays -- that is the surface gap that
+   keeps two neighbouring cells from reading as one block. */
 .viz-heat { border-collapse:separate; border-spacing:2px;
-  font:400 .8rem/1.3 var(--sans); }
-.viz-heat th { font:600 .72rem/1.3 var(--sans); color:var(--ink-3);
-  padding:.3rem .4rem; text-align:left; white-space:nowrap; }
-.viz-heat td { background:var(--c); padding:.4rem .5rem; border-radius:3px;
-  text-align:right; font-variant-numeric:tabular-nums; color:#0d366b; }
+  font:400 .72rem/1.25 var(--sans); }
+.viz-heat th { font:600 .66rem/1.25 var(--sans); color:var(--ink-3);
+  padding:.22rem; text-align:left; white-space:nowrap; }
+.viz-heat td { background:var(--c); padding:.3rem .22rem; border-radius:3px;
+  text-align:right; font-variant-numeric:tabular-nums; color:#0d366b;
+  white-space:nowrap; }
 .viz-heat td.on-dark { color:var(--viz-on-heat); }
 .viz-heat td.viz-nil { background:var(--surf-2); }
 
