@@ -1,4 +1,4 @@
-"""Compute the 52 corpus measurements into a `Report`.
+"""Compute the 51 corpus measurements into a `Report`.
 
 Two data sources, deliberately in this order of preference:
 
@@ -32,9 +32,10 @@ from concurrent.futures import ProcessPoolExecutor
 
 from ..lib import catalog, layout, util
 from ..lib.facets import flow_group
+from ..lib.page import register_anchor
 from ..lib.pinpoint import citation
 from . import scan
-from .model import Cell, Measure, Point, Report, Row
+from .model import Cell, Measure, Point, Report, Row, Tile
 
 BASE = "https://lagen.nu/"
 # the SFS download tree: where change-act titles live (`scan.scan_sfs_register`)
@@ -56,14 +57,27 @@ def _series(pairs):
     return [Point(x=str(x), y=y) for x, y in pairs]
 
 
-def _rank_profile(values, k=120):
-    """`values` sorted largest first and sampled at `k` evenly spaced ranks:
-    a bar per rank whose height is that thing's *own* size, never a bucket
-    count. Every sampled bar is a real member of the population (its x is
-    the rank), so the curve's endpoints are the actual record holders."""
+def _rank_profile(values, k=120, log=False):
+    """`values` sorted largest first and sampled at `k` ranks: a bar per rank
+    whose height is that thing's *own* size, never a bucket count. Every
+    sampled bar is a real member of the population (its x is the rank), so the
+    curve's endpoints are the actual record holders.
+
+    `log` spaces the sampled ranks geometrically -- 1, 2, 3, … 10 … 100 …
+    5 000, each step a multiplication -- instead of evenly. Every measure that
+    asks it of a corpus whose largest member is a thousand times its median,
+    which is all of them here: socialförsäkringsbalken is 1 700 times the
+    median statute, so an evenly sampled axis spends 119 of its 120 columns on
+    values that are all the same height, and draws one tall bar beside a flat
+    line. The head collapses to consecutive ranks under the geometric step (no
+    corpus has a rank 1.4), so the column count comes out below `k`."""
     ordered = sorted(values, reverse=True)
-    idx = range(len(ordered)) if len(ordered) <= k else \
-        [round(i * (len(ordered) - 1) / (k - 1)) for i in range(k)]
+    if len(ordered) <= k:
+        idx = range(len(ordered))
+    elif log:
+        idx = sorted({round(len(ordered) ** (i / (k - 1))) - 1 for i in range(k)})
+    else:
+        idx = [round(i * (len(ordered) - 1) / (k - 1)) for i in range(k)]
     return [Point("{:,}".format(i + 1).replace(",", " "), ordered[i])
             for i in idx]
 
@@ -108,6 +122,20 @@ def _paragraf_label(t):
     chapter-qualified (scan.py builds it from the anchor): a bare "62 §" of a
     chaptered statute names nothing."""
     return "%s %s" % (t[2], t[3]["clean_title"])
+
+
+def _prop_label(identifier, found):
+    """A proposition as a row label: its beteckning plus what it was about,
+    "Prop. 2018/19:162 En ny beteckning för kommuner på regional nivå".
+
+    The beteckning alone says nothing about what the proposition did, so the
+    catalog's title earns its place -- except where that title *is* the
+    beteckning again (1 603 prop artifacts carry no title of their own), which
+    would print the identifier twice. `found` is None for a proposition the
+    register cites but the catalog does not hold."""
+    title = found[1] if found else ""
+    return ("%s %s" % (identifier, title[:70])
+            if title and not title.startswith(identifier) else identifier)
 
 
 def _paragraf_uri(t):
@@ -174,8 +202,8 @@ def _group_a(con, s):
         lede="Kroppstext i tecken, per konsoliderad författning. Formen är "
              "poängen: några få jättar och en mycket lång svans av "
              "tvåparagrafsförordningar.",
-        xlabel="plats i längdordning", ylabel="tecken",
-        points=_rank_profile([r["chars"] for r in sized]),
+        xlabel="plats i längdordning (logaritmisk)", ylabel="tecken",
+        points=_rank_profile([r["chars"] for r in sized], log=True),
         rows=([Row(_shorten(r["clean_title"]), r["chars"], r["uri"],
                    group="Längst") for r in sized[:5]]
               + [Row(_shorten(r["clean_title"]), r["chars"], r["uri"],
@@ -185,8 +213,8 @@ def _group_a(con, s):
     yield Measure(
         2, "A", "Antal paragrafer", "profile", unit="paragrafer",
         lede="Antal § per författning; kapitelantalet står som detalj.",
-        xlabel="plats i längdordning", ylabel="paragrafer",
-        points=_rank_profile([r["paragrafer"] for r in by_parag]),
+        xlabel="plats i längdordning (logaritmisk)", ylabel="paragrafer",
+        points=_rank_profile([r["paragrafer"] for r in by_parag], log=True),
         rows=([Row(_shorten(r["clean_title"]), r["paragrafer"], r["uri"],
                    "%d kap." % r["kapitel"] if r["kapitel"] else None,
                    group="Flest") for r in by_parag[:5]]
@@ -204,13 +232,12 @@ def _group_a(con, s):
         # row (scan.py), so measuring the corpus by the rows here would publish
         # a number several thousand short of the paragrafer that exist
         lede="Gällande rätt har %s paragrafer, varav %s går att mäta. "
-             "Medianparagrafen är %d tecken; medelvärdet %d — fördelningen är "
-             "kraftigt högersvansad."
+             "Medianparagrafen är %d tecken; medelvärdet %d."
              % ("{:,}".format(sum(r["paragrafer"] for r in laws)).replace(",", " "),
                 "{:,}".format(len(plens)).replace(",", " "),
                 statistics.median(lengths), statistics.mean(lengths)),
-        xlabel="plats i längdordning", ylabel="tecken",
-        points=_rank_profile([c for c in lengths if c > 0]),
+        xlabel="plats i längdordning (logaritmisk)", ylabel="tecken",
+        points=_rank_profile([c for c in lengths if c > 0], log=True),
         rows=([Row(_paragraf_label(t), t[0], _paragraf_uri(t), group="Längst")
                for t in sorted(plens, key=lambda t: -t[0])[:5]]
               + [Row(_paragraf_label(t), t[0], _paragraf_uri(t), group="Kortast")
@@ -235,7 +262,7 @@ def _group_a(con, s):
     # corpus's shape -- those articles are still live on the site.
     excluded = [
         ("i ändringsakter", sum(len(a["lengths"]) for a in swedish if a["amending"])),
-        ("i dokument som buntar flera instrument",
+        ("i dokument som buntar flera akter",
          sum(len(a["lengths"]) for a in s["eurlex"] if a["multi_instrument"])),
         ("i andra språkversioner än den svenska",
          sum(len(a["lengths"]) for a in single if a["lang"] != "swe")),
@@ -247,15 +274,16 @@ def _group_a(con, s):
     ]
     yield Measure(
         4, "A", "Artikellängd i EU-rätten", "profile", unit="tecken",
-        lede="Korpuset i CELEX sektor 1 (fördrag) och 3 (lagstiftning) har "
-             "%s artiklar; %s mäts. Utanför står %s. Median %d tecken."
+        lede="Databasen har %s artiklar i CELEX sektor 1 (fördrag) och 3 "
+             "(lagstiftning); %s mäts. Ej med i beräkningarna: %s. "
+             "Median %d tecken."
              % ("{:,}".format(total_articles).replace(",", " "),
                 "{:,}".format(len(eu_own)).replace(",", " "),
                 ", ".join("%s %s" % ("{:,}".format(count).replace(",", " "), what)
                           for what, count in excluded),
                 statistics.median(t[0] for t in eu_own)),
-        xlabel="plats i längdordning", ylabel="tecken",
-        points=_rank_profile([t[0] for t in eu_own]),
+        xlabel="plats i längdordning (logaritmisk)", ylabel="tecken",
+        points=_rank_profile([t[0] for t in eu_own], log=True),
         rows=([Row("Art. %s — %s" % (t[1], t[2]["title"][:70] or t[2]["celex"]),
                    t[0], BASE + "ext/celex/" + t[2]["celex"], group="Längst")
                for t in sorted(eu_own, key=lambda t: -t[0])[:5]]
@@ -268,8 +296,12 @@ def _group_a(con, s):
     yield Measure(
         5, "A", "Rubriklängd i svenska författningar", "profile",
         unit="tecken",
-        lede="Beteckningen räknas inte med — ”Ellag (1997:857)” är en rubrik på "
-             "fem tecken, inte sexton.",
+        # the caveat this lede used to carry (the beteckning is not counted)
+        # sits in the template's note -- measure 6 compares its EU median
+        # against this one, so the number belongs in the prose beside it
+        lede="Medianrubriken bland %s gällande författningar är %d tecken."
+             % ("{:,}".format(len(titled)).replace(",", " "),
+                statistics.median(len(r["clean_title"]) for r in titled)),
         xlabel="plats i längdordning", ylabel="tecken",
         points=_rank_profile([len(r["clean_title"]) for r in titled]),
         rows=([Row(_shorten(r["clean_title"]), len(r["clean_title"]), r["uri"],
@@ -296,7 +328,7 @@ def _group_a(con, s):
         lede="En EU-akts rubrik är hela den officiella titeln: utfärdare, "
              "beteckning, datum och ärende i en enda mening. Medianen bland "
              "%s akter på svenska är %d tecken — den svenska medianrubriken "
-             "(mått 5) är %d."
+             "är %d tecken."
              % ("{:,}".format(len(eu_titled)).replace(",", " "),
                 statistics.median(eu_tl),
                 statistics.median(len(r["clean_title"]) for r in titled)),
@@ -330,16 +362,22 @@ def _group_a(con, s):
 
     total_chars = sum(r["chars"] for r in laws)
     words = total_chars // 6
-    hours = words / 200 / 60
+    hours = words / 150 / 60
+    # three numbers, not one, so this scalar answers as a KPI row rather than a
+    # hero line: "1 234 · 5 678 · 42" set at display size ran as one sentence
+    # and wrapped mid-figure. Each number keeps its own tile and its own unit
     yield Measure(
         9, "A", "Hela svensk författningssamling i siffror", "scalar",
         unit="tecken",
         value=total_chars,
-        display="%s tecken · %s ord · %d dygn högläsning" % (
+        display="%s tecken · %s ord · %d dygns högläsning" % (
             "{:,}".format(total_chars).replace(",", " "),
             "{:,}".format(words).replace(",", " "), hours / 24),
-        lede="All gällande författningstext tillsammans. Vid 200 ord i minuten "
-             "tar det %d dygn att läsa upp den utan paus." % (hours / 24))
+        tiles=[Tile("{:,}".format(total_chars).replace(",", " "), "tecken"),
+               Tile("{:,}".format(words).replace(",", " "), "ord"),
+               Tile("%d" % (hours / 24), "dygns högläsning")],
+        lede="All gällande författningstext tillsammans. Med ett tempo på 150 ord i minuten "
+             "tar det %d dygn (utan paus) att läsa upp den." % (hours / 24))
 
 
 # ==========================================================================
@@ -349,21 +387,48 @@ def _group_a(con, s):
 def _group_b(con, s):
     laws = s["laws"]                    # gällande rätt (see `_in_force`)
 
+    # 10 -- the two ends of one distribution, which used to be two measures: a
+    # toplist of the most-amended laws (10) and a scalar counting the never-
+    # amended (13). They are the head and the tail of the same rank profile, and
+    # apart neither showed that the tail is most of the corpus.
+    #
+    # The count is one less than the amendment list: `register.Register.acts`
+    # opens that list with the grundförfattning itself, so a law with a single
+    # entry has never been changed -- which is exactly the test measure 13 made
+    # (`len(amendments) <= 1`), now applied to both ends alike.
+    changes = {r["uri"]: max(len(r["amendments"]) - 1, 0) for r in laws}
+    by_changes = sorted(laws, key=lambda r: -changes[r["uri"]])
+    never = [r for r in laws if changes[r["uri"]] == 0]
     yield Measure(
-        10, "B", "De mest ändrade lagarna", "toplist", unit="ändringar",
-        lede="Antal ändringsförfattningar i registret.",
-        rows=[Row(r["clean_title"], len(r["amendments"]), r["uri"])
-              for r in sorted(laws, key=lambda r: -len(r["amendments"]))[:12]])
+        10, "B", "Ändringar per lag", "profile", unit="ändringar",
+        lede="Varje gällande författning på sin plats i ändringsordningen. "
+             "%s av %s har aldrig ändrats; den mest ändrade har ändrats %s gånger."
+             % ("{:,}".format(len(never)).replace(",", " "),
+                "{:,}".format(len(laws)).replace(",", " "),
+                "{:,}".format(changes[by_changes[0]["uri"]]).replace(",", " ")),
+        xlabel="plats i ändringsordning (logaritmisk)", ylabel="ändringar",
+        points=_rank_profile(list(changes.values()), log=True),
+        rows=([Row(_shorten(r["clean_title"]), changes[r["uri"]], r["uri"],
+                   group="Mest ändrade") for r in by_changes[:6]]
+              + [Row(_shorten(r["clean_title"]), 0, r["uri"], r["ikraft"],
+                     group="Aldrig ändrade, äldst först")
+                 for r in sorted((x for x in never if x["ikraft"]),
+                                 key=lambda r: r["ikraft"])[:6]]))
 
-    # 11 -- the chain depth, read out of the download tree's change-act titles
-    chains = [(bet, rubrik, depth)
-              for rows in s["registers"] for bet, rubrik, depth in rows if depth >= 2]
+    # 11 -- the chain depth, read out of the download tree's change-act titles.
+    # The row links into the base statute's own amendment register, at the entry
+    # for this change act (`.../1949:105#L2025:191`) -- the chain is written in
+    # that entry's rubrik, so the link lands the reader on the sentence measured
+    labels = dict(_q(con, "SELECT label, uri FROM documents WHERE source='sfs'"))
+    chains = [(base, bet, rubrik, depth)
+              for rows in s["registers"] for base, bet, rubrik, depth in rows
+              if depth >= 2]
     seen, deepest = set(), []
-    for bet, rubrik, depth in sorted(chains, key=lambda t: -t[2]):
+    for base, bet, rubrik, depth in sorted(chains, key=lambda t: -t[3]):
         if bet in seen:
             continue
         seen.add(bet)
-        deepest.append((bet, rubrik, depth))
+        deepest.append((labels.get("SFS " + base), bet, rubrik, depth))
     yield Measure(
         11, "B", "”Lag om ändring i lagen om ändring i lagen om…”", "toplist",
         unit="led",
@@ -372,7 +437,8 @@ def _group_b(con, s):
         # the chains themselves, longest first -- the distribution behind them
         # said how many were 2 and 3 links deep, which is the uninteresting part:
         # the point of this measure is that the deep ones exist at all
-        rows=[Row(r[:150], d, None, b) for b, r, d in deepest[:10]])
+        rows=[Row(r[:150], d, uri and uri + "#" + register_anchor(b), b)
+              for uri, b, r, d in deepest[:10]])
 
     touch = collections.defaultdict(set)
     for r in laws:
@@ -386,15 +452,8 @@ def _group_b(con, s):
         rows=[Row(k, len(v), None, sorted(v)[0][:60] + " m.fl.")
               for k, v in sorted(touch.items(), key=lambda t: -len(t[1]))[:10]])
 
-    never = [r for r in laws if len(r["amendments"]) <= 1]
-    yield Measure(
-        13, "B", "Lagar som aldrig har ändrats", "scalar", unit="författningar",
-        value=len(never),
-        display="%d av %d" % (len(never), len(laws)),
-        lede="Aldrig en enda ändring sedan de utfärdades.",
-        rows=[Row(r["clean_title"][:80], len(r["amendments"]), r["uri"], r["ikraft"])
-              for r in sorted((x for x in never if x["ikraft"]),
-                              key=lambda r: r["ikraft"])[:10]])
+    # 13 was "Lagar som aldrig har ändrats" -- now the tail of measure 10, where
+    # it stands beside the head it is the counterweight to
 
     byyear = collections.Counter()
     for r in laws:
@@ -445,19 +504,27 @@ def _group_b(con, s):
     # which amendment last touched each one (`ersatter`/`inforsI`).
     weighted = [(age, int(r["ikraft"][:4]), r) for r in laws
                 if (age := text_age(r)) is not None]
+    # each row's value is the number of years its group ranks on, never the mean
+    # year itself: a row that reads "1 989" under a column headed "år" reads as a
+    # count, and a bar drawn from zero to the year 1989 is 99.7 % of the bar
+    # drawn to 1994 -- six full-width bars saying nothing
     yield Measure(
         17, "B", "Lagtextens medelålder", "toplist", unit="år",
-        lede="Per paragraf: vilket år fick den sin nuvarande lydelse? Snittet "
-             "över en lags paragrafer är textens verkliga ålder — %d "
-             "författningar går att mäta så, och deras medeltext är från %d."
-             % (len(weighted),
+        lede="En lag är en mosaik: varje paragraf fick sin nuvarande lydelse "
+             "ett visst år, och snittet över lagens paragrafer är det år texten "
+             "i genomsnitt skrevs. %s lagar har ett register som är utförligt "
+             "nog att räkna så, och deras medeltext är från %d."
+             % ("{:,}".format(len(weighted)).replace(",", " "),
                 statistics.mean([m for m, _, _ in weighted]) if weighted else 0),
-        rows=([Row(r["clean_title"][:70], round(mean, 1), r["uri"],
-                   "grundförfattning %d" % born, group="Äldst kvarvarande text")
+        # `born` is the year the act took *effect*, not its SFS year -- brottsbalken
+        # is 1962:700 but came into force in 1965, so the detail says "i kraft"
+        rows=([Row(r["clean_title"][:70], today - round(mean), r["uri"],
+                   "medeltexten är från %d; lagen i kraft %d" % (mean, born),
+                   group="Äldst kvarvarande text — textens ålder")
                for mean, born, r in sorted(weighted, key=lambda t: t[0])[:6]]
-              + [Row(r["clean_title"][:70], round(mean, 1), r["uri"],
-                     "grundförfattning %d — %d års förnyelse" % (born, mean - born),
-                     group="Mest renoverade")
+              + [Row(r["clean_title"][:70], round(mean - born), r["uri"],
+                     "i kraft %d, medeltexten från %d" % (born, mean),
+                     group="Mest omskrivna — år mellan ikraftträdande och medeltext")
                  for mean, born, r in sorted(weighted,
                                              key=lambda t: t[0] - t[1])[-6:][::-1]]))
 
@@ -469,11 +536,17 @@ def _group_b(con, s):
                 changed[anchor] += 1
             for anchor in a["inforsI"]:
                 introduced[anchor] += 1
+    # the register anchors a rewritten paragraf on the *base* act's uri
+    # ("https://lagen.nu/1962:700#K3P1"), which is the catalog key too, so the
+    # act's citing name comes straight off `documents`
+    names = dict(_q(con, "SELECT uri, descriptive FROM documents "
+                         "WHERE source='sfs' AND descriptive IS NOT NULL"))
     yield Measure(
         18, "B", "Den mest omskrivna enskilda paragrafen", "toplist",
         unit="omskrivningar",
         lede="Hur många gånger en och samma paragraf har fått ny lydelse.",
-        rows=[Row(u.replace(BASE, ""), n, u) for u, n in changed.most_common(12)])
+        rows=[Row(citation(u, names.get(u.partition("#")[0])), n, u)
+              for u, n in changed.most_common(12)])
 
     verbs = collections.Counter()
     verb_year = collections.defaultdict(collections.Counter)
@@ -567,9 +640,9 @@ def _group_c(con, s):
 
     yield Measure(
         25, "C", "Vilken dag träder svensk lag i kraft?", "bars", unit="ändringar",
-        lede="Ikraftträdandedatumen samlade på månad. Svensk lagstiftning har "
-             "två hjärtslag om året — 1 januari och 1 juli — och nästan "
-             "ingenting däremellan.",
+        lede="Ikraftträdandedatumen samlade på månad. Nästan allt träder i "
+             "kraft 1 januari eller 1 juli. Månaderna däremellan är nästan "
+             "tomma.",
         xlabel="månad", ylabel="ikraftträdda ändringar",
         # the whole history: this describes when Sweden *has* brought changes
         # into force, and an amendment to an act repealed since was no less a
@@ -583,22 +656,27 @@ def _group_c(con, s):
     # changes would describe registration practice rather than lawmaking.
     # whole history, for the same reason as 27: how much notice lawmaking has
     # given is a fact about the past, not about what survives today
-    notice = [(d, r) for r in s["laws_all"] if (d := notice_days(r)) is not None]
+    notice = sorted(((d, r) for r in s["laws_all"]
+                     if (d := notice_days(r)) is not None), key=lambda t: -t[0])
     days = sorted(d for d, _ in notice)
-    bins = [(0, 1), (1, 15), (15, 31), (31, 61), (61, 92), (92, 183),
-            (183, 366), (366, 10**6)]
-    labels = ["samma dag", "1–14 dygn", "15–30", "31–60", "61–91", "3–6 mån",
-              "6–12 mån", ">1 år"]
     yield Measure(
-        26, "C", "Hur långt varsel får en ny lag?", "histogram",
-        unit="författningar",
-        lede="Tiden från att författningen utfärdas till att den träder i kraft. "
-             "Medianen är %d dygn; en fjärdedel får %d dygn eller mindre."
-             % (statistics.median(days) if days else 0,
-                days[len(days) // 4] if days else 0),
-        xlabel="varsel", ylabel="författningar",
-        points=_series(zip(labels, [sum(1 for d in days if lo <= d < hi)
-                                    for lo, hi in bins], strict=True)))
+        26, "C", "Hur långt varsel får en ny lag?", "profile", unit="dygn",
+        lede="Tiden från att författningen utfärdas till att den träder i kraft, "
+             "för var och en av %s grundförfattningar. Medianen är %d dygn; en "
+             "fjärdedel får %d dygn eller mindre, och %s träder i kraft samma "
+             "dag som de utfärdas."
+             % ("{:,}".format(len(days)).replace(",", " "),
+                statistics.median(days) if days else 0,
+                days[len(days) // 4] if days else 0,
+                "{:,}".format(sum(1 for d in days if d == 0)).replace(",", " ")),
+        xlabel="plats i varselordning (logaritmisk)", ylabel="dygn",
+        points=_rank_profile([d for d, _ in notice], log=True),
+        rows=([Row(r["clean_title"][:70], d, r["uri"],
+                   "utfärdad %s, i kraft %s" % (r["utfardad"], r["ikraft"]),
+                   group="Längst varsel") for d, r in notice[:5]]
+              + [Row(r["clean_title"][:70], d, r["uri"],
+                     "utfärdad och i kraft %s" % r["ikraft"],
+                     group="Kortast varsel") for d, r in notice[-5:][::-1]]))
 
     future = collections.Counter()
     for r in s["laws"]:
@@ -722,7 +800,7 @@ def _group_d(con, s):
     unresolved = _q(con, "SELECT count(*) FROM links l LEFT JOIN documents d "
                          "ON d.uri = l.to_root WHERE d.uri IS NULL")[0][0]
     yield Measure(
-        29, "D", "Korpuset i siffror", "sankey", unit="hänvisningar",
+        29, "D", "Databasen i siffror", "sankey", unit="hänvisningar",
         value=links,
         display="%s hänvisningar mellan %s dokument"
                 % ("{:,}".format(links).replace(",", " "),
@@ -733,8 +811,8 @@ def _group_d(con, s):
         # does not compute
         lede="Varje hänvisning är upplöst till ett dokument och, där källan har "
              "sidor, till sidan den står på (%s av dem). Flödet visar de %s "
-             "hänvisningar som går mellan två dokument i korpuset. Ytterligare "
-             "%s pekar på ett dokument som korpuset inte har."
+             "hänvisningar som går mellan två dokument i databasen. Ytterligare "
+             "%s pekar på ett dokument som databasen inte har."
              % ("{:,}".format(paged).replace(",", " "),
                 "{:,}".format(sum(c.value for c in flows)).replace(",", " "),
                 "{:,}".format(unresolved).replace(",", " ")),
@@ -742,7 +820,7 @@ def _group_d(con, s):
 
     yield Measure(
         30, "D", "Mest hänvisade dokument", "toplist", unit="hänvisningar",
-        lede="Inkommande länkar från hela korpuset.",
+        lede="Inkommande länkar från hela databasen.",
         rows=[Row(t or u.replace(BASE, ""), c, u) for u, t, c in
               _q(con, "SELECT l.to_root, d.title, count(*) c FROM links l "
                       "LEFT JOIN documents d ON d.uri = l.to_root "
@@ -750,7 +828,7 @@ def _group_d(con, s):
 
     yield Measure(
         31, "D", "Mest hänvisade enskilda paragraf", "toplist", unit="hänvisningar",
-        lede="Ner på paragrafnivå — vilken enskild regel korpuset faktiskt talar om.",
+        lede="Ner på paragrafnivå — vilken enskild regel databasen faktiskt talar om.",
         rows=[Row(citation(u, desc), c, u) for u, desc, _src, c in
               _q(con, "SELECT l.to_uri, d.descriptive, d.source, count(*) c "
                       "FROM links l LEFT JOIN documents d ON d.uri = l.to_root "
@@ -794,7 +872,7 @@ def _group_d(con, s):
         34, "D", "Hur många hänvisar till en lag?", "histogram",
         unit="författningar",
         lede="Gällande författningar efter antal inkommande hänvisningar från "
-             "hela korpuset — lag, dom, förarbete och föreskrift tillsammans. "
+             "hela databasen — lag, dom, förarbete och föreskrift tillsammans. "
              "%d av %d har inga alls; de är öar snarare än övergivna, oftast "
              "förvaltningsförordningar som ingenting har anledning att citera."
              % (counts[0], sum(counts)),
@@ -812,7 +890,8 @@ def _group_d(con, s):
 
     yield Measure(
         36, "D", "Mest omtalade begrepp", "toplist", unit="hänvisningar",
-        lede="Begreppen rankade på inkommande länkar — vad korpuset bråkar om.",
+        lede="Begreppen rankade på antalet inkommande länkar: vilka begrepp "
+             "resten av databasen hänvisar till.",
         rows=[Row(t, c, u) for u, t, c in
               _q(con, "SELECT d.uri, d.title, count(*) c FROM links l "
                       "JOIN documents d ON d.uri = l.to_root "
@@ -862,10 +941,18 @@ def _group_e(con, s):
                 if f.lower().startswith("prop"):
                     fb[f] += 1
                     fblaws[f].add(r["uri"])
+    # the register names the proposition by its citation string ("Prop.
+    # 2013/14:110"), which is the catalog's `label` for the same document -- the
+    # same join measure 41 makes. It buys the row both a title (a beteckning
+    # alone says nothing about what the proposition did) and a link to it
+    props = {label: (uri, title) for label, uri, title in
+             _q(con, "SELECT label, uri, title FROM documents "
+                     "WHERE source='forarbete' AND label LIKE 'Prop.%'")}
     yield Measure(
         40, "E", "Propositionen som ändrade flest lagar", "toplist", unit="lagar",
-        lede="En proposition kan skriva om hundratals lagar på en gång.",
-        rows=[Row(k, len(fblaws[k]), None, "%d ändringar" % fb[k])
+        lede="En proposition kan föreslå ändringar i hundratals lagar på en gång.",
+        rows=[Row(_prop_label(k, props.get(k)), len(fblaws[k]),
+                  props[k][0] if k in props else None, "%d ändringar" % fb[k])
               for k in sorted(fb, key=lambda k: -len(fblaws[k]))[:12]])
 
     # 41 -- how long the road from bill to binding law is. The join is by the
@@ -957,10 +1044,22 @@ def _group_f(con, s):
                       "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
 
     dv = [d for d in s["dv"] if d["chars"] > 0]
+    # the two lengths the lede compares. `dv` is empty only in the tests, whose
+    # fixture corpus holds no verdicts -- the zeros keep the builders runnable
+    # there without a guard in each format argument
+    chars = [d["chars"] for d in dv] or [0]
+    median_dv, longest = statistics.median(chars), max(chars)
     yield Measure(
         48, "F", "Längsta och kortaste avgörandet", "toplist", unit="tecken",
-        lede="Median %d tecken. Somliga domar är böcker, somliga referat är tre "
-             "meningar." % (statistics.median([d["chars"] for d in dv]) if dv else 0),
+        # the minimum is deliberately not in the lede. The shortest artifacts
+        # measure 8 tecken ("Not 125."), but the page for that same notisfall
+        # renders a body the artifact does not carry -- so the number would
+        # publish a disagreement between scan and the renderer as a fact about
+        # how short a Swedish decision can be
+        lede="Medianavgörandet är %s tecken. Det längsta är %d gånger så långt "
+             "som medianen."
+             % ("{:,}".format(int(median_dv)).replace(",", " "),
+                longest / median_dv if median_dv else 0),
         rows=([Row(d["label"] or d["uri"].replace(BASE, ""), d["chars"], d["uri"],
                    d["court"], group="Längst")
                for d in sorted(dv, key=lambda d: -d["chars"])[:6]]
@@ -989,9 +1088,12 @@ def _group_g(con, s):
         50, "G", "Direktiven som satt djupast spår i svensk rätt", "toplist",
         unit="paragrafer",
         lede="Antal svenska paragrafer som genomför direktivets artiklar.",
-        rows=[Row(d.replace(BASE + "ext/celex/", ""), c, d) for d, c in
-              _q(con, "SELECT directive, count(DISTINCT sfs_uri||sfs_anchor) c "
-                      "FROM genomforande GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+        rows=[Row(_shorten(citation(d, desc), 80), c, d) for d, desc, c in
+              _q(con, "SELECT g.directive, t.descriptive, "
+                      "       count(DISTINCT g.sfs_uri||g.sfs_anchor) c "
+                      "FROM genomforande g "
+                      "LEFT JOIN documents t ON t.uri = g.directive "
+                      "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
 
     yield Measure(
         51, "G", "Europakonventionen i svensk rätt", "toplist", unit="hänvisningar",

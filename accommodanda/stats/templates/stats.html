@@ -26,50 +26,52 @@
 {%- endif -%}
 {%- endmacro -%}
 {% block body %}
+{#- the caveat every rank profile carries, written once: the x-axis is the
+    place in the size order, and it is logarithmic. -#}
+{%- set logx = "X-axeln är logaritmisk: varje steg åt höger multiplicerar platssiffran (plats 1, 3, 10, 32, 100 …). På en linjär axel tar de få jättarna hela höjden, och alla andra blir en rak linje strax över noll." -%}
 {% set group_A %}
 {{ stat(1,
         "Lagars längd",
-        lede="Kroppstext i tecken, per konsoliderad författning. Formen är poängen: några få jättar och en mycket lång svans av tvåparagrafsförordningar.") }}
+        lede="Lagtexternas längd i tecken (inklusive mellanslag), per konsoliderad författning",
+        note=logx) }}
 {{ stat(2,
         "Antal paragrafer",
-        lede="Antal § per författning; kapitelantalet står som detalj.") }}
+        lede="Antal paragrafer per författning",
+        note="kapitelantalet står som detalj. " ~ logx) }}
 {{ stat(3,
         "Paragraflängd i svenska författningar",
-        computed_lede=true) }}
+        computed_lede=true,
+        note=logx) }}
 {{ stat(4,
         "Artikellängd i EU-rätten",
         computed_lede=true,
-        note="Artiklarna med inläst sidhuvud eller signaturblock är kända inläsningsfel i det äldsta källskiktet — de står kvar på sidorna, men de mäter inte artikelns egen längd.") }}
+        note="Artiklarna med inläst sidhuvud eller signaturblock är kända inläsningsfel i det äldsta källskiktet — de står kvar på sidorna, men de mäter inte artikelns egen längd. " ~ logx) }}
 {{ stat(5,
         "Rubriklängd i svenska författningar",
-        lede="Beteckningen räknas inte med — ”Ellag (1997:857)” är en rubrik på fem tecken, inte sexton.") }}
+        computed_lede=true,
+        note="SFS-numret räknas inte med — ”Ellag (1997:857)” är en rubrik på fem tecken, inte sexton.") }}
 {{ stat(6,
         "Rubriklängd i EU-rätten",
-        computed_lede=true,
-        note="Bara den svenska språkversionen av akter vars artiklar går att mäta räknas; ett CELEX-dokument som buntar flera instrument (fördragspaketen) står utanför.") }}
-{{ stat(7,
-        "Lagar med eget namn",
-        lede="Författningar som bär en etablerad förkortning (BrB, RB, ABL, IL) — kända nog att ha ett smeknamn.") }}
+        computed_lede=true) }}
 {{ stat(8,
         "Författningar per departement",
-        lede="Vem som äger regelmassan.") }}
+        computed_lede=true) }}
 {{ stat(9,
         "Hela svensk författningssamling i siffror",
         computed_lede=true) }}
 {% endset %}
 {% set group_B %}
 {{ stat(10,
-        "De mest ändrade lagarna",
-        lede="Antal ändringsförfattningar i registret.") }}
+        "De mest ändrade lagarna — och de aldrig ändrade",
+        computed_lede=true,
+        note="Antal ändringsförfattningar i registret, per gällande författning. " ~ logx) }}
 {{ stat(11,
         "”Lag om ändring i lagen om ändring i lagen om…”",
         lede="En ändringsförfattning kan ändra en ändringsförfattning som ändrar en annan. De längsta kedjorna i registret, räknat i led.") }}
 {{ stat(12,
         "Ändringsförfattningen som rör flest lagar samtidigt",
         lede="En enda författning kan skriva om hela regelmassan på en gång.") }}
-{{ stat(13,
-        "Lagar som aldrig har ändrats",
-        lede="Aldrig en enda ändring sedan de utfärdades.") }}
+{# 13 ("Lagar som aldrig har ändrats") is folded into 10, as its tail #}
 {{ stat(14,
         "Ändringar per år",
         lede="Takten har legat stadigt kring tusen till tvåtusen ikraftträdda ändringar om året sedan 1970-talet.") }}
@@ -78,19 +80,13 @@
         lede="Tiden från att lagen trädde i kraft till att den första ändringen gjorde det.") }}
 {{ stat(16,
         "Lagar med äldst kvarvarande text",
-        lede="Gällande författningar vars senaste ändring ligger längst tillbaka — regelmassans orörda botten.") }}
+        lede="Gällande författningar vars senaste ändring ligger längst tillbaka") }}
 {{ stat(17,
         "Lagtextens medelålder",
         computed_lede=true) }}
 {{ stat(18,
         "Den mest omskrivna enskilda paragrafen",
         lede="Hur många gånger en och samma paragraf har fått ny lydelse.") }}
-{{ stat(19,
-        "Vad ändringar faktiskt gör",
-        lede="Fördelningen av registrets omfattningstext i kategorier. En ändringsförfattning kan göra flera saker och räknas då i flera.") }}
-{{ stat(20,
-        "Tidsmaskinens djup",
-        computed_lede=true) }}
 {% endset %}
 {% set group_C %}
 {{ stat(21,
@@ -107,28 +103,28 @@
         lede="Av alla författningar utfärdade år X — hur stor andel gäller fortfarande idag? Kurvan är svensk lagstiftnings halveringstid.") }}
 {{ stat(25,
         "Vilken dag träder svensk lag i kraft?",
-        lede="Ikraftträdandedatumen samlade på månad. Svensk lagstiftning har två hjärtslag om året — 1 januari och 1 juli — och nästan ingenting däremellan.") }}
+        lede="Ikraftträdandedatumen samlade på månad. Nästan allt träder i kraft 1 januari eller 1 juli. Månaderna däremellan är nästan tomma.") }}
 {{ stat(26,
         "Hur långt varsel får en ny lag?",
         computed_lede=true) }}
 {{ stat(27,
-        "Framtiden som redan är skriven",
-        lede="Ändringar som är beslutade men ännu inte i kraft — lagstiftning som redan finns men inte gäller.") }}
+        "Längst ikraftträdandefrist",
+        lede="Ändringar som är beslutade men ännu inte i kraft — lagstiftning som redan finns men inte gäller ännu.") }}
 {{ stat(28,
         "Nya författningar per decennium",
         lede="Bland dem som fortfarande gäller — vilket visar hur snabbt äldre lager tunnas ut snarare än hur mycket som skrevs.") }}
 {% endset %}
 {% set group_D %}
 {{ stat(29,
-        "Korpuset i siffror",
+        "Databasen i siffror",
         computed_lede=true,
         note="Bandets tjocklek är antalet hänvisningar, rakt av — men ett band som blir tunnare än en linje ritas som en linje, annars syns det inte alls. Ett flöde under 0,01 % av totalen ritas inte; siffran vid varje grupp räknar ändå med det, och tabellen visar det. Konventionstexterna hänvisar nästan aldrig vidare till något vi har, och står därför bara på höger sida.") }}
 {{ stat(30,
         "Mest hänvisade dokument",
-        lede="Inkommande länkar från hela korpuset.") }}
+        lede="Inkommande länkar från hela databasen.") }}
 {{ stat(31,
         "Mest hänvisade enskilda paragraf",
-        lede="Ner på paragrafnivå — vilken enskild regel korpuset faktiskt talar om.") }}
+        lede="Ner på paragrafnivå — vilken enskild regel databasen faktiskt talar om.") }}
 {{ stat(32,
         "Dokument med flest utgående hänvisningar",
         lede="Vilka dokument som citerar mest — utredningar, i praktiken.") }}
@@ -143,7 +139,7 @@
         lede="Hänvisningar från ett dokument till sig självt.") }}
 {{ stat(36,
         "Mest omtalade begrepp",
-        lede="Begreppen rankade på inkommande länkar — vad korpuset bråkar om.") }}
+        lede="Begreppen rankade på antalet inkommande länkar: vilka begrepp resten av databasen hänvisar till.") }}
 {% endset %}
 {% set group_E %}
 {{ stat(37,
@@ -157,7 +153,7 @@
         lede="Teckenantal per SOU.") }}
 {{ stat(40,
         "Propositionen som ändrade flest lagar",
-        lede="En proposition kan skriva om hundratals lagar på en gång.") }}
+        lede="En proposition kan föreslå ändringar i hundratals lagar på en gång.") }}
 {{ stat(41,
         "Från förslag till lag",
         computed_lede=true) }}
@@ -216,5 +212,5 @@
 {% for key, heading, body in groups if body | trim %}
 <section class="stat-group" id="g{{ key }}"><h2>{{ heading }}</h2>{{ body }}</section>
 {% endfor %}
-<p class="stat-foot">Mätt {{ generated }} mot korpusen som den såg ut då. Varje siffra är räknad ur artefakterna och katalogen — inga uppskattningar utom där noten säger det.</p>
+<p class="stat-foot">Mätt {{ generated }} mot databasen som den såg ut då. Varje siffra är räknad ur artefakterna och katalogen — inga uppskattningar utom där noten säger det.</p>
 {% endblock %}

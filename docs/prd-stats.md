@@ -292,7 +292,8 @@ regex över rubriktext, vilket också är mycket mer trovärdigt.
 > tillträde till EES-avtalet. Sedan SFS 1993:1278 (55), SFS 1994:103 (50),
 > SFS 1999:1230 (37).
 
-**13. Lagar som aldrig har ändrats** ✔
+**13. Lagar som aldrig har ändrats** ✔ *(sedan 2026-08-16 svansen i mått 10,
+inte ett eget mått: det är samma fördelning sedd från andra hållet)*
 > **2 111** av 11 210 författningar har aldrig fått en enda ändring
 > (gällande och upphävda tillsammans). De äldsta är från 1850-talet, t.ex.
 > Förordning (1851:55 s.4) angående sättet för uppsägning av förbindelser,

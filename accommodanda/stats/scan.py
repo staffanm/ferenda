@@ -196,14 +196,21 @@ def scan_sfs_register(path):
     """One downloaded SFS register record -> its change acts' titles, which the
     artifact does not carry. The title is the only place the "lag om ändring i
     lagen om ändring i …" chain is written down, so measuring its depth means
-    reading the download tree (PRD "Vad som saknas", point 2)."""
+    reading the download tree (PRD "Vad som saknas", point 2).
+
+    Each row leads with the *base* act's beteckning ("1949:105"), which is the
+    record's own: the chain's rubrik is printed in that statute's amendment
+    register, so a measure of chain depth can link the reader to the entry it
+    counted rather than to nothing."""
     rec = load(path)
     if rec is None:
         return []
+    base = rec.get("beteckning")
     out = []
     for entry in rec.get("andringsforfattningar") or []:
         rubrik = entry.get("rubrik") or ""
-        out.append((entry.get("beteckning"), rubrik, len(RE_CHAIN.findall(rubrik))))
+        out.append((base, entry.get("beteckning"), rubrik,
+                    len(RE_CHAIN.findall(rubrik))))
     return out
 
 

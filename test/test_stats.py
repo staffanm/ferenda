@@ -14,7 +14,7 @@ import pytest
 
 from accommodanda.lib import facets, layout
 from accommodanda.stats import charts, compute, render, scan
-from accommodanda.stats.model import Cell, Measure, Point, Report, Row
+from accommodanda.stats.model import Cell, Measure, Point, Report, Row, Tile
 
 
 def write_artifact(tmp_path, name, art):
@@ -345,6 +345,38 @@ def test_a_plotted_measure_carries_its_table_view():
         points=[Point("2024", 100), Point("2025", 120)]))
     assert "<svg" in html and "Visa som tabell" in html
     assert "<th scope=\"col\">år</th>" in html
+
+
+def test_a_profile_shows_its_record_holders_instead_of_a_table_view():
+    # 100 rows of "plats 1 743 -> 214 tecken" name no thing a reader can look
+    # up; the rank profile's named extremes are what its rows are for
+    html = charts.figure(Measure(
+        1, "A", "Lagars längd", "profile", unit="tecken", xlabel="plats",
+        points=[Point("1", 900), Point("2", 20)],
+        rows=[Row("Socialförsäkringsbalk", 900, group="Längst")]))
+    assert "<svg" in html and "Visa som tabell" not in html
+    assert "Socialförsäkringsbalk" in html
+
+
+def test_the_log_rank_profile_spends_its_columns_on_the_head():
+    points = compute._rank_profile(list(range(5000, 0, -1)), k=40, log=True)
+    ranks = [int(p.x.replace(" ", " ").replace(" ", "")) for p in points]
+    # the head is sampled rank by rank (there is no rank 1.4 to sample), the
+    # tail in steps of hundreds -- and both ends are still real members
+    assert ranks[:4] == [1, 2, 3, 4]
+    assert ranks[-1] == 5000 and points[0].y == 5000
+    assert ranks[len(ranks) // 2] < 200          # half the columns cover 4 % of the corpus
+    # the even sampling it replaces reaches rank 100 only in its second column
+    assert compute._rank_profile(list(range(5000, 0, -1)), k=40)[1].x != "2"
+
+
+def test_a_scalar_with_several_numbers_answers_as_a_row_of_tiles():
+    html = charts.figure(Measure(
+        9, "A", "I siffror", "scalar", unit="tecken", value=520,
+        display="520 tecken · 86 ord",
+        tiles=[Tile("520", "tecken"), Tile("86", "ord")]))
+    assert html.count("viz-tile-val") == 2 and "viz-hero" not in html
+    assert ">tecken<" in html and ">86<" in html
 
 
 def test_text_age_weights_every_paragraf_by_its_own_amendment():
