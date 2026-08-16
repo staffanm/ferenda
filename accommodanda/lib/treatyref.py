@@ -182,11 +182,22 @@ def patterns(extra=()):
 def _named(text, extra):
     """Every instrument name in `text`, as (start, end, target, name).
 
-    A longer name wins the span a shorter one sits inside ("Rome Statute" beats
-    the "Statute" within it). Two instruments sharing the *same* span do not
-    compete: "the Geneva Conventions" names all four, and common article 3 is
-    an article of each, so it resolves to four references rather than to a guess
-    at which one was meant.
+    A longer name wins any span it overlaps, whether the shorter one sits
+    inside it ("Rome Statute" beats the "Statute" within it) or only runs into
+    it. Two names of the same instrument may start a word apart -- "the Hague
+    Regulations concerning the Laws and Customs of War on Land" is both "Hague
+    Regulations" [4:21] and "Regulations concerning the Laws and Customs of War
+    on Land" [10:68] -- and so may a caller's short form and a curated title:
+    "the Convention Against Torture" is "the Convention" to hudoc's reader and
+    the CAT to the table. Neither pair nests, so a containment test kept both,
+    which files a citation of the ECHR that the sentence never makes and hands
+    `interleave` two spans it cannot splice (rule:fail-fast). 41 hudoc
+    judgments failed to parse on that assertion.
+
+    Two instruments sharing the *same* span do not compete: "the Geneva
+    Conventions" names all four, and common article 3 is an article of each, so
+    it resolves to four references rather than to a guess at which one was
+    meant.
     """
     found = []
     for pattern, target, name, context in patterns(tuple(extra)):
@@ -197,12 +208,20 @@ def _named(text, extra):
                     text, max(0, match.start() - CONTEXT_WINDOW),
                     match.end() + CONTEXT_WINDOW):
                 continue
-            span = (match.start(), match.end())
-            if any(start <= span[0] and span[1] <= end and (start, end) != span
-                   for start, end, _t, _n in found):
-                continue
-            found.append((span[0], span[1], target, name or match.group(0)))
-    return sorted(found)
+            found.append((match.start(), match.end(), target,
+                          name or match.group(0)))
+    # longest first, so the fuller name is the one already held; `patterns`
+    # cannot order this itself, because a caller's extra is a compiled pattern
+    # whose source length says nothing about the words it matches
+    kept = []
+    for start, end, target, name in sorted(found,
+                                           key=lambda e: (e[0] - e[1], e[0])):
+        if any(start < held_end and held_start < end
+               and (held_start, held_end) != (start, end)
+               for held_start, held_end, _t, _n in kept):
+            continue
+        kept.append((start, end, target, name))
+    return sorted(kept)
 
 
 def _binding(text, named, match):

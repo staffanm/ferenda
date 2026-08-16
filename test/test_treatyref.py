@@ -7,6 +7,8 @@ carry 13,887 "article N ... of the Statute" citations, and getting the binding
 wrong files them against the wrong treaty rather than against none.
 """
 
+import re
+
 from accommodanda.lib import treatyref
 
 STATUTE = (("the Statute", "icrc/585"),)
@@ -211,10 +213,35 @@ def test_the_full_official_citation_carries_its_own_context():
     assert ("icrc/470", "Protocol I") in _refs(text)
 
 
+def test_a_longer_name_wins_a_span_it_only_overlaps():
+    """Two names of the same instrument may start a word apart. The Hague
+    Regulations' short form does not nest inside its official title -- "Hague
+    Regulations" is [4:21] and "Regulations concerning the Laws and Customs of
+    War on Land" is [10:68] -- so a containment test kept both, and
+    `lagrum.interleave` cannot splice two spans that share text."""
+    text = ("The Hague Regulations concerning the Laws and Customs of War on "
+            "Land of 18 October 1907 contain, inter alia, relevant provisions.")
+    assert _refs(text) == [
+        ("icrc/195", "Regulations concerning the Laws and Customs of War on Land")]
+    assert treatyref.spans(text) == [(10, 68, EXT + "icrc/195")]
+
+
+def test_a_short_form_loses_to_the_title_that_continues_it():
+    """The same overlap across the caller's own table: "the Convention" and the
+    curated "Convention against Torture" share one word. Keeping both filed a
+    citation of the ECHR that the sentence never makes, and bound article 3 to
+    it -- 41 hudoc judgments failed to parse on the assertion it raised."""
+    extra = ((re.compile(r"\b[Tt]he Convention\b"), "coe/005"),)
+    text = "refoulement provisions in Article 3 of the Convention Against Torture"
+    assert _refs(text, extra) == \
+        [("untc/I-24841#A3", "Convention against Torture, article 3")]
+    assert treatyref.spans(text, extra) == \
+        [(26, 35, EXT + "untc/I-24841#A3"), (43, 69, EXT + "untc/I-24841")]
+
+
 def test_a_caller_s_short_form_may_be_a_guarded_pattern():
     """hudoc reads "the Convention" as the ECHR -- but only where no longer
     title continues it, which a plain escaped name cannot express."""
-    import re
     extra = ((re.compile(r"\b[Tt]he Convention\b"
                          r"(?!\s+(?:on|for|against|of|relating|concerning|to)"
                          r"\b)"), "coe/005"),)

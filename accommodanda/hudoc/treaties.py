@@ -10,7 +10,13 @@ local here is the Court's own shorthand, safe only inside an ECHR text:
     down where a longer title continues it ("the Convention on the Rights of
     the Child" must keep naming the CRC), and the capital C is load-bearing:
     a lower-cased "the convention" in running prose is the sentence's word,
-    not the Court's.
+    not the Court's. The continuation word carries the Court's own
+    capitalisation -- it writes "the Convention Against Torture" as often as
+    "against" -- and a Geneva convention continues in a roman numeral instead
+    ("the Convention (IV) relative to the Protection of Civilian Persons").
+    A curated title that starts one word later now wins the span either way
+    (`treatyref._named`), so this guard is what protects the titles the table
+    does *not* hold.
   * **"Protocol No. N"** names the ECHR protocol series. Outside an ECHR
     text the same words number a different family (the CoE corpus holds four
     treaty families with numbered protocols), which is why these are caller
@@ -41,7 +47,8 @@ AMENDING_PROTOCOLS = {
 }
 SHORT_FORMS = (
     (re.compile(r"\b[Tt]he Convention\b"
-                r"(?!\s+(?:on|for|against|of|relating|concerning|to)\b)"),
+                r"(?!\s+(?i:on|for|against|of|relating|concerning|to)\b)"
+                r"(?!\s+\((?=[IVX]+\)))"),
      CONVENTION),
 ) + tuple(
     (re.compile(r"\bProtocol No\.\s*%s\b" % number), "coe/%s" % ets)

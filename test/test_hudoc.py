@@ -6,7 +6,14 @@ from pathlib import Path
 import pytest
 
 from accommodanda.coe import render as coe_render
-from accommodanda.hudoc import citations, download, parse, summaries, translations
+from accommodanda.hudoc import (
+    citations,
+    download,
+    parse,
+    summaries,
+    translations,
+    treaties,
+)
 from accommodanda.hudoc import render as hudoc_render
 from accommodanda.lib import catalog, coe, facets, layout, page
 from accommodanda.lib.errors import SkipDocument
@@ -545,7 +552,6 @@ def test_treaty_short_forms_link_convention_and_protocols():
     """R4: "the Convention" and "Protocol No. N" are the Court's own shorthand
     and safe only inside an ECHR text, so they are hudoc's caller extras. The
     article pinpoints anchor because the targets are curated instruments."""
-    from accommodanda.hudoc import treaties
     text = ("a violation of Article 8 of the Convention "
             "and of Article 1 of Protocol No. 1")
     assert [(r.text, r.uri.replace("https://lagen.nu/ext/", "")) for r in
@@ -556,3 +562,25 @@ def test_treaty_short_forms_link_convention_and_protocols():
     # stands down before "Convention on ..."
     crc = treaties.refs("relying on the Convention on the Rights of the Child")
     assert [r.uri for r in crc] == ["https://lagen.nu/ext/untc/I-27531"]
+
+
+def test_the_court_capitalises_the_word_that_continues_a_title():
+    """The Court writes "the Convention Against Torture" as often as
+    "against", and a Geneva convention continues in a roman numeral instead.
+    A lower-case-only guard read both as the ECHR, which cost 41 judgments
+    their parse and filed 46 citations of the ECHR the text never makes."""
+    def refs(text):
+        return [(r.text, r.uri.replace("https://lagen.nu/ext/", ""))
+                for r in treaties.refs(text)]
+
+    assert refs("provisions in Article 3 of the Convention Against Torture") \
+        == [("Article 3", "untc/I-24841#A3"),
+            ("Convention Against Torture", "untc/I-24841")]
+    assert refs("Articles 146 and 147 of the Convention (IV) relative to the "
+                "Protection of Civilian Persons in Time of War") == \
+        [("Articles 146", "icrc/380#A146"), ("147", "icrc/380#A147"),
+         ("Convention (IV) relative to the Protection of Civilian Persons "
+          "in Time of War", "icrc/380")]
+    # the guard is what protects a title the table does *not* hold: UNCAC is
+    # not curated, and reading its capital A as the ECHR is the same bug
+    assert refs("States Parties to the Convention Against Corruption") == []
