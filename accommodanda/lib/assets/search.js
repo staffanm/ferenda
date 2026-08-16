@@ -232,7 +232,9 @@
     if (andGo && local.length) { go(); return; }
     waitOn(mine);
     fetch('/api/v1/search?limit=8&q=' + encodeURIComponent(q))
-      .then(function (r) { return r.json(); })
+      // a 503 (search cluster down) carries a JSON body, so r.json() alone
+      // would read it as 0 hits -- an outage rendered as "Inga träffar"
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (d) { if (mine === seq && results) { waitOff(); results.classList.remove('loading'); render(local, d.results || [], d.total || 0, q); if (andGo) go(); } })
       .catch(function () {
         // local hits (already painted) survive, but the outage must show:

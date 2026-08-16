@@ -636,7 +636,12 @@
       if (text.length < 2) { hits.hidden = true; return; }
       const r = await fetch("/api/v1/search?q=" + encodeURIComponent(text) +
                             "&limit=8");
-      if (!r.ok) return;
+      if (!r.ok) {                     // search cluster down: say so, don't sit inert
+        hitRows = []; hitIndex = -1;
+        hits.innerHTML = '<div class="hit">sökningen kunde inte nås</div>';
+        hits.hidden = false;
+        return;
+      }
       hitRows = (await r.json()).results;
       hitIndex = -1;
       hits.innerHTML = hitRows.map((res, i) =>
