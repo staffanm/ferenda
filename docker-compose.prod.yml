@@ -23,10 +23,13 @@ services:
   # A single-node, security-disabled OpenSearch 2.x at the code's default
   # endpoint (config.DEFAULT_OPENSEARCH_URL = http://localhost:9200). Security
   # is OFF on purpose: a local index over public data, plain HTTP, no auth.
-  # Do NOT expose port 9200 to the internet -- the prod host firewall must keep
-  # 9200/9600 closed; only the accommodanda container talks to it (over the
-  # compose network as http://opensearch:9200). On WSL2, if it won't boot,
-  # raise vm.max_map_count: `sudo sysctl -w vm.max_map_count=262144`.
+  # Do NOT expose port 9200 to the internet. The ports below bind to loopback
+  # explicitly: a bare "9200:9200" publishes on 0.0.0.0 and Docker's iptables
+  # rules BYPASS the host firewall -- that exact mistake let a ransom bot wipe
+  # the index on 2026-08-15. Only the accommodanda container talks to it (over
+  # the compose network as http://opensearch:9200); loopback is for host-side
+  # admin/sync only. On WSL2, if it won't boot, raise vm.max_map_count:
+  # `sudo sysctl -w vm.max_map_count=262144`.
   opensearch:
     # Pinned to 3.7.0 (Lucene 10). Frozen at 2.9.0 for years because 2.10.0+
     # images require the x86-64-v2 CPU baseline and the prod host's virtualized
@@ -63,8 +66,8 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "9200:9200"        # REST API -- the endpoint the code connects to
-      - "9600:9600"        # performance analyzer (optional)
+      - "127.0.0.1:9200:9200"   # REST API -- loopback only, never the public NIC
+      - "127.0.0.1:9600:9600"   # performance analyzer (optional), loopback only
     volumes:
       - opensearch-data:/usr/share/opensearch/data   # persist the index across restarts
     healthcheck:
