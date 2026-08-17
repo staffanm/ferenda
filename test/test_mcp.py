@@ -380,6 +380,19 @@ def test_end_to_end_streamable_http(corpus, caplog):
                     assert isinstance(json.loads(result["content"][0]["text"]),
                                       dict), tool
 
+                # Every tool declares an outputSchema, so every reply carries
+                # structuredContent -- the read the spec points a client at. The
+                # SDK derives the schema from the return annotation and a bare
+                # `-> dict` yields neither, which left three tools with nothing
+                # to read structurally.
+                listed = await raw.post(
+                    base, headers=accept,
+                    json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+                names = {t["name"]: t for t in listed.json()["result"]["tools"]}
+                assert len(names) == 8, sorted(names)
+                missing = [n for n, t in names.items() if "outputSchema" not in t]
+                assert not missing, missing
+
                 # DELETE (session teardown) answers the same on both, so the two
                 # paths are one endpoint rather than two that merely agree about
                 # POST. GET is left out on purpose: it opens the transport's

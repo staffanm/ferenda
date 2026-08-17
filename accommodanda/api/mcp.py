@@ -197,6 +197,53 @@ class SearchResults(TypedDict):
     total: int
 
 
+class Document(TypedDict):
+    """`get_document`'s reply.
+
+    Declared, rather than left as a bare `-> dict`, because the SDK builds a
+    tool's `outputSchema` from its return annotation and emits
+    `structuredContent` only when it has one. A bare dict yields neither, so a
+    client that reads results structurally -- the read the spec points at -- had
+    nothing to read for this tool and had to fall back to parsing the text
+    block."""
+
+    uri: str
+    source: str | None
+    kind: str | None
+    label: str | None
+    title: str | None
+    source_url: str | None
+    inbound_count: int
+    pinpoint: str | None
+    truncated: bool
+    text: str
+
+
+class DocumentList(TypedDict):
+    """`list_documents`' page, declared for the reason in `Document`."""
+
+    total: int
+    limit: int
+    offset: int
+    documents: list[dict]
+
+
+class IncomingCitations(TypedDict):
+    """`get_incoming_citations`' page, declared for the reason in `Document`.
+    `total` counts the rows `source` left, while `by_source` covers the whole
+    scope before that filter -- so the reply still says what the other corpora
+    hold."""
+
+    uri: str
+    scope: str
+    source: str | None
+    total: int
+    by_source: dict[str, int]
+    limit: int
+    offset: int
+    citations: list[dict]
+
+
 class ResolvedCitations(TypedDict):
     """`resolve_citation`'s hits, wrapped.
 
@@ -236,7 +283,10 @@ class FetchedDocument(TypedDict):
     has no field for -- source, kind, publisher page, citation count -- ride."""
 
     id: str
-    title: str
+    # `str | None`, not `str`: the catalog's title column is nullable, so a
+    # document can genuinely have none. Declaring it required-and-present made
+    # the schema promise something the data does not
+    title: str | None
     text: str
     url: str
     metadata: dict[str, str | int | bool | None]
@@ -338,7 +388,7 @@ def resolve_citation(citation: str) -> ResolvedCitations:
 
 @mcp.tool(title="Get a document's metadata and text", annotations=READ_ONLY)
 def get_document(uri: str, pinpoint: str | None = None,
-                 max_chars: int = 20000) -> dict:
+                 max_chars: int = 20000) -> Document:
     """Fetch a document's metadata and its full parsed plain text by URI.
 
     `uri` is a lagen.nu document URI (e.g. `https://lagen.nu/1962:700`). Pass
@@ -369,8 +419,15 @@ def get_document(uri: str, pinpoint: str | None = None,
                              % (pinpoint, uri))
     else:
         body = text.document_text(art)
-    return {**data, "pinpoint": pinpoint,
-            "truncated": len(body) > max_chars, "text": body[:max_chars]}
+    # named rather than splatted from `data`: the keys are the tool's declared
+    # output schema, so spelling them here is what makes a change to
+    # `reads.document` a type error instead of a silently altered contract
+    return Document(
+        uri=data["uri"], source=data["source"], kind=data["kind"],
+        label=data["label"], title=data["title"],
+        source_url=data["source_url"], inbound_count=data["inbound_count"],
+        pinpoint=pinpoint, truncated=len(body) > max_chars,
+        text=body[:max_chars])
 
 
 @mcp.tool(title="Fetch a document by search-result id", annotations=READ_ONLY)
@@ -406,7 +463,7 @@ def fetch(id: str) -> FetchedDocument:
 
 @mcp.tool(title="List documents in the corpus", annotations=READ_ONLY)
 def list_documents(source: SourceArg = None, kind: KindArg = None,
-                   limit: int = 50, offset: int = 0) -> dict:
+                   limit: int = 50, offset: int = 0) -> DocumentList:
     """Enumerate documents (id + lightweight metadata), filtered by source/kind
     and paginated -- the corpus index, *not* full-text search (that is `search`,
     which takes a query). Use it to see what a source contains, then `get_document`
@@ -427,7 +484,7 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
           annotations=READ_ONLY)
 def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
                            source: str | None = None,
-                           scope: Literal["tree", "exact"] = "tree") -> dict:
+                           scope: Literal["tree", "exact"] = "tree") -> IncomingCitations:
     """Which other documents cite `uri` -- the citation graph inbound, lagen.nu's
     signature feature as data. Answers "which cases apply this statute
     paragraph", "what refers to this ruling".
