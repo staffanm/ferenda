@@ -7,6 +7,7 @@ import contextlib
 import json
 
 import anyio
+import httpx
 import pytest
 import uvicorn
 from mcp.client import Client, ClientSession
@@ -334,6 +335,36 @@ def test_end_to_end_streamable_http(corpus, caplog):
 
     async def scenario():
         async with _served(8791):
+            # /mcp and /mcp/ are the same endpoint, and neither redirects.
+            # The published URL has no trailing slash, so a 307 there put one on
+            # the first POST of every session -- and a client whose transport
+            # does not replay a POST body across a redirect fails the handshake
+            # with nothing in our logs to show for it.
+            async with httpx.AsyncClient(follow_redirects=False) as raw:
+                base = "http://127.0.0.1:8791/mcp"
+                accept = {"accept": "application/json, text/event-stream"}
+                body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+
+                bare = await raw.post(base, json=body, headers=accept)
+                slashed = await raw.post(base + "/", json=body, headers=accept)
+                assert bare.status_code == 200, bare.status_code
+                assert "result" in bare.json()
+                assert bare.json() == slashed.json()
+                # no redirect, on either -- not merely one that happens to be
+                # followed. A `Location` here is the thing being removed.
+                for reply in (bare, slashed):
+                    assert "location" not in reply.headers, reply.headers
+
+                # DELETE (session teardown) answers the same on both, so the two
+                # paths are one endpoint rather than two that merely agree about
+                # POST. GET is left out on purpose: it opens the transport's
+                # long-lived SSE stream, so asserting on it would mean waiting
+                # for a stream designed never to end on its own.
+                a = await raw.request("DELETE", base, headers=accept)
+                b = await raw.request("DELETE", base + "/", headers=accept)
+                assert a.status_code == b.status_code, (a.status_code, b.status_code)
+                assert "location" not in a.headers, a.headers
+
             # the tidy public URL (no trailing slash) must work too
             async with Client("http://127.0.0.1:8791/mcp") as client:
                 listed = await client.list_tools()

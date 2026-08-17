@@ -30,8 +30,6 @@ from mcp.server.caching import CacheableMethod, CacheHint
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import ConfigDict, Field
-from starlette.responses import RedirectResponse
-from starlette.routing import Route
 
 from .. import config
 from ..lib import layout, pins, text
@@ -658,6 +656,8 @@ class _LoggedMCP:
         rid = next(_request_ids)
         method = scope["method"]
         common = "mcp[%d] %s %s ip=%s ua=%s" % (
+            # `path` is the full request path even under a Mount (`root_path`
+            # carries the prefix separately, so joining them doubles it)
             rid, method, scope.get("path", "-"), _client_ip(scope),
             _header(scope, "user-agent"))
 
@@ -753,15 +753,39 @@ class _LoggedMCP:
             analytics.track_mcp(scope, *called, failed=failed)
 
 
-async def _redirect_to_slash(request):
-    # a bare POST/GET /mcp -> /mcp/ (307 preserves method + body), so both the
-    # tidy public URL and the mounted path work; MCP clients follow the redirect
-    return RedirectResponse(url="/mcp/", status_code=307)
+class BarePathToMount:
+    """Make `/mcp` reach the mount instead of being redirected to `/mcp/`.
+
+    This has to sit *ahead of the router*. `Mount("/mcp")` compiles to a pattern
+    that requires something after the prefix, so the bare path never matches it;
+    Starlette's `redirect_slashes` then notices that adding a slash would match
+    and answers 307. Rewriting the path inside the mounted app is therefore too
+    late -- nothing gets there.
+
+    A redirect is correct HTTP and still the wrong answer here. The URL we
+    publish has no trailing slash, so *every* session paid a 307 on its first
+    POST, and a client whose transport will not replay a POST body across a
+    redirect fails at the handshake -- which reaches the model as a bare
+    "server error" and leaves nothing in our logs, since the request never got
+    past the router. Two sources of that failure disappear at once: the extra
+    round trip, and the redirect itself.
+
+    Exact match only: `/mcp/…` sub-paths are the transport's own business."""
+
+    def __init__(self, app, path="/mcp"):
+        self.app = app
+        self.path = path
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path") == self.path:
+            scope = {**scope, "path": self.path + "/",
+                     "raw_path": (self.path + "/").encode()}
+        await self.app(scope, receive, send)
 
 
 def mount(app):
-    """Expose the MCP server on `app` at /mcp (and /mcp/). Call before the static
-    site catch-all is mounted (serve() mounts "/" last), so the MCP routes win."""
-    app.router.routes.append(
-        Route("/mcp", _redirect_to_slash, methods=["GET", "POST", "DELETE"]))
+    """Expose the MCP server on `app` at /mcp and /mcp/, neither redirecting.
+    Call before the static site catch-all is mounted (serve() mounts "/" last),
+    so the MCP routes win."""
     app.mount("/mcp/", _LoggedMCP(_http_app))
+    app.add_middleware(BarePathToMount)
