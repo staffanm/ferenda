@@ -498,18 +498,31 @@ def _message(body):
 
 
 def _describe(msg, size):
-    """One grep-friendly token run for a JSON-RPC request: the method, and for
-    tools/call the tool name + its arguments (truncated -- get_document can take
-    a 200k max_chars but the *arguments* stay small; the cap only guards against
-    a hostile oversized payload flooding the log)."""
+    """One grep-friendly token run for a JSON-RPC request: the method, its
+    envelope id, and for tools/call the tool name + its arguments (truncated --
+    get_document can take a 200k max_chars but the *arguments* stay small; the cap
+    only guards against a hostile oversized payload flooding the log).
+
+    The `id` earns its place by making a client's own giving-up legible: a caller
+    that stops waiting may say so with `notifications/cancelled`, whose params
+    name the request being abandoned. Without both ids in the log, that notice
+    could not be paired with the call it cancelled -- and a client-side timeout is
+    otherwise invisible from in here (it is reported to the model, not to us, and
+    the model tends to relay it as a server fault). So the cancellation also
+    prints its `requestId` and `reason`."""
     if msg is None:
         return "<unparseable body, %d bytes>" % size
     method = msg.get("method", "<no method>")
+    ident = "id=%s" % json.dumps(msg.get("id"))
+    params = msg.get("params") or {}
+    if method == "notifications/cancelled":
+        return "%s %s cancels=%s reason=%s" % (
+            method, ident, json.dumps(params.get("requestId")),
+            json.dumps(params.get("reason"))[:200])
     if method != "tools/call":
-        return method
-    params = msg.get("params", {})
+        return "%s %s" % (method, ident)
     args = json.dumps(params.get("arguments", {}), ensure_ascii=False)
-    return "%s %s %s" % (method, params.get("name"), args[:500])
+    return "%s %s %s %s" % (method, ident, params.get("name"), args[:500])
 
 
 def _called(msg):

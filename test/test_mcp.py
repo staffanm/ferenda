@@ -358,14 +358,18 @@ def test_end_to_end_streamable_http(corpus, caplog):
                         "Brottsbalk (1962:700)"
 
     anyio.run(scenario)
-    # every JSON-RPC request logs one line (the access log only shows POST
-    # /mcp/); a tools/call line carries the tool name + its arguments
+    # every JSON-RPC request logs a start and a done line (the access log only
+    # shows POST /mcp/); each carries the envelope id, and a tools/call line the
+    # tool name + its arguments
     logged = [r.message for r in caplog.records
               if r.name == "accommodanda.api.mcp"]
-    assert any(m.endswith("server/discover") for m in logged)   # the 2026 opener
-    assert any(m.endswith("initialize") for m in logged)        # the 2025 opener
-    assert any("tools/call get_document" in m
+    assert any("server/discover id=" in m for m in logged)      # the 2026 opener
+    assert any("initialize id=" in m for m in logged)           # the 2025 opener
+    assert any("tools/call id=" in m and "get_document" in m
                and '"uri": "https://lagen.nu/1962:700"' in m for m in logged)
+    # arrival and completion, for the same request
+    assert any(" start " in m and "get_document" in m for m in logged)
+    assert any(" done status=200 " in m and "get_document" in m for m in logged)
 
 
 def _tracked(monkeypatch, asgi_app, hits):
@@ -408,7 +412,7 @@ def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
 
     post = [m for m in lines if "POST" in m]
     assert len(post) == 2, post
-    assert " start " in post[0] and "tools/call search" in post[0]
+    assert " start " in post[0] and "tools/call id=1 search" in post[0]
     assert " done status=200 " in post[1] and "bytes=" in post[1]
     # the caller's address, not the proxy's -- every line used to read 172.19.0.4
     assert "ip=203.0.113.7" in post[0] and "ua=openai-mcp/1.0.0" in post[0]
@@ -420,6 +424,37 @@ def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
     get = [m for m in lines if "GET" in m]
     assert len(get) == 2, get
     assert "JSONRPC-ERROR" not in get[1]
+
+
+def test_a_cancellation_names_the_call_it_abandons(caplog):
+    """A client is free to stop waiting whenever it likes, and `cancelled` is the
+    one notice we get when it does. It has to name the abandoned request, or it
+    cannot be paired with the call it refers to -- and a client-side timeout is
+    otherwise invisible here: it is reported to the model, not to us, and the
+    model relays it as a server fault."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+
+    async def ack(scope, receive, send):
+        await receive()
+        await send({"type": "http.response.start", "status": 202, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    client = TestClient(mcpmod._LoggedMCP(ack))
+    client.post("/mcp/", json={"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                               "params": {"name": "search",
+                                          "arguments": {"query": "mord"}}})
+    client.post("/mcp/", json={
+        "jsonrpc": "2.0", "method": "notifications/cancelled",
+        "params": {"requestId": 7, "reason": "client timeout"}})
+    lines = [r.message for r in caplog.records if r.name == mcpmod.log.name]
+
+    assert any("tools/call id=7 search" in m for m in lines)
+    cancel = [m for m in lines if "notifications/cancelled" in m]
+    assert cancel, lines
+    assert "cancels=7" in cancel[0], cancel[0]
+    assert "client timeout" in cancel[0], cancel[0]
+    # a 202 with an empty body is an acknowledged notification, not a failure
+    assert not any("JSONRPC-ERROR" in m for m in lines), lines
 
 
 def test_a_response_past_the_proxy_timeout_says_so(monkeypatch, caplog):
