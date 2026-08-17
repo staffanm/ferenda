@@ -1,7 +1,16 @@
 {#- The static shell for the citation-graph explorer at /hanvisningar/;
     graf.js draws the canvas, the source rows and the panel from
-    /api/v1/graph. The default center is article 6 ECHR -- the corpus' most-
-    cited single provision.
+    /api/v1/graph.
+
+    The default center is 12 kap. 42 § jordabalken -- when a tenancy is
+    forfeit. It was article 6 ECHR, the corpus' most-cited single provision,
+    which turned out to be the worst node to open on: its 31,996 citers are
+    almost all ECHR judgments, so the first thing a reader saw was 118 raw
+    ECLI identifiers under two of the twelve source rows, and nothing to
+    filter. 12:42 draws six source groups (56 rättsfall against 56 förarbeten,
+    then författningar, myndighetsavgöranden, begrepp and a lagkommentar), all
+    551 edges of its internal graph rather than a capped slice, and names its
+    neighbours "SOU 2024:83" and "Prop. 2025/26:188".
 
     The stage is the page, filling the viewport under the masthead, and the two
     rails are cards standing *over* it. Each rolls up windowshade-style to its
@@ -14,7 +23,7 @@
     the controls do not. -#}
 {% extends "page.html" %}
 {% block body %}
-<div class="graf" data-default-uri="https://lagen.nu/ext/coe/005#A6"
+<div class="graf" data-default-uri="https://lagen.nu/1970:994#K12P42"
      data-flow-groups="{{ flow_groups }}">
 {#- the page's own h1, which render's own_h1 promises the body brings. The two
     rail heads are peer cards and take the same heading level (h2), so the
