@@ -166,6 +166,18 @@ def _own_page_xhr(request):
     return bool(referer) and urlsplit(referer).netloc == request.url.netloc
 
 
+def _keep_warm(request):
+    """Whether this is the prod keep-warm cron rather than a caller.
+
+    The 31 GB OpenSearch index cannot stay in prod's ~8 GB page cache, so a
+    search after an idle hour reads hundreds of scattered blocks off an
+    HDD-class disk and costs 10+ s. A cron search every 15 minutes holds the
+    hot blocks resident. The header is the probe's own declaration -- no
+    user-agent sniffing, and a caller who sets it only removes itself from
+    our audience numbers."""
+    return request.headers.get("x-keep-warm") == "1"
+
+
 def _titled(steps, failed):
     """A Matomo page title from its path steps, branched on the outcome:
     `API/search` when it worked, `API/error/search` when it did not.
@@ -247,6 +259,9 @@ class Tracked:
         # Our own pages call the API over XHR, and the browser tracker already
         # counted the page that made the call -- so a *successful* one would
         # double-count. A failing one is a defect report rather than an audience
-        # measurement, and those are worth having whoever made the call.
-        if failed or not _own_page_xhr(request):
+        # measurement, and those are worth having whoever made the call. The
+        # prod keep-warm cron is the same trade one step further out: it is our
+        # own traffic, four calls an hour, and counting it would report a
+        # machine as an audience.
+        if failed or not (_own_page_xhr(request) or _keep_warm(request)):
             _hit(str(request.url), _api_title(scope["path"], failed), request)

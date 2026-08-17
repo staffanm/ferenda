@@ -234,31 +234,19 @@ services:
       - ./lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
     restart: always
     depends_on:
-      - elasticsearch
       - fuseki
     stdin_open: true
     logging:
       options:
         max-size: "10m"
         max-file: "10"
-  elasticsearch:
-    image: elasticsearch:7.7.1
-    profiles: [prod]
-    volumes:
-      - /mnt/data/elasticsearch:/usr/share/elasticsearch/data
-    environment:
-      - "discovery.type=single-node"
-      # was 8g/8g: measured heap_used was ~1.3GB (16%) against the 1.37M-doc
-      # `lagen` index (14GB on disk) -- Xms=Xmx=8g eagerly commits the full 8GB
-      # at JVM startup regardless of actual usage, which combined with
-      # OpenSearch's heap pushed the 15GB prod host into swap thrashing. 3g
-      # leaves >2x headroom over observed usage.
-      - "ES_JAVA_OPTS=-Xms3g -Xmx3g"
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
+  # elasticsearch (7.7.1) retired 2026-08-17: it held 3 GB of RAM and a 15 GB
+  # index on this 16 GB host, starving the page cache that the rebuilt site's
+  # OpenSearch index needs. The legacy site no longer reads it -- /search/ and
+  # the free-text half of /api/ answer 410 (ferenda/wsgiapp.py
+  # handle_retired_search) and ferenda.ini sets fulltextindex = False, so relate
+  # writes nothing. The data is still at /mnt/data/elasticsearch (15 GB) if the
+  # decision has to be revisited; git history holds the service definition.
   fuseki:
     build:
       context: docker/fuseki
@@ -315,7 +303,6 @@ services:
 volumes:
   db:
   fuseki:
-  elasticsearch:
   # The OpenSearch index (~28 G) lives on the roomy /mnt/forstor NFS, not the
   # local docker-root disk. A bind-type local volume keeps the volume NAME
   # (ferenda_opensearch-data) stable -- so `sync-up index` still targets it by
