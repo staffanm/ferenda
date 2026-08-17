@@ -2863,8 +2863,9 @@ def avg_harvest(scopes):
               % (RUN.only or ", ".join(scopes) or "jo + jk + arn + imy + kkv",
                  layout.AVG_DOWNLOADED))
         return
+    # five organs, five agency sites: fan them out (lib.harvest.fan_out)
     totals = avg_download.sync(layout.AVG_DOWNLOADED, scopes=scopes or None,
-                               full=RUN.force, only=RUN.only)
+                               full=RUN.force, only=RUN.only, jobs=RUN.jobs)
     for org, (seen, new) in totals.items():
         print("avg %s: %d seen, %d new" % (org, seen, new))
     return _sum_scope_totals(totals)
@@ -2954,8 +2955,11 @@ def rs_harvest(scopes):
         print("rs download: would download %s into %s"
               % (RUN.only or ", ".join(scopes), layout.RS_DOWNLOADED))
         return
+    # six agencies, six hosts: fan them out. The browser-shielded ones are not in
+    # DEFAULT_ORGS, and `serial=` keeps them off each other if named explicitly.
     totals = rs_download.sync(layout.RS_DOWNLOADED, scopes=scopes,
-                              full=RUN.force, only=RUN.only, limit=RUN.limit)
+                              full=RUN.force, only=RUN.only, limit=RUN.limit,
+                              jobs=RUN.jobs)
     for org, (seen, new) in totals.items():
         print("rs %s: %d seen, %d new" % (org, seen, new))
     return _sum_scope_totals(totals)

@@ -5,12 +5,10 @@ existing base regulations (new amendments / consolidations), ``--only BASEFILE``
 fetches one (needs a single fs scope)."""
 
 import re
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import nullcontext
 from pathlib import Path
 
 from ..lib import compress
+from ..lib import harvest as harvest_lib
 from ..lib.compress import list_basefiles as _list_basefiles
 from ..lib.util import NullReporter, Reporter, fold_swedish, record_path
 from . import harvest
@@ -50,68 +48,26 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1)
     printing each agency's own summary line as it finishes. Returns {fs: (seen,
     new)}.
 
-    With ``jobs > 1`` (and more than one agency, no ``--only``) the agencies are
-    harvested concurrently: each hits a different remote host, so the fan-out is
-    polite, and the wall time drops from the sum of every site to roughly the
-    slowest single one. Concurrent per-agency live progress lines would collide,
-    so each worker reports through a NullReporter and the coordinator shows one
-    aggregate '(done/total agencies)' line, printing each agency's summary above
-    it as the future completes."""
+    The fan-out itself is `lib.harvest.fan_out`, shared with every other
+    multi-scope source (avg's organs, rs's agencies): with ``jobs > 1`` the
+    agencies are harvested concurrently, each hitting a different remote host, so
+    the wall time drops from the sum of every site to roughly the slowest single
+    one. This vertical supplies only what is its own -- which agencies exist,
+    which are browser-shielded, and how to harvest one."""
     fslist = list(scopes or REGISTRY)
-    if jobs <= 1 or only or len(fslist) <= 1:
-        # sequential: each agency keeps its own live progress line
-        totals = {}
-        for fs in fslist:
-            _, totals[fs] = _one(fs, root, full, only, delay, log, None)
-            log("foreskrift %s: %d seen, %d new" % (fs, *totals[fs]))
-        return totals
+    quiet = NullReporter()
 
-    # parallel: quiet workers (NullReporter), one shared aggregate line. Each
-    # worker logs into its own buffer so a completed agency's stray notes and its
-    # summary print together, on the coordinator thread, without interleaving.
-    totals = {}
-    buffers = {fs: [] for fs in fslist}
-    running: set[str] = set()
-    state = threading.Lock()                 # guards `running`
-    # DetachedChrome starts headful Chrome on a private Xvfb display and points the
-    # *process-global* DISPLAY at it (browser.py:_ensure_display), so two browser
-    # agencies at once corrupt each other's display -> stalled navigation. Serialise
-    # them; the HTTP agencies (the overwhelming majority) still run fully parallel.
-    browser_lock = threading.Lock()
+    def one(fs, into):
+        # a worker's live progress line would collide with the others', so a
+        # parallel run reports through NullReporter and writes into `into`; the
+        # sequential path gets the real Reporter and prints as it goes
+        parallel = jobs > 1 and not only and len(fslist) > 1
+        return _one(fs, root, full, only, delay, into,
+                    quiet if parallel else Reporter())[1]
 
-    def work(fs):
-        with state:
-            running.add(fs)
-        try:
-            gate = browser_lock if REGISTRY[fs].browser else nullcontext()
-            with gate:
-                return _one(fs, root, full, only, delay,
-                            buffers[fs].append, NullReporter())
-        finally:
-            with state:
-                running.discard(fs)
-
-    rep = Reporter()
-    done = new_total = 0
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = {pool.submit(work, fs): fs for fs in fslist}
-        for future in as_completed(futures):
-            fs, (seen, new) = future.result()
-            totals[fs] = (seen, new)
-            new_total += new
-            done += 1
-            rep.clear()                          # lift the live line off the row
-            for line in buffers[fs]:
-                log(line)
-            log("foreskrift %s: %d seen, %d new" % (fs, seen, new))
-            # name what is still in flight, so a slow browser agency (settle 20s per
-            # navigation) reads as working, not as a frozen counter
-            with state:
-                busy = sorted(running)
-            note = "  [running: %s]" % ", ".join(busy) if busy else ""
-            rep.update(done, len(fslist), scope="foreskrift", new=new_total, note=note)
-    rep.done()
-    return totals
+    return harvest_lib.fan_out(
+        fslist, one, jobs=jobs, label="foreskrift",
+        serial=[fs for fs in fslist if REGISTRY[fs].browser], log=log)
 
 
 def list_basefiles(root, fs):

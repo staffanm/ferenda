@@ -1464,7 +1464,12 @@ SYNC = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync, "imy": imy_sync,
         "kkv": kkv_sync}
 
 
-def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
-    """Download the named organs (default all five). Returns {org: (seen, new)}."""
+def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5, jobs=1):
+    """Download the named organs (default all five). Returns {org: (seen, new)}.
+
+    The five organs are five separate agency sites, so `jobs > 1` harvests them
+    concurrently (lib.harvest.fan_out) -- each worker still paces its own host,
+    and the wall clock drops to roughly the slowest organ instead of their sum."""
     return dispatch_scopes(root, scopes, SYNC, ORGS, full=full, only=only,
-                           limit=limit, delay=delay, label="avg download")
+                           limit=limit, delay=delay, jobs=jobs,
+                           label="avg download")

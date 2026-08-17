@@ -107,7 +107,7 @@ from ..lib.util import (
     swedish_date,
 )
 from . import skv
-from .agencies import BY_ORG, DEFAULT_ORGS, number_slug
+from .agencies import BROWSER_ORGS, BY_ORG, DEFAULT_ORGS, number_slug
 
 # --------------------------------------------------------------------------
 # per-agency constants
@@ -929,11 +929,11 @@ SYNC = {"imy": imy_sync, "fi": fi_sync, "fk": fk_sync, "kfm": kfm_sync,
         "migr": migr_sync, "kkv": kkv_sync, "skv": skv_sync}
 
 
-def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
+def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5, jobs=1):
     """Download the named agencies' ställningstaganden. With no scopes named,
     the six ordinary HTTP agencies -- Skatteverket needs the serial headful
     browser and runs on its own schedule (`agencies.BROWSER_ORGS`), though
     naming it explicitly still harvests it. Returns {org: (seen, new)}."""
     return dispatch_scopes(root, scopes, SYNC, DEFAULT_ORGS, full=full,
-                           only=only, limit=limit, delay=delay,
-                           label="rs download")
+                           only=only, limit=limit, delay=delay, jobs=jobs,
+                           serial=BROWSER_ORGS, label="rs download")

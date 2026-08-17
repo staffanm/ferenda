@@ -41,11 +41,14 @@ parameters -- publication cadence differs, so each call site states its own.
 """
 
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Mapping
+from typing import Any, Callable, Container, Iterable, Iterator, Mapping, Sequence
 
 from . import compress
 from .util import (
@@ -530,11 +533,106 @@ def walk_records(root: Path | str, pending: Iterable[Pending], *,
 # the per-scope entry point
 # --------------------------------------------------------------------------
 
+def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
+                                                  tuple[int, int]],
+            *, jobs: int = 1, serial: Container[str] = (),
+            label: str = "harvest", log: Callable[[str], None] = print,
+            ) -> dict[str, tuple[int, int]]:
+    """Run `work(scope, log)` once per scope, concurrently when `jobs > 1`, and
+    return ``{scope: (seen, new)}``.
+
+    A source's scopes are separate upstreams on separate hosts, so fanning them
+    out is polite -- each worker still paces its own host -- and the wall time
+    drops from the sum of every site to roughly the slowest single one.
+
+    Concurrent per-scope progress lines would collide, so each worker writes into
+    its own buffer and the coordinator prints that buffer, then the scope's
+    summary, above one aggregate '(done/total)' line. The line names what is
+    still in flight, so a slow scope reads as working rather than as a frozen
+    counter. Workers should report through a `NullReporter`; the caller's `work`
+    decides that, since only it knows what its runner takes.
+
+    `serial` names scopes that must not run concurrently with each other -- the
+    browser-driven ones, where `DetachedChrome` points a *process-global* DISPLAY
+    at its own Xvfb and Playwright's sync API is single-threaded, so two at once
+    corrupt each other's display and stall. They still overlap the HTTP scopes,
+    which are the overwhelming majority.
+
+    Sequential whenever there is nothing to gain (`jobs <= 1`, one scope), and
+    then each scope keeps its own live progress line."""
+    scopes = list(scopes)
+    elapsed: dict[str, float] = {}
+    totals: dict[str, tuple[int, int]] = {}
+
+    def timed(scope, into):
+        started = time.monotonic()
+        try:
+            return work(scope, into)
+        finally:
+            elapsed[scope] = time.monotonic() - started
+
+    if jobs <= 1 or len(scopes) <= 1:
+        for scope in scopes:
+            totals[scope] = timed(scope, log)
+            log("%s %s: %d seen, %d new" % (label, scope, *totals[scope]))
+        _log_scope_times(elapsed, label, log)
+        return totals
+
+    buffers: dict[str, list[str]] = {scope: [] for scope in scopes}
+    running: set[str] = set()
+    state = threading.Lock()          # guards `running`
+    serial_lock = threading.Lock()
+
+    def worker(scope):
+        with state:
+            running.add(scope)
+        try:
+            gate = serial_lock if scope in serial else nullcontext()
+            with gate:
+                return timed(scope, buffers[scope].append)
+        finally:
+            with state:
+                running.discard(scope)
+
+    rep = Reporter()
+    done = new_total = 0
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = {pool.submit(worker, scope): scope for scope in scopes}
+        for future in as_completed(futures):
+            scope = futures[future]
+            totals[scope] = seen, new = future.result()
+            new_total += new
+            done += 1
+            rep.clear()               # lift the live line off the row
+            for line in buffers[scope]:
+                log(line)
+            log("%s %s: %d seen, %d new" % (label, scope, seen, new))
+            with state:
+                busy = sorted(running)
+            rep.update(done, len(scopes), scope=label, new=new_total,
+                       note="  [running: %s]" % ", ".join(busy) if busy else "")
+    rep.done()
+    _log_scope_times(elapsed, label, log)
+    return totals
+
+
+def _log_scope_times(elapsed, label, log):
+    """Which upstream actually cost the time. The run ledger measures a whole
+    source (`avg` download is 553 s), which is the wrong grain: these scopes are
+    separate hosts, so a fan-out's gain is bounded by the slowest one alone, and
+    nothing else records which that is."""
+    if len(elapsed) > 1:
+        log("%s scope times: %s" % (
+            label, ", ".join("%s %.1fs" % (scope, secs) for scope, secs
+                             in sorted(elapsed.items(), key=lambda kv: -kv[1]))))
+
+
 def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
                     runners: Mapping[str, Callable[..., tuple[int, int]]],
                     default: Iterable[str], *, full: bool = False,
                     only: str | None = None, limit: int | None = None,
-                    delay: float = 0.5, label: str = "harvest",
+                    delay: float = 0.5, jobs: int = 1,
+                    serial: Container[str] = (), label: str = "harvest",
                     log: Callable[[str], None] = print,
                     ) -> dict[str, tuple[int, int]]:
     """Run one harvest per named scope -- all of `default` when `scopes` is
@@ -554,25 +652,15 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
     if only and not any(only.startswith(scope + "/") for scope in run):
         raise ValueError("--only %s names no scope in this run (%s)"
                          % (only, ", ".join(run)))
-    totals = {}
-    elapsed = {}
     for scope in run:
         if scope not in runners:      # user-typed scope: raise, never assert
             raise ValueError("no harvest scope %r" % scope)
-        started = time.monotonic()
-        totals[scope] = runners[scope](
+    # `--only` narrows to one document, so there is one scope to run and nothing
+    # to fan out; the pool would only cost it its own live progress line.
+    def one(scope, _log):
+        return runners[scope](
             str(root), full=full, limit=limit, delay=delay,
             only=only if only and only.startswith(scope + "/") else None)
-        elapsed[scope] = time.monotonic() - started
-    # Which upstream actually costs the time. The run ledger measures a whole
-    # source (`avg` is 553 s), which is the wrong grain for deciding anything:
-    # these scopes are separate hosts, so they could run concurrently, but the
-    # gain of that is bounded by the slowest one alone -- and nothing recorded
-    # which that is. One line, sorted, so the next harvest answers it.
-    if len(elapsed) > 1:
-        log("%s scope times: %s" % (
-            label,
-            ", ".join("%s %.1fs" % (scope, secs) for scope, secs
-                      in sorted(elapsed.items(), key=lambda kv: -kv[1]))))
-    return totals
+    return fan_out(run, one, jobs=1 if only else jobs, serial=serial,
+                   label=label, log=log)
 
