@@ -197,6 +197,39 @@ class SearchResults(TypedDict):
     total: int
 
 
+class ResolvedCitations(TypedDict):
+    """`resolve_citation`'s hits, wrapped.
+
+    Wrapped, and not returned as a bare list, because the SDK renders a list
+    return as one content block *per element*. A client reading `content[0]` --
+    which the spec permits, since `content` is the human-readable rendering --
+    then gets element 0 of N with no error raised anywhere. That is
+    size-dependent truncation: this tool usually resolves exactly one citation,
+    so such a client works perfectly until the day two hits come back, while
+    `get_outgoing_citations` silently hands it 1 of 55 from the start. A single
+    block cannot be half-read.
+
+    `results` rather than `citations`: these rows are the same shape `search`
+    returns under that name, so a client can reuse the same handler."""
+
+    results: list[dict]
+
+
+class OutgoingCitations(TypedDict):
+    """`get_outgoing_citations`' rows, wrapped for the reason in
+    `ResolvedCitations`. `citations` matches `get_incoming_citations`, which
+    already answers with a dict under that key, so the pair reads alike."""
+
+    citations: list[dict]
+
+
+class SourceList(TypedDict):
+    """`list_sources`' rows, wrapped for the reason in `ResolvedCitations` --
+    this one emitted 16 content blocks, one per source."""
+
+    sources: list[dict]
+
+
 class FetchedDocument(TypedDict):
     """A document (or one provision of it) in the fetch contract's shape.
     `metadata` is the free-form slot, and is where the corpus facts the contract
@@ -282,7 +315,7 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
 
 
 @mcp.tool(title="Resolve a legal citation to its URI", annotations=READ_ONLY)
-def resolve_citation(citation: str) -> list[dict]:
+def resolve_citation(citation: str) -> ResolvedCitations:
     """Resolve a Swedish or EU legal citation written by name/abbreviation into
     its exact lagen.nu document URI(s) -- the reliable way to turn "what the user
     wrote" into a citable, fragment-deep link without full-text search.
@@ -290,15 +323,17 @@ def resolve_citation(citation: str) -> list[dict]:
     Handles a statute nickname/abbreviation + pinpoint ("avtalslagen 36 §",
     "BrB 3:1"), an EU act + article ("GDPR artikel 32", "dataskyddsförordningen
     art. 6") and a case nickname ("NJA 2015 s. 899", "Instagrambilden"). Returns a
-    list (usually one entry, or empty if nothing resolves) of {id, uri, url,
-    identifier, title, source, kind, inbound_count, fragments} -- `uri` being the
-    document's identifier and `url` its absolute public page URL; when the
-    citation named a paragraph/article, `fragments[0].uri` is the pinpointed
-    fragment URI and `id` (what `fetch` takes) is that same pinpointed URI.
+    `results` list (usually one entry, empty if nothing resolves) of {id, uri,
+    url, identifier, title, source, kind, inbound_count, fragments} -- the same
+    row shape `search` returns, `uri` being the document's identifier and `url`
+    its absolute public page URL; when the citation named a paragraph/article,
+    `fragments[0].uri` is the pinpointed fragment URI and `id` (what `fetch`
+    takes) is that same pinpointed URI.
     """
     with _con() as con:
-        return [{**r, "id": _hit_id(r)}
-                for r in _absolute_page_urls(pins.resolved_results(con, citation))]
+        return ResolvedCitations(results=[
+            {**r, "id": _hit_id(r)}
+            for r in _absolute_page_urls(pins.resolved_results(con, citation))])
 
 
 @mcp.tool(title="Get a document's metadata and text", annotations=READ_ONLY)
@@ -426,26 +461,27 @@ def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
 
 @mcp.tool(title="What this document cites (outbound citations)",
           annotations=READ_ONLY)
-def get_outgoing_citations(uri: str) -> list[dict]:
-    """Every citation a document makes -- the citation graph outbound. Each entry:
-    uri (the cited target, with its `#`-fragment where the citation is
-    paragraph-deep), anchor (where in the citing document it sits), predicate (the
-    relation, e.g. dcterms:references), text (the citation as it reads in the
-    source), label/title/source of the target, and `hosted` (false when the target
-    is not yet in the corpus -- then label/title are absent). Pass a bare document
-    URI.
+def get_outgoing_citations(uri: str) -> OutgoingCitations:
+    """Every citation a document makes -- the citation graph outbound. Each entry
+    in `citations`: uri (the cited target, with its `#`-fragment where the
+    citation is paragraph-deep), anchor (where in the citing document it sits),
+    predicate (the relation, e.g. dcterms:references), text (the citation as it
+    reads in the source), label/title/source of the target, and `hosted` (false
+    when the target is not yet in the corpus -- then label/title are absent).
+    Pass a bare document URI.
     """
     with _con() as con:
-        return reads.outbound(con, uri)
+        return OutgoingCitations(citations=reads.outbound(con, uri))
 
 
 @mcp.tool(title="List the corpus sources and their sizes", annotations=READ_ONLY)
-def list_sources() -> list[dict]:
+def list_sources() -> SourceList:
     """The corpus' sources and how many documents each holds -- orientation for
-    the `source` filter on `search`/`list_documents`. Each: source, documents.
+    the `source` filter on `search`/`list_documents`. Each entry in `sources`:
+    source, documents.
     """
     with _con() as con:
-        return reads.sources(con)
+        return SourceList(sources=reads.sources(con))
 
 
 # --------------------------------------------------------------------------

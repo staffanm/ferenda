@@ -105,7 +105,7 @@ def test_every_tool_url_is_absolute(corpus):
     the MCP boundary's job, so it is checked on every tool that emits a url."""
     base = config.PUBLIC_BASE_URL
     urls = [mcpmod.search("mord", source="sfs")["results"][0]["url"],
-            mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")[0]["url"],
+            mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"][0]["url"],
             mcpmod.fetch("https://lagen.nu/1962:700#K3P1")["url"],
             mcpmod.fetch("https://lagen.nu/1962:700")["url"]]
     for url in urls:
@@ -132,7 +132,7 @@ def test_search_fails_visibly_without_opensearch(corpus):
 
 
 def test_resolve_citation_to_fragment(corpus):
-    hits = mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")
+    hits = mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"]
     assert hits, "expected the nickname+pinpoint to resolve"
     assert hits[0]["uri"] == "https://lagen.nu/1962:700"
     assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1962:700#K3P1"
@@ -140,13 +140,13 @@ def test_resolve_citation_to_fragment(corpus):
 
 def test_resolve_citation_bare_sfs_number(corpus):
     # the id-shaped probe API clients naturally send ("SFS 2018:585")
-    hits = mcpmod.resolve_citation("SFS 2018:585")
+    hits = mcpmod.resolve_citation("SFS 2018:585")["results"]
     assert hits and hits[0]["uri"] == "https://lagen.nu/2018:585"
     # a bare page-number law id: only the catalog knows the _s.1 suffix
-    hits = mcpmod.resolve_citation("SFS 1904:48")
+    hits = mcpmod.resolve_citation("SFS 1904:48")["results"]
     assert hits and hits[0]["uri"] == "https://lagen.nu/1904:48_s.1"
     # ...and a pinpoint follows the rewritten root
-    hits = mcpmod.resolve_citation("1904:48 3 §")
+    hits = mcpmod.resolve_citation("1904:48 3 §")["results"]
     assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1904:48_s.1#P3"
 
 
@@ -195,7 +195,7 @@ def test_citation_graph(corpus):
                                           scope="exact")
     assert exact["scope"] == "exact" and exact["total"] == 0
 
-    outbound = mcpmod.get_outgoing_citations("https://lagen.nu/2018:585")
+    outbound = mcpmod.get_outgoing_citations("https://lagen.nu/2018:585")["citations"]
     ref = next(c for c in outbound if c["uri"] == "https://lagen.nu/1962:700#K3P1")
     assert ref["hosted"] is True and ref["text"] == "3 kap. 1 §"
 
@@ -207,7 +207,7 @@ def test_list_documents_and_sources(corpus):
         "https://lagen.nu/1962:700", "https://lagen.nu/2018:585",
         "https://lagen.nu/1904:48_s.1"}
 
-    sources = mcpmod.list_sources()
+    sources = mcpmod.list_sources()["sources"]
     assert {"source": "sfs", "documents": 3} in sources
 
 
@@ -259,7 +259,8 @@ def test_search_and_fetch_satisfy_the_openai_contract(corpus):
     assert whole["url"] == config.PUBLIC_BASE_URL + "/1962:700"
 
     # resolve_citation hands back the same handle, so its hits are fetchable too
-    assert mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")[0]["id"] == hit["id"]
+    assert (mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"][0]["id"]
+            == hit["id"])
 
 
 def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
@@ -354,6 +355,30 @@ def test_end_to_end_streamable_http(corpus, caplog):
                 # followed. A `Location` here is the thing being removed.
                 for reply in (bare, slashed):
                     assert "location" not in reply.headers, reply.headers
+
+                # One content block per tool, whatever the row count. The SDK
+                # renders a *list* return as one block per element, so a client
+                # reading content[0] -- which the spec permits, `content` being
+                # the human-readable rendering -- silently got element 0 of N:
+                # list_sources answered in 16 blocks and get_outgoing_citations
+                # in 55. Size-dependent truncation is the worst shape, since a
+                # single-hit resolve_citation makes such a client look correct
+                # right up until a second row appears.
+                for tool, args in (("list_sources", {}),
+                                   ("get_outgoing_citations",
+                                    {"uri": "https://lagen.nu/2018:585"}),
+                                   ("resolve_citation",
+                                    {"citation": "brottsbalken 3 kap. 1 §"})):
+                    reply = await raw.post(
+                        base, headers=accept,
+                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                              "params": {"name": tool, "arguments": args}})
+                    result = reply.json()["result"]
+                    assert len(result["content"]) == 1, (tool,
+                                                         len(result["content"]))
+                    # and that one block carries the whole answer, not a row of it
+                    assert isinstance(json.loads(result["content"][0]["text"]),
+                                      dict), tool
 
                 # DELETE (session teardown) answers the same on both, so the two
                 # paths are one endpoint rather than two that merely agree about
