@@ -186,12 +186,25 @@ CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
 # the freelist for `CREATE` to reuse, and the real corpus catalog went from
 # 4.87 to 4.96 GB.
 # `documents`' own covering index, for the same reason as its links-side sibling
-# below. The ops dashboard's per-source totals are one `SELECT source, COUNT(*),
-# SUM(art_size) ... GROUP BY source`; a (source)-only index orders that scan but
-# cannot answer it, so the query reads the whole 173.8 MB table. Covering, the
-# same query is a 5.5 MB index scan. `source` leads, so every plain
-# `WHERE source = ?` keeps the index it had.
-INDEX_DOCS_SOURCE_COLUMNS = ("source", "art_size")
+# below. It serves two queries, and the column order is what lets one index do
+# both:
+#
+#   * The ops dashboard's per-source totals, one `SELECT source, COUNT(*),
+#     SUM(art_size) ... GROUP BY source`. A (source)-only index orders that scan
+#     but cannot answer it, so the query reads the whole 173.8 MB table;
+#     covering, it is a 5.5 MB index scan.
+#   * The paginated listing (`documents()`, behind the MCP `list_documents` and
+#     the browse pages): `WHERE source = ? ORDER BY uri LIMIT n`. Without `uri`
+#     in the index the plan is `USE TEMP B-TREE FOR ORDER BY` -- every row of the
+#     source read and sorted to return the first few, so the cost scales with the
+#     source, not with `n`. Measured on prod, cold: sfs (11k rows) 28 s, dv (24k)
+#     50 s, forarbete (97k) **154 s**, which is past nginx's 60 s
+#     proxy_read_timeout -- the caller got a 504 while the query ran on. With
+#     `uri` second, SQLite walks the index in order and stops after `n`.
+#
+# `source` leads, so every plain `WHERE source = ?` keeps the index it had, and
+# `art_size` stays present so the dashboard's scan is still covering.
+INDEX_DOCS_SOURCE_COLUMNS = ("source", "uri", "art_size")
 _CREATE_DOCS_SOURCE = ("CREATE INDEX IF NOT EXISTS idx_docs_source ON documents(%s)"
                        % ", ".join(INDEX_DOCS_SOURCE_COLUMNS))
 

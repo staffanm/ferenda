@@ -96,6 +96,17 @@ def test_a_narrow_docs_source_index_is_widened(tmp_path):
         con, lambda: con.execute("SELECT uri FROM documents WHERE source = 'sfs'")
         .fetchall())
     assert "idx_docs_source" in lookup, lookup
+
+    # ...and `uri` sits second, so the paginated listing walks the index in order
+    # instead of sorting the whole source to return the first few. Without it the
+    # plan is `USE TEMP B-TREE FOR ORDER BY` and the cost scales with the source,
+    # not the page: measured on prod, forarbete (97k rows) took 154 s cold and
+    # the caller got nginx's 60 s 504 while the query ran on.
+    listing = _plan_of_last_query(
+        con, lambda: catalog.documents(con, "sfs", None, 2, 0))
+    assert "TEMP B-TREE" not in listing, listing
+    assert "idx_docs_source" in listing, listing
+
     assert catalog.widen_docs_source_index(con) is False   # idempotent
     con.close()
 
