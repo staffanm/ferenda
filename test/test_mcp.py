@@ -376,6 +376,69 @@ def _tracked(monkeypatch, asgi_app, hits):
     monkeypatch.setattr(config, "MATOMO_SITE_API", 3)
     return TestClient(mcpmod._LoggedMCP(asgi_app))
 
+def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
+    """Two lines per request, whatever the method.
+
+    Written because the wrapper logged only POST and only on arrival, so three
+    situations were indistinguishable in the log: a call that answered, a call
+    that answered a JSON-RPC error, and a call that never produced a response.
+    A GET or DELETE -- streamable HTTP uses both -- was invisible altogether,
+    which is the blind spot a client-side "the tool failed" report lands in."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+
+    async def jsonrpc(scope, receive, send):
+        if scope["method"] == "POST":
+            await receive()
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body",
+                    "body": b'{"jsonrpc":"2.0","id":1,"result":{}}'})
+
+    client = TestClient(mcpmod._LoggedMCP(jsonrpc))
+    client.post("/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                               "params": {"name": "search",
+                                          "arguments": {"query": "mord"}}},
+                headers={"x-forwarded-for": "203.0.113.7, 10.0.0.1",
+                         "user-agent": "openai-mcp/1.0.0"})
+    client.get("/mcp/")
+    lines = [r.message for r in caplog.records]
+
+    post = [m for m in lines if "POST" in m]
+    assert len(post) == 2, post
+    assert " start " in post[0] and "tools/call search" in post[0]
+    assert " done status=200 " in post[1] and "bytes=" in post[1]
+    # the caller's address, not the proxy's -- every line used to read 172.19.0.4
+    assert "ip=203.0.113.7" in post[0] and "ua=openai-mcp/1.0.0" in post[0]
+    # both lines carry the same request id, so concurrent calls can be paired
+    assert post[0].split()[0] == post[1].split()[0]
+
+    # ...and a non-POST is logged too, without the JSON-RPC envelope test being
+    # applied to a body that carries no envelope
+    get = [m for m in lines if "GET" in m]
+    assert len(get) == 2, get
+    assert "JSONRPC-ERROR" not in get[1]
+
+
+def test_a_request_that_dies_inside_the_app_is_logged(monkeypatch, caplog):
+    """An exception on the way out leaves a record with its traceback. Without
+    it, an app-side failure and a request that never arrived look identical --
+    which is exactly the ambiguity that made a client's error report
+    unfalsifiable from our side."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+
+    async def boom(scope, receive, send):
+        await receive()
+        raise RuntimeError("the tool exploded")
+
+    with pytest.raises(RuntimeError, match="exploded"):
+        TestClient(mcpmod._LoggedMCP(boom)).post(
+            "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    lines = [r.message for r in caplog.records]
+    assert any(" start " in m and "tools/list" in m for m in lines)
+    assert any("raised after" in m for m in lines)
+    assert any(r.exc_info for r in caplog.records), "the traceback is the point"
+
+
 def test_the_wrapper_passes_the_response_through_while_counting_it(monkeypatch):
     """Drives `_LoggedMCP` itself -- the response-watching closure that decides
     what Matomo is told. Written after that closure shipped with an augmented

@@ -18,8 +18,10 @@ corpus fact reaches MCP and REST through one code path.
 """
 
 import contextlib
+import itertools
 import json
 import logging
+import time
 from collections.abc import Mapping
 from typing import Annotated, Literal, TypedDict
 
@@ -561,45 +563,91 @@ def _failed(status, body, truncated):
                               and msg["result"].get("isError") is True)
 
 
-class _LoggedMCP:
-    """ASGI wrapper logging one line per MCP request -- client IP, JSON-RPC
-    method, tool name and arguments -- and reporting the same call to Matomo
-    (api/analytics.py) when a tracker is configured. The uvicorn/nginx access
-    logs see only `POST /mcp/ 200`, so tool-level visibility has to come from
-    here. The request body is buffered to be parsed (bodies are single JSON-RPC
-    messages, stateless_http -- small by construction) and replayed to the
-    wrapped app.
+def _header(scope, name):
+    """One request header from an ASGI scope, latin-1 decoded as the spec stores
+    it, or "-" when absent. Truncated: a user-agent is caller-controlled."""
+    want = name.encode("latin-1")
+    for key, value in scope.get("headers", ()):
+        if key == want:
+            return value.decode("latin-1", "replace")[:200]
+    return "-"
 
-    The *response* is watched too, up to CAPTURE_MAX, because whether a tool call
-    failed is only readable there -- see `_failed`. Nothing is withheld from the
-    caller: each message is passed on as it arrives, and the tracking hit is sent
-    after the response has gone out."""
+
+def _client_ip(scope):
+    """The caller's address, not nginx's.
+
+    `scope["client"]` is the socket peer, which behind the compose-network proxy
+    is always nginx (172.19.x.x) -- so every MCP line logged the same address and
+    could not tell an OpenAI host from a Claude one. The vhost sets
+    X-Forwarded-For; its FIRST entry is the original client, the rest are proxies.
+    It is caller-forgeable, so it identifies traffic, it does not authorise
+    anything."""
+    forwarded = _header(scope, "x-forwarded-for")
+    if forwarded != "-":
+        return forwarded.split(",")[0].strip()
+    client = scope.get("client")
+    return client[0] if client else "-"
+
+
+_request_ids = itertools.count(1)
+
+
+class _LoggedMCP:
+    """ASGI wrapper logging every MCP request twice -- once on arrival, once on
+    completion -- and reporting tool calls to Matomo (api/analytics.py) when a
+    tracker is configured.
+
+    Two lines, not one, because a single arrival line cannot distinguish the three
+    outcomes that matter when a client reports a failure we cannot see: the call
+    answered, the call answered with a JSON-RPC error, or the app never produced a
+    response at all. Both lines carry `mcp[<n>]`, so concurrent calls can be
+    paired up (`grep 'mcp\\[7\\]'`).
+
+    Every request is logged, whatever its method. Only POST carries a JSON-RPC
+    body, but streamable HTTP also uses GET (the SSE stream) and DELETE (session
+    teardown), and those used to pass through invisibly -- a blind spot exactly
+    where a client-side transport failure would show.
+
+    The uvicorn/nginx access logs see only `POST /mcp/ 200`, so tool-level
+    visibility has to come from here. A POST body is buffered to be parsed
+    (single JSON-RPC messages, stateless_http -- small by construction) and
+    replayed to the wrapped app. The response is watched up to CAPTURE_MAX
+    because whether a tool call failed is only readable there (see `_failed`).
+    Nothing is withheld from the caller: each message is passed on as it arrives,
+    and the tracking hit is sent after the response has gone out."""
 
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["method"] != "POST":
+        if scope["type"] != "http":
             return await self.app(scope, receive, send)
-        messages = []
-        while True:
-            message = await receive()
-            messages.append(message)
-            if message["type"] != "http.request" or not message.get("more_body"):
-                break
-        body = b"".join(m.get("body", b"") for m in messages
-                        if m["type"] == "http.request")
-        client = scope.get("client")
-        msg = _message(body)
-        log.info("%s %s", client[0] if client else "-", _describe(msg, len(body)))
-        called = _called(msg)
-        replay = iter(messages)
+        rid = next(_request_ids)
+        method = scope["method"]
+        common = "mcp[%d] %s %s ip=%s ua=%s" % (
+            rid, method, scope.get("path", "-"), _client_ip(scope),
+            _header(scope, "user-agent"))
 
-        async def receive_replayed():
-            return next(replay, None) or await receive()
+        receive_replayed, called, described = receive, None, ""
+        if method == "POST":
+            messages = []
+            while True:
+                message = await receive()
+                messages.append(message)
+                if (message["type"] != "http.request"
+                        or not message.get("more_body")):
+                    break
+            body = b"".join(m.get("body", b"") for m in messages
+                            if m["type"] == "http.request")
+            msg = _message(body)
+            described = _describe(msg, len(body))
+            called = _called(msg)
+            replay = iter(messages)
 
-        if not (analytics.ENABLED and called):
-            return await self.app(scope, receive_replayed, send)
+            async def receive_replayed():
+                return next(replay, None) or await receive()
+
+        log.info("%s start %s", common, described)
 
         status, captured = None, bytearray()
 
@@ -617,18 +665,35 @@ class _LoggedMCP:
                 captured.extend(message.get("body", b"")[:CAPTURE_MAX - len(captured)])
             await send(message)
 
+        started = time.monotonic()
         try:
             await self.app(scope, receive_replayed, watched)
         except Exception:
             # the call did not complete, whatever the caller ends up receiving
             # (api/errors.py's 500, or a body cut short if the transport had
-            # already started one). Count it, then let the exception through
-            # untouched -- this wrapper observes, it does not handle.
-            analytics.track_mcp(scope, *called, failed=True)
+            # already started one). Logged with its traceback here -- this is the
+            # one record that a request arrived and died inside us, which is the
+            # question a client-side error report cannot answer. Then let it
+            # through untouched: this wrapper observes, it does not handle.
+            log.exception("%s raised after %.0f ms (status so far %s)",
+                          common, (time.monotonic() - started) * 1000, status)
+            if analytics.ENABLED and called:
+                analytics.track_mcp(scope, *called, failed=True)
             raise
-        analytics.track_mcp(scope, *called,
-                            failed=_failed(status, bytes(captured),
-                                           len(captured) >= CAPTURE_MAX))
+        # `_failed` reads a JSON-RPC envelope, which only a POST answers. A GET is
+        # the SSE stream, whose `event:`/`data:` frames are not JSON -- running the
+        # envelope test on those would label every stream JSONRPC-ERROR.
+        if method == "POST":
+            failed = _failed(status, bytes(captured), len(captured) >= CAPTURE_MAX)
+            flag = " JSONRPC-ERROR" if failed else ""
+        else:
+            failed = status is None or status >= 400
+            flag = " HTTP-ERROR" if failed else ""
+        log.info("%s done status=%s %.0f ms bytes=%d%s %s",
+                 common, status, (time.monotonic() - started) * 1000,
+                 len(captured), flag, described)
+        if analytics.ENABLED and called:
+            analytics.track_mcp(scope, *called, failed=failed)
 
 
 async def _redirect_to_slash(request):
