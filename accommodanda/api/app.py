@@ -18,6 +18,7 @@ artifact's `uri` is also its API key, its dump id and its OpenSearch `_id`.
 
 import json
 import logging
+import os
 import re
 import sqlite3
 import subprocess
@@ -1223,5 +1224,21 @@ def serve(directory, host="127.0.0.1", port=8000):
     # which would otherwise be nginx's own address for every request. The
     # session cookie's Secure flag is an explicit config switch
     # (config.COOKIE_SECURE), not derived from this header.
-    # forwarded_allow_ips defaults to 127.0.0.1, the proxy on the same host.
+    #
+    # proxy_headers alone is not enough: uvicorn rewrites the client address
+    # only for peers named in FORWARDED_ALLOW_IPS, which defaults to 127.0.0.1
+    # -- the same *host*, not the same compose network. On prod nginx is its own
+    # container at 172.19.0.4, so the header was read from an untrusted peer and
+    # dropped, and every request logged `"client": "172.19.0.4"`. That put the
+    # whole internet in one login-quota bucket, so bots probing /auth/login
+    # locked the editors out, and it collapsed Matomo's visitor ids into one.
+    # Prod sets FORWARDED_ALLOW_IPS to the proxy's address (the API port is
+    # published to no host interface, so only the compose network can reach it).
+    #
+    # Announced at startup for the same reason the Matomo line above is: a
+    # misconfiguration whose only symptom is a rate limit that fires for the
+    # wrong people should say, once, what it trusts.
+    logging.info("proxy: trusting X-Forwarded-* from %s (FORWARDED_ALLOW_IPS); "
+                 "client addresses and the login rate limit key on it",
+                 os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1 (default)"))
     uvicorn.run(app, host=host, port=port, proxy_headers=True)
