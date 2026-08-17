@@ -42,22 +42,36 @@ services:
     image: opensearchproject/opensearch:3.7.0
     container_name: lagen-opensearch
     environment:
-      - discovery.type=single-node           # one node; relaxes the bootstrap checks
+      # one node; relaxes the bootstrap checks. One consequence worth knowing:
+      # the security-analytics plugin creates .opensearch-sap-* indices with a
+      # replica, which can never allocate here, so the CLUSTER reads `yellow`
+      # while `lagen` itself is green -- a standing false alarm that hides a real
+      # one. Fixed on prod 2026-08-17 with an index template pinning those to 0
+      # replicas: PUT _index_template/sap-single-node {"index_patterns":
+      # [".opensearch-sap-*"], "priority": 500, "template": {"settings":
+      # {"number_of_replicas": 0}}}. Reapply after a nuke-and-rebuild.
+      - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
       - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
       - bootstrap.memory_lock=true            # keep the JVM heap out of swap
-      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g    # 15GB host. Headroom opened up: the
-                                              # legacy Elasticsearch dropped 8g->3g
-                                              # and fuseki (2g) now runs ONLY during
-                                              # the nightly legacy regen (host cron
-                                              # start/stops it around `build all
-                                              # all`), so it isn't resident by day.
-                                              # 2g is generous already -- measured
-                                              # heap use is ~24% of 1g (the collapse
-                                              # index is deliberately not heap-hungry:
-                                              # no parent-child join). The bigger win
-                                              # from the freed RAM is OS page cache
-                                              # for the on-disk index, not JVM heap.
+      # 15GB host, and every byte here is taken FROM the page cache: memory_lock
+      # pins the whole heap, and Xms == Xmx commits it at startup. That trade is
+      # the wrong way round for this workload -- the index is ~31GB on a disk
+      # doing ~100 random IOPS, so latency is decided by how much of it the OS
+      # can cache (a cold search costs 10+ s, a warm one ~100 ms), not by heap.
+      #
+      # Measured on prod 2026-08-17 at 2g: 0.65GB used (32%), ZERO old GCs in
+      # 4.2h, zero query-cache and fielddata evictions. Nothing was short of
+      # heap, so 1536m keeps >2x headroom over observed use and hands 512MB back
+      # to the cache. The collapse index is deliberately not heap-hungry (no
+      # parent-child join). Raise it only against evidence -- an old-GC count
+      # that climbs, or fielddata/query-cache evictions in _nodes/stats.
+      #
+      # Room came from retiring the legacy Elasticsearch container entirely
+      # (2026-08-17: it held 3g of heap and a 15GB index) and from fuseki (2g)
+      # now running ONLY during the nightly legacy regen, which the host cron
+      # start/stops around `build all all`, so it isn't resident by day.
+      - OPENSEARCH_JAVA_OPTS=-Xms1536m -Xmx1536m
     ulimits:
       memlock:
         soft: -1
