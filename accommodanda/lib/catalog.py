@@ -288,6 +288,16 @@ def connect(path: Path | str, data_root: Path | None = None,
     # puts it right (`widen_to_root_index`).
     if not con.execute("SELECT 1 FROM links LIMIT 1").fetchone():
         con.execute(_CREATE_TO_ROOT)
+    # Hand back a connection with no transaction in flight. `_record_data_root`
+    # runs a DELETE or an INSERT, and sqlite3's legacy isolation_level opens an
+    # implicit transaction before DML -- so without this, `connect` returned
+    # mid-write. Anything that then issued an explicit BEGIN died with "cannot
+    # start a transaction within a transaction": `rebuild` did exactly that via
+    # `widen_docs_source_index`, on every catalog old enough to need the widening,
+    # which killed `lagen all relate` corpus-wide. Committing here also makes the
+    # schema migrations above durable at once, which is what a caller expects of
+    # a factory that says "schema ensured".
+    con.commit()
     return con
 
 

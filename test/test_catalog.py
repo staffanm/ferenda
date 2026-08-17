@@ -100,6 +100,42 @@ def test_a_narrow_docs_source_index_is_widened(tmp_path):
     con.close()
 
 
+def test_connect_leaves_no_transaction_open(tmp_path):
+    """`connect` must hand back a connection with nothing in flight.
+
+    `_record_data_root` runs DML, and sqlite3's legacy isolation_level opens an
+    implicit transaction before DML -- so `connect` used to return mid-write, and
+    the next explicit BEGIN died with "cannot start a transaction within a
+    transaction". That is what `rebuild` does via `widen_docs_source_index`, so
+    `lagen all relate` crashed on every catalog old enough to need the widening.
+
+    The `data_root=` argument is the whole point of this test: without it
+    `_record_data_root` returns before touching the database, which is why the
+    widening tests above never caught this. `rebuild` always passes it."""
+    root = tmp_path / "corpus"
+    root.mkdir()
+    path = tmp_path / "catalog.sqlite"
+
+    con = catalog.connect(path, data_root=root)
+    assert con.in_transaction is False
+    # an older catalog carries both indexes narrow; the widenings BEGIN, so they
+    # are what a dangling transaction breaks
+    con.execute("DROP INDEX idx_docs_source")
+    con.execute("CREATE INDEX idx_docs_source ON documents(source)")
+    con.execute("DROP INDEX IF EXISTS idx_links_to_root")
+    con.execute("CREATE INDEX idx_links_to_root ON links(to_root)")
+    con.commit()
+    con.close()
+
+    con = catalog.connect(path, data_root=root)
+    assert con.in_transaction is False
+    assert catalog.widen_to_root_index(con) is True
+    assert catalog.widen_docs_source_index(con) is True
+    assert (tuple(r[2] for r in con.execute("PRAGMA index_info(idx_docs_source)"))
+            == catalog.INDEX_DOCS_SOURCE_COLUMNS)
+    con.close()
+
+
 def test_a_half_widened_index_is_not_mistaken_for_the_real_one(tmp_path):
     """The miss is detected by asking for the indexed columns, not by matching
     the recorded CREATE: `links(to_root, from_anchor)` mentions the right names
