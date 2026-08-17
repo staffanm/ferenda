@@ -162,6 +162,16 @@ MAPPING = {
         # bulk-rebuilt, read-mostly -- refresh rarely so a multi-hundred-thousand
         # doc run isn't flushing constantly (index_source refreshes once at the end).
         "refresh_interval": "60s",
+        # DEFLATE instead of LZ4 for the stored fields. This index is
+        # page-cache-bound, not CPU-bound: on prod it is 34 GB against ~11 GB of
+        # cache on a disk that does ~100 random IOPS, so a search over cold
+        # blocks costs 10+ s where a warm one costs ~100 ms. Bytes are the
+        # scarce resource and `_source` carries the text of all 14 M fragment
+        # docs, so trading decompression CPU for a smaller store buys cache
+        # coverage. Static: it applies to segments written after it is set, so a
+        # live index needs a reindex (or a force-merge) to convert what is
+        # already on disk.
+        "codec": "best_compression",
     },
     "mappings": {
         # strict: a document field absent from this mapping is rejected, never
