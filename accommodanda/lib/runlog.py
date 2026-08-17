@@ -26,6 +26,9 @@ import (build.py imports the API app, so the dependency must point this way).
 """
 
 import json
+import os
+import re
+import socket
 import statistics
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,13 +40,49 @@ TB_CAP = 4096             # chars of traceback kept per errors.json entry (the t
 SAMPLE_LIMIT = 200        # full tracebacks per (source, stage) per apply_outcomes call
 
 
-def make_run_id(pid, dt=None):
-    """A timestamp-sortable, per-process-unique run id:
-    ``20260704T101112.004711Z-4711``. The microseconds matter -- two runs
-    started in the same process and wall-clock second would otherwise share an
-    id and silently merge in the ledger."""
-    return "%s-%d" % ((dt or datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%S.%fZ"),
-                      pid)
+# the run id's host segment: the short hostname, reduced to the characters a
+# `<ts>-<host>-<pid>` id can carry unambiguously. A dot-qualified name keeps only
+# its first label, so "lagen.lysator.liu.se" reads "lagen"; anything else becomes
+# "-" so the id keeps exactly three fields.
+_RUN_HOST_OK = re.compile(r"[^A-Za-z0-9_]+")
+
+
+def this_host():
+    """This machine's short name for a run id -- 'lagen', 'staffan-desktop'.
+
+    `LAGEN_HOST` wins when set, because in a container `gethostname()` is the
+    container id: prod's ledger would name every run after a 12-hex string that
+    changes on each `up -d`, which is worse than no name at all. Prod sets the
+    variable (or compose's `hostname:`) to the machine a person would say."""
+    return _RUN_HOST_OK.sub(
+        "-", (os.environ.get("LAGEN_HOST") or socket.gethostname()
+              ).partition(".")[0]) or "unknown"
+
+
+def make_run_id(pid, dt=None, host=None):
+    """A timestamp-sortable, per-process-unique run id naming the machine that
+    ran it: ``20260704T101112.004711Z-lagen-4711``.
+
+    The microseconds matter -- two runs started in the same process and
+    wall-clock second would otherwise share an id and silently merge in the
+    ledger. The host matters because the ledger travels: a corpus built on dev
+    is rsynced to prod, so prod's ledger carries runs from both machines, and
+    `_classify` can only read a pid against the process table of the host that
+    minted it.
+
+    The pid stays the last `-` field, which is what `_run_start` recovers from a
+    headless group, so a host name containing `-` cannot hide it."""
+    return "%s-%s-%d" % (
+        (dt or datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%S.%fZ"),
+        host or this_host(), pid)
+
+
+def run_host(run):
+    """The machine a run id names, or None for a legacy two-field id minted
+    before run ids carried one. Ledgers hold both for as long as `prune` keeps
+    the old runs, so every reader has to admit the None."""
+    parts = run.split("-")
+    return "-".join(parts[1:-1]) if len(parts) >= 3 else None
 
 
 # --------------------------------------------------------------------------
@@ -102,11 +141,22 @@ def _group_runs(events):
     return [(run, groups[run]) for run in order]
 
 
-def _classify(pid, has_end):
+def _classify(run, pid, has_end):
     """A run's state: complete when its run-end landed; a run-start without a
-    run-end is still running iff its pid is alive, else it crashed."""
+    run-end is still running iff its pid is alive, else it crashed.
+
+    "Its pid is alive" is only answerable on the machine that minted the id. A
+    corpus built on dev is rsynced to prod, so prod's ledger carries dev's runs,
+    and reading dev's pid against prod's /proc compares unrelated numbers: an
+    unfinished dev run reads "running" whenever prod happens to hold that pid,
+    and "aborted" otherwise. Neither is a fact about the run. A foreign (or
+    legacy id-less) host is reported as `incomplete` -- what the ledger actually
+    proves -- rather than a guess dressed as a state."""
     if has_end:
         return "complete"
+    host = run_host(run)
+    if host is not None and host != this_host():
+        return "incomplete"
     return "running" if Path("/proc/%d" % pid).exists() else "aborted"
 
 
@@ -135,9 +185,9 @@ def _run_summary(run, events):
     end = next((ev for ev in events if ev["event"] == "run-end"), None)
     segments = [ev for ev in events if ev["event"] == "segment"]
     return {"run": run, "t": start["t"], "argv": start["argv"],
-            "pid": start["pid"],
+            "pid": start["pid"], "host": run_host(run),
             "status": ("damaged" if headless
-                       else _classify(start["pid"], end is not None)),
+                       else _classify(run, start["pid"], end is not None)),
             "secs": end["secs"] if end else None,
             "ok": end["ok"] if end else None,
             "errors": end["errors"] if end else sum(s["errors"] for s in segments),
@@ -159,11 +209,12 @@ def run_detail(path, run_id):
         if run == run_id:
             start, headless = _run_start(run, events)
             end = next((ev for ev in events if ev["event"] == "run-end"), None)
-            return {"run": run, "start": start,
+            return {"run": run, "start": start, "host": run_host(run),
                     "segments": [ev for ev in events if ev["event"] == "segment"],
                     "end": end,
                     "status": ("damaged" if headless
-                               else _classify(start["pid"], end is not None))}
+                               else _classify(run, start["pid"],
+                                              end is not None))}
     return None
 
 
@@ -179,22 +230,50 @@ def last_success(path):
     return out
 
 
+def last_segments(path):
+    """Per (step, source): the most recent segment event, whatever its outcome.
+
+    `last_success` answers "when did this last work"; this answers "what
+    happened the last time it ran", which is what a health cell has to show --
+    a step whose last three runs all failed is not healthy just because it
+    succeeded a week ago."""
+    return {(ev["step"], ev["source"]): ev for ev in _iter_events(path)
+            if ev["event"] == "segment"}
+
+
 def duration_history(path, n=None):
-    """Per (step, source): the executed segments' durations across runs (the
-    last `n` if given), with a regression flag when the latest run took more
-    than 1.5x the median. Skipped segments (secs≈0) would poison the median,
-    so they are excluded."""
+    """Per (step, source): how long each executed run of that step took *per
+    document* across runs (the last `n` if given), and the multiple the latest
+    run stands at against their median. Skipped segments (secs≈0) would poison
+    the median, so they are excluded.
+
+    Per document, not per run, because runs are not the same size. A whole-site
+    generate of 329,126 pages and a one-page generate are both `generate`, and
+    against a median dominated by the small ones the big one measured 285x --
+    a number about the corpus, not about the code. Rate makes them comparable.
+    A segment reporting no counts (a harvest) keeps raw seconds, which is the
+    best it can offer; `rate` says which of the two a key is measured in."""
     series = {}
     for ev in _iter_events(path):
         if ev["event"] == "segment" and ev["status"] != "skipped":
-            series.setdefault((ev["step"], ev["source"]), []).append(ev["secs"])
+            series.setdefault((ev["step"], ev["source"]), []).append(ev)
     out = {}
-    for key, secs in series.items():
+    for key, evs in series.items():
         if n is not None:
-            secs = secs[-n:]
-        median = statistics.median(secs)
-        out[key] = {"secs": secs, "latest": secs[-1], "median": median,
-                    "regression": len(secs) >= 2 and secs[-1] > 1.5 * median}
+            evs = evs[-n:]
+        # Rate needs a positive count on the latest sample and on enough others
+        # to have a median. Samples without one are dropped rather than mixed
+        # in: a generate ledger holds runs of 1, 2,859 and 329,123 pages, and a
+        # single count-less entry among them used to force the whole key back to
+        # raw seconds -- where the full run measured 285x its own median.
+        rates = [ev["secs"] / ev["ran"] for ev in evs if ev["ran"]]
+        rate = bool(evs[-1]["ran"]) and len(rates) >= 2
+        vals = rates if rate else [ev["secs"] for ev in evs]
+        median = statistics.median(vals)
+        out[key] = {"secs": [ev["secs"] for ev in evs], "vals": vals,
+                    "latest": vals[-1], "median": median, "rate": rate,
+                    "ratio": vals[-1] / median if median else 0,
+                    "regression": len(vals) >= 2 and vals[-1] > 1.5 * median}
     return out
 
 

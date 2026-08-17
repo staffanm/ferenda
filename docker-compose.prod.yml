@@ -121,6 +121,12 @@ services:
       # Unset either variable and no server-side tracking happens at all.
       - MATOMO_URL=http://matomo/matomo.php
       - MATOMO_SITE_API=3
+      # The machine name a run id carries (lib/runlog.this_host). The corpus is
+      # built on dev and rsynced here, and also built here directly, so one
+      # ledger holds runs from both and each has to say where it ran. Without
+      # this the container's own hostname is used -- a 12-hex container id that
+      # changes on every `up -d`, which names nothing.
+      - LAGEN_HOST=lagen
     volumes:
       # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
       # the roomy 2 TB /mnt/forstor NFS mount.

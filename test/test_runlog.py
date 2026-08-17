@@ -90,6 +90,40 @@ def test_run_id_is_timestamp_sortable():
     assert len(ts) == 23 and ts[15] == "."   # 20260704T101112.004711Z (µs)
 
 
+def test_run_id_names_the_host_and_keeps_the_pid_last():
+    """`<ts>-<host>-<pid>`. The pid stays the last `-` field because
+    `_run_start` recovers it from the id when a concurrent prune ate the
+    run-start, so a host name containing `-` must not hide it."""
+    dt = datetime(2026, 7, 4, 10, 11, 12, 4711, tzinfo=timezone.utc)
+    assert runlog.make_run_id(4711, dt, host="lagen") \
+        == "20260704T101112.004711Z-lagen-4711"
+    assert runlog.run_host("20260704T101112.004711Z-lagen-4711") == "lagen"
+    hyphenated = runlog.make_run_id(4711, dt, host="staffan-desktop")
+    assert runlog.run_host(hyphenated) == "staffan-desktop"
+    assert int(hyphenated.rpartition("-")[2]) == 4711
+    # a legacy two-field id names no host, and every reader must admit that
+    assert runlog.run_host("20260704T101112.004711Z-4711") is None
+    # the real host name is a bare label: non-empty, and the dot-qualified
+    # tail dropped, so run_host can never confuse it with the timestamp field
+    assert runlog.this_host() and "." not in runlog.this_host()
+
+
+def test_a_foreign_hosts_unfinished_run_is_not_classified_by_pid(tmp_path):
+    """A dev-built corpus is rsynced to prod, so prod's ledger holds dev's runs.
+    Reading dev's pid against prod's /proc compares unrelated numbers, so a
+    run from another host reports what the ledger proves -- `incomplete`."""
+    path = tmp_path / "runs.ndjson"
+    # our own live pid, but minted on another machine: must NOT read "running"
+    _write_run(path, runlog.make_run_id(os.getpid(), host="someotherbox"),
+               pid=os.getpid(), end=False)
+    assert runlog.read_runs(path)[0]["status"] == "incomplete"
+    assert runlog.read_runs(path)[0]["host"] == "someotherbox"
+    # the same pid minted here is still classified by the process table
+    path2 = tmp_path / "runs2.ndjson"
+    _write_run(path2, runlog.make_run_id(os.getpid()), pid=os.getpid(), end=False)
+    assert runlog.read_runs(path2)[0]["status"] == "running"
+
+
 def test_run_id_unique_within_process_second():
     # two runs in the same process+second must not collide (µs differentiates)
     dt = datetime(2026, 7, 4, 10, 11, 12, 4711, tzinfo=timezone.utc)
@@ -208,12 +242,42 @@ def test_duration_history_regression_flag(tmp_path):
                                               ("parse", "dv", 1.0, 0)])
     hist = runlog.duration_history(path)
     assert hist[("parse", "sfs")]["secs"] == [1.0, 1.0, 1.0, 10.0]
-    assert hist[("parse", "sfs")]["latest"] == 10.0
-    assert hist[("parse", "sfs")]["regression"] is True      # 10 > 1.5 * median(1)
+    # `_write_run` reports ran=10 on every segment, so the series is a rate:
+    # 10 s over 10 documents is 1.0 s/doc against a 0.1 s/doc median
+    assert hist[("parse", "sfs")]["rate"] is True
+    assert hist[("parse", "sfs")]["latest"] == 1.0
+    assert hist[("parse", "sfs")]["ratio"] == 10.0
+    assert hist[("parse", "sfs")]["regression"] is True
     assert hist[("parse", "dv")]["regression"] is False
     # n limits the window (and can flip the verdict: last 1 sample has median 10)
     assert runlog.duration_history(path, n=2)[("parse", "sfs")]["secs"] == [1.0, 10.0]
     assert runlog.duration_history(path, n=1)[("parse", "sfs")]["regression"] is False
+
+
+def test_a_bigger_run_is_not_a_slower_one(tmp_path):
+    """Runs are not the same size. A whole-site generate of 329,126 pages and a
+    one-page generate are both `generate`; against a median dominated by the
+    small ones the big one measured 285x, which is a fact about the corpus, not
+    the code. The comparison is per document, so equal rates never flag."""
+    path = tmp_path / "runs.ndjson"
+    runlog.emit_run_start(path, "r0", ["lagen", "all", "generate"], 4711)
+    for i, (secs, ran) in enumerate([(1.0, 1), (1.0, 1), (1400.0, 1400)]):
+        runlog.emit_segment(path, "r0", "generate", "__site__", secs,
+                            total=ran, ran=ran, errors=0, status="ok",
+                            t="2026-07-04T10:00:0%dZ" % i)
+    hist = runlog.duration_history(path)[("generate", "__site__")]
+    assert hist["rate"] is True
+    assert hist["ratio"] == 1.0 and hist["regression"] is False
+
+    # a sample that carries no count cannot yield a rate; it is dropped rather
+    # than dragging the whole key back to raw seconds, where the big run reads
+    # as a huge regression against the small ones
+    runlog.emit_segment(path, "r0", "generate", "__site__", 0.0, total=None,
+                        ran=None, errors=0, status="ok", t="2026-07-04T10:00:04Z")
+    runlog.emit_segment(path, "r0", "generate", "__site__", 1400.0, total=1400,
+                        ran=1400, errors=0, status="ok", t="2026-07-04T10:00:05Z")
+    hist = runlog.duration_history(path)[("generate", "__site__")]
+    assert hist["rate"] is True and hist["regression"] is False
 
 
 def test_last_success_ignores_skips_and_errors(tmp_path):
