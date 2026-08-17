@@ -63,12 +63,22 @@ def test_section_outline_truncates_long_headings():
 
 @pytest.fixture
 def arende(tmp_path, monkeypatch):
-    """A stored `Remiss` record with three instances, one of them not fetched."""
+    """A stored `Remiss` record with three instances, one of them not fetched,
+    plus the parsed artifact of the one answer these tests name.
+
+    `answers` asserts a directly named answer has an artifact, so the fixture
+    has to own the artifact tree as well as the downloaded one -- otherwise the
+    assertion is answered by whatever the developer's real corpus holds (which
+    is how this passed before test/conftest.py emptied the root)."""
     monkeypatch.setattr(layout, "DOWNLOADED", tmp_path / "downloaded")
     monkeypatch.setattr(layout, "REMISSER_DOWNLOADED",
                         tmp_path / "downloaded" / "remisser")
     monkeypatch.setattr(layout, "REMISSER_ANALYSED",
                         tmp_path / "downloaded" / "remisser" / ".analysed.json")
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
+    answer = layout.artifact("remisser", "sou/2026-14/kammarkollegiet")
+    answer.parent.mkdir(parents=True, exist_ok=True)
+    answer.write_text(json.dumps({"basefile": "sou/2026-14/kammarkollegiet"}))
     path = layout.remisser_arende("sou/2026:14")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({

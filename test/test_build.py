@@ -1227,6 +1227,12 @@ def _analyze_targets(monkeypatch, expansions, outcome, tmp_path):
     monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
     monkeypatch.setattr(build.remisser_analyze, "answers",
                         lambda arg: expansions[arg])
+    # `is_arende` is the predicate `answers` pairs with -- the action asks it
+    # first, and it decides by looking for a stored record on disk. Faking the
+    # expansion without it left the real filesystem to answer, so these tests
+    # only expanded anything on a machine whose corpus held that ärende
+    monkeypatch.setattr(build.remisser_analyze, "is_arende",
+                        lambda bf: bf in expansions)
     seen = []
 
     def fake_analyze(basefile, force=False):
