@@ -12,8 +12,8 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
 from accommodanda import config
 from accommodanda.api import app as api
-from accommodanda.api import db
-from accommodanda.lib import catalog, compress, inbound
+from accommodanda.api import db, reads
+from accommodanda.lib import catalog, compress, facets, inbound
 
 
 @pytest.fixture
@@ -475,3 +475,56 @@ def test_graph_neighborhood_and_pinpoint(client):
         "uri": "https://lagen.nu/1962:700", "limit": 300}).status_code == 200
     assert client.get("/api/v1/graph", params={
         "uri": "https://lagen.nu/1962:700", "limit": 301}).status_code == 422
+
+
+def test_graph_labels_only_the_rows_the_reply_carries(tmp_path):
+    """An unfiltered inbound side takes the counts-only queries and labels its
+    top rows alone; a group-filtered one still labels every neighbor, because
+    the filter reads each one's `source` and `kind`. The two must answer the
+    same -- naming every group filters nothing out.
+
+    The join it drops cost one random row lookup per *citer*: article 6 ECHR
+    has 50,624 of them, and labelling them all to answer with 120 measured
+    5.4 s of a 5.8 s reply on prod's disk."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1962:700"
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, path) "
+                "VALUES (?, 'sfs', 'law', 'BrB', 'Brottsbalk', '')", (law,))
+    # five citers, each citing 3 kap. 1 § a different number of times, so the
+    # `n DESC` order the reply is sliced by is unambiguous
+    for i in range(5):
+        citer = "https://lagen.nu/dom/HFD/%d" % i
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, 'dv', 'verdict', ?, 'T', '')",
+                    (citer, "HFD %d" % i))
+        for _ in range(i + 1):
+            con.execute(
+                "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?, 'P1', 'dcterms:references', ?, ?)",
+                (citer, law + "#K3P1", law))
+
+    every_group = set(facets.FLOW_GROUP_NAMES)
+    for uri in (law, law + "#K3P1"):
+        unfiltered = reads.graph(con, uri, limit=2)
+        filtered = reads.graph(con, uri, groups=every_group, limit=2)
+        assert unfiltered == filtered
+        side = unfiltered["inbound"]
+        # the totals describe the whole neighborhood, not the two rows drawn
+        assert (side["total_docs"], side["total_links"]) == (5, 15)
+        assert [(r["label"], r["n"]) for r in side["top"]] \
+            == [("HFD 4", 5), ("HFD 3", 4)]
+        assert side["top"][0]["group"] == "Rättsfall"
+    con.close()
+
+
+def test_graph_answers_for_a_node_nothing_cites(tmp_path):
+    """`catalog.graph_labels` builds an `IN (…)` list from the rows the reply
+    carries. A node with no citers builds `IN ()`, which SQLite accepts and
+    nothing matches -- so the empty side is an empty side, not an error."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, path) "
+                "VALUES ('https://lagen.nu/x', 'sfs', 'law', 'X', 'T', '')")
+    assert catalog.graph_labels(con, []) == {}
+    assert reads.graph(con, "https://lagen.nu/x")["inbound"] \
+        == {"total_links": 0, "total_docs": 0, "top": []}
+    con.close()

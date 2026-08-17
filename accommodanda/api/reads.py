@@ -154,6 +154,44 @@ def _graph_side(rows, groups, limit):
             "top": kept[:limit]}
 
 
+def _graph_side_unfiltered(con, counts, limit):
+    """The same answer as `_graph_side` with no group filter, labelling only
+    the `limit` rows the reply carries.
+
+    A group filter has to know every neighbor's group to decide what it keeps,
+    so it needs them all labelled. With no filter nothing is dropped: the
+    totals are the whole aggregate and the order is `n` descending, both
+    already settled by `counts`. Labelling the other 50,504 rows of article 6
+    ECHR only to discard them cost most of that reply -- see the note above
+    `catalog.graph_inbound_counts`."""
+    labels = catalog.graph_labels(con, [uri for uri, _n in counts[:limit]])
+    top = []
+    for uri, n in counts[:limit]:
+        label, title, source, kind, descriptive = labels[uri]
+        top.append({"uri": uri, "label": label, "title": title,
+                    "descriptive": descriptive, "source": source,
+                    "kind": kind, "group": facets.flow_group(source, kind),
+                    "n": n})
+    return {"total_links": sum(n for _uri, n in counts),
+            "total_docs": len(counts), "top": top}
+
+
+def _graph_inbound_side(con, root, unit, groups, limit):
+    """The inbound direction for a document (`unit` None) or one provision.
+
+    Only this direction takes the counts-only path. A document's *outbound*
+    neighbors are bounded by the length of its own text -- brottsbalken cites
+    thousands, article 6 ECHR is cited by 50,624 -- and there the join is also
+    the filter that drops targets the corpus does not hold."""
+    if groups:
+        return _graph_side(
+            catalog.graph_anchor_inbound(con, root, unit) if unit
+            else catalog.graph_inbound(con, root), groups, limit)
+    return _graph_side_unfiltered(
+        con, catalog.graph_anchor_inbound_counts(con, root, unit) if unit
+        else catalog.graph_inbound_counts(con, root), limit)
+
+
 def _graph_internal(con, root, focus_unit):
     """The document's internal citation graph at unit (§/article) level:
     {nodes, edges, truncated}. Change-marker anchors (L1988:942) are the
@@ -194,11 +232,9 @@ def graph(con, uri, *, direction="both", groups=None, limit=20):
     if frag:
         # keyed on the *unit*, not the raw fragment: a deep arrival anchor
         # (#K4P7S2) answers for the § the reply's `pinpoint` names
-        in_rows = catalog.graph_anchor_inbound(con, root, unit)
         out_rows = catalog.graph_anchor_outbound(con, root, unit)
         raw_links, _raw_docs = catalog.graph_anchor_out_totals(con, root, unit)
     else:
-        in_rows = catalog.graph_inbound(con, root)
         out_rows = catalog.graph_outbound(con, root)
         raw_links, _raw_docs = catalog.graph_out_totals(con, root)
     unresolved = raw_links - sum(r[1] for r in out_rows)
@@ -216,7 +252,7 @@ def graph(con, uri, *, direction="both", groups=None, limit=20):
         "inbound": None, "outbound": None, "internal": None,
     }
     if direction in ("in", "both"):
-        result["inbound"] = _graph_side(in_rows, groups, limit)
+        result["inbound"] = _graph_inbound_side(con, root, unit, groups, limit)
     if direction in ("out", "both"):
         result["outbound"] = _graph_side(out_rows, groups, limit)
         result["outbound"]["unresolved"] = unresolved

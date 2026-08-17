@@ -2046,13 +2046,47 @@ def graph_outbound(con, uri):
 
 def graph_inbound(con, uri):
     """The distinct documents citing `uri`, largest first -- the mirror of
-    `graph_outbound`, walking idx_links_to_root."""
+    `graph_outbound`, walking idx_links_to_root.
+
+    Every citer is labelled, which a *group-filtered* reply needs (the filter
+    reads `source` and `kind`). An unfiltered reply carries only its top rows
+    and wants `graph_inbound_counts` + `graph_labels` instead: see those."""
     return con.execute(
         "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
         "       d.descriptive "
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.to_root = ? AND l.from_uri != l.to_root "
         "GROUP BY l.from_uri ORDER BY n DESC", (uri,)).fetchall()
+
+
+# The join to `documents` in the two inbound queries above costs one random row
+# lookup per *citer*, however few of them the reply carries. Article 6 ECHR has
+# 50,624 citers, and labelling all of them to answer with 120 measured 5.4 s of
+# a 5.8 s reply on prod's HDD-class disk (0.2 s of 0.3 s on dev's SSD). The
+# aggregate alone is a covering-index walk of idx_links_to_root.
+#
+# The counts-only pair below drops the join. It fixes neither the totals nor the
+# order -- both come from the full aggregate, exactly as before -- only *who*
+# gets a label: the rows the reply carries, fetched by `graph_labels`.
+
+def graph_inbound_counts(con, uri):
+    """(from_uri, n) per distinct citer of `uri`, largest first, unlabelled --
+    `graph_inbound` without the join to `documents`."""
+    return con.execute(
+        "SELECT l.from_uri, count(*) n FROM links l "
+        "WHERE l.to_root = ? AND l.from_uri != l.to_root "
+        "GROUP BY l.from_uri ORDER BY n DESC", (uri,)).fetchall()
+
+
+def graph_labels(con, uris):
+    """{uri: (label, title, source, kind, descriptive)} for a handful of
+    documents -- what the counts-only queries leave for the caller to fetch,
+    once the reply knows which rows it carries. A uri absent from `documents`
+    is absent from the result; both inbound queries join, so none is. An empty
+    `uris` asks `IN ()`, which SQLite accepts and nothing matches."""
+    return {row[0]: row[1:] for row in con.execute(
+        "SELECT uri, label, title, source, kind, descriptive FROM documents "
+        "WHERE uri IN (%s)" % ",".join("?" * len(uris)), tuple(uris))}
 
 
 def graph_out_totals(con, uri):
@@ -2080,6 +2114,19 @@ def graph_anchor_inbound(con, uri, frag):
         "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
         "       d.descriptive "
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
+        "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
+        "                         OR l.to_uri GLOB ?) "
+        "AND l.from_uri != l.to_root "
+        "GROUP BY l.from_uri ORDER BY n DESC",
+        (uri, uri + "#" + frag, letter, dot)).fetchall()
+
+
+def graph_anchor_inbound_counts(con, uri, frag):
+    """(from_uri, n) per distinct citer of one provision, largest first,
+    unlabelled -- `graph_anchor_inbound` without the join to `documents`."""
+    letter, dot = _frag_globs(uri + "#" + frag)
+    return con.execute(
+        "SELECT l.from_uri, count(*) n FROM links l "
         "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
         "                         OR l.to_uri GLOB ?) "
         "AND l.from_uri != l.to_root "
