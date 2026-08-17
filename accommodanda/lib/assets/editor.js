@@ -258,13 +258,35 @@
     var err = el('div', 'ed-err');
     var go = el('button', 'ed-do', 'Logga in');
     host.appendChild(u); host.appendChild(pw); host.appendChild(go); host.appendChild(err);
+    // Why the login failed, in the reader's language. Every failure used to
+    // read "Fel användarnamn eller lösenord", which is a lie for three of the
+    // four: the rate limiter's 429 says the credentials were never checked,
+    // and 403 says editing is off site-wide. An editor locked out by the
+    // backoff retyped a correct password and was told it was wrong.
+    //
+    // 401 stays deliberately vague: /auth/login answers a wrong username and a
+    // wrong password identically, so that neither the reply nor its timing can
+    // enumerate editors, and this message must not undo that.
+    function loginError(r) {
+      if (r.status === 401) return 'Fel användarnamn eller lösenord.';
+      if (r.status === 403) return 'Redigering är avstängd på den här servern.';
+      if (r.status === 429) {
+        // the limiter sends Retry-After in whole seconds; nginx may drop it,
+        // so the wait is an addition, not the sentence
+        var wait = parseInt(r.headers.get('Retry-After'), 10);
+        if (!(wait > 0)) return 'För många inloggningsförsök. Försök igen senare.';
+        return 'För många inloggningsförsök. Försök igen om '
+          + wait + (wait === 1 ? ' sekund.' : ' sekunder.');
+      }
+      return 'Inloggningen misslyckades (fel ' + r.status + ').';
+    }
     function submit() {
       j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
         // '/ops', not '/ops/': the dashboard is registered at the exact path, and
         // the static site mounted at '/' matches the trailing-slash form before
         // Starlette's redirect_slashes can fire (see api/app.py), so logging in
         // landed on a 404
-        .then(function (r) { if (r.ok) location.assign('/ops'); else err.textContent = 'Fel användarnamn eller lösenord.'; });
+        .then(function (r) { if (r.ok) location.assign('/ops'); else err.textContent = loginError(r); });
     }
     go.addEventListener('click', submit);
     pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
