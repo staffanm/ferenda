@@ -401,7 +401,10 @@ def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
                 headers={"x-forwarded-for": "203.0.113.7, 10.0.0.1",
                          "user-agent": "openai-mcp/1.0.0"})
     client.get("/mcp/")
-    lines = [r.message for r in caplog.records]
+    # by logger name, not by substring: other libraries (httpx) log their own
+    # "HTTP Request: POST ..." lines into caplog whenever the run enables CLI
+    # logging, and a substring filter then matches those too
+    lines = [r.message for r in caplog.records if r.name == mcpmod.log.name]
 
     post = [m for m in lines if "POST" in m]
     assert len(post) == 2, post
@@ -433,10 +436,10 @@ def test_a_request_that_dies_inside_the_app_is_logged(monkeypatch, caplog):
     with pytest.raises(RuntimeError, match="exploded"):
         TestClient(mcpmod._LoggedMCP(boom)).post(
             "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
-    lines = [r.message for r in caplog.records]
-    assert any(" start " in m and "tools/list" in m for m in lines)
-    assert any("raised after" in m for m in lines)
-    assert any(r.exc_info for r in caplog.records), "the traceback is the point"
+    ours = [r for r in caplog.records if r.name == mcpmod.log.name]
+    assert any(" start " in r.message and "tools/list" in r.message for r in ours)
+    assert any("raised after" in r.message for r in ours)
+    assert any(r.exc_info for r in ours), "the traceback is the point"
 
 
 def test_the_wrapper_passes_the_response_through_while_counting_it(monkeypatch):
