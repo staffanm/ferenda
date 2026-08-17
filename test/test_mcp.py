@@ -422,6 +422,73 @@ def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
     assert "JSONRPC-ERROR" not in get[1]
 
 
+def test_a_response_past_the_proxy_timeout_says_so(monkeypatch, caplog):
+    """A 200 we sent after nginx gave up is not a 200 the caller got.
+
+    `proxy_read_timeout` fires while nginx reads the response; it then answers the
+    caller 504 and drops the upstream connection, and this app never finds out --
+    it emits `http.response.start` with 200 regardless. Measured on prod: a tool
+    call arrived 12:28:20 and nginx logged "upstream timed out" at 12:29:20. So a
+    bare `status=200` past that mark would be a lie by omission."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    monkeypatch.setattr(mcpmod, "PROXY_READ_TIMEOUT", 0.0)   # everything is late
+
+    async def slow(scope, receive, send):
+        await receive()
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body",
+                    "body": b'{"jsonrpc":"2.0","id":1,"result":{}}'})
+
+    TestClient(mcpmod._LoggedMCP(slow)).post(
+        "/mcp/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    done = [r.message for r in caplog.records
+            if r.name == mcpmod.log.name and " done " in r.message]
+    assert len(done) == 1 and "status=200" in done[0]
+    assert "PAST-PROXY-TIMEOUT" in done[0], done[0]
+    assert "not-what-the-caller-got" in done[0], done[0]
+
+
+def test_a_caller_that_stopped_waiting_is_recorded(monkeypatch, caplog):
+    """`http.disconnect` is definite evidence the caller went away -- which is
+    what an nginx read timeout looks like from in here, since it drops the
+    upstream connection. Only seen when something polls the channel, so the flag
+    confirms the duration signal rather than replacing it."""
+    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+
+    async def polls_until_disconnect(scope, receive, send):
+        await receive()                      # the buffered body
+        assert (await receive())["type"] == "http.disconnect"
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    async def receive_then_disconnect():
+        return {"type": "http.disconnect"}
+
+    wrapper = mcpmod._LoggedMCP(polls_until_disconnect)
+    body = b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    scope = {"type": "http", "method": "POST", "path": "/mcp/",
+             "headers": [(b"user-agent", b"openai-mcp/1.0.0")],
+             "client": ("10.0.0.1", 1234)}
+    sent = []
+
+    async def drive():
+        first = iter([{"type": "http.request", "body": body, "more_body": False}])
+
+        async def receive():
+            return next(first, None) or await receive_then_disconnect()
+        await wrapper(scope, receive, lambda m: _noop(sent, m))
+    anyio.run(drive)
+    done = [r.message for r in caplog.records
+            if r.name == mcpmod.log.name and " done " in r.message]
+    assert len(done) == 1 and "CLIENT-GONE" in done[0], done
+
+
+async def _noop(sink, message):
+    sink.append(message)
+
+
 def test_a_request_that_dies_inside_the_app_is_logged(monkeypatch, caplog):
     """An exception on the way out leaves a record with its traceback. Without
     it, an app-side failure and a request that never arrived look identical --

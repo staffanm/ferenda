@@ -591,6 +591,20 @@ def _client_ip(scope):
 
 _request_ids = itertools.count(1)
 
+# nginx's `proxy_read_timeout` for the vhost that fronts this app. It is not set
+# in docker/nginx/ferenda.lagen.nu.conf, so nginx's own default applies -- keep
+# this in step if that changes.
+#
+# Load-bearing for the log's honesty: the timeout fires while nginx reads the
+# response, after which it answers the client 504 and drops the upstream
+# connection. The app does not find out. It goes on to emit `http.response.start`
+# with 200, so a `done status=200` line can describe a request the caller
+# received a 504 for -- measured on 2026-08-17, when a resolve_citation logged as
+# arriving at 12:28:20 and nginx logged "upstream timed out while reading
+# response header" at 12:29:20, exactly 60 s later. Past this mark the status we
+# report is what we *sent*, not what the caller *got*.
+PROXY_READ_TIMEOUT = 60.0
+
 
 class _LoggedMCP:
     """ASGI wrapper logging every MCP request twice -- once on arrival, once on
@@ -607,6 +621,12 @@ class _LoggedMCP:
     body, but streamable HTTP also uses GET (the SSE stream) and DELETE (session
     teardown), and those used to pass through invisibly -- a blind spot exactly
     where a client-side transport failure would show.
+
+    The status on the done line is what this app *sent*. Past
+    PROXY_READ_TIMEOUT that is not what the caller *received* -- nginx has
+    already answered it 504 and dropped the connection -- so the line says so
+    outright rather than showing a bare `status=200` for a request that failed
+    from the caller's side.
 
     The uvicorn/nginx access logs see only `POST /mcp/ 200`, so tool-level
     visibility has to come from here. A POST body is buffered to be parsed
@@ -628,7 +648,7 @@ class _LoggedMCP:
             rid, method, scope.get("path", "-"), _client_ip(scope),
             _header(scope, "user-agent"))
 
-        receive_replayed, called, described = receive, None, ""
+        called, described, replay = None, "", None
         if method == "POST":
             messages = []
             while True:
@@ -644,8 +664,24 @@ class _LoggedMCP:
             called = _called(msg)
             replay = iter(messages)
 
-            async def receive_replayed():
-                return next(replay, None) or await receive()
+        client_gone = False
+
+        async def receive_replayed():
+            """The buffered request messages, then the real channel -- watching
+            for `http.disconnect`, which is definite evidence the caller stopped
+            waiting (an nginx timeout drops the upstream connection).
+
+            Definite when it arrives, but not something to rely on: nothing polls
+            this channel after the body is read, so a disconnect usually goes
+            unobserved. The duration against PROXY_READ_TIMEOUT is the dependable
+            signal; this one confirms it when we happen to see it."""
+            nonlocal client_gone
+            message = next(replay, None) if replay is not None else None
+            if message is None:
+                message = await receive()
+            if message["type"] == "http.disconnect":
+                client_gone = True
+            return message
 
         log.info("%s start %s", common, described)
 
@@ -689,9 +725,17 @@ class _LoggedMCP:
         else:
             failed = status is None or status >= 400
             flag = " HTTP-ERROR" if failed else ""
+        elapsed = time.monotonic() - started
+        # `status` is what we sent, which past the proxy's read timeout is not
+        # what the caller got -- see PROXY_READ_TIMEOUT. Say so on the line rather
+        # than leaving a bare `status=200` to be read as a delivered 200.
+        if elapsed > PROXY_READ_TIMEOUT:
+            flag += (" PAST-PROXY-TIMEOUT(%.0fs) status-is-what-we-sent-not-what"
+                     "-the-caller-got" % PROXY_READ_TIMEOUT)
+        if client_gone:
+            flag += " CLIENT-GONE"
         log.info("%s done status=%s %.0f ms bytes=%d%s %s",
-                 common, status, (time.monotonic() - started) * 1000,
-                 len(captured), flag, described)
+                 common, status, elapsed * 1000, len(captured), flag, described)
         if analytics.ENABLED and called:
             analytics.track_mcp(scope, *called, failed=failed)
 
