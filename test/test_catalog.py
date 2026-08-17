@@ -77,6 +77,29 @@ def test_a_narrow_to_root_index_is_widened(tmp_path):
     con.close()
 
 
+def test_a_narrow_docs_source_index_is_widened(tmp_path):
+    """`idx_docs_source` must cover (source, art_size). Narrow, the ops
+    dashboard's per-source totals read `art_size` out of the 173.8 MB
+    `documents` table; covering, the same query is a 5.5 MB index scan -- which
+    is what the page costs on a cold page cache. Every catalog built before the
+    widening carries the narrow one, and `IF NOT EXISTS` keeps it."""
+    path = tmp_path / "catalog.sqlite"
+    con = catalog.connect(path)          # fresh catalogs get it wide already
+    assert catalog.widen_docs_source_index(con) is False
+    con.execute("DROP INDEX idx_docs_source")
+    con.execute("CREATE INDEX idx_docs_source ON documents(source)")
+    assert catalog.widen_docs_source_index(con) is True
+    plan = _plan_of_last_query(con, lambda: catalog.source_stats(con))
+    assert "COVERING INDEX idx_docs_source" in plan, plan
+    # source stays the leading column, so a plain lookup keeps its index
+    lookup = _plan_of_last_query(
+        con, lambda: con.execute("SELECT uri FROM documents WHERE source = 'sfs'")
+        .fetchall())
+    assert "idx_docs_source" in lookup, lookup
+    assert catalog.widen_docs_source_index(con) is False   # idempotent
+    con.close()
+
+
 def test_a_half_widened_index_is_not_mistaken_for_the_real_one(tmp_path):
     """The miss is detected by asking for the indexed columns, not by matching
     the recorded CREATE: `links(to_root, from_anchor)` mentions the right names

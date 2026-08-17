@@ -5,6 +5,7 @@ editor's session (auth.require_editor), so tests log in as an editor rather than
 present a token. No network, no build driver."""
 
 import json
+import re
 import os
 
 import pytest
@@ -38,6 +39,14 @@ def _stub_index(monkeypatch):
     overview reads _index.store_size(), which would otherwise open a cluster
     connection. Stub a fixed byte count; individual tests override as needed."""
     monkeypatch.setattr(ops._index, "store_size", lambda: 42_000_000)
+
+
+def _health_columns(body):
+    """The corpus & pipeline table's column headers. Asserting on a bare
+    `<th>x</th>` would also match a row heading (the "other steps" table heads
+    each row with its step name) and the explanatory prose under either."""
+    thead = re.search(r"<thead>(.*?)</thead>", body, re.S)
+    return re.findall(r"<th[^>]*>(.*?)</th>", thead.group(1)) if thead else []
 
 
 def _login(client):
@@ -124,17 +133,47 @@ def test_editing_disabled_403(ledger, monkeypatch):
 
 # -- /ops overview --------------------------------------------------------
 
-def test_overview_renders_matrix_and_failures(client):
+def test_overview_renders_one_table_of_corpus_and_pipeline(client):
+    """Corpus size and pipeline health were two tables keyed by the same
+    sources; they are one now, and its cells come from the run ledger."""
     r = client.get("/ops")
     assert r.status_code == 200
     body = r.text
-    assert "pipeline health" in body
+    assert "corpus &amp; pipeline" in body
     assert "sfs" in body and "dv" in body
-    assert "1 failed" in body                       # the failed sfs parse cell
-    assert "1 docs failing overall" in body
+    assert "1 err" in body                          # the failing sfs parse cell
+    assert "1 docs failing" in body
     assert 'http-equiv="refresh"' in body
-    # catalog absent -> a rendered empty-state, not a 503
-    assert "catalog not built" in body
+    # the two old headings are gone, not merely renamed around
+    assert "<h2>pipeline health</h2>" not in body
+    assert "<h2>corpus</h2>" not in body
+    # the catalog-delta table went with them -- it is a cell now
+    assert "<h2>catalog delta</h2>" not in body
+
+
+def test_overview_reads_stage_cells_from_the_ledger_not_the_snapshot(
+        tmp_path, monkeypatch, editor_auth):
+    """relate/index/dump/generate never write a per-source status cell -- only
+    a full-source parse/download does -- so reading status.json left those four
+    columns blank for every source while the ledger held 23 runs of each."""
+    build = tmp_path / ".build"
+    build.mkdir()
+    runs = build / "runs.ndjson"
+    run = runlog.make_run_id(os.getpid())
+    runlog.emit_run_start(runs, run, ["lagen", "all", "relate"], os.getpid())
+    for step in ("relate", "index", "dump", "generate"):
+        runlog.emit_segment(runs, run, step, "sfs", 3.0, total=9, ran=9,
+                            errors=0, status="ok")
+    runlog.emit_run_end(runs, run, 12.0, ok=True, errors=0)
+    monkeypatch.setattr(ops, "RUNS", runs)
+    monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
+    monkeypatch.setattr(ops, "STATUS", build / "status.json")   # deliberately absent
+    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    body = _login(TestClient(api.app)).get("/ops").text
+    for step in ("relate", "index", "dump", "generate"):
+        assert "<th>%s</th>" % step in body
+    # four filled cells, from a snapshot that does not exist at all
+    assert body.count("9/9") == 4
 
 
 def test_overview_lists_recent_runs(client, ledger):
@@ -145,11 +184,13 @@ def test_overview_lists_recent_runs(client, ledger):
 # -- system section (version / wiki / index size) -------------------------
 
 def test_system_section_renders_version_wiki_and_index_size(client, monkeypatch):
+    """The system facts are one line above the table now, not a table of their
+    own -- and it names the host, so a dashboard open on two machines says
+    which one it is describing."""
     monkeypatch.setattr("accommodanda.api.ops.git.push_state", lambda repo: (2, True))
     body = client.get("/ops").text
-    assert "<h2>system</h2>" in body
-    assert "accommodanda" in body and "lagen-wiki" in body
-    assert "2 unpushed commits" in body and "uncommitted changes" in body
+    assert "lagen-wiki" in body and runlog.this_host() in body
+    assert "2 unpushed" in body and "uncommitted" in body
     assert "42.0 MB" in body                         # _human_bytes(42_000_000)
 
 
@@ -178,27 +219,36 @@ def test_corpus_section_lists_docs_and_size_per_source(client, tmp_path, monkeyp
     con.close()
     monkeypatch.setattr(db, "CATALOG", cat)
     body = client.get("/ops").text
-    assert "<h2>corpus</h2>" in body
     assert "3.0 kB" in body                          # sfs: 1000 + 2000
     assert "500 B" in body                           # dv
     assert "3.5 kB" in body                          # total 3500
+    # the counts sit on the same row as that source's stage cells
+    assert "corpus &amp; pipeline" in body
 
 
-def test_versions_cell_renders_a_column(tmp_path, monkeypatch, editor_auth):
-    # sfs writes a ("sfs", "versions") status cell; the matrix must grow a
-    # versions column for it rather than silently hiding the cell
+def test_a_one_source_step_is_listed_not_given_a_column(tmp_path, monkeypatch,
+                                                        editor_auth):
+    """`versions` is sfs's alone and `compute` is stats'. As columns they were
+    18 empty cells and one number each, so steps off the common pipeline are
+    listed under the table instead."""
     build = tmp_path / ".build"
     build.mkdir()
-    status = build / "status.json"
-    runlog.update_status_cell(status, "sfs", "versions",
-                              {"total": 4, "fresh": 4, "stale": 0, "missing": 0,
-                               "failed": 0, "empty": 0, "run": "r1"})
-    monkeypatch.setattr(ops, "RUNS", build / "runs.ndjson")
+    runs = build / "runs.ndjson"
+    run = runlog.make_run_id(os.getpid())
+    runlog.emit_run_start(runs, run, ["lagen", "sfs", "versions"], os.getpid())
+    runlog.emit_segment(runs, run, "versions", "sfs", 7.0, total=4, ran=4,
+                        errors=0, status="ok")
+    runlog.emit_segment(runs, run, "parse", "dv", 1.0, total=2, ran=2,
+                        errors=0, status="ok")
+    runlog.emit_run_end(runs, run, 8.0, ok=True, errors=0)
+    monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
-    monkeypatch.setattr(ops, "STATUS", status)
+    monkeypatch.setattr(ops, "STATUS", build / "status.json")
     monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
     body = _login(TestClient(api.app)).get("/ops").text
-    assert "<th>versions</th>" in body
+    assert "versions" not in _health_columns(body)  # not a column
+    assert "parse" in _health_columns(body)         # the common spine still is
+    assert "other steps" in body and "4/4" in body  # but its result is shown
 
 
 # -- /ops/runs ------------------------------------------------------------
@@ -207,9 +257,38 @@ def test_runs_table_newest_first(client, ledger):
     r = client.get("/ops/runs")
     assert r.status_code == 200
     body = r.text
-    assert "lagen sfs parse" in body
+    # the command without its `lagen` head -- every row would carry that word
+    assert "sfs parse" in body
+    assert "did what" in body and "sources" in body
     # the failing run is newer, so it appears before the good one
     assert body.index(ledger["bad"]) < body.index(ledger["good"])
+
+
+def test_runs_table_names_the_host_and_will_not_guess_a_foreign_pid(
+        tmp_path, monkeypatch, editor_auth):
+    """Runs happen on dev and on prod, and the corpus is rsynced between them,
+    so one ledger holds both. A run from the other machine cannot be classified
+    by pid here -- /proc is this host's."""
+    build = tmp_path / ".build"
+    build.mkdir()
+    runs = build / "runs.ndjson"
+    away = runlog.make_run_id(os.getpid(), host="otherbox")
+    runlog.emit_run_start(runs, away, ["lagen", "all", "all"], os.getpid())
+    runlog.emit_segment(runs, away, "parse", "sfs", 1.0, total=1, ran=1,
+                        errors=0, status="ok")            # no run-end: unfinished
+    monkeypatch.setattr(ops, "RUNS", runs)
+    monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
+    monkeypatch.setattr(ops, "STATUS", build / "status.json")
+    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    body = _login(TestClient(api.app)).get("/ops/runs").text
+    assert "otherbox" in body
+    assert "ran elsewhere" in body
+    # our live pid must not have been read as "running" for another host's run.
+    # Assert on the outcome cell, not the page: the table's own note explains
+    # the running/aborted distinction in prose.
+    outcomes = re.findall(r'<td class="(\w+)">(?:complete|running|aborted'
+                          r'|incomplete|errors|damaged)', body)
+    assert outcomes == ["incomplete"], outcomes
 
 
 # -- /ops/runs/{id} -------------------------------------------------------

@@ -150,7 +150,9 @@ CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
 -- it over a populated table is minutes of work that `executescript(SCHEMA)`
 -- would do on the serving path. `connect` creates it while the table is still
 -- empty; `widen_to_root_index` rebuilds it later. See INDEX_TO_ROOT_COLUMNS.
-CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
+-- `idx_docs_source` is deliberately NOT here: it covers (source, art_size), and
+-- `art_size` is an ALTER-added column this script cannot reference. `connect`
+-- creates it below, after the migrations. See INDEX_DOCS_SOURCE_COLUMNS.
 """
 
 # The inbound-citation queries count one entry per (citing document, pinpoint),
@@ -183,6 +185,16 @@ CREATE INDEX IF NOT EXISTS idx_docs_source   ON documents(source);
 # narrow one on dev; built as its replacement, `DROP` returns the old pages to
 # the freelist for `CREATE` to reuse, and the real corpus catalog went from
 # 4.87 to 4.96 GB.
+# `documents`' own covering index, for the same reason as its links-side sibling
+# below. The ops dashboard's per-source totals are one `SELECT source, COUNT(*),
+# SUM(art_size) ... GROUP BY source`; a (source)-only index orders that scan but
+# cannot answer it, so the query reads the whole 173.8 MB table. Covering, the
+# same query is a 5.5 MB index scan. `source` leads, so every plain
+# `WHERE source = ?` keeps the index it had.
+INDEX_DOCS_SOURCE_COLUMNS = ("source", "art_size")
+_CREATE_DOCS_SOURCE = ("CREATE INDEX IF NOT EXISTS idx_docs_source ON documents(%s)"
+                       % ", ".join(INDEX_DOCS_SOURCE_COLUMNS))
+
 INDEX_TO_ROOT_COLUMNS = ("to_root", "from_uri", "from_anchor")
 _CREATE_TO_ROOT = ("CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(%s)"
                    % ", ".join(INDEX_TO_ROOT_COLUMNS))
@@ -260,6 +272,12 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE genomforande ADD COLUMN sfs_pinpoint TEXT")
     con.execute("CREATE INDEX IF NOT EXISTS idx_docs_publisher "
                 "ON documents(source, publisher)")
+    # (source, art_size), now that the ALTERs above have made art_size exist.
+    # Free on a fresh catalog; on a populated one this is the *narrow* index
+    # every catalog built before the widening still carries, and `IF NOT EXISTS`
+    # matches its name, so it stays narrow until `rebuild` calls
+    # `widen_docs_source_index` -- correct and slow, never a stall here.
+    con.execute(_CREATE_DOCS_SOURCE)
     # Only while the table is empty, i.e. on a fresh catalog, where it is free.
     # Building this index over a populated links table is minutes of work, and
     # `connect` is on the serving path (`connect_ro` calls it for its one-time
@@ -271,6 +289,26 @@ def connect(path: Path | str, data_root: Path | None = None,
     if not con.execute("SELECT 1 FROM links LIMIT 1").fetchone():
         con.execute(_CREATE_TO_ROOT)
     return con
+
+
+def widen_docs_source_index(con: sqlite3.Connection) -> bool:
+    """Rebuild `idx_docs_source` covering (INDEX_DOCS_SOURCE_COLUMNS) if it is
+    not already, returning whether it had to -- the `widen_to_root_index`
+    pattern, for the reason given at INDEX_DOCS_SOURCE_COLUMNS and with the same
+    transaction discipline. Idempotent; asks `index_info` for the indexed
+    columns, so a half-widened index is detected as the miss it is.
+
+    Cheap next to its links-side sibling (296k rows, not 15M), but it belongs
+    here rather than in `connect` for the same reason: `connect` is on the
+    serving path, and re-sorting a table is build-cost work."""
+    if tuple(row[2] for row in con.execute(
+            "PRAGMA index_info(idx_docs_source)")) == INDEX_DOCS_SOURCE_COLUMNS:
+        return False
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("DROP INDEX IF EXISTS idx_docs_source")
+    con.execute(_CREATE_DOCS_SOURCE)
+    con.execute("COMMIT")
+    return True
 
 
 def widen_to_root_index(con: sqlite3.Connection) -> bool:
@@ -1137,6 +1175,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     sync, and how many documents were (re)written this run."""
     con = connect(catalog_path, data_root=data_root, exclusive=exclusive)
     widen_to_root_index(con)     # build-cost work belongs here, not in serving
+    widen_docs_source_index(con)   # ... and so does its documents-side sibling
     # artifact paths are stored data_root-relative (portable catalog); the root is
     # what `connect` just recorded (or the catalog file's own directory when the two
     # are colocated), never assumed to be catalog_path.parent -- catalog_root may

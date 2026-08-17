@@ -1,11 +1,14 @@
 """The ops dashboard (`/ops`) -- an at-a-glance health view over the run
 instrumentation `lib/runlog.py` writes under ``DATA/.build/``.
 
-Deliberately self-contained: it renders its own minimal HTML (a local
-``_page`` shell + one CSS constant), never reusing render.py's site shell,
-because the health page must load precisely when the corpus is broken or no
-site has been built. It only *reads* the runlog files through the same
-module the build driver writes them with -- neither side imports the other.
+It renders its own small HTML (a local ``_page`` shell, ``templates/ops.html``)
+rather than render.py's site shell, but wears the site's ``/style.css`` so the
+two look like one application. That is a change: the shell used to carry a
+whole private stylesheet so the page would load when no site had been built.
+The site is built, so the second design system only made ops look foreign.
+
+It only *reads* the runlog files through the same module the build driver
+writes them with -- neither side imports the other.
 
 Auth is the inline editor's session (``auth.require_editor``): the dashboard
 serves the same small hand-curated set of editors, so it rides their login
@@ -24,7 +27,7 @@ from markupsafe import Markup
 from opensearchpy.exceptions import OpenSearchException
 
 from .. import config
-from ..lib import catalog, git, runlog, search, tpl
+from ..lib import catalog, git, layout, runlog, search, tpl
 from . import db
 from .auth import require_editor
 
@@ -32,14 +35,28 @@ RUNS = config.DATA / ".build" / "runs.ndjson"
 ERRORS = config.DATA / ".build" / "errors.json"
 STATUS = config.DATA / ".build" / "status.json"
 
-# the canonical pipeline stages, in run order, the health matrix lays out as
-# columns (a source that never ran a stage simply has no cell there). The actual
-# columns are these unioned with any stage present in the snapshot (see
-# `_stage_columns`), so a cell a source wrote -- e.g. sfs's "versions" -- is
-# never silently hidden.
-STAGES = ["download", "parse", "versions", "relate", "index", "dump", "generate"]
+# The pipeline every source walks, in run order -- the health table's columns.
+# These are read from the *run ledger*, not from status.json: only a full-source
+# `parse`/`download` writes a status cell, so relate/index/dump/generate were
+# blank for every source in the snapshot while the ledger held 23 runs of each.
+STAGES = ["download", "parse", "relate", "index", "dump", "generate"]
 
+# Steps outside that spine: one source's own extra work (sfs's `versions`,
+# stats's `compute`, dv's `namedcases`), or an occasional manual harvest
+# (`browser-download`). As columns they were 18 empty cells and one number, so
+# they get a list of their own under the table instead.
 STALE_AFTER_H = 26        # snapshot-age warning threshold (a daily run + slack)
+
+# How far past its own median a step has to run before the table says so. The
+# old flag fired at 1.5x and said only "slow", which on the live dashboard
+# marked 11 of 19 sources -- a warning that is always on is not a warning. The
+# cell now prints the multiple it measured, so "2.4x median" can be judged.
+SLOW_FACTOR = 2.0
+
+# Ledger "sources" that are not sources: the whole-site generate and relate's
+# cross-corpus correspondence pass both record their segments under a name of
+# their own. They belong to no row of a per-source table.
+PSEUDO_SOURCES = {"__site__", "__corr__"}
 
 router = APIRouter()
 
@@ -63,13 +80,41 @@ def _page(title, body, *, refresh=None):
     return TPL.shell(title, body, refresh)
 
 
-def _stage_columns(status):
-    """The matrix columns: the canonical STAGES in run order, plus any stage a
-    source actually wrote that STAGES doesn't know about (appended, sorted), so
-    every snapshot cell is displayed."""
-    present = {stage for src, cells in status.items() if src != "_updated"
-               for stage in cells}
-    return STAGES + [s for s in sorted(present) if s not in STAGES]
+def _stage_cell(seg, hist, now):
+    """One (source, stage) cell from the last ledger segment that ran it, or
+    None when it never has. `hist` is that key's duration history."""
+    if seg is None:
+        return None
+    errors, status = seg["errors"], seg["status"]
+    ratio = hist["ratio"] if hist else 0
+    # "ran/total" only where the two count the same things -- how many of this
+    # source's documents did work. `index` counts *units* in `ran` (a document
+    # becomes many searchable units), so forarbete's cell read "6870102/97187",
+    # which looks like a fault and is a ratio. Above total, show total alone and
+    # leave the other number to the tooltip.
+    total, ran = seg["total"], seg["ran"]
+    counts = ("%s/%s" % (ran, total) if ran is not None and total is not None
+              and ran <= total else
+              str(total) if total is not None else None)
+    return {
+        "cls": "fail" if errors else ("stale" if status == "skipped" else "ok"),
+        "age": _age(seg["t"], now=now),
+        "errors": errors,
+        "skipped": status == "skipped",
+        "counts": counts,
+        # the parse cell's catalog delta, filled by the caller for the sources
+        # that catalogue at all. Always present: the template environment is
+        # strict, and a key that appears only sometimes is a 500 waiting to fire
+        "delta": None,
+        # the multiple, not the word "slow": a bare flag at 1.5x marked 11 of
+        # 19 sources and told the reader nothing about how much. "per doc" says
+        # the comparison is a rate, so a big run is not called slow for being big
+        "slow": ("%.1fx median%s" % (ratio, " per doc" if hist["rate"] else "")
+                 if ratio >= SLOW_FACTOR else None),
+        "tip": "%s %s: %.1fs, ran %s of %s, %d errors, last ran %s"
+               % (seg["step"], seg["source"], seg["secs"], ran, total, errors,
+                  seg["t"]),
+    }
 
 
 def _hue(source):
@@ -132,6 +177,17 @@ def _index_size():
     return _human_bytes(size) if size is not None else "index not built"
 
 
+def _duration(secs):
+    """A wall clock a reader can size up: '13.4s', '35m 12s', '9h 53m'. The
+    runs table printed raw seconds, where sfs's versions step reads
+    '35583.5s' -- a number nobody converts to ten hours at a glance."""
+    if secs < 60:
+        return "%.1fs" % secs
+    if secs < 3600:
+        return "%dm %ds" % (secs // 60, secs % 60)
+    return "%dh %dm" % (secs // 3600, (secs % 3600) // 60)
+
+
 def _human_bytes(n):
     """A compact decimal size ('39.5 GB', '812 MB', '4.0 kB'), matching how
     OpenSearch's own _cat output sizes stores."""
@@ -148,85 +204,83 @@ def _human_bytes(n):
 
 @router.get("/ops", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
 def ops_overview():
-    """Health overview: the per-source x per-stage matrix, a snapshot-age
-    banner, total failing docs, the last-5-runs strip, per-cell last-success
-    age + duration-regression flags, and the catalog delta."""
+    """Health overview: one row per source carrying both what the corpus holds
+    (documents, artifact bytes) and how each pipeline step last went, plus the
+    recent runs and the steps outside the common spine.
+
+    Corpus size and pipeline health were two tables keyed by the same sources,
+    read one under the other; they are one table now. The stage cells come from
+    the run ledger rather than status.json -- see STAGES."""
     status = runlog.read_status(STATUS)
     errors = runlog.read_errors(ERRORS)
     runs = runlog.read_runs(RUNS)
-    successes = runlog.last_success(RUNS)
+    segments = runlog.last_segments(RUNS)
     history = runlog.duration_history(RUNS)
     stats = _source_stats()
+    now = datetime.now(timezone.utc)
 
     parts = []
 
     updated = status.get("_updated")
-    if updated and (datetime.now(timezone.utc) - _parse_iso(updated)
-                    > timedelta(hours=STALE_AFTER_H)):
-        parts.append(TPL.stale_banner(updated, _age(updated)))
-    parts.append(TPL.snapshot_line(_age(updated) if updated else "never",
-                                   len(errors)))
+    if updated and (now - _parse_iso(updated) > timedelta(hours=STALE_AFTER_H)):
+        parts.append(TPL.stale_banner(updated, _age(updated, now=now)))
 
-    # system: running revision, wiki push state, search-index size
+    # system: running revision + host, wiki push state, search-index size
     ahead, dirty = git.push_state(config.WIKI_ROOT)
-    parts.append(TPL.system_table(
-        _version(),
+    parts.append(TPL.system_line(
+        _age(updated, now=now) if updated else "never", len(errors),
+        _version(), runlog.this_host(),
         {"no_upstream": ahead is None, "ahead": ahead, "dirty": dirty},
         _index_size()))
 
-    # corpus: document count + artifact size per source, from the catalog
-    crows = []
-    if stats:
-        for src in sorted(stats):
-            docs, nbytes = stats[src]
-            crows.append({"source": src, "docs": docs,
-                          "size": _human_bytes(nbytes)})
-        crows.append({"source": "total",
-                      "docs": sum(d for d, _ in stats.values()),
-                      "size": _human_bytes(sum(b for _, b in stats.values()))})
-    parts.append(TPL.corpus_table(crows))
+    # one row per source: every source the catalog knows plus every source the
+    # ledger has run a step for -- a source that parses but catalogues nothing
+    # (remisser) belongs on the health table even with no corpus numbers
+    sources = sorted((set(stats or ()) | {src for _step, src in segments})
+                     - PSEUDO_SOURCES)
 
-    # last-5-runs strip
+    def row(src):
+        docs, nbytes = (stats or {}).get(src, (None, None))
+        cells = [_stage_cell(segments.get((stage, src)),
+                             history.get((stage, src)), now)
+                 for stage in STAGES]
+        # the catalog delta, folded into the cell it belongs beside instead of
+        # the separate table it was: parse wrote N artifacts, the catalog holds
+        # M. Only for sources that catalogue at all -- remisser parses 80,200
+        # consultation responses and publishes none of them by decision, which
+        # the old table flagged red every single load.
+        parsed = status.get(src, {}).get("parse", {}).get("fresh")
+        if (src in layout.CATALOGUED_SOURCES and cells[STAGES.index("parse")]
+                and parsed is not None and docs is not None and parsed > docs):
+            cells[STAGES.index("parse")]["delta"] = parsed - docs
+        return {"source": src, "docs": docs,
+                "size": _human_bytes(nbytes) if nbytes is not None else None,
+                "cells": cells}
+
+    parts.append(TPL.health_table(
+        STAGES, [row(src) for src in sources],
+        {"docs": sum(d for d, _ in stats.values()),
+         "size": _human_bytes(sum(b for _, b in stats.values()))}
+        if stats else None))
+
+    # Everything the per-source table cannot hold: a step outside the common
+    # spine (sfs's versions, stats' compute, dv's namedcases), and the two
+    # corpus-wide passes that record under a name of their own. Without this the
+    # whole-site generate -- which is what actually builds the pages, and shows
+    # as an empty cell for every source -- appeared nowhere on the dashboard.
+    parts.append(TPL.other_steps([
+        {"step": step, "source": src, "pseudo": src in PSEUDO_SOURCES,
+         "cell": _stage_cell(seg, history.get((step, src)), now)}
+        for (step, src), seg in sorted(segments.items())
+        if step not in STAGES or src in PSEUDO_SOURCES]))
+
     parts.append(TPL.runs_strip([
         {"outcome": r["status"] if r["ok"] is not False else "errors",
-         "run": r["run"], "tip": "%s  %s" % (r["t"], " ".join(r["argv"]))}
-        for r in runs[:5]]))
-
-    # per-source x per-stage matrix
-    sources = sorted(k for k in status if k != "_updated")
-    columns = _stage_columns(status) if sources else []
-
-    def matrix_cell(src, stage):
-        cell = status[src].get(stage)
-        if cell is None:
-            return None
-        # every writer of a status cell (build.cmd_status, build's per-segment
-        # writer) emits the whole set of counts, so a missing one is schema
-        # drift worth crashing on rather than rendering as a zero
-        failed, stale = cell["failed"], cell["stale"]
-        key = (stage, src)
-        return {"cls": "fail" if failed else ("stale" if stale else "ok"),
-                "tip": "last ok %s" % _age(successes.get(key)),
-                "counts": "%d/%d" % (cell["fresh"], cell["total"]),
-                "failed": failed, "stale": stale,
-                "regress": history.get(key, {}).get("regression")}
-
-    parts.append(TPL.matrix(columns, [
-        {"source": src, "cells": [matrix_cell(src, stage) for stage in columns]}
-        for src in sources]))
-
-    # catalog delta: parsed-but-not-catalogued per source. A source with no
-    # parse stage has no cell to read (hence the .get), and a source whose
-    # artifacts are never catalogued -- remisser -- has no stats row.
-    delta = None
-    if stats is not None:
-        delta = [{"source": src,
-                  "fresh": (fresh := status[src]["parse"]["fresh"]
-                            if "parse" in status[src] else 0),
-                  "catn": (catn := stats[src][0] if src in stats else 0),
-                  "delta": fresh - catn}
-                 for src in sources]
-    parts.append(TPL.delta_table(delta))
+         "run": r["run"], "host": r["host"], "age": _age(r["t"], now=now),
+         # argv[1:], as the runs table does: every chip would open with `lagen`
+         "argv": " ".join(r["argv"][1:]) if r["argv"] else "—",
+         "tip": "%s  %s" % (r["t"], " ".join(r["argv"] or ["(damaged)"]))}
+        for r in runs[:8]]))
 
     return _page("ops health", Markup("").join(parts), refresh=60)
 
@@ -239,15 +293,21 @@ def ops_runs():
     runs = runlog.read_runs(RUNS)
     if not runs:
         return _page("runs", TPL.empty("no runs recorded yet."))
+    now = datetime.now(timezone.utc)
     rows = []
     for r in runs:
         outcome = r["status"] if r["ok"] is not False else "errors"
-        rows.append({"run": r["run"], "t": r["t"],
-                     "wall": ("%.1fs" % r["secs"]
+        rows.append({"run": r["run"], "t": r["t"], "age": _age(r["t"], now=now),
+                     "host": r["host"], "elsewhere": r["host"] not in
+                     (None, runlog.this_host()),
+                     "wall": (_duration(r["secs"])
                               if r["secs"] is not None else "—"),
-                     "argv": " ".join(r["argv"]), "outcome": outcome,
-                     "outcome_text": "%s (%d err)" % (outcome,
-                                                      r["errors"] or 0),
+                     # what the run did, not how it was typed: `lagen` and the
+                     # trailing flags are the same on every row
+                     "argv": " ".join(r["argv"][1:]) if r["argv"] else "—",
+                     "outcome": outcome,
+                     "errors": r["errors"] or 0,
+                     "sources": ", ".join(r["sources"]) or "—",
                      "segments": r["segments"]})
     return _page("runs", TPL.runs_table(rows))
 
@@ -264,8 +324,9 @@ def ops_run_detail(run_id: str):
     segments = detail["segments"]
     start = detail["start"]
 
-    parts = [TPL.run_header(start["t"], " ".join(start["argv"]),
-                            detail["status"])]
+    parts = [TPL.run_header(start["t"], " ".join(start["argv"] or ["(damaged)"]),
+                            detail["status"], detail["host"],
+                            detail["host"] not in (None, runlog.this_host()))]
 
     # per-step timing bars: one row per step, one block per source width ∝ secs
     by_step = {}

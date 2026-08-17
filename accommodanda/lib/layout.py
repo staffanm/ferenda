@@ -66,6 +66,18 @@ def artifact_dir(source: str) -> Path:
     return ARTIFACT / SOURCE_DIR[source]
 
 
+# Which sources put documents in the catalog. The three left out parse plenty
+# and catalogue nothing, each on purpose: `remisser` holds 80k consultation
+# responses we do not publish, `site` and `stats` render editorial pages rather
+# than corpus documents. Named here, next to the artifact layout both readers
+# share, because two of them ask: `build.ARTIFACTS` builds relate/index/dump's
+# work list from it, and the ops dashboard reads it to tell "parsed but never
+# catalogued" (a real fault) from "parsed and never meant to be" (these three).
+CATALOGUED_SOURCES = ("sfs", "dv", "forarbete", "kommentar", "begrepp",
+                      "eurlex", "foreskrift", "avg", "rs", "edpb",
+                      "hudoc", "coe", "icrc", "untc", "icc", "icj")
+
+
 # raw roots -- the download writers put their structure under these
 SFS_DOWNLOADED = DOWNLOADED / "sfs"
 SFS_ARTIFACT = ARTIFACT / "sfs"                     # sfs artifacts + sidecars + archive/
