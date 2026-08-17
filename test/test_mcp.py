@@ -91,8 +91,27 @@ def test_search_combines_fulltext_and_pins(corpus):
     assert res["query"] == "mord"
     hit = res["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
-    assert hit["url"] == "/1962:700"                 # layout.page_url
+    assert hit["url"] == config.PUBLIC_BASE_URL + "/1962:700"
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
+
+
+def test_every_tool_url_is_absolute(corpus):
+    """`url` must carry its origin. A root-relative path is resolved by the
+    reading client against *its own* host: ChatGPT rendered `/1915:218` as
+    https://chatgpt.com/1915:218 and every citation it published was broken.
+
+    The site's own pages keep linking relatively (`layout.page_url`) -- this is
+    the MCP boundary's job, so it is checked on every tool that emits a url."""
+    base = config.PUBLIC_BASE_URL
+    urls = [mcpmod.search("mord", source="sfs")["results"][0]["url"],
+            mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")[0]["url"],
+            mcpmod.fetch("https://lagen.nu/1962:700#K3P1")["url"],
+            mcpmod.fetch("https://lagen.nu/1962:700")["url"]]
+    for url in urls:
+        assert url.startswith(base + "/"), url
+        # the origin appears once: a producer that starts absolutizing upstream
+        # would otherwise double it silently
+        assert url.count("://") == 1, url
 
 
 def test_search_fails_visibly_without_opensearch(corpus):
@@ -227,14 +246,16 @@ def test_search_and_fetch_satisfy_the_openai_contract(corpus):
 
     doc = mcpmod.fetch(hit["id"])
     assert set(doc) == {"id", "title", "text", "url", "metadata"}
-    assert doc["id"] == hit["id"] and doc["url"] == "/1962:700#K3P1"
+    assert doc["id"] == hit["id"]
+    assert doc["url"] == config.PUBLIC_BASE_URL + "/1962:700#K3P1"
     assert "berövar annan livet" in doc["text"]
     assert doc["metadata"]["source"] == "sfs"
     assert doc["metadata"]["pinpoint"] == "K3P1"
 
     # a bare document URI is an equally valid id -- then it is the whole document
     whole = mcpmod.fetch("https://lagen.nu/1962:700")
-    assert whole["metadata"]["pinpoint"] is None and whole["url"] == "/1962:700"
+    assert whole["metadata"]["pinpoint"] is None
+    assert whole["url"] == config.PUBLIC_BASE_URL + "/1962:700"
 
     # resolve_citation hands back the same handle, so its hits are fetchable too
     assert mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")[0]["id"] == hit["id"]
@@ -249,7 +270,8 @@ def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
         def search(self, q, source=None, kind=None, year=None, limit=10,
                    offset=0, cursor=None):
             return {"total": 1, "next_cursor": None, "facets": {}, "results": [{
-                "uri": "https://lagen.nu/2018:585", "identifier": "SFS 2018:585",
+                "uri": "https://lagen.nu/2018:585", "url": "/2018:585",
+                "identifier": "SFS 2018:585",
                 "title": "Förvaltningslag (2018:585)", "source": "sfs",
                 "kind": "law", "score": 4.2, "inbound_count": 0,
                 "highlight": [], "fragments": []}]}

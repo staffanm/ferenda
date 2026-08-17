@@ -31,6 +31,7 @@ from pydantic import ConfigDict, Field
 from starlette.responses import RedirectResponse
 from starlette.routing import Route
 
+from .. import config
 from ..lib import layout, pins, text
 from ..lib.search import SearchIndex
 from . import analytics, db, reads
@@ -222,6 +223,30 @@ def _hit_id(hit):
     return hit["fragments"][0]["uri"] if hit["fragments"] else hit["uri"]
 
 
+def _page_url(uri, pinpoint=None):
+    """The absolute public URL of a document's page, `#pinpoint` appended.
+
+    Absolute, unlike the root-relative path `layout.page_url` mints for the
+    site's own pages: an MCP result is read by a client on another origin, and a
+    relative path there is not merely unhelpful but wrong -- ChatGPT resolved
+    `/1915:218` against `https://chatgpt.com` and rendered its citations pointing
+    at that host. Every `url` the tools below emit goes through here or
+    `_absolute_page_urls`."""
+    return (config.PUBLIC_BASE_URL + layout.page_url(uri)
+            + ("#" + pinpoint.lstrip("#") if pinpoint else ""))
+
+
+def _absolute_page_urls(hits):
+    """`hits` with each row's relative `url` replaced by its absolute form.
+
+    The two producers of this row shape (`search.parse_hit`,
+    `pins.resolved_results`) set `url` for the site's own pages, so the MCP layer
+    rewrites rather than adds. Indexed, not `.get`-ed: a row without the key
+    means the shape changed under us, and silently emitting no link is worse than
+    failing here (rule:fail-fast)."""
+    return [{**hit, "url": config.PUBLIC_BASE_URL + hit["url"]} for hit in hits]
+
+
 # --------------------------------------------------------------------------
 # tools
 # --------------------------------------------------------------------------
@@ -240,9 +265,10 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
     text). `source`/`kind` narrow the hits; `limit` is 1-50.
 
     Each result: id (pass it to `fetch`; it pinpoints the matching provision
-    where the match was paragraph-deep), uri, url (the public page path --
-    append `#<pinpoint>` to deep link), identifier, title, source, kind,
-    inbound_count (how often cited), and the matching fragments. Follow up with
+    where the match was paragraph-deep), uri (the document's identifier), url
+    (its absolute public page URL, ready to show a reader -- append
+    `#<pinpoint>` to deep link), identifier, title, source, kind, inbound_count
+    (how often cited), and the matching fragments. Follow up with
     `get_document` (or `fetch`) for the full text.
     """
     limit = max(1, min(limit, 50))
@@ -252,7 +278,7 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
     res = reads.search(_index, query, source=source, kind=kind, limit=limit)
     return SearchResults(query=query, total=res["total"],
                          results=[{**r, "id": _hit_id(r)}
-                                  for r in res["results"]])
+                                  for r in _absolute_page_urls(res["results"])])
 
 
 @mcp.tool(title="Resolve a legal citation to its URI", annotations=READ_ONLY)
@@ -265,12 +291,14 @@ def resolve_citation(citation: str) -> list[dict]:
     "BrB 3:1"), an EU act + article ("GDPR artikel 32", "dataskyddsförordningen
     art. 6") and a case nickname ("NJA 2015 s. 899", "Instagrambilden"). Returns a
     list (usually one entry, or empty if nothing resolves) of {id, uri, url,
-    identifier, title, source, kind, inbound_count, fragments}; when the citation
-    named a paragraph/article, `fragments[0].uri` is the pinpointed fragment URI
-    and `id` (what `fetch` takes) is that same pinpointed URI.
+    identifier, title, source, kind, inbound_count, fragments} -- `uri` being the
+    document's identifier and `url` its absolute public page URL; when the
+    citation named a paragraph/article, `fragments[0].uri` is the pinpointed
+    fragment URI and `id` (what `fetch` takes) is that same pinpointed URI.
     """
     with _con() as con:
-        return [{**r, "id": _hit_id(r)} for r in pins.resolved_results(con, citation)]
+        return [{**r, "id": _hit_id(r)}
+                for r in _absolute_page_urls(pins.resolved_results(con, citation))]
 
 
 @mcp.tool(title="Get a document's metadata and text", annotations=READ_ONLY)
@@ -320,7 +348,8 @@ def fetch(id: str) -> FetchedDocument:
     `get_document`, which takes the URI and the pinpoint separately and can cap
     the length -- prefer that one when you already know both.
 
-    Returns id, title, url, text and a `metadata` map carrying source, kind,
+    Returns id, title, url (the absolute public page URL, pinpointed where `id`
+    was), text and a `metadata` map carrying source, kind,
     label, the publisher's authoritative page, how often the document is cited,
     the `pinpoint` read (null for a whole document) and `truncated`. The body
     caps at 200000 characters: when `metadata.truncated` is true you have a
@@ -333,7 +362,7 @@ def fetch(id: str) -> FetchedDocument:
     doc = get_document(uri, pinpoint or None, max_chars=MAX_CHARS)
     return FetchedDocument(
         id=id, title=doc["title"], text=doc["text"],
-        url=layout.page_url(doc["uri"]) + ("#" + pinpoint if pinpoint else ""),
+        url=_page_url(doc["uri"], pinpoint),
         metadata={"source": doc["source"], "kind": doc["kind"],
                   "label": doc["label"], "source_url": doc["source_url"],
                   "pinpoint": doc["pinpoint"], "truncated": doc["truncated"],

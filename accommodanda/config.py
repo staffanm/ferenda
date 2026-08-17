@@ -30,6 +30,12 @@ CONFIG_PATH = REPO / "config.yml"
 DEFAULT_DATA = REPO / "site" / "data"
 DEFAULT_WIKI_ROOT = REPO.parent / "lagen-wiki"   # git-backed markdown content repo
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
+# where the generated site answers the paths lib/layout.page_url mints -- the
+# origin the MCP tools prefix onto them so a remote client gets a link it can
+# follow. The rebuilt site, not lagen.nu: only a subset of these paths (statutes,
+# cases, förarbeten) exists on the legacy site, while /celex/… and /dom/echr/…
+# are the rebuild's own.
+DEFAULT_PUBLIC_BASE_URL = "https://ferenda.lagen.nu"
 DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
 # the OpenAI-compatible endpoint the ai-* passes call, minus the
 # /chat/completions path (lib/llm appends it). Berget unless pointed elsewhere.
@@ -135,6 +141,34 @@ def resolve_opensearch_url(doc):
     ``OPENSEARCH_URL`` environment variable (for ad-hoc overrides), then the
     ``opensearch_url`` key in config.yml, then ``http://localhost:9200``."""
     return _resolve_str(doc, "opensearch_url", "OPENSEARCH_URL", DEFAULT_OPENSEARCH_URL)
+
+
+def resolve_public_base_url(doc):
+    """The origin the generated site is served from, for the absolute URLs the MCP
+    tools hand a remote client.
+
+    Pages link each other by root-relative path (``lib/layout.page_url`` -- a
+    statute is ``/2018:585``), which is right for a browser on our own origin and
+    wrong for an MCP client: ChatGPT resolved the ``url`` field against
+    ``https://chatgpt.com`` and rendered citations pointing there. So the MCP layer
+    joins this base onto the path; nothing else uses it.
+
+    Precedence: the ``PUBLIC_BASE_URL`` environment variable, then the
+    ``public_base_url`` key in config.yml, then the production origin (correct for
+    prod without a config edit; a dev serve on another port should set it)."""
+    return _resolve_str(doc, "public_base_url", "PUBLIC_BASE_URL",
+                        DEFAULT_PUBLIC_BASE_URL, post=_checked_origin)
+
+
+def _checked_origin(value):
+    """An absolute ``scheme://host`` origin with no trailing slash. A relative or
+    scheme-less value is the exact defect this setting exists to prevent, so it
+    raises here rather than producing a subtly wrong link in every tool result."""
+    origin = value.rstrip("/")
+    if not origin.startswith(("http://", "https://")):
+        raise ValueError(
+            "public_base_url must be an absolute http(s) origin, got %r" % value)
+    return origin
 
 
 def resolve_llm_model(doc):
@@ -398,6 +432,7 @@ DATA = resolve_data_root(_doc)
 CATALOG_ROOT = resolve_catalog_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
+PUBLIC_BASE_URL = resolve_public_base_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)
 LLM_BASE_URL = resolve_llm_base_url(_doc)
 LLM_TEMPERATURE = resolve_llm_temperature(_doc)
