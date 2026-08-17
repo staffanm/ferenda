@@ -744,6 +744,45 @@ def test_all_download_skips_derived_sources(wire, tmp_path, monkeypatch):
     assert harvest_called == [[]]
 
 
+def test_a_download_segment_records_what_the_harvest_found(wire, tmp_path,
+                                                           monkeypatch):
+    """A harvest returns `(seen, changed)` and the ledger keeps it as the
+    segment's (total, ran).
+
+    Every source computed those two numbers and printed them; `_run_harvest`
+    called the harvest for its side effects and emitted the segment with
+    neither, so all 70 download segments on prod carried total=null, ran=null
+    and the dashboard could not say what a nightly download brought in."""
+    src = Source("syn_counts", lambda: [], {}, harvest=lambda scopes: (312, 7),
+                 origin="http://example.com")
+    wire(src)
+    build.main(["all", "download", "-j1"])
+    seg = [e for e in _events(build.RUNS) if e["event"] == "segment"
+           and e["step"] == "download" and e["source"] == "syn_counts"][-1]
+    assert (seg["total"], seg["ran"]) == (312, 7)
+
+
+def test_a_dry_run_harvest_counts_nothing(wire, tmp_path, monkeypatch):
+    """A harvest that returns nothing -- every source's `--dry-run` path --
+    records null counts rather than zeroes. "Nothing was downloaded" and "we
+    did not look" are different facts, and a zero would read as the first."""
+    src = Source("syn_none", lambda: [], {}, harvest=lambda scopes: None,
+                 origin="http://example.com")
+    wire(src)
+    build.main(["all", "download", "-j1"])
+    seg = [e for e in _events(build.RUNS) if e["event"] == "segment"
+           and e["step"] == "download" and e["source"] == "syn_none"][-1]
+    assert (seg["total"], seg["ran"]) == (None, None)
+
+
+def test_scope_totals_sum_across_sub_corpora():
+    """avg sweeps five organs, rs and föreskrift their agencies, eurlex its
+    sectors: each sync answers per scope and the ledger wants the run's total."""
+    assert build._sum_scope_totals(
+        {"jo": (100, 3), "jk": (50, 1), "arn": (7, 0)}) == (157, 4)
+    assert build._sum_scope_totals({}) == (0, 0)
+
+
 def test_all_download_contains_harvest_exceptions(wire, tmp_path, monkeypatch):
     harvests = {}
     def harvest1(scopes):

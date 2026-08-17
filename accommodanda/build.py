@@ -313,6 +313,7 @@ def _simple_source(name, download_mod, parse_fn, root, code, *, inputs, origin,
             root, full=RUN.force, only=RUN.only, limit=RUN.limit,
             delay=POLITENESS)
         print("%s download: %d seen, %d changed" % (name, seen, changed))
+        return seen, changed
 
     return Source(name, lambda: download_mod.list_basefiles(root),
                   {"parse": _parse_stage(name, parse_fn, root,
@@ -1058,6 +1059,9 @@ def sfs_harvest(scopes):
     print("sfs download: %d seen, %d new, %d updated, %d skipped"
           % (seen, new, updated, skipped))
     _sfs_mirror_pdf_run(sfs_pdfmirror.corpus_beteckningar(sfs_list()), force=False)
+    # sfs splits "changed" in two -- an act we did not hold, and a new lydelse of
+    # one we did. Both wrote a record, so both count as work done
+    return seen, new + updated
 
 
 def sfs_parse_run(basefile):
@@ -1710,6 +1714,9 @@ def dv_harvest(scopes):
         traceback.print_exc()
         _emit_segment("namedcases", "dv", time.perf_counter() - t0,
                       status="errors", errors=1)
+    # the case harvest's own numbers, not the two sidecar refreshes' -- those
+    # report as their own segments
+    return seen, changed
 
 
 def dv_reindex(args=()):
@@ -1868,16 +1875,21 @@ def fa_harvest(scopes):
               % (RUN.only or ", ".join(scopes) or "all types",
                  layout.FA_DOWNLOADED))
         return
+    # both drivers report {typ: (seen, new)}, so one run's total spans them
+    totals = {}
     if do_reg:
         # sync prints each type's own "forarbete <typ>: Starting at ..." banner and
         # closing summary, so every regeringen subtype reads as one block
-        fa_download.sync(str(layout.FA_DOWNLOADED), types=reg_scopes or None,
-                         full=RUN.force, only=RUN.only)
+        totals.update(fa_download.sync(str(layout.FA_DOWNLOADED),
+                                       types=reg_scopes or None,
+                                       full=RUN.force, only=RUN.only))
     for typ in rd_scopes:
         util.harvest_start("forarbete %s" % typ, fa_riksdagen.API)
         seen, new = riksdagen_syncs[typ](str(layout.FA_DOWNLOADED), full=RUN.force,
                                          riksmote=RUN.riksmote)
         print("forarbete %s: %d seen, %d new" % (typ, seen, new))
+        totals[typ] = (seen, new)
+    return _sum_scope_totals(totals)
 
 
 def fa_parse_run(basefile):
@@ -2190,12 +2202,15 @@ def eurlex_harvest(scopes):
                  layout.EURLEX_DOWNLOADED))
         return
     languages = tuple(RUN.lang.split(",")) if RUN.lang else eurlex_download.LANGUAGES
+    totals = {}
     for sector in (scopes or list(eurlex_download.SECTORS)):
         seen, stored, skipped = eurlex_download.sync(
             layout.EURLEX_DOWNLOADED, sector, full=RUN.force, since=RUN.since,
             languages=languages, source=RUN.source)
         print("eurlex %s: %d seen, %d stored, %d skipped"
               % (sector, seen, stored, skipped))
+        totals[sector] = (seen, stored)     # `skipped` is seen-minus-stored
+    return _sum_scope_totals(totals)
 
 
 def eurlex_unpack(args):
@@ -2399,9 +2414,12 @@ def hudoc_harvest(scopes):
     if bounded:
         print("hudoc download: bounded run -- the Court's summaries and the "
               "Swedish translations are left for an unbounded one")
-        return
+        return seen, changed
     hudoc_summaries.sync(layout.HUDOC_DOWNLOADED, delay=POLITENESS)
     hudoc_translations.propose(layout.HUDOC_DOWNLOADED, layout.WIKI_ROOT)
+    # the case harvest's numbers; the two ride-along sweeps produce inputs for
+    # other stages, not hudoc documents, so they do not add to the count
+    return seen, changed
 
 
 def hudoc_casenames(args=()):
@@ -2596,9 +2614,9 @@ def foreskrift_harvest(scopes):
         return
     # sync prints each agency's own summary as it finishes and, with jobs>1, fans
     # the agencies out across a thread pool (each hits a different host)
-    foreskrift_download.sync(str(layout.FORESKRIFT_DOWNLOADED),
-                             scopes=scopes, full=RUN.force,
-                             only=RUN.only, jobs=RUN.jobs)
+    return _sum_scope_totals(foreskrift_download.sync(
+        str(layout.FORESKRIFT_DOWNLOADED), scopes=scopes, full=RUN.force,
+        only=RUN.only, jobs=RUN.jobs))
 
 
 def foreskrift_browser_download(_basefiles):
@@ -2849,6 +2867,7 @@ def avg_harvest(scopes):
                                full=RUN.force, only=RUN.only)
     for org, (seen, new) in totals.items():
         print("avg %s: %d seen, %d new" % (org, seen, new))
+    return _sum_scope_totals(totals)
 
 
 # No per-document download stage (the foreskrift rule): decisions arrive only
@@ -2939,6 +2958,7 @@ def rs_harvest(scopes):
                               full=RUN.force, only=RUN.only, limit=RUN.limit)
     for org, (seen, new) in totals.items():
         print("rs %s: %d seen, %d new" % (org, seen, new))
+    return _sum_scope_totals(totals)
 
 
 def rs_browser_download(_basefiles):
@@ -3005,6 +3025,7 @@ def edpb_harvest(scopes):
                                full=RUN.force, only=RUN.only)
     for serie, (seen, new) in totals.items():
         print("edpb %s: %d seen, %d new" % (serie, seen, new))
+    return _sum_scope_totals(totals)
 
 
 # No per-document download stage (the foreskrift/avg/rs rule): the guidance
@@ -3128,12 +3149,15 @@ def remisser_harvest(scopes):
               % (result["basefile"], result["svar"], result["fetched"],
                  " (externt dokument -- answers not harvested)"
                  if result["externt"] else ""))
-        return
+        return result["svar"], result["fetched"]
     summary = remisser_download.sync(full=RUN.force)
     print("remisser: %d new, %d repolled, %d fetched, %d failed; %d still open, "
           "%d externt (skipped)"
           % (summary["new"], summary["repolled"], summary["fetched"],
              summary["failed"], summary["open"], summary["externt"]))
+    # a remiss ärende is the document here; `fetched` counts the answer files
+    # pulled for those ärenden, which is the work the run did
+    return summary["new"] + summary["repolled"], summary["fetched"]
 
 
 def remisser_ai_analyze(basefiles):
@@ -3618,11 +3642,12 @@ api_patch.set_reparse(reparse_one)
 # consolidations, föreskrift's `.grund.json` as-enacted pages). Hand-globbing
 # here is what let the exclusions drift: the föreskrift entry's `*/*.json`
 # handed relate 1,650 .grund sidecars as if they were documents.
-# Absent by design: remisser/site/stats publish no catalogued documents.
+# Absent by design: remisser/site/stats publish no catalogued documents. The
+# membership itself is `layout.CATALOGUED_SOURCES`, because the ops dashboard
+# asks the same question and must not import build (build imports the API app,
+# so the dependency points the other way -- see lib/runlog.py's docstring).
 ARTIFACTS = {name: functools.partial(layout.artifacts, name)
-             for name in ("sfs", "dv", "forarbete", "kommentar", "begrepp",
-                          "eurlex", "foreskrift", "avg", "rs", "edpb",
-                          "hudoc", "coe", "icrc", "untc", "icc", "icj")}
+             for name in layout.CATALOGUED_SOURCES}
 
 
 # relate's per-source extraction (the documents/links it derives per artifact)
@@ -3967,6 +3992,31 @@ def cmd_dump(names):
         save_fingerprints(store)
 
 
+def _sum_scope_totals(totals):
+    """`(seen, changed)` across a `{scope: (seen, new)}` map -- what the harvests
+    that sweep several sub-corpora at once (avg's five organs, rs's and
+    föreskrift's agencies, edpb's three series) get back from their sync. They
+    print a line per scope for a person and report the sum to the ledger."""
+    return (sum(seen for seen, _new in totals.values()),
+            sum(new for _seen, new in totals.values()))
+
+
+def _harvest_counts(result):
+    """`(seen, changed)` from what a harvest returned, or `(None, None)`.
+
+    Every harvest returns that pair -- documents the sweep enumerated upstream,
+    and documents it actually wrote -- summing its own scopes first, because
+    only the harvest knows whether its numbers are per agency, per sector or per
+    doctype. A dry run returns nothing and counts nothing.
+
+    The pair reaches the ledger as a segment's (total, ran), the same measures
+    every other step reports: how much there was, and how much did work."""
+    if result is None:
+        return None, None
+    seen, changed = result
+    return seen, changed
+
+
 def _run_harvest(source, scopes):
     """Run one source's bulk discovery harvest, banner and ledger segment
     included; True when it failed. `scopes` narrows the sweep to named
@@ -3979,8 +4029,12 @@ def _run_harvest(source, scopes):
         util.harvest_start("%s download" % label, source.origin)
     t0 = time.perf_counter()
     try:
-        source.harvest(scopes)
-        _emit_segment("download", name, time.perf_counter() - t0, status="ok")
+        # every source computed "N seen, M changed" and printed it; the ledger
+        # recorded neither, so the dashboard could not say what a nightly
+        # download brought in (all 70 prod segments carried total=null, ran=null)
+        seen, changed = _harvest_counts(source.harvest(scopes))
+        _emit_segment("download", name, time.perf_counter() - t0,
+                      total=seen, ran=changed, status="ok")
     except Exception:  # noqa: BLE001 — per-source resilience point: one source's harvest failure must not abort the remaining sources; printed + nonzero exit at end (rule:no-catch-log-continue)
         traceback.print_exc()
         _emit_segment("download", name, time.perf_counter() - t0,
