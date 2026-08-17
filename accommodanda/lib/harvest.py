@@ -50,7 +50,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable, Container, Iterable, Iterator, Mapping, Sequence
 
-from . import compress
+from . import compress, net
 from .util import (
     Reporter,
     basefile_slug,
@@ -562,20 +562,24 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
     then each scope keeps its own live progress line."""
     scopes = list(scopes)
     elapsed: dict[str, float] = {}
+    requests_made: dict[str, int] = {}
     totals: dict[str, tuple[int, int]] = {}
 
     def timed(scope, into):
         started = time.monotonic()
-        try:
-            return work(scope, into)
-        finally:
-            elapsed[scope] = time.monotonic() - started
+        # per-thread, so a fanned-out scope is billed its own requests
+        with net.counted() as made:
+            try:
+                return work(scope, into)
+            finally:
+                elapsed[scope] = time.monotonic() - started
+                requests_made[scope] = made()
 
     if jobs <= 1 or len(scopes) <= 1:
         for scope in scopes:
             totals[scope] = timed(scope, log)
             log("%s %s: %d seen, %d new" % (label, scope, *totals[scope]))
-        _log_scope_times(elapsed, label, log)
+        _log_scope_costs(elapsed, requests_made, label, log)
         return totals
 
     buffers: dict[str, list[str]] = {scope: [] for scope in scopes}
@@ -612,19 +616,25 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
             rep.update(done, len(scopes), scope=label, new=new_total,
                        note="  [running: %s]" % ", ".join(busy) if busy else "")
     rep.done()
-    _log_scope_times(elapsed, label, log)
+    _log_scope_costs(elapsed, requests_made, label, log)
     return totals
 
 
-def _log_scope_times(elapsed, label, log):
-    """Which upstream actually cost the time. The run ledger measures a whole
-    source (`avg` download is 553 s), which is the wrong grain: these scopes are
-    separate hosts, so a fan-out's gain is bounded by the slowest one alone, and
-    nothing else records which that is."""
+def _log_scope_costs(elapsed, requests_made, label, log):
+    """What each upstream cost: wall clock and HTTP attempts.
+
+    The run ledger measures a whole source (`avg` download is 553 s over 3,888
+    documents), which is the wrong grain twice over. These scopes are separate
+    hosts, so a fan-out's gain is bounded by the slowest one alone; and a
+    document count says nothing about how chatty the harvest was -- 1,025
+    documents can be 1,025 fetches or three SPARQL queries returning 1,025
+    records. Only the request count tells those apart, and it is the number to
+    reduce."""
     if len(elapsed) > 1:
-        log("%s scope times: %s" % (
-            label, ", ".join("%s %.1fs" % (scope, secs) for scope, secs
-                             in sorted(elapsed.items(), key=lambda kv: -kv[1]))))
+        log("%s scope cost: %s" % (
+            label, ", ".join(
+                "%s %.1fs/%dreq" % (scope, secs, requests_made.get(scope, 0))
+                for scope, secs in sorted(elapsed.items(), key=lambda kv: -kv[1]))))
 
 
 def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,

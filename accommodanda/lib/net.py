@@ -21,8 +21,11 @@ import socket
 import ssl
 import sys
 import tempfile
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable, Iterator
 
 import certifi
 import httpx
@@ -348,6 +351,38 @@ def is_not_found(exc: requests.RequestException) -> bool:
     return exc.response is not None and exc.response.status_code == 404
 
 
+# HTTP attempts made, per thread. Per *thread* because harvests fan their scopes
+# out across a pool (lib.harvest.fan_out) and a global counter would bill one
+# agency's requests to whichever finished next.
+#
+# Attempts, not calls: `request` retries a throttle or a 5xx internally, and it is
+# the attempts that reach the network and that a rate limiter counts. The number
+# is the one download metric that cannot be inferred from the others -- a source
+# that reports "1,025 seen" may have made 1,025 requests or three SPARQL queries
+# returning 1,025 records, and only this tells them apart.
+_attempts = threading.local()
+
+
+def attempts() -> int:
+    """HTTP attempts made on this thread since the process started."""
+    return getattr(_attempts, "n", 0)
+
+
+@contextmanager
+def counted() -> Iterator[Callable[[], int]]:
+    """Count the HTTP attempts made on this thread inside the block. Yields a
+    callable returning the delta -- live during the block, final after it."""
+    start = attempts()
+    total = None
+
+    def delta():
+        return attempts() - start if total is None else total
+    try:
+        yield delta
+    finally:
+        total = attempts() - start
+
+
 def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs):
     """Perform an HTTP request, riding out the transient failures a long
     unattended harvest meets: an empty/non-JSON 2xx body, a throttle (403/429),
@@ -374,6 +409,7 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
             kwargs["timeout"] = min(kwargs["timeout"], max(remaining, 1.0))
         response = None
         try:
+            _attempts.n = getattr(_attempts, "n", 0) + 1
             response = session.request(method, url, **kwargs)
             raise_for_status(response)
             return response.json() if parse_json else response
