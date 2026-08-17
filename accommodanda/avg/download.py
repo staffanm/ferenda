@@ -1467,4 +1467,4 @@ SYNC = {"jo": jo_sync, "jk": jk_sync, "arn": arn_sync, "imy": imy_sync,
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
     """Download the named organs (default all five). Returns {org: (seen, new)}."""
     return dispatch_scopes(root, scopes, SYNC, ORGS, full=full, only=only,
-                           limit=limit, delay=delay)
+                           limit=limit, delay=delay, label="avg download")

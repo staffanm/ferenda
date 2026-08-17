@@ -534,7 +534,9 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
                     runners: Mapping[str, Callable[..., tuple[int, int]]],
                     default: Iterable[str], *, full: bool = False,
                     only: str | None = None, limit: int | None = None,
-                    delay: float = 0.5) -> dict[str, tuple[int, int]]:
+                    delay: float = 0.5, label: str = "harvest",
+                    log: Callable[[str], None] = print,
+                    ) -> dict[str, tuple[int, int]]:
     """Run one harvest per named scope -- all of `default` when `scopes` is
     None -- and return ``{scope: (seen, new)}``, the shape `build` expects of a
     multi-scope source's ``sync``.
@@ -553,11 +555,24 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
         raise ValueError("--only %s names no scope in this run (%s)"
                          % (only, ", ".join(run)))
     totals = {}
+    elapsed = {}
     for scope in run:
         if scope not in runners:      # user-typed scope: raise, never assert
             raise ValueError("no harvest scope %r" % scope)
+        started = time.monotonic()
         totals[scope] = runners[scope](
             str(root), full=full, limit=limit, delay=delay,
             only=only if only and only.startswith(scope + "/") else None)
+        elapsed[scope] = time.monotonic() - started
+    # Which upstream actually costs the time. The run ledger measures a whole
+    # source (`avg` is 553 s), which is the wrong grain for deciding anything:
+    # these scopes are separate hosts, so they could run concurrently, but the
+    # gain of that is bounded by the slowest one alone -- and nothing recorded
+    # which that is. One line, sorted, so the next harvest answers it.
+    if len(elapsed) > 1:
+        log("%s scope times: %s" % (
+            label,
+            ", ".join("%s %.1fs" % (scope, secs) for scope, secs
+                      in sorted(elapsed.items(), key=lambda kv: -kv[1]))))
     return totals
 

@@ -935,4 +935,5 @@ def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
     browser and runs on its own schedule (`agencies.BROWSER_ORGS`), though
     naming it explicitly still harvests it. Returns {org: (seen, new)}."""
     return dispatch_scopes(root, scopes, SYNC, DEFAULT_ORGS, full=full,
-                           only=only, limit=limit, delay=delay)
+                           only=only, limit=limit, delay=delay,
+                           label="rs download")
