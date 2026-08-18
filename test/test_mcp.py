@@ -20,7 +20,7 @@ from accommodanda import config
 from accommodanda.api import analytics, db, reads
 from accommodanda.api import app as api
 from accommodanda.api import mcp as mcpmod
-from accommodanda.lib import catalog, inbound
+from accommodanda.lib import catalog, facets, inbound
 
 
 @pytest.fixture
@@ -224,11 +224,17 @@ def test_tool_schemas_steer_the_model():
         assert t.annotations and t.annotations.read_only_hint is True
 
     props = tools["search"].input_schema["properties"]
-    # source is an optional enum of exactly the corpus sources
+    # `source` is an optional enum of exactly the sources a reader can reach.
+    # Checked against facets.SOURCE_LABELS rather than a list repeated here: the
+    # enum had drifted four sources behind the corpus (icc, icj, icrc, untc), so
+    # `list_sources` advertised 649 documents that `search(source=...)` then
+    # rejected as a schema violation. A restated literal cannot catch that; this
+    # fails the moment a source is added without teaching the tools about it.
+    #
+    # `remisser` is the one deliberate exclusion: it is parsed but not published
+    # (artifacts, no catalog rows), so filtering by it could only ever be empty.
     source_enum = next(b["enum"] for b in props["source"]["anyOf"] if "enum" in b)
-    assert set(source_enum) == {"sfs", "dv", "hudoc", "forarbete", "foreskrift",
-                                "eurlex", "coe", "avg", "rs", "edpb",
-                                "kommentar", "begrepp"}
+    assert set(source_enum) == set(facets.SOURCE_LABELS) - {"remisser"}
     # kind is a plain string (no enum) but carries guidance
     assert not any("enum" in b for b in props["kind"]["anyOf"])
     assert "fffs" in props["kind"]["description"]

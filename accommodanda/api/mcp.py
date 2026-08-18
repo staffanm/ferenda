@@ -46,31 +46,44 @@ log = logging.getLogger(__name__)
 # Shown to the AI host so it knows when to reach for these tools, what the ids
 # look like, and the order to call them in. Read once by the host at connect.
 INSTRUCTIONS = """\
-lagen.nu -- the Swedish legal corpus: statutes (SFS), court decisions (dv),
-European Court of Human Rights case law (hudoc), preparatory works (forarbete),
-agency regulations (foreskrift), EU law (eurlex), Council of Europe treaties
-(coe), JO/JK/ARN decisions (avg) and editorial commentary (kommentar/begrepp) --
-with the citation graph between them. Use these tools to ground answers about
-Swedish, EU and European human-rights law in the primary sources and to cite the
-exact paragraph/article rather than from memory: statutes are amended, and the
-corpus carries the current wording.
+lagen.nu -- den svenska rättskällesamlingen: lagar och förordningar (sfs),
+domstolsavgöranden (dv), Europadomstolens praxis (hudoc), förarbeten
+(forarbete), myndighetsföreskrifter (foreskrift), EU-rätt (eurlex),
+Europarådets konventioner (coe), JO-, JK- och ARN-avgöranden (avg),
+myndigheters ställningstaganden (rs), folkrättsliga källor (icj, icc, icrc,
+untc) och redaktionell kommentar (kommentar, begrepp) -- med
+hänvisningsgrafen mellan dem.
 
-Documents are identified by their public lagen.nu URI, e.g.
-`https://lagen.nu/1962:700` (Brottsbalken); a `#`-fragment pinpoints a
-paragraph/article -- `#K3P1` is 3 kap. 1 §, `#P6` is 6 §, an EU article is `#32`.
+Använd verktygen när användaren frågar vad lagen säger, vad som gäller
+rättsligt, hur en bestämmelse ska tolkas, eller efterfrågar lagrum, rättsfall,
+förarbeten, myndighetsbeslut eller källhänvisningar. Använd dem även när
+lagen.nu inte nämns uttryckligen, och även när en fråga om svensk rätt,
+EU-rätt eller Europakonventionen ställs på engelska. Föredra verktygen framför
+allmän webbsökning när uppgiften är att identifiera, hämta eller hänvisa till
+en rättskälla: lagar ändras, och samlingen bär den gällande lydelsen.
 
-Canonical flow for grounding a legal question:
- 1. Turn each law/case into a URI: `resolve_citation` when the user named it
-    ("utlänningslagen", "avtalslagen 36 §", "GDPR art 32"), else `search` to find
-    it by topic. Prefer `resolve_citation` over guessing a URI.
- 2. `get_document(uri, pinpoint=...)` for the exact provision's current text.
- 3. `get_incoming_citations(uri + '#' + pinpoint)` for the case law and
-    regulations that apply that provision; `get_outgoing_citations` for what it
-    relies on. Walking this graph is the point -- it is what a plain web search
-    can't do.
- 4. Cite the pinpoint fragment (e.g. `#K5P8`), never just the law.
+Dokument identifieras med sin publika lagen.nu-URI, t.ex.
+`https://lagen.nu/1962:700` (brottsbalken). Ett `#`-fragment pekar ut en
+enskild bestämmelse: `#K3P1` är 3 kap. 1 §, `#P6` är 6 §, en EU-artikel är
+`#32`. Fragmentet är det som gör en hänvisning exakt.
 
-All data is read-only and public; nothing here mutates anything.\
+Normalt arbetssätt för att belägga en rättsfråga:
+ 1. Gör om varje lag eller rättsfall till en URI: `resolve_citation` när
+    användaren har namngett den ("utlänningslagen", "avtalslagen 36 §",
+    "GDPR art 32"), annars `search` för att hitta den utifrån ämne. Gissa
+    aldrig en URI.
+ 2. `get_document(uri, pinpoint=...)` för bestämmelsens gällande lydelse.
+ 3. `get_incoming_citations(uri + '#' + pinpoint)` för den praxis och de
+    beslut som tillämpar bestämmelsen; `get_outgoing_citations` för vad
+    dokumentet självt stöder sig på. Att gå längs grafen är själva poängen --
+    det är vad en vanlig webbsökning inte kan.
+ 4. Hänvisa till fragmentet (t.ex. `#K5P8`), aldrig bara till lagen.
+
+Använd exakta URI:er, id:n och fragment som verktygen har returnerat; ändra
+eller konstruera dem inte själv. Utelämna valfria filter när de inte behövs --
+ett felaktigt `source`- eller `kind`-filter döljer relevanta källor.
+
+Allt är läsning av offentliga data; inget verktyg ändrar något.\
 """
 
 
@@ -134,17 +147,85 @@ def _con():
 # doctype, …), so it stays a guided free string -- a strict enum there would
 # reject valid kinds the host sees in results.
 Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
-                 "coe", "avg", "rs", "edpb", "kommentar", "begrepp"]
+                 "coe", "avg", "rs", "edpb", "kommentar", "begrepp",
+                 "icc", "icj", "icrc", "untc"]
 SourceArg = Annotated[Source | None, Field(
-    description="restrict to one corpus source; omit to search all")]
+    description="Begränsar till en del av källsamlingen. Utelämna när flera "
+    "slags rättskällor kan vara relevanta -- ett felaktigt filter döljer "
+    "relevanta källor. Värden: sfs (svenska lagar och förordningar), dv "
+    "(svenska domstolsavgöranden), forarbete (propositioner, SOU, Ds, "
+    "kommittédirektiv m.m.), foreskrift (myndigheters författningssamlingar), "
+    "eurlex (EU-rättsakter och EU-domstolens avgöranden), hudoc "
+    "(Europadomstolen), coe (Europarådets konventioner och protokoll), avg "
+    "(JO, JK, ARN, IMY, KKV), rs (myndigheters rättsliga ställningstaganden), "
+    "edpb (Europeiska dataskyddsstyrelsen), icj (Internationella domstolen), "
+    "icc (Internationella brottmålsdomstolen), icrc (humanitärrättsliga "
+    "traktater), untc (FN:s traktatsamling), kommentar (juridiska "
+    "kommentarer), begrepp (begreppsbeskrivningar).")]
 KindArg = Annotated[str | None, Field(
-    description="restrict to one document kind. Kinds are source-specific: "
-    "law (sfs), case (dv), prop/sou/ds/dir (forarbete), a doctype like "
-    "regulation/directive/judgment (eurlex), an FS code like fffs/nfs "
-    "(foreskrift), judgment/decision (hudoc), treaty/protocol (coe), "
-    "jo/jk/arn (avg), an agency code like fk/migr/imy (rs), kommentar, "
-    "begrepp. Omit unless you know the "
-    "exact kind (it appears as `kind` on every result).")]
+    description="Begränsar till en dokumenttyp inom källan. Typerna är "
+    "källspecifika: lag/forordning (sfs), case (dv), "
+    "prop/bet/rskr/sou/dir/so/lr/ds/pm/skr (forarbete), "
+    "regulation/directive/judgment/opinion/decision (eurlex), "
+    "judgment/decision (hudoc), treaty/protocol (coe), en "
+    "författningssamlingskod som fffs eller nfs (foreskrift), "
+    "jo/kkv/jk/arn/imy (avg), en myndighetskod som skv, fk eller migr (rs), "
+    "riktlinjer/rekommendationer/wp (edpb), dom/beslut (icj), "
+    "kommentar, begrepp. Utelämna om dokumenttypen inte är känd -- den står "
+    "som `kind` på varje träff, vilket är det säkra sättet att få den rätt.")]
+
+QueryArg = Annotated[str, Field(
+    description="Den juridiska hänvisningen, det rättsliga begreppet eller den "
+    "sakfråga som ska sökas: en exakt hänvisning ('dataskyddslagen 1 kap. 7 §', "
+    "'GDPR Article 85') eller en kort beskrivning i naturligt språk "
+    "('arbetsgivares rätt att läsa anställdas e-post', 'preskription av "
+    "konsumentfordran'). Håll frågan kort och saklig -- skicka inte hela "
+    "konversationen eller instruktioner som inte hör till sökningen.")]
+SearchLimitArg = Annotated[int, Field(
+    description="Högsta antal träffar, 1-50. Lågt för en avgränsad fråga, "
+    "högre när rättsläget behöver undersökas bredare.")]
+CitationArg = Annotated[str, Field(
+    description="Hänvisningen som ska slås upp, skriven som i juridisk text "
+    "eller som användaren formulerade den: '1 kap. 7 § dataskyddslagen', "
+    "'YGL 1:4', 'GDPR art. 85', 'artikel 10 Europakonventionen', "
+    "'NJA 2020 s. 3', 'C-199/24'. Ange en hänvisning, inte en allmän "
+    "rättsfråga -- för den, använd `search`.")]
+DocUriArg = Annotated[str, Field(
+    description="Dokumentets fullständiga lagen.nu-URI, t.ex. "
+    "'https://lagen.nu/1962:700' eller 'https://lagen.nu/ext/celex/62024CJ0199'. "
+    "Hämta den från `search`, `resolve_citation` eller ett tidigare "
+    "verktygsresultat; ange inte en sökfråga här.")]
+PinpointArg = Annotated[str | None, Field(
+    description="Pekar ut en enskild bestämmelse: 'K3P1' för 3 kap. 1 §, 'P6' "
+    "för 6 §, ett artikel-id för en EU-rättsakt, eller ett fragment/ankare som "
+    "`search`, `resolve_citation` eller hänvisningsverktygen har returnerat. "
+    "Utelämna för hela dokumentet.")]
+MaxCharsArg = Annotated[int, Field(
+    description="Högsta antal tecken av dokumenttexten, tak 200000. Lägre när "
+    "en översikt räcker. För mycket långa dokument: begär hellre en exakt "
+    "`pinpoint` än en större text.")]
+FetchIdArg = Annotated[str, Field(
+    description="Det exakta `id` som `search` returnerade, t.ex. "
+    "'https://lagen.nu/1962:700' eller 'https://lagen.nu/1962:700#K3P1'. "
+    "Ändra det inte och konstruera inte ett eget fragment.")]
+CitedUriArg = Annotated[str, Field(
+    description="URI:n vars hänvisningar ska hämtas. En fragment-URI "
+    "('https://lagen.nu/2018:218#K1P7') ställer den skarpare frågan om hur en "
+    "viss paragraf har tillämpats; en URI utan fragment svarar för hela "
+    "dokumentet.")]
+ScopeArg = Annotated[Literal["tree", "exact"], Field(
+    description="'tree' (förvalt) tar med hänvisningar till URI:n och alla "
+    "bestämmelser under den -- för en stor lag tiotusentals rader. 'exact' tar "
+    "bara med dem som namnger URI:n själv.")]
+PageLimitArg = Annotated[int, Field(
+    description="Högsta antal rader på sidan, 1-1000. Bläddra vidare med "
+    "`offset`.")]
+ListLimitArg = Annotated[int, Field(
+    description="Högsta antal dokument på sidan, 1-500.")]
+OffsetArg = Annotated[int, Field(
+    description="Hur många rader från början av den stabila ordningen som ska "
+    "hoppas över. 0 för första sidan; öka med föregående `limit` för nästa.")]
+
 
 # every tool is a pure read of public data: readOnlyHint lets a host auto-run them
 # without a per-call approval prompt (so the multi-step grounding flow isn't
@@ -334,25 +415,33 @@ def _absolute_page_urls(hits):
 # tools
 # --------------------------------------------------------------------------
 
-@mcp.tool(title="Search the Swedish legal corpus", annotations=READ_ONLY)
-def search(query: str, source: SourceArg = None, kind: KindArg = None,
-           limit: int = 10) -> SearchResults:
-    """Full-text search across the whole corpus, ranked by relevance combined
-    with how often a document is cited, down to the matching paragraph/article
-    (each hit carries the matching `fragments` with highlighted text).
+@mcp.tool(title="Sök i den svenska rättskällesamlingen", annotations=READ_ONLY)
+def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
+           limit: SearchLimitArg = 10) -> SearchResults:
+    """Standardverktyget för juridisk informationssökning. Använd det när
+    användaren ställer en rättslig fråga eller efterfrågar rättskällor -- "vad
+    gäller?", "vad säger lagen?", "får man ...?", "vilken bestämmelse gäller?",
+    "finns det rättsfall om detta?" -- även när lagen.nu inte nämns.
 
-    When the query reads as a citation -- a law nickname/abbreviation + pinpoint
-    ("avtalslagen 36", "BrB 12:1"), an EU act + article ("GDPR art 32") or a case
-    nickname ("Instagrambilden") -- the exact target is resolved and pinned as the
-    first result, which plain full-text can't do (the name appears nowhere in the
-    text). `source`/`kind` narrow the hits; `limit` is 1-50.
+    Fulltextsökning i hela samlingen, rangordnad på både relevans och hur ofta
+    ett dokument har citerats. Sökningen når enskilda paragrafer och artiklar,
+    och varje träff bär de `fragments` med markerad text som visar var och
+    varför den träffade.
 
-    Each result: id (pass it to `fetch`; it pinpoints the matching provision
-    where the match was paragraph-deep), uri (the document's identifier), url
-    (its absolute public page URL, ready to show a reader -- append
-    `#<pinpoint>` to deep link), identifier, title, source, kind, inbound_count
-    (how often cited), and the matching fragments. Follow up with
-    `get_document` (or `fetch`) for the full text.
+    Verktyget känner också igen juridiska hänvisningar och vedertagna namn: är
+    frågan "avtalslagen 36 §", "BrB 12:1", "GDPR artikel 32", "NJA 2015 s. 899"
+    eller ett etablerat rättsfallsnamn, löses den exakta källan ut och läggs
+    först i resultatet -- vilket ren fulltext inte kan, eftersom namnet oftast
+    inte står i texten.
+
+    Hämta sedan texten med `get_document` (eller `fetch`, när ett exakt `id`
+    från ett sökresultat redan finns). Använd inte `list_documents` för
+    fulltextsökning -- det är ett index, inte en sökning.
+
+    Varje träff: id (skickas till `fetch`; pekar ut den matchande bestämmelsen
+    när träffen var paragrafdjup), uri (dokumentets identitet), url (dess
+    publika webbadress), identifier, title, source, kind, inbound_count (hur
+    ofta dokumentet citeras) och fragments.
     """
     limit = max(1, min(limit, 50))
     # a down cluster raises reads.SearchUnavailable, which the SDK returns as
@@ -364,21 +453,26 @@ def search(query: str, source: SourceArg = None, kind: KindArg = None,
                                   for r in _absolute_page_urls(res["results"])])
 
 
-@mcp.tool(title="Resolve a legal citation to its URI", annotations=READ_ONLY)
-def resolve_citation(citation: str) -> ResolvedCitations:
-    """Resolve a Swedish or EU legal citation written by name/abbreviation into
-    its exact lagen.nu document URI(s) -- the reliable way to turn "what the user
-    wrote" into a citable, fragment-deep link without full-text search.
+@mcp.tool(title="Slå upp en juridisk hänvisning", annotations=READ_ONLY)
+def resolve_citation(citation: CitationArg) -> ResolvedCitations:
+    """Gör om en känd juridisk hänvisning -- en lagförkortning, ett vedertaget
+    lagnamn, ett rättsfallsnamn -- till exakt URI, och när hänvisningen pekar ut
+    en paragraf eller artikel även till det exakta fragmentet. Det pålitliga
+    sättet att gå från "det användaren skrev" till en citerbar länk, utan att
+    gissa en URI.
 
-    Handles a statute nickname/abbreviation + pinpoint ("avtalslagen 36 §",
-    "BrB 3:1"), an EU act + article ("GDPR artikel 32", "dataskyddsförordningen
-    art. 6") and a case nickname ("NJA 2015 s. 899", "Instagrambilden"). Returns a
-    `results` list (usually one entry, empty if nothing resolves) of {id, uri,
-    url, identifier, title, source, kind, inbound_count, fragments} -- the same
-    row shape `search` returns, `uri` being the document's identifier and `url`
-    its absolute public page URL; when the citation named a paragraph/article,
-    `fragments[0].uri` is the pinpointed fragment URI and `id` (what `fetch`
-    takes) is that same pinpointed URI.
+    Klarar t.ex. "avtalslagen 36 §", "BrB 3:1", "dataskyddslagen 1 kap. 7 §",
+    "GDPR artikel 85", "artikel 10 Europakonventionen", "NJA 2015 s. 899",
+    "C-199/24" och etablerade rättsfallsnamn som "Instagrambilden".
+
+    Använd det när källan redan är namngiven. Gäller frågan ett bredare ämne och
+    rätt bestämmelse ännu inte är känd, använd `search` i stället.
+
+    Svaret är en `results`-lista (oftast en post, tom när inget löses ut) med
+    samma radform som `search` ger: id, uri, url, identifier, title, source,
+    kind, inbound_count och fragments. Avsåg hänvisningen en paragraf eller
+    artikel är `fragments[0].uri` den utpekade delen, och `id` -- det `fetch`
+    tar -- är samma utpekade URI.
     """
     with _con() as con:
         return ResolvedCitations(results=[
@@ -386,22 +480,25 @@ def resolve_citation(citation: str) -> ResolvedCitations:
             for r in _absolute_page_urls(pins.resolved_results(con, citation))])
 
 
-@mcp.tool(title="Get a document's metadata and text", annotations=READ_ONLY)
-def get_document(uri: str, pinpoint: str | None = None,
-                 max_chars: int = 20000) -> Document:
-    """Fetch a document's metadata and its full parsed plain text by URI.
+@mcp.tool(title="Hämta ett dokuments text och metadata", annotations=READ_ONLY)
+def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
+                 max_chars: MaxCharsArg = 20000) -> Document:
+    """Hämtar metadata och fullständig, bearbetad klartext för ett känt
+    dokument, eller för en bestämd del av det.
 
-    `uri` is a lagen.nu document URI (e.g. `https://lagen.nu/1962:700`). Pass
-    `pinpoint` (e.g. "K3P1" for 3 kap. 1 §, "P6" for 6 §, an EU article id) to get
-    just that section's text instead of the whole document -- cheaper and precise;
-    pinpoints come from `search` fragments, `resolve_citation`, or the `anchor`
-    field of the citation tools. Long bodies are truncated to `max_chars`
-    (capped at 200000) with `truncated: true` -- request a specific `pinpoint` for
-    a large statute.
+    Det normala hämtningssteget efter `search` eller `resolve_citation`, när
+    URI:n är känd. Ange `pinpoint` när bara en viss paragraf eller artikel
+    behövs -- det är billigare och precisare, och håller irrelevant text borta.
+    Pinpoints kommer från `search`-fragment, `resolve_citation` eller
+    `anchor`-fältet på hänvisningsverktygens träffar.
 
-    Returns uri, source, kind, label, title, source_url (the publisher's
-    authoritative page), inbound_count (how often the document is cited), the
-    requested `pinpoint`, and `text`.
+    Långa texter kapas vid `max_chars` (högst 200 000 tecken). Är svaret märkt
+    `truncated: true` har bara början hämtats -- hänvisa då inte till text som
+    inte returnerats, utan begär en mer exakt `pinpoint`.
+
+    Svaret: uri, source, kind, label, title, source_url (utgivarens egen sida),
+    inbound_count (hur ofta dokumentet citeras), den efterfrågade `pinpoint`
+    och `text`.
     """
     max_chars = max(1, min(max_chars, MAX_CHARS))
     with _con() as con:
@@ -430,23 +527,26 @@ def get_document(uri: str, pinpoint: str | None = None,
         text=body[:max_chars])
 
 
-@mcp.tool(title="Fetch a document by search-result id", annotations=READ_ONLY)
-def fetch(id: str) -> FetchedDocument:
-    """Retrieve the full text behind an `id` returned by `search`.
+@mcp.tool(title="Hämta ett dokument via sökresultatets id", annotations=READ_ONLY)
+def fetch(id: FetchIdArg) -> FetchedDocument:
+    """Hämtar texten bakom ett `id` som `search` har returnerat.
 
-    `id` is a lagen.nu URI. A `#`-fragment in it (`https://lagen.nu/1962:700#K3P1`
-    -- what `search` ids a paragraph-deep hit with) fetches just that provision;
-    a bare document URI fetches the whole document. Equivalent to
-    `get_document`, which takes the URI and the pinpoint separately and can cap
-    the length -- prefer that one when you already know both.
+    Bär `id` ett fragment efter `#` -- `https://lagen.nu/1962:700#K3P1`, som är
+    hur `search` id-märker en paragrafdjup träff -- hämtas just den
+    bestämmelsen; utan fragment hämtas hela dokumentet.
 
-    Returns id, title, url (the absolute public page URL, pinpointed where `id`
-    was), text and a `metadata` map carrying source, kind,
-    label, the publisher's authoritative page, how often the document is cited,
-    the `pinpoint` read (null for a whole document) and `truncated`. The body
-    caps at 200000 characters: when `metadata.truncated` is true you have a
-    prefix, not the whole provision, so don't cite past it -- fetch a
-    `#`-pinpointed id instead.
+    Motsvarar `get_document`, men tar ett sammansatt sökresultat-id i stället
+    för URI och pinpoint var för sig. Använd `get_document` när du redan har
+    båda separat, eller när textens längd behöver styras.
+
+    Ändra inte identifieraren och konstruera inte ett eget fragment när ett
+    exakt `id` redan finns i sökresultatet.
+
+    Svaret: id, title, url (absolut publik adress), text och `metadata` med
+    source, kind, label, utgivarens sida, inbound_count, den lästa `pinpoint`
+    (null för ett helt dokument) och `truncated`. Texten kapas vid 200 000
+    tecken; är `metadata.truncated` true har du ett prefix, inte hela
+    bestämmelsen -- hämta då ett `#`-utpekat id i stället.
     """
     # the contract asks for the *complete* content, so take get_document's
     # ceiling rather than its (deliberately modest) interactive default
@@ -461,17 +561,24 @@ def fetch(id: str) -> FetchedDocument:
                   "inbound_count": doc["inbound_count"]})
 
 
-@mcp.tool(title="List documents in the corpus", annotations=READ_ONLY)
+@mcp.tool(title="Lista dokument i samlingen", annotations=READ_ONLY)
 def list_documents(source: SourceArg = None, kind: KindArg = None,
-                   limit: int = 50, offset: int = 0) -> DocumentList:
-    """Enumerate documents (id + lightweight metadata), filtered by source/kind
-    and paginated -- the corpus index, *not* full-text search (that is `search`,
-    which takes a query). Use it to see what a source contains, then `get_document`
-    each URI. `total` is the match count before paging (stable order by URI), so
-    you can page through the whole set; `limit` is 1-500.
+                   limit: ListLimitArg = 50,
+                   offset: OffsetArg = 0) -> DocumentList:
+    """Bläddrar i eller inventerar vad samlingen innehåller: dokument med
+    grundläggande metadata, filtrerbart på källa och dokumenttyp, sidindelat.
 
-    Each entry: uri, source, kind, label, title, source_url (publisher page where
-    known), updated (the artifact's last-build time, ISO 8601).
+    Detta är ett **index**, inte en fulltextsökning. Ställer användaren en
+    sakfråga, söker ett rättsligt begrepp eller vill hitta dokument som
+    innehåller viss text -- använd `search`. Använd det här när frågan är vilka
+    dokument från en viss myndighet, författningssamling eller kategori som
+    finns. Hämta sedan ett enskilt dokument med `get_document`.
+
+    Ordningen är stabil (efter URI), och `total` är antalet träffar före
+    sidindelning, så hela mängden kan bläddras igenom med `limit`/`offset`.
+
+    Varje post: uri, source, kind, label, title, source_url (utgivarens sida
+    där den är känd) och updated (när dokumentet senast bearbetades, ISO 8601).
     """
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
@@ -480,35 +587,36 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
                                limit=limit, offset=offset)
 
 
-@mcp.tool(title="Who cites this document (inbound citations)",
+@mcp.tool(title="Vilka källor hänvisar hit (inkommande hänvisningar)",
           annotations=READ_ONLY)
-def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
-                           source: str | None = None,
-                           scope: Literal["tree", "exact"] = "tree") -> IncomingCitations:
-    """Which other documents cite `uri` -- the citation graph inbound, lagen.nu's
-    signature feature as data. Answers "which cases apply this statute
-    paragraph", "what refers to this ruling".
+def get_incoming_citations(uri: CitedUriArg, limit: PageLimitArg = 50,
+                           offset: OffsetArg = 0,
+                           source: SourceArg = None,
+                           scope: ScopeArg = "tree") -> IncomingCitations:
+    """Vilka rättsfall, myndighetsbeslut, förarbeten och andra källor som
+    hänvisar till, tillämpar eller diskuterar ett dokument eller en bestämmelse
+    -- hänvisningsgrafen inåt, och lagen.nu:s signaturfunktion som data.
+    Besvarar "vilka domar tillämpar den här paragrafen", "vad hänvisar till det
+    här avgörandet".
 
-    Pass a fragment URI (`…#K3P1`) to ask at paragraph level -- much the sharper
-    question. A bare document URI answers for the law **and every provision in
-    it** (`scope="tree"`, the default), which for a big statute is tens of
-    thousands of rows: read `total` and `by_source` in the reply to see the
-    shape of it, then narrow by pinpoint or by `source` rather than paging
-    through. `scope="exact"` is the narrow question: only citations naming
-    `uri` itself, none of its provisions.
+    Ange en fragment-URI (`...#K1P7`) när frågan gäller hur en viss paragraf
+    har tillämpats -- det är den skarpare frågan. En URI utan fragment svarar
+    för lagen **och varje bestämmelse i den** (`scope="tree"`, förvalt), vilket
+    för en stor lag är tiotusentals rader: läs `total` och `by_source` för att
+    se formen, och begränsa sedan med en exakt bestämmelse eller med `source`
+    i stället för att bläddra igenom alltihop. `scope="exact"` är den smala
+    frågan: bara hänvisningar som namnger `uri` själv.
 
-    Ordered as lagen.nu itself orders these: case law first for a statute, then
-    agency decisions, then the citation graph -- so the default first rows are
-    the ones a lawyer would look at first. `source` filters to one corpus
-    ("dv" for court decisions, "forarbete" for preparatory works, "sfs" for
-    statutes; `list_sources` has them all). `limit`/`offset` page a stable order.
+    Ordningen är den lagen.nu självt använder: för en författning kommer
+    rättspraxis först, sedan myndighetsavgöranden, sedan resten av grafen --
+    så de första raderna är de en jurist läser först.
 
-    Returns: uri; scope and source (the filters, echoed); total (rows you can
-    page through, so *after* any `source`); by_source ({source: rows} over the
-    whole scope, before `source`, so it still tells you what the other corpora
-    hold); limit; offset; and citations -- each with uri (the citing document),
-    target (the provision it cited), anchor and page (where in the citer it
-    sits), label, title, source, kind, date.
+    Svaret: uri; scope och source (filtren, återgivna); total (rader att
+    bläddra, alltså *efter* `source`); by_source (antal per källa över hela
+    scopet, alltså *före* `source` -- så svaret ändå säger vad de andra
+    samlingarna bär); limit; offset; och citations -- var och en med uri (det
+    citerande dokumentet), target (den citerade bestämmelsen), anchor och page
+    (var i citeraren den står), label, title, source, kind och date.
     """
     limit, offset = max(1, min(limit, 1000)), max(0, offset)
     with _con() as con:
@@ -516,26 +624,33 @@ def get_incoming_citations(uri: str, limit: int = 50, offset: int = 0,
                                        limit=limit, offset=offset)
 
 
-@mcp.tool(title="What this document cites (outbound citations)",
+@mcp.tool(title="Vad dokumentet hänvisar till (utgående hänvisningar)",
           annotations=READ_ONLY)
-def get_outgoing_citations(uri: str) -> OutgoingCitations:
-    """Every citation a document makes -- the citation graph outbound. Each entry
-    in `citations`: uri (the cited target, with its `#`-fragment where the
-    citation is paragraph-deep), anchor (where in the citing document it sits),
-    predicate (the relation, e.g. dcterms:references), text (the citation as it
-    reads in the source), label/title/source of the target, and `hosted` (false
-    when the target is not yet in the corpus -- then label/title are absent).
-    Pass a bare document URI.
+def get_outgoing_citations(uri: DocUriArg) -> OutgoingCitations:
+    """Varje hänvisning ett dokument gör -- hänvisningsgrafen utåt. Användbart
+    för att se vilka lagrum, rättsfall, förarbeten och andra källor som åberopas
+    i en dom, ett myndighetsbeslut, ett förarbete eller en kommentar. Ange
+    dokumentets grund-URI, utan fragment.
+
+    Varje post i `citations`: uri (den citerade källan, med `#`-fragment när
+    hänvisningen är paragrafdjup), anchor (var i det citerande dokumentet den
+    står), predicate (relationen, t.ex. dcterms:references), text (hur
+    hänvisningen lyder i källan), label, title och source för målet, samt
+    `hosted` -- false när målet ännu inte finns i samlingen, och då saknas
+    label och title.
     """
     with _con() as con:
         return OutgoingCitations(citations=reads.outbound(con, uri))
 
 
-@mcp.tool(title="List the corpus sources and their sizes", annotations=READ_ONLY)
+@mcp.tool(title="Lista källorna och deras storlek", annotations=READ_ONLY)
 def list_sources() -> SourceList:
-    """The corpus' sources and how many documents each holds -- orientation for
-    the `source` filter on `search`/`list_documents`. Each entry in `sources`:
-    source, documents.
+    """Vilka källor samlingen har och hur många dokument var och en bär --
+    orientering, och sättet att välja ett riktigt `source`-värde till `search`,
+    `list_documents` eller `get_incoming_citations`.
+
+    Använd det inte som första steg i en vanlig rättsfråga; börja då med
+    `search`. Varje post i `sources`: source och documents.
     """
     with _con() as con:
         return SourceList(sources=reads.sources(con))
