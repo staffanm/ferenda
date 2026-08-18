@@ -59,7 +59,7 @@ from ..lib import (
     search,
 )
 from ..lib.util import basefile_slug
-from . import analytics, auth, db, edit, errors, ops, patch, pdf, reads
+from . import analytics, auth, db, edit, errors, ops, patch, pdf, pdfjob, reads
 from . import mcp as mcp_server
 from .db import get_con
 
@@ -103,6 +103,10 @@ app.include_router(ops.router)
 app.include_router(auth.router)
 app.include_router(edit.router)
 app.include_router(patch.router)   # the patch-file (source-fix) editor
+
+# the PDF export's waiting screen (/api/v1/pdf/vanta); its job routes are
+# declared next to /api/v1/pdf itself, below
+app.include_router(pdfjob.router)
 
 # the public MCP server at /mcp (Streamable HTTP) -- the corpus reshaped as tools
 # for AI hosts. Added before serve()'s static "/" catch-all so its routes win.
@@ -984,24 +988,10 @@ def pdf_endpoint(
     the paged-media layer browsers skip. `toc` adds the page's own TOC with
     resolved page numbers; `kontext` prints the chosen context kinds under
     each provision, the way the screen page shows them in the rail."""
+    generated, kinds = pdfjob.parse_request(path, kontext)
     try:
-        kinds = pdf.parse_kinds(kontext)
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
-    rel = layout.url_to_relpath(path)
-    if rel is None:
-        raise HTTPException(404, "no such page: %r" % path)
-    client = TestClient(app)
-
-    def subresource(path_qs):
-        r = client.get(path_qs)
-        if r.status_code != 200:
-            raise ValueError("subresource %s -> %d" % (path_qs, r.status_code))
-        return r.content, r.headers.get("content-type", "")
-
-    try:
-        data = pdf.export(config.DATA / "generated" / rel, toc=toc,
-                          kinds=kinds, subresource=subresource)
+        data = pdf.export(generated, toc=toc, kinds=kinds,
+                          subresource=_pdf_subresource())
     except FileNotFoundError:
         raise HTTPException(404, "no generated page at %r" % path) from None
     except pdf.SubresourceUnavailable as exc:
@@ -1011,6 +1001,51 @@ def pdf_endpoint(
     return Response(data, media_type="application/pdf", headers={
         "Content-Disposition": '%s; filename="%s"' % (
             "attachment" if download else "inline", pdf.filename_for(path))})
+
+
+def _pdf_subresource():
+    """How the export fetches the page's own images and stylesheets: the app
+    answering for itself in-process, so nothing leaves the container."""
+    client = TestClient(app)
+
+    def subresource(path_qs):
+        r = client.get(path_qs)
+        if r.status_code != 200:
+            raise ValueError("subresource %s -> %d" % (path_qs, r.status_code))
+        return r.content, r.headers.get("content-type", "")
+
+    return subresource
+
+
+@app.post("/api/v1/pdf/jobb", tags=["document"], include_in_schema=False)
+def pdf_job_start(
+        path: str = Query(..., description="public page path"),
+        toc: bool = Query(False),
+        kontext: str = Query("")):
+    """Start the export in the background and answer at once with its job.
+    A render already running for the same page and options is joined, not
+    started again; one already in the cache comes back finished.
+
+    This is what keeps a large export off the request: laying out a statute
+    with its full context runs well past nginx's proxy timeout, and a reader
+    who waited on it got a 504 for work that had in fact succeeded."""
+    generated, kinds = pdfjob.parse_request(path, kontext)
+    try:
+        job = pdfjob.start(generated, toc=toc, kinds=kinds,
+                           subresource=_pdf_subresource())
+    except FileNotFoundError:
+        raise HTTPException(404, "no generated page at %r" % path) from None
+    return job.status()
+
+
+@app.get("/api/v1/pdf/jobb/{job_id}", tags=["document"], include_in_schema=False)
+def pdf_job_status(job_id: str):
+    """How far the export has come: the step it is in, the pages it has laid
+    out, and how many seconds are left at the rate it is going."""
+    job = pdfjob.get(job_id)
+    if job is None:
+        raise HTTPException(404, "no such pdf job")
+    return job.status()
 
 
 # the legacy path grammar in its two arities: riksmöte-numbered förarbeten and

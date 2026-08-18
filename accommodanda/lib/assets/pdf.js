@@ -1,28 +1,48 @@
 /* "Spara som PDF": the printer icon on the short-id row of the TOC rail,
-   driving
-   /api/v1/pdf -- the print-typeset export of this very page. The dialog's
-   options mirror what the export can do: the page's TOC with printed page
-   numbers, and the context rail's sections printed under each provision,
-   chosen by kind. The kind list is read out of the page's own
-   #lagen-context island (the same panels scrollspy feeds the rail with),
-   so the dialog never offers a kind this document does not have -- and it
-   is read lazily on first open, since a large statute's island is
-   megabytes. Injected by script rather than baked into the page HTML, so
-   the whole feature ships as an assets-only refresh. */
+   driving the print-typeset export of this very page. The dialog's options
+   mirror what the export can do: the page's TOC with printed page numbers,
+   and the context rail's sections printed under each provision, chosen by
+   kind. The kind list is read out of the page's own #lagen-context island
+   (the same panels scrollspy feeds the rail with), so the dialog never
+   offers a kind this document does not have -- and it is read lazily on
+   first open, since a large statute's island is megabytes. Injected by
+   script rather than baked into the page HTML, so the whole feature ships
+   as an assets-only refresh.
+
+   The dialog itself does not render anything. It opens /api/v1/pdf/vanta,
+   which starts the job, shows the render's progress and then becomes the
+   PDF -- see api/pdfjob.py. Doing the work here, as one long fetch, meant
+   holding a request open past nginx's 60-second timeout (a 504 for a render
+   that had in fact succeeded) and parking the reader in a blank tab
+   meanwhile. */
 (function () {
   var tocCol = document.querySelector('aside.toc-col');
   if (!tocCol) return;               // solo pages are not documents
 
-  // the printer icon rides the short-id row at the top of the TOC rail
-  // (absolute against .toc-list; a page with no TOC anchors it to the
-  // column itself, which is also positioned)
+  // The printer icon rides the short-id row at the top of the TOC rail.
+  // A document with no headings has an empty rail and so had no such row,
+  // and no way to reach the export at all -- räntelagen among them. It gets
+  // the row anyway, carrying the document's own short id from the
+  // frontmatter, so the affordance is in the same place on every document.
+  var row = tocCol.querySelector('.toc-list');
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'toc-list';
+    var eyebrow = document.querySelector('.frontmatter .eyebrow');
+    var label = document.createElement('span');
+    label.className = 'lvl1 toc-top';
+    label.textContent = eyebrow ? eyebrow.textContent.trim() : 'Dokumentet';
+    row.appendChild(label);
+    tocCol.appendChild(row);
+  }
+
   var open = document.createElement('button');
   open.type = 'button';
   open.className = 'pdf-open';
   open.setAttribute('aria-label', 'Spara som PDF');
   open.title = 'Spara som PDF';
   open.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
-  (tocCol.querySelector('.toc-list') || tocCol).appendChild(open);
+  row.appendChild(open);
 
   // [{key, label}] in first-seen order across the panels, deduplicated --
   // the order the rail itself ranks sections in
@@ -83,17 +103,12 @@
     if (kontext) kontext.addEventListener('change', function () {
       fs.disabled = !kontext.checked;
     });
-    // the export runs as a fetch so the dialog can show real progress; a
-    // large statute lays out for a minute or more on first request (the
-    // server caches the result, so the next one is instant)
+    // The dialog hands the export over to a page of its own
+    // (/api/v1/pdf/vanta), which starts the render, shows how far it has
+    // come and then becomes the PDF. The tab opens inside this click --
+    // a popup blocker allows nothing opened a minute later -- and it opens
+    // on a real address, where it used to open blank and be written into.
     var go = dlg.querySelector('.pdf-go');
-    var pending = null;      // {ctrl, win} while a fetch is in flight
-
-    function busy(on) {
-      go.disabled = on;
-      go.classList.toggle('busy', on);
-      go.textContent = on ? 'Skapar PDF \u2026' : 'Skapa PDF';
-    }
 
     function fail(message) {
       var err = dlg.querySelector('.pdf-err');
@@ -105,8 +120,8 @@
       err.textContent = message;
     }
 
-    function exportUrl() {
-      var q = '/api/v1/pdf?path=' + encodeURIComponent(location.pathname);
+    function waitUrl() {
+      var q = '/api/v1/pdf/vanta?path=' + encodeURIComponent(location.pathname);
       if (dlg.querySelector('input[name=toc]').checked) q += '&toc=1';
       if (kontext && kontext.checked) {
         var boxes = dlg.querySelectorAll('input[name=kind]');
@@ -118,65 +133,23 @@
             picked.length === boxes.length ? 'alla' : picked.join(','));
         }
       }
+      if (dlg.querySelector('input[name=mode]:checked').value !== 'visa') {
+        q += '&download=1';
+      }
       return q;
     }
 
     go.addEventListener('click', function () {
-      var visa = dlg.querySelector('input[name=mode]:checked').value === 'visa';
-      // the viewing tab must open inside the click gesture -- opened after
-      // a minute-long fetch it would be popup-blocked
-      var win = visa ? window.open('', '_blank') : null;
-      if (win) {
-        win.document.title = 'Skapar PDF \u2026';
-        win.document.body.textContent = 'Skapar PDF \u2026';
-      }
-      var ctrl = new AbortController();
-      pending = { ctrl: ctrl, win: win };
-      busy(true);
       var old = dlg.querySelector('.pdf-err');
       if (old) old.remove();
-      fetch(exportUrl(), { signal: ctrl.signal }).then(function (r) {
-        if (!r.ok) throw new Error('servern svarade ' + r.status);
-        // the filename rule lives server-side only (api/pdf.filename_for);
-        // a blob URL carries none, so lift it off the response header
-        var disp = /filename="([^"]+)"/.exec(
-          r.headers.get('content-disposition') || '');
-        return r.blob().then(function (blob) {
-          return { blob: blob, name: disp ? disp[1] : 'dokument.pdf' };
-        });
-      }).then(function (res) {
-        var url = URL.createObjectURL(res.blob);
-        if (win) {
-          win.location = url;
-        } else {
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = res.name;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-        }
-        pending = null;
-        busy(false);
+      if (window.open(waitUrl(), '_blank')) {
         dlg.close();
-      }).catch(function (err) {
-        pending = null;
-        busy(false);
-        if (err.name === 'AbortError') return;   // Avbryt closed the dialog
-        if (win) win.close();
-        fail('Det gick inte att skapa PDF:en (' + err.message + '). ' +
-             'Prova igen, eller skriv ut sidan med Ctrl+P.');
-      });
+      } else {
+        fail('Webbl\u00e4saren blockerade den nya fliken. Till\u00e5t popup-f\u00f6nster ' +
+             'f\u00f6r lagen.nu, eller skriv ut sidan med Ctrl+P.');
+      }
     });
 
-    // Avbryt (or Esc) while a render runs: stop the fetch, drop the tab
-    dlg.addEventListener('close', function () {
-      if (!pending) return;
-      pending.ctrl.abort();
-      if (pending.win) pending.win.close();
-      pending = null;
-      busy(false);
-    });
     document.body.appendChild(dlg);
   }
 

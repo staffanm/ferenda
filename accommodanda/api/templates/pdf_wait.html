@@ -1,0 +1,140 @@
+{#- The screen a reader waits on while a PDF export renders (api/pdfjob.py).
+
+    It exists because the alternative was a blank tab: the dialog used to
+    open a window with no address and write "Skapar PDF …" into it, which
+    left the reader on a document they could not reload, share or keep, and
+    which said nothing about how long the wait would be.
+
+    The page starts the job itself. That way the tab can be opened inside the
+    click that asked for it -- a popup blocker allows nothing opened a minute
+    later -- while the render still only begins once, since the server joins
+    identical jobs.
+
+    It wears the site's /style.css for its tokens; the few rules below are
+    this screen's own furniture. -#}
+{%- macro wait_page(path, titel, toc, kontext, download) -%}
+<!doctype html><html lang="sv"><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>{{ titel or path }} — skapar PDF …</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.wait { max-width: 32rem; margin: 18vh auto 0; padding: 0 1.5rem;
+  font: 400 .95rem/1.6 var(--sans); color: var(--ink); }
+.wait h1 { font: 500 1.5rem/1.25 var(--serif); margin: 0 0 .3rem; }
+.wait .doc { font-family: var(--serif); font-style: italic; margin: 0 0 1.6rem; }
+.wait .doc a { color: var(--ink-3); text-decoration: none; }
+.wait .doc a:hover { color: var(--accent); }
+.wait .track { height: .5rem; border-radius: 99px; background: var(--surf-3);
+  overflow: hidden; }
+.wait .bar { height: 100%; width: 0; border-radius: 99px;
+  background: var(--accent); transition: width .4s ease; }
+.wait .line { display: flex; justify-content: space-between; gap: 1rem;
+  margin-top: .55rem; font-size: .85rem; color: var(--ink-3); }
+.wait .line .left { font-variant-numeric: tabular-nums; }
+.wait .note { color: var(--ink-4); font-size: .82rem; margin: 2.2rem 0 0; }
+.wait .err { color: var(--danger); }
+.wait a { color: var(--accent); }
+</style></head>
+<body class="wait" data-path="{{ path }}" data-toc="{{ 1 if toc else 0 }}"
+      data-kontext="{{ kontext }}" data-download="{{ 1 if download else 0 }}">
+<h1>Skapar PDF</h1>
+<p class="doc"><a href="{{ path }}">{{ titel or path }}</a></p>
+<div class="track"><div class="bar" id="bar"></div></div>
+<p class="line"><span class="left" id="fas">startar …</span>
+<span class="right" id="kvar"></span></p>
+<p class="note" id="note">Sidan öppnas av sig själv när PDF:en är klar.
+Stora dokument med all kontext tar någon minut första gången — därefter
+ligger den i cachen och kommer direkt.</p>
+<script>
+(function () {
+  var d = document.body.dataset;
+  var pdfUrl = '/api/v1/pdf?path=' + encodeURIComponent(d.path)
+    + (d.toc === '1' ? '&toc=1' : '')
+    + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : '')
+    + (d.download === '1' ? '&download=1' : '');
+  var bar = document.getElementById('bar');
+  var fas = document.getElementById('fas');
+  var kvar = document.getElementById('kvar');
+  var note = document.getElementById('note');
+
+  function fail(message) {
+    fas.textContent = 'Det gick inte';
+    fas.className = 'left err';
+    kvar.textContent = '';
+    note.innerHTML = '';
+    note.appendChild(document.createTextNode(message + ' '));
+    var again = document.createElement('a');
+    again.href = location.href;
+    again.textContent = 'Försök igen';
+    note.appendChild(again);
+    note.appendChild(document.createTextNode(
+      ', eller skriv ut dokumentsidan med Ctrl+P — samma pappersform, ' +
+      'utan innehållsförteckning och kontext.'));
+  }
+
+  function show(s) {
+    bar.style.width = Math.round(s.andel * 100) + '%';
+    // the page counter only means something once layout has started, and
+    // "av ca" while the total is still the estimate the transform made
+    var text = s.fas;
+    if (s.sida) {
+      text += ' — sida ' + s.sida + (s.sidor ? (s.exakt ? ' av ' : ' av ca ')
+        + s.sidor : '');
+    }
+    fas.textContent = text;
+    kvar.textContent = s.kvar == null ? ''
+      : s.kvar > 90 ? 'ca ' + Math.round(s.kvar / 60) + ' min kvar'
+      : 'ca ' + Math.max(1, s.kvar) + ' s kvar';
+  }
+
+  function done() {
+    bar.style.width = '100%';
+    fas.textContent = 'klar';
+    kvar.textContent = '';
+    if (d.download !== '1') {
+      location.replace(pdfUrl);   // replace: Bakåt går till dokumentet
+      return;
+    }
+    // nedladdningsläget: filen hämtas, och sidan blir kvar som kvitto med
+    // en länk att hämta om -- en flik som stänger sig själv är sämre
+    document.querySelector('h1').textContent = 'PDF:en är klar';
+    var a = document.createElement('a');
+    a.href = pdfUrl;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    note.innerHTML = '';
+    note.appendChild(document.createTextNode('PDF:en laddas ned. '));
+    var again = document.createElement('a');
+    again.href = pdfUrl;
+    again.textContent = 'Hämta igen';
+    note.appendChild(again);
+    note.appendChild(document.createTextNode('.'));
+  }
+
+  function poll(id) {
+    fetch('/api/v1/pdf/jobb/' + id).then(function (r) {
+      if (!r.ok) throw new Error('servern svarade ' + r.status);
+      return r.json();
+    }).then(function (s) {
+      if (s.fel) return fail('Renderingen misslyckades (' + s.fel + ').');
+      if (s.klar) return done();
+      show(s);
+      setTimeout(function () { poll(id); }, 1000);
+    }).catch(function (e) { fail('Kontakten med servern bröts (' + e.message + ').'); });
+  }
+
+  fetch('/api/v1/pdf/jobb?path=' + encodeURIComponent(d.path)
+        + (d.toc === '1' ? '&toc=1' : '')
+        + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : ''),
+        { method: 'POST' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('servern svarade ' + r.status);
+      return r.json();
+    })
+    .then(function (s) { if (s.klar) { done(); } else { show(s); poll(s.id); } })
+    .catch(function (e) { fail('Det gick inte att starta renderingen (' + e.message + ').'); });
+})();
+</script>
+</body></html>
+{%- endmacro -%}

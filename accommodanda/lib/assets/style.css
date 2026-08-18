@@ -227,15 +227,9 @@ nav.toc a.toc-top { padding-right: 2.6rem; }
 .pdf-actions button:hover { background: var(--surf-3); color: var(--ink); }
 .pdf-actions .pdf-go { background: var(--accent); border-color: var(--accent);
                        color: var(--on-accent); }
-/* the in-flight state: a small ring ahead of "Skapar PDF …" -- a first
-   render of a large statute takes a minute or more */
-.pdf-actions .pdf-go.busy::before { content: ""; display: inline-block;
-                       width: .75em; height: .75em; margin-right: .45rem;
-                       vertical-align: -.08em; border-radius: 50%;
-                       border: 2px solid var(--on-accent);
-                       border-right-color: transparent;
-                       animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* the dialog no longer waits for anything: "Skapa PDF" opens the export's
+   own page (/api/v1/pdf/vanta), which carries the progress bar */
+@keyframes spin { to { transform: rotate(360deg); } }   /* also .search-spin */
 .pdf-err { color: var(--danger); font-size: .82rem; margin: .8rem 0 0; }
 
 /* -- Frontmatter -- */
@@ -1387,24 +1381,75 @@ section.occurrences details.more > summary { color: var(--ink-3);
     color-scheme: light;
   }
 
+  /* One wide margin, the same on every page, holding the context apparatus
+     (`.print-kontext`). An *alternating* outer margin was built first and
+     cannot be made to work: a note longer than the page continues against
+     the next page's text column, which a mirrored page has moved to the
+     other side of the sheet, so the tail prints off the paper.
+
+     33 mm left and 60 mm right leaves 117 mm of text -- about 67 characters
+     to the line, where the 170 mm a 20 mm margin left ran to 97 -- and a
+     44 mm column for the apparatus. A4 stays, because that is what people
+     can print.
+
+     The two widths are named once, here, and every rule that needs them
+     reads them: they were percentages of the block, and a percentage inside
+     a fixed table resolves against the wrong box -- an annotated recital
+     came out 17 mm narrower than an unannotated one on the same page, and
+     the margin column sat 16 mm off. */
+  :root { --matt: 117mm; --marg: 50mm; }
+
   @page {
     size: A4;
-    margin: 22mm 20mm 24mm;
-    @top-center { content: string(doc-id);
+    margin: 22mm 60mm 24mm 33mm;
+    /* The running head uses the whole sheet, not the text column:
+       `@top-left`/`@top-center`/`@top-right` divide the *content* width
+       between them, and only the corner boxes reach the paper (measured:
+       corners at 0-33 mm and 150-210 mm). Each corner is set toward its own
+       edge and overflows inwards over an empty head, which gives a long
+       locator the room it needs. The page number stands alone in the outer
+       bottom corner, at the edge where a thumb finds it -- the total
+       belonged to a screen document, not to a printed sheet. */
+    @top-left-corner { content: string(doc-id); text-align: right;
+                       padding-right: 5mm;
+                       font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                       color: #6a6a6a; }
+    @top-center { content: string(doc-title);
                   font: italic 9pt "Source Serif 4", Georgia, serif;
-                  color: #3d3d3d; letter-spacing: .04em; }
-    @bottom-center { content: counter(page) " (" counter(pages) ")";
-                     font: 8.5pt "Inter", system-ui, sans-serif;
-                     font-variant-numeric: tabular-nums; color: #3d3d3d; }
-    @bottom-left { content: "lagen.nu";
-                   font: italic 8.5pt "Source Serif 4", Georgia, serif;
-                   color: #6a6a6a; }
+                  color: #3d3d3d; }
+    @top-right-corner { content: string(here, start) string(here-inner, start);
+                        text-align: right; padding-right: 8mm;
+                        white-space: nowrap;
+                        font: 8.5pt "Inter", system-ui, sans-serif;
+                        color: #3d3d3d; }
+    @bottom-right-corner { content: counter(page); text-align: right;
+                           padding-right: 8mm;
+                           font: 8.5pt "Inter", system-ui, sans-serif;
+                           font-variant-numeric: tabular-nums; color: #3d3d3d; }
+    @bottom-left { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right { content: none; }
   }
   /* the first page carries the document's own title block; no running head */
   @page :first {
     @top-center { content: none; }
+    @top-left-corner { content: none; }
+    @top-right-corner { content: none; }
   }
   .frontmatter .eyebrow { string-set: doc-id content(text); }
+  .frontmatter h1 { string-set: doc-title content(text); }
+  /* "Where you are": the chapter, and within it the § or article. Each
+     writes its own half, and the head prints whichever half the page has.
+     `start` -- the value in force as the page opens, not `first`, which is
+     the first value *assigned on* it -- so a page that starts mid-§ still
+     names that §. The separator rides in the chapter's own string, so
+     a statute with no chapter division prints "3 §" and not " · 3 §".
+     `h3.artikel > a` rather than the heading: an EU article heading is
+     "Artikel 5 – Principer för behandling av personuppgifter", and only its
+     first link is the citable "Artikel 5". */
+  .kaprubrik, h2.rubrik, .instans-rubrik { string-set: here attr(data-kort); }
+  .paragraf-gutter .n, .artikel > a:first-child {
+    string-set: here-inner content(text); }
 
   /* chrome and widgets: nothing a finger can operate belongs on paper */
   .masthead, .mobile-bar, .toc-col, .rail, .drawer-scrim, .search-overlay,
@@ -1471,10 +1516,20 @@ section.occurrences details.more > summary { color: var(--ink-3);
   a.term { border-bottom: 0; }
   .paragraf-gutter .n, .num { color: var(--accent); }
 
-  /* the § gutter at paper scale: "3 b §" must not wrap */
-  section.paragraf { grid-template-columns: 4rem minmax(0, 1fr); }
+  /* The § gutter stays inside the measure. Hanging it in the left margin
+     reads better, and did until the apparatus moved out there: on a verso
+     page the left margin *is* the outer one, and the numeral landed on top
+     of the notes. 3.5rem holds "3 b §" without wrapping. */
+  section.paragraf { grid-template-columns: 3.5rem minmax(0, 1fr);
+                     gap: .8rem; }
 
-  img, .grafik-img { max-width: 100%; }
+  img, .grafik-img, table, figure { max-width: 100%; }
+  /* Tables and figures used to be allowed past the measure, on the grounds
+     that a rate table squeezed into 67 characters wraps every cell. The
+     margin they grew into now holds the apparatus: measured on an
+     eight-column table, the cells drew out to 534 pt while the note beside
+     them started at 451 pt, so the table printed over its own context. They
+     keep the reading column. */
 
   /* --- PDF export only (api/pdf.py injects the markup) --- */
   /* the outline panel of the exported PDF: WeasyPrint's UA sheet bookmarks
@@ -1493,19 +1548,75 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .print-toc a::after { content: leader(dotted) " " target-counter(attr(href), page);
                         font-variant-numeric: tabular-nums; }
 
-  /* the context apparatus under a provision: editorial voice (sans, small,
-     half-tone) set clearly apart from the document's own text */
-  .print-kontext { font-family: var(--sans); font-size: .78rem; line-height: 1.45;
-                   color: var(--ink-2); margin: .9rem 0 1.6rem;
-                   padding-left: .9rem; border-left: 2px solid var(--rule-soft); }
-  section.paragraf + .print-kontext { margin-left: 5rem; }
-  .print-kontext .rail-h { font-weight: 600; font-size: .72rem;
+  /* Provision and note are the two cells of one row. Floating the note
+     instead lets the text flow past it, which fills the page -- and turns
+     local congestion into a queue that never drains: the GDPR's recitals
+     carry three times the context their text can sit beside, so by page 60
+     the margin was empty and by page 100 the reading column was. The row
+     keeps each note level with what it annotates and shows congestion where
+     it happens, as air in the reading column.
+
+     The margin is the same on every page, so a note that outruns the foot
+     of the page continues at the head of the next in the same place. That
+     is what an alternating outer margin could not do, and why it is gone. */
+  .kontextblock { display: table; table-layout: fixed;
+                  width: calc(var(--matt) + var(--marg));
+                  margin-right: calc(-1 * var(--marg)); }
+  .kontextrad { display: table-row; }
+  .kontextsp { display: table-cell; width: var(--matt); vertical-align: top; }
+  .kontextnot { display: table-cell; width: var(--marg); vertical-align: top;
+                padding-left: 6mm; }
+  /* the two cells must break at the same place, and the reading column's own
+     typography stopped them: a note is a list and starts anywhere, while the
+     provision is a paragraph under `orphans: 3` (or a § under
+     `break-inside: avoid`), so a row starting two lines from the foot of a
+     page opened its note there and moved its text overleaf */
+  .kontextsp p, .kontextsp li { orphans: 1; widows: 1; }
+  .kontextsp section.paragraf, .kontextsp .andring, .kontextsp figure,
+  .kontextsp blockquote, .kontextsp p.ruta { break-inside: auto; }
+  /* an annotated heading keeps its text */
+  .kontextblock.rubrikblock { break-after: avoid; }
+  .print-kontext { border-left: 1px solid var(--rule-soft); padding-left: 3mm;
+                   font-family: var(--sans); font-size: .6rem;
+                   line-height: 1.4; color: var(--ink-2);
+                   margin-bottom: 1.1rem; }
+  /* Run-in labels: a section heading on a line of its own cost a line for
+     every kind a provision has, and a provision with seven kinds spent seven
+     of its thirty lines saying nothing. The label now opens the list it
+     names. */
+  .print-kontext .rail-sec { border-top: 0; padding: 0; margin-bottom: .35rem; }
+  .print-kontext h4 { display: inline; font-size: .6rem; font-weight: 600;
+                      margin: 0; }
+  .print-kontext h4::after { content: " "; }
+  .print-kontext .rail-sec ul { display: inline; margin: 0; padding: 0; }
+  .print-kontext .rail-sec li { display: inline; }
+  /* the space after the separator is non-breaking: a trailing space in
+     generated content collapses against the next inline box, and the list
+     read "C-204/21 ·C-439/19" */
+  .print-kontext .rail-sec li::after { content: " \00b7\00a0"; color: var(--ink-4); }
+  .print-kontext .rail-sec li:last-child::after { content: ""; }
+  .print-kontext .more { display: inline; margin: 0; color: var(--ink-4); }
+  /* the disclosure follows the last item it stands for, and needs the same
+     separator between them ("C-579/21+3 fler" read as one citation) */
+  .print-kontext .more::before { content: " \00b7\00a0"; }
+  /* The document-level apparatus is front matter about the act rather than a
+     note on a provision, and it is a page and a half on its own. */
+  .print-kontext.bred { display: block; width: auto; font-size: .68rem;
+                        margin: 1.2rem 0 1.6rem; padding: 0 0 0 .9rem;
+                        border: 0; border-left: 2px solid var(--rule-soft); }
+  .print-kontext .rail-h { font-weight: 600; font-size: .58rem;
                            text-transform: uppercase; letter-spacing: .06em;
-                           color: var(--ink-3); margin: 0 0 .35rem; }
-  .print-kontext h4 { font-size: .78rem; font-weight: 600; margin: .6rem 0 .2rem; }
+                           color: var(--ink-3); margin: 0 0 .3rem;
+                           padding-bottom: 0; border-bottom: 0; }
+  /* No rules between the sections: the bold label already separates them,
+     and on screen the line does work it cannot do here -- it marks a row
+     you can fold. Every one of them costs a millimetre of a column that is
+     the tallest thing on the page. */
+  .print-kontext .rail-sec-flat { padding: 0; }
   .print-kontext h4 .n { color: var(--ink-4); font-weight: 400; margin-left: .3rem; }
-  .print-kontext ul { list-style: none; margin: 0 0 .4rem; padding: 0; }
-  .print-kontext li { margin: .12rem 0; break-inside: avoid; }
+  .print-kontext ul { list-style: none; margin: 0; padding: 0; }
+  .print-kontext li { margin: 0 0 .1rem; break-inside: avoid; }
+  .print-kontext p { margin: 0 0 .15rem; text-align: inherit; }
   .print-kontext .prov { color: var(--ink-4); }
   .print-kontext .q { font-family: var(--serif); font-style: italic; }
 }
