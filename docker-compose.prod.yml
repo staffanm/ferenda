@@ -141,6 +141,22 @@ services:
       # this the container's own hostname is used -- a 12-hex container id that
       # changes on every `up -d`, which names nothing.
       - LAGEN_HOST=lagen
+      # Which peers uvicorn accepts X-Forwarded-For/-Proto from. It defaults to
+      # 127.0.0.1 -- the same *host*, not the same compose network -- so nginx
+      # (its own container) was an untrusted peer and every request arrived as
+      # the proxy's address: one login-rate-limit bucket for the whole internet,
+      # and one Matomo visitor id. The value is the compose network's subnet
+      # rather than nginx's container IP, which is not stable across a recreate;
+      # the API port is published to no host interface, so nothing outside that
+      # network can reach uvicorn to begin with. uvicorn reads CIDR here.
+      - FORWARDED_ALLOW_IPS=172.19.0.0/16
+      # The checkout the /patch editor reads and WRITES its patches in
+      # (at <PATCH_REPO>/accommodanda/patches). It commits every save, so the
+      # tree has to sit inside a real checkout -- and the image is built with
+      # `.git` excluded (.dockerignore), so the in-image accommodanda/patches
+      # can neither commit nor survive a redeploy. The mount below supplies
+      # one; see the volumes list.
+      - PATCH_REPO=/patchrepo
     volumes:
       # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
       # the roomy 2 TB /mnt/forstor NFS mount.
@@ -152,6 +168,15 @@ services:
       # local /mnt/data); it's root_squashed, so the checkout is owned 1001:3362
       # (staffan:lagen-nfs) and pushes are done from the host, not the container.
       - /mnt/forstor/lagen-wiki:/wiki
+      # The patch tree the editor commits into: a full checkout of THIS repo on
+      # the host, so a patch written on prod is an ordinary commit that pushes
+      # to origin and reaches dev by pull -- the same arrangement as lagen-wiki
+      # above. On local /mnt/data rather than the NFS mount: the checkout is
+      # small (~200 MB), a repo is latency-sensitive the way the catalog is,
+      # and /mnt/forstor is root:lagen-nfs, so creating a directory there needs
+      # root. Owned by uid 1001, which is what the container runs as, so the
+      # editor can write and commit; pushes are done from the host.
+      - /mnt/data/ferenda-patchrepo:/patchrepo
       # Secrets + editor registry (editor_secret, editors[].pwhash, ops_token, LLM
       # key). config.py reads config.yml from the repo root (/app); without this
       # mount the file is absent and everything falls back to defaults -- the inline
@@ -293,6 +318,12 @@ services:
       options:
         max-size: "10m"
         max-file: "10"
+  # --- Matomo's database ---------------------------------------------------
+  # Credentials live in the untracked `.env` beside this file; copy
+  # `.env.example` and fill it in. NOTE: the entrypoint reads these ONLY when
+  # the `db` volume is first created. On the existing prod volume they are
+  # inert -- rotating a password there is an `ALTER USER` against the running
+  # server, and `.env` must then be updated to match. See .env.example.
   db:
     image: mariadb
     command: --max-allowed-packet=64MB
@@ -300,20 +331,49 @@ services:
     volumes:
       - db:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=ncfeGpSR63xmnyTa
+      # root is reachable only over the container's unix socket (`docker exec
+      # ferenda_db_1 mariadb -uroot -p`); the `root`@`%` grant that let any
+      # peer on the compose network log in as root is dropped.
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD in .env}
+      # the least-privilege account Matomo actually connects with
+      - MARIADB_DATABASE=matomo
+      - MARIADB_USER=matomo
+      - MARIADB_PASSWORD=${MATOMO_DB_PASSWORD:?set MATOMO_DB_PASSWORD in .env}
     restart: always
     logging:
       options:
         max-size: "10m"
         max-file: "10"
   matomo:
-    image: matomo:5
+    # Pinned to a patch version, not floating `5`: the application tree lives in
+    # the volume below, so the running Matomo and the image tag can silently
+    # disagree -- exactly what happened before 2026-08-19, when the tag said 5
+    # and the volume had been serving 5.1.2 since 2024. Bump this deliberately,
+    # and follow the upgrade steps in the volume comment.
+    image: matomo:5.12.0
     profiles: [prod]
+    volumes:
+      # Matomo's application tree. NAMED -- it used to be an anonymous volume,
+      # which put the only copy of config/config.ini.php (the database
+      # credentials, and the `salt` that signs sessions) somewhere a
+      # `down -v` or a volume prune would take without saying so.
+      #
+      # This volume also SHADOWS the image's code, and the entrypoint seeds it
+      # only `if [ ! -e matomo.php ]`. So pulling a newer image upgrades
+      # nothing on its own. An upgrade is three steps: repopulate this volume
+      # from the new image's /usr/src/matomo, put config/config.ini.php and
+      # misc/DBIP-City.mmdb back, then run `console core:update` for the
+      # database migration.
+      - matomo-app:/var/www/html
     environment:
+      # These seed the installer only; once `config/config.ini.php` exists in
+      # the service's volume that file is authoritative, so a credential change
+      # has to be written there too (.env.example).
       - MATOMO_DATABASE_HOST=db
-      - MYSQL_PASSWORD=ncfeGpSR63xmnyTa
-      - MYSQL_DATABASE=matomo
-      - MYSQL_USER=root
+      - MATOMO_DATABASE_ADAPTER=mysql
+      - MATOMO_DATABASE_DBNAME=matomo
+      - MATOMO_DATABASE_USERNAME=matomo
+      - MATOMO_DATABASE_PASSWORD=${MATOMO_DB_PASSWORD:?set MATOMO_DB_PASSWORD in .env}
     restart: always
     logging:
       options:
@@ -322,6 +382,9 @@ services:
 
 volumes:
   db:
+  # Matomo's application tree -- see the matomo service for why it is named and
+  # what an upgrade of it involves.
+  matomo-app:
   fuseki:
   # The OpenSearch index (~28 G) lives on the roomy /mnt/forstor NFS, not the
   # local docker-root disk. A bind-type local volume keeps the volume NAME

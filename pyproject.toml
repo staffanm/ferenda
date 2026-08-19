@@ -78,7 +78,11 @@ dependencies = [
     "requests",
     "ruamel-yaml>=0.19.1",
     "urllib3",
-    "uvicorn",
+    # >=0.31: FORWARDED_ALLOW_IPS is matched with `ipaddress` from that
+    # release on. Earlier versions compare the peer address as a literal
+    # string, so the deployment's CIDR value would match nothing and every
+    # request would silently keep the proxy's address.
+    "uvicorn>=0.31",
     # HTML+CSS -> PDF for the /api/v1/pdf export (api/pdf.py): renders the
     # generated page through the same style.css print rules the browser uses,
     # and adds what browsers don't implement -- @page margin boxes, string-set
