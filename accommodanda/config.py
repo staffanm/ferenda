@@ -8,9 +8,12 @@ value point at the offending line (``data_root invalid at config.yml:43``),
 and round-trip writes (planned) can rewrite one key without disturbing the
 rest of the file.
 
-Scope is deliberately narrow: this module locates the *corpus*, nothing
-else. Curated source resources that ship in the repo (e.g. ``sfs_namedlaws.json``) are
-anchored to the package source tree by their own callers, not here.
+Scope is deliberately narrow: this module locates the *corpus*, and the
+checkouts the running site writes into -- ``wiki_root`` for the markdown
+content repo, ``patch_repo`` for the source patches the editor commits. Curated
+source resources that only ever ship in the repo and are never written at
+runtime (e.g. ``sfs_namedlaws.json``) are anchored to the package source tree by
+their own callers, not here.
 """
 
 import os
@@ -133,6 +136,27 @@ def resolve_wiki_root(doc):
     checkout). Authored separately in its own git repo (a sibling checkout, not a
     submodule), so it is not under ``data_root``."""
     return _resolve_str(doc, "wiki_root", "WIKI_ROOT", DEFAULT_WIKI_ROOT,
+                        post=lambda v: Path(v).expanduser())
+
+
+def resolve_patch_repo(doc):
+    """The *checkout* holding the hand-authored source patches (`lib/patch.py`,
+    the `/patch` editor); the patches themselves sit at its
+    ``accommodanda/patches`` (`layout.PATCHES`). Precedence: the ``PATCH_REPO``
+    environment variable, then the ``patch_repo`` key in config.yml, then this
+    repo -- where they are tracked, and where a working-tree run finds them.
+
+    Configurable because the editor *commits* what it writes, so the tree has to
+    sit inside a checkout at runtime, and the deployed image is built with
+    ``.git`` excluded. Prod mounts a real checkout and points this at it; the
+    patches stay in the code repo, so an edit made on prod reaches dev through a
+    normal push/pull.
+
+    It names the checkout root rather than the patch directory for the same
+    reason `wiki_root` does: the committer needs the repo, and deriving one from
+    the other by asking git costs a subprocess per save and can disagree with
+    the configured path whenever a symlink is involved."""
+    return _resolve_str(doc, "patch_repo", "PATCH_REPO", REPO,
                         post=lambda v: Path(v).expanduser())
 
 
@@ -431,6 +455,7 @@ _doc = load()                                # parse config.yml once
 DATA = resolve_data_root(_doc)
 CATALOG_ROOT = resolve_catalog_root(_doc)
 WIKI_ROOT = resolve_wiki_root(_doc)
+PATCH_REPO = resolve_patch_repo(_doc)
 OPENSEARCH_URL = resolve_opensearch_url(_doc)
 PUBLIC_BASE_URL = resolve_public_base_url(_doc)
 LLM_MODEL = resolve_llm_model(_doc)

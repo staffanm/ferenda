@@ -166,6 +166,12 @@ def _version():
             or "unknown")
 
 
+def _repo_state(repo):
+    """One checkout's push state, shaped for the template."""
+    ahead, dirty = git.push_state(repo)
+    return {"no_upstream": ahead is None, "ahead": ahead, "dirty": dirty}
+
+
 def _index_size():
     """Human size of the OpenSearch index, 'index not built' when absent, or
     'unavailable' when the cluster can't be reached -- the health page must load
@@ -225,12 +231,14 @@ def ops_overview():
     if updated and (now - _parse_iso(updated) > timedelta(hours=STALE_AFTER_H)):
         parts.append(TPL.stale_banner(updated, _age(updated, now=now)))
 
-    # system: running revision + host, wiki push state, search-index size
-    ahead, dirty = git.push_state(config.WIKI_ROOT)
+    # system: running revision + host, push state of both checkouts the site
+    # writes into, search-index size. The patch repo is reported for the same
+    # reason the wiki is: the editor commits into it but nothing pushes it, so
+    # unpushed redactions would otherwise sit there unannounced.
     parts.append(TPL.system_line(
         _age(updated, now=now) if updated else "never", len(errors),
         _version(), runlog.this_host(),
-        {"no_upstream": ahead is None, "ahead": ahead, "dirty": dirty},
+        _repo_state(config.WIKI_ROOT), _repo_state(config.PATCH_REPO),
         _index_size()))
 
     # one row per source: every source the catalog knows plus every source the

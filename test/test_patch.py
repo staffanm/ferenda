@@ -44,8 +44,12 @@ def _all_text(obj, out):
 
 @pytest.fixture
 def patches(tmp_path, monkeypatch):
-    """Redirect the patch store to a tmp dir so tests write no repo files."""
+    """Redirect the patch store to a tmp dir so tests write no repo files. The
+    dir is created: a checkout always carries the tracked patch tree, and
+    `layout.patch` refuses an absent one (an absent tree would silently drop
+    every redaction)."""
     root = tmp_path / "patches"
+    root.mkdir()
     monkeypatch.setattr(layout, "PATCHES", root)
     return root
 
@@ -479,8 +483,7 @@ def webenv(tmp_path, monkeypatch):
     _git(repo, "config", "user.email", "seed@example.org")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "seed")
 
-    monkeypatch.setattr(config, "REPO", repo)
-    monkeypatch.setattr(patch_api.config, "REPO", repo)
+    monkeypatch.setattr(config, "PATCH_REPO", repo)
     monkeypatch.setattr(layout, "PATCHES", repo / "patches")
     monkeypatch.setattr(config, "EDITOR_SECRET", "test-signing-key")
     monkeypatch.setattr(config, "COOKIE_SECURE", False)
@@ -582,3 +585,34 @@ def test_web_disabled_without_secret(webenv, monkeypatch):
     c = TestClient(api.app)
     assert c.get("/api/v1/patch/document",
                  params={"source": "sfs", "basefile": "1999:175"}).status_code == 403
+
+
+# --------------------------------------------------------------------------
+# PATCH_REPO resolution and the guard on an absent patch tree
+# --------------------------------------------------------------------------
+
+def test_patch_repo_defaults_to_this_repo():
+    """With nothing configured, patches resolve to the tracked in-repo tree."""
+    assert config.resolve_patch_repo({}) == config.REPO
+    assert (config.REPO / "accommodanda" / "patches").is_dir()
+
+
+def test_patch_repo_precedence(monkeypatch, tmp_path):
+    """env beats config.yml beats the default -- the precedence every other
+    scalar setting in config.py follows."""
+    monkeypatch.delenv("PATCH_REPO", raising=False)
+    assert config.resolve_patch_repo({"patch_repo": str(tmp_path)}) == tmp_path
+
+    monkeypatch.setenv("PATCH_REPO", str(tmp_path / "from-env"))
+    assert (config.resolve_patch_repo({"patch_repo": str(tmp_path)})
+            == tmp_path / "from-env")
+
+
+def test_absent_patch_tree_is_fatal(monkeypatch, tmp_path):
+    """A PATCH_REPO with no patch tree must fail loudly. Returning "no patch"
+    instead would drop every redaction and republish the personal data the
+    .rot18 patches exist to remove."""
+    monkeypatch.setattr(layout, "PATCHES", tmp_path / "nope")
+    monkeypatch.setattr(config, "PATCH_REPO", tmp_path)
+    with pytest.raises(AssertionError, match="PATCH_REPO"):
+        layout.patch("sfs", "2020:123")

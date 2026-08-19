@@ -276,12 +276,16 @@ def _respell(source, basefile):
 # patch files -- curated, version-controlled fixes to a document's raw/
 # intermediate source, applied at parse time (see lib/patch.py). Unlike the
 # downloaded/artifact trees these are hand-authored knowledge that must be
-# reviewable and must ship with the pipeline, so they live *in the repo*, not
-# under DATA -- anchored to the package tree like the other curated in-repo
-# resources (sfs/data/*.json). Keyed by the same (source, basefile) -> relpath
-# rule as artifact(), so a document's patch sits at a predictable location.
+# reviewable and must ship with the pipeline, so they live in a *checkout*, not
+# under DATA. Keyed by the same (source, basefile) -> relpath rule as
+# artifact(), so a document's patch sits at a predictable location.
+#
+# Which checkout is `config.PATCH_REPO`, not this file's own tree: the /patch
+# editor commits what it writes, and the deployed image is built without `.git`,
+# so prod mounts a real checkout and points PATCH_REPO at it. The default is
+# this repo, so a working-tree run is unaffected.
 # --------------------------------------------------------------------------
-PATCHES = Path(__file__).resolve().parent.parent / "patches"   # accommodanda/patches
+PATCHES = config.PATCH_REPO / "accommodanda" / "patches"
 
 
 def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
@@ -290,6 +294,14 @@ def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
     obfuscated redaction, so removed personal data is not itself plain-text
     googleable in the committed patch) or ``.desc`` (a multi-line description
     sidecar)."""
+    # An absent patch tree is indistinguishable from "this document has no
+    # patch": find_patch would return None for every document, and a redaction
+    # would be dropped -- silently republishing the personal data it removes.
+    # So a missing tree fails here rather than parsing on. (rule:fail-fast)
+    assert PATCHES.is_dir(), (
+        "patch tree %s missing -- PATCH_REPO (%s) must point at a checkout of "
+        "this repo; an absent tree drops every redaction without a word"
+        % (PATCHES, config.PATCH_REPO))
     rel = relpath(source, basefile)
     return PATCHES / source / rel.with_name(rel.name + suffix)
 

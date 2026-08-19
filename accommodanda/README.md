@@ -474,10 +474,12 @@ citation-shaped-query resolver (a name+pinpoint → one exact fragment target)
 shared by the REST `/search` and the MCP `search`/`resolve_citation` tools.
 
 **Top-level**: `config.py` resolves the optional `config.yml` — the corpus
-roots (`data_root`, `catalog_root`, `wiki_root` — `catalog_root`
+roots (`data_root`, `catalog_root`, `wiki_root`, `patch_repo` — `catalog_root`
 decouples `catalog.sqlite` from `data_root` so the latency-sensitive SQLite
 catalog can sit on fast local disk while the bulk artifact corpus is on NFS;
-defaults to `data_root`, colocated), the services the pipeline
+defaults to `data_root`, colocated; `patch_repo` names the checkout the
+`/patch` editor commits into, this repo by default — see "Patch files"
+below), the services the pipeline
 talks to (`opensearch_url`, `llm_base_url`/`llm_model`/`llm_temperature`/
 `llm_top_p`/`vision_model`) and the deployment's own settings (`editor_secret`,
 `editors`, `compress`/`compress_quality`, `cookie_secure`,
@@ -1151,10 +1153,31 @@ never silently skipped). The one exception is an archived SFS consolidation (the
 lydelse (a conflict there is the normal case, not a broken patch) but keeps a
 **redaction** fatal — republishing unredacted personal data because an older
 wording didn't line up is exactly the harm, so that version is recorded as
-skipped rather than published (`sfs.versions.build`). Patches live committed in the repo at
-`patches/<source>/<relpath>.patch` (or `.rot18.patch`), keyed by the same rule as
-the artifact tree (`layout.patch`); they are folded into every patchable source's
-parse freshness inputs so editing one re-stales its document.
+skipped rather than published (`sfs.versions.build`). Patches live committed in a
+repo at `patches/<source>/<relpath>.patch` (or `.rot18.patch`), keyed by the same
+rule as the artifact tree (`layout.patch` — `PATCHES`, which is
+`config.PATCH_REPO/accommodanda/patches`);
+they are folded into every patchable source's parse freshness inputs so editing
+one re-stales its document.
+
+`PATCH_REPO` defaults to this repo; override it with the `patch_repo` key in
+`config.yml` or the `PATCH_REPO` env var, same precedence as `WIKI_ROOT` above.
+It has to be configurable because the web editor below *commits* what it
+writes, so the tree must sit inside a real git checkout at runtime — and the
+deployed image is built with `.git` excluded (`.dockerignore`), so the in-image
+`accommodanda/patches` can neither commit nor survive a container replacement.
+Production instead bind-mounts a full checkout of this repo and points
+`PATCH_REPO` at it, so a save is an ordinary commit that pushes to origin and
+reaches dev by pull. Like `wiki_root`, the setting names the *checkout* and not
+the content directory inside it: `_commit` needs the repo, and deriving one
+from the other by asking git would cost a subprocess per save and could
+disagree with the configured path across a symlink.
+
+`layout.patch` asserts the tree exists. An absent one is indistinguishable from
+"this document has no patch", so a mistyped mount would drop every `.rot18`
+redaction and republish the personal data it removes — silently. The ops
+dashboard reports the patch checkout's unpushed/dirty state beside the wiki's,
+because nothing pushes it automatically.
 
 The six folkrätt sources — `hudoc`, `coe`, `icrc`, `untc`, `icc`, `icj` — apply a patch
 at parse time the same way (`patch.apply` on the stored record/HTML text for

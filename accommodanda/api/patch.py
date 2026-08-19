@@ -114,14 +114,18 @@ def save(body: SaveBody, editor: Editor = Depends(require_editor)):
                   obfuscated=body.obfuscated)
     _reparse(body.source, body.basefile)
     return {"removed": removed, "sha": sha,
-            "path": None if removed else str(path.relative_to(config.REPO))}
+            "path": None if removed else str(path.relative_to(config.PATCH_REPO))}
 
 
 def _commit(source, basefile, editor, removed, obfuscated):
-    """Stage a document's patch files and commit them to the code repo as the
-    logged-in editor (git identity = their name/email, exactly as a hand commit
-    would attribute it). Returns the commit sha, or HEAD when nothing changed."""
-    repo = config.REPO
+    """Stage a document's patch files and commit them to the patch repo as the
+    logged-in editor (identity = their name/email, exactly as a hand commit
+    would attribute it). Returns the commit sha, or HEAD when nothing changed.
+
+    The repo is `config.PATCH_REPO`, which `layout.PATCHES` is derived from --
+    so the paths staged here and the paths written by `create_patch` come from
+    one root and cannot disagree."""
+    repo = config.PATCH_REPO
     rels = [str(layout.patch(source, basefile, sfx).relative_to(repo))
             for sfx in (patchlib.PLAIN_SUFFIX, patchlib.ROT18_SUFFIX, ".desc")]
     # stage only the variants that exist on disk (a write) or are tracked (a

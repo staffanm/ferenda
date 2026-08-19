@@ -4399,7 +4399,7 @@ rewrite work.
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`), `ul.list--block` listing walk (`listing_items`), and the identity rules for the two series-numberless doctypes (`pm_identity`, `lr_identity`) so `forarbete/download.py` and `remisser/download.py` mint the same basefile for the same document from different pages |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — a line is stripped only when it *is* the header (identifier + at most a page number/date), not merely when it contains the identifier; `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify`; `repair_pdf` (ghostscript rebuild of a PDF whose cross-reference table poppler refuses, cached beside the source) feeds `pages_with_ocr` when poppler's `pdftohtml` fails outright rather than yielding empty text. Four source-agnostic cleaning steps, added for remisser (2026-08-04) where no per-source header string exists (each of ~90 organisations answers on its own letterhead): `strip_page_furniture` (running header/footer found by digit-masked repetition + margin position + font size, not a passed-in identifier), `join_across_pages` (rejoins a sentence a page break split), `drop_footnotes` (drops footnote text and its superscript markers by font size), `strip_addressing` (drops a letter's masthead/reference line/contact block by composition — address tokens + reference labels — since a masthead printed once cannot be found by repetition) |
-| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`/`catalog_root` — the latter decoupling `catalog.sqlite`'s location from the bulk corpus, env `CATALOG_ROOT`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address), resilient HTTP session + harvest progress reporter |
+| `accommodanda/config.py`, `lib/layout.py`, `lib/net.py` | runtime config (`config.yml`/`data_root`/`catalog_root` — the latter decoupling `catalog.sqlite`'s location from the bulk corpus, env `CATALOG_ROOT` — and `patch_repo`, env `PATCH_REPO`, default this repo; prod repoints it at a bind-mounted checkout so the `/patch` editor's commits land in a real git tree, since the deployed image excludes `.git`), centralized document layout (`page_relpath` on-disk file ↔ `page_url`/`url_to_relpath` public lagen.nu address; `layout.PATCHES = config.PATCH_REPO/accommodanda/patches`, asserted to exist so a missing mount cannot silently drop every redaction), resilient HTTP session + harvest progress reporter |
 | `site/data/{downloaded,artifact}/eurlex/` | harvested EU corpus (`notice.ttl` + best manifestation per language) + artifacts |
 | `test/test_eurlex_parse.py`, `test/test_eurlex_html.py`, `test/test_eurlex_definitions.py`, `test/test_eucasenaming.py`, `test/test_eurlex_casenames.py` | EU parser, defined-terms and case-naming suites |
 | `accommodanda/lib/wikitext.py` | shared MediaWiki-dump parser (wikilinks + citation engine → runs) |
@@ -4535,6 +4535,20 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **api/lib/build** (2026-08-19) — `config.py` gains `resolve_patch_repo`/
+  `PATCH_REPO` (same env→config.yml→default precedence as `WIKI_ROOT`,
+  `CATALOG_ROOT`), and `lib/layout.py`'s `PATCHES` derives from it instead of
+  from a path anchored to the package tree. Needed because the `/patch` editor
+  commits every save (`api/patch.py`'s `_commit`), and the deployed image
+  excludes `.git` (`.dockerignore`), so the in-image `accommodanda/patches`
+  cannot commit or survive a container replacement. Prod now bind-mounts a
+  full checkout and points `PATCH_REPO` at it, so a prod edit is an ordinary
+  commit that reaches dev by push/pull. Like `wiki_root` the setting names the
+  checkout, so `_commit` uses it directly — no discovery subprocess per save,
+  and no resolved-vs-configured path mismatch. `layout.patch` asserts the tree
+  exists, because an absent one reads as "no patch" and would republish every
+  redaction; the ops dashboard now shows the patch checkout's push state beside
+  the wiki's, since nothing pushes it automatically.
 - **lib/api/coe** (2026-08-15) — a corpus-wide graph explorer,
   `/hanvisningar/` (`lib/templates/hanvisningar.html`, `lib/assets/graf.js`)
   over a new `GET /api/v1/graph` (`api/reads.graph`, `catalog.py`'s
