@@ -20,6 +20,7 @@ from accommodanda.api import auth
 from accommodanda.api import patch as patch_api
 from accommodanda.dv import legacy as dv_legacy
 from accommodanda.dv import parse as dv_parse
+from accommodanda.dv import paths as dv_paths
 from accommodanda.eurlex import parse as eurlex_parse
 from accommodanda.foreskrift import parse as fs_parse
 from accommodanda.lib import harvest, layout, markup, patch, pdftext, util
@@ -201,7 +202,7 @@ def test_dv_intermediate_is_the_whole_record_one_block_per_line(patches,
     record = tmp_path / "case.json"
     record.write_text('{"malNummerLista": ["B 1-11"], "innehall": "<p>one</p><p>two</p>"}',
                       encoding="utf-8")
-    monkeypatch.setattr(build, "dv_record", lambda bf: record)
+    monkeypatch.setattr(dv_paths, "record", lambda bf: record)
     text, _label = patchsource.intermediate("dv", "NJA 2001 s 1")
     # the record's own JSON, so the structured metadata is patchable too, with
     # the innehåll as one block element per line
@@ -218,7 +219,7 @@ def test_dv_notis_intermediate_and_patch(patches, monkeypatch, tmp_path):
     (tmp_path / "REG").mkdir()
     record = tmp_path / "REG" / "1996_not_1.xml"
     record.write_text(xml, encoding="utf-8")
-    monkeypatch.setattr(build, "dv_record", lambda bf: record)
+    monkeypatch.setattr(dv_paths, "record", lambda bf: record)
     assert patchsource.intermediate("dv", "RÅ 1996 not 1")[0] == xml
 
     patch.create_patch("dv", "RÅ 1996 not 1", xml, xml.replace("SECRET", "[X]"),
@@ -235,7 +236,7 @@ def test_dv_word_referat_has_no_patchable_intermediate(patches, monkeypatch,
     # read through POI, so there is no editable text form to diff against
     doc = tmp_path / "T 1-99.doc"
     doc.write_bytes(b"\xd0\xcf\x11\xe0")
-    monkeypatch.setattr(build, "dv_record", lambda bf: doc)
+    monkeypatch.setattr(dv_paths, "record", lambda bf: doc)
     with pytest.raises(SkipDocument):
         patchsource.intermediate("dv", "NJA 1999 s. 1")
 
@@ -245,8 +246,8 @@ def test_dv_intermediate_without_innehall_or_pdf(patches, monkeypatch, tmp_path)
     # cleanly rather than crash the editor on a None path
     record = tmp_path / "case.json"
     record.write_text('{"malNummerLista": ["B 1-11"]}', encoding="utf-8")
-    monkeypatch.setattr(build, "dv_record", lambda bf: record)
-    monkeypatch.setattr(build, "dv_verdict_pdf", lambda bf, rec: None)
+    monkeypatch.setattr(dv_paths, "record", lambda bf: record)
+    monkeypatch.setattr(dv_paths, "verdict_pdf", lambda bf, rec: None)
     with pytest.raises(SkipDocument):
         patchsource.intermediate("dv", "MDO 2002-7")
 

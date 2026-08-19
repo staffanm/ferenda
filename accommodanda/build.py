@@ -65,6 +65,7 @@ from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import legacy as dv_legacy
 from .dv import namedcases as dv_namedcases_mod
+from .dv import paths as dv_paths
 from .dv import render as dv_render
 from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
 from .edpb import download as edpb_download
@@ -1562,16 +1563,6 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
 
 
 @functools.cache
-def _dv_cases():
-    """canonical id -> index case, for every case with a parseable source:
-    an API record, or -- legacy-only -- a non-empty frozen original (Word
-    referat / imported notis XML)."""
-    cases = json.loads(DV_INDEX.read_text())
-    return {c["canonical_id"]: c for c in cases
-            if api_member(c) or dv_legacy.legacy_original(c)}
-
-
-@functools.cache
 def _dv_grupps():
     """gruppKorrelationsnummer -> canonical case id, for resolving curated
     related-case references whose fritext the citation grammar cannot read.
@@ -1583,18 +1574,6 @@ def _dv_grupps():
 @functools.cache
 def _dv_session():
     return dv_download.make_session(dv_download.USER_AGENT)
-
-
-def dv_member(basefile):
-    """The member record parse reads for a case: the API record when the case
-    has one, else the legacy original (a frozen Word referat or notis XML)."""
-    case = _dv_cases()[basefile]
-    return api_member(case) or dv_legacy.legacy_original(case)
-
-
-def dv_record(basefile):
-    # the identity index stores paths data_root-relative (portable); resolve here
-    return util.load_relpath(layout.DATA, dv_member(basefile)["path"])
 
 
 def dv_reconcile_artifacts():
@@ -1610,7 +1589,7 @@ def dv_reconcile_artifacts():
     so the referat's "Ursprunglig dom" link keeps working. Full-source parse only
     (the whole canonical set must be present to know what is stale). Returns the
     count removed."""
-    valid = {layout.artifact("dv", bf) for bf in _dv_cases()}
+    valid = {layout.artifact("dv", bf) for bf in dv_paths.cases()}
     removed = 0
     for path in layout.artifacts("dv"):     # logical .json paths, .br-resolved
         if path not in valid:
@@ -1629,7 +1608,7 @@ def dv_original_verdicts(basefile):
     download url the referat page links as "Ursprunglig dom". Empty when the case
     published straight to a referat (nothing was folded in)."""
     out = []
-    for m in _dv_cases()[basefile]["members"]:
+    for m in dv_paths.cases()[basefile]["members"]:
         if m["store"] != "domstol" or m.get("referat") or not m.get("bilagor"):
             continue
         member_path = util.load_relpath(layout.DATA, m["path"])
@@ -1647,29 +1626,16 @@ def dv_original_verdicts(basefile):
     return out
 
 
-def dv_verdict_pdf(basefile, record):
-    """The raw verdict's PDF attachment path (``{uuid}/{målnummer}.pdf``), or None
-    -- the body source when a not-yet-published HD/HFD decision carries no innehåll
-    HTML (R2). Stored plain (PDFs skip Brotli), so the path is resolved directly."""
-    for bilaga in record.get("bilagaLista") or []:
-        name = Path(bilaga.get("filnamn") or "").name
-        if name.lower().endswith(".pdf"):
-            pdf = dv_record(basefile).with_suffix("") / name
-            if pdf.exists():
-                return pdf
-    return None
-
-
 def dv_download_run(basefile):
     """Re-fetch one named case's API record (by the uuid the identity index
     already holds) and its attachments. New-case *discovery* is dv_harvest
     (bare `lagen dv download`) + identity reindex -- a case has no uuid to
     fetch until the harvest has seen it, so it can't enter through here."""
-    member = api_member(_dv_cases()[basefile])
+    member = api_member(dv_paths.cases()[basefile])
     assert member, ("%s is a legacy-only case: its frozen original is already "
                     "on disk and nothing upstream serves it" % basefile)
     record = dv_download.fetch_record(_dv_session(), member["uuid"])
-    out = dv_record(basefile)
+    out = dv_paths.record(basefile)
     util.write_atomic(out, json.dumps(
         record, ensure_ascii=False, indent=2).encode())
     dv_download.download_bilagor(_dv_session(), out.parent.parent, record,
@@ -1734,7 +1700,7 @@ def dv_reindex(args=()):
     print("dv reindex: %s" % summary)
     for warning in warnings:
         print("  !! %s" % warning)
-    _dv_cases.cache_clear()
+    dv_paths.cases.cache_clear()
     _dv_grupps.cache_clear()
 
 
@@ -1755,18 +1721,18 @@ def dv_namedcases(args=()):
 
 
 def dv_parse_run(basefile):
-    member = dv_member(basefile)
+    member = dv_paths.member(basefile)
     if member["store"] == "dv":   # legacy-only: frozen Word referat / notis XML
-        av = dv_legacy.parse_legacy_file(dv_record(basefile),
-                                         _dv_cases()[basefile])
+        av = dv_legacy.parse_legacy_file(dv_paths.record(basefile),
+                                         dv_paths.cases()[basefile])
         art = to_artifact(av, canonical_id=basefile, grupp_uris=_dv_grupps())
         art["label"] = casenaming.case_label(art)
         write_artifact("dv", basefile, art)
         return
-    record = compress.read_json(dv_record(basefile))
+    record = compress.read_json(dv_paths.record(basefile))
     # a not-yet-published HD/HFD verdict has no innehåll HTML -- only the court's
     # own PDF attachment; parse its body from that instead (R2)
-    pdf = None if record.get("innehall") else dv_verdict_pdf(basefile, record)
+    pdf = None if record.get("innehall") else dv_paths.verdict_pdf(basefile, record)
     av = (parse_pdf_record(record, pdf, basefile) if pdf
           else parse_api_record(record, basefile))
     # the case's public publication-search page is keyed by the record's
@@ -1787,11 +1753,11 @@ def dv_parse_run(basefile):
                    source_url=layout.dv_source_url(grupp) if grupp else None)
 
 
-SOURCES["dv"] = Source("dv", lambda: sorted(_dv_cases()), {
-    "download": Stage("download", dv_download_run, dv_record),
+SOURCES["dv"] = Source("dv", lambda: sorted(dv_paths.cases()), {
+    "download": Stage("download", dv_download_run, dv_paths.record),
     "parse": Stage("parse", dv_parse_run,
                    functools.partial(layout.artifact, "dv"),
-                   inputs=lambda bf: [dv_record(bf)] + _patch_input("dv", bf),
+                   inputs=lambda bf: [dv_paths.record(bf)] + _patch_input("dv", bf),
                    code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
    actions={"reindex": dv_reindex, "namedcases": dv_namedcases})

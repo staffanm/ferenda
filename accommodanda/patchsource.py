@@ -28,6 +28,7 @@ from .avg.download import (
     kkv_body_path,
 )
 from .avg.parse import kkv_html_text
+from .dv import paths as dv_paths
 from .dv.parse import record_intermediate as dv_record_intermediate
 from .edpb.download import pdf_path as edpb_pdf_path
 from .eurlex.parse import content_file, formex_intermediate, formex_members
@@ -62,14 +63,7 @@ def _dv_intermediate(basefile):
     notis XML for a legacy-only case. A legacy Word referat is read through POI
     and has no editable text form to diff against, the same as avg's two Word
     documents."""
-    # lazy: build imports this module (via api.patch), so a top-level
-    # `from .build import` would close a build->api.patch->patchsource->build
-    # cycle. The one sanctioned in-function import here (rule:no-infunction-imports).
-    from .build import (  # noqa: PLC0415 -- breaks the build import cycle
-        dv_record,
-        dv_verdict_pdf,
-    )
-    path = dv_record(basefile)
+    path = dv_paths.record(basefile)
     if path.suffix.lower() == ".xml":
         return path.read_text()
     if path.suffix.lower() != ".json":
@@ -82,7 +76,7 @@ def _dv_intermediate(basefile):
         # is what a patch targets (the PDF-bodied sources' intermediate). Some
         # ~290 cases have neither, which parse tolerates (they are metadata-only
         # entries): there is nothing to diff against.
-        pdf = dv_verdict_pdf(basefile, record)
+        pdf = dv_paths.verdict_pdf(basefile, record)
         if pdf is None:
             raise SkipDocument("%s: the record carries neither innehåll nor a "
                                "verdict PDF" % basefile)

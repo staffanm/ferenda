@@ -673,6 +673,28 @@ def test_a_big_response_is_not_copied_whole_to_classify_it(monkeypatch):
     assert hits[0]["action_name"] == "MCP/tools/call/get_document"
 
 
+def test_a_request_body_over_the_limit_is_refused_before_it_is_buffered(monkeypatch):
+    """The wrapper buffers the whole request body to describe and replay it, so
+    without a cap one caller decides how much memory the process spends. nginx
+    refuses more than 4 MiB in production, but a direct uvicorn has no such
+    front, which is what BODY_MAX covers."""
+    monkeypatch.setattr(mcpmod, "BODY_MAX", 64)
+    reached = []
+
+    async def app(scope, receive, send):
+        reached.append(scope["path"])
+        await receive()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    client = TestClient(mcpmod._LoggedMCP(app))
+    big = client.post("/mcp/", content=b'{"pad":"%s"}' % (b"x" * 200))
+    assert big.status_code == 413
+    assert reached == []                      # refused before the app saw it
+    small = client.post("/mcp/", content=b'{"jsonrpc":"2.0","id":1}')
+    assert small.status_code == 200 and reached == ["/mcp/"]
+
+
 def test_an_exception_inside_the_transport_is_counted_then_re_raised(monkeypatch):
     hits = []
 

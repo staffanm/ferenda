@@ -145,6 +145,20 @@ def test_pdf_data_uri_image_renders(client, tmp_path):
     assert r.status_code == 200 and r.content.startswith(b"%PDF-")
 
 
+def test_a_data_uri_keeps_its_content_type_and_both_encodings_decode():
+    """`_data_uri` replaced weasyprint's deprecated default_url_fetcher. Only the
+    base64 form is exercised by the render test above, and only the media type
+    was carried at first -- a `charset` dropped here makes WeasyPrint read the
+    payload as latin-1."""
+    b64 = pdf._data_uri("data:image/gif;base64,R0lGODlhAQABAAAAACw=")
+    assert b64.headers["content-type"] == "image/gif"
+    text = pdf._data_uri("data:text/plain;charset=utf-8,h%C3%A4r")
+    assert text.headers["content-type"] == 'text/plain; charset="utf-8"'
+    assert text._file_obj.read() == "här".encode()
+    bare = pdf._data_uri("data:,plain")
+    assert bare.headers["content-type"] == 'text/plain; charset="US-ASCII"'
+
+
 def test_pdf_result_is_cached_per_option_set(client, tmp_path):
     params = {"path": "/1998:9999", "toc": "1"}
     assert client.get("/api/v1/pdf", params=params).status_code == 200

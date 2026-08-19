@@ -749,6 +749,14 @@ def _called(msg):
 # cap is what keeps a 200k-character document from being copied to count it.
 CAPTURE_MAX = 64 * 1024
 
+# How large a request body this endpoint reads before refusing it. The
+# middleware buffers the whole body to describe and replay it, so without a cap
+# one caller decides how much memory the process spends. nginx already refuses
+# more than this in production (`client_max_body_size`), but the app must not
+# depend on nginx standing in front of it -- a direct uvicorn or another
+# deployment gets the same limit. An MCP call is a few kilobytes of JSON.
+BODY_MAX = 4 * 1024**2
+
 
 def _failed(status, body, truncated):
     """Whether an MCP response carries an error.
@@ -871,10 +879,27 @@ class _LoggedMCP:
 
         called, described, replay = None, "", None
         if method == "POST":
-            messages = []
+            messages, size = [], 0
             while True:
                 message = await receive()
                 messages.append(message)
+                size += len(message.get("body", b""))
+                if size > BODY_MAX:
+                    # the arrival/completion pair, kept: a request that answers
+                    # here still logs two lines under the same mcp[<n>], which is
+                    # what reading the log by request id depends on
+                    log.info("%s start body over %d bytes", common, BODY_MAX)
+                    log.info("%s done status=413 OVERSIZED-BODY", common)
+                    # `close`: the caller may still be sending, and a reset it
+                    # meets before reading the response turns a clean 413 into an
+                    # opaque transport error at the one caller we want to inform
+                    await send({"type": "http.response.start", "status": 413,
+                                "headers": [(b"content-type",
+                                             b"application/json; charset=utf-8"),
+                                            (b"connection", b"close")]})
+                    await send({"type": "http.response.body",
+                                "body": b'{"error": "request body too large"}'})
+                    return
                 if (message["type"] != "http.request"
                         or not message.get("more_body")):
                     break

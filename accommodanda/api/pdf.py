@@ -32,11 +32,12 @@ key means two readers of the same cold export share one render, and a large
 one runs as a background job the reader follows (``api/pdfjob.py``).
 """
 
+import base64
 import hashlib
 import json
 import os
 import re
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, unquote_to_bytes, urlsplit
 
 import lxml.html
 import weasyprint
@@ -505,6 +506,23 @@ def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
     return data
 
 
+def _data_uri(url):
+    """A ``data:`` URI decoded in place -- both its forms, base64 and
+    percent-encoded. WeasyPrint's own `default_url_fetcher` does this too, but it
+    is deprecated and goes away in WeasyPrint 69, so the decode is six lines here
+    rather than a dependency on a removed function. Everything before the comma
+    except the ``;base64`` marker *is* the content type, parameters included: a
+    `data:text/plain;charset=utf-8,...` that arrives with its charset removed is
+    read as latin-1."""
+    head, _, payload = url[len("data:"):].partition(",")
+    b64 = head.endswith(";base64")
+    body = base64.b64decode(payload) if b64 else unquote_to_bytes(payload)
+    return URLFetcherResponse(
+        url, body=body,
+        headers={"content-type": (head[:-len(";base64")] if b64 else head)
+                                 or "text/plain;charset=US-ASCII"})
+
+
 def _fetcher(subresource, failures):
     """A WeasyPrint url_fetcher that never touches the network: assets from
     lib/assets, data: URIs decoded in place, everything else from the
@@ -517,7 +535,7 @@ def _fetcher(subresource, failures):
 
     def fetch(url, timeout=None, ssl_context=None):
         if url.startswith("data:"):     # inline payload, nothing to fetch
-            return weasyprint.default_url_fetcher(url)
+            return _data_uri(url)
         u = urlsplit(url)
         try:
             if (u.scheme, u.netloc) != (site.scheme, site.netloc):
