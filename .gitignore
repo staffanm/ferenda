@@ -52,3 +52,7 @@ vendor/poi/*.jar
 
 # UX audit reports (screenshots + findings) -- not needed in the git repo
 /ux-audit/
+
+# Ad-hoc review output -- temporary, not part of the repo
+/code-review.md
+/docs/code-review-remediation-handover.md
