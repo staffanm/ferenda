@@ -6,8 +6,11 @@ curated datasets (sfs/data/namedlaws.json, eurlex/data/namedacts.json,
 dv/data/namedcases.json); no network, no OpenSearch, no catalog.
 """
 
+import threading
+
 from accommodanda.dv import namedcases
 from accommodanda.lib import resolve
+from accommodanda.lib.lagrum import LagrumParser
 
 # --- SFS: nickname/abbreviation + chapter/§ pinpoint, in ⌘K (law-first) order
 
@@ -99,6 +102,47 @@ def test_sfs_learned_alias_does_not_leak_from_earlier_query():
     assert (resolve.resolve_sfs("7 § hittepålagen (1999:123)")
             == "https://lagen.nu/1999:123#P7")
     assert resolve.resolve_sfs("9 § hittepålagen") is None
+
+
+def test_two_concurrent_queries_do_not_share_parser_state(monkeypatch):
+    """/search is a synchronous endpoint, so uvicorn serves it from a thread
+    pool. One shared parser then means one shared "samma lag": a query that
+    names no law picks up the law another thread taught, and returns a *wrong*
+    URI rather than an error. Each thread gets its own parser instead.
+
+    The two events force the interleaving that leaks. B resets first, then
+    waits; A resets and parses, which teaches its law; B parses last."""
+    b_reset, a_parsed = threading.Event(), threading.Event()
+    real_reset, real_parse = LagrumParser.reset, LagrumParser.parse_text
+
+    def reset(self):
+        real_reset(self)
+        if threading.current_thread().name == "B":
+            b_reset.set()
+        else:
+            assert b_reset.wait(5), "B never reset"
+
+    def parse_text(self, *args, **kwargs):
+        if threading.current_thread().name == "B":
+            assert a_parsed.wait(5), "A never parsed"
+        refs = real_parse(self, *args, **kwargs)
+        if threading.current_thread().name == "A":
+            a_parsed.set()
+        return refs
+
+    monkeypatch.setattr(LagrumParser, "reset", reset)
+    monkeypatch.setattr(LagrumParser, "parse_text", parse_text)
+    out = {}
+    threads = [threading.Thread(name=name, target=lambda n=name, q=query:
+                                out.__setitem__(n, resolve.resolve_sfs(q)))
+               for name, query in (("A", "12 kap. 1 § brottsbalken"),
+                                   ("B", "5 § samma lag"))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert out["A"] == "https://lagen.nu/1962:700#K12P1"
+    assert out["B"] is None          # B never named a law, so it resolves none
 
 
 # --- EU: short name + optional article -------------------------------------

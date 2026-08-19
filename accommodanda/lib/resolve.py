@@ -28,6 +28,7 @@ simply doesn't surface.
 
 import functools
 import re
+import threading
 
 from . import datasets
 from .coe import treaty_uri
@@ -46,23 +47,25 @@ from .lagrum import (
 # SFS -- nickname/abbr + chapter/§ pinpoint, in the order ⌘K users type
 # --------------------------------------------------------------------------
 
-@functools.cache
-def _sfs_parser():
-    """The cached citation parser. Construction (grammar + dataset loading) is
-    the expensive part, so it is cached; its *state* is stateful and leaks
-    across parse_text calls ("samma lag", learned aliases), so every query must
-    reset it first via `_fresh_sfs_parser` -- never call this directly."""
-    return LagrumParser(load_namedlaws(datasets.NAMEDLAWS), basefile="query",
-                        abbreviations=load_abbreviations(datasets.NAMEDLAWS))
+_parsers = threading.local()
 
 
 def _fresh_sfs_parser():
-    """The cached parser with a clean per-query state. The resolver treats each
-    ⌘K query as an independent one-shot citation, so state accumulated by an
-    earlier query (a named law for a later "samma lag", an alias taught by
-    "lagen (1999:123) om ...") must not leak into the next -- the same
-    reset-per-document pattern the verticals use before parsing a new document."""
-    parser = _sfs_parser()
+    """This thread's citation parser, with a clean per-query state. Construction
+    (grammar + dataset loading) is the expensive part, so each thread builds one
+    parser and keeps it. The parser is *stateful* and that state leaks across
+    parse_text calls ("samma lag", learned aliases), so the resolver -- which
+    treats each ⌘K query as an independent one-shot citation -- resets it before
+    every query, the same reset-per-document pattern the verticals use.
+
+    One parser per thread, not one shared cached parser: /search is a
+    synchronous endpoint, so FastAPI runs it in a thread pool and two concurrent
+    queries would otherwise reset each other's parse mid-flight."""
+    parser = getattr(_parsers, "sfs", None)
+    if parser is None:
+        parser = _parsers.sfs = LagrumParser(
+            load_namedlaws(datasets.NAMEDLAWS), basefile="query",
+            abbreviations=load_abbreviations(datasets.NAMEDLAWS))
     parser.reset()
     return parser
 
