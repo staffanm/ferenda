@@ -26,6 +26,7 @@ import re
 from ..lib import compress, layout
 from ..lib.eu_structure import CASELAW, doctype
 from ..lib.pinpoint import human_fragment
+from ..lib.text import runs_text
 
 # a trailing "Lag (2011:590)." / "Förordning (2019:12)." provenance marker: the
 # amendment that last touched the node, not part of its rule
@@ -53,15 +54,7 @@ def load(path):
     return compress.read_json(path)
 
 
-def _run_text(runs):
-    """One run list flattened. A run is either a bare string or a link/reference
-    object carrying its display text under ``text``."""
-    if isinstance(runs, str):
-        return runs
-    return "".join(r if isinstance(r, str) else r.get("text", "") for r in runs)
-
-
-def _runs_text(node):
+def _own_text(node):
     """The node's own inline text, table cells included.
 
     A table row (``rad``) holds ``cells``, and each cell is itself a *run list*,
@@ -69,8 +62,8 @@ def _runs_text(node):
     naive read of them come back empty. Cells are joined on a space because a
     cell boundary is a real one: run together, "dråp;" and "Mord" read as one
     word."""
-    return " ".join([_run_text(node.get("text") or ""),
-                     *(_run_text(cell) for cell in node.get("cells") or [])]).strip()
+    return " ".join([runs_text(node.get("text") or ""),
+                     *(runs_text(cell) for cell in node.get("cells") or [])]).strip()
 
 
 def _subtree_text(node):
@@ -86,7 +79,7 @@ def _subtree_text(node):
     function serves both and there is no pair to keep in lockstep."""
     if node.get("type") == "redaktionell":
         return ""
-    parts = [_runs_text(node)]
+    parts = [_own_text(node)]
     for child in node.get("children") or []:
         parts.append(_subtree_text(child))
     return " ".join(p for p in parts if p)
@@ -124,7 +117,7 @@ def scan_sfs(path):
         kind = node.get("type")
         if kind == "redaktionell":
             return          # the publisher's note, not the statute's text
-        chars += len(_runs_text(node))
+        chars += len(_own_text(node))
         if kind == "kapitel":
             kapitel += 1
         elif kind == "stycke":
@@ -337,7 +330,7 @@ def scan_forarbete(path):
 
     def walk(node):
         nonlocal chars
-        chars += len(_runs_text(node))
+        chars += len(_own_text(node))
         for child in node.get("children") or []:
             walk(child)
 
@@ -357,7 +350,7 @@ def scan_dv(path):
 
     def walk(node):
         nonlocal chars
-        chars += len(_runs_text(node))
+        chars += len(_own_text(node))
         for child in node.get("children") or []:
             walk(child)
 

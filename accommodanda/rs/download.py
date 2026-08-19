@@ -102,6 +102,7 @@ from ..lib.pdftext import pdf_first_page_text
 from ..lib.util import (
     Reporter,
     document_extension,
+    element_text,
     href,
     normalize_space,
     swedish_date,
@@ -114,9 +115,6 @@ from .agencies import BROWSER_ORGS, BY_ORG, DEFAULT_ORGS, number_slug
 # --------------------------------------------------------------------------
 
 IMY_BASE = "https://www.imy.se"
-# imy.se sets its headings with soft hyphens: a line-breaking hint, invisible on
-# the page but not in a stored title or a search index
-RE_IMY_SOFT_HYPHEN = re.compile("[­​]")
 RE_IMY_NUMBER = re.compile(r"IMYRS\s*(\d{4}:\d+)")
 # where the page stops being about *this* statement and starts being about the
 # series: IMY closes every publication page with the same two blocks
@@ -234,12 +232,6 @@ def _walk(root, records, session, delay, full, limit, scope, fetch=True,
 # IMY
 # --------------------------------------------------------------------------
 
-def imy_text(element):
-    """An imy.se element's display text, stripped of the soft hyphens the CMS
-    sets its headings with."""
-    return RE_IMY_SOFT_HYPHEN.sub(
-        "", normalize_space(element.get_text(" ", strip=True)))
-
 
 def imy_parse_listing(html_text):
     """The listing's entries: {titel, nummer, url} per info block. Pure over the
@@ -253,10 +245,10 @@ def imy_parse_listing(html_text):
         anchor = block.find("a", href=True)
         assert heading is not None and anchor is not None, \
             "imy.se ställningstagande block has no heading or link"
-        number = RE_IMY_NUMBER.search(imy_text(anchor))
+        number = RE_IMY_NUMBER.search(element_text(anchor))
         assert number, ("imy.se ställningstagande %r names no IMYRS number"
-                        % imy_text(heading))
-        items.append({"titel": imy_text(heading), "nummer": number.group(1),
+                        % element_text(heading))
+        items.append({"titel": element_text(heading), "nummer": number.group(1),
                       "url": urljoin(IMY_BASE, href(anchor))})
     return items
 
@@ -272,10 +264,10 @@ def imy_parse_page(html_text, url):
     summary = []
     for el in main.find_all(["h2", "h3", "p"]):
         if el.name != "p":
-            if imy_text(el).lower().startswith(IMY_BOILERPLATE):
+            if element_text(el).lower().startswith(IMY_BOILERPLATE):
                 break
             continue
-        text = imy_text(el)
+        text = element_text(el)
         if text:
             summary.append(text)
     document = next((urljoin(url, href(a)) for a in main.find_all("a", href=True)

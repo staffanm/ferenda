@@ -33,6 +33,7 @@ import re
 from pathlib import Path
 
 from ..lib import compress
+from ..lib.emdref import fold_party_name
 from ..lib.lagrum import ECHR_BASE, Ref, yield_overlaps
 from ..lib.util import normalize_space
 from .model import document_kind, record_date
@@ -65,13 +66,6 @@ APPLICANT_WINDOW = 60
 RESPONDENT_WINDOW = 45
 
 
-def _norm(name):
-    """One party name, comparable across a title's caps and a citation's mixed
-    case: casefolded, determiners dropped, punctuation-insensitive."""
-    name = normalize_space(name).casefold().replace("the ", " ")
-    return re.sub(r"[^\w]+", " ", name).strip()
-
-
 @functools.lru_cache(maxsize=1)
 def index(root):
     """The held corpus, keyed for both matchers: ``by_no[appno]`` and
@@ -93,7 +87,8 @@ def index(root):
         m = RE_TITLE.match(normalize_space(record.get("docname") or ""))
         key = None
         if m:
-            key = (_norm(m.group("applicant")), _norm(m.group("respondent")),
+            key = (fold_party_name(m.group("applicant")),
+                   fold_party_name(m.group("respondent")),
                    m.group("serial") or "")
             by_name.setdefault(key, []).append(entry)
             respondents.add(key[1])
@@ -154,7 +149,7 @@ def _name_refs(text, own, by_name, respondents, own_key):
         # its determiner included in the span but not the key
         after = text[m.end():m.end() + RESPONDENT_WINDOW]
         resp = next((cut for cut in range(len(after), 0, -1)
-                     if _norm(after[:cut]) in respondents
+                     if fold_party_name(after[:cut]) in respondents
                      and (cut == len(after) or not after[cut].isalnum())), None)
         if resp is None:
             continue
@@ -164,7 +159,7 @@ def _name_refs(text, own, by_name, respondents, own_key):
         before = text[max(0, m.start() - APPLICANT_WINDOW):m.start()]
         found = None
         for cut in [0] + [w.end() for w in re.finditer(r"[\s(]", before)]:
-            key = (_norm(before[cut:]), _norm(after[:resp]),
+            key = (fold_party_name(before[cut:]), fold_party_name(after[:resp]),
                    serial.group(1) if serial else "")
             if before[cut:].strip() and key in by_name:
                 found = (cut, key)

@@ -21,9 +21,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
     "Topic :: Text Processing",
@@ -143,7 +141,7 @@ zip-safe = false
 #   uv run ty check accommodanda
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py314"
 # Only the rebuilt package; never lint the legacy tree.
 include = ["accommodanda/**/*.py"]
 extend-exclude = ["ferenda", "lagen", "site", "doc", "tools", "test"]

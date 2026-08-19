@@ -153,6 +153,8 @@ from ..lib.util import (
     Reporter,
     basefile_slug,
     document_extension,
+    element_text,
+    normalize_hints,
     normalize_space,
     record_path,
 )
@@ -264,9 +266,6 @@ RE_IMY_ISODATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # unambiguous; the pre-2018 header labels nothing and puts the decision date
 # first, immediately after the "Diarienr" column head
 RE_IMY_DATUM = re.compile(r"Datum:\s*(\d{4}-\d{2}-\d{2})")
-# imy.se sets its headings with soft hyphens ("Dataskyddsom\xadbudens roll"):
-# a rendering hint that must not reach a stored title or a search index
-RE_IMY_SOFT_HYPHEN = re.compile("[­​]")
 # the file-size trailer EPiServer appends to every document link's text
 RE_IMY_FILEINFO = re.compile(r"\s*\((?:pdf|docx?)[^)]*\)\s*$", re.I)
 # the verbiage a prose document link opens with, so what is left is the thing
@@ -656,15 +655,6 @@ def imy_asset_name(url):
     return name[:-len(".aspx")] + ".pdf" if name.endswith(".aspx") else name
 
 
-def imy_text(element):
-    """An imy.se element's display text: whitespace-collapsed, and stripped of
-    the soft hyphens the CMS sets its headings with. They are line-breaking
-    hints, invisible on the page but not in a stored title or a search index --
-    "Dataskyddsom\xadbudens roll" must be filed as "Dataskyddsombudens roll"."""
-    return RE_IMY_SOFT_HYPHEN.sub(
-        "", normalize_space(element.get_text(" ", strip=True)))
-
-
 def imy_document_title(anchor, text):
     """A document's title. The common "Beslut" card states it as the enclosing
     info-block's heading; the pages that decide several ärenden list their
@@ -674,7 +664,7 @@ def imy_document_title(anchor, text):
     block = anchor.find_parent(class_="imy-info-block")
     heading = block.find(class_="imy-info-block__heading") if block else None
     if heading is not None:
-        return imy_text(heading)
+        return element_text(heading)
     return RE_IMY_LINK_LEAD.sub("", RE_IMY_FILEINFO.sub("", text)) or text
 
 
@@ -696,10 +686,10 @@ def imy_parse_listing(html_text):
         status = anchor.find(class_="imy-search-hit__detail-text")
         items.append({
             "slug": imy_slug(url), "url": url,
-            "title": imy_text(heading),
-            "status": imy_text(status) if status else None,
+            "title": element_text(heading),
+            "status": element_text(status) if status else None,
             "kategorier": list(dict.fromkeys(
-                imy_text(c) for c in
+                element_text(c) for c in
                 anchor.select(".imy-search-hit__category-item-link")))})
     return items, int(pagecount.group(1))
 
@@ -751,7 +741,7 @@ def imy_praxis_fields(paragraph):
     field, which has to be looked at rather than guessed past."""
     fields = {}
     for strong in paragraph.find_all("strong"):
-        label = imy_text(strong).rstrip(":").lower()
+        label = element_text(strong).rstrip(":").lower()
         key = next((k for stem, k in IMY_PRAXIS_FIELDS if label.startswith(stem)),
                    None)
         assert key, "imy.se praxisbeslut carries an unknown field %r" % label
@@ -764,8 +754,7 @@ def imy_praxis_fields(paragraph):
             if sibling.name != "br":
                 value.append(sibling.get_text(" ", strip=True)
                              if sibling.name else str(sibling))
-        fields[key] = RE_IMY_SOFT_HYPHEN.sub(
-            "", normalize_space("".join(value))).lstrip(": ")
+        fields[key] = normalize_hints("".join(value)).lstrip(": ")
     return fields
 
 
@@ -783,16 +772,16 @@ def imy_parse_praxis(html_text, guid_map):
     curated, amne = {}, None
     for el in main.find_all(["h3", "div"]):
         if el.name == "h3":
-            amne = imy_text(el)
+            amne = element_text(el)
             continue
         if "imy-expandable-box" not in (el.get("class") or []):
             continue
         heading = el.find(class_="imy-expandable-box__heading")
         assert heading is not None, "imy.se praxis box has no heading"
         labelled = [p for p in el.find_all("p") if p.find("strong")]
-        entry = {"amne": amne, "rubrik": imy_text(heading),
+        entry = {"amne": amne, "rubrik": element_text(heading),
                  "sammanfattning": normalize_space(" ".join(
-                     imy_text(p) for p in el.find_all("p")
+                     element_text(p) for p in el.find_all("p")
                      if p not in labelled))}
         if labelled:
             entry.update(imy_praxis_fields(labelled[-1]))
@@ -815,7 +804,7 @@ def imy_parse_sanktion(html_text, guid_map):
         slugs = imy_curated_slugs(anchor, guid_map)
         if not slugs:
             continue
-        text = imy_text(anchor).replace("\xa0", " ")
+        text = element_text(anchor).replace("\xa0", " ")
         _who, sep, belopp = text.rpartition(": ")
         assert sep, "imy.se sanktionsavgift entry %r names no amount" % text
         for slug in slugs:
@@ -836,10 +825,10 @@ def imy_page_metadata(landing_html):
     step = soup.select_one(".imy-status-in-process__visualization-item--current"
                            " .imy-status-in-process__heading")
     summary = soup.select_one(".imy-status-in-process__description")
-    return {"titel": imy_text(heading),
-            "ingress": imy_text(ingress) if ingress else None,
-            "status": imy_text(step) if step else None,
-            "sammanfattning": imy_text(summary) if summary else None}
+    return {"titel": element_text(heading),
+            "ingress": element_text(ingress) if ingress else None,
+            "status": element_text(step) if step else None,
+            "sammanfattning": element_text(summary) if summary else None}
 
 
 def imy_documents(landing_html):
@@ -859,7 +848,7 @@ def imy_documents(landing_html):
         href = str(anchor["href"])
         if not (href.lower().endswith(".pdf") or anchor.get("data-type") == "DOC"):
             continue
-        text = imy_text(anchor)
+        text = element_text(anchor)
         if not href.startswith(("/", "http")):
             print("imy: document link %r has no target, skipping" % text,
                   flush=True)

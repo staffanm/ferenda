@@ -443,6 +443,28 @@ def normalize_space(s: str) -> str:
     return " ".join((s or "").split())
 
 
+# the invisible line-breaking hints a CMS sets its headings with: a soft hyphen
+# and a zero-width space
+RE_BREAK_HINT = re.compile("[\u00ad\u200b]")
+
+
+def normalize_hints(s: str) -> str:
+    """Whitespace-collapsed and stripped, with the line-breaking hints removed.
+    They are invisible on the page but not in a stored title or a search index --
+    imy.se writes "Dataskyddsom\xadbudens roll", which must be filed as
+    "Dataskyddsombudens roll"."""
+    return RE_BREAK_HINT.sub("", normalize_space(s))
+
+
+def element_text(element) -> str:
+    """A parsed HTML element's display text, through `normalize_hints`. Shared by
+    every scraper that reads a heading or a label off a CMS page. `element` is a
+    `bs4.Tag` at every call site, but the parameter is left unannotated on
+    purpose: this module is pure stdlib, and importing bs4 for one annotation
+    would put a parser behind every import of util."""
+    return normalize_hints(element.get_text(" ", strip=True))
+
+
 def normalize_fold(s: str) -> str:
     """Whitespace-collapsed, stripped and case-folded -- the matching key for
     comparing titles/headings/terms case- and spacing-insensitively while the

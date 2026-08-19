@@ -665,7 +665,7 @@ def test_imy_document_title_peels_the_link_verbiage():
     def title(html):
         anchor = BeautifulSoup(html, "html.parser").find("a")
         return avg_download.imy_document_title(
-            anchor, avg_download.imy_text(anchor))
+            anchor, avg_download.element_text(anchor))
     assert title('<a href="/x.pdf">Läs beslutet mot Hemköp (pdf, 109 kB)</a>') \
         == "Hemköp"
     assert title('<a href="/x.pdf">Beslut i tillsyn mot Försäkringskassan '

@@ -50,9 +50,11 @@ RE_DATE_AFTER = re.compile(r"[^.;()]{0,60}?" + _DATE)
 RE_DATE_BEFORE = re.compile(_DATE + r"[^.;()]{0,60}$")
 
 
-def _norm(name):
-    """hudoc.citations' name folding, which the snapshot keys are built with:
-    casefolded, determiners dropped, punctuation-insensitive."""
+def fold_party_name(name):
+    """One party name, comparable across a title's caps and a citation's mixed
+    case: casefolded, determiners dropped, punctuation-insensitive. The snapshot
+    keys here and the hudoc citation matcher are both built with it, so it lives
+    on this side -- lib never imports a vertical (rule:lib-never-imports-vertical)."""
     name = normalize_space(name).casefold().replace("the ", " ")
     return re.sub(r"[^\w]+", " ", name).strip()
 
@@ -145,7 +147,7 @@ def _name_refs(text, base, by_name, respondents_sv):
             if not before[cut:].strip():
                 continue
             for rk in resp_keys:
-                key = (_norm(before[cut:]), rk,
+                key = (fold_party_name(before[cut:]), rk,
                        serial.group(1) if serial else "")
                 if key in by_name:
                     found = (cut, key)

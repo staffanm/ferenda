@@ -56,7 +56,7 @@ def test_table_cells_count_as_text(tmp_path):
     # whose whole body is a table measures the length of its stem alone
     rad = {"type": "rad", "cells": [["ordförande:"],
                                     ["den som leder ", {"text": "nämnden"}]]}
-    assert scan._runs_text(rad) == "ordförande: den som leder nämnden"
+    assert scan._own_text(rad) == "ordförande: den som leder nämnden"
 
     art = law([paragraf("1", [
         {"type": "stycke", "text": "I denna lag betyder"},
