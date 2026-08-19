@@ -355,3 +355,24 @@ minutes. A weekly run costs the register plus what moved. The first run takes
 ~15 hours, so slice it with `--limit N` and let the next run resume. Nothing is
 stranded — a run stores a record only once its page is on disk. Run both browser
 jobs **one at a time**: they share the process-global `DISPLAY`.
+
+### Evicting the facsimile cache
+
+`data/cache/facsimile` holds the page PNGs `lib/facsimile` renders on demand.
+It is a **pure cache**. Nothing else reads it. A deleted file is re-rendered on
+the next request, in about half a second. Eviction is therefore a crontab line,
+by age, as the legacy tree does it — not code:
+
+```sh
+0 1 * * * find <data_root>/cache/facsimile -name "*.png" -mtime +15 -delete
+```
+
+The legacy line covers `/mnt/data/lagen/data/*/intermediate` only. It does not
+reach this tree. On the live box `<data_root>` is `/mnt/forstor/accommodanda`.
+Measured 2026-08-19: 245 PNGs, 34 MB. There is no pressure yet, so the line is
+written down here and not installed.
+
+Its siblings under `cache/` are not pure caches on the same terms.
+`cache/pdfconv` (9.9 GB) holds the poppler conversions the parsers read. A lost
+entry costs a re-conversion during a build, not during a request. Do not point
+the same `find` at it.
