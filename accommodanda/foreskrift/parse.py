@@ -40,7 +40,7 @@ from ..lib.lagrum import (
     sfs_parser,
 )
 from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
-from ..lib.util import MONTHS, approximate_date, fold_swedish
+from ..lib.util import MONTHS, approximate_date, confine, fold_swedish
 from .agencies import AAFS_SERIES, REGISTRY
 from .model import Amendment, Consolidation, Regulation, regulation_uri
 from .structure import nest
@@ -732,8 +732,10 @@ def amendment_uri(identifier):
 
 def body_path(root, fs, entry):
     """Absolute path of a body PDF a record's ``files`` entry references, stored
-    under ``root/fs/<name>``."""
-    return Path(root) / fs / entry["name"]
+    under ``root/fs/<name>``. `fs` comes off the basefile and `name` off the
+    harvested record, so neither is trusted to stay under `root`."""
+    return Path(root) / confine(Path(fs) / entry["name"],
+                                "%s/%s" % (fs, entry["name"]), str(root))
 
 
 def parse_record(record, root):

@@ -25,7 +25,7 @@ from urllib.parse import quote, unquote
 from .. import config
 from . import compress
 from .catalog import BASE, local, strip_fragment
-from .util import basefile_slug
+from .util import basefile_slug, confine
 
 DATA = config.DATA
 GENERATED = DATA / "generated"
@@ -111,7 +111,9 @@ GUIDANCE_INDEX = ARTIFACT / "kommentar" / "guidance-index.json"  # AI-guidance i
 
 def _sfs_parts(basefile):
     year, nr = basefile.split(":", 1)
-    return year, nr.replace(" ", "_")
+    nr = nr.replace(" ", "_")
+    confine(Path(year) / nr, basefile, "sfs")     # both halves become segments
+    return year, nr
 
 
 def _alnum_slug(s):
@@ -150,7 +152,13 @@ def kommentar_host(basefile: str) -> str:
 
 def relpath(source: str, basefile: str) -> Path:
     """The filesystem-safe storage sub-path of a document, shared by its
-    downloaded and artifact trees where both are rule-based."""
+    downloaded and artifact trees where both are rule-based. The result is
+    confined to the source's own tree (`_confine`); half the sources below put
+    the basefile into the path verbatim."""
+    return confine(_relpath(source, basefile), basefile, source)
+
+
+def _relpath(source: str, basefile: str) -> Path:
     if source == "sfs":
         year, nr = _sfs_parts(basefile)
         return Path(year) / nr
@@ -184,7 +192,7 @@ def relpath(source: str, basefile: str) -> Path:
         # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
         # SFS 2009:400 and one on a same-slug act in another source never collide
         host = kommentar_host(basefile)
-        return Path(host) / relpath(host, basefile)
+        return Path(host) / _relpath(host, basefile)
     if source == "begrepp":
         # concept names are their own namespace (no host); keep the flat slug
         return Path(_alnum_slug(basefile))
@@ -413,8 +421,10 @@ def sfs_version_file(stage_dir: Path, basefile: str, version: str) -> Path:
     root = _sfs_version_dir(stage_dir, basefile)
     if ":" in version:
         vyear, vnr = version.split(":", 1)
-        return root / vyear / ("%s.json" % vnr.replace(" ", "_"))
-    return root / ("%s.json" % version.replace(" ", "_"))
+        return root / confine(Path(vyear) / ("%s.json" % vnr.replace(" ", "_")),
+                              version, "sfs archive")
+    return root / confine(Path("%s.json" % version.replace(" ", "_")),
+                          version, "sfs archive")
 
 
 def sfs_archive_version_download(destdir, basefile, version):
@@ -519,7 +529,8 @@ def fa_dir(root: Path | str, typ: str, ident: str) -> Path:
     test/scratch root); `ident` the per-type basefile (``2021:82`` or its slug),
     off which the year is read. Record and files live together, so a bare `files`
     name still resolves beside its record after segmentation."""
-    return Path(root) / typ / _fa_year(basefile_slug(ident))
+    return Path(root) / confine(Path(typ) / _fa_year(basefile_slug(ident)),
+                                "%s/%s" % (typ, ident), "forarbete")
 
 
 def fa_record_file(root: Path | str, typ: str, ident: str) -> Path:
@@ -630,7 +641,8 @@ def remisser_arende(basefile: str) -> Path:
     ``<id-slug>/`` dir). `basefile` is the referred document's own identity,
     ``"<typ>/<identifier>"`` (``"sou/2026:14"``, ``"pm/LI2026/01339"``)."""
     typ, ident = basefile.split("/", 1)
-    return REMISSER_DOWNLOADED / typ / (basefile_slug(ident) + ".json")
+    return REMISSER_DOWNLOADED / confine(
+        Path(typ) / (basefile_slug(ident) + ".json"), basefile, "remisser")
 
 
 def remisser_answer(arende_basefile: str, org_slug: str) -> Path:
@@ -639,7 +651,9 @@ def remisser_answer(arende_basefile: str, org_slug: str) -> Path:
     rule the artifact tree uses (`relpath`), so record, PDF and artifact all
     agree on where a given answer lives."""
     typ, ident = arende_basefile.split("/", 1)
-    return REMISSER_DOWNLOADED / typ / basefile_slug(ident) / (org_slug + ".pdf")
+    return REMISSER_DOWNLOADED / confine(
+        Path(typ) / basefile_slug(ident) / (org_slug + ".pdf"),
+        arende_basefile, "remisser")
 
 
 # the bookkeeping of which regeringen.se remiss *ärende pages* have been examined,

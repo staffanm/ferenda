@@ -122,9 +122,25 @@ def href(anchor):
     return value
 
 
+def confine(rel: Path, basefile: str, tree: str) -> Path:
+    """`rel`, refused if it leaves `tree`. A basefile is untrusted where a
+    request supplies one: the /patch editor reads it out of a request body, and
+    the path builders put it into a path -- several of them verbatim. A `..`
+    segment or a leading slash would place the file outside the tree the caller
+    then joins it onto. Lives here, not in `layout`, because `layout`, `harvest`
+    and the foreskrift body path all build one and all import util. An escaping
+    basefile is malformed input, not a server fault: ValueError."""
+    if rel.is_absolute() or ".." in rel.parts:
+        raise ValueError("basefile %r leaves the %s tree" % (basefile, tree))
+    return rel
+
+
 def record_path(root: Path | str, subdir: str, basefile: str) -> Path:
-    """The harvest-record JSON path for `basefile` under `root/subdir`."""
-    return Path(root) / subdir / (basefile_slug(basefile) + ".json")
+    """The harvest-record JSON path for `basefile` under `root/subdir`. `subdir`
+    is the basefile's own leading segment at every call site, so it is confined
+    against `root` here."""
+    return Path(root) / confine(Path(subdir) / (basefile_slug(basefile) + ".json"),
+                                basefile, str(root))
 
 
 def document_extension(data: bytes) -> str | None:

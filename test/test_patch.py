@@ -21,7 +21,8 @@ from accommodanda.api import patch as patch_api
 from accommodanda.dv import legacy as dv_legacy
 from accommodanda.dv import parse as dv_parse
 from accommodanda.eurlex import parse as eurlex_parse
-from accommodanda.lib import layout, markup, patch, pdftext
+from accommodanda.foreskrift import parse as fs_parse
+from accommodanda.lib import harvest, layout, markup, patch, pdftext, util
 from accommodanda.lib.errors import SkipDocument
 
 ORIG = "line one\nSECRET NAME\nline three\nline four\n"
@@ -585,6 +586,70 @@ def test_web_disabled_without_secret(webenv, monkeypatch):
     c = TestClient(api.app)
     assert c.get("/api/v1/patch/document",
                  params={"source": "sfs", "basefile": "1999:175"}).status_code == 403
+
+
+# --------------------------------------------------------------------------
+# a basefile stays inside its own tree
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("source,basefile", [
+    ("sfs", "../../artifact/sfs/2020:123"),      # the split puts ".." in the year
+    ("hudoc", "../../../etc/passwd"),            # used verbatim as the path
+    ("site", "/etc/passwd"),                     # absolute: the join drops the root
+    ("forarbete", "prop/../../../x"),
+])
+def test_a_basefile_cannot_leave_its_tree(source, basefile):
+    """`basefile` is untrusted: /patch reads it out of a request body. The
+    refusal lives in `util.confine`, which `relpath` calls, so the artifact and
+    downloaded trees are covered at once. (`layout.patch` is the same basefile
+    through `relpath`; the route test below covers that end.)"""
+    with pytest.raises(ValueError, match="leaves the"):
+        layout.relpath(source, basefile)
+
+
+@pytest.mark.parametrize("call", [
+    lambda: layout.sfs_source("../../../../etc/x:passwd"),
+    lambda: layout.sfs_sfst("../../x:1"),
+    lambda: layout.sfs_sfsr("../../x:1"),
+    lambda: layout.sfs_pdf("../../x:1"),
+    lambda: layout.sfs_version_file(pathlib.Path("/d"), "1999:175", "../../x:1"),
+    lambda: layout.sfs_version_file(pathlib.Path("/d"), "1999:175", "../11"),
+    lambda: layout.fa_record("../../x/y"),
+    lambda: layout.fa_dir("/d", "..", "2021:82"),
+    lambda: layout.remisser_arende("../../x/y"),
+    lambda: layout.remisser_answer("../x/y", "org"),
+    lambda: harvest.pdf_path("/d", "../x"),
+    lambda: harvest.page_path("/d", "../x"),
+    lambda: util.record_path("/d", "..", "x"),
+    lambda: fs_parse.body_path("/d", "..", {"name": "x.pdf"}),
+])
+def test_a_builder_that_splits_the_identifier_itself_also_confines_it(call):
+    """These paths do not go through `relpath` -- each splits the identifier
+    itself. That is the *read* side of the same untrusted string: `patchsource`
+    hands the /patch basefile straight to `layout.sfs_source`, so a confined
+    write side alone would still let the editor read a file outside the tree.
+    The archive version id and a foreskrift record's file name are not
+    basefiles, but they become path segments the same way."""
+    with pytest.raises(ValueError, match="leaves the"):
+        call()
+
+
+def test_the_patch_editor_writes_nothing_outside_the_patch_tree(webenv):
+    """The same input through the route. It is an editor-only endpoint, so this
+    is not an anonymous hole -- but a patch is committed and reparsed, and one
+    written above the tree would land in the checkout's own source."""
+    repo, reparsed = webenv
+    c = TestClient(api.app)
+    _login(c)
+    escaping = {"source": "sfs", "basefile": "../../accommodanda/config"}
+    # the load looks for an existing patch first, and that lookup is the refusal
+    assert c.get("/api/v1/patch/document", params=escaping).status_code == 404
+    r = c.post("/api/v1/patch/save",
+               json={**escaping, "edited_text": EDITED, "description": "",
+                     "obfuscated": False, "base_sha": "0" * 64})
+    assert r.status_code == 404
+    assert reparsed == []
+    assert list((repo / "patches").rglob("*")) == []
 
 
 # --------------------------------------------------------------------------

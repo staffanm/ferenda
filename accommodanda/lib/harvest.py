@@ -54,6 +54,7 @@ from . import compress, net
 from .util import (
     Reporter,
     basefile_slug,
+    confine,
     document_extension,
     record_path,
     write_atomic,
@@ -399,16 +400,18 @@ Pending = tuple[dict, Callable[[], bytes | str] | None]
 def pdf_path(root: Path | str, basefile: str) -> Path:
     """The document PDF beside its harvest record ("fk/2025:01" ->
     ``<root>/fk/fk-2025-01.pdf``)."""
-    return (Path(root) / basefile.split("/", 1)[0]
-            / (basefile_slug(basefile) + ".pdf"))
+    return Path(root) / confine(Path(basefile.split("/", 1)[0])
+                                / (basefile_slug(basefile) + ".pdf"),
+                                basefile, str(root))
 
 
 def page_path(root: Path | str, basefile: str) -> Path:
     """The document's own web page beside its harvest record ("skv/8-492402" ->
     ``<root>/skv/skv-8-492402.html``), for a source whose publisher issues the
     document *as* a page rather than as a PDF."""
-    return (Path(root) / basefile.split("/", 1)[0]
-            / (basefile_slug(basefile) + ".html"))
+    return Path(root) / confine(Path(basefile.split("/", 1)[0])
+                                / (basefile_slug(basefile) + ".html"),
+                                basefile, str(root))
 
 
 def verify_pdf(data: bytes | str) -> None:
