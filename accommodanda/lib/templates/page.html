@@ -16,19 +16,36 @@
     bar's Sök button (different sizes) so the two can't drift apart -#}
 <svg width="{{ size }}" height="{{ size }}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><path d="M11 11l4 4"></path></svg>
 {%- endmacro -%}
+{%- macro site_mark() -%}
+{#- the lagen.nu mark: the section sign drawn as four nodes on one axis, the
+    two inner ones filled with the link colour. aria-hidden like the magnifier
+    above: the h1 beside it already says lagen.nu, and so does the masthead. It takes its colours from the
+    page tokens (--ink, --accent, --bg), so it follows the theme; the standalone
+    copy in assets/favicon.svg carries the same geometry with literal colours.
+    The `bg` strokes are the light channel along the axis, so they must be the
+    page background, not `none`. -#}
+<svg class="site-mark" viewBox="-24.96 -54.96 49.91 109.91" aria-hidden="true"><g fill="none" stroke="var(--ink)" stroke-width="12.5" stroke-linecap="butt"><path d="M 0 -15 A 15 15 0 1 1 0 15 A 15 15 0 1 1 0 -15"></path><path d="M 4.834 -44.200 A 15 15 0 1 0 0 -15"></path><path d="M -4.834 44.200 A 15 15 0 1 0 0 15"></path></g><circle cx="3.791" cy="-14.513" r="10" fill="none" stroke="var(--bg)" stroke-width="7.5"></circle><circle cx="-3.791" cy="14.513" r="10" fill="none" stroke="var(--bg)" stroke-width="7.5"></circle><circle cx="3.791" cy="-14.513" r="6.25" fill="var(--accent)"></circle><circle cx="-3.791" cy="14.513" r="6.25" fill="var(--accent)"></circle><circle cx="10.607" cy="-40.607" r="10" fill="none" stroke="var(--accent)" stroke-width="7.5"></circle><circle cx="-10.607" cy="40.607" r="10" fill="none" stroke="var(--accent)" stroke-width="7.5"></circle></svg>
+{%- endmacro -%}
 {%- macro frontmatter() -%}
 {#- id="top": the TOC's first entry (the document's short id) points here, so
     the reader can get back to the head of the document from anywhere. Panes in
     the split view each carry one; popover.js resolves a #hash inside its own
     pane, and the browser's own "top" fragment covers the case with no header. -#}
-<header class="frontmatter" id="top">
+<header class="frontmatter{% if mark %} branded{% endif %}" id="top">
+  {#- `mark` is the frontpage: the mark hangs in the reading column's left
+      margin, beside the eyebrow + h1 stack, so the two are one lockup -#}
+  {%- if mark %}{{ site_mark() }}<div class="branded-text">{% endif -%}
   {%- if eyebrow %}<div class="eyebrow">{{ eyebrow }}</div>{% endif -%}
   {#- a page whose body carries its own heading (the browse listing) gets no
       second h1 here -#}
   {%- if not own_h1 %}<h1>{{ title_html or title }}</h1>{% endif -%}
   {%- if subtitle %}<p class="subtitle">{{ subtitle }}</p>{% endif -%}
   {%- if summary_text %}<p class="sammanfattning">{{ summary_text }}</p>{% endif -%}
-  {{ summary }}{{ meta }}</header>
+  {{ summary }}{{ meta }}
+  {#- the wrapper closes around the whole text stack, not just the h1: everything
+      the frontmatter holds is the mark's one flex neighbour -#}
+  {%- if mark %}</div>{% endif -%}
+</header>
 {%- endmacro -%}
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
@@ -37,6 +54,9 @@
 {{ head }}
 <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head><body class="gr-root{{ body_class }}">
 <header class="masthead"><div class="mast-inner"><a class="brand" href="/">lagen<em>.nu</em></a><button class="search" type="button" data-search>
   {{- search_icon(15) -}}

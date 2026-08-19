@@ -3,12 +3,14 @@
 against a small fixture site/ tree under test/files/sitecontent/."""
 
 import json
+import re
 import xml.dom.minidom as minidom
 from pathlib import Path
 
 import pytest
 
 from accommodanda.lib import compress, markdown
+from accommodanda.lib import render as lib_render
 from accommodanda.site import parse, render
 
 FIX = str(Path(__file__).resolve().parent / "files" / "sitecontent")
@@ -203,6 +205,44 @@ def test_frontpage_render_links_and_masthead():
     assert 'href="/1949:381"' in html                    # sfs uri -> bare /id
     assert "<strong>" in html
     assert ">Om</a>" in html and ">Nyheter</a>" in html   # new masthead entries
+
+
+def test_the_frontpage_wears_the_mark_and_every_page_links_the_icons():
+    # the mark is frontpage-only (page(mark=True)) and takes the theme tokens,
+    # so it inverts with the page instead of shipping a second dark copy
+    html = render.render_frontpage(parse.artifact("frontpage", FIX))
+    assert '<svg class="site-mark"' in html
+    assert 'stroke="var(--ink)"' in html and 'fill="var(--accent)"' in html
+    assert 'href="/favicon.svg"' in html
+    # a document page gets the icons but not the mark
+    news = render.render_sitenews(parse.artifact("sitenews", FIX))
+    assert "site-mark" not in news
+    assert 'href="/favicon.svg"' in news
+
+
+def test_write_assets_emits_the_icons(tmp_path):
+    lib_render.write_assets(tmp_path)
+    # the SVG is above compress.MIN_SIZE, so with compression on it lands as
+    # favicon.svg.br only -- compress.exists knows both spellings. The ICO and
+    # the PNG go through encodings=() and are always plain.
+    assert compress.exists(tmp_path / "favicon.svg")
+    for name in ("favicon.ico", "apple-touch-icon.png"):
+        assert (tmp_path / name).exists(), name
+
+
+def test_the_inline_mark_and_the_favicon_draw_the_same_figure():
+    # the mark exists twice: as a template macro wearing the theme tokens and as
+    # a standalone favicon with literal colours. Only the colours and the *radii*
+    # of the two end nodes may differ (the favicon fills them, because the open
+    # ring closes up below 28px), so the three arcs and every node centre must
+    # match. page.html holds other glyphs too, hence the filter: the macro's
+    # values are compared in the icon's own order.
+    lib = Path(lib_render.__file__).parent
+    page_html = (lib / "templates" / "page.html").read_text()
+    icon_svg = (lib / "assets" / "favicon.svg").read_text()
+    for pattern in (r'd="([^"]+)"', r'cx="([^"]+)" cy="([^"]+)"'):
+        macro, icon = (re.findall(pattern, t) for t in (page_html, icon_svg))
+        assert icon and [v for v in macro if v in icon] == icon, pattern
 
 
 def test_write_site_emits_expected_paths(tmp_path, monkeypatch):

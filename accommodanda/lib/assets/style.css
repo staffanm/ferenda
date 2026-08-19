@@ -245,6 +245,16 @@ nav.toc a.toc-top { padding-right: 2.6rem; }
               text-wrap: balance; }
 .gr-main h1 em { color: var(--accent); font-style: italic; }
 .gr-body.solo h1 { font-size: 2.1rem; }
+/* the frontpage lockup: the mark stands beside the eyebrow + h1 stack, in the
+   reading column's own left padding. The negative margin is the mark's width
+   plus the gap (3rem), so at a wide viewport the heading text sits exactly
+   where it does on every other page. Where the padding is narrower than 3rem
+   the pull shrinks with it and the text moves right by the difference -- the
+   mark never crosses the page edge. */
+.frontmatter.branded { display: flex; align-items: center; gap: 1rem; }
+.frontmatter.branded .branded-text { min-width: 0; }
+.site-mark { flex: none; height: 70px; width: auto;
+             margin-left: calc(-1 * clamp(1.5rem, 4vw, 3rem)); }
 /* the full official title, sitting under the short-name h1 -- kept compact so a
    long formal title (SFS/EU acts, treaties) does not steal the top of the page */
 .subtitle { font-family: var(--serif); font-style: italic; font-size: .95rem;
@@ -1089,6 +1099,10 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .gr-body { display: block; }
   .gr-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 8rem; }
   .gr-main h1 { font-size: 1.9rem; }
+  /* the reading column runs edge to edge here, with 1.25rem of padding and no
+     margin to hang in -- so the mark stacks above the eyebrow instead */
+  .frontmatter.branded { display: block; }
+  .site-mark { height: 58px; margin: 0 0 .6rem; }
   /* a table wider than the screen (BrB 2:3's jurisdiction table, a prop's
      unbreakable ELI URLs) scrolls inside its own box; left to overflow it
      widens the layout viewport and the whole page zooms out to fit */

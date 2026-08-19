@@ -2061,19 +2061,23 @@ _RAIL = ENV.get_template("partials/rail.html").module
 NODES = ENV.get_template("nodes.html").module
 def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                  summary="", summary_text=None, island="", solo=False,
-                 body_class="", head="", own_h1=False, title_html=None, **extra):
+                 body_class="", head="", own_h1=False, title_html=None,
+                 mark=False, **extra):
     """The page-shell context every render goes through (page.html and the
     sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
     `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
     `eyebrow`/`subtitle`/`summary_text` are plain text the template escapes.
     `own_h1` says the body brings its own <h1> (the browse pages' listing
-    heading), so the frontmatter must not emit a second one. `extra` carries a
+    heading), so the frontmatter must not emit a second one. `mark` puts the
+    lagen.nu mark in the frontmatter's left margin -- the frontpage, which is
+    the site speaking as itself rather than showing a document. `extra` carries a
     source template's own variables (pre-rendered fragments should already be
     Markup)."""
     return dict(title=title, kind=kind, meta=Markup(meta), toc=Markup(toc),
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
                 body_class=body_class, head=Markup(head), own_h1=own_h1,
+                mark=mark,
                 title_html=Markup(title_html) if title_html is not None else None,
                 **extra)
 
@@ -2086,7 +2090,7 @@ BRAND = Markup("lagen<em>.nu</em>")
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
          summary="", island="", solo=False, body_class="",
-         head="", own_h1=False, title_html=None):
+         head="", own_h1=False, title_html=None, mark=False):
     """Assemble a page (templates/page.html: masthead, frontmatter, grid,
     mobile toolbar). Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
@@ -2099,7 +2103,8 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
     return ENV.get_template("page.html").render(page_context(
         title, kind, meta, toc=toc, eyebrow=eyebrow, subtitle=subtitle,
         summary=summary, island=island, solo=solo, body_class=body_class,
-        head=head, own_h1=own_h1, title_html=title_html, body=Markup(body)))
+        head=head, own_h1=own_h1, title_html=title_html, mark=mark,
+        body=Markup(body)))
 
 
 def prop_link(site, ident):

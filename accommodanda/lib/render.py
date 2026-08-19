@@ -330,7 +330,7 @@ def _render_index(con):
     body = LISTS.index_body(sum(n.values()), sum(1 for s in n if n[s]),
                              list(_index_rows(n)), cols)
     return page("lagen.nu", "Start", "", body, title_html=BRAND,
-                eyebrow="Sveriges lagar, med kontext", solo=True)
+                eyebrow="Sveriges lagar, med kontext", solo=True, mark=True)
 
 
 # --------------------------------------------------------------------------
@@ -1040,6 +1040,16 @@ def write_assets(out_root):
                         (ASSETS / "graf.js").read_text(encoding="utf-8"))
     compress.write_text(out_root / "robots.txt",
                         (ASSETS / "robots.txt").read_text(encoding="utf-8"))
+    # the site icons page.html links: the SVG is the real one (it carries its own
+    # prefers-color-scheme rules, so it follows the reader's theme), the .ico is
+    # the fallback for Safari, which still does not read an SVG icon, and the
+    # apple-touch-icon is what iOS puts on a home screen. PNG and ICO are already
+    # compressed, so they are stored plain.
+    compress.write_text(out_root / "favicon.svg",
+                        (ASSETS / "favicon.svg").read_text(encoding="utf-8"))
+    for icon in ("favicon.ico", "apple-touch-icon.png"):
+        compress.write_bytes(out_root / icon, (ASSETS / icon).read_bytes(),
+                             encodings=())
     # style.css ships the self-hosted @font-face set first (assets/fonts/,
     # replacing the fonts.googleapis.com stylesheet -- no visitor request
     # leaves the site for a font), then the reader stylesheet, then the editor

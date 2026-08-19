@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24.96 -54.96 49.91 109.91" role="img" aria-label="lagen.nu">
+  <!-- The lagen.nu mark at favicon size: the section sign as a chain of four
+       nodes on one axis. Below about 28px the open end rings close up when
+       rasterised, so this variant fills them solid instead. Colours are
+       literal, not tokens. A favicon renders outside the page, with no
+       stylesheet, so the media query below reads the browser's own dark mode. -->
+  <style>
+    .ink { stroke: #171b21 }
+    .bg  { stroke: #e9ecf0 }
+    .acc { fill: #8f3524 }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e7e9ec }
+      .bg  { stroke: #12161b }
+      .acc { fill: #cd6f56 }
+    }
+  </style>
+  <g class="ink" fill="none" stroke-width="12.5" stroke-linecap="butt">
+    <path d="M 0 -15 A 15 15 0 1 1 0 15 A 15 15 0 1 1 0 -15"/>
+    <path d="M 4.834 -44.200 A 15 15 0 1 0 0 -15"/>
+    <path d="M -4.834 44.200 A 15 15 0 1 0 0 15"/>
+  </g>
+  <circle class="bg" cx="3.791" cy="-14.513" r="10" fill="none" stroke-width="7.5"/>
+  <circle class="bg" cx="-3.791" cy="14.513" r="10" fill="none" stroke-width="7.5"/>
+  <circle class="acc" cx="3.791" cy="-14.513" r="6.25"/>
+  <circle class="acc" cx="-3.791" cy="14.513" r="6.25"/>
+  <circle class="acc" cx="10.607" cy="-40.607" r="13.75"/>
+  <circle class="acc" cx="-10.607" cy="40.607" r="13.75"/>
+</svg>
