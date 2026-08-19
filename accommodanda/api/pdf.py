@@ -36,7 +36,6 @@ import hashlib
 import json
 import os
 import re
-import threading
 from urllib.parse import unquote, urlsplit
 
 import lxml.html
@@ -45,7 +44,7 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from weasyprint.urls import URLFetcherResponse
 
 from .. import config
-from ..lib import compress, layout
+from ..lib import compress, layout, util
 from ..lib.catalog import BASE
 from ..lib.page import RAIL_SECTION_ORDER
 from ..lib.render import ASSETS
@@ -398,21 +397,7 @@ def cache_entry(page, *, toc: bool, kinds: frozenset[str]):
 # One render per cache key at a time. Two readers asking for the same big
 # export used to pay for it twice over, in parallel, on a host that has the
 # cores for neither; the second now waits for the first and reads its bytes.
-_renders: dict[str, threading.Lock] = {}
-_renders_lock = threading.Lock()
-
-
-def _render_lock(key: str) -> threading.Lock:
-    with _renders_lock:
-        if len(_renders) > 512:
-            # a lock per export ever asked for would grow without end; the
-            # idle ones are dropped. A key dropped between lookup and acquire
-            # gets a second lock and so a second render -- the same race the
-            # cache write has always tolerated, and it ends the same way
-            for old, lock in list(_renders.items()):
-                if not lock.locked():
-                    del _renders[old]
-        return _renders.setdefault(key, threading.Lock())
+_render_lock = util.KeyedLocks()
 
 
 def export(page, *, toc: bool, kinds: frozenset[str], subresource,

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 import time
 import unicodedata
 from datetime import datetime, timezone
@@ -40,19 +41,46 @@ def number_slug(number: str) -> str:
 def write_atomic(path: Path | str, data: bytes | str) -> None:
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
     atomic rename, so an interrupted run never leaves a partial file behind.
-    The temp name is per-process unique: concurrent writers (parallel `lagen`
-    invocations both pruning the runlog) must not consume each other's temp
-    file -- with a fixed name, one writer's os.replace() raced away the file
-    the other had just written and crashed it with FileNotFoundError."""
+    The temp name is unique per process *and* per thread: concurrent writers
+    (parallel `lagen` invocations both pruning the runlog; two API threads
+    saving two users' edit carts) must not consume each other's temp file --
+    with a fixed name, one writer's os.replace() raced away the file the other
+    had just written and crashed it with FileNotFoundError."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp%d" % os.getpid())
+    tmp = path.with_suffix(path.suffix + ".tmp%d-%d"
+                           % (os.getpid(), threading.get_ident()))
     try:
         tmp.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
         os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+class KeyedLocks:
+    """One lock per key, so at most one thread at a time does the work a key
+    names. The synchronous API endpoints run in a thread pool, so two readers
+    can ask for the same expensive artifact at once: without this they both
+    render it. The second waits and reads the first one's output instead.
+
+    A lock per key ever asked for would grow without end, so idle ones are
+    dropped once there are more than `limit`. A key dropped between lookup and
+    acquire gets a second lock, and so a second render -- the same race a cache
+    write has always tolerated, and it ends the same way."""
+
+    def __init__(self, limit: int = 512):
+        self._locks: dict[str, threading.Lock] = {}
+        self._guard = threading.Lock()
+        self._limit = limit
+
+    def __call__(self, key: str) -> threading.Lock:
+        with self._guard:
+            if len(self._locks) > self._limit:
+                for old, lock in list(self._locks.items()):
+                    if not lock.locked():
+                        del self._locks[old]
+            return self._locks.setdefault(key, threading.Lock())
 
 
 def store_relpath(path: Path | str, root: Path) -> str:

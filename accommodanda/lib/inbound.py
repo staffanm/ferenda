@@ -165,11 +165,12 @@ def citations(con, uri):
 
 
 # Longest filename this tree writes, in bytes. ext4 and NFS cap a path component
-# at 255, and `util.write_atomic` writes through a same-directory ".tmpNNNNNNN"
-# sibling, so the cap has to leave that room. It bites only on the *uncited* side
-# of the corpus: a begrepp uri is its concept name, and the ones the citation
-# extraction got wrong are whole sentences -- they never became pages (which is
-# why the site never hit this), but they are cited, so they get a file.
+# at 255, and `util.write_atomic` writes through a same-directory
+# ".tmp<pid>-<thread>" sibling (about 25 bytes), so the cap has to leave that
+# room. It bites only on the *uncited* side of the corpus: a begrepp uri is its
+# concept name, and the ones the citation extraction got wrong are whole
+# sentences -- they never became pages (which is why the site never hit this),
+# but they are cited, so they get a file.
 _NAME_MAX = 200
 
 
