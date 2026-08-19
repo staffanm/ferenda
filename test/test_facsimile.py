@@ -2,6 +2,8 @@
 the API endpoint in both its documented and legacy-path forms."""
 
 import json
+import threading
+import time
 
 import pytest
 from fastapi import HTTPException
@@ -58,6 +60,7 @@ def corpus(tmp_path, monkeypatch):
         "G1": {"sfs": "2021:734", "page": 1, "bbox": [72, 72, 300, 200]},
         "G2": {"sfs": "2021:734", "page": 1},          # no bbox -> whole page
         "G9": {"sfs": "2099:1", "page": 1, "bbox": [0, 0, 10, 10]},  # unmirrored
+        "G8": {"sfs": "2021:734", "page": 1, "bbox": [0, 0, 5000, 5000]},  # off-page
     }))
     (ann / "sfs" / "2002" / "781.graphics").write_text(json.dumps({
         "meta": {"status": "generated"},
@@ -238,3 +241,93 @@ def test_a_malformed_bbox_is_client_error_not_an_assertion(raw):
     with pytest.raises(HTTPException) as exc:
         api._parse_bbox(raw)
     assert exc.value.status_code == 400
+
+
+# --------------------------------------------------------------------------
+# the crop must lie on the page, and two threads must not race
+# --------------------------------------------------------------------------
+
+def test_page_size_reads_the_mediabox(corpus):
+    pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
+    assert facsimile.page_size(pdf, 1) == (595.0, 842.0)
+
+
+def test_a_crop_off_the_page_is_refused(corpus, tmp_path):
+    pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
+    with pytest.raises(facsimile.OffPage):
+        facsimile.render_region(pdf, 1, [0, 0, 5000, 5000],
+                                tmp_path / "out" / "crop.png")
+    assert not (tmp_path / "out" / "crop.png").exists()
+
+
+def test_a_full_bleed_crop_still_renders(corpus, tmp_path):
+    """A figure rectangle is derived by scaling poppler's pixel geometry, so a
+    full-bleed illustration rounds to a fraction of a point past the page edge.
+    `EDGE_SLOP` absorbs that; a rectangle past the slop does not render."""
+    pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
+    edge = [0, 0, 595 + facsimile.EDGE_SLOP, 842 + facsimile.EDGE_SLOP]
+    out = facsimile.render_region(pdf, 1, edge, tmp_path / "out" / "bleed.png")
+    assert out.read_bytes()[:4] == PNG_MAGIC
+    with pytest.raises(facsimile.OffPage):
+        facsimile.render_region(pdf, 1, [0, 0, 595, 842 + 2 * facsimile.EDGE_SLOP],
+                                tmp_path / "out" / "past.png")
+
+
+def test_a_stored_off_page_bbox_fails_loudly(corpus):
+    """The same rectangle out of a reviewed .graphics layer is not client input.
+    It is a corpus fault, and a 400 would report it to the reader as their
+    mistake and leave the bad layer in place. It raises instead."""
+    client = TestClient(api.app)
+    with pytest.raises(facsimile.OffPage):
+        client.get("/api/v1/sfs-graphic",
+                   params={"uri": "https://lagen.nu/2002:780", "node": "G8"})
+
+
+def test_an_off_page_crop_is_a_400_and_mints_no_cache_entry(corpus):
+    """A bbox `valid_bbox` accepts can still lie past the page edge. Unchecked
+    it renders whitespace, and writes that whitespace into a cache file. The
+    check refuses the render; it is not a bound on cache size (the in-page
+    crops alone are past counting -- eviction is the cron job)."""
+    client = TestClient(api.app)
+    r = client.get("/api/v1/facsimile",
+                   params={"uri": "https://lagen.nu/2021:734", "sid": 1,
+                           "bbox": "0,0,5000,5000"})
+    assert r.status_code == 400
+    assert not layout.facsimile_crop("sfs", "2021:734", 1,
+                                     [0, 0, 5000, 5000]).exists()
+
+
+def test_a_page_the_pdf_lacks_is_still_a_404_with_a_crop(corpus):
+    client = TestClient(api.app)
+    r = client.get("/api/v1/facsimile",
+                   params={"uri": "https://lagen.nu/2021:734", "sid": 9,
+                           "bbox": "0,0,100,100"})
+    assert r.status_code == 404
+
+
+def test_concurrent_requests_for_one_page_render_it_once(corpus, monkeypatch):
+    """The endpoints are synchronous, so uvicorn serves them from a thread
+    pool: without the per-key lock four readers opening the same facsimile pay
+    for four renders and write the same temp file over each other."""
+    pdf = layout.fa_dir(corpus / "forarbete", "prop", "2013/14:116") / "2013-14-116.pdf"
+    calls, real = [], facsimile.render_page
+
+    def slow(*a):
+        calls.append(a)
+        time.sleep(0.05)                 # widen the check-then-render window
+        return real(*a)
+
+    monkeypatch.setattr(facsimile, "render_page", slow)
+    out = []
+    threads = [threading.Thread(
+        target=lambda: out.append(
+            facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)))
+        for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(calls) == 1
+    assert len(out) == 4 and len(set(out)) == 1
+    assert out[0].read_bytes()[:4] == PNG_MAGIC
+    assert not list(out[0].parent.glob("*.tmp*"))

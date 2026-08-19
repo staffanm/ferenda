@@ -391,6 +391,7 @@ def pdf_figures(pdf_path, patch_key=None):
             continue
         pageno = int(page.get("number"))
         px_width = int(page.get("width") or 0)
+        px_height = int(page.get("height") or 0)
         # the text margins of this page, which is what "inside the margins"
         # and the measure are both read from
         lefts = Counter(int(t.get("left")) for t in page.findall("text"))
@@ -399,8 +400,9 @@ def pdf_figures(pdf_path, patch_key=None):
         left = lefts.most_common(1)[0][0] if lefts else None
         right = rights.most_common(1)[0][0] if rights else None
         figs = [f for f in
-                (Figure(pageno, int(im.get("left")), int(im.get("top")),
-                        int(im.get("width") or 0), int(im.get("height") or 0))
+                (_on_page(Figure(pageno, int(im.get("left")), int(im.get("top")),
+                                 int(im.get("width") or 0),
+                                 int(im.get("height") or 0)), px_height)
                  for im in images)
                 if is_figure(f, (left, right))]
         if figs:
@@ -493,6 +495,19 @@ class Figure:
     top: int
     width: int
     height: int
+
+
+def _on_page(fig, px_height):
+    """`fig` with its foot cut back to the page bottom. poppler reports an
+    image's placed height, which for a figure set at the foot of a page can run
+    past the paper -- the part that overhangs is not printed and not in the
+    facsimile. `is_figure` bounds a figure horizontally against the text
+    margins, so only the vertical side needs this. The crop renderer refuses a
+    rectangle that leaves the page (`facsimile.OffPage`), and it is right to:
+    the geometry is fixed here, where the page is known, not there."""
+    if px_height and fig.top + fig.height > px_height:
+        return replace(fig, height=max(px_height - fig.top, 0))
+    return fig
 
 
 def is_figure(fig, margins):

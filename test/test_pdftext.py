@@ -40,6 +40,7 @@ from accommodanda.lib.pdftext import (
     page_paragraphs,
     pdf_pages,
     points_from_pdftohtml,
+    _on_page,
 )
 
 
@@ -650,6 +651,22 @@ def test_which_rasters_count_as_an_illustration():
     assert is_figure(Figure(5, 80, 100, 20, int(FIGURE_MIN * 446) + 1), margins)
     # a scan has no placed text, so no margins and nothing to judge against
     assert not is_figure(pyramid, (None, None))
+
+
+def test_a_figure_at_the_page_foot_is_cut_at_the_page_bottom():
+    """poppler reports an image's placed height, which for a figure set at the
+    foot of a page can run past the paper. The overhang is not printed and is
+    not in the facsimile, and the crop renderer refuses a rectangle that leaves
+    the page, so the foot is cut here -- where the page height is known."""
+    page_px = 1052                             # an A4 page at poppler's default
+    assert _on_page(Figure(3, 100, 900, 200, 400), page_px) == \
+        Figure(3, 100, 900, 200, 152)          # 900 + 400 -> the page bottom
+    # a figure that ends on the page is untouched, and so is one on a page
+    # whose height poppler did not report
+    assert _on_page(Figure(3, 100, 200, 200, 300), page_px) == \
+        Figure(3, 100, 200, 200, 300)
+    assert _on_page(Figure(3, 100, 900, 200, 400), 0) == \
+        Figure(3, 100, 900, 200, 400)
 
 
 def test_pdftohtml_geometry_converts_to_pdf_points():

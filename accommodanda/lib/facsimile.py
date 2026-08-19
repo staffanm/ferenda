@@ -17,26 +17,95 @@ a second, so the defaults are chosen for speed:
 Works identically for born-digital and scanned PDFs: pdftoppm rasterizes the
 page as drawn (a scan's page image included), so the caller never needs to
 know which kind it has.
+
+The API endpoints that call this are synchronous, so FastAPI runs them in a
+thread pool: several threads of *one* process render at the same time. Every
+poppler call therefore carries a timeout, the temp file each render writes is
+unique per call, and `cached` holds a per-cache-key lock so two readers asking
+for the same page pay for one render. A poppler call that hits the timeout
+raises subprocess.TimeoutExpired, which no caller handles: a wedged renderer is
+a broken host, and a 500 is the honest answer to it.
 """
 
 import math
 import os
 import re
 import subprocess
+import tempfile
+from pathlib import Path
 
-from . import layout
+from . import layout, util
 
 DPI = 150
+
+# No poppler call may hold a request thread for ever. The ceiling is deliberately
+# generous: a born-digital A4 page renders in ~0.5 s and a scanned page in a few
+# seconds, but the corpus holds SOU volumes of many hundred scanned pages where
+# pdfinfo alone takes a while, and a page of dense vector maps is slow to
+# rasterize. Five minutes is far past any of those, so only a wedged process
+# reaches it.
+TIMEOUT = 300
+
+# How far past the page edge a crop may still reach. Both producers of a stored
+# bbox bound it to the page and then convert poppler's pixel geometry to points
+# (sfs/graphics.py against the page image, lib/pdftext._on_page against the page
+# box), so what is left is rounding: half a point at most. One point is below a
+# rendered pixel at any DPI, so absorbing it costs no visible area.
+EDGE_SLOP = 1.0
+
+
+class OffPage(ValueError):
+    """A crop rectangle that does not lie on the page it names. For a bbox out
+    of the query string this is client input and the route answers 400; for one
+    read off a stored .graphics layer or artifact it is a corpus fault and must
+    fail loudly."""
+
+
+def _pdfinfo(pdf_path, *args):
+    return subprocess.run(["pdfinfo", *args, str(pdf_path)], capture_output=True,
+                          check=True, text=True, timeout=TIMEOUT).stdout
 
 
 def page_count(pdf_path):
     """The number of pages in `pdf_path` (poppler's ``pdfinfo``). Raises
     CalledProcessError on a broken/absent PDF -- the caller knows the context."""
-    out = subprocess.run(["pdfinfo", str(pdf_path)],
-                         capture_output=True, check=True, text=True).stdout
-    m = re.search(r"^Pages:\s*(\d+)", out, re.M)
+    m = re.search(r"^Pages:\s*(\d+)", _pdfinfo(pdf_path), re.M)
     assert m, "pdfinfo emitted no page count for %s" % pdf_path
     return int(m.group(1))
+
+
+def page_size(pdf_path, page):
+    """(width, height) of 1-based `page` of `pdf_path`, in PDF points. Raises
+    CalledProcessError like `page_count`; a page the PDF does not have is
+    poppler's exit 99, the same code an out-of-range ``pdftoppm`` range gives,
+    so a caller that maps 99 to a 404 needs no extra case for it."""
+    out = _pdfinfo(pdf_path, "-f", str(page), "-l", str(page))
+    m = re.search(r"^Page\s+%d\s+size:\s*([\d.]+)\s*x\s*([\d.]+)\s*pts" % page,
+                  out, re.M)
+    assert m, "pdfinfo emitted no size for page %d of %s" % (page, pdf_path)
+    return float(m.group(1)), float(m.group(2))
+
+
+def _pdftoppm(pdf_path, page, out_path, *crop):
+    """Run pdftoppm for one page of `pdf_path` (with `crop` as extra
+    ``-x/-y/-W/-H`` arguments) and move the PNG onto `out_path`. `mkstemp`
+    reserves the temp name with O_EXCL, so it is unique per *call* -- two
+    threads rendering the same page cannot write each other's file."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, root = tempfile.mkstemp(prefix=out_path.stem + ".tmp",
+                                dir=out_path.parent)
+    os.close(fd)                      # the reservation, not the render target
+    png = Path(root + ".png")         # what pdftoppm -singlefile appends
+    try:
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", str(DPI), "-f", str(page), "-l", str(page),
+             *crop, "-singlefile", str(pdf_path), root],
+            capture_output=True, check=True, timeout=TIMEOUT)
+        png.replace(out_path)
+    finally:
+        Path(root).unlink(missing_ok=True)
+        png.unlink(missing_ok=True)   # only left behind by a failed render
+    return out_path
 
 
 def render_page(pdf_path, page, out_path):
@@ -46,16 +115,7 @@ def render_page(pdf_path, page, out_path):
     CalledProcessError when pdftoppm cannot render (no such page, broken
     PDF) -- the caller knows the request context and maps it to its own
     error."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    # pid-unique temp root: two workers racing on the same page each write
-    # their own file; the loser's replace is a harmless overwrite
-    tmp_root = out_path.parent / ("%s.tmp%d" % (out_path.stem, os.getpid()))
-    subprocess.run(
-        ["pdftoppm", "-png", "-r", str(DPI), "-f", str(page), "-l", str(page),
-         "-singlefile", str(pdf_path), str(tmp_root)],
-        capture_output=True, check=True)
-    (out_path.parent / (tmp_root.name + ".png")).replace(out_path)
-    return out_path
+    return _pdftoppm(pdf_path, page, out_path)
 
 
 def valid_bbox(bbox):
@@ -78,20 +138,24 @@ def render_region(pdf_path, page, bbox, out_path):
     with a TOP-LEFT origin -- the representation the .graphics layer stores;
     poppler's ``-x/-y/-W/-H`` crop window is likewise top-left, in device
     pixels, so each point coordinate scales by `DPI`/72. Same atomic
-    temp->replace and error contract as `render_page`."""
+    temp->replace and error contract as `render_page`, plus one check
+    `valid_bbox` cannot make: the rectangle must lie on the page, give or take
+    `EDGE_SLOP`. A rectangle past that is an `OffPage` -- it would render
+    whitespace, which is never what a caller wants and never worth a cache
+    entry. (It is not a bound on cache *growth*: the entry is keyed by the
+    rounded bbox, so the in-page crops of one A4 page are already more than
+    anyone can enumerate. Eviction is the cron job, see docs/operating.)"""
     assert valid_bbox(bbox), "invalid PDF crop bbox %r" % (bbox,)
     x0, y0, x1, y1 = bbox
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_root = out_path.parent / ("%s.tmp%d" % (out_path.stem, os.getpid()))
-    subprocess.run(
-        ["pdftoppm", "-png", "-r", str(DPI), "-f", str(page), "-l", str(page),
-         "-x", str(round(x0 * DPI / 72)), "-y", str(round(y0 * DPI / 72)),
-         "-W", str(round((x1 - x0) * DPI / 72)),
-         "-H", str(round((y1 - y0) * DPI / 72)),
-         "-singlefile", str(pdf_path), str(tmp_root)],
-        capture_output=True, check=True)
-    (out_path.parent / (tmp_root.name + ".png")).replace(out_path)
-    return out_path
+    width, height = page_size(pdf_path, page)
+    if x1 > width + EDGE_SLOP or y1 > height + EDGE_SLOP:
+        raise OffPage("crop %r is outside the %g x %g pt page %d of %s"
+                      % (bbox, width, height, page, pdf_path))
+    return _pdftoppm(
+        pdf_path, page, out_path,
+        "-x", str(round(x0 * DPI / 72)), "-y", str(round(y0 * DPI / 72)),
+        "-W", str(round((x1 - x0) * DPI / 72)),
+        "-H", str(round((y1 - y0) * DPI / 72)))
 
 
 def png_size(data):
@@ -103,6 +167,11 @@ def png_size(data):
             int.from_bytes(data[20:24], "big"))
 
 
+# One render per cache entry at a time: without it two readers opening the same
+# facsimile each pay for the render.
+_render_lock = util.KeyedLocks()
+
+
 def cached(source, basefile, pdf_path, page, bbox=None):
     """The facsimile PNG for one page of a document's source PDF -- or, with
     `bbox`, just that rectangle of the page -- rendered on the first request and
@@ -111,7 +180,11 @@ def cached(source, basefile, pdf_path, page, bbox=None):
     same region are shared and a re-verified bbox lands on a fresh file."""
     out = (layout.facsimile_crop(source, basefile, page, bbox) if bbox
            else layout.facsimile(source, basefile, page))
-    if not out.exists():
+    if out.exists():
+        return out
+    with _render_lock(str(out)):
+        if out.exists():                 # rendered while we waited for the lock
+            return out
         if bbox:
             render_region(pdf_path, page, bbox, out)
         else:

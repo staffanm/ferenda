@@ -894,12 +894,21 @@ def _parse_bbox(raw):
     return bbox
 
 
-def _png_response(source, basefile, pdf, page, bbox, missing):
+def _png_response(source, basefile, pdf, page, bbox, missing, *,
+                  client_bbox=False):
     """The cached facsimile PNG of one source-PDF page (or `bbox` of it) as a
     response, rendering it on first request. `missing` is the 404 detail for a
-    page the PDF does not have."""
+    page the PDF does not have. `client_bbox` says the rectangle came from the
+    query string: an off-page one is then the caller's mistake and a 400. Off a
+    stored .graphics layer it is a corpus fault and stays a 500."""
     try:
         png = facsimile.cached(source, basefile, pdf, page, bbox)
+    except facsimile.OffPage:
+        if not client_bbox:
+            raise
+        # the detail stays generic: the exception carries the server-side PDF
+        # path, which is for the log and not for an anonymous caller
+        raise HTTPException(400, "bbox does not lie on the page") from None
     except subprocess.CalledProcessError as exc:
         # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
         # file" -- the source is corrupt, a corpus data-integrity problem
@@ -926,7 +935,8 @@ def _facsimile_response(local, sid, bbox=None):
         raise HTTPException(404, "no PDF source downloaded for %r" % local)
     source, basefile, pdf = resolved
     return _png_response(source, basefile, pdf, sid, bbox,
-                         "%r has no page %d" % (local, sid))
+                         "%r has no page %d" % (local, sid),
+                         client_bbox=bbox is not None)
 
 
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
