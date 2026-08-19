@@ -976,6 +976,18 @@ def test_kkv_casetypes_are_the_supervisory_ones():
     assert sum(int(hi) - int(lo) + 1 for lo, hi in groups) == len(covered)
 
 
+def test_kkv_listing_refuses_a_truncated_group(monkeypatch):
+    # the diarium's paging is cumulative, so a group is asked for in one
+    # response and completeness is the only check that it arrived whole. It
+    # raises rather than asserts: under `python -O` an assert is removed, and
+    # the short group would become the harvest's authoritative output
+    monkeypatch.setattr(avg_download, "request",
+                        lambda *a, **kw: {"items": [{"caseNumber": "1/2020"}],
+                                          "pagination": {"total": 2}})
+    with pytest.raises(ValueError, match="got 1 of 2 cases"):
+        avg_download.kkv_listing(None, ("38", "38"))
+
+
 def test_kkv_cases_dedupes_across_groups(monkeypatch):
     # the ranges are the *site's*, and nothing guarantees they stay disjoint
     shared = {"caseNumber": "1/2020", "subject": "a"}

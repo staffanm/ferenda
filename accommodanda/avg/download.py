@@ -236,7 +236,7 @@ KKV_CASETYPES = (
     ("52", "64"),      # upphandlingsskadeavgift + domstolsärenden
 )
 # a whole group's result set in one response -- the largest is ~700 cases, and
-# `kkv_listing` asserts rather than truncating if that ever stops holding
+# `kkv_listing` raises rather than truncating if that ever stops holding
 KKV_TAKE = 5000
 RE_KKV_DNR = re.compile(r"(\d+/\d{4})")
 
@@ -1058,17 +1058,19 @@ def kkv_listing(session, casetype):
     answers with the bare result JSON instead of a 300 kB page -- 500 bytes per
     case rather than 4 kB. The group is the harvest's slice because the
     diarium's paging is *cumulative* (``page=2`` re-sends page 1), so ``take``
-    asks for the whole group in one response instead; the assert is the guard
-    that a group never silently truncates."""
+    asks for the whole group in one response instead; the completeness check
+    below is the guard that a group never silently truncates. A ValueError
+    rather than an assert, because `python -O` drops an assert and a short
+    group would then become the harvest's authoritative output."""
     envelope = request(session, "GET", KKV_SEARCH, parse_json=True, timeout=120,
                        headers={"X-Requested-With": "XMLHttpRequest"},
                        params=[*KKV_STATUS, ("caseTypeFrom", casetype[0]),
                                ("caseTypeTo", casetype[1]),
                                ("take", str(KKV_TAKE))])
-    items = envelope["items"]
-    assert len(items) == envelope["pagination"]["total"], (
-        "kkv caseType %s-%s: got %d of %d cases -- raise KKV_TAKE"
-        % (*casetype, len(items), envelope["pagination"]["total"]))
+    items, total = envelope["items"], envelope["pagination"]["total"]
+    if len(items) != total:
+        raise ValueError("kkv caseType %s-%s: got %d of %d cases -- raise "
+                         "KKV_TAKE" % (*casetype, len(items), total))
     return items
 
 
