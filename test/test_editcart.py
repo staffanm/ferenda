@@ -3,6 +3,7 @@ per user, a checkout is one git commit authored as the editor, and a hunk that
 went stale under a draft fails the commit rather than clobbering."""
 
 import subprocess
+import threading
 
 import pytest
 
@@ -111,3 +112,28 @@ def test_discard(repo):
 def test_carts_are_per_user(repo):
     editcart.upsert("anna", REGION, "## 1 §\n\nA.\n")
     assert editcart.cart("bo") == []            # bo sees nothing of anna's
+
+
+def test_concurrent_upserts_keep_both_drafts(repo, monkeypatch):
+    """Two carts written at once used to lose one: `upsert` reads the store,
+    appends and writes it back, and the API endpoint is synchronous, so two
+    requests run that sequence in two threads of one worker."""
+    real = editcart._load
+
+    def slow(username):
+        drafts = real(username)
+        threading.Event().wait(0.05)     # widen the read-modify-write window
+        return drafts
+
+    monkeypatch.setattr(editcart, "_load", slow)
+    other = editcontent.Region("kommentar", "2009:400", "P1")
+    threads = [threading.Thread(target=editcart.upsert,
+                                args=("anna", region, text))
+               for region, text in ((REGION, "## 1 §\n\nEtt.\n"),
+                                    (other, "## 1 §\n\nTvå.\n"))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert {d["key"] for d in editcart.cart("anna")} == {REGION.key, other.key}
+    assert not list(editcart.EDITS.glob("*.tmp*"))
