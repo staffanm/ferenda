@@ -46,6 +46,23 @@ def on_disk(destdir, record):
     return download.record_dir(destdir, record).with_suffix(".json").exists()
 
 
+@pytest.mark.parametrize("field,value", [
+    ("kod", "../../../etc"),
+    ("rid", "../../../etc/passwd"),
+])
+def test_record_dir_refuses_a_path_segment_from_the_api(tmp_path, field, value):
+    """Both segments come straight out of the API response, and the caller
+    writes to the path and removes it recursively. A ValueError rather than an
+    assert: `python -O` removes an assert, and the check must survive it."""
+    record = rec(1, "2024-01-01")
+    if field == "kod":
+        record["domstol"]["domstolKod"] = value
+    else:
+        record["id"] = value
+    with pytest.raises(ValueError, match="unexpected"):
+        download.record_dir(tmp_path, record)
+
+
 def seed_downloaded(destdir, api, *records):
     """Put records on disk *and* in the fake corpus, as a completed prior run
     would have left them."""

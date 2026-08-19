@@ -89,10 +89,15 @@ DOMSTOLKOD_RE = re.compile(r"[A-Za-zÅÄÖåäö0-9]+")
 
 
 def record_dir(destdir, record):
-    """``destdir/{domstolKod}/{id}`` with both segments validated."""
+    """``destdir/{domstolKod}/{id}`` with both segments validated. A ValueError
+    rather than an assert: the caller writes to this path and removes it
+    recursively, and `python -O` would drop an assert and leave both segments
+    unchecked. The guard is against remote data, not a programmer invariant."""
     kod, rid = record["domstol"]["domstolKod"], record["id"]
-    assert DOMSTOLKOD_RE.fullmatch(kod), "unexpected domstolKod: %r" % kod
-    assert UUID_RE.fullmatch(rid), "unexpected record id: %r" % rid
+    if not DOMSTOLKOD_RE.fullmatch(kod):
+        raise ValueError("unexpected domstolKod: %r" % kod)
+    if not UUID_RE.fullmatch(rid):
+        raise ValueError("unexpected record id: %r" % rid)
     return destdir / kod / rid
 
 
