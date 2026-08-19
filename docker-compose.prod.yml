@@ -145,10 +145,12 @@ services:
       # 127.0.0.1 -- the same *host*, not the same compose network -- so nginx
       # (its own container) was an untrusted peer and every request arrived as
       # the proxy's address: one login-rate-limit bucket for the whole internet,
-      # and one Matomo visitor id. The value is the compose network's subnet
-      # rather than nginx's container IP, which is not stable across a recreate;
-      # the API port is published to no host interface, so nothing outside that
-      # network can reach uvicorn to begin with. uvicorn reads CIDR here.
+      # and one Matomo visitor id. The value is the compose network's subnet,
+      # declared under `networks:` at the foot of this file so the two cannot
+      # drift; nginx's own container IP would not survive a recreate. Trusting
+      # the whole network is safe because the API port is published to no host
+      # interface, so nothing outside it can reach uvicorn at all. uvicorn
+      # matches CIDR here from 0.31 on (pinned in pyproject.toml).
       - FORWARDED_ALLOW_IPS=172.19.0.0/16
       # The checkout the /patch editor reads and WRITES its patches in
       # (at <PATCH_REPO>/accommodanda/patches). It commits every save, so the
@@ -266,12 +268,22 @@ services:
     # The legacy app image. It CANNOT be built from this branch: the
     # modernization branch deleted requirements.txt (the legacy root Dockerfile
     # does `COPY requirements.txt .`), replacing it with pyproject/uv.lock for
-    # accommodanda. So reference the already-built legacy image rather than
-    # rebuilding it. Tag your existing/prod legacy image as `lagen-ferenda:legacy`
-    # (e.g. `docker tag <old-ferenda-image> lagen-ferenda:legacy`) or adjust here.
-    # (On master, where requirements.txt still exists, this can go back to
-    # `build: {context: .}` if you cherry-pick this file over there.)
+    # accommodanda. So this references an already-built image rather than
+    # rebuilding it. (On master, where requirements.txt still exists, this can
+    # go back to `build: {context: .}` if you cherry-pick this file over there.)
+    #
+    # The tag is NOT produced by anything here -- it is made by hand on the
+    # host, once:
+    #     docker tag <the running legacy image> lagen-ferenda:legacy
+    # For as long as a container exists compose never resolves this reference,
+    # so a missing tag stays invisible. It surfaces the first time the service
+    # is created from cold -- which is how a `down`/`up` took the site down on
+    # 2026-08-19: with no local match and no `build:`, compose fell back to a
+    # registry and reported "pull access denied", which reads like an auth
+    # problem rather than the missing local tag it is. `pull_policy: never`
+    # keeps that failure honest: no registry, just "image not found locally".
     image: lagen-ferenda:legacy
+    pull_policy: never
     profiles: [prod]
     volumes:
       - /mnt/data/lagen:/usr/share/site
@@ -293,8 +305,18 @@ services:
   # writes nothing. The data is still at /mnt/data/elasticsearch (15 GB) if the
   # decision has to be revisited; git history holds the service definition.
   fuseki:
+    # `image:` beside `build:` so the built artifact has a stable name of our
+    # choosing rather than compose's generated `<project>-<service>`, which
+    # changed spelling between compose v1 and v2 (`ferenda_fuseki` ->
+    # `ferenda-fuseki`) and left the v1-named image stranded. Compose reuses
+    # this image when it exists and builds it only when it does not.
+    #
+    # Do not count on that build: the context's base image is old enough that
+    # its `apt-get` step now fails (exit 100, 2026-08-19). Treat the tag as the
+    # artifact and the context as history until someone refreshes the base.
     build:
       context: docker/fuseki
+    image: lagen-fuseki:legacy
     profiles: [prod]
     volumes:
       - fuseki:/fuseki
@@ -307,8 +329,11 @@ services:
         max-size: "10m"
         max-file: "10"
   mediawiki:
+    # Same arrangement as fuseki above: a stable image name for the pre-built
+    # artifact, with the build context kept but not relied on.
     build:
       context: docker/mediawiki
+    image: lagen-mediawiki:legacy
     profiles: [prod]
     volumes:
       - /mnt/data/mediawiki/db:/var/www/data
@@ -399,3 +424,23 @@ volumes:
       o: bind
       device: /mnt/forstor/opensearch
   certbot-webroot:
+
+networks:
+  # The project's default network, with its address range stated rather than
+  # left to the daemon's allocator. Every service joins this one -- naming it
+  # `default` keeps that implicit, so no service needs a `networks:` key.
+  #
+  # It is declared because `FORWARDED_ALLOW_IPS` above is this subnet. An
+  # allocated range is not a promise: recreate the network while another
+  # project holds 172.19, and the daemon hands out a different /16. uvicorn
+  # would then trust nobody, every request would arrive as nginx's address,
+  # and the login rate limit would collapse to a single bucket again -- with
+  # the startup log still cheerfully printing the value it was given. Stating
+  # the subnet makes the constant a fact of this file.
+  #
+  # Changing it means recreating the network, which means `docker compose
+  # down` first: a network in use cannot be re-addressed in place.
+  default:
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
