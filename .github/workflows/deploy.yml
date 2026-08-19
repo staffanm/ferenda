@@ -18,7 +18,17 @@
 #
 # On every push to the deployed branch the deploy fast-forwards ~/wds/accommodanda
 # and rebuilds + restarts ONLY the accommodanda service (the legacy stack is left
-# untouched). It is a PURE CODE DEPLOY -- it processes no data.
+# untouched), then publishes the static browser chrome. It is a PURE CODE DEPLOY --
+# it processes no data.
+#
+# The chrome (style.css + the script.js bundle, lib/assets/) is the one part of the
+# code that does NOT ride the image: the pages link it by URL and the serve reads it
+# out of `generated/`, the corpus tree. So an image-only deploy shipped new API
+# routes to a browser still running the old bundle -- the PDF export's job endpoints
+# (/api/v1/pdf/vanta) went live on 2026-08-18 and the reader kept getting the old
+# one-long-request dialog, because nothing had rewritten generated/script.js. The
+# publish step below closes that gap. It is code, not data: `--assets-only` copies
+# four files out of the checkout and reads neither the catalog nor an artifact.
 #
 # Folding new input DATA into the corpus is deliberately NOT done here: a code push
 # must not trigger a reparse/regenerate (the host can't re-parse ~100K förarbeten
@@ -83,3 +93,39 @@ jobs:
           set -euo pipefail
           cd "$COMPOSE"
           docker compose --profile prod up -d accommodanda
+
+      # The pages link /style.css and /script.js by URL, and the serve reads them
+      # from `generated/` -- a bind-mounted host tree, not the image. Without this
+      # the deploy ships new code to a browser still running the old bundle.
+      #
+      # Runs INSIDE the container on purpose: generated/ lives on the root_squashed
+      # /mnt/forstor NFS export, writable only by gid 3362, which the image's `app`
+      # user carries (docker-compose.prod.yml build args). A host-side `lagen` would
+      # EPERM. It writes four files (script.js, style.css, graf.js, robots.txt, each
+      # Brotli-precompressed) plus the font woff2s, reads no catalog and re-renders
+      # no page, so it costs seconds -- see build.cmd_generate's `--assets-only`
+      # branch, which returns before the fingerprint gate and so never skips.
+      #
+      # No nginx reload and no second restart: this vhost proxies everything to the
+      # app (docker/nginx/ferenda.lagen.nu.conf `location /`), and the serve reads
+      # the asset off disk per request rather than memoizing it at import.
+      - name: Publish the static browser chrome (style.css + the script bundle)
+        run: |
+          set -euo pipefail
+          cd "$COMPOSE"
+          # `up -d` returns once the container is started, but a recreate can still
+          # be a moment short of accepting an exec ("container is restarting").
+          # Wait for `running` first, so a real failure below is the command's own
+          # and not a race we retried over.
+          for attempt in $(seq 1 30); do
+            # `|| true`: mid-recreate the container id can vanish between the two
+            # calls, and pipefail would turn that race into a failed deploy. An
+            # empty state just means "not yet" -- retry, and let the exec below be
+            # the thing that fails if it never comes up.
+            state="$(docker compose ps -q accommodanda \
+                     | xargs -r docker inspect -f '{{.State.Status}}' || true)"
+            [ "$state" = running ] && break
+            echo "accommodanda is '${state:-absent}' -- waiting ($attempt/30)"
+            sleep 2
+          done
+          docker compose exec -T accommodanda lagen all generate --assets-only
