@@ -6,7 +6,12 @@ dropped. Two in-corpus signals mark the loss:
 
 - an editorial ``<noun> är inte med här`` marker ("the <noun> is not included
   here"), with or without slash delimiters and sometimes followed by amendment
-  provenance. It is normally its own stycke; a few trail a ``Bilaga N`` heading.
+  provenance. It is normally its own stycke; a few trail a ``Bilaga N`` heading
+  (which may then be the bilaga's own rubrik, its body dropped whole). The
+  wording varies -- ``Bilagan inte med här``, ``Bilagor finns inte med här``,
+  ``Tabellen ej med här`` -- and the older acts use a second formula instead:
+  ``Bilagan är här utesluten`` / ``Tabellen utelämnad``, usually with a note on
+  where the appendix may be read.
 - the Vägmärkesförordning (2007:90), which carries no marker at all: it lists
   road signs by designator (A1, P11, …) in tables whose image column was
   dropped, so a designator cell *is* the trace of a missing sign.
@@ -35,29 +40,40 @@ from .. import config
 from ..lib import facsimile, llm, page, pdftext
 from .tokenizer import re_ChangeNote
 
-# The source is inconsistent about its editorial delimiters. All of these occur
-# in the corpus: `/Formeln är inte med här/`, `Formeln är inte med här.`,
-# `Bilaga 2 är inte med här` and `/Bilagan är inte med här. Bilagan senast
-# ändrad genom lag (2013:1017)./`. Capture the human label; marker_gap separately
+# The source is inconsistent about its editorial wording as well as its
+# delimiters. Two formulas occur, each in many shapes. All of these are corpus
+# forms: `/Formeln är inte med här/`, `Formeln är inte med här.`, `Bilagan inte
+# med här.`, `Bilagor finns inte med här.`, `Tabellen ej med här.`, `Bilaga 3
+# /inte med här. Senast ändrad genom förordning (2017:1253)./`, `//Tabellen
+# utelämnad//` and `Bilagan är här utesluten; upplysning om dess innehåll kan
+# erhållas hos länsstyrelserna.` Capture the human label; marker_gap separately
 # requires the *whole block* to consist of the marker plus known editorial
 # provenance, so this deliberately permissive search cannot eat real prose.
 _DESIGNATOR = (r"(?:\d+[a-z]?|[A-ZÅÄÖ]|[IVX]+)"
                r"(?:\s*[-–]\s*(?:\d+[a-z]?|[A-ZÅÄÖ]|[IVX]+))?"
                r"(?:\s*(?:,|och)\s*(?:\d+[a-z]?|[A-ZÅÄÖ]|[IVX]+))*")
+# the noun is optional: a marker trailing its own heading drops it (`Bilaga 3
+# /inte med här./`), and heading_gap then takes the sort from the heading
+_LABEL = r"(?:(?P<label>[A-ZÅÄÖa-zåäö]+(?:\s+%s)?)\s+)?" % _DESIGNATOR
+# `Kartorna är inte med.` (1997:1137) drops the "här" as well. That shape is a
+# marker only when it ends the block, period and all -- "tas inte med vid
+# taxering" is ordinary prose -- so it is anchored where the other is not.
 MARKER_RE = re.compile(
-    r"(?P<label>[A-ZÅÄÖa-zåäö]+(?:\s+%s)?)\s+är inte med här\s*\.?"
-    % _DESIGNATOR, re.I)
+    _LABEL + r"(?:(?:är|äro|finns)\s+)?(?:inte|ej)\s+"
+    r"(?:med här\s*\.?|med\s*\.\s*$)", re.I)
 
 # noun head (lowercased) -> canonical omission sort. An unlisted noun still
 # yields a typed gap (its lowercased self), so a new variant degrades to a
 # generic graphic rather than silently vanishing back into the text.
 _SORT = {
     "bilaga": "bilaga", "bilagan": "bilaga", "bilagorna": "bilaga",
-    "bilden": "bild", "kartan": "karta",
+    "bilagor": "bilaga",
+    "bilden": "bild", "kartan": "karta", "kartorna": "karta",
     "figuren": "figur", "formeln": "formel", "symbolen": "symbol",
     "specialtecken": "specialtecken", "förteckningen": "forteckning",
-    "tabellen": "tabell", "tabellerna": "tabell",
+    "tabellen": "tabell", "tabellerna": "tabell", "tulltaxan": "tabell",
     "sammanställningen": "tabell", "uppställningen": "tabell",
+    "blanketten": "blankett", "formulären": "formular",
     "tillägg": "bilaga",
 }
 
@@ -65,7 +81,15 @@ _EDITORIAL_SENTENCE_RE = re.compile(
     r"(?:Bilag(?:an|a(?:\s+\S+)?)\s+)?(?:senast\s+)?"
     r"(?:ändrad|införd)\s+genom\s+"
     r"(?:(?:lag|förordning)\s+\(\d{4}:\d+\)|SFS\s+\d{4}:\d+)|"
-    r"Rättelseblad\s+\d{4}:\d+\s+har\s+iakttagits", re.I)
+    r"Rättelseblad\s+\d{4}:\d+\s+har\s+iakttagits|"
+    # where the source editor says the omitted content may instead be read: a
+    # sister SFS that prints it, or (the older formula) an authority's counter.
+    # Both tails are anchored -- _editorial_only decides whether the whole
+    # stycke may be replaced by a grafik node, so a wildcard tail would delete
+    # any real prose that shares the sentence
+    r"se\s+SFS\s+\d{4}:\d+|"
+    r"upplysning\s+om\s+(?:dess|deras)\s+innehåll\s+kan[^.]*erhållas[^.]*|"
+    r"den\s+är\s+även\s+tillgänglig\s+i\s+bokhandeln", re.I)
 _MARKER_PROVENANCE_RE = re.compile(
     r"(?:lag|förordning)\s+\((\d{4}:\d+)\)|SFS\s+(\d{4}:\d+)", re.I)
 
@@ -80,7 +104,35 @@ ROADSIGN_RE = re.compile(r"^[A-ZÅÄÖ]\d+[a-z]?\b")
 ROADSIGN_DOCS = frozenset({"2007:90"})
 
 
+# The second formula, in the older acts: the appendix is "excluded here" or
+# "left out", usually with a note on where to read it instead. Its verbs also
+# occur in ordinary legal prose ("Renvoi är utesluten" is a real rubrik in
+# 1998:167), and a heading is short enough that the editorial-tail test cannot
+# tell the two apart. Two guards, not one. Every alternative takes only a known
+# omission noun; and the `utesluten` verbs take the source editor's own "här"
+# on top of that ("Bilagan är här utesluten", "Bilagan har uteslutits här") --
+# prose says "utesluten från", never "utesluten här". `utelämnad` has no such
+# tell, so there the known noun plus marker_gap's whole-block editorial test
+# are the whole guard: widen the noun list with that in mind.
+EXCLUDED_RE = re.compile(
+    r"(?P<label>(?:%s)(?:\s+%s)?)\s+"
+    r"(?:(?:är|äro|har)\s+)?(?:här\s+(?:utesluten|uteslutna|uteslutits)"
+    r"|(?:utesluten|uteslutna|uteslutits)\s+här|utelämnad[es]?|utelämnats)\s*\.?"
+    % ("|".join(sorted(_SORT, key=len, reverse=True)), _DESIGNATOR), re.I)
+
+
+def find_marker(text):
+    """The first omission marker in `text` of either formula, or None."""
+    found = [m for m in (MARKER_RE.search(text), EXCLUDED_RE.search(text)) if m]
+    return min(found, key=lambda m: m.start()) if found else None
+
+
 def marker_sort(noun):
+    """The canonical omission sort for a marker's own noun. ``None`` when the
+    marker carries no noun -- only heading_gap sees that shape, and it answers
+    from the heading instead."""
+    if noun is None:
+        return None
     head = noun.split()[0].lower()
     return _SORT.get(head, head)
 
@@ -104,6 +156,12 @@ def _marker_rest(text, marker):
     return rest
 
 
+# what separates an editorial sentence from the marker before it. The semicolon
+# and dash are the source's own joiners ("Bilagan är här utesluten; upplysning
+# …", "/inte med här - se SFS 2019:797/").
+_TRIM = " /,.;-–"
+
+
 def _editorial_only(text):
     """Whether `text` is only recognized source-editor provenance sentences."""
     if not text:
@@ -111,9 +169,9 @@ def _editorial_only(text):
     note = re_ChangeNote.fullmatch(text)
     if note:
         return True
-    return all(_EDITORIAL_SENTENCE_RE.fullmatch(part.strip(" /,.").strip())
+    return all(_EDITORIAL_SENTENCE_RE.fullmatch(part.strip(_TRIM).strip())
                for part in re.split(r"\.\s+|,\s+(?=[Bb]ilagan\b)", text)
-               if part.strip(" /,."))
+               if part.strip(_TRIM))
 
 
 def marker_provenance(text):
@@ -126,14 +184,17 @@ def marker_gap(text):
     """If `text` is *only* an omission marker (optionally followed by a change
     note), return ``(sort, satt_av)``; else None. Standalone markers are the
     dominant corpus shape (each `/Formeln.../` is its own stycke). A marker
-    embedded in real prose returns None so no surrounding text is lost."""
-    m = MARKER_RE.search(text)
+    embedded in real prose returns None so no surrounding text is lost. A
+    marker with no noun of its own is a heading_gap, not a standalone gap:
+    nothing here could say what was omitted."""
+    m = find_marker(text)
     if not m:
         return None
     rest = _marker_rest(text, m)
     if not _editorial_only(rest):
         return None
-    return marker_sort(m.group("label")), marker_provenance(text)
+    sort = marker_sort(m.group("label"))
+    return (sort, marker_provenance(text)) if sort else None
 
 
 def heading_gap(text):
@@ -141,14 +202,17 @@ def heading_gap(text):
     Returns ``(clean_heading, sort)`` when a marker follows non-marker text, so
     the heading stays and the gap becomes a sibling grafik; else ``(text,
     None)``."""
-    m = MARKER_RE.search(text)
+    m = find_marker(text)
     if not m:
         return text, None
     clean = text[:m.start()].strip(" /(")
     tail = text[m.end():].strip().removeprefix("/").removesuffix("/").strip()
     if not clean or not _editorial_only(tail):
         return text, None  # a bare marker is a marker_gap, not a heading
-    return clean, marker_sort(m.group("label"))
+    # a marker with no noun of its own is named by the heading it trails
+    # (`Bilaga 3 /inte med här./`), read the same way and degrading the same
+    # way -- an unknown head stays itself rather than being guessed
+    return clean, marker_sort(m.group("label")) or marker_sort(clean)
 
 
 def roadsign_code(cell_text):
@@ -525,6 +589,7 @@ _SORT_DESC = {
     "tabell": "en tabell", "bilaga": "grafiskt innehåll i en bilaga",
     "symbol": "en symbol eller ett specialtecken",
     "forteckning": "en förteckning", "vagmarke": "en vägmärkesbild",
+    "blankett": "en blankett", "formular": "ett formulär",
 }
 
 # how many page images to send in one vision call. A superset of "one call per

@@ -1679,7 +1679,8 @@ def _renest_punkter(children):
 _GRAFIK_LABEL = {
     "bilaga": "Bilaga", "bild": "Bild", "karta": "Karta", "figur": "Figur",
     "formel": "Formel", "symbol": "Symbol", "specialtecken": "Specialtecken",
-    "forteckning": "Förteckning", "tabell": "Tabell", "vagmarke": "Vägmärke"}
+    "forteckning": "Förteckning", "tabell": "Tabell", "vagmarke": "Vägmärke",
+    "blankett": "Blankett", "formular": "Formulär"}
 
 
 def register_anchor(nr):

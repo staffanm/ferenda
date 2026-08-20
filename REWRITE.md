@@ -362,8 +362,13 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   `languages` list (two or three) via the `--n-languages` custom property.
 - ✅ **Omitted graphics — detected, localized and rendered.** The consolidated
   SFST source drops graphics, formulas, maps, symbols and some tables.
-  Detection is deterministic: `sfs/graphics.py` turns both slash-delimited and
-  plain `... är inte med här` placeholders into typed `grafik` nodes during the `nf.py` projection
+  Detection is deterministic: `sfs/graphics.py` turns the source's omission
+  markers into typed `grafik` nodes during the `nf.py` projection. Two formulas,
+  slash-delimited or plain, each in many wordings — `... är inte med här`,
+  `Bilagan inte med här`, `Bilagor finns inte med här`, `Tabellen ej med här`,
+  and the older acts' `Bilagan är här utesluten` / `Tabellen utelämnad`. The
+  marker may stand alone, trail a heading, or be the bilaga's own rubrik with
+  the whole appendix dropped under it
   (a projection-time overlay, like reference links — no model dataclass),
   preserving `sort` and the governing amendment (`satt_av`), and also
   recognizes the otherwise unmarked road-sign designator cells in 2007:90.

@@ -71,6 +71,94 @@ def test_marker_gap_standalone():
         "tabell", None)
 
 
+def test_marker_gap_wording_variants():
+    """The copula and the negation both vary across the corpus, and a marker
+    trailing its own heading drops the noun altogether."""
+    assert graphics.marker_gap("Bilagan inte med här.") == ("bilaga", None)
+    assert graphics.marker_gap("Bilagor finns inte med här.") == ("bilaga", None)
+    assert graphics.marker_gap("Bilagorna ej med här.") == ("bilaga", None)
+    assert graphics.marker_gap("Tabellen ej med här.") == ("tabell", None)
+    assert graphics.marker_gap("Tabellen finns ej med här.") == ("tabell", None)
+    assert graphics.marker_gap("//blanketten finns inte med här//") == (
+        "blankett", None)
+    assert graphics.marker_gap("Formulären inte med här.") == ("formular", None)
+    assert graphics.marker_gap(
+        "Bilaga 10 finns inte med här. Förordning (1990:745).") == (
+            "bilaga", "1990:745")
+    # a marker with no noun of its own says nothing about what was omitted
+    assert graphics.marker_gap("inte med här.") is None
+
+
+def test_marker_gap_excluded_and_left_out_formula():
+    """The older editors wrote 'är här utesluten' / 'utelämnad', usually with a
+    note on where the appendix may be read instead (1961:337, 1966:98)."""
+    assert graphics.marker_gap("//Tabellen utelämnad//") == ("tabell", None)
+    assert graphics.marker_gap("(Bilagan utelämnad.)") == ("bilaga", None)
+    assert graphics.marker_gap(
+        "Bilagan är här utesluten; upplysning om dess innehåll kan erhållas "
+        "hos länsstyrelserna och polismyndigheterna. Den är även tillgänglig "
+        "i bokhandeln.") == ("bilaga", None)
+    assert graphics.marker_gap(
+        "Bilagan har uteslutits här. Upplysning om dess innehåll kan erhållas "
+        "hos riksskattenämnden.") == ("bilaga", None)
+    # the same verbs in ordinary statute prose stay prose
+    assert graphics.marker_gap("Renvoi är utesluten") is None
+    assert graphics.marker_gap(
+        "En bolagsman som är utesluten från förvaltningen har rätt att") is None
+    assert graphics.heading_gap("Renvoi är utesluten") == (
+        "Renvoi är utesluten", None)
+    assert graphics.heading_gap("Uppgifter som får utelämnas") == (
+        "Uppgifter som får utelämnas", None)
+
+
+def test_marker_sort_vocabulary():
+    """Every noun the corpus body actually uses, and the act it comes from. A
+    noun no body carries is deliberately absent: `protokollet` (1972:698) and
+    `konventionstexten` (1960:198) appear only in the register's Övrigt field,
+    which the body parser never sees."""
+    assert graphics.marker_sort("Bilagor") == "bilaga"          # 1987:938
+    assert graphics.marker_sort("Tulltaxan") == "tabell"        # 1987:1068
+    assert graphics.marker_sort("blanketten") == "blankett"     # 1987:1126
+    assert graphics.marker_sort("Formulären") == "formular"     # 1950:516
+    assert graphics.marker_sort("Kartorna") == "karta"          # 1997:1137
+    # an unlisted noun degrades to itself rather than to a guessed sort
+    assert graphics.marker_sort("Protokollet") == "protokollet"
+
+
+def test_marker_gap_plural_and_bare_forms():
+    """The oldest acts inflect the verb (`äro … uteslutna`), and one drops the
+    `här` entirely -- that shape counts only when it ends the block."""
+    assert graphics.marker_gap(
+        "Bilagorna äro här uteslutna; upplysning om deras innehåll kan "
+        "erhållas hos kommerskollegium.") == ("bilaga", None)   # 1958:564
+    assert graphics.marker_gap("Formulären är uteslutna här.") == (
+        "formular", None)                                       # 1969:495
+    assert graphics.marker_gap("Kartorna är inte med.") == ("karta", None)
+    assert graphics.marker_gap("Tabellen är inte med.") == ("tabell", None)
+    # the same words inside prose stay prose -- the block is not only a marker
+    assert graphics.marker_gap(
+        "Sådan inkomst tas inte med vid taxering i Sverige.") is None
+    assert graphics.marker_gap(
+        "Från utövning av rättighet att i adelsmöte deltaga äro uteslutna:"
+    ) is None
+
+
+def test_heading_gap_marker_without_noun():
+    """A marker on its own heading names no noun; the heading names it instead
+    (2015:406), and may point at the SFS that prints the content (2004:881)."""
+    assert graphics.heading_gap(
+        "Bilaga 3 /inte med här. Senast ändrad genom förordning "
+        "(2017:1253)./") == ("Bilaga 3", "bilaga")
+    # an unknown head is not guessed into a canonical sort: it degrades to
+    # itself, exactly as an unlisted marker noun does
+    assert graphics.heading_gap(
+        "Fasta index för kommuner /inte med här - se SFS 2019:797/") == (
+            "Fasta index för kommuner", "fasta")
+    assert graphics.marker_provenance(
+        "Fasta index för kommuner /inte med här - se SFS 2019:797/"
+    ) == "2019:797"
+
+
 def test_marker_gap_rejects_embedded_and_placeholder():
     # a marker inside real prose is left in place (no text may be lost)
     assert graphics.marker_gap("Se figuren /Figuren är inte med här/ nedan") is None
@@ -145,6 +233,18 @@ def test_heading_marker_keeps_explicit_provenance():
              "genom lag (2025:1369)./")])
     graphic = grafiks(to_normalform(doc, BASEFILE))[0]
     assert graphic["satt_av"] == "2025:1369"
+
+
+def test_bilaga_heading_marker_emits_grafik():
+    """A wholly dropped appendix carries its marker on the bilaga's own rubrik
+    (2016:1145), which the Rubrik case never sees."""
+    doc = Forfattning(children=[
+        Bilaga(rubrik="Bilaga 1 /Bilagan är inte med här/", children=[])])
+    nf = to_normalform(doc, BASEFILE)
+    kids = nf["structure"][0]["children"]
+    assert [n["type"] for n in kids] == ["rubrik", "grafik"]
+    assert plain(kids[0]["text"]) == "Bilaga 1"
+    assert kids[1]["sort"] == "bilaga"
 
 
 def test_roadsign_gap_only_for_roadsign_docs():

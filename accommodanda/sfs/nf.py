@@ -548,7 +548,15 @@ def project_children(children, pairs, proj, frag, live=True, satt_av=None,
                 node_id = proj.minter.mint(sub, node)
                 ctx = node_id or frag
                 blive = live and _in_force(node, proj.minter)
-                kids = [rubrik_nf(node.rubrik, 1, proj, ctx, live=blive)]
+                heading, sort = graphics.heading_gap(node.rubrik)
+                kids = [rubrik_nf(heading, 1, proj, ctx, live=blive)]
+                # the whole appendix may be dropped, its marker left on the
+                # heading ("Bilaga 1 /Bilagan är inte med här/") -- the same
+                # split the Rubrik case makes, which a bilaga never reaches
+                if sort:
+                    kids.append(grafik_node(
+                        proj, sort,
+                        graphics.marker_provenance(node.rubrik) or gov))
                 kids += project_children(node.children, sub if node_id else None,
                                          proj, ctx, blive, satt_av=gov,
                                          in_appendix=True)
