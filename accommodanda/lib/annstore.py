@@ -44,7 +44,7 @@ from datetime import date
 from pathlib import Path
 
 from .. import config
-from . import compress, layout, util
+from . import compress, layout, llm, util
 
 ROOT = config.WIKI_ROOT / "ann"
 
@@ -195,16 +195,39 @@ def write(p, payload, inputs, force=False, model=None, meta_extra=None,
     -- a costly one-shot output must never survive truncated. Per-entry curation
     (a ``"verified": true`` flag on individual payload entries) is the source's
     concern: it decides what to carry over and hands `write` the final payload
-    (sfs.graphics.plan_localization), so this stays a blunt writer."""
+    (sfs.graphics.plan_localization), so this stays a blunt writer.
+
+    ``meta.run`` records how the layer was authored -- endpoint host, model,
+    sampling, token counts, wall-clock span and a hash of the prompts actually
+    sent (`lib.llm.record`). It is stamped only when an ai- action opened a
+    recording window and the window saw a call, so a mechanically derived layer
+    stays free of it. Without this a layer cannot say what produced it: two runs
+    of the same pass at different temperatures, or against a local model rather
+    than the hosted one, are indistinguishable on disk.
+
+    Writing a layer closes the recording window and opens a fresh one
+    (`llm.rearm`), so authoring several layers in one process gives each only
+    its own calls. The separate running `llm.USAGE` tally is untouched -- it is
+    what forarbete ai-genomforande prints after its `write`."""
     assert "meta" not in payload, "payload must not carry its own `meta` key"
     guard(p, force)
     assert status in STATUSES, "unknown layer status %r" % status
     meta = {"status": status, "model": model or config.LLM_MODEL,
             "generated": date.today().isoformat(), "inputs": inputs,
+            **({"run": run} if (run := llm.record()) else {}),
             **(meta_extra or {})}
-    util.write_atomic(p, json.dumps({"meta": meta, **payload},
-                                    ensure_ascii=False, indent=2))
+    dump(p, {"meta": meta, **payload})
+    llm.rearm()
     return p
+
+
+def dump(p, layer):
+    """Serialize a whole layer to `p`, atomically. The one spelling of the
+    envelope on disk, so a curation edit that rewrites a single entry
+    (`api/graphicsedit.write`) produces a diff of just that entry rather than
+    re-indenting the file -- the git diff of a layer is how a human review is
+    read (this module's own contract), and a reformat would bury it."""
+    util.write_atomic(p, json.dumps(layer, ensure_ascii=False, indent=2))
 
 
 def entries():
@@ -212,3 +235,28 @@ def entries():
     for `lagen ann status`."""
     return sorted(p for pattern in ("*.ann", "*.corr", "*.graphics")
                   for p in ROOT.rglob(pattern))
+
+
+def layer_entries(suffix):
+    """Every payload entry of every layer with `suffix`, as
+    ``(path, meta, key, entry)`` in store order.
+
+    Globs the one suffix rather than reusing `entries()`, which walks all
+    three patterns over the whole store -- 7,000 files to reach 26 `.graphics`
+    layers, per request, on an HDD-class box.
+
+    The one walk over the store's payloads, so the readers that split it by
+    `publishable` cannot disagree about what they are splitting: the renderer
+    indexes the entries that pass (`lib/page._graphics_index`) and the review
+    queue lists the ones that do not (`api/graphicsedit.queue`). Two copies of
+    the walk would drift the moment an entry shape changes -- the queue would
+    start offering entries the site already shows, or hide ones it refuses."""
+    for path in sorted(ROOT.rglob("*" + suffix)):
+        layer = json.loads(path.read_text(encoding="utf-8"))
+        # through `read_meta`, not the raw dict: a hand-typed `"verifed"` would
+        # otherwise sail past `publishable`, silently drop every crop of that
+        # act from the render and re-offer them all as pending
+        meta = read_meta(path)
+        for key, entry in layer.items():
+            if key != "meta":
+                yield path, meta, key, entry

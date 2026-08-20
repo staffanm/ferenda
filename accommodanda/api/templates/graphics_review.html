@@ -1,0 +1,229 @@
+{#- The self-contained crop-review page (api/graphics.py `/review`): served on
+    demand behind the editor session, no build-time asset, no site chrome. The
+    script drives the /api/v1/graphics endpoints and carts through the shared
+    /api/v1/edit cart, so a session of approvals lands as one attributed commit. -#}
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Granska grafik</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;margin:0;padding:1.25rem;max-width:82rem}
+ h1{font-size:1.1rem;margin:0} .muted{color:#666;font-weight:normal}
+ header{display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap;
+   border-bottom:1px solid #ddd;padding-bottom:.6rem;margin-bottom:1rem}
+ #progress{margin-left:auto;font-variant-numeric:tabular-nums}
+ .grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(18rem,2fr);gap:1.5rem}
+ .pagewrap{position:relative;display:inline-block;max-width:100%;
+   border:1px solid #ccc;background:#f7f7f7;cursor:crosshair}
+ .pagewrap img{display:block;max-width:100%;height:auto;-webkit-user-drag:none}
+ #rect{position:absolute;border:2px solid #c5221f;background:rgba(197,34,31,.12);
+   pointer-events:none}
+ dl{display:grid;grid-template-columns:auto 1fr;gap:.25rem .75rem;margin:.5rem 0}
+ dt{color:#666} dd{margin:0}
+ .crop{border:1px solid #ccc;background:#fff;padding:.25rem;max-width:100%}
+ .crop img{display:block;max-width:100%;height:auto}
+ .row{margin:.7rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+ button{padding:.45rem .9rem;font-size:.95rem;cursor:pointer}
+ button.primary{font-weight:600}
+ #msg{margin-left:auto} .ok{color:#137333} .err{color:#c5221f}
+ .hint{color:#666;font-size:.85rem;margin:.3rem 0}
+ .anchor{background:#f4f4f4;padding:.4rem .5rem;border-left:3px solid #ccc;
+   font-size:.9rem;max-height:7rem;overflow:auto}
+ input[type=text]{flex:1;min-width:12rem;padding:.35rem}
+ .done{padding:2rem;text-align:center;color:#137333;font-size:1.05rem}
+</style></head><body>
+<header>
+ <h1>Granska grafik <span class="muted">— {{ username }}</span></h1>
+ <span id="progress"></span>
+</header>
+
+<div id="empty" class="done" hidden>Inget kvar att granska.</div>
+
+<div id="item" class="grid" hidden>
+ <div>
+  <div class="row">
+   <button id="prevpage">◀ Föregående sida</button>
+   <span id="pagelabel" class="muted"></span>
+   <button id="nextpage">Nästa sida ▶</button>
+   <span class="hint">Dra en ny ruta på sidan för att flytta beskärningen.</span>
+  </div>
+  <div class="pagewrap" id="pagewrap">
+   <img id="pageimg" alt="">
+   <div id="rect" hidden></div>
+  </div>
+ </div>
+ <div>
+  <dl>
+   <dt>Författning</dt><dd><code id="ref"></code></dd>
+   <dt>Typ</dt><dd id="sort"></dd>
+   <dt>Alt-text</dt><dd id="alt"></dd>
+   <dt>Hämtas ur</dt><dd><code id="prov"></code></dd>
+  </dl>
+  <p class="hint">Texten beskärningen hör till:</p>
+  <div class="anchor" id="anchortext"></div>
+  <p class="hint">Beskärningen som läsaren skulle se:</p>
+  <div class="crop"><img id="cropimg" alt=""></div>
+  <div class="row">
+   <button id="approve" class="primary">Godkänn</button>
+   <button id="wholepage">Hela sidan</button>
+   <button id="skip">Hoppa över</button>
+  </div>
+  <p class="hint" id="bboxlabel"></p>
+ </div>
+</div>
+
+<div class="row" style="border-top:1px solid #ddd;padding-top:.8rem;margin-top:1rem">
+ <b id="cartcount">0 i korgen</b>
+ <input type="text" id="message" placeholder="Commit-meddelande (t.ex. 'sfs: granskad grafik')">
+ <button id="commit">Checka in korgen</button>
+ <span id="msg"></span>
+</div>
+
+<script>
+const msg=document.getElementById("msg");
+function show(t,ok){msg.textContent=t;msg.className=ok?"ok":"err";}
+async function api(url,opts){
+ const r=await fetch(url,Object.assign({credentials:"same-origin"},opts||{}));
+ if(!r.ok) throw new Error(r.status+" "+await r.text());
+ return r.headers.get("content-type").includes("json")?r.json():r;
+}
+
+let queue=[], at=0, cur=null, page=1, bbox=null, pagePts=null, baseSha="";
+
+function fmtBbox(b){return b?b.map(v=>Math.round(v)).join(", "):"hela sidan";}
+
+async function loadQueue(){
+ const d=await api("/api/v1/graphics/queue");
+ queue=d.pending; at=0;
+ await render();
+}
+
+async function render(){
+ document.getElementById("progress").textContent=
+   queue.length?((at+1)+" / "+queue.length):"";
+ if(at>=queue.length){
+  document.getElementById("item").hidden=true;
+  document.getElementById("empty").hidden=false;
+  document.getElementById("progress").textContent="";
+  return;
+ }
+ document.getElementById("empty").hidden=true;
+ document.getElementById("item").hidden=false;
+ cur=queue[at]; page=cur.page; bbox=cur.bbox?cur.bbox.slice():null;
+ // the fingerprint the cart re-checks against the layer on disk; it comes from
+ // the queue, so a vision re-run since the queue was fetched surfaces as the
+ // 409 the cart route raises, not as a silent overwrite
+ baseSha=cur.base_sha;
+ document.getElementById("ref").textContent=cur.ref+"  "+cur.anchor;
+ document.getElementById("sort").textContent=cur.sort||"—";
+ document.getElementById("alt").textContent=cur.alt||"—";
+ document.getElementById("anchortext").textContent=cur.anchor_text||"—";
+ await showPage();
+}
+
+async function showPage(){
+ document.getElementById("prov").textContent=
+   "SFS "+cur.sfs+", sida "+page+(cur.pages?" av "+cur.pages:"");
+ document.getElementById("pagelabel").textContent="sida "+page;
+ document.getElementById("pageimg").src=
+   "/api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
+ const ps=await api("/api/v1/graphics/pagesize?sfs="+
+   encodeURIComponent(cur.sfs)+"&page="+page);
+ pagePts=ps;
+ drawRect(); showCrop();
+}
+
+function scale(){
+ const img=document.getElementById("pageimg");
+ return img.clientWidth&&pagePts?img.clientWidth/pagePts.width:0;
+}
+
+function drawRect(){
+ const r=document.getElementById("rect"), s=scale();
+ document.getElementById("bboxlabel").textContent="bbox: "+fmtBbox(bbox);
+ if(!bbox||!s){r.hidden=true;return;}
+ r.hidden=false;
+ r.style.left=(bbox[0]*s)+"px"; r.style.top=(bbox[1]*s)+"px";
+ r.style.width=((bbox[2]-bbox[0])*s)+"px";
+ r.style.height=((bbox[3]-bbox[1])*s)+"px";
+}
+
+function showCrop(){
+ const img=document.getElementById("cropimg");
+ img.src=bbox
+  ?"/api/v1/graphics/crop?sfs="+encodeURIComponent(cur.sfs)+"&page="+page+
+    "&bbox="+bbox.map(v=>v.toFixed(1)).join(",")
+  :"/api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
+}
+
+document.getElementById("pageimg").addEventListener("load",drawRect);
+addEventListener("resize",drawRect);
+
+// drag a new rectangle on the page
+(function(){
+ const wrap=document.getElementById("pagewrap");
+ let start=null;
+ wrap.addEventListener("pointerdown",e=>{
+  const s=scale(); if(!s)return;
+  const r=wrap.getBoundingClientRect();
+  start=[(e.clientX-r.left)/s,(e.clientY-r.top)/s];
+  wrap.setPointerCapture(e.pointerId);
+ });
+ wrap.addEventListener("pointermove",e=>{
+  if(!start)return;
+  const s=scale(), r=wrap.getBoundingClientRect();
+  const now=[(e.clientX-r.left)/s,(e.clientY-r.top)/s];
+  bbox=[Math.min(start[0],now[0]),Math.min(start[1],now[1]),
+        Math.max(start[0],now[0]),Math.max(start[1],now[1])];
+  drawRect();
+ });
+ wrap.addEventListener("pointerup",e=>{
+  if(!start)return; start=null;
+  // too small to be a real drag: fall back to the entry's own rectangle, but
+  // only on its own page -- restoring it onto a page the reviewer paged to
+  // would draw the previous page's geometry and cart it as if reviewed
+  if(bbox&&bbox[2]-bbox[0]>2&&bbox[3]-bbox[1]>2){showCrop();return;}
+  bbox=(page===cur.page&&cur.bbox)?cur.bbox.slice():null;
+  drawRect(); showCrop();
+ });
+})();
+
+document.getElementById("prevpage").onclick=async()=>{
+ if(page>1){page--;bbox=null;await showPage();}};
+document.getElementById("nextpage").onclick=async()=>{
+ if(!cur.pages||page<cur.pages){page++;bbox=null;await showPage();}};
+
+async function cart(withBbox){
+ try{
+  const d=await api("/api/v1/graphics/cart",{method:"POST",
+   headers:{"content-type":"application/json"},
+   body:JSON.stringify({ref:cur.ref,anchor:cur.anchor,page:page,
+     bbox:withBbox?bbox:null,verified:true,base_sha:baseSha})});
+  setCart(d.carted); show("Lagd i korgen",true);
+  at++; await render();
+ }catch(e){show(""+e.message,false);}
+}
+document.getElementById("approve").onclick=()=>cart(true);
+document.getElementById("wholepage").onclick=()=>cart(false);
+document.getElementById("skip").onclick=async()=>{at++;show("",true);await render();};
+
+function setCart(n){document.getElementById("cartcount").textContent=n+" i korgen";}
+async function refreshCart(){
+ try{const d=await api("/api/v1/edit/cart");setCart(d.drafts.length);}
+ catch(e){show("Kunde inte läsa korgen: "+e.message,false);}
+}
+document.getElementById("commit").onclick=async()=>{
+ const m=document.getElementById("message").value.trim();
+ if(!m){show("Ett commit-meddelande krävs",false);return;}
+ try{
+  const d=await api("/api/v1/edit/commit",{method:"POST",
+   headers:{"content-type":"application/json"},body:JSON.stringify({message:m})});
+  show("Incheckat "+(d.sha||"").slice(0,8)+" — "+(d.rebuilt||[]).length+" sida(or) omgenererade",true);
+  setCart(0); document.getElementById("message").value="";
+  await loadQueue();
+ }catch(e){show(""+e.message,false);}
+};
+
+refreshCart(); loadQueue().catch(e=>show(""+e.message,false));
+</script>
+</body></html>

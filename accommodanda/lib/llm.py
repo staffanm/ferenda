@@ -8,11 +8,13 @@ is called only from those explicit ai-* actions on named ids -- never from a
 corpus-wide parse/relate/generate."""
 
 import base64
+import dataclasses
+import hashlib
 import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import requests
@@ -33,6 +35,96 @@ LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 # actions'/benchmarks' cost reporting; the endpoint's `usage` object is the
 # only place the true (tokenizer-accurate) counts exist
 USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
+
+# The provenance of one unit of authored work -- what `annstore.write` stamps
+# into a layer's `meta.run`, so a layer says who made it, how, and at what cost.
+# None until an ai- action opens a window with `start_record`, which is what
+# keeps a mechanically derived layer (sfs road signs) from claiming a model run.
+#
+# The window is per *document*, not per process: `ai-includegraphics a b c`
+# authors three layers in one process, and each must record only its own calls,
+# which `annstore.write` arranges by calling `rearm` after each stamp.
+@dataclasses.dataclass
+class _Window:
+    """One document's calls, accumulated. A dataclass rather than a dict so the
+    fields are the schema -- `meta.run` is committed data, and a typo'd key in a
+    dict would write a silently wrong layer."""
+    started: str
+    temperature: float
+    top_p: float | None
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    prompt_shas: list[str] = dataclasses.field(default_factory=list)
+    ended: str | None = None
+    host: str | None = None
+    model: str | None = None
+
+
+_RECORD: _Window | None = None
+
+
+def start_record():
+    """Open a provenance window for one document's worth of calls. Call it at
+    the top of a per-document ai- action; `annstore.write` reads the matching
+    `record()` when the layer is written."""
+    global _RECORD
+    _RECORD = _Window(started=_now(), temperature=TEMPERATURE, top_p=TOP_P)
+
+
+def rearm():
+    """Close the current window and open a fresh one, keeping recording armed.
+    `annstore.write` calls this after stamping a layer, so the next layer in the
+    same process records only its own calls -- `ai-includegraphics a b c`
+    authors three layers and none inherits another's tokens. A no-op when no
+    window is open, which is what keeps a derived layer unstamped."""
+    if _RECORD is not None:
+        start_record()
+
+
+def record():
+    """The open window's provenance, or None when no window is open or it saw
+    no call.
+
+    `prompt_sha` digests the prompts actually sent -- the rendered text and,
+    for a vision pass, the images with it, since those are equally part of what
+    produced the answer. It is the whole prompt rather than a fingerprint of the
+    code that built it: only the prompt reaching the endpoint changes the reply,
+    so a refactor that changes no output would churn a code hash, and a change
+    in a helper it called would slip past one.
+
+    It belongs here rather than in the layer's `inputs`: `drifted` recomputes
+    every input from its label, and recomputing a rendered prompt means running
+    a source's prompt builder, which this package may not do.
+    """
+    if _RECORD is None or not _RECORD.calls:
+        return None
+    out = {k: v for k, v in dataclasses.asdict(_RECORD).items()
+           if k != "prompt_shas" and v is not None}
+    out["prompt_sha"] = hashlib.sha256(
+        "\n".join(_RECORD.prompt_shas).encode("utf-8")).hexdigest()
+    return out
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _observe(messages, model, usage):
+    """Fold one completed call into the open window (a no-op when none is)."""
+    if _RECORD is None:
+        return
+    _RECORD.calls += 1
+    _RECORD.prompt_tokens += usage.get("prompt_tokens") or 0
+    _RECORD.completion_tokens += usage.get("completion_tokens") or 0
+    _RECORD.prompt_shas.append(hashlib.sha256(
+        json.dumps(messages, sort_keys=True, ensure_ascii=False,
+                   default=str).encode("utf-8")).hexdigest())
+    _RECORD.ended = _now()
+    # the host, never the base URL: it carries no secret today, but a bearer
+    # token in a query string is one deploy away and a layer is committed
+    _RECORD.host = urlsplit(API_URL).hostname
+    _RECORD.model = model
 
 
 def vision_content(text, images):
@@ -172,6 +264,7 @@ def complete_thread(messages, model=DEFAULT_MODEL, timeout=TIMEOUT, max_tokens=N
     USAGE["calls"] += 1
     USAGE["prompt_tokens"] += usage.get("prompt_tokens") or 0
     USAGE["completion_tokens"] += usage.get("completion_tokens") or 0
+    _observe(messages, model, usage)
     choice = data["choices"][0]
     # a `length` finish means the model ran out of budget mid-answer -- the reply
     # is truncated and unparseable. raise (not assert, which -O strips): this is

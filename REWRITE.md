@@ -173,7 +173,7 @@ accommodanda/
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
   wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
-  api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), pdf·pdfjob·pdfcollection (single-document and collection paper exports), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), patch (source-fix editor)
+  api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), pdf·pdfjob·pdfcollection (single-document and collection paper exports), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), graphicsedit·graphics (`.graphics` crop-review editor), patch (source-fix editor), facsimiles (the shared source-PDF page/crop responder, its own module because `app` imports every router)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
 
@@ -422,7 +422,15 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   true` surviving a rerun so a reviewer can sign off graphics one at a time
   without losing prior sign-offs. The layer
   stores raw PDF points (top-left origin) and is hand-editable; generated,
-  unverified candidates stay out of the public render.
+  unverified candidates stay out of the public render until a human signs them
+  off — by hand, or at `GET /api/v1/graphics/review` (`api/graphicsedit.py` +
+  `api/graphics.py`, the crop-review editor), which shows the crop beside the
+  whole source page with the rectangle drawn on it and carts an approve/move/
+  whole-page decision through the same cart and attributed-commit machinery as
+  the inline content editor (`editcart.py`'s draft-kind dispatch). Its
+  page/crop routes deliberately bypass `annstore.publishable` for a logged-in
+  editor — an editor has to see an unreviewed crop to judge it — while the
+  public `GET /api/v1/sfs-graphic` still 404s it.
   **Road-sign statutes take a second, fully deterministic route.** 2007:90 lists
   326 signs, each a designator cell with no marker and no per-row change note,
   and neither question a vision model could answer well at that scale. Both are
@@ -4421,7 +4429,7 @@ rewrite work.
 | `accommodanda/foreskrift/` | **agency-regulations vertical**: `model` (Regulation/Consolidation/Amendment primitives), `harvest` (per-agency enumerate seam {indexed,paginated,json,sitemap,bespoke} × resolve seam {landing+classify, direct} wired onto `lib/harvest.walk`; `Agency.browser` transport selection; `Skip`/`guarded_enumerate` resilience for flaky indexes; classify seam {file,section,href,single,default_regulation}), `agencies` (per-fs config registry, 71 registered författningssamlingar, 66 live + 5 with no live harvester), `skvfs`/`mtfs` (F5-protected source semantics), `download`, `parse` (PDF → Regulation artifact: text-based `N kap.`/`N §` classify, masthead metadata, bemyndigande/genomför via the citation engine; `clean_title`/`title_from_body` fall back to the PDF's own opening rubric when the harvest title is link chrome), `structure` (kapitel/paragraf nest + SFS `#K2P3` anchors), `data/series.json` (hand-edited designation/official-title/successor registry, `lib/datasets.FS_SERIES` — drives the browse's headings, Swedish ordering and succession folding, `lib/facets.py`). All §7g frozen-import records (the 909 SKVFS/SOSFS/HSLF-FS records, then the ~30 further myndfs corpora, 2,177 documents) were one-time imported and migrated into ordinary harvested form; body PDFs copied under `FORESKRIFT_DOWNLOADED/<fs>/`, `legacy`-marked records kept as ordinary records with a `"source": "*-legacy"` provenance marker. Both one-time import modules (`legacy.py`, twice built and twice deleted once its import ran to completion) are gone (§7g teardown, 2026-07-19) |
 | `accommodanda/lib/browser.py` | detached headful-Chrome transport for F5/Shape-protected public sources: navigate without a Playwright/CDP connection, wait the source-configured interval, then attach briefly to read the completed DOM or exact browser-cached PDF; selected only by SKVFS and MTFS; on a headless host it auto-starts a private Xvfb framebuffer and runs Chrome headful against it, torn down on exit |
 | `accommodanda/remisser/` | **remiss (referral-response) vertical**: `model` (`Remiss` keyed on the *referred document's* own identity, `basefile = "<typ>/<identifier>"` — not the regeringen.se ärende-page slug, kept in `url` — plus `Remissinstans`/`Remissvar`, `org_slug`, `Remiss.externt_dokument`), `download` (regeringen.se `/remisser/` sync over the AJAX filter listing (`REMISS_CATEGORY`, not the decorative `?p=N`); `parse_arende` raises rather than minting a stub identity when an ärende remits a regeringen-published document of an unrecognised doctype; `pm`/`lr` cross-refs resolved via `lib.regeringen`'s shared identity rules; the examined-ärende index `layout.REMISSER_SEEN` — keyed by URL slug, since only the ärende page names the remitted document — drives the sweep, `until` = deadline + grace period; `sync`'s shared `_poll` step + `sync_one`/`--only`, both gated by `externt_dokument` for ärenden whose remitted document regeringen didn't publish), `parse` (answer → `Remissvar`; `_body_text` dispatches on the file's magic bytes rather than trusting its stored `.pdf` name — `lib/pdftext` with no fixed header for a real PDF, `lib.poi` for the 4 answers actually stored as Word; since 2026-08-04 the shared `pdftext` pipeline also strips running furniture found by shape, drops footnotes, rejoins page-break-split sentences and strips the letter's addressing apparatus before flattening to paragraph text — the whole corpus, 79,982 answers, was reparsed), `ai_analyze` (the sole LLM pass — sentiment+quote per section, `.ann` layer in the curated store, `lib/annstore.py`, joined to forarbete via `layout.resolve_basefile`; a basefile may now name a whole ärende, expanded to every fetched answer still lacking a layer; each quote carries a `quote_type` (`grund`/`standpunkt`) so a stated non-answer is not confused with an invented ground, and a reworded quote is snapped back to the answer's own wording (`snap_to_source`) rather than only rejected; `--update` re-analyses every ärende already covered whose remissperiod has not closed — the same deadline + grace the download side re-polls by (`download.still_open`) — picking up answers that arrived after the first analysis, with a `.ann.watch` marker per ärende so one analysed before its first answer arrived is still tracked; never part of a rebuild). Never `relate`d/published; its `.ann` layer feeds the referred förarbete's rail via `page._remiss_indexes`; `KNOWN-GAPS.md` records the corpus's outstanding non-self-healing gaps; `tools/remisser-eval/` scores `ai-analyze` output against a hand-built `.ann.key` answer key |
-| `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar/forarbete (`ai-genomforande`) `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified, model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon), `guard`/`drifted` gate regeneration and derive staleness; per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
+| `accommodanda/lib/annstore.py` | the curated store for every `ai-*` action's output (eurlex/kommentar/forarbete (`ai-genomforande`) `.ann`, sfs `.corr` — the latter also written mechanically by `lagen sfs table-correspond` from a prop's own jämförelsetabell bilagor (`forarbete/jamforelse.py`) and by `lagen sfs renumber-correspond` from the register's "betecknas" omfattning clauses (same-law renumbering, RF 2010:1408) — and sfs `.graphics`, `lagen sfs ai-includegraphics`'s vision-localized graphic crops) — `WIKI_ROOT/ann/<source-dir>/<relpath>`, mirroring the artifact tree's relpath grammar; envelope (`meta`: status generated/verified/derived — `derived` marks a layer computed mechanically rather than authored by a model, which `publishable` lets reach the render as it stands — model, date, input sha256 hashes, optional `meta_extra` fields like `.graphics`'s `through` provenance horizon, and `run` — endpoint host, model, sampling, token counts, wall-clock span and a hash of the prompts actually sent, `lib/llm.py`'s `record()` — stamped only when an `ai-*` action opened a recording window and it saw a call, so a `derived` layer stays free of it; `write` calls `llm.rearm()` after stamping so several layers authored in one process each get only their own calls), `guard`/`drifted` gate regeneration and derive staleness (`run`'s prompt hash is deliberately not one of the recomputed `inputs`, since `drifted` recomputes every input from its label alone and a rendered prompt needs the source's own prompt builder, which `lib/` may not call — a prompt change is visible by comparing `run.prompt_sha` across runs, not as staleness); per-entry `"verified": true` curation on a `.graphics` gap is preserved only while both resolved source and stored semantic identity still match, so renumbered/transformed gaps cannot inherit a crop by positional id; `write` itself stays blunt; inventoried by `lagen ann status` |
 | `accommodanda/lib/regeringen.py` | shared regeringen.se harvest knowledge (rule:second-use-goes-to-lib): the doctype table (`TYPES`), `ul.list--block` listing walk (`listing_items`), and the identity rules for the two series-numberless doctypes (`pm_identity`, `lr_identity`) so `forarbete/download.py` and `remisser/download.py` mint the same basefile for the same document from different pages |
 | `accommodanda/site/` | **editorial-chrome vertical**: `model` (block-tree dataclasses + `Frontpage`/`AboutPage`/`Sitenews`), `parse` (markdown → artifact for `frontpage`/`om/<slug>`/`sitenews`), `render` (artifacts → HTML + Atom, `write_site`). Content is markdown in `lagen-wiki/site/`, migrated once by `tools/migrate_site_content.py`. Never `relate`d/indexed/dumped (absent from `ARTIFACTS`, like remisser); rendered during `generate` |
 | `accommodanda/lib/pdftext.py` | **shared font-aware PDF extraction** (förarbete + föreskrift + avg (JO/ARN) + remisser): `pdf_pages` (`pdftohtml -xml` → bold/italic-tagged `Line`s) → `page_paragraphs` (reflow, strip running header/page-no/TOC — a line is stripped only when it *is* the header (identifier + at most a page number/date), not merely when it contains the identifier; `identifier=None` skips header-stripping for sources with no fixed masthead, e.g. remisser) → the vertical's own `classify`; `repair_pdf` (ghostscript rebuild of a PDF whose cross-reference table poppler refuses, cached beside the source) feeds `pages_with_ocr` when poppler's `pdftohtml` fails outright rather than yielding empty text. Four source-agnostic cleaning steps, added for remisser (2026-08-04) where no per-source header string exists (each of ~90 organisations answers on its own letterhead): `strip_page_furniture` (running header/footer found by digit-masked repetition + margin position + font size, not a passed-in identifier), `join_across_pages` (rejoins a sentence a page break split), `drop_footnotes` (drops footnote text and its superscript markers by font size), `strip_addressing` (drops a letter's masthead/reference line/contact block by composition — address tokens + reference labels — since a masthead printed once cannot be found by repetition) |
@@ -4561,6 +4569,47 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **api** (2026-08-20) — a crop-review editor for the `.graphics` layer.
+  `api/graphicsedit.py` is the content model for one entry (its
+  `region_of`/`read`/`write`, the sibling of `api/editcontent.py`'s markdown
+  regions); `api/graphics.py` routes `GET
+  /api/v1/graphics/{queue,page,pagesize,crop,review}` and `POST
+  /api/v1/graphics/cart`, all gated by `auth.require_editor`. The reviewer
+  sees the crop and the whole source page with the rectangle drawn on it side
+  by side — a confident placement on the wrong figure still returns a clean
+  picture, and only the full page reveals it — and carts approve-as-is,
+  approve-a-moved-rectangle or approve-the-whole-page, one entry at a time.
+  `api/editcart.py` is generalized over draft *kinds* (`_region_of`/`_read`/
+  `_write` dispatch on `graphicsedit.KIND`) rather than markdown alone, so the
+  existing cart, conflict check and attributed commit carry a graphics
+  decision unchanged; the markdown-only wiki index cache-clear now runs only
+  when the committed cart holds a markdown kind. `build.rebuild_after_commit`
+  gained a `graphics` branch: a reviewed entry needs no reparse or relate (the
+  layer is read at generate time, `page._graphics_index`), so checkout
+  regenerates only the host statute's page. The page/crop routes deliberately
+  bypass `annstore.publishable` — an editor has to see an unreviewed crop to
+  judge it — while the public `/api/v1/sfs-graphic` still 404s it.
+  `test/test_graphicsedit.py`.
+- **lib** (2026-08-20) — every `ai-*` layer records who authored it. A new
+  `lib/llm.py` `_Window` accumulates one document's calls (`start_record`
+  opens it; `complete_thread`, the single HTTP call site, folds each reply in
+  via `_observe`); `record()` returns host, model, sampling, token counts,
+  wall-clock span and `prompt_sha` — a hash of the prompts actually sent (the
+  rendered text and, for a vision pass, the images with it), not of the code
+  that built them, since only what reached the endpoint can have produced the
+  reply. `annstore.write` stamps this as `meta.run` when a window is open and
+  saw a call, then calls `llm.rearm()` so several layers authored in one
+  process (`ai-includegraphics a b c`) each carry only their own calls; a
+  mechanically derived layer (sfs road signs) arms no window and carries no
+  `run`. The prompt hash lives in `meta.run`, not in the layer's `inputs`:
+  `annstore.drifted` recomputes every input from its label alone, and
+  recomputing a rendered prompt would mean running a source's prompt builder,
+  which `lib/` may not do — so a prompt change does not mark old layers stale
+  by itself, it shows up as a changed `prompt_sha` across runs. `build.py`'s
+  six per-document `ai-*` actions (`sfs ai-correspond`, `sfs
+  ai-includegraphics`, `forarbete ai-genomforande`, `eurlex ai-annotate`,
+  `remisser ai-analyze`, `kommentar ai-annotate`) call `llm.start_record()`.
+  `test/test_llm_record.py`.
 - **render/api** (2026-08-20) — the recovered graphics become readable. Every
   crop is a `button.grafik-open` wrapping its `<img>`, and `assets/grafik.js`
   opens it full size in a lightbox (backdrop/Escape/× close it, a click on the

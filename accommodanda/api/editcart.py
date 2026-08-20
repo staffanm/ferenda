@@ -40,9 +40,47 @@ from pathlib import Path
 from .. import config
 from ..lib import git, util
 from ..wiki import parse as wiki_parse
-from . import editcontent
+from . import editcontent, graphicsedit
 
 EDITS = config.DATA / ".build" / "edits"
+
+
+# --------------------------------------------------------------------------
+# kind dispatch: a draft's payload is whatever its kind's content module says
+# --------------------------------------------------------------------------
+# Every kind exposes the same three calls -- `region_of(draft)`,
+# `read(region) -> {text, base_sha}`, `write(region, text) -> {kind, basefile,
+# path}` -- so drafting, the conflict check and the write loop below carry any
+# kind unchanged. Markdown regions are the original kind and keep
+# `editcontent`'s own vocabulary ("markdown"); the adapter is the one place
+# that translates, rather than renaming a field the editor JS also reads.
+#
+# Two places still know a kind by name, both deliberately: `commit` skips the
+# wiki index invalidation for a graphics-only cart (there is no markdown to
+# reindex), and `region_view` serves the markdown editor alone -- the crop
+# reviewer has its own view (`api/graphics.py`), because a bbox has no textarea.
+
+
+def _region_of(draft):
+    """Rebuild the address a draft names, whichever kind it is."""
+    if draft["kind"] == graphicsedit.KIND:
+        return graphicsedit.region_of(draft)
+    return editcontent.region_of(draft)
+
+
+def _read(region):
+    """The on-disk state a draft is based on, as `{text, base_sha}`."""
+    if region.kind == graphicsedit.KIND:
+        return graphicsedit.read(region)
+    view = editcontent.read(region)
+    return {"text": view["markdown"], "base_sha": view["base_sha"]}
+
+
+def _write(region, new_text):
+    """Apply one draft to its file; returns `{kind, basefile, path}`."""
+    if region.kind == graphicsedit.KIND:
+        return graphicsedit.write(region, new_text)
+    return editcontent.write(region, new_text)
 
 # One lock for both the draft store and checkout; see the module docstring.
 _LOCK = threading.Lock()
@@ -83,13 +121,13 @@ def upsert(username, region, new_text):
     """Add or replace the draft for `region`; returns the resulting cart size.
     An edit that matches the on-disk text is a no-op -- it *removes* any existing
     draft rather than carting a change that would commit nothing."""
-    base = editcontent.read(region)
+    base = _read(region)
     with _LOCK:
         drafts = [d for d in _load(username) if d["key"] != region.key]
-        if new_text.rstrip("\n") != base["markdown"].rstrip("\n"):
+        if new_text.rstrip("\n") != base["text"].rstrip("\n"):
             drafts.append({"key": region.key, "kind": region.kind,
                            "ref": region.ref, "anchor": region.anchor,
-                           "base_text": base["markdown"],
+                           "base_text": base["text"],
                            "base_sha": base["base_sha"],
                            "new_text": new_text.rstrip("\n") + "\n",
                            "updated": int(time.time())})
@@ -139,20 +177,22 @@ def commit(editor, message):
             raise ValueError("a commit needs a message")
 
         stale = [d["key"] for d in drafts
-                 if editcontent.read(editcontent.region_of(d))["base_sha"]
-                 != d["base_sha"]]
+                 if _read(_region_of(d))["base_sha"] != d["base_sha"]]
         if stale:
             raise Conflict(stale)
 
         files, changes = [], []
         for d in drafts:
-            info = editcontent.write(editcontent.region_of(d), d["new_text"])
+            info = _write(_region_of(d), d["new_text"])
             files.append(info["path"])
             changes.append({"kind": info["kind"], "basefile": info["basefile"]})
         # a brand-new commentary file changed the set of files on disk; the cached
-        # frontmatter->path indexes must be rebuilt before the reparse reads them
-        wiki_parse.kommentar_index.cache_clear()
-        wiki_parse.begrepp_index.cache_clear()
+        # frontmatter->path indexes must be rebuilt before the reparse reads them.
+        # A graphics-only cart touches no markdown, so it skips the invalidation
+        # rather than paying for a rebuild of indexes nothing read.
+        if any(c["kind"] != graphicsedit.KIND for c in changes):
+            wiki_parse.kommentar_index.cache_clear()
+            wiki_parse.begrepp_index.cache_clear()
 
         sha = git.commit_as(config.WIKI_ROOT, [str(Path(f)) for f in files],
                             message, name=editor.name, email=editor.email)

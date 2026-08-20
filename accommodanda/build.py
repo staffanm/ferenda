@@ -53,6 +53,7 @@ from . import browse, config, patchsource
 from .api import app as api_app
 from .api import edit as api_edit
 from .api import errors as api_errors
+from .api import graphicsedit as api_graphicsedit
 from .api import patch as api_patch
 from .avg import arsberattelse as avg_arsberattelse_mod
 from .avg import download as avg_download
@@ -1129,6 +1130,7 @@ def sfs_ai_correspond(basefiles):
         sys.exit("usage: lagen sfs ai-correspond <new-sfs> <prop-basefile> "
                  "[<old-sfs>]  (e.g. 2018:585 prop/2017-18-89)")
     new_sfs, prop = basefiles[0], basefiles[1]
+    llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
     new_art = compress.read_json(layout.artifact("sfs", new_sfs))
     prop_art = compress.read_json(layout.artifact("forarbete", prop))
     old_uri = ("https://lagen.nu/" + basefiles[2] if len(basefiles) == 3
@@ -1479,6 +1481,7 @@ def _sfs_includegraphics_one(basefile):
     # keep verified+provenance-current entries; (re)localize the rest, grouped by
     # source PDF. A verified crop whose bilaga has since been amended (its `sfs`
     # no longer equals the resolved provenance) is re-localized, not kept stale.
+    llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
     existing = json.loads(out.read_text()) if out.exists() else {}
     keep, todo = sfs_graphics.plan_localization(gaps, existing, register, basefile)
     # Before any vision spend, make sure every source PDF is on disk -- fetching
@@ -2127,6 +2130,7 @@ def fa_ai_genomforande(basefiles):
                  "[<CELEX> ...]  (e.g. prop/2025-26-28 32022L2555; the CELEX "
                  "defaults to the directives the prop's implements names)")
     prop, celexes = basefiles[0], basefiles[1:]
+    llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
     prop_art = compress.read_json(layout.artifact("forarbete", prop))
     if not celexes:
         celexes = fa_aigenomforande.detect_directives(prop_art)
@@ -2316,6 +2320,7 @@ def eurlex_ai_annotate(basefiles):
     if not basefiles:
         sys.exit("usage: lagen eurlex ai-annotate <CELEX> [<CELEX> ...]")
     for celex in basefiles:
+        llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
         if RUN.dry_run:
             print("eurlex ai-annotate: would annotate %s -> %s"
                   % (celex, annstore.path("eurlex", celex)))
@@ -3297,6 +3302,10 @@ def remisser_ai_analyze(basefiles):
             print("remisser ai-analyze: would analyze %s -> %s"
                   % (basefile, annstore.path("remisser", basefile)))
             continue
+        # one provenance window per answer, opened here rather than left to
+        # `annstore.write`'s rearm: an Unanalyzable answer below writes no layer,
+        # and its spent calls must not be stamped onto the next answer's
+        llm.start_record()
         try:
             out = remisser_analyze.analyze(basefile, force=RUN.force)
         except remisser_analyze.Unanalyzable:
@@ -3457,6 +3466,7 @@ def kommentar_ai_annotate(basefiles):
     if not basefiles:
         sys.exit("usage: lagen kommentar ai-annotate <basefile> [<basefile> ...]")
     for basefile in basefiles:
+        llm.start_record()   # one provenance window per layer (lib.annstore stamps meta.run)
         if RUN.dry_run:
             print("kommentar ai-annotate: would annotate %s -> %s"
                   % (basefile, annstore.path("kommentar", basefile)))
@@ -3641,8 +3651,9 @@ def rebuild_after_commit(changes):
     touched host/concept pages (and, for editorial edits, the site pages). Reuses
     the exact stage functions the `lagen` CLI runs; a web request mints no run id,
     so the ledger emissions inside them no-op (see `RUN_ID`). `changes` is the
-    list `editcart.commit` returns -- `{"kind": kommentar|begrepp|site,
-    "basefile": …}`. Returns the public URLs of the rebuilt pages.
+    list `editcart.commit` returns -- `{"kind": kommentar|begrepp|site|graphics,
+    "basefile": …}`; a `graphics` entry is a reviewed `.graphics` crop and needs
+    neither, only its host statute's page regenerated. Returns the public URLs of the rebuilt pages.
 
     Called from `api/edit.py` (the write side of the service). build already
     imports `api.app`; this is the one call back the other way, used only at
@@ -3650,6 +3661,11 @@ def rebuild_after_commit(changes):
     kommentar = [c["basefile"] for c in changes if c["kind"] == "kommentar"]
     begrepp = [c["basefile"] for c in changes if c["kind"] == "begrepp"]
     site = [c["basefile"] for c in changes if c["kind"] == "site"]
+    # a reviewed .graphics entry needs no parse and no relate: the layer is read
+    # at generate time (`page._graphics_index`), not folded into the artifact,
+    # and a crop mints no links. Regenerating the host statute's page is the
+    # whole of it.
+    graphics = [c["basefile"] for c in changes if c["kind"] == "graphics"]
     for bf in kommentar:
         kommentar_parse_run(bf)
     for bf in begrepp:
@@ -3677,6 +3693,10 @@ def rebuild_after_commit(changes):
     if site:
         cmd_generate(source="site")      # write_site rewrites all editorial pages
         urls += ["/" if bf == "frontpage" else "/" + bf for bf in site]
+    for bf in graphics:                  # the crop rides its own statute's page
+        cmd_generate(only={str(layout.artifact("sfs", bf))}, source="sfs",
+                     force=True)
+        urls.append(layout.page_url(api_graphicsedit.document_uri(bf)))
     return urls
 
 

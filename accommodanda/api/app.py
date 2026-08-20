@@ -21,7 +21,6 @@ import logging
 import os
 import re
 import sqlite3
-import subprocess
 import threading
 from datetime import datetime
 from html import escape
@@ -67,6 +66,8 @@ from . import (
     db,
     edit,
     errors,
+    facsimiles,
+    graphics,
     ops,
     patch,
     pdf,
@@ -117,6 +118,7 @@ app.include_router(ops.router)
 app.include_router(auth.router)
 app.include_router(edit.router)
 app.include_router(patch.router)   # the patch-file (source-fix) editor
+app.include_router(graphics.router)  # the .graphics crop-review editor
 
 # the PDF export's waiting screen (/api/v1/pdf/vanta); its job routes are
 # declared next to /api/v1/pdf itself, below
@@ -887,59 +889,6 @@ def _dv_pdf(local):
 
 _PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _rs_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
 
-# immutable: the PDF a facsimile renders from never changes in place (a
-# re-download replaces the record wholesale), so clients may cache forever
-_FAX_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
-
-
-def _parse_bbox(raw):
-    """A ``bbox=x0,y0,x1,y1`` query value as the float list the crop renderer
-    takes, in PDF points from the page's top-left. A malformed or degenerate
-    rectangle is client input, so it is a 400 rather than an assertion."""
-    parts = raw.split(",")
-    if len(parts) != 4:
-        raise HTTPException(400, "bbox needs four comma-separated numbers")
-    try:
-        bbox = [float(p) for p in parts]
-    except ValueError:
-        raise HTTPException(400, "bbox coordinates must be numbers") from None
-    if not facsimile.valid_bbox(bbox):
-        raise HTTPException(400, "bbox must satisfy 0 <= x0 < x1, 0 <= y0 < y1")
-    return bbox
-
-
-def _png_response(source, basefile, pdf, page, bbox, missing, *,
-                  client_bbox=False, dpi):
-    """The cached facsimile PNG of one source-PDF page (or `bbox` of it at `dpi`)
-    as a response, rendering it on first request. `missing` is the 404 detail for
-    a page the PDF does not have. `client_bbox` says the rectangle came from the
-    query string: an off-page one is then the caller's mistake and a 400. Off a
-    stored .graphics layer it is a corpus fault and stays a 500.
-
-    `dpi` has no default on purpose: a crop's right resolution follows from what
-    the page does with it, and the two callers differ. A förarbete illustration
-    is shown once at column width and nowhere else; a recovered SFS graphic is a
-    thumbnail among hundreds that also opens full size."""
-    try:
-        png = facsimile.cached(source, basefile, pdf, page, bbox, dpi=dpi)
-    except facsimile.OffPage:
-        if not client_bbox:
-            raise
-        # the detail stays generic: the exception carries the server-side PDF
-        # path, which is for the log and not for an anonymous caller
-        raise HTTPException(400, "bbox does not lie on the page") from None
-    except subprocess.CalledProcessError as exc:
-        # poppler exit codes (see `man pdftoppm`): 1 is "error opening a PDF
-        # file" -- the source is corrupt, a corpus data-integrity problem
-        # that must fail loudly, not read as a client 404. 99 ("other
-        # error") is what an out-of-range -f/-l page range produces -- a
-        # genuinely missing page, so that alone is a 404.
-        if exc.returncode == 1:
-            raise
-        raise HTTPException(404, missing) from None
-    return FileResponse(png, media_type="image/png", headers=_FAX_HEADERS)
-
-
 def _facsimile_response(local, sid, bbox=None):
     """The facsimile PNG for page `sid` of the document at uri-local path
     `local` ("prop/2013/14:116"), rendering into the disk cache on first
@@ -956,7 +905,7 @@ def _facsimile_response(local, sid, bbox=None):
     # a förarbete's illustration is displayed once, at the measure of the text
     # column, and nothing opens it larger -- so it is rendered at the same
     # resolution as the page facsimile it is cut from
-    return _png_response(source, basefile, pdf, sid, bbox,
+    return facsimiles.png_response(source, basefile, pdf, sid, bbox,
                          "%r has no page %d" % (local, sid),
                          client_bbox=bbox is not None, dpi=facsimile.DPI)
 
@@ -975,7 +924,7 @@ def facsimile_endpoint(
     resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
     region of that page -- what a figure inside a förarbete is."""
     return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid,
-                               _parse_bbox(bbox) if bbox else None)
+                               facsimiles.parse_bbox(bbox) if bbox else None)
 
 
 _DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
@@ -1199,7 +1148,7 @@ def _sfs_graphic_response(local, node, dpi):
         raise HTTPException(404, "source SFS %s is not mirrored" % src)
     # an entry with no bbox *is* the whole page, which has one resolution: there
     # is no larger render to ask for, so `stor` cannot apply to it
-    return _png_response("sfs", src, pdf, page, bbox,
+    return facsimiles.png_response("sfs", src, pdf, page, bbox,
                          "SFS %s has no page %d" % (src, page),
                          dpi=dpi if bbox else facsimile.DPI)
 

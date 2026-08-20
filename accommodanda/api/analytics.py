@@ -59,7 +59,8 @@ API_PREFIXES = ("/api/v1", "/docs", "/redoc", "/openapi.json")
 # ...minus the editor's own routes. `auth/me` alone fires on every single page
 # load (editor.js asks whether to mount the edit affordance), so leaving these in
 # would make the "API" numbers a copy of the site's page views.
-API_EXCLUDED = ("/api/v1/auth", "/api/v1/edit", "/api/v1/patch")
+API_EXCLUDED = ("/api/v1/auth", "/api/v1/edit", "/api/v1/patch",
+                "/api/v1/graphics")
 
 ENABLED = bool(config.MATOMO_URL and config.MATOMO_SITE_API)
 # Parsed once, here, so a malformed endpoint raises at import -- the worker

@@ -302,17 +302,12 @@ def _graphics_index():
     layer is verified, while a mechanically derived layer needs no such review.
     """
     index = {}
-    for path in (p for p in annstore.entries() if p.suffix == ".graphics"):
-        layer = json.loads(path.read_text())
-        meta = layer.get("meta") or {}
-        eligible = [(gap_key, entry) for gap_key, entry in layer.items()
-                    if (gap_key != "meta" and "page" in entry
-                        and annstore.publishable(meta, entry))]
-        if eligible:
-            uri = meta.get("uri")
-            assert uri, "%s: publishable graphics layer has no meta.uri" % path
-            for gap_key, entry in eligible:
-                index[(uri, gap_key)] = entry
+    for path, meta, gap_key, entry in annstore.layer_entries(".graphics"):
+        if not annstore.publishable(meta, entry):
+            continue
+        uri = meta.get("uri")
+        assert uri, "%s: publishable graphics layer has no meta.uri" % path
+        index[(uri, gap_key)] = entry
     return index
 
 

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from accommodanda import config
 from accommodanda.api import app as api
+from accommodanda.api import facsimiles
 from accommodanda.lib import annstore, compress, facsimile, layout
 
 # a minimal one-page A4 PDF poppler accepts (blank page)
@@ -230,8 +231,8 @@ def test_sfs_full_page_facsimile_resolver(corpus):
 # --------------------------------------------------------------------------
 
 def test_bbox_query_parses_to_the_renderer_shape():
-    assert api._parse_bbox("331,338,476,452") == [331.0, 338.0, 476.0, 452.0]
-    assert api._parse_bbox("220.9,225.5,317.6,301.6") == [
+    assert facsimiles.parse_bbox("331,338,476,452") == [331.0, 338.0, 476.0, 452.0]
+    assert facsimiles.parse_bbox("220.9,225.5,317.6,301.6") == [
         220.9, 225.5, 317.6, 301.6]
 
 
@@ -248,7 +249,7 @@ def test_a_malformed_bbox_is_client_error_not_an_assertion(raw):
     invariant and wrong for a query string: a bad one is the caller's mistake,
     so it is a 400 rather than a 500 with a traceback."""
     with pytest.raises(HTTPException) as exc:
-        api._parse_bbox(raw)
+        facsimiles.parse_bbox(raw)
     assert exc.value.status_code == 400
 
 
