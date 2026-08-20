@@ -895,14 +895,19 @@ def _parse_bbox(raw):
 
 
 def _png_response(source, basefile, pdf, page, bbox, missing, *,
-                  client_bbox=False):
-    """The cached facsimile PNG of one source-PDF page (or `bbox` of it) as a
-    response, rendering it on first request. `missing` is the 404 detail for a
-    page the PDF does not have. `client_bbox` says the rectangle came from the
+                  client_bbox=False, dpi):
+    """The cached facsimile PNG of one source-PDF page (or `bbox` of it at `dpi`)
+    as a response, rendering it on first request. `missing` is the 404 detail for
+    a page the PDF does not have. `client_bbox` says the rectangle came from the
     query string: an off-page one is then the caller's mistake and a 400. Off a
-    stored .graphics layer it is a corpus fault and stays a 500."""
+    stored .graphics layer it is a corpus fault and stays a 500.
+
+    `dpi` has no default on purpose: a crop's right resolution follows from what
+    the page does with it, and the two callers differ. A förarbete illustration
+    is shown once at column width and nowhere else; a recovered SFS graphic is a
+    thumbnail among hundreds that also opens full size."""
     try:
-        png = facsimile.cached(source, basefile, pdf, page, bbox)
+        png = facsimile.cached(source, basefile, pdf, page, bbox, dpi=dpi)
     except facsimile.OffPage:
         if not client_bbox:
             raise
@@ -934,9 +939,12 @@ def _facsimile_response(local, sid, bbox=None):
     if resolved is None:
         raise HTTPException(404, "no PDF source downloaded for %r" % local)
     source, basefile, pdf = resolved
+    # a förarbete's illustration is displayed once, at the measure of the text
+    # column, and nothing opens it larger -- so it is rendered at the same
+    # resolution as the page facsimile it is cut from
     return _png_response(source, basefile, pdf, sid, bbox,
                          "%r has no page %d" % (local, sid),
-                         client_bbox=bbox is not None)
+                         client_bbox=bbox is not None, dpi=facsimile.DPI)
 
 
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
@@ -1087,7 +1095,7 @@ def facsimile_legacy_2(a: str, b: str, sid: int):
 # viewed statute + gap id; the reviewed .graphics layer holds the geometry AND
 # the provenance -- which amending SFS's PDF the region is cropped from (the act
 # that last set that wording), not the viewed statute's own PDF.
-def _sfs_graphic_response(local, node):
+def _sfs_graphic_response(local, node, dpi):
     """The cropped PNG for gap `node` of the SFS at uri-local `local`, its page,
     bbox and source PDF read from the statute's .graphics layer."""
     if ".." in local or not _RE_SFS_BASEFILE.match(local):
@@ -1113,8 +1121,11 @@ def _sfs_graphic_response(local, node):
     pdf = layout.sfs_pdf(src)
     if not pdf.exists():
         raise HTTPException(404, "source SFS %s is not mirrored" % src)
+    # an entry with no bbox *is* the whole page, which has one resolution: there
+    # is no larger render to ask for, so `stor` cannot apply to it
     return _png_response("sfs", src, pdf, page, bbox,
-                         "SFS %s has no page %d" % (src, page))
+                         "SFS %s has no page %d" % (src, page),
+                         dpi=dpi if bbox else facsimile.DPI)
 
 
 @app.get("/api/v1/sfs-graphic", response_class=FileResponse, tags=["document"],
@@ -1124,11 +1135,21 @@ def sfs_graphic_endpoint(
         node: str = Query(..., description="stable graphic-gap key (the "
                           "data-grafik value, e.g. g-a1b2…)"),
         v: str = Query(None, description="opaque cache-buster (the bbox "
-                       "version); accepted and ignored")):
+                       "version); accepted and ignored"),
+        stor: bool = Query(False, description="render the crop for full-size "
+                           "viewing (the lightbox) rather than for the "
+                           "thumbnail printed in the text; no effect on a gap "
+                           "whose layer entry names a whole page rather than a "
+                           "rectangle of one")):
     """A PNG crop of a graphic/formula/map the consolidated SFS text omits,
     cut from the published PDF of the amendment that set it (per the reviewed
-    .graphics layer), rendered at 150 DPI on first request and cached."""
-    return _sfs_graphic_response(catalog.local(catalog.strip_fragment(uri)), node)
+    .graphics layer), rendered on first request and cached. Two resolutions, one
+    per use: the inline thumbnail, and `stor=1` for the lightbox. A page of road
+    signs asks for hundreds of the first and one of the second, so serving the
+    large one to both would cost the reader megabytes nothing on screen uses."""
+    return _sfs_graphic_response(
+        catalog.local(catalog.strip_fragment(uri)), node,
+        facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI)
 
 
 @app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"])

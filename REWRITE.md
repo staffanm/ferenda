@@ -435,7 +435,15 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   /api/v1/sfs-graphic?uri=&node=` serves the crop lazily, resolving the
   provenance-correct PDF from the `.graphics` layer; the renderer's `grafik`
   node emits a `<figure>`/`<img>` crop with source-SFS attribution when the
-  layer has placed it, else an honest placeholder. `golden_sfs.py`'s
+  layer has placed it, else an honest placeholder. Every crop is also a
+  lightbox opener (`assets/grafik.js`): these print small -- a road sign is
+  3.5rem in its table cell -- which is exactly where a sign's symbol or a
+  formula's subscripts stop being legible, so clicking one opens it as large as
+  the viewport allows. The two sizes are two *renders*, not one stretched: a
+  crop is rasterized at twice the page DPI inline and four times it for the
+  lightbox (`facsimile.CROP_DPI`/`CROP_DPI_LARGE`, the endpoint's `stor=1`),
+  since 2007:90 puts 325 thumbnails on one page (of its 326 signs, all but Y2,
+  a sound signal the PDF draws nothing for) but opens them one at a time. `golden_sfs.py`'s
   `grafik-node-replaces-marker` adjudication family accepts the new grafik
   nodes as new-is-right against the old pipeline's dropped-graphics golden.
   `test/test_sfs_graphics.py`, `test/test_sfs_pdfmirror.py`.
@@ -4548,6 +4556,18 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **render/api** (2026-08-20) — the recovered graphics become readable. Every
+  crop is a `button.grafik-open` wrapping its `<img>`, and `assets/grafik.js`
+  opens it full size in a lightbox (backdrop/Escape/× close it, a click on the
+  image does not; focus returns to the opener). A crop now carries its own
+  resolution: `facsimile.CROP_DPI` for the thumbnail printed in the text and
+  `CROP_DPI_LARGE` for the lightbox, chosen by `/api/v1/sfs-graphic`'s new
+  `stor` parameter and folded into the cache path and the URL's `v` hash — the
+  response is `immutable` for a year, so a resolution raise behind an unchanged
+  URL would reach no one. A förarbete illustration keeps the page resolution:
+  it is shown once, at column width, and nothing opens it larger. Also fixes
+  `sfs/graphics.py`'s road-sign alt text, which took only the designator line
+  and so cut a wrapped caption mid-phrase ("C3 Förbud mot trafik med annat").
 - **sfs** (2026-08-20) — road-sign graphics (2007:90, 326 signs) drop the
   vision model. `sfs/graphics.py`'s `roadsign_boxes`/`roadsign_index` read
   each row's page, crop rectangle and source act off the published PDFs'

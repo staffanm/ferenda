@@ -90,8 +90,10 @@ def test_cached_renders_once(corpus, monkeypatch):
     real = facsimile.render_page
     monkeypatch.setattr(facsimile, "render_page",
                         lambda *a: calls.append(a) or real(*a))
-    first = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)
-    second = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)
+    first = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
+                                dpi=facsimile.DPI)
+    second = facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
+                                dpi=facsimile.DPI)
     assert first == second == layout.facsimile("forarbete",
                                                "prop/2013-14-116", 1)
     assert len(calls) == 1                           # second hit from cache
@@ -133,13 +135,15 @@ def test_path_traversal_shapes_rejected(corpus):
 # ---- sfs-graphic crops -----------------------------------------------------
 
 def test_render_region_crops_to_bbox_pixels(corpus, tmp_path):
-    # bbox is PDF points top-left; the crop is those points scaled by DPI/72
+    # bbox is PDF points top-left; the crop is those points scaled by CROP_DPI/72
+    # -- twice the page DPI, so a small region still stands up to the lightbox
     out = facsimile.render_region(
         tmp_path / "sfs" / "pdf" / "2021" / "734.pdf", 1, [72, 72, 300, 200],
-        tmp_path / "out" / "crop.png")
+        tmp_path / "out" / "crop.png", facsimile.CROP_DPI)
     data = out.read_bytes()
     assert data[:4] == PNG_MAGIC
-    assert facsimile.png_size(data) == (round(228 * 150 / 72), round(128 * 150 / 72))
+    assert facsimile.png_size(data) == (round(228 * facsimile.CROP_DPI / 72),
+                                       round(128 * facsimile.CROP_DPI / 72))
     assert not list(out.parent.glob("*.tmp*"))       # temp root cleaned up
 
 
@@ -149,13 +153,16 @@ def test_cached_crop_renders_once_keyed_by_bbox(corpus, monkeypatch):
     real = facsimile.render_region
     monkeypatch.setattr(facsimile, "render_region",
                         lambda *a: calls.append(a) or real(*a))
-    a = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
-    b = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200])
+    a = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200],
+                         dpi=facsimile.CROP_DPI)
+    b = facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 200],
+                         dpi=facsimile.CROP_DPI)
     assert a == b == layout.facsimile_crop("sfs", "2021:734", 1,
-                                           [72, 72, 300, 200])
+                                           [72, 72, 300, 200], facsimile.CROP_DPI)
     assert len(calls) == 1                            # second hit from cache
     # a different bbox is a different cache file (re-verification never stale)
-    facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 300])
+    facsimile.cached("sfs", "2021:734", pdf, 1, [72, 72, 300, 300],
+                     dpi=facsimile.CROP_DPI)
     assert len(calls) == 2
 
 
@@ -166,10 +173,12 @@ def test_sfs_graphic_endpoint_crops_from_provenance_pdf(corpus):
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/png"
     assert r.content[:4] == PNG_MAGIC
-    assert facsimile.png_size(r.content) == (round(228 * 150 / 72), round(128 * 150 / 72))
+    assert facsimile.png_size(r.content) == (round(228 * facsimile.CROP_DPI / 72),
+                                            round(128 * facsimile.CROP_DPI / 72))
     assert "immutable" in r.headers["cache-control"]
     # the crop is cached under the *source* SFS (2021:734), not the viewed one
-    assert layout.facsimile_crop("sfs", "2021:734", 1, [72, 72, 300, 200]).exists()
+    assert layout.facsimile_crop("sfs", "2021:734", 1, [72, 72, 300, 200],
+                                 facsimile.CROP_DPI).exists()
 
 
 def test_sfs_graphic_whole_page_when_bbox_omitted(corpus):
@@ -256,7 +265,7 @@ def test_a_crop_off_the_page_is_refused(corpus, tmp_path):
     pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
     with pytest.raises(facsimile.OffPage):
         facsimile.render_region(pdf, 1, [0, 0, 5000, 5000],
-                                tmp_path / "out" / "crop.png")
+                                tmp_path / "out" / "crop.png", facsimile.CROP_DPI)
     assert not (tmp_path / "out" / "crop.png").exists()
 
 
@@ -266,11 +275,12 @@ def test_a_full_bleed_crop_still_renders(corpus, tmp_path):
     `EDGE_SLOP` absorbs that; a rectangle past the slop does not render."""
     pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
     edge = [0, 0, 595 + facsimile.EDGE_SLOP, 842 + facsimile.EDGE_SLOP]
-    out = facsimile.render_region(pdf, 1, edge, tmp_path / "out" / "bleed.png")
+    out = facsimile.render_region(pdf, 1, edge, tmp_path / "out" / "bleed.png",
+                                  facsimile.CROP_DPI)
     assert out.read_bytes()[:4] == PNG_MAGIC
     with pytest.raises(facsimile.OffPage):
         facsimile.render_region(pdf, 1, [0, 0, 595, 842 + 2 * facsimile.EDGE_SLOP],
-                                tmp_path / "out" / "past.png")
+                                tmp_path / "out" / "past.png", facsimile.CROP_DPI)
 
 
 def test_a_stored_off_page_bbox_fails_loudly(corpus):
@@ -294,7 +304,8 @@ def test_an_off_page_crop_is_a_400_and_mints_no_cache_entry(corpus):
                            "bbox": "0,0,5000,5000"})
     assert r.status_code == 400
     assert not layout.facsimile_crop("sfs", "2021:734", 1,
-                                     [0, 0, 5000, 5000]).exists()
+                                     [0, 0, 5000, 5000],
+                                     facsimile.CROP_DPI).exists()
 
 
 def test_a_page_the_pdf_lacks_is_still_a_404_with_a_crop(corpus):
@@ -321,7 +332,8 @@ def test_concurrent_requests_for_one_page_render_it_once(corpus, monkeypatch):
     out = []
     threads = [threading.Thread(
         target=lambda: out.append(
-            facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1)))
+            facsimile.cached("forarbete", "prop/2013-14-116", pdf, 1,
+                                dpi=facsimile.DPI)))
         for _ in range(4)]
     for t in threads:
         t.start()
@@ -331,3 +343,52 @@ def test_concurrent_requests_for_one_page_render_it_once(corpus, monkeypatch):
     assert len(out) == 4 and len(set(out)) == 1
     assert out[0].read_bytes()[:4] == PNG_MAGIC
     assert not list(out[0].parent.glob("*.tmp*"))
+
+
+def test_stor_asks_for_the_full_size_render(corpus):
+    """The lightbox and the thumbnail are two renders of one crop, not one
+    stretched: `stor=1` is what asks for the larger, and it must actually
+    arrive, or the overlay shows a blown-up thumbnail."""
+    client = TestClient(api.app)
+    params = {"uri": "https://lagen.nu/2002:780", "node": "G1"}
+    small = client.get("/api/v1/sfs-graphic", params=params)
+    large = client.get("/api/v1/sfs-graphic", params={**params, "stor": 1})
+    assert small.status_code == large.status_code == 200
+    ratio = facsimile.CROP_DPI_LARGE / facsimile.CROP_DPI
+    # poppler rounds each edge of the crop window independently, so the two
+    # renders can differ by a pixel from the exact ratio -- what is asserted is
+    # that the larger one really was rendered larger, not merely scaled
+    assert all(abs(big - round(small_px * ratio)) <= 1 for big, small_px
+               in zip(facsimile.png_size(large.content),
+                      facsimile.png_size(small.content), strict=True))
+
+
+def test_two_resolutions_of_one_bbox_are_two_cache_files(corpus):
+    """The cache path carries the DPI. Without it, raising the resolution would
+    keep serving whatever render happened to be on disk under the shared name --
+    for as long as the (externally evicted) cache kept it."""
+    pdf = corpus / "sfs" / "pdf" / "2021" / "734.pdf"
+    bbox = [72, 72, 300, 200]
+    small = facsimile.cached("sfs", "2021:734", pdf, 1, bbox,
+                             dpi=facsimile.CROP_DPI)
+    large = facsimile.cached("sfs", "2021:734", pdf, 1, bbox,
+                             dpi=facsimile.CROP_DPI_LARGE)
+    assert small != large
+    assert facsimile.png_size(large.read_bytes())[0] > \
+        facsimile.png_size(small.read_bytes())[0]
+
+
+def test_a_forarbete_illustration_keeps_the_page_resolution(corpus, monkeypatch):
+    """A förarbete figure is shown once at column width and nothing opens it
+    larger, so it is not rendered at the SFS graphics' thumbnail resolution --
+    that would be four times the pixels for detail no reader can reach."""
+    asked = []
+    real = facsimile.cached
+    monkeypatch.setattr(facsimile, "cached",
+                        lambda *a, **kw: asked.append(kw["dpi"]) or real(*a, **kw))
+    client = TestClient(api.app)
+    r = client.get("/api/v1/facsimile",
+                   params={"uri": "https://lagen.nu/2021:734", "sid": 1,
+                           "bbox": "72,72,300,200"})
+    assert r.status_code == 200
+    assert asked == [facsimile.DPI]

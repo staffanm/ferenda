@@ -651,7 +651,8 @@ def localize_group(gaps, pdf_path, src, model=None, author=llm.author,
         if not remaining:
             break
         log("%s: rendering page image(s) %d-%d" % (src, chunk[0], chunk[-1]))
-        images = [facsimile.cached("sfs", src, pdf_path, p).read_bytes()
+        images = [facsimile.cached("sfs", src, pdf_path, p,
+                                   dpi=facsimile.DPI).read_bytes()
                   for p in chunk]
         image_sizes = {page: facsimile.png_size(image)
                        for page, image in zip(chunk, images, strict=True)}
@@ -735,8 +736,9 @@ def _column_margins(lines, designators):
     return (left, right.most_common(1)[0][0]) if right else None
 
 
-def _caption_foot(lines, designator, limit, col1, pitch):
-    """The foot of the last caption line of one row -- where its sign may start.
+def _caption_lines(lines, designator, limit, col1, pitch):
+    """``(caption lines, foot)`` for one row -- its whole Märke-column text, and
+    where the sign under it may start.
 
     A caption is the designator line plus the lines that continue it in the
     Märke column, and "continue" is a matter of leading, not just alignment:
@@ -746,23 +748,27 @@ def _caption_foot(lines, designator, limit, col1, pitch):
     Märke-column line continues the caption only while it follows the previous
     one at ordinary leading; the description column's own lines sit between
     them and are simply passed over."""
-    foot, previous = designator.bottom, designator.top
+    caption, foot, previous = [designator], designator.bottom, designator.top
     for line in sorted((l for l in lines if designator.top < l.top < limit),
                        key=lambda l: l.top):
         if abs(line.runs[0].left - col1) > CAPTION_INDENT:
             continue
         if line.top - previous > 1.5 * pitch:
             break
+        caption.append(line)
         foot, previous = max(foot, line.bottom), line.top
-    return foot
+    return caption, foot
 
 
 def _row_band(lines, designators, i, col1, col2, pitch, foot):
-    """The (top, bottom) pixel band one row's sign occupies: from the foot of
-    the row's last caption line to the head of whatever the Märke column prints
-    next -- the following row, a footnote, or the page's last line."""
+    """``(caption lines, (top, bottom))`` for one row -- its Märke-column text
+    and the pixel band its sign occupies, which runs from the foot of the last
+    caption line to the head of whatever the Märke column prints next (the
+    following row, a footnote, or the page's last line). ``(caption, None)``
+    when the column prints nothing after the caption at all."""
     following = designators[i + 1].top if i + 1 < len(designators) else None
-    top = _caption_foot(lines, designators[i], following or 10 ** 9, col1, pitch)
+    caption, top = _caption_lines(lines, designators[i], following or 10 ** 9,
+                                  col1, pitch)
     stops = [l.top for l in lines if l.top >= top
              and any(col1 - 5 <= r.left < col2 - 5 for r in l.runs)]
     if following is not None:
@@ -770,19 +776,23 @@ def _row_band(lines, designators, i, col1, col2, pitch, foot):
     if foot >= top:
         stops.append(foot)
     if not stops:
-        return None
+        return caption, None
     # poppler sets a line's glyphs a little above the box top it reports, so a
     # band that runs to the next row's own top still catches its first pixels.
     # Half a line of clearance costs nothing: a caption always has whitespace
     # over it, and the ink search takes back whatever the inset gave away.
-    return top, min(stops) - pitch * 0.5
+    return caption, (top, min(stops) - pitch * 0.5)
 
 
-def _caption(line, col2):
-    """The Märke column's own text of a designator line. poppler puts both
-    columns' runs on one baseline where they share it, so the row's caption is
-    the runs left of the second column -- the alt text a reader gets."""
-    return " ".join(r.text for r in line.runs if r.left < col2).strip()
+def _caption(caption_lines, col2):
+    """A row's Märke-column text -- the sign's alt text and the lightbox's only
+    caption. Two cuts, both necessary: poppler puts both columns' runs on one
+    baseline where they share it, so each line keeps only the runs left of the
+    second column; and a caption that wraps ("C3 Förbud mot trafik med annat /
+    motordrivet fordon än moped klass II") is several such lines, so a
+    designator line alone would name half the sign."""
+    return " ".join(r.text for line in caption_lines for r in line.runs
+                    if r.left < col2).strip()
 
 
 def _ink_bbox(page_image, box):
@@ -826,13 +836,15 @@ def roadsign_boxes(pdf_path, src):
         col1, col2 = margins
         designators = [l for l in designators if abs(l.runs[0].left - col1) <= 3]
         foot, pitch = max(l.top for l in lines), _line_pitch(lines)
-        with Image.open(facsimile.cached("sfs", src, pdf_path, pageno)) as page_png:
+        with Image.open(facsimile.cached("sfs", src, pdf_path, pageno,
+                                         dpi=facsimile.DPI)) as page_png:
             page_image = page_png.convert("L")
             # the ruler both tools share: this page as poppler *renders* it,
             # never `pdfinfo`'s size (see pdftext.page_boxes)
             page_pt = page_image.width * 72 / facsimile.DPI
             for i, line in enumerate(designators):
-                band = _row_band(lines, designators, i, col1, col2, pitch, foot)
+                caption, band = _row_band(lines, designators, i, col1, col2,
+                                          pitch, foot)
                 if not band:
                     continue
                 box = pdftext.points_from_pdftohtml(
@@ -845,7 +857,7 @@ def roadsign_boxes(pdf_path, src):
                 if bbox:
                     boxes[roadsign_code(line.text)] = {
                         "page": pageno, "bbox": [round(v, 2) for v in bbox],
-                        "alt": _caption(line, col2)}
+                        "alt": _caption(caption, col2)}
     return boxes
 
 

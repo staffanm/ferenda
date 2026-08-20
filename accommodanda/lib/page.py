@@ -47,6 +47,7 @@ from . import (
     catalog,
     compress,
     facets,
+    facsimile,
     layout,
 )
 from .catalog import BASE
@@ -1691,9 +1692,17 @@ def register_anchor(nr):
 def _grafik_crop(entry, doc_uri, gap_key, alt):
     """The `<img>` for one located graphic: the /api/v1/sfs-graphic crop of the
     provenance-correct published PDF (geometry lives server-side in the layer,
-    so the src is just uri+node), lazily loaded. `v` hashes source, page and bbox
-    so every content-changing re-verification gets a fresh immutable URL."""
-    versioned = {k: entry.get(k) for k in ("sfs", "page", "bbox")}
+    so the src is just uri+node), lazily loaded. `v` hashes source, page and
+    bbox so every content-changing re-verification gets a fresh immutable URL --
+    and *both* render resolutions with them, because the response is cached
+    `immutable` for a year: raising either constant behind an unchanged URL
+    would reach nobody who had already loaded the page, and no CDN edge at all.
+    The large one belongs here too even though this URL is the thumbnail's: the
+    lightbox mints its own by appending `stor=1` to this very string, so one
+    identity selects both renders (`assets/grafik.js`)."""
+    versioned = {"sfs": entry["sfs"], "page": entry["page"],
+                 "bbox": entry.get("bbox"),
+                 "dpi": [facsimile.CROP_DPI, facsimile.CROP_DPI_LARGE]}
     ver = hashlib.sha256(json.dumps(versioned, sort_keys=True).encode()).hexdigest()[:12]
     src = "/api/v1/sfs-graphic?uri=%s&node=%s&v=%s" % (
         quote(doc_uri, safe=""), quote(gap_key, safe=""),

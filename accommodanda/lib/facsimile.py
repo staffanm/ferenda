@@ -37,6 +37,23 @@ from pathlib import Path
 from . import layout, util
 
 DPI = 150
+# What a crop is rendered at for the page it is printed on. Twice the page DPI:
+# a road sign is ~50 pt wide and sits inline at about 56 px, which 150 DPI
+# already covers, but the crops are also the source for a retina display and for
+# the lightbox's first paint. The cost is real and bounded. 2007:90 is the
+# heaviest page in the corpus by image weight -- it prints 325 signs, of the 326
+# it lists (Y2 is a sound signal the PDF draws nothing for) -- and those weigh
+# 1.0 MB at 150 DPI against 2.1 MB here. Every thumbnail is `loading="lazy"`, so
+# a reader pays for what they scroll past. Anything sharper belongs behind a
+# click, not on the page.
+CROP_DPI = 2 * DPI
+# What the lightbox asks for (the sfs-graphic endpoint's `stor=1`). The page
+# weight above is why this is a second render and not the inline one: it is one
+# request for the graphic the reader actually opened, where CROP_DPI is paid
+# hundreds of times over. Rendering rather than upscaling is what keeps it
+# sharp -- these are vector drawings in the PDF, so there is always more detail
+# to be had, and a browser stretching the thumbnail would only blur it.
+CROP_DPI_LARGE = 4 * DPI
 
 # No poppler call may hold a request thread for ever. The ceiling is deliberately
 # generous: a born-digital A4 page renders in ~0.5 s and a scanned page in a few
@@ -86,11 +103,12 @@ def page_size(pdf_path, page):
     return float(m.group(1)), float(m.group(2))
 
 
-def _pdftoppm(pdf_path, page, out_path, *crop):
-    """Run pdftoppm for one page of `pdf_path` (with `crop` as extra
-    ``-x/-y/-W/-H`` arguments) and move the PNG onto `out_path`. `mkstemp`
-    reserves the temp name with O_EXCL, so it is unique per *call* -- two
-    threads rendering the same page cannot write each other's file."""
+def _pdftoppm(pdf_path, page, out_path, dpi, *crop):
+    """Run pdftoppm for one page of `pdf_path` at `dpi` (with `crop` as extra
+    ``-x/-y/-W/-H`` arguments, in that same device space) and move the PNG onto
+    `out_path`. `mkstemp` reserves the temp name with O_EXCL, so it is unique
+    per *call* -- two threads rendering the same page cannot write each
+    other's file."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fd, root = tempfile.mkstemp(prefix=out_path.stem + ".tmp",
                                 dir=out_path.parent)
@@ -98,7 +116,7 @@ def _pdftoppm(pdf_path, page, out_path, *crop):
     png = Path(root + ".png")         # what pdftoppm -singlefile appends
     try:
         subprocess.run(
-            ["pdftoppm", "-png", "-r", str(DPI), "-f", str(page), "-l", str(page),
+            ["pdftoppm", "-png", "-r", str(dpi), "-f", str(page), "-l", str(page),
              *crop, "-singlefile", str(pdf_path), root],
             capture_output=True, check=True, timeout=TIMEOUT)
         png.replace(out_path)
@@ -115,7 +133,7 @@ def render_page(pdf_path, page, out_path):
     CalledProcessError when pdftoppm cannot render (no such page, broken
     PDF) -- the caller knows the request context and maps it to its own
     error."""
-    return _pdftoppm(pdf_path, page, out_path)
+    return _pdftoppm(pdf_path, page, out_path, DPI)
 
 
 def valid_bbox(bbox):
@@ -132,12 +150,12 @@ def valid_bbox(bbox):
     return 0 <= x0 < x1 and 0 <= y0 < y1
 
 
-def render_region(pdf_path, page, bbox, out_path):
+def render_region(pdf_path, page, bbox, out_path, dpi):
     """Render just the `bbox` rectangle of 1-based `page` to `out_path` (a PNG
     at `DPI`) and return it. `bbox` is ``[x0, y0, x1, y1]`` in raw PDF points
     with a TOP-LEFT origin -- the representation the .graphics layer stores;
     poppler's ``-x/-y/-W/-H`` crop window is likewise top-left, in device
-    pixels, so each point coordinate scales by `DPI`/72. Same atomic
+    pixels, so each point coordinate scales by `dpi`/72. Same atomic
     temp->replace and error contract as `render_page`, plus one check
     `valid_bbox` cannot make: the rectangle must lie on the page, give or take
     `EDGE_SLOP`. A rectangle past that is an `OffPage` -- it would render
@@ -152,10 +170,10 @@ def render_region(pdf_path, page, bbox, out_path):
         raise OffPage("crop %r is outside the %g x %g pt page %d of %s"
                       % (bbox, width, height, page, pdf_path))
     return _pdftoppm(
-        pdf_path, page, out_path,
-        "-x", str(round(x0 * DPI / 72)), "-y", str(round(y0 * DPI / 72)),
-        "-W", str(round((x1 - x0) * DPI / 72)),
-        "-H", str(round((y1 - y0) * DPI / 72)))
+        pdf_path, page, out_path, dpi,
+        "-x", str(round(x0 * dpi / 72)), "-y", str(round(y0 * dpi / 72)),
+        "-W", str(round((x1 - x0) * dpi / 72)),
+        "-H", str(round((y1 - y0) * dpi / 72)))
 
 
 def png_size(data):
@@ -172,13 +190,21 @@ def png_size(data):
 _render_lock = util.KeyedLocks()
 
 
-def cached(source, basefile, pdf_path, page, bbox=None):
+def cached(source, basefile, pdf_path, page, bbox=None, *, dpi):
     """The facsimile PNG for one page of a document's source PDF -- or, with
-    `bbox`, just that rectangle of the page -- rendered on the first request and
-    served from the cache thereafter. `source`/`basefile` identify the *source*
-    PDF (for a crop, the amending SFS the region comes from), so crops of the
-    same region are shared and a re-verified bbox lands on a fresh file."""
-    out = (layout.facsimile_crop(source, basefile, page, bbox) if bbox
+    `bbox`, just that rectangle of the page at `dpi` -- rendered on the first
+    request and served from the cache thereafter. `source`/`basefile` identify
+    the *source* PDF (for a crop, the amending SFS the region comes from), so
+    crops of the same region are shared and a re-verified bbox lands on a fresh
+    file.
+
+    `dpi` is a *crop's* resolution. A whole page has exactly one, chosen for the
+    reading view (see the module docstring), and its cache path carries no
+    resolution to tell two apart -- so asking for a page at anything else is a
+    caller error, not a request this quietly downgrades (rule:fail-fast)."""
+    assert bbox or dpi == DPI, \
+        "a whole page renders at DPI; %r is a crop resolution" % dpi
+    out = (layout.facsimile_crop(source, basefile, page, bbox, dpi) if bbox
            else layout.facsimile(source, basefile, page))
     if out.exists():
         return out
@@ -186,7 +212,7 @@ def cached(source, basefile, pdf_path, page, bbox=None):
         if out.exists():                 # rendered while we waited for the lock
             return out
         if bbox:
-            render_region(pdf_path, page, bbox, out)
+            render_region(pdf_path, page, bbox, out, dpi)
         else:
             render_page(pdf_path, page, out)
     return out

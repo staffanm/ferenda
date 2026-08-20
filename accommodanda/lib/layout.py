@@ -582,13 +582,16 @@ def facsimile(source: str, basefile: str, page: int) -> Path:
     return FACSIMILE / source / relpath(source, basefile) / ("sid%d.png" % page)
 
 
-def facsimile_crop(source, basefile, page, bbox):
+def facsimile_crop(source, basefile, page, bbox, dpi):
     """The cached PNG of one cropped region of a source-PDF page:
-    ``cache/facsimile/<source>/<relpath>/sid<N>-<x>_<y>_<w>_<h>.png``. Keyed by
-    the bbox (rounded PDF points) so a crop never collides with the full page
-    `facsimile` sibling and a re-verified bbox lands on a fresh file."""
+    ``cache/facsimile/<source>/<relpath>/sid<N>-<x>_<y>_<w>_<h>@<dpi>.png``.
+    Keyed by the bbox (rounded PDF points) so a crop never collides with the full
+    page `facsimile` sibling and a re-verified bbox lands on a fresh file, and by
+    the render resolution so raising it lands on fresh files too -- the cache is
+    evicted by an external process, so a stale entry under a reused name would
+    otherwise be served at the old resolution for as long as it survives."""
     x0, y0, x1, y1 = (round(v) for v in bbox)
-    name = "sid%d-%d_%d_%d_%d.png" % (page, x0, y0, x1 - x0, y1 - y0)
+    name = "sid%d-%d_%d_%d_%d@%d.png" % (page, x0, y0, x1 - x0, y1 - y0, dpi)
     return FACSIMILE / source / relpath(source, basefile) / name
 
 

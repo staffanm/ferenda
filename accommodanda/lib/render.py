@@ -1009,7 +1009,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
 # refresh instead of forcing a full corpus regenerate.
 SCRIPT_FILES = ("matomo.js", "dom.js", "drawers.js", "scrollspy.js", "search.js",
                 "popover.js", "fullsearch.js", "versions.js", "faksimil.js",
-                "pdf.js", "editor.js")
+                "grafik.js", "pdf.js", "editor.js")
 SCRIPT_BUNDLE = "script.js"     # the single served URL (render.PAGE links it)
 
 

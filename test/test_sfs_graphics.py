@@ -519,7 +519,7 @@ def test_localize_group_chunks_pages_and_merges(monkeypatch):
 
     monkeypatch.setattr(facsimile, "page_count", lambda pdf: 8)
     monkeypatch.setattr(facsimile, "cached",
-                        lambda source, src, pdf, p: _P(p))
+                        lambda source, src, pdf, p, **kw: _P(p))
     calls = []
 
     def fake_author(prompt, validate, model=None, images=(), max_tokens=None):
@@ -554,7 +554,7 @@ def test_localize_group_refuses_partial_result(monkeypatch):
             return _fake_png(100, 100)
 
     monkeypatch.setattr(facsimile, "page_count", lambda pdf: 1)
-    monkeypatch.setattr(facsimile, "cached", lambda *args: _P())
+    monkeypatch.setattr(facsimile, "cached", lambda *a, **kw: _P())
     gap = {"id": "G1", "key": "g-one", "identity": {"n": 1},
            "sort": "formel", "anchor": "Balanstalet"}
     with pytest.raises(ValueError, match="did not locate gap.*G1"):
@@ -605,7 +605,10 @@ def test_render_roadsign_cell_localized_and_not():
                        "code": "A1"}}
     toc, rail = page.Toc(), page.Rail(site, DOC_URI)
     html = page.render_node(row, site, DOC_URI, toc, rail)
-    assert '<td class="grafik" data-grafik="g-a1"><img' in html
+    # the crop is wrapped in the lightbox opener (grafik.js), so it is
+    # keyboard-reachable and openable at full size
+    assert '<td class="grafik" data-grafik="g-a1"><button' in html
+    assert 'class="grafik-open" aria-label="Visa i full storlek: Vägmärke A1"' in html
     assert 'alt="Vägmärke A1"' in html
     # the same row with no layer entry falls back to the honest gap cell
     bare = page.render_node(row, _site({}), DOC_URI, page.Toc(),
@@ -712,14 +715,22 @@ def sign_page(rows, col2=340, first=100, pitch=18, band=110):
     return lines
 
 
-def band_of(lines, code):
+def row_of(lines, code, col2=None):
+    """One row's ``(caption text, band)`` -- what `_row_band` now returns, since
+    the caption and the band come out of the same walk over the Märke column."""
     designators = [l for l in lines if graphics.ROADSIGN_RE.match(l.text)]
-    col1, col2 = graphics._column_margins(lines, designators)
+    col1, found = graphics._column_margins(lines, designators)
     i = next(n for n, l in enumerate(designators)
              if graphics.ROADSIGN_RE.match(l.text).group() == code)
-    return graphics._row_band(lines, designators, i, col1, col2,
-                              graphics._line_pitch(lines),
-                              max(l.top for l in lines))
+    col2 = col2 or found
+    caption, band = graphics._row_band(lines, designators, i, col1, col2,
+                                       graphics._line_pitch(lines),
+                                       max(l.top for l in lines))
+    return graphics._caption(caption, col2), band
+
+
+def band_of(lines, code):
+    return row_of(lines, code)[1]
 
 
 def test_row_band_starts_below_the_caption_and_stops_at_the_next_row():
@@ -759,7 +770,29 @@ def test_caption_is_the_marke_column_only():
     line = sign_line("A1|Varning|för|farlig|kurva", 100, 100)
     line.runs.append(Run(340, 500, "Märket anger en farlig kurva", False,
                          False, 14))
-    assert graphics._caption(line, 340) == "A1 Varning för farlig kurva"
+    assert graphics._caption([line], 340) == "A1 Varning för farlig kurva"
+
+
+def test_a_wrapped_caption_names_the_whole_sign():
+    """The alt text is the sign's only description, and it is what the lightbox
+    captions. Taken from the designator line alone, 2007:90's C3 reads "C3
+    Förbud mot trafik med annat" and stops mid-phrase."""
+    lines = sign_page([("C3|Förbud|mot|trafik|med|annat",
+                        ["motordrivet|fordon|än|moped|klass|II"],
+                        ["Avser|förbudet"]),
+                       ("C4|Förbud|mot|trafik", [], [])], col2=620)
+    assert row_of(lines, "C3", 620)[0] == ("C3 Förbud mot trafik med annat "
+                                            "motordrivet fordon än moped klass II")
+
+
+def test_a_caption_stops_at_prose_it_does_not_own():
+    """The walk that bounds the band bounds the caption too, so the paragraf
+    printed under the last row of a table never lands in a sign's alt text."""
+    lines = sign_page([("M7|Reversibelt|körfält", [], ["Markeringen|avgränsar"])])
+    lines.append(sign_line("5 §|Heldragna|linjer|används", 100 + 90, 100))
+    # col2 stated rather than inferred: one description line leaves
+    # `_column_margins` no majority to read the second column off
+    assert row_of(lines, "M7", 340)[0] == "M7 Reversibelt körfält"
 
 
 def test_roadsign_sources_are_the_base_act_and_its_amendments_oldest_first():
