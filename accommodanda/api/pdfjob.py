@@ -36,13 +36,20 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from ..lib import compress, tpl
-from . import pdf
+from . import pdf, pdfcollection
 
 # Two renders at a time. The work is CPU-bound Python, so more workers than
 # the box has cores to spare just makes every reader wait longer; two lets a
 # short export past a long one instead of queueing behind it, and leaves four
 # of production's six cores to serve everyone else.
 WORKERS = 2
+
+# At most six requests wait behind the two active renders. A 5,000-page
+# collection can occupy a worker for a long time and can use substantial
+# memory. An unbounded ThreadPoolExecutor queue would let one busy client
+# commit the server to hours of later work. Identical requests still join
+# one job, and cached PDFs do not use a queue slot.
+MAX_LIVE_JOBS = 8
 
 # A finished job stays readable this long, so a poll that arrives after the
 # last one still learns the render succeeded. The bytes live in the disk
@@ -85,6 +92,7 @@ class Job:
     id: str
     key: str                     # the cache file name: identical exports join
     started: float
+    filename: str = "dokument.pdf"
     est_pages: int = 0           # from the transform, before layout begins
     step: int = 0
     pages: int = 0               # highest page laid out in the current pass
@@ -203,6 +211,10 @@ _pool: ThreadPoolExecutor | None = None
 _threads: dict[int, Job] = {}       # rendering thread -> the job it serves
 
 
+class QueueFull(RuntimeError):
+    """The bounded PDF render queue has no slot for a new unique job."""
+
+
 class _Handler(logging.Handler):
     """Every WeasyPrint progress line, routed to whichever job the emitting
     thread is rendering. Lines from a render outside a job (none today) are
@@ -248,6 +260,28 @@ def get(job_id: str) -> Job | None:
     return _jobs.get(job_id)
 
 
+def _start(entry, filename, run) -> Job:
+    """Start or join one cache-keyed render callable."""
+    with _lock:
+        _reap(time.monotonic())
+        if (live := _by_key.get(entry.name)) is not None:
+            return live
+        if (not entry.is_file()
+                and sum(not candidate.done for candidate in _by_key.values())
+                >= MAX_LIVE_JOBS):
+            raise QueueFull("PDF-kön är full; försök igen senare")
+        job = Job(id=uuid.uuid4().hex[:16], key=entry.name,
+                  started=time.monotonic(), filename=filename)
+        _jobs[job.id] = job
+        _by_key[job.key] = job
+        if entry.is_file():
+            job.finished = job.started
+            return job
+        pool = _install()
+    pool.submit(_run, job, run).add_done_callback(job.settle)
+    return job
+
+
 def start(page, *, toc: bool, kinds: frozenset[str], subresource,
           amendments: bool, columns: int) -> Job:
     """Start -- or join -- the export of `page`. Raises FileNotFoundError if
@@ -255,33 +289,39 @@ def start(page, *, toc: bool, kinds: frozenset[str], subresource,
     back finished, having rendered nothing."""
     entry = pdf.cache_entry(page, toc=toc, kinds=kinds,
                             amendments=amendments, columns=columns)
-    with _lock:
-        _reap(time.monotonic())
-        if (live := _by_key.get(entry.name)) is not None:
-            return live
-        job = Job(id=uuid.uuid4().hex[:16], key=entry.name,
-                  started=time.monotonic())
-        _jobs[job.id] = job
-        _by_key[job.key] = job
-        if entry.is_file():
-            job.finished = job.started        # a hit: nothing to render
-            return job
-        pool = _install()
-    pool.submit(_run, job, page, toc, kinds, subresource, amendments,
-                columns).add_done_callback(job.settle)
-    return job
+    return _start(entry, pdf.filename_for(page.name),
+                  lambda progress: pdf.export(
+                      page, toc=toc, kinds=kinds, subresource=subresource,
+                      progress=progress, amendments=amendments, columns=columns))
 
 
-def _run(job: Job, page, toc, kinds, subresource, amendments, columns) -> None:
+def start_collection(manifest: pdfcollection.CollectionManifest, *, subresource,
+                     generated) -> Job:
+    """Start or join a stateless collection render."""
+    entry = pdfcollection.cache_entry(manifest, generated)
+    return _start(entry, pdfcollection.filename(manifest),
+                  lambda progress: pdfcollection.export(
+                      manifest, subresource=subresource, generated=generated,
+                      progress=progress))
+
+
+def _run(job: Job, run) -> None:
     """The render, on a worker thread. Whatever it raises travels back on the
     future to `Job.settle`; the thread binding is what routes WeasyPrint's
     progress lines to this job."""
     _threads[threading.get_ident()] = job
     try:
-        pdf.export(page, toc=toc, kinds=kinds, subresource=subresource,
-                   progress=job, amendments=amendments, columns=columns)
+        run(job)
     finally:
         del _threads[threading.get_ident()]
+
+
+def result(job: Job):
+    """The finished job's cache entry, or None while it has no usable PDF."""
+    if not job.done or job.error:
+        return None
+    entry = pdf.cache_dir() / job.key
+    return entry if entry.is_file() else None
 
 
 # --------------------------------------------------------------------------

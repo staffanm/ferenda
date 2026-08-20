@@ -596,6 +596,13 @@ def generated_page(path: str):
     return page if compress.resolve(page) is not None else None
 
 
+def cache_dir():
+    """Where every rendered PDF is cached -- single-document exports and
+    collections alike, so one prune policy covers both. A function, not a
+    constant: `config.DATA` moves under test."""
+    return config.DATA / "cache" / "pdfexport"
+
+
 def cache_entry(page, *, toc: bool, kinds: frozenset[str],
                 amendments: bool, columns: int):
     """The cache file this export lands in -- present means the PDF is ready
@@ -603,9 +610,8 @@ def cache_entry(page, *, toc: bool, kinds: frozenset[str],
     resolved = compress.resolve(page)
     if resolved is None:
         raise FileNotFoundError(str(page))
-    return (config.DATA / "cache" / "pdfexport"
-            / (_cache_key(resolved.read_bytes(), toc, kinds, amendments,
-                          columns) + ".pdf"))
+    return cache_dir() / (_cache_key(resolved.read_bytes(), toc, kinds,
+                                     amendments, columns) + ".pdf")
 
 
 # One render per cache key at a time. Two readers asking for the same big
@@ -752,6 +758,13 @@ def _paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
     body = doc.find("body")
     assert body is not None, "generated page has no body"  # rule:fail-fast
     _add_class(body, "pdf-weasy")
+    # Collection assembly namespaces every id. Paper layout must therefore
+    # not depend on the public page's ``id="dokument"`` surviving that step.
+    # The class is private to this transformed DOM and remains stable when
+    # several documents share one PDF.
+    document = doc.get_element_by_id("dokument", None)
+    if document is not None:
+        _add_class(document, "print-document")
     dropped = _paper_amendments(doc, amendments)
     island = _island(doc) if kinds else {}
     # the TOC aside is harvested before the chrome it sits in is dropped
@@ -856,6 +869,16 @@ def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
     with (bytes, mime) -- the app answering for itself in-process."""
     doc = _paper_document(html_text, toc=toc, kinds=kinds,
                           amendments=amendments, columns=columns)
+    return render_document(doc, subresource=subresource, progress=progress)
+
+
+def render_document(doc, *, subresource, progress=None) -> bytes:
+    """A transformed paper DOM as PDF bytes.
+
+    Single-page export builds this DOM in ``_paper_document``.  A collection
+    builds it by combining several such document fragments, then uses the same
+    estimator, fetch policy, mirrored-note pass and failure contract here.
+    """
     if progress is not None:
         progress.plan(estimate_pages(doc))
     failures = []

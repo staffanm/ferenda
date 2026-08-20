@@ -191,9 +191,10 @@ nav.toc a.toc-collapsed { display: none; }
    at the top right of the TOC rail, and its options dialog. Screen chrome
    only -- the print block hides the icon, and api/pdf.py drops the whole
    column. The toc-top row reserves its width so a long id never runs
-   under it. -- */
+   under it -- room for both icons, the printer and the collection button
+   beside it. -- */
 .toc-list { position: relative; }
-nav.toc a.toc-top { padding-right: 2.6rem; }
+nav.toc a.toc-top { padding-right: 5.3rem; }
 .pdf-open { position: absolute; top: .05rem; right: .9rem;
             display: inline-flex; align-items: center; justify-content: center;
             padding: .2rem; border: 0; border-radius: 4px;
@@ -234,6 +235,130 @@ nav.toc a.toc-top { padding-right: 2.6rem; }
    own page (/api/v1/pdf/vanta), which carries the progress bar */
 @keyframes spin { to { transform: rotate(360deg); } }   /* also .search-spin */
 .pdf-err { color: var(--danger); font-size: .82rem; margin: .8rem 0 0; }
+
+/* -- Browser-owned PDF collection -------------------------------------- */
+.collection-add { position: absolute; top: .05rem; right: 3rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: none; color: var(--ink-3);
+  cursor: pointer; padding: .2rem; }
+.collection-add:hover { color: var(--accent); background: var(--surf-2); }
+.collection-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.collection-add[aria-pressed="true"] { color: var(--accent); }
+
+.collection-mast-spacer { flex: 1; }
+.collection-toolbar { position: relative; flex: none; display: inline-flex;
+  align-items: center; justify-content: center; width: 2rem; height: 2rem;
+  box-sizing: border-box; color: var(--ink-2); background: var(--surf-2);
+  border: 1px solid var(--rule); border-radius: 999px;
+  transition: background-color .15s, color .15s, opacity .15s; }
+.collection-toolbar:hover { color: var(--accent); background: var(--surf-3);
+  text-decoration: none; }
+.collection-toolbar:focus-visible { outline: 2px solid var(--accent);
+  outline-offset: 2px; }
+.collection-toolbar[aria-disabled="true"] { opacity: .35; pointer-events: none; }
+.collection-badge { position: absolute; top: -.38rem; right: -.42rem;
+  min-width: 1rem; height: 1rem; box-sizing: border-box; padding: 0 .22rem;
+  border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font: 600 .62rem/1rem var(--sans); text-align: center;
+  font-variant-numeric: tabular-nums; }
+.collection-badge:empty { display: none; }
+@keyframes collection-arrived {
+  0% { transform: scale(.72); }
+  40% { transform: scale(1.24); }
+  70% { transform: scale(.94); }
+  100% { transform: scale(1); }
+}
+.collection-toolbar.collection-arrived { animation: collection-arrived .7s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .collection-toolbar.collection-arrived { animation: none; }
+}
+
+.collection-editor { width: min(68rem, calc(100% - 3rem)); margin: 3.5rem auto 6rem;
+  color: var(--ink); }
+.collection-editor-head { max-width: 46rem; margin-bottom: 2rem; }
+.collection-editor-head h1 { font: 500 2.6rem/1.05 var(--serif); margin: .25rem 0 .5rem; }
+.collection-editor-head p { color: var(--ink-3); }
+.collection-card, .collection-document-row { border: 1px solid var(--rule);
+  border-radius: 7px; background: var(--surf); }
+.collection-settings { padding: 1.2rem 1.35rem; display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1.4rem;
+  font: 400 .88rem/1.45 var(--sans); }
+.collection-settings h2 { grid-column: 1 / -1; margin: 0; font: 600 1.15rem var(--serif); }
+.collection-settings > label:not(.collection-check) { display: grid; gap: .25rem; }
+.collection-settings input[type=text], .collection-settings input:not([type]) {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--rule);
+  border-radius: 4px; background: var(--surf-2); color: var(--ink); padding: .45rem .55rem; }
+.collection-settings fieldset { border: 0; padding: 0; margin: 0; }
+.collection-settings legend { font-weight: 600; margin-bottom: .2rem; }
+.collection-settings fieldset label { margin-right: 1rem; }
+.collection-context-kinds { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .3rem 1rem; }
+.collection-context-kinds[disabled] { opacity: .5; }
+.collection-documents { margin-top: 2.4rem; }
+.collection-section-head { display: flex; align-items: baseline; justify-content: space-between; }
+.collection-section-head h2 { font: 600 1.35rem var(--serif); margin: 0 0 .8rem; }
+.collection-count, .collection-empty { color: var(--ink-4); font: .82rem var(--sans); }
+.collection-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .8rem; }
+.collection-document-row { padding: 1rem 1.15rem; }
+.collection-document-row[draggable=true] { cursor: grab; }
+.collection-document-head { display: flex; justify-content: space-between; gap: 1rem; }
+.collection-document-name h3 { margin: .1rem 0 0; font: 500 1.1rem/1.25 var(--serif); }
+.collection-document-name h3 a { color: var(--ink); }
+.collection-document-name .eyebrow { font-size: .78rem; }
+.collection-ordering { flex: none; display: flex; gap: .35rem; align-items: start; }
+.collection-ordering button, .collection-actions button, .collection-import {
+  border: 1px solid var(--rule); border-radius: 4px; background: var(--surf-2);
+  color: var(--ink-2); padding: .4rem .65rem; cursor: pointer;
+  font: 500 .76rem/1.2 var(--sans); }
+.collection-document-settings { display: flex; flex-wrap: wrap; gap: .45rem 1.4rem;
+  margin-top: .9rem; padding-top: .75rem; border-top: 1px solid var(--rule-soft);
+  font: .8rem var(--sans); }
+.collection-document-settings select { margin-left: .3rem; }
+.collection-sections { margin-top: .7rem; font: .8rem/1.4 var(--sans); }
+.collection-sections summary { color: var(--accent); cursor: pointer; }
+.collection-sections > label { display: block; margin: .5rem 0; font-weight: 600; }
+.collection-outline { max-height: 18rem; overflow-y: auto; display: grid; gap: .15rem;
+  padding: .5rem .7rem; border-left: 2px solid var(--rule-soft); }
+.collection-outline label { padding-left: calc((var(--outline-level) - 1) * 1.1rem); }
+.collection-actions { position: sticky; bottom: 0; display: flex; flex-wrap: wrap;
+  align-items: center; gap: .5rem; margin-top: .5rem; padding: .8rem;
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--surf); }
+.collection-action-spacer { flex: 1; }
+.collection-actions .collection-create { background: var(--accent); border-color: var(--accent);
+  color: var(--on-accent); font-size: .84rem; }
+.collection-import input { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); }
+.collection-error { color: var(--danger); font: .85rem var(--sans); }
+.collection-direct-link { display: flex; align-items: center; gap: .45rem;
+  margin-top: 1.5rem; font: .78rem/1.4 var(--sans); color: var(--ink-3); }
+.collection-direct-link > span:first-child { flex: none; }
+.collection-direct-link > a { min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.collection-direct-link button { flex: none; display: inline-flex; align-items: center;
+  justify-content: center; padding: .25rem; border: 0; border-radius: 4px;
+  background: none; color: var(--ink-3); cursor: pointer; }
+.collection-direct-link button:hover, .collection-direct-link button.copied {
+  color: var(--accent); background: var(--surf-2); }
+.collection-copy-status { position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); }
+
+.collection-wait { max-width: 32rem; margin: 18vh auto 0; padding: 0 1.5rem;
+  font: 400 .95rem/1.6 var(--sans); color: var(--ink); }
+.collection-wait h1 { font: 500 1.5rem/1.25 var(--serif); margin: 0 0 .3rem; }
+.collection-wait .doc { font-family: var(--serif); font-style: italic; margin: 0 0 1.6rem; }
+.collection-wait .track { height: .5rem; border-radius: 99px; background: var(--surf-3); overflow: hidden; }
+.collection-wait .bar { height: 100%; width: 0; border-radius: 99px; background: var(--accent); }
+.collection-wait .line { display: flex; justify-content: space-between; gap: 1rem;
+  margin-top: .55rem; font-size: .85rem; color: var(--ink-3); }
+.collection-wait .note { color: var(--ink-4); font-size: .82rem; margin-top: 2.2rem; }
+.collection-wait .err { color: var(--danger); }
+
+@media (max-width: 44rem) {
+  .collection-settings { grid-template-columns: 1fr; }
+  .collection-settings > * { grid-column: 1; }
+  .collection-document-head { display: block; }
+  .collection-ordering { margin-top: .7rem; }
+  .collection-actions { position: static; }
+}
 
 /* -- Frontmatter -- */
 /* #top -- the TOC's first entry jumps here, so it clears the sticky masthead
@@ -1457,7 +1582,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
     margin-bottom: 24mm;
     /* The page-specific boxes below keep the running head inside the same
        172 mm band as the reading column and its context column. */
-    @top-center { content: string(doc-title);
+    @top-center { content: string(doc-title, start);
                   font: italic 9pt "Source Serif 4", Georgia, serif;
                   color: #3d3d3d; }
     @bottom-left { content: none; }
@@ -1467,7 +1592,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
   @page :right {
     margin-left: 28mm;
     margin-right: 10mm;
-    @top-left { content: string(doc-id); text-align: left;
+    @top-left { content: string(doc-id, start); text-align: left;
                 font: italic 8.5pt "Source Serif 4", Georgia, serif;
                 color: #6a6a6a; }
     @top-right { content: string(here, start) string(here-inner, start);
@@ -1487,7 +1612,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
                        white-space: nowrap;
                        font: italic 8.5pt "Source Serif 4", Georgia, serif;
                        color: #3d3d3d; }
-    @top-right { content: string(doc-id); text-align: right;
+    @top-right { content: string(doc-id, start); text-align: right;
                  font: italic 8.5pt "Source Serif 4", Georgia, serif;
                  color: #6a6a6a; }
     @bottom-left-corner { content: counter(page); text-align: left;
@@ -1500,12 +1625,12 @@ section.occurrences details.more > summary { color: var(--ink-3);
   @page compact {
     size: A4;
     margin: 18mm 12mm;
-    @top-center { content: string(doc-title);
+    @top-center { content: string(doc-title, start);
                   font: italic 8pt "Source Serif 4", Georgia, serif;
                   color: #3d3d3d; }
   }
   @page compact:right {
-    @top-left { content: string(doc-id); text-align: left;
+    @top-left { content: string(doc-id, start); text-align: left;
                 font: italic 8pt "Source Serif 4", Georgia, serif;
                 color: #6a6a6a; }
     @top-right { content: string(here, start) string(here-inner, start);
@@ -1522,7 +1647,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
                 width: 62mm; text-align: left; white-space: nowrap;
                 font: italic 8pt "Source Serif 4", Georgia, serif;
                 color: #3d3d3d; }
-    @top-right { content: string(doc-id); text-align: right;
+    @top-right { content: string(doc-id, start); text-align: right;
                  font: italic 8pt "Source Serif 4", Georgia, serif;
                  color: #6a6a6a; }
     @bottom-left { content: counter(page); text-align: left;
@@ -1560,9 +1685,9 @@ section.occurrences details.more > summary { color: var(--ink-3);
 
   /* chrome and widgets: nothing a finger can operate belongs on paper */
   .masthead, .mobile-bar, .toc-col, .rail, .drawer-scrim, .search-overlay,
-  .theme-toggle, a.pilcrow, .fn-back, details.lydelser,
+  .theme-toggle, .paragraf-gutter a.pilcrow, .fn-back, details.lydelser,
   .ed-tools, .ed-panel, .ed-overlay, .ed-btn-top, .admin-panel,
-  .pdf-open,
+  .pdf-open, .collection-add, .collection-toolbar,
   .grafik-lightbox { display: none; }
   /* the crop's button wrapper is not chrome -- it *is* the graphic, so it
      prints; only its interactive affordances go */
@@ -1624,16 +1749,16 @@ section.occurrences details.more > summary { color: var(--ink-3);
      opening grid keeps the section number with its first paragraph. Table rows
      remain indivisible through the general `tr` rule below, so a table breaks
      only between rows. */
-  body.pdf-two-columns #dokument section.paragraf {
+  body.pdf-two-columns .print-document section.paragraf {
     display: block; min-height: 5rem; break-inside: auto;
   }
-  body.pdf-two-columns #dokument .paragraf-body { margin-left: 4.3rem; }
-  body.pdf-two-columns #dokument .paragraf-start {
+  body.pdf-two-columns .print-document .paragraf-body { margin-left: 4.3rem; }
+  body.pdf-two-columns .print-document .paragraf-start {
     display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .8rem;
     width: calc(100% + 4.3rem); margin-left: -4.3rem;
     align-items: baseline; break-inside: avoid;
   }
-  body.pdf-two-columns #dokument table { break-inside: auto; }
+  body.pdf-two-columns .print-document table { break-inside: auto; }
 
   /* breaks: no orphaned headings, register entries whole */
   /* `.artikel` is not in this list: both article headings are already here as
@@ -1646,7 +1771,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .note-banner, .version-banner, p.ruta { break-inside: avoid; }
   /* SFS provisions range from one line to several pages. Keep other document
      units whole, but let a statute provision continue on the next page. */
-  #dokument section.paragraf { break-inside: auto; }
+  .print-document section.paragraf { break-inside: auto; }
   tr { break-inside: avoid; }
   thead { display: table-header-group; }
   p { orphans: 3; widows: 3; }
@@ -1830,6 +1955,87 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .print-kontext p { margin: 0 0 .15rem; text-align: inherit; }
   .print-kontext .prov { color: var(--ink-4); }
   .print-kontext .q { font-style: italic; }
+
+  /* A collection uses the same paper fragments as one document, inside a
+     page-fragmenting wrapper. The wrapper passes the complete page band to
+     context rows; ordinary children keep the normal reading measure. */
+  body.pdf-collection .collection-main > .collection-document { width: 100%; }
+  body.pdf-collection .collection-document > * { width: var(--matt); }
+  body.pdf-collection .collection-document > .kontextrot,
+  body.pdf-collection .collection-document > .kontextblock { width: 100%; }
+  body.pdf-collection .collection-document.start-page { break-before: page; }
+  body.pdf-collection .collection-document.start-recto,
+  body.pdf-collection .collection-first-document { break-before: right; }
+  /* WeasyPrint's `string(..., start)` correctly keeps the first document's
+     title when another document begins midway down a page. At a forced page
+     break it otherwise keeps the old title for one page. This zero-size box
+     updates the two strings after the old page header is fixed and before
+     WeasyPrint starts the new page. */
+  body.pdf-collection .collection-running-next {
+    position: absolute; height: 0; margin: 0; padding: 0;
+    font-size: 0; line-height: 0;
+    string-set: doc-title attr(data-doc-title), doc-id attr(data-doc-id),
+                here "", here-inner "";
+  }
+  body.pdf-collection .collection-document.start-direct:not(.collection-first-document) {
+    margin-top: 2.6rem;
+  }
+  body.pdf-collection .collection-document > .frontmatter {
+    break-after: avoid; margin-top: 0; string-set: here "", here-inner "";
+  }
+  body.pdf-collection .collection-document .frontmatter h1 { bookmark-level: 1; }
+
+  /* The optional cover is a recto followed by an intentionally blank verso.
+     Both omit running furniture. The visible footer belongs to the cover's
+     content so it never appears on the blank reverse. */
+  @page collection-cover {
+    size: A4; margin: 24mm 28mm;
+    @top-left { content: none; } @top-center { content: none; }
+    @top-right { content: none; } @bottom-left { content: none; }
+    @bottom-center { content: none; } @bottom-right { content: none; }
+    @bottom-left-corner { content: none; } @bottom-right-corner { content: none; }
+  }
+  @page collection-blank {
+    size: A4; margin: 0;
+    @top-left { content: none; } @top-center { content: none; }
+    @top-right { content: none; } @bottom-left { content: none; }
+    @bottom-center { content: none; } @bottom-right { content: none; }
+    @bottom-left-corner { content: none; } @bottom-right-corner { content: none; }
+  }
+  @page :blank {
+    @top-left { content: none; } @top-center { content: none; }
+    @top-right { content: none; } @bottom-left { content: none; }
+    @bottom-center { content: none; } @bottom-right { content: none; }
+    @bottom-left-corner { content: none; } @bottom-right-corner { content: none; }
+  }
+  body.pdf-collection .collection-cover { page: collection-cover; width: 100%;
+    box-sizing: border-box; height: 249mm; margin: 0; display: flex;
+    flex-direction: column; justify-content: center; position: relative;
+    break-after: page; text-align: center; }
+  body.pdf-collection .collection-cover h1 { bookmark-level: none;
+    font-size: 30pt; line-height: 1.12; margin: 0; }
+  body.pdf-collection .collection-subtitle { font: italic 15pt/1.35 var(--serif);
+    text-align: center; margin: 1rem auto 0; max-width: 125mm; }
+  body.pdf-collection .collection-generated { position: absolute; bottom: 0;
+    width: 100%; text-align: center; font: italic 9pt var(--serif); color: var(--ink-3); }
+  body.pdf-collection .collection-cover-verso { page: collection-blank;
+    width: 100%; min-height: 1px; break-after: page; }
+
+  /* The collection TOC is deliberately shallow. Internal headings stay in
+     the PDF sidebar but do not consume paper here. It ends on a verso when
+     needed, so the first document always starts on a recto. */
+  body.pdf-collection .collection-toc { width: 100%; margin: 0;
+    padding-top: 8mm; break-after: right; bookmark-level: none; }
+  body.pdf-collection .collection-toc h2 { font-size: 1.5rem; }
+  body.pdf-collection .collection-toc li { margin: .3rem 0; }
+  body.pdf-collection .collection-toc-id { display: inline-block; width: 36mm;
+    margin-right: 3mm; font-style: italic; color: var(--ink-3); }
+  body.pdf-collection .collection-toc-title { color: var(--ink); }
+
+  body.pdf-collection.pdf-two-columns .collection-document > .frontmatter,
+  body.pdf-collection.pdf-two-columns .collection-document > .print-columns {
+    width: 100%;
+  }
 }
 
 /* -- /hanvisningar/: the citation-graph explorer (graf.js) -- */

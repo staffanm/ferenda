@@ -173,7 +173,7 @@ accommodanda/
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
   wiki/     kommentar + begrepp sources — parse·annotate·guidance_discover (markdown content repo, WIKI_ROOT)
-  api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), patch (source-fix editor)
+  api/      HTTP API — app (REST/OpenAPI + static site + legacy feeds), pdf·pdfjob·pdfcollection (single-document and collection paper exports), mcp (MCP server), ops (health dashboard), auth·edit·editcontent·editcart (inline content editor), patch (source-fix editor)
   build.py  orchestrator — the `lagen` build driver, composes the verticals
 ```
 
@@ -4578,6 +4578,14 @@ in `git log`. This document is the forest-level status; section markers
   status beside generated/verified; `annstore.publishable` is now the one
   policy for what reaches the render). `pdftext.page_boxes` and `Line.bottom`
   supply the pixel-to-point geometry this needed.
+- **api/render** (2026-08-20) — `/samling` adds account-free PDF collections.
+  The browser keeps one localStorage draft and encodes a compact versioned
+  recipe in `/samling#…`; JSON import/export is the long-link fallback.
+  Each document has start, SFS-register, EU-preamble and multi-section choices.
+  One WeasyPrint layout provides direct starts, mirrored context, a shallow
+  printed TOC and a deeper PDF outline. A cover has a blank reverse. The first
+  document starts recto. A bounded shared job queue handles the render. Real
+  SFS/EU/proposition output and a 5,002-page capacity run were verified.
 - **api/render** (2026-08-20) — the PDF export's print layout rebuilt as
   mirrored book pages: a right page holds text at 28 mm (117 mm wide) with
   the apparatus at 145 mm (55 mm wide), a left page mirrors both, through

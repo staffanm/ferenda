@@ -398,8 +398,8 @@ curl -G http://127.0.0.1:8001/api/v1/graph \
 
 ### `GET /api/v1/pdf` — dokumentet som PDF
 
-En genererad sida omrenderad för papper: A4, löpande sidhuvud, sidfot av
-formen "3 (12)" (sida/antal sidor), PDF-bokmärken — samma `style.css`-
+En genererad sida omrenderad för papper: A4, löpande sidhuvud, sidnummer i
+det yttre hörnet och PDF-bokmärken — samma `style.css`-
 utskriftsblock som webbläsarens egen Skriv ut, plus det sidbrytningslager
 (`@page`, `string-set`, `target-counter()`) webbläsare inte implementerar.
 Renderas av WeasyPrint (`api/pdf.py`); understilar och bilder hämtas i
@@ -415,6 +415,8 @@ behåller cacheträffen.
 | `path` | sträng (obligatorisk) | sidans publika sökväg, t.ex. `/1998:204` eller `/prop/2020/21:22` |
 | `toc` | bool (standard `false`) | lägg till sidans egen innehållsförteckning med utlästa sidnummer |
 | `kontext` | sträng | kommaseparerad lista kontextslag att skriva ut under varje paragraf/artikel (rälsens sektionsnamn, t.ex. `kommentar,dv,forarbete`), eller `alla`; standard: ingen kontext |
+| `andringar` | bool (standard `true`) | ta med SFS-registret Ändringar och övergångsbestämmelser, utan skärmens fillänkar |
+| `kolumner` | heltal `1` eller `2` | använd normal spegelvänd layout eller kompakt tvåspaltslayout; två spalter tar inte med kontext |
 | `download` | bool (standard `false`) | servera som bifogad fil (nedladdning) i stället för inline (visning) |
 
 ```sh
@@ -422,6 +424,39 @@ curl -G http://127.0.0.1:8001/api/v1/pdf \
      --data-urlencode "path=/1998:204" --data-urlencode "toc=true" \
      --data-urlencode "kontext=forarbete,dv" -o forvaltningslagen.pdf
 ```
+
+### `/samling` — flera dokument i en PDF
+
+`/samling` bygger en författningssamling utan konto eller serverlagrad lista.
+Webbläsaren sparar utkastet i `localStorage`. Bokmärkeslänken bär ett
+kompakt, versionsmärkt representation efter `#`. Fragmentet skickas inte till
+servern. Samlingen kan exporteras och importeras som JSON när länken blir
+opraktiskt lång.
+
+Redigeraren kan ordna högst 1 000 dokument. Varje dokument kan starta direkt,
+på nästa sida eller på nästa högersida. Den kan också utesluta SFS-
+ändringar, en EU-preambel eller delar av ett dokument. Flera separata avsnitt
+kan väljas ur samma proposition. Globala val styr en eller två spalter och
+vilka kontextslag som ska finnas med.
+
+Ett valfritt omslag bär titel, undertitel och genereringsdatum. Omslagets
+baksida är tom. Den tryckta innehållsförteckningen listar endast dokument.
+PDF-panelen kan dessutom visa dokumentens interna rubriker.
+
+Servern tar emot hela manifestet först när webbläsaren inspekterar eller skapar
+samlingen:
+
+- `POST /api/v1/pdf/samling/inspektera` läser titlar, tillgängliga val och
+  avsnitt ur de aktuella genererade sidorna.
+- `POST /api/v1/pdf/samling/jobb` startar eller ansluter till en cachelagd
+  bakgrundsrendering.
+- `GET /api/v1/pdf/jobb/{id}/resultat` hämtar den färdiga filen.
+
+Alla dokument sätts i en WeasyPrint-körning. Därför kan `direct` använda
+plats som finns kvar på den aktuella sidan. Globala sidnummer, TOC-mål och
+spegelvända marginaler blir också exakta. Ett kapacitetsprov skapade 5 002
+fysiska sidor. Jobbkön tillåter högst åtta unika pågående jobb. Identiska
+begäranden delar jobb och cacheträffar tar ingen köplats.
 
 ### `GET /api/v1/sources` — källor och antal
 

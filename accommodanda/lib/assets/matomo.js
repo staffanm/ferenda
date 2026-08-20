@@ -28,6 +28,10 @@
      followed -- the privacy stance lagen.nu ships with */
   _paq.push(["disableCookies"]);
   _paq.push(["disableBrowserFeatureDetection"]);
+  /* A /samling bookmark keeps its complete document recipe in the fragment.
+     Fragments never reach HTTP, and analytics must not copy one out through
+     its browser API. Anchors are navigation state on every other page too. */
+  _paq.push(["setCustomUrl", location.pathname + location.search]);
   _paq.push(["trackPageView"]);
   _paq.push(["setTrackerUrl", u + "matomo.php"]);
   _paq.push(["setSiteId", String(site)]);

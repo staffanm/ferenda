@@ -427,7 +427,11 @@ re-rendered for paper by `api/pdf.py`, WeasyPrint over the same `style.css`
 print rules the browser uses, its subresources — stylesheet, fonts, facsimile
 images — all resolved in-process, never over the network; a large export runs
 as a background job (`api/pdfjob.py`) that the reader follows on a waiting
-page with a progress bar, rather than on a request nginx times out at 60 s)
+page with a progress bar, rather than on a request nginx times out at 60 s;
+`api/pdfcollection.py` and `/samling` assemble up to 1,000 browser-owned
+documents into one exact WeasyPrint layout, with localStorage drafts,
+bookmark-fragment recipes, per-document section/start choices, an optional
+cover and a document-only printed TOC)
 that also serves the static site under `lagen serve`. `api/mcp.py` mounts a public, no-auth **MCP server** (Model
 Context Protocol) at `/mcp` on the same app — the same read-only view reshaped as
 tools (search, resolve_citation, get_document, the citation graph, …) so any

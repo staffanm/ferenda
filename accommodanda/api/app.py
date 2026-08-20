@@ -23,8 +23,10 @@ import re
 import sqlite3
 import subprocess
 import threading
+from datetime import datetime
 from html import escape
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -59,7 +61,19 @@ from ..lib import (
     search,
 )
 from ..lib.util import basefile_slug
-from . import analytics, auth, db, edit, errors, ops, patch, pdf, pdfjob, reads
+from . import (
+    analytics,
+    auth,
+    db,
+    edit,
+    errors,
+    ops,
+    patch,
+    pdf,
+    pdfcollection,
+    pdfjob,
+    reads,
+)
 from . import mcp as mcp_server
 from .db import get_con
 
@@ -1028,6 +1042,66 @@ def pdf_endpoint(
             "attachment" if download else "inline", pdf.filename_for(path))})
 
 
+@app.get("/samling", response_class=HTMLResponse, include_in_schema=False)
+def pdf_collection_page():
+    """The browser-owned editor for a bookmarkable document collection."""
+    return HTMLResponse(pdfcollection.collection_page())
+
+
+@app.get("/api/v1/pdf/samling/vanta", response_class=HTMLResponse,
+         include_in_schema=False)
+def pdf_collection_wait_page():
+    """A real waiting address whose fragment carries the collection recipe."""
+    return HTMLResponse(pdfcollection.wait_page())
+
+
+@app.post("/api/v1/pdf/samling/inspektera", tags=["document"],
+          include_in_schema=False)
+def pdf_collection_inspect(request: pdfcollection.InspectRequest):
+    """Labels, options and selectable headings for the collection editor."""
+    try:
+        return {"documents": pdfcollection.inspect(request.paths)}
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+
+
+@app.post("/api/v1/pdf/samling/jobb", tags=["document"],
+          include_in_schema=False)
+def pdf_collection_job_start(manifest: pdfcollection.CollectionManifest):
+    """Start one stateless collection render and return its background job."""
+    try:
+        pdfcollection.validate(manifest)
+        job = pdfjob.start_collection(
+            manifest, subresource=_pdf_subresource(),
+            generated=datetime.now(ZoneInfo("Europe/Stockholm")).date())
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
+    except pdfjob.QueueFull as exc:
+        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return job.status()
+
+
+@app.get("/api/v1/pdf/jobb/{job_id}/resultat", tags=["document"],
+         include_in_schema=False)
+def pdf_job_result(job_id: str, download: bool = Query(False)):
+    """The cached PDF produced by a finished background job."""
+    job = pdfjob.get(job_id)
+    if job is None:
+        raise HTTPException(404, "no such pdf job")
+    if job.error:
+        raise HTTPException(503, job.error)
+    entry = pdfjob.result(job)
+    if entry is None:
+        raise HTTPException(409, "pdf job is not finished")
+    return FileResponse(
+        entry, media_type="application/pdf", filename=job.filename,
+        content_disposition_type="attachment" if download else "inline")
+
+
 def _pdf_subresource():
     """How the export fetches the page's own images and stylesheets: the app
     answering for itself in-process, so nothing leaves the container."""
@@ -1063,6 +1137,8 @@ def pdf_job_start(
                            amendments=andringar, columns=kolumner)
     except FileNotFoundError:
         raise HTTPException(404, "no generated page at %r" % path) from None
+    except pdfjob.QueueFull as exc:
+        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
     return job.status()
 
 

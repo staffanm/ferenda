@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Min samling — lagen.nu</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head><body class="gr-root collection-editor-page" data-collection-editor>
+<header class="masthead"><div class="mast-inner"><a class="brand" href="/">lagen<em>.nu</em></a><span class="collection-mast-spacer"></span><button class="theme-toggle" type="button" data-theme-toggle aria-label="Växla mellan ljust och mörkt tema" title="Växla ljust / mörkt tema"><svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg><svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></button></div></header>
+<main class="collection-editor">
+  <header class="collection-editor-head">
+    <div class="eyebrow">PDF</div>
+    <h1>Min samling</h1>
+    <p>Ordna dokument och välj vad den tryckta samlingen ska innehålla.</p>
+  </header>
+
+  <section class="collection-card collection-settings" aria-labelledby="collection-settings-h">
+    <h2 id="collection-settings-h">Samlingen</h2>
+    <label>Titel <input name="collection-title" maxlength="200"></label>
+    <label>Undertitel <input name="collection-subtitle" maxlength="400"></label>
+    <label class="collection-check"><input type="checkbox" name="collection-cover"> Omslag</label>
+    <label class="collection-check"><input type="checkbox" name="collection-toc"> Innehållsförteckning</label>
+    <fieldset><legend>Sidlayout</legend>
+      <label><input type="radio" name="collection-columns" value="1"> En kolumn</label>
+      <label><input type="radio" name="collection-columns" value="2"> Två kolumner</label>
+    </fieldset>
+    <label class="collection-check"><input type="checkbox" name="collection-context"> Kontext</label>
+    <fieldset class="collection-context-kinds" disabled><legend>Kontextslag</legend></fieldset>
+  </section>
+
+  <section class="collection-documents" aria-labelledby="collection-documents-h">
+    <div class="collection-section-head"><h2 id="collection-documents-h">Dokument</h2>
+      <span class="collection-count"></span></div>
+    <p class="collection-empty">Samlingen är tom. Lägg till dokument från deras sidor.</p>
+    <ol class="collection-list"></ol>
+  </section>
+
+  <p class="collection-error" role="alert" hidden></p>
+  <div class="collection-direct-link">
+    <span>Direktlänk till denna samling:</span>
+    <a data-collection-link href="/samling"></a>
+    <button type="button" data-collection-copy aria-label="Kopiera direktlänken" title="Kopiera direktlänken"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg></button>
+    <span class="collection-copy-status" aria-live="polite"></span>
+  </div>
+  <div class="collection-actions">
+    <button type="button" data-collection-export>Exportera samling</button>
+    <label class="button collection-import">Importera samling<input type="file" accept="application/json,.json"></label>
+    <button type="button" data-collection-clear>Töm</button>
+    <span class="collection-action-spacer"></span>
+    <label><input type="checkbox" name="collection-download"> Ladda ned</label>
+    <button type="button" class="collection-create" data-collection-create>Skapa PDF</button>
+  </div>
+</main>
+<script src="/script.js" defer></script>
+<script>(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;b.addEventListener('click',function(){var cur=document.documentElement.getAttribute('data-theme');if(cur!=='light'&&cur!=='dark')cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var next=cur==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('theme',next);}catch(e){}});})();</script>
+</body></html>

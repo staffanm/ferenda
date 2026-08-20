@@ -258,6 +258,20 @@ def test_job_of_a_missing_page_is_404(client):
                        params={"path": "/1999:0"}).status_code == 404
 
 
+def test_new_unique_job_is_rejected_when_the_queue_is_full(
+        client, monkeypatch):
+    monkeypatch.setattr(pdfjob, "MAX_LIVE_JOBS", 1)
+    occupied = pdfjob.Job(id="occupied", key="another.pdf",
+                          started=time.monotonic())
+    pdfjob._jobs[occupied.id] = occupied
+    pdfjob._by_key[occupied.key] = occupied
+    response = client.post("/api/v1/pdf/jobb",
+                           params={"path": "/1998:9999"})
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "30"
+    assert "PDF-kön är full" in response.json()["detail"]
+
+
 def test_identical_exports_share_one_render(client, monkeypatch):
     # two readers asking for the same export at the same moment: the second
     # must wait on the first render, not start a second one beside it
@@ -610,6 +624,8 @@ def test_two_column_sfs_table_breaks_between_columns_after_its_opening_text():
         + rows + '</table></div></section></div>')
     doc = pdf._paper_document(PAGE.replace(old, provision), toc=False,
                               kinds=frozenset(), amendments=True, columns=2)
+    assert "print-document" in doc.get_element_by_id(
+        "dokument").get("class").split()
     start = doc.find_class("paragraf-start")[0]
     assert "paragraf-gutter" in start[0].get("class").split()
     assert start[1].get("id") == "table-opening"
@@ -849,6 +865,24 @@ def test_every_note_of_one_block_shares_the_margin():
              for _ in range(3)]
     block = pdf._attach(para, notes)
     assert block.find_class("kontextnot")[0].getchildren() == notes
+
+
+def test_the_permalink_pilcrow_does_not_reach_paper():
+    # `a.pilcrow` alone loses to `.paragraf-gutter .pilcrow`, which sets
+    # `display: block` on screen. The print block therefore hid nothing, and
+    # every § printed a stray glyph under its number.
+    page = PAGE.replace(
+        '<span class="n">1 §</span></div>',
+        '<span class="n">1 §</span>'
+        '<a class="pilcrow" href="#P1" aria-label="Permalänk">¶</a></div>')
+    out = subprocess.run(
+        ["pdftotext", "-", "-"],
+        input=pdf.render_pdf(page, toc=False, kinds=frozenset(),
+                             subresource=_no_subresource,
+                             amendments=True, columns=1),
+        capture_output=True, check=True).stdout.decode()
+    assert "1 §" in out
+    assert "¶" not in out
 
 
 def test_an_annotated_heading_keeps_its_text():
