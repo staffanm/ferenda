@@ -24,6 +24,11 @@ in which directory it happens to sit in.
   * ``status: "verified"`` -- a human has checked (and possibly edited) it.
     `guard` refuses to regenerate it without --force; verification is flipping
     the field by hand in an editor, captured in git history.
+  * ``status: "derived"`` -- computed mechanically from the sources rather than
+    authored by a model (sfs road-sign geometry, read off the published PDF's
+    own text layer and ink). It reaches the public render as it stands and is
+    regenerated as freely as a generated layer: what gets reviewed is the
+    deriver's code, not each entry.
   * stale is *derived*, never stored: a layer whose recorded input hashes no
     longer match the current artifacts has drifted and needs human re-review
     (`lagen ann status` reports it) -- it is never silently regenerated.
@@ -45,6 +50,9 @@ ROOT = config.WIKI_ROOT / "ann"
 
 GENERATED = "generated"
 VERIFIED = "verified"
+DERIVED = "derived"
+# every status a layer envelope may carry, in reporting order (`lagen ann status`)
+STATUSES = (GENERATED, VERIFIED, DERIVED)
 
 
 def tree(source):
@@ -79,10 +87,19 @@ def read_meta(p):
     through to regenerable."""
     meta = json.loads(Path(p).read_text()).get("meta", {})
     st = meta.get("status", VERIFIED)
-    if st not in (GENERATED, VERIFIED):
-        raise ValueError("%s has unknown meta.status %r (expected %r or %r)"
-                         % (p, st, GENERATED, VERIFIED))
+    if st not in STATUSES:
+        raise ValueError("%s has unknown meta.status %r (expected one of %s)"
+                         % (p, st, ", ".join(map(repr, STATUSES))))
     return {**meta, "status": st}
+
+
+def publishable(meta, entry):
+    """Whether one layer entry may reach the public render: a human verified the
+    whole layer or that entry, or the layer needs no review at all. The one home
+    of that policy -- the page renderer and the crop endpoint must agree, or a
+    page shows an `<img>` the API answers 404 for."""
+    return (meta.get("status") in (VERIFIED, DERIVED)
+            or bool(entry.get("verified")))
 
 
 def status(p):
@@ -162,13 +179,16 @@ def drifted(inputs):
                   if _current_hash(label) != recorded)
 
 
-def write(p, payload, inputs, force=False, model=None, meta_extra=None):
-    """Write one authored layer as a fresh ``generated`` envelope: ``meta``
-    (status, model, authored date, input hashes) beside the payload's own
-    keys. ``model`` defaults to the configured LLM (the usual author); a
-    mechanical deriver (sfs table-correspond) passes its own marker instead.
-    ``meta_extra`` merges extra source-specific fields into ``meta`` (the sfs
-    .graphics layer records its provenance horizon there as ``through``).
+def write(p, payload, inputs, force=False, model=None, meta_extra=None,
+          status=GENERATED):
+    """Write one layer as a fresh envelope: ``meta`` (status, model, authored
+    date, input hashes) beside the payload's own keys. ``status`` defaults to
+    ``generated``; a mechanical deriver passes ``derived``, which the render
+    publishes without per-entry sign-off (`publishable`). ``model`` defaults to
+    the configured LLM, the usual author -- a mechanical deriver passes its own
+    marker instead (sfs table-correspond, sfs road signs). ``meta_extra`` merges
+    extra source-specific fields into ``meta`` (the sfs .graphics layer records
+    its provenance horizon there as ``through``).
 
     Guards against clobbering a *whole-file* verified layer (the writer also
     guards before the LLM spend; this is the choke point) and writes atomically
@@ -178,7 +198,8 @@ def write(p, payload, inputs, force=False, model=None, meta_extra=None):
     (sfs.graphics.plan_localization), so this stays a blunt writer."""
     assert "meta" not in payload, "payload must not carry its own `meta` key"
     guard(p, force)
-    meta = {"status": GENERATED, "model": model or config.LLM_MODEL,
+    assert status in STATUSES, "unknown layer status %r" % status
+    meta = {"status": status, "model": model or config.LLM_MODEL,
             "generated": date.today().isoformat(), "inputs": inputs,
             **(meta_extra or {})}
     util.write_atomic(p, json.dumps({"meta": meta, **payload},

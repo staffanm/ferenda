@@ -30,6 +30,10 @@
 {#- unlocalized road-sign image: the honest gap beside the code -#}
 <td class="grafik-saknas" data-grafik="{{ gid }}">[{{ code }}]</td>
 {%- endmacro -%}
+{%- macro grafik_spacer_cell() -%}
+{#- the image column on a row that has no sign of its own (the header row) -#}
+<td class="grafik"></td>
+{%- endmacro -%}
 {%- macro grafik_img(src, alt) -%}
 <img class="grafik-img" src="{{ src }}" alt="{{ alt }}" loading="lazy">
 {%- endmacro -%}

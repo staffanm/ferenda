@@ -415,9 +415,22 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   resulting layer in the curated store
   (`lib/annstore.py`) — a peer of `.ann`/`.corr`, with per-entry `"verified":
   true` surviving a rerun so a reviewer can sign off graphics one at a time
-  (2007:90's hundreds of signs) without losing prior sign-offs. The layer
+  without losing prior sign-offs. The layer
   stores raw PDF points (top-left origin) and is hand-editable; generated,
-  unverified candidates stay out of the public render. `lib/facsimile.py`
+  unverified candidates stay out of the public render.
+  **Road-sign statutes take a second, fully deterministic route.** 2007:90 lists
+  326 signs, each a designator cell with no marker and no per-row change note,
+  and neither question a vision model could answer well at that scale. Both are
+  read off the published PDFs instead (`roadsign_boxes`, `roadsign_index`,
+  `localize_roadsigns`): their text layer names each row by the same designator,
+  so the sign is the ink in the Märke column between that row's caption and the
+  next row's, and the act that prints a row *last* is the one whose graphic is in
+  force. The register cannot answer the provenance question — an amendment
+  reprints only the rows it changes, not the whole paragraf, so 2017:923 sets
+  2 kap. 5 § but prints only A30–A41 — which is why the PDFs decide. The
+  resulting layer is `status: "derived"`: mechanical, so it reaches the render
+  without per-entry sign-off, and regenerated as freely as a generated one. A row
+  the PDF draws nothing for (Y2 is a *sound* signal) keeps its placeholder. `lib/facsimile.py`
   crops the bbox (`facsimile.cached` with a `bbox`); `GET
   /api/v1/sfs-graphic?uri=&node=` serves the crop lazily, resolving the
   provenance-correct PDF from the `.graphics` layer; the renderer's `grafik`
@@ -4535,6 +4548,16 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **sfs** (2026-08-20) — road-sign graphics (2007:90, 326 signs) drop the
+  vision model. `sfs/graphics.py`'s `roadsign_boxes`/`roadsign_index` read
+  each row's page, crop rectangle and source act off the published PDFs'
+  own text layer and rendered ink; `localize_roadsigns` places the gaps and
+  reports the designators no PDF draws. `build.py`'s `_sfs_roadsigns_one`
+  wires the route into `lagen sfs ai-includegraphics`, and the resulting
+  `.graphics` layer writes with `annstore.DERIVED` status (a new third
+  status beside generated/verified; `annstore.publishable` is now the one
+  policy for what reaches the render). `pdftext.page_boxes` and `Line.bottom`
+  supply the pixel-to-point geometry this needed.
 - **api/render** (2026-08-20) — the PDF export's print layout rebuilt as
   mirrored book pages: a right page holds text at 28 mm (117 mm wide) with
   the apparatus at 145 mm (55 mm wide), a left page mirrors both, through

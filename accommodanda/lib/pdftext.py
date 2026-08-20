@@ -94,6 +94,11 @@ class Line:
     # (start, end, "i"/"b"/"bi") over `text`: which stretches the document
     # emphasised, kept per-span rather than collapsed to the whole-line flags
     spans: list[tuple[int, int, str]] = field(default_factory=list)
+    # the foot of the line's text box (poppler's top + height), in the same
+    # pixel space as `top`. What separates a caption from the whitespace under
+    # it, which `top` plus a guessed line height cannot do: poppler's box is
+    # shorter than the leading, and the difference is what a crop clips.
+    bottom: int = 0     # 0 only for a Line built without poppler geometry
 
 
 @dataclass
@@ -348,6 +353,27 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
                               sizes.get(t.get("font"), 0),
                               fonts.get(t.get("font"), "")))
         yield int(page.get("number")), _lines(spans)
+
+
+def page_boxes(pdf_path):
+    """``{pageno: (width, height)}`` in pdftohtml's own pixel space -- the space
+    every geometry in `pdf_pages` is expressed in. Paired with the page as
+    poppler *renders* it (`facsimile`), this is what converts a text box to the
+    PDF points a crop takes. It has to come from the same conversion the
+    geometry does: for a PDF whose CropBox differs from its MediaBox, poppler's
+    two tools disagree about the page, and `pdfinfo`'s size is then the wrong
+    ruler (2007:90 is 468 x 686 pt to `pdfinfo` and 496 x 714 pt to both
+    `pdftohtml` and `pdftoppm`). Reads the cached conversion, so it costs a
+    parse, not a poppler run.
+
+    pdftohtml always sizes its `<page>`, so the attributes are read straight: a
+    conversion missing them is broken, and a zero-width page would travel on as
+    a zero scale and divide by zero in a caller three frames away."""
+    root = etree.fromstring(pdftohtml_xml(pdf_path),
+                            etree.XMLParser(recover=True, load_dtd=False,
+                                            no_network=True))
+    return {int(p.get("number")): (int(p.get("width")), int(p.get("height")))
+            for p in root.findall("page")}
 
 
 RE_PAGE_SIZE = re.compile(r"^Page\s+\d+\s+size:\s+([\d.]+) x ([\d.]+)", re.M)
@@ -669,24 +695,25 @@ def _lines(spans):
     the heading comes apart -- the title becomes a stycke and the number a
     paragraph of its own, on every numbered heading whose page prints the header
     at that height."""
-    grouped: list[tuple[int, list[Run], int]] = []
+    grouped: list[tuple[int, list[Run], int, int]] = []
     for top, left, base, text, bold, italic, right, size, font in sorted(
             spans, key=lambda s: (s[2], s[1], s[0])):
         run = Run(left, right, text, bold, italic, size, font)
         if grouped and abs(base - grouped[-1][0]) <= LINE_TOL:
-            prev_base, runs, prev_top = grouped[-1]
+            prev_base, runs, prev_top, prev_foot = grouped[-1]
             runs.append(run)
-            grouped[-1] = (prev_base, runs, min(prev_top, top))
+            grouped[-1] = (prev_base, runs, min(prev_top, top),
+                           max(prev_foot, base))
         else:
-            grouped.append((base, [run], top))
+            grouped.append((base, [run], top, base))
     out = []
-    for _base, runs, top in grouped:
+    for _base, runs, top, foot in grouped:
         runs.sort(key=lambda r: r.left)
-        out.append(line_from_runs(runs, top))
+        out.append(line_from_runs(runs, top, foot))
     return out
 
 
-def line_from_runs(runs, top):
+def line_from_runs(runs, top, bottom=None):
     """A `Line` built from its runs -- text, style spans *and* the whole-line
     style flags all derived from the same run set, so they cannot disagree.
 
@@ -701,6 +728,11 @@ def line_from_runs(runs, top):
     # non-empty by construction and a run-dropping caller filters first. Without
     # it the failure is a bare IndexError out of `runs[0].bold` (rule:fail-fast)
     assert runs, "line_from_runs needs at least one run"
+    # An omitted `bottom` (a Line assembled without poppler geometry) collapses
+    # the box onto its own top rather than to 0, which would put the foot above
+    # the head. A caller rebuilding a *converted* line must pass that line's own
+    # `bottom`: dropping it silently shortens the box, and nothing complains
+    # until something reads it.
     text, spans = _join_runs(runs)
     # The line's size is the size *most of its characters* are set in, not its
     # largest run's. Both readings keep a raised footnote marker from shrinking
@@ -718,7 +750,7 @@ def line_from_runs(runs, top):
                 all(r.bold for r in runs), runs[0].bold,
                 all(r.italic for r in runs),
                 max(weight, key=lambda size: (weight[size], size)),
-                runs, spans)
+                runs, spans, top if bottom is None else bottom)
 
 
 def flat_lines(pdf_path, hidden=False):
@@ -1120,7 +1152,7 @@ def _strip_split_header(lines, identifier):
         if not rs:
             kept.append(l)
         elif body_runs:
-            kept.append(line_from_runs(body_runs, l.top))
+            kept.append(line_from_runs(body_runs, l.top, l.bottom))
         # a line that was nothing but header fragments is dropped whole
     return kept
 
@@ -1544,7 +1576,7 @@ def page_paragraphs(lines, identifier, pageno, force_break_tops=frozenset(),
                     # the largest run's, which is the identifier's wherever the
                     # head is set larger than the title beside it.
                     if body_runs:
-                        l = line_from_runs(body_runs, l.top)
+                        l = line_from_runs(body_runs, l.top, l.bottom)
                         raw, spans = l.text, l.spans
                     else:
                         raw, spans = "", []     # the line was only the header

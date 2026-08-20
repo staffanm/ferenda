@@ -40,6 +40,7 @@ import sqlite3
 import sys
 import time
 import traceback
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
@@ -1437,6 +1438,33 @@ def _sfs_mirror_on_demand(beteckningar):
     return [b for b in beteckningar if not compress.exists(layout.sfs_pdf(b))]
 
 
+def _sfs_roadsign_index(basefile, register):
+    """``(index, sources_read)`` -- the published road-sign geometry for one act,
+    and the acts it was read from.
+
+    Mirrors every act whose PDF may reprint a row, then reads each row's page +
+    rectangle off those PDFs. An *amending* act the publisher has no facsimile
+    for is skipped: it only means one older reprint is unavailable, and any row
+    it would have carried still resolves to an earlier printing. The base act's
+    own PDF is not optional -- without it most rows have no printing at all, and
+    the run would quietly write a layer that drops crops the site is serving
+    (rule:fail-fast)."""
+    sources = sfs_graphics.roadsign_sources(register, basefile)
+    for beteckning in _sfs_mirror_on_demand(
+            [s for s in sources if not compress.exists(layout.sfs_pdf(s))]):
+        vlog("sfs ai-includegraphics %s: no published PDF for %s -- skipped"
+             % (basefile, beteckning))
+    read = [s for s in sources if compress.exists(layout.sfs_pdf(s))]
+    if basefile not in read:
+        raise ValueError("%s: the base act's own published PDF is not "
+                         "available, so most road-sign rows have no printing "
+                         "to crop" % basefile)
+    vlog("sfs ai-includegraphics %s: reading road-sign rows from %d published "
+         "PDF(s)" % (basefile, len(read)))
+    return sfs_graphics.roadsign_index(
+        [(s, layout.sfs_pdf(s)) for s in read], log=vlog), read
+
+
 def _sfs_includegraphics_one(basefile):
     art = compress.read_json(layout.artifact("sfs", basefile))
     register = compress.read_json(sfs_source(basefile))
@@ -1444,6 +1472,9 @@ def _sfs_includegraphics_one(basefile):
     out = annstore.path("sfs", basefile, ".graphics")
     if not gaps:
         print("sfs ai-includegraphics %s: no graphic gaps" % basefile)
+        return
+    if basefile in sfs_graphics.ROADSIGN_DOCS:
+        _sfs_roadsigns_one(basefile, art, register, gaps, out)
         return
     # keep verified+provenance-current entries; (re)localize the rest, grouped by
     # source PDF. A verified crop whose bilaga has since been amended (its `sfs`
@@ -1473,25 +1504,100 @@ def _sfs_includegraphics_one(basefile):
     annstore.guard(out, RUN.force)     # a verified layer refuses, pre-LLM-spend
     vlog("sfs ai-includegraphics %s: localizing %d gap(s) across %d source PDF(s): %s"
          % (basefile, todo_n, len(todo), ", ".join(sorted(todo))))
-    payload, inputs = dict(keep), dict(annstore.artifact_input("sfs", basefile))
+    payload = dict(keep)
     for src, group in todo.items():
-        pdf = layout.sfs_pdf(src)
-        payload.update(sfs_graphics.localize_group(group, pdf, src, log=vlog))
-        inputs.update(annstore.download_input(str(pdf.relative_to(layout.DOWNLOADED))))
-    # a kept entry's source PDF is an input too, so drift still tracks it
-    for ent in keep.values():
-        kept_pdf = layout.sfs_pdf(ent["sfs"])
-        if compress.exists(kept_pdf):
-            inputs.update(annstore.download_input(
-                str(kept_pdf.relative_to(layout.DOWNLOADED))))
-    through = sfs_graphics.register_latest_amendment(register)
-    layer_meta = {"uri": art["uri"]}
-    if through:
-        layer_meta["through"] = through
-    annstore.write(out, payload, inputs, RUN.force, model=config.VISION_MODEL,
-                   meta_extra=layer_meta)
+        payload.update(sfs_graphics.localize_group(
+            group, layout.sfs_pdf(src), src, log=vlog))
+    # a kept entry's source PDF was consulted too, so drift still tracks it
+    _sfs_write_graphics(basefile, art, register, out, payload,
+                        list(todo) + [e["sfs"] for e in keep.values()],
+                        config.VISION_MODEL)
     print("sfs ai-includegraphics %s: localized %d gap(s) (kept %d verified), "
           "wrote %s" % (basefile, todo_n, len(keep), out))
+
+
+def _sfs_write_graphics(basefile, art, register, out, payload, sources, model,
+                        status=annstore.GENERATED):
+    """Write one act's .graphics layer. Every source PDF the pass *read* is an
+    input -- not just those a payload entry ended up naming -- so a re-mirrored
+    or corrected facsimile shows up as drift even when it printed no row this
+    time and would print one after the correction. `through` records how far the
+    register had moved when the layer was authored.
+
+    A source PDF that is not on disk is fatal, and says so: it is the file the
+    crop endpoint would have to read, so a layer written without it points every
+    one of those crops at nothing. On the vision path it can only be a *kept*
+    entry's PDF -- the run mirrors the ones it localizes from -- which means an
+    earlier sign-off is about to be recorded against a facsimile this host no
+    longer has (rule:fail-fast)."""
+    inputs = dict(annstore.artifact_input("sfs", basefile))
+    for src in sorted(set(sources)):
+        pdf = layout.sfs_pdf(src)
+        if not compress.exists(pdf):
+            raise ValueError(
+                "%s: source PDF %s is not mirrored, so the layer cannot record "
+                "it as an input -- re-run `lagen sfs mirror-pdf %s`"
+                % (basefile, src, src))
+        inputs.update(annstore.download_input(
+            str(pdf.relative_to(layout.DOWNLOADED))))
+    through = sfs_graphics.register_latest_amendment(register)
+    meta = {"uri": art["uri"]}
+    if through:
+        meta["through"] = through
+    annstore.write(out, payload, inputs, RUN.force, model=model,
+                   meta_extra=meta, status=status)
+
+
+def _sfs_roadsigns_one(basefile, art, register, gaps, out):
+    """The road-sign path: no vision call, no register-note provenance.
+
+    A road-sign statute prints no omission marker and carries no per-row change
+    note -- the designator cell *is* the dropped sign, 326 of them in 2007:90 --
+    so both questions are answered by the published PDFs themselves. Their text
+    layer names each row by the same designator, which gives the crop rectangle
+    (the ink between this row's caption and the next), and the act that prints
+    a row last is the one whose graphic is in force."""
+    # the whole act routes here, so every one of its gaps must be a road sign.
+    # A marker gap appearing in one (a future `/Bilagan är inte med här/`) has
+    # no designator to look up and belongs on the vision path -- fail rather
+    # than attribute it to the base act by default (rule:fail-fast)
+    codeless = [g["id"] for g in gaps if not g.get("code")]
+    if codeless:
+        raise ValueError("%s: gap(s) %s carry no road-sign designator -- a "
+                         "road-sign act has gained a marker gap, which this "
+                         "route cannot place" % (basefile, ", ".join(codeless)))
+    index, sources = _sfs_roadsign_index(basefile, register)
+    existing = json.loads(out.read_text()) if out.exists() else {}
+    keep, todo = sfs_graphics.plan_localization(
+        gaps, existing, register, basefile,
+        provenance=lambda gap: index[gap["code"]]["sfs"]
+        if gap["code"] in index else basefile)
+    todo_gaps = [gap for group in todo.values() for gap in group]
+    if RUN.dry_run:
+        print("sfs ai-includegraphics %s: %d road-sign gap(s); keep %d "
+              "verified, place %d from %d published PDF(s) -> %s"
+              % (basefile, len(gaps), len(keep), len(todo_gaps),
+                 len(todo), out))
+        return
+    if not todo:
+        print("sfs ai-includegraphics %s: all %d road-sign gap(s) placed and "
+              "current (%d verified) -- nothing to do"
+              % (basefile, len(gaps), len(keep)))
+        return
+    annstore.guard(out, RUN.force)
+    placed, unprinted = sfs_graphics.localize_roadsigns(todo_gaps, index)
+    if not placed:
+        raise ValueError("%s: not one of %d road-sign gap(s) is printed in any "
+                         "of the %d published PDF(s) read -- writing the layer "
+                         "would drop every crop the site is serving"
+                         % (basefile, len(todo_gaps), len(sources)))
+    if unprinted:
+        print("sfs ai-includegraphics %s: no published PDF draws %s -- left as "
+              "placeholder(s)" % (basefile, ", ".join(unprinted)))
+    _sfs_write_graphics(basefile, art, register, out, dict(keep) | placed,
+                        sources, "roadsign", status=annstore.DERIVED)
+    print("sfs ai-includegraphics %s: placed %d road-sign gap(s) (kept %d "
+          "verified), wrote %s" % (basefile, len(placed), len(keep), out))
 
 
 SOURCES["sfs"] = Source("sfs", sfs_list, {
@@ -4590,26 +4696,27 @@ def cmd_status_document(source, basefile):
 
 def cmd_ann_status():
     """`lagen ann status` -- inventory the curated LLM-layer store (lib.annstore):
-    every `.ann`/`.corr` layer with its status (generated/verified), model,
-    authoring date and staleness. Stale = the recorded input hashes no longer
-    match the artifacts on disk: a *generated* layer can simply be re-run; a
+    every `.ann`/`.corr`/`.graphics` layer with its status, model, authoring date
+    and staleness. Stale = the recorded input hashes no longer match the
+    artifacts on disk: a *generated* or *derived* layer can simply be re-run; a
     *verified* one has hand curation authored against drifted data and needs
     human re-review -- it is never regenerated mechanically (--force overrides)."""
     rows = 0
-    counts = {"generated": 0, "verified": 0, "stale": 0}
+    counts = Counter()
     for p in annstore.entries():
         meta = annstore.read_meta(p)     # the store's status policy, one home
-        st = meta["status"]
         drift = annstore.drifted(meta.get("inputs", {}))
-        counts[st] += 1
+        counts[meta["status"]] += 1
         if drift:
             counts["stale"] += 1
         rows += 1
         print("%-9s %-10s %s%s"
-              % (st, meta.get("generated", "-"), p.relative_to(annstore.ROOT),
+              % (meta["status"], meta.get("generated", "-"),
+                 p.relative_to(annstore.ROOT),
                  "  STALE: %s" % ", ".join(drift) if drift else ""))
-    print("ann status: %d layer(s) in %s -- %d generated, %d verified, %d stale"
-          % (rows, annstore.ROOT, counts["generated"], counts["verified"],
+    print("ann status: %d layer(s) in %s -- %s, %d stale"
+          % (rows, annstore.ROOT,
+             ", ".join("%d %s" % (counts[st], st) for st in annstore.STATUSES),
              counts["stale"]))
 
 

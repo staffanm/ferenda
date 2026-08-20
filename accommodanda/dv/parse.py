@@ -348,7 +348,7 @@ def _body_lines(lines, body_size):
         runs = [r for r in l.runs if r.size >= body_size]
         if not runs:
             continue
-        line = line_from_runs(runs, l.top)
+        line = line_from_runs(runs, l.top, l.bottom)
         if line.text:
             out.append(line)
     return out

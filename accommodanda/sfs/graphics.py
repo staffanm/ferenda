@@ -24,11 +24,15 @@ omitted graphic.
 import hashlib
 import json
 import re
+import statistics
 import time
+from collections import Counter
 from datetime import date, datetime
 
+from PIL import Image, ImageChops
+
 from .. import config
-from ..lib import facsimile, llm, page
+from ..lib import facsimile, llm, page, pdftext
 from .tokenizer import re_ChangeNote
 
 # The source is inconsistent about its editorial delimiters. All of these occur
@@ -464,8 +468,12 @@ def register_latest_amendment(register, as_of=None):
     return max(bets, key=_sfs_key) if bets else None
 
 
-def plan_localization(gaps, existing, register, base):
+def plan_localization(gaps, existing, register, base, provenance=None):
     """Split `gaps` into (keep, todo) against the `existing` layer entries.
+
+    `provenance` overrides how a gap's source SFS is resolved -- the road-sign
+    path reads it off the published PDFs rather than the register. The merge
+    policy below is the same either way, which is why it lives here once.
 
     - **keep**: ``{gap_key: entry}`` -- entries preserved verbatim. An entry is
       kept ONLY if it is ``verified`` AND its recorded source ``sfs`` still equals
@@ -479,18 +487,18 @@ def plan_localization(gaps, existing, register, base):
 
     Pure and deterministic -- the action calls it, so the merge policy lives with
     the source (not in the source-agnostic annstore)."""
+    resolve = provenance or (lambda gap: provenance_sfs(gap, register, base))
     unique = {}
     for gap in gaps:
         prior = unique.setdefault(gap["key"], gap)
         assert prior["identity"] == gap["identity"], \
             "gap-key collision for %s" % gap["key"]
-        assert provenance_sfs(prior, register, base) == provenance_sfs(
-            gap, register, base), \
+        assert resolve(prior) == resolve(gap), \
             "%s aliases gaps with different provenance" % gap["key"]
 
     keep, todo = {}, {}
     for key, gap in unique.items():
-        prov = provenance_sfs(gap, register, base)
+        prov = resolve(gap)
         ent = existing.get(key)
         if (ent and ent.get("verified") and ent.get("sfs") == prov
                 and ent.get("identity") == gap["identity"]):
@@ -670,3 +678,208 @@ def localize_group(gaps, pdf_path, src, model=None, author=llm.author,
     return {gap_by_id[gid]["key"]: {**entry,
             "identity": gap_by_id[gid]["identity"]}
             for gid, entry in located.items()}
+
+
+# ---------------------------------------------------------------------------
+# Road-sign localization: deterministic, no vision call.
+#
+# A road-sign statute drops one graphic per table row -- 2007:90 alone lists
+# 326 -- and offering every one of them to a vision model on every page chunk
+# is both slow and hopeless. It is also unnecessary: the published PDF prints
+# the rows in the same order, in a two-column "Märke / Närmare föreskrifter"
+# table, and its text layer names each row by the same designator the
+# consolidated text kept. So the sign is simply the ink in the Märke column
+# between the row's own caption and the next row's, and the act that most
+# recently reprints a row is the one whose PDF carries its current graphic.
+# Both facts are read off the PDF, so neither provenance nor geometry is a
+# guess (a register note cannot answer this: an amendment reprints only the
+# rows it changes, not the whole paragraf -- 2017:923 sets 2 kap. 5 § but
+# prints only A30-A41).
+# ---------------------------------------------------------------------------
+
+# how far past the ink a crop reaches, in PDF points -- enough to keep a sign's
+# outline off the edge, too little to reach the caption above or below it.
+SIGN_PAD = 2
+# the least a row band may measure (points) before it is taken for a layout the
+# scanner has misread rather than a sign
+SIGN_MIN = 8
+# a run this far right of the Märke column's own margin opens the second column
+COLUMN_GAP = 40
+# how far short of the second column a crop stops, in pdftohtml pixels -- the
+# description's own text starts exactly there
+COLUMN_INSET = 5
+# an 8-bit grey darker than this is ink rather than paper (the value is the
+# inverted level, so 12 = anything below 243)
+INK_MIN = 12
+# how far a wrapped caption line may hang off the column margin and still count
+# as part of the row above (a hanging indent), in pdftohtml pixels
+CAPTION_INDENT = 20
+
+
+def _line_pitch(lines):
+    """The page's median leading in pdftohtml pixels -- how far apart two lines
+    of the same paragraph sit. Measured rather than taken from the font size,
+    which does not say how the page was set."""
+    tops = sorted({l.top for l in lines})
+    steps = [b - a for a, b in zip(tops, tops[1:], strict=False)
+             if 0 < b - a <= 40]
+    return statistics.median(steps) if steps else 18
+
+
+def _column_margins(lines, designators):
+    """(märke-column left, next-column left) in pdftohtml pixels, or None when
+    the page has no second column to bound the crop with."""
+    left = Counter(l.runs[0].left for l in designators).most_common(1)[0][0]
+    right = Counter(r.left for l in lines for r in l.runs
+                    if r.left > left + COLUMN_GAP)
+    return (left, right.most_common(1)[0][0]) if right else None
+
+
+def _caption_foot(lines, designator, limit, col1, pitch):
+    """The foot of the last caption line of one row -- where its sign may start.
+
+    A caption is the designator line plus the lines that continue it in the
+    Märke column, and "continue" is a matter of leading, not just alignment:
+    the last row of a table is followed by ordinary prose set at the very same
+    margin (2007:90 prints ``5 §`` under marking M7, 2017:923 prints ``7 §``
+    under sign A41), and a row that ran down to it would crop blank paper. So a
+    Märke-column line continues the caption only while it follows the previous
+    one at ordinary leading; the description column's own lines sit between
+    them and are simply passed over."""
+    foot, previous = designator.bottom, designator.top
+    for line in sorted((l for l in lines if designator.top < l.top < limit),
+                       key=lambda l: l.top):
+        if abs(line.runs[0].left - col1) > CAPTION_INDENT:
+            continue
+        if line.top - previous > 1.5 * pitch:
+            break
+        foot, previous = max(foot, line.bottom), line.top
+    return foot
+
+
+def _row_band(lines, designators, i, col1, col2, pitch, foot):
+    """The (top, bottom) pixel band one row's sign occupies: from the foot of
+    the row's last caption line to the head of whatever the Märke column prints
+    next -- the following row, a footnote, or the page's last line."""
+    following = designators[i + 1].top if i + 1 < len(designators) else None
+    top = _caption_foot(lines, designators[i], following or 10 ** 9, col1, pitch)
+    stops = [l.top for l in lines if l.top >= top
+             and any(col1 - 5 <= r.left < col2 - 5 for r in l.runs)]
+    if following is not None:
+        stops.append(following)
+    if foot >= top:
+        stops.append(foot)
+    if not stops:
+        return None
+    # poppler sets a line's glyphs a little above the box top it reports, so a
+    # band that runs to the next row's own top still catches its first pixels.
+    # Half a line of clearance costs nothing: a caption always has whitespace
+    # over it, and the ink search takes back whatever the inset gave away.
+    return top, min(stops) - pitch * 0.5
+
+
+def _caption(line, col2):
+    """The Märke column's own text of a designator line. poppler puts both
+    columns' runs on one baseline where they share it, so the row's caption is
+    the runs left of the second column -- the alt text a reader gets."""
+    return " ".join(r.text for r in line.runs if r.left < col2).strip()
+
+
+def _ink_bbox(page_image, box):
+    """`box` (PDF points) shrunk to the ink inside it, or None when the band is
+    blank -- a row whose sign the PDF does not print.
+
+    Read off the rendered page rather than the PDF's own drawing operators
+    because a Swedish road sign is vector art of dozens of paths, and its
+    bounding box is what the reader sees, not what the file lists."""
+    per_point = facsimile.DPI / 72
+    x0, y0, x1, y1 = (v * per_point for v in box)
+    crop = page_image.crop((int(x0), int(y0), int(x1), int(y1)))
+    # anything but paper counts: the threshold clears PNG/anti-alias noise on a
+    # white ground without eating the pale grey a dashed outline sign is drawn in
+    ink = ImageChops.invert(crop).point(lambda v: 255 if v > INK_MIN else 0)
+    found = ink.getbbox()
+    if not found:
+        return None
+    pad = SIGN_PAD * per_point
+    # the pad is a margin around the sign, never a reason to reach back out of
+    # the band the row owns -- past it lies the neighbouring row's caption
+    return [max(x0, x0 + found[0] - pad) / per_point,
+            max(y0, y0 + found[1] - pad) / per_point,
+            min(x1, x0 + found[2] + pad) / per_point,
+            min(y1, y0 + found[3] + pad) / per_point]
+
+
+def roadsign_boxes(pdf_path, src):
+    """Every road-sign row one published SFS prints, as ``{code: {page, bbox,
+    alt}}`` -- the sign's own rectangle in PDF points, tightened to its ink. A
+    code the act prints twice keeps its last print, which is the act's own
+    latest word on it."""
+    boxes = {}
+    pixels = pdftext.page_boxes(pdf_path)
+    for pageno, lines in pdftext.pdf_pages(pdf_path):
+        lines = [l for l in lines if l.runs]
+        designators = [l for l in lines if ROADSIGN_RE.match(l.text)]
+        margins = _column_margins(lines, designators) if designators else None
+        if not margins:
+            continue
+        col1, col2 = margins
+        designators = [l for l in designators if abs(l.runs[0].left - col1) <= 3]
+        foot, pitch = max(l.top for l in lines), _line_pitch(lines)
+        with Image.open(facsimile.cached("sfs", src, pdf_path, pageno)) as page_png:
+            page_image = page_png.convert("L")
+            # the ruler both tools share: this page as poppler *renders* it,
+            # never `pdfinfo`'s size (see pdftext.page_boxes)
+            page_pt = page_image.width * 72 / facsimile.DPI
+            for i, line in enumerate(designators):
+                band = _row_band(lines, designators, i, col1, col2, pitch, foot)
+                if not band:
+                    continue
+                box = pdftext.points_from_pdftohtml(
+                    pixels[pageno][0], page_pt,
+                    (col1, band[0], col2 - COLUMN_INSET - col1,
+                     band[1] - band[0]))
+                if box[3] - box[1] < SIGN_MIN:
+                    continue
+                bbox = _ink_bbox(page_image, box)
+                if bbox:
+                    boxes[roadsign_code(line.text)] = {
+                        "page": pageno, "bbox": [round(v, 2) for v in bbox],
+                        "alt": _caption(line, col2)}
+    return boxes
+
+
+def roadsign_sources(register, base):
+    """The acts whose PDF may reprint a road-sign row -- the base act and every
+    amending act, oldest first. Deliberately not filtered by the register's
+    Omfattning: the notes name paragrafer, and an amendment reprints only the
+    rows it changes within one, so the PDF's own text layer is the finer and
+    the authoritative answer to which act carries a given sign."""
+    return sorted({base} | {af["beteckning"]
+                            for af in register.get("andringsforfattningar") or []
+                            if af.get("beteckning")}, key=_sfs_key)
+
+
+def roadsign_index(pdfs, log=lambda _msg: None):
+    """``{code: {sfs, page, bbox, alt}}`` over ``pdfs`` -- ``[(sfs, path)]``
+    oldest first. A later act's reprint of a row replaces an earlier one, so
+    each sign ends up attributed to the act that published it last."""
+    index = {}
+    for src, path in pdfs:
+        boxes = roadsign_boxes(path, src)
+        log("%s: %d road-sign row(s)" % (src, len(boxes)))
+        index.update({code: {"sfs": src, **box} for code, box in boxes.items()})
+    return index
+
+
+def localize_roadsigns(gaps, index):
+    """``(placed, unprinted)``: the gaps `index` can place, keyed by stable
+    semantic gap key, and the designators no published PDF draws anything for.
+
+    Not every row of a road-sign table has a picture. 2007:90's Y2 is a *sound*
+    signal, and its Signalbild column is blank in print as well as in the text
+    database, so there is nothing to crop. Such a row keeps the reader's honest
+    ``[Y2]`` placeholder instead of a rectangle of blank paper."""
+    placed = {g["key"]: {**index[g["code"]], "identity": g["identity"]}
+              for g in gaps if g["code"] in index}
+    return placed, sorted({g["code"] for g in gaps if g["code"] not in index})

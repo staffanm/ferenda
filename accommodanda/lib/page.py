@@ -292,20 +292,21 @@ def _remiss_indexes():
 
 
 def _graphics_index():
-    """{(document_uri, gap_key): entry} of verified graphic crops.
+    """{(document_uri, gap_key): entry} of publishable graphic crops.
 
     The host URI is explicit layer metadata, so this horizontal reader neither
-    imports nor branches on an SFS vertical. Generated candidates remain out of
-    the public render until either the entry or whole layer is verified.
+    imports nor branches on an SFS vertical. `annstore.publishable` owns which
+    entries qualify, so this reader and the crop endpoint cannot disagree: a
+    model's guess stays out of the public render until the entry or the whole
+    layer is verified, while a mechanically derived layer needs no such review.
     """
     index = {}
     for path in (p for p in annstore.entries() if p.suffix == ".graphics"):
         layer = json.loads(path.read_text())
         meta = layer.get("meta") or {}
-        layer_verified = meta.get("status") == annstore.VERIFIED
         eligible = [(gap_key, entry) for gap_key, entry in layer.items()
                     if (gap_key != "meta" and "page" in entry
-                        and (layer_verified or entry.get("verified")))]
+                        and annstore.publishable(meta, entry))]
         if eligible:
             uri = meta.get("uri")
             assert uri, "%s: publishable graphics layer has no meta.uri" % path
@@ -1872,6 +1873,32 @@ def temporal_state(node, today):
     return ""
 
 
+def _render_rad(node, site, doc_uri, image_column):
+    """One table row. `image_column` says the whole table carries a road-sign
+    image column, which this row must fill even when it has no sign of its own
+    (the header row, and a row the published PDF draws nothing for)."""
+    cells = [Markup(render_runs(c, site)) for c in node.get("cells", [])]
+    g = node.get("grafik")
+    grafik_cell = ""
+    if g:  # a dropped road-sign image (2007:90): the sign beside its code
+        gid = g.get("key") or g.get("id", "")
+        entry = site.graphics.get((doc_uri, gid))
+        if entry:
+            alt = entry.get("alt") or ("Vägmärke %s" % g.get("code", ""))
+            grafik_cell = NODES.grafik_cell(
+                gid, _grafik_crop(entry, doc_uri, gid, alt))
+        else:  # unlocalized: the honest gap beside the code
+            grafik_cell = NODES.grafik_saknas_cell(gid, g.get("code", ""))
+    elif image_column:
+        grafik_cell = NODES.grafik_spacer_cell()
+    # a pending/expiring row variant carries the temporal marker itself
+    # (a 2007:90 road-sign row amended with deferred entry into force);
+    # printed as a marker row above, spanning the full width
+    return NODES.rad(_temporal_notice(node),
+                     len(node.get("cells", [])) + (1 if grafik_cell else 0),
+                     grafik_cell, cells)
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -1880,28 +1907,19 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return _render_konventionsbilaga(node, site, doc_uri, toc, rail)
 
     if t == "tabell":
+        # a road-sign table gains a leading image column. Its header row carries
+        # no sign of its own, so it needs the column too -- without it "Märke"
+        # and "Närmare föreskrifter" sit one column left of the cells they name.
+        image_column = any(c.get("grafik") for c in node.get("children", []))
         return NODES.tabell(Markup("".join(
-            render_node(c, site, doc_uri, toc, rail)
+            _render_rad(c, site, doc_uri, image_column)
+            if c.get("type") == "rad"
+            else render_node(c, site, doc_uri, toc, rail)
             for c in node.get("children", []))))
     if t == "rad":
-        cells = [Markup(render_runs(c, site)) for c in node.get("cells", [])]
-        g = node.get("grafik")
-        grafik_cell = ""
-        if g:  # a dropped road-sign image (2007:90): the sign beside its code
-            gid = g.get("key") or g.get("id", "")
-            entry = site.graphics.get((doc_uri, gid))
-            if entry:
-                alt = entry.get("alt") or ("Vägmärke %s" % g.get("code", ""))
-                grafik_cell = NODES.grafik_cell(
-                    gid, _grafik_crop(entry, doc_uri, gid, alt))
-            else:  # unlocalized: the honest gap beside the code
-                grafik_cell = NODES.grafik_saknas_cell(gid, g.get("code", ""))
-        # a pending/expiring row variant carries the temporal marker itself
-        # (a 2007:90 road-sign row amended with deferred entry into force);
-        # printed as a marker row above, spanning the full width
-        return NODES.rad(_temporal_notice(node),
-                          len(node.get("cells", [])) + (1 if g else 0),
-                          grafik_cell, cells)
+        # a row reached outside its table: it can only speak for itself, and
+        # `image_column` is unread whenever the row carries a sign of its own
+        return _render_rad(node, site, doc_uri, False)
     if t == "grafik":
         return render_grafik(node, site, doc_uri)
     if t == "avskiljare":

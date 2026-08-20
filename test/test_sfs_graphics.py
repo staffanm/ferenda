@@ -11,9 +11,11 @@ and corpus-independent -- the four real statutes (2002:780, 2005:874,
 import json
 
 import pytest
+from PIL import Image
 
 from accommodanda.lib import annstore, facsimile, page
 from accommodanda.lib.page import plain
+from accommodanda.lib.pdftext import Line, Run
 from accommodanda.sfs import graphics
 from accommodanda.sfs.model import (
     Bilaga,
@@ -678,3 +680,191 @@ def test_graphics_index_keys_by_uri_and_stable_gap_key(tmp_path, monkeypatch):
     idx = page._graphics_index()
     assert set(idx) == {(DOC_URI, "g-one")}  # meta + unverified draft skipped
     assert idx[(DOC_URI, "g-one")]["sfs"] == "2021:734"
+
+
+# --- road-sign localization (deterministic, off the published PDF) ----------
+
+def sign_line(text, top, left, pitch=18):
+    """One visual line of a Märke/Närmare-föreskrifter table, as pdftohtml
+    reports it: the box is shorter than the leading (13 of 18 pixels here),
+    which is exactly what separates a caption from the sign under it."""
+    runs, x = [], left
+    for word in text.split("|"):
+        runs.append(Run(x, x + 8 * len(word), word, False, False, 14))
+        x = runs[-1].right + 10
+    return Line(" ".join(r.text for r in runs), top, False, False, False, 14,
+                runs, [], top + pitch - 5)
+
+
+def sign_page(rows, col2=340, first=100, pitch=18, band=110):
+    """A page of `rows` -- (designator caption, [extra Märke-column lines],
+    [description lines]) -- laid out one band apart, ending in a page number
+    outside both columns."""
+    lines, top = [], first
+    for caption, extra, description in rows:
+        lines.append(sign_line(caption, top, 100, pitch))
+        for i, more in enumerate(extra):
+            lines.append(sign_line(more, top + pitch * (i + 1), 100, pitch))
+        for i, more in enumerate(description):
+            lines.append(sign_line(more, top + pitch * i, col2, pitch))
+        top += band
+    lines.append(sign_line("12", top, 700, pitch))
+    return lines
+
+
+def band_of(lines, code):
+    designators = [l for l in lines if graphics.ROADSIGN_RE.match(l.text)]
+    col1, col2 = graphics._column_margins(lines, designators)
+    i = next(n for n, l in enumerate(designators)
+             if graphics.ROADSIGN_RE.match(l.text).group() == code)
+    return graphics._row_band(lines, designators, i, col1, col2,
+                              graphics._line_pitch(lines),
+                              max(l.top for l in lines))
+
+
+def test_row_band_starts_below_the_caption_and_stops_at_the_next_row():
+    lines = sign_page([("A1|Varning|för|farlig|kurva", [], ["Märket|anger"]),
+                       ("A2|Varning|för|kaj", [], ["Märket|anger"])])
+    top, bottom = band_of(lines, "A1")
+    assert top == 113        # the caption's own box foot, not its top
+    assert bottom < 210      # clear of the A2 caption's first pixels
+
+
+def test_row_band_includes_every_wrapped_caption_line():
+    lines = sign_page([("A29|Varning|för|vägkorsning|där",
+                        ["trafikanter|på|anslutande|väg|har"], ["Märket|anger"]),
+                       ("A30|Varning|för|cirkulationsplats", [], [])])
+    top, _ = band_of(lines, "A29")
+    assert top == 131        # the second caption line's foot, not the first's
+
+
+def test_row_band_stops_at_prose_set_at_the_same_margin():
+    """The last row of a table is followed by an ordinary paragraf at the Märke
+    column's own margin (2007:90 prints `5 §` under marking M7). A band that ran
+    down to it would crop blank paper and the paragraf's first line."""
+    lines = sign_page([("M7|Reversibelt|körfält", [], ["Markeringen|avgränsar"])])
+    lines.append(sign_line("5 §|Heldragna|linjer|används", 100 + 90, 100))
+    top, bottom = band_of(lines, "M7")
+    assert top == 113 and bottom <= 190
+
+
+def test_column_margins_are_none_without_a_second_column():
+    lines = [sign_line("A1|Varning", 100, 100)]
+    assert graphics._column_margins(lines, lines) is None
+
+
+def test_caption_is_the_marke_column_only():
+    """poppler puts both columns on one baseline where they share it, so the
+    alt text has to be cut at the second column, not taken from the line."""
+    line = sign_line("A1|Varning|för|farlig|kurva", 100, 100)
+    line.runs.append(Run(340, 500, "Märket anger en farlig kurva", False,
+                         False, 14))
+    assert graphics._caption(line, 340) == "A1 Varning för farlig kurva"
+
+
+def test_roadsign_sources_are_the_base_act_and_its_amendments_oldest_first():
+    register = {"andringsforfattningar": [{"beteckning": "2017:923"},
+                                          {"beteckning": "2008:45"}, {}]}
+    assert graphics.roadsign_sources(register, "2007:90") == [
+        "2007:90", "2008:45", "2017:923"]
+
+
+def test_roadsign_index_lets_the_latest_reprint_win(monkeypatch):
+    """An amendment reprints only the rows it changes, so provenance is per
+    row: A1 stays with the base act while A30 moves to the act that reset it."""
+    printed = {"base.pdf": {"A1": {"page": 6, "bbox": [1, 2, 3, 4], "alt": ""},
+                            "A30": {"page": 11, "bbox": [1, 2, 3, 4], "alt": ""}},
+               "later.pdf": {"A30": {"page": 5, "bbox": [5, 6, 7, 8], "alt": ""}}}
+    monkeypatch.setattr(graphics, "roadsign_boxes",
+                        lambda path, src: printed[path])
+    index = graphics.roadsign_index([("2007:90", "base.pdf"),
+                                     ("2017:923", "later.pdf")])
+    assert index["A1"]["sfs"] == "2007:90"
+    assert index["A30"] == {"sfs": "2017:923", "page": 5, "bbox": [5, 6, 7, 8],
+                            "alt": ""}
+
+
+def test_localize_roadsigns_reports_a_sign_no_pdf_draws():
+    """2007:90's Y2 is a *sound* signal: its Signalbild column is blank in print
+    too, so the row keeps the reader's honest placeholder."""
+    gaps = [{"key": "g-a1", "code": "A1", "identity": {"a": 1}},
+            {"key": "g-y2", "code": "Y2", "identity": {"b": 2}}]
+    placed, unprinted = graphics.localize_roadsigns(
+        gaps, {"A1": {"sfs": "2007:90", "page": 6, "bbox": [1, 2, 3, 4]}})
+    assert unprinted == ["Y2"]
+    assert placed == {"g-a1": {"sfs": "2007:90", "page": 6, "bbox": [1, 2, 3, 4],
+                               "identity": {"a": 1}}}
+
+
+def test_plan_localization_takes_the_road_sign_provenance_rule():
+    gap = {"key": "g-a30", "code": "A30", "identity": {"a": 1},
+           "sort": "vagmarke", "satt_av": None, "in_bilaga": False,
+           "bilaga_ordinal": None}
+    keep, todo = graphics.plan_localization(
+        [gap], {}, {}, "2007:90", provenance=lambda g: "2017:923")
+    assert keep == {} and list(todo) == ["2017:923"]
+
+
+def test_derived_layer_reaches_the_render_without_hand_verification(
+        tmp_path, monkeypatch):
+    """A road-sign layer is geometry read off the PDF, not a model's guess, so
+    there is nothing per entry for a human to check."""
+    monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
+    p = annstore.path("sfs", "2007:90", ".graphics")
+    p.parent.mkdir(parents=True)
+    p.write_text(json.dumps({
+        "meta": {"status": annstore.DERIVED, "uri": DOC_URI},
+        "g-a1": {"sfs": "2007:90", "page": 6, "bbox": [1, 2, 3, 4]}}))
+    assert set(page._graphics_index()) == {(DOC_URI, "g-a1")}
+
+
+def test_a_road_sign_tables_header_row_gets_the_image_column():
+    """The signs add a leading column the header row has no cell for. Without a
+    spacer, "Märke" and "Närmare föreskrifter" sit over the image and the code,
+    one column left of the values they name."""
+    site = _site({(DOC_URI, "g-a1"): {"sfs": "2007:90", "page": 12,
+                                      "bbox": [10, 10, 40, 40], "alt": "A1"}})
+    table = {"type": "tabell", "children": [
+        {"type": "rad", "cells": [["Märke"], ["Närmare föreskrifter"]]},
+        {"type": "rad", "cells": [["A1 Varning"], ["Märket anger"]],
+         "grafik": {"id": "G1", "key": "g-a1", "sort": "vagmarke",
+                    "code": "A1"}}]}
+    html = page.render_node(table, site, DOC_URI, page.Toc(),
+                            page.Rail(site, DOC_URI))
+    assert '<tr><td class="grafik"></td><td>Märke</td>' in html
+    assert html.count("<td") == 6          # every row is three cells wide
+
+
+def test_a_table_without_signs_gains_no_image_column():
+    table = {"type": "tabell", "children": [
+        {"type": "rad", "cells": [["Beteckning"], ["Betydelse"]]},
+        {"type": "rad", "cells": [["Symbol"], ["Bild i stället för text"]]}]}
+    html = page.render_node(table, _site({}), DOC_URI, page.Toc(),
+                            page.Rail(_site({}), DOC_URI))
+    assert 'class="grafik"' not in html
+    assert html.count("<td") == 4
+
+
+def test_ink_bbox_shrinks_a_band_to_the_sign_and_pads_within_it():
+    """The whole pdftohtml-pixel -> PDF-point -> rendered-pixel chain, against a
+    page whose only ink is a known rectangle. The pad may widen the crop toward
+    the band's edges but never past them: past them lies a neighbouring caption.
+    """
+    scale = facsimile.DPI / 72
+    canvas = Image.new("L", (int(200 * scale), int(200 * scale)), 255)
+    # ink from 40,50 to 90,100 points, in the rendered page's own pixels
+    canvas.paste(0, (int(40 * scale), int(50 * scale),
+                     int(90 * scale), int(100 * scale)))
+    box = graphics._ink_bbox(canvas, [10, 20, 150, 160])
+    assert [round(v) for v in box] == [40 - graphics.SIGN_PAD,
+                                       50 - graphics.SIGN_PAD,
+                                       90 + graphics.SIGN_PAD,
+                                       100 + graphics.SIGN_PAD]
+    # a band that ends where the ink does gets no pad past its own edge
+    tight = graphics._ink_bbox(canvas, [40, 50, 90, 100])
+    assert [round(v) for v in tight] == [40, 50, 90, 100]
+
+
+def test_ink_bbox_reports_a_band_the_pdf_draws_nothing_in():
+    blank = Image.new("L", (400, 400), 255)
+    assert graphics._ink_bbox(blank, [10, 10, 100, 100]) is None

@@ -1099,8 +1099,7 @@ def _sfs_graphic_response(local, node):
     entry = content.get(node)
     if entry is None:
         raise HTTPException(404, "no graphic %r in %r" % (node, local))
-    if (content.get("meta", {}).get("status") != annstore.VERIFIED
-            and not entry.get("verified")):
+    if not annstore.publishable(content.get("meta", {}), entry):
         raise HTTPException(404, "graphic %r in %r is not verified" % (node, local))
     # the amending SFS whose published PDF carries the region (provenance)
     src, page, bbox = entry["sfs"], entry["page"], entry.get("bbox")

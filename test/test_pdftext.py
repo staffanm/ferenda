@@ -37,6 +37,7 @@ from accommodanda.lib.pdftext import (
     letterhead_footnotes,
     line_body_support,
     line_from_runs,
+    page_boxes,
     page_paragraphs,
     pdf_pages,
     points_from_pdftohtml,
@@ -76,9 +77,9 @@ def test_a_real_identifier_strips_headers_but_not_body_text():
 
 
 PAGE_XML = (b"<pdf2xml>"
-            b"<page number='1' height='1200'>"
+            b"<page number='1' width='744' height='1200'>"
             b"<text top='10' left='5' height='10'>first page</text></page>"
-            b"<page number='2' height='1200'>"
+            b"<page number='2' width='744' height='1200'>"
             b"<text top='10' left='5' height='10'>second page</text></page>"
             b"</pdf2xml>")
 
@@ -1233,3 +1234,29 @@ def test_a_page_with_no_shared_line_start_has_no_margin():
     paras = page_paragraphs(lines, None, 1, indent_breaks=True)
     assert not any(p.boxed for p in paras)
     assert " ".join(p.text for p in paras).count("fragment") == 10
+
+
+def test_page_boxes_reads_poppler_own_pixel_space(monkeypatch):
+    """The page size in pdftohtml's pixels, which is the space `pdf_pages`'
+    geometry is in -- and, for a PDF whose CropBox differs from its MediaBox,
+    not the size `pdfinfo` reports."""
+    monkeypatch.setattr(pdftext.subprocess, "run", _fake_run([]))
+    assert page_boxes("doc.pdf") == {1: (744, 1200), 2: (744, 1200)}
+
+
+def test_a_line_carries_the_foot_of_its_text_box(monkeypatch):
+    """poppler's box is shorter than the leading, so a caption's foot is not
+    `top` plus a guessed line height. A crop that starts at the wrong one of the
+    two clips the sign under the caption, or eats the caption itself."""
+    monkeypatch.setattr(pdftext.subprocess, "run", _fake_run([]))
+    line = next(iter(pdf_pages("doc.pdf")))[1][0]
+    assert (line.top, line.bottom) == (10, 20)
+
+
+def test_rebuilt_line_keeps_its_own_foot():
+    """A caller rebuilding a converted line must carry its foot over. An omitted
+    `bottom` collapses the box onto its own top -- degenerate, but never the
+    inverted box a 0 would give."""
+    runs = [Run(10, 90, "kvar", False, False, 14)]
+    assert line_from_runs(runs, 100, 113).bottom == 113
+    assert line_from_runs(runs, 100).bottom == 100    # never above its top
