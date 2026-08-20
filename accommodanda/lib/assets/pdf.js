@@ -1,8 +1,9 @@
 /* "Spara som PDF": the printer icon on the short-id row of the TOC rail,
    driving the print-typeset export of this very page. The dialog's options
-   mirror what the export can do: the page's TOC with printed page numbers,
-   and the context rail's sections printed under each provision, chosen by
-   kind. The kind list is read out of the page's own #lagen-context island
+   mirror what the export can do: one or two text columns, the page's TOC
+   with printed page numbers, the SFS amendment register, and the context
+   rail's sections printed under each provision, chosen by kind. The kind
+   list is read out of the page's own #lagen-context island
    (the same panels scrollspy feeds the rail with), so the dialog never
    offers a kind this document does not have -- and it is read lazily on
    first open, since a large statute's island is megabytes. Injected by
@@ -68,12 +69,22 @@
   var dlg = null;
   function build() {
     var kinds = collectKinds();
+    var isSfs = !!document.querySelector('section.andringar .andring');
     dlg = document.createElement('dialog');
     dlg.className = 'pdf-dialog';
     dlg.innerHTML =
       '<form method="dialog"><h2>Spara som PDF</h2>' +
+      '<fieldset class="pdf-layout"><legend>Sidlayout</legend>' +
+      '<label><input type="radio" name="columns" value="1" checked> ' +
+      'En kolumn</label>' +
+      '<label><input type="radio" name="columns" value="2"> ' +
+      'Två kolumner</label></fieldset>' +
       '<label class="pdf-row"><input type="checkbox" name="toc" checked> ' +
       'Innehållsförteckning med sidnummer</label>' +
+      (isSfs
+        ? '<label class="pdf-row"><input type="checkbox" name="andringar" ' +
+          'checked> Ändringar och övergångsbestämmelser</label>'
+        : '') +
       (kinds.length
         ? '<label class="pdf-row"><input type="checkbox" name="kontext"> ' +
           'Kontext under varje avsnitt</label>' +
@@ -103,6 +114,25 @@
     if (kontext) kontext.addEventListener('change', function () {
       fs.disabled = !kontext.checked;
     });
+    var toc = dlg.querySelector('input[name=toc]');
+    var andringar = dlg.querySelector('input[name=andringar]');
+    var columnChoices = dlg.querySelectorAll('input[name=columns]');
+    Array.prototype.forEach.call(columnChoices, function (choice) {
+      choice.addEventListener('change', function () {
+        if (choice.value === '2' && choice.checked) {
+          toc.checked = false;
+          if (andringar) andringar.checked = false;
+          if (kontext) {
+            kontext.checked = false;
+            kontext.disabled = true;
+            fs.disabled = true;
+          }
+        } else if (choice.value === '1' && choice.checked && kontext) {
+          kontext.disabled = false;
+          fs.disabled = !kontext.checked;
+        }
+      });
+    });
     // The dialog hands the export over to a page of its own
     // (/api/v1/pdf/vanta), which starts the render, shows how far it has
     // come and then becomes the PDF. The tab opens inside this click --
@@ -122,7 +152,11 @@
 
     function waitUrl() {
       var q = '/api/v1/pdf/vanta?path=' + encodeURIComponent(location.pathname);
-      if (dlg.querySelector('input[name=toc]').checked) q += '&toc=1';
+      if (toc.checked) q += '&toc=1';
+      if (andringar && !andringar.checked) q += '&andringar=0';
+      if (dlg.querySelector('input[name=columns]:checked').value === '2') {
+        q += '&kolumner=2';
+      }
       if (kontext && kontext.checked) {
         var boxes = dlg.querySelectorAll('input[name=kind]');
         var picked = Array.prototype.filter.call(boxes,

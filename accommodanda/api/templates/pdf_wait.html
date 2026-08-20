@@ -12,7 +12,7 @@
 
     It wears the site's /style.css for its tokens; the few rules below are
     this screen's own furniture. -#}
-{%- macro wait_page(path, titel, toc, kontext, download) -%}
+{%- macro wait_page(path, titel, toc, kontext, andringar, kolumner, download) -%}
 <!doctype html><html lang="sv"><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>{{ titel or path }} — skapar PDF …</title>
@@ -36,7 +36,9 @@
 .wait a { color: var(--accent); }
 </style></head>
 <body class="wait" data-path="{{ path }}" data-toc="{{ 1 if toc else 0 }}"
-      data-kontext="{{ kontext }}" data-download="{{ 1 if download else 0 }}">
+      data-kontext="{{ kontext }}" data-andringar="{{ 1 if andringar else 0 }}"
+      data-kolumner="{{ kolumner }}"
+      data-download="{{ 1 if download else 0 }}">
 <h1>Skapar PDF</h1>
 <p class="doc"><a href="{{ path }}">{{ titel or path }}</a></p>
 <div class="track"><div class="bar" id="bar"></div></div>
@@ -51,6 +53,8 @@ ligger den i cachen och kommer direkt.</p>
   var pdfUrl = '/api/v1/pdf?path=' + encodeURIComponent(d.path)
     + (d.toc === '1' ? '&toc=1' : '')
     + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : '')
+    + (d.andringar === '0' ? '&andringar=0' : '')
+    + (d.kolumner === '2' ? '&kolumner=2' : '')
     + (d.download === '1' ? '&download=1' : '');
   var bar = document.getElementById('bar');
   var fas = document.getElementById('fas');
@@ -126,7 +130,9 @@ ligger den i cachen och kommer direkt.</p>
 
   fetch('/api/v1/pdf/jobb?path=' + encodeURIComponent(d.path)
         + (d.toc === '1' ? '&toc=1' : '')
-        + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : ''),
+        + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : '')
+        + (d.andringar === '0' ? '&andringar=0' : '')
+        + (d.kolumner === '2' ? '&kolumner=2' : ''),
         { method: 'POST' })
     .then(function (r) {
       if (!r.ok) throw new Error('servern svarade ' + r.status);

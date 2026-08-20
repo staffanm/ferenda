@@ -12,6 +12,10 @@ side columns:
 * ``kinds`` names which context kinds (the rail's section slugs: kommentar,
   dv, forarbete, ...) to print as an editorial apparatus under each provision
   or section that has any.
+* ``amendments`` includes or omits the SFS amendment and transition-provision
+  register. Its paper form keeps legal text and metadata, but not screen links.
+* ``columns`` selects the normal mirrored apparatus layout or a compact
+  two-column text layout. The compact layout does not include context.
 
 Both consume the page's own artifacts -- the ``nav.toc`` markup and the
 ``#lagen-context`` JSON island -- so the printed apparatus cannot drift from
@@ -35,6 +39,7 @@ one runs as a background job the reader follows (``api/pdfjob.py``).
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
 from urllib.parse import unquote, unquote_to_bytes, urlsplit
@@ -53,6 +58,57 @@ from ..lib.render import ASSETS
 # the PDF result cache is bounded by size alone (the key carries every
 # staleness input); 2 GiB holds a few hundred large exports
 CACHE_MAX_BYTES = 2 * 1024**3
+
+
+# style.css is also the browser stylesheet. WeasyPrint reports browser-only
+# declarations while correctly ignoring them. Keep new or print-relevant CSS
+# warnings visible, but remove the known screen layer from the server log.
+_BROWSER_ONLY_PROPERTIES = frozenset((
+    "all", "backdrop-filter", "box-shadow", "clip-path", "fill",
+    "fill-opacity", "filter", "overflow-x", "overflow-y", "stroke",
+    "stroke-linecap", "stroke-linejoin", "stroke-opacity", "stroke-width",
+    "text-wrap", "user-select",
+))
+
+
+class _PaperCSSLogFilter(logging.Filter):
+    """Remove known browser-CSS noise without hiding new print warnings."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if record.name == "fontTools.ttLib.woff2":
+            return not message.startswith("Processing <")
+        if record.name != "weasyprint":
+            return True
+        if message.startswith("Expected a media type, got '("):
+            return False
+        if (message.startswith("Invalid media type ' (")
+                and ("prefers-" in message or "max-width" in message)):
+            return False
+        if (message.startswith("Invalid or unsupported selector,")
+                and ("::backdrop" in message
+                     or "::-webkit-details-marker" in message)):
+            return False
+        if (message.startswith("Unknown rule <AtRule ")
+                and ("@keyframes" in message or "@supports" in message)):
+            return False
+        if message.startswith("Ignored `"):
+            declaration = message.removeprefix("Ignored `").split("`", 1)[0]
+            prop, _, value = declaration.partition(":")
+            if prop.strip() in _BROWSER_ONLY_PROPERTIES:
+                return False
+            if prop.strip() == "position" and value.strip() == "sticky":
+                return False
+            if prop.strip() == "font-weight" and value.strip() == "550":
+                return False
+        return True
+
+
+_PAPER_CSS_LOG_FILTER = _PaperCSSLogFilter()
+logging.getLogger("weasyprint").addFilter(_PAPER_CSS_LOG_FILTER)
+logging.getLogger("fontTools.ttLib.woff2").addFilter(_PAPER_CSS_LOG_FILTER)
+
+_FONT_WEIGHT_RANGE = re.compile(r"(font-weight:\s*\d+)\s+\d+(\s*;)")
 
 
 def parse_kinds(kontext: str) -> frozenset[str]:
@@ -85,8 +141,13 @@ def _stylesheet() -> str:
     render, never memoized: an `--assets-only` publish must reach a running
     serve, and the stylesheet text is a cache-key input -- a pinned copy
     would key new pages against old CSS until restart."""
-    return ((ASSETS / "fonts" / "fonts.css").read_text(encoding="utf-8")
-            + (ASSETS / "style.css").read_text(encoding="utf-8"))
+    # WeasyPrint does not implement the CSS Fonts 4 range descriptor. It used
+    # to ignore each face's descriptor and use the same variable font as its
+    # normal face. State that supported result explicitly for paper. The live
+    # browser asset keeps its range and native variable-font interpolation.
+    fonts = _FONT_WEIGHT_RANGE.sub(
+        r"\1\2", (ASSETS / "fonts" / "fonts.css").read_text(encoding="utf-8"))
+    return fonts + (ASSETS / "style.css").read_text(encoding="utf-8")
 
 
 def _drop(doc, *classes):
@@ -111,13 +172,20 @@ def _island(doc):
     return json.loads(el.text) if el is not None else {}
 
 
-def _print_toc(doc):
+def _print_toc(doc, dropped):
     """The page's nav.toc rebuilt as a print TOC (nav.print-toc): a flat list
     keeping the lvl* indent classes; page numbers are CSS's job. None for a
     page without a TOC. The #top self-entry is dropped -- the document's
-    title block is necessarily on page one."""
+    title block is necessarily on page one.
+
+    `dropped` names the anchors this export has removed from the body (the
+    amendment register under ``andringar=0``). Their entries go too, because
+    `target-counter()` has no page to resolve. Any other dangling entry stays:
+    a renderer that loses an anchor must show that, not print a short TOC."""
     entries = [a for lst in doc.find_class("toc-list") for a in lst.iter("a")
-               if a.get("href") != "#top"]
+               if a.get("href") != "#top"
+               and unquote((a.get("href") or "").removeprefix("#"))
+               not in dropped]
     if not entries:
         return None
     nav = lxml.html.Element("nav", {"class": "print-toc"})
@@ -215,7 +283,7 @@ def _kontext_aside(panel_html, kinds):
     the accordion rows (details.rail-sec / div.rail-sec-flat) become plain
     blocks with an h4 label, widgets gone, each list capped at MARGIN_CAP.
     None if no requested kind is in the panel."""
-    aside = lxml.html.fragment_fromstring(panel_html, create_parent="aside")
+    aside = lxml.html.fragment_fromstring(panel_html, create_parent="div")
     aside.set("class", "print-kontext")
     kept = False
     for sec in aside.find_class("rail-sec"):
@@ -278,39 +346,181 @@ def _running_labels(doc) -> None:
 
 def _column_block(el, main):
     """The element `el`'s own block in the reading column: the ancestor that
-    is a child of ``.gr-main``, or `el` itself when it already is one.
+    is a child of ``.gr-main`` or a page-width ``.kontextrot``.
 
     A note is hung there rather than on `el` directly, because a rail marker
     can sit deep inside one -- SFS marks each stycke of a §, eurlex marks a
     recital. Down there the block that reaches into the margin would be laid
     out against an indented content box, so the distance it must reach would
     differ per nesting depth. Every note therefore hangs off the one column
-    that has the same two edges on every page. Several markers in one block
-    share it, and their notes stack in document order."""
-    while el is not None and el.getparent() is not main:
+    that has the same two edges on every page. SFS structural containers are
+    explicit layout roots: this keeps each provision independent instead of
+    making all provisions in ``#dokument`` one enormous grid row."""
+    # SFS puts a chapter's rail marker on the structural <section>, while the
+    # note belongs beside its heading. Wrapping the complete chapter makes
+    # its note an outer table cell around every provision. A nested provision
+    # can then start before that outer note ends. Use the direct heading as
+    # the chapter's independent row instead.
+    if "kontextrot" in _classes(el):
+        heading = next((child for child in el
+                        if child.tag in _HEADINGS), None)
+        if heading is not None:
+            el = heading
+    while (el is not None and el.getparent() is not main
+           and "kontextrot" not in _classes(el.getparent())):
         el = el.getparent()
     return el
+
+
+def _classes(el) -> set[str]:
+    """The classes on `el`, also for a missing parent while walking upward."""
+    return set((el.get("class") or "").split()) if el is not None else set()
+
+
+def _add_class(el, name: str) -> None:
+    """Add one class without changing the order of existing classes."""
+    if name not in _classes(el):
+        el.set("class", " ".join(filter(None, (el.get("class"), name))))
+
+
+def _list_shell(source, *, identity: bool):
+    """An empty copy of a list around one PDF provision fragment."""
+    attrs = dict(source.attrib)
+    if not identity:
+        attrs.pop("id", None)
+        attrs.pop("data-rail", None)
+    shell = etree.Element(source.tag, attrs)
+    shell.text = source.text
+    return shell
+
+
+def _provision_chunks(body):
+    """Split one SFS provision body before each annotated stycke or point.
+
+    The generated SFS model puts stycken directly in ``.paragraf-body`` and
+    numbered points directly in an ``ol``. The point number is an explicit
+    ``span.num``, so a list can be split without changing its visible number.
+    Each returned chunk starts at a context marker, except the first chunk,
+    which starts at the provision itself."""
+    chunks = [[]]
+    for child in list(body):
+        marked_items = ([item for item in child
+                         if item.get("data-rail")]
+                        if child.tag in ("ol", "ul") else [])
+        if not marked_items:
+            if child.get("data-rail") and chunks[-1]:
+                chunks.append([])
+            chunks[-1].append(child)
+            continue
+
+        # Splitting a list restarts its numbering. The SFS points survive it
+        # because each writes its own number as a `span.num` child, and the
+        # list prints no marker of its own. Only an `ol` numbers anything, so
+        # only an `ol` has to prove it.
+        groups = [[]]
+        for item in list(child):
+            assert child.tag != "ol" or any(  # rule:fail-fast
+                "num" in _classes(part) for part in item), (
+                "point %r writes no number of its own to survive a split"
+                % item.get("id"))
+            if item.get("data-rail") and groups[-1]:
+                groups.append([])
+            groups[-1].append(item)
+        for index, group in enumerate(groups):
+            if group[0].get("data-rail") and chunks[-1]:
+                chunks.append([])
+            shell = _list_shell(child, identity=index == 0)
+            shell.extend(group)
+            if index == len(groups) - 1:
+                shell.tail = child.tail
+            chunks[-1].append(shell)
+    return [chunk for chunk in chunks if chunk]
+
+
+def _split_sfs_provisions(doc, main) -> None:
+    """Make every annotated SFS stycke or point an independent layout row.
+
+    A later row must wait when an earlier margin note is taller than its law
+    text. Splitting the visual § into continuation fragments gives each marker
+    its own article/aside row while the blank gutter keeps the provision number
+    on the first fragment only."""
+    document = doc.get_element_by_id("dokument", None)
+    if document is None:
+        return                            # not an SFS page: nothing to split
+    assert document.getparent() is main, (  # rule:fail-fast
+        "#dokument is not the reading column's own child")
+    provisions = [el for el in document.find_class("paragraf")
+                  if el.tag == "section"]
+    for provision in provisions:
+        body = next((el for el in provision.getchildren()
+                     if "paragraf-body" in _classes(el)), None)
+        assert body is not None, (  # rule:fail-fast
+            "SFS provision %r has no paragraf-body" % provision.get("id"))
+        chunks = _provision_chunks(body)
+        assert chunks, (  # rule:fail-fast
+            "SFS provision %r has an empty paragraf-body" % provision.get("id"))
+        if len(chunks) == 1:
+            continue
+        for child in list(body):
+            body.remove(child)
+        body.extend(chunks[0])
+        fragments = [provision]
+        tail = provision.tail
+        provision.tail = None
+        previous = provision
+        for chunk in chunks[1:]:
+            attrs = {key: value for key, value in provision.attrib.items()
+                     if key not in ("id", "data-rail")}
+            fragment = etree.Element("section", attrs)
+            _add_class(fragment, "paragraf-fortsatt")
+            etree.SubElement(fragment, "div", {"class": "paragraf-gutter"})
+            continuation = etree.SubElement(
+                fragment, "div", {"class": "paragraf-body"})
+            continuation.extend(chunk)
+            previous.addnext(fragment)
+            previous = fragment
+            fragments.append(fragment)
+        for fragment in fragments:
+            _add_class(fragment, "paragraf-del")
+        _add_class(fragments[-1], "paragraf-del-sist")
+        fragments[-1].tail = tail
+
+    # A page-width root passes the current page fragment's width to each
+    # article/aside row. Its unannotated children retain the reading measure.
+    _add_class(document, "kontextrot")
+    for provision in [el for el in document.find_class("paragraf")
+                      if el.tag == "section"]:
+        parent = provision.getparent()
+        while parent is not main:
+            _add_class(parent, "kontextrot")
+            parent = parent.getparent()
 
 
 def _attach(el, asides):
     """Put `el`'s notes in the margin beside it, and return the block that
     now holds them both.
 
-    The two are the cells of one table row, so the note stays level with what
-    it annotates. Floating it instead lets the text flow past, which fills
-    the page and decouples the columns: the GDPR's recitals carry three times
-    the context their text can sit beside, and the backlog never drained."""
+    The text and its notes are one article/aside grid pair, so the note stays
+    level with what it annotates. Both occupy the same grid row. The row ends
+    only when both flows end, and a later article cannot pass a longer note."""
     classes = ["kontextblock"]
     if el.tag in _HEADINGS:
         # the break falls after the block, out of reach of the heading's own
         # break-after: avoid
         classes.append("rubrikblock")
-    block = lxml.html.Element("div", {"class": " ".join(classes)})
+        if "artikel" in _classes(el):
+            classes.append("artikelblock")
+        elif "kaprubrik" in _classes(el):
+            classes.append("kaprubrikblock")
+    if "paragraf" in _classes(el):
+        classes.append("paragrafblock")
+        if "paragraf-fortsatt" in _classes(el):
+            classes.append("fortsattblock")
+    block = lxml.html.Element("section", {"class": " ".join(classes)})
     el.addprevious(block)
     block.tail, el.tail = el.tail, None
-    row = etree.SubElement(block, "div", {"class": "kontextrad"})
-    etree.SubElement(row, "div", {"class": "kontextsp"}).append(el)
-    etree.SubElement(row, "div", {"class": "kontextnot"}).extend(asides)
+    etree.SubElement(block, "article", {"class": "kontextsp"}).append(el)
+    etree.SubElement(block, "aside", {"class": "kontextnot"}).extend(asides)
     return block
 
 
@@ -331,7 +541,7 @@ def _paper_html(doc) -> str:
 # any change to _print_toc/_kontext_aside/_attach/_drop or the fold handling,
 # or the cache serves the old transform's output for every unchanged page
 # (the search index's INDEX_FORMAT is the same pattern)
-PDF_FORMAT = 2
+PDF_FORMAT = 7
 
 
 class SubresourceUnavailable(RuntimeError):
@@ -341,7 +551,7 @@ class SubresourceUnavailable(RuntimeError):
     refuses instead (rule:fail-fast)."""
 
 
-def _cache_key(stored: bytes, toc, kinds):
+def _cache_key(stored: bytes, toc, kinds, amendments, columns):
     """Everything the rendered bytes depend on: the page *content* (the
     stored variant's bytes -- so a regenerate after a source update or a
     patch-file change invalidates, while a deploy that only re-copies
@@ -349,6 +559,7 @@ def _cache_key(stored: bytes, toc, kinds):
     renderer version (WeasyPrint and the transform). A stale entry is
     thereby unreachable, never served."""
     raw = repr((hashlib.sha256(stored).hexdigest(), toc, sorted(kinds),
+                amendments, columns,
                 hashlib.sha256(_stylesheet().encode()).hexdigest(),
                 weasyprint.VERSION, PDF_FORMAT))
     return hashlib.sha256(raw.encode()).hexdigest()
@@ -385,14 +596,16 @@ def generated_page(path: str):
     return page if compress.resolve(page) is not None else None
 
 
-def cache_entry(page, *, toc: bool, kinds: frozenset[str]):
+def cache_entry(page, *, toc: bool, kinds: frozenset[str],
+                amendments: bool, columns: int):
     """The cache file this export lands in -- present means the PDF is ready
     to serve. FileNotFoundError if `page` is not generated."""
     resolved = compress.resolve(page)
     if resolved is None:
         raise FileNotFoundError(str(page))
     return (config.DATA / "cache" / "pdfexport"
-            / (_cache_key(resolved.read_bytes(), toc, kinds) + ".pdf"))
+            / (_cache_key(resolved.read_bytes(), toc, kinds, amendments,
+                          columns) + ".pdf"))
 
 
 # One render per cache key at a time. Two readers asking for the same big
@@ -402,12 +615,13 @@ _render_lock = util.KeyedLocks()
 
 
 def export(page, *, toc: bool, kinds: frozenset[str], subresource,
-           progress=None) -> bytes:
+           amendments: bool, columns: int, progress=None) -> bytes:
     """`render_pdf` behind the disk cache. `page` is the logical generated
     file (compress resolves the stored variant); FileNotFoundError if the
     page is not generated. `progress`, when given, is told the page estimate
     and then follows the render (api/pdfjob.Job)."""
-    entry = cache_entry(page, toc=toc, kinds=kinds)
+    entry = cache_entry(page, toc=toc, kinds=kinds, amendments=amendments,
+                        columns=columns)
     entry.parent.mkdir(parents=True, exist_ok=True)
     with _render_lock(entry.name):
         if entry.is_file():
@@ -417,7 +631,8 @@ def export(page, *, toc: bool, kinds: frozenset[str], subresource,
             except FileNotFoundError:
                 pass                        # a sibling worker pruned it: render
         data = render_pdf(compress.read_text(page), toc=toc, kinds=kinds,
-                          subresource=subresource, progress=progress)
+                          subresource=subresource, progress=progress,
+                          amendments=amendments, columns=columns)
         tmp = entry.with_name(entry.name + ".tmp-%d" % os.getpid())
         tmp.write_bytes(data)
         os.replace(tmp, entry)              # concurrent processes: last wins
@@ -436,6 +651,10 @@ def export(page, *, toc: bool, kinds: frozenset[str], subresource,
 # as the first pass over the pages ends.
 CHARS_PER_PAGE = 1850
 BLOCKS_PER_PAGE = 132
+# Two 89 mm columns at 8.25 pt hold about 2.6 times the text of the normal
+# 117 mm column at 10.5 pt. The compact GDPR estimate is 75 pages; layout
+# resolves it to 64, within the progress display's intended "ca" range.
+TWO_COLUMN_PAGE_FACTOR = 2.6
 _BLOCK_TAGS = ("p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "dt", "dd",
                "blockquote", "figure")
 
@@ -444,35 +663,119 @@ def estimate_pages(doc) -> int:
     """How many A4 pages the transformed document will make. An estimate for
     the progress bar -- the true count only exists after layout."""
     blocks = sum(len(doc.findall(".//" + tag)) for tag in _BLOCK_TAGS)
-    return max(1, round(len(doc.text_content()) / CHARS_PER_PAGE
-                        + blocks / BLOCKS_PER_PAGE))
+    pages = (len(doc.text_content()) / CHARS_PER_PAGE
+             + blocks / BLOCKS_PER_PAGE)
+    if "pdf-two-columns" in _classes(doc):
+        pages /= TWO_COLUMN_PAGE_FACTOR
+    return max(1, round(pages))
 
 
-def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
-               subresource, progress=None) -> bytes:
-    """The page as PDF bytes. `subresource` answers an in-site path+query
-    with (bytes, mime) -- the app answering for itself in-process."""
+def _paper_amendments(doc, include: bool) -> frozenset[str]:
+    """Keep or remove the SFS amendment register for paper, and answer with
+    the anchors the removal took out of the page.
+
+    The screen register starts every entry with links to publication files,
+    older consolidations and diffs. Paper keeps the legal transition text and
+    its metadata, but removes that direct link list."""
+    if doc.get_element_by_id("dokument", None) is None:
+        return frozenset()
+    registers = [section for section in doc.find_class("andringar")
+                 if section.find_class("andring")]
+    dropped = set()
+    for register in registers:
+        if not include:
+            dropped.update(el.get("id") for el in register.iter()
+                           if el.get("id"))
+            register.getparent().remove(register)
+            continue
+        _add_class(register, "print-andringar")
+        for post in register.find_class("andring"):
+            for child in list(post):
+                if child.tag == "ul":
+                    post.remove(child)
+    return frozenset(dropped)
+
+
+def _two_column_body(doc, front) -> None:
+    """Wrap everything after the title in one paged two-column flow."""
+    root = doc.getroottree().getroot()
+    body = doc.find("body")
+    assert body is not None, "generated page has no body"  # rule:fail-fast
+    _add_class(root, "pdf-two-columns")
+    _add_class(body, "pdf-two-columns")
+    if front is None:
+        return
+    main = front.getparent()
+    flow = etree.Element("div", {"class": "print-columns"})
+    for child in list(main)[main.index(front) + 1:]:
+        flow.append(child)
+    front.addnext(flow)
+
+
+def _compact_sfs_provisions(doc) -> None:
+    """Put each SFS number in its provision's fragmenting text flow.
+
+    The screen grid keeps the number and body in separate columns. WeasyPrint
+    can fragment that grid into different paper columns, leaving a bare ``§``
+    at one column's foot. Compact paper uses a block instead. A small start grid
+    keeps only the gutter and opening paragraph together. Later content can
+    fragment independently.
+    """
+    document = doc.get_element_by_id("dokument", None)
+    if document is None:
+        return
+    for provision in [el for el in document.find_class("paragraf")
+                      if el.tag == "section"]:
+        gutter = next((el for el in provision
+                       if "paragraf-gutter" in _classes(el)), None)
+        body = next((el for el in provision
+                     if "paragraf-body" in _classes(el)), None)
+        assert gutter is not None and body is not None, (  # rule:fail-fast
+            "SFS provision %r lacks its gutter or body" % provision.get("id"))
+        first = next(iter(body), None)
+        assert first is not None and first.tag == "p", (  # rule:fail-fast
+            "SFS provision %r does not start with a paragraph"
+            % provision.get("id"))
+        start = etree.Element("div", {"class": "paragraf-start"})
+        body.insert(0, start)
+        start.append(gutter)
+        start.append(first)
+
+
+def _paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
+                    amendments: bool, columns: int):
+    """Parse and recast one generated page as the DOM used for paper."""
+    assert columns in (1, 2), "PDF columns must be 1 or 2"  # rule:fail-fast
+    if columns == 2:
+        kinds = frozenset()
     doc = lxml.html.document_fromstring(html_text, parser=_PARSER)
+    body = doc.find("body")
+    assert body is not None, "generated page has no body"  # rule:fail-fast
+    _add_class(body, "pdf-weasy")
+    dropped = _paper_amendments(doc, amendments)
     island = _island(doc) if kinds else {}
     # the TOC aside is harvested before the chrome it sits in is dropped
-    nav = _print_toc(doc) if toc else None
+    nav = _print_toc(doc, dropped) if toc else None
     _drop(doc, "masthead", "toc-col", "rail", "mobile-bar")
     _running_labels(doc)
     front = next(iter(doc.find_class("frontmatter")), None)
     annotated = {}
     if island and front is not None:
         main = front.getparent()
-        # the document-level panel annotates the frontmatter; the rest hang
-        # off whatever carries the rail marker, hoisted to its own block in
-        # the reading column
+        _split_sfs_provisions(doc, main)
+        # The document-level panel starts beside the document text, after
+        # the title and the optional TOC. The remaining panels hang off the
+        # blocks that carry their rail markers.
         if island.get(""):
-            # not a margin note: even capped it runs to a page and a half,
-            # and a note that outruns its page cannot stay in the outer
-            # margin -- see `.print-kontext.bred`
             aside = _kontext_aside(island[""], kinds)
             if aside is not None:
-                aside.set("class", "print-kontext bred")
-                front.addnext(aside)
+                first = front.getnext()
+                assert first is not None, (  # rule:fail-fast
+                    "document context has no document text to annotate")
+                block = _column_block(first, main)
+                assert block is not None, (  # rule:fail-fast
+                    "document text sits outside the reading column")
+                annotated.setdefault(block, []).append(aside)
         for el in doc.xpath("//*[@data-rail]"):
             panel = island.get(el.get("data-rail"))
             aside = _kontext_aside(panel, kinds) if panel else None
@@ -482,22 +785,85 @@ def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
                     "rail marker %r sits outside the reading column"
                     % el.get("data-rail"))
                 annotated.setdefault(block, []).append(aside)
-    blocks = {el: _attach(el, asides) for el, asides in annotated.items()}
+    for el, asides in annotated.items():
+        _attach(el, asides)
     if nav is not None and front is not None:
-        # after the frontmatter -- and after the last of the blocks it now
-        # sits in, or the TOC's page break would cut the frontmatter's own
-        # note in half and strand its continuation behind the contents
-        blocks.get(front, front).addnext(nav)
+        # The TOC follows the title and precedes the first document/context
+        # pair. Its page break therefore opens the text and its note together.
+        front.addnext(nav)
+    if columns == 2:
+        _compact_sfs_provisions(doc)
+        _two_column_body(doc, front)
     # WeasyPrint renders a closed fold's content anyway -- declare every
     # fold open so the print CSS hides the summary widgets, not the text
     for d in doc.iter("details"):
         d.set("open", "open")
+    return doc
+
+
+def _mirror_margin_notes(document) -> None:
+    """Move table-laid margin notes from the recto to the verso outer edge.
+
+    WeasyPrint paginates a table row in linear time and repeats both cells on
+    every fragment. CSS page selectors cannot change the order of content
+    cells. Layout therefore uses recto order on both pages, and this final
+    paper-space adjustment moves only the note cell on even pages. Descendant
+    coordinates are absolute, so the complete cell subtree moves together.
+
+    The distance is the block's own width -- the reading column plus the note
+    column -- read off the laid-out row, so the CSS keeps naming the two
+    widths and this pass follows them."""
+    for page_number, page in enumerate(document.pages, 1):
+        if page_number % 2:
+            continue
+        rows = [box for box in page._page_box.descendants()
+                if type(box).__name__ == "TableRowBox"]
+        for row in rows:
+            cells = [child for child in row.children
+                     if type(child).__name__ == "TableCellBox"]
+            cell = next((child for child in cells
+                         if "kontextnot" in _classes(getattr(child, "element",
+                                                             None))), None)
+            if cell is None:
+                continue
+            shift = sum(child.border_width() for child in cells)
+            boxes = list(cell.descendants())
+            for box in boxes:
+                box.position_x -= shift
+            # The divider is the note block's inner edge on recto pages. On
+            # verso pages its right edge faces the text. Swap equal border and
+            # padding widths, then move the content across that padding.
+            for note in boxes:
+                element = getattr(note, "element", None)
+                if (type(note).__name__ != "BlockBox" or element is None
+                        or "print-kontext" not in _classes(element)):
+                    continue
+                border = note.border_left_width
+                padding = note.padding_left
+                note.border_left_width = 0
+                note.border_right_width = border
+                note.padding_left = 0
+                note.padding_right = padding
+                for child in note.descendants():
+                    if child is not note:
+                        child.position_x -= padding
+
+
+def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
+               subresource, amendments: bool, columns: int,
+               progress=None) -> bytes:
+    """The page as PDF bytes. `subresource` answers an in-site path+query
+    with (bytes, mime) -- the app answering for itself in-process."""
+    doc = _paper_document(html_text, toc=toc, kinds=kinds,
+                          amendments=amendments, columns=columns)
     if progress is not None:
         progress.plan(estimate_pages(doc))
     failures = []
-    data = weasyprint.HTML(
+    document = weasyprint.HTML(
         string=_paper_html(doc), base_url=BASE,
-        url_fetcher=_fetcher(subresource, failures)).write_pdf()
+        url_fetcher=_fetcher(subresource, failures)).render()
+    _mirror_margin_notes(document)
+    data = document.write_pdf()
     # WeasyPrint catches every fetcher exception and lays out without the
     # resource -- fine for its use, but here it would mean serving (and
     # caching, in export) a PDF that silently lacks an image or font

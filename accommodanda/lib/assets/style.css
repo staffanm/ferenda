@@ -209,6 +209,9 @@ nav.toc a.toc-top { padding-right: 2.6rem; }
 .pdf-dialog::backdrop { background: var(--overlay); }
 .pdf-dialog h2 { font: 600 1.05rem var(--sans); margin: 0 0 .9rem; }
 .pdf-dialog .pdf-row { display: block; margin: .45rem 0; }
+.pdf-layout { display: flex; gap: 1.2rem; border: 0; margin: 0 0 .75rem;
+              padding: 0; }
+.pdf-layout legend { margin-bottom: .25rem; font-weight: 600; }
 .pdf-kinds { border: 0; margin: .2rem 0 .2rem 1.55rem; padding: 0;
              display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .8rem; }
 .pdf-kinds[disabled] { opacity: .45; }
@@ -1404,59 +1407,112 @@ section.occurrences details.more > summary { color: var(--ink-3);
     color-scheme: light;
   }
 
-  /* One wide margin, the same on every page, holding the context apparatus
-     (`.print-kontext`). An *alternating* outer margin was built first and
-     cannot be made to work: a note longer than the page continues against
-     the next page's text column, which a mirrored page has moved to the
-     other side of the sheet, so the tail prints off the paper.
+  /* Mirrored book pages: 117 mm of text and a 55 mm outer column. The wider
+     context column takes its five extra millimetres from the inner margin.
+     Right pages put text at x=28 mm and notes at x=145 mm. Left pages mirror
+     them: notes at x=10 mm and text at x=65 mm.
 
-     33 mm left and 60 mm right leaves 117 mm of text -- about 67 characters
-     to the line, where the 170 mm a 20 mm margin left ran to 97 -- and a
-     44 mm column for the apparatus. A4 stays, because that is what people
-     can print.
+     WeasyPrint recalculates percentage margins against each page fragment.
+     The right page content box is 172 mm wide; the left one is 117 mm.
+     `.kontextnot` turns that changing width into the two required offsets:
 
-     The two widths are named once, here, and every rule that needs them
-     reads them: they were percentages of the block, and a percentage inside
-     a fixed table resolves against the wrong box -- an annotated recital
-     came out 17 mm narrower than an unannotated one on the same page, and
-     the margin column sat 16 mm off. */
-  :root { --matt: 117mm; --marg: 50mm; }
+       right: 3.12727273 * 172 - 420.89091 = 117 mm; 28 + 117 = 145 mm
+       left:  3.12727273 * 117 - 420.89091 = -55 mm; 65 - 55 = 10 mm
+
+     Every ordinary child keeps the 117 mm measure. Only the article/aside
+     grid reads the full page content width as its side signal. */
+  :root { --matt: 117mm; --marg: 55mm; }
 
   @page {
     size: A4;
-    margin: 22mm 60mm 24mm 33mm;
-    /* The running head uses the whole sheet, not the text column:
-       `@top-left`/`@top-center`/`@top-right` divide the *content* width
-       between them, and only the corner boxes reach the paper (measured:
-       corners at 0-33 mm and 150-210 mm). Each corner is set toward its own
-       edge and overflows inwards over an empty head, which gives a long
-       locator the room it needs. The page number stands alone in the outer
-       bottom corner, at the edge where a thumb finds it -- the total
-       belonged to a screen document, not to a printed sheet. */
-    @top-left-corner { content: string(doc-id); text-align: right;
-                       padding-right: 5mm;
-                       font: italic 8.5pt "Source Serif 4", Georgia, serif;
-                       color: #6a6a6a; }
+    margin-top: 22mm;
+    margin-bottom: 24mm;
+    /* The page-specific boxes below keep the running head inside the same
+       172 mm band as the reading column and its context column. */
     @top-center { content: string(doc-title);
                   font: italic 9pt "Source Serif 4", Georgia, serif;
                   color: #3d3d3d; }
-    @top-right-corner { content: string(here, start) string(here-inner, start);
-                        text-align: right; padding-right: 8mm;
-                        white-space: nowrap;
-                        font: 8.5pt "Inter", system-ui, sans-serif;
-                        color: #3d3d3d; }
-    @bottom-right-corner { content: counter(page); text-align: right;
-                           padding-right: 8mm;
-                           font: 8.5pt "Inter", system-ui, sans-serif;
-                           font-variant-numeric: tabular-nums; color: #3d3d3d; }
     @bottom-left { content: none; }
     @bottom-center { content: none; }
     @bottom-right { content: none; }
+  }
+  @page :right {
+    margin-left: 28mm;
+    margin-right: 10mm;
+    @top-left { content: string(doc-id); text-align: left;
+                font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                color: #6a6a6a; }
+    @top-right { content: string(here, start) string(here-inner, start);
+                 width: 55mm; text-align: right;
+                 white-space: nowrap;
+                 font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                 color: #3d3d3d; }
+    @bottom-right { content: counter(page); width: 55mm; text-align: right;
+                    font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                    font-variant-numeric: tabular-nums; color: #3d3d3d; }
+  }
+  @page :left {
+    margin-left: 65mm;
+    margin-right: 28mm;
+    @top-left-corner { content: string(here, start) string(here-inner, start);
+                       text-align: left; padding-left: 10mm;
+                       white-space: nowrap;
+                       font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                       color: #3d3d3d; }
+    @top-right { content: string(doc-id); text-align: right;
+                 font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                 color: #6a6a6a; }
+    @bottom-left-corner { content: counter(page); text-align: left;
+                          padding-left: 10mm;
+                          font: italic 8.5pt "Source Serif 4", Georgia, serif;
+                          font-variant-numeric: tabular-nums; color: #3d3d3d; }
+  }
+  /* The space-saving mode uses the complete page band. Its two 89 mm
+     columns have an 8 mm gutter and 12 mm page margins. */
+  @page compact {
+    size: A4;
+    margin: 18mm 12mm;
+    @top-center { content: string(doc-title);
+                  font: italic 8pt "Source Serif 4", Georgia, serif;
+                  color: #3d3d3d; }
+  }
+  @page compact:right {
+    @top-left { content: string(doc-id); text-align: left;
+                font: italic 8pt "Source Serif 4", Georgia, serif;
+                color: #6a6a6a; }
+    @top-right { content: string(here, start) string(here-inner, start);
+                 width: 62mm; text-align: right; white-space: nowrap;
+                 font: italic 8pt "Source Serif 4", Georgia, serif;
+                 color: #3d3d3d; }
+    @bottom-right { content: counter(page); text-align: right;
+                    font: italic 8pt "Source Serif 4", Georgia, serif;
+                    font-variant-numeric: tabular-nums; color: #3d3d3d; }
+  }
+  @page compact:left {
+    @top-left-corner { content: none; }
+    @top-left { content: string(here, start) string(here-inner, start);
+                width: 62mm; text-align: left; white-space: nowrap;
+                font: italic 8pt "Source Serif 4", Georgia, serif;
+                color: #3d3d3d; }
+    @top-right { content: string(doc-id); text-align: right;
+                 font: italic 8pt "Source Serif 4", Georgia, serif;
+                 color: #6a6a6a; }
+    @bottom-left { content: counter(page); text-align: left;
+                   font: italic 8pt "Source Serif 4", Georgia, serif;
+                   font-variant-numeric: tabular-nums; color: #3d3d3d; }
+    @bottom-left-corner { content: none; }
+  }
+  @page compact:first {
+    @top-center { content: none; }
+    @top-left { content: none; }
+    @top-right { content: none; }
   }
   /* the first page carries the document's own title block; no running head */
   @page :first {
     @top-center { content: none; }
     @top-left-corner { content: none; }
+    @top-left { content: none; }
+    @top-right { content: none; }
     @top-right-corner { content: none; }
   }
   .frontmatter .eyebrow { string-set: doc-id content(text); }
@@ -1495,6 +1551,13 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .gr-body { display: block; max-width: none; }
   .gr-body.solo { max-width: none; }
   .gr-main { max-width: none; padding: 0; }
+  .gr-main > * { width: var(--matt); }
+  /* SFS keeps divisions and chapters as semantic containers. They must pass
+     the page fragment's full width to an annotated provision, while their
+     ordinary headings and provisions retain the reading measure. */
+  .gr-main > .kontextrot, .kontextrot > .kontextrot,
+  .kontextrot > .kontextblock { width: 100%; }
+  .kontextrot > * { width: var(--matt); }
   body.parallel-appendix .gr-main { max-width: none; }
 
   /* book typography: serif, justified, hyphenated. 1rem = 10.5pt scales
@@ -1514,21 +1577,67 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .frontmatter { border-bottom-color: var(--ink); margin-bottom: 1.6rem; }
   dl.meta { row-gap: .15rem; }
 
-  /* breaks: no orphaned headings, no severed §§, register entries whole */
+  /* The title stays full width. All following document sections share one
+     paged two-column flow. At 8.25 pt, an 89 mm column holds about 66 prose
+     characters without changing the document's typefaces. */
+  html.pdf-two-columns { font-size: 8.25pt; }
+  body.pdf-two-columns { page: compact; }
+  body.pdf-two-columns .gr-main > .frontmatter,
+  body.pdf-two-columns .gr-main > .print-columns { width: 100%; }
+  body.pdf-two-columns .print-columns {
+    column-count: 2; column-gap: 8mm; column-fill: auto;
+  }
+  body.pdf-two-columns .print-columns > * { width: auto; }
+  /* Compact SFS replaces the screen grid with a fragmenting block. A small
+     opening grid keeps the section number with its first paragraph. Table rows
+     remain indivisible through the general `tr` rule below, so a table breaks
+     only between rows. */
+  body.pdf-two-columns #dokument section.paragraf {
+    display: block; min-height: 5rem; break-inside: auto;
+  }
+  body.pdf-two-columns #dokument .paragraf-body { margin-left: 4.3rem; }
+  body.pdf-two-columns #dokument .paragraf-start {
+    display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .8rem;
+    width: calc(100% + 4.3rem); margin-left: -4.3rem;
+    align-items: baseline; break-inside: avoid;
+  }
+  body.pdf-two-columns #dokument table { break-inside: auto; }
+
+  /* breaks: no orphaned headings, register entries whole */
   /* `.artikel` is not in this list: both article headings are already here as
      `h2`/`h3`, and the class also names the `section.artikel` *container* --
      a whole treaty article, 25 400 characters at coe/026#A11, which
      `break-inside: avoid` would demand fit on one printed page */
   h1, h2, h3, h4, h5, h6, .kaprubrik, .rubrik,
   .instans-rubrik, .delmal-rubrik { break-after: avoid; break-inside: avoid; }
-  section.paragraf, .andring, figure, blockquote, .expired-banner,
+  .andring, figure, blockquote, .expired-banner,
   .note-banner, .version-banner, p.ruta { break-inside: avoid; }
+  /* SFS provisions range from one line to several pages. Keep other document
+     units whole, but let a statute provision continue on the next page. */
+  #dokument section.paragraf { break-inside: auto; }
   tr { break-inside: avoid; }
   thead { display: table-header-group; }
   p { orphans: 3; widows: 3; }
   /* the amendment register is an appendix: start it on its own page */
   section.andringar { break-before: page; margin-top: 0; }
   .andring { border-color: var(--rule-soft); background: none; }
+  /* The PDF register is a compact legal appendix. Its screen-only source,
+     consolidation and diff links have already been removed by pdf.py. */
+  body.pdf-weasy section.print-andringar > h2 { margin-bottom: 1.4rem; }
+  body.pdf-weasy section.print-andringar .andring {
+    break-inside: auto; margin: 1.5rem 0; padding: 0; border: 0;
+    border-radius: 0; background: none;
+  }
+  body.pdf-weasy section.print-andringar .andring h2 {
+    font-size: 1rem; margin: 0 0 .45rem;
+  }
+  body.pdf-weasy section.print-andringar .andring h3 {
+    font-size: .95rem; margin: .8rem 0 .2rem;
+  }
+  body.pdf-weasy section.print-andringar .andring dl.meta {
+    margin-top: .55rem; font-size: .82rem;
+  }
+  body.pdf-weasy section.print-andringar a { color: inherit; }
 
   /* links: ink, not paint -- the citation text is the reference on paper.
      The § numerals and inline number markers keep the accent. The extra
@@ -1536,6 +1645,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
      (section.forarbeten a, .rail-sec.forarbete a, ...). */
   .gr-main a, section.forarbeten a, .print-kontext .rail-sec a,
   .print-kontext .rail-sec .prov a { color: inherit; text-decoration: none; }
+  a.ext::after { content: none; }
   a.term { border-bottom: 0; }
   .paragraf-gutter .n, .num { color: var(--accent); }
 
@@ -1545,6 +1655,21 @@ section.occurrences details.more > summary { color: var(--ink-3);
      of the notes. 3.5rem holds "3 b §" without wrapping. */
   section.paragraf { grid-template-columns: 3.5rem minmax(0, 1fr);
                      gap: .8rem; }
+  /* One visual § can contain several synchronized context rows. Preserve its
+     original top and bottom space, but do not insert a § margin between its
+     stycken or numbered points. Their own paragraph/list margins remain. */
+  section.paragraf.paragraf-del { margin-bottom: 0; }
+  section.paragraf.paragraf-del + section.paragraf.paragraf-del {
+    margin-top: 0;
+  }
+  section.paragraf.paragraf-del-sist { margin-bottom: 1.75rem; }
+
+  /* A direct EU point has a left margin and an explicit page measure. Reduce
+     its width by the same amount so its right edge stays on the text edge. */
+  .gr-main > p.point { width: calc(var(--matt) - 2.2rem); }
+  .gr-main > p.point.sub2 { width: calc(var(--matt) - 4rem); }
+  .gr-main > p.point.sub3 { width: calc(var(--matt) - 5.8rem); }
+  .gr-main > p.point.sub4 { width: calc(var(--matt) - 7.6rem); }
 
   img, .grafik-img, table, figure { max-width: 100%; }
   /* Tables and figures used to be allowed past the measure, on the grounds
@@ -1571,62 +1696,93 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .print-toc a::after { content: leader(dotted) " " target-counter(attr(href), page);
                         font-variant-numeric: tabular-nums; }
 
-  /* Provision and note are the two cells of one row. Floating the note
-     instead lets the text flow past it, which fills the page -- and turns
-     local congestion into a queue that never drains: the GDPR's recitals
-     carry three times the context their text can sit beside, so by page 60
-     the margin was empty and by page 100 the reading column was. The row
-     keeps each note level with what it annotates and shows congestion where
-     it happens, as air in the reading column.
-
-     The margin is the same on every page, so a note that outruns the foot
-     of the page continues at the head of the next in the same place. That
-     is what an alternating outer margin could not do, and why it is gone. */
-  .kontextblock { display: table; table-layout: fixed;
-                  width: calc(var(--matt) + var(--marg));
-                  margin-right: calc(-1 * var(--marg)); }
-  .kontextrad { display: table-row; }
-  .kontextsp { display: table-cell; width: var(--matt); vertical-align: top; }
-  .kontextnot { display: table-cell; width: var(--marg); vertical-align: top;
+  /* Provision and note overlap in one grid cell, then their fixed widths and
+     the note's calculated margin put them beside each other. The row height
+     follows the longer flow. A later provision therefore waits for both.
+     When either flow crosses a page, WeasyPrint resolves the note margin
+     against the new fragment and moves it to that page's outer side. */
+  .kontextblock { display: grid; grid-template-columns: 1fr;
+                  grid-template-rows: auto; justify-items: start;
+                  width: 100%; }
+  .kontextsp, .kontextnot { grid-column: 1; grid-row: 1;
+                            justify-self: start; align-self: start;
+                            min-width: 0; }
+  .kontextsp { width: var(--matt); }
+  .kontextnot { width: var(--marg);
+                margin-left: calc(312.727273% - 420.89091mm);
                 padding-left: 6mm; }
-  /* the two cells must break at the same place, and the reading column's own
-     typography stopped them: a note is a list and starts anywhere, while the
-     provision is a paragraph under `orphans: 3` (or a § under
-     `break-inside: avoid`), so a row starting two lines from the foot of a
-     page opened its note there and moved its text overleaf */
+  /* Both flows must use the same break opportunities. A note is a list and
+     starts anywhere, while the provision is normally a three-line paragraph
+     or an unbroken §. */
   .kontextsp p, .kontextsp li { orphans: 1; widows: 1; }
   .kontextsp section.paragraf, .kontextsp .andring, .kontextsp figure,
   .kontextsp blockquote, .kontextsp p.ruta { break-inside: auto; }
   /* an annotated heading keeps its text */
   .kontextblock.rubrikblock { break-after: avoid; }
-  .print-kontext { border-left: 1px solid var(--rule-soft); padding-left: 3mm;
+  .kontextblock.rubrikblock > .kontextnot { margin-top: 2.25rem; }
+  .kontextblock.artikelblock > .kontextnot { margin-top: 2rem; }
+  .kontextblock.kaprubrikblock > .kontextnot { margin-top: 3rem; }
+  .kontextblock.paragrafblock > .kontextnot { margin-top: 1.75rem; }
+  .kontextblock.paragrafblock { break-inside: avoid; }
+  .kontextblock.fortsattblock > .kontextnot { margin-top: 0; }
+  .kontextsp > section.paragraf.paragraf-fortsatt { margin-top: 0; }
+  /* WeasyPrint's grid paginator becomes superlinear across hundreds of SFS
+     provisions. The API marks its private paper DOM with `.pdf-weasy` and
+     uses a fixed table row instead. Table rows fragment both cells together
+     and calculate the next row from the taller cell. Both cells first use
+     recto order. api/pdf.py then moves the note-cell boxes left on verso
+     pages, by the row's own laid-out width, so the two widths below stay
+     the only place either number is written. The generic grid above remains
+     the standalone CSS implementation and the fallback for other print
+     engines. */
+  body.pdf-weasy .kontextblock { display: table; table-layout: fixed;
+                                 border-spacing: 0; break-inside: auto; }
+  body.pdf-weasy .kontextsp, body.pdf-weasy .kontextnot {
+    display: table-cell; vertical-align: top;
+  }
+  body.pdf-weasy .kontextsp { width: var(--matt); }
+  body.pdf-weasy .kontextnot { width: var(--marg); margin-left: 0; }
+  body.pdf-weasy .kontextblock.rubrikblock > .kontextnot {
+    margin-top: 0; padding-top: 2.25rem;
+  }
+  body.pdf-weasy .kontextblock.artikelblock > .kontextnot {
+    padding-top: 2rem;
+  }
+  body.pdf-weasy .kontextblock.kaprubrikblock > .kontextnot {
+    padding-top: 3rem;
+  }
+  body.pdf-weasy .kontextblock.paragrafblock > .kontextnot {
+    margin-top: 0; padding-top: 1.75rem;
+  }
+  body.pdf-weasy .kontextblock.fortsattblock > .kontextnot {
+    padding-top: 0;
+  }
+  .print-kontext { border-left: 1px solid var(--rule-soft);
+                   border-right: 0 solid var(--rule-soft); padding-left: 3mm;
                    font-family: var(--sans); font-size: .6rem;
                    line-height: 1.4; color: var(--ink-2);
                    margin-bottom: 1.1rem; }
-  /* Run-in labels: a section heading on a line of its own cost a line for
-     every kind a provision has, and a provision with seven kinds spent seven
-     of its thirty lines saying nothing. The label now opens the list it
-     names. */
+  /* The screen rail gives commentary and official commentary larger serif
+     prose. Paper context has one compact sans-serif size throughout. Source
+     labels may use bold and quotations may use italic, but neither changes
+     family, size, or leading. `!important` isolates this paper component from
+     the more specific screen selectors it reuses. */
+  .print-kontext * {
+    font-family: var(--sans) !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+  /* Each source label and each reference gets a line. This keeps distinct
+     cases and preparatory works legible without adding list bullets. */
   .print-kontext .rail-sec { border-top: 0; padding: 0; margin-bottom: .35rem; }
-  .print-kontext h4 { display: inline; font-size: .6rem; font-weight: 600;
-                      margin: 0; }
-  .print-kontext h4::after { content: " "; }
-  .print-kontext .rail-sec ul { display: inline; margin: 0; padding: 0; }
-  .print-kontext .rail-sec li { display: inline; }
-  /* the space after the separator is non-breaking: a trailing space in
-     generated content collapses against the next inline box, and the list
-     read "C-204/21 ·C-439/19" */
-  .print-kontext .rail-sec li::after { content: " \00b7\00a0"; color: var(--ink-4); }
-  .print-kontext .rail-sec li:last-child::after { content: ""; }
-  .print-kontext .more { display: inline; margin: 0; color: var(--ink-4); }
-  /* the disclosure follows the last item it stands for, and needs the same
-     separator between them ("C-579/21+3 fler" read as one citation) */
-  .print-kontext .more::before { content: " \00b7\00a0"; }
-  /* The document-level apparatus is front matter about the act rather than a
-     note on a provision, and it is a page and a half on its own. */
-  .print-kontext.bred { display: block; width: auto; font-size: .68rem;
-                        margin: 1.2rem 0 1.6rem; padding: 0 0 0 .9rem;
-                        border: 0; border-left: 2px solid var(--rule-soft); }
+  .print-kontext h4 { display: block; font-size: .6rem; font-weight: 600;
+                      margin: 0 0 .08rem; }
+  .print-kontext h4::after { content: none; }
+  .print-kontext .rail-sec ul { display: block; margin: 0; padding: 0; }
+  .print-kontext .rail-sec li { display: block; }
+  .print-kontext .rail-sec li::after { content: none; }
+  .print-kontext .more { display: block; margin: 0; color: var(--ink-4); }
+  .print-kontext .more::before { content: none; }
   .print-kontext .rail-h { font-weight: 600; font-size: .58rem;
                            text-transform: uppercase; letter-spacing: .06em;
                            color: var(--ink-3); margin: 0 0 .3rem;
@@ -1641,7 +1797,7 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .print-kontext li { margin: 0 0 .1rem; break-inside: avoid; }
   .print-kontext p { margin: 0 0 .15rem; text-align: inherit; }
   .print-kontext .prov { color: var(--ink-4); }
-  .print-kontext .q { font-family: var(--serif); font-style: italic; }
+  .print-kontext .q { font-style: italic; }
 }
 
 /* -- /hanvisningar/: the citation-graph explorer (graf.js) -- */

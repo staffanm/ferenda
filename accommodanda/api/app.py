@@ -991,17 +991,24 @@ def pdf_endpoint(
         kontext: str = Query("", description="comma-separated context kinds to "
                              "print under each provision/section (the rail's "
                              "slugs, e.g. kommentar,dv,forarbete), or 'alla'"),
+        andringar: bool = Query(True, description="include the SFS amendment "
+                                "and transition-provision register"),
+        kolumner: int = Query(1, ge=1, le=2, description="one or two text "
+                              "columns; two columns omit context"),
         download: bool = Query(False, description="serve as attachment "
                                "(download) instead of inline (display)")):
     """The page typeset for paper as a PDF: A4, running headers, "n (total)"
     folios, a PDF outline -- the same print stylesheet the browser uses, plus
     the paged-media layer browsers skip. `toc` adds the page's own TOC with
     resolved page numbers; `kontext` prints the chosen context kinds under
-    each provision, the way the screen page shows them in the rail."""
-    generated, kinds = pdfjob.parse_request(path, kontext)
+    each provision, the way the screen page shows them in the rail.
+    `andringar` controls the SFS amendment register. `kolumner=2` uses the
+    compact two-column layout and omits context."""
+    generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
     try:
         data = pdf.export(generated, toc=toc, kinds=kinds,
-                          subresource=_pdf_subresource())
+                          subresource=_pdf_subresource(),
+                          amendments=andringar, columns=kolumner)
     except FileNotFoundError:
         raise HTTPException(404, "no generated page at %r" % path) from None
     except pdf.SubresourceUnavailable as exc:
@@ -1031,7 +1038,9 @@ def _pdf_subresource():
 def pdf_job_start(
         path: str = Query(..., description="public page path"),
         toc: bool = Query(False),
-        kontext: str = Query("")):
+        kontext: str = Query(""),
+        andringar: bool = Query(True),
+        kolumner: int = Query(1, ge=1, le=2)):
     """Start the export in the background and answer at once with its job.
     A render already running for the same page and options is joined, not
     started again; one already in the cache comes back finished.
@@ -1039,10 +1048,11 @@ def pdf_job_start(
     This is what keeps a large export off the request: laying out a statute
     with its full context runs well past nginx's proxy timeout, and a reader
     who waited on it got a 504 for work that had in fact succeeded."""
-    generated, kinds = pdfjob.parse_request(path, kontext)
+    generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
     try:
         job = pdfjob.start(generated, toc=toc, kinds=kinds,
-                           subresource=_pdf_subresource())
+                           subresource=_pdf_subresource(),
+                           amendments=andringar, columns=kolumner)
     except FileNotFoundError:
         raise HTTPException(404, "no generated page at %r" % path) from None
     return job.status()

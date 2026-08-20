@@ -248,11 +248,13 @@ def get(job_id: str) -> Job | None:
     return _jobs.get(job_id)
 
 
-def start(page, *, toc: bool, kinds: frozenset[str], subresource) -> Job:
+def start(page, *, toc: bool, kinds: frozenset[str], subresource,
+          amendments: bool, columns: int) -> Job:
     """Start -- or join -- the export of `page`. Raises FileNotFoundError if
     the page is not generated. A job whose result is already cached comes
     back finished, having rendered nothing."""
-    entry = pdf.cache_entry(page, toc=toc, kinds=kinds)
+    entry = pdf.cache_entry(page, toc=toc, kinds=kinds,
+                            amendments=amendments, columns=columns)
     with _lock:
         _reap(time.monotonic())
         if (live := _by_key.get(entry.name)) is not None:
@@ -265,19 +267,19 @@ def start(page, *, toc: bool, kinds: frozenset[str], subresource) -> Job:
             job.finished = job.started        # a hit: nothing to render
             return job
         pool = _install()
-    pool.submit(_run, job, page, toc, kinds, subresource).add_done_callback(
-        job.settle)
+    pool.submit(_run, job, page, toc, kinds, subresource, amendments,
+                columns).add_done_callback(job.settle)
     return job
 
 
-def _run(job: Job, page, toc, kinds, subresource) -> None:
+def _run(job: Job, page, toc, kinds, subresource, amendments, columns) -> None:
     """The render, on a worker thread. Whatever it raises travels back on the
     future to `Job.settle`; the thread binding is what routes WeasyPrint's
     progress lines to this job."""
     _threads[threading.get_ident()] = job
     try:
         pdf.export(page, toc=toc, kinds=kinds, subresource=subresource,
-                   progress=job)
+                   progress=job, amendments=amendments, columns=columns)
     finally:
         del _threads[threading.get_ident()]
 
@@ -289,11 +291,12 @@ def _run(job: Job, page, toc, kinds, subresource) -> None:
 router = APIRouter()
 
 
-def parse_request(path: str, kontext: str):
+def parse_request(path: str, kontext: str, columns: int):
     """The generated file and the context kinds an export request names, or
     the HTTP error it earns. Shared by all three routes of the feature --
     `/api/v1/pdf`, its job and its waiting screen answer one contract, and
     a second copy of it would drift the moment the contract moved."""
+    assert columns in (1, 2), "PDF columns must be 1 or 2"  # rule:fail-fast
     try:
         kinds = pdf.parse_kinds(kontext)
     except ValueError as exc:
@@ -301,7 +304,7 @@ def parse_request(path: str, kontext: str):
     page = pdf.generated_page(path)
     if page is None:
         raise HTTPException(404, "no generated page at %r" % path)
-    return page, kinds
+    return page, frozenset() if columns == 2 else kinds
 
 TPL = tpl.environment("accommodanda.api").get_template("pdf_wait.html").module
 
@@ -312,6 +315,8 @@ def pdf_wait_page(
         path: str = Query(..., description="public page path"),
         toc: bool = Query(False),
         kontext: str = Query(""),
+        andringar: bool = Query(True),
+        kolumner: int = Query(1, ge=1, le=2),
         download: bool = Query(False)):
     """The page a reader waits on while a large export renders. It is a real
     address on purpose: opening a blank tab and writing "Skapar PDF …" into
@@ -320,8 +325,11 @@ def pdf_wait_page(
     The screen starts the job itself, so the tab can be opened inside the
     click that asked for it (a popup blocker allows nothing later) and the
     render still only begins once."""
-    page, _kinds = parse_request(path, kontext)
-    return HTMLResponse(TPL.wait_page(path, _title(page), toc, kontext, download))
+    page, _kinds = parse_request(path, kontext, kolumner)
+    effective_kontext = "" if kolumner == 2 else kontext
+    return HTMLResponse(TPL.wait_page(
+        path, _title(page), toc, effective_kontext, andringar, kolumner,
+        download))
 
 
 def _title(page) -> str:

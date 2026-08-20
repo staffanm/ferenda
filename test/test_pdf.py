@@ -3,18 +3,22 @@ routes): the transform that recasts a generated page for paper, the export
 as a background job, and the endpoints driven through FastAPI's TestClient
 over a tiny generated tree -- no corpus, no network."""
 
+import json
 import subprocess
 import threading
 import time
 
 import lxml.html
 import pytest
+import weasyprint
 from fastapi.testclient import TestClient
 
-from accommodanda import config
+from accommodanda import build, config
 from accommodanda.api import app as api
 from accommodanda.api import pdf, pdfjob
-from accommodanda.lib import compress
+from accommodanda.lib import catalog, compress, render
+from accommodanda.lib import page as page_layout
+from accommodanda.lib.catalog import BASE
 
 # a minimal but structurally faithful generated page: chrome, TOC column,
 # frontmatter, one § carrying a rail marker, and the context island with a
@@ -173,6 +177,17 @@ def test_pdf_result_is_cached_per_option_set(client, tmp_path):
     assert len(list(cache.glob("*.pdf"))) == 2
 
 
+def test_pdf_cache_separates_column_and_amendment_options(client):
+    page = pdf.generated_page("/1998:9999")
+    entries = {
+        pdf.cache_entry(page, toc=False, kinds=frozenset(),
+                        amendments=amendments, columns=columns).name
+        for amendments in (False, True)
+        for columns in (1, 2)
+    }
+    assert len(entries) == 4
+
+
 def test_pdf_cache_key_is_content_based(client, tmp_path):
     params = {"path": "/1998:9999"}
     client.get("/api/v1/pdf", params=params)
@@ -297,8 +312,20 @@ def test_wait_page_is_a_real_page_for_the_export(client):
     # it carries the options it must start the job with
     assert 'data-path="/1998:9999"' in r.text
     assert 'data-toc="1"' in r.text and 'data-kontext="dv"' in r.text
+    assert 'data-andringar="1"' in r.text and 'data-kolumner="1"' in r.text
     # and it names the document by the page's own title, not by its path
     assert "Testlag" in r.text
+
+
+def test_wait_page_carries_the_compact_options_and_drops_the_context(client):
+    # two columns print no context, so the screen must not start a job for a
+    # kind the export would ignore
+    r = client.get("/api/v1/pdf/vanta",
+                   params={"path": "/1998:9999", "toc": "1", "kontext": "dv",
+                           "andringar": "0", "kolumner": "2"})
+    assert r.status_code == 200
+    assert 'data-kontext=""' in r.text
+    assert 'data-andringar="0"' in r.text and 'data-kolumner="2"' in r.text
 
 
 def test_wait_page_rejects_what_the_export_would_reject(client):
@@ -307,6 +334,9 @@ def test_wait_page_rejects_what_the_export_would_reject(client):
     assert client.get("/api/v1/pdf/vanta",
                       params={"path": "/1998:9999",
                               "kontext": "nonsens"}).status_code == 422
+    assert client.get("/api/v1/pdf/vanta",
+                      params={"path": "/1998:9999",
+                              "kolumner": "3"}).status_code == 422
 
 
 def test_progress_never_walks_backwards_or_reaches_full_early():
@@ -344,7 +374,7 @@ def _doc():
 
 
 def test_print_toc_drops_the_top_self_entry():
-    nav = pdf._print_toc(_doc())
+    nav = pdf._print_toc(_doc(), frozenset())
     links = [(a.get("href"), a.text) for a in nav.iter("a")]
     assert links == [("#R1", "Inledande bestämmelser")]
 
@@ -352,6 +382,7 @@ def test_print_toc_drops_the_top_self_entry():
 def test_kontext_aside_filters_by_kind_and_removes_widgets():
     island = pdf._island(_doc())
     aside = pdf._kontext_aside(island["P1"], frozenset(["dv"]))
+    assert aside.tag == "div"       # the semantic <aside> wraps this panel
     # the flat begrepp section was not requested and is gone
     assert not aside.find_class("begrepp")
     # the fold became a plain block with an h4 label + count
@@ -364,23 +395,449 @@ def test_kontext_aside_filters_by_kind_and_removes_widgets():
     assert "NJA 2022" not in lxml.html.tostring(aside, encoding="unicode")
 
 
-def test_kontext_block_is_a_two_cell_row():
-    # provision and note are the two cells of one row, so the note stays
-    # level with what it annotates. Floating it lets the text flow past,
-    # which fills the page and decouples the columns: the GDPR's recitals
-    # carry three times the context their text can sit beside, and the
-    # backlog never drained -- page 60 had an empty margin, page 100 an
-    # empty reading column.
+def test_kontext_block_is_an_article_aside_pair():
+    # Both flows occupy one grid row, so the note stays level with what it
+    # annotates and a later article must wait for the longer flow.
     doc = _doc()
     para = doc.get_element_by_id("P1")
     aside = pdf._kontext_aside(pdf._island(doc)["P1"], frozenset(["dv"]))
     block = pdf._attach(para, [aside])
-    assert block.get("class") == "kontextblock"
-    (row,) = block.getchildren()
-    assert row.get("class") == "kontextrad"
-    text, note = row.getchildren()
-    assert text.get("class") == "kontextsp" and text.getchildren() == [para]
-    assert note.get("class") == "kontextnot" and note.getchildren() == [aside]
+    assert block.tag == "section"
+    assert {"kontextblock", "paragrafblock"} <= set(block.get("class").split())
+    text, note = block.getchildren()
+    assert text.tag == "article" and text.get("class") == "kontextsp"
+    assert text.getchildren() == [para]
+    assert note.tag == "aside" and note.get("class") == "kontextnot"
+    assert note.getchildren() == [aside]
+
+
+def test_document_context_starts_beside_the_document_text_after_the_toc():
+    panel = (
+        '<div class=\\"rail-sec rail-sec-flat dv\\" data-sec=\\"dv\\" '
+        'data-label=\\"Om dokumentet\\" data-n=\\"1\\">'
+        '<span class=\\"rail-sec-h\\">Om dokumentet</span>'
+        '<ul><li>Dokumentnot</li></ul></div>')
+    page = PAGE.replace(
+        '<h2 class="rubrik" id="R1">',
+        '<p id="body-start">Dokumentets första text.</p>'
+        '<h2 class="rubrik" id="R1">').replace(
+            '{"P1":', '{"":"%s","P1":' % panel)
+    doc = pdf._paper_document(page, toc=True, kinds=frozenset(["dv"]),
+                              amendments=True, columns=1)
+    front = doc.find_class("frontmatter")[0]
+    toc = front.getnext()
+    block = toc.getnext()
+    assert "print-toc" in (toc.get("class") or "").split()
+    assert "kontextblock" in (block.get("class") or "").split()
+    assert block.find_class("kontextsp")[0][0].get("id") == "body-start"
+    note = block.find_class("kontextnot")[0]
+    assert "Om dokumentet" in note.text_content()
+
+
+def test_sfs_stycken_and_points_become_independent_context_rows():
+    page = PAGE.replace(
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>',
+        '<div id="dokument"><section class="kapitel">'
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>'
+        '<section class="paragraf" id="P1" data-rail="P1">'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>'
+        '<div class="paragraf-body"><p id="P1S1">Första stycket.</p>'
+        '<p id="P1S2" data-rail="P1S2">Andra stycket.</p>'
+        '<ol class="punkter"><li id="P1S2N1"><span class="num">1.</span>Ett</li>'
+        '<li id="P1S2N2" data-rail="P1S2N2"><span class="num">2.</span>Två</li>'
+        '</ol></div></section></section></div>')
+    source = lxml.html.document_fromstring(page)
+    island = source.get_element_by_id("lagen-context")
+    panels = json.loads(island.text)
+    panels.update({marker:
+                   '<div class="rail-sec rail-sec-flat dv" data-sec="dv" '
+                   'data-label="Rättsfall" data-n="1"><ul><li>%s</li></ul></div>'
+                   % label
+                   for marker, label in (("P1S2", "Andra"),
+                                         ("P1S2N2", "Punkt två"))})
+    island.text = json.dumps(panels)
+    page = lxml.html.tostring(source, encoding="unicode")
+    doc = pdf._paper_document(page, toc=False, kinds=frozenset(["dv"]),
+                              amendments=True, columns=1)
+    blocks = doc.find_class("kontextblock")
+    assert len(blocks) == 3
+    assert [block.find_class("kontextsp")[0][0].get("id")
+            for block in blocks] == ["P1", None, None]
+    assert doc.get_element_by_id("P1S1").getparent().getparent().get("id") == "P1"
+    for marker in ("P1S2", "P1S2N2"):
+        row = doc.get_element_by_id(marker)
+        while "kontextsp" not in (row.get("class") or "").split():
+            row = row.getparent()
+        provision = row[0]
+        assert "paragraf-fortsatt" in provision.get("class").split()
+        assert not provision.find_class("paragraf-gutter")[0].text_content()
+    assert "kontextrot" in doc.get_element_by_id("dokument").get("class").split()
+
+
+def test_sfs_chapter_context_gets_a_row_before_its_first_provision():
+    old = (
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>')
+    new = (
+        '<div id="dokument"><section class="kapitel" data-rail="K2">'
+        '<h2 class="kaprubrik" id="K2">2 kap. Lagens tillämpningsområde</h2>'
+        + old[old.index('<section class="paragraf"'):] +
+        '</section></div>')
+    page = PAGE.replace(old, new).replace(
+        '{"P1":',
+        '{"K2":"<div class=\\"rail-sec rail-sec-flat dv\\" '
+        'data-sec=\\"dv\\" data-label=\\"Om kapitlet\\" data-n=\\"1\\">'
+        '<ul><li>En lång kapitelnote</li></ul></div>","P1":')
+    doc = pdf._paper_document(page, toc=False, kinds=frozenset(["dv"]),
+                              amendments=True, columns=1)
+    chapter = doc.find_class("kapitel")[0]
+    chapter_row, provision_row = chapter.getchildren()[:2]
+    assert "kaprubrikblock" in chapter_row.get("class").split()
+    assert chapter_row.find_class("kontextsp")[0][0].get("id") == "K2"
+    assert "paragrafblock" in provision_row.get("class").split()
+    assert chapter_row.getparent() is provision_row.getparent()
+
+
+def _page_with_sfs_register():
+    old = (
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>')
+    register = (
+        '<div id="dokument">%s</div>'
+        '<section class="andringar" id="L">'
+        '<h2 class="kaprubrik">Ändringar och övergångsbestämmelser</h2>'
+        '<div class="andring"><h2>Ändring, SFS 1999:1</h2>'
+        '<ul><li><a href="/official.pdf">Tryckt format</a></li></ul>'
+        '<h3>Övergångsbestämmelse</h3>'
+        '<section class="overgangsbestammelse"><ul class="punkter">'
+        '<li>Denna lag träder i kraft.</li></ul></section>'
+        '<dl class="meta"><dt>Ikraftträder</dt><dd>1999-01-01</dd></dl>'
+        '</div></section>') % old
+    return PAGE.replace(old, register).replace(
+        '<a href="#R1" class="lvl2">Inledande bestämmelser</a>',
+        '<a href="#R1" class="lvl2">Inledande bestämmelser</a>'
+        '<a href="#L" class="lvl2">Ändringar</a>')
+
+
+def test_sfs_amendments_keep_legal_text_but_drop_screen_links():
+    doc = pdf._paper_document(_page_with_sfs_register(), toc=True,
+                              kinds=frozenset(), amendments=True, columns=1)
+    register = doc.find_class("print-andringar")[0]
+    post = register.find_class("andring")[0]
+    assert not post.xpath("./ul")
+    assert post.xpath("./section/ul/li")[0].text_content() == \
+        "Denna lag träder i kraft."
+    assert post.find_class("meta")[0].text_content() == \
+        "Ikraftträder1999-01-01"
+
+
+def test_sfs_amendments_can_be_omitted_from_the_body_and_toc():
+    # only the register's own entry goes with it. A TOC entry whose target is
+    # missing for any other reason stays: that is a renderer bug, and a short
+    # TOC would hide it.
+    page = _page_with_sfs_register().replace(
+        '<a href="#L" class="lvl2">',
+        '<a href="#SPOKE" class="lvl2">Spökavsnitt</a><a href="#L" class="lvl2">')
+    doc = pdf._paper_document(page, toc=True, kinds=frozenset(),
+                              amendments=False, columns=1)
+    assert not doc.find_class("andringar")
+    hrefs = [a.get("href") for a in doc.find_class("print-toc")[0].iter("a")]
+    assert "#L" not in hrefs and "#SPOKE" in hrefs
+
+
+def test_two_column_mode_keeps_the_title_wide_and_uses_two_text_columns():
+    old = (
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>')
+    prose = '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>' + \
+        "".join('<p id="line-%d">En paragraf med lagom mycket text.</p>' % i
+                for i in range(180))
+    doc = pdf._paper_document(PAGE.replace(old, prose), toc=False,
+                              kinds=frozenset(["dv"]), amendments=True,
+                              columns=2)
+    assert "pdf-two-columns" in doc.get("class").split()
+    assert "pdf-two-columns" in doc.find("body").get("class").split()
+    assert not doc.find_class("print-kontext")
+    front = doc.find_class("frontmatter")[0]
+    assert front.getnext().get("class") == "print-columns"
+
+    failures = []
+    document = weasyprint.HTML(
+        string=pdf._paper_html(doc), base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    mm = 25.4 / 96
+    lines = []
+    title = None
+    for box in document.pages[0]._page_box.descendants():
+        element = getattr(box, "element", None)
+        element_id = element.get("id") if element is not None else None
+        if type(box).__name__ == "BlockBox" and element_id == "top":
+            title = box
+        if (type(box).__name__ == "BlockBox" and element_id
+                and element_id.startswith("line-")):
+            lines.append(box)
+    assert title is not None and title.border_width() * mm > 175
+    positions = {round(box.position_x * mm) for box in lines}
+    assert positions == {12, 109}
+    assert {round(box.border_width() * mm) for box in lines} == {89}
+
+
+def test_two_column_sfs_table_breaks_between_columns_after_its_opening_text():
+    old = (
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>')
+    rows = "".join(
+        '<tr id="long-row-%d"><td>Begrepp %d</td><td>En beskrivning som '
+        'tar tillräckligt mycket plats för att tabellen ska fortsätta.</td></tr>'
+        % (i, i) for i in range(45))
+    provision = (
+        '<div id="dokument"><section class="paragraf" id="table-provision">'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>'
+        '<div class="paragraf-body"><p id="table-opening">I denna lag används '
+        'följande begrepp.</p><table><tr><td>Begrepp</td><td>Betydelse</td></tr>'
+        + rows + '</table></div></section></div>')
+    doc = pdf._paper_document(PAGE.replace(old, provision), toc=False,
+                              kinds=frozenset(), amendments=True, columns=2)
+    start = doc.find_class("paragraf-start")[0]
+    assert "paragraf-gutter" in start[0].get("class").split()
+    assert start[1].get("id") == "table-opening"
+
+    failures = []
+    document = weasyprint.HTML(
+        string=pdf._paper_html(doc), base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    mm = 25.4 / 96
+    first_page_rows = []
+    for box in document.pages[0]._page_box.descendants():
+        element = getattr(box, "element", None)
+        element_id = element.get("id") if element is not None else None
+        if (type(box).__name__ == "TableRowBox" and element_id
+                and element_id.startswith("long-row-")):
+            first_page_rows.append(box)
+    assert len({round(box.position_x * mm) for box in first_page_rows}) == 2
+
+
+def test_sfs_tables_use_italic_headers_without_row_rules():
+    old = (
+        '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>\n'
+        '<section class="paragraf" id="P1" data-rail="P1">\n'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>\n'
+        '<div class="paragraf-body"><p>En paragraf.</p></div></section>')
+    table = (
+        '<div id="dokument"><section class="paragraf" id="table-provision">'
+        '<div class="paragraf-gutter"><span class="n">1 §</span></div>'
+        '<div class="paragraf-body"><p>Följande begrepp används.</p>'
+        '<table><tr><td id="table-head">Begrepp</td>'
+        '<td>Betydelse</td></tr><tr><td id="table-body">Sekretess</td>'
+        '<td>Ett förbud att röja en uppgift.</td></tr></table>'
+        '</div></section></div>')
+    doc = pdf._paper_document(PAGE.replace(old, table), toc=False,
+                              kinds=frozenset(), amendments=True, columns=1)
+    failures = []
+    document = weasyprint.HTML(
+        string=pdf._paper_html(doc), base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    cells = {}
+    provisions = []
+    for box in document.pages[0]._page_box.descendants():
+        element = getattr(box, "element", None)
+        element_id = element.get("id") if element is not None else None
+        if type(box).__name__ == "TableCellBox" and element_id:
+            cells[element_id] = box
+        if (type(box).__name__ in ("BlockBox", "GridBox")
+                and element_id == "table-provision"):
+            provisions.append(box)
+    assert provisions and all(box.style["break_inside"] == "auto"
+                              for box in provisions)
+    assert cells["table-head"].style["font_style"] == "italic"
+    assert cells["table-body"].style["font_style"] == "normal"
+    for cell in cells.values():
+        assert cell.border_top_width == cell.border_bottom_width == 0
+
+
+def test_article_aside_fragments_mirror_across_pages():
+    paragraphs = "".join(
+        "<p>Textflöde %d med några ord för en naturlig radbrytning.</p>" % i
+        for i in range(60))
+    html = (
+        '<!doctype html><html lang="sv"><head>'
+        '<link rel="stylesheet" href="/style.css"></head>'
+        '<body><div class="gr-body"><main class="gr-main">'
+        '<section class="kontextblock">'
+        '<article class="kontextsp">%s</article>'
+        '<aside class="kontextnot">%s</aside>'
+        '</section><article class="after">Efterföljande artikel.</article>'
+        '</main></div></body></html>' % (paragraphs, paragraphs))
+    failures = []
+    document = weasyprint.HTML(
+        string=html, base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    mm = 25.4 / 96
+    expected = (
+        {"kontextsp": (28, 117), "kontextnot": (145, 55)},
+        {"kontextsp": (65, 117), "kontextnot": (10, 55)},
+    )
+    for page, page_expected in zip(document.pages[:2], expected, strict=True):
+        fragments = {}
+        for box in page._page_box.descendants():
+            element = getattr(box, "element", None)
+            classes = ((element.get("class") or "").split()
+                       if element is not None else [])
+            for cls in page_expected.keys() & classes:
+                if type(box).__name__ == "BlockBox":
+                    fragments[cls] = (
+                        (box.position_x + box.margin_left) * mm,
+                        box.border_width() * mm)
+        assert fragments.keys() == page_expected.keys()
+        for cls, (x, width) in fragments.items():
+            expected_x, expected_width = page_expected[cls]
+            assert x == pytest.approx(expected_x)
+            assert width == pytest.approx(expected_width)
+    note_fragments = []
+    after = None
+    for page_number, page in enumerate(document.pages):
+        for box in page._page_box.descendants():
+            element = getattr(box, "element", None)
+            classes = ((element.get("class") or "").split()
+                       if element is not None else [])
+            if type(box).__name__ != "BlockBox":
+                continue
+            if ("kontextnot" in classes
+                    and box.border_width() * mm == pytest.approx(55)):
+                note_fragments.append(
+                    (page_number, (box.position_y + box.border_height()) * mm))
+            if "after" in classes:
+                after = (page_number, box.position_y * mm)
+    assert after is not None and note_fragments
+    last_page, last_bottom = note_fragments[-1]
+    assert after[0] > last_page or (after[0] == last_page
+                                    and after[1] >= last_bottom)
+
+
+def test_weasy_table_rows_mirror_after_linear_layout():
+    # The API-specific table layout avoids WeasyPrint's superlinear grid
+    # pagination on large SFS files. It first lays both cells in recto order;
+    # the paper-space pass moves note-cell fragments on verso pages.
+    paragraphs = "".join(
+        "<p>Textflöde %d med några ord för en naturlig radbrytning.</p>" % i
+        for i in range(60))
+    html = (
+        '<!doctype html><html lang="sv"><head>'
+        '<link rel="stylesheet" href="/style.css"></head>'
+        '<body class="pdf-weasy"><div class="gr-body"><main class="gr-main">'
+        '<section class="kontextblock">'
+        '<article class="kontextsp">%s</article>'
+        '<aside class="kontextnot"><div class="print-kontext">%s</div></aside>'
+        '</section><article class="after">Efterföljande artikel.</article>'
+        '</main></div></body></html>' % (paragraphs, paragraphs))
+    failures = []
+    document = weasyprint.HTML(
+        string=html, base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    pdf._mirror_margin_notes(document)
+    assert not failures
+    mm = 25.4 / 96
+    expected = (
+        {"kontextsp": (28, 117), "kontextnot": (145, 55)},
+        {"kontextsp": (65, 117), "kontextnot": (10, 55)},
+    )
+    for page_number, (page, page_expected) in enumerate(
+            zip(document.pages[:2], expected, strict=True), 1):
+        fragments = {}
+        dividers = []
+        for box in page._page_box.descendants():
+            element = getattr(box, "element", None)
+            classes = ((element.get("class") or "").split()
+                       if element is not None else [])
+            for cls in page_expected.keys() & classes:
+                if type(box).__name__ == "TableCellBox":
+                    fragments[cls] = (box.position_x * mm,
+                                      box.border_width() * mm)
+            if type(box).__name__ == "BlockBox" and "print-kontext" in classes:
+                dividers.append(box)
+        assert fragments.keys() == page_expected.keys()
+        for cls, (x, width) in fragments.items():
+            expected_x, expected_width = page_expected[cls]
+            assert x == pytest.approx(expected_x)
+            assert width == pytest.approx(expected_width)
+        assert dividers
+        divider = dividers[0]
+        if page_number == 1:
+            assert divider.border_left_width > 0
+            assert divider.border_right_width == 0
+            assert divider.padding_left > 0 and divider.padding_right == 0
+        else:
+            assert divider.border_left_width == 0
+            assert divider.border_right_width > 0
+            assert divider.padding_left == 0 and divider.padding_right > 0
+
+
+def test_paper_stylesheet_removes_known_weasyprint_warning_causes(caplog):
+    assert "font-weight: 400 600" not in pdf._stylesheet()
+    caplog.set_level("INFO")
+    failures = []
+    weasyprint.HTML(
+        string='<link rel="stylesheet" href="/style.css"><p>Text</p>',
+        base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    assert not [record for record in caplog.records
+                if record.name in ("weasyprint", "fontTools.ttLib.woff2")]
+
+
+def test_print_context_references_and_indented_points_keep_their_edges():
+    html = (
+        '<html><head><link rel="stylesheet" href="/style.css"></head>'
+        '<body><div class="gr-body"><main class="gr-main">'
+        '<div class="print-kontext"><div class="rail-sec">'
+        '<h4 id="label">Förarbeten</h4><ul>'
+        '<li id="one">Prop. 2020/21:1</li>'
+        '<li id="two">SOU 2020:2</li></ul></div>'
+        '<div class="rail-sec kommentar"><p id="comment">Kommentar</p></div>'
+        '</div>'
+        '<p id="point" class="point hang">a) En punkt med text.</p>'
+        '<p><a class="ext">Extern hänvisning</a></p>'
+        '</main></div></body></html>')
+    failures = []
+    document = weasyprint.HTML(
+        string=html, base_url=BASE,
+        url_fetcher=pdf._fetcher(_no_subresource, failures)).render()
+    assert not failures
+    boxes = {}
+    texts = []
+    for box in document.pages[0]._page_box.descendants():
+        element = getattr(box, "element", None)
+        element_id = element.get("id") if element is not None else None
+        if element_id in ("label", "one", "two", "comment", "point") \
+                and type(box).__name__ == "BlockBox":
+            boxes[element_id] = box
+        if type(box).__name__ == "TextBox":
+            texts.append(box.text)
+    assert boxes["label"].position_y < boxes["one"].position_y \
+        < boxes["two"].position_y
+    assert boxes["comment"].style["font_family"] == \
+        boxes["one"].style["font_family"]
+    assert boxes["comment"].style["font_size"] == boxes["one"].style["font_size"]
+    mm = 25.4 / 96
+    point_right = (boxes["point"].position_x + boxes["point"].margin_left
+                   + boxes["point"].border_width()) * mm
+    assert point_right == pytest.approx(145)
+    assert "↗" not in "".join(texts)
 
 
 def test_every_note_of_one_block_shares_the_margin():
@@ -415,7 +872,8 @@ def test_the_printed_page_carries_a_running_head_and_its_number():
     out = subprocess.run(
         ["pdftotext", "-layout", "-f", "3", "-l", "3", "-", "-"],
         input=pdf.render_pdf(long, toc=False, kinds=frozenset(),
-                             subresource=_no_subresource),
+                             subresource=_no_subresource,
+                             amendments=True, columns=1),
         capture_output=True, check=True).stdout.decode()
     lines = [line for line in out.splitlines() if line.strip()]
     head, foot = lines[0], lines[-1]
@@ -511,3 +969,68 @@ def test_parse_kinds():
 def test_filename_for():
     assert pdf.filename_for("/1998:204") == "1998-204.pdf"
     assert pdf.filename_for("/prop/2020/21:22") == "prop-2020-21-22.pdf"
+
+
+def test_paper_transform_holds_on_a_really_rendered_sfs_page(tmp_path):
+    """The paper transform asserts the SFS page's own structure -- a
+    `.paragraf-gutter` and a `.paragraf-body` that opens with a paragraph.
+    That markup belongs to `sfs/templates/sfs.html`, so a hand-written page
+    cannot prove the contract still holds. Render one for real instead."""
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1998:9998",
+        "metadata": {"properties": {"dcterms:title": "Provlag (1998:9998)"}},
+        "structure": [
+            {"type": "paragraf", "id": "P1", "ordinal": "1", "children": [
+                {"type": "stycke", "id": "P1S1", "beteckning": "1 §",
+                 "text": ["Denna lag gäller"], "children": [
+                     {"type": "punkt", "id": "P1S1N1", "ordinal": "1",
+                      "text": ["på prov, och"]},
+                     {"type": "punkt", "id": "P1S1N2", "ordinal": "2",
+                      "text": ["i andra hand."]},
+                 ]},
+                {"type": "stycke", "id": "P1S2",
+                 "text": ["Ett andra stycke."]},
+            ]},
+        ],
+    }), encoding="utf-8")
+    # a case citing the § gives the page its rail marker and context island,
+    # which is what puts the provision through `_split_sfs_provisions`
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/NJA_1994_s_1",
+        "court": "HDO", "court_namn": "Högsta domstolen",
+        "referat": ["NJA 1994 s. 1"], "malnummer": ["T 1-94"],
+        "metadata": {"sammanfattning": "Om provlagen."},
+        "structure": [{"type": "stycke", "text": [
+            "Enligt ",
+            {"predicate": "dcterms:references", "text": "1 § 2 provlagen",
+             "uri": "https://lagen.nu/1998:9998#P1S1N2"}, "."]}],
+    }), encoding="utf-8")
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "dv", [case])
+    out = tmp_path / "generated"
+    render.generate_site(db, out, build.SOURCE_RENDERERS, source="sfs",
+                         write_index=False)
+    page = compress.read_text(
+        out / page_layout.doc_relpath("https://lagen.nu/1998:9998"))
+    assert 'id="lagen-context"' in page and "data-rail" in page
+
+    doc = pdf._paper_document(page, toc=True, kinds=frozenset(["dv"]),
+                              amendments=True, columns=1)
+    assert doc.find_class("kontextblock")
+    provision = doc.find_class("paragraf")[0]
+    assert provision.find_class("paragraf-gutter")
+    assert provision.find_class("paragraf-body")[0][0].tag == "p"
+    # the case cites the § second point, so the list really is split -- and
+    # the point keeps the explicit number the split relies on
+    fragment = doc.find_class("paragraf-fortsatt")[0]
+    point = fragment.find_class("paragraf-body")[0][0][0]
+    assert point.get("id") == "P1S1N2"
+    assert point.find_class("num")[0].text_content() == "2."
+    # and the compact layout, whose asserts read the same three facts
+    compact = pdf._paper_document(page, toc=False, kinds=frozenset(),
+                                  amendments=True, columns=2)
+    start = compact.find_class("paragraf-start")[0]
+    assert "paragraf-gutter" in start[0].get("class").split()
