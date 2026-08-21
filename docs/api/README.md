@@ -188,10 +188,59 @@ is the narrow question, only the rows naming the uri itself. Pass a fragment uri
 
 Rows come back in the order the site's own context rail uses — case law first
 for a statute, then decisions, then the citation graph — so the first page is
-representative rather than whichever source name sorts earliest. The order is
-total and build-independent, so `offset` paging is stable across rebuilds.
+representative rather than whichever source name sorts earliest. That order is
+total and build-independent, so `offset` paging is stable across rebuilds
+(`sort=citations` changes that — see below).
 `limit` defaults to (and caps at) 10 000 rows; `total` and `by_source` describe
 the whole answer, not the page returned.
+
+**Which of these matter — `inbound_count` and `sort=citations`.** Every row
+carries the *citing* document's own citation count, the same number and the
+same name `/search` and `/document` answer with, so the reply ranks itself
+without a call per row. `sort=citations` orders the whole scope by it, biggest
+first; `sort=rail` (the default) keeps the order above.
+
+`sort=citations` is the one order `offset` paging is **not** stable under
+across rebuilds: the count is recomputed every build, so a row can move between
+pages as the corpus grows. Ties fall back to the rail order, which is stable.
+Take the first page, or page a ranked answer in one sitting.
+
+That is the "leading cases on this paragraf" question, and it wants
+`source=dv` with it:
+
+```sh
+curl -G https://ferenda.lagen.nu/api/v1/document/inbound \
+     --data-urlencode "uri=https://lagen.nu/1915:218#P36" \
+     -d source=dv -d sort=citations -d limit=5
+```
+
+```
+  32  Den kollektiva hemförsäkringen (NJA 1987 s. 394)
+  29  NJA 1992 s. 66
+  27  AD 1998 nr 80
+  26  AD 1994 nr 122
+  23  AD 1998 nr 97
+```
+
+Two things to know before leaning on it. The count is how often a document is
+cited, which correlates with authority but is not the same thing: it favours an
+old case over a recent one, and it can only count what this corpus holds — a
+fresh precedent can matter with a low number. And the row set is unreduced (see
+below), so a heavily-citing document repeats: under `sort=citations` over
+avtalslagen 36 § *without* a source filter, a 50-row page holds 14 distinct
+documents, because a proposition cites the same paragraf from many places. With
+`source=dv` it holds 48, and under the default `sort=rail` it holds 46 either
+way. Collapse on `uri` if you are ranking documents rather than citations.
+
+`sort=citations` counts the whole scope before paging rather than just the page
+— 893 citers and 13 ms for avtalslagen 36 §, 11 693 and 578 ms for the whole of
+brottsbalken. The default counts the page alone, which is up to `limit` citers
+and costs 8 ms on a 10 000-row page of brottsbalken. Either way it is a small
+share of the request: this endpoint reads its whole per-document file before it
+pages, which is 260 ms on brottsbalken and 1.85 s on the ECHR. The count runs on
+a covering index, so it is index reads rather than table reads. (Measured
+2026-08-21 on a warm dev disk; the production host is HDD-class and these were
+not measured there.)
 
 The set is **unreduced**: the site folds a document's repeated citations into
 one line and hides whole-document citations superseded by a pinpointed one, and
@@ -293,6 +342,7 @@ expect a slow response on a big document.
 | browse by facet | `GET /api/v1/facets`, `GET /api/v1/browse` |
 | get one document | `GET /api/v1/document?uri=…` |
 | who cites this? | `GET /api/v1/document/inbound?uri=…` |
+| which citers weigh most? | `GET /api/v1/document/inbound?uri=…&source=dv&sort=citations` |
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |
 | version history | `GET /api/v1/document/versions?uri=…` |
 | diff two versions | `GET /api/v1/document/diff?uri=…&from=…&to=…` (HTML) |

@@ -95,13 +95,49 @@ def document(con, uri):
             "artifact": art}
 
 
-def inbound_citations(con, uri, *, scope="tree", source=None, limit, offset):
+def inbound_citations(con, uri, *, scope="tree", source=None, sort="rail",
+                      limit, offset):
     """Who cites `uri`. Two orthogonal filters, both available to both faces:
     `scope` narrows the asked-about side ("tree": the uri and everything
     inside it, the default; "exact": only rows naming the uri itself), and
     `source` narrows the citing side to one corpus. `total` counts after both
     filters (it is what paging walks); `by_source` counts the whole scope
-    before `source`, so the reply still says what the other corpora hold."""
+    before `source`, so the reply still says what the other corpora hold.
+
+    Every row carries the citing document's own `inbound_count` -- how many
+    documents cite *it* -- so a caller ranking "the leading cases on this
+    paragraf" has the authority signal on the row instead of one lookup per
+    citer. It is `catalog.document_inbound_count`'s number, the same one
+    `search` and `document` already answer with under the same name.
+
+    `sort="citations"` orders by it, biggest first. That has to count the whole
+    scope before paging, not just the page: 893 citers and 13 ms for
+    avtalslagen 36 §, 11 693 and 578 ms for the whole of brottsbalken
+    (measured 2026-08-21 on a warm dev disk; the query runs on
+    `idx_links_to_root` as a covering index, so it is index reads, not table
+    reads). `sort="rail"`, the default, keeps the order the site's own context
+    rail uses and counts only the page -- which is still a query the endpoint
+    did not make before: up to `limit` distinct citers, 2 925 of them on a
+    10 000-row page of brottsbalken. It is small against what the request
+    already costs, because `inbound.read` is whole-file: 8 ms of counting
+    against 260 ms of reading there, 5 ms against 1.85 s on the ECHR, 13 ms
+    against 120 ms on avtalslagen 36 § (warm dev disk; prod is HDD-class and
+    unmeasured, but the read is the bigger half there too).
+
+    Ties under "citations" fall back to the rail order -- Python's sort is
+    stable and that order is total. The *primary* key is not: a citation count
+    is recomputed every build, which is exactly why `inbound.sort_key` refused
+    to order the file on it. Ordering on it at query time is a deliberate trade,
+    but it means `offset` paging under "citations" can drop or repeat a row
+    across a rebuild, where "rail" cannot."""
+    # both faces validate these at their edge (a pattern on REST, a Literal on
+    # MCP), so a bad value here is a third caller's typo -- which must not read
+    # as "ordered by citations" while quietly answering in rail order, nor as
+    # the whole tree while quietly answering the narrow `exact` question. The
+    # scope branch below is an if/else, so an unrecognised value silently means
+    # `exact` -- the narrower answer, which is the one that looks like a result.
+    assert scope in ("tree", "exact"), "unknown scope %r" % scope
+    assert sort in ("rail", "citations"), "unknown sort %r" % sort
     root = catalog.data_root(con)
     if not inbound.available(root):
         raise InboundUnavailable("inbound citations not built -- run "
@@ -111,9 +147,18 @@ def inbound_citations(con, uri, *, scope="tree", source=None, limit, offset):
     counts = inbound.by_source(rows)
     if source is not None:
         rows = [row for row in rows if row["source"] == source]
-    return {"uri": uri, "scope": scope, "source": source, "total": len(rows),
-            "by_source": counts, "limit": limit, "offset": offset,
-            "citations": rows[offset:offset + limit]}
+    if sort == "citations":
+        cited = catalog.inbound_counts_for(con, {row["uri"] for row in rows})
+        rows = sorted(rows, key=lambda row: -cited.get(row["uri"], 0))
+        page = rows[offset:offset + limit]
+    else:
+        page = rows[offset:offset + limit]
+        cited = catalog.inbound_counts_for(con, {row["uri"] for row in page})
+    return {"uri": uri, "scope": scope, "source": source, "sort": sort,
+            "total": len(rows), "by_source": counts, "limit": limit,
+            "offset": offset,
+            "citations": [dict(row, inbound_count=cited.get(row["uri"], 0))
+                          for row in page]}
 
 
 def outbound(con, uri):

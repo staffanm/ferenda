@@ -195,6 +195,14 @@ def test_citation_graph(corpus):
                                           scope="exact")
     assert exact["scope"] == "exact" and exact["total"] == 0
 
+    # each row carries the *citing* document's own citation count, and `sort`
+    # reaches reads rather than being echoed unused -- the AI host's whole
+    # ranking signal rides on both (fl is cited by nothing here, so 0)
+    ranked = mcpmod.get_incoming_citations("https://lagen.nu/1962:700#K3P1",
+                                           sort="citations")
+    assert ranked["sort"] == "citations"
+    assert [c["inbound_count"] for c in ranked["citations"]] == [0]
+
     outbound = mcpmod.get_outgoing_citations("https://lagen.nu/2018:585")["citations"]
     ref = next(c for c in outbound if c["uri"] == "https://lagen.nu/1962:700#K3P1")
     assert ref["hosted"] is True and ref["text"] == "3 kap. 1 §"

@@ -1937,8 +1937,18 @@ def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:
         "l.from_anchor) GROUP BY to_root"))
 
 
+# uris per `inbound_counts_for` query. SQLite binds one variable per uri and
+# caps them at SQLITE_MAX_VARIABLE_NUMBER, 32 766 on this build; asking for
+# more raises OperationalError("too many SQL variables"), which reaches a
+# caller as an unhandled 500. The ECHR (`ext/coe/005`) alone has 50 626
+# citers, and the next four roots are 19 570 / 15 013 / 13 656 / 12 018, so the
+# corpus is one nightly growth away from more. Well under the cap rather than
+# at it, because the margin costs nothing: 50 626 citers is six queries.
+_COUNT_CHUNK = 10_000
+
+
 def inbound_counts_for(con: sqlite3.Connection, uris) -> dict[str, int]:
-    """`document_inbound_count` for a named handful of documents -- {uri: count}
+    """`document_inbound_count` for a named set of documents -- {uri: count}
     over exactly `uris`, omitting the ones nothing cites.
 
     The rail orders its case-law entries by this (D4), and it needs the counts
@@ -1946,15 +1956,21 @@ def inbound_counts_for(con: sqlite3.Connection, uris) -> dict[str, int]:
     `document_inbound_counts` is a 13.5M-row pass costing ~9 s and 209k entries,
     which is right for the reindex that reads all of it and wrong per render
     worker -- and wronger still on an `only`-scoped one-page render, which the
-    rest of the render path is careful to keep targeted."""
+    rest of the render path is careful to keep targeted.
+
+    Asked for more than `_COUNT_CHUNK` uris it queries in chunks and merges.
+    Each uri lands in exactly one chunk and the count is grouped by `to_root`,
+    so merging is a plain dict update -- no uri is counted twice."""
     uris = list(uris)
-    if not uris:
-        return {}
-    return dict(con.execute(
-        "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
-        "WHERE l.to_root IN (%s)" % ",".join("?" * len(uris)) + _NOT_SELF
-        + " GROUP BY l.to_root, l.from_uri, l.from_anchor) GROUP BY to_root",
-        uris))
+    counts: dict[str, int] = {}
+    for start in range(0, len(uris), _COUNT_CHUNK):
+        chunk = uris[start:start + _COUNT_CHUNK]
+        counts.update(con.execute(
+            "SELECT to_root, COUNT(*) FROM (SELECT l.to_root, 1 FROM links l "
+            "WHERE l.to_root IN (%s)" % ",".join("?" * len(chunk)) + _NOT_SELF
+            + " GROUP BY l.to_root, l.from_uri, l.from_anchor) GROUP BY to_root",
+            chunk))
+    return counts
 
 
 def counts(con: sqlite3.Connection) -> dict[str, int]:

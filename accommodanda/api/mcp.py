@@ -217,6 +217,13 @@ ScopeArg = Annotated[Literal["tree", "exact"], Field(
     description="'tree' (förvalt) tar med hänvisningar till URI:n och alla "
     "bestämmelser under den -- för en stor lag tiotusentals rader. 'exact' tar "
     "bara med dem som namnger URI:n själv.")]
+CitationSortArg = Annotated[Literal["rail", "citations"], Field(
+    description="Ordningen på raderna. 'rail' (förvalt) är den lagen.nu självt "
+    "använder: rättspraxis först för en författning, sedan "
+    "myndighetsavgöranden, sedan resten av grafen. 'citations' lägger de mest "
+    "citerade källorna först -- svaret på 'vilka är de viktigaste rättsfallen "
+    "om den här bestämmelsen'. Kombinera 'citations' med source='dv' när "
+    "frågan gäller praxis.")]
 PageLimitArg = Annotated[int, Field(
     description="Högsta antal rader på sidan, 1-1000. Bläddra vidare med "
     "`offset`.")]
@@ -318,6 +325,7 @@ class IncomingCitations(TypedDict):
     uri: str
     scope: str
     source: str | None
+    sort: str
     total: int
     by_source: dict[str, int]
     limit: int
@@ -592,7 +600,8 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
 def get_incoming_citations(uri: CitedUriArg, limit: PageLimitArg = 50,
                            offset: OffsetArg = 0,
                            source: SourceArg = None,
-                           scope: ScopeArg = "tree") -> IncomingCitations:
+                           scope: ScopeArg = "tree",
+                           sort: CitationSortArg = "rail") -> IncomingCitations:
     """Vilka rättsfall, myndighetsbeslut, förarbeten och andra källor som
     hänvisar till, tillämpar eller diskuterar ett dokument eller en bestämmelse
     -- hänvisningsgrafen inåt, och lagen.nu:s signaturfunktion som data.
@@ -611,17 +620,44 @@ def get_incoming_citations(uri: CitedUriArg, limit: PageLimitArg = 50,
     rättspraxis först, sedan myndighetsavgöranden, sedan resten av grafen --
     så de första raderna är de en jurist läser först.
 
-    Svaret: uri; scope och source (filtren, återgivna); total (rader att
-    bläddra, alltså *efter* `source`); by_source (antal per källa över hela
-    scopet, alltså *före* `source` -- så svaret ändå säger vad de andra
-    samlingarna bär); limit; offset; och citations -- var och en med uri (det
-    citerande dokumentet), target (den citerade bestämmelsen), anchor och page
-    (var i citeraren den står), label, title, source, kind och date.
+    **Vilka av dem väger tyngst?** Varje rad bär `inbound_count` -- hur många
+    dokument som citerar det *citerande* dokumentet. Det är källans egen
+    auktoritetssignal, så svaret går att rangordna utan ett anrop per rad.
+    `sort="citations"` ordnar hela scopet efter den, störst först.
+
+    **Sätt source="dv" till när frågan gäller praxis.** En lag eller en
+    proposition citeras en tiopotens oftare än något avgörande, så
+    `sort="citations"` utan källfilter svarar med författningar och förarbeten
+    och når aldrig fram till ett rättsfall: på avtalslagen 36 § är de tre
+    översta SFS 1994:1512 (955), Prop. 2007/08:95 (946) och Prop. 2004/05:85
+    (681), medan det mest citerade *avgörandet* om paragrafen -- NJA 1987
+    s. 394, Den kollektiva hemförsäkringen -- har 32. Med source="dv" ligger
+    det avgörandet överst. Svarar du på "vilka är de viktigaste rättsfallen"
+    utan filtret rapporterar du propositioner som rättsfall.
+
+    Läs siffran som en ledtråd, inte som ett facit: den mäter hur ofta något
+    citeras, vilket samvarierar med auktoritet men inte är samma sak. Den
+    gynnar ett gammalt avgörande framför ett färskt, och den kan bara räkna det
+    som finns i den här samlingen. Ett färskt prejudikat kan väga tungt med
+    låg siffra.
+
+    `sort="citations"` är den enda ordning där `offset` *inte* är stabil mellan
+    ombyggnader -- siffran räknas om vid varje bygge, så en rad kan flytta sig
+    mellan sidor när samlingen växer. Ta första sidan, eller bläddra klart i
+    ett svep.
+
+    Svaret: uri; scope, source och sort (filtren och ordningen, återgivna);
+    total (rader att bläddra, alltså *efter* `source`); by_source (antal per
+    källa över hela scopet, alltså *före* `source` -- så svaret ändå säger vad
+    de andra samlingarna bär); limit; offset; och citations -- var och en med
+    uri (det citerande dokumentet), target (den citerade bestämmelsen), anchor
+    och page (var i citeraren den står), label, title, source, kind, date och
+    inbound_count.
     """
     limit, offset = max(1, min(limit, 1000)), max(0, offset)
     with _con() as con:
         return reads.inbound_citations(con, uri, scope=scope, source=source,
-                                       limit=limit, offset=offset)
+                                       sort=sort, limit=limit, offset=offset)
 
 
 @mcp.tool(title="Vad dokumentet hänvisar till (utgående hänvisningar)",

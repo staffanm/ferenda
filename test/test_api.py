@@ -299,6 +299,139 @@ def test_inbound_pages_a_stable_order(client):
     assert body["citations"] == []
 
 
+def _cited_corpus(tmp_path):
+    """A law, three documents citing one of its paragrafer, and a different
+    number of citations *of each citer* -- so "which of these weighs most" has
+    an unambiguous answer. Returns the connection; the inbound sidecar the
+    endpoint reads is written from the catalog, as `generate` writes it."""
+    (tmp_path / "artifact").mkdir()          # data_root's fail-fast wants one
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1962:700"
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, path) "
+                "VALUES (?, 'sfs', 'lag', 'BrB', 'Brottsbalk', '')", (law,))
+    # The prop is the most-cited citer and the rail order puts it *last* (case
+    # law leads a statute's panel), so the two orders disagree -- without that
+    # a passing test proves nothing about which one the endpoint used.
+    for citer, source, label, weight in (
+            ("https://lagen.nu/dom/nja/2013s376", "dv", "NJA 2013 s. 376", 5),
+            ("https://lagen.nu/dom/nja/2016s3", "dv", "NJA 2016 s. 3", 2),
+            ("https://lagen.nu/prop/2020/21:1", "forarbete", "Prop. 2020/21:1", 9)):
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, ?, 'x', ?, 'T', '')",
+                    (citer, source, label))
+        con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                    "to_uri, to_root) VALUES (?, 'P1', 'dcterms:references', "
+                    "?, ?)", (citer, law + "#K3P1", law))
+        for i in range(weight):
+            con.execute(
+                "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES (?, ?, 'dcterms:references', ?, ?)",
+                ("https://lagen.nu/other/%d" % i, "P%d" % i, citer, citer))
+    inbound.write(tmp_path, law, inbound.citations(con, law))
+    inbound.mark_built(tmp_path, 1, 0)
+    con.commit()          # so a second connection (the HTTP path) sees the rows
+    return con, law
+
+
+def test_inbound_rows_carry_the_citing_document_s_own_citation_count(tmp_path):
+    """Every row says how heavily the *citer* is cited, so "which of these
+    matter" is answerable from the reply instead of a call per row. Same number
+    and same name /search and /document answer with."""
+    con, law = _cited_corpus(tmp_path)
+    rows = reads.inbound_citations(con, law, limit=10, offset=0)["citations"]
+    assert {r["label"]: r["inbound_count"] for r in rows} == {
+        "NJA 2013 s. 376": 5, "NJA 2016 s. 3": 2, "Prop. 2020/21:1": 9}
+    # ...and the default order is the rail's, which ignores the count: the
+    # most-cited citer here is the prop, and it comes last
+    assert [r["label"] for r in rows] == [
+        "NJA 2013 s. 376", "NJA 2016 s. 3", "Prop. 2020/21:1"]
+    con.close()
+
+
+def test_inbound_sorted_by_citations_puts_the_weightiest_citer_first(tmp_path):
+    """`sort=citations` is the "leading cases on this paragraf" question. The
+    default order is the site's context rail -- case law first, then the rest --
+    which answers a different one."""
+    con, law = _cited_corpus(tmp_path)
+    ranked = reads.inbound_citations(con, law, sort="citations",
+                                     limit=10, offset=0)
+    assert [r["label"] for r in ranked["citations"]] == [
+        "Prop. 2020/21:1", "NJA 2013 s. 376", "NJA 2016 s. 3"]
+    assert ranked["sort"] == "citations"      # echoed back, like scope/source
+    # the filters compose: the prop drops out, the case order is unchanged
+    cases = reads.inbound_citations(con, law, sort="citations", source="dv",
+                                    limit=10, offset=0)
+    assert [r["label"] for r in cases["citations"]] == [
+        "NJA 2013 s. 376", "NJA 2016 s. 3"]
+    assert cases["by_source"] == {"dv": 2, "forarbete": 1}   # the whole scope
+    con.close()
+
+
+def test_inbound_citation_sort_breaks_ties_on_the_rail_order(tmp_path):
+    """Two citers nothing cites are both 0, so the sort has nothing to say
+    about them. Python's sort is stable and the rail order is total, so they
+    keep it -- which is what makes `offset` paging stable under either sort."""
+    con, law = _cited_corpus(tmp_path)
+    con.execute("DELETE FROM links WHERE from_uri LIKE '%/other/%'")
+    default = reads.inbound_citations(con, law, limit=10, offset=0)
+    ranked = reads.inbound_citations(con, law, sort="citations",
+                                     limit=10, offset=0)
+    assert {r["inbound_count"] for r in ranked["citations"]} == {0}
+    assert [r["uri"] for r in ranked["citations"]] == \
+        [r["uri"] for r in default["citations"]]
+    con.close()
+
+
+def test_inbound_ranking_reaches_the_rest_endpoint(tmp_path):
+    """Through HTTP, not through `reads`: the endpoint has to pass `sort` on and
+    the response model has to carry `inbound_count`. Dropping either left every
+    test above green while the endpoint answered rail rows under a
+    `"sort": "citations"` label."""
+    con, law = _cited_corpus(tmp_path)
+    con.close()
+
+    def _fresh():
+        # TestClient runs the endpoint on a worker thread, and a sqlite
+        # connection belongs to the thread that opened it
+        request_con = sqlite3.connect(tmp_path / "catalog.sqlite")
+        try:
+            yield request_con
+        finally:
+            request_con.close()
+
+    api.app.dependency_overrides[api.get_con] = _fresh
+    try:
+        body = TestClient(api.app).get(
+            "/api/v1/document/inbound",
+            params={"uri": law, "sort": "citations", "limit": 10}).json()
+    finally:
+        api.app.dependency_overrides.clear()
+    assert body["sort"] == "citations"
+    assert [(c["label"], c["inbound_count"]) for c in body["citations"]] == [
+        ("Prop. 2020/21:1", 9), ("NJA 2013 s. 376", 5), ("NJA 2016 s. 3", 2)]
+
+
+def test_inbound_counts_more_citers_than_sqlite_binds_at_once(tmp_path):
+    """`sort=citations` counts the whole scope, and SQLite binds one variable
+    per uri with a hard cap (32 766 here). The ECHR has 50 626 citers, so the
+    unchunked query raised OperationalError -- an unhandled 500 on a public
+    endpoint. Proven against the limit itself rather than a stand-in."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    limit = sqlite3.connect(":memory:").getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+    uris = ["https://lagen.nu/x/%d" % i for i in range(limit + 50)]
+    con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
+                "to_root) VALUES ('https://lagen.nu/citer', 'P1', "
+                "'dcterms:references', ?, ?)", (uris[0], uris[0]))
+    assert catalog.inbound_counts_for(con, uris) == {uris[0]: 1}
+    con.close()
+
+
+def test_inbound_rejects_an_unknown_sort(client):
+    assert client.get("/api/v1/document/inbound",
+                      params={"uri": "https://lagen.nu/1962:700",
+                              "sort": "nonsens"}).status_code == 422
+
+
 def test_outbound_marks_unhosted_targets(client):
     r = client.get("/api/v1/document/outbound",
                    params={"uri": "https://lagen.nu/2018:585"})

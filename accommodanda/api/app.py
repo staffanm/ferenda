@@ -349,6 +349,14 @@ class InboundCitation(BaseModel):
     kind: str | None = Field(None, description="its document kind")
     date: str | None = Field(None, description="its date (ISO 8601), where the "
                              "source records one")
+    inbound_count: int = Field(
+        description="how many documents cite the *citing* document -- its "
+        "own authority signal, so a caller can rank \"the leading cases on "
+        "this paragraf\" without a lookup per row. Same number and same name "
+        "as /search and /document answer with. It is how often a document is "
+        "cited, which correlates with authority but is not the same thing: it "
+        "favours an old case over a recent one, and it can only count what "
+        "this corpus holds. Order by it with ?sort=citations.")
 
 
 class InboundCitations(BaseModel):
@@ -360,6 +368,7 @@ class InboundCitations(BaseModel):
     scope: str = Field(description="the scope asked for, echoed back")
     source: str | None = Field(None, description="the citing-side filter, "
                                "echoed back")
+    sort: str = Field(description="the order asked for, echoed back")
     total: int = Field(description="rows matching the scope and filter, before "
                        "paging")
     limit: int
@@ -861,6 +870,11 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
                      source: str | None = Query(
                          None, description="only citations from one corpus "
                                            "(dv, forarbete, sfs, …)"),
+                     sort: str = Query(
+                         "rail", pattern="^(rail|citations)$",
+                         description="rail: the context rail's order (default); "
+                                     "citations: most-cited citing document "
+                                     "first"),
                      limit: int = Query(INBOUND_MAX, ge=1, le=INBOUND_MAX),
                      offset: int = Query(0, ge=0),
                      con: sqlite3.Connection = Depends(get_con)):
@@ -876,8 +890,32 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
 
     Ordered as the site's context rail orders its panels -- case law first for a
     statute, then decisions, then the citation graph -- so the first page is
-    representative rather than whichever source name sorts earliest. The order is
-    total and build-independent, so `offset` paging is stable.
+    representative rather than whichever source name sorts earliest. That order
+    is total and build-independent, so `offset` paging is stable (`sort` can
+    change that -- see below).
+
+    **Which of these matter?** Every row carries the citing document's own
+    `inbound_count` -- how many documents cite *it* -- so the answer ranks
+    itself without a call per row. `sort=citations` orders the whole scope by
+    it, biggest first.
+
+    **Pair that with `source=dv` when the question is about case law.** A
+    statute or a proposition is cited an order of magnitude more often than any
+    judgment, so unfiltered `sort=citations` answers with legislation and
+    preparatory works and never reaches a case: on avtalslagen 36 § the top
+    three are SFS 1994:1512 (955), Prop. 2007/08:95 (946) and Prop. 2004/05:85
+    (681), while the most-cited *case* on that paragraf -- NJA 1987 s. 394, Den
+    kollektiva hemförsäkringen -- has 32, and leads once the filter is on. The
+    filter is also much the cheaper question: 300 citers against 893.
+
+    Read the count as a hint, not a verdict: it favours an old case over a
+    recent one and counts only what this corpus holds.
+
+    `sort=citations` is the one order `offset` paging is **not** stable under
+    across rebuilds -- the count is recomputed every build, so a row can move
+    between pages as the corpus grows. Ties fall back to the rail order, which
+    is stable. Page a ranked answer in one sitting, or take the first page and
+    stop.
 
     The complete set, unreduced: the site folds a document's repeated citations
     into one line and hides whole-document citations superseded by a pinpointed
@@ -888,11 +926,11 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
     """
     try:
         data = reads.inbound_citations(con, uri, scope=scope, source=source,
-                                       limit=limit, offset=offset)
+                                       sort=sort, limit=limit, offset=offset)
     except reads.InboundUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc
     return InboundCitations(
-        uri=uri, scope=scope, source=source, total=data["total"],
+        uri=uri, scope=scope, source=source, sort=sort, total=data["total"],
         limit=limit, offset=offset, by_source=data["by_source"],
         citations=[InboundCitation(**row) for row in data["citations"]])
 

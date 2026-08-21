@@ -301,9 +301,56 @@ visar vad de andra källorna håller.
 Ordningen är densamma som i sidans kontextspalt — rättsfall först för en lag,
 sedan myndighetsavgöranden, sedan lagrumshänvisningar — så att första sidan är
 representativ i stället för att styras av vilket källnamn som råkar sortera
-först. Ordningen är total och oberoende av bygget, så `offset` är stabilt mellan
-ombyggnader. `limit` är 10 000 rader (och taket); `total` och `by_source` avser
+först. Den ordningen är total och oberoende av bygget, så `offset` är stabilt
+mellan ombyggnader (`sort=citations` ändrar det — se nedan). `limit` är 10 000 rader (och taket); `total` och `by_source` avser
 hela svaret, inte den returnerade sidan.
+
+**Vilka av dem väger tyngst — `inbound_count` och `sort=citations`.** Varje rad
+bär det *citerande* dokumentets egen citeringssiffra: samma tal och samma namn
+som `/search` och `/document` svarar med, så svaret går att rangordna utan ett
+anrop per rad. `sort=citations` ordnar hela scopet efter den, störst först;
+`sort=rail` (förvalt) behåller ordningen ovan.
+
+`sort=citations` är den enda ordningen där `offset` **inte** är stabil mellan
+ombyggnader: siffran räknas om vid varje bygge, så en rad kan flytta sig mellan
+sidor när samlingen växer. Lika tal faller tillbaka på kontextspaltens ordning,
+som är stabil. Ta första sidan, eller bläddra klart i ett svep.
+
+Det är frågan "vilka är de viktigaste rättsfallen om den här bestämmelsen", och
+den vill ha `source=dv` med sig:
+
+```sh
+curl -G http://127.0.0.1:8001/api/v1/document/inbound \
+     --data-urlencode "uri=https://lagen.nu/1915:218#P36" \
+     -d source=dv -d sort=citations -d limit=5
+```
+
+```
+  32  Den kollektiva hemförsäkringen (NJA 1987 s. 394)
+  29  NJA 1992 s. 66
+  27  AD 1998 nr 80
+  26  AD 1994 nr 122
+  23  AD 1998 nr 97
+```
+
+Två saker att veta först. Siffran mäter hur ofta något citeras, vilket
+samvarierar med auktoritet men inte är samma sak: den gynnar ett gammalt
+avgörande framför ett färskt, och den räknar bara det som finns i samlingen.
+Och raderna är oreducerade (se nedan), så ett flitigt citerande dokument
+återkommer: med `sort=citations` över avtalslagen 36 § *utan* källfilter rymmer
+en sida på 50 rader 14 skilda dokument, eftersom en proposition citerar samma
+paragraf från många ställen. Med `source=dv` rymmer den 48, och med förvalt
+`sort=rail` rymmer den 46 oavsett. Slå ihop på `uri` om det är dokument
+och inte citeringar som ska rangordnas.
+
+`sort=citations` räknar hela scopet före sidindelningen, inte bara sidan — 893
+citerande källor och 13 ms för avtalslagen 36 §, 11 693 och 578 ms för hela
+brottsbalken. Förvalet räknar bara sidan, alltså som mest `limit` källor, vilket
+kostar 8 ms på en sida med 10 000 rader ur brottsbalken. Bådadera är en liten
+del av anropet: endpointen läser hela dokumentets citeringsfil innan den
+sidindelar, vilket är 260 ms för brottsbalken och 1,85 s för EKMR. Frågan går på
+ett täckande index, alltså indexläsningar och inte tabelläsningar. (Mätt
+2026-08-21 på en varm utvecklingsdisk; produktionsvärden är inte mätta.)
 
 Mängden är **oreducerad**: sidan slår ihop ett dokuments upprepade citeringar
 till en rad och döljer heldokumentscitat som ersätts av en pinpoint — båda är
@@ -321,6 +368,7 @@ curl -G http://127.0.0.1:8001/api/v1/document/inbound \
 {
   "uri": "https://lagen.nu/1975:635#P6",
   "scope": "tree",
+  "sort": "rail",
   "total": 3924,
   "limit": 10000,
   "offset": 0,
@@ -337,7 +385,8 @@ curl -G http://127.0.0.1:8001/api/v1/document/inbound \
       "title": "F 8748-25",
       "source": "dv",
       "kind": "case",
-      "date": "2026-07-15"
+      "date": "2026-07-15",
+      "inbound_count": 0
     }
   ]
 }
@@ -584,7 +633,7 @@ om corpuset växer varje natt.
 | `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
 | `fetch` | samma text, men hämtad på ett `id` från `search` (`…/1962:700#K3P1`) i stället för URI + pinpoint var för sig — se *Sök/hämta-kontraktet* nedan |
 | `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
-| `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader i sidans egen ordning (rättsfall först), filtrerbart på `source` (vem som citerar) och `scope` (`tree`/`exact` — vad frågan gäller) |
+| `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader, filtrerbart på `source` (vem som citerar) och `scope` (`tree`/`exact` — vad frågan gäller). Varje rad bär det citerande dokumentets eget `inbound_count`, och `sort` väljer ordning: `rail` (förvalt, sidans egen — rättsfall först) eller `citations` (mest citerade källan först — "vilka är de viktigaste rättsfallen om den här bestämmelsen") |
 | `get_outgoing_citations` | alla citeringar ett dokument gör (grafen utåt) |
 | `list_sources` | corpusets källor och antal — orientering för `source`-filtret |
 

@@ -1263,7 +1263,18 @@ to a future per-doc incremental generate.
   materialised first, which *is* the expensive read. Sorting once at build time
   in the order the site's context rail already uses settles both. The API
   contract changed with it (whole-law scope by default, `total`/`by_source`,
-  10,000-row pages) while there are still no external consumers. Same date,
+  10,000-row pages) while there are still no external consumers.
+  **Since 2026-08-21 every row also carries the citing document's own
+  `inbound_count`**, and `sort=citations` orders the whole scope by it — the
+  "which of these matter" question, which the build-time order cannot answer
+  because it is one fixed order for every reader. That count comes from
+  `catalog.inbound_counts_for`, the targeted query the context rail already
+  uses, on the `idx_links_to_root` covering index: 893 citers and 13 ms for
+  avtalslagen 36 §, 11,693 and 578 ms for the whole of brottsbalken. `rail`
+  stays the default and counts only the page. Both faces take it (REST
+  `?sort=`, MCP `sort`), because ranking candidates is exactly what an AI host
+  asking "the leading cases on this paragraf" needs and it had no signal for
+  it. Same date,
   `catalog.DEP_INBOUND_COLUMNS` (what a page's freshness digest covers) widened
   from five link columns to ten, fixing a real staleness bug along the way: a
   citer re-parse that only moved *which* provision a pinpoint landed on (e.g. a
