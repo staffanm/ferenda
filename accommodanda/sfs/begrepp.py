@@ -110,6 +110,11 @@ NOT_A_CONCEPT = frozenset({
     "chefen",              # "Med chefen förstås vid tillämpning av 5 §
                            # verksstadgan rådets ordförande" -- each
                            # myndighetsinstruktion naming its own head, 62 of them
+    # the parenthesis that gives an act its short *title*, not a term: 170 acts
+    # write "kompletterar Europaparlamentets och rådets förordning (EU) 2016/679
+    # ... (allmän dataskyddsförordning)", and a concept page collecting them
+    # lists 170 acts saying nothing about a concept
+    "allmän dataskyddsförordning",
 })
 
 # --- helpers for term extraction ---
