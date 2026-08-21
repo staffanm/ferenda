@@ -52,8 +52,20 @@ re_brottsdef_alt = re.compile(
 # carries, where the old single `search` stopped at the first.
 re_parantesdef = re.compile(r'\(([\w ]{3,50})\)\.', re.UNICODE).search
 re_parantesdefs = re.compile(r'\(([\w ]{3,50})\)', re.UNICODE).finditer
+# "Med detaljhandel avses i denna lag ..." -- and, just as often, without the
+# "i denna lag": säkerhetsskyddslagen 1 kap. 2 § writes "Med
+# säkerhetsskyddsklassificerade uppgifter avses uppgifter som rör
+# säkerhetskänslig verksamhet ...", and drafting also says "i detta kapitel",
+# "i det följande" or "vid tillämpning av 5 §". Requiring the one tail form lost
+# 3 558 definitions in 1 427 acts, so the tail is not required at all.
+#
+# What that lets in is one shape: "Med" opening an adverbial rather than a
+# definiendum ("Med undantag av de fordon som avses i 6 kap. 3 § ...", "Med
+# hjälp av ett underhållssystem som avses i ..."). Those two heads are excluded
+# by name -- 12 of the 3 558 -- rather than by a rule about prepositions, because
+# "stöd till start av näringsverksamhet" is a defined term and reads the same.
 re_loptextdef = re.compile(
-    r'^Med ([\w ]{3,50}) (?:avses|förstås) i denna (förordning|lag|balk)',
+    r'^Med (?!(?:undantag|hjälp) (?:av|för)\b)([\w ]{3,50}) (?:avses|förstås)\b',
     re.UNICODE).search
 RE_DIGIT = re.compile(r"\d")
 # the roman numerals a list actually uses, as a set rather than as an alphabet:
@@ -95,6 +107,9 @@ NOT_A_CONCEPT = frozenset({
     "böte",                # a 1734 års lag verb form, not a term
     "institutet",          # the act's own shorthand for the body it just named
     "publ",                # "(publ)" marks a publikt aktiebolag, not a definition
+    "chefen",              # "Med chefen förstås vid tillämpning av 5 §
+                           # verksstadgan rådets ordförande" -- each
+                           # myndighetsinstruktion naming its own head, 62 of them
 })
 
 # --- helpers for term extraction ---
@@ -124,6 +139,23 @@ def _strip_formula_prefix(term):
     while len(words) > 1 and RE_FORMULA_TOKEN.search(words[0]):
         words.pop(0)
     return " ".join(words)
+
+
+# What a löptext definiendum carries that is not part of the term: the article
+# in front of it ("Med ett träds grundyta avses ...", 186 of them) and the
+# qualifier behind it naming where the definition applies ("Med dotterbolag
+# enligt första stycket 3 avses ...", 94). Both would mint a begrepp page under
+# a name no one looks up. Only this mode is trimmed -- a colon list and a
+# parenthesised coinage write the bare term already.
+RE_TERM_ARTICLE = re.compile(r"^(?:en|ett|den|det|de)\s+", re.I)
+RE_TERM_QUALIFIER = re.compile(
+    r"\s+(?:enligt|i denna|i detta|i första|i andra|i tredje|i fjärde)\s+.*$",
+    re.I)
+
+
+def _loptext_term(term):
+    """A löptext definiendum with its article and its scope qualifier removed."""
+    return RE_TERM_QUALIFIER.sub("", RE_TERM_ARTICLE.sub("", term)).strip()
 
 
 def term_to_subject(term):
@@ -194,7 +226,8 @@ def _stycke_terms(text, mode, in_appendix=False):
     for rx, group in ((re_brottsdef, 2), (re_brottsdef_alt, 1), (re_loptextdef, 1)):
         m = rx(text)
         if m:
-            term = m.group(group)
+            term = _loptext_term(m.group(group)) if rx is re_loptextdef \
+                else m.group(group)
     # parentes: a coinage ("dödas (dödning)") names the parenthetical, but a
     # prepositional *clarifier* ("Behandling (av personuppgifter)") names the head
     # noun before it -- not the parenthetical

@@ -88,6 +88,51 @@ def test_parentes_and_loptext():
                            None, "stycke") == ["detaljhandel"]
 
 
+def test_loptext_does_not_need_i_denna_lag():
+    """säkerhetsskyddslagen 1 kap. 2 §: "Med säkerhetsskyddsklassificerade
+    uppgifter avses uppgifter som rör säkerhetskänslig verksamhet ..." -- no
+    "i denna lag" anywhere. Requiring that tail lost 3 558 definitions in
+    1 427 acts, so it is not required."""
+    assert b.paragraf_mode(["Med säkerhetsskydd avses skydd av verksamhet"]) \
+        == "loptext"
+    assert b.defined_terms(
+        "Med säkerhetsskyddsklassificerade uppgifter avses uppgifter som rör "
+        "säkerhetskänslig verksamhet.", None, "stycke") \
+        == ["säkerhetsskyddsklassificerade uppgifter"]
+    # "i detta kapitel", "vid tillämpning av 5 §" and no tail at all all count
+    assert b.defined_terms("Med fingeravtryck avses även handavtryck.",
+                           None, "stycke") == ["fingeravtryck"]
+
+
+def test_med_opening_an_adverbial_defines_nothing():
+    """"Med undantag av de fordon som avses i 6 kap. 3 § ..." reads exactly like
+    a definition and is a prepositional phrase. Only these two heads are
+    excluded, by name: "stöd till start av näringsverksamhet" is a defined term
+    and has the same shape."""
+    assert b.defined_terms("Med undantag av de fordon som avses i 6 kap. 3 § "
+                           "får endast registreras.", None, "stycke") == []
+    assert b.defined_terms("Med hjälp av ett underhållssystem som avses i "
+                           "2 kap. 10 § ska den göras.", None, "stycke") == []
+    assert b.defined_terms("Med stöd till start av näringsverksamhet avses "
+                           "stöd till en näringsidkares försörjning.",
+                           None, "stycke") == ["stöd till start av näringsverksamhet"]
+
+
+def test_a_loptext_term_drops_its_article_and_its_scope():
+    """The definiendum is the term, not the sentence around it: "Med ett träds
+    grundyta avses ..." defines grundyta, and "Med dotterbolag enligt första
+    stycket 3 avses ..." defines dotterbolag. Both would otherwise mint a
+    begrepp page under a name no one looks up."""
+    assert b.defined_terms("Med ett elektroniskt dokument avses en upptagning.",
+                           None, "stycke") == ["elektroniskt dokument"]
+    assert b.defined_terms("Med dotterbolag enligt första stycket 3 avses "
+                           "dotterbolag som organisationen äger.",
+                           None, "stycke") == ["dotterbolag"]
+    # the four other modes write the bare term already, so they are untouched
+    assert b.defined_terms("Inteckning får dödas (en dödning).",
+                           None, "stycke") == ["en dödning"]
+
+
 def test_one_sentence_can_define_two_terms():
     """säkerhetsskyddslagen 2 kap. 1 §. The rule used to require the parenthesis
     to close the sentence, so säkerhetsskyddsanalys was a defined term and

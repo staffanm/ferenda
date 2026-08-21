@@ -1906,6 +1906,20 @@ inbound → render pipeline as the machine-extracted sources.
     untouched. Swedish manifestation only (the namespace is Swedish); English acts
     excluded. Verified on 32003L0049 → Ränta/Royalties concepts with the act
     inbound.
+  - **"Med X avses Y" without "i denna lag"** (`sfs.begrepp.re_loptextdef`).
+    The löptext trigger required the tail "i denna lag/förordning/balk", and
+    drafting as often writes "i detta kapitel", "vid tillämpning av 5 §" or
+    nothing at all -- säkerhetsskyddslagen 1 kap. 2 § states "Med
+    säkerhetsskyddsklassificerade uppgifter avses uppgifter som rör
+    säkerhetskänslig verksamhet …". Requiring the tail lost **3 558 definitions
+    in 1 427 acts**. What dropping it lets in is one shape, "Med" opening an
+    adverbial ("Med undantag av de fordon som avses i …"), excluded by naming
+    its two heads -- 12 of the 3 558 -- rather than by a rule about
+    prepositions, since "stöd till start av näringsverksamhet" is a defined term
+    and reads the same. The definiendum is then trimmed of the article in front
+    of it (186) and the scope qualifier behind it ("Med dotterbolag enligt
+    första stycket 3 avses …", 94), both of which would mint a begrepp page
+    under a name no one looks up. `test/test_sfs_begrepp.py`.
   - **Concept canonicalization** (`lib/concepts.py` + `catalog.canonicalize_concepts`):
     a hand-rolled, **corpus-aware** Swedish noun de-inflector collapses inflected
     surface forms onto one concept (`Näringsidkare/Näringsidkaren/Näringsidkarna`),
