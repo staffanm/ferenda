@@ -136,6 +136,12 @@ class Block:
                                # the first point level, 2 = inside a point, …),
                                # which hangs its anchor under its parent's
                                # ("1.1.f.ii") and steps its indent in
+    label: str | None = None   # a heading's or article's own designation, kept
+                               # apart from its title: the sources set them as
+                               # separate elements (Formex TI/STI, TI.ART/
+                               # STI.ART) and the page hangs the designation in
+                               # a gutter beside the title. None where the
+                               # heading carries no designation of its own.
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
     defines: str | None = None # a definitions-article point: the term it defines
 

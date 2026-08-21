@@ -23,9 +23,8 @@ def _prose(*sentences):
 # ---- the EU article designation ------------------------------------------
 
 def test_article_splits_its_designation_from_its_title():
-    block = {"type": "article", "num": "1", "id": "1",
-             "text": [{"text": "Artikel 1", "uri": "https://lagen.nu/ext/celex/X#1"},
-                      " – Innehåll och tillämpningsområde"]}
+    block = {"type": "article", "num": "1", "id": "1", "label": "Artikel 1",
+             "text": ["Innehåll och tillämpningsområde"]}
     word, num, title = _article_parts(block)
     assert (word, num) == ("Artikel", "1")
     assert runs_text(title) == "Innehåll och tillämpningsområde"
@@ -33,18 +32,17 @@ def test_article_splits_its_designation_from_its_title():
 
 def test_article_with_no_title_keeps_only_its_designation():
     # 128 of 150 sampled acts: the article heading is the designation alone
-    block = {"type": "article", "num": "2", "id": "2",
-             "text": [{"text": "Artikel 2", "uri": "https://lagen.nu/ext/celex/X#2"}]}
+    block = {"type": "article", "num": "2", "id": "2", "label": "Artikel 2",
+             "text": []}
     word, num, title = _article_parts(block)
     assert (word, num, title) == ("Artikel", "2", [])
 
 
-def test_article_number_split_across_runs():
-    # Formex sets "Artikel 6" and the letter as siblings (31979R0929 art. 6b);
-    # cutting by run index left "Artikel 6b" in the title beside the gutter
-    block = {"type": "article", "num": "6b", "id": "6b",
-             "text": [{"text": "Artikel 6", "uri": "https://lagen.nu/ext/celex/X#6b"},
-                      "b", " – Rubriken"]}
+def test_article_with_a_lettered_number():
+    # 31979R0929 art. 6b: Formex sets "Artikel 6" and the letter as siblings, and
+    # the parser's flatten of TI.ART puts them back together
+    block = {"type": "article", "num": "6b", "id": "6b", "label": "Artikel 6b",
+             "text": ["Rubriken"]}
     word, num, title = _article_parts(block)
     assert (word, num) == ("Artikel", "6b")
     assert runs_text(title) == "Rubriken"
@@ -52,8 +50,8 @@ def test_article_number_split_across_runs():
 
 def test_article_heading_in_another_language_still_splits():
     # 32013R0389 art. 65: the lead run is the whole English heading
-    block = {"type": "article", "num": "65", "id": "65",
-             "text": ["Article 65 – Överföring av utsläppsrätter"]}
+    block = {"type": "article", "num": "65", "id": "65", "label": "Article 65",
+             "text": ["Överföring av utsläppsrätter"]}
     word, num, title = _article_parts(block)
     assert (word, num) == ("Article", "65")
     assert runs_text(title) == "Överföring av utsläppsrätter"
@@ -62,12 +60,14 @@ def test_article_heading_in_another_language_still_splits():
 def test_article_that_does_not_split_reports_it():
     # no designation to find -> the caller prints the plain one-line heading
     # rather than printing the designation twice
-    block = {"type": "article", "num": "3", "id": "3", "text": ["Något helt annat"]}
+    block = {"type": "article", "num": "3", "id": "3", "label": "Enda artikel",
+             "text": []}
     assert _article_parts(block) == (None, None, None)
 
 
 def test_article_with_no_number_reports_it():
-    assert _article_parts({"type": "article", "text": ["Artikel"]}) == (None, None, None)
+    assert _article_parts({"type": "article", "label": "Artikel",
+                           "text": []}) == (None, None, None)
 
 
 # ---- the EU division heading ---------------------------------------------
@@ -76,8 +76,8 @@ def test_division_heading_splits_and_lowercases():
     blocks = _prose("Dessa allmänna bestämmelser gäller alla.",
                     "De allmänna reglerna och bestämmelser som avses.",
                     "Vidare gäller allmänna bestämmelser i övrigt.")
-    label, title = _division_label(["KAPITEL I ALLMÄNNA BESTÄMMELSER"],
-                                   _case_map(blocks))
+    label, title = _division_label(
+        {"label": "KAPITEL I", "text": ["ALLMÄNNA BESTÄMMELSER"]}, _case_map(blocks))
     assert label == "Kapitel I"
     assert runs_text(title) == "Allmänna bestämmelser"
 
@@ -87,8 +87,9 @@ def test_division_title_keeps_a_capital_the_act_uses_consistently():
                     "Rapporten sänds till Europeiska centralbanken.",
                     "Ett organ eller kommissionen får begära uppgifter.",
                     "Beslut fattas av kommissionen efter samråd.")
-    label, title = _division_label(["KAPITEL V ORGAN, KOMMISSIONEN OCH EUROPEISKA"],
-                                   _case_map(blocks))
+    label, title = _division_label(
+        {"label": "KAPITEL V", "text": ["ORGAN, KOMMISSIONEN OCH EUROPEISKA"]},
+        _case_map(blocks))
     assert label == "Kapitel V"
     assert runs_text(title) == "Organ, kommissionen och Europeiska"
 
@@ -99,7 +100,8 @@ def test_a_single_stray_capital_is_not_evidence():
     blocks = _prose("Se avsnittet Direktanspråk nedan.",
                     "Ett direktanspråk får framställas av den skadelidande.",
                     "Varje intyg utfärdas av försäkringsgivaren.")
-    _, title = _division_label(["KAPITEL VI INTYG, DIREKTANSPRÅK"], _case_map(blocks))
+    _, title = _division_label(
+        {"label": "KAPITEL VI", "text": ["INTYG, DIREKTANSPRÅK"]}, _case_map(blocks))
     assert runs_text(title) == "Intyg, direktanspråk"
 
 
@@ -107,12 +109,13 @@ def test_heading_without_a_designation_is_left_as_published():
     # 32010R0642: the act writes "AMERIKAS FÖRENTA STATER" nowhere else, so
     # lowercasing it would put words on the page the act never wrote
     runs = ["INTYG GODKÄNT AV AMERIKAS FÖRENTA STATER"]
-    assert _division_label(runs, _case_map(_prose("Ett intyg utfärdas."))) == (None, runs)
+    assert _division_label({"text": runs},
+                           _case_map(_prose("Ett intyg utfärdas."))) == (None, runs)
 
 
 def test_a_heading_the_source_sets_in_mixed_case_is_untouched():
     runs = ["Europeiska unionens officiella tidning"]
-    assert _division_label(runs, ({}, {}, set())) == (None, runs)
+    assert _division_label({"text": runs}, ({}, {}, set())) == (None, runs)
 
 
 def test_a_code_the_act_prints_in_capitals_is_left_alone():
@@ -121,7 +124,8 @@ def test_a_code_the_act_prints_in_capitals_is_left_alone():
     blocks = _prose("Kraven i ADR.OR.B.015 ska uppfyllas av ledningen.",
                     "Se ADR.OR.B för närmare bestämmelser om ledning.",
                     "Denna ledning ska dokumenteras.")
-    label, title = _division_label(["KAPITEL B LEDNING (ADR.OR.B)"], _case_map(blocks))
+    label, title = _division_label(
+        {"label": "KAPITEL B", "text": ["LEDNING (ADR.OR.B)"]}, _case_map(blocks))
     assert label == "Kapitel B"
     assert runs_text(title) == "Ledning (ADR.OR.B)"
 
@@ -130,8 +134,9 @@ def test_division_title_keeps_the_links_inside_it():
     blocks = _prose("Reglerna om data gäller varje företag.",
                     "Ett företag som behandlar data ska anmäla detta.")
     _, title = _division_label(
-        ["KAPITEL II DATADELNING MELLAN ",
-         {"text": "FÖRETAG", "uri": "https://lagen.nu/ext/celex/X#2.24"}],
+        {"label": "KAPITEL II",
+         "text": ["DATADELNING MELLAN ",
+                  {"text": "FÖRETAG", "uri": "https://lagen.nu/ext/celex/X#2.24"}]},
         _case_map(blocks))
     assert title[1]["uri"] == "https://lagen.nu/ext/celex/X#2.24"
     assert title[1]["text"] == "företag"
@@ -143,8 +148,9 @@ def test_an_acronym_glued_to_an_ordinary_word_splits_at_the_hyphen():
     blocks = _prose("Kommissionen förvaltar garantin enligt avtalet.",
                     "Denna garantin och garantifonden redovisas separat.",
                     "Medlen i garantifonden ska placeras säkert.")
-    _, title = _division_label(["KAPITEL III EFHU-GARANTIN OCH EFHU-GARANTIFONDEN"],
-                               _case_map(blocks))
+    _, title = _division_label(
+        {"label": "KAPITEL III", "text": ["EFHU-GARANTIN OCH EFHU-GARANTIFONDEN"]},
+        _case_map(blocks))
     assert runs_text(title) == "EFHU-garantin och EFHU-garantifonden"
 
 
@@ -152,8 +158,9 @@ def test_only_the_token_after_the_designation_is_a_numeral():
     # "I SAMBAND MED" holds a standalone I, and it is the preposition
     blocks = _prose("Villkoren i samband med åtkomst ska vara skäliga.",
                     "Oskäliga villkor i samband med avtal gäller inte.")
-    label, title = _division_label(["KAPITEL IV OSKÄLIGA VILLKOR I SAMBAND MED"],
-                                   _case_map(blocks))
+    label, title = _division_label(
+        {"label": "KAPITEL IV", "text": ["OSKÄLIGA VILLKOR I SAMBAND MED"]},
+        _case_map(blocks))
     assert label == "Kapitel IV"
     assert runs_text(title) == "Oskäliga villkor i samband med"
 

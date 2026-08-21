@@ -28,7 +28,7 @@ from ..lib.page import (
     swedish_join,
 )
 from ..lib.pinpoint import eu_article_label, human_fragment
-from ..lib.text import drop_prefix, runs_text
+from ..lib.text import runs_text
 
 ENV = tpl.environment("accommodanda.eurlex")
 
@@ -323,59 +323,49 @@ def _cased_runs(runs, casemap):
     return out
 
 
-def _division_label(runs, casemap):
-    """A division heading split into its designation and its title: the sources
-    print "KAPITEL I ALLMÄNNA BESTÄMMELSER" as one run of capitals. Returns
-    `(label, title_runs)`, the label None where the heading carries no
-    designation.
+def _division_label(b, casemap):
+    """A division heading's designation and its title runs, both ready to print.
 
-    A heading with no designation is left exactly as published, capitals and
-    all. Those are the free-form ones -- "FÖRLAGA TILL INTYG OM ÖVERENSSTÄMMELSE
+    The artifact keeps them apart (Formex sets `TI` and `STI` as separate
+    elements, and `eurlex/parse.py` no longer flattens the pair). The sources set
+    both in capitals; the title is re-set in sentence case, the designation
+    capitalised.
+
+    A heading with no designation is left exactly as published, capitals and all.
+    Those are the free-form ones -- "FÖRLAGA TILL INTYG OM ÖVERENSSTÄMMELSE
     GODKÄNT AV AMERIKAS FÖRENTA STATER", "FÖRTECKNING ÖVER FÖRETAG SOM AVSES I
     ARTIKEL 2.1 A" -- and they carry names the act never writes in prose, so
     lowercasing them would put words on the page the act never wrote. A
     designation, by contrast, always opens a common-noun title. 508 of 533
     all-caps headings in a 600-act sample carry one."""
-    text = runs_text(runs)
-    if not _shouts(text):
+    runs = b.get("text") or []
+    label = b.get("label")
+    if not label:
         return None, runs
-    m = _DIVISION_LABEL.match(text)
-    if not m:
-        return None, runs
-    label = "%s %s" % (_sentence_case(m.group(1), casemap)[0], m.group(2))
-    rest = drop_prefix(runs, m.end())
-    if rest and isinstance(rest[0], str):
-        rest[0] = rest[0].lstrip()
-    return label, _cased_runs(rest, casemap)
+    if _shouts(label):
+        # only the designation word is a word: "KAPITEL IV" -> "Kapitel IV", and
+        # the numeral after it stays exactly as the source set it
+        word, _, rest = label.partition(" ")
+        label = " ".join(x for x in (word.capitalize(), rest) if x)
+    return label, _cased_runs(runs, casemap) if _shouts(runs_text(runs)) else runs
 
 
 def _article_parts(b):
-    """An article heading split into `(word, number, title_runs)`, or
-    `(None, None, None)` where it does not split.
+    """An article heading's `(word, number, title_runs)`, or `(None, None, None)`
+    where it carries no designation of its own ("Enda artikel").
 
-    The parser writes the heading as the source's TI.ART ("Artikel 5") joined to
-    its STI.ART (the title, which most articles do not have) with an en dash, and
-    the first run is the article's own self-reference. The number is not reliably
-    one run -- Formex sets "Artikel 6" and "b" as siblings -- so the designation
-    is matched against the flattened text and cut by character offset.
-
-    Returning None rather than a guess matters: the caller then prints the plain
-    one-line heading. Without it, a heading that did not split printed its
-    designation twice, once in the gutter and once in the title."""
-    runs = list(b.get("text") or [])
-    num = b.get("num")
-    if not runs or not num:
+    The designation is the source's own TI.ART, kept apart from the STI.ART title
+    by the parser -- most articles have no title at all."""
+    label, num = b.get("label"), b.get("num")
+    if not label or not num:
         return None, None, None
-    m = re.match(r"(\S+)\s+%s(?=\W|$)" % re.escape(num), runs_text(runs))
+    m = re.match(r"(\S+)\s+%s(?=\W|$)" % re.escape(num), label)
     if not m:
         return None, None, None
     word = m.group(1)
     if word.isupper():                 # a legacy act shouting "ARTICLE 1"
         word = word.capitalize()
-    rest = drop_prefix(runs, m.end())
-    if rest and isinstance(rest[0], str):   # the " - " the parser joined them with
-        rest[0] = re.sub(r"^[\s\u2013\u2014-]+", "", rest[0])
-    return word, num, [r for r in rest if runs_text([r])]
+    return word, num, b.get("text") or []
 
 
 def _eurlex_pin(t, num, bid):
@@ -401,7 +391,7 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
     # whole-block render is left to the paths that use it
     if t == "heading":
         level = b.get("level") or 1
-        label, title = _division_label(b.get("text") or [], casemap)
+        label, title = _division_label(b, casemap)
         anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x), level)
         return NODES.eu_heading(min(level + 1, 5), anchor, label,
                                 Markup(render_runs(title, site)))
@@ -437,13 +427,13 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
     rail.add(bid, pin, extra)
     rail_id = bid if bid and bid in rail.data else None
     if t == "article":
-        anchor = toc.add(bid, plain(b["text"]), 2)
         word, number, title = _article_parts(b)
-        # the split path renders only the title, so the whole-block render is
-        # left to the paths below that actually use it
+        anchor = toc.add(bid, " ".join(x for x in (b.get("label"),
+                                                   plain(b["text"])) if x), 2)
+        # an article with no designation prints its label as the plain heading
         return NODES.eu_article(anchor, rail_id, word, number,
-                                Markup(render_runs(title if number else b["text"],
-                                                   site)))
+                                Markup(render_runs(title, site)) if number
+                                else escape(b.get("label") or ""))
     runs = render_runs(b["text"], site)
     classes = [EURLEX_CLASS.get(t, "")]
     # a marked recital/paragraph/point hangs its marker in the left margin

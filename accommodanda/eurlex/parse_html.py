@@ -210,12 +210,14 @@ def _oj(text):
 
 def _emit_structural_row(marker, text, blocks, in_body, voc):
     if voc.article.match(marker):
+        # the marker is the designation, the text its title -- kept apart, the
+        # way the Formex parser keeps TI.ART and STI.ART apart
         num = L.article_num(marker)
-        blocks.append(Block("article", "%s – %s" % (marker, text) if text else marker,
-                            num=num, anchor=num))
+        blocks.append(Block("article", text or "", num=num, anchor=num,
+                            label=marker))
     elif voc.heading.match(marker):
-        blocks.append(Block("heading", normalize_space("%s %s" % (marker, text)),
-                            level=1))
+        blocks.append(Block("heading", normalize_space(text or ""), level=1,
+                            label=normalize_space(marker)))
     elif (m := L.RE_RECITAL.match(marker)):
         num = m.group(1)
         blocks.append(Block("recital" if not in_body else "point", text, num=num))
@@ -339,11 +341,11 @@ def parse_html(markup, celex, lang):
                                 and voc.article_heading.match(text)
                                 and len(text) <= 60):
             num = L.article_num(text)
-            doc.body.append(Block("article", text, num=num, anchor=num))
+            doc.body.append(Block("article", "", num=num, anchor=num, label=text))
             in_body = True
         elif role == "sti-art":
             if doc.body and doc.body[-1].kind == "article":
-                doc.body[-1].text = "%s – %s" % (doc.body[-1].text, text)
+                doc.body[-1].text = text
             else:
                 doc.body.append(Block("heading", text, level=2))
         elif role.startswith("ti-"):

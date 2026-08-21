@@ -441,10 +441,11 @@ def _emit_alinea(unit, num, blocks, stycke=None):
 
 def parse_article(article, blocks):
     num = _article_number(article)
-    title = _text(article, "TI.ART")
-    subtitle = _text(article, "STI.ART")
-    blocks.append(Block("article", " – ".join(t for t in (title, subtitle) if t),
-                        num=num, anchor=num))
+    # TI.ART is the article's designation ("Artikel 5"), STI.ART its title --
+    # which most articles do not have. Kept apart: the page hangs the
+    # designation in a gutter beside the title (see parse_division).
+    blocks.append(Block("article", _text(article, "STI.ART"), num=num, anchor=num,
+                        label=_text(article, "TI.ART") or None))
     parags = article.findall("PARAG")
     if parags:
         # an article's unnumbered PARAGs are all stycken of the article itself, so
@@ -485,9 +486,16 @@ def _emit_stycken(alineas, num, blocks, start):
 
 
 def parse_division(division, level, blocks):
-    title = _text(division, "TITLE")
+    # the source keeps the designation and the title apart -- <TI>KAPITEL I</TI>
+    # beside <STI>ALLMÄNNA BESTÄMMELSER</STI> -- and the page sets them apart
+    # too, so the block keeps them apart rather than flattening the pair into
+    # one run. A division with only a TITLE has no designation of its own.
+    node = division.find("TITLE")
+    designation, title = _text(node, "TI"), _text(node, "STI")
+    if not title:
+        designation, title = None, _text(division, "TITLE")
     if title:
-        blocks.append(Block("heading", title, level=level))
+        blocks.append(Block("heading", title, level=level, label=designation))
     for child in division:
         if child.tag == "DIVISION":
             parse_division(child, level + 1, blocks)
@@ -916,7 +924,7 @@ def to_artifact(doc):
         uses = yield_overlaps(
             term_refs(b.text, matcher, index, doc.uri, b.anchor), cites)
         block = {"type": b.kind, "text": interleave(b.text, cites + uses)}
-        for key in ("num", "level", "depth"):
+        for key in ("num", "level", "depth", "label"):
             if getattr(b, key) is not None:
                 block[key] = getattr(b, key)
         # the citation anchor is the artifact `id` -- the key the catalog

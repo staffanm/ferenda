@@ -195,7 +195,9 @@ def test_heading_table_marker():
             '</tr></table></body>')
     doc = parse_html(html, "11957E", "eng")
     assert kinds(doc) == ["heading"]
-    assert "TITLE I" in doc.body[0].text
+    # the designation and the title are separate fields, the way Formex sets them
+    assert doc.body[0].label == "TITLE I"
+    assert doc.body[0].text == "General provisions"
 
 
 def test_old_flavour_swedish_text_structure():

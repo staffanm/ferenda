@@ -70,6 +70,13 @@ def _annex_cut(blocks, lang):
     return len(blocks)
 
 
+def _designated(b, text):
+    """A heading's designation and title as one line -- "Kapitel I Allmänna
+    bestämmelser". The artifact keeps them apart so the page can hang the
+    designation in a gutter; prose wants them joined."""
+    return " ".join(x for x in (b.get("label"), text) if x)
+
+
 def act_markdown(art):
     """The parsed artifact flattened to a plain-text/markdown rendering of the
     act's enacting terms -- the analyzer's input, annexes trimmed off the tail
@@ -88,11 +95,13 @@ def act_markdown(art):
         elif t == "citation":
             lines.append("- %s" % text)
         elif t == "heading":
-            lines.append("\n%s %s" % ("#" * min((b.get("level") or 1) + 1, 4), text))
+            lines.append("\n%s %s" % ("#" * min((b.get("level") or 1) + 1, 4),
+                                      _designated(b, text)))
         elif t == "article":
-            # the block text already reads "Artikel 4 – <title>"; fall back to the
-            # bare number only if it is empty
-            lines.append("\n## %s" % (text or "Artikel %s" % (num or "")))
+            # the designation and the title are separate fields; the prompt wants
+            # the pair, and the bare number where the block carries neither
+            lines.append("\n## %s" % (_designated(b, text)
+                                      or "Artikel %s" % (num or "")))
         elif t == "paragraph":
             lines.append("%s%s" % ("%s. " % num if num else "", text))
         elif t == "point":

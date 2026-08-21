@@ -150,11 +150,15 @@ def test_parse_act_body_structure():
     assert ("citation", None, None, "med beaktande av fördraget") in seen
     assert ("recital", "1", None, "Syftet med direktivet.") in seen
     assert ("preamble", None, None, "HÄRIGENOM FÖRESKRIVS FÖLJANDE.") in seen
-    assert ("heading", None, 1, "KAPITEL I ALLMÄNNA BESTÄMMELSER") in seen
-    # the article carries its number as the citation anchor
+    # a division's designation (TI) and its title (STI) stay separate fields
+    heading = next(b for b in doc.body if b.kind == "heading")
+    assert (heading.level, heading.label, heading.text) == (
+        1, "KAPITEL I", "ALLMÄNNA BESTÄMMELSER")
+    # the article carries its number as the citation anchor, its designation
+    # (TI.ART) as the label and its title (STI.ART) as the text
     article = next(b for b in doc.body if b.kind == "article")
     assert article.num == "1" and article.anchor == "1"
-    assert article.text == "Artikel 1 – Innehåll"
+    assert (article.label, article.text) == ("Artikel 1", "Innehåll")
     # numbered paragraph, then a lead paragraph + a list point
     assert ("paragraph", "1", None, "I detta direktiv fastställs åtgärder.") in seen
     assert ("paragraph", "2", None, "Följande fastställs:") in seen
@@ -550,9 +554,12 @@ def test_general_root_act_body_sits_under_contents():
     assert doc.date == "20040331"
     seen = [(b.kind, b.text) for b in doc.body]
     assert ("recital", "Vid tilldelning av kontrakt.") in seen
-    assert ("heading", "AVDELNING I") in seen
+    # a TITLE with no STI beside it is the title itself, not a designation
+    heading = next(b for b in doc.body if b.kind == "heading")
+    assert (heading.label, heading.text) == (None, "AVDELNING I")
     article = next(b for b in doc.body if b.kind == "article")
-    assert article.num == "1" and article.text == "Artikel 1 – Definitioner"
+    assert article.num == "1"
+    assert (article.label, article.text) == ("Artikel 1", "Definitioner")
 
 
 def test_general_root_act_body_nested_in_a_gr_seq():

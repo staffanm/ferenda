@@ -81,7 +81,9 @@ def parse_pdf(path, celex, lang):
     for text, _bold in paras:
         if voc.article_heading.match(text) and len(text) <= 60:
             num = L.article_num(text)
-            doc.body.append(Block("article", text, num=num, anchor=num))
+            # a scanned act prints the designation alone on its own line; it
+            # carries no separate title to keep apart from it
+            doc.body.append(Block("article", "", num=num, anchor=num, label=text))
             in_body = True
         elif voc.heading.match(text) and (text.isupper() or len(text) <= 40):
             doc.body.append(Block("heading", text, level=1))
