@@ -1922,9 +1922,8 @@ inbound → render pipeline as the machine-extracted sources.
     acts leave the rail (`DEFINING_KEYS`, `Rail.drop_document_sections`) so the
     same list never appears twice. Stored at relate because it already has the
     artifact open: a term defined in a hundred acts would otherwise open a
-    hundred artifacts, on each of ~28,900 concept pages. **41 862 definitions
-    over 5 209 acts** (14 573 SFS, 27 289 eurlex), 22 283 concepts; 40 741 of
-    them quote a sentence, the rest are listings the source left empty (below).
+    hundred artifacts, on each of ~28,900 concept pages. **41 440 definitions
+    over 5 140 acts** (14 401 SFS, 27 039 eurlex), on 22 133 concepts.
     - The two corpora state a definition in different places. An eurlex
       definitions-article point is the definition whole -- except where the body
       is a sub-list and the point's own text stops at the colon (NIS2 art. 6.1),
@@ -1944,6 +1943,22 @@ inbound → render pipeline as the machine-extracted sources.
       renders: the wiki page *Risken* absorbs the form *Risk*, so *Risk*'s 31
       legaldefinitioner had no page while the page had none of them. 1 077 rows
       over 494 concepts were in that state.
+  - **An amending instruction is not a defined term**
+    (`eurlex.definitions._is_amendment`). An amending act writes its
+    instructions in exactly a definition's shape — "Artikel 6 ska ersättas med
+    följande: *&lt;the whole replacement article&gt;*" — and 2014/48/EU's article 1
+    is headed "Definitioner av vissa termer", because that is the heading of the
+    article it *inserts*. Every instruction under it read as a definition, and
+    2026/1183 art. 1.7 became a 47 kB "definition" of the concept "Artiklarna
+    67–112 ska ersättas med följande". A definiendum is a noun phrase and an
+    instruction is a clause whose verb is a ska-passive, so the two separate on
+    where the "ska" sits: a term carries one only inside a relative clause
+    ("sammanlagt belopp som ska betalas av konsumenten", "kemikalie för vilken
+    exportanmälan ska ske"). Measured over the corpus's 27 289 defined terms:
+    **268 contain "ska", the test rejects 250 and every one is an instruction**;
+    the 18 it keeps are real terms, and no instruction reaches it without a
+    "ska" (the four heads carrying another amending verb are genuine terms). The
+    reparse changed 36 of 64 038 acts. `test/test_eurlex_definitions.py`.
   - **"Med X avses Y" without "i denna lag"** (`sfs.begrepp.re_loptextdef`).
     The löptext trigger required the tail "i denna lag/förordning/balk", and
     drafting as often writes "i detta kapitel", "vid tillämpning av 5 §" or
@@ -4275,24 +4290,35 @@ catalog — each number with its provenance and its status — is
   Narrowing once here rather than at each call site means reaching for the
   whole history is always a visible, named decision in the measure that makes
   it.
-- **Defined terms (53, 54).** Which act states the most definitions, and which
-  term the corpus defines in the most different ways. Only an *explicit
-  definition statement* counts, and the two corpora write one differently: an
-  EU act's definitions-article point (`eurlex.definitions` stamps `defines` on
-  it at parse time) and the Swedish term-list item ("konsument: en fysisk person
-  …") or löptext form ("Med detaljhandel avses i denna lag …"). `sfs.begrepp`
-  also marks two things that state no definition — a brottsrubricering, and an
-  abbreviation coined in a parenthesis — and counting them takes the measure
-  over: "allmän dataskyddsförordning" is coined in 170 acts inside 90 different
-  surrounding sentences, which reads as 90 competing definitions of a term
-  nobody disputes. Two further exclusions: a definition that only points
-  elsewhere ("personuppgifter: personuppgifter enligt definitionen i artikel 4.1
-  i förordning (EU) 2016/679") states none of its own, and a superseded temporal
-  wording is not the law today — PBL 1 kap. 4 § stands in the artifact twice,
-  once expiring 2027-01-01 and once entering into force then, which would give
-  the act 62 definitions where it states 34. Two definitions count as one when
-  their text is the same, so NIS2 art. 6.9 and CER-direktivet art. 2.6 are two
-  definitions of "risk" — they differ by three words.
+- **Defined terms (53, 54).** Which act states the most legal definitions, and
+  which begrepp the corpus defines in the most different ways. A definition is
+  whatever the corpus marks as one: an eurlex definitions-article point
+  (`eurlex.definitions` stamps `defines` at parse time) and every SFS term run
+  `sfs.begrepp` mints, in all four of its modes. A brottsrubricering ("… dömes
+  för fyndförseelse till böter") and a parenthesised coinage ("… (dödning)")
+  state a definition too — the hard part is only telling which words of the
+  sentence *are* the definition, and neither measure needs to know: the text
+  does one job, telling two definitions of the same term apart, so the whole
+  node is the unit. The finer sentence pick belongs to
+  `catalog.definition_sentences`, which quotes the text on the begrepp page and
+  does have to get the boundary right.
+  - Two exclusions, both about what the corpus is rather than what a definition
+    is. A definition that only points elsewhere ("personuppgifter:
+    personuppgifter enligt definitionen i artikel 4.1 i förordning (EU)
+    2016/679") states none of its own. And a superseded temporal wording is not
+    the law today: PBL 1 kap. 4 § stands in the artifact twice, once expiring
+    2027-01-01 and once entering into force then, which would give the act 62
+    definitions where it states 34 (`scan.superseded_variant` — `sfs.nf`
+    suppresses the id of the variant out of force, so an id-less node carrying
+    an `upphor`/`ikrafttrader` date *is* that variant).
+  - Measure 54 keys on the **begrepp**, not on the surface form the act happens
+    to write: a term's identity here is its begrepp uri after the inflection
+    fold (`catalog.canonicalize_concepts`), which is what the page the row links
+    to counts. Keyed on the surface form instead, 382 concepts split in two
+    (`Personuppgift` into personuppgift + personuppgifter) and the row printed a
+    number the page it points at contradicts. Two definitions count as one when
+    their text is the same, so NIS2 art. 6.9 and CER-direktivet art. 2.6 are two
+    definitions of "risk" — they differ by three words.
 - **Where a measure's population had to shrink, it says so on the figure.**
   Notice period is a measure of *base statutes* only: the amendment register
   carries `rpubl:utfardandedatum` on 11 of 50,948 entries and the download tree
@@ -4532,7 +4558,15 @@ site (rule:second-use-goes-to-lib).
   each document has exactly one.** 1 168 of the ECB's yttranden are the PDF the
   ECB itself set, 241 are Formex and 21 are EUR-Lex HTML. Formex is read with
   `lib.formex`, the PDF with the same paragraph reader the site-walked bodies
-  use, and the HTML as the flat `<p>` run EUR-Lex serves it as.
+  use, and the HTML as the flat `<p>` run EUR-Lex serves it as. The ECB's own
+  PDF template marks a heading bold at the running text's size and reprints
+  "ECB-PUBLIC" on every page, so the registry sets both flags for it: read by
+  size instead, one sampled document in three showed no heading at all.
+
+The corpus today: 3 891 documents — ecb 1 617, enisa 568, easa 507, edps 436,
+acer 271, esma 128, esrb 99, eba 80, edpb 60, eiopa 58, berec 43, euipo 24.
+They carry 75 696 references, 71 426 of which reach a document the corpus holds
+(94.4%).
 - **`GENERAL` is the commonest Formex root here, and the act reader walks
   straight past it.** An ECB-yttrande is printed in the C series and carries
   its text in `CONTENTS`, not in enacting terms; `parse_act` returned zero
@@ -4543,8 +4577,8 @@ site (rule:second-use-goes-to-lib).
 - **An amending act carries its own number last.** The ESRB prints the act it
   amends first and its own number in the trailing parenthesis
   ("…om ändring av beslut ESRB/2011/1 … (ESRB/2020/3)"). Reading the first
-  match filed nine documents under the amended act's number, each one
-  overwriting that act's own text.
+  match filed documents under the amended act's number, each one overwriting
+  that act's own text: taking the last recovered 23 documents, 76 → 99.
 - **How the corpus actually cites this material.** Every mention of the twelve
   bodies across föreskrifter, rättsliga ställningstaganden, JO/JK-beslut,
   förarbeten, remissvar and SFS was classified into four grammars:
@@ -4561,12 +4595,32 @@ site (rule:second-use-goes-to-lib).
   is next. The svepande class is the trap: those are förarbeten describing a
   body's *mandate to issue* guidance, in the future tense, about documents that
   do not exist yet. A grammar that matched them would mint links to nothing.
-- **Pending: the EBA's Swedish titles.** 72 of the EBA's 80 documents *are*
-  Swedish text, but the stored `titel` is English — the leaf page's `<h1>` is
-  English and so is the file name, and only the PDF cover prints the Swedish
-  name ("EBA:s riktlinjer om stressjusterat Value-At-Risk…"). Since the title
-  grammar is what carries the inbound citations, this is what blocks linking
-  them, not a cosmetic gap. `guidance/KNOWN-GAPS.md` records it.
+- **`lib/lagrum.py` mints the number form for five bodies.** ESRB/2017/6,
+  EBA/GL/2021/05, ESMA/2013/720 (and ESMA35-43-349, and the joint committee's
+  JC/GL/2024/36), CON/2013/82 and BoR (11) 67 each carry their body's own
+  acronym, so the number alone names the document and no surrounding words are
+  needed to anchor it. Checked against the corpus: all 1 967 documents of those
+  five bodies have their own printed number resolve to their own page. EIOPA is
+  deliberately left out even though it is cited by number 40 times —
+  EIOPA-BoS-19/465 does not say whether the document is a riktlinje or a
+  rekommendation, and its address carries that series segment, so minting from
+  the number would be guessing.
+
+  Where that pays: **förarbeten**, with 350 of these numbers across 115
+  documents. Föreskrifter print exactly one in the whole corpus of 12 903, so
+  `foreskrift` keeps its narrow parse-type set rather than paying a full
+  re-parse for a single link. The title grammar, which is what föreskrifter
+  actually use, is the open work.
+- **The EBA's Swedish title comes off its own cover.** 72 of the EBA's 80
+  documents *are* Swedish text, but everything the harvest can read names them
+  in English — the leaf page's `<h1>`, the link and the file name. The Swedish
+  name is printed on the cover of the same PDF the body is read from, so
+  `parse.eba_cover_title` reads it there. It reads all 72: take the first cover
+  paragraph that is not the shouted running head (an uppercase-letter ratio over
+  0.8) and carries a vägledningsord, join a continuation the EBA set on the next
+  line, and take the number, the date and the distribution mark off the *ends* —
+  never the middle, since an amending riktlinje names the riktlinje it amends by
+  number inside its own title.
 
 ### 7b. Vertical scope closed ✅
 
