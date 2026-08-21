@@ -5,21 +5,61 @@ re-derive it. The EDPB figures are measured against the 60-document corpus
 harvested 2026-08-01, the EBA ones against the single-rulebook walk of
 2026-08-21.
 
-## EBA: a Swedish document under an English title
+## EBA: a Swedish document under an English title — closed 2026-08-21
 
 An EBA leaf page states its title in English only — the h1 of the ancillary
 services page reads "Guidelines on Ancillary Services Undertakings", while the
 Swedish PDF it links opens "Riktlinjer för specificering av kriterierna för
 identifiering av de verksamheter som avses i artikel 4.1.18 i förordning (EU)
-nr 575/2013". The harvest records the page's title, so a Swedish document is
-currently published under an English heading.
+nr 575/2013". The harvest records the page's title, so a Swedish document was
+published under an English heading.
 
-The Swedish title is on the cover, below the number and the date, and that is
-where it should be read from — `parse._eba_fields` already reads the cover for
-the number and would only have to keep going. It is not done yet because the
-cover sets the title across several lines and ends it with an all-caps running
-head, and telling the title from the head needs the font sizes rather than the
-line breaks. Until then the record's title stands.
+`parse.eba_cover_title` now reads the Swedish title off the cover of the same
+PDF the body comes from. It reads all 72 of the Swedish documents. The rule:
+take the first cover paragraph that is not the shouted running head (an
+uppercase-letter ratio over 0.8) and carries a vägledningsord, join a
+continuation the EBA set on the next line (a bare lead word, or a line opening
+with a preposition), and take the number, the date and the distribution mark off
+the ends of the result — never its middle, since an amending riktlinje names the
+riktlinje it amends by number inside its own title. One document ships with the
+EBA's own unfilled template ("EBA/GL/20XX/XX DD månad ÅÅÅÅ"); the real title
+stands further down the same cover.
+
+The English documents keep the record's title, which is already in their own
+language.
+
+## EBA: about half the numbered corpus is missing (open, 2026-08-22)
+
+The EBA numbers `EBA/GL/ÅÅÅÅ/NN` sequentially per year, so the numbers we hold
+count what we do not. We hold **80**, and there are **82 gaps** below each
+year's own highest number:
+
+| år | held | highest | missing |
+|---|---|---|---|
+| 2014 | 4 | 14 | 10 |
+| 2015 | 5 | 20 | 15 |
+| 2016 | 1 | 11 | 10 |
+| 2017 | 4 | 16 | 12 |
+| 2021 | 9 | 17 | 8 |
+| 2025 | 5 | 5 | 0 |
+| 2026 | 8 | 8 | 0 |
+
+The shape of the loss says what it is: the recent years are complete and the
+older ones are nearly empty. `eba_download` walks the **single rulebook**, which
+is a rulebook — it lists what applies now, so a repealed or superseded riktlinje
+drops out of it. That is a defensible scope for a reader who wants current law
+and a bad one for a corpus that resolves citations, because a förarbete from
+2016 cites the riktlinje that was in force in 2016.
+
+Measured, not inferred: the walk sees 36 ämnessidor and 289 leaves today, 80 of
+which we store. The other 209 are a mix — tekniska standarder (adopted as
+kommissionsförordningar, and `eurlex`'s), reports, opinions and consultation
+papers — but the missing 82 numbers are *not* among them, because a leaf that
+carries an EBA/GL number is stored. They are not in the listing at all.
+
+Not fixed here. Taking them needs a second listing (the EBA's publications
+archive, filtered by document type) and a rule for what a repealed riktlinje's
+page should say, which is a scope decision rather than a parser fix.
 
 ## EBA: identity costs a download on the first run
 
@@ -165,10 +205,37 @@ set no notes at all.
 
 ## The citation grammar catches the number, not the subject
 
-`lagrum.VAGLEDNING` links every form that names a document by its **number**:
-`Riktlinjer 05/2020`, `riktlinjerna 8/2022`, `riktlinjen 4/2019`,
+`lagrum.VAGLEDNING` links every form that names a document by its **number**.
+For the EDPB: `Riktlinjer 05/2020`, `riktlinjerna 8/2022`, `riktlinjen 4/2019`,
 `Rekommendation(er) NN/ÅÅÅÅ`, `WP 243`, `WP248 rev.01`. Padded and unpadded
 citations mint one address.
+
+Five more bodies were added on 2026-08-21, each cited by a number carrying its
+own acronym, so the number alone names the document: `ESRB/2017/6`,
+`EBA/GL/2021/05` (and `EBA/REC/…`), `ESMA/2013/720`, `ESMA35-43-349`,
+`JC/GL/2024/36`, `CON/2013/82`, `BoR (11) 67`. Checked against the corpus: all
+1 967 documents of those five have their own printed number resolve to their
+own page.
+
+**EIOPA is deliberately absent**, though 40 citations name it by number. Its
+number (`EIOPA-BoS-19/465`) does not say whether the document is a riktlinje or
+a rekommendation, and its address carries that series segment. Minting from the
+number alone would guess, and a wrong guess is a link to a different document
+rather than to none. It needs the same thing the title grammar needs: a lookup
+from the number to the document we hold.
+
+**ACER is absent for a different reason.** It is cited as `Decision No 67/2022`
+(306 such mentions in the corpus), but ACER's documents are identified here by a
+slug of their title (`acer/ramriktlinjer/capacity-allocation-and-congestion-management-for-electricity`), so there is no number on our side to match. The
+same shape is also printed for EU decisions that are not ACER's at all
+(`Decision No 39/1984`), which is a second reason the form cannot carry a link
+by itself.
+
+**Where the number grammar pays.** Förarbeten print 350 of these numbers across
+115 documents. Föreskrifter print exactly **one** in the whole corpus of 12 903,
+so `foreskrift` keeps its narrow parse-type set rather than paying a full
+re-parse for a single link — föreskrifter cite this material by title, which is
+the open work below.
 
 It does **not** catch the form IMY actually uses most of the time. Of 138 IMY
 beslut in the corpus, 43 cite this guidance, and the majority cite it by

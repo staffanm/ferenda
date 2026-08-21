@@ -75,7 +75,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `nf.py` | tree → golden normal form (replicates old URI-minting quirks) |
 | `register.py` | SFSR register page → amendments + change tuples; `resource_map`/`lookup_resource` resolve org/series labels via the ported `data/resources.json` dataset |
 | `versions.py` | archived consolidations (download archive, three raw generations) → per-version artifacts + `.versions.json` sidecar |
-| `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links. A stycke can define **several** terms: one sentence coins two ("… säkerhetskänslig verksamhet (verksamhetsutövare) ska utreda behovet av säkerhetsskydd (säkerhetsskyddsanalys)"), where the rule used to require the parenthesis to close the sentence and so read only the last. A parenthesis away from the sentence end must read like a coinage (lowercase, digit-free, not a list marker), must not sit in a bilaga/konventionsbilaga/övergångsbestämmelser (`in_appendix` — an annex is a list of things, not drafting), and must not be in `NOT_A_CONCEPT` (an act naming its own actor: "myndigheten", "tillsynsmyndigheten", "chefen"). Measured over 1,500 acts: +916 terms, 0 lost. The löptext form does **not** require the tail "i denna lag" — drafting as often writes "i detta kapitel", "vid tillämpning av 5 §" or nothing (säkerhetsskyddslagen 1 kap. 2 §), and requiring it lost 3,558 definitions in 1,427 acts; "Med" opening an adverbial ("Med undantag av …", "Med hjälp av …") is excluded by name, and the definiendum is trimmed of its article and its scope qualifier ("Med dotterbolag enligt första stycket 3 avses …" defines dotterbolag) |
+| `begrepp.py` | `find_definitions` — begreppsdefinition heuristics (paragraf mode + defined-term cases) → `dcterms:subject` links. A stycke can define **several** terms: one sentence coins two ("… säkerhetskänslig verksamhet (verksamhetsutövare) ska utreda behovet av säkerhetsskydd (säkerhetsskyddsanalys)"), where the rule used to require the parenthesis to close the sentence and so read only the last. A parenthesis away from the sentence end must read like a coinage (lowercase, digit-free, not a list marker), must not sit in a bilaga/konventionsbilaga/övergångsbestämmelser (`in_appendix` — an annex is a list of things, not drafting), and must not be in `NOT_A_CONCEPT` (an act naming its own actor — "myndigheten", "tillsynsmyndigheten", "chefen" — or giving an act its short title: "allmän dataskyddsförordning", written that way by 170 acts). Measured over 1,500 acts: +916 terms, 0 lost. The löptext form does **not** require the tail "i denna lag" — drafting as often writes "i detta kapitel", "vid tillämpning av 5 §" or nothing (säkerhetsskyddslagen 1 kap. 2 §), and requiring it lost 3,558 definitions in 1,427 acts; "Med" opening an adverbial ("Med undantag av …", "Med hjälp av …") is excluded by name, and the definiendum is trimmed of its article and its scope qualifier ("Med dotterbolag enligt första stycket 3 avses …" defines dotterbolag) |
 | `graphics.py` | recovers content omitted by the text-only SFST source. Detection is deterministic and runs at parse time: the source's omission markers — `... är inte med här` and its wording variants (`Bilagan inte med här`, `Bilagor finns inte med här`, `Tabellen ej med här`), the older `Bilagan är här utesluten` / `Tabellen utelämnad` formula, standing alone or trailing a heading or a bilaga's own rubrik — plus otherwise unmarked road-sign cells in 2007:90 become typed `grafik` nodes. Each node carries a stable semantic `key`, hashed from structural path + kind/code + normalized anchor + occurrence within its container; transient `G1` ids remain diagnostic only. Localization resolves provenance (variant-aware: a pending, not-yet-in-force copy of a bilaga gets its own keys and its own source PDF), deduplicates content duplicates by key, strictly validates complete vision output and writes `.graphics` entries keyed by that semantic key with the unhashed identity alongside; wired as `lagen sfs ai-includegraphics`. Road-sign statutes take a deterministic route instead of the vision one: `roadsign_boxes`/`roadsign_index`/`localize_roadsigns` read each sign's page, rectangle and source act off the published PDFs (the designator opens the Märke column, so the sign is the ink between one row's caption and the next; the act that prints a row last owns it) |
 | `redaktionell.py` | detects a stycke that is the publisher's *editorial note* rather than statute text, another projection-time overlay in `nf.py`'s NF pass like `graphics.py`'s gaps — `retype_editorial` retypes the finished stycke node as a `redaktionell` node, keeping its id, inline runs and beteckning. Two sorts: `endast-tryckt` (`/Författningens text finns bara i tryckt version/`, a corpus gap — a couple of dozen acts) and `upphavd` (`Har upphävts genom lag (1982:1101)`, a genuine repeal notice carrying the repealing SFS as `satt_av` — ~300 stycken, a handful of them a base act's whole body and the rest single repealed paragrafer inside a live act). The renderer gives the node the same subdued treatment as the grafik placeholder (`p.redaktionell`) |
 | `pdfmirror.py` | official published-SFS PDF mirror, the crop source for graphic localization. Each act's source follows from its SFS number: `1998:306`–`2018:159` from direct rkrattsdb URLs, `2018:160`– from svenskforfattningssamling.se document pages, and nothing before `1998:306` (print only). Fetched bytes must be PDFs. `.mirror.json` records the acts an upstream answered it has no PDF for, which is the only thing telling those apart from "not fetched yet" and so the only thing keeping a rerun free. Runs as part of `lagen sfs download` and as `lagen sfs mirror-pdf`, not as a parse stage |
@@ -704,25 +704,44 @@ whatever is already stored — while a weekly run costs the register plus the
 handful of documents that moved. Its documents are stored as `.html`, not
 `.pdf`: Skatteverket publishes the ställningstagande *as* a web page.
 
-**edpb — EDPB riktlinjer och rekommendationer** (operates on
-`site/data/{downloaded,artifact}/edpb/`):
+**guidance — EU-organens vägledningar, 12 utgivare** (operates on
+`site/data/{downloaded,artifact}/guidance/`):
 
 ```sh
-uv run python -m accommodanda.build edpb download        # all three series
-uv run python -m accommodanda.build edpb download riktlinjer --only riktlinjer/05-2020
-uv run python -m accommodanda.build edpb download wp --force   # re-resolve the WP29 ZIPs
-uv run python -m accommodanda.build edpb parse           # incremental, like every source
+uv run python -m accommodanda.build guidance download          # every body
+uv run python -m accommodanda.build guidance download acer     # one body
+uv run python -m accommodanda.build guidance download ecb esrb # the two CELLAR bodies
+uv run python -m accommodanda.build guidance download edpb/riktlinjer --only edpb/riktlinjer/05-2020
+uv run python -m accommodanda.build guidance download edpb/wp --force   # re-resolve the WP29 ZIPs
+uv run python -m accommodanda.build guidance parse             # incremental, like every source
 ```
 
-Identity is the EDPB's own number (`edpb/riktlinjer/05-2020`,
-`edpb/rekommendationer/01-2019`, `edpb/wp/248`), so `--only` names that and
-needs its series scope. The Swedish version is published wherever the EDPB has
-issued one and the English one otherwise; the record says which. The `wp` scope
-is a closed corpus of sixteen documents whose text lives on the Commission
-newsroom, each costing a 10–28 MB language ZIP to resolve — a routine run skips
-whatever is already on disk. Citations to these documents (`Riktlinjer 05/2020`,
-`WP 248`) are linked by the `VAGLEDNING` parse type; `edpb/KNOWN-GAPS.md`
-records what the grammar deliberately does *not* catch.
+A download scope is one **upstream walk**, not one series: a bare utgivare
+where one walk covers all of that body's series (ten of the twelve), and
+`<utgivare>/<serie>` where the series come off different upstreams — the EDPB's
+two open series come off its sitemap and its closed WP29 series off the
+Commission newsroom.
+
+Identity is the issuing body's own number, never a CELEX
+(`edpb/riktlinjer/05-2020`, `eba/gl/2021-05`, `ecb/con/2013-82`, and
+`esrb/2014-01` where the body numbers in one sequence and the address carries no
+series segment), so `--only` names that and needs its scope. The Swedish version
+is published wherever the body has issued one and the English one otherwise; the
+record says which. The `edpb/wp` scope is a closed corpus of sixteen documents
+whose text lives on the Commission newsroom, each costing a 10–28 MB language
+ZIP to resolve — a routine run skips whatever is already on disk.
+
+The ECB and the ESRB publish in EUT rather than on their own sites, so `ecb` and
+`esrb` harvest out of CELLAR through `lib/cellar.py` with the same language and
+format preferences the eurlex source uses, and their documents parse from
+whichever manifestation CELLAR served — Formex through `lib/formex.py`, or the
+PDF, or EUR-Lex HTML.
+
+Citations to these documents are linked by the `VAGLEDNING` parse type, by the
+EDPB's form (`Riktlinjer 05/2020`, `WP 248`) and by the five bodies whose number
+carries their own acronym (`ESRB/2017/6`, `EBA/GL/2021/05`, `ESMA/2013/720`,
+`CON/2013/82`, `BoR (11) 67`). `guidance/KNOWN-GAPS.md` records what the grammar
+deliberately does *not* catch, and why EIOPA and ACER are left out of it.
 
 **HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law**:
 
