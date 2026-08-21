@@ -28,6 +28,7 @@ from ..lib.page import (
     swedish_join,
 )
 from ..lib.pinpoint import eu_article_label, human_fragment
+from ..lib.text import drop_prefix, runs_text
 
 ENV = tpl.environment("accommodanda.eurlex")
 
@@ -181,6 +182,202 @@ def _eurlex_marker(t, num):
     return num
 
 
+# The division designations the Swedish Formex sources print before a division
+# title, always in capitals ("KAPITEL I ALLMÄNNA BESTÄMMELSER"). The set is the
+# one the corpus shows -- BILAGA 354, KAPITEL 91, AVDELNING 26, DEL 23, AVSNITT
+# 14 over 600 sampled acts. Only the token right after one of these words is a
+# division numeral, which is why the label has to come off before the title is
+# re-cased: "OSKÄLIGA AVTALSVILLKOR I SAMBAND MED" also holds a standalone "I",
+# and it is the preposition.
+_DIVISION_WORDS = ("BILAGA", "KAPITEL", "AVDELNING", "AVSNITT", "DEL")
+_DIVISION_LABEL = re.compile(
+    r"^(%s)\s+((?:[IVXLC]+|\d+[a-zA-Z]?|[A-Z]))(?=\s|$)" % "|".join(_DIVISION_WORDS))
+_WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
+# a dotted/slashed identifier read as one token: "ADR.OR.B", "ATM/ANS.AR.B",
+# "96/9/EG", "META-SPC". Split into words it loses its capitals one component at
+# a time -- "ADR.OR.B" came out "ADR.OR.b", because a one-letter component
+# cannot be told from an ordinary capital.
+_CODE = re.compile(r"[^\W_]+(?:[./\-][^\W_]+)+", re.UNICODE)
+# the scan order matters: a code before the word it would otherwise be cut into
+_TOKEN = re.compile(r"%s|[^\W\d_]+|." % _CODE.pattern, re.UNICODE | re.DOTALL)
+# where the act's own prose lives -- the evidence _case_map reads. A heading is
+# excluded (it may be the shouting one we are re-casing) and so is a table: a
+# cell's text is joined with pipes, which made every cell look like a sentence
+# start and put a capital "Artikel" in the map.
+_PROSE = ("recital", "paragraph", "point", "stycke", "preamble", "citation")
+
+
+def _shouts(text):
+    """True where every letter in `text` is a capital -- how the sources set a
+    division title, and never how they set running text."""
+    letters = [c for c in text if c.isalpha()]
+    return bool(letters) and all(c.isupper() for c in letters)
+
+
+def _case_map(blocks):
+    """How this act writes each word in its own prose:
+    `(capitalised, lowercase, shouted)` -- the capitalised spelling and its count
+    per lowercased word, the lowercase counts, and the tokens the act sets in
+    capitals inside ordinary text. An all-caps division title is re-set in sentence
+    case for display, and this is what keeps the capitals the act itself uses --
+    "direktiv 96/9/EG", not "direktiv 96/9/eg" -- with no list of proper nouns or
+    acronyms to maintain anywhere.
+
+    Only mid-sentence occurrences count: a word after a full stop is capitalised
+    by position and says nothing about how the act writes it."""
+    forms, low, shouted = {}, {}, set()
+    for b in blocks:
+        text = runs_text(b.get("text") or [])
+        if _shouts(text):
+            continue
+        # the identifiers a regulation cites itself by, set in capitals inside
+        # ordinary text ("ADR.OR.B", "ATM/ANS.AR.B", "META-SPC"). Read from every
+        # block, tables included: that is where the codes live. Only dotted or
+        # hyphenated codes count -- a bare capitalised token is as often an
+        # ordinary word a line happens to shout ("KRAV", "OCH"), and the
+        # capitalisation counts below already keep a real acronym like "EG".
+        for code in _CODE.findall(text):
+            if not code.isupper():
+                continue
+            # the act writes "ADR.OR.B.015" in prose and "ADR.OR.B" in the
+            # heading, so every prefix of a known code is known too
+            parts = re.split(r"([./\-])", code)
+            shouted.update("".join(parts[:i]) for i in range(1, len(parts) + 1, 2))
+        if b.get("type") not in _PROSE:
+            continue
+        for m in _WORD.finditer(text):
+            before = text[:m.start()].rstrip()
+            if not before or before[-1] in ".!?:;|":
+                continue
+            word = m.group(0)
+            if word[:1].isupper():
+                seen = forms.setdefault(word.lower(), {})
+                seen[word] = seen.get(word, 0) + 1
+            else:
+                low[word.lower()] = low.get(word.lower(), 0) + 1
+    # the spelling the act uses most often -- "Europeiska", never the heading's
+    # own "EUROPEISKA", which is the shout we are undoing
+    cap = {lower: max(seen.items(), key=lambda kv: kv[1])
+           for lower, seen in forms.items()}
+    return cap, low, shouted
+
+
+def _sentence_case(text, casemap, capitalise=True):
+    """`text` re-set in sentence case, and whether the next word still opens the
+    sentence. A word keeps its capital only where the act capitalises it in prose
+    *consistently* -- twice or more, and more than twice as often as it writes
+    the same word lowercase -- and it then takes the act's own spelling, not the
+    heading's. One stray capital is not evidence: it capitalised "Direktanspråk"
+    in the middle of a chapter title off a single cross-reference. A token the
+    act sets in capitals in ordinary text is left alone whatever the counts say:
+    lowercasing "ADR.OR.B" to "ADR.or.b" rewrites the identifier the regulation
+    cites itself by."""
+    cap, low, shouted = casemap
+    out = []
+    for m in _TOKEN.finditer(text):
+        token = m.group(0)
+        if token in shouted:           # an identifier the act prints in capitals
+            out.append(token)
+            capitalise = False
+            continue
+        if _CODE.fullmatch(token):
+            # a code shape the act does not print as one ("EFHU-GARANTIN",
+            # "WTO-TULLKVOTER"): an acronym glued to an ordinary word. Each
+            # component decides for itself, and a component the act never writes
+            # in lower case anywhere is the acronym half.
+            parts = re.split(r"([./\-])", token)
+            for i, part in enumerate(parts):
+                if i % 2:              # the separator
+                    out.append(part)
+                elif part.isupper() and part.lower() not in low and \
+                        part.lower() not in cap:
+                    out.append(part)
+                    capitalise = False
+                else:
+                    word, capitalise = _sentence_case(part, casemap, capitalise)
+                    out.append(word)
+            continue
+        if not _WORD.fullmatch(token):
+            out.append(token)
+            continue
+        written, seen = cap.get(token.lower(), ("", 0))
+        word = (written if seen >= 2 and seen > 2 * low.get(token.lower(), 0)
+                else token.lower())
+        if capitalise:
+            word = word[:1].upper() + word[1:]
+            capitalise = False
+        out.append(word)
+    return "".join(out), capitalise
+
+
+def _cased_runs(runs, casemap):
+    """`_sentence_case` across a run list, so the links inside a heading survive
+    it. The opens-the-sentence state carries from run to run: without it every
+    run capitalised its own first word, and a linked term mid-title came out
+    "Datadelning mellan Företag"."""
+    out, capitalise = [], True
+    for run in runs:
+        text = run if isinstance(run, str) else run.get("text", "")
+        cased, capitalise = _sentence_case(text, casemap, capitalise)
+        out.append(cased if isinstance(run, str) else dict(run, text=cased))
+    return out
+
+
+def _division_label(runs, casemap):
+    """A division heading split into its designation and its title: the sources
+    print "KAPITEL I ALLMÄNNA BESTÄMMELSER" as one run of capitals. Returns
+    `(label, title_runs)`, the label None where the heading carries no
+    designation.
+
+    A heading with no designation is left exactly as published, capitals and
+    all. Those are the free-form ones -- "FÖRLAGA TILL INTYG OM ÖVERENSSTÄMMELSE
+    GODKÄNT AV AMERIKAS FÖRENTA STATER", "FÖRTECKNING ÖVER FÖRETAG SOM AVSES I
+    ARTIKEL 2.1 A" -- and they carry names the act never writes in prose, so
+    lowercasing them would put words on the page the act never wrote. A
+    designation, by contrast, always opens a common-noun title. 508 of 533
+    all-caps headings in a 600-act sample carry one."""
+    text = runs_text(runs)
+    if not _shouts(text):
+        return None, runs
+    m = _DIVISION_LABEL.match(text)
+    if not m:
+        return None, runs
+    label = "%s %s" % (_sentence_case(m.group(1), casemap)[0], m.group(2))
+    rest = drop_prefix(runs, m.end())
+    if rest and isinstance(rest[0], str):
+        rest[0] = rest[0].lstrip()
+    return label, _cased_runs(rest, casemap)
+
+
+def _article_parts(b):
+    """An article heading split into `(word, number, title_runs)`, or
+    `(None, None, None)` where it does not split.
+
+    The parser writes the heading as the source's TI.ART ("Artikel 5") joined to
+    its STI.ART (the title, which most articles do not have) with an en dash, and
+    the first run is the article's own self-reference. The number is not reliably
+    one run -- Formex sets "Artikel 6" and "b" as siblings -- so the designation
+    is matched against the flattened text and cut by character offset.
+
+    Returning None rather than a guess matters: the caller then prints the plain
+    one-line heading. Without it, a heading that did not split printed its
+    designation twice, once in the gutter and once in the title."""
+    runs = list(b.get("text") or [])
+    num = b.get("num")
+    if not runs or not num:
+        return None, None, None
+    m = re.match(r"(\S+)\s+%s(?=\W|$)" % re.escape(num), runs_text(runs))
+    if not m:
+        return None, None, None
+    word = m.group(1)
+    if word.isupper():                 # a legacy act shouting "ARTICLE 1"
+        word = word.capitalize()
+    rest = drop_prefix(runs, m.end())
+    if rest and isinstance(rest[0], str):   # the " - " the parser joined them with
+        rest[0] = re.sub(r"^[\s\u2013\u2014-]+", "", rest[0])
+    return word, num, [r for r in rest if runs_text([r])]
+
+
 def _eurlex_pin(t, num, bid):
     """The rail's "Kontext för …" label for an EU block."""
     if t == "recital" and num:
@@ -195,17 +392,21 @@ def _eurlex_pin(t, num, bid):
     return human_fragment(bid)
 
 
-def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None, key=None):
-    runs = render_runs(b["text"], site)
+def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
+                         editorial=None, key=None):
     bid = b.get("id")
     t = b["type"]
     num = b.get("num")
+    # the heading and article paths render their own split-out runs, so the
+    # whole-block render is left to the paths that use it
     if t == "heading":
         level = b.get("level") or 1
-        anchor = toc.add(bid, plain(b["text"]), level)
-        return NODES.eu_heading(min(level + 1, 5), anchor, Markup(runs))
+        label, title = _division_label(b.get("text") or [], casemap)
+        anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x), level)
+        return NODES.eu_heading(min(level + 1, 5), anchor, label,
+                                Markup(render_runs(title, site)))
     if t == "keyword":
-        return NODES.eu_keyword(Markup(runs))
+        return NODES.eu_keyword(Markup(render_runs(b["text"], site)))
     # editorial layer (.ann): wire this block into the article<->recital graph.
     # A recital gets a back-link panel (its articles + group); an article/
     # sub-article (paragraph/point, keyed like the .ann's "4.5") gets a forward
@@ -237,7 +438,13 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, editorial=None, key=None):
     rail_id = bid if bid and bid in rail.data else None
     if t == "article":
         anchor = toc.add(bid, plain(b["text"]), 2)
-        return NODES.eu_article(anchor, rail_id, Markup(runs))
+        word, number, title = _article_parts(b)
+        # the split path renders only the title, so the whole-block render is
+        # left to the paths below that actually use it
+        return NODES.eu_article(anchor, rail_id, word, number,
+                                Markup(render_runs(title if number else b["text"],
+                                                   site)))
+    runs = render_runs(b["text"], site)
     classes = [EURLEX_CLASS.get(t, "")]
     # a marked recital/paragraph/point hangs its marker in the left margin
     if num and t in ("recital", "paragraph", "point"):
@@ -315,10 +522,14 @@ def render(art, site):
     parts = []
     anchors = Anchors()                  # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
+    # read once for the whole act: how it writes its own words, which is what
+    # re-sets an all-caps division heading in sentence case (_case_map)
     # the artifact is a nested structure (divisions > articles > paragraphs >
     # points); render reads it in document order -- the heading levels and the
     # TOC already convey the hierarchy, so no nested <section> markup is needed
-    for b in eurlex_flatten(art.get("structure", [])):
+    blocks = list(eurlex_flatten(art.get("structure", [])))
+    casemap = _case_map(blocks)
+    for b in blocks:
         t = b["type"]
         key = anchors.key(t, b.get("num"), b.get("id"), b.get("depth"))
         if editorial and t == "recital" and (b.get("num") or "").isdigit():
@@ -331,7 +542,7 @@ def render(art, site):
                 toc.add(anchor, group.get("label", ""), 2)
                 parts.append(_recital_group_heading(group))
         parts.append(_render_eurlex_block(b, site, art["uri"], toc, rail,
-                                          editorial, key))
+                                          casemap, editorial, key))
     rail.add_document()        # external links + commentary, the rail's default panel
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
     return ENV.get_template("eurlex.html").render(page_context(

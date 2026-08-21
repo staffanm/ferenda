@@ -532,9 +532,60 @@ section.andringar { margin-top: 4rem; }
    paragraphs (nodes.html `eu_article` / `artikel_section`). Typography has to
    sit on the heading -- on the container it inherits into every paragraph, and
    the whole of every coe/icrc/untc treaty rendered semi-bold. */
-h3.artikel, section.artikel > h2 {
-           font-family: var(--serif); font-weight: 600; font-size: 1.15rem;
-           margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
+/* an article whose heading did not split into a designation and a title (six
+   of 10,204 sampled: "Enda artikel", "Article premier") keeps the plain one
+   line -- `display: block` because the grid rule below matches it too, and a
+   grid would set the whole heading inside the 3.25rem gutter column */
+h3.artikel.artikel-plain, section.artikel > h2 {
+           display: block; font-family: var(--serif); font-weight: 600;
+           font-size: 1.15rem; margin: 2rem 0 .5rem;
+           scroll-margin-top: var(--scroll-clear); }
+/* -- Three places hang a number in a gutter beside its text: an SFS paragraf,
+   an EU article heading and a numbered förarbete section. The numeral and the
+   permalink look the same in all three; only the grid geometry differs, and
+   that is all each block below sets. -- */
+.paragraf-gutter .n, h3.artikel > .n, .rubrik.numrerad > .n {
+  font-family: var(--serif); font-size: 1.55rem; font-weight: 500;
+  line-height: 1.2; color: var(--accent); font-variant-numeric: oldstyle-nums; }
+.paragraf-gutter .pilcrow, h3.artikel > .pilcrow, .rubrik.numrerad > .pilcrow {
+  font-family: var(--sans); font-size: .7rem; font-weight: 400;
+  color: var(--ink-4); opacity: 0; transition: opacity .15s; }
+section.paragraf:hover .pilcrow, h3.artikel:hover > .pilcrow,
+.rubrik.numrerad:hover > .pilcrow { opacity: 1; }
+.paragraf-gutter .pilcrow:hover, h3.artikel > .pilcrow:hover,
+.rubrik.numrerad > .pilcrow:hover { color: var(--accent); text-decoration: none; }
+
+/* -- An EU article heading: the designation hangs in the same gutter an SFS
+   paragraf uses, the word small over the number, the permalink under it. Three
+   rows, because the title has to sit on the number's baseline and the word
+   above it -- one baseline-aligned row would put the title beside the word. -- */
+h3.artikel { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
+             gap: 0 .9rem; margin: 2.25rem 0 .5rem; font-weight: 400;
+             scroll-margin-top: var(--scroll-clear); }
+/* the gutter's contents set flush left, not right as the §-gutter's do: the
+   number then stands directly over the article's own paragraph markers, which
+   hang at the same edge -- right-aligned it sat to the right of them */
+h3.artikel > .k { grid-area: 1 / 1; font-family: var(--sans);
+                  font-size: .62rem; font-weight: 500; letter-spacing: .07em;
+                  text-transform: uppercase; color: var(--ink-3); }
+h3.artikel > .n { grid-area: 2 / 1; }
+h3.artikel > .artikel-titel { grid-area: 2 / 2; align-self: baseline;
+                              font-family: var(--serif); font-weight: 600;
+                              font-size: 1.15rem; }
+h3.artikel > .pilcrow { grid-area: 3 / 1; }
+/* the division designation ("Kapitel I"), set apart from the title it opens */
+.rubrik-nr { color: var(--accent); font-variant-numeric: oldstyle-nums; }
+/* -- A numbered förarbete section: its number hangs in a gutter of its own,
+   with a permalink, and the title reads as before. The gutter is wider than the
+   §-gutter because a section number nests ("9.2.4"). -- */
+h1.rubrik.numrerad, h2.rubrik.numrerad, h3.rubrik.numrerad,
+h4.rubrik.numrerad, h5.rubrik.numrerad {
+  display: grid; grid-template-columns: 3.6rem minmax(0,1fr); gap: 0 .9rem;
+  align-items: baseline; scroll-margin-top: var(--scroll-clear); }
+.rubrik.numrerad > .n { grid-area: 1 / 1; }
+.rubrik.numrerad > .n.lang { font-size: 1.05rem; }
+.rubrik.numrerad > .rubrik-titel { grid-area: 1 / 2; }
+.rubrik.numrerad > .pilcrow { grid-area: 2 / 1; }
 section.artikel { margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
 section.artikel > h2 { margin-top: 0; }
 
@@ -544,12 +595,7 @@ section.paragraf { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
                    scroll-margin-top: var(--scroll-clear); }
 .paragraf-gutter { text-align: right; font-family: var(--serif); line-height: 1.2;
                    font-variant-numeric: oldstyle-nums; }
-.paragraf-gutter .n { font-size: 1.55rem; font-weight: 500; color: var(--accent); }
-.paragraf-gutter .pilcrow { display: block; margin-top: .15rem; font-family: var(--sans);
-                            font-size: .7rem; color: var(--ink-4); opacity: 0;
-                            transition: opacity .15s; }
-section.paragraf:hover .pilcrow { opacity: 1; }
-.paragraf-gutter .pilcrow:hover { color: var(--accent); text-decoration: none; }
+.paragraf-gutter .pilcrow { display: block; margin-top: .15rem; }
 .paragraf-body { min-width: 0; font-size: 1.0rem; line-height: 1.7; }
 .paragraf-body > p:first-child { margin-top: 0; }
 p { margin: 0 0 .7rem; }
@@ -1326,6 +1372,14 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .gr-main table { display: block; overflow-x: auto; }
   /* no sticky masthead left to clear when jumping to an anchor */
   :root { --scroll-clear: .75rem; }
+  /* the reading column runs edge to edge here, so a gutter cannot hang outside
+     it: the article/section number sets on its own line above the title */
+  h3.artikel, h1.rubrik.numrerad, h2.rubrik.numrerad, h3.rubrik.numrerad,
+  h4.rubrik.numrerad, h5.rubrik.numrerad { display: block; }
+  h3.artikel > .k { display: inline; }
+  h3.artikel > .n, .rubrik.numrerad > .n { margin-right: .4rem; }
+  h3.artikel > .k::after { content: " "; }
+  h3.artikel > .artikel-titel, .rubrik.numrerad > .rubrik-titel { display: block; }
 
   /* TOC: an off-canvas left drawer (kept in layout, so scrollspy's active
      tracking and auto-scroll keep working while it is closed) */
@@ -1728,16 +1782,21 @@ section.occurrences details.more > summary { color: var(--ink-3);
      the first value *assigned on* it -- so a page that starts mid-§ still
      names that §. The separator rides in the chapter's own string, so
      a statute with no chapter division prints "3 §" and not " · 3 §".
-     `h3.artikel > a` rather than the heading: an EU article heading is
-     "Artikel 5 – Principer för behandling av personuppgifter", and only its
-     first link is the citable "Artikel 5". */
+     An EU article splits the citable "Artikel 5" across two elements of its
+     gutter -- the word in `.k`, the number in `.n` -- and eurlex headings carry
+     no `data-kort`, so the word has to take the `here` slot the statutes fill
+     from that attribute. Setting only `.n` printed a running head reading "5",
+     which names nothing. A numbered förarbete section has no word, so its
+     number goes in the same slot as a § numeral. */
   .kaprubrik, h2.rubrik, .instans-rubrik { string-set: here attr(data-kort); }
-  .paragraf-gutter .n, .artikel > a:first-child {
+  h3.artikel > .k { string-set: here content(text) " "; }
+  .paragraf-gutter .n, h3.artikel > .n, .rubrik.numrerad > .n {
     string-set: here-inner content(text); }
 
   /* chrome and widgets: nothing a finger can operate belongs on paper */
   .masthead, .mobile-bar, .toc-col, .rail, .drawer-scrim, .search-overlay,
-  .theme-toggle, .paragraf-gutter a.pilcrow, .fn-back, details.lydelser,
+  .theme-toggle, .paragraf-gutter a.pilcrow, h3.artikel > a.pilcrow,
+  .rubrik.numrerad > a.pilcrow, .fn-back, details.lydelser,
   .ed-tools, .ed-panel, .ed-overlay, .ed-btn-top, .admin-panel,
   .pdf-open, .collection-add, .collection-toolbar,
   .grafik-lightbox { display: none; }
@@ -1856,7 +1915,8 @@ section.occurrences details.more > summary { color: var(--ink-3);
   .print-kontext .rail-sec .prov a { color: inherit; text-decoration: none; }
   a.ext::after { content: none; }
   a.term { border-bottom: 0; }
-  .paragraf-gutter .n, .num { color: var(--accent); }
+  .paragraf-gutter .n, .num, h3.artikel > .n, .rubrik.numrerad > .n,
+  .rubrik-nr { color: var(--accent); }
 
   /* The § gutter stays inside the measure. Hanging it in the left margin
      reads better, and did until the apparatus moved out there: on a verso

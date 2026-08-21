@@ -4,6 +4,8 @@ margin.
 Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 `render` is the `(art, site) -> str` the generate driver calls.
 """
+import re
+from collections import Counter
 from urllib.parse import quote
 
 from markupsafe import Markup
@@ -20,6 +22,7 @@ from ..lib.page import (
     render_runs,
     render_toc,
 )
+from ..lib.text import drop_prefix, runs_text
 
 ENV = tpl.environment("accommodanda.forarbete")
 
@@ -50,6 +53,102 @@ def _implements_items(art, site):
     return items
 
 
+# A section heading that opens with its own number ("4.2 Remissförfarandet").
+# A dotted number is unambiguous; a bare integer is not. The scanned older
+# propositions carry running heads and table rows on `avsnitt` nodes -- "172
+# Kungl. Maj:ts proposition nr 144 år 1970", "1562 Investeringar" -- and they
+# look exactly like a numbered section. Four tests, each read off the document
+# itself rather than off a list:
+#
+#   * the outline level: a "4.2" on level 2 puts "4" on level 1, so a number
+#     counts only on the level its own document hangs that depth at;
+#   * repetition: a title the document prints again and again is a running head,
+#     the same test `lib.pdftext.strip_page_furniture` uses for page furniture.
+#     Applied to bare integers only -- a real "6.2.1 Allmänt" repeats per chapter;
+#   * the document's own ceiling: a bare integer above the highest number it
+#     subdivides is a page or a table cell, not section 1562;
+#   * the shape: a four-digit component means a date, not a section (_outline_shaped);
+#   * a title with fewer than four letters is OCR debris ("3 J-", "1 W «").
+#
+# Measured over 300 sampled artifacts: 3,066 dotted and 701 bare numbers into the
+# gutter, 2,627 rejected. What survives is a handful of scans whose body text the
+# parser classified as a heading upstream.
+_SECTION_NUMBER = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+(\S.*)$", re.DOTALL)
+_MAX_LEVELS = 4          # "11.5.1" is three
+_MAX_COMPONENT = 3       # digits; a component wider than that is a year
+_MIN_TITLE_LETTERS = 4
+
+
+def _outline_shaped(num):
+    """True where `num` could be an outline number at all. An EU Official
+    Journal running head reprinted inside a förarbete is dotted like a section
+    number -- "27.6.2013 SV Europeiska unionens officiella tidning L 176/431" --
+    and the date is the tell: no section number carries a four-digit component.
+    Over 600 sampled artifacts this rejects 13 numbers, all of them dates or OCR
+    debris, and no real section number."""
+    parts = num.split(".")
+    return len(parts) <= _MAX_LEVELS and all(len(p) <= _MAX_COMPONENT for p in parts)
+
+
+def _section_rows(nodes):
+    """Every `avsnitt` as `(level, number_match)`, in document order. Every
+    `avsnitt` carries its own `level` (16,749 of 16,749 over 300 sampled
+    artifacts), and the render walk reads the same field -- deriving one from the
+    recursion depth instead would put the two on different scales."""
+    rows = []
+
+    def walk(ns):
+        for n in ns:
+            if n.get("type") == "avsnitt":
+                rows.append((n["level"],
+                             _SECTION_NUMBER.match(runs_text(n.get("text") or []).strip())))
+            walk(n.get("children", []))
+
+    walk(nodes)
+    return rows
+
+
+def _outline(nodes):
+    """What this document's own numbering says about itself: the heading levels
+    it hangs top-level numbers on, the highest number it subdivides, and how
+    often each title is printed. Empty levels mean no decimal numbering at all --
+    then no bare integer in a heading is a section number."""
+    rows = _section_rows(nodes)
+    dotted = [(lvl, m) for lvl, m in rows if m and "." in m.group(1)]
+    heads = [int(m.group(1).split(".")[0]) for _, m in dotted
+             if m.group(1).split(".")[0].isdigit()]
+    return {"levels": {lvl - m.group(1).count(".") for lvl, m in dotted},
+            "ceiling": (max(heads) if heads else 0) + 2,
+            "titles": Counter(m.group(2).strip() for _, m in rows if m)}
+
+
+def _numbered(node, level, outline):
+    """`(number, title_runs)` for a numbered section heading, `(None, runs)`
+    otherwise. The number leaves the title runs, since it moves to the gutter.
+
+    The number is cut from the *flattened* text by character offset: it is often
+    a styled run of its own (`{"style": "b", "text": "3.1"}`), so reading only a
+    leading plain string missed half of them."""
+    runs = list(node.get("text") or [])
+    m = _SECTION_NUMBER.match(runs_text(runs).strip())
+    if not m:
+        return None, runs
+    num, title = m.group(1), m.group(2).strip()
+    if not title[:1].isupper() or not _outline_shaped(num):
+        return None, runs
+    if sum(c.isalpha() for c in title) < _MIN_TITLE_LETTERS:
+        return None, runs
+    if (level - num.count(".")) not in outline["levels"]:
+        return None, runs
+    if "." not in num and (outline["titles"][title] > 1
+                           or int(num) > outline["ceiling"]):
+        return None, runs
+    # the match ran against the stripped text, so the cut has to add back the
+    # leading whitespace the runs still carry
+    flat = runs_text(runs)
+    return num, drop_prefix(runs, len(flat) - len(flat.lstrip()) + m.start(2))
+
+
 def render(art, site):
     lb = labels.document_labels("forarbete", art)
     title = lb.short_title or art["uri"]
@@ -61,6 +160,9 @@ def render(art, site):
     doc_uri = art["uri"]
     rail = Rail(site, doc_uri)
     state = {"page": None}
+    # read once: the top-level numbers this document actually subdivides, which
+    # is what tells a section number from a page number (_numbered)
+    outline = _outline(art.get("structure") or [])
 
     def emit_page(node):
         # page anchor (#sid{N} -- the förarbete citation target, unchanged by the
@@ -104,10 +206,11 @@ def render(art, site):
                 # this avsnitt); a section with no context gets no data-rail
                 rail.add(n.get("id"), plain(n["text"]))
                 nid = n.get("id")
+                num, title = _numbered(n, level, outline)
                 parts.append(NODES.fa_avsnitt(
                     min(level + 1, 5), anchor,
-                    nid if nid and nid in rail.data else None,
-                    Markup(render_runs(n["text"], site))))
+                    nid if nid and nid in rail.data else None, num,
+                    Markup(render_runs(title, site))))
                 walk(n.get("children", []))
             elif n.get("type") == "tabell":
                 # a nuvarande/föreslagen lydelse comparison: two columns of

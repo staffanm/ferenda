@@ -146,8 +146,16 @@
 {%- if fax %}<button type="button" role="tab" aria-selected="false" data-fax="{{ fax }}" title="Visa sidan {{ pg }} som den trycktes"><svg class="sid-ico" viewBox="0 0 16 16" aria-hidden="true" width="12" height="12"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5.5" cy="6.5" r="1.2" fill="currentColor"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg> Original</button>{% endif -%}
 </span>
 {%- endmacro -%}
-{%- macro fa_avsnitt(lvl, anchor, rail_id, body) -%}
-<h{{ lvl }} id="{{ anchor }}"{{ rail_attr(rail_id) }} class="rubrik">{{ body }}</h{{ lvl }}>
+{%- macro fa_avsnitt(lvl, anchor, rail_id, num, body) -%}
+{#- a numbered section hangs its number in a gutter with its own permalink; the
+    title reads as before. An unnumbered heading keeps the plain single line. -#}
+<h{{ lvl }} id="{{ anchor }}"{{ rail_attr(rail_id) }} class="rubrik{% if num %} numrerad{% endif %}">
+{%- if num -%}
+<span class="n{% if num|length > 3 %} lang{% endif %}">{{ num }}</span><a class="pilcrow" href="#{{ anchor }}" aria-label="Permalänk">¶</a><span class="rubrik-titel">{{ body }}</span>
+{%- else -%}
+{{ body }}
+{%- endif -%}
+</h{{ lvl }}>
 {%- endmacro -%}
 {%- macro fa_lydelse_tabell(rows) -%}
 {#- a nuvarande/föreslagen lydelse comparison: aligned cells, th rows the
@@ -170,14 +178,28 @@
 <p{% if kind %} class="{{ kind }}"{% endif %}>{{ body }}</p>
 {%- endmacro -%}
 {#- ============================ eurlex blocks ============================ -#}
-{%- macro eu_heading(lvl, anchor, body) -%}
-<h{{ lvl }} id="{{ anchor }}" class="rubrik">{{ body }}</h{{ lvl }}>
+{%- macro eu_heading(lvl, anchor, label, body) -%}
+{#- `label` is the division's own designation ("Kapitel I"), set apart from the
+    title it precedes; the sources print the pair as one uppercase run -#}
+<h{{ lvl }} id="{{ anchor }}" class="rubrik">{% if label %}<span class="rubrik-nr">{{ label }}</span> {% endif %}{{ body }}</h{{ lvl }}>
 {%- endmacro -%}
 {%- macro eu_keyword(body) -%}
 <span class="sokord">{{ body }}</span>
 {%- endmacro -%}
-{%- macro eu_article(anchor, rail_id, body) -%}
-<h3 id="{{ anchor }}" class="artikel"{{ rail_attr(rail_id) }}>{{ body }}</h3>
+{%- macro eu_article(anchor, rail_id, word, num, title) -%}
+{#- The article's designation hangs in a gutter, the way an SFS paragraf hangs
+    its numeral: the word ("Artikel") small above the number, the permalink
+    below it, and the article's own title beside them. Most articles carry no
+    title at all, so the title cell is often empty and the row is just the
+    number. With no number to hang (a legacy act whose heading the parser could
+    not split) the heading stays one plain line. -#}
+<h3 id="{{ anchor }}" class="artikel{% if not num %} artikel-plain{% endif %}"{{ rail_attr(rail_id) }}>
+{%- if num -%}
+<span class="k">{{ word }}</span><span class="n">{{ num }}</span><a class="pilcrow" href="#{{ anchor }}" aria-label="Permalänk">¶</a><span class="artikel-titel">{{ title }}</span>
+{%- else -%}
+{{ title }}
+{%- endif -%}
+</h3>
 {%- endmacro -%}
 {%- macro eu_block(nid, cls, rail_id, marker_target, marker_label, body, stycke_id="") -%}
 {#- the marker doubles as the block's permalink when the block is

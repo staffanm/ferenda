@@ -125,6 +125,26 @@ def runs_text(runs):
     return "".join(r if isinstance(r, str) else r.get("text", "") for r in runs)
 
 
+def drop_prefix(runs, n):
+    """`runs` with the first `n` characters of its flattened text removed.
+
+    A heading's own number is not reliably one run: Formex sets "Artikel 6" and
+    "b" as siblings, and a förarbete's number is often a styled run of its own.
+    A caller that locates the number in the flattened text therefore has to cut
+    by character offset rather than by run index -- and keep the links in the
+    rest of the runs intact, which is what this returns."""
+    out = []
+    for run in runs:
+        text = run if isinstance(run, str) else run.get("text", "")
+        if n >= len(text):
+            n -= len(text)
+            continue
+        rest = text[n:]
+        n = 0
+        out.append(rest if isinstance(run, str) else dict(run, text=rest))
+    return out
+
+
 def _collect_text(node, parts):
     """Append every node's runs and table cells, in document order. A node's own
     ``text``/``cells`` come before its descendants (walked via the other keys)."""
