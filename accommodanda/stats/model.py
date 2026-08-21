@@ -107,7 +107,7 @@ class Report:
     def to_artifact(self):
         """The on-disk shape: empty fields dropped, so a measure's JSON says only
         what that measure has. `asdict` would write every one of the twelve keys
-        on all 52, which makes the artifact three times its size and makes a diff
+        on all 53, which makes the artifact three times its size and makes a diff
         between two builds unreadable -- and the diff is the point of storing it."""
         return {"generated": self.generated,
                 "measures": [_prune(asdict(m)) for m in self.measures]}

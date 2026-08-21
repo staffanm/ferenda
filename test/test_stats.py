@@ -212,6 +212,103 @@ def test_an_amending_act_and_a_runaway_article_are_flagged(tmp_path):
     assert [clean for _, _, clean in signed["lengths"]] == [False]
 
 
+def test_every_marked_term_states_a_definition():
+    """All four of `sfs.begrepp`'s modes state one. A brottsrubricering and a
+    parenthesised coinage say what the term means without setting the definition
+    off from the sentence around it, and cutting at a boundary that is not there
+    would lose the definition rather than trim it. The text has one job here --
+    telling two definitions of the same term apart (measure 54) -- so the whole
+    node is the right unit, and the finer sentence pick belongs to the begrepp
+    page (`catalog.definition_sentences`)."""
+    assert scan.definition_body_eu(
+        "risk", "risk: risk för förlust orsakad av en incident.") \
+        == "risk för förlust orsakad av en incident."
+    assert scan.definition_body_sfs(
+        "konsument", "konsument: en fysisk person som handlar.") \
+        == "en fysisk person som handlar."
+    # no "term:" head to cut at -- the sentence stays whole
+    assert scan.definition_body_sfs(
+        "mord", "Den som berövar annan livet, döms för mord till fängelse.") \
+        == "Den som berövar annan livet, döms för mord till fängelse."
+    assert scan.definition_body_sfs("dödning", "Inteckning får dödas (dödning).") \
+        == "Inteckning får dödas (dödning)."
+
+
+def test_a_definition_that_only_points_elsewhere_is_not_one():
+    # "50. personuppgifter: personuppgifter enligt definitionen i artikel 4.1 i
+    # förordning (EU) 2016/679" defines nothing -- it hands the term to the
+    # dataskyddsförordning. The lead in front of the cue may restate the term
+    # ("uppgifter" for "personuppgifter"), but a lead that says something new
+    # makes the sentence a definition of its own.
+    assert scan.is_cross_reference(
+        "personuppgifter",
+        "personuppgifter enligt definitionen i artikel 4.1 i förordning (EU) 2016/679.")
+    assert scan.is_cross_reference(
+        "personuppgifter",
+        "uppgifter enligt definitionen i artikel 2 a i förordning (EG) nr 45/2001.")
+    assert scan.is_cross_reference(
+        "kvalificerat innehav",
+        "detsamma som i 1 kap. 5 § lagen om bank- och finansieringsrörelse.")
+    assert not scan.is_cross_reference(
+        "risk", "risk för förlust eller störning orsakad av en incident.")
+    assert not scan.is_cross_reference(
+        "område",
+        "en yta som anges av gemenskapen och medlemsstaten och som omfattar "
+        "en eller flera anläggningar.")
+    assert not scan.is_cross_reference(
+        "BAT-referensdokument",
+        "ett dokument som är resultatet av det informationsutbyte som "
+        "anordnats i enlighet med artikel 13 och som upprättats för en "
+        "angiven verksamhet.")
+
+
+def test_a_superseded_wording_does_not_double_an_acts_definitions(tmp_path):
+    # PBL 1 kap. 4 § stands in the artifact twice, as the wording expiring
+    # 2027-01-01 and the one entering into force the same day. `sfs.nf`
+    # suppresses the id of the variant that is not in force, and counting both
+    # gives the act twice the definitions it states.
+    def definition(term, pid):
+        return {"type": "stycke", "id": pid,
+                "text": [{"kind": "term", "predicate": "dcterms:subject",
+                          "text": term, "uri": "https://lagen.nu/begrepp/X"},
+                         ": ett område avsett för ett gemensamt behov,"]}
+
+    art = law([{"type": "kapitel", "id": "K1", "children": [
+        {"type": "paragraf", "id": "K1P4", "ordinal": "4",
+         "upphor": "2027-01-01",
+         "children": [definition("allmän plats", "K1P4S1")]},
+        {"type": "paragraf", "id": None, "ordinal": "4",
+         "ikrafttrader": "2027-01-01",
+         "children": [definition("allmän plats", None)]}]}])
+    scanned = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))
+    assert [(d["term"], d["place"], d["place_label"])
+            for d in scanned["definitions"]] \
+        == [("allmän plats", "K1P4", "1 kap. 4 §")]
+    # the character and paragraf counts are deliberately untouched: measures 1,
+    # 2 and 9 have always counted every variant
+    assert scanned["paragrafer"] == 2
+
+
+def test_a_corrigendum_does_not_republish_an_acts_definitions(tmp_path):
+    # 32006R1907R(01) reprints REACH whole; its 44 definitions are the parent
+    # act's, counted a second time. The article lengths keep it -- that measure
+    # is about how well each manifestation parsed.
+    def act(celex):
+        return write_artifact(tmp_path, celex + ".json", {
+            "celex": celex, "doctype": "regulation", "lang": "swe",
+            "title": "Testförordning", "date": "2006-12-30",
+            "structure": [{"type": "article", "num": "3", "children": [
+                {"type": "paragraph", "id": "3.1", "num": "1",
+                 "defines": "ämne",
+                 "text": "ämne: ett kemiskt grundämne och dess föreningar."}]}]})
+
+    assert [d["term"] for d in scan.scan_eurlex(act("32006R1907"))["definitions"]] \
+        == ["ämne"]
+    corrigendum = scan.scan_eurlex(act("32006R1907R(01)"))
+    assert corrigendum["definitions"] == []
+    assert len(corrigendum["lengths"]) == 1
+
+
 def test_the_artifact_drops_a_measure_s_empty_fields():
     # writing all twelve keys on every measure triples the artifact and makes a
     # diff between two builds unreadable -- and the diff is why it is stored
@@ -377,6 +474,41 @@ def test_a_scalar_with_several_numbers_answers_as_a_row_of_tiles():
         tiles=[Tile("520", "tecken"), Tile("86", "ord")]))
     assert html.count("viz-tile-val") == 2 and "viz-hero" not in html
     assert ">tecken<" in html and ">86<" in html
+
+
+def test_two_definitions_are_the_same_when_their_text_is():
+    # NIS2 art. 6.9 and CER-direktivet art. 2.6 both define "risk" and differ by
+    # three words, so they are two definitions; the same wording with a full
+    # stop added is still one.
+    nis2 = ("risk för förlust eller störning orsakad av en incident, som ska "
+            "uttryckas som en kombination av omfattningen av förlusten eller "
+            "störningen och sannolikheten för att en sådan incident inträffar.")
+    cer = nis2.replace("en sådan incident inträffar", "incidenten inträffar")
+    assert compute._definition_key(nis2) != compute._definition_key(cer)
+    assert compute._definition_key(nis2) == compute._definition_key(
+        "Risk för förlust eller  störning orsakad av en incident, som ska "
+        "uttryckas som en kombination av omfattningen av förlusten eller "
+        "störningen och sannolikheten för att en sådan incident inträffar")
+
+
+def test_an_act_states_its_definitions_somewhere_citable():
+    # CRR states 188 definitions in 8 articles, so the row names the first one
+    # in reading order and counts the rest -- and links to that article, not to
+    # the act's first page. An act that gathers them in one just says which.
+    def defs(*places):
+        return [{"place": a, "place_label": t} for a, t in places]
+
+    assert compute._definition_place(
+        defs(("3", "artikel 3"), ("3", "artikel 3"))) == ("3", "artikel 3")
+    # reading order, not sorted: article 4 comes before 142, and "142" < "4"
+    assert compute._definition_place(
+        defs(("4", "artikel 4"), ("142", "artikel 142"), ("192", "artikel 192"))) \
+        == ("4", "artikel 4 och 2 andra")
+    # the citation is not the anchor: 82/714/EEG's "Artikel 1.01" anchors as
+    # "1-001", because the dot separates anchor segments
+    assert compute._definition_place(defs(("1-001", "artikel 1.01"))) \
+        == ("1-001", "artikel 1.01")
+    assert compute._definition_place(defs((None, ""))) == (None, None)
 
 
 def test_text_age_weights_every_paragraf_by_its_own_amendment():

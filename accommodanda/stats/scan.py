@@ -44,6 +44,120 @@ RE_TITLE_MARKER = re.compile(r"/[^/]*?(?:upphör att gälla|träder i kraft)[^/]
 RE_CHAIN = re.compile(r"om ändring i ", re.I)
 
 
+# --------------------------------------------------------------------------
+# defined terms
+# --------------------------------------------------------------------------
+#
+# A definition is whatever the corpus marks as one: an eurlex definitions-article
+# point (`eurlex.definitions` stamps `defines` at parse time) and every SFS term
+# run `sfs.begrepp` mints, in all four of its modes. A brottsrubricering ("…
+# dömes för fyndförseelse till böter") and a parenthesised coinage ("… (dödning)")
+# state a definition too -- the hard part is only telling which words of the
+# sentence *are* the definition, and these measures never need to know.
+#
+# So the text stored here is the whole node, and it does one job: two definitions
+# of the same term count as one when their text is the same (measure 54). That
+# makes the shorter unit a nicety, not a correctness question -- the finer
+# sentence pick belongs to `catalog.definition_sentences`, which quotes the text
+# on the begrepp page and does have to get the boundary right.
+
+# The phrases that hand a definition to another text, and what a pure pointer
+# may put in front of one: a determiner and up to three words restating the
+# defined term -- "en molntjänst enligt definitionen i …", "personuppgifter:
+# uppgifter enligt definitionen i artikel 2 a i …". A definition that opens this
+# way defines nothing itself; it points at the dataskyddsförordning rather than
+# stating a 36th definition of personuppgifter.
+_LEAD = r"(?:(?:en|ett|den|det|de|dessa|sådan[at]?|sådana)\s+)?(?:[^\s,.:;]+\s+){0,3}"
+_CUE = (r"enligt (?:definitionen|den definition som|artikel|led|bilaga|kapitel)"
+        r"|i den mening som avses"
+        r"|som (?:avses|definieras|anges|har definierats|det definieras)"
+        r"|såsom (?:den|det|de|dessa) definieras"
+        r"|i enlighet med (?:definitionen|artikel)"
+        r"|har (?:samma betydelse|den (?:betydelse|innebörd|lydelse) som)"
+        r"|detsamma som (?:i|enligt|det)|samma (?:betydelse|innebörd) som"
+        r"|definieras i")
+RE_XREF_HEAD = re.compile(r"^\s*(?P<lead>%s)(?:%s)\b" % (_LEAD, _CUE), re.I)
+# a word in that lead is a restatement only when it is a word of the term, or a
+# word the term is built from ("uppgifter" for "personuppgifter"). Without the
+# test, "område: en yta som anges av gemenskapen och medlemsstaten och som
+# omfattar en eller flera anläggningar …" reads as a pointer, and it is a
+# definition. Short words are no evidence either way.
+_HEAD_MIN = 4
+RE_WORD = re.compile(r"[^\W\d_]+")
+# a term has to be a word: the SFS detector occasionally reads a bare number or
+# a spaced-out heading ("d ö d s b o d e l ä g a r e") as one
+RE_WORDY = re.compile(r"[^\W\d_]{2}")
+_WS = re.compile(r"\s+")
+
+
+def _flat(text):
+    return _WS.sub(" ", (text or "").replace("\xa0", " ")).strip()
+
+
+def definition_body_eu(term, text):
+    """An EU definition point's body -- its text with the ``term:`` head removed
+    ("risk: risk för förlust …" -> "risk för förlust …")."""
+    t = _flat(text)
+    if t.lower().startswith(term.lower()):
+        t = t[len(term):].lstrip()
+    return t.lstrip(":").strip()
+
+
+def definition_body_sfs(term, text):
+    """A Swedish definition's text: the node's own, with the ``term:`` head
+    removed where it carries one ("konsument: en fysisk person …"). A node in
+    any other shape keeps its text whole -- the sentence around a
+    brottsrubricering or a parenthesised coinage says what the term means
+    without setting it off, and cutting at a boundary that is not there would
+    lose the definition rather than trim it."""
+    t = _flat(text)
+    rest = t[len(term):].lstrip() if t.lower().startswith(term.lower()) else ""
+    return rest[1:].strip() or t if rest.startswith(":") else t
+
+
+def is_cross_reference(term, body):
+    """Whether the definition only points at another text's definition -- the
+    cue reached after nothing but a restatement of the defined term.
+
+    Measured over the corpus's 31 589 definition statements this marks 2 727
+    (8.6 %). Of 30 marked statements read by hand, 29 were pointers and one was
+    not ("område med stor påverkan: ett område som definieras av en i artikel
+    2.1 förtecknad entitet, som rymmer alla tillgångar …", which carries its own
+    substance after the reference); of 20 kept statements that carry a cue
+    anyway, all 20 stated a definition of their own. It under-detects rather
+    than over-detects: a pointer that restates the term with a synonym
+    ("konkurs: insolvensförfaranden i den mening som avses i …") is left in,
+    which costs a definition too many rather than a definition lost."""
+    m = RE_XREF_HEAD.match(body)
+    if not m:
+        return False
+    lead = m.group("lead").lower()
+    return not lead.strip() or any(len(w) >= _HEAD_MIN and w in term.lower()
+                                   for w in RE_WORD.findall(lead))
+
+
+def superseded_variant(node):
+    """Whether `node` is a temporal variant the projection ruled out of force --
+    a wording that has expired, or one that does not apply yet.
+
+    `sfs.nf` suppresses such a node's id at parse time (`in_effect`), so an
+    id-less node carrying an ``upphor``/``ikrafttrader`` date is exactly the
+    variant that is not the law today. PBL 1 kap. 4 § is in the artifact twice
+    for this reason -- the wording expiring 2027-01-01 and the one entering into
+    force the same day -- and counting both gives the act 62 definitions where it
+    states 35."""
+    return not node.get("id") and bool(node.get("upphor") or node.get("ikrafttrader"))
+
+
+def _definition(term, body):
+    """One definition statement, or None when the term or the body is unusable.
+    The caller adds the citable place it knows (`place`/`place_label`)."""
+    term = _flat(term)
+    if not body or not RE_WORDY.search(term):
+        return None
+    return {"term": term, "body": body, "xref": is_cross_reference(term, body)}
+
+
 def load(path):
     """The artifact at `path`, or None when it is a zero-byte SkipDocument
     placeholder. Empty artifacts are the pipeline's documented way of recording
@@ -111,13 +225,30 @@ def scan_sfs(path):
 
     chars = paragrafer = kapitel = stycken = 0
     lengths = []                       # (chars, anchor, beteckning) per paragraf
+    definitions = []                   # the act's explicit definition statements
 
-    def walk(node):
+    def walk(node, paragraf=None, superseded=False):
         nonlocal chars, paragrafer, kapitel, stycken
         kind = node.get("type")
         if kind == "redaktionell":
             return          # the publisher's note, not the statute's text
         chars += len(_own_text(node))
+        superseded = superseded or superseded_variant(node)
+        # a defined term is marked inline (`sfs.begrepp` mints the dcterms:subject
+        # run over the definiendum's own span), so the statement defining it is
+        # the node the run sits in and the paragraf is the citable place. Only
+        # the definitions skip a superseded wording: the character and paragraf
+        # counts above have always counted every variant, and quietly changing
+        # what measures 1, 2 and 9 stand for is not this measure's business.
+        for run in (node.get("text") or []) if not superseded else ():
+            if isinstance(run, dict) and run.get("kind") == "term" \
+                    and run.get("predicate") == "dcterms:subject":
+                term = run.get("text") or ""
+                found = _definition(
+                    term, definition_body_sfs(term, _subtree_text(node)))
+                if found:
+                    definitions.append({**found, "place": paragraf,
+                                        "place_label": human_fragment(paragraf)})
         if kind == "kapitel":
             kapitel += 1
         elif kind == "stycke":
@@ -140,7 +271,7 @@ def scan_sfs(path):
                 if where:
                     lengths.append((len(body), node["id"], where))
         for child in node.get("children") or []:
-            walk(child)
+            walk(child, node["id"] if kind == "paragraf" else paragraf, superseded)
 
     for block in art.get("structure") or []:
         walk(block)
@@ -181,6 +312,7 @@ def scan_sfs(path):
         "chars": chars, "paragrafer": paragrafer,
         "kapitel": kapitel, "stycken": stycken,
         "paragraf_lengths": lengths,
+        "definitions": definitions,
         "amendments": amendments,
     }
 
@@ -281,7 +413,23 @@ def scan_eurlex(path):
         return None
     lengths = []
     nums = []
+    definitions = []
     amending = False
+    # a corrigendum ("32006R1907R(01)") republishes an act we already hold, so
+    # its definitions are the parent act's counted a second time. The article
+    # lengths keep it -- that measure is about parse quality of every
+    # manifestation -- but a definition census must not double-count an act.
+    republication = "(" in celex
+
+    def defs(node, article):
+        if node.get("defines"):
+            term = node["defines"]
+            found = _definition(
+                term, definition_body_eu(term, _subtree_text(node)))
+            if found:
+                definitions.append({**found, **article})
+        for child in node.get("children") or []:
+            defs(child, article)
 
     def walk(node):
         nonlocal amending
@@ -291,15 +439,27 @@ def scan_eurlex(path):
             lengths.append((len(body), node.get("num"), not _stray(body)))
             nums.append(node.get("num"))
             amending = amending or bool(RE_AMEND.search(body[:200]))
+            if not republication:
+                # the article the points belong to is where a reader is sent,
+                # and its own `label` is the citation the page prints -- the
+                # anchor is not ("Artikel 1.01" anchors as "1-001", since the
+                # dot separates anchor segments). Lower-cased because the row
+                # prints it after the act's name, not on its own.
+                label = node.get("label") or ""
+                article = {"place": node.get("id"),
+                           "place_label": label[:1].lower() + label[1:]}
+                for child in node.get("children") or []:
+                    defs(child, article)
             return
         for child in node.get("children") or []:
             walk(child)
 
     for block in art.get("structure") or []:
         walk(block)
-    return {"celex": celex, "doctype": art.get("doctype"),
+    return {"celex": celex, "uri": art.get("uri"), "doctype": art.get("doctype"),
             "title": art.get("title") or "", "date": art.get("date"),
             "lang": art.get("lang"), "lengths": lengths,
+            "definitions": definitions,
             "amending": amending,
             "multi_instrument": _restarts(nums)}
 

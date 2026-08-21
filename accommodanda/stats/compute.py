@@ -1,4 +1,4 @@
-"""Compute the 51 corpus measurements into a `Report`.
+"""Compute the 53 corpus measurements into a `Report`.
 
 Two data sources, deliberately in this order of preference:
 
@@ -27,11 +27,13 @@ lede that names two of five reads as though the other three do not exist.
 
 import collections
 import datetime
+import re
 import statistics
 from concurrent.futures import ProcessPoolExecutor
 
 from ..lib import catalog, layout, util
 from ..lib.facets import flow_group
+from ..lib.markdown import begrepp_uri
 from ..lib.page import register_anchor
 from ..lib.pinpoint import citation
 from . import scan
@@ -138,6 +140,35 @@ def _prop_label(identifier, found):
             if title and not title.startswith(identifier) else identifier)
 
 
+def _definition_place(definitions):
+    """Where an act states its definitions, as (anchor, citation) for the *first*
+    one in reading order -- ("4", "artikel 4 och 7 andra"), ("K1P5", "1 kap. 5 §").
+
+    An act may hold several definition articles: CRR states 188 definitions in
+    8 of them, each headed "Definitioner" (4, 5, 142, 192, 242, 272, 300, 411).
+    The row has to land the reader on one rather than on the act's first page,
+    so the link goes to the first in reading order and the count goes in the
+    text beside it. Each definition carries its own place and the citation for
+    it (`scan._definition`'s callers), because the two corpora write one
+    differently and an anchor is not always the citation: 82/714/EEG's
+    "Artikel 1.01" anchors as "1-001". (None, None) when the act states its
+    definitions nowhere citable."""
+    places = dict.fromkeys((d["place"], d["place_label"])
+                           for d in definitions if d["place"])
+    if not places:
+        return None, None
+    (anchor, where), *rest = places
+    return anchor, (where if not rest
+                    else "%s och %d andra" % (where, len(rest)))
+
+
+def _definition_key(body):
+    """Two definitions are the same definition when their text is the same --
+    compared with case and trailing punctuation set aside, so "personuppgifter"
+    is not credited with a second definition for a full stop."""
+    return re.sub(r"[\s.,;:]+$", "", " ".join(body.split()).lower())
+
+
 def _paragraf_uri(t):
     """The paragraf's own url, not its statute's -- the row promises a specific
     paragraf, so the link has to land on it. The anchor is the node id the
@@ -182,7 +213,7 @@ def run_scans(jobs=None, progress=None):
 
 
 # ==========================================================================
-# A. the statute book: size and shape (1-9)
+# A. the statute book: size and shape (1-9, 53-54)
 # ==========================================================================
 #
 # The size-and-shape measures share one form, the rank profile: every value
@@ -378,6 +409,93 @@ def _group_a(con, s):
                Tile("%d" % (hours / 24), "dygns högläsning")],
         lede="All gällande författningstext tillsammans. Med ett tempo på 150 ord i minuten "
              "tar det %d dygn (utan paus) att läsa upp den." % (hours / 24))
+
+    # 53-54 -- the defined vocabulary. Only an explicit definition statement is
+    # counted (scan.definition_body_*): the EU definitions article's points, and
+    # the Swedish term list and löptext forms. Population is gällande rätt on the
+    # Swedish side (`laws` is already narrowed); the EU side has no in-force data
+    # in the catalog, so it is every act of sectors 1 and 3 we hold.
+    eu_defs = [r for r in s["eurlex"] if r["definitions"]]
+    sfs_defs = [r for r in laws if r["definitions"]]
+    descriptive = dict(_q(con, "SELECT uri, descriptive FROM documents "
+                               "WHERE source IN ('sfs','eurlex') "
+                               "  AND descriptive IS NOT NULL"))
+
+    def act_row(r, group):
+        # the row promises the act's definitions, so it links to the article or
+        # paragraf that states them, not to the act's first page
+        anchor, where = _definition_place(r["definitions"])
+        return Row(_shorten(descriptive.get(r["uri"]) or r["title"], 70),
+                   len(r["definitions"]),
+                   "%s#%s" % (r["uri"], anchor) if anchor else r["uri"],
+                   where, group=group)
+
+    yield Measure(
+        53, "A", "Rättsakterna med flest definitioner", "toplist",
+        unit="definitioner",
+        lede="%s EU-rättsakter och %s gällande svenska författningar räknar upp "
+             "sina egna definitioner. Tillsammans blir det %s definitioner. "
+             "Varje definierad term länkas sedan där den används i resten av "
+             "akten."
+             % ("{:,}".format(len(eu_defs)).replace(",", " "),
+                "{:,}".format(len(sfs_defs)).replace(",", " "),
+                "{:,}".format(sum(len(r["definitions"])
+                                  for r in eu_defs + sfs_defs)).replace(",", " ")),
+        rows=([act_row(r, "EU-rättsakter")
+               for r in sorted(eu_defs, key=lambda r: -len(r["definitions"]))[:10]]
+              + [act_row(r, "Svenska författningar")
+                 for r in sorted(sfs_defs, key=lambda r: -len(r["definitions"]))[:6]]))
+
+    # A begrepp's definitions, one entry per *textually distinct* wording. NIS2
+    # art. 6.9 and CER-direktivet art. 2.6 both define "risk" and differ, so they
+    # are two; a definition that only points elsewhere ("personuppgifter:
+    # personuppgifter enligt definitionen i artikel 4.1 i förordning (EU)
+    # 2016/679") states none of its own and is left out.
+    #
+    # Keyed on the *concept*, not on the surface form the act happens to write:
+    # a term's identity in this corpus is its begrepp uri after the inflection
+    # fold (`catalog.canonicalize_concepts`), which is what the page the row
+    # links to counts. Keyed on the surface form instead, 382 concepts split in
+    # two (`Personuppgift` into personuppgift + personuppgifter) and the row
+    # printed a number the page it points at contradicts.
+    canonical = dict(_q(con, "SELECT variant, canonical FROM concept_alias"))
+    concept_name = dict(_q(con, "SELECT uri, label FROM documents "
+                                "WHERE source = 'begrepp'"))
+    wordings = collections.defaultdict(set)
+    holders = collections.defaultdict(set)
+    terms: dict[str, str] = {}     # concept uri -> the term as the acts write it
+    stated = crossrefs = 0
+    for r in eu_defs + sfs_defs:
+        for d in r["definitions"]:
+            stated += 1
+            if d["xref"]:
+                crossrefs += 1
+                continue
+            uri = begrepp_uri(d["term"])
+            uri = canonical.get(uri, uri)
+            wordings[uri].add(_definition_key(d["body"]))
+            holders[uri].add(r["uri"])
+            terms.setdefault(uri, d["term"])
+    ranked = sorted(wordings.items(), key=lambda kv: -len(kv[1]))[:12]
+    yield Measure(
+        54, "A", "Begreppen som definieras på flest sätt", "toplist",
+        unit="olika definitioner",
+        lede="Rättskällorna ställer upp %s definitioner. %s av dem hänvisar bara "
+             "vidare till en annan text och räknas inte som egna. De övriga "
+             "definierar %s olika begrepp, och två av dem räknas som samma "
+             "definition när de har samma lydelse."
+             % ("{:,}".format(stated).replace(",", " "),
+                "{:,}".format(crossrefs).replace(",", " "),
+                "{:,}".format(len(wordings)).replace(",", " ")),
+        # every concept the catalog holds carries a label; one it does not hold
+        # gets neither a name nor a link, and is named by the term as the acts
+        # write it. 1 901 of 22 283 defined concepts have no `documents` row --
+        # none of them near the top, but the row must not link to a page that
+        # is not there
+        rows=[Row(concept_name.get(uri) or terms[uri], len(bodies),
+                  uri if uri in concept_name else None,
+                  "i %d dokument" % len(holders[uri]))
+              for uri, bodies in ranked])
 
 
 # ==========================================================================
@@ -1133,7 +1251,7 @@ def _in_force(con, scans):
 
     Gällande rätt is the default population: a reader asking how long the
     longest law is means one that *is* a law, not the Kommunalskattelag repealed
-    in 1999. Narrowing once here rather than at 52 call sites means a measure
+    in 1999. Narrowing once here rather than at 53 call sites means a measure
     that genuinely needs the whole history -- churn, lifespan, "how many have
     been repealed" -- has to reach for `laws_all` by name, so counting repealed
     acts is always a visible decision in the measure that does it, never an

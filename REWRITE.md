@@ -4191,12 +4191,12 @@ both no network. `untc` has run a real download+parse+relate+generate harvest:
 all 14 curated treaties are live on `/folkratt/` and `/untc/{unts}`. `icc` is
 wired the same way; see its own bullet above for its test/harvest status.
 
-### 7k. stats vertical — 51 measurements of the corpus ✅ (first cut)
+### 7k. stats vertical — 53 measurements of the corpus ✅ (first cut)
 
 `accommodanda/stats/` inverts every other vertical's direction: there is
 nothing to download and no document to parse, because the corpus *is* the
 input. It reads the finished catalog and artifact trees, writes one artifact
-holding 51 measurements, and renders that to `/statistik`. The measurement
+holding 53 measurements, and renders that to `/statistik`. The measurement
 catalog — each number with its provenance and its status — is
 [`docs/prd-stats.md`](docs/prd-stats.md).
 
@@ -4241,7 +4241,7 @@ catalog — each number with its provenance and its status — is
   `histogram`/`bars`/`matrix`/`sankey`/`table`) is the on-disk discriminator the renderer
   dispatches on, chosen by *what the data's job is* so the renderer never guesses
   a chart form. `Report.to_artifact()` prunes a measure's empty fields — writing
-  all twelve keys on all 51 triples the artifact and makes a diff unreadable, and
+  all twelve keys on all 53 triples the artifact and makes a diff unreadable, and
   the diff is the point of storing it. `note` is where a measure could admit a
   population caveat beyond its `lede`, rendered *on* the figure; every use
   was pulled at the user's request in favour of folding the same information
@@ -4256,7 +4256,7 @@ catalog — each number with its provenance and its status — is
   **provenance markers and renumbering stubs do not** (counted naively, "*Lag
   (2011:590).*" is the shortest rule in Swedish law). It also reads
   `downloaded/sfs/` for change-act titles, which the artifact does not carry.
-- **`compute.py`** — the 51 measures in seven groups (A–G), preferring catalog
+- **`compute.py`** — the 53 measures in seven groups (A–G), preferring catalog
   SQL over the scan wherever the data is in the catalog. That preference is also
   the roadmap: every measure reaching for `scan` today is one `relate` could
   serve from SQL tomorrow (the PRD's R1–R3). Three measures the first cut left
@@ -4275,6 +4275,24 @@ catalog — each number with its provenance and its status — is
   Narrowing once here rather than at each call site means reaching for the
   whole history is always a visible, named decision in the measure that makes
   it.
+- **Defined terms (53, 54).** Which act states the most definitions, and which
+  term the corpus defines in the most different ways. Only an *explicit
+  definition statement* counts, and the two corpora write one differently: an
+  EU act's definitions-article point (`eurlex.definitions` stamps `defines` on
+  it at parse time) and the Swedish term-list item ("konsument: en fysisk person
+  …") or löptext form ("Med detaljhandel avses i denna lag …"). `sfs.begrepp`
+  also marks two things that state no definition — a brottsrubricering, and an
+  abbreviation coined in a parenthesis — and counting them takes the measure
+  over: "allmän dataskyddsförordning" is coined in 170 acts inside 90 different
+  surrounding sentences, which reads as 90 competing definitions of a term
+  nobody disputes. Two further exclusions: a definition that only points
+  elsewhere ("personuppgifter: personuppgifter enligt definitionen i artikel 4.1
+  i förordning (EU) 2016/679") states none of its own, and a superseded temporal
+  wording is not the law today — PBL 1 kap. 4 § stands in the artifact twice,
+  once expiring 2027-01-01 and once entering into force then, which would give
+  the act 62 definitions where it states 34. Two definitions count as one when
+  their text is the same, so NIS2 art. 6.9 and CER-direktivet art. 2.6 are two
+  definitions of "risk" — they differ by three words.
 - **Where a measure's population had to shrink, it says so on the figure.**
   Notice period is a measure of *base statutes* only: the amendment register
   carries `rpubl:utfardandedatum` on 11 of 50,948 entries and the download tree
