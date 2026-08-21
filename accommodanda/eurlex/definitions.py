@@ -59,12 +59,39 @@ _COLON = re.compile(r"\s*:\s*")
 _TERM_MAX = 80   # a definition's lead term is short; a long head means the colon
                  # sits mid-prose, not at a definition boundary
 
+# An amending act writes its instructions in exactly the shape a definition has:
+# "Artikel 6 ska ersättas med följande: <the whole replacement article>". When
+# such an act's article carries a definitions-looking heading -- 2014/48/EU
+# article 1 is headed "Definitioner av vissa termer", because that is the
+# heading of the article it *inserts* -- every instruction under it reads as a
+# definition, and 2026/1183 art. 1.7 became a 47 kB "definition" of the concept
+# "Artiklarna 67-112 ska ersättas med följande".
+#
+# A definiendum is a noun phrase; an instruction is a clause, and its verb is a
+# ska-passive. The two separate on where the "ska" sits: a term carries one only
+# inside a relative clause ("sammanlagt belopp som ska betalas av konsumenten",
+# "kemikalie för vilken exportanmälan ska ske"), an instruction leads with it.
+# Measured over the corpus's 27 289 defined terms: 268 contain "ska", the test
+# rejects 250 and every one of them is an instruction; the 18 it keeps are real
+# terms. No amending instruction reaches it without a "ska" -- the four that
+# carry another amending verb ("betecknas") are genuine terms.
+_SKA = re.compile(r"^(.*?)\bska\b", re.I | re.S)
+_RELATIVE = re.compile(r"\b(som|vilken|vilket|vilka|där|när)\b", re.I)
+
 
 def _is_intro(text, lang):
     """Whether `text` is the line *announcing* a definitions list ("I detta
     direktiv gäller följande definitioner:") rather than a definition itself."""
     spec = DEFN_VOCAB.get(lang, DEFN_VOCAB["eng"])
     return any(p in (text or "").lower() for p in spec["intro"])
+
+
+def _is_amendment(head):
+    """Whether `head` instructs a change to a text rather than naming a term --
+    "Artikel 6 ska ersättas med följande", "Följande punkt ska läggas till"
+    (see _SKA)."""
+    m = _SKA.search(head)
+    return bool(m) and not _RELATIVE.search(m.group(1))
 
 
 def _term_of(point_text, lang):
@@ -75,12 +102,13 @@ def _term_of(point_text, lang):
     a colon like a definition does and is itself a numbered paragraph in some acts
     (2015/1535 art. 1.1), so it would otherwise be read as defining its whole self.
     Testing the head rather than the block keeps the same phrase inside a genuine
-    definition ("tjänst: … I denna definition avses med …") harmless."""
+    definition ("tjänst: … I denna definition avses med …") harmless. An amending
+    instruction is rejected on the head for the same reason."""
     if not _COLON.search(point_text):
         return None
     head = _COLON.split(point_text, 1)[0].strip()
     if (2 <= len(head) <= _TERM_MAX and any(c.isalpha() for c in head)
-            and not _is_intro(head, lang)):
+            and not _is_intro(head, lang) and not _is_amendment(head)):
         return head
     return None
 

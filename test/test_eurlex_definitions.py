@@ -61,6 +61,28 @@ def test_term_of_rejects_non_definition_points():
     assert _term_of("I detta direktiv gäller följande definitioner:", "swe") is None
 
 
+def test_an_amending_instruction_is_not_a_defined_term():
+    """An amending act writes its instructions in exactly a definition's shape,
+    and 2014/48/EU article 1 is headed "Definitioner av vissa termer" -- the
+    heading of the article it *inserts* -- so every instruction under it read as
+    a definition. 2026/1183 art. 1.7 became a 47 kB "definition" of the concept
+    "Artiklarna 67-112 ska ersättas med följande"."""
+    for head in ("Artikel 6 ska ersättas med följande",
+                 "Artiklarna 67–112 ska ersättas med följande",
+                 "Följande punkt ska läggas till",
+                 "I artikel 20 ska följande punkt läggas till som punkt 5",
+                 "Artikel 27 ska ändras på följande sätt"):
+        assert _term_of(head + ": den nya texten", "swe") is None, head
+
+    # a term carries "ska" only inside a relative clause, and keeps it: 18 of the
+    # corpus's 268 ska-bearing heads are real terms and all 18 read this way
+    for term in ("sammanlagt belopp som ska betalas av konsumenten",
+                 "kemikalie för vilken exportanmälan ska ske",
+                 "garanti som ska infrias på anfordran",
+                 "enheter som inte ska undersökas"):
+        assert _term_of(term + ": en beskrivning.", "swe") == term
+
+
 def test_extract_definitions_anchors_points_and_maps_terms():
     body = [Block("article", "Artikel 5 – Definitioner", num="5", anchor="5"),
             Block("paragraph", "I detta direktiv gäller följande definitioner:"),
