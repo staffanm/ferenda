@@ -449,31 +449,28 @@
   }
 
   function collectionToolbar() {
-    var mast = document.querySelector('.masthead .mast-inner');
-    if (!mast) return;
+    var tools = document.querySelector('.masthead .mast-tools');
+    if (!tools) return;
     var control = document.createElement('a');
     control.className = 'collection-toolbar';
-    control.innerHTML = COLLECTION_ICON + '<span class="collection-badge"></span>';
-    var theme = mast.querySelector('.theme-toggle');
-    if (theme) mast.insertBefore(control, theme);
-    else mast.appendChild(control);
+    control.innerHTML = COLLECTION_ICON + '<span class="mast-badge"></span>';
+    tools.insertBefore(control, tools.firstChild);
 
     function render(state, animate) {
       var count = state.items.length;
-      control.href = '/samling#' + wire(state);
+      control.hidden = !count;          // an empty collection shows no icon
+      // the control is hidden, not removed, so its attributes stay in the DOM:
+      // clearing them keeps the last collection's recipe out of the href
+      control.href = '/samling' + (count ? '#' + wire(state) : '');
       control.title = count ? 'Visa samlingen (' + count + ')' : 'Samlingen är tom';
       control.setAttribute('aria-label', control.title);
-      control.setAttribute('aria-disabled', count ? 'false' : 'true');
-      control.querySelector('.collection-badge').textContent = count || '';
+      control.querySelector('.mast-badge').textContent = count || '';
       if (animate && count) {
         control.classList.remove('collection-arrived');
         void control.offsetWidth;
         control.classList.add('collection-arrived');
       }
     }
-    control.addEventListener('click', function (event) {
-      if (control.getAttribute('aria-disabled') === 'true') event.preventDefault();
-    });
     control.addEventListener('animationend', function () {
       control.classList.remove('collection-arrived');
     });

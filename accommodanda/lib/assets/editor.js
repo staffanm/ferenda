@@ -16,7 +16,7 @@
   var REF = meta && meta.dataset.ref;
   var SOURCE = meta && meta.dataset.source;      // patch identity (if patchable)
   var BASEFILE = meta && meta.dataset.basefile;
-  var me = null, cartEl = null;
+  var me = null, badgeEl = null;
 
   function j(url, opts) {
     opts = opts || {};
@@ -39,7 +39,7 @@
   function boot(u) {
     me = u;
     account();
-    if (me) { mountCart(); refreshCart(); enableEditing(); }
+    if (me) { refreshCart(); enableEditing(); }
   }
   if (/(?:^|;\s*)lagen_editor_hint=/.test(document.cookie)) {
     j(API + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
@@ -51,18 +51,37 @@
     boot(null);
   }
 
-  // A logged-in editor keeps a header indicator (who they are · Logga ut). An
-  // anonymous reader gets no sign-in affordance in the masthead -- login lives on
-  // its own /admin/ page (adminPage below), so the reader chrome stays clean.
+  // A logged-in editor keeps a masthead control of their own: the same 2rem
+  // circle the collection and theme controls use, carrying their initials and
+  // -- once something is in the cart -- the count of uncommitted changes. It
+  // opens the account panel (the cart, the commit form, logout). An anonymous
+  // reader gets no sign-in affordance in the masthead -- login lives on its own
+  // /admin/ page (adminPage below), so the reader chrome stays clean.
   function account() {
-    var mast = document.querySelector('header.masthead');
-    if (mast && me) {
-      var box = el('span', 'ed-account');
-      box.innerHTML = esc(me.name) + ' · <a href="#" class="ed-logout">Logga ut</a>';
-      mast.appendChild(box);
-      box.querySelector('.ed-logout').addEventListener('click', logout);
+    var tools = document.querySelector('.masthead .mast-tools');
+    if (tools && me) {
+      var box = el('button', 'ed-account');
+      box.type = 'button';
+      box.innerHTML = '<span class="ed-initials">' + esc(initials(me.name)) +
+                      '</span><span class="mast-badge"></span>';
+      tools.appendChild(box);
+      badgeEl = box.querySelector('.mast-badge');
+      box.addEventListener('click', checkout);
+      setCart(0);            // the label, until GET /edit/cart says otherwise
     }
     adminPage();
+  }
+
+  // "Staffan Malmgren" -> "SM"; a single-word name gives one letter
+  function initials(name) {
+    return (name || '?').trim().split(/\s+/).slice(0, 2)
+      .map(function (w) { return w.charAt(0).toUpperCase(); }).join('');
+  }
+  // who the editor is, plus what they have not committed yet -- the one place
+  // that sentence is written, used by the control's label and the panel head
+  function accountLabel(n) {
+    return 'Inloggad som ' + me.name +
+      (n > 0 ? ' · ' + n + (n === 1 ? ' osparad ändring' : ' osparade ändringar') : '');
   }
 
   function logout(e) {
@@ -186,14 +205,13 @@
   }
 
   // ---- cart + checkout --------------------------------------------------
-  function mountCart() {
-    cartEl = el('button', 'ed-cart'); cartEl.type = 'button'; cartEl.style.display = 'none';
-    cartEl.addEventListener('click', checkout); document.body.appendChild(cartEl);
-  }
+  // The cart has no widget of its own; its size rides as a badge on the
+  // account control, the way the collection count does on its own icon.
   function setCart(n) {
-    if (!cartEl) return;
-    cartEl.textContent = '🧺 ' + n + (n === 1 ? ' ändring' : ' ändringar');
-    cartEl.style.display = n > 0 ? 'block' : 'none';
+    if (!badgeEl) return;
+    badgeEl.textContent = n > 0 ? n : '';
+    badgeEl.parentNode.title = accountLabel(n);
+    badgeEl.parentNode.setAttribute('aria-label', badgeEl.parentNode.title);
   }
   function refreshCart() { j(API + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { setCart((d.drafts || []).length); }); }
 
@@ -201,7 +219,8 @@
 
   function checkoutPanel(drafts) {
     var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
-    p.appendChild(el('h3', null, 'Dina ändringar (' + drafts.length + ')'));
+    p.appendChild(el('h3', null, esc(accountLabel(0))));
+    p.appendChild(el('h4', null, 'Dina ändringar (' + drafts.length + ')'));
     var ul = el('ul', 'ed-cart-list'); p.appendChild(ul);
     drafts.forEach(function (dr) {
       var li = el('li', null, '<span>' + esc(label(dr.kind, dr.ref, dr.anchor)) + '</span>');
@@ -216,10 +235,12 @@
     if (!drafts.length) { p.appendChild(el('p', null, 'Korgen är tom.')); }
     var ta = el('textarea', 'ed-msg'); ta.placeholder = 'Beskriv ändringen (blir commit-meddelandet)';
     p.appendChild(ta);
-    var row = el('div', 'ed-row', '<button class="ed-cancel">Stäng</button><button class="ed-commit">Spara allt</button>');
+    var row = el('div', 'ed-row', '<button class="ed-logout">Logga ut</button>' +
+      '<button class="ed-cancel">Stäng</button><button class="ed-commit">Spara allt</button>');
     p.appendChild(row);
     var err = el('div', 'ed-err'); p.appendChild(err);
     row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
+    row.querySelector('.ed-logout').addEventListener('click', logout);
     var commitBtn = row.querySelector('.ed-commit');
     if (!drafts.length) commitBtn.disabled = true;
     commitBtn.addEventListener('click', function () {

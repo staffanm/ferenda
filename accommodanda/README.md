@@ -1127,13 +1127,15 @@ editorial pages edit their whole markdown body. The editor has a link toolbar
 that turns a search hit into an `sfs:`/`eurlex:`/`begrepp:` link.
 
 Edits accumulate in a per-user **cart** (`DATA/.build/edits/<user>.json`, kept
-out of the working tree so users don't collide). "Checkout" opens a
-commit-message box and turns the whole cart into **one git commit authored as
-that user** — byte-for-byte the history a `git clone` + commit would produce — 
-then synchronously re-parses / re-relates / regenerates just the touched pages
-(`build.rebuild_after_commit`) so the edit is live when the request returns. A
-hunk that changed on disk since it was carted fails the checkout (409) rather
-than clobbering.
+out of the working tree so users don't collide). The masthead carries the
+logged-in editor's own control — a circle with their initials, beside the
+collection and theme circles, badged with the number of uncommitted changes —
+and it opens the checkout. Checkout takes a commit message and turns the whole
+cart into **one git commit authored as that user** — byte-for-byte the history
+a `git clone` + commit would produce — then synchronously re-parses /
+re-relates / regenerates just the touched pages (`build.rebuild_after_commit`)
+so the edit is live when the request returns. A hunk that changed on disk since
+it was carted fails the checkout (409) rather than clobbering.
 
 The routes are same-origin only (the session cookie is `SameSite=Lax`; CORS
 stays GET-open for the public read API). No new dependencies — cookie signing

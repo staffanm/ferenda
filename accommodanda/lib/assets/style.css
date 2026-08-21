@@ -87,7 +87,7 @@ a:hover { text-decoration: underline; }
 /* -- Masthead -- */
 .masthead { position: sticky; top: 0; z-index: 10; height: 4rem;
             background: var(--surf); border-bottom: 1px solid var(--rule); }
-.mast-inner { display: flex; align-items: center; gap: 1.5rem; height: 100%;
+.mast-inner { display: flex; align-items: center; gap: 1rem; height: 100%;
               max-width: var(--page-max); margin: 0 auto; padding: 0 1.5rem; }
 .masthead .brand { font-family: var(--serif); font-size: 1.5rem; font-weight: 500;
                    letter-spacing: -.015em; color: var(--ink); }
@@ -99,6 +99,29 @@ a:hover { text-decoration: underline; }
                     border: 1px solid var(--rule); border-radius: 6px;
                     font-family: var(--serif); font-style: italic; font-size: .95rem; }
 .masthead .search:hover { background: var(--surf-3); }
+/* Under about 1236px the search label wraps to a second line and the button
+   grows from 40px tall to 62px. The row does not grow with it -- .masthead
+   pins height: 4rem until 64rem -- so the taller button crowds the 64px row
+   and overflows it. Collapse the field to the same 2rem circle the other
+   masthead controls use before that can happen. */
+@media (max-width: 80rem) {
+  /* The circle joins the other controls at the end of the row (order, because
+     the DOM keeps the field before the nav for tab order and for the wide
+     layout; .mast-nav orders itself after these below 64rem). The nav takes
+     the space the flexible field used to hold, so between 64rem and 80rem it
+     sits directly after the brand. */
+  /* the geometry is restated rather than shared with the controls above: the
+     field is 36rem wide over 80rem, so only the collapsed form is a circle.
+     `cursor` is part of that -- collapsed it opens the palette on a click and
+     must not keep the text field's I-beam. */
+  .masthead .search { order: 1; flex: 0 0 auto; margin-left: auto;
+                      margin-right: -.5rem; box-sizing: border-box;
+                      width: 2rem; height: 2rem; padding: 0; gap: 0;
+                      cursor: pointer; justify-content: center;
+                      border-radius: 999px; }
+  .masthead .search > span { display: none; }   /* icon-only; opens the palette */
+  .mast-tools { order: 2; }
+}
 .masthead .search .k { margin-left: auto; font-family: var(--sans); font-style: normal;
                        font-size: .72rem; color: var(--ink-2); background: var(--surf);
                        border: 1px solid var(--rule); border-radius: 4px; padding: .1rem .5rem; }
@@ -108,15 +131,45 @@ a:hover { text-decoration: underline; }
 .mast-nav a:hover { color: var(--ink); text-decoration: none;
                     border-bottom-color: var(--ink-3); }
 .mast-nav a.on { color: var(--ink); font-weight: 500; border-bottom-color: var(--accent); }
+/* -- The masthead's icon controls (collection, theme, account) sit in one
+   group at the end of the row, closer to each other than to the nav. -- */
+.mast-tools { display: flex; flex: none; align-items: center; gap: .5rem; }
+/* Every control in that group is the same circle -- the theme toggle, the
+   collection icon and the logged-in editor's initials (.ed-account, mounted by
+   editor.js and skinned here so the group has one definition; style.css
+   already names the editor's classes in its @media print block). Each control
+   keeps only what makes it itself, below and in editor.css. The selector lists
+   the classes rather than adding a shared one to the markup, so a page
+   rendered before this change still draws its theme toggle as a circle.
+   `position: relative` is here because two of the three hang a .mast-badge off
+   their corner. */
+.theme-toggle, .collection-toolbar, .ed-account {
+  position: relative; flex: none; display: inline-flex;
+  align-items: center; justify-content: center; width: 2rem; height: 2rem;
+  box-sizing: border-box; padding: 0; cursor: pointer; color: var(--ink-2);
+  background: var(--surf-2); border: 1px solid var(--rule);
+  border-radius: 999px; transition: background-color .15s, color .15s; }
+.theme-toggle:hover, .collection-toolbar:hover, .ed-account:hover {
+  background: var(--surf-3); color: var(--accent); text-decoration: none; }
+.theme-toggle:focus-visible, .collection-toolbar:focus-visible,
+.ed-account:focus-visible { outline: 2px solid var(--accent);
+  outline-offset: 2px; }
+/* `display: inline-flex` above beats the browser's own rule for [hidden], so a
+   control that hides itself (the collection icon, when the collection is
+   empty) needs the display reset spelled out here */
+.theme-toggle[hidden], .collection-toolbar[hidden], .ed-account[hidden] {
+  display: none; }
+/* the count of documents in the collection, or of an editor's uncommitted
+   changes -- the corner badge shared by the controls that carry one */
+.mast-badge { position: absolute; top: -.38rem; right: -.42rem;
+  min-width: 1rem; height: 1rem; box-sizing: border-box; padding: 0 .22rem;
+  border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font: 600 .62rem/1rem var(--sans); text-align: center;
+  font-variant-numeric: tabular-nums; }
+.mast-badge:empty { display: none; }
 /* -- Theme toggle: a single sun/moon control; the icon reflects the scheme the
    click would switch AWAY from -- moon while light, sun while dark. -- */
-.theme-toggle { display: inline-flex; align-items: center; justify-content: center;
-                width: 2rem; height: 2rem; padding: 0; color: var(--ink-2);
-                background: var(--surf-2); border: 1px solid var(--rule);
-                border-radius: 999px; cursor: pointer;
-                transition: background-color .15s, color .15s; }
-.theme-toggle:hover { background: var(--surf-3); color: var(--ink); }
-.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle:hover { color: var(--ink); }   /* not the accent the others take */
 .theme-toggle .icon-sun { display: none; }
 .theme-toggle .icon-moon { display: inline-flex; }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: inline-flex; }
@@ -246,22 +299,6 @@ nav.toc a.toc-top { padding-right: 5.3rem; }
 .collection-add[aria-pressed="true"] { color: var(--accent); }
 
 .collection-mast-spacer { flex: 1; }
-.collection-toolbar { position: relative; flex: none; display: inline-flex;
-  align-items: center; justify-content: center; width: 2rem; height: 2rem;
-  box-sizing: border-box; color: var(--ink-2); background: var(--surf-2);
-  border: 1px solid var(--rule); border-radius: 999px;
-  transition: background-color .15s, color .15s, opacity .15s; }
-.collection-toolbar:hover { color: var(--accent); background: var(--surf-3);
-  text-decoration: none; }
-.collection-toolbar:focus-visible { outline: 2px solid var(--accent);
-  outline-offset: 2px; }
-.collection-toolbar[aria-disabled="true"] { opacity: .35; pointer-events: none; }
-.collection-badge { position: absolute; top: -.38rem; right: -.42rem;
-  min-width: 1rem; height: 1rem; box-sizing: border-box; padding: 0 .22rem;
-  border-radius: 999px; background: var(--accent); color: var(--on-accent);
-  font: 600 .62rem/1rem var(--sans); text-align: center;
-  font-variant-numeric: tabular-nums; }
-.collection-badge:empty { display: none; }
 @keyframes collection-arrived {
   0% { transform: scale(.72); }
   40% { transform: scale(1.24); }
@@ -1271,9 +1308,6 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
 @media (max-width: 64rem) {
   .masthead { position: static; height: auto; }
   .mast-inner { flex-wrap: wrap; height: auto; gap: .5rem .9rem; padding: .6rem 1rem; }
-  .masthead .search { flex: 0 0 auto; margin-left: auto;
-                      padding: .45rem .55rem; border-radius: 999px; }
-  .masthead .search > span { display: none; }   /* icon-only; opens the palette */
   .mast-nav { order: 10; flex-basis: 100%; overflow-x: auto;
               white-space: nowrap; scrollbar-width: none;
               margin: 0 -1rem; padding: 0 1rem; }

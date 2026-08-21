@@ -1289,9 +1289,9 @@ to a future per-doc incremental generate.
   becomes a single reading column with the side columns as drawers — the TOC an
   off-canvas left drawer, the rail a bottom sheet, opened from a fixed bottom
   toolbar (Innehåll · Sök · Kontext, the mobile bar in `lib/templates/
-  page.html` + `lib/assets/drawers.js`) while the masthead wraps (icon-only
-  search, horizontally
-  scrollable nav) and scrolls away — a serif/sans type system on warm paper, and SFS §-numerals
+  page.html` + `lib/assets/drawers.js`) while the masthead wraps (horizontally
+  scrollable nav; the search collapsed to an icon already at 80rem, before its
+  label can wrap) and scrolls away — a serif/sans type system on warm paper, and SFS §-numerals
   hung in a gutter with a permalink pilcrow. The big structural change is that
   **inbound is no longer floated inline next to each paragraph** — a `Rail`
   collector gathers every id-bearing node's context (who cites it — split

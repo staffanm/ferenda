@@ -1,8 +1,12 @@
-/* The inline editor's chrome (appended to style.css at generate): edit
-   buttons, cart drawer, dialogs -- inert without a logged-in session. */
+/* The inline editor's chrome (appended to style.css at generate): the
+   masthead account control, edit buttons, dialogs -- inert without a
+   logged-in session. */
 /* inline editor (editor.js) */
-.ed-account { margin-left: 1rem; font-size: .85rem; color: var(--ink-3); }
-.ed-account a { color: var(--accent); }
+/* the logged-in editor's masthead control: the same circle as the theme
+   toggle and the collection icon (style.css skins all three, and holds the
+   .mast-badge on its corner), carrying the editor's initials */
+.ed-initials { font: 600 .72rem/1 var(--sans); letter-spacing: .02em;
+               user-select: none; }
 .ed-btn { border: 1px solid var(--rule); background: var(--surf); color: var(--accent);
           border-radius: 5px; cursor: pointer; font-size: .8rem; line-height: 1;
           padding: .15rem .35rem; }
@@ -18,6 +22,7 @@
             border: 1px solid var(--rule); border-radius: 10px; padding: 1rem 1.2rem;
             box-shadow: 0 16px 48px var(--shadow-modal); }
 .ed-panel h3 { margin: 0 0 .6rem; font-size: 1.05rem; }
+.ed-panel h4 { margin: .9rem 0 .4rem; font-size: .9rem; color: var(--ink-2); }
 .ed-panel textarea { width: 100%; box-sizing: border-box; min-height: 200px;
                      font-family: var(--mono, ui-monospace, monospace); font-size: .9rem;
                      border: 1px solid var(--rule); border-radius: 6px; padding: .5rem; }
@@ -33,6 +38,7 @@
               margin-top: .5rem; background: var(--bg); }
 .ed-preview h4 { margin: .3rem 0; }
 .ed-row { display: flex; gap: .5rem; justify-content: flex-end; margin-top: .7rem; }
+.ed-row .ed-logout { margin-right: auto; }
 .ed-err { color: var(--danger); font-size: .85rem; margin-top: .4rem; }
 /* the /admin/ login page: the sign-in form editor.js mounts, standalone rather
    than in a modal overlay */
@@ -50,10 +56,6 @@
 .ed-cart-list { list-style: none; margin: 0 0 .6rem; padding: 0; }
 .ed-cart-list li { display: flex; justify-content: space-between; gap: .5rem;
                    align-items: center; padding: .3rem 0; border-bottom: 1px solid var(--rule); }
-.ed-cart { position: fixed; right: 1rem; bottom: 1rem; z-index: 70; cursor: pointer;
-           border: 1px solid var(--accent); background: var(--surf); color: var(--accent);
-           border-radius: 999px; padding: .55rem .9rem; font: inherit; font-weight: 600;
-           box-shadow: 0 6px 20px var(--shadow-modal); }
 @media (max-width: 64rem) {
   [id] > .ed-btn, .paragraf > .ed-btn { position: static; margin-left: .4rem; }
 }
