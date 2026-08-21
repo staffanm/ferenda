@@ -45,7 +45,7 @@ from lark.exceptions import UnexpectedInput
 from . import datasets, emdref
 from .coe_ids import article_fragment as coe_article_fragment
 from .treaty_ids import article_fragment as treaty_article_fragment
-from .util import fold_swedish, number_slug
+from .util import fold_swedish, number_slug, own_number_slug
 
 # --- parse-type configuration ---------------------------------------
 #
@@ -139,7 +139,9 @@ ROOTS = {
                  'avsnitt_list', 'forarb_doc'],
     EURATTSFALL: ['ecj_ref'],
     MYNDIGHETSBESLUT: ['arn_refs', 'jo_refs', 'jo_arsb_ref', 'jk_refs'],
-    VAGLEDNING: ['riktlinje_ref', 'rekommendation_ref', 'wp_ref'],
+    VAGLEDNING: ['riktlinje_ref', 'rekommendation_ref', 'wp_ref',
+                 'esrb_ref', 'eba_ref', 'esma_ref', 'ecb_ref',
+                 'berec_ref'],
     FORESKRIFT: ['foreskrift_ref'],
     STALLNINGSTAGANDE: ['skv_st_refs'],
     # absolute SFS forms only -- a bare relative ref ("3 §") has no root,
@@ -663,6 +665,52 @@ VL_ID: /\d{1,2}\/(?:19|20)\d{2}/
 WP_ID: /\d{2,3}(?![\d\/])/
 """
 
+# The other bodies whose guidance this corpus holds are cited by a number that
+# carries the body's own acronym, so the number alone names the document and no
+# surrounding words are needed to anchor it. Measured over the corpus, this is
+# how each is written and how often:
+#
+#   ESRB/2017/6            156 citations -- the one body cited by number more
+#                          often than by title
+#   EBA/GL/2021/05         73, and EBA/REC/2017/02 in the same shape
+#   ESMA/2013/720          163 between this and ESMA's newer reference form
+#                          (ESMA35-43-349), which 82 of its 128 documents carry
+#   CON/2013/82            28
+#   BoR (11) 67            2
+#
+# ESMA's form also covers the joint committee's (JC/GL/2024/36, "JC 2024 28"):
+# the three ESAs issue those together and this source files them under esma, so
+# that is the address they answer to.
+#
+# The ECB's and the ESRB's forms are also the identity CELLAR states for them
+# (`guidance/eurlex_download.py`), so a citation and the document agree by
+# construction.
+#
+# EIOPA is deliberately absent even though 40 citations name it by number: its
+# number (EIOPA-BoS-19/465) does not say whether the document is a riktlinje or
+# a rekommendation, and its address carries that series segment. Minting from
+# the number alone would guess, and guessing wrong is a link to another
+# document rather than to none.
+GUIDANCE_NUMBER_RULES = r"""
+esrb_ref.5: esrb_id
+eba_ref.5: eba_id
+esma_ref.5: esma_id
+ecb_ref.5: con_id
+berec_ref.5: bor_id
+
+esrb_id: ESRB_ID
+eba_id: EBA_ID
+esma_id: ESMA_ID
+con_id: CON_ID
+bor_id: BOR_ID
+
+ESRB_ID: /ESRB\/(?:19|20)\d{2}\/\d{1,3}\b/
+EBA_ID: /EBA\/(?:GL|REC)\/(?:19|20)\d{2}\/\d{1,3}\b/
+ESMA_ID: /(?:ESMA(?:\/(?:19|20)\d{2}\/\d{1,4}|-?\d{2,}-[\d-]{2,})|JC[\/ ](?:GL[\/ ])?(?:19|20)\d{2}[\/ ]\d{1,3})\b/
+CON_ID: /CON\/(?:19|20)\d{2}\/\d{1,3}\b/
+BOR_ID: /BoR\s?\(\d{2}\)\s?\d{1,3}(?:\s?Rev\s?\d+)?\b/
+"""
+
 # FORESKRIFT (myndighetsföreskrifter: "PMFS 2022:1", "ELSÄK-FS 2008:1").
 #
 # An agency regulation is cited by its författningssamling designation and
@@ -721,7 +769,7 @@ RULES = {LAGRUM: LAGRUM_RULES, EULAGSTIFTNING: EU_RULES,
          KORTLAGRUM: KORTLAGRUM_RULES, RATTSFALL: RATTSFALL_RULES,
          FORARBETEN: FORARBETEN_RULES, EURATTSFALL: EURATTSFALL_RULES,
          MYNDIGHETSBESLUT: MYNDIGHETSBESLUT_RULES,
-         VAGLEDNING: VAGLEDNING_RULES,
+         VAGLEDNING: VAGLEDNING_RULES + GUIDANCE_NUMBER_RULES,
          FORESKRIFT: FORESKRIFT_RULES,
          STALLNINGSTAGANDE: STALLNINGSTAGANDE_RULES}
 
@@ -865,6 +913,12 @@ VAGLEDNING_TRIGGER_SRC = r"""
     \b[Rr]iktlinje(?:n|r|rna)?\ (?:nr\.?\ ?)?\d{1,2}/(?:19|20)\d{2}
   | \b[Rr]ekommendation(?:en|er|erna)?\ (?:nr\.?\ ?)?\d{1,2}/(?:19|20)\d{2}
   | \bWP\ ?\d{2,3}
+  | \bESRB/(?:19|20)\d{2}/\d{1,3}
+  | \bEBA/(?:GL|REC)/(?:19|20)\d{2}/\d{1,3}
+  | \bESMA(?:/(?:19|20)\d{2}/\d{1,4}|-?\d{2,}-[\d-]{2,})
+  | \bJC[/\ ](?:GL[/\ ])?(?:19|20)\d{2}[/\ ]\d{1,3}
+  | \bCON/(?:19|20)\d{2}/\d{1,3}
+  | \bBoR\ ?\(\d{2}\)\ ?\d{1,3}(?:\ ?Rev\ ?\d+)?
 """
 
 # fires at "dnr" followed by a Skatteverket-shaped diarienummer (see
@@ -2707,6 +2761,48 @@ class LagrumParser:
             return
         out.append({'_uri': self.base + 'guidance/edpb/wp/' + number,
                     '_span': _node_span(node)})
+
+    # --- the other EU bodies, cited by a number carrying their own acronym ---
+
+    def _guidance_number(self, node, path, out):
+        """One body's number -> its address. `path` is the utgivare, the series
+        where the body runs more than one, and the document's own segment."""
+        out.append({'_uri': self.base + 'guidance/' + path,
+                    '_span': _node_span(node)})
+
+    def _slashed(self, node, name):
+        """"ESRB/2016/14" -> "2016-14": the year and the zero-padded löpnummer
+        the address is built from. The prefix is the body's acronym, which the
+        caller already knows -- it is why it dispatched here."""
+        _prefix, ar, lopnummer = _token_text(subtree(node, name)).rsplit('/', 2)
+        return '%s-%02d' % (ar, int(lopnummer))
+
+    def fmt_esrb_ref(self, node, match, out, context):
+        # one sequence across the ESRB's rekommendationer, varningar, beslut
+        # and råd, so its address carries no series segment
+        self._guidance_number(
+            node, 'esrb/%s' % self._slashed(node, 'esrb_id'), out)
+
+    def fmt_ecb_ref(self, node, match, out, context):
+        self._guidance_number(
+            node, 'ecb/con/%s' % self._slashed(node, 'con_id'), out)
+
+    def fmt_eba_ref(self, node, match, out, context):
+        # "EBA/GL/2021/05" -- the middle component is the series
+        _eba, serie, ar, lopnummer = \
+            _token_text(subtree(node, 'eba_id')).split('/')
+        self._guidance_number(
+            node, 'eba/%s/%s-%02d' % (serie.lower(), ar, int(lopnummer)), out)
+
+    def fmt_esma_ref(self, node, match, out, context):
+        self._guidance_number(
+            node, 'esma/riktlinjer/%s'
+            % own_number_slug(_token_text(subtree(node, 'esma_id'))), out)
+
+    def fmt_berec_ref(self, node, match, out, context):
+        self._guidance_number(
+            node, 'berec/riktlinjer/%s'
+            % own_number_slug(_token_text(subtree(node, 'bor_id'))), out)
 
 
 # --------------------------------------------------------------------------

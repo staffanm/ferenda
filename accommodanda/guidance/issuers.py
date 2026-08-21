@@ -47,6 +47,8 @@ engine can be told rather than taught.
 import re
 from dataclasses import dataclass
 
+from ..lib.util import own_number_slug
+
 # ---------------------------------------------------------------------------
 # numbering
 # ---------------------------------------------------------------------------
@@ -69,7 +71,6 @@ HELA_NUMRET = ("nummer",)
 
 RE_PAR = re.compile(r"\b(\d{1,4})/(\d{1,4})\b")
 # every run of characters a URI segment should not carry
-RE_OSLUG = re.compile(r"[^a-z0-9]+")
 
 
 def number_slug(number, order):
@@ -84,18 +85,6 @@ def number_slug(number, order):
     return "%s-%s" % ((parts["ar"], "%02d" % int(parts["lopnummer"]))
                       if order == AR_FORST
                       else ("%02d" % int(parts["lopnummer"]), parts["ar"]))
-
-
-def own_number_slug(number):
-    """The URI/file form of a number a body writes in a shape of its own:
-    lowercased, with every run of other characters folded to one hyphen.
-    ``"ESMA35-43-3448"`` -> ``esma35-43-3448``; ``"ESMA/2016/1477"`` ->
-    ``esma-2016-1477``; ``"JC/GL/2024/36"`` -> ``jc-gl-2024-36``. The address
-    still reads as the citation, one character class at a time, so a reader who
-    has the number can type the page."""
-    slug = RE_OSLUG.sub("-", number.strip().lower()).strip("-")
-    assert slug, "not a number: %r" % number
-    return slug
 
 
 @dataclass(frozen=True)

@@ -38,6 +38,37 @@ def number_slug(number: str) -> str:
     return RE_NUMBER_UNSAFE.sub("-", number.strip()).strip("-")
 
 
+#: everything that is not a lowercase letter or a digit, for `own_number_slug`
+RE_NUMBER_OTHER = re.compile(r"[^a-z0-9]+")
+
+
+def own_number_slug(number: str) -> str:
+    """The URI/file form of a number a body writes in a shape of its own:
+    lowercased, with every run of other characters folded to one hyphen.
+    ``"ESMA35-43-3448"`` -> ``esma35-43-3448``; ``"ESMA/2016/1477"`` ->
+    ``esma-2016-1477``; ``"BoR (11) 67"`` -> ``bor-11-67``. The address still
+    reads as the citation, one character class at a time, so a reader who has
+    the number can type the page.
+
+    One implementation for the minter (`guidance.issuers`) and the citation
+    engine's VAGLEDNING formatters, for the same reason `number_slug` is
+    shared: the address a citation resolves to cannot drift from the address
+    the page is published under."""
+    slug = RE_NUMBER_OTHER.sub("-", number.strip().lower()).strip("-")
+    assert slug, "not a number: %r" % number
+    return slug
+
+
+def shouted(text: str) -> bool:
+    """Whether `text` is set in capitals -- more than four fifths of its
+    letters uppercase. The test a document's own typography answers: a shouted
+    running head reprints the title in caps above the sentence-case one (the
+    EBA's covers), and a heading set in caps is a heading however short (dv's
+    domskäl)."""
+    letters = [c for c in text if c.isalpha()]
+    return bool(letters) and sum(c.isupper() for c in letters) / len(letters) > 0.8
+
+
 def write_atomic(path: Path | str, data: bytes | str) -> None:
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
     atomic rename, so an interrupted run never leaves a partial file behind.

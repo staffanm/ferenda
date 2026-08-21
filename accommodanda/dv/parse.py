@@ -43,7 +43,7 @@ from ..lib.pdftext import (
     pdf_images,
     pdf_pages,
 )
-from ..lib.util import MONTHS, approximate_date
+from ..lib.util import MONTHS, approximate_date, shouted
 from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
 from .structure import nest
 
@@ -132,8 +132,7 @@ def is_heading(text):
         return False
     if text.lower().rstrip(".") in KNOWN_HEADINGS:
         return True
-    letters = [c for c in text if c.isalpha()]
-    if letters and sum(c.isupper() for c in letters) / len(letters) > 0.8:
+    if shouted(text):
         return True
     # short, capitalized, no terminal sentence punctuation -> heading
     return (text[:1].isupper() and text[-1:] not in ".!?:,"

@@ -41,6 +41,7 @@ from accommodanda.lib.lagrum import (
     MYNDIGHETSBESLUT,
     RATTSFALL,
     STALLNINGSTAGANDE,
+    VAGLEDNING,
     LagrumParser,
     Ref,
     build_trigger,
@@ -1367,3 +1368,34 @@ def test_a_same_name_successor_takes_the_name_over(tmp_path):
     laws = load_namedlaws(_dataset(tmp_path, data))
     assert laws.at("polisdatalagen", "2008-01-01") == "1998:622"
     assert laws.at("polisdatalagen", "2026-01-01") == "2010:361"
+
+
+def test_guidance_numbers_resolve_to_their_own_pages():
+    """The five EU bodies whose number carries their own acronym: the number
+    alone names the document, so no surrounding words anchor it. Measured over
+    the corpus, this is the citation form that carries the ESRB (156 citations
+    against 39 by title) and the second form for the EBA, ESMA and the ECB."""
+    parser = LagrumParser({}, basefile="x", parse_types=[VAGLEDNING])
+    cases = {
+        "ESRB/2017/6": "guidance/esrb/2017-06",
+        "EBA/GL/2021/05": "guidance/eba/gl/2021-05",
+        "EBA/REC/2017/02": "guidance/eba/rec/2017-02",
+        "ESMA/2013/720": "guidance/esma/riktlinjer/esma-2013-720",
+        "ESMA35-43-349": "guidance/esma/riktlinjer/esma35-43-349",
+        # the three ESAs issue a joint-committee document together and this
+        # corpus files it under esma
+        "JC/GL/2024/36": "guidance/esma/riktlinjer/jc-gl-2024-36",
+        "CON/2013/82": "guidance/ecb/con/2013-82",
+        "BoR (11) 67": "guidance/berec/riktlinjer/bor-11-67",
+        "BoR (10) 44 Rev 1": "guidance/berec/riktlinjer/bor-10-44-rev-1",
+    }
+    for number, path in cases.items():
+        refs = parser.parse_text("se %s om saken" % number)
+        assert [r.uri for r in refs] == ["https://lagen.nu/" + path], number
+    # the löpnummer pads to two digits on the way in, the way the address is
+    # minted from the document's side
+    assert [r.uri for r in parser.parse_text("(ESRB/2017/6)")] == \
+        [r.uri for r in parser.parse_text("(ESRB/2017/06)")]
+    # a body named without a number is not a citation of a document
+    assert parser.parse_text("en ESMA-rapport utan nummer") == []
+    assert parser.parse_text("Eiopa har utfärdat riktlinjer") == []
