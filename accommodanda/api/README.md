@@ -648,7 +648,7 @@ om corpuset växer varje natt.
 |---|---|
 | `search` | fulltextsökning över hela corpuset, ned på paragraf-/artikelnivå; en citeringsformad fråga ("avtalslagen 36", "GDPR art 32", "Instagrambilden") fäster det exakta målet överst. Degraderar till enbart citeringsträff om OpenSearch är nere |
 | `resolve_citation` | slår upp en citering skriven med namn/förkortning → exakt dokument-URI (+ fragment); kräver *inte* OpenSearch |
-| `get_document` | ett dokuments metadata + fullständiga parsade klartext (hela, eller en enskild `pinpoint` som `K3P1`) |
+| `get_document` | ett dokuments metadata + fullständiga text (hela, eller en enskild `pinpoint` som `K3P1`); `format` väljer markdown (förvalt, via `lib/mdtext.py` — samma transform som REST:ens `/document?format=md`) eller rå artefakt-JSON |
 | `fetch` | samma text, men hämtad på ett `id` från `search` (`…/1962:700#K3P1`) i stället för URI + pinpoint var för sig — se *Sök/hämta-kontraktet* nedan |
 | `list_documents` | räknar upp dokument (id + lättviktig metadata) filtrerade på källa/typ — corpus-indexet, inte fulltextsökning |
 | `get_incoming_citations` | vilka dokument som citerar denna URI/paragraf **och allt som ligger i den** (citeringsgrafen inåt — lagen.nu:s signaturfunktion); svarar med `total` + `by_source` för hela mängden och en sida rader, filtrerbart på `source` (vem som citerar) och `scope` (`tree`/`exact` — vad frågan gäller). Varje rad bär det citerande dokumentets eget `inbound_count`, och `sort` väljer ordning: `rail` (förvalt, sidans egen — rättsfall först) eller `citations` (mest citerade källan först — "vilka är de viktigaste rättsfallen om den här bestämmelsen") |

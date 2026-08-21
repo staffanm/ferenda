@@ -1554,6 +1554,14 @@ to a future per-doc incremental generate.
     exact fragment target) behind both REST `/search` and the MCP
     `search`/`resolve_citation` tools. `test/test_mcp.py`, incl. end-to-end
     Streamable HTTP round-trips against a running app.
+    `get_document` (and `fetch` through it) answers with the body rendered as
+    **markdown** by default (`lib/mdtext.py` — headings, paragraph
+    designations, lists, tables, citations as inline `[text](uri)` links;
+    tuned for the SFS/eurlex/förarbete shapes, generic for the rest);
+    `format="json"` returns the raw artifact tree instead. REST's
+    `/api/v1/document` takes the same `format` parameter with the opposite
+    default (`json`), swapping `artifact` for a `markdown` field — the
+    envelope and metadata stay JSON either way. `test/test_mdtext.py`.
     The endpoint speaks protocol revision **2026-07-28** (SDK `mcp>=2.0`,
     `MCPServer`), the revision that deleted the protocol's session concept:
     no `initialize` handshake, no `Mcp-Session-Id`, every call a

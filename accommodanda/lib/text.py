@@ -245,6 +245,17 @@ def fragment_texts(art):
     return [(uri, body) for uri, body, _ in fragment_texts_and_headings(art)]
 
 
+def fragment_node(art, frag):
+    """The one id-bearing node of the presented body with id `frag`, or None.
+
+    The node-level base under `fragment_text` and the MCP pinpoint reader
+    (which renders the node via mdtext.node_markdown): both answer for a
+    single provision, and each wants a different rendering of the same
+    subtree (rule:second-use-goes-to-lib)."""
+    return next((node for node in _body_id_nodes(art)
+                 if node["id"] == frag), None)
+
+
 def fragment_text(art, frag):
     """The text of one id-bearing node, or '' when the presented body has no
     node with that id.
@@ -253,5 +264,5 @@ def fragment_text(art, frag):
     document: the search path resolves a citation to a single provision and
     wants that provision's words, and building Inkomstskattelagen's whole
     fragment map to return one of them is work the query waits on."""
-    return next((node_text(node) for node in _body_id_nodes(art)
-                 if node["id"] == frag), "")
+    node = fragment_node(art, frag)
+    return node_text(node) if node else ""

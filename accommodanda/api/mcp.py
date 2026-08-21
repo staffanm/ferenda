@@ -204,6 +204,11 @@ MaxCharsArg = Annotated[int, Field(
     description="Högsta antal tecken av dokumenttexten, tak 200000. Lägre när "
     "en översikt räcker. För mycket långa dokument: begär hellre en exakt "
     "`pinpoint` än en större text.")]
+FormatArg = Annotated[Literal["md", "json"], Field(
+    description="Textens format. 'md' (förvalt) ger läsbar markdown: rubriker, "
+    "paragrafbeteckningar, listor och tabeller, med varje hänvisning som en "
+    "[text](uri)-länk. 'json' ger den råa artefakt-JSON:en -- trädet av typade "
+    "noder med texten som inline-runs -- för strukturell bearbetning.")]
 FetchIdArg = Annotated[str, Field(
     description="Det exakta `id` som `search` returnerade, t.ex. "
     "'https://lagen.nu/1962:700' eller 'https://lagen.nu/1962:700#K3P1'. "
@@ -303,6 +308,7 @@ class Document(TypedDict):
     source_url: str | None
     inbound_count: int
     pinpoint: str | None
+    format: Literal["md", "json"]
     truncated: bool
     text: str
 
@@ -507,13 +513,20 @@ def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
     Pinpoints kommer från `search`-fragment, `resolve_citation` eller
     `anchor`-fältet på hänvisningsverktygens träffar.
 
-    Långa texter kapas vid `max_chars` (högst 200 000 tecken). Är svaret märkt
+    Texten är markdown (förvalt): rubriker, paragrafbeteckningar, listor och
+    tabeller, med varje hänvisning i texten som en [text](uri)-länk vars URI
+    kan skickas vidare till verktygen. Ange `format='json'` för dokumentets
+    råa artefakt-JSON i stället, när svaret ska bearbetas strukturellt.
+
+    Lång markdown kapas vid `max_chars` (högst 200 000 tecken). Är svaret märkt
     `truncated: true` har bara början hämtats -- hänvisa då inte till text som
-    inte returnerats, utan begär en mer exakt `pinpoint`.
+    inte returnerats, utan begär en mer exakt `pinpoint`. JSON kapas aldrig:
+    ryms inte trädet inom `max_chars` blir det ett fel som säger vad som
+    behövs i stället.
 
     Svaret: uri, source, kind, label, title, source_url (utgivarens egen sida),
-    inbound_count (hur ofta dokumentet citeras), den efterfrågade `pinpoint`
-    och `text`.
+    inbound_count (hur ofta dokumentet citeras), den efterfrågade `pinpoint`,
+    `format` och `text`.
     """
     max_chars = max(1, min(max_chars, MAX_CHARS))
     with _con() as con:
@@ -522,15 +535,25 @@ def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
         raise ValueError("no document %r in the catalog" % uri)
     art = data.pop("artifact")
     if pinpoint:
-        want = data["uri"] + "#" + pinpoint.lstrip("#")
-        body = next((t for furi, t in text.fragment_texts(art) if furi == want),
-                    None)
-        if body is None:
+        node = text.fragment_node(art, pinpoint.lstrip("#"))
+        if node is None:
             raise ValueError("no section %r in %s -- check the pinpoint against a "
                              "search fragment or a citation anchor"
                              % (pinpoint, uri))
+        body = (json.dumps(node, ensure_ascii=False) if format == "json"
+                else mdtext.node_markdown(node))
     else:
-        body = text.document_text(art)
+        body = (json.dumps(art, ensure_ascii=False) if format == "json"
+                else mdtext.document_markdown(
+                    art, title=data["title"] or data["label"]))
+    # a JSON body is never truncated: a markdown prefix is readable, a JSON
+    # prefix is unparseable -- worse than no answer for the structural
+    # processing the format exists for (rule:fail-fast)
+    if format == "json" and len(body) > max_chars:
+        raise ValueError(
+            "the artifact JSON is %d chars, over max_chars=%d -- raise "
+            "max_chars (ceiling %d), request a pinpoint, or use format='md'"
+            % (len(body), max_chars, MAX_CHARS))
     # named rather than splatted from `data`: the keys are the tool's declared
     # output schema, so spelling them here is what makes a change to
     # `reads.document` a type error instead of a silently altered contract
@@ -538,7 +561,7 @@ def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
         uri=data["uri"], source=data["source"], kind=data["kind"],
         label=data["label"], title=data["title"],
         source_url=data["source_url"], inbound_count=data["inbound_count"],
-        pinpoint=pinpoint, truncated=len(body) > max_chars,
+        pinpoint=pinpoint, format=format, truncated=len(body) > max_chars,
         text=body[:max_chars])
 
 
@@ -557,7 +580,8 @@ def fetch(id: FetchIdArg) -> FetchedDocument:
     Ändra inte identifieraren och konstruera inte ett eget fragment när ett
     exakt `id` redan finns i sökresultatet.
 
-    Svaret: id, title, url (absolut publik adress), text och `metadata` med
+    Svaret: id, title, url (absolut publik adress), text (markdown, som
+    `get_document` ger) och `metadata` med
     source, kind, label, utgivarens sida, inbound_count, den lästa `pinpoint`
     (null för ett helt dokument) och `truncated`. Texten kapas vid 200 000
     tecken; är `metadata.truncated` true har du ett prefix, inte hela

@@ -177,6 +177,14 @@ Metadata plus the **full parsed artifact**:
 
 The `artifact` object is the same one you get per line in the bulk dumps.
 
+**`format=md`** swaps the `artifact` field for a `markdown` string — the body
+rendered as a reading text (headings, paragraph designations, lists, pipe
+tables, every citation as an inline `[text](uri)` link) for consumers that
+want prose rather than the tree: a human, an LLM, a RAG chunker. The envelope
+and metadata stay JSON. The markdown is a lossy derivation; the artifact
+(`format=json`, the default) stays the source of truth. The MCP server's
+`get_document` tool answers with the same markdown by default.
+
 ### Derived views
 
 **Inbound links / citation graph — `GET /api/v1/document/inbound?uri=…`** — the
@@ -345,6 +353,7 @@ expect a slow response on a big document.
 | enumerate documents | `GET /api/v1/documents` |
 | browse by facet | `GET /api/v1/facets`, `GET /api/v1/browse` |
 | get one document | `GET /api/v1/document?uri=…` |
+| a document as markdown | `GET /api/v1/document?uri=…&format=md` |
 | who cites this? | `GET /api/v1/document/inbound?uri=…` |
 | which citers weigh most? | `GET /api/v1/document/inbound?uri=…&source=dv&sort=citations` |
 | what does this cite? | `GET /api/v1/document/outbound?uri=…` |

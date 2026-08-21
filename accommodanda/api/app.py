@@ -30,6 +30,7 @@ import sqlite3
 import threading
 from html import escape
 from pathlib import Path
+from typing import Literal
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -54,6 +55,7 @@ from ..lib import (
     feeds,
     history,
     layout,
+    mdtext,
     search,
 )
 from . import (
@@ -438,6 +440,18 @@ class Document(DocumentMeta):
         "the artifact-format section of docs/api/README.md.")
 
 
+class MarkdownDocument(DocumentMeta):
+    """A document: its metadata plus the body rendered as markdown."""
+
+    source_url: str | None = Field(
+        None, description="the publisher's own page for the document")
+    markdown: str = Field(
+        description="the document body as markdown: title, headings, "
+        "paragraph designations, lists and tables, with every citation as an "
+        "inline [text](uri) link. A lossy reading text derived from the "
+        "artifact -- the artifact (format=json) stays the source of truth.")
+
+
 class BrowseDoc(BaseModel):
     """A leaf entry in a browse listing -- what one line of a generated browse
     page says. Only /browse populates these; /facets stops at the counts."""
@@ -711,9 +725,14 @@ def documents_endpoint(
                                    for d in listing["documents"]])
 
 
-@app.get("/api/v1/document", response_model=Document, tags=["document"],
+@app.get("/api/v1/document", response_model=Document | MarkdownDocument,
+         tags=["document"],
          summary="One document and its full parsed artifact")
 def document_endpoint(uri: str = Query(..., description="full lagen.nu document uri"),
+                      format: Literal["json", "md"] = Query(
+                          "json", description="body format: 'json' (default) "
+                          "returns the parsed artifact verbatim, 'md' the "
+                          "body rendered as markdown"),
                       con: sqlite3.Connection = Depends(get_con)):
     """One document, whole: its catalog metadata plus the parsed artifact --
     the structure/body with every citation inline.
@@ -726,12 +745,21 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     `{predicate, uri, text}`. Those link dicts are the citation graph -- the
     catalog is an index over them.
 
+    `format=md` swaps the artifact for the body rendered as markdown --
+    headings, paragraph designations, lists, tables, citations as inline
+    links -- for consumers that want a reading text (a human, an LLM, a RAG
+    chunker) rather than the tree. The envelope and metadata stay JSON.
+
     The same object comes back per line in the bulk dumps, so a consumer
     reprocessing the whole corpus should take the dumps and never call this
     endpoint in a loop. See docs/api/README.md for the per-source shapes."""
     data = reads.document(con, uri)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
+    if format == "md":
+        art = data.pop("artifact")
+        return MarkdownDocument(**data, markdown=mdtext.document_markdown(
+            art, title=data["title"] or data["label"]))
     return Document(**data)
 
 

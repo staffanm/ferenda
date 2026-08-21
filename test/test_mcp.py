@@ -176,6 +176,34 @@ def test_get_document_truncates(corpus):
     assert doc["truncated"] and len(doc["text"]) == 10
 
 
+def test_get_document_format_defaults_to_markdown(corpus):
+    doc = mcpmod.get_document("https://lagen.nu/1962:700")
+    assert doc["format"] == "md"
+    assert doc["text"].startswith("# Brottsbalk (1962:700)")
+
+
+def test_get_document_format_json_returns_the_artifact_tree(corpus):
+    doc = mcpmod.get_document("https://lagen.nu/1962:700", format="json")
+    assert doc["format"] == "json"
+    art = json.loads(doc["text"])
+    assert art["structure"][0]["id"] == "K3P1"
+
+    frag = mcpmod.get_document("https://lagen.nu/1962:700", pinpoint="K3P1",
+                               format="json")
+    node = json.loads(frag["text"])
+    assert node["id"] == "K3P1" and "berövar annan livet" in node["text"][0]
+
+
+def test_get_document_format_json_refuses_to_truncate(corpus):
+    # a truncated JSON prefix is unparseable -- worse than no answer for the
+    # structural processing the format exists for; markdown still truncates
+    with pytest.raises(ValueError, match="max_chars"):
+        mcpmod.get_document("https://lagen.nu/1962:700", format="json",
+                            max_chars=10)
+    assert mcpmod.get_document("https://lagen.nu/1962:700", format="md",
+                               max_chars=10)["truncated"]
+
+
 def test_citation_graph(corpus):
     incoming = mcpmod.get_incoming_citations("https://lagen.nu/1962:700#K3P1")
     assert any(c["uri"] == "https://lagen.nu/2018:585"

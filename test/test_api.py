@@ -219,6 +219,22 @@ def test_document_returns_metadata_and_artifact(client):
     assert body["artifact"]["structure"][0]["id"] == "K3P1"
 
 
+def test_document_format_md_swaps_the_artifact_for_markdown(client):
+    body = client.get("/api/v1/document",
+                      params={"uri": "https://lagen.nu/1962:700",
+                              "format": "md"}).json()
+    # the envelope and metadata stay JSON; only the body is transformed
+    assert body["title"] == "Brottsbalk (1962:700)"
+    assert body["inbound_count"] == 1
+    assert "artifact" not in body
+    assert body["markdown"].startswith("# Brottsbalk (1962:700)")
+    assert "Den som dödar annan döms för mord." in body["markdown"]
+
+    assert client.get("/api/v1/document",
+                      params={"uri": "https://lagen.nu/1962:700",
+                              "format": "xml"}).status_code == 422
+
+
 def test_document_begrepp_stub_served_with_empty_artifact(client):
     # a synthesized begrepp stub is a real catalog row with no artifact file
     # (path='', as minted by catalog.synthesize_concepts) -- /document must
