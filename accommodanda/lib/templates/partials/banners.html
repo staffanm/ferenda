@@ -36,20 +36,21 @@
 {%- if ersatt_av %}. Ersatt av {% if ersatt_av.url %}<a href="{{ ersatt_av.url }}">{{ ersatt_av.label }}</a>{% else %}{{ ersatt_av.label }}{% endif %}{% endif -%}
 .</span></div>
 {%- endmacro -%}
-{%- macro edpb_language_banner(source_url) -%}
-{#- an EDPB vägledning the board has published in no Swedish version. The
+{%- macro vagledning_language_banner(utgivare, source_url) -%}
+{#- a vägledning the issuing body has published in no Swedish version. The
     reader is about to read English on a Swedish site, which is worth saying
-    before they start rather than leaving them to notice. -#}
-<div class="note-banner"><strong>Endast på engelska</strong><span>Europeiska dataskyddsstyrelsen har inte publicerat någon svensk version av detta dokument. Texten nedan återges på engelska
-{%- if source_url %}, så som den publicerats av <a href="{{ source_url }}" rel="external">styrelsen själv</a>{% endif -%}
+    before they start rather than leaving them to notice. The body is named
+    rather than assumed: this source carries several. -#}
+<div class="note-banner"><strong>Endast på engelska</strong><span>{{ utgivare }} har inte publicerat någon svensk version av detta dokument. Texten nedan återges på engelska
+{%- if source_url %}, så som den publicerats av <a href="{{ source_url }}" rel="external">{{ utgivare }}</a>{% endif -%}
 .</span></div>
 {%- endmacro -%}
-{%- macro edpb_version_banner(version, konsultation) -%}
-{#- which version of a riktlinje this is. The EDPB adopts, consults and
-    re-adopts, publishing both versions, so a page that did not say would let a
-    superseded draft read as the board's current position. -#}
-<div class="note-banner"><strong>{{ version }}</strong><span>Riktlinjer antas, remitteras och antas på nytt i reviderad lydelse.
-{%- if konsultation %} Den <a href="{{ konsultation }}" rel="external">version som remitterades</a> publiceras separat av styrelsen.{% endif -%}
+{%- macro vagledning_version_banner(utgivare, version, konsultation) -%}
+{#- which version of a vägledning this is. The issuing bodies adopt, consult
+    and re-adopt, publishing both versions, so a page that did not say would
+    let a superseded draft read as the body's current position. -#}
+<div class="note-banner"><strong>{{ version }}</strong><span>Vägledningar antas, remitteras och antas på nytt i reviderad lydelse.
+{%- if konsultation %} Den <a href="{{ konsultation }}" rel="external">version som remitterades</a> publiceras separat av {{ utgivare }}.{% endif -%}
 </span></div>
 {%- endmacro -%}
 {%- macro text_not_held(what, source_url, source_name) -%}

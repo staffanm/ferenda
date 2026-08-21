@@ -243,7 +243,7 @@ def _bucket_note(source, nodes):
     is and whom it binds (N2). '' where the bucket has nothing to add."""
     if source == "foreskrift":
         return _fs_series_note(nodes[0])
-    if source in ("eurlex", "edpb"):
+    if source in ("eurlex", "guidance"):
         return _EU_TYPE_NOTE.get(nodes[0]["key"], "")
     return ""
 
@@ -524,7 +524,7 @@ def generate_all(catalog_path, out_root, con):
             generate_browse(
                 client, source, out_root,
                 cross_axis=(folk_axis if source == "hudoc"
-                            else eu_axis if source in ("eurlex", "edpb")
+                            else eu_axis if source in ("eurlex", "guidance")
                             else None))
     finally:
         api_service.app.dependency_overrides.pop(api_service.get_con, None)

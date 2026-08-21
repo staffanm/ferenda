@@ -129,7 +129,7 @@ def test_reap_still_works_for_a_source_nested_inside_another(tmp_path):
     gone.mkdir()
     (gone / "index.html").write_text("a year bucket that moved")
 
-    assert browse._reap_browse(tmp_path, "edpb", {keep}) == 1
+    assert browse._reap_browse(tmp_path, "guidance", {keep}) == 1
     assert not gone.exists()
     assert (keep / "index.html").exists()
 

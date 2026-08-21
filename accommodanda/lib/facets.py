@@ -236,8 +236,15 @@ def _dated_year(r):
     return r.date[:4] if r.date and re.match(r"\d{4}", r.date) else "okänt"
 
 
-def _edpb_year(r):
-    """The year an EDPB vägledning browses under: the year it was adopted where
+def _guidance_utgivare(r):
+    """Which body issued it: the URI's own segment after the source
+    ("guidance/edpb/riktlinjer/05-2020" -> "edpb"). Read off the address
+    rather than the catalog `kind`, which this source spends on the series."""
+    return r.local.split("/")[1]
+
+
+def _guidance_year(r):
+    """The year an EU-level vägledning browses under: the year it was adopted where
     the catalog dates it, else the year its own number carries.
 
     The number is the fallback rather than the rule because these documents are
@@ -248,7 +255,7 @@ def _edpb_year(r):
     the adoption date the cover states."""
     if r.date and re.match(r"\d{4}", r.date):
         return r.date[:4]
-    m = re.search(r"-(\d{4})$", r.local)          # 'edpb/riktlinjer/05-2020'
+    m = re.search(r"(?:-|/)(\d{4})(?:-\d+)?$", r.local)   # …/05-2020, …/gl/2021-05
     return m.group(1) if m else "okänt"
 
 
@@ -462,7 +469,7 @@ class _Level:
     slug that key, and how to order the keys."""
 
     def __init__(self, name, key, order, label=None, labels=None, slug=None,
-                 kind_axis=False):
+                 kind_axis=False, only_above=None):
         self.name = name                 # navigator heading ("Domstol", "År")
         self.key = key                   # Row -> bucket key
         self.order = order               # [key] -> [key] sorted
@@ -477,6 +484,13 @@ class _Level:
         # need. dv's Domstol axis is derived from the uri (its kind is 'case'),
         # so it is not one, and föreskrift's Serie axis reads series.json.
         self.kind_axis = kind_axis
+        # Offer this axis only under a top-level bucket holding more than
+        # `only_above` documents. The rule avg/rs/föreskrift set: a by-year
+        # selector earns its place once a body's output is too long to read in
+        # one list, and under that it only adds a click. The gate is the
+        # top-level bucket (the utgivare), not the immediate parent -- what a
+        # reader is deciding is whether *this body's* output needs splitting.
+        self.only_above = only_above
 
     def label(self, key):
         return self._label(key) or key
@@ -529,14 +543,64 @@ SCHEMES = {
                                 "kkv": "Konkurrensverket"})),
         _Level("År", _rs_year, _by_year_desc),
     ],
-    "edpb": [
+    # Utgivare first: this source carries several bodies, and "Riktlinjer"
+    # means a different series under each. The year axis is offered only where a
+    # body's own output runs past 100 documents -- the avg/rs/föreskrift rule.
+    "guidance": [
+        _Level("Utgivare", _guidance_utgivare,
+              _curated(["edpb", "edps", "eba", "esma", "eiopa", "ecb",
+                        "esrb", "easa", "acer", "enisa", "berec", "euipo"]),
+              labels=({"edpb": "Europeiska dataskyddsstyrelsen (EDPB)",
+                       "edps": "Europeiska datatillsynsmannen (EDPS)",
+                       "eba": "Europeiska bankmyndigheten (EBA)",
+                       "esma": "Europeiska värdepappersmyndigheten (Esma)",
+                       "eiopa": "Europeiska försäkrings- och "
+                                "tjänstepensionsmyndigheten (Eiopa)",
+                       "ecb": "Europeiska centralbanken (ECB)",
+                       "esrb": "Europeiska systemrisknämnden (ESRB)",
+                       "easa": "EU:s byrå för luftfartssäkerhet (EASA)",
+                       "acer": "EU:s byrå för energitillsyn (ACER)",
+                       "enisa": "EU:s cybersäkerhetsbyrå (ENISA)",
+                       "berec": "Organet för europeiska "
+                                "regleringsmyndigheter för elektronisk "
+                                "kommunikation (Berec)",
+                       "euipo": "EU:s immaterialrättsmyndighet (EUIPO)"})),
         _Level("Serie", _catalog_kind, kind_axis=True,
-              order=_curated(["riktlinjer", "rekommendationer", "wp"]),
+              order=_curated(["riktlinjer", "rekommendationer", "wp",
+                        "gl", "rec", "amc-gm", "amc", "gm",
+                        "ramriktlinjer", "yttranden", "rapporter",
+                        "varumarke", "formgivning", "gi"]),
               labels=({
                   "riktlinjer": "Riktlinjer",
                   "rekommendationer": "Rekommendationer",
-                  "wp": "Artikel 29-gruppens vägledningar"})),
-        _Level("År", _edpb_year, _by_year_desc),
+                  "wp": "Artikel 29-gruppens vägledningar",
+                  "gl": "Riktlinjer",
+                  "rec": "Rekommendationer",
+                  # EASA's own abbreviations, and the only ones its readers
+                  # use: acceptable means of compliance and guidance material
+                  "amc-gm": "AMC & GM",
+                  "amc": "AMC",
+                  "gm": "GM",
+                  # ACER's ramriktlinjer are not riktlinjer in the EDPB/EBA
+                  # sense: they state the principles a coming nätföreskrift
+                  # must follow, so they keep their own label
+                  "ramriktlinjer": "Ramriktlinjer",
+                  "yttranden": "Yttranden",
+                  # the ECB's yttranden carry the CON prefix its citation does;
+                  # the ESRB numbers every document type in one sequence, so
+                  # its documents are catalogued under the body itself
+                  "con": "Yttranden",
+                  "esrb": "Rekommendationer, varningar och beslut",
+                  # ENISA divides its output into no series at all, so its one
+                  # kod says what the whole of it is: rapporter
+                  "rapporter": "Rapporter",
+                  # EUIPO's three produktfamiljer: one granskningsriktlinje
+                  # per IP right, named after the right rather than after the
+                  # document type, because every EUIPO series is riktlinjer
+                  "varumarke": "Riktlinjer för varumärken",
+                  "formgivning": "Riktlinjer för formgivningar",
+                  "gi": "Riktlinjer för geografiska beteckningar"})),
+        _Level("År", _guidance_year, _by_year_desc, only_above=100),
     ],
     "hudoc": [
         _Level("Dokumenttyp", _catalog_kind, kind_axis=True,
@@ -667,7 +731,7 @@ SOURCE_LABELS = {
     # the EU-rätt browse selector overrides this one heading; see
     # `render._EU_AXIS_LABEL` for why a group standing over all three EDPB
     # series cannot call them all riktlinjer
-    "edpb": "EU:s dataskyddsriktlinjer",
+    "guidance": "EU-vägledning",
     "hudoc": "Europadomstolens praxis", "coe": "Europarådets fördrag",
     "icrc": "Internationell humanitär rätt", "untc": "FN-fördrag",
     "icc": "Internationella brottmålsdomstolen",
@@ -893,7 +957,7 @@ def group(con, source):
     # "Riktlinjer 3/2018" about förordning (EU) 2016/679 sorted on 1679
     sort_key = {"dv": _id_doc_sort, "forarbete": _id_doc_sort,
                 "foreskrift": _id_doc_sort, "rs": _id_doc_sort,
-                "avg": _id_doc_sort, "edpb": _id_doc_sort,
+                "avg": _id_doc_sort, "guidance": _id_doc_sort,
                 "eurlex": _eu_doc_sort}.get(source, _doc_sort)
     for rows in buckets.values():
         rows.sort(key=sort_key)
@@ -967,8 +1031,11 @@ def tree(con, source, buckets=None):
             "default": default, "buckets": nodes}
 
 
-def _level_nodes(levels, counts, prefix):
-    """Recursively build the ordered bucket nodes at depth `len(prefix)`."""
+def _level_nodes(levels, counts, prefix, root_count=None):
+    """Recursively build the ordered bucket nodes at depth `len(prefix)`.
+
+    `root_count` is how many documents the top-level bucket this recursion is
+    inside holds -- what a level's `only_above` is gated on."""
     depth = len(prefix)
     level = levels[depth]
     here = {}
@@ -978,8 +1045,12 @@ def _level_nodes(levels, counts, prefix):
     nodes = []
     for key in level.order(list(here)):
         child_prefix = prefix + (key,)
-        children = (_level_nodes(levels, counts, child_prefix)
-                    if depth + 1 < len(levels) else None)
+        below = here[key] if depth == 0 else root_count
+        deeper = levels[depth + 1] if depth + 1 < len(levels) else None
+        children = (_level_nodes(levels, counts, child_prefix, below)
+                    if deeper is not None
+                    and (deeper.only_above is None
+                         or below > deeper.only_above) else None)
         nodes.append({"key": key, "label": level.label(key), "slug": level.slug(key),
                       "count": here[key], "children": children})
     return nodes
@@ -1116,7 +1187,7 @@ FLOW_GROUPS = {
     "sfs": "Författningar", "forarbete": "Förarbeten", "dv": "Rättsfall",
     "foreskrift": "Föreskrifter", "avg": "Myndighetsavgöranden",
     "rs": "Ställningstaganden", "kommentar": "Lagkommentarer",
-    "begrepp": "Begrepp", "edpb": "EU-vägledning",
+    "begrepp": "Begrepp", "guidance": "EU-vägledning",
     "coe": "Konventioner", "icrc": "Konventioner", "untc": "Konventioner",
     "hudoc": "Folkrättslig praxis", "icj": "Folkrättslig praxis",
     "icc": "Folkrättslig praxis",

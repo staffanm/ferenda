@@ -28,7 +28,12 @@ MAST_NAV = (("Lagar", "/sfs/", ("Författning",)),
              "Rättsligt ställningstagande")),
             ("EU-rätt", "/eurlex/", ("EU-förordning", "EU-direktiv", "EU-beslut",
              "EU-domstolen", "Fördrag", "EU-rättsakt", "Riktlinje",
-             "Rekommendation", "Artikel 29-gruppens vägledning")),
+             "Rekommendation", "Artikel 29-gruppens vägledning",
+             # EASA's AMC/GM, named as EASA and its readers name them. A
+             # Swedish rendering of "AMC" would be an invention, not a
+             # translation, and the masthead marks EU-rätt current by the page's
+             # own section line
+             "AMC & GM", "AMC", "GM")),
             ("Folkrätt", "/folkratt/", ("Folkrätt", "Europarådets fördrag",
              "Internationell humanitär rätt", "FN-fördrag", "Europadomstolen",
              "Internationella brottmålsdomstolen")),

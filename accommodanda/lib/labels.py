@@ -448,7 +448,7 @@ def _icj(art):
 
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
-             "avg": _avg, "rs": _rs, "edpb": _edpb,
+             "avg": _avg, "rs": _rs, "guidance": _edpb,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc, "icj": _icj, "begrepp": _begrepp,
              "kommentar": _kommentar}

@@ -32,7 +32,7 @@ from mcp.types import ToolAnnotations
 from pydantic import ConfigDict, Field
 
 from .. import config
-from ..lib import layout, pins, text
+from ..lib import layout, mdtext, pins, text
 from ..lib.search import SearchIndex
 from . import analytics, db, reads
 
@@ -147,7 +147,7 @@ def _con():
 # doctype, …), so it stays a guided free string -- a strict enum there would
 # reject valid kinds the host sees in results.
 Source = Literal["sfs", "dv", "hudoc", "forarbete", "foreskrift", "eurlex",
-                 "coe", "avg", "rs", "edpb", "kommentar", "begrepp",
+                 "coe", "avg", "rs", "guidance", "kommentar", "begrepp",
                  "icc", "icj", "icrc", "untc"]
 SourceArg = Annotated[Source | None, Field(
     description="Begränsar till en del av källsamlingen. Utelämna när flera "

@@ -277,13 +277,15 @@ def test_numbered_series_list_by_number_not_by_subject(tmp_path):
     # an EDPB title carries the digits of the act it interprets, and the subject
     # order sorted on those: "Riktlinjer 3/2018" about förordning (EU) 2016/679
     # sorted on 1679, landing between 2/2019 and 1/2019
-    con = _catalog(_dir(tmp_path, "edpb"), [
-        (U + "edpb/riktlinjer/2-2019", "edpb", "riktlinjer", "Riktlinjer 2/2019",
+    con = _catalog(_dir(tmp_path, "guidance"), [
+        (U + "guidance/edpb/riktlinjer/2-2019", "guidance", "riktlinjer",
+         "Riktlinjer 2/2019",
          "Riktlinjer 2/2019 om artikel 6.1 b i förordning (EU) 2016/679"),
-        (U + "edpb/riktlinjer/1-2019", "edpb", "riktlinjer", "Riktlinjer 1/2019",
-         "Riktlinjer 1/2019 om uppförandekoder"),
+        (U + "guidance/edpb/riktlinjer/1-2019", "guidance", "riktlinjer",
+         "Riktlinjer 1/2019", "Riktlinjer 1/2019 om uppförandekoder"),
     ])
-    assert [r.label for r in facets.group(con, "edpb")[("riktlinjer", "2019")]] \
+    assert [r.label for r in
+            facets.group(con, "guidance")[("edpb", "riktlinjer", "2019")]] \
         == ["Riktlinjer 1/2019", "Riktlinjer 2/2019"]
 
 

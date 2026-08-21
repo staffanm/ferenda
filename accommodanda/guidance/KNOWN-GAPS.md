@@ -1,7 +1,34 @@
-# edpb — known gaps
+# guidance — known gaps
 
-What this vertical does *not* do, and why, so the next reader does not have to
-re-derive it. Measured against the 60-document corpus harvested 2026-08-01.
+What this source does *not* do, and why, so the next reader does not have to
+re-derive it. The EDPB figures are measured against the 60-document corpus
+harvested 2026-08-01, the EBA ones against the single-rulebook walk of
+2026-08-21.
+
+## EBA: a Swedish document under an English title
+
+An EBA leaf page states its title in English only — the h1 of the ancillary
+services page reads "Guidelines on Ancillary Services Undertakings", while the
+Swedish PDF it links opens "Riktlinjer för specificering av kriterierna för
+identifiering av de verksamheter som avses i artikel 4.1.18 i förordning (EU)
+nr 575/2013". The harvest records the page's title, so a Swedish document is
+currently published under an English heading.
+
+The Swedish title is on the cover, below the number and the date, and that is
+where it should be read from — `parse._eba_fields` already reads the cover for
+the number and would only have to keep going. It is not done yet because the
+cover sets the title across several lines and ends it with an all-caps running
+head, and telling the title from the head needs the font sizes rather than the
+line breaks. Until then the record's title stands.
+
+## EBA: identity costs a download on the first run
+
+Of the 289 leaves in the single rulebook, only 52 print an `EBA-GL-ÅÅÅÅ-NN`
+token anywhere on the page, and two of those print two. Every other document
+states its number only on its own cover, so the first harvest downloads each
+PDF to name it. `eba_download.known_identities` keeps that from repeating: a
+leaf whose address and linked document are both unchanged is read back off the
+stored record, so a steady run fetches nothing.
 
 ## Scope: two series plus the endorsed WP29 set
 
@@ -314,6 +341,55 @@ English page carries a banner saying so, and the citation scan runs the English
 surface of the engine for it. The WP29 Swedish translations live inside 10–28 MB
 language ZIPs on the Commission newsroom; a routine run does not re-resolve them
 (`--force` does).
+
+## EUIPO: what the coordinate identity costs
+
+Measured against the three current publications on 2026-08-21.
+
+**Only the current edition is carried.** EUIPO revises the riktlinjerna about
+once a year and the delivery app keeps ten editions. The identity is the
+coordinate, so a new edition replaces the old at the same address and
+`version` records which edition the reader has. A citation that names an older
+edition therefore lands on text that has moved.
+
+**The varumärkesriktlinjerna are in English today.** The Swedish translations
+trail the English edition: Edition 2026 came into force 2026-07-01 and exists
+in 22 languages, Swedish not among them, while the superseded Edition 2025 has
+it. The harvest takes the current edition, so 22 of the 24 documents carry
+English text and say so. A later run picks the Swedish up with no change of
+address, because the number is EUIPO's own language-free scope code
+(`part-b-section-4`, not `del-b-avsnitt-4`).
+
+**Formgivnings- and GI-riktlinjerna are one document each.** EUIPO publishes
+no PDF for the delar that carry those two families' own guidance — 223 topics
+of "Prövning av ansökningar om registrerade EU-formgivningar", 116 of
+"Prövning av ansökningar om ogiltigförklaring", and all nine delar of
+GI-riktlinjerna resolve to the whole-volume PDF. So the volume is the document
+(554 and 208 pages) and "del A, avsnitt 3" is not an address for them, only for
+the varumärkesriktlinjerna.
+
+**The front matter is dropped.** "1 Inledning" and the redaktionella noten
+about the revision process resolve to the whole-volume PDF in every family —
+five topics of the varumärkesvolymen, two of formgivningsvolymen, one of
+GI-volymen. They state the revision procedure, not examination practice. The
+only way to carry them would be to carry the 1 776-page varumärkesvolym whole.
+
+**The chapter is not an anchor.** The delivery app serves the same text as
+2 043 HTML topics, one per kapitel and subsection, each with its own address.
+This harvest takes the PDF instead, so the anchors are the ones
+`lib.pdftext` mints from the running text. A citation to "del B, avsnitt 4,
+kapitel 3" lands on the avsnitt's page, not on the kapitel.
+
+**The whole-volume documents' covers are not checked.** `parse._euipo_fields`
+proves a varumärkesdokument is the del it is filed under, and that its cover
+prints the avsnitt it is filed as. A volume's cover lists every del it contains
+and states no coordinate, so there is nothing to check it against.
+
+**Where the Swedish title is.** Both the app's own metadata (`Title` on
+`/api/publications`, and every innehållsförteckningsnod) and the PDF cover are
+in the publication's language. The file name is not a third place: `/binary/`
+answers with no `Content-Disposition` at all, so the stored file is named from
+our own basefile.
 
 ## Republication basis
 

@@ -263,7 +263,7 @@ def render_document(art, source, site, renderers):
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
-                "eurlex", "edpb", "coe", "icrc", "untc", "icc", "icj",
+                "eurlex", "guidance", "coe", "icrc", "untc", "icc", "icj",
                 "begrepp")
 # the reader-facing source names, defined once in `facets` (which this module
 # imports; the reverse would cycle) and re-exported here under the name the
@@ -279,7 +279,7 @@ FOLKRATT_LABEL = "Folkrätt"
 # hudoc browses under folkrätt: the guidance belongs beside the rättsakt it
 # interprets, and has no address of its own to justify
 BROWSE_DIR = {"dv": "dom", "hudoc": "folkratt/hudoc",
-              "edpb": "eurlex/vagledning"}
+              "guidance": "eurlex/vagledning"}
 
 
 def browse_dir(source):
@@ -665,7 +665,7 @@ def cross_nav(groups, active_id):
 # vägledningar are not riktlinjer. What a group heading has to say is who
 # issued what is under it.
 _EU_AXIS_LABEL = {"eurlex": SOURCE_LABEL["eurlex"],
-                  "edpb": "EDPB:s vägledningar"}
+                  "guidance": "EU-organens vägledningar"}
 
 
 def eurlex_axis(con):
@@ -673,7 +673,7 @@ def eurlex_axis(con):
              [("%s:%s" % (source, bucket["slug"]), bucket["label"],
                browse_url(source, [bucket["slug"]]), bucket["count"])
               for bucket in facets.tree(con, source)["buckets"]])
-            for source in ("eurlex", "edpb")
+            for source in ("eurlex", "guidance")
             if catalog.document_count(con, source)]
 
 

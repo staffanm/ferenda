@@ -1428,6 +1428,6 @@ def test_footnotes_are_citation_scanned_onto_the_artifact():
                  fotnoter=[Fotnot("12", "Se riktlinjer 05/2020 och WP 248.")],
                  ).to_artifact(sfs_parser("avg", avg_parse.AVG_PARSE_TYPES))
     assert [x["uri"] for x in art["footnotes"][0]["text"] if isinstance(x, dict)] \
-        == ["https://lagen.nu/edpb/riktlinjer/05-2020",
-            "https://lagen.nu/edpb/wp/248"]
+        == ["https://lagen.nu/guidance/edpb/riktlinjer/05-2020",
+            "https://lagen.nu/guidance/edpb/wp/248"]
     assert art["footnotes"][0]["mark"] == "12"

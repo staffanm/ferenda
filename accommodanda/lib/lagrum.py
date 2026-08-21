@@ -628,7 +628,7 @@ JK_ID: /\d+-\d{2}-\d{2}/
 # VAGLEDNING (EDPB guidance) -- soft law over the allmänna
 # dataskyddsförordningen, cited by the number its issuer gave it and by nothing
 # else: no CELEX, no diarienummer. Three surfaces, because there are three
-# series (see `edpb/series.py`):
+# series (see `guidance/issuers.py`):
 #
 #   * "Riktlinjer 05/2020", "riktlinje 3/2019" -- and the definite "riktlinjerna
 #     05/2020" Swedish prose writes as often. The EDPB pads the löpnummer in
@@ -1635,8 +1635,8 @@ def vagledning_slug(number):
     The löpnummer is zero-padded to two digits because the EDPB pads it in some
     years and not others -- "Riktlinjer 05/2020" beside "Riktlinjer 1/2018" --
     and a citation copies whichever form it saw. Kept byte-identical to
-    `edpb.series.number_slug`, which mints the same address from the document's
-    side; `test_edpb.py` holds the two together."""
+    `guidance.issuers.number_slug`, which mints the same address from the
+    document's side; `test_guidance.py` holds the two together."""
     serial, _, year = number.partition('/')
     return '%02d-%s' % (int(serial), year)
 
@@ -2678,10 +2678,21 @@ class LagrumParser:
 
     # --- VAGLEDNING (EDPB / artikel 29-gruppens guidance) ---
 
+    # The EDPB was established by artikel 68 in the allmänna
+    # dataskyddsförordningen and held its first plenary in May 2018, so it has
+    # issued nothing numbered for an earlier year. Without this floor the
+    # trigger claims every "rekommendation nr NN/ÅÅÅÅ" ever printed: 78 of the
+    # 581 links to a numbered EDPB series pointed at years the board did not
+    # exist in, back to "Rekommendationen nr 12/1966" in a betänkande from 1972.
+    # Those are ILO and Europarådet recommendations, and the right outcome is an
+    # unlinked citation rather than a link to a document that cannot be.
+    EDPB_FOUNDED = 2018
+
     def _vagledning(self, node, serie, out):
-        out.append({'_uri': '%sedpb/%s/%s'
-                    % (self.base, serie,
-                       vagledning_slug(_token_text(subtree(node, 'vl_id')))),
+        slug = vagledning_slug(_token_text(subtree(node, 'vl_id')))
+        if int(slug.rsplit('-', 1)[-1]) < self.EDPB_FOUNDED:
+            return
+        out.append({'_uri': '%sguidance/edpb/%s/%s' % (self.base, serie, slug),
                     '_span': _node_span(node)})
 
     def fmt_riktlinje_ref(self, node, match, out, context):
@@ -2694,7 +2705,7 @@ class LagrumParser:
         number = _token_text(subtree(node, 'wp_id'))
         if number == WP29_GROUP:   # "WP29" names the group, not a document
             return
-        out.append({'_uri': self.base + 'edpb/wp/' + number,
+        out.append({'_uri': self.base + 'guidance/edpb/wp/' + number,
                     '_span': _node_span(node)})
 
 

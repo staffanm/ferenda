@@ -300,10 +300,16 @@ def pdf_info(pdf_path):
             if _}
 
 
-def pdf_first_page_text(pdf_path):
+def pdf_first_page_text(pdf_path, pages=1):
     """The first page's text, whitespace-collapsed -- enough to tell a
-    rättelseblad from a betänkande without converting the whole file."""
-    out = subprocess.run(["pdftotext", "-f", "1", "-l", "1", str(pdf_path), "-"],
+    rättelseblad from a betänkande without converting the whole file.
+
+    `pages` reads that many pages from the front instead, for a publisher that
+    puts a wrapper in front of the cover: every ACER PDF published before 2017
+    opens with a "Publishing date / we appreciate your feedback" page, and the
+    document's own cover -- which is where its number is -- is page 2."""
+    out = subprocess.run(["pdftotext", "-f", "1", "-l", str(pages),
+                          str(pdf_path), "-"],
                          capture_output=True, check=True, text=True).stdout
     return normalize_space(out)
 

@@ -854,7 +854,7 @@ _LABELLED_KIND = {
     "begrepp": lambda art, lb: "begrepp",
     "avg": lambda art, lb: art.get("org", "avg"),      # the organ (jo/jk/…)
     "rs": lambda art, lb: art.get("org", "rs"),        # the agency (fk/imy/…)
-    "edpb": lambda art, lb: art.get("serie", "edpb"),  # riktlinjer/…/wp
+    "guidance": lambda art, lb: art.get("serie") or art["utgivare"],
     "coe": lambda art, lb: art.get("doctype", "treaty"),
 }
 

@@ -70,10 +70,6 @@ from .dv import namedcases as dv_namedcases_mod
 from .dv import paths as dv_paths
 from .dv import render as dv_render
 from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
-from .edpb import download as edpb_download
-from .edpb import parse as edpb_parse
-from .edpb import render as edpb_render
-from .edpb import series as edpb_series
 from .eurlex import annotate as eurlex_annotate
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
@@ -99,6 +95,12 @@ from .foreskrift import harvest as foreskrift_harvest_mod
 from .foreskrift import parse as foreskrift_parse
 from .foreskrift import render as foreskrift_render
 from .foreskrift.agencies import REGISTRY as FORESKRIFT_AGENCIES
+from .guidance import download as guidance_download
+from .guidance import edpb_download
+from .guidance import eurlex_download as guidance_eurlex_download
+from .guidance import issuers as guidance_issuers
+from .guidance import parse as guidance_parse
+from .guidance import render as guidance_render
 from .hudoc import casenames as hudoc_casenames_mod
 from .hudoc import download as hudoc_download
 from .hudoc import parse as hudoc_parse
@@ -3066,74 +3068,106 @@ def rs_browser_download(_basefiles):
 
 
 # --------------------------------------------------------------------------
-# edpb source (Europeiska dataskyddsstyrelsens riktlinjer och rekommendationer)
+# guidance source (vägledning from EU-level bodies -- see guidance/issuers.py)
 # --------------------------------------------------------------------------
 
-EDPB_CODE = (PKG / "edpb" / "parse.py", PKG / "edpb" / "model.py",
-             PKG / "edpb" / "series.py", PKG / "edpb" / "download.py",
-             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
-             PKG / "lib" / "emdref.py", *CITATION_DATA,
-             PKG / "lib" / "artifact.py")
+GUIDANCE_CODE = (PKG / "guidance" / "parse.py", PKG / "guidance" / "model.py",
+                 PKG / "guidance" / "issuers.py",
+                 PKG / "guidance" / "edpb_data.py",
+                 PKG / "guidance" / "edpb_download.py",
+                 PKG / "guidance" / "eba_download.py",
+                 PKG / "guidance" / "easa_download.py",
+                 PKG / "guidance" / "acer_download.py",
+                 PKG / "guidance" / "enisa_download.py",
+                 PKG / "guidance" / "esma_download.py",
+                 PKG / "guidance" / "berec_download.py",
+                 PKG / "guidance" / "edps_download.py",
+                 PKG / "guidance" / "eiopa_download.py",
+                 PKG / "guidance" / "eurlex_download.py",
+                 PKG / "guidance" / "euipo_download.py",
+                 PKG / "guidance" / "download.py",
+                 PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                 PKG / "lib" / "formex.py",
+                 PKG / "lib" / "emdref.py", *CITATION_DATA,
+                 PKG / "lib" / "artifact.py")
 
 
-def edpb_list():
-    return sorted(bf for serie in edpb_series.KODER
-                  for bf in compress.list_basefiles(layout.EDPB_DOWNLOADED, serie))
+def guidance_list():
+    # one directory per issuing body under the shared root; the basefile leads
+    # with the issuer, so listing per body gives the whole source
+    return sorted(bf for utgivare in guidance_issuers.KODER
+                  for bf in compress.list_basefiles(layout.GUIDANCE_DOWNLOADED,
+                                                    utgivare))
 
 
-def edpb_inputs(basefile):
-    """The record JSON plus the document PDF -- re-downloading either re-stales
-    the parse. Every edpb record names a document (the harvest writes no record
-    without one), so the PDF is always an input."""
-    return [util.record_path(layout.EDPB_DOWNLOADED, basefile.split("/", 1)[0],
-                             basefile),
-            edpb_download.pdf_path(layout.EDPB_DOWNLOADED, basefile)] \
-        + _patch_input("edpb", basefile)
+def guidance_inputs(basefile):
+    """The record JSON plus the document -- re-downloading either re-stales the
+    parse. Every guidance record names a document (the harvest writes no record
+    without one).
+
+    Where the document came from CELLAR rather than the body's own site it is a
+    directory of manifestations (one file per language), not a single PDF, so
+    the whole directory's contents are the input."""
+    utgivare = basefile.split("/", 1)[0]
+    record = util.record_path(layout.GUIDANCE_DOWNLOADED, utgivare, basefile)
+    if utgivare in guidance_parse.EURLEX_KODER:
+        content = sorted(guidance_eurlex_download.content_dir(
+            layout.GUIDANCE_DOWNLOADED, basefile).glob("*"))
+    else:
+        content = [edpb_download.pdf_path(layout.GUIDANCE_DOWNLOADED, basefile)]
+    return [record, *content] + _patch_input("guidance", basefile)
 
 
-def edpb_harvest(scopes):
-    """Bulk harvest of the EDPB's guidance (scopes = series codes; empty = all
-    three). `--force` refetches every document; `--only riktlinjer/05-2020`
-    fetches a single document (needs its series scope)."""
-    _require_single_scope("edpb", scopes, "series",
-                          "lagen edpb download riktlinjer "
-                          "--only riktlinjer/05-2020")
+def guidance_harvest(scopes):
+    """Bulk harvest of EU-level guidance (scopes = ``<utgivare>/<serie>``;
+    empty = all). `--force` refetches every document; `--only
+    edpb/riktlinjer/05-2020` fetches a single document (needs its scope)."""
+    _require_single_scope("guidance", scopes, "scope",
+                          "lagen guidance download edpb/riktlinjer "
+                          "--only edpb/riktlinjer/05-2020")
     if RUN.dry_run:
-        print("edpb download: would download %s into %s"
-              % (RUN.only or ", ".join(scopes) or " + ".join(edpb_series.KODER),
-                 layout.EDPB_DOWNLOADED))
+        print("guidance download: would download %s into %s"
+              % (RUN.only or ", ".join(scopes)
+                 or " + ".join(guidance_download.SCOPES),
+                 layout.GUIDANCE_DOWNLOADED))
         return
-    totals = edpb_download.sync(layout.EDPB_DOWNLOADED, scopes=scopes or None,
-                               full=RUN.force, only=RUN.only)
-    for serie, (seen, new) in totals.items():
-        print("edpb %s: %d seen, %d new" % (serie, seen, new))
+    # three upstreams (the EDPB site, the Commission newsroom, the EBA):
+    # fan them out the way rs/avg/foreskrift do
+    totals = guidance_download.sync(layout.GUIDANCE_DOWNLOADED,
+                                    scopes=scopes or None,
+                                    full=RUN.force, only=RUN.only,
+                                    limit=RUN.limit, jobs=RUN.jobs)
+    for scope, (seen, new) in totals.items():
+        print("guidance %s: %d seen, %d new" % (scope, seen, new))
     return _sum_scope_totals(totals)
 
 
 # No per-document download stage (the foreskrift/avg/rs rule): the guidance
-# arrives only through the bulk `edpb_harvest` sweep.
-SOURCES["edpb"] = Source("edpb", edpb_list, {
-    "parse": _parse_stage("edpb", edpb_parse.parse,
-                          layout.EDPB_DOWNLOADED,
-                          inputs=edpb_inputs, code=EDPB_CODE),
+# arrives only through the bulk `guidance_harvest` sweep.
+SOURCES["guidance"] = Source("guidance", guidance_list, {
+    "parse": _parse_stage("guidance", guidance_parse.parse,
+                          layout.GUIDANCE_DOWNLOADED,
+                          inputs=guidance_inputs, code=GUIDANCE_CODE),
 },
-    harvest=edpb_harvest,
-    origin=edpb_download.SITEMAP,
-    scopes=frozenset(edpb_series.KODER),
-    notes="download flag: --only serie/nummer (fetch one; needs its series "
+    harvest=guidance_harvest,
+    origin=guidance_download.ORIGIN,
+    scopes=frozenset(guidance_download.SCOPES),
+    notes="download flag: --only utgivare/serie/nummer (fetch one; needs its "
           "scope)\n"
-          "scopes are the series: " + ", ".join(
-              "%s (%s)" % (s.kod, s.label) for s in edpb_series.REGISTRY)
+          "scopes are <utgivare>/<serie>: " + ", ".join(
+              "%s/%s (%s)" % (i.kod, s.kod, s.label)
+              for i in guidance_issuers.REGISTRY for s in i.series
+              if "%s/%s" % (i.kod, s.kod) in guidance_download.SCOPES)
           + "; empty = all\n"
-          "identity is the EDPB's own number -- these documents have no CELEX, "
-          "which is why they are not eurlex (Riktlinjer 05/2020, "
-          "Rekommendation 01/2019, WP 248)\n"
-          "the Swedish version is published wherever the EDPB has issued one "
-          "(48 of 51) and the English one otherwise; the record says which\n"
-          "the wp scope is a closed corpus of seven artikel 29-gruppens "
-          "vägledningar, harvested from the Commission newsroom (the EDPB's own "
-          "pages for them carry no document) -- a run re-resolves them only "
-          "under --force, each costing a 10-28 MB language ZIP")
+          "identity is the issuing body's own number, never a CELEX -- 122 "
+          "förarbeten cite an ECB-yttrande as CON/2013/82 and none as "
+          "52013AB0082 (Riktlinjer 05/2020, EBA/GL/2021/05, WP 248)\n"
+          "the Swedish version is published wherever the body has issued one "
+          "and the English one otherwise; the record says which\n"
+          "edpb/wp is a closed corpus of artikel 29-gruppens vägledningar, "
+          "harvested from the Commission newsroom (the EDPB's own pages for "
+          "them carry no document) -- a run re-resolves them only under "
+          "--force, each costing a 10-28 MB language ZIP")
 
 
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden
@@ -4291,7 +4325,7 @@ SOURCE_RENDERERS = {
     "foreskrift": foreskrift_render.render,
     "avg": avg_render.render,
     "rs": rs_render.render,
-    "edpb": edpb_render.render,
+    "guidance": guidance_render.render,
     "hudoc": hudoc_render.render,
     "coe": coe_render.render,
     "icrc": icrc_render.render,

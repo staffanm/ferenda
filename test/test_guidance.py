@@ -14,26 +14,45 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from lxml import etree
 
-from accommodanda.edpb import download as edpb_download
-from accommodanda.edpb import parse as edpb_parse
-from accommodanda.edpb.model import (
+from accommodanda.guidance import (
+    acer_download,
+    easa_download,
+    edpb_download,
+    euipo_download,
+    eurlex_download,
+)
+from accommodanda.guidance import download as guidance_download
+from accommodanda.guidance import parse as edpb_parse
+from accommodanda.guidance import render as guidance_render
+from accommodanda.guidance.edpb_data import HBDI, WP29, WP29_BY_SLUG
+from accommodanda.guidance.edpb_download import HARVESTED
+from accommodanda.guidance.issuers import (
+    EASA,
+    EDPB,
+    EUIPO,
+    LOPNUMMER_FORST,
+)
+from accommodanda.guidance.issuers import number_slug as _number_slug
+from accommodanda.guidance.model import (
     Block,
     Fotnot,
     Vagledning,
     vagledning_identifier,
     vagledning_uri,
 )
-from accommodanda.edpb.series import (
-    HARVESTED,
-    HBDI,
-    KODER,
-    REGISTRY,
-    WP29,
-    WP29_BY_SLUG,
-    number_slug,
-)
-from accommodanda.lib import catalog, facets, labels, layout, render
+from accommodanda.lib import formex as lib_formex
+
+# the EDPB's series data now lives on its registry entry, and its numbering
+# rule takes the component order as an argument (the EBA writes the year first)
+KODER = EDPB.koder
+REGISTRY = EDPB.series
+
+
+def number_slug(number):
+    return _number_slug(number, LOPNUMMER_FORST)
+from accommodanda.lib import catalog, facets, labels, layout, render, tpl
 from accommodanda.lib.lagrum import (
     EULAGSTIFTNING,
     VAGLEDNING,
@@ -70,19 +89,19 @@ def lines(name):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("serie,nummer,uri,identifier", [
-    ("riktlinjer", "05/2020", "https://lagen.nu/edpb/riktlinjer/05-2020",
+    ("riktlinjer", "05/2020", "https://lagen.nu/guidance/edpb/riktlinjer/05-2020",
      "Riktlinjer 05/2020"),
     # the EDPB pads the löpnummer in some years and not others; one document has
     # one address however it was written
-    ("riktlinjer", "5/2020", "https://lagen.nu/edpb/riktlinjer/05-2020",
+    ("riktlinjer", "5/2020", "https://lagen.nu/guidance/edpb/riktlinjer/05-2020",
      "Riktlinjer 5/2020"),
     ("rekommendationer", "01/2019",
-     "https://lagen.nu/edpb/rekommendationer/01-2019", "Rekommendation 01/2019"),
-    ("wp", "248", "https://lagen.nu/edpb/wp/248", "WP 248"),
+     "https://lagen.nu/guidance/edpb/rekommendationer/01-2019", "Rekommendation 01/2019"),
+    ("wp", "248", "https://lagen.nu/guidance/edpb/wp/248", "WP 248"),
 ])
 def test_identity(serie, nummer, uri, identifier):
-    assert vagledning_uri(serie, nummer) == uri
-    assert vagledning_identifier(serie, nummer) == identifier
+    assert vagledning_uri("edpb", serie, nummer) == uri
+    assert vagledning_identifier("edpb", serie, nummer) == identifier
 
 
 def test_number_slug_normalises_the_padding_only():
@@ -134,9 +153,10 @@ def test_the_one_endorsed_document_with_no_wp_number_is_named_and_dated_here():
     both -- and it is cited by name, having no number to be cited by."""
     wp = WP29_BY_SLUG["artikel-30-5"]
     assert wp.number is None and wp.titel and wp.antagen == "2018-04-19"
-    assert vagledning_identifier("wp", "artikel-30-5") == wp.citation
+    assert vagledning_identifier("edpb", "wp", "artikel-30-5",
+                                 wp.citation) == wp.citation
     # every other one is cited by its number, and states its own title
-    assert vagledning_identifier("wp", "248") == "WP 248"
+    assert vagledning_identifier("edpb", "wp", "248") == "WP 248"
     assert not any(wp.titel or wp.antagen for wp in WP29 if wp.number)
 
 
@@ -569,7 +589,7 @@ class _NoRefs:
 
 
 def _artifact(**kwargs):
-    fields = dict(serie="riktlinjer", nummer="05/2020",
+    fields = dict(utgivare="edpb", serie="riktlinjer", nummer="05/2020",
                   titel="Riktlinjer 05/2020 om samtycke", antagen="2020-05-04",
                   body=[Block("rubrik", "1 INLEDNING", 2),
                         Block("stycke", "1. Inledningsvis gäller detta.",
@@ -580,7 +600,7 @@ def _artifact(**kwargs):
 
 def test_artifact_anchors_a_numbered_punkt_on_its_own_number():
     art = _artifact()
-    assert art["uri"] == "https://lagen.nu/edpb/riktlinjer/05-2020"
+    assert art["uri"] == "https://lagen.nu/guidance/edpb/riktlinjer/05-2020"
     assert art["identifier"] == "Riktlinjer 05/2020"
     assert art["serie"] == "riktlinjer"
     ids = [n.get("id") for n in art["structure"] if n["type"] == "stycke"]
@@ -600,7 +620,7 @@ def test_artifact_carries_the_version_and_the_language():
 def test_a_wp29_artifact_is_published_by_the_working_party():
     art = _artifact(serie="wp", nummer="248", titel="Riktlinjer om …",
                     revision="rev.01")
-    assert art["uri"] == "https://lagen.nu/edpb/wp/248"
+    assert art["uri"] == "https://lagen.nu/guidance/edpb/wp/248"
     assert art["identifier"] == "WP 248"
     assert art["metadata"]["publisher"] == "Artikel 29-gruppen"
     assert art["metadata"]["revision"] == "rev.01"
@@ -612,31 +632,31 @@ def test_a_wp29_artifact_is_published_by_the_working_party():
 
 @pytest.fixture(scope="module")
 def refparser():
-    return LagrumParser({}, basefile="edpb",
+    return LagrumParser({}, basefile="guidance",
                         parse_types=[EULAGSTIFTNING, VAGLEDNING])
 
 
 @pytest.mark.parametrize("text,expected", [
     ("Se riktlinjer 05/2020 om samtycke.",
-     ["https://lagen.nu/edpb/riktlinjer/05-2020"]),
+     ["https://lagen.nu/guidance/edpb/riktlinjer/05-2020"]),
     # the definite and singular forms Swedish prose writes just as often
     ("enligt riktlinjerna 8/2022 punkt 12",
-     ["https://lagen.nu/edpb/riktlinjer/08-2022"]),
+     ["https://lagen.nu/guidance/edpb/riktlinjer/08-2022"]),
     ("riktlinjen 4/2019 om inbyggt dataskydd",
-     ["https://lagen.nu/edpb/riktlinjer/04-2019"]),
+     ["https://lagen.nu/guidance/edpb/riktlinjer/04-2019"]),
     # the EDPB itself alternates singular and plural for its recommendations
     ("Rekommendation 01/2020 om åtgärder",
-     ["https://lagen.nu/edpb/rekommendationer/01-2020"]),
+     ["https://lagen.nu/guidance/edpb/rekommendationer/01-2020"]),
     ("Rekommendationer 02/2020 om garantierna",
-     ["https://lagen.nu/edpb/rekommendationer/02-2020"]),
+     ["https://lagen.nu/guidance/edpb/rekommendationer/02-2020"]),
     # the artikel 29-gruppens own numbering, spaced or not, with or without rev
     ("artikel 29-gruppens riktlinjer om dataskyddsombud (WP 243)",
-     ["https://lagen.nu/edpb/wp/243"]),
-    ("se WP248 rev.01 avsnitt III", ["https://lagen.nu/edpb/wp/248"]),
+     ["https://lagen.nu/guidance/edpb/wp/243"]),
+    ("se WP248 rev.01 avsnitt III", ["https://lagen.nu/guidance/edpb/wp/248"]),
     # a padded and an unpadded citation to one document are one address
     ("riktlinjer 1/2018 och riktlinjer 01/2018",
-     ["https://lagen.nu/edpb/riktlinjer/01-2018",
-      "https://lagen.nu/edpb/riktlinjer/01-2018"]),
+     ["https://lagen.nu/guidance/edpb/riktlinjer/01-2018",
+      "https://lagen.nu/guidance/edpb/riktlinjer/01-2018"]),
     # "WP29" names the group, not a document
     ("Artikel 29-gruppen (WP29) antog yttrande 15/2011", []),
     # and a bare number pair in prose is not a citation
@@ -653,7 +673,7 @@ def test_a_guidance_reference_the_site_does_not_host_still_parses(refparser):
     any other and render as plain text until the document exists."""
     refparser.reset()
     assert [r.uri for r in refparser.parse_text("WP259 rev.01", context={})] \
-        == ["https://lagen.nu/edpb/wp/259"]
+        == ["https://lagen.nu/guidance/edpb/wp/259"]
 
 
 def test_artikel_29_gruppen_is_a_body_not_a_reference_to_artikel_29(refparser):
@@ -679,36 +699,64 @@ def test_artikel_29_gruppen_is_a_body_not_a_reference_to_artikel_29(refparser):
 # --------------------------------------------------------------------------
 
 def test_layout_files_a_document_under_its_series():
-    assert layout.relpath("edpb", "riktlinjer/05-2020") == \
-        Path("riktlinjer/05-2020")
-    assert layout.relpath("edpb", "wp/248") == Path("wp/248")
-    assert layout.SOURCE_DIR["edpb"] == "edpb"
+    assert layout.relpath("guidance", "edpb/riktlinjer/05-2020") == \
+        Path("edpb/riktlinjer/05-2020")
+    assert layout.relpath("guidance", "edpb/wp/248") == \
+        Path("edpb/wp/248")
+    assert layout.SOURCE_DIR["guidance"] == "guidance"
 
 
 def test_catalog_rows_carry_the_series_as_the_kind():
     art = _artifact()
-    uri, source, kind, label, title, path = catalog.document_row(art, "x.json", "edpb")
-    assert (source, kind, label) == ("edpb", "riktlinjer", "Riktlinjer 05/2020")
+    uri, source, kind, label, title, path = catalog.document_row(
+        art, "x.json", "guidance")
+    assert (source, kind, label) == ("guidance", "riktlinjer",
+                                     "Riktlinjer 05/2020")
     assert title == "Riktlinjer 05/2020 om samtycke"
 
 
 def test_labels_name_an_english_only_document_as_one():
-    swedish = labels.document_labels("edpb", _artifact())
+    swedish = labels.document_labels("guidance", _artifact())
     assert swedish.descriptive_label == "Riktlinjer 05/2020"
-    english = labels.document_labels("edpb", _artifact(sprak="en"))
+    english = labels.document_labels("guidance", _artifact(sprak="en"))
     assert english.descriptive_label == "Riktlinjer 05/2020 (engelsk version)"
 
 
-def test_the_browse_scheme_is_series_then_year():
-    levels = facets.SCHEMES["edpb"]
-    assert [level.name for level in levels] == ["Serie", "År"]
+def test_the_browse_scheme_is_utgivare_then_series_then_year():
+    """Utgivare first, because this source carries several bodies and
+    "Riktlinjer" names a different series under each."""
+    levels = facets.SCHEMES["guidance"]
+    assert [level.name for level in levels] == ["Utgivare", "Serie", "År"]
+
+
+def test_a_year_selector_appears_only_once_a_body_publishes_over_a_hundred():
+    """The avg/rs/föreskrift rule: a by-year axis earns its place when a body's
+    own output is too long to read in one list, and under that it is only an
+    extra click. The gate is the utgivare's total, not the series' -- what the
+    reader is deciding is whether *this body's* output needs splitting."""
+    levels = facets.SCHEMES["guidance"]
+    assert levels[2].only_above == 100
+
+    def tree(counts):
+        return facets._level_nodes(levels, counts, prefix=())
+
+    # 60 EDPB documents: series, then straight to the documents
+    small = tree({("edpb", "riktlinjer", "2020"): 37,
+                  ("edpb", "wp", "2018"): 23})
+    assert [b["key"] for b in small] == ["edpb"]
+    assert [c["children"] for c in small[0]["children"]] == [None, None]
+
+    # a body over the threshold keeps its years
+    big = tree({("eba", "gl", "2021"): 80, ("eba", "gl", "2022"): 47})
+    years = big[0]["children"][0]["children"]
+    assert [y["key"] for y in years] == ["2022", "2021"]
 
 
 def test_edpb_browses_under_the_eu_ratt_masthead_entry():
     """The nav decision: EDPB guidance has no CELEX and is not a rättsakt, so it
     is a source of its own -- but it belongs beside the förordning it interprets,
     the way hudoc sits under folkrätt rather than getting a masthead entry."""
-    assert render.BROWSE_DIR["edpb"] == "eurlex/vagledning"
+    assert render.BROWSE_DIR["guidance"] == "eurlex/vagledning"
     entry = next(e for e in render.ENV.globals["MAST_NAV"] if e[0] == "EU-rätt")
     assert "Riktlinje" in entry[2] and "Rekommendation" in entry[2]
     assert not any(e[0] in ("Vägledning", "Soft law")
@@ -729,14 +777,17 @@ def test_the_eu_selector_names_the_body_each_group_of_documents_comes_from(
         path.write_text(json.dumps(_artifact(serie=serie, nummer=nummer)),
                         "utf-8")
         paths.append(path)
-    catalog.rebuild(db, "edpb", paths)
+    catalog.rebuild(db, "guidance", paths)
     con = catalog.connect(db)
     groups = render.eurlex_axis(con)
-    # eurlex is empty in this catalog, so only the EDPB group is offered -- the
-    # selector is built from what the corpus holds, not from a fixed list
-    assert [axis for axis, _entries in groups] == ["EDPB:s vägledningar"]
+    # eurlex is empty in this catalog, so only the guidance group is offered --
+    # the selector is built from what the corpus holds, not from a fixed list
+    assert [axis for axis, _entries in groups] == ["EU-organens vägledningar"]
+    # and its entries are the issuing bodies, not their series. With one body
+    # the series read as a flat list of document types; with two, "Riktlinjer"
+    # would appear twice with nothing saying whose.
     assert [label for _key, label, _url, _count in groups[0][1]] == [
-        "Riktlinjer", "Rekommendationer", "Artikel 29-gruppens vägledningar"]
+        "Europeiska dataskyddsstyrelsen (EDPB)"]
 
 
 # --------------------------------------------------------------------------
@@ -773,15 +824,14 @@ def test_the_page_furniture_that_shares_the_small_size_is_not_a_footnote():
 
 
 def test_a_footnote_is_citation_scanned_like_any_other_text():
-    art = Vagledning(
-        serie="riktlinjer", nummer="05/2020", titel="Riktlinjer 05/2020",
+    art = Vagledning(utgivare="edpb", serie="riktlinjer", nummer="05/2020", titel="Riktlinjer 05/2020",
         body=[Block("stycke", "Se riktlinjerna nedan.")],
         fotnoter=[Fotnot("16", "Se WP 248 och riktlinjer 3/2019.")],
     ).to_artifact(LagrumParser({}, basefile="edpb",
                                parse_types=[EULAGSTIFTNING, VAGLEDNING]))
     assert [x["uri"] for x in art["footnotes"][0]["text"]
-            if isinstance(x, dict)] == ["https://lagen.nu/edpb/wp/248",
-                                        "https://lagen.nu/edpb/riktlinjer/03-2019"]
+            if isinstance(x, dict)] == ["https://lagen.nu/guidance/edpb/wp/248",
+                                        "https://lagen.nu/guidance/edpb/riktlinjer/03-2019"]
 
 
 def test_another_authority_numbered_guidance_is_not_the_edpbs(refparser):
@@ -799,22 +849,22 @@ def test_another_authority_numbered_guidance_is_not_the_edpbs(refparser):
 
 
 @pytest.mark.parametrize("text,expected", [
-    ("EDPB:s riktlinjer 05/2020", "https://lagen.nu/edpb/riktlinjer/05-2020"),
+    ("EDPB:s riktlinjer 05/2020", "https://lagen.nu/guidance/edpb/riktlinjer/05-2020"),
     ("Europeiska dataskyddsstyrelsens riktlinjer 3/2019",
-     "https://lagen.nu/edpb/riktlinjer/03-2019"),
+     "https://lagen.nu/guidance/edpb/riktlinjer/03-2019"),
     ("Dataskyddsstyrelsens riktlinjer 07/2020",
-     "https://lagen.nu/edpb/riktlinjer/07-2020"),
-    ("Styrelsens riktlinjer 07/2020", "https://lagen.nu/edpb/riktlinjer/07-2020"),
+     "https://lagen.nu/guidance/edpb/riktlinjer/07-2020"),
+    ("Styrelsens riktlinjer 07/2020", "https://lagen.nu/guidance/edpb/riktlinjer/07-2020"),
     ("Artikel 29-gruppens riktlinjer 1/2018",
-     "https://lagen.nu/edpb/riktlinjer/01-2018"),
+     "https://lagen.nu/guidance/edpb/riktlinjer/01-2018"),
     # the bare form, which is what the guidance itself and IMY both write once
     # the board has been named
-    ("Se riktlinjer 05/2020.", "https://lagen.nu/edpb/riktlinjer/05-2020"),
+    ("Se riktlinjer 05/2020.", "https://lagen.nu/guidance/edpb/riktlinjer/05-2020"),
     # sentence-initial: the capitalised "I" used to read as another issuer's
     # name because the exemption list was case-sensitive (RE_EDPB_SELF,
     # 2026-08-15 audit R9)
     ("I dataskyddsstyrelsens riktlinjer 05/2020 anges vidare",
-     "https://lagen.nu/edpb/riktlinjer/05-2020"),
+     "https://lagen.nu/guidance/edpb/riktlinjer/05-2020"),
 ])
 def test_the_edpbs_own_names_still_link(refparser, text, expected):
     refparser.reset()
@@ -860,7 +910,7 @@ def test_the_issuer_guard_spans_a_multi_word_name(refparser):
     refparser.reset()
     assert [r.uri for r in refparser.parse_text(
         "Europeiska dataskyddsstyrelsens riktlinjer 3/2019", context={})] \
-        == ["https://lagen.nu/edpb/riktlinjer/03-2019"]
+        == ["https://lagen.nu/guidance/edpb/riktlinjer/03-2019"]
 
 
 def test_a_title_echo_behind_cover_punctuation_still_goes():
@@ -892,3 +942,691 @@ def test_one_word_furniture_is_not_a_footnote():
         Para(text=t, size=10) for t in
         ("Antagna", "Bakgrund", "Praxis", "Ibid.", "Se skäl 87.")]
     assert [f.text for f in edpb_parse.footnotes(stream)] == ["Ibid.", "Se skäl 87."]
+
+
+def test_a_citation_predating_the_edpb_is_not_linked_to_it(refparser):
+    """The board was established by artikel 68 in dataskyddsförordningen and
+    first met in May 2018, so it has issued nothing numbered for an earlier
+    year. Without the floor the trigger claimed every "rekommendation nr
+    NN/ÅÅÅÅ" ever printed -- a betänkande from 1972 citing "Rekommendationen nr
+    12/1966" (an ILO recommendation) linked to edpb/rekommendationer/12-1966."""
+    def linked(text):
+        return [r.uri for r in refparser.parse_text(text)]
+
+    assert linked("Se riktlinjer 05/2020.") == [
+        "https://lagen.nu/guidance/edpb/riktlinjer/05-2020"]
+    assert linked("Rekommendationen nr 12/1966 om detta.") == []
+    assert linked("rekommendation nr 26/1980 anger vidare") == []
+
+
+# --------------------------------------------------------------------------
+# acer: the two listing shapes, the slug and the cover's word against the page's
+# --------------------------------------------------------------------------
+#
+# The fixtures under ``test/files/acer/`` are trimmed captures of the live 2026
+# listings, cut down to the sections that carry a case worth naming.
+
+ACER_FIXTURES = Path(__file__).parent / "files" / "acer"
+
+
+def acer_fixture(name):
+    return (ACER_FIXTURES / name).read_text("utf-8")
+
+
+def test_acer_framework_page_names_the_ramriktlinjer_and_not_what_sits_beside():
+    """The ramriktlinjesidan lists the adopting ACER-beslut and an ENTSOG
+    impact assessment under the same markup as the ramriktlinjerna. Only a
+    document naming itself a Framework Guideline *first* is one: the beslut's
+    title carries the words too, further in ("ACER Decision 02-2011 on the
+    Framework Guidelines on ...")."""
+    titles = [titel for titel, _ in acer_download.linked_documents(
+        acer_fixture("framework-guidelines.html"), "https://www.acer.europa.eu")]
+    assert len(titles) == 5
+    assert [t for t in titles if acer_download.RE_FRAMEWORK.match(t)] == [
+        "Framework Guideline on Demand Response",
+        "Framework Guidelines on Capacity Allocation and Congestion "
+        "Management for Electricity",
+        "Framework Guidelines on Capacity Allocation and Congestion "
+        "Management for Electricity"]
+
+
+@pytest.mark.parametrize("titel,slug", [
+    ("Framework Guideline on Demand Response", "demand-response"),
+    # the article after the preposition goes too, so "for the joint scenarios"
+    # and "on joint scenarios" would not be two documents
+    ("Framework Guidelines for the joint scenarios for network development "
+     "planning of electricity and gas",
+     "joint-scenarios-for-network-development-planning-of-electricity-and-gas"),
+    # the file name carries a date stamp and the title does not: the slug is the
+    # name's, so it reads as the citation
+    ("Framework Guideline on Sector-Specific Rules for Cybersecurity Aspects "
+     "of Cross-Border Electricity Flows",
+     "sector-specific-rules-for-cybersecurity-aspects-of-cross-border-"
+     "electricity-flows"),
+])
+def test_acer_framework_slug(titel, slug):
+    assert acer_download.framework_slug(titel) == slug
+
+
+def test_acer_one_ramriktlinje_listed_twice_slugs_the_same_way():
+    """The canonical section and the ämnessektionen name the same ramriktlinje
+    from two different files. The name is the identity, so both reach one
+    address and the walk takes the first."""
+    slugs = [acer_download.framework_slug(titel)
+             for titel, _ in acer_download.linked_documents(
+                 acer_fixture("framework-guidelines.html"), "")
+             if acer_download.RE_FRAMEWORK.match(titel)]
+    assert slugs[1] == slugs[2] == \
+        "capacity-allocation-and-congestion-management-for-electricity"
+
+
+def test_acer_opinions_page_states_a_number_for_all_but_the_annex():
+    """The opinions page is one hand-built listing of anchors: an annex sits
+    beside the yttrande it belongs to, and one yttrande ACER never numbered
+    sits among the numbered ones. Both are outcomes with a count of their own,
+    not silent drops."""
+    rows = acer_download.linked_documents(acer_fixture("opinions.html"), "")
+    annexes = [t for t, _ in rows if acer_download.RE_ANNEX.match(t)]
+    numbers = [acer_download.listing_number("yttranden", t) for t, _ in rows
+               if not acer_download.RE_ANNEX.match(t)]
+    assert annexes == ["Annex I to ACER Opinion 03-2025"]
+    assert numbers == ["13/2026", "03/2025", "04/2014", None, "04/2014"]
+
+
+def test_acer_card_view_reads_its_own_dates_and_counts_its_annexes():
+    """The rekommendationsvyn is the other page shape: cards with a date and a
+    collapsed annex list. An annex is ACER's own document, not this one's text,
+    so it is counted and not followed."""
+    cards = acer_download.card_documents(
+        acer_fixture("recommendations.html"), "https://www.acer.europa.eu")
+    assert [(c[1], c[3]) for c in cards] == [("2026-03-30", 0),
+                                             ("2026-03-20", 0),
+                                             ("2025-07-29", 1)]
+    assert cards[0][2].endswith(
+        "/ACER-Recommendation-02-2026-Proposals-to-strengthen-electricity-"
+        "market-rules.pdf")
+    assert acer_download.listing_number("rekommendationer", cards[0][0]) \
+        == "02/2026"
+
+
+def test_acer_pager_ends_where_the_view_ends():
+    assert acer_download.has_next_page(acer_fixture("recommendations.html"))
+    assert not acer_download.has_next_page(
+        acer_fixture("recommendations-last.html"))
+
+
+class _AcerCounts:
+    """What `filed_number` counts, without the rest of the run."""
+
+    def __init__(self):
+        self.silent = 0
+        self.renamed = []
+        self.conflicts = []
+
+
+@pytest.mark.parametrize("listed,printed,filed", [
+    # the ordinary case: the cover prints what the listing says
+    ("13/2026", {"13/2026"}, "13/2026"),
+    # a scanned cover prints nothing this can read, so the listing stands
+    ("02/2011", set(), "02/2011"),
+    # the cover names another document beside itself; the listed number is
+    # among them, so nothing changes (the `eba_download` rule)
+    ("03/2025", {"03/2025", "01/2024"}, "03/2025"),
+    # ACER links ACER-Opinion-04-2015.pdf under the title of 04-2014. The file
+    # is the document: it is filed as 04/2015, which is listed nowhere else
+    ("04/2014", {"04/2015"}, "04/2015"),
+    # several numbers and none of them the listed one: refused, not guessed
+    ("04/2014", {"04/2015", "07/2013"}, None),
+])
+def test_acer_the_cover_settles_the_number(listed, printed, filed):
+    counts = _AcerCounts()
+    assert acer_download.filed_number(listed, set(printed), "u", counts) == filed
+
+
+def test_acer_every_way_the_cover_answers_is_counted_apart():
+    """rule:instrument-failures: a cover that says nothing, one that overrules
+    the listing and one that contradicts it must not look alike in a run."""
+    counts = _AcerCounts()
+    acer_download.filed_number("02/2011", set(), "silent", counts)
+    acer_download.filed_number("04/2014", {"04/2015"}, "renamed", counts)
+    acer_download.filed_number("04/2014", {"04/2015", "07/2013"}, "clash",
+                               counts)
+    assert counts.silent == 1
+    assert len(counts.renamed) == 1 and "renamed" in counts.renamed[0]
+    assert len(counts.conflicts) == 1 and "clash" in counts.conflicts[0]
+
+
+def test_acer_cover_numbers_ignore_the_rattsakter_a_cover_cites():
+    """Every ACER cover recites the förordning it rests on ("Regulation (EC) No
+    714/2009"), and those are numbered too. A löpnummer is two digits, so a
+    three- or four-digit one cannot be this document's."""
+    assert acer_download.cover_numbers(
+        "OPINION No 19/2019 OF THE EUROPEAN UNION AGENCY ... Having regard to "
+        "Regulation (EC) No 714/2009 ... and Decision No 1364/2006/EC"
+    ) == {"19/2019"}
+
+
+def test_acer_cover_date_is_the_documents_own_and_not_a_rattsakts():
+    """The heading names the agency before it states the date, and the recitals
+    state a rättsakts date after it. Only the recitals stop the read."""
+    assert acer_download.cover_date(
+        "PUBLIC OPINION No 07/2024 OF THE EUROPEAN UNION AGENCY FOR THE "
+        "COOPERATION OF ENERGY REGULATORS of 29 October 2024 on the review of "
+        "gas and hydrogen national Network Development Plans THE EUROPEAN "
+        "UNION AGENCY ..., Having regard to Regulation (EU) 2024/1789 ... of "
+        "13 June 2024") == "2024-10-29"
+    # a ramriktlinje states a bare date under its title and recites nothing
+    assert acer_download.cover_date(
+        "Framework Guideline on Demand Response 20 December 2022 European "
+        "Union Agency for the Cooperation of Energy Regulators") == "2022-12-20"
+    # the pre-2017 wrapper page, whose cover behind it is a scan that states
+    # no date pdftotext can read
+    assert acer_download.cover_date(
+        "Publishing date: 30/05/2012 Document title: We appreciate your "
+        "feedback") == "2012-05-30"
+
+
+def test_acer_identity_reproduces_the_number_acer_prints():
+    """"OPINION No 13/2026" -> guidance/acer/yttranden/13-2026, löpnummer
+    first. The series segment carries its weight here: ACER restarts every
+    series at 01 each year and the sequences are independent, so 01/2013 is a
+    yttrande, a rekommendation and a beslut at once."""
+    assert vagledning_uri("acer", "yttranden", "13/2026") == \
+        "https://lagen.nu/guidance/acer/yttranden/13-2026"
+    assert vagledning_uri("acer", "rekommendationer", "2/2025") == \
+        "https://lagen.nu/guidance/acer/rekommendationer/02-2025"
+    assert vagledning_identifier("acer", "yttranden", "13/2026") == \
+        "ACER Opinion No 13/2026"
+    # a ramriktlinje has no number, so it is cited by the name ACER lists it
+    # under and its address is that name's slug
+    assert vagledning_uri("acer", "ramriktlinjer", "demand-response") == \
+        "https://lagen.nu/guidance/acer/ramriktlinjer/demand-response"
+    assert vagledning_identifier(
+        "acer", "ramriktlinjer", "demand-response",
+        citation="Framework Guideline on Demand Response") == \
+        "Framework Guideline on Demand Response"
+
+
+def test_acer_basefile_and_listing_come_off_the_registry():
+    assert acer_download.basefile("yttranden", "13/2026") == \
+        "acer/yttranden/13-2026"
+    assert acer_download.LISTING["ramriktlinjer"] == \
+        "https://www.acer.europa.eu/documents/official-documents/" \
+        "framework-guidelines"
+
+
+# --------------------------------------------------------------------------
+# easa: the AMC/GM annexes to EASA:s ED Decisions
+# --------------------------------------------------------------------------
+
+EASA_FIXTURES = Path(__file__).parent / "files" / "easa"
+
+
+def easa_fixture(name):
+    return (EASA_FIXTURES / name).read_text("utf-8")
+
+
+@pytest.mark.parametrize("titel,serie,nummer", [
+    # the ordinary shape, in the four spellings EASA uses for the lead
+    ("AMC & GM to Part-CAT — Issue 2, Amendment 20",
+     "amc-gm", "part-cat-issue-2-amendment-20"),
+    ("AMC and GM to Part 21 — Issue 2, Amendment 18",
+     "amc-gm", "part-21-issue-2-amendment-18"),
+    ("AMC/GM to Part 21 — Issue 2, Amendment 17",
+     "amc-gm", "part-21-issue-2-amendment-17"),
+    ("AMC & GM Part-TCO — Initial Issue", "amc-gm", "part-tco-initial-issue"),
+    # neither preposition nor "to"
+    ("GM on Remote tower operations — Issue 3",
+     "gm", "remote-tower-operations-issue-3"),
+    # an annex holding one of the two, which is a series of its own
+    ("AMC to Part-66 — Amendment 10", "amc", "part-66-amendment-10"),
+    ("GM to Annex I (Definitions) — Amendment 5",
+     "gm", "annex-i-definitions-amendment-5"),
+    # the pre-2013 shape: the rule first, and the two amendment sequences of
+    # the AMC and the GM printed side by side
+    ("Part-145 / AMC Amendment 4 / GM Amendment 1",
+     "amc-gm", "part-145-amc-amendment-4-gm-amendment-1"),
+])
+def test_easa_series_number_reads_the_annex_name(titel, serie, nummer):
+    """The identity is the annex's own name: its lead says which series it
+    belongs to, and the rest is the number."""
+    assert easa_download.series_number(titel) == (serie, nummer)
+
+
+def test_easa_amc_and_gm_to_one_rule_are_separate_documents():
+    """The lead is not decoration. The AMC and the GM to one rule run separate
+    amendment sequences, so "Amendment 4" alone names two documents seven years
+    apart -- and dropping the lead from the address would file the 2015 GM over
+    the 2008 AMC."""
+    amc = easa_download.series_number("AMC to Part-M — Amendment 4")
+    gm = easa_download.series_number("GM to Part M — Amendment 4")
+    assert amc == ("amc", "part-m-amendment-4")
+    assert gm == ("gm", "part-m-amendment-4")
+    assert easa_download.basefile(*amc) != easa_download.basefile(*gm)
+
+
+def test_easa_a_name_that_is_neither_amc_nor_gm_is_declined():
+    """One page in the library is titled just "Part-M" and holds Decision
+    2011-002-R -- the Executive Director's decision, not an annex to one. It is
+    counted, never filed under a guessed series."""
+    assert easa_download.series_number("Part-M") is None
+
+
+def test_easa_uri_and_identifier():
+    """The address reproduces the annex's own name, and the citation is that
+    name verbatim -- EASA gives its AMC/GM no separate number, so every record
+    carries a `citation` and `Series.identifier` is never reached."""
+    assert vagledning_uri("easa", "amc-gm", "part-cat-issue-2-amendment-20") \
+        == "https://lagen.nu/guidance/easa/amc-gm/part-cat-issue-2-amendment-20"
+    assert vagledning_identifier(
+        "easa", "amc-gm", "part-cat-issue-2-amendment-20",
+        "AMC & GM to Part-CAT — Issue 2, Amendment 20") \
+        == "AMC & GM to Part-CAT — Issue 2, Amendment 20"
+
+
+def test_easa_leaf_pages_reads_the_listing():
+    """One listing page names its documents once each, in view order -- the row
+    links the same page from the title and from a "view" icon."""
+    assert easa_download.leaf_pages(easa_fixture("listing-fragment.html")) == [
+        "/en/document-library/acceptable-means-of-compliance-and-guidance-"
+        "material/amc-gm-commission-regulation-eu-no-1178-2011-issue-1-"
+        "amendment-3",
+        "/en/document-library/acceptable-means-of-compliance-and-guidance-"
+        "material/amc-gm-part-ara-issue-1-amendment-15",
+        "/en/document-library/acceptable-means-of-compliance-and-guidance-"
+        "material/amc-gm-part-fcl-issue-1-amendment-15"]
+
+
+def test_easa_parse_leaf_reads_an_annex():
+    """A document page states everything the record needs: the annex's name,
+    the instrument that issued it, the rule it attaches to, and the file."""
+    fields = easa_download.parse_leaf(easa_fixture("leaf-part-ara.html"), "x")
+    assert fields == {
+        "titel": "AMC & GM to Part-ARA — Issue 1, Amendment 15",
+        "bilaga": True,
+        "antagen": "2026-07-15",
+        "beslut": "ED Decision 2026/006/R",
+        "amnesord": ["Part-ARA - Authority Requirements for Aircrew"],
+        "dokument_url": "https://www.easa.europa.eu/en/downloads/143883/en",
+        "pdf": True}
+
+
+def test_easa_parse_leaf_declines_an_unofficial_consolidation():
+    """EASA's own running consolidation of a rule annex is not an annex to any
+    ED Decision: it carries neither the Official Publication mark nor a Related
+    ED Decision, which is what `bilaga` reads."""
+    fields = easa_download.parse_leaf(easa_fixture("leaf-consolidated.html"), "x")
+    assert fields["titel"].startswith("Consolidated (unofficial)")
+    assert fields["bilaga"] is False
+    assert fields["beslut"] is None
+
+
+def _easa_pager(pages, monkeypatch):
+    """Serve `pages` (a list of leaf-path lists) under ?page=N, and repeat the
+    last one for ever after -- the EASA pager's own behaviour."""
+    def fetch(_session, url, _delay):
+        n = int(url.rsplit("page=", 1)[1])
+        return "".join(
+            '<div class="view-main-content"><table><tbody><tr><td>'
+            '<a class="easa_node_link" href="%s">x</a></td></tr></tbody>'
+            '</table></div>' % path
+            for path in pages[min(n, len(pages) - 1)])
+    monkeypatch.setattr(easa_download, "_fetch", fetch)
+
+
+def test_easa_walk_library_stops_on_no_new_document(monkeypatch):
+    """The stop rule is "this page named nothing new", never "this page was
+    empty". Rows shift between pages while a walk runs, so page 2 here repeats
+    one of page 1's -- and past the end EASA keeps serving rows rather than a
+    404."""
+    _easa_pager([["/a", "/b"], ["/b", "/c"], ["/c"]], monkeypatch)
+    pages, walked = easa_download.walk_library(None, 0, log=lambda _m: None)
+    assert pages == ["/a", "/b", "/c"]
+    assert walked == 3
+
+
+def test_easa_walk_library_refuses_a_pager_that_never_repeats(monkeypatch):
+    """A pager that keeps naming new documents past the cap is a changed site,
+    not a large corpus: it stops the harvest with a message rather than
+    crawling on."""
+    _easa_pager([["/%d" % n] for n in range(easa_download.PAGE_CAP + 1)],
+                monkeypatch)
+    with pytest.raises(ValueError, match="no longer terminates"):
+        easa_download.walk_library(None, 0, log=lambda _m: None)
+
+
+def _easa_cover(text):
+    return [Para(text=text, size=17)]
+
+
+def test_easa_cover_must_name_the_decision_the_page_named():
+    """The page named the instrument and the annex's cover names it too, so
+    reading both closes the loop: a file that changes behind its URL fails the
+    parse rather than being filed under an identity that is not its."""
+    record = {"basefile": "easa/amc-gm/part-cat-issue-2-amendment-20",
+              "beslut": "ED Decision 2022/005/R", "titel": "T", "antagen": None}
+    cover = _easa_cover(
+        "Annex IV to ED Decision 2022/005/R ‘AMC and GM to Annex IV (Part-CAT) "
+        "to Commission Regulation (EU) No 965/2012 — Issue 2, Amendment 20’ "
+        # the amending annex prints the decision it amends as well, and the
+        # filed number is accepted anywhere on the cover, never as the first
+        # number found
+        "The Annex to Decision 2014/015/R of 24 April 2014 is amended")
+    assert edpb_parse._easa_fields("amc-gm", record, cover)["citation"] == "T"
+    with pytest.raises(AssertionError, match="its cover names"):
+        edpb_parse._easa_fields(
+            "amc-gm", record,
+            _easa_cover("Annex I to ED Decision 2019/008/R"))
+
+
+def test_easa_a_cover_naming_only_the_amended_decision_is_read_by_its_name():
+    """Some covers name the decision they amend and never their own -- and one
+    misspells its own, "201/022/R" where EASA means 2019. What every cover does
+    carry is the annex's own name, so that witnesses instead. The name must
+    reach TITLE_ECHO_MIN folded characters: a two-letter title is inside almost
+    any cover and would witness for a document it has nothing to do with."""
+    record = {"basefile": "easa/amc-gm/part-21-issue-2-amendment-13",
+              "beslut": "ED Decision 2021/011/R", "antagen": None,
+              "titel": "AMC & GM to Part 21 — Issue 2, Amendment 13"}
+    cover = _easa_cover(
+        "AMC and GM to Part-21 Issue 2, Amendment 13 "
+        "The Annex to ED Decision 2012/020/R is amended as follows")
+    assert edpb_parse._easa_fields("amc-gm", record, cover)["antagen"] is None
+    # the same cover, for a document whose name it does not carry
+    with pytest.raises(AssertionError, match="its cover names"):
+        edpb_parse._easa_fields(
+            "amc-gm", {**record, "titel": "AMC & GM to Part-ATS"}, cover)
+
+
+def test_easa_an_old_cover_naming_no_decision_is_accepted():
+    """The oldest annexes name no decision at all: the cover of AMC & GM to
+    Part-MED reads "Initial issue / 15 December 2011" and nothing more. The
+    check is on what the cover says, not on it saying something."""
+    record = {"basefile": "easa/amc-gm/part-med", "beslut": "ED Decision "
+              "2011/015/R", "titel": "AMC & GM to Part-MED", "antagen": None}
+    cover = _easa_cover("European Aviation Safety Agency Acceptable Means of "
+                        "Compliance and Guidance Material to Part-MED "
+                        "Initial issue 15 December 2011")
+    assert edpb_parse._easa_fields("amc-gm", record, cover)["titel"] \
+        == "AMC & GM to Part-MED"
+
+
+def test_easa_is_wired_into_the_source():
+    """The registry entry, the harvest scope and the facet labels are three
+    places one body has to be named, and a body named in one but not the others
+    is a page that never renders or a scope that never runs."""
+    assert EASA.koder == ("amc-gm", "amc", "gm")
+    # no series here is numbered NN/ÅÅÅÅ: the identity is the annex's own name,
+    # so the slug is the number verbatim
+    assert all(s.order is None for s in EASA.series)
+    assert EASA.serie("amc-gm").slug("part-cat-issue-2-amendment-20") \
+        == "part-cat-issue-2-amendment-20"
+    assert guidance_download.SYNC[EASA.kod] is easa_download.easa_sync
+    serie = [level for level in facets.SCHEMES["guidance"]
+             if level.name == "Serie"][0]
+    assert set(EASA.koder) <= set(serie.labels)
+    # the section line an EASA page prints has to be one of the strings the
+    # masthead marks EU-rätt current by, or the page renders with no nav entry
+    # lit at all
+    eu_ratt = next(act for label, _route, act in tpl.MAST_NAV
+                   if label == "EU-rätt")
+    assert all(guidance_render.SECTION[(EASA.kod, kod)] in eu_ratt
+               for kod in EASA.koder)
+
+
+# --------------------------------------------------------------------------
+# EUIPO: the coordinate that stands in for a number, and which PDFs a volume
+# is carried as
+# --------------------------------------------------------------------------
+
+def test_euipo_unit_nummer_reads_the_scope_codes():
+    """The identity is EUIPO's own language-free scope codes, so one document
+    keeps one address when the Swedish translation of an edition lands."""
+    assert euipo_download.unit_nummer("PARTB", "SECTION4") == "part-b-section-4"
+    assert euipo_download.unit_nummer("PARTM", "") == "part-m"
+    # a leading zero is a real avsnitt here: Del C opens with Avsnitt 0
+    assert euipo_download.unit_nummer("PARTC", "SECTION0") == "part-c-section-0"
+    with pytest.raises(AssertionError):
+        euipo_download.unit_nummer("PARTEXA RCD", "")
+
+
+def test_euipo_cover_scope_reads_the_printed_coordinate():
+    """A cover states its del once and its avsnitt as one of the numbers the
+    opening prints -- a del-level PDF carries the covers of every avsnitt in
+    it, so the avsnitt half is a set."""
+    assert euipo_download.cover_scope(
+        "GUIDELINES FOR EXAMINATION OF EUROPEAN UNION TRADE MARKS "
+        "EUROPEAN UNION INTELLECTUAL PROPERTY OFFICE (EUIPO) Part C "
+        "Opposition Section 3 Unauthorised filing by agents") == ("C", {"3"})
+    # the Swedish volume prints the same coordinate in Swedish
+    assert euipo_download.cover_scope(
+        "RIKTLINJER FÖR PRÖVNING AV EU-VARUMÄRKEN Del B Prövning Avsnitt 4 "
+        "Absoluta registreringshinder") == ("B", {"4"})
+    # a del-level cover prints no avsnitt of its own
+    assert euipo_download.cover_scope(
+        "GUIDELINES FOR EXAMINATION Part A General rules") == ("A", set())
+    # and one that carries its avsnitt's covers prints several
+    assert euipo_download.cover_scope(
+        "Part A General rules Section 1 Means of communication "
+        "Part A General rules Section 2 General principles") \
+        == ("A", {"1", "2"})
+
+
+def test_euipo_plan_units_takes_the_smallest_pdf_that_overlaps_nothing():
+    """Three shapes, one rule: the smallest PDF EUIPO publishes that no other
+    taken PDF contains."""
+    whole = euipo_download.WHOLE_VOLUME
+    # a del every one of whose avsnitt publishes its own PDF: avsnitt by avsnitt
+    units, declined = euipo_download.plan_units([
+        ("PARTB", "Part B Examination", "2005000000", "/b",
+         [("SECTION1", "Section 1 Proceedings", "2000120000", "/b1"),
+          ("SECTION2", "Section 2 Formalities", "2000130000", "/b2")])])
+    assert [u[0] for u in units] == ["part-b-section-1", "part-b-section-2"]
+    assert declined == []
+    # a del one of whose avsnitt publishes none -- Del A, whose Avsnitt 10
+    # Bevis exists only inside the del's own PDF. Taking both would carry the
+    # other avsnitt twice.
+    units, declined = euipo_download.plan_units([
+        ("PARTA", "Part A General rules", "2004000000", "/a",
+         [("SECTION1", "Section 1 Means of communication", "2000030000", "/a1"),
+          ("SECTION10", "Section 10 Evidence", "2004000000", "/a10")])])
+    assert [u[0] for u in units] == ["part-a"]
+    # a del that publishes no PDF at all, and the front matter that never does
+    units, declined = euipo_download.plan_units([
+        ("", "1 Inledning", whole, "/i", []),
+        ("PARTOTHER", "Redaktionell not", whole, "/n", []),
+        ("PARTEXA RCD", "Prövning av ansökningar", whole, "/e", [])])
+    assert units == []
+    assert declined == [("inledande sidor", "1 Inledning"),
+                        ("inledande sidor", "Redaktionell not"),
+                        ("delar utan egen PDF", "Prövning av ansökningar")]
+
+
+def test_euipo_pick_publication_takes_the_current_edition_in_swedish():
+    """The current edition, Swedish where that edition has a Swedish text.
+    Two editions can be unflagged at once -- formgivningsriktlinjerna carry
+    2023 and 2026 today -- and the older one is superseded whatever the flag
+    says."""
+    def pub(pid, sprak, force, obsolete=None, family="Design Guidelines"):
+        return {"Id": pid, "Language": sprak, "ProductFamily": [family],
+                "EntryIntoForce": force + "T00:00:00",
+                "IsPubObsolete": obsolete}
+    publications = [pub("1", "sv", "2023-03-31"), pub("2", "en", "2023-03-31"),
+                    pub("3", "sv", "2026-07-01"), pub("4", "en", "2026-07-01"),
+                    pub("5", "sv", "2022-03-31", "Yes"),
+                    pub("6", "en", "2026-07-01", family="Trade mark Guidelines")]
+    assert euipo_download.pick_publication(
+        publications, "Design Guidelines")["Id"] == "3"
+    # the trade mark edition in force has no Swedish text yet, so English
+    assert euipo_download.pick_publication(
+        publications, "Trade mark Guidelines")["Id"] == "6"
+    with pytest.raises(AssertionError):
+        euipo_download.pick_publication(publications, "Craft GI Guidelines")
+
+
+def test_euipo_unit_title_names_the_volume_the_del_and_the_avsnitt():
+    assert euipo_download.unit_title(
+        "Trade mark guidelines", "Part C Opposition",
+        "Section 0 Introduction") \
+        == "Trade mark guidelines, Part C Opposition, Section 0 Introduction"
+    assert euipo_download.unit_title(
+        "Riktlinjer för formgivningar", None, None) \
+        == "Riktlinjer för formgivningar"
+
+
+def _euipo_cover(text):
+    """One EUIPO cover as the Para stream `parse._euipo_fields` reads."""
+    return [Para(text=text, size=30)]
+
+
+def test_euipo_cover_check_reads_del_and_avsnitt_apart():
+    """`parse._euipo_fields` proves the stored file is the del it is filed
+    under, and -- for an avsnitt document -- that the cover prints that
+    avsnitt among its numbers."""
+    record = {"basefile": "euipo/varumarke/part-c-section-3",
+              "nummer": "part-c-section-3", "titel": "…", "antagen": None,
+              "citation": "…"}
+    assert edpb_parse._euipo_fields(
+        "varumarke", record,
+        _euipo_cover("GUIDELINES FOR EXAMINATION Part C Opposition Section 3 "
+                  "Unauthorised filing"))["citation"] == "…"
+    with pytest.raises(AssertionError):
+        edpb_parse._euipo_fields(
+            "varumarke", record,
+            _euipo_cover("GUIDELINES FOR EXAMINATION Part D Cancellation "
+                      "Section 3 Substantive provisions"))
+    # a whole-volume document's nummer is no coordinate, and its cover lists
+    # every del, so no check is made
+    volume = {"basefile": "euipo/gi/all-parts", "nummer": "all-parts",
+              "titel": "…", "antagen": None, "citation": "…"}
+    assert edpb_parse._euipo_fields(
+        "gi", volume,
+        _euipo_cover("RIKTLINJER FÖR GRANSKNING Del A Geografiska beteckningar "
+                  "Del B Immaterialrättsmyndighetens organisation"))["titel"] \
+        == "…"
+
+
+def test_euipo_is_wired_into_the_source():
+    """The registry entry, the harvest scope, the facet labels and the section
+    line are four places one body has to be named."""
+    assert EUIPO.koder == ("varumarke", "formgivning", "gi")
+    # no series here is numbered NN/ÅÅÅÅ: the identity is a coordinate, so the
+    # slug is the number verbatim
+    assert all(s.order is None for s in EUIPO.series)
+    assert EUIPO.serie("varumarke").slug("part-b-section-4") \
+        == "part-b-section-4"
+    assert guidance_download.SYNC[EUIPO.kod] is euipo_download.euipo_sync
+    serie = [level for level in facets.SCHEMES["guidance"]
+             if level.name == "Serie"][0]
+    assert set(EUIPO.koder) <= set(serie.labels)
+    eu_ratt = next(act for label, _route, act in tpl.MAST_NAV
+                   if label == "EU-rätt")
+    assert all(guidance_render.SECTION[(EUIPO.kod, kod)] in eu_ratt
+               for kod in EUIPO.koder)
+    # EUIPO's template marks its headings bold and reprints a running head on
+    # every page; both are read off the registry, not branched on in the parse
+    assert EUIPO.feta_rubriker and EUIPO.upprepat_sidhuvud
+    assert not EDPB.feta_rubriker and not EDPB.upprepat_sidhuvud
+
+
+def test_eurlex_amending_act_is_filed_under_its_own_number():
+    """An amending act names the act it amends first and prints its own number
+    in the trailing parenthesis. Reading the first match filed nine ESRB
+    documents under the amended act's number, overwriting that act's own text."""
+    body = eurlex_download.BODIES["esrb"]
+    titel = ("Europeiska systemrisknämndens beslut av den 20 mars 2020 om "
+             "ändring av beslut ESRB/2011/1 om arbetsordningen för Europeiska "
+             "systemrisknämnden (ESRB/2020/3) 2020/C 140/04")
+    assert eurlex_download.series_number(body, {}, titel) == "2020/3"
+
+
+def test_eurlex_stated_number_beats_the_printed_one():
+    """CELLAR's own prefix/year/sequence predicates are the body's structured
+    statement of the number, so a title that names another document cannot
+    displace them."""
+    body = eurlex_download.BODIES["esrb"]
+    row = {"pfx": {"value": "ESRB"}, "yr": {"value": "2019"},
+           "nr": {"value": "3"}}
+    assert eurlex_download.series_number(
+        body, row, "... om ändring av rekommendation ESRB/2016/14 ...") == "2019/3"
+
+
+# --------------------------------------------------------------------------
+# route A: the ECB and the ESRB, read from the manifestation CELLAR serves
+# --------------------------------------------------------------------------
+
+def _formex(xml):
+    return etree.fromstring(xml.encode("utf-8"), lib_formex.XML_PARSER)
+
+
+def test_general_root_carries_its_text_in_contents():
+    """An ECB-yttrande is printed in the C series and comes as a `GENERAL`
+    root, whose text sits in CONTENTS. `parse_act` walks straight past it and
+    returned zero blocks for all 224 of them."""
+    root = _formex(
+        '<GENERAL><TITLE><TI><P>Opinion of the European Central Bank</P></TI>'
+        '</TITLE><CONTENTS><NP><NO.P>1.</NO.P><TXT>The ECB received a request.'
+        '</TXT></NP><GR.SEQ><TITLE><TI><P>General considerations</P></TI>'
+        '</TITLE><NP><NO.P>2.</NO.P><TXT>The proposal is welcome.</TXT></NP>'
+        '</GR.SEQ></CONTENTS></GENERAL>')
+    raw = []
+    edpb_parse._formex_main(root, raw)
+    assert [(b.kind, b.text) for b in raw] == [
+        ("paragraph", "1. The ECB received a request."),
+        ("heading", "General considerations"),
+        ("paragraph", "2. The proposal is welcome."),
+    ]
+
+
+def test_corr_root_keeps_the_passage_each_correction_names():
+    """A rättelse says which passage it corrects in a DESCRIPTION that
+    `walk_content` does not reach; without it the correction reads as two
+    unattached quotations."""
+    root = _formex(
+        '<CORR><TITLE><TI><P>Rättelse</P></TI></TITLE><CONTENTS.CORR>'
+        '<CORRECTION><DESCRIPTION>Sidan 2, skäl 4</DESCRIPTION>'
+        '<OLD.CORR><P>I stället för:</P></OLD.CORR>'
+        '<NEW.CORR><P>ska det stå:</P></NEW.CORR></CORRECTION>'
+        '</CONTENTS.CORR></CORR>')
+    raw = []
+    edpb_parse._formex_main(root, raw)
+    assert raw[0].kind == "heading"
+    assert raw[0].text == "Sidan 2, skäl 4"
+
+
+def test_formex_article_heading_carries_its_designation():
+    """The guidance block holds one string where Formex sets the designation
+    and the title apart, so the heading has to name the article itself."""
+    blocks, noter = edpb_parse._from_formex_blocks([
+        lib_formex.Block("article", "Ändringar", num="1"),
+        lib_formex.Block("note", "EUT L 331, 15.12.2010, s. 1.", num="1"),
+    ], "sv")
+    assert [(b.kind, b.text) for b in blocks] == [("rubrik", "Artikel 1 Ändringar")]
+    assert [(n.mark, n.text) for n in noter] == [
+        ("1", "EUT L 331, 15.12.2010, s. 1.")]
+
+
+def test_html_body_drops_the_title_block_above_the_first_punkt():
+    """EUR-Lex serves the oldest yttranden as a flat run of <p> whose first
+    paragraphs reprint the title, the date and the CON number -- all of which
+    the record already carries as fields."""
+    html = ("<html><body><p>Opinion of the European Central Bank</p>"
+            "<p>of 13 September 2001</p><p>(CON/2001/25)</p>"
+            "<p>1. On 21 May 2001 the ECB received a request.</p>"
+            "<p>2. The ECB's competence is based on Article 105(4).</p>"
+            "</body></html>")
+    blocks = edpb_parse._html_paragraph_blocks(html)
+    assert [(b.punkt, b.text[:20]) for b in blocks] == [
+        ("1", "1. On 21 May 2001 th"),
+        ("2", "2. The ECB's compete"),
+    ]
+
+
+def test_ecb_classification_mark_is_front_matter():
+    """The ECB prints it at the top of every page of a yttrande. The first
+    page's line carries the language code and the rest do not, so the recurrence
+    test that removes the others leaves this one standing."""
+    for line in ("EN ECB-PUBLIC", "ECB-PUBLIC", "SV ECB-PUBLIC"):
+        assert edpb_parse.RE_FRONT_MATTER.match(line), line
+    assert not edpb_parse.RE_FRONT_MATTER.match(
+        "ECB-PUBLIC is not what this paragraph says")

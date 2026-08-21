@@ -444,7 +444,7 @@ def describe_citer(from_uri, anchor, label, title, source):
 
 # The inbound rail's accordion rows, in display order. Ranking lives in
 # RAIL_SECTION_ORDER, keyed by these same slugs.
-INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "edpb",
+INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "guidance",
                  "hudoc", "icc", "icj", "eu-caselaw", "eu-forslag", "eurlex",
                  "coe", "icrc", "untc", "begrepp")
 
@@ -1324,7 +1324,7 @@ RAIL_SECTION_ORDER = (
     "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "icj", "eu-caselaw",
     "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
-    "eurlex", "edpb", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
+    "eurlex", "guidance", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
 
 

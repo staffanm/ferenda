@@ -51,8 +51,8 @@ DATASETS = (
     Dataset("myndprax", "avg", "Samtliga dokument"),
     Dataset("myndrs", "rs", "Samtliga rättsliga ställningstaganden"),
     Dataset("eurlex", "eurlex", "Samtliga EU-rättsakter"),
-    Dataset("euvagledning", "edpb",
-            "Samtliga riktlinjer och rekommendationer"),
+    Dataset("euvagledning", "guidance",
+            "Samtliga vägledningar från EU-organ"),
     # the folkrätt sources. They carry no legacy alias (the old site had no such
     # repositories), so each is named for its own source.
     Dataset("hudoc", "hudoc", "Samtliga avgöranden från Europadomstolen"),

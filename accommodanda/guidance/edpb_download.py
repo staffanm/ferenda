@@ -33,7 +33,7 @@ pre-consultation first version, and the EDPB's own topic tags.
 
 **The Commission newsroom** (ec.europa.eu/newsroom/article29) is where the
 artikel 29-gruppens own documents actually live. The EDPB pages that endorse
-them are stubs where they exist at all -- see `series.WP29` for what is wrong
+them are stubs where they exist at all -- see `edpb_data.WP29` for what is wrong
 with them -- so this route goes to the newsroom item recorded there, whose page
 links the English PDF beside a ZIP of every language version. The Swedish text
 is the ``wp<N>…_sv.pdf`` member of that ZIP (never the ``…_annex_sv.pdf`` one,
@@ -45,7 +45,7 @@ Neither route paginates and both corpora are small and fully enumerable, so the
 JK/ARN idiom applies: one walk per run, fetching what is new or changed, no
 watermark.
 
-Stored per document under ``site/data/downloaded/edpb/{serie}/``: a
+Stored per document under ``site/data/downloaded/guidance/edpb/{serie}/``: a
 ``<slug>.json`` record and the ``<slug>.pdf`` document.
 """
 
@@ -60,20 +60,23 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import dispatch_scopes, pdf_path, select_pending, walk_records
+from ..lib.harvest import pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import document_extension, href, normalize_space
-from .series import (
-    BY_KOD,
-    HARVESTED,
-    KODER,
-    NEWSROOM,
-    RE_NUMBER,
-    WP29,
-    WP29_DUPLICATE_PAGES,
-    number_slug,
-)
+from .edpb_data import NEWSROOM, WP29, WP29_DUPLICATE_PAGES
+from .issuers import EDPB
+
+# the series this issuer's own index is walked for -- the two open ones, which
+# the EDPB site publishes under a document-type path segment. The closed WP29
+# series has no such page and comes from the newsroom instead (`wp29_sync`).
+HARVESTED = tuple(s.kod for s in EDPB.series if s.doctype)
+
+# "05/2020", and the unpadded "1/2018" the EDPB writes just as often. Narrower
+# than `issuers.RE_PAR`, which only has to split an already-known number: this
+# one searches free text and a four-digit year is what tells a number from a
+# date range.
+RE_NUMBER = re.compile(r"\b(\d{1,2})/(\d{4})\b")
 
 SITEMAP = "https://www.edpb.europa.eu/sitemap.xml"
 SITEMAP_PAGES = 5
@@ -106,8 +109,10 @@ DOCUMENT_FILE = r"_%s(_\d+)?\.pdf$"
 # is no depth to stop short of. What is this source's own is the basefile.
 
 def basefile(serie, nummer):
-    """The harvest basefile of one document ("riktlinjer/05-2020", "wp/248")."""
-    return "%s/%s" % (serie, nummer if serie == "wp" else number_slug(nummer))
+    """The harvest basefile of one document ("edpb/riktlinjer/05-2020",
+    "edpb/wp/248") -- the issuer, then what its URI carries after it, so a
+    basefile and an address are the same string."""
+    return "%s/%s/%s" % (EDPB.kod, serie, EDPB.serie(serie).slug(nummer))
 
 
 # --------------------------------------------------------------------------
@@ -217,7 +222,7 @@ def edpb_sync(root, serie, full=False, only=None, limit=None, delay=0.5):
     -- `wp29_sync` owns those, from the newsroom where their text actually is.
     """
     session = make_session(USER_AGENT)
-    doctype = BY_KOD[serie].doctype
+    doctype = EDPB.serie(serie).doctype
     pages = sitemap_document_pages(_sitemap_page(session, n, delay)
                                    for n in range(1, SITEMAP_PAGES + 1))
     wp29_slugs = {wp.page for wp in WP29} | WP29_DUPLICATE_PAGES
@@ -359,7 +364,7 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
     A registry entry carrying its own `document` is fetched straight from there
     and the newsroom is not consulted at all: the two BCR application forms were
     published as Word forms, so the only PDFs of them are a tillsynsmyndighets
-    conversions (`series.HBDI`, with what each was verified against recorded
+    conversions (`edpb_data.HBDI`, with what each was verified against recorded
     beside it)."""
     session = make_session(USER_AGENT)
     pending, held = [], 0
@@ -393,17 +398,11 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
 
 
 # --------------------------------------------------------------------------
-# entry point
+# the runners, by series
 # --------------------------------------------------------------------------
 
 # the two open series come off the EDPB site's own index, one harvest
-# parametrized by which; the closed WP29 one comes from the newsroom instead
+# parametrized by which; the closed WP29 one comes from the newsroom instead.
+# `download.SYNC` prefixes each key with this issuer's kod to make the scope.
 SYNC = {**{kod: partial(edpb_sync, serie=kod) for kod in HARVESTED},
         "wp": wp29_sync}
-
-
-def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5):
-    """Download the named series (default all three). Returns
-    {serie: (seen, new)}."""
-    return dispatch_scopes(root, scopes, SYNC, KODER, full=full, only=only,
-                           limit=limit, delay=delay)

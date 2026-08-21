@@ -41,7 +41,6 @@ rather than resolved through the EDPB stub, because the stub's link is the part
 that has already been observed wrong.
 """
 
-import re
 from dataclasses import dataclass
 
 EDPB_NAME = "Europeiska dataskyddsstyrelsen"
@@ -57,41 +56,6 @@ NEWSROOM = "https://ec.europa.eu/newsroom/article29/items/%s"
 # to those two; see the WP264/WP265 entries below for how each was verified.
 HBDI = "https://datenschutz.hessen.de/sites/datenschutz.hessen.de/files/2022-11/"
 
-
-@dataclass(frozen=True)
-class Series:
-    """One guidance series."""
-    kod: str                 # our short code, the URI segment ("riktlinjer")
-    doctype: str | None      # the EDPB site's own document-type path segment,
-                             # None for the closed WP29 series, which the EDPB
-                             # site does not publish (see WP29 below)
-    publisher: str           # who issues it (dcterms:publisher)
-    identifier: str          # citation form, %-formatted with the number
-    label: str               # what the collection is called in Swedish
-    note: str = ""           # what is peculiar about this series
-
-
-REGISTRY = (
-    Series(kod="riktlinjer", doctype="guideline", publisher=EDPB_NAME,
-           identifier="Riktlinjer %s", label="Riktlinjer",
-           note="the main series; the EDPB numbers it inconsistently "
-                "(01/2020 beside 1/2018), so the number is normalised for the "
-                "URI and kept verbatim for the citation"),
-    Series(kod="rekommendationer", doctype="recommendation", publisher=EDPB_NAME,
-           identifier="Rekommendation %s", label="Rekommendationer",
-           note="the same numbering; the EDPB's own Swedish titles alternate "
-                "between 'Rekommendation 01/2019' and 'Rekommendationer "
-                "02/2020', and the title is left as the document wrote it"),
-    Series(kod="wp", doctype=None, publisher=WP29_NAME,
-           identifier="WP %s", label="Artikel 29-gruppens vägledningar",
-           note="closed: the WP29 documents the EDPB endorsed on 25 May 2018, "
-                "enumerated in WP29 below"),
-)
-
-BY_KOD = {series.kod: series for series in REGISTRY}
-KODER = tuple(series.kod for series in REGISTRY)
-# the two open series, which are the ones harvested from the EDPB site's index
-HARVESTED = tuple(series.kod for series in REGISTRY if series.doctype)
 
 
 @dataclass(frozen=True)
@@ -212,17 +176,3 @@ WP29_DUPLICATE_PAGES = frozenset((
     BASE + "/documents/guideline/"
     "guidelines-on-the-right-to-data-portability-under-regulation-2016679-wp242",
 ))
-
-# "05/2020", and the unpadded "1/2018" the EDPB writes just as often
-RE_NUMBER = re.compile(r"\b(\d{1,2})/(\d{4})\b")
-
-
-def number_slug(number):
-    """The URI/file form of a series number. The EDPB pads the löpnummer to two
-    digits in some years and not others -- "Riktlinjer 05/2020" beside
-    "Riktlinjer 1/2018" -- and a citation copies whichever it saw, so the slug
-    normalises to the padded form and one document has one address however it
-    was written ("5/2020" and "05/2020" -> ``05-2020``)."""
-    match = RE_NUMBER.fullmatch(number.strip())
-    assert match, "not an EDPB series number: %r" % number
-    return "%02d-%s" % (int(match.group(1)), match.group(2))

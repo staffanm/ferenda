@@ -30,11 +30,12 @@ from .avg.download import (
 from .avg.parse import kkv_html_text
 from .dv import paths as dv_paths
 from .dv.parse import record_intermediate as dv_record_intermediate
-from .edpb.download import pdf_path as edpb_pdf_path
-from .eurlex.parse import content_file, formex_intermediate, formex_members
+from .eurlex.parse import content_file
 from .foreskrift.parse import body_path as fs_body_path
+from .guidance.edpb_download import pdf_path as guidance_pdf_path
 from .lib import compress, layout, markup, patch, pdftext
 from .lib.errors import SkipDocument
+from .lib.formex import formex_intermediate, formex_members
 from .lib.util import document_extension, record_path
 from .rs.agencies import BY_ORG
 from .rs.download import body_path as rs_body_path
@@ -179,11 +180,11 @@ def _avg_intermediate(basefile):
     return _pdf_xml(arn_pdf_path(layout.AVG_DOWNLOADED, "arn/" + record["diarienummer"]))
 
 
-def _edpb_intermediate(basefile):
+def _guidance_intermediate(basefile):
     """An EDPB vägledning's PDF as pdftohtml XML. Every record names a document
     -- the harvest writes none without one -- so an absent file is a broken
     store, not a document-less entry."""
-    return _pdf_xml(edpb_pdf_path(layout.EDPB_DOWNLOADED, basefile))
+    return _pdf_xml(guidance_pdf_path(layout.GUIDANCE_DOWNLOADED, basefile))
 
 
 def _rs_intermediate(basefile):
@@ -222,7 +223,7 @@ _INTERMEDIATE = {
             "pdftohtml XML (jk, and kkv's pre-2006 documents: HTML)"),
     "rs": (_rs_intermediate,
            "pdftohtml XML (skv: the ställningstagande's own web page)"),
-    "edpb": (_edpb_intermediate, "pdftohtml XML"),
+    "guidance": (_guidance_intermediate, "pdftohtml XML"),
     "remisser": (_remisser_intermediate, "pdftohtml XML"),
 }
 

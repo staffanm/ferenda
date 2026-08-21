@@ -168,7 +168,7 @@ accommodanda/
   foreskrift/ agency-regulations vertical — agencies·harvest·download·model·parse·structure
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
   rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
-  edpb/     EDPB guidance vertical (riktlinjer·rekommendationer·WP29) — series·download·model·parse
+  guidance/ EU soft-law source, 12 issuing bodies (EDPB·EBA·EASA·ACER·ESMA·ENISA·BEREC·EDPS·EIOPA·EUIPO·ECB·ESRB) — issuers·<body>_download·eurlex_download·model·parse·render
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
@@ -4261,6 +4261,11 @@ catalog — each number with its provenance and its status — is
 
 ### 7m. edpb vertical — Europeiska dataskyddsstyrelsens vägledningar ✅ (first cut)
 
+*(Superseded by §7n: this source is now the `edpb` utgivare of
+`accommodanda/guidance/`, which collects twelve EU bodies. The design
+below is unchanged and still describes how the EDPB's own documents are
+harvested, identified and rendered; only the module path moved.)*
+
 `accommodanda/edpb/` — the site's first **soft law from outside Sweden**, and
 the interpretive layer over a regulation the corpus already holds. A riktlinje
 binds nobody: the EDPB states, in advance and in general, how the
@@ -4411,6 +4416,87 @@ in a 7-Zip archive nothing in the stdlib opens).
   hermetic fixtures in `test/files/edpb/`; `accommodanda/edpb/KNOWN-GAPS.md`
   records the scope left out and why a *named* citation surface ("riktlinjer om
   samtycke", the form IMY uses most) was prototyped and rejected as unsafe.
+
+### 7n. guidance source — EU-organens vägledningar ✅ (first cut)
+
+`accommodanda/guidance/` — **soft law from the EU's agencies and bodies**, one
+source collecting twelve issuing bodies the way `avg` collects JO/JK/ARN/IMY/KKV
+and `foreskrift` collects seventeen myndigheter. It absorbs the earlier
+`accommodanda/edpb/` source (§7m), whose 60 documents are now the `edpb`
+utgivare here; nothing about the EDPB's own treatment changed.
+
+The twelve: **EDPB**, **EDPS**, **EBA**, **ESMA**, **EIOPA**, **ECB**,
+**ESRB**, **EASA**, **ACER**, **ENISA**, **BEREC**, **EUIPO**. What makes them
+one source and not twelve is that they share everything except how their
+listing is walked: one document model (`Vagledning`), one parse, one renderer,
+one browse. `issuers.py` is the registry that drives it — a body's name, its
+series, its number format and the two flags its PDF template needs — and
+`download.py` maps each harvest scope to the one runner that walks that body's
+site (rule:second-use-goes-to-lib).
+
+- **Identity is the issuing body's own number, never a CELEX.** `edpb/riktlinjer/05-2020`,
+  `eba/gl/2021-05`, `ecb/con/2013-82`, `esrb/2014-01`. Measured on the corpus:
+  122 förarbeten cite an ECB-yttrande as CON/2013/82 and none as 52013AB0082.
+  Where a body has one number sequence across several document kinds — the
+  ESRB numbers its 62 rekommendationer, 23 beslut, 20 varningar and 2 råd
+  together — the address carries no series segment at all.
+- **Two harvest routes, one store.** Ten bodies publish on their own sites and
+  are walked there. The ECB and the ESRB publish in EUT instead, so their
+  documents come out of CELLAR — the same Publications Office endpoint the
+  eurlex source reads, with the same language and format preferences and the
+  same fallbacks, but stored under `guidance/<utgivare>/` and identified by the
+  body's own number. `guidance/eurlex_download.py` enumerates a body's works by
+  its corporate-body URI and reads the number off CELLAR's own
+  `resource_legal_internal_number_prefix/_year/_sequential_number` predicates,
+  falling back to the number printed in the title.
+- **`lib/formex.py`: the Formex reader is now shared.** Reading the XML the
+  Publications Office publishes an EU document as had lived inside
+  `eurlex/parse.py`. A source may not import a sibling source, and route A
+  needed the same reader, so the whole layer moved to `lib/` — the block
+  emitters, the zip-member ordering, the patch hook. The move is
+  behaviour-neutral: 400 randomly sampled eurlex artifacts re-parse
+  byte-identically against the pre-move code. Each source projects those blocks
+  onto its own model; guidance's page shows rubriker and stycken and has no
+  article rail, so an article becomes a heading that names itself.
+- **A route A document arrives in whichever manifestation CELLAR holds, and
+  each document has exactly one.** 1 168 of the ECB's yttranden are the PDF the
+  ECB itself set, 241 are Formex and 21 are EUR-Lex HTML. Formex is read with
+  `lib.formex`, the PDF with the same paragraph reader the site-walked bodies
+  use, and the HTML as the flat `<p>` run EUR-Lex serves it as.
+- **`GENERAL` is the commonest Formex root here, and the act reader walks
+  straight past it.** An ECB-yttrande is printed in the C series and carries
+  its text in `CONTENTS`, not in enacting terms; `parse_act` returned zero
+  blocks for all 224 of them. The root tag decides the reader
+  (`_formex_main`): ACT keeps the act path, GENERAL and CORR are walked as
+  contents, and a rättelse keeps the `DESCRIPTION` naming the passage it
+  corrects.
+- **An amending act carries its own number last.** The ESRB prints the act it
+  amends first and its own number in the trailing parenthesis
+  ("…om ändring av beslut ESRB/2011/1 … (ESRB/2020/3)"). Reading the first
+  match filed nine documents under the amended act's number, each one
+  overwriting that act's own text.
+- **How the corpus actually cites this material.** Every mention of the twelve
+  bodies across föreskrifter, rättsliga ställningstaganden, JO/JK-beslut,
+  förarbeten, remissvar and SFS was classified into four grammars:
+
+  | grammar | hits | linkable |
+  |---|---|---|
+  | titel — "Europeiska bankmyndighetens riktlinjer om …" | ~1 363 | needs a title index |
+  | nummer — "(ESRB/2017/6)", "CON/2013/82" | ~482 | yes |
+  | svepande — "EBA kommer att ta fram riktlinjer för …" | ~1 899 | no: names no document |
+  | omnämnd — the body's name alone | ~85 500 | not a citation |
+
+  The title form carries most citations for most bodies; the ESRB is the one
+  body cited by number more often than by title (156 against 39), and the ECB
+  is next. The svepande class is the trap: those are förarbeten describing a
+  body's *mandate to issue* guidance, in the future tense, about documents that
+  do not exist yet. A grammar that matched them would mint links to nothing.
+- **Pending: the EBA's Swedish titles.** 72 of the EBA's 80 documents *are*
+  Swedish text, but the stored `titel` is English — the leaf page's `<h1>` is
+  English and so is the file name, and only the PDF cover prints the Swedish
+  name ("EBA:s riktlinjer om stressjusterat Value-At-Risk…"). Since the title
+  grammar is what carries the inbound citations, this is what blocks linking
+  them, not a cosmetic gap. `guidance/KNOWN-GAPS.md` records it.
 
 ### 7b. Vertical scope closed ✅
 
