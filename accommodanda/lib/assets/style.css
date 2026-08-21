@@ -1633,6 +1633,16 @@ section.occurrences ul { list-style: none; margin: 0; padding: 0; }
 section.occurrences li { margin: .3rem 0; line-height: 1.45; }
 section.occurrences details.more > summary { color: var(--ink-3);
          font-size: .85rem; cursor: pointer; margin-top: .4rem; }
+/* Legaldefinitioner: the citation is the label, the act's own sentence the
+   reading matter under it. A term defined in a hundred acts makes a hundred
+   entries, so the sentence sets at reading width and the citation stays small
+   above it -- a two-column dl would put a 300-character definition in a
+   half-width gutter. */
+section.definitions dl { margin: 0; }
+section.definitions dt { margin: .8rem 0 .1rem; font-size: .85rem;
+         color: var(--ink-3); }
+section.definitions dt:first-child { margin-top: .4rem; }
+section.definitions dd { margin: 0; line-height: 1.55; }
 
 /* ------------------------------------------------------------------- print
    One print design, two consumers: the browser's own Skriv ut, and the PDF

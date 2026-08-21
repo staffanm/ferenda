@@ -1,9 +1,42 @@
 {#- A concept (begrepp) page: the wiki description, or -- for a synthesized
     stub with no wiki page yet -- the term's occurrences as the page itself. -#}
 {% extends "page.html" %}
+{#- What each act says the term means, in the reading column under the title
+    and the curated description -- a legaldefinition is the answer a reader came
+    for, not context in the margin. Shown on a described page too: our own
+    description and the lagstiftarens are different things and both belong.
+    The acts are also dropped from the rail (render.DEFINING_KEYS), so the same
+    list never prints twice -- which means this section inherits the rail's cap
+    along with its content: `page.PANEL_CAP` entries, the rest behind the same
+    `details.more` disclosure the rail rows use. Without it a term defined in
+    173 acts (allmän dataskyddsförordning) replaces a 20-line panel with 65 kB
+    of prose. The cap decides what is collapsed, never what is published. -#}
+{%- macro definition_rows(rows) -%}
+<dl>
+{%- for d in rows %}
+<dt><a href="{{ d.href }}">{{ d.citation }}</a></dt>
+{#- a definition the source left empty is still a definition: the act is listed,
+    there is just nothing to quote under it -#}
+{%- if d.sentence %}<dd>{{ d.sentence }}</dd>{% endif -%}
+{%- endfor %}
+</dl>
+{%- endmacro -%}
+{%- macro definition_list(definitions, cap) -%}
+{%- if definitions %}
+<section class="occurrences definitions">
+<h2>Legaldefinitioner <span class="c">{{ definitions | length }}</span></h2>
+{{ definition_rows(definitions[:cap]) }}
+{%- if definitions | length > cap %}
+<details class="more"><summary>+{{ definitions | length - cap }} fler</summary>
+{{ definition_rows(definitions[cap:]) }}</details>
+{%- endif %}
+</section>
+{%- endif -%}
+{%- endmacro -%}
 {% block body %}
 {%- if has_description -%}
 {{ structure }}
+{{ definition_list(definitions, definition_cap) }}
 {%- else -%}
 {#- No description is the normal case (568 of ~28,900 concepts have one), and it
     does not mean the page is empty: the corpus itself is the content. A begrepp
@@ -25,6 +58,7 @@
     denial printed above its own occurrences. -#}
 <p class="stub-lede">Termen förekommer inte i något dokument i rättskällorna.</p>
 {%- endif -%}
+{{ definition_list(definitions, definition_cap) }}
 {%- for g in groups %}
 <section class="occurrences {{ g.key }}">
 <h2>{{ g.label }} <span class="c">{{ g.count }}</span></h2>

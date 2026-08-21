@@ -8,12 +8,14 @@ from markupsafe import Markup
 
 from ..lib import catalog, tpl
 from ..lib.page import (
+    PANEL_CAP,
     doc_meta,
     document_body,
     ordered_sections,
     page_context,
     render_toc,
 )
+from ..lib.pinpoint import citation
 
 ENV = tpl.environment("accommodanda.wiki")
 
@@ -30,6 +32,27 @@ EDITORIAL_KEYS = frozenset({"begrepp", "kommentar", "vagledning"})
 # are. Only the body listing is renamed; the rail keeps the shared vocabulary it
 # shares with every other page.
 GROUP_LABEL = {"sfs": "Legaldefinitioner"}
+
+# The sources that reach a concept by *defining* the term: an SFS
+# begreppsdefinition, an EU act's definitions article. The page prints what each
+# of them says the term means (`_definitions`), so listing the same acts again
+# as bare citations -- in the reading column or in the margin -- prints the list
+# twice.
+DEFINING_KEYS = frozenset({"sfs", "eurlex"})
+
+
+def _definitions(uri, site):
+    """What every act that defines this term says it means: the act's own
+    sentence, and a citation that links to the provision stating it.
+
+    Read from the catalog, which relate filled while it had the artifact open
+    (`catalog.definition_sentences`) -- a term defined in a hundred acts would
+    otherwise open a hundred artifacts, on every one of ~28,900 concept pages."""
+    return [{"href": "%s#%s" % (act, anchor) if anchor else act,
+             "citation": citation("%s#%s" % (act, anchor or ""), descriptive),
+             "term": term, "sentence": sentence}
+            for act, anchor, descriptive, term, sentence
+            in catalog.concept_definitions(site.con, uri)]
 
 
 def render(art, site):
@@ -48,12 +71,19 @@ def render(art, site):
     meta = [("Kategori", ", ".join(art.get("categories") or []))]
     structure, toc, rail = document_body(art, site, key="body")
     has_description = bool(art.get("body"))
+    definitions = _definitions(art["uri"], site)
+    if definitions:
+        rail.drop_document_sections(DEFINING_KEYS)
     groups, uses, island = [], 0, rail.island()
     if not has_description:
         # `document_body` closed the rail with `add_document`, which already
         # built these -- taking them again would run the catalog query twice
         sections = ordered_sections(rail.doc_sections)
-        uses = sum(s.count for s in sections if s.key not in EDITORIAL_KEYS)
+        # the defining acts left the rail above, so they are counted from the
+        # definitions instead -- an act that defines the term is a document the
+        # term occurs in, and the lede would otherwise undercount by exactly them
+        uses = sum(s.count for s in sections if s.key not in EDITORIAL_KEYS) \
+            + len({d["href"].partition("#")[0] for d in definitions})
         # the rail's own markup carries accordion and scrollspy semantics that
         # mean nothing in a reading column, so take the order and bring our own
         groups = [{"key": s.key, "count": s.count, "html": Markup(s.html),
@@ -65,4 +95,5 @@ def render(art, site):
         title, "Begrepp", doc_meta(meta, art.get("source_url")),
         toc=render_toc(toc, title), eyebrow="Begrepp", island=island,
         structure=structure, has_description=has_description,
+        definitions=definitions, definition_cap=PANEL_CAP,
         groups=groups, uses=uses))

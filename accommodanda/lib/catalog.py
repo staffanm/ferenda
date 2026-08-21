@@ -139,6 +139,15 @@ CREATE TABLE IF NOT EXISTS directive_correspondence (
     new_pinpoint TEXT,              -- the table cell's finer new-side ref ("12.1")
     old_pinpoint TEXT               -- ... and old-side ("18.3")
 );
+CREATE TABLE IF NOT EXISTS definitions (
+    concept   TEXT NOT NULL,        -- the begrepp uri the defined term resolves to
+    from_uri  TEXT NOT NULL,        -- the act that defines it (doc uri, no fragment)
+    anchor    TEXT,                 -- the node stating it (K1P2S2 / 6.9)
+    term      TEXT NOT NULL,        -- the term as that act writes it
+    sentence  TEXT NOT NULL         -- the sentence that states the definition
+);
+CREATE INDEX IF NOT EXISTS idx_definitions_concept ON definitions(concept);
+CREATE INDEX IF NOT EXISTS idx_definitions_from ON definitions(from_uri);
 CREATE INDEX IF NOT EXISTS idx_dircorr_new
     ON directive_correspondence(new_uri, new_article);
 CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
@@ -831,6 +840,165 @@ def definition_links(art):
 
 
 # --------------------------------------------------------------------------
+# legal definitions (the `definitions` table)
+# --------------------------------------------------------------------------
+#
+# A defined term's begrepp page is an index of where the term is used, and the
+# most useful thing it can show is what each act says the term *means*. The
+# link alone cannot: "säkerhetsskyddslagen 1 kap. 1 § 1 st" tells a reader
+# where to look, not what they would find. So relate stores the defining
+# sentence beside the edge -- it is reading the artifact anyway, and a page that
+# fetched it at render time would open one artifact per occurrence (a term
+# defined in 100 acts, on every one of ~28,900 concept pages).
+#
+# The two corpora state a definition in different places, so each is read where
+# it puts one:
+#
+#   SFS     an inline `dcterms:subject` term run over the definiendum's own span
+#           (`sfs.begrepp`). The node around it is a whole stycke and often
+#           holds more than the definition -- brottsbalken 10 kap. 8 § 1 st runs
+#           "Fullgör man ej ... dömes för fyndförseelse till böter. Underlåter
+#           man ..." -- so the unit stored is the *sentence* carrying the term.
+#   eurlex  a definitions-article point, whose whole text is the definition
+#           ("risk: risk för förlust eller störning orsakad av en incident.").
+
+
+def _defining_sentence(runs, index):
+    """The sentence of `runs` that carries the run at `index`.
+
+    Offsets are exact -- `runs_text` concatenates runs with no separator, and
+    `text.sentences` only strips, so every unit is a substring at a known
+    position. `sentences` discards only a chunk carrying no letters, and the
+    term run's own text carries some, so the chunk holding it always survives
+    and some unit must cover it. Asserted rather than defaulted to the whole
+    node: falling back silently would store exactly the untrimmed stycke this
+    function exists to avoid, with nothing recorded (rule:fail-fast)."""
+    body = text.runs_text(runs)
+    start = len(text.runs_text(runs[:index]))
+    at = 0
+    for sentence in text.sentences(body):
+        at = body.index(sentence, at)
+        if at <= start < at + len(sentence):
+            return sentence
+        at += len(sentence)
+    raise AssertionError(
+        "no sentence covers the term run at offset %d of %r" % (start, body))
+
+
+# a definition that has said all it has to say: its text closes on a sentence
+# terminator. One that stops on a colon, or on nothing at all, is a lead-in and
+# its body is the list underneath ("Med skatt avses i denna lag, om inte annat
+# anges", uppbördslagen 1 §; "finansiellt företag: någon av följande enheter:",
+# 32005L0068 art. 2.1 o).
+_CLOSED = re.compile(r"[.!?][\"'’”»)\]]*\s*$")
+
+
+def _with_sublist(node, lead):
+    """`lead` extended with the node's sub-list, where the lead-in is open.
+
+    Having children is *not* the test. 1 353 of 14 034 SFS definitions sit on a
+    node that carries some, and on 245 of them the definition is already a whole
+    sentence: brottsbalken 6 kap. 1 § states våldtäkt in 257 characters and then
+    lists the acts it covers, and appending those turned the definition into
+    1 185 characters of the whole paragraf -- with the "Lag (2026:852)."
+    trailer wedged in the middle, since a node's own runs come before its
+    descendants'. So the two shapes separate on whether the text closes."""
+    return lead if _CLOSED.search(lead) or not node.get("children") \
+        else text.node_text(node)
+
+
+def _term_runs(runs, node, anchor, out, whole=None):
+    """Every defined-term run in `runs`, with the text that states its
+    definition. `whole` overrides the sentence pick for a carrier that *is* the
+    definition and holds no other sentence -- a table row."""
+    for i, run in enumerate(runs):
+        if isinstance(run, dict) and run.get("kind") == "term" \
+                and run.get("predicate") == "dcterms:subject" and "uri" in run:
+            out.append((run["uri"], anchor, run.get("text") or "",
+                        whole if whole is not None
+                        else _with_sublist(node, _defining_sentence(runs, i))))
+
+
+def _row_text(cells):
+    """A table row as one line: "Småhus: En- och tvåbostadshus ...". 336 SFS
+    definitions are written as a two-column table under an "I denna lag betyder"
+    stem, and the term cell alone states nothing."""
+    head, *rest = [text.runs_text(cell).strip() for cell in cells]
+    return ": ".join([head, " ".join(r for r in rest if r)]) if any(rest) else head
+
+
+def _walk_definitions(node, out, anchor=None):
+    """Both carriers, in one walk: an inline term run (SFS) and a `defines`
+    point (eurlex). The anchor is the nearest enclosing node id, exactly as
+    `collect_links` attributes a citation -- a table row carries none of its
+    own, and its definition still has to link somewhere."""
+    if isinstance(node, dict):
+        anchor = node.get("id") or anchor
+        if node.get("defines"):
+            # an eurlex definitions-article point is the definition whole, and
+            # its own text stops at the colon when the definition is a sub-list
+            out.append((begrepp_uri(node["defines"]), anchor, node["defines"],
+                        _with_sublist(node, text.runs_text(node.get("text") or ""))))
+        for key, value in node.items():
+            if key == "text" and isinstance(value, list):
+                _term_runs(value, node, anchor, out)
+            elif key == "cells":
+                # the row is the definition, not one sentence of it, so every
+                # cell's term takes the whole row as its text
+                row = _row_text(value)
+                for cell in value:
+                    _term_runs(cell, node, anchor, out, whole=row)
+            else:
+                _walk_definitions(value, out, anchor)
+    elif isinstance(node, list):
+        for item in node:
+            _walk_definitions(item, out, anchor)
+
+
+def definition_sentences(art):
+    """(concept, anchor, term, sentence) for every legal definition the artifact
+    states. Empty for a document that defines nothing, which is nearly all of
+    them.
+
+    Only the **Swedish** manifestation of an EU act contributes, the same rule
+    `definition_links` applies: the begrepp namespace is Swedish, so an English
+    act's terms are not concepts here. A sentence that came out empty is dropped
+    -- a definition a reader cannot read is worse than a bare link."""
+    if art.get("lang") not in (None, "swe"):
+        return []
+    out = []
+    for nodes in text.body_sections(art):
+        _walk_definitions(nodes, out)
+    rows = [(concept, anchor, term.strip(), " ".join(sentence.split()))
+            for concept, anchor, term, sentence in out if term.strip()]
+    # A sentence that says nothing but the term quotes nothing: the source left
+    # the definition body empty ("total tillåten fångstmängd (TAC): ",
+    # 32015R0104 art. 3 f) or the SFS detector read a bare list fragment as a
+    # term ("brott som avses i", brottsbalken 2 kap. 5 § 2 st). The row stays,
+    # with an empty sentence -- the act does define the term and the concept
+    # page still has to list it; there is just nothing to quote. Dropping the
+    # row instead would have hidden 863 concepts' occurrences outright.
+    return [(concept, anchor, term,
+             "" if sentence.rstrip(".:,; ") == term.rstrip(".:,; ") else sentence)
+            for concept, anchor, term, sentence in rows]
+
+
+def concept_definitions(con, concept):
+    """What every act that defines `concept` says it means: Swedish acts first,
+    then the EU ones, each by its own citing name. That is the order the context
+    rail already uses (`page.RAIL_SECTION_ORDER` puts `sfs` before `eurlex`), and
+    a reader looking up a Swedish legal term reads the Swedish acts first. Each
+    row is (uri, anchor, descriptive, term, sentence) -- `uri`+`anchor` is the
+    link, `descriptive` the act's citing name."""
+    return con.execute(
+        "SELECT d.from_uri, d.anchor, doc.descriptive, d.term, d.sentence "
+        "FROM definitions d JOIN documents doc ON doc.uri = d.from_uri "
+        "WHERE d.concept = ? "
+        "ORDER BY doc.source = 'eurlex', doc.descriptive, d.anchor",
+        (concept,)).fetchall()
+
+
+# --------------------------------------------------------------------------
 # document rows
 # --------------------------------------------------------------------------
 
@@ -1074,6 +1242,7 @@ def _drop_document(con, uri):
     """Remove a document and everything keyed off it: its outbound links, its
     EU-act lineage and its concept redirects."""
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    con.execute("DELETE FROM definitions WHERE from_uri = ?", (uri,))
     con.execute("DELETE FROM directive_correspondence WHERE new_uri = ?", (uri,))
     con.execute("DELETE FROM documents WHERE uri = ?", (uri,))
     con.execute("DELETE FROM concept_redirect WHERE concept = ?", (uri,))
@@ -1084,6 +1253,13 @@ def _index_document(con, art, path, source):
     replacing any prior version keyed by the same uri."""
     uri = art["uri"]
     con.execute("DELETE FROM links WHERE from_uri = ?", (uri,))
+    # what this act says its defined terms mean -- the begrepp page's reading
+    # matter, stored beside the edge that points at it (see definition_sentences)
+    con.execute("DELETE FROM definitions WHERE from_uri = ?", (uri,))
+    con.executemany(
+        "INSERT INTO definitions VALUES (?,?,?,?,?)",
+        [(concept, uri, anchor, term, sentence)
+         for concept, anchor, term, sentence in definition_sentences(art)])
     # the EU-act lineage the act's own jämförelsetabell states, extracted at
     # parse time into the artifact (eurlex/correspond.py). Written here rather
     # than in a cross-document post-pass because that would mean re-reading
@@ -1314,7 +1490,12 @@ def canonicalize_concepts(con):
     an artifact to the canonical page (the artifacts keep their variant uris --
     canonicalisation is a graph + render concern, no re-parse). Runs before
     `synthesize_concepts`, so stubs are minted for canonical forms. Returns the
-    number of variant forms folded away."""
+    number of variant forms folded away.
+
+    The `definitions` rows fold with the links they sit beside. Left behind,
+    they strand on a page nobody renders: the wiki page *Risken* absorbs the
+    form *Risk*, and *Risk*'s 31 legaldefinitioner then have no page while the
+    page has no definitions. 1 077 rows over 494 concepts were in that state."""
     targets = [r[0] for r in con.execute(
         "SELECT DISTINCT to_root FROM links WHERE to_root LIKE ?", (BEGREPP + "%",))]
     wiki = {_concept_form(r[0]) for r in con.execute(
@@ -1333,6 +1514,8 @@ def canonicalize_concepts(con):
             if v_uri != canon_uri:
                 con.execute("UPDATE links SET to_uri = ?, to_root = ? "
                             "WHERE to_root = ?", (canon_uri, canon_uri, v_uri))
+                con.execute("UPDATE definitions SET concept = ? WHERE concept = ?",
+                            (canon_uri, v_uri))
                 con.execute("INSERT OR REPLACE INTO concept_alias VALUES (?, ?)",
                             (v_uri, canon_uri))
                 folded += 1
@@ -1344,6 +1527,8 @@ def canonicalize_concepts(con):
         if variant != canon_uri:
             con.execute("UPDATE links SET to_uri = ?, to_root = ? "
                         "WHERE to_root = ?", (canon_uri, canon_uri, variant))
+            con.execute("UPDATE definitions SET concept = ? WHERE concept = ?",
+                        (canon_uri, variant))
             con.execute("INSERT OR REPLACE INTO concept_alias VALUES (?, ?)",
                         (variant, canon_uri))
             folded += 1

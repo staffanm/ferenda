@@ -1512,6 +1512,18 @@ class Rail:
         if sections:
             self.data[""] = self._panel("Om dokumentet", sections)
 
+    def drop_document_sections(self, keys):
+        """Rebuild the document-level panel without the sections in `keys`.
+
+        For a page that renders those sections itself, in its reading column: a
+        concept page shows what each act says the term means, and leaving the
+        same acts listed in the margin prints the list twice."""
+        self.doc_sections = [s for s in self.doc_sections if s.key not in keys]
+        if self.doc_sections:
+            self.data[""] = self._panel("Om dokumentet", self.doc_sections)
+        else:
+            self.data.pop("", None)
+
     @staticmethod
     def _panel(heading, sections):
         return ('<div class="rail-h">%s</div>%s'

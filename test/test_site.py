@@ -3314,8 +3314,10 @@ DEFINING_LAW = {
         {"type": "paragraf", "id": "P6", "ordinal": "6", "children": [
             {"type": "stycke", "id": "P6S1", "beteckning": "6 §", "text": [
                 "Ränta enligt denna lag utgår som ",
-                {"predicate": "dcterms:subject", "text": "dröjsmålsränta",
-                 "uri": "https://lagen.nu/begrepp/Dröjsmålsränta"}, "."]},
+                {"kind": "term", "predicate": "dcterms:subject",
+                 "text": "dröjsmålsränta",
+                 "uri": "https://lagen.nu/begrepp/Dröjsmålsränta"},
+                ". Detta gäller även i andra fall."]},
         ]},
     ],
 }
@@ -3345,6 +3347,62 @@ def test_concept_without_description_lists_its_occurrences_in_the_body(tmp_path)
     assert 'id="lagen-context"' not in html
     # ... and the page leads with what it holds, never with what it lacks
     assert "ännu ingen beskrivning" not in html
+
+
+def test_a_concept_prints_what_each_act_says_the_term_means(tmp_path):
+    """The link alone tells a reader where to look, not what they would find.
+    So the page carries the act's own sentence -- the one carrying the term, not
+    the whole stycke around it -- and links straight to the provision."""
+    site = _concept_site(tmp_path)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    assert '<section class="occurrences definitions">' in html
+    assert "Ränta enligt denna lag utgår som dröjsmålsränta." in html
+    assert "Detta gäller även i andra fall" not in html      # the next sentence
+    assert '<a href="https://lagen.nu/1975:635#P6S1">6 § 1 st räntelagen</a>' in html
+
+
+def test_a_defining_act_is_not_listed_twice(tmp_path):
+    """The definitions section *is* the sfs listing, with the text added. Left in
+    the rail (or in a second body group) the same act prints twice."""
+    site = _concept_site(tmp_path)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    assert html.count("https://lagen.nu/1975:635#P6S1") == 1
+    assert "Legaldefinitioner" in html and html.count("Legaldefinitioner") == 1
+
+
+def test_a_long_definition_list_collapses_like_the_rail_row_it_replaced(
+        tmp_path, monkeypatch):
+    """The section replaces a rail group that showed `PANEL_CAP` documents with
+    the rest behind a disclosure, so it inherits the cap along with the content:
+    "allmän dataskyddsförordning" is coined in 173 acts, and uncapped it puts
+    65 kB of prose where a 20-line panel stood. The cap decides what is
+    collapsed, never what is published -- every act is still in the page.
+
+    Driven through `render` rather than the template, so it also proves the cap
+    is actually handed over: rendering the template directly would pass either
+    way."""
+    site = _concept_site(tmp_path)
+    many = [{"href": "https://lagen.nu/1975:635#P%d" % i,
+             "citation": "%d § räntelagen" % i, "term": "dröjsmålsränta",
+             "sentence": "Definition %d." % i} for i in range(5)]
+    monkeypatch.setattr(wiki_render, "_definitions", lambda uri, site: many)
+    monkeypatch.setattr(wiki_render, "PANEL_CAP", 3)
+    html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
+    assert '<details class="more"><summary>+2 fler</summary>' in html
+    for i in range(5):                           # nothing is dropped
+        assert "Definition %d." % i in html
+
+
+def test_a_described_concept_shows_the_legaldefinition_under_its_description(tmp_path):
+    """Our own description and the lagstiftarens definition are different things
+    and both belong on the page -- the definition below the description, in the
+    reading column rather than in the margin."""
+    site = _concept_site(tmp_path)
+    described = json.loads(json.dumps(CONCEPT))
+    described["body"] = [{"type": "stycke", "text": ["Ränta vid dröjsmål."]}]
+    html = wiki_render.render(described, site)
+    assert html.index("Ränta vid dröjsmål.") \
+        < html.index("Ränta enligt denna lag utgår som dröjsmålsränta.")
 
 
 def test_concept_lede_never_denies_the_list_below_it(tmp_path):

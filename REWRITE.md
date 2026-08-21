@@ -1906,6 +1906,36 @@ inbound → render pipeline as the machine-extracted sources.
     untouched. Swedish manifestation only (the namespace is Swedish); English acts
     excluded. Verified on 32003L0049 → Ränta/Royalties concepts with the act
     inbound.
+  - **What each act says the term means** (`catalog.definition_sentences` -> the
+    `definitions` table; `wiki/render._definitions`). The link alone tells a
+    reader where to look, not what they would find, so relate stores the
+    *defining sentence* beside the edge and the concept page prints it under the
+    title and the curated description -- in the reading column, and the defining
+    acts leave the rail (`DEFINING_KEYS`, `Rail.drop_document_sections`) so the
+    same list never appears twice. Stored at relate because it already has the
+    artifact open: a term defined in a hundred acts would otherwise open a
+    hundred artifacts, on each of ~28,900 concept pages. **41 862 definitions
+    over 5 209 acts** (14 573 SFS, 27 289 eurlex), 22 283 concepts; 40 741 of
+    them quote a sentence, the rest are listings the source left empty (below).
+    - The two corpora state a definition in different places. An eurlex
+      definitions-article point is the definition whole -- except where the body
+      is a sub-list and the point's own text stops at the colon (NIS2 art. 6.1),
+      where the sub-list is taken with it. An SFS node is a whole stycke and
+      often holds more: brottsbalken 10 kap. 8 § 1 st runs "Fullgör man ej …
+      dömes för fyndförseelse till böter. Underlåter man …", so the unit stored
+      is the **sentence** carrying the term (`lib.text.sentences`, which already
+      survives "10 kap. 8 §", "bl.a." and "m.m."). A definition written as a
+      two-column table row is stored whole -- 336 of them, where the term cell
+      alone states nothing.
+    - A definition the source left empty ("total tillåten fångstmängd (TAC): ",
+      32015R0104 art. 3 f) keeps its row with an empty sentence: the act does
+      define the term and the page still has to list it, there is just nothing
+      to quote. Dropping those rows instead hid 863 concepts' occurrences.
+    - A definition folds onto the **canonical** concept with the link beside it
+      (`canonicalize_concepts`). Left behind it strands on a page nobody
+      renders: the wiki page *Risken* absorbs the form *Risk*, so *Risk*'s 31
+      legaldefinitioner had no page while the page had none of them. 1 077 rows
+      over 494 concepts were in that state.
   - **"Med X avses Y" without "i denna lag"** (`sfs.begrepp.re_loptextdef`).
     The löptext trigger required the tail "i denna lag/förordning/balk", and
     drafting as often writes "i detta kapitel", "vid tillämpning av 5 §" or

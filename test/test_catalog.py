@@ -245,6 +245,133 @@ def _corpus(tmp_path, target_ids, cited_anchor):
     return catalog.connect(path)
 
 
+def test_a_definition_is_stored_as_the_sentence_that_states_it():
+    """brottsbalken 10 kap. 8 § 1 st runs two sentences and only the first
+    defines fyndförseelse. The begrepp page prints what the act says, so the
+    unit stored is the sentence carrying the term, not the whole stycke."""
+    art = {"uri": "https://lagen.nu/1962:700", "structure": [
+        {"type": "paragraf", "id": "K10P8", "children": [
+            {"type": "stycke", "id": "K10P8S1", "text": [
+                "Fullgör man ej vad i lag är föreskrivet om skyldighet att "
+                "tillkännagiva hittegods, dömes för ",
+                {"kind": "term", "predicate": "dcterms:subject",
+                 "text": "fyndförseelse",
+                 "uri": "https://lagen.nu/begrepp/Fyndförseelse"},
+                " till böter. Underlåter man att fullgöra sådan skyldighet med "
+                "uppsåt att tillägna sig godset, skall gälla vad där är stadgat."]}]}]}
+    assert catalog.definition_sentences(art) == [(
+        "https://lagen.nu/begrepp/Fyndförseelse", "K10P8S1", "fyndförseelse",
+        "Fullgör man ej vad i lag är föreskrivet om skyldighet att tillkännagiva "
+        "hittegods, dömes för fyndförseelse till böter.")]
+
+
+def test_a_swedish_definition_reaches_into_its_list_only_when_it_is_open():
+    """The two shapes separate on whether the text closes, not on whether the
+    node has children. Uppbördslagen 1 § stops on "om inte annat anges" and its
+    body is the list under it; brottsbalken 6 kap. 1 § states våldtäkt in a
+    whole sentence and *then* lists the acts it covers -- appending those turned
+    a 257-character definition into 1 185 characters of the whole paragraf."""
+    def stycke(lead, term, items):
+        return {"uri": "https://lagen.nu/1953:272", "structure": [
+            {"type": "paragraf", "id": "P1", "children": [
+                {"type": "stycke", "id": "P1S1", "text": [
+                    lead,
+                    {"kind": "term", "predicate": "dcterms:subject", "text": term,
+                     "uri": "https://lagen.nu/begrepp/X"},
+                    ""],
+                 "children": [{"type": "punkt", "text": [i]} for i in items]}]}]}
+
+    open_lead = stycke("Med ", "skatt", ["kommunal inkomstskatt,",
+                                         "statlig inkomstskatt."])
+    # the lead-in carries no terminator at all -- not even the colon
+    open_lead["structure"][0]["children"][0]["text"][2] = \
+        " avses i denna lag, om inte annat anges"
+    assert catalog.definition_sentences(open_lead)[0][3] == (
+        "Med skatt avses i denna lag, om inte annat anges kommunal "
+        "inkomstskatt, statlig inkomstskatt.")
+
+    closed = stycke("Den som genomför ett samlag döms för ", "våldtäkt",
+                    ["ett vaginalt samlag,", "en annan sexuell handling."])
+    closed["structure"][0]["children"][0]["text"][2] = " till fängelse."
+    assert catalog.definition_sentences(closed)[0][3] == (
+        "Den som genomför ett samlag döms för våldtäkt till fängelse.")
+
+
+def test_an_eu_definition_point_reaches_past_its_own_colon():
+    """A definitions-article point is the definition whole -- except where the
+    definition is a sub-list and the point's own text stops at the colon
+    (NIS2 art. 6.1). Then the sub-list is what the act says."""
+    art = {"uri": "https://lagen.nu/ext/celex/32022L2555", "lang": "swe",
+           "structure": [{"type": "article", "num": "6", "children": [
+               {"type": "paragraph", "id": "6.9", "defines": "risk",
+                "text": ["risk: risk för förlust orsakad av en incident."]},
+               {"type": "paragraph", "id": "6.1",
+                "defines": "nätverks- och informationssystem",
+                "text": ["nätverks- och informationssystem:"],
+                "children": [{"type": "point", "num": "a",
+                              "text": ["Ett elektroniskt kommunikationsnät."]}]}]}]}
+    assert [(anchor, sentence) for _, anchor, _, sentence
+            in catalog.definition_sentences(art)] == [
+        ("6.9", "risk: risk för förlust orsakad av en incident."),
+        ("6.1", "nätverks- och informationssystem: Ett elektroniskt "
+                "kommunikationsnät.")]
+
+
+def test_a_definition_folds_onto_the_canonical_concept(tmp_path):
+    """The wiki page *Risken* absorbs the form *Risk*, so links to Risk are
+    remapped onto it. The definitions beside those links have to move with them
+    -- left behind, Risk holds 31 legaldefinitioner and no page while the page
+    holds none. 1 077 rows over 494 concepts were in that state."""
+    db = str(tmp_path / "catalog.sqlite")
+    law = tmp_path / "law.json"
+    law.write_text(json.dumps({
+        "uri": "https://lagen.nu/1990:931", "structure": [
+            {"type": "paragraf", "id": "P1", "children": [
+                {"type": "stycke", "id": "P1S1", "text": [
+                    "Köparen bär ",
+                    {"kind": "term", "predicate": "dcterms:subject", "text": "risk",
+                     "uri": "https://lagen.nu/begrepp/Risk"},
+                    " för varan efter avlämnandet."]}]}],
+        "metadata": {"properties": {"dcterms:title": "Köplag (1990:931)"}}}),
+        encoding="utf-8")
+    wiki = tmp_path / "risken.json"
+    wiki.write_text(json.dumps({"uri": "https://lagen.nu/begrepp/Risken",
+                                "type": "begrepp", "title": "Risken",
+                                "body": [{"type": "stycke", "text": ["Om risk."]}]}),
+                    encoding="utf-8")
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "begrepp", [wiki])
+    con = catalog.connect(db)
+    catalog.canonicalize_concepts(con)
+    assert [r[0] for r in con.execute("SELECT concept FROM definitions")] \
+        == ["https://lagen.nu/begrepp/Risken"]
+    assert len(catalog.concept_definitions(
+        con, "https://lagen.nu/begrepp/Risken")) == 1
+    con.close()
+
+
+def test_an_english_act_states_no_swedish_concept():
+    """The begrepp namespace is Swedish, so an English manifestation's terms are
+    not concepts here -- the rule `definition_links` already applies."""
+    english = {"uri": "https://lagen.nu/ext/celex/32022L2555", "lang": "eng",
+               "structure": [{"type": "paragraph", "id": "6.9", "defines": "risk",
+                              "text": ["risk: risk of loss caused by an incident."]}]}
+    assert catalog.definition_sentences(english) == []
+
+
+def test_a_definition_with_no_body_is_listed_with_nothing_to_quote():
+    """32015R0104 art. 3 f is "total tillåten fångstmängd (TAC): " and stops --
+    the source left the body out. The act still defines the term, so the row
+    stays with an empty sentence; dropping it hid 863 concepts' occurrences."""
+    empty = {"uri": "https://lagen.nu/ext/celex/32015R0104", "lang": "swe",
+             "structure": [{"type": "point", "id": "3.f",
+                            "defines": "total tillåten fångstmängd (TAC)",
+                            "text": ["total tillåten fångstmängd (TAC): "]}]}
+    assert catalog.definition_sentences(empty) == [(
+        "https://lagen.nu/begrepp/Total_tillåten_fångstmängd_(TAC)", "3.f",
+        "total tillåten fångstmängd (TAC)", "")]
+
+
 def test_a_source_outside_the_audit_is_not_read_at_all(tmp_path):
     """The audit is only answerable for a source whose page offers exactly the
     anchors its artifact carries. sfs mints a change-act anchor per amendment,
