@@ -9,18 +9,20 @@ from lxml import etree
 from accommodanda.eurlex.correspond import correspondence
 from accommodanda.eurlex.parse import (
     UNCARRIED,
-    XML_PARSER,
-    _annex_anchor,
     content_file,
     doctype,
-    flatten,
-    formex_members,
-    load_formex,
     notice_work_date,
     parse_dir,
     parse_document,
     parse_formex,
     to_artifact,
+)
+from accommodanda.lib.formex import (
+    XML_PARSER,
+    _annex_anchor,
+    flatten,
+    formex_members,
+    load_formex,
 )
 from accommodanda.lib.errors import SkipDocument
 from accommodanda.lib.eu_structure import anchored_blocks

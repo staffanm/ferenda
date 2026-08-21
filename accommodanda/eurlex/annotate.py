@@ -19,9 +19,9 @@ from pathlib import Path
 
 from ..lib import annstore, compress, layout, llm
 from ..lib.eu_structure import ARTICLE, flatten
+from ..lib.formex import ANNEX_ANCHOR
 from ..lib.text import runs_text
 from .lang import vocab
-from .parse import ANNEX_ANCHOR
 
 PROMPT = Path(__file__).with_name("preamble_analyzer_prompt.txt")
 PLACEHOLDER = "[PASTE FULL LEGAL ACT TEXT HERE]"

@@ -23,6 +23,7 @@ from accommodanda.dv import parse as dv_parse
 from accommodanda.dv import paths as dv_paths
 from accommodanda.eurlex import parse as eurlex_parse
 from accommodanda.foreskrift import parse as fs_parse
+from accommodanda.lib import formex as lib_formex
 from accommodanda.lib import harvest, layout, markup, patch, pdftext, util
 from accommodanda.lib.errors import SkipDocument
 
@@ -351,10 +352,10 @@ def test_eurlex_hook_applies_patch_to_formex(patches, tmp_path):
     src.write_text(xml, encoding="utf-8")
     # a Formex patch targets the *normalised* XML (one element per line) --
     # the same text `patchsource.intermediate` hands the editor
-    normalised = eurlex_parse.formex_intermediate(xml.encode("utf-8"))
+    normalised = lib_formex.formex_intermediate(xml.encode("utf-8"))
     patch.create_patch("eurlex", "32016R0679", normalised,
                        normalised.replace("SECRET", "REDACTED"))
-    roots = eurlex_parse._formex_roots(src, "32016R0679")
+    roots = lib_formex.formex_roots(src, "eurlex", "32016R0679")
     assert roots[0].findtext("P") == "Article one REDACTED."
 
 
@@ -362,7 +363,7 @@ def test_eurlex_hook_noop_is_byte_identical(patches, tmp_path):
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<DOC><P>plain</P></DOC>\n'
     src = tmp_path / "swe.fmx4"
     src.write_text(xml, encoding="utf-8")
-    assert eurlex_parse._formex_roots(src, "32016R0679")[0].findtext("P") == "plain"
+    assert lib_formex.formex_roots(src, "eurlex", "32016R0679")[0].findtext("P") == "plain"
 
 
 # --------------------------------------------------------------------------

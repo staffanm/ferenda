@@ -2212,6 +2212,7 @@ SOURCES["forarbete"] = Source("forarbete", fa_list, {
 # --------------------------------------------------------------------------
 
 EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
+               PKG / "lib" / "formex.py",
                PKG / "eurlex" / "correspond.py",
                PKG / "eurlex" / "parse_pdf.py", PKG / "eurlex" / "lang.py",
                PKG / "eurlex" / "model.py", PKG / "eurlex" / "structure.py",

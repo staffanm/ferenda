@@ -11,6 +11,7 @@ from datetime import date, timedelta
 import pytest
 
 from accommodanda.eurlex import download as D
+from accommodanda.lib import cellar as C
 from accommodanda.lib import catalog
 
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
@@ -19,25 +20,25 @@ TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
 def test_store_document_skips_a_work_with_no_manifestation(tmp_path):
     # empty selection -> no swe/eng manifestation: nothing is written, not even a
     # notice (session is never touched, so None is fine)
-    stored = D.store_document(None, tmp_path / "1965" / "31965R0163",
+    stored = C.store_document(None, tmp_path / "1965" / "31965R0163",
                               "31965R0163", "1965-11-25", [], [])
     assert stored == []
     assert not (tmp_path / "1965").exists()
 
 
 def test_content_ok_rejects_image_under_a_text_type():
-    assert not D._content_ok("fmx4", TIFF)          # scanned placeholder
-    assert D._content_ok("fmx4", b"  <?xml ?>")     # real Formex
-    assert D._content_ok("fmx4", D.ZIP_MAGIC + b"x")  # zipped Formex bundle
-    assert not D._content_ok("xhtml", TIFF)
-    assert D._content_ok("html", b"<!DOCTYPE html>")
-    assert D._content_ok("pdf", b"%PDF-1.4")
-    assert not D._content_ok("pdf", TIFF)
+    assert not C._content_ok("fmx4", TIFF)          # scanned placeholder
+    assert C._content_ok("fmx4", b"  <?xml ?>")     # real Formex
+    assert C._content_ok("fmx4", C.ZIP_MAGIC + b"x")  # zipped Formex bundle
+    assert not C._content_ok("xhtml", TIFF)
+    assert C._content_ok("html", b"<!DOCTYPE html>")
+    assert C._content_ok("pdf", b"%PDF-1.4")
+    assert not C._content_ok("pdf", TIFF)
 
 
 def test_ranked_types_orders_fmx4_xhtml_html_then_pdf():
     by_type = {"html": [1], "pdf": [2], "fmx4": [3], "xhtml": [4], "pdfa1a": [5]}
-    assert D._ranked_types(by_type) == ["fmx4", "xhtml", "html", "pdf", "pdfa1a"]
+    assert C._ranked_types(by_type) == ["fmx4", "xhtml", "html", "pdf", "pdfa1a"]
 
 
 def _fake_sparql(selection_rows, stream_rows):
@@ -58,26 +59,26 @@ def test_fetch_selection_degrades_a_wrapper_only_fmx4_to_html(monkeypatch):
     # entirely and degrade to the next type (as bulk._select_content does),
     # never ship the wrapper -- and single-item manifestations must enter
     # wrapper disambiguation for this to be seen at all
-    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+    monkeypatch.setattr(C, "sparql_select", _fake_sparql(
         [_row("32000L0001", "SWE", "fmx4", "u-doc"),
          _row("32000L0001", "SWE", "html", "u-html")],
         [{"item": {"value": "u-doc"},
           "stream": {"value": "http://x/L_2000001SV.doc.xml"}}]))
-    out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
+    out = C.fetch_selection(object(), ["32000L0001"], ["swe"])
     assert out["32000L0001"] == [("swe", [("html", "u-html", None)])]
 
 
 def test_fetch_selection_keeps_the_real_item_beside_its_wrapper(monkeypatch):
     # the common case: a Formex manifestation carrying both the real .xml item
     # and its .doc.xml wrapper -- the real item wins, the wrapper is dropped
-    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+    monkeypatch.setattr(C, "sparql_select", _fake_sparql(
         [_row("32000L0001", "SWE", "fmx4", "u-doc"),
          _row("32000L0001", "SWE", "fmx4", "u-xml")],
         [{"item": {"value": "u-doc"},
           "stream": {"value": "http://x/L_2000001SV.doc.xml"}},
          {"item": {"value": "u-xml"},
           "stream": {"value": "http://x/L_2000001SV.01.xml"}}]))
-    out = D.fetch_selection(object(), ["32000L0001"], ["swe"])
+    out = C.fetch_selection(object(), ["32000L0001"], ["swe"])
     assert out["32000L0001"] == [("swe", [("fmx4", "u-xml", None)])]
 
 
@@ -89,7 +90,7 @@ def test_fetch_selection_takes_a_multipart_formex_as_the_whole_manifestation(
     # 0 articles). Multi-part Formex must be fetched as the whole manifestation
     # in one zip -- the .fmx4.zip bundle parse.formex_members reads in order.
     items = ["http://x/cellar/uuid.0011.04/DOC_%d" % n for n in (1, 2, 3)]
-    monkeypatch.setattr(D, "sparql_select", _fake_sparql(
+    monkeypatch.setattr(C, "sparql_select", _fake_sparql(
         [_row("32004L0018", "SWE", "fmx4", u) for u in items]
         + [_row("32004L0018", "SWE", "fmx4", "u-doc")],
         [{"item": {"value": "u-doc"},
@@ -97,9 +98,9 @@ def test_fetch_selection_takes_a_multipart_formex_as_the_whole_manifestation(
         + [{"item": {"value": u},
             "stream": {"value": "http://x/L_2004134SV.0101140%d.xml" % i}}
            for i, u in enumerate(items)]))
-    out = D.fetch_selection(object(), ["32004L0018"], ["swe"])
+    out = C.fetch_selection(object(), ["32004L0018"], ["swe"])
     assert out["32004L0018"] == [
-        ("swe", [("fmx4", "http://x/cellar/uuid.0011.04", D.ZIP_ACCEPT)])]
+        ("swe", [("fmx4", "http://x/cellar/uuid.0011.04", C.ZIP_ACCEPT)])]
 
 
 def test_store_document_asks_for_zip_only_on_the_manifestation_candidate(
@@ -109,30 +110,30 @@ def test_store_document_asks_for_zip_only_on_the_manifestation_candidate(
     asked = []
 
     class Resp:
-        content = D.ZIP_MAGIC + b"junk"
+        content = C.ZIP_MAGIC + b"junk"
 
     def fake_request(session, method, url, **kw):
         asked.append((url, (kw.get("headers") or {}).get("Accept")))
         return Resp()
 
-    monkeypatch.setattr(D, "request", fake_request)
+    monkeypatch.setattr(C, "request", fake_request)
     target = tmp_path / "2004" / "32004L0018"
-    D.store_document(object(), target, "32004L0018", "2004-03-31",
+    C.store_document(object(), target, "32004L0018", "2004-03-31",
                      [("swe", [("fmx4", "http://x/cellar/uuid.0011.04",
-                                D.ZIP_ACCEPT)]),
+                                C.ZIP_ACCEPT)]),
                       ("eng", [("html", "u-html", None)])], [])
-    assert asked == [("http://x/cellar/uuid.0011.04", D.ZIP_ACCEPT),
+    assert asked == [("http://x/cellar/uuid.0011.04", C.ZIP_ACCEPT),
                      ("u-html", None)]
     assert (target / "swe.fmx4.zip").exists()   # zip-ness flagged in the name
 
 
 def test_manifestation_url_rejects_a_non_item_url():
-    assert (D.manifestation_url("http://x/cellar/uuid.0011.04/DOC_12")
+    assert (C.manifestation_url("http://x/cellar/uuid.0011.04/DOC_12")
             == "http://x/cellar/uuid.0011.04")
     # ValueError, not AssertionError: the check must survive `python -O`, or a
     # changed CELLAR convention would silently fetch the wrong resource
     with pytest.raises(ValueError, match="not a CELLAR item URL"):
-        D.manifestation_url("http://x/cellar/uuid.0011.04")
+        C.manifestation_url("http://x/cellar/uuid.0011.04")
 
 
 # --- the backfill want-list ------------------------------------------------
@@ -208,11 +209,11 @@ def test_store_document_falls_back_when_fmx4_is_a_scanned_image(tmp_path,
         fetched.append(url)
         return Resp(bodies[url])
 
-    monkeypatch.setattr(D, "request", fake_request)
+    monkeypatch.setattr(C, "request", fake_request)
     target = tmp_path / "1993" / "61993CC0425"
     selection = [("swe", [("fmx4", "u-fmx4", None),
                           ("xhtml", "u-xhtml", None)])]
-    stored = D.store_document(object(), target, "61993CC0425", "1993-01-01",
+    stored = C.store_document(object(), target, "61993CC0425", "1993-01-01",
                               selection, [])
     assert stored == ["swe"]
     assert fetched == ["u-fmx4", "u-xhtml"]            # tried fmx4, fell back
@@ -230,11 +231,11 @@ def test_store_document_writes_no_notice_when_every_candidate_is_rejected(
     class Resp:
         content = TIFF
 
-    monkeypatch.setattr(D, "request", lambda *a, **kw: Resp())
+    monkeypatch.setattr(C, "request", lambda *a, **kw: Resp())
     target = tmp_path / "1993" / "61993CC0425"
     selection = [("swe", [("fmx4", "u1", None), ("pdf", "u2", None)]),
                  ("eng", [("fmx4", "u3", None)])]
-    stored = D.store_document(object(), target, "61993CC0425", "1993-01-01",
+    stored = C.store_document(object(), target, "61993CC0425", "1993-01-01",
                               selection, [])
     assert stored == []
     assert not (target / "notice.ttl").exists()
@@ -391,7 +392,7 @@ def test_sync_retries_pending_no_content_work_and_clears_it(tmp_path, monkeypatc
 
     class Resp:
         content = b"<?xml version='1.0'?><html/>"
-    monkeypatch.setattr(D, "request", lambda *a, **k: Resp())
+    monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
 
     _seen, stored, _skipped = D.sync(tmp_path, "caselaw", delay=0)
     assert stored == 1

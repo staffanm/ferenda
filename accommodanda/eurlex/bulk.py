@@ -40,15 +40,10 @@ from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 
 from ..lib import compress
+from ..lib.cellar import content_filename, parse_notice
 from ..lib.eu_structure import doctype
 from ..lib.util import status
-from .download import (
-    SECTORS,
-    content_filename,
-    doc_dir,
-    parse_notice,
-    write_watermark,
-)
+from .download import SECTORS, doc_dir, write_watermark
 
 LANG = {"EN": "eng", "SV": "swe"}    # dump language code -> our 3-letter code
 

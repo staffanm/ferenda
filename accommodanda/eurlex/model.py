@@ -17,6 +17,8 @@ act and the act itself agree by construction.
 import re
 from dataclasses import dataclass, field
 
+from ..lib.formex import Block
+
 # the language-neutral CELEX URI the citation engine mints for EU references, so
 # a citation to an act and the act itself agree by construction
 BASE = "https://lagen.nu/ext/celex/%s"
@@ -123,27 +125,6 @@ def looks_like_act_title(text):
     surrounding scan stopping at the preamble."""
     return bool(text and _LABEL_DESIGNATION.search(text)
                 and _TITLE_DATE.search(text))
-
-
-@dataclass
-class Block:
-    kind: str                  # see KINDS below
-    text: str
-    num: str | None = None     # structural marker: recital "(1)", article "1",
-                               # paragraph "2", point "a"
-    level: int | None = None   # a heading's division depth (1 = outermost)
-    depth: int | None = None   # a point's nesting inside another point (unset =
-                               # the first point level, 2 = inside a point, …),
-                               # which hangs its anchor under its parent's
-                               # ("1.1.f.ii") and steps its indent in
-    label: str | None = None   # a heading's or article's own designation, kept
-                               # apart from its title: the sources set them as
-                               # separate elements (Formex TI/STI, TI.ART/
-                               # STI.ART) and the page hangs the designation in
-                               # a gutter beside the title. None where the
-                               # heading carries no designation of its own.
-    anchor: str | None = None  # citation-target fragment (e.g. article "5")
-    defines: str | None = None # a definitions-article point: the term it defines
 
 
 # block kinds, in rough document order of where they occur:
