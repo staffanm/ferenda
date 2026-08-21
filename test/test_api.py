@@ -407,7 +407,17 @@ def test_the_public_schema_carries_only_the_public_api(client):
                    for p in paths)
 
 
-def test_the_internal_api_answers_under_its_own_prefix(client):
+@pytest.fixture
+def editing_on(monkeypatch):
+    """An editor secret, so `require_editor` answers 401 (log in) rather than
+    403 (editing disabled). Without it these tests read whatever `config.yml`
+    the machine happens to carry -- they passed here and failed on a checkout
+    with no `editor_secret`, which is the wrong thing to be sensitive to: what
+    they are about is whether the *route* is there, not how the host is set up."""
+    monkeypatch.setattr(config, "EDITOR_SECRET", "test-signing-key")
+
+
+def test_the_internal_api_answers_under_its_own_prefix(client, editing_on):
     """The routes moved rather than vanished -- and 404, not 401, is what the
     public prefix now says about them."""
     assert client.get("/api/v1/auth/me").status_code == 404
@@ -437,7 +447,8 @@ def test_the_internal_surface_refuses_another_origin(client, path, headers):
                                      {"sec-fetch-site": "none"},
                                      {"origin": "http://testserver"},
                                      {"origin": "https://testserver"}])
-def test_the_internal_surface_lets_its_own_origin_through(client, headers):
+def test_the_internal_surface_lets_its_own_origin_through(client, editing_on,
+                                                         headers):
     """Our own page, a typed address or a bookmark, and a non-browser caller
     (curl, the in-process client `generate` runs) all reach the editor gate --
     401 is that gate, not the origin check.
