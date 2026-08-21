@@ -4743,6 +4743,12 @@
    "uri": "https://lagen.nu/dom/nja/2016s142"
   },
   {
+   "namn": "Cadillacen i Miami",
+   "referat": "NJA 2016 s. 149",
+   "malnr": null,
+   "uri": "https://lagen.nu/dom/nja/2016s149"
+  },
+  {
    "namn": "Den dolda posten II",
    "referat": "NJA 2016 s. 189 II",
    "malnr": null,
@@ -9870,6 +9876,12 @@
    "namn": "Underhåll och lagval",
    "referat": "NJA 2026 s. xxx",
    "malnr": "Ö 4337-25",
+   "uri": null
+  },
+  {
+   "namn": "Den rostskadade anläggningen",
+   "referat": "NJA 2026 s. xxx",
+   "malnr": "T 8184-24",
    "uri": null
   }
  ]
