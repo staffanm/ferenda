@@ -38,7 +38,7 @@ def client(hits):
         return PlainTextResponse("gone", status_code=404)
 
     app = Starlette(routes=[Route("/api/v1/search", ok),
-                            Route("/api/v1/auth/me", ok),
+                            Route("/internal-api/v1/auth/me", ok),
                             Route("/api/v1/vanished", missing),
                             Route("/docs", ok),
                             Route("/2018:585", ok)],
@@ -97,7 +97,7 @@ def test_our_own_pages_calling_the_api_are_not_counted(client, hits):
 def test_the_editors_own_routes_are_not_an_audience(client, hits):
     # auth/me fires on every page load; counting it would make the API numbers
     # a copy of the site's page views
-    client.get("/api/v1/auth/me")
+    client.get("/internal-api/v1/auth/me")
     assert hits == []
 
 
@@ -179,9 +179,9 @@ def test_a_path_that_merely_starts_like_ours_is_not_ours(hits):
     assert analytics.under("/docs/oauth2-redirect", analytics.API_PREFIXES)
     assert not analytics.under("/docsomething", analytics.API_PREFIXES)
     assert not analytics.under("/api/v1x/search", analytics.API_PREFIXES)
-    # ...and the exclusions read the same way
-    assert analytics.under("/api/v1/auth/me", analytics.API_EXCLUDED)
-    assert not analytics.under("/api/v1/authority", analytics.API_EXCLUDED)
+    # the internal API is a separate path namespace, so the site's own chatter
+    # (auth/me on every page load) falls outside the tracked set by shape
+    assert not analytics.under("/internal-api/v1/auth/me", analytics.API_PREFIXES)
 
 
 def test_a_tool_call_is_counted_under_its_tool_name(hits):

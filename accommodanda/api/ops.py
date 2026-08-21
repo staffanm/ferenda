@@ -14,8 +14,12 @@ Auth is the inline editor's session (``auth.require_editor``): the dashboard
 serves the same small hand-curated set of editors, so it rides their login
 rather than carrying a second credential. No/expired session -> 401 (log in);
 editing disabled (no ``editor_secret``) -> 403 -- exactly as the edit routes
-answer. This is an HTML view for humans; a curl/monitoring integration should
-target a JSON API endpoint, not this page.
+answer. And like them it is same-origin only and out of the public OpenAPI
+schema (``auth.same_origin``, ``include_in_schema=False`` on the router): it is
+the internal surface, and only its path is different -- ``/ops`` stays where it
+is because it is a page a person bookmarks, not a route the site calls. This is
+an HTML view for humans; a curl/monitoring integration should target a JSON API
+endpoint, not this page.
 """
 
 import os
@@ -29,7 +33,7 @@ from opensearchpy.exceptions import OpenSearchException
 from .. import config
 from ..lib import catalog, git, layout, runlog, search, tpl
 from . import db
-from .auth import require_editor
+from .auth import require_editor, same_origin
 
 RUNS = config.DATA / ".build" / "runs.ndjson"
 ERRORS = config.DATA / ".build" / "errors.json"
@@ -58,7 +62,12 @@ SLOW_FACTOR = 2.0
 # their own. They belong to no row of a per-source table.
 PSEUDO_SOURCES = {"__site__", "__corr__"}
 
-router = APIRouter()
+# The dashboard is internal in every sense the internal API is, so it carries
+# the same two gates -- out of the public schema, and same-origin only. It
+# keeps its own path because it is a bookmarked page for a person, not a
+# route the site calls (see api/internal.py).
+router = APIRouter(include_in_schema=False,
+                   dependencies=[Depends(same_origin)])
 
 # one search client for the module (constructing it opens no connection -- only
 # an actual store_size() call does), mirroring api/app.py's single _index.

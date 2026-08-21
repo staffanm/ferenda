@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from accommodanda import build, config
 from accommodanda.api import app as api
-from accommodanda.api import pdf, pdfjob
+from accommodanda.api import facsimiles, pdf, pdfjob
 from accommodanda.lib import catalog, compress, render
 from accommodanda.lib import page as page_layout
 from accommodanda.lib.catalog import BASE
@@ -70,12 +70,12 @@ def client(tmp_path, monkeypatch):
 def _finished(client, params, timeout=60):
     """Start the export as a job and poll it to the end, as the waiting
     screen does. Returns the final status."""
-    status = client.post("/api/v1/pdf/jobb", params=params).json()
+    status = client.post("/internal-api/v1/pdf/jobb", params=params).json()
     deadline = time.monotonic() + timeout
     while not status["klar"] and status["fel"] is None:
         assert time.monotonic() < deadline, "export never finished: %s" % status
         time.sleep(0.05)
-        status = client.get("/api/v1/pdf/jobb/%s" % status["id"]).json()
+        status = client.get("/internal-api/v1/pdf/jobb/%s" % status["id"]).json()
     return status
 
 
@@ -111,14 +111,55 @@ def _with_img(src):
                         '<p>En paragraf.</p><img src="%s" alt="">' % src)
 
 
-def test_pdf_subresource_fetch_runs_through_the_app(client, tmp_path):
-    # the img URL is answered by the app itself via the in-process client;
-    # any 200 body proves that loop (a body WeasyPrint cannot decode as an
-    # image is non-fatal by design, like a broken img on screen)
+# a real 1x1 PNG -- WeasyPrint has to decode it, so a stand-in byte string
+# would not prove the image reached the page
+PNG_1X1 = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753"
+    "de0000000c4944415408d763f8cfc0000003010100c9fe92ef0000000049454e"
+    "44ae426082")
+
+
+def test_pdf_subresource_reads_the_facsimile_off_disk(client, tmp_path,
+                                                      monkeypatch):
+    """The export resolves a facsimile URL to a file and reads it -- no HTTP.
+
+    It used to answer its own subresource fetches through an in-process
+    `TestClient(app)`, which cost a full ASGI round trip per image (2.34 ms
+    against 0.11 ms; 0.8 s of it on 2007:90's 325 road signs) and stranded the
+    export's own routes in `app.py`, the only module that can name `app`.
+    `facsimiles.subresource` parses the URL and reads the cached PNG instead.
+
+    `facsimile_path` is stubbed because rendering it from a real downloaded
+    PDF is `test_facsimile.py`'s subject, not this one; what is asserted here
+    is the parsing and the read, which is the code that changed."""
+    png = tmp_path / "sid1.png"
+    png.write_bytes(PNG_1X1)
+    seen = []
+    monkeypatch.setattr(facsimiles, "facsimile_path",
+                        lambda local, sid, bbox=None:
+                        (seen.append((local, sid, bbox)), png)[1])
+    compress.write_text(
+        tmp_path / "generated" / "1998:9999.html",
+        _with_img("/api/v1/facsimile?uri=https%3A%2F%2Flagen.nu%2F1998%3A9999"
+                  "&amp;sid=7"))
+    r = client.get("/api/v1/pdf", params={"path": "/1998:9999"})
+    assert r.status_code == 200 and r.content.startswith(b"%PDF-")
+    # the uri came back decoded to its catalog-local form, and sid as an int
+    assert seen == [("1998:9999", 7, None)]
+
+
+def test_pdf_subresource_outside_the_served_paths_is_503(client, tmp_path):
+    """The dispatcher serves two path families and refuses everything else.
+
+    Narrower than the old in-process client, which answered any route the app
+    had. That is the point: a renderer that starts emitting a subresource the
+    export cannot resolve now fails loudly here instead of printing a page with
+    a hole in it."""
     compress.write_text(tmp_path / "generated" / "1998:9999.html",
                         _with_img("/openapi.json"))
     r = client.get("/api/v1/pdf", params={"path": "/1998:9999"})
-    assert r.status_code == 200 and r.content.startswith(b"%PDF-")
+    assert r.status_code == 503
+    assert not list((tmp_path / "cache" / "pdfexport").glob("*.pdf"))
 
 
 def test_pdf_subresource_failure_is_503_and_never_cached(client, tmp_path):
@@ -221,7 +262,7 @@ def test_job_for_a_cached_export_starts_nothing(client, monkeypatch):
     params = {"path": "/1998:9999", "toc": "1"}
     assert _finished(client, params)["fel"] is None
     monkeypatch.setattr(pdf, "render_pdf", _never_called)
-    assert client.post("/api/v1/pdf/jobb", params=params).json()["klar"] is True
+    assert client.post("/internal-api/v1/pdf/jobb", params=params).json()["klar"] is True
 
 
 def _never_called(*args, **kwargs):
@@ -243,18 +284,18 @@ def test_a_failed_export_is_retried_not_rejoined(client, tmp_path):
     compress.write_text(tmp_path / "generated" / "1998:9999.html",
                         _with_img("/api/v1/facsimile?uri=x&sid=1"))
     first = _finished(client, {"path": "/1998:9999"})
-    second = client.post("/api/v1/pdf/jobb", params={"path": "/1998:9999"}).json()
+    second = client.post("/internal-api/v1/pdf/jobb", params={"path": "/1998:9999"}).json()
     # the causes are transient, so "Försök igen" must render again rather
     # than hand back the recorded failure
     assert second["id"] != first["id"]
 
 
 def test_job_status_of_an_unknown_id_is_404(client):
-    assert client.get("/api/v1/pdf/jobb/nosuchjob").status_code == 404
+    assert client.get("/internal-api/v1/pdf/jobb/nosuchjob").status_code == 404
 
 
 def test_job_of_a_missing_page_is_404(client):
-    assert client.post("/api/v1/pdf/jobb",
+    assert client.post("/internal-api/v1/pdf/jobb",
                        params={"path": "/1999:0"}).status_code == 404
 
 
@@ -265,7 +306,7 @@ def test_new_unique_job_is_rejected_when_the_queue_is_full(
                           started=time.monotonic())
     pdfjob._jobs[occupied.id] = occupied
     pdfjob._by_key[occupied.key] = occupied
-    response = client.post("/api/v1/pdf/jobb",
+    response = client.post("/internal-api/v1/pdf/jobb",
                            params={"path": "/1998:9999"})
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
@@ -285,8 +326,8 @@ def test_identical_exports_share_one_render(client, monkeypatch):
 
     monkeypatch.setattr(pdf, "render_pdf", slow)
     params = {"path": "/1998:9999", "toc": "1"}
-    first = client.post("/api/v1/pdf/jobb", params=params).json()
-    second = client.post("/api/v1/pdf/jobb", params=params).json()
+    first = client.post("/internal-api/v1/pdf/jobb", params=params).json()
+    second = client.post("/internal-api/v1/pdf/jobb", params=params).json()
     assert second["id"] == first["id"]        # joined, not started again
     assert _finished(client, params)["fel"] is None
     assert len(renders) == 1
@@ -319,7 +360,7 @@ def test_the_render_lock_holds_for_direct_requests_too(client, monkeypatch):
 
 
 def test_wait_page_is_a_real_page_for_the_export(client):
-    r = client.get("/api/v1/pdf/vanta",
+    r = client.get("/internal-api/v1/pdf/vanta",
                    params={"path": "/1998:9999", "toc": "1", "kontext": "dv"})
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
@@ -334,7 +375,7 @@ def test_wait_page_is_a_real_page_for_the_export(client):
 def test_wait_page_carries_the_compact_options_and_drops_the_context(client):
     # two columns print no context, so the screen must not start a job for a
     # kind the export would ignore
-    r = client.get("/api/v1/pdf/vanta",
+    r = client.get("/internal-api/v1/pdf/vanta",
                    params={"path": "/1998:9999", "toc": "1", "kontext": "dv",
                            "andringar": "0", "kolumner": "2"})
     assert r.status_code == 200
@@ -343,12 +384,12 @@ def test_wait_page_carries_the_compact_options_and_drops_the_context(client):
 
 
 def test_wait_page_rejects_what_the_export_would_reject(client):
-    assert client.get("/api/v1/pdf/vanta",
+    assert client.get("/internal-api/v1/pdf/vanta",
                       params={"path": "/1999:0"}).status_code == 404
-    assert client.get("/api/v1/pdf/vanta",
+    assert client.get("/internal-api/v1/pdf/vanta",
                       params={"path": "/1998:9999",
                               "kontext": "nonsens"}).status_code == 422
-    assert client.get("/api/v1/pdf/vanta",
+    assert client.get("/internal-api/v1/pdf/vanta",
                       params={"path": "/1998:9999",
                               "kolumner": "3"}).status_code == 422
 

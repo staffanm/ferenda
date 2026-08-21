@@ -4615,8 +4615,9 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
 
 def cmd_serve(host="127.0.0.1", port=8000):
     # one process serves the whole thing: the static site and the REST API it
-    # consumes (the API answers under /api/v1/, the site is everything else).
-    # Same origin, so the ⌘K palette needs no second port.
+    # consumes -- the public API under /api/v1/, the site's own surface (the
+    # editors, the export's jobs) under /internal-api/v1/, and the site
+    # everything else. Same origin, so the ⌘K palette needs no second port.
     if not GENERATED.exists():
         raise SystemExit("nothing generated yet -- run `lagen all generate` first")
     # show the LAN-reachable host when bound to a wildcard, else localhost

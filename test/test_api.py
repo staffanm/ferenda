@@ -394,6 +394,85 @@ def test_openapi_served(client):
     assert "/api/v1/search" in r.json()["paths"]
 
 
+def test_the_public_schema_carries_only_the_public_api(client):
+    """/docs is the public contract, so nothing the site drives itself may
+    appear in it -- a reader who saw POST .../edit/commit beside GET
+    .../search could not tell which of the two is a promise."""
+    paths = client.get("/openapi.json").json()["paths"]
+    assert all(p.startswith("/api/v1/") for p in paths), sorted(paths)
+    assert not any(p.startswith("/api/v1/" + internal) for p in paths
+                   for internal in ("auth", "edit", "patch", "graphics",
+                                    "pdf/jobb", "pdf/samling"))
+    assert not any(p.startswith("/ops") or p.startswith("/internal-api")
+                   for p in paths)
+
+
+def test_the_internal_api_answers_under_its_own_prefix(client):
+    """The routes moved rather than vanished -- and 404, not 401, is what the
+    public prefix now says about them."""
+    assert client.get("/api/v1/auth/me").status_code == 404
+    assert client.get("/api/v1/edit/cart").status_code == 404
+    # 401 is the editor gate answering, i.e. the route is there
+    assert client.get("/internal-api/v1/auth/me").status_code == 401
+    assert client.get("/internal-api/v1/edit/cart").status_code == 401
+
+
+@pytest.mark.parametrize("path", ["/internal-api/v1/edit/cart",
+                                  "/internal-api/v1/graphics/queue",
+                                  "/internal-api/v1/pdf/jobb/x",
+                                  "/ops"])
+@pytest.mark.parametrize("headers", [{"sec-fetch-site": "cross-site"},
+                                     {"sec-fetch-site": "same-site"},
+                                     {"origin": "https://evil.example"}])
+def test_the_internal_surface_refuses_another_origin(client, path, headers):
+    """Every internal route, reading or writing, and the ops dashboard with
+    them. CORS alone would not do it: it stops a cross-origin browser from
+    *reading* a GET's response, and the crop-review queue is a GET."""
+    r = client.get(path, headers=headers)
+    assert r.status_code == 403, (path, headers, r.status_code)
+    assert r.json()["detail"] == "this endpoint answers same-origin requests only"
+
+
+@pytest.mark.parametrize("headers", [{}, {"sec-fetch-site": "same-origin"},
+                                     {"sec-fetch-site": "none"},
+                                     {"origin": "http://testserver"},
+                                     {"origin": "https://testserver"}])
+def test_the_internal_surface_lets_its_own_origin_through(client, headers):
+    """Our own page, a typed address or a bookmark, and a non-browser caller
+    (curl, the in-process client `generate` runs) all reach the editor gate --
+    401 is that gate, not the origin check.
+
+    The https case is the one that bites: `Origin` is compared on host alone,
+    because the scheme the app computes for itself is `https` only when
+    `FORWARDED_ALLOW_IPS` names the proxy. That variable has been wrong on this
+    deployment before, and comparing the whole origin string turned that into a
+    403 on every editor POST, every PDF job and every /ops page."""
+    assert client.get("/internal-api/v1/edit/cart",
+                      headers=headers).status_code == 401
+
+
+def test_an_internal_error_answers_json_not_the_site_page(client):
+    """`/internal-api` is in `errors.JSON_PREFIXES`, and it has to be: the JS
+    that drives these routes (editor.js, patch_edit.html, pdf_wait.html) calls
+    `.json()` on a failed response, and without the prefix a 404 there would
+    hand it the site's rendered HTML error page."""
+    r = client.get("/internal-api/v1/pdf/jobb/nosuchjob")
+    assert r.status_code == 404
+    assert r.headers["content-type"].startswith("application/json")
+    assert r.json()["detail"] == "no such pdf job"
+    # 404 and 5xx are the statuses that carry a ledger reference -- the
+    # documented contract in docs/api/README.md
+    assert "error_id" in r.json()
+
+
+def test_the_public_api_stays_open_to_any_origin(client):
+    """The read API is the one thing this split must not narrow."""
+    r = client.get("/api/v1/sources", headers={"sec-fetch-site": "cross-site",
+                                               "origin": "https://evil.example"})
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "*"
+
+
 def test_search_pins_a_pinpoint_citation_with_its_provision(client):
     # the reader's query names a provision, so the hit says which provision it
     # landed on and shows that provision's own words -- "Brottsbalk (1962:700)"

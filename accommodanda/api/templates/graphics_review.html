@@ -1,7 +1,7 @@
 {#- The self-contained crop-review page (api/graphics.py `/review`): served on
     demand behind the editor session, no build-time asset, no site chrome. The
-    script drives the /api/v1/graphics endpoints and carts through the shared
-    /api/v1/edit cart, so a session of approvals lands as one attributed commit. -#}
+    script drives the /internal-api/v1/graphics endpoints and carts through the shared
+    /internal-api/v1/edit cart, so a session of approvals lands as one attributed commit. -#}
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -93,7 +93,7 @@ let queue=[], at=0, cur=null, page=1, bbox=null, pagePts=null, baseSha="";
 function fmtBbox(b){return b?b.map(v=>Math.round(v)).join(", "):"hela sidan";}
 
 async function loadQueue(){
- const d=await api("/api/v1/graphics/queue");
+ const d=await api("/internal-api/v1/graphics/queue");
  queue=d.pending; at=0;
  await render();
 }
@@ -126,8 +126,8 @@ async function showPage(){
    "SFS "+cur.sfs+", sida "+page+(cur.pages?" av "+cur.pages:"");
  document.getElementById("pagelabel").textContent="sida "+page;
  document.getElementById("pageimg").src=
-   "/api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
- const ps=await api("/api/v1/graphics/pagesize?sfs="+
+   "/internal-api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
+ const ps=await api("/internal-api/v1/graphics/pagesize?sfs="+
    encodeURIComponent(cur.sfs)+"&page="+page);
  pagePts=ps;
  drawRect(); showCrop();
@@ -151,9 +151,9 @@ function drawRect(){
 function showCrop(){
  const img=document.getElementById("cropimg");
  img.src=bbox
-  ?"/api/v1/graphics/crop?sfs="+encodeURIComponent(cur.sfs)+"&page="+page+
+  ?"/internal-api/v1/graphics/crop?sfs="+encodeURIComponent(cur.sfs)+"&page="+page+
     "&bbox="+bbox.map(v=>v.toFixed(1)).join(",")
-  :"/api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
+  :"/internal-api/v1/graphics/page?sfs="+encodeURIComponent(cur.sfs)+"&page="+page;
 }
 
 document.getElementById("pageimg").addEventListener("load",drawRect);
@@ -195,7 +195,7 @@ document.getElementById("nextpage").onclick=async()=>{
 
 async function cart(withBbox){
  try{
-  const d=await api("/api/v1/graphics/cart",{method:"POST",
+  const d=await api("/internal-api/v1/graphics/cart",{method:"POST",
    headers:{"content-type":"application/json"},
    body:JSON.stringify({ref:cur.ref,anchor:cur.anchor,page:page,
      bbox:withBbox?bbox:null,verified:true,base_sha:baseSha})});
@@ -209,14 +209,14 @@ document.getElementById("skip").onclick=async()=>{at++;show("",true);await rende
 
 function setCart(n){document.getElementById("cartcount").textContent=n+" i korgen";}
 async function refreshCart(){
- try{const d=await api("/api/v1/edit/cart");setCart(d.drafts.length);}
+ try{const d=await api("/internal-api/v1/edit/cart");setCart(d.drafts.length);}
  catch(e){show("Kunde inte läsa korgen: "+e.message,false);}
 }
 document.getElementById("commit").onclick=async()=>{
  const m=document.getElementById("message").value.trim();
  if(!m){show("Ett commit-meddelande krävs",false);return;}
  try{
-  const d=await api("/api/v1/edit/commit",{method:"POST",
+  const d=await api("/internal-api/v1/edit/commit",{method:"POST",
    headers:{"content-type":"application/json"},body:JSON.stringify({message:m})});
   show("Incheckat "+(d.sha||"").slice(0,8)+" — "+(d.rebuilt||[]).length+" sida(or) omgenererade",true);
   setCart(0); document.getElementById("message").value="";

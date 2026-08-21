@@ -285,7 +285,7 @@ nav.toc a.toc-top { padding-right: 5.3rem; }
 .pdf-actions .pdf-go { background: var(--accent); border-color: var(--accent);
                        color: var(--on-accent); }
 /* the dialog no longer waits for anything: "Skapa PDF" opens the export's
-   own page (/api/v1/pdf/vanta), which carries the progress bar */
+   own page (/internal-api/v1/pdf/vanta), which carries the progress bar */
 @keyframes spin { to { transform: rotate(360deg); } }   /* also .search-spin */
 .pdf-err { color: var(--danger); font-size: .82rem; margin: .8rem 0 0; }
 

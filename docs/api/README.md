@@ -29,17 +29,27 @@ One uvicorn process serves both the static site and the API; the API lives under
 `/api/v1`. Because the site and API share an origin, the site calls the API with
 relative URLs — there is no separate API host to configure.
 
-- **Base path:** `/api/v1`
+- **Base path:** `/api/v1`. Everything under it is public, read-only and `GET`.
 - **CORS:** open to any origin, GET only (`allow_origins: ["*"]`,
-  `allow_methods: ["GET"]`). The public read API is cross-origin usable; the
-  mutation surface (inline editor) is same-origin only.
+  `allow_methods: ["GET"]`).
 - **Interactive docs:** `GET /docs` (Swagger UI), `GET /openapi.json` (OpenAPI 3
-  schema, generated from the typed handlers).
+  schema, generated from the typed handlers). Both describe *this* API and
+  nothing else.
 - **Document URIs are always a `uri` query parameter**, never a path segment —
   lagen.nu URIs contain `:` and `/`.
-- **Errors:** FastAPI's `{"detail": "<message>"}` JSON. Notable: `503 "catalog
-  not built"` if the catalog is missing; `404` unknown document; `400` malformed
-  version id; `422` for out-of-range query params.
+- **Errors:** `{"detail": <message>}` JSON. A `404` or a `5xx` adds
+  `"error_id": "<id>"`, which names the entry in the server's error ledger —
+  quote it in a bug report. The key is `null` if the ledger itself could not be
+  written; the response is served either way. A `422` carries FastAPI's list of
+  validation errors as `detail`, not a string. Notable: `503 "catalog not built"` if the catalog
+  is missing; `404` unknown document; `400` malformed version id; `422` for
+  out-of-range query params.
+
+Everything the site drives itself — login, the inline editors, the PDF export's
+background jobs — is a **second API at `/internal-api/v1`**, kept out of this
+schema on purpose. It is same-origin only, reads included, and its shapes change
+with the UI. Nothing in it is part of this contract, and no external consumer
+needs it: whatever the site can read there, it reads from `/api/v1` too.
 
 ### Search — `GET /api/v1/search`
 
@@ -49,8 +59,8 @@ there is no separate `/resolve` endpoint.
 | Param | Default | Notes |
 |---|---|---|
 | `q` | (required) | free-text query |
-| `source` | — | `sfs`, `dv`, `hudoc`, `forarbete`, `foreskrift`, `eurlex`, `coe`, `avg`, `kommentar`, `begrepp` |
-| `kind` | — | restrict to a document kind |
+| `source` | — | any name `GET /api/v1/sources` lists: `sfs`, `dv`, `forarbete`, `foreskrift`, `avg`, `rs`, `kommentar`, `begrepp`, `eurlex`, `edpb`, `hudoc`, `coe`, `icrc`, `untc`, `icc`, `icj` |
+| `kind` | — | restrict to a document kind within the source (`lag`, `forordning`, `case`, `prop`, `sou`, `directive`, …); the buckets of the `kind` facet in any response list them |
 | `year` | — | four-digit publication/decision year |
 | `limit` | 10 | 1–100 |
 | `offset` | 0 | ≥ 0, capped at 9900; use `cursor` for deep paging |
@@ -70,8 +80,11 @@ fail search.
   "total": 42,
   "next_cursor": "eyJzb3J0IjpbMTIuM10s...",  // null once the last page is reached
   "facets": {
-    "source": [{ "value": "sfs", "count": 31 }, { "value": "dv", "count": 11 }],
-    "kind": [{ "value": "law", "count": 31 }],
+    // `label` is the reader-facing name, resolved server-side; render
+    // `label || value`. A year is its own label, so it has none.
+    "source": [{ "value": "sfs", "count": 31, "label": "Författningar" },
+               { "value": "dv", "count": 11, "label": "Rättsfall" }],
+    "kind": [{ "value": "lag", "count": 31, "label": "Lagar" }],
     "year": [{ "value": "1975", "count": 1 }, { "value": "2024", "count": 3 }]
   },
   "results": [
@@ -82,12 +95,16 @@ fail search.
       "title": "Räntelag (1975:635)",
       "display": "Räntelagen",            // reader-facing heading
       "source": "sfs",
-      "kind": "law",
+      "kind": "lag",
+      "kind_label": "Lag",                // what `kind` is called to a reader
       "score": 12.3,                       // null for a pinned/resolved hit
       "inbound_count": 2783,
-      "highlight": ["…<em>ränta</em>…"],
+      "highlight": ["…<em>ränta</em>…"],   // the document's own snippet
+      // where inside the document the query matched. A citation-shaped query
+      // puts the provision it resolved to first.
       "fragments": [
-        { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "P6", "highlight": ["…"] }
+        { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "P6",
+          "label": "6 §", "highlight": ["…"] }
       ]
     }
   ]
@@ -106,7 +123,7 @@ counts stay usable for widening the filter), and each aggregation runs over
 
 **`GET /api/v1/documents`** — paginated catalog enumeration (not search — no
 query). Filter by `source` and/or `kind`. `limit` default 100 (1–1000), `offset`
-≥ 0.
+≥ 0. To take the whole corpus, use the bulk dumps instead.
 
 ```jsonc
 // DocumentList
@@ -115,7 +132,7 @@ query). Filter by `source` and/or `kind`. `limit` default 100 (1–1000), `offse
   "documents": [
     {
       "uri": "https://lagen.nu/2018:585",
-      "source": "sfs", "kind": "law",
+      "source": "sfs", "kind": "lag",
       "label": "2018:585", "title": "Lag (2018:585) …",
       "source_url": "https://rkrattsbaser.gov.se/…",   // publisher's page
       "updated": "2026-07-01T09:12:00Z"                 // artifact mtime; null for stubs
@@ -126,14 +143,17 @@ query). Filter by `source` and/or `kind`. `limit` default 100 (1–1000), `offse
 
 **`GET /api/v1/facets`** — ordered navigation buckets with counts (no leaf
 documents); a lightweight navigator. `source` (required, a faceted source:
-`sfs`/`dv`/`hudoc`/`forarbete`/`foreskrift`/`eurlex`/`coe`/`avg`/`begrepp`). Returns a
+`sfs`/`dv`/`hudoc`/`forarbete`/`foreskrift`/`eurlex`/`coe`/`avg`/`begrepp`). Not
+every source is faceted; an unfaceted one is a `404`. Returns a
 `FacetTree`: `{ source, levels[], default[], buckets[] }` where each bucket is
 `{ key, label, slug, count, children?, documents? }`.
 
 **`GET /api/v1/browse`** — the same tree, but every leaf bucket's `documents` are
-populated (each a `BrowseDoc`: `{ uri, url, display, pre?, key?, subdued?, year?
-}`; the `pre/key/subdued/year` extras are statute-listing only). This is the full
-browse model the static site is generated from.
+populated (each a `BrowseDoc`: `{ uri, url, display, short_id?, short_title?,
+description?, … }`, plus per-source listing extras — `pre`/`key`/`subdued`/`year`
+for statutes, `variant`/`date` for case law, `amendments`/`consolidated` for
+agency regulations). This is the full browse model the static site is generated
+from; `/openapi.json` has the field-by-field description.
 
 ### Get one document — `GET /api/v1/document?uri=…`
 
@@ -143,7 +163,7 @@ Metadata plus the **full parsed artifact**:
 // Document
 {
   "uri": "https://lagen.nu/1975:635",
-  "source": "sfs", "kind": "law",
+  "source": "sfs", "kind": "lag",
   "label": "1975:635", "title": "Räntelag (1975:635)",
   "inbound_count": 2783,
   "source_url": "https://rkrattsbaser.gov.se/…",
@@ -224,6 +244,44 @@ pages and citations use. Rendered on demand at retina resolution (150 DPI,
 legacy path grammar, `GET /prop/2022/23:10/sid1.png` /
 `GET /sou/2021:82/sid1.png` (undocumented alias, kept for old links).
 
+**Statute graphic — `GET /api/v1/sfs-graphic?uri=…&node=…`** — a PNG crop of a
+figure, formula or map the *consolidated* statute text omits but the published
+PDF carries. `node` is the gap's stable key (the `data-grafik` value on the
+rendered page). The crop is cut from the PDF of the amendment that last set that
+wording, not from the viewed statute's own PDF, per the reviewed `.graphics`
+layer; a gap nobody has signed off on is a `404`. Two resolutions: the default
+is the inline thumbnail, `stor=1` the full-size render — a page of 325 road
+signs asks for hundreds of the first and one of the second.
+
+**Original verdict PDF — `GET /api/v1/dv-verdict?court=…&id=…&file=…`** — the
+PDF a decision was first served as, before its NJA referat was published. The
+three parameters come from the decision's own artifact; there is nothing to
+guess.
+
+**Citation-graph neighbourhood — `GET /api/v1/graph?uri=…`** — the same
+citations `/document/inbound` and `/document/outbound` serve one row each,
+aggregated **per neighbour document** and ready to draw. This is what the
+`/hanvisningar/` explorer walks.
+
+`direction` picks the sides (`in`, `out`, `both` — the default), `groups` is a
+comma-separated filter on the flow groups (`Författningar`, `Rättsfall`, …), and
+`limit` (default 20, max 300) bounds each side's `top` list. The `total_links` /
+`total_docs` / `unresolved` counts describe the whole side, not the page.
+
+Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
+`internal`: the document citing itself, as a provision-to-provision graph at
+§/article level.
+
+**Document as PDF — `GET /api/v1/pdf?path=…`** — a generated page typeset for
+paper: A4, running heads, `n (total)` folios, a PDF outline. `path` is the
+public page path (`/1998:204`), not a uri. `toc=1` prepends the document's own
+table of contents with resolved page numbers; `kontext=` prints chosen context
+kinds under each provision (the rail's slugs — `kommentar,dv,forarbete` — or
+`alla`); `andringar=0` drops the SFS amendment register; `kolumner=2` uses the
+compact two-column layout and omits context; `download=1` serves it as an
+attachment. A full statute with all its context takes minutes to lay out, so
+expect a slow response on a big document.
+
 ### Endpoint → task map
 
 | I want to… | Endpoint |
@@ -239,6 +297,10 @@ legacy path grammar, `GET /prop/2022/23:10/sid1.png` /
 | version history | `GET /api/v1/document/versions?uri=…` |
 | diff two versions | `GET /api/v1/document/diff?uri=…&from=…&to=…` (HTML) |
 | page facsimile (PNG) | `GET /api/v1/facsimile?uri=…&sid=N` |
+| a statute's omitted graphic (PNG) | `GET /api/v1/sfs-graphic?uri=…&node=…` |
+| the original verdict PDF | `GET /api/v1/dv-verdict?court=…&id=…&file=…` |
+| draw the citation graph | `GET /api/v1/graph?uri=…` |
+| a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | machine schema | `GET /openapi.json`, `GET /docs` |
 

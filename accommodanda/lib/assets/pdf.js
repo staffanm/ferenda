@@ -10,7 +10,7 @@
    script rather than baked into the page HTML, so the whole feature ships
    as an assets-only refresh.
 
-   The dialog itself does not render anything. It opens /api/v1/pdf/vanta,
+   The dialog itself does not render anything. It opens /internal-api/v1/pdf/vanta,
    which starts the job, shows the render's progress and then becomes the
    PDF -- see api/pdfjob.py. Doing the work here, as one long fetch, meant
    holding a request open past nginx's 60-second timeout (a 504 for a render
@@ -134,7 +134,7 @@
       });
     });
     // The dialog hands the export over to a page of its own
-    // (/api/v1/pdf/vanta), which starts the render, shows how far it has
+    // (/internal-api/v1/pdf/vanta), which starts the render, shows how far it has
     // come and then becomes the PDF. The tab opens inside this click --
     // a popup blocker allows nothing opened a minute later -- and it opens
     // on a real address, where it used to open blank and be written into.
@@ -151,7 +151,7 @@
     }
 
     function waitUrl() {
-      var q = '/api/v1/pdf/vanta?path=' + encodeURIComponent(location.pathname);
+      var q = '/internal-api/v1/pdf/vanta?path=' + encodeURIComponent(location.pathname);
       if (toc.checked) q += '&toc=1';
       if (andringar && !andringar.checked) q += '&andringar=0';
       if (dlg.querySelector('input[name=columns]:checked').value === '2') {

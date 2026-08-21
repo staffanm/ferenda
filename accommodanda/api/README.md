@@ -89,6 +89,38 @@ annan origin.
 
 ---
 
+## De två API:erna
+
+Processen svarar för två olika publiker, och de ligger i **var sitt
+sökvägsutrymme och var sitt schema** (`api/internal.py`):
+
+| | publikt | internt |
+|---|---|---|
+| bas | `/api/v1` | `/internal-api/v1` |
+| schema | `/openapi.json`, `/docs` | `/internal-api/openapi.json`, `/internal-api/docs` |
+| vem | vem som helst, varifrån som helst | webbplatsens egen JS och redaktörsverktygen |
+| metoder | bara `GET` | `GET` och `POST` |
+| origin | alla (CORS `*`) | bara samma origin |
+| stabilitet | ett löfte — resten av den här filen | ändras när gränssnittet ändras |
+
+Det interna API:t bär inloggningen (`/auth/*`), de tre redigerarna
+(`/edit/*`, `/patch/*`, `/graphics/*`) och PDF-exportens bakgrundsjobb
+(`/pdf/*`). Ops-panelen `/ops` behåller sin egen sökväg men har samma två
+grindar: utanför det publika schemat och bara samma origin.
+
+**Samma origin gäller allt internt, inte bara skrivningarna.** Grinden
+(`auth.same_origin`) avvisar en begäran vars `Sec-Fetch-Site` säger att en
+annan sida gjorde den, eller vars `Origin` inte har vår egen värd — med `403`.
+En anropare utan de huvudena (curl, testklienten, den interna klient som
+`generate` kör) släpps igenom; grinden stoppar webbläsare på främmande
+sidor, den är ingen autentisering. Det gör `require_editor` fortfarande.
+CORS räcker inte: det hindrar bara en främmande sida från att *läsa* svaret
+på en `GET`, och halva den interna ytan är `GET`.
+
+Resten av den här filen handlar om det publika API:t.
+
+---
+
 ## Om dokument-URI:er
 
 Ett dokument identifieras av sin publika lagen.nu-URI, t.ex.
@@ -446,11 +478,14 @@ PDF-panelen kan dessutom visa dokumentens interna rubriker.
 Servern tar emot hela manifestet först när webbläsaren inspekterar eller skapar
 samlingen:
 
-- `POST /api/v1/pdf/samling/inspektera` läser titlar, tillgängliga val och
-  avsnitt ur de aktuella genererade sidorna.
-- `POST /api/v1/pdf/samling/jobb` startar eller ansluter till en cachelagd
-  bakgrundsrendering.
-- `GET /api/v1/pdf/jobb/{id}/resultat` hämtar den färdiga filen.
+- `POST /internal-api/v1/pdf/samling/inspektera` läser titlar, tillgängliga
+  val och avsnitt ur de aktuella genererade sidorna.
+- `POST /internal-api/v1/pdf/samling/jobb` startar eller ansluter till en
+  cachelagd bakgrundsrendering.
+- `GET /internal-api/v1/pdf/jobb/{id}/resultat` hämtar den färdiga filen.
+
+De tre ligger under `/internal-api/v1` — bara webbläsarens egen
+samlingsredigerare anropar dem. Se "De två API:erna" ovan.
 
 Alla dokument sätts i en WeasyPrint-körning. Därför kan `direct` använda
 plats som finns kvar på den aktuella sidan. Globala sidnummer, TOC-mål och
@@ -466,16 +501,22 @@ curl http://127.0.0.1:8001/api/v1/sources
 
 ```json
 [
-  {"source": "avg", "documents": 6256},
-  {"source": "begrepp", "documents": 564},
+  {"source": "avg", "documents": 8607},
+  {"source": "begrepp", "documents": 30393},
   {"source": "coe", "documents": 233},
-  {"source": "dv", "documents": 17103},
-  {"source": "eurlex", "documents": 69290},
-  {"source": "forarbete", "documents": 15237},
-  {"source": "foreskrift", "documents": 1218},
-  {"source": "hudoc", "documents": 21661},
-  {"source": "kommentar", "documents": 212},
-  {"source": "sfs", "documents": 11184}
+  {"source": "dv", "documents": 23734},
+  {"source": "edpb", "documents": 60},
+  {"source": "eurlex", "documents": 64035},
+  {"source": "forarbete", "documents": 97215},
+  {"source": "foreskrift", "documents": 11252},
+  {"source": "hudoc", "documents": 46045},
+  {"source": "icc", "documents": 269},
+  {"source": "icj", "documents": 255},
+  {"source": "icrc", "documents": 111},
+  {"source": "kommentar", "documents": 316},
+  {"source": "rs", "documents": 2868},
+  {"source": "sfs", "documents": 11214},
+  {"source": "untc", "documents": 14}
 ]
 ```
 
@@ -643,9 +684,19 @@ fäster det exakta målet (§/artikel) överst, så Enter går direkt dit.
 
 | Kod | Betyder |
 |---|---|
+| `403` | en begäran från en annan origin till `/internal-api/v1` eller `/ops` |
 | `404` | dokumentet finns inte i katalogen |
 | `422` | obligatorisk parameter saknas eller är ogiltig (FastAPI-validering) |
 | `503` | katalogen är inte byggd — kör `lagen all relate` |
+
+Svaret är JSON: `{"detail": …}`. Ett `404` och ett `5xx` — alltså även `503` i
+tabellen ovan — bär dessutom `"error_id"`, nyckeln till felloggen: `lagen all
+errors <id>` skriver ut vad som spelades in. Nyckeln är `null` om själva
+loggen inte gick att skriva; svaret levereras ändå.
+
+De två andra koderna i tabellen, `403` och `422`, har ingen `error_id` alls.
+Båda är anroparens eget fel och loggas inte, och ett `422` bär dessutom
+FastAPI:s lista över valideringsfel som `detail`, inte en mening.
 
 Söker du och får ett fel från OpenSearch: kontrollera att klustret är igång,
 att `OPENSEARCH_URL` stämmer och att `lagen all index` har körts.

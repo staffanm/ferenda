@@ -4,9 +4,9 @@ source, or an obfuscated redaction of personal data. (The commentary/concept edi
 next door, `edit.py`, edits editorial markdown; this edits the source the parser
 reads.)
 
-Same posture as the rest of the write side: every route is gated by
-`auth.require_editor` (401 anonymous / 403 editing-off), same-origin only. The
-flow:
+Same posture as the rest of the write side: the routes live on the internal API
+(`api/internal.py`) at `/internal-api/v1/patch/…`, same-origin only, and each is
+gated by `auth.require_editor` (401 anonymous / 403 editing-off). The flow:
 
   * ``GET /patch/document`` returns a document's *intermediate source text* -- the
     best format to patch (plain text for sfs, innehåll HTML for dv, Formex XML for
@@ -36,7 +36,7 @@ from .db import base_sha
 _EDITOR_PAGE = tpl.environment("accommodanda.api").get_template(
     "patch_edit.html")
 
-router = APIRouter(prefix="/api/v1/patch", tags=["patch"])
+router = APIRouter(prefix="/patch", tags=["patch"])
 
 # build injects the single-document reparse (build imports this package for
 # `serve`, so we can't import build here -- the same injection the commentary

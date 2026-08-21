@@ -1,6 +1,13 @@
 """The public REST/OpenAPI service (REWRITE.md §6) -- the machine-readable face
 of the corpus that replaces Fuseki's SPARQL endpoint.
 
+Everything in *this* module is public: read-only, callable from any origin, and
+described by `/docs` + `/openapi.json`. The site's own surface -- login, the
+editors, the PDF export's background jobs, the ops dashboard -- is a second app
+mounted at `/internal-api/v1` (api/internal.py), out of the public schema and
+same-origin only. docs/api/README.md is the prose contract for the public half;
+accommodanda/api/README.md is the developer's tour of both.
+
 FastAPI gives OpenAPI 3 + a Swagger UI (`/docs`) for free from the typed
 handlers below. Three read-only, fully-rebuildable backends:
 
@@ -16,28 +23,20 @@ Published URIs are unchanged from the old pipeline (standing constraint), so an
 artifact's `uri` is also its API key, its dump id and its OpenSearch `_id`.
 """
 
-import json
 import logging
 import os
 import re
 import sqlite3
 import threading
-from datetime import datetime
 from html import escape
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-
-# the PDF export's subresource fetches (facsimile images) run through the app
-# itself in-process -- the same idiom browse.py generates the static browse
-# pages with
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # StaticFiles.get_response raises Starlette's HTTPException (FastAPI's is a
 # subclass, so it would not catch the parent) -- the SiteFiles rewrite catches this
@@ -47,7 +46,6 @@ from starlette.staticfiles import NotModifiedResponse
 
 from .. import config
 from ..lib import (
-    annstore,
     catalog,
     compress,
     diff,
@@ -56,20 +54,14 @@ from ..lib import (
     feeds,
     history,
     layout,
-    regeringen,
     search,
 )
-from ..lib.util import basefile_slug
 from . import (
     analytics,
-    auth,
-    db,
-    edit,
     errors,
     facsimiles,
-    graphics,
+    internal,
     ops,
-    patch,
     pdf,
     pdfcollection,
     pdfjob,
@@ -80,10 +72,50 @@ from .db import get_con
 
 DUMPS = config.DATA / "dumps"
 
+# The blurb at the top of /docs. It carries the three facts a first-time caller
+# needs before reading any single endpoint; docs/api/README.md is the long form.
+DESCRIPTION = """
+Search, the catalog and the citation graph over the Swedish legal corpus:
+statutes (SFS), case law, preparatory works, agency regulations, EU law and
+Council of Europe / ECHR material.
+
+**A document's canonical uri is its identity everywhere.** The published
+`https://lagen.nu/<id>` uri is at once this API's key (`?uri=…`), the bulk-dump
+line id and the search index `_id`, and it is stable across versions. Uris are
+always a `uri` query parameter, never a path segment -- they contain `:` and
+`/`.
+
+**The JSON artifact is the source of truth.** The catalog and the search index
+are derived from it and rebuildable. `GET /api/v1/document` hands it back
+verbatim, and each line of a bulk dump *is* one.
+
+**Everything here is read-only and open to any origin** (`GET`, `*`). An error
+is `{"detail": …}`; a 404 or a 5xx adds an `error_id` that names the entry in
+the server's own error ledger, worth quoting in a bug report -- `null` on the
+rare occasion the ledger itself could not be written. (On a 422 the `detail` is
+FastAPI's list of validation errors, not a message.)
+
+For reprocessing the whole corpus use the NDJSON dumps rather than paging these
+endpoints -- `GET /api/v1/dumps` is the manifest.
+"""
+
+TAGS = [
+    {"name": "search",
+     "description": "Full text plus citation resolution. One endpoint; the "
+                    "⌘K palette uses no other."},
+    {"name": "catalog",
+     "description": "What the corpus holds: sources, navigation facets and "
+                    "the bulk-dump manifest."},
+    {"name": "document",
+     "description": "One document: its parsed body, its citations in both "
+                    "directions, its versions, and its pages as images or PDF."},
+]
+
 app = FastAPI(
     title="lagen.nu API",
     version="1.0",
-    description="Search and the citation graph over the Swedish legal corpus.",
+    description=DESCRIPTION,
+    openapi_tags=TAGS,
     # runs the MCP server's Streamable HTTP session manager (a no-op for the
     # in-process TestClient path, which never calls /mcp) -- see api/mcp.py
     lifespan=mcp_server.lifespan,
@@ -91,7 +123,10 @@ app = FastAPI(
 
 # the generated static site (served on another port) reaches the API from the
 # browser via the ⌘K palette -- a cross-origin GET. The API is public read-only
-# data, so any origin may read it.
+# data, so any origin may read it. This covers the mounted /internal-api too,
+# which is why that app carries a same-origin gate of its own: CORS only stops
+# a cross-origin browser from *reading* a response, and half the internal
+# surface is a GET whose body is nobody else's business.
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["GET"], allow_headers=["*"])
 
@@ -108,21 +143,17 @@ app.add_route("/redoc/", lambda request: RedirectResponse("/redoc", 308))
 app.add_route("/ops/", lambda request: RedirectResponse("/ops", 308))
 
 # the ops dashboard (/ops*), registered like /api/v1 -- before the SiteFiles
-# mount added in serve(), so its explicit routes win over the static catch-all
+# mount added in serve(), so its explicit routes win over the static catch-all.
+# Its routes are out of the public schema and same-origin only (api/ops.py).
 app.include_router(ops.router)
 
-# the inline editor's auth + write routes. The mutating side of the service: it
-# stays GET-open/CORS-* for the public read API above and same-origin only for
-# these (the editor JS is served from this same origin; the session cookie is
-# SameSite=Lax), so CORS deliberately keeps blocking cross-origin writes.
-app.include_router(auth.router)
-app.include_router(edit.router)
-app.include_router(patch.router)   # the patch-file (source-fix) editor
-app.include_router(graphics.router)  # the .graphics crop-review editor
-
-# the PDF export's waiting screen (/api/v1/pdf/vanta); its job routes are
-# declared next to /api/v1/pdf itself, below
-app.include_router(pdfjob.router)
+# the internal API: login, the three editors and the PDF export's background
+# jobs, at /internal-api/v1 (api/internal.py). A mounted app rather than a
+# router, so its routes cannot reach the public /openapi.json at all and its
+# own schema is a separate document. Mounted here, before serve()'s static "/"
+# catch-all, for the same reason /api/v1 is declared here. Nothing of it is
+# declared in this module -- api/internal.py lists every route it serves.
+app.mount(internal.PREFIX, internal.app, name="internal-api")
 
 # the public MCP server at /mcp (Streamable HTTP) -- the corpus reshaped as tools
 # for AI hosts. Added before serve()'s static "/" catch-all so its routes win.
@@ -167,64 +198,131 @@ def _cached_diff_html(basefile, from_version, to):
 
 
 # --------------------------------------------------------------------------
-# response models (these drive the OpenAPI schema)
+# response models
+#
+# These *are* the published schema: every field description below is what a
+# reader of /docs and /openapi.json gets, so they say what the value means to a
+# consumer, not how the handler produced it. docs/api/README.md is the same
+# contract in prose -- keep the two in step.
 # --------------------------------------------------------------------------
 
 class Fragment(BaseModel):
-    uri: str
-    pinpoint: str | None = None
-    # the pinpoint written the way a reader cites it ("4 kap. 4 §", "artikel
-    # 32"). Set on a citation-resolved hit, whose whole point is the provision
-    # it landed on; a full-text fragment hit carries the raw anchor only (Q2).
-    label: str | None = None
-    highlight: list[str] = []
+    """A place *inside* a document: the uri plus what to call it. Follow it as
+    `SearchResult.url + "#" + pinpoint`."""
+
+    uri: str = Field(description="the fragment uri, e.g. "
+                     "https://lagen.nu/1975:635#P6")
+    pinpoint: str | None = Field(
+        None, description="the anchor within the document (\"P6\", \"K4P7\", "
+        "\"A32\") -- the part after the #")
+    label: str | None = Field(
+        None, description="what names this place: the pinpoint written the way "
+        "a reader cites it (\"4 kap. 4 §\", \"artikel 32\"), or -- where the "
+        "anchor has no citation grammar, as a förarbete's \"sec745\" has none "
+        "-- the heading the document prints over that section. Null where "
+        "there is neither.")
+    highlight: list[str] = Field(
+        [], description="query matches in this passage, as HTML with the "
+        "matched terms in <em>")
 
 
 class SearchResult(BaseModel):
-    uri: str
-    url: str | None = None          # the public page path (/1962:700, /dom/nja/…)
-    identifier: str | None = None
-    title: str | None = None
-    display: str | None = None      # reader-facing heading (short name + acronym, else title)
-    source: str | None = None
-    kind: str | None = None
-    # what `kind` is called to a reader ("Lagrådsremiss", "Betänkande"). A hit
-    # whose identifier is its own title -- every förarbete published without a
-    # series number -- has nothing else to say what sort of document it is (Q4).
-    kind_label: str | None = None
-    score: float | None = None
-    inbound_count: int = 0
-    highlight: list[str] = []
-    fragments: list[Fragment] = []
+    """One hit. `url` is where to send a reader; `fragments` are the places
+    inside the document the query matched."""
+
+    uri: str = Field(description="the document's canonical uri -- its id "
+                     "everywhere: this API's ?uri=, the dump line, the search "
+                     "index _id")
+    url: str | None = Field(
+        None, description="the public page path (/1975:635, /dom/nja/2015s1). "
+        "Null for a document the site does not host a page for.")
+    identifier: str | None = Field(
+        None, description="the document's own printed id (\"1975:635\", "
+        "\"NJA 2015 s. 1\")")
+    title: str | None = Field(None, description="its full title")
+    display: str | None = Field(
+        None, description="the reader-facing heading: the short name plus its "
+        "acronym where there is one, else the title")
+    source: str | None = Field(
+        None, description="which corpus it comes from (sfs, dv, forarbete, …)")
+    kind: str | None = Field(
+        None, description="the document kind within that source (lag, "
+        "forordning, case, prop, …)")
+    kind_label: str | None = Field(
+        None, description="what `kind` is called to a reader (\"Lagrådsremiss\", "
+        "\"Betänkande\"). A hit whose identifier is its own title -- every "
+        "förarbete published without a series number -- has nothing else to "
+        "say what sort of document it is.")
+    score: float | None = Field(
+        None, description="relevance, combining text match with citation "
+        "count. Null for a pinned hit, which was resolved rather than ranked.")
+    inbound_count: int = Field(
+        0, description="how many catalogued documents cite this one -- the "
+        "same graph /document/inbound serves in full")
+    highlight: list[str] = Field(
+        [], description="the document's own snippet: what this hit is about. "
+        "Always the document's, never a passage's.")
+    fragments: list[Fragment] = Field(
+        [], description="the passages inside this document where the query "
+        "matched, most relevant first. Supporting detail to show under the "
+        "hit -- never its link target, since a word can stand in a document "
+        "for reasons that are not what the reader asked for "
+        "(\"dataförordningen\" stands in article 47 of the EU Data Act because "
+        "that article amends another regulation by quoting its title).")
 
 
 class SearchFacetBucket(BaseModel):
-    value: str
-    count: int
-    # the reader-facing name for `value`, resolved server-side from the same
-    # facet schemes the browse pages use. The search UI used to carry its own
-    # abbreviated copy, which is how "bet"/"pm"/"rskr" reached the page as raw
-    # keys (N4); clients render `label or value`.
-    label: str | None = None
+    """One value of one facet, with how many hits carry it. Render
+    `label or value`."""
+
+    value: str = Field(description="the raw facet value (\"sfs\", \"bet\", "
+                       "\"2024\")")
+    count: int = Field(description="hits with this value, counted against the "
+                       "*other* selected filters -- so the number stays usable "
+                       "for widening the search")
+    label: str | None = Field(
+        None, description="the reader-facing name for `value`, from the same "
+        "facet schemes the browse pages use. Null when the value is its own "
+        "label, as a year is.")
 
 
 class SearchResponse(BaseModel):
-    query: str
-    total: int
-    next_cursor: str | None = None
-    facets: dict[str, list[SearchFacetBucket]] = {}
+    """The answer to /search. Page it with `next_cursor`; `offset` is the
+    bounded random-access alternative."""
+
+    query: str = Field(description="the query as asked, echoed back")
+    total: int = Field(description="matching documents, before paging")
+    next_cursor: str | None = Field(
+        None, description="opaque cursor for the next page; null once the last "
+        "page is reached")
+    facets: dict[str, list[SearchFacetBucket]] = Field(
+        {}, description="bucket counts per facet field (source, kind, year)")
     results: list[SearchResult]
 
 
 class Citation(BaseModel):
-    uri: str
-    anchor: str | None = None
-    predicate: str | None = None
-    text: str | None = None
-    label: str | None = None
-    title: str | None = None
-    source: str | None = None
-    hosted: bool = True
+    """One citation a document makes -- the outbound direction."""
+
+    uri: str = Field(description="the cited target: a document uri or a "
+                     "fragment of one")
+    anchor: str | None = Field(
+        None, description="where in the citing document the citation sits")
+    predicate: str | None = Field(
+        None, description="the relation, when it is a typed one "
+        "(rpubl:bemyndigande, rpubl:andrar, rpubl:upphaver); "
+        "dcterms:references is the plain reference")
+    text: str | None = Field(
+        None, description="the citation's own surface text, as the citing "
+        "document wrote it (\"6 § räntelagen\")")
+    label: str | None = Field(None, description="the target's printed id; null "
+                              "when the target is not hosted")
+    title: str | None = Field(None, description="the target's title; null when "
+                              "the target is not hosted")
+    source: str | None = Field(None, description="the target's corpus; null "
+                               "when the target is not hosted")
+    hosted: bool = Field(True, description="false when the cited document is "
+                         "not (yet) in the corpus -- the citation is real, the "
+                         "target is not held here")
 
 
 class InboundCitation(BaseModel):
@@ -233,130 +331,193 @@ class InboundCitation(BaseModel):
     provision the citation landed on, which is the whole answer when the query
     was a law rather than a paragraf. `hosted` has no inbound counterpart -- a
     citer is a catalogued document or it would not be here."""
-    uri: str                        # the citing document
-    target: str                     # what it cited: `uri` or a fragment of it
-    anchor: str | None = None       # where in the citing document it sits
-    page: int | None = None         # the printed page, where the citer has pages
-    predicate: str | None = None
-    label: str | None = None
-    title: str | None = None
-    source: str | None = None
-    kind: str | None = None
-    date: str | None = None
+
+    uri: str = Field(description="the citing document")
+    target: str = Field(description="what it cited: the queried uri or a "
+                        "fragment of it")
+    anchor: str | None = Field(
+        None, description="where in the citing document the citation sits")
+    page: int | None = Field(
+        None, description="the printed page it sits on, where the citing "
+        "document has pages (förarbeten, föreskrifter, avgöranden)")
+    predicate: str | None = Field(
+        None, description="the relation, when it is a typed one "
+        "(rpubl:bemyndigande, rpubl:andrar, rpubl:upphaver)")
+    label: str | None = Field(None, description="the citing document's printed id")
+    title: str | None = Field(None, description="its title")
+    source: str | None = Field(None, description="its corpus")
+    kind: str | None = Field(None, description="its document kind")
+    date: str | None = Field(None, description="its date (ISO 8601), where the "
+                             "source records one")
 
 
 class InboundCitations(BaseModel):
-    uri: str
-    scope: str
-    source: str | None = None       # the citing-side filter, echoed back
-    total: int                      # matching the scope and filter, before paging
+    """Who cites a document. One row per (citing document, citing spot,
+    provision cited) -- unreduced, so a document that cites the same provision
+    five times is five rows."""
+
+    uri: str = Field(description="the uri asked about, echoed back")
+    scope: str = Field(description="the scope asked for, echoed back")
+    source: str | None = Field(None, description="the citing-side filter, "
+                               "echoed back")
+    total: int = Field(description="rows matching the scope and filter, before "
+                       "paging")
     limit: int
     offset: int
-    # {source: rows} over the whole scope, not the page -- so a client that took
-    # the first 10 000 of brottsbalken's 162 909 can still see what the rest is
-    # made of, and page towards it, instead of inferring the corpus from a slice.
-    by_source: dict[str, int]
+    by_source: dict[str, int] = Field(
+        description="{source: rows} over the whole scope, not the page -- so a "
+        "client that took the first 10 000 of brottsbalken's 162 909 can still "
+        "see what the rest is made of, and page towards it, instead of "
+        "inferring the corpus from a slice")
     citations: list[InboundCitation]
 
 
 class DocumentSummary(BaseModel):
-    uri: str
-    source: str
-    kind: str | None = None
-    label: str | None = None
-    title: str | None = None
-    source_url: str | None = None
-    updated: str | None = None      # artifact file mtime, ISO 8601 UTC
+    """A document as it appears in a listing: its id and top-level metadata,
+    without its body. Fetch the body with /document?uri=…"""
+
+    uri: str = Field(description="the canonical uri -- the key for every other "
+                     "endpoint")
+    source: str = Field(description="which corpus it comes from")
+    kind: str | None = Field(None, description="the document kind within it")
+    label: str | None = Field(None, description="its printed id (\"2018:585\")")
+    title: str | None = Field(None, description="its full title")
+    source_url: str | None = Field(
+        None, description="the publisher's own page for the document (the "
+        "\"Källa\" link), where one is derivable")
+    updated: str | None = Field(
+        None, description="when the artifact was last built (ISO 8601 UTC). "
+        "Null for a stub with no artifact of its own.")
 
 
 class DocumentList(BaseModel):
-    total: int                      # documents matching the filter (before paging)
+    """One page of the catalog enumeration."""
+
+    total: int = Field(description="documents matching the filter, before paging")
     limit: int
     offset: int
     documents: list[DocumentSummary]
 
 
 class DocumentMeta(BaseModel):
-    uri: str
-    source: str
-    kind: str | None = None
-    label: str | None = None
-    title: str | None = None
-    inbound_count: int
+    """The metadata head every document answer carries."""
+
+    uri: str = Field(description="the canonical uri")
+    source: str = Field(description="which corpus it comes from")
+    kind: str | None = Field(None, description="the document kind within it")
+    label: str | None = Field(None, description="its printed id")
+    title: str | None = Field(None, description="its full title")
+    inbound_count: int = Field(description="how many catalogued documents cite it")
 
 
 class Document(DocumentMeta):
-    source_url: str | None = None
-    artifact: dict
+    """A document: its metadata plus the parsed artifact itself."""
+
+    source_url: str | None = Field(
+        None, description="the publisher's own page for the document")
+    artifact: dict = Field(
+        description="the on-disk artifact JSON, verbatim -- the same object a "
+        "bulk-dump line carries, and the source of truth everything else here "
+        "is derived from. Each source owns its shape, but every renderable "
+        "text value is a list of inline runs: a plain string, or a link dict "
+        "{predicate, uri, text}. Those link dicts are the citation graph. See "
+        "the artifact-format section of docs/api/README.md.")
 
 
 class BrowseDoc(BaseModel):
-    uri: str
-    url: str                        # the hosted page path (/2018:585, /dom/nja/…)
-    display: str                    # the listing handle (law name / short label / id)
-    # the listing name forms (labels): the bare id shown as the bold linked term,
-    # the short human name, and the source's one-line description (a case's
-    # sammanfattning) -- the per-type listing templates (I2)
-    short_id: str | None = None
-    short_title: str | None = None
-    description: str | None = None
-    # dv-only: the case-law form (dom/referat/notis) the listing groups under, and
-    # the avgörandedatum bare domar sort by
-    variant: str | None = None
-    date: str | None = None
-    # statute-only listing extras: the title split into a subdued designation/number
-    # prefix + the emphasised sort subject, whether it is primary law (else subdued),
-    # and its year -- what the SFS listing renders and filters on (None elsewhere)
-    pre: str | None = None
-    key: str | None = None
-    subdued: bool | None = None
-    year: str | None = None
-    # föreskrift-only: the ändringsförfattningar nested under their base
-    # regulation in the listing (F5)
-    amendments: list["BrowseDoc"] | None = None
-    # föreskrift-only: this entry is the konsoliderade version, and the text as
-    # promulgated lives at <uri>/grund. Both used to list, with the same
-    # beteckning and the same title and nothing to choose between them (B4)
-    consolidated: bool | None = None
+    """A leaf entry in a browse listing -- what one line of a generated browse
+    page says. Only /browse populates these; /facets stops at the counts."""
+
+    uri: str = Field(description="the canonical uri")
+    url: str = Field(description="the hosted page path (/2018:585, /dom/nja/…)")
+    display: str = Field(description="the listing handle: law name, short "
+                         "label, or bare id")
+    short_id: str | None = Field(
+        None, description="the bare id shown as the bold linked term")
+    short_title: str | None = Field(None, description="the short human name")
+    description: str | None = Field(
+        None, description="the source's one-line description -- a case's "
+        "sammanfattning")
+    variant: str | None = Field(
+        None, description="dv only: the case-law form (dom/referat/notis) the "
+        "listing groups under")
+    date: str | None = Field(
+        None, description="dv only: the avgörandedatum bare domar sort by")
+    pre: str | None = Field(
+        None, description="sfs only: the subdued designation/number prefix of "
+        "the title")
+    key: str | None = Field(
+        None, description="sfs only: the emphasised sort subject of the title")
+    subdued: bool | None = Field(
+        None, description="sfs only: false for primary law, true for the rest "
+        "(rendered subdued)")
+    year: str | None = Field(None, description="sfs only: its year")
+    amendments: list["BrowseDoc"] | None = Field(
+        None, description="föreskrift only: the ändringsförfattningar nested "
+        "under their base regulation")
+    consolidated: bool | None = Field(
+        None, description="föreskrift only: this entry is the konsoliderade "
+        "version, and the text as promulgated lives at <uri>/grund")
 
 
 class FacetBucket(BaseModel):
-    key: str                        # the raw bucket key ("nja", "2024", "A")
-    label: str                      # its display label ("NJA – Högsta domstolen")
-    slug: str                       # its URL path segment
-    count: int                      # documents in this bucket (incl. children)
-    children: list["FacetBucket"] | None = None   # the next facet level, if any
-    documents: list[BrowseDoc] | None = None      # leaf listing (only from /browse)
+    """One navigation bucket: a court, a year, a subject initial. Buckets nest
+    at most two levels deep."""
+
+    key: str = Field(description="the raw bucket key (\"nja\", \"2024\", \"A\")")
+    label: str = Field(description="its display label (\"NJA – Högsta "
+                       "domstolen\")")
+    slug: str = Field(description="its URL path segment on the site")
+    count: int = Field(description="documents in this bucket, children included")
+    children: list["FacetBucket"] | None = Field(
+        None, description="the next facet level, where there is one")
+    documents: list[BrowseDoc] | None = Field(
+        None, description="the leaf listing. Populated by /browse only; always "
+        "null from /facets.")
 
 
 class FacetTree(BaseModel):
-    source: str
-    levels: list[str]               # the facet axis names, outer-first
-    default: list[str]              # the landing bucket's key path
+    """A source's whole navigation model: which axes it is filed by, where a
+    reader lands, and the buckets themselves."""
+
+    source: str = Field(description="the source asked about, echoed back")
+    levels: list[str] = Field(description="the facet axis names, outer first "
+                              "(e.g. [\"court\", \"year\"])")
+    default: list[str] = Field(description="the landing bucket's key path")
     buckets: list[FacetBucket]
 
 
 class SourceInfo(BaseModel):
-    source: str
-    documents: int
+    """One corpus and how much of it there is."""
+
+    source: str = Field(description="the source name, as every ?source= "
+                        "parameter takes it")
+    documents: int = Field(description="catalogued documents in it")
 
 
 class DumpInfo(BaseModel):
-    source: str
-    file: str
-    bytes: int
+    """One bulk dump. This is a manifest entry, not a download link -- the
+    files are served beside the API at /dumps/<file>."""
+
+    source: str = Field(description="the source the dump holds")
+    file: str = Field(description="its filename, e.g. sfs.ndjson.gz")
+    bytes: int = Field(description="its size on disk")
 
 
 # --------------------------------------------------------------------------
 # endpoints
 # --------------------------------------------------------------------------
 
-@app.get("/api/v1/search", response_model=SearchResponse, tags=["search"])
+@app.get("/api/v1/search", response_model=SearchResponse, tags=["search"],
+         summary="Search the corpus, with citations resolved")
 def search_endpoint(
         q: str = Query(..., description="free-text query"),
-        source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, kommentar, begrepp)"),
-        kind: str | None = Query(None, description="restrict to a document kind"),
+        source: str | None = Query(None, description="restrict to one source "
+                                   "-- any name /api/v1/sources lists (sfs, "
+                                   "dv, forarbete, eurlex, hudoc, …)"),
+        kind: str | None = Query(None, description="restrict to a document "
+                                 "kind within the source (lag, forordning, "
+                                 "case, prop, sou, directive, …)"),
         year: str | None = Query(None, pattern=r"^\d{4}$",
                                  description="restrict to a four-digit publication/decision year"),
         limit: int = Query(10, ge=1, le=100),
@@ -370,9 +531,23 @@ def search_endpoint(
     citation (a law nickname/abbreviation + pinpoint, an EU act + article, or a
     case nickname), the exact resource is resolved and pinned as the first
     result -- so ⌘K + Enter lands on the right §/article, which plain full-text
-    can't do (the name appears nowhere in the text). The rest is the usual
-    full-text ranking (relevance combined with citation count) with the matching
-    §/article fragments and highlights."""
+    can't do (the name appears nowhere in the text). The resolved provision
+    comes back as that hit's first `fragments` entry. The rest is the usual
+    full-text ranking (relevance combined with citation count); each hit
+    carries the document's own snippet plus, in `fragments`, the passages
+    inside it where the query matched.
+
+    Resolution runs on the first page only, and is best-effort: an unbuilt
+    catalog costs the resolved hit, not the search.
+
+    Paging: follow `next_cursor` until it comes back null. `offset` is the
+    bounded random-access alternative (up to 9 900) and the two are mutually
+    exclusive. `facets` counts each field against the *other* selected filters,
+    so a bucket's count stays a usable answer to "what if I widen this?"; every
+    bucket carries a reader-facing `label` where its raw value is not one.
+
+    This is the one endpoint that needs a running OpenSearch and a built index
+    -- 503 when either is missing. The catalog endpoints answer without it."""
     if cursor and offset is not None:
         raise HTTPException(422, "cursor and offset are mutually exclusive")
     try:
@@ -465,10 +640,13 @@ def legacy_html_feed(
     return HTMLResponse(feeds.render_page(item, rows, params))
 
 
-@app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])
+@app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"],
+         summary="A source's navigation buckets and their counts")
 def facets_endpoint(
-        source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, begrepp)"),
+        source: str = Query(..., description="a faceted source: sfs, dv, "
+                            "forarbete, foreskrift, avg, rs, begrepp, "
+                            "eurlex, edpb, hudoc, coe, icrc, untc, icc, "
+                            "icj. A source with no facet scheme is a 404."),
         con: sqlite3.Connection = Depends(get_con)):
     """The navigation facets for a source: the ordered buckets (one or two levels
     -- a law's subject initial, a case's court + year) with document counts, plus
@@ -479,10 +657,13 @@ def facets_endpoint(
     return FacetTree(**facets.tree(con, source))
 
 
-@app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"])
+@app.get("/api/v1/browse", response_model=FacetTree, tags=["catalog"],
+         summary="The same buckets, with each leaf's documents")
 def browse_endpoint(
-        source: str = Query(..., description="a faceted source "
-                            "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, begrepp)"),
+        source: str = Query(..., description="a faceted source: sfs, dv, "
+                            "forarbete, foreskrift, avg, rs, begrepp, "
+                            "eurlex, edpb, hudoc, coe, icrc, untc, icc, "
+                            "icj. A source with no facet scheme is a 404."),
         con: sqlite3.Connection = Depends(get_con)):
     """The complete browse model for a source: the facet navigator *plus* each
     leaf bucket's ordered, display-labelled documents. The single payload the
@@ -493,12 +674,14 @@ def browse_endpoint(
     return FacetTree(**facets.browse_view(con, source))
 
 
-@app.get("/api/v1/documents", response_model=DocumentList, tags=["document"])
+@app.get("/api/v1/documents", response_model=DocumentList, tags=["document"],
+         summary="Enumerate documents by source and kind")
 def documents_endpoint(
-        source: str | None = Query(None, description="restrict to a source "
-                                   "(sfs, dv, hudoc, forarbete, foreskrift, eurlex, coe, avg, kommentar, begrepp)"),
+        source: str | None = Query(None, description="restrict to one source "
+                                   "-- any name /api/v1/sources lists"),
         kind: str | None = Query(None, description="restrict to a document kind "
-                                 "(law, case, prop, directive, …)"),
+                                 "within the source (lag, forordning, case, "
+                                 "prop, sou, directive, …)"),
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
         con: sqlite3.Connection = Depends(get_con)):
@@ -514,11 +697,24 @@ def documents_endpoint(
                                    for d in listing["documents"]])
 
 
-@app.get("/api/v1/document", response_model=Document, tags=["document"])
+@app.get("/api/v1/document", response_model=Document, tags=["document"],
+         summary="One document and its full parsed artifact")
 def document_endpoint(uri: str = Query(..., description="full lagen.nu document uri"),
                       con: sqlite3.Connection = Depends(get_con)):
-    """A document's metadata plus its full parsed artifact (structure/body with
-    inline citations)."""
+    """One document, whole: its catalog metadata plus the parsed artifact --
+    the structure/body with every citation inline.
+
+    The artifact is the source of truth; everything else this API answers is
+    derived from it. Each source owns its own shape (a statute nests into
+    kapitel/paragraf/stycke, a förarbete is a flat page-precise list), but one
+    rule is universal: every renderable text value is a *list of inline runs*,
+    each element either a plain string or a link dict
+    `{predicate, uri, text}`. Those link dicts are the citation graph -- the
+    catalog is an index over them.
+
+    The same object comes back per line in the bulk dumps, so a consumer
+    reprocessing the whole corpus should take the dumps and never call this
+    endpoint in a loop. See docs/api/README.md for the per-source shapes."""
     data = reads.document(con, uri)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
@@ -567,25 +763,46 @@ def _version_artifact(basefile, version):
 
 
 class VersionInfo(BaseModel):
-    version: str                    # the consolidation cutoff ("2003:466")
-    uri: str
-    url: str                        # the hosted lydelse page (/1998:204/konsolidering/2003:466)
-    ikraft: str | None = None       # when the cutoff amendment entered force
-    forarbeten: list[str] = []      # its preparatory works ("Prop. 1997/98:44", …)
+    """One archived consolidation (lydelse) of a statute: the text as it stood
+    after a named amendment, before the next one."""
+
+    version: str = Field(description="the consolidation cutoff -- the SFS "
+                         "number of the amendment this text includes "
+                         "(\"2003:466\"). Pass it as ?from= / ?to= to /diff.")
+    uri: str = Field(description="the version's own canonical uri")
+    url: str = Field(description="its hosted page "
+                     "(/1998:204/konsolidering/2003:466)")
+    ikraft: str | None = Field(
+        None, description="when the cutoff amendment entered force (ISO 8601). "
+        "Null where the statute's register does not say.")
+    forarbeten: list[str] = Field(
+        [], description="the amendment's preparatory works, as printed "
+        "(\"Prop. 1997/98:44\")")
 
 
 class VersionList(BaseModel):
-    uri: str
-    versions: list[VersionInfo]     # oldest first; the current consolidation excluded
+    """A statute's version history."""
+
+    uri: str = Field(description="the statute asked about, echoed back")
+    versions: list[VersionInfo] = Field(
+        description="oldest first. The current consolidation is excluded -- it "
+        "is what /document returns.")
 
 
-@app.get("/api/v1/document/versions", response_model=VersionList, tags=["document"])
+@app.get("/api/v1/document/versions", response_model=VersionList,
+         tags=["document"],
+         summary="A statute's archived consolidations")
 def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
                       con: sqlite3.Connection = Depends(get_con)):
     """A statute's archived historical consolidations (lydelser), oldest
     first -- each one browsable at its own page and diffable via
     /api/v1/document/diff. Amendment dates and preparatory works are joined
-    in from the statute's register where known."""
+    in from the statute's register where known.
+
+    Statutes only: SFS is the one source the pipeline consolidates over time,
+    so any other uri is a 404. The *current* consolidation is not in the list
+    -- it is what /document returns, and it is what /diff compares against when
+    `to` is omitted."""
     basefile = _sfs_basefile(uri)
     row = catalog.document(con, catalog.BASE + basefile)
     info = (history.amendment_info(
@@ -598,7 +815,9 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute u
         for v, vuri in history.versions(basefile)])
 
 
-@app.get("/api/v1/document/diff", response_class=HTMLResponse, tags=["document"])
+@app.get("/api/v1/document/diff", response_class=HTMLResponse,
+         tags=["document"],
+         summary="Two consolidations compared, as marked-up HTML")
 def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
                   from_version: str = Query(..., alias="from",
                                             description="older version id, e.g. 2003:466"),
@@ -632,7 +851,7 @@ INBOUND_MAX = 10_000            # rows per response; ~3.5 MB of JSON
 
 
 @app.get("/api/v1/document/inbound", response_model=InboundCitations,
-         tags=["document"])
+         tags=["document"], summary="Who cites this document")
 def inbound_endpoint(uri: str = Query(..., description="document or fragment uri"),
                      scope: str = Query(
                          "tree", pattern="^(tree|exact)$",
@@ -678,69 +897,120 @@ def inbound_endpoint(uri: str = Query(..., description="document or fragment uri
         citations=[InboundCitation(**row) for row in data["citations"]])
 
 
-@app.get("/api/v1/document/outbound", response_model=list[Citation], tags=["document"])
+@app.get("/api/v1/document/outbound", response_model=list[Citation],
+         tags=["document"], summary="What this document cites")
 def outbound_endpoint(uri: str = Query(..., description="citing document uri"),
                       con: sqlite3.Connection = Depends(get_con)):
-    """Every citation a document makes. Targets not (yet) in the corpus come back
-    with `hosted: false` and no label/title."""
+    """Every citation a document makes -- the mirror of /document/inbound, and
+    `uri` here is the *citing* document.
+
+    One row per citation, in document order, carrying the surface text the
+    citing document actually wrote ("6 § räntelagen"). That text lives on this
+    side only: the inbound answer cannot have it, because it belongs to the
+    citer, not to the cited provision.
+
+    A target the corpus does not (yet) hold comes back with `hosted: false` and
+    no label/title/source -- the citation is real either way, and roughly one
+    in twenty points outside what is held here.
+
+    The same links sit inline in the artifact `/document` returns; this is the
+    flat, already-resolved view of them."""
     return [Citation(**row) for row in reads.outbound(con, uri)]
 
 
-@app.get("/api/v1/sources", response_model=list[SourceInfo], tags=["catalog"])
+@app.get("/api/v1/sources", response_model=list[SourceInfo], tags=["catalog"],
+         summary="The corpus' sources and their document counts")
 def sources_endpoint(con: sqlite3.Connection = Depends(get_con)):
-    """The corpus' sources and their document counts."""
+    """Every source in the corpus and how many documents it holds.
+
+    The `source` names here are exactly what the `source` parameter of /search,
+    /documents, /facets and /browse takes, so this is the endpoint to call
+    first when writing against the API -- the set grows as sources are added,
+    and hardcoding it dates."""
     return [SourceInfo(**row) for row in reads.sources(con)]
 
 
 class GraphNeighbor(BaseModel):
-    uri: str
-    label: str | None = None
-    title: str | None = None
-    descriptive: str | None = None  # the compact citing form (I1) -- the node label
-    source: str
-    kind: str | None = None
-    group: str                      # the flow-group node name (facets.flow_group)
-    n: int                          # links between the two documents
+    """One document on the other end of the citation relation, with the two
+    documents' links between them counted into one row."""
+
+    uri: str = Field(description="the neighbour's canonical uri")
+    label: str | None = Field(None, description="its printed id")
+    title: str | None = Field(None, description="its title")
+    descriptive: str | None = Field(
+        None, description="the compact citing form -- what to print on the "
+        "node (\"NJA 2015 s. 1\", \"Räntelagen\")")
+    source: str = Field(description="its corpus")
+    kind: str | None = Field(None, description="its document kind")
+    group: str = Field(description="the flow group it belongs to "
+                       "(\"Författningar\", \"Rättsfall\", …) -- the same "
+                       "names ?groups= filters on")
+    n: int = Field(description="links between the two documents")
 
 
 class GraphSide(BaseModel):
-    total_links: int                # over the resolved, group-filtered set
-    total_docs: int
-    unresolved: int = 0             # outbound only: targets outside the corpus
+    """One direction of the neighbourhood. `top` is the `limit` biggest
+    neighbours; the totals describe the whole side."""
+
+    total_links: int = Field(description="links on this side, over the "
+                             "resolved and group-filtered set")
+    total_docs: int = Field(description="distinct documents on this side")
+    unresolved: int = Field(
+        0, description="outbound only: citations whose target is not in the "
+        "corpus, so they have no neighbour row")
     top: list[GraphNeighbor]
 
 
 class GraphUnit(BaseModel):
-    anchor: str                     # the unit's fragment id ("K4P7", "A6")
-    label: str                      # its reader form ("4 kap. 7 §")
-    n: int                          # internal links touching the unit
+    """One provision of the document, as a node of its internal graph."""
+
+    anchor: str = Field(description="the unit's fragment id (\"K4P7\", \"A6\")")
+    label: str = Field(description="its reader form (\"4 kap. 7 §\")")
+    n: int = Field(description="internal links touching the unit")
 
 
 class GraphInternal(BaseModel):
+    """The document citing itself: which of its provisions cite which. Only
+    answered for a fragment uri."""
+
     nodes: list[GraphUnit]
-    edges: list[tuple[str, str, int]]   # (citing unit, cited unit, links)
-    truncated: int                  # unit pairs cut by the edge cap
+    edges: list[tuple[str, str, int]] = Field(
+        description="(citing unit anchor, cited unit anchor, links)")
+    truncated: int = Field(description="unit pairs left out by the edge cap")
 
 
 class GraphResponse(BaseModel):
-    uri: str
-    root: str                       # `uri` without its fragment
-    anchor: str | None = None       # the fragment as asked
-    unit: str | None = None         # the pinpointable unit it belongs to
-    pinpoint: str | None = None     # that unit's reader form
-    descriptive: str | None = None  # the compact citing name of the document
-    citation: str                   # the whole node as a citation ("Artikel 6 EKMR")
-    label: str | None = None
-    title: str | None = None
-    source: str
-    kind: str | None = None
-    group: str
-    inbound: GraphSide | None = None    # None when direction excluded it
-    outbound: GraphSide | None = None
-    internal: GraphInternal | None = None   # only for a fragment uri
+    """One node's neighbourhood in the citation graph, aggregated per neighbour
+    document and ready to draw."""
+
+    uri: str = Field(description="the uri asked about, echoed back")
+    root: str = Field(description="`uri` without its fragment -- the document")
+    anchor: str | None = Field(None, description="the fragment as asked, if any")
+    unit: str | None = Field(
+        None, description="the pinpointable unit that anchor belongs to (an "
+        "anchor inside a stycke answers for its paragraf)")
+    pinpoint: str | None = Field(None, description="that unit's reader form "
+                                 "(\"4 kap. 7 §\")")
+    descriptive: str | None = Field(
+        None, description="the compact citing name of the document")
+    citation: str = Field(description="the whole node written as a citation "
+                          "(\"Artikel 6 EKMR\")")
+    label: str | None = Field(None, description="the document's printed id")
+    title: str | None = Field(None, description="its title")
+    source: str = Field(description="its corpus")
+    kind: str | None = Field(None, description="its document kind")
+    group: str = Field(description="the flow group it belongs to")
+    inbound: GraphSide | None = Field(
+        None, description="who cites this node; null when ?direction= excluded it")
+    outbound: GraphSide | None = Field(
+        None, description="what this node cites; null when ?direction= excluded it")
+    internal: GraphInternal | None = Field(
+        None, description="the document's own provision-to-provision graph. "
+        "Only for a fragment uri.")
 
 
-@app.get("/api/v1/graph", response_model=GraphResponse, tags=["document"])
+@app.get("/api/v1/graph", response_model=GraphResponse, tags=["document"],
+         summary="A node's neighbourhood in the citation graph")
 def graph_endpoint(uri: str = Query(..., description="document or fragment uri"),
                    direction: str = Query(
                        "both", pattern="^(in|out|both)$",
@@ -782,137 +1052,9 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
 # record -- adding a source is one resolver.
 # --------------------------------------------------------------------------
 
-# a förarbete basefile as it appears in a uri path: "prop/2013/14:116" (the
-# riksmöte types carry an extra slash), "sou/2021:82", "bet/2020/21:JuU25";
-# the type whitelist is the harvest vocabulary + bet
-_RE_FA_BASEFILE = re.compile(
-    r"^(%s|bet)/(\d{4}(?:/\d{2,4})?:[A-Za-zÅÄÖ]*\d+[a-z]?)$"
-    % "|".join(regeringen.TYPES))
-# a föreskrift: "<fs>/<year>:<löpnr>" ("mcffs/2026:1")
-_RE_FS_BASEFILE = re.compile(r"^([a-zåäö]+)/(\d{4}:\d+)$")
-# an avgörande: "avg/<org>/<dnr>" ("avg/jo/2340-2025", "avg/jk/2024/8082")
-_RE_AVG_BASEFILE = re.compile(r"^avg/([a-z]+)/([A-Za-z0-9/-]+)$")
-# a rättsligt ställningstagande, the same {source}/{org}/{nummer} grammar; the
-# number keeps the colon four of the six agencies write it with ("fk/2025:01")
-_RE_RS_BASEFILE = re.compile(r"^rs/([a-z]+)/([A-Za-z0-9:/-]+)$")
-
-
-def _fa_pdf(local):
-    m = _RE_FA_BASEFILE.match(local)
-    if not m:
-        return None
-    typ, num = m.group(1), m.group(2)
-    basefile = "%s/%s" % (typ, basefile_slug(num))
-    record_path = layout.fa_record(basefile)
-    if not compress.exists(record_path):
-        return None
-    record = compress.read_json(record_path)
-    pdfs = [layout.fa_dir(layout.FA_DOWNLOADED, typ, num) / f
-            for f in record.get("files", []) if f.lower().endswith(".pdf")]
-    if pdfs:
-        return ("forarbete", basefile, pdfs[0])
-    # no PDF body, but the document may still have a page-image scan beside its
-    # record (the KB propkb facsimiles -- forarbete/propkb.py). Resolved by rule
-    # + existence, like the mirrored SFS PDFs in `_sfs_pdf`: it is a facsimile
-    # source, not a parse input, so it is deliberately not named in the record.
-    scan = layout.fa_facsimile_pdf(typ, m.group(2))
-    return ("forarbete", basefile, scan) if scan.exists() else None
-
-
-def _foreskrift_pdf(local):
-    m = _RE_FS_BASEFILE.match(local)
-    if not m or m.group(1) in regeringen.TYPES:
-        return None
-    fs = m.group(1)
-    record_path = (layout.FORESKRIFT_DOWNLOADED / fs
-                   / (basefile_slug(local) + ".json"))
-    if not compress.exists(record_path):
-        return None
-    # the page anchors come from the `regulation` PDF (the body foreskrift's
-    # parse reads), so that is the one a facsimile must rasterize
-    regulation = compress.read_json(record_path)["files"].get("regulation")
-    if not regulation:
-        return None
-    return ("foreskrift", local, layout.FORESKRIFT_DOWNLOADED / fs
-            / regulation["name"])
-
-
-def _avg_pdf(local):
-    m = _RE_AVG_BASEFILE.match(local)
-    if not m:
-        return None
-    basefile = local[len("avg/"):]
-    pdf = (layout.AVG_DOWNLOADED / m.group(1)
-           / (basefile_slug(basefile) + ".pdf"))
-    return ("avg", basefile, pdf) if pdf.exists() else None
-
-
-def _rs_pdf(local):
-    m = _RE_RS_BASEFILE.match(local)
-    if not m:
-        return None
-    basefile = local[len("rs/"):]
-    pdf = (layout.RS_DOWNLOADED / m.group(1)
-           / (basefile_slug(basefile) + ".pdf"))
-    return ("rs", basefile, pdf) if pdf.exists() else None
-
-
-# an SFS: a bare "<year>:<löpnr>" ("2002:780"), no source prefix -- the
-# officially published PDF the mirror fetched (pdfmirror), facsimile source for
-# both a full published page and a sfs-graphic crop
-_RE_SFS_BASEFILE = re.compile(r"^\d{4}:\d+[a-z]?$")
-
-
-def _sfs_pdf(local):
-    if not _RE_SFS_BASEFILE.match(local):
-        return None
-    pdf = layout.sfs_pdf(local)
-    return ("sfs", local, pdf) if pdf.exists() else None
-
-
-def _dv_pdf(local):
-    # a raw verdict's own source PDF, for the inline page-facsimile buttons. Unlike
-    # the other sources there is no layout rule from the uri to the PDF (it is a
-    # court attachment keyed by an opaque uuid), so the path is read from the
-    # artifact's stamped `facsimile_pdf`. Only raw verdicts carry it; a referat
-    # renders from HTML and has no facsimile.
-    if not local.startswith("dom/") or not db.catalog_ready():
-        return None
-    with db.connection() as con:
-        row = catalog.document(con, catalog.BASE + local)
-        art = catalog.load_artifact(catalog.data_root(con), row[5]) if row else {}
-    ref = art.get("facsimile_pdf")
-    if not ref:
-        return None
-    pdf = layout.DATA / ref
-    return ("dv", basefile_slug(local), pdf) if pdf.exists() else None
-
-
-_PDF_RESOLVERS = (_fa_pdf, _avg_pdf, _rs_pdf, _foreskrift_pdf, _sfs_pdf, _dv_pdf)
-
-def _facsimile_response(local, sid, bbox=None):
-    """The facsimile PNG for page `sid` of the document at uri-local path
-    `local` ("prop/2013/14:116"), rendering into the disk cache on first
-    request. With `bbox`, just that rectangle of the page -- the same renderer
-    and cache the SFS graphics layer crops its figures with, so a förarbete's
-    illustration needs no extraction path of its own: the pixels are already
-    in the source PDF and this reads them where they are."""
-    if ".." in local or sid < 1:
-        raise HTTPException(404, "no such document: %r" % local)
-    resolved = next(filter(None, (r(local) for r in _PDF_RESOLVERS)), None)
-    if resolved is None:
-        raise HTTPException(404, "no PDF source downloaded for %r" % local)
-    source, basefile, pdf = resolved
-    # a förarbete's illustration is displayed once, at the measure of the text
-    # column, and nothing opens it larger -- so it is rendered at the same
-    # resolution as the page facsimile it is cut from
-    return facsimiles.png_response(source, basefile, pdf, sid, bbox,
-                         "%r has no page %d" % (local, sid),
-                         client_bbox=bbox is not None, dpi=facsimile.DPI)
-
-
 @app.get("/api/v1/facsimile", response_class=FileResponse, tags=["document"],
-         responses={200: {"content": {"image/png": {}}}})
+         responses={200: {"content": {"image/png": {}}}},
+         summary="A PNG of one printed page of the source PDF")
 def facsimile_endpoint(
         uri: str = Query(..., description="full lagen.nu document uri"),
         sid: int = Query(..., ge=1, description="printed page number "
@@ -924,7 +1066,7 @@ def facsimile_endpoint(
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
     resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
     region of that page -- what a figure inside a förarbete is."""
-    return _facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid,
+    return facsimiles.facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid,
                                facsimiles.parse_bbox(bbox) if bbox else None)
 
 
@@ -934,7 +1076,8 @@ _DV_COURT_RE = re.compile(r"[A-Za-zÅÄÖåäö0-9]+")
 
 
 @app.get("/api/v1/dv-verdict", response_class=FileResponse, tags=["document"],
-         responses={200: {"content": {"application/pdf": {}}}})
+         responses={200: {"content": {"application/pdf": {}}}},
+         summary="The original verdict PDF behind a decision")
 def dv_verdict_endpoint(
         court: str = Query(..., description="court code (domstolKod), e.g. HDO"),
         id: str = Query(..., description="the record's UUID"),
@@ -954,7 +1097,8 @@ def dv_verdict_endpoint(
 
 
 @app.get("/api/v1/pdf", tags=["document"],
-         responses={200: {"content": {"application/pdf": {}}}})
+         responses={200: {"content": {"application/pdf": {}}}},
+         summary="A document typeset for paper, as PDF")
 def pdf_endpoint(
         path: str = Query(..., description="public page path, e.g. /1998:204 "
                           "or /prop/2020/21:22"),
@@ -979,7 +1123,7 @@ def pdf_endpoint(
     generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
     try:
         data = pdf.export(generated, toc=toc, kinds=kinds,
-                          subresource=_pdf_subresource(),
+                          subresource=facsimiles.subresource,
                           amendments=andringar, columns=kolumner)
     except FileNotFoundError:
         raise HTTPException(404, "no generated page at %r" % path) from None
@@ -998,164 +1142,24 @@ def pdf_collection_page():
     return HTMLResponse(pdfcollection.collection_page())
 
 
-@app.get("/api/v1/pdf/samling/vanta", response_class=HTMLResponse,
-         include_in_schema=False)
-def pdf_collection_wait_page():
-    """A real waiting address whose fragment carries the collection recipe."""
-    return HTMLResponse(pdfcollection.wait_page())
-
-
-@app.post("/api/v1/pdf/samling/inspektera", tags=["document"],
-          include_in_schema=False)
-def pdf_collection_inspect(request: pdfcollection.InspectRequest):
-    """Labels, options and selectable headings for the collection editor."""
-    try:
-        return {"documents": pdfcollection.inspect(request.paths)}
-    except FileNotFoundError as exc:
-        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
-
-
-@app.post("/api/v1/pdf/samling/jobb", tags=["document"],
-          include_in_schema=False)
-def pdf_collection_job_start(manifest: pdfcollection.CollectionManifest):
-    """Start one stateless collection render and return its background job."""
-    try:
-        pdfcollection.validate(manifest)
-        job = pdfjob.start_collection(
-            manifest, subresource=_pdf_subresource(),
-            generated=datetime.now(ZoneInfo("Europe/Stockholm")).date())
-    except FileNotFoundError as exc:
-        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
-    except pdfjob.QueueFull as exc:
-        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
-    return job.status()
-
-
-@app.get("/api/v1/pdf/jobb/{job_id}/resultat", tags=["document"],
-         include_in_schema=False)
-def pdf_job_result(job_id: str, download: bool = Query(False)):
-    """The cached PDF produced by a finished background job."""
-    job = pdfjob.get(job_id)
-    if job is None:
-        raise HTTPException(404, "no such pdf job")
-    if job.error:
-        raise HTTPException(503, job.error)
-    entry = pdfjob.result(job)
-    if entry is None:
-        raise HTTPException(409, "pdf job is not finished")
-    return FileResponse(
-        entry, media_type="application/pdf", filename=job.filename,
-        content_disposition_type="attachment" if download else "inline")
-
-
-def _pdf_subresource():
-    """How the export fetches the page's own images and stylesheets: the app
-    answering for itself in-process, so nothing leaves the container."""
-    client = TestClient(app)
-
-    def subresource(path_qs):
-        r = client.get(path_qs)
-        if r.status_code != 200:
-            raise ValueError("subresource %s -> %d" % (path_qs, r.status_code))
-        return r.content, r.headers.get("content-type", "")
-
-    return subresource
-
-
-@app.post("/api/v1/pdf/jobb", tags=["document"], include_in_schema=False)
-def pdf_job_start(
-        path: str = Query(..., description="public page path"),
-        toc: bool = Query(False),
-        kontext: str = Query(""),
-        andringar: bool = Query(True),
-        kolumner: int = Query(1, ge=1, le=2)):
-    """Start the export in the background and answer at once with its job.
-    A render already running for the same page and options is joined, not
-    started again; one already in the cache comes back finished.
-
-    This is what keeps a large export off the request: laying out a statute
-    with its full context runs well past nginx's proxy timeout, and a reader
-    who waited on it got a 504 for work that had in fact succeeded."""
-    generated, kinds = pdfjob.parse_request(path, kontext, kolumner)
-    try:
-        job = pdfjob.start(generated, toc=toc, kinds=kinds,
-                           subresource=_pdf_subresource(),
-                           amendments=andringar, columns=kolumner)
-    except FileNotFoundError:
-        raise HTTPException(404, "no generated page at %r" % path) from None
-    except pdfjob.QueueFull as exc:
-        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
-    return job.status()
-
-
-@app.get("/api/v1/pdf/jobb/{job_id}", tags=["document"], include_in_schema=False)
-def pdf_job_status(job_id: str):
-    """How far the export has come: the step it is in, the pages it has laid
-    out, and how many seconds are left at the rate it is going."""
-    job = pdfjob.get(job_id)
-    if job is None:
-        raise HTTPException(404, "no such pdf job")
-    return job.status()
-
-
 # the legacy path grammar in its two arities: riksmöte-numbered förarbeten and
 # avgöranden carry an extra slash ("/prop/2022/23:10/sid1.png",
 # "/avg/jo/2340-2025/sid1.png"); year-numbered ids do not
 # ("/sou/2021:82/sid1.png", "/mcffs/2026:1/sid1.png")
 @app.get("/{a}/{b}/{c}/sid{sid:int}.png", include_in_schema=False)
 def facsimile_legacy_3(a: str, b: str, c: str, sid: int):
-    return _facsimile_response("%s/%s/%s" % (a, b, c), sid)
+    return facsimiles.facsimile_response("%s/%s/%s" % (a, b, c), sid)
 
 
 @app.get("/{a}/{b}/sid{sid:int}.png", include_in_schema=False)
 def facsimile_legacy_2(a: str, b: str, sid: int):
-    return _facsimile_response("%s/%s" % (a, b), sid)
+    return facsimiles.facsimile_response("%s/%s" % (a, b), sid)
 
 
-# sfs-graphic: a crop of the graphic/formula/map the consolidated SFS text drops
-# but the published PDF carries. Unlike a facsimile the client sends only the
-# viewed statute + gap id; the reviewed .graphics layer holds the geometry AND
-# the provenance -- which amending SFS's PDF the region is cropped from (the act
-# that last set that wording), not the viewed statute's own PDF.
-def _sfs_graphic_response(local, node, dpi):
-    """The cropped PNG for gap `node` of the SFS at uri-local `local`, its page,
-    bbox and source PDF read from the statute's .graphics layer."""
-    if ".." in local or not _RE_SFS_BASEFILE.match(local):
-        raise HTTPException(404, "not an SFS document: %r" % local)
-    layer = annstore.path("sfs", local, ".graphics")
-    if not layer.exists():
-        raise HTTPException(404, "no graphics layer for %r" % local)
-    content = json.loads(layer.read_text())
-    entry = content.get(node)
-    if entry is None:
-        raise HTTPException(404, "no graphic %r in %r" % (node, local))
-    if not annstore.publishable(content.get("meta", {}), entry):
-        raise HTTPException(404, "graphic %r in %r is not verified" % (node, local))
-    # the amending SFS whose published PDF carries the region (provenance)
-    src, page, bbox = entry["sfs"], entry["page"], entry.get("bbox")
-    assert isinstance(src, str) and _RE_SFS_BASEFILE.fullmatch(src), \
-        "%s/%s: invalid graphics source %r" % (local, node, src)
-    assert isinstance(page, int) and not isinstance(page, bool) and page > 0, \
-        "%s/%s: invalid graphics page %r" % (local, node, page)
-    if bbox is not None:
-        assert facsimile.valid_bbox(bbox), \
-            "%s/%s: invalid graphics bbox %r" % (local, node, bbox)
-    pdf = layout.sfs_pdf(src)
-    if not pdf.exists():
-        raise HTTPException(404, "source SFS %s is not mirrored" % src)
-    # an entry with no bbox *is* the whole page, which has one resolution: there
-    # is no larger render to ask for, so `stor` cannot apply to it
-    return facsimiles.png_response("sfs", src, pdf, page, bbox,
-                         "SFS %s has no page %d" % (src, page),
-                         dpi=dpi if bbox else facsimile.DPI)
-
-
-@app.get("/api/v1/sfs-graphic", response_class=FileResponse, tags=["document"],
-         responses={200: {"content": {"image/png": {}}}})
+@app.get("/api/v1/sfs-graphic", response_class=FileResponse,
+         tags=["document"],
+         responses={200: {"content": {"image/png": {}}}},
+         summary="A graphic the consolidated statute text omits")
 def sfs_graphic_endpoint(
         uri: str = Query(..., description="full lagen.nu SFS uri"),
         node: str = Query(..., description="stable graphic-gap key (the "
@@ -1173,14 +1177,27 @@ def sfs_graphic_endpoint(
     per use: the inline thumbnail, and `stor=1` for the lightbox. A page of road
     signs asks for hundreds of the first and one of the second, so serving the
     large one to both would cost the reader megabytes nothing on screen uses."""
-    return _sfs_graphic_response(
+    return facsimiles.sfs_graphic_response(
         catalog.local(catalog.strip_fragment(uri)), node,
         facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI)
 
 
-@app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"])
+@app.get("/api/v1/dumps", response_model=list[DumpInfo], tags=["catalog"],
+         summary="The NDJSON bulk dumps on offer")
 def dumps_endpoint():
-    """The available NDJSON bulk dumps (one per source), for machine consumers."""
+    """The NDJSON bulk dumps on offer, one per source -- the right way to take
+    the whole corpus.
+
+    A *manifest*, not a download route: it reports each dump's source, file
+    name and size, and the files themselves are served beside the API at
+    `/dumps/<file>` (by the reverse proxy, because the set is several
+    gigabytes and wants sendfile and byte ranges).
+
+    Each line of a dump is one source artifact, minified, with nothing removed
+    or transformed -- the same object `/document` returns in `artifact`.
+    Because the citation graph sits inline in each artifact, a line is
+    self-contained: reprocessing the corpus needs no second call. Documents
+    that parsed to nothing are omitted."""
     if not DUMPS.exists():
         return []
     return [DumpInfo(source=p.name.split(".", 1)[0], file=p.name,

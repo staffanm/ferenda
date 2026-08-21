@@ -52,7 +52,7 @@ def _health_columns(body):
 def _login(client):
     """Log the TestClient in as editor `anna` (sets the session cookie on its
     jar) and return it, so subsequent /ops requests carry the editor session."""
-    assert client.post("/api/v1/auth/login",
+    assert client.post("/internal-api/v1/auth/login",
                        json={"username": "anna", "password": "hunter2"}
                        ).status_code == 200
     return client

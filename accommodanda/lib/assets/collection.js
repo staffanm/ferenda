@@ -361,7 +361,7 @@
 
     function inspect() {
       if (!state.items.length) return;
-      fetch('/api/v1/pdf/samling/inspektera', { method: 'POST',
+      fetch('/internal-api/v1/pdf/samling/inspektera', { method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paths: state.items.map(function (item) { return item.path; }) }) })
         .then(function (response) {
@@ -437,7 +437,7 @@
       fail('');
       if (!state.items.length) return fail('Samlingen innehåller inga dokument.');
       var download = page.querySelector('[name=collection-download]').checked;
-      var target = '/api/v1/pdf/samling/vanta' + (download ? '?download=1' : '') + '#' + wire(state);
+      var target = '/internal-api/v1/pdf/samling/vanta' + (download ? '?download=1' : '') + '#' + wire(state);
       if (!window.open(target, '_blank')) fail('Webbläsaren blockerade den nya fliken.');
     });
 
@@ -509,14 +509,14 @@
     }
     function done(id) {
       bar.style.width = '100%'; phase.textContent = 'klar'; left.textContent = '';
-      var result = '/api/v1/pdf/jobb/' + id + '/resultat' + (download ? '?download=1' : '');
+      var result = '/internal-api/v1/pdf/jobb/' + id + '/resultat' + (download ? '?download=1' : '');
       if (!download) return location.replace(result);
       var link = document.createElement('a'); link.href = result;
       document.body.appendChild(link); link.click(); link.remove();
       note.textContent = 'PDF:en laddas ned.';
     }
     function poll(id) {
-      fetch('/api/v1/pdf/jobb/' + id).then(function (response) {
+      fetch('/internal-api/v1/pdf/jobb/' + id).then(function (response) {
         if (!response.ok) throw new Error('servern svarade ' + response.status);
         return response.json();
       }).then(function (status) {
@@ -525,7 +525,7 @@
         show(status); setTimeout(function () { poll(id); }, 1000);
       }).catch(function (reason) { fail('Kontakten med servern bröts (' + reason.message + ').'); });
     }
-    fetch('/api/v1/pdf/samling/jobb', { method: 'POST',
+    fetch('/internal-api/v1/pdf/samling/jobb', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (response) {
         if (!response.ok) return response.json().then(function (answer) {

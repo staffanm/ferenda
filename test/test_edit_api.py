@@ -57,21 +57,37 @@ def env(tmp_path, monkeypatch):
 
 
 def _login(client):
-    return client.post("/api/v1/auth/login",
+    return client.post("/internal-api/v1/auth/login",
                        json={"username": "anna", "password": "hunter2"})
+
+
+def test_the_internal_schema_is_behind_the_editor_session(env):
+    """The internal API documents itself at /internal-api/docs, but only to the
+    people who can already use it -- it is a map of the write surface."""
+    anon = TestClient(api.app)
+    assert anon.get("/internal-api/docs").status_code == 401
+    assert anon.get("/internal-api/openapi.json").status_code == 401
+
+    c = TestClient(api.app)
+    _login(c)
+    assert c.get("/internal-api/docs").status_code == 200
+    paths = c.get("/internal-api/openapi.json").json()["paths"]
+    assert "/v1/edit/commit" in paths and "/v1/auth/login" in paths
+    # ...and it is a different document from the public one
+    assert "/api/v1/search" not in paths
 
 
 def test_write_requires_login(env):
     c = TestClient(api.app)
-    assert c.get("/api/v1/edit/region",
+    assert c.get("/internal-api/v1/edit/region",
                  params={"kind": "kommentar", "ref": "1915:218", "anchor": "P1"}
                  ).status_code == 401
-    assert c.post("/api/v1/edit/commit", json={"message": "x"}).status_code == 401
+    assert c.post("/internal-api/v1/edit/commit", json={"message": "x"}).status_code == 401
 
 
 def test_login_bad_password(env):
     c = TestClient(api.app)
-    assert c.post("/api/v1/auth/login",
+    assert c.post("/internal-api/v1/auth/login",
                   json={"username": "anna", "password": "wrong"}).status_code == 401
 
 
@@ -81,10 +97,10 @@ def test_login_me_logout(env):
     # the JS-readable hint cookie rides along with the HttpOnly session cookie
     # -- editor.js keys the "should I even call /auth/me" decision on it
     assert c.cookies.get(auth.COOKIE_HINT) == "1"
-    assert c.get("/api/v1/auth/me").json()["username"] == "anna"
-    c.post("/api/v1/auth/logout")
+    assert c.get("/internal-api/v1/auth/me").json()["username"] == "anna"
+    c.post("/internal-api/v1/auth/logout")
     assert c.cookies.get(auth.COOKIE_HINT) is None
-    assert c.get("/api/v1/auth/me").status_code == 401
+    assert c.get("/internal-api/v1/auth/me").status_code == 401
 
 
 def test_full_edit_commit_flow(env):
@@ -92,17 +108,17 @@ def test_full_edit_commit_flow(env):
     c = TestClient(api.app)
     _login(c)
 
-    seeded = c.get("/api/v1/edit/region",
+    seeded = c.get("/internal-api/v1/edit/region",
                    params={"kind": "kommentar", "ref": "1915:218", "anchor": "P1"})
     assert seeded.json()["markdown"].startswith("## 1 §")
 
-    r = c.post("/api/v1/edit/region", json={
+    r = c.post("/internal-api/v1/edit/region", json={
         "kind": "kommentar", "ref": "1915:218", "anchor": "P1",
         "new_text": "## 1 §\n\nAnnas kommentar med [FB](sfs:1949:381).\n"})
     assert r.json() == {"cart": 1}
-    assert len(c.get("/api/v1/edit/cart").json()["drafts"]) == 1
+    assert len(c.get("/internal-api/v1/edit/cart").json()["drafts"]) == 1
 
-    done = c.post("/api/v1/edit/commit", json={"message": "kommentera 1 §"})
+    done = c.post("/internal-api/v1/edit/commit", json={"message": "kommentera 1 §"})
     assert done.status_code == 200
     body = done.json()
     assert body["rebuilt"] == ["/1915:218"]
@@ -111,20 +127,20 @@ def test_full_edit_commit_flow(env):
     assert _git(root, "log", "-1", "--format=%an|%s") == "Anna Ek|kommentera 1 §"
     assert "Annas kommentar" in \
         (root / "commentary" / "sfs" / "1915" / "218.md").read_text()
-    assert c.get("/api/v1/edit/cart").json()["drafts"] == []
+    assert c.get("/internal-api/v1/edit/cart").json()["drafts"] == []
 
 
 def test_commit_conflict_returns_409(env):
     root, _ = env
     c = TestClient(api.app)
     _login(c)
-    c.post("/api/v1/edit/region", json={
+    c.post("/internal-api/v1/edit/region", json={
         "kind": "kommentar", "ref": "1915:218", "anchor": "P1",
         "new_text": "## 1 §\n\nAnnas.\n"})
     # a concurrent change on disk moves the region out from under the draft
     (root / "commentary" / "sfs" / "1915" / "218.md").write_text(
         "---\nannotates: 1915:218\n---\n## 1 §\n\nNågon annans.\n", encoding="utf-8")
-    r = c.post("/api/v1/edit/commit", json={"message": "should 409"})
+    r = c.post("/internal-api/v1/edit/commit", json={"message": "should 409"})
     assert r.status_code == 409
     assert r.json()["detail"]["conflicts"] == ["kommentar:1915:218#P1"]
 
@@ -132,8 +148,8 @@ def test_commit_conflict_returns_409(env):
 def test_disabled_when_no_secret(env, monkeypatch):
     monkeypatch.setattr(config, "EDITOR_SECRET", None)
     c = TestClient(api.app)
-    assert c.get("/api/v1/auth/me").status_code == 403
-    assert c.post("/api/v1/auth/login",
+    assert c.get("/internal-api/v1/auth/me").status_code == 403
+    assert c.post("/internal-api/v1/auth/login",
                   json={"username": "anna", "password": "hunter2"}).status_code == 403
 
 
@@ -144,12 +160,12 @@ def test_disabled_when_no_secret(env, monkeypatch):
 def test_login_rate_limited_after_repeated_failures(env):
     c = TestClient(api.app)
     for _ in range(auth._LOGIN_FREE_ATTEMPTS):
-        r = c.post("/api/v1/auth/login",
+        r = c.post("/internal-api/v1/auth/login",
                    json={"username": "anna", "password": "wrong"})
         assert r.status_code == 401
     # the free quota is spent -- the next attempt is throttled, not even
     # given the chance to fail on the password
-    limited = c.post("/api/v1/auth/login",
+    limited = c.post("/internal-api/v1/auth/login",
                      json={"username": "anna", "password": "wrong"})
     assert limited.status_code == 429
     assert "Retry-After" in limited.headers
@@ -175,11 +191,11 @@ def test_rate_limiter_tracks_keys_independently():
 def test_login_success_resets_the_rate_limit(env):
     c = TestClient(api.app)
     for _ in range(auth._LOGIN_FREE_ATTEMPTS - 1):
-        c.post("/api/v1/auth/login", json={"username": "anna", "password": "wrong"})
+        c.post("/internal-api/v1/auth/login", json={"username": "anna", "password": "wrong"})
     assert _login(c).status_code == 200
-    c.post("/api/v1/auth/logout")
+    c.post("/internal-api/v1/auth/logout")
     # the successful login reset anna's counter -- back to a fresh quota
-    assert c.post("/api/v1/auth/login",
+    assert c.post("/internal-api/v1/auth/login",
                   json={"username": "anna", "password": "wrong"}).status_code == 401
 
 
@@ -191,7 +207,7 @@ def test_login_concurrency_cap_rejects_beyond_the_semaphore(env, monkeypatch):
         assert auth._LOGIN_SEM.acquire(blocking=False)
     try:
         c = TestClient(api.app)
-        r = c.post("/api/v1/auth/login",
+        r = c.post("/internal-api/v1/auth/login",
                    json={"username": "anna", "password": "hunter2"})
         assert r.status_code == 429
     finally:
@@ -206,7 +222,7 @@ def test_login_concurrency_cap_rejects_beyond_the_semaphore(env, monkeypatch):
 def test_password_change_revokes_outstanding_sessions(env, monkeypatch):
     c = TestClient(api.app)
     _login(c)
-    assert c.get("/api/v1/auth/me").status_code == 200
+    assert c.get("/internal-api/v1/auth/me").status_code == 200
     # anna's password (and so her pwhash) changes -- e.g. after a suspected
     # compromise -- with no server-side session table to also update
     monkeypatch.setitem(config.EDITORS, "anna",
@@ -214,4 +230,4 @@ def test_password_change_revokes_outstanding_sessions(env, monkeypatch):
                          "pwhash": auth.hash_password("newpassword", rounds=1000)})
     # the old cookie's embedded pwhash fingerprint no longer matches -> 401,
     # even though the signature and expiry are still perfectly valid
-    assert c.get("/api/v1/auth/me").status_code == 401
+    assert c.get("/internal-api/v1/auth/me").status_code == 401

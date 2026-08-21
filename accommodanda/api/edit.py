@@ -1,11 +1,11 @@
 """The write side of the service: the inline editor's REST surface.
 
-Every route is gated by `auth.require_editor`, so an anonymous or expired session
-gets a 401 and editing-disabled (no `editor_secret`) a 403 -- the same posture as
-the ops dashboard, one gate, no per-route checks. The public read API stays
-GET-only and CORS-open; these mutating routes are same-origin only (the editor
-JS runs on the served site), and the session cookie is `SameSite=Lax`, so a
-cross-site page can't drive them.
+Part of the internal API (`api/internal.py`), so every route below answers at
+`/internal-api/v1/edit/…` and, like the rest of that app, only to a same-origin
+caller. Each is additionally gated by `auth.require_editor`: an anonymous or
+expired session gets a 401 and editing-disabled (no `editor_secret`) a 403 --
+the same posture as the ops dashboard, one gate, no per-route checks. The
+session cookie is `SameSite=Lax` on top of that.
 
 The flow mirrors the UI: `GET /edit/region` fills the inline textarea,
 `POST /edit/region` carts a hunk (or un-carts a no-op), `GET /edit/cart` +
@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from . import editcart, editcontent
 from .auth import Editor, require_editor
 
-router = APIRouter(prefix="/api/v1/edit", tags=["edit"])
+router = APIRouter(prefix="/edit", tags=["edit"])
 
 # The post-commit page rebuild lives in build.py (it drives relate/generate). We
 # must not import build here: build imports this package (for `serve`), so a

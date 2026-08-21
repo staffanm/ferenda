@@ -25,8 +25,8 @@ Four things this is built around:
     calls from one client group into one visit without the address itself
     reaching Matomo. Same privacy stance as the pages' cookie-less tracker.
   * **Only foreign traffic -- until something breaks.** The site's own pages
-    call `/api/v1/*` over XHR (the ⌘K palette, the context rail, `auth/me` on
-    every load). Those are already counted as page views by the browser tracker,
+    call `/api/v1/*` over XHR (the ⌘K palette, the context rail, the citation
+    graph). Those are already counted as page views by the browser tracker,
     so counting them again here would bury actual API consumers under the site's
     own chatter -- same-origin browser fetches are skipped, see `_own_page_xhr`.
     A *failing* call is exempt: every error is recorded, whoever made it, under
@@ -52,15 +52,13 @@ log = logging.getLogger(__name__)
 
 # the REST surface worth counting: the public read API plus its human-facing
 # OpenAPI pages. Deliberately not the whole app -- the static site below "/" is
-# counted in the browser, and /ops is an operator dashboard, not an audience.
+# counted in the browser, /ops is an operator dashboard rather than an audience,
+# and /internal-api is the site calling itself (`auth/me` alone fires on every
+# page load, so counting it would make the "API" numbers a copy of the site's
+# page views). Both of those now sit outside this prefix set by construction.
 # (Not the same set as errors.JSON_PREFIXES, which answers a different question:
 # what shape an error takes. Matched the same way, with `under`.)
 API_PREFIXES = ("/api/v1", "/docs", "/redoc", "/openapi.json")
-# ...minus the editor's own routes. `auth/me` alone fires on every single page
-# load (editor.js asks whether to mount the edit affordance), so leaving these in
-# would make the "API" numbers a copy of the site's page views.
-API_EXCLUDED = ("/api/v1/auth", "/api/v1/edit", "/api/v1/patch",
-                "/api/v1/graphics")
 
 ENABLED = bool(config.MATOMO_URL and config.MATOMO_SITE_API)
 # Parsed once, here, so a malformed endpoint raises at import -- the worker
@@ -213,10 +211,10 @@ def track_mcp(scope, method, tool, failed=False):
 
 
 class Tracked:
-    """ASGI middleware recording the REST surface (`API_PREFIXES` minus
-    `API_EXCLUDED`). Pure pass-through for everything else -- notably the static
-    site, which is by far the most requested path through this app and tracks
-    itself in the browser.
+    """ASGI middleware recording the public REST surface (`API_PREFIXES`). Pure
+    pass-through for everything else -- notably the static site, which is by far
+    the most requested path through this app and tracks itself in the browser,
+    and /internal-api, which is the site calling itself.
 
     A plain ASGI class rather than a `@app.middleware("http")` function: those
     are Starlette `BaseHTTPMiddleware` instances, which wrap every response in a
@@ -232,8 +230,7 @@ class Tracked:
         # OPTIONS preflight itself with a 200 -- counting those would double
         # every hit from exactly the browser-app consumers worth counting.
         if (scope["type"] != "http" or scope["method"] != "GET"
-                or not under(scope["path"], API_PREFIXES)
-                or under(scope["path"], API_EXCLUDED)):
+                or not under(scope["path"], API_PREFIXES)):
             return await self.app(scope, receive, send)
         status = None
 

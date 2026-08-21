@@ -21,6 +21,12 @@ Here the render moves to a worker thread and the browser follows it:
 The waiting screen (``templates/pdf_wait.html``) is a real page at a real
 address, not a blank tab: it polls the job, draws the bar, and replaces
 itself with the PDF when the render lands.
+
+The job routes are the site's own plumbing -- nothing but ``pdf.js`` and
+``collection.js`` calls them -- so they sit on the internal API
+(``api/internal.py``), at ``/internal-api/v1/pdf/…`` and same-origin only. The
+single-shot ``GET /api/v1/pdf`` they share a cache with stays public: it is one
+request that answers with the file.
 """
 
 import logging
@@ -30,13 +36,15 @@ import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime
 from html import unescape
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from ..lib import compress, tpl
-from . import pdf, pdfcollection
+from . import facsimiles, pdf, pdfcollection
 
 # Two renders at a time. The work is CPU-bound Python, so more workers than
 # the box has cores to spare just makes every reader wait longer; two lets a
@@ -328,7 +336,7 @@ def result(job: Job):
 # the waiting screen
 # --------------------------------------------------------------------------
 
-router = APIRouter()
+router = APIRouter(prefix="/pdf", tags=["pdf"])
 
 
 def parse_request(path: str, kontext: str, columns: int):
@@ -349,8 +357,7 @@ def parse_request(path: str, kontext: str, columns: int):
 TPL = tpl.environment("accommodanda.api").get_template("pdf_wait.html").module
 
 
-@router.get("/api/v1/pdf/vanta", response_class=HTMLResponse,
-            include_in_schema=False)
+@router.get("/vanta", response_class=HTMLResponse, include_in_schema=False)
 def pdf_wait_page(
         path: str = Query(..., description="public page path"),
         toc: bool = Query(False),
@@ -378,3 +385,90 @@ def _title(page) -> str:
     anyone can open, and it would then print whatever the URL said."""
     title = _TITLE_RE.search(compress.read_text(page))
     return unescape(title.group(1)).strip() if title else ""
+
+
+@router.get("/samling/vanta", response_class=HTMLResponse,
+            include_in_schema=False)
+def pdf_collection_wait_page():
+    """A real waiting address whose fragment carries the collection recipe."""
+    return HTMLResponse(pdfcollection.wait_page())
+
+
+@router.post("/samling/inspektera")
+def pdf_collection_inspect(request: pdfcollection.InspectRequest):
+    """Labels, options and selectable headings for the collection editor."""
+    try:
+        return {"documents": pdfcollection.inspect(request.paths)}
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+
+
+@router.post("/samling/jobb")
+def pdf_collection_job_start(manifest: pdfcollection.CollectionManifest):
+    """Start one stateless collection render and return its background job."""
+    try:
+        pdfcollection.validate(manifest)
+        job = start_collection(
+            manifest, subresource=facsimiles.subresource,
+            generated=datetime.now(ZoneInfo("Europe/Stockholm")).date())
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
+    except QueueFull as exc:
+        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return job.status()
+
+
+@router.get("/jobb/{job_id}/resultat")
+def pdf_job_result(job_id: str, download: bool = Query(False)):
+    """The cached PDF produced by a finished background job."""
+    job = get(job_id)
+    if job is None:
+        raise HTTPException(404, "no such pdf job")
+    if job.error:
+        raise HTTPException(503, job.error)
+    entry = result(job)
+    if entry is None:
+        raise HTTPException(409, "pdf job is not finished")
+    return FileResponse(
+        entry, media_type="application/pdf", filename=job.filename,
+        content_disposition_type="attachment" if download else "inline")
+
+
+@router.post("/jobb")
+def pdf_job_start(
+        path: str = Query(..., description="public page path"),
+        toc: bool = Query(False),
+        kontext: str = Query(""),
+        andringar: bool = Query(True),
+        kolumner: int = Query(1, ge=1, le=2)):
+    """Start the export in the background and answer at once with its job.
+    A render already running for the same page and options is joined, not
+    started again; one already in the cache comes back finished.
+
+    This is what keeps a large export off the request: laying out a statute
+    with its full context runs well past nginx's proxy timeout, and a reader
+    who waited on it got a 504 for work that had in fact succeeded."""
+    generated, kinds = parse_request(path, kontext, kolumner)
+    try:
+        job = start(generated, toc=toc, kinds=kinds,
+                    subresource=facsimiles.subresource,
+                    amendments=andringar, columns=kolumner)
+    except FileNotFoundError:
+        raise HTTPException(404, "no generated page at %r" % path) from None
+    except QueueFull as exc:
+        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
+    return job.status()
+
+
+@router.get("/jobb/{job_id}")
+def pdf_job_status(job_id: str):
+    """How far the export has come: the step it is in, the pages it has laid
+    out, and how many seconds are left at the rate it is going."""
+    job = get(job_id)
+    if job is None:
+        raise HTTPException(404, "no such pdf job")
+    return job.status()

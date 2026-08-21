@@ -22,10 +22,12 @@ Both consume the page's own artifacts -- the ``nav.toc`` markup and the
 what the rail shows on screen.
 
 Subresources (the stylesheet, fonts, facsimile images) never leave the
-process: /style.css and /fonts/* come straight from lib/assets, and every
-other URL is answered by the running app itself through the ``subresource``
-callable the route hands in (an in-process TestClient, the same idiom
-browse.py uses for static browse-page generation).
+process, and never go through HTTP: /style.css and /fonts/* come straight from
+lib/assets, and every other URL goes to the ``subresource`` callable the route
+hands in -- ``api/facsimiles.subresource``, which resolves the two facsimile
+path families to a cached PNG on disk and reads it. Anything else it refuses,
+so a renderer that starts emitting an unresolvable subresource fails loudly
+rather than printing a page with a hole in it.
 
 Rendered PDFs are cached on disk (``cache/pdfexport/``): the GDPR with TOC
 and full context lays out for some 14 s here and about four times that on

@@ -1,6 +1,6 @@
 {#- The minimal self-contained patch-editor page (api/patch.py `/edit`):
     served on demand behind the editor session, no build-time asset, no
-    site chrome. The script drives the /api/v1/patch endpoints. -#}
+    site chrome. The script drives the /internal-api/v1/patch endpoints. -#}
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,7 +34,7 @@ let base_sha="";
 const msg=document.getElementById("msg");
 function show(t,ok){msg.textContent=t;msg.className=ok?"ok":"err";}
 async function load(){
- const r=await fetch("/api/v1/patch/document?source="+encodeURIComponent(source)+
+ const r=await fetch("/internal-api/v1/patch/document?source="+encodeURIComponent(source)+
    "&basefile="+encodeURIComponent(basefile),{credentials:"same-origin"});
  if(!r.ok){show("Load failed: "+r.status+" "+await r.text(),false);return;}
  const d=await r.json(); base_sha=d.base_sha;
@@ -47,7 +47,7 @@ document.getElementById("save").onclick=async()=>{
  const body={source,basefile,edited_text:document.getElementById("text").value,
    description:document.getElementById("desc").value,
    obfuscated:document.getElementById("obfuscated").checked,base_sha};
- const r=await fetch("/api/v1/patch/save",{method:"POST",credentials:"same-origin",
+ const r=await fetch("/internal-api/v1/patch/save",{method:"POST",credentials:"same-origin",
    headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
  if(!r.ok){show("Save failed: "+r.status+" "+await r.text(),false);return;}
  const d=await r.json();

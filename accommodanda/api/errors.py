@@ -6,14 +6,16 @@ body carries it as ``error_id``, and `lagen all errors <id>` prints what was
 recorded -- so a reader's "page 404s" becomes a url, a referer and a timestamp,
 and a 500 becomes a traceback, without anyone grepping a container log.
 
-Two response shapes from one handler, chosen by path: ``/api/v1/*`` (and the
-OpenAPI routes) keep the JSON body their clients parse -- now with the id added
--- and everything else, which is the browsable site, gets HTML. Deciding on the
-path rather than on Accept is deliberate: a browser sends ``Accept: text/html``
-to the API too, and a script that curls a document url wants the same body a
-browser's tab would show.
+Two response shapes from one handler, chosen by path: ``/api/v1/*``,
+``/internal-api/v1/*`` (and the OpenAPI routes) keep the JSON body their
+clients parse -- now with the id added -- and everything else, which is the
+browsable site, gets HTML. Deciding on the path rather than on Accept is
+deliberate: a browser sends ``Accept: text/html`` to the API too, and a script
+that curls a document url wants the same body a browser's tab would show.
 
-The handlers are installed by `install`, called from api.app at import.
+The handlers are installed by `install`, called at import by both apps --
+api.app for the public one and api.internal for the internal one, which is a
+mounted sub-app and so has exception middleware of its own.
 """
 
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -35,11 +37,14 @@ from ..lib.tpl import ENV
 # storage whose failure it reports is not a ledger.
 LEDGER = config.CATALOG_ROOT / "httperrors.ndjson"
 
-# path prefixes that answer JSON rather than a page. Distinct from
+# path prefixes that answer JSON rather than a page. `/internal-api` is here
+# for the same reason `/api` is -- its callers are scripts and the site's own
+# JS, which parse `detail`, not readers who want the 404 page. Distinct from
 # analytics.API_PREFIXES, which is a different set for a different question
-# (what to *count*): the editor's routes are tracked nowhere but still answer
+# (what to *count*): the internal routes are tracked nowhere but still answer
 # JSON, and /mcp is the reverse.
-JSON_PREFIXES = ("/api", "/docs", "/redoc", "/openapi.json", "/mcp")
+JSON_PREFIXES = ("/api", "/internal-api", "/docs", "/redoc", "/openapi.json",
+                 "/mcp")
 
 _COPY = {
     404: ("Sidan finns inte",

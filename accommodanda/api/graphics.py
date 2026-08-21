@@ -7,8 +7,9 @@ text drops to a page + rectangle of the published PDF, and writes it as a
 entry out of the public render until a human approves it, so this editor is the
 step between "the model placed it" and "the reader sees it".
 
-Same posture as the rest of the write side: every route is gated by
-`auth.require_editor` (401 anonymous / 403 editing-off), same-origin only. The
+Same posture as the rest of the write side: the routes live on the internal API
+(`api/internal.py`) at `/internal-api/v1/graphics/…`, same-origin only, and each
+is gated by `auth.require_editor` (401 anonymous / 403 editing-off). The
 flow mirrors the commentary editor rather than the patch editor, because
 approving crops is *batch* work -- twenty small decisions, one commit:
 
@@ -39,7 +40,7 @@ from .auth import Editor, require_editor
 _REVIEW_PAGE = tpl.environment("accommodanda.api").get_template(
     "graphics_review.html")
 
-router = APIRouter(prefix="/api/v1/graphics", tags=["graphics"])
+router = APIRouter(prefix="/graphics", tags=["graphics"])
 
 
 class Decision(BaseModel):

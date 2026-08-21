@@ -117,7 +117,7 @@ ligger den i cachen och kommer direkt.</p>
   }
 
   function poll(id) {
-    fetch('/api/v1/pdf/jobb/' + id).then(function (r) {
+    fetch('/internal-api/v1/pdf/jobb/' + id).then(function (r) {
       if (!r.ok) throw new Error('servern svarade ' + r.status);
       return r.json();
     }).then(function (s) {
@@ -128,7 +128,7 @@ ligger den i cachen och kommer direkt.</p>
     }).catch(function (e) { fail('Kontakten med servern bröts (' + e.message + ').'); });
   }
 
-  fetch('/api/v1/pdf/jobb?path=' + encodeURIComponent(d.path)
+  fetch('/internal-api/v1/pdf/jobb?path=' + encodeURIComponent(d.path)
         + (d.toc === '1' ? '&toc=1' : '')
         + (d.kontext ? '&kontext=' + encodeURIComponent(d.kontext) : '')
         + (d.andringar === '0' ? '&andringar=0' : '')

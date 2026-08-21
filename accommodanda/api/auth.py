@@ -1,5 +1,6 @@
 """Login + session for the inline content editor (REWRITE.md §6, the write
-side of the service).
+side of the service) -- plus `same_origin`, the gate the whole internal surface
+carries.
 
 The public site and REST API are read-only; editing content is the one
 authenticated, mutating surface. Editors are a small hand-curated registry in
@@ -21,6 +22,11 @@ wholesale: ``require_editor`` answers 403 -- which also gates the ops
 dashboard (`/ops`, api/ops.py), since it rides this same editor session
 rather than a separate credential.
 
+These routes answer at ``/internal-api/v1/auth/…``; the module lives here
+rather than in `api/internal.py` because `require_editor` and `same_origin` --
+the two gates -- belong together, and `api/ops.py` imports both without
+importing the internal app.
+
 Passwords are stored only as ``pbkdf2$rounds$salt$hash`` strings (stdlib
 ``hashlib.pbkdf2_hmac``); ``python -m accommodanda.api.auth hash`` mints one to
 paste into config.yml so a plaintext password is never written down.
@@ -34,13 +40,14 @@ import os
 import sys
 import threading
 import time
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from .. import config
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 COOKIE = "lagen_editor"
 # The session cookie is HttpOnly, so page scripts can't tell whether a session
@@ -195,6 +202,50 @@ def current_editor(request: Request):
     return Editor(username, entry)
 
 
+_CROSS_ORIGIN = "this endpoint answers same-origin requests only"
+
+
+def same_origin(request: Request):
+    """Refuse a request that a browser made from another origin.
+
+    Two headers, because they fail in different directions:
+
+      * ``Sec-Fetch-Site`` is sent by every current browser and by nothing
+        else. ``same-origin`` is our own page; ``none`` is a typed address or
+        a bookmark, which is how an editor reaches `/internal-api/v1/pdf/vanta`
+        or the review pages; anything else (``cross-site``, ``same-site``) is
+        another origin driving us.
+      * ``Origin`` is sent on every POST and on cross-origin fetches, including
+        by a browser too old to send the first header. It is compared on
+        **host alone**, not on the whole origin string.
+
+    A request with neither header is not a browser -- curl, the test client,
+    the in-process client `generate` runs -- and is let through. This is a
+    same-origin gate, not authentication: `require_editor` is what decides who
+    may act, and it still gates every route that acts.
+
+    Host alone, because the scheme half of our own origin is not a fact the app
+    holds. ``request.url.scheme`` says ``https`` only when uvicorn accepted
+    ``X-Forwarded-Proto``, which it does only for a peer named in
+    ``FORWARDED_ALLOW_IPS`` -- and that variable has already been wrong on this
+    deployment once (see `app.serve`, where every request was attributed to
+    nginx's own address). In that state the browser sends
+    ``Origin: https://ferenda.lagen.nu``, the app computes ``http://…``, and
+    every editor POST, every PDF job and every ``/ops`` page answers 403 with a
+    message pointing at the browser rather than at the env var. The host
+    answers the question this gate is asking, and it answers it from the
+    request's own ``Host`` header. A scheme downgrade is not reachable past a
+    TLS-terminating proxy that redirects port 80 and sets HSTS, and it would
+    not be this gate's job to catch it if it were.
+    """
+    site = request.headers.get("sec-fetch-site")
+    if site is not None and site not in ("same-origin", "none"):
+        raise HTTPException(403, _CROSS_ORIGIN)
+    origin = request.headers.get("origin")
+    if origin is not None and urlsplit(origin).netloc != request.url.netloc:
+        raise HTTPException(403, _CROSS_ORIGIN)
+
+
 def require_editor(request: Request) -> Editor:
     """The single auth gate on every mutating endpoint. Editing off (no
     ``editor_secret``) -> 403 with a hint; anonymous/expired/unknown -> 401."""
@@ -303,7 +354,7 @@ class Me(BaseModel):
     name: str
 
 
-@router.post("/api/v1/auth/login", response_model=Me, tags=["auth"])
+@router.post("/login", response_model=Me)
 def login(body: LoginBody, request: Request, response: Response):
     """Exchange a username + password for a signed session cookie. A wrong
     username and a wrong password fail identically -- same 401, same pbkdf2 cost
@@ -344,7 +395,7 @@ def login(body: LoginBody, request: Request, response: Response):
     return Me(username=body.username, name=entry["name"])
 
 
-@router.post("/api/v1/auth/logout", tags=["auth"])
+@router.post("/logout")
 def logout(response: Response):
     """Clear the session cookie. Idempotent -- safe to call when not logged in."""
     response.delete_cookie(COOKIE, path="/")
@@ -352,7 +403,7 @@ def logout(response: Response):
     return {"ok": True}
 
 
-@router.get("/api/v1/auth/me", response_model=Me, tags=["auth"])
+@router.get("/me", response_model=Me)
 def me(editor: Editor = Depends(require_editor)):
     """Who the current session is -- the client's login check that decides
     whether to render the edit affordances."""

@@ -63,7 +63,7 @@ def webenv(tmp_path, monkeypatch):
 
 
 def _login(c):
-    return c.post("/api/v1/auth/login",
+    return c.post("/internal-api/v1/auth/login",
                   json={"username": "anna", "password": "hunter2"})
 
 
@@ -71,11 +71,11 @@ CROP = {"sfs": "2006:1574", "page": 2, "bbox": "53,46,422,389"}
 
 
 @pytest.mark.parametrize("path, params", [
-    ("/api/v1/graphics/queue", {}),
-    ("/api/v1/graphics/review", {}),
-    ("/api/v1/graphics/crop", CROP),
-    ("/api/v1/graphics/page", {"sfs": "2006:1574", "page": 2}),
-    ("/api/v1/graphics/pagesize", {"sfs": "2006:1574", "page": 2}),
+    ("/internal-api/v1/graphics/queue", {}),
+    ("/internal-api/v1/graphics/review", {}),
+    ("/internal-api/v1/graphics/crop", CROP),
+    ("/internal-api/v1/graphics/page", {"sfs": "2006:1574", "page": 2}),
+    ("/internal-api/v1/graphics/pagesize", {"sfs": "2006:1574", "page": 2}),
 ])
 def test_every_read_route_refuses_an_anonymous_caller(webenv, path, params):
     assert TestClient(api.app).get(path, params=params).status_code == 401
@@ -85,7 +85,7 @@ def test_the_mutating_route_refuses_an_anonymous_caller(webenv):
     """The route where a dropped gate would actually cost something: an
     anonymous caller writing into an editor's cart."""
     r = TestClient(api.app).post(
-        "/api/v1/graphics/cart",
+        "/internal-api/v1/graphics/cart",
         json={"ref": "2006:171", "anchor": "g-pending", "page": 2,
               "bbox": None, "verified": True, "base_sha": "x"})
     assert r.status_code == 401
@@ -94,7 +94,7 @@ def test_the_mutating_route_refuses_an_anonymous_caller(webenv):
 def test_the_queue_lists_the_unreviewed_crop(webenv):
     c = TestClient(api.app)
     _login(c)
-    pending = c.get("/api/v1/graphics/queue").json()["pending"]
+    pending = c.get("/internal-api/v1/graphics/queue").json()["pending"]
     assert [e["anchor"] for e in pending] == ["g-pending"]
     assert pending[0]["sort"] == "tabell" and pending[0]["pages"] == 7
 
@@ -103,7 +103,7 @@ def test_an_editor_sees_a_crop_the_public_is_refused(webenv):
     """The bypass this editor exists for -- and its exact limit."""
     c = TestClient(api.app)
     _login(c)
-    assert c.get("/api/v1/graphics/crop", params=CROP).status_code == 200
+    assert c.get("/internal-api/v1/graphics/crop", params=CROP).status_code == 200
     anon = TestClient(api.app)
     assert anon.get("/api/v1/sfs-graphic",
                     params={"uri": "https://lagen.nu/2006:171",
@@ -114,14 +114,14 @@ def test_an_editor_sees_a_crop_the_public_is_refused(webenv):
 def test_a_malformed_rectangle_is_a_400(webenv, bbox):
     c = TestClient(api.app)
     _login(c)
-    assert c.get("/api/v1/graphics/crop",
+    assert c.get("/internal-api/v1/graphics/crop",
                  params={**CROP, "bbox": bbox}).status_code == 400
 
 
 def test_an_unknown_gap_is_a_404(webenv):
     c = TestClient(api.app)
     _login(c)
-    r = c.post("/api/v1/graphics/cart",
+    r = c.post("/internal-api/v1/graphics/cart",
                json={"ref": "2006:171", "anchor": "g-gone", "page": 2,
                      "bbox": None, "verified": True, "base_sha": "x"})
     assert r.status_code == 404
@@ -130,12 +130,12 @@ def test_an_unknown_gap_is_a_404(webenv):
 def test_carting_a_decision_and_the_stale_check(webenv):
     c = TestClient(api.app)
     _login(c)
-    entry = c.get("/api/v1/graphics/queue").json()["pending"][0]
+    entry = c.get("/internal-api/v1/graphics/queue").json()["pending"][0]
     body = {"ref": entry["ref"], "anchor": entry["anchor"], "page": 2,
             "bbox": [60, 50, 400, 380], "verified": True,
             "base_sha": entry["base_sha"]}
-    assert c.post("/api/v1/graphics/cart", json=body).json() == {"carted": 1}
-    assert c.post("/api/v1/graphics/cart",
+    assert c.post("/internal-api/v1/graphics/cart", json=body).json() == {"carted": 1}
+    assert c.post("/internal-api/v1/graphics/cart",
                   json={**body, "base_sha": "stale"}).status_code == 409
     # carting writes to the cart store only -- the layer is untouched until commit
     assert "verified" not in json.loads(webenv.read_text())["g-pending"]

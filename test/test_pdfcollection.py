@@ -187,18 +187,18 @@ def test_manifest_rejects_two_public_aliases_for_the_same_document(client):
 
 
 def test_collection_endpoints_render_job_and_stream_result(client):
-    inspected = client.post("/api/v1/pdf/samling/inspektera",
+    inspected = client.post("/internal-api/v1/pdf/samling/inspektera",
                             json={"paths": ["/1998:1", "/1998:2"]})
     assert inspected.status_code == 200
-    started = client.post("/api/v1/pdf/samling/jobb",
+    started = client.post("/internal-api/v1/pdf/samling/jobb",
                           json=_manifest().model_dump()).json()
     deadline = time.monotonic() + 30
     while not started["klar"]:
         assert started["fel"] is None
         assert time.monotonic() < deadline
         time.sleep(.05)
-        started = client.get("/api/v1/pdf/jobb/%s" % started["id"]).json()
-    result = client.get("/api/v1/pdf/jobb/%s/resultat" % started["id"])
+        started = client.get("/internal-api/v1/pdf/jobb/%s" % started["id"]).json()
+    result = client.get("/internal-api/v1/pdf/jobb/%s/resultat" % started["id"])
     assert result.status_code == 200
     assert result.content.startswith(b"%PDF-")
     assert 'filename="Provsamling.pdf"' in result.headers["content-disposition"]
@@ -211,7 +211,7 @@ def test_collection_job_is_rejected_when_the_pdf_queue_is_full(
                           started=time.monotonic())
     pdfjob._jobs[occupied.id] = occupied
     pdfjob._by_key[occupied.key] = occupied
-    response = client.post("/api/v1/pdf/samling/jobb",
+    response = client.post("/internal-api/v1/pdf/samling/jobb",
                            json=_manifest().model_dump())
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
@@ -224,7 +224,7 @@ def test_collection_pages_are_real_reloadable_addresses(client):
     assert "Exportera samling" in page and "Importera samling" in page
     assert "recept" not in page.lower()
     assert "data-collection-wait" in client.get(
-        "/api/v1/pdf/samling/vanta").text
+        "/internal-api/v1/pdf/samling/vanta").text
 
 
 def test_bookmark_recipe_round_trips_unicode_and_document_options():

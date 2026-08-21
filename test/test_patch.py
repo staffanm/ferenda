@@ -501,19 +501,19 @@ def webenv(tmp_path, monkeypatch):
 
 
 def _login(c):
-    return c.post("/api/v1/auth/login", json={"username": "anna", "password": "hunter2"})
+    return c.post("/internal-api/v1/auth/login", json={"username": "anna", "password": "hunter2"})
 
 
 def test_web_requires_login(webenv):
     c = TestClient(api.app)
-    assert c.get("/api/v1/patch/document",
+    assert c.get("/internal-api/v1/patch/document",
                  params={"source": "sfs", "basefile": "1999:175"}).status_code == 401
 
 
 def test_web_get_document(webenv):
     c = TestClient(api.app)
     _login(c)
-    r = c.get("/api/v1/patch/document", params={"source": "sfs", "basefile": "1999:175"})
+    r = c.get("/internal-api/v1/patch/document", params={"source": "sfs", "basefile": "1999:175"})
     assert r.status_code == 200
     body = r.json()
     assert body["format"] == "plain text"
@@ -524,9 +524,9 @@ def test_web_save_commits_and_reparses(webenv):
     repo, reparsed = webenv
     c = TestClient(api.app)
     _login(c)
-    base_sha = c.get("/api/v1/patch/document",
+    base_sha = c.get("/internal-api/v1/patch/document",
                      params={"source": "sfs", "basefile": "1999:175"}).json()["base_sha"]
-    r = c.post("/api/v1/patch/save", json={
+    r = c.post("/internal-api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
         "description": "Rättad OCR", "obfuscated": False, "base_sha": base_sha})
     assert r.status_code == 200
@@ -539,9 +539,9 @@ def test_web_save_commits_and_reparses(webenv):
 def test_web_save_obfuscated(webenv):
     c = TestClient(api.app)
     _login(c)
-    base_sha = c.get("/api/v1/patch/document",
+    base_sha = c.get("/internal-api/v1/patch/document",
                      params={"source": "sfs", "basefile": "1999:175"}).json()["base_sha"]
-    r = c.post("/api/v1/patch/save", json={
+    r = c.post("/internal-api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
         "description": "", "obfuscated": True, "base_sha": base_sha})
     assert r.status_code == 200 and r.json()["path"].endswith(".rot18.patch")
@@ -551,7 +551,7 @@ def test_web_save_obfuscated(webenv):
 def test_web_save_stale_source_409(webenv):
     c = TestClient(api.app)
     _login(c)
-    r = c.post("/api/v1/patch/save", json={
+    r = c.post("/internal-api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
         "description": "", "obfuscated": False, "base_sha": "stale-sha"})
     assert r.status_code == 409
@@ -561,13 +561,13 @@ def test_web_save_noop_removes(webenv):
     repo, _ = webenv
     c = TestClient(api.app)
     _login(c)
-    doc = c.get("/api/v1/patch/document",
+    doc = c.get("/internal-api/v1/patch/document",
                 params={"source": "sfs", "basefile": "1999:175"}).json()
-    c.post("/api/v1/patch/save", json={
+    c.post("/internal-api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": EDITED,
         "description": "", "obfuscated": False, "base_sha": doc["base_sha"]})
     # editing back to the pristine text removes the patch
-    r = c.post("/api/v1/patch/save", json={
+    r = c.post("/internal-api/v1/patch/save", json={
         "source": "sfs", "basefile": "1999:175", "edited_text": ORIG,
         "description": "", "obfuscated": False, "base_sha": doc["base_sha"]})
     assert r.json()["removed"] is True
@@ -577,7 +577,7 @@ def test_web_save_noop_removes(webenv):
 def test_web_edit_page_served(webenv):
     c = TestClient(api.app)
     _login(c)
-    r = c.get("/api/v1/patch/edit", params={"source": "sfs", "basefile": "1999:175"})
+    r = c.get("/internal-api/v1/patch/edit", params={"source": "sfs", "basefile": "1999:175"})
     assert r.status_code == 200 and "text/html" in r.headers["content-type"]
     assert "intermediate format: plain text" in r.text
 
@@ -585,7 +585,7 @@ def test_web_edit_page_served(webenv):
 def test_web_disabled_without_secret(webenv, monkeypatch):
     monkeypatch.setattr(config, "EDITOR_SECRET", None)
     c = TestClient(api.app)
-    assert c.get("/api/v1/patch/document",
+    assert c.get("/internal-api/v1/patch/document",
                  params={"source": "sfs", "basefile": "1999:175"}).status_code == 403
 
 
@@ -644,8 +644,8 @@ def test_the_patch_editor_writes_nothing_outside_the_patch_tree(webenv):
     _login(c)
     escaping = {"source": "sfs", "basefile": "../../accommodanda/config"}
     # the load looks for an existing patch first, and that lookup is the refusal
-    assert c.get("/api/v1/patch/document", params=escaping).status_code == 404
-    r = c.post("/api/v1/patch/save",
+    assert c.get("/internal-api/v1/patch/document", params=escaping).status_code == 404
+    r = c.post("/internal-api/v1/patch/save",
                json={**escaping, "edited_text": EDITED, "description": "",
                      "obfuscated": False, "base_sha": "0" * 64})
     assert r.status_code == 404

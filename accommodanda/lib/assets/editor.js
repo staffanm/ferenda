@@ -8,10 +8,15 @@
    render_document / the site renderer, attaches an ✎ button to each editable
    node (a §/article for commentary, or the whole body for a concept/
    editorial page), and drives the cart + checkout against the same-origin
-   /api/v1/edit/* routes. */
+   /internal-api/v1/edit/* routes.
+
+   Two bases, because the editor spans both halves of the service: INTERNAL is
+   the site's own surface (login, the editors), PUBLIC is the read API it uses
+   for the link-target search box. */
 (function () {
   var meta = document.querySelector('meta[name="lagen-doc"]');
-  var API = '/api/v1';
+  var INTERNAL = '/internal-api/v1';
+  var PUBLIC = '/api/v1';
   var KIND = meta && meta.dataset.kind;
   var REF = meta && meta.dataset.ref;
   var SOURCE = meta && meta.dataset.source;      // patch identity (if patchable)
@@ -42,7 +47,7 @@
     if (me) { refreshCart(); enableEditing(); }
   }
   if (/(?:^|;\s*)lagen_editor_hint=/.test(document.cookie)) {
-    j(API + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
+    j(INTERNAL + '/auth/me').then(function (r) { return r.ok ? r.json() : null; })
       .then(function (u) {
         if (!u) document.cookie = 'lagen_editor_hint=; Max-Age=0; path=/';
         boot(u);
@@ -86,7 +91,7 @@
 
   function logout(e) {
     if (e) e.preventDefault();
-    j(API + '/auth/logout', { method: 'POST' }).then(function () { location.reload(); });
+    j(INTERNAL + '/auth/logout', { method: 'POST' }).then(function () { location.reload(); });
   }
 
   // ---- attaching edit buttons -------------------------------------------
@@ -108,7 +113,7 @@
     b.title = 'Rätta eller avidentifiera källtexten för detta dokument';
     b.addEventListener('click', function (e) {
       e.preventDefault();
-      window.open(API + '/patch/edit?source=' + encodeURIComponent(SOURCE) +
+      window.open(INTERNAL + '/patch/edit?source=' + encodeURIComponent(SOURCE) +
                   '&basefile=' + encodeURIComponent(BASEFILE), '_blank');
     });
     after.after(b);
@@ -133,7 +138,7 @@
 
   // ---- the inline editor ------------------------------------------------
   function openEditor(anchor) {
-    var q = API + '/edit/region?kind=' + encodeURIComponent(KIND) + '&ref=' + encodeURIComponent(REF) +
+    var q = INTERNAL + '/edit/region?kind=' + encodeURIComponent(KIND) + '&ref=' + encodeURIComponent(REF) +
             (anchor ? '&anchor=' + encodeURIComponent(anchor) : '');
     j(q).then(function (r) { return r.json(); }).then(function (v) { editorPanel(anchor, v.markdown); });
   }
@@ -158,7 +163,7 @@
     p.appendChild(row);
     row.querySelector('.ed-cancel').addEventListener('click', function () { ov.remove(); });
     row.querySelector('.ed-save').addEventListener('click', function () {
-      j(API + '/edit/region', { method: 'POST', body: { kind: KIND, ref: REF, anchor: anchor, new_text: ta.value } })
+      j(INTERNAL + '/edit/region', { method: 'POST', body: { kind: KIND, ref: REF, anchor: anchor, new_text: ta.value } })
         .then(function (r) {
           if (!r.ok) return r.json().then(function (d) { alert('Kunde inte spara: ' + (d.detail || r.status)); });
           return r.json().then(function (d) { setCart(d.cart); ov.remove(); });
@@ -175,7 +180,7 @@
       clearTimeout(timer);
       timer = setTimeout(function () {
         var q = inp.value.trim(); if (!q) { ul.innerHTML = ''; return; }
-        j(API + '/search?q=' + encodeURIComponent(q) + '&source=' + src + '&limit=6')
+        j(PUBLIC + '/search?q=' + encodeURIComponent(q) + '&source=' + src + '&limit=6')
           .then(function (r) { return r.json(); }).then(function (res) {
             ul.innerHTML = '';
             (res.results || []).forEach(function (hit) {
@@ -213,9 +218,9 @@
     badgeEl.parentNode.title = accountLabel(n);
     badgeEl.parentNode.setAttribute('aria-label', badgeEl.parentNode.title);
   }
-  function refreshCart() { j(API + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { setCart((d.drafts || []).length); }); }
+  function refreshCart() { j(INTERNAL + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { setCart((d.drafts || []).length); }); }
 
-  function checkout() { j(API + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { checkoutPanel(d.drafts || []); }); }
+  function checkout() { j(INTERNAL + '/edit/cart').then(function (r) { return r.json(); }).then(function (d) { checkoutPanel(d.drafts || []); }); }
 
   function checkoutPanel(drafts) {
     var ov = overlay(), p = el('div', 'ed-panel'); ov.appendChild(p);
@@ -226,7 +231,7 @@
       var li = el('li', null, '<span>' + esc(label(dr.kind, dr.ref, dr.anchor)) + '</span>');
       var x = el('button', 'ed-rm', 'Ta bort');
       x.addEventListener('click', function () {
-        j(API + '/edit/discard', { method: 'POST', body: { key: dr.key } })
+        j(INTERNAL + '/edit/discard', { method: 'POST', body: { key: dr.key } })
           .then(function (r) { return r.json(); })
           .then(function (res) { setCart(res.cart); ov.remove(); if (res.cart > 0) checkout(); });
       });
@@ -246,7 +251,7 @@
     commitBtn.addEventListener('click', function () {
       var msg = ta.value.trim(); if (!msg) { ta.focus(); return; }
       commitBtn.disabled = true; commitBtn.textContent = 'Sparar…';
-      j(API + '/edit/commit', { method: 'POST', body: { message: msg } }).then(function (r) {
+      j(INTERNAL + '/edit/commit', { method: 'POST', body: { message: msg } }).then(function (r) {
         if (r.ok) return r.json().then(function () { setCart(0); location.reload(); });
         return r.json().then(function (d) {
           var detail = d.detail;
@@ -302,7 +307,7 @@
       return 'Inloggningen misslyckades (fel ' + r.status + ').';
     }
     function submit() {
-      j(API + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
+      j(INTERNAL + '/auth/login', { method: 'POST', body: { username: u.value, password: pw.value } })
         // '/ops', not '/ops/': the dashboard is registered at the exact path, and
         // the static site mounted at '/' matches the trailing-slash form before
         // Starlette's redirect_slashes can fire (see api/app.py), so logging in
