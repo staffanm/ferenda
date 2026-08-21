@@ -94,7 +94,7 @@ _DV_VARIANTS = (("dom", "Domar"), ("referat", "Referat"), ("notis", "Notiser"))
 def _dv_listing(docs):
     """A court+year bucket's cases, grouped Domar / Referat / Notiser (headed only
     when more than one form is present). Referat and Notiser keep their referat-
-    number order (facets._dv_doc_sort); bare Domar are re-sorted by avgörandedatum,
+    number order (facets._id_doc_sort); bare Domar are re-sorted by avgörandedatum,
     newest first (R2)."""
     groups = {k: [] for k, _ in _DV_VARIANTS}
     for d in docs:

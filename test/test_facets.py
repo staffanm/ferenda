@@ -50,7 +50,7 @@ def test_dv_cases_sort_by_referat_number_not_popular_name():
     early = row(U + "dom/nja/2019s5", label="NJA 2019 s. 5", title="Zebran")
     late = row(U + "dom/nja/2019s1021", label="NJA 2019 s. 1021",
                title="Apan")
-    assert sorted([late, early], key=facets._dv_doc_sort) == [early, late]
+    assert sorted([late, early], key=facets._id_doc_sort) == [early, late]
 
 
 def test_eu_only_latest_corrected_revision_lists():
@@ -228,6 +228,78 @@ def test_documents_naturally_ordered_within_bucket(tmp_path):
     bucket = facets.group(con, "dv")[("nja", "2024")]
     assert [r.label for r in bucket] == [
         "NJA 2024 s. 2", "NJA 2024 s. 9", "NJA 2024 s. 10"]
+
+
+def _dir(tmp_path, name):
+    (tmp_path / name).mkdir()
+    return tmp_path / name
+
+
+def test_numbered_series_list_by_number_not_by_subject(tmp_path):
+    """A bucket of a numbered series is scanned by its numbers, so it lists by
+    the identifier the entry prints, naturally ordered -- :2 before :11.
+    Förarbeten, föreskrifter, ställningstaganden, myndighetsavgöranden and EDPB
+    guidance listed alphabetically by subject instead, which put Prop.
+    2025/26:207 ("Aktivitetskrav…") at the head of the bucket and Prop.
+    2025/26:2 nowhere near it."""
+    con = _catalog(tmp_path, [
+        (U + "prop/2025/26:11", "forarbete", "prop", "Prop. 2025/26:11", "Anonyma vittnen"),
+        (U + "prop/2025/26:2", "forarbete", "prop", "Prop. 2025/26:2", "Öppna data"),
+        (U + "prop/2025/26:107", "forarbete", "prop", "Prop. 2025/26:107", "Bolag och brott"),
+    ])
+    assert [r.label for r in facets.group(con, "forarbete")[("prop", "2025")]] \
+        == ["Prop. 2025/26:2", "Prop. 2025/26:11", "Prop. 2025/26:107"]
+
+    con = _catalog(_dir(tmp_path, "fs"), [
+        (U + "affs/2025:2", "foreskrift", "affs", "AFFS 2025:2", "Statsbidrag"),
+        (U + "affs/2025:1", "foreskrift", "affs", "AFFS 2025:1", "Uppgiftsskyldighet"),
+    ])
+    assert [r.label for r in facets.group(con, "foreskrift")[("AFFS", "2025")]] \
+        == ["AFFS 2025:1", "AFFS 2025:2"]
+
+    con = _catalog(_dir(tmp_path, "rs"), [
+        (U + "rs/skv/8-2895-2025", "rs", "skv",
+         "Skatteverkets ställningstagande dnr 8-2895-2025", "Avdrag för ränta"),
+        (U + "rs/skv/8-441-2025", "rs", "skv",
+         "Skatteverkets ställningstagande dnr 8-441-2025", "Alkoholskatt"),
+    ])
+    assert [r.label for r in facets.group(con, "rs")[("skv", "2025")]] \
+        == ["Skatteverkets ställningstagande dnr 8-441-2025",
+            "Skatteverkets ställningstagande dnr 8-2895-2025"]
+
+    con = _catalog(_dir(tmp_path, "avg"), [
+        (U + "avg/arn/1991-5452", "avg", "arn", "ARN 1991-5452", "Övrigt"),
+        (U + "avg/arn/1991-4398", "avg", "arn", "ARN 1991-4398", "Резание"),
+    ])
+    assert [r.label for r in facets.group(con, "avg")[("arn", "1991")]] \
+        == ["ARN 1991-4398", "ARN 1991-5452"]
+
+    # an EDPB title carries the digits of the act it interprets, and the subject
+    # order sorted on those: "Riktlinjer 3/2018" about förordning (EU) 2016/679
+    # sorted on 1679, landing between 2/2019 and 1/2019
+    con = _catalog(_dir(tmp_path, "edpb"), [
+        (U + "edpb/riktlinjer/2-2019", "edpb", "riktlinjer", "Riktlinjer 2/2019",
+         "Riktlinjer 2/2019 om artikel 6.1 b i förordning (EU) 2016/679"),
+        (U + "edpb/riktlinjer/1-2019", "edpb", "riktlinjer", "Riktlinjer 1/2019",
+         "Riktlinjer 1/2019 om uppförandekoder"),
+    ])
+    assert [r.label for r in facets.group(con, "edpb")[("riktlinjer", "2019")]] \
+        == ["Riktlinjer 1/2019", "Riktlinjer 2/2019"]
+
+
+def test_a_subject_bucket_still_lists_by_subject(tmp_path):
+    """The counterpart: sfs and begrepp file under a subject initial, so the
+    subject -- not the SFS number -- is what orders the bucket."""
+    con = _catalog(tmp_path, [
+        (U + "2008:1302", "sfs", "lag", "2008:1302",
+         "Lag (2008:1302) om avtal mellan Sverige och Isle of Man"),
+        (U + "1949:105", "sfs", "lag", "1949:105", "Tryckfrihetsförordning (1949:105)"),
+        (U + "2018:1197", "sfs", "lag", "2018:1197",
+         "Lag (2018:1197) om Förenta nationernas konvention om barnets rättigheter"),
+    ])
+    buckets = facets.group(con, "sfs")
+    assert [r.label for r in buckets[("A",)]] == ["2008:1302"]
+    assert [r.label for r in buckets[("F",)]] == ["2018:1197"]
 
 
 def test_browse_view_attaches_leaf_documents(tmp_path):

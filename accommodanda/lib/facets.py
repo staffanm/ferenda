@@ -883,9 +883,18 @@ def group(con, source):
     buckets = {}
     for row in _rows(con, source):
         buckets.setdefault(_path(levels, row), []).append(row)
-    # cases sort by their referat identity (NJA/HFD number), not the popular
-    # name -- the bucket is one court+year, so the number orders the list (R3)
-    sort_key = {"dv": _dv_doc_sort, "eurlex": _eu_doc_sort}.get(source, _doc_sort)
+    # a document of a numbered series sorts by that number, not by its subject:
+    # the bucket is already one court+year, one samling+year or one agency+year,
+    # so the number is what a reader scans (R3). `_doc_sort` -- the subject order
+    # -- is for the sources whose buckets are subject buckets (sfs, begrepp) and
+    # for those whose documents are known by name rather than by number (a hudoc
+    # case, a treaty). Sorting a numbered series by subject read as random and
+    # sometimes was: `_sfs_sortname` finds the digits in an EDPB title, so
+    # "Riktlinjer 3/2018" about förordning (EU) 2016/679 sorted on 1679
+    sort_key = {"dv": _id_doc_sort, "forarbete": _id_doc_sort,
+                "foreskrift": _id_doc_sort, "rs": _id_doc_sort,
+                "avg": _id_doc_sort, "edpb": _id_doc_sort,
+                "eurlex": _eu_doc_sort}.get(source, _doc_sort)
     for rows in buckets.values():
         rows.sort(key=sort_key)
     return buckets
@@ -899,9 +908,14 @@ def _natural(s):
 
 
 def _doc_sort(row):
-    """Within a leaf bucket: laws and concepts read alphabetically by subject;
-    everything else by its identifier, naturally ordered (the bucket is already
-    one year/court, so the number is what distinguishes the entries)."""
+    """The subject order: laws and concepts read alphabetically by what they are
+    about, which is also how their buckets are keyed (initial letter). It is the
+    default, so it also carries the sources whose documents are known by name
+    rather than by number -- a hudoc case, a treaty.
+
+    It is *not* the identifier order: `_sfs_sortname` reads the title, so a
+    document whose title carries digits sorts by those digits. Use
+    `_id_doc_sort` for a numbered series."""
     primary = _sfs_sortname(row.title or "").lower() or row.label or row.local
     return (_natural(primary), _natural(row.local))
 
@@ -916,12 +930,16 @@ def _eu_doc_sort(row):
     return _doc_sort(row)
 
 
-def _dv_doc_sort(row):
-    """Within a court+year bucket, order cases by their referat identity
-    ('NJA 2019 s. 1021', 'HFD 2011 ref. 4') so a reader scans by number, not by
-    the editor's popular name (R3). short_id is the bare referat (never name-
-    prefixed); natural order puts s. 5 before s. 1021; the uri breaks ties for raw
-    avgöranden that share a bare id. (Raw domar are re-sorted by date at render.)"""
+def _id_doc_sort(row):
+    """Within a leaf bucket, order documents by the identifier the listing
+    prints -- 'NJA 2019 s. 1021', 'Prop. 2025/26:42', 'AFFS 2025:1' -- so a
+    reader scans by number, not by the editor's popular name or the document's
+    subject (R3). It is the same string `_browse_doc` puts in the `<dt>`.
+
+    Natural order throughout, so `:2` precedes `:11` and `s. 5` precedes
+    `s. 1021`; the uri breaks ties for raw avgöranden that share a bare id.
+    (Raw domar are re-sorted by date at render -- a målnummer is a docket
+    sequence, not an editorial number.)"""
     return (_natural(row.short_id or row.label or row.local), _natural(row.local))
 
 
