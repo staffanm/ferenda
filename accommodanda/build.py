@@ -3142,6 +3142,16 @@ def guidance_harvest(scopes):
     return _sum_scope_totals(totals)
 
 
+def _guidance_scope_label(scope):
+    """What one download scope covers, for the source's help: the series where
+    the scope names one, and the issuing body where one walk covers all of that
+    body's series."""
+    utgivare, _, serie = scope.partition("/")
+    issuer = guidance_issuers.BY_KOD[utgivare]
+    return guidance_issuers.BY_SERIE[(utgivare, serie)].label if serie \
+        else issuer.namn
+
+
 # No per-document download stage (the foreskrift/avg/rs rule): the guidance
 # arrives only through the bulk `guidance_harvest` sweep.
 SOURCES["guidance"] = Source("guidance", guidance_list, {
@@ -3154,10 +3164,11 @@ SOURCES["guidance"] = Source("guidance", guidance_list, {
     scopes=frozenset(guidance_download.SCOPES),
     notes="download flag: --only utgivare/serie/nummer (fetch one; needs its "
           "scope)\n"
-          "scopes are <utgivare>/<serie>: " + ", ".join(
-              "%s/%s (%s)" % (i.kod, s.kod, s.label)
-              for i in guidance_issuers.REGISTRY for s in i.series
-              if "%s/%s" % (i.kod, s.kod) in guidance_download.SCOPES)
+          "a scope is one upstream walk, not one series: a bare utgivare "
+          "where one walk covers all of that body's series, <utgivare>/<serie> "
+          "where the series come off different upstreams -- " + ", ".join(
+              "%s (%s)" % (scope, _guidance_scope_label(scope))
+              for scope in guidance_download.SCOPES)
           + "; empty = all\n"
           "identity is the issuing body's own number, never a CELEX -- 122 "
           "förarbeten cite an ECB-yttrande as CON/2013/82 and none as "

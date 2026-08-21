@@ -80,6 +80,7 @@ from ..lib.util import (
     match_fold,
     normalize_space,
     record_path,
+    shouted,
 )
 from . import (
     acer_download,
@@ -599,6 +600,140 @@ def _edpb_fields(serie, record, paras):
 RE_EBA_COVER = re.compile(r"EBA/(?:GL|REC)/(\d{4})/(\d+)")
 
 
+# --------------------------------------------------------------------------
+# the EBA's Swedish title, which lives only on the document's own cover
+# --------------------------------------------------------------------------
+# 72 of the EBA's 80 documents *are* Swedish text, but everything the harvest
+# can read names them in English: the leaf page's <h1>, the link, and the file
+# name (which marks the language with an "_SV" suffix and nothing else). The
+# Swedish name is printed on the cover of the same PDF the body is read from.
+# That matters beyond tidiness -- the corpus cites this material by title far
+# more often than by number (285 title citations against 73 number ones for the
+# EBA), so an English title is what stops those citations resolving.
+#
+# The cover sets, in some order: a shouted running head, the number and date,
+# the EBA's distribution mark, and the title in sentence case. The title is the
+# first sentence-case paragraph carrying a vägledningsord, with the furniture
+# taken off its ends -- never its middle, since an amending riktlinje names the
+# riktlinje it amends by number inside its own title.
+RE_VAGLEDNINGSORD = re.compile(
+    r"riktlinjer(?:na)?|riktlinje|rekommendation(?:er)?(?:na)?", re.I)
+# what the cover prints beside the title and the title is not: the number, the
+# date in either spelling, the EBA's own distribution mark, and a version note
+RE_EBA_FURNITURE = re.compile(
+    r"EBA/(?:GL|REC)/\d{4}/\d+|ESMA\d[\w-]*"
+    r"|\b\d{1,2}\s+(?:januari|februari|mars|april|maj|juni|juli|augusti"
+    r"|september|oktober|november|december)\s+(?:19|20)\d{2}"
+    r"|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b|\b(?:19|20)\d{2}-\d{2}-\d{2}\b"
+    r"|EBA (?:Public|Regular Use)|\(konsoliderad version\)", re.I)
+# "Slutrapport om riktlinjer för X" -- the EBA publishes a riktlinje inside a
+# final report and the report's wrapper is not part of the riktlinje's name
+RE_EBA_RAPPORT = re.compile(
+    r"^(?:Slutlig\s+rapport|Slutrapport)\s*[–-]?\s*(?:om\s+)?", re.I)
+# what a consolidated cover prints before the title: EUR-Lex's own change
+# markers, set in a symbol font (a private-use glyph) and followed by the
+# marker's letter code -- "\uf0daO Riktlinjer", "\uf0d8A1 EBA/GL/2023/02".
+# Dropping the glyph alone left the bare "O" opening the title.
+RE_EBA_COVER_LEAD = re.compile(r"^(?:[\uE000-\uF8FF][A-Z]\d?|[^\w(])+\s*")
+RE_EBA_BODY = re.compile(
+    r"^(?:[A-D]\.\s*|\d+\.?\s+)?(?:Efterlevnad|Riktlinjernas status"
+    r"|Rekommendationernas status|Innehåll|Contents)", re.I)
+COVER_LINES = 12
+# a title set across two paragraphs continues in one opening with a preposition
+RE_EBA_FORTSATTNING = re.compile(
+    r"(?:för|om|enligt|avseende|gällande|till|på|i)\s", re.I)
+# an unfilled template the EBA left in the document
+RE_EBA_MALL = re.compile(r"20XX|ÅÅÅÅ|XX/XX|DD\s+månad", re.I)
+# the riktlinje a cover title says it amends. A document cannot amend itself,
+# so this naming the record's *own* number proves the PDF behind that leaf is
+# the amending riktlinje rather than the document filed there.
+RE_EBA_ANDRING = re.compile(
+    r"om\s+ändring\s+av\s+(?:riktlinjerna|rekommendationerna)\s+"
+    r"EBA/(?:GL|REC)/(\d{4})/(\d+)", re.I)
+# shorter than this the cover printed a lead word, not a title
+TITEL_MIN = 25
+
+
+def _clean(para):
+    """One cover paragraph with the furniture beside the title removed.
+
+    Only at the ends: an amending riktlinje names the riktlinje it amends by
+    number in the middle of its own title ("Riktlinjer om ändring av
+    riktlinjerna EBA/GL/2016/07 för tillämpningen av..."), and that number is
+    part of what the document is called."""
+    text = RE_EBA_COVER_LEAD.sub("", normalize_space(para or ""))
+    while True:
+        head = RE_EBA_FURNITURE.match(text)
+        if head:
+            text = text[head.end():].strip()
+            continue
+        tail = None
+        for m in RE_EBA_FURNITURE.finditer(text):
+            if m.end() == len(text.rstrip()):
+                tail = m
+        if not tail:
+            return normalize_space(text)
+        text = text[:tail.start()].strip()
+
+
+def eba_cover_title(paras):
+    raw = [RE_EBA_COVER_LEAD.sub("", normalize_space(p.text or "")) for p in paras[:COVER_LINES]]
+    clean = [_clean(text) for text in raw]
+    for i, text in enumerate(clean):
+        if RE_EBA_BODY.match(text):
+            break
+        ord_ = RE_VAGLEDNINGSORD.search(text)
+        if not text or shouted(text) or ord_ is None:
+            continue
+        title = raw[i]
+        # the EBA sets a long title as its lead word alone over the rest
+        oavslutad = ord_.end() == len(text)
+        for j in range(i + 1, len(raw)):
+            if not clean[j] or shouted(clean[j]) or RE_EBA_BODY.match(clean[j]):
+                break
+            if oavslutad and RE_VAGLEDNINGSORD.match(clean[j]):
+                title = raw[j]          # the lead word repeated, not continued
+            elif oavslutad or RE_EBA_FORTSATTNING.match(clean[j]):
+                title = "%s %s" % (title, raw[j])
+            else:
+                break
+            oavslutad = False
+        title = RE_EBA_RAPPORT.sub("", _clean(title))
+        if len(title) < TITEL_MIN or RE_EBA_MALL.search(title):
+            continue
+        return title[:1].upper() + title[1:]
+    return None
+
+
+def eba_titel(record, paras):
+    """The document's title: its Swedish name off the cover where the document
+    is Swedish, and the record's own English name otherwise.
+
+    Two documents' worth of care. An English document's record title is already
+    in its own language, so the cover adds nothing. And a Swedish cover whose
+    title says it amends *this document's own number* is not this document's
+    title at all: nothing amends itself, so the PDF behind that leaf is the
+    amending riktlinje, which the EBA files behind the amended riktlinje's page.
+    Five documents are in that state (eba/gl/2015-12, 2018-01, 2018-05, 2018-10
+    and 2020-14). Taking the cover title there would leave the artifact saying
+    it is the amendment while its own identifier says it is the amended act --
+    so the record's title stands, and `KNOWN-GAPS.md` records the harvest
+    defect underneath it."""
+    if record["sprak"] != "sv":
+        return record["titel"]
+    titel = eba_cover_title(paras)
+    # 72 of the 72 Swedish documents state a title here. None means the EBA
+    # changed its cover template, which is a parser change and not something to
+    # ship an English title over in silence (rule:fail-fast).
+    assert titel, ("the cover of %s prints no Swedish title"
+                   % record["basefile"])
+    ar, lopnummer = record["nummer"].split("/")
+    amends = RE_EBA_ANDRING.search(titel)
+    if amends and (amends.group(1), int(amends.group(2))) == (ar, int(lopnummer)):
+        return record["titel"]
+    return titel
+
+
 def _eba_fields(serie, record, paras):
     """What an EBA document's cover adds to its record: the check that it is the
     right document.
@@ -611,8 +746,9 @@ def _eba_fields(serie, record, paras):
     WP29 document: a file that ever changes behind its URL fails the parse
     rather than being filed under an identity that is not its.
 
-    The title still comes from the record, and `KNOWN-GAPS.md` says why that is
-    wrong for the Swedish documents."""
+    The Swedish title comes from that same cover (`eba_cover_title`): the
+    record's is the English one, which is what the EBA's leaf page, link and
+    file name all carry even for a document that is Swedish throughout."""
     del serie
     cover = " ".join(p.text for p in paras[:8] if p.text)
     printed = {"%s/%s" % (year, int(serial))
@@ -627,7 +763,7 @@ def _eba_fields(serie, record, paras):
     assert "%s/%s" % (year, int(serial)) in printed, (
         "%s is filed as %s but its cover prints %s"
         % (record["basefile"], record["nummer"], ", ".join(sorted(printed))))
-    return {"titel": record["titel"], "antagen": record["antagen"],
+    return {"titel": eba_titel(record, paras), "antagen": record["antagen"],
             "revision": None, "citation": None}
 
 

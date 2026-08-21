@@ -381,8 +381,8 @@ def test_patchsource_intermediate_sfs(monkeypatch, tmp_path):
 def test_patchsource_lists_all_wired_sources():
     # sfs/dv/eurlex (text) + the pdftohtml-XML PDF sources + avg (mixed)
     assert patchsource.patchable_sources() == [
-        "avg", "dv", "edpb", "eurlex", "forarbete", "foreskrift", "remisser",
-        "rs", "sfs"]
+        "avg", "dv", "eurlex", "forarbete", "foreskrift", "guidance",
+        "remisser", "rs", "sfs"]
 
 
 def test_patchsource_rejects_non_patchable_source():

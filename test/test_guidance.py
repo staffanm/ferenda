@@ -24,6 +24,7 @@ from accommodanda.guidance import (
     eurlex_download,
 )
 from accommodanda.guidance import download as guidance_download
+from accommodanda.guidance import issuers as guidance_issuers
 from accommodanda.guidance import parse as edpb_parse
 from accommodanda.guidance import render as guidance_render
 from accommodanda.guidance.edpb_data import HBDI, WP29, WP29_BY_SLUG
@@ -43,6 +44,7 @@ from accommodanda.guidance.model import (
     vagledning_uri,
 )
 from accommodanda.lib import formex as lib_formex
+from accommodanda.lib import lagrum
 
 # the EDPB's series data now lives on its registry entry, and its numbering
 # rule takes the component order as an argument (the EBA writes the year first)
@@ -1630,3 +1632,162 @@ def test_ecb_classification_mark_is_front_matter():
         assert edpb_parse.RE_FRONT_MATTER.match(line), line
     assert not edpb_parse.RE_FRONT_MATTER.match(
         "ECB-PUBLIC is not what this paragraph says")
+
+
+# --------------------------------------------------------------------------
+# the EBA's Swedish title, read off the document's own cover
+# --------------------------------------------------------------------------
+# The covers below are the recorded paragraph streams of the real PDFs, so the
+# tests assert against what the extraction actually yields -- "LGDskattning"
+# without its hyphen, the consolidation glyph, the unfilled template.
+
+def _eba_cover(*lines):
+    return [Para(text=line, size=17) for line in lines]
+
+
+def test_eba_cover_title_is_read_past_the_shouted_running_head():
+    """The cover sets the title twice: once shouted as a running head and once
+    in sentence case. Only the second is the document's name."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "RIKTLINJER FÖR PD-SKATTNING, LGD-SKATTNING OCH HANTERING AV FALLERADE"
+        " EXPONERINGAR",
+        "EBA/GL/2017/16 23/04/2018",
+        "Riktlinjer för PD-skattning, LGDskattning och hantering av fallerade"
+        " exponeringar",
+    )) == ("Riktlinjer för PD-skattning, LGDskattning och hantering av "
+           "fallerade exponeringar")
+
+
+def test_eba_cover_title_joins_a_title_split_over_two_paragraphs():
+    """The EBA sets a long title as its lead word alone over the rest."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "EBA/GL/2024/06 6 juni 2024",
+        "Riktlinjer",
+        "för minimiinnehållet i styrningsarrangemangen för utgivare av "
+        "tillgångsanknutna token",
+    )) == ("Riktlinjer för minimiinnehållet i styrningsarrangemangen för "
+           "utgivare av tillgångsanknutna token")
+
+
+def test_eba_cover_title_keeps_the_number_an_amending_title_names():
+    """An amending riktlinje names the riktlinje it amends by number inside its
+    own title, so the furniture comes off the ends and never the middle."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "SLUTRAPPORT OM RIKTLINJER OM ÄNDRING AV RIKTLINJERNA FÖR BEDÖMNING AV"
+        " SEKRETESSORDNINGARS LIKVÄRDIGHET EBA/GL/2025/05 4 november 2025",
+        "Riktlinjer",
+        "om ändring av riktlinjerna EBA/GL/2022/04 för bedömning av "
+        "sekretessordningars likvärdighet",
+    )) == ("Riktlinjer om ändring av riktlinjerna EBA/GL/2022/04 för bedömning"
+           " av sekretessordningars likvärdighet")
+
+
+def test_eba_cover_title_skips_an_unfilled_template():
+    """eba/gl/2018-05 ships with the EBA's own placeholder still in it; the
+    real title stands further down the same cover."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "Riktlinjer",
+        "EBA/GL/20XX/XX DD månad ÅÅÅÅ Riktlinjernas nummer ska anges av COMMS",
+        "Riktlinjer om ändring av riktlinjerna EBA/GL/2018/05",
+        "För rapportering av statistiska uppgifter om bedrägeri enligt andra "
+        "betaltjänstdirektivet",
+    )) == ("Riktlinjer om ändring av riktlinjerna EBA/GL/2018/05 För "
+           "rapportering av statistiska uppgifter om bedrägeri enligt andra "
+           "betaltjänstdirektivet")
+
+
+def test_eba_cover_title_does_not_double_a_repeated_lead_word():
+    """eba/gl/2017-05 sets the lead word twice, once alone and once opening the
+    title itself."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "RIKTLINJER OM IKT-RISKBEDÖMNING ENLIGT ÖUP EBA/GL/2017/05 11/09/2017",
+        "Riktlinjer",
+        "Riktlinjer om IKT-riskbedömning inom ramen för översyns- och "
+        "utvärderingsprocessen (ÖUP)",
+    )) == ("Riktlinjer om IKT-riskbedömning inom ramen för översyns- och "
+           "utvärderingsprocessen (ÖUP)")
+
+
+def test_eba_cover_title_drops_a_consolidation_marker():
+    """A consolidated cover prints EUR-Lex's own change markers before the
+    title, set in a symbol font: a private-use glyph and the marker's letter
+    code. eba/gl/2021-17 opens "\uf0daO Riktlinjer", and dropping the glyph
+    alone left the bare "O" standing at the head of the title."""
+    assert edpb_parse.eba_cover_title(_eba_cover(
+        "EBA:S RIKTLINJER FÖR AVGRÄNSNING OCH RAPPORTERING AV TILLGÄNGLIGA "
+        "FINANSIELLA MEDEL I INSÄTTNINGSGARANTISYSTEM",
+        "EBA/GL/2021/17 (konsoliderad version) 17 december 2021",
+        "\uf0daO Riktlinjer",
+        "för avgränsning och rapportering av tillgängliga finansiella medel i "
+        "insättningsgarantisystem",
+    )) == ("Riktlinjer för avgränsning och rapportering av tillgängliga "
+           "finansiella medel i insättningsgarantisystem")
+
+
+# --------------------------------------------------------------------------
+# which of the two titles an EBA artifact carries
+# --------------------------------------------------------------------------
+
+def test_eba_english_document_keeps_its_record_title():
+    """Eight of the 80 are English throughout; the record's title is already in
+    their own language and the cover adds nothing."""
+    record = {"basefile": "eba/gl/2018-09", "sprak": "en", "nummer": "2018/09",
+              "titel": "Guidelines on the STS criteria for non-ABCP "
+                       "securitisation"}
+    assert edpb_parse.eba_titel(record, _eba_cover("Final Report")) == \
+        record["titel"]
+
+
+def test_eba_refuses_a_cover_title_naming_this_documents_own_number():
+    """Nothing amends itself. The EBA files an amending riktlinje behind the
+    amended riktlinje's leaf page, so the PDF at eba/gl/2018-10 is
+    EBA/GL/2022/13 and its cover title names EBA/GL/2018/10 as the act it
+    amends. Taking that title would leave the artifact saying it is the
+    amendment while its own identifier says it is the amended act. Five
+    documents are in this state."""
+    record = {"basefile": "eba/gl/2018-10", "sprak": "sv", "nummer": "2018/10",
+              "titel": "Guidelines on disclosure of non-performing and "
+                       "forborne exposures"}
+    cover = _eba_cover(
+        "RIKTLINJER OM ÄNDRING AV RIKTLINJERNA EBA/GL/2018/10",
+        "EBA Public",
+        "EBA/GL/2022/13 12 oktober 2022",
+        "Riktlinjer",
+        "om ändring av riktlinjerna EBA/GL/2018/10 om offentliggörande av "
+        "nödlidande exponeringar och exponeringar med anstånd")
+    assert edpb_parse.eba_titel(record, cover) == record["titel"]
+
+
+def test_eba_keeps_an_amending_title_that_names_another_document():
+    """The same shape is the *right* title when the number it amends is not
+    this document's own: eba/gl/2025-05 really does amend EBA/GL/2022/04."""
+    record = {"basefile": "eba/gl/2025-05", "sprak": "sv", "nummer": "2025/05",
+              "titel": "Guidelines amending the guidelines on equivalence of "
+                       "confidentiality regimes"}
+    cover = _eba_cover(
+        "Riktlinjer",
+        "om ändring av riktlinjerna EBA/GL/2022/04 för bedömning av "
+        "sekretessordningars likvärdighet")
+    assert edpb_parse.eba_titel(record, cover) == (
+        "Riktlinjer om ändring av riktlinjerna EBA/GL/2022/04 för bedömning av"
+        " sekretessordningars likvärdighet")
+
+
+def test_eba_swedish_cover_with_no_title_is_a_parser_change():
+    """72 of the 72 Swedish documents state a title on their cover. None means
+    the EBA changed its template, which is a parser change and not something to
+    ship an English title over in silence (rule:fail-fast)."""
+    record = {"basefile": "eba/gl/2099-01", "sprak": "sv", "nummer": "2099/01",
+              "titel": "Guidelines on something"}
+    with pytest.raises(AssertionError, match="no Swedish title"):
+        edpb_parse.eba_titel(record, _eba_cover("EBA/GL/2099/01 1 januari 2099"))
+
+
+def test_own_number_slug_is_shared_by_the_minter_and_the_citation_engine():
+    """The address a citation resolves to cannot drift from the address the
+    page is published under, so both sides call one implementation."""
+    assert guidance_issuers.own_number_slug is lagrum.own_number_slug
+    for number in ("ESMA35-43-3448", "ESMA/2016/1477", "JC/GL/2024/36",
+                   "BoR (11) 67", "BoR (10) 44 Rev 1"):
+        assert guidance_issuers.own_number_slug(number) == \
+            lagrum.own_number_slug(number)
