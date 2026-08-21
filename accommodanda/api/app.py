@@ -457,11 +457,12 @@ def legacy_html_feed(
         rpubl_rattsfallspublikation: str | None = Query(None),
         dcterms_publisher: str | None = Query(None),
         con: sqlite3.Connection = Depends(get_con)):
-    """Human-readable twin of a legacy Atom feed."""
+    """Human-readable twin of a legacy Atom feed -- the same page static
+    generation writes, so a filtered feed is the site's feed screen too."""
     item, rows, params = _legacy_feed(con, dataset, rdf_type,
                                       rpubl_rattsfallspublikation,
                                       dcterms_publisher)
-    return HTMLResponse(feeds.render_html(item, rows, params))
+    return HTMLResponse(feeds.render_page(item, rows, params))
 
 
 @app.get("/api/v1/facets", response_model=FacetTree, tags=["catalog"])

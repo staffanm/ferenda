@@ -15,7 +15,7 @@ from pathlib import Path
 
 from markupsafe import Markup
 
-from ..lib import compress, layout, tpl
+from ..lib import compress, feeds, layout, tpl
 from ..lib.page import BRAND, escape, href, page
 from ..lib.render import edit_meta
 
@@ -129,13 +129,18 @@ def render_about(art):
 
 def render_sitenews(art):
     """The news listing: every item in full, each an ``<article>`` anchored by
-    its id so the Atom feed's per-entry links resolve to it."""
+    its id so the Atom feed's per-entry links resolve to it.
+
+    It renders on the same screen as every document feed (`lib.feeds`): the
+    source selector in the left rail, the entries beside it. The news feed is
+    one feed among sixteen, so a reader who arrives here can reach the rest."""
     items = sorted(art["items"], key=lambda it: it["published"], reverse=True)
     body = _TPL.sitenews_body(
+        feeds.nav(feeds.SITENEWS_ALIAS), art["title"],
         [{"id": it["id"], "date": it["published"][:10], "title": it["title"],
           "blocks": Markup(_blocks_html(it["blocks"]))} for it in items])
-    return page(art["title"], "Nyheter", "", body, eyebrow="Nyheter", solo=True,
-                body_class=" site",
+    return page(art["title"], "Nyheter", "", body, solo=True, own_h1=True,
+                body_class=" site browse",
                 head='<link rel="alternate" type="application/atom+xml" '
                      'href="/dataset/sitenews/feed.atom">')
 

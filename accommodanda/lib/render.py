@@ -87,18 +87,6 @@ def _render_admin_page():
         "Logga in", "Admin", "", solo=True, eyebrow="Redaktörsinloggning"))
 
 
-def _render_feed_page(item, entries, params=None):
-    """Human-readable twin of an Atom document at the legacy ``/feed`` URL."""
-    atom = feeds.feed_url(item.alias, atom=True, params=params)
-    body = LISTS.feed_page_body(atom, [
-        {"date": entry.published[:10], "url": entry.url,
-         "title": entry.title, "summary": entry.summary}
-        for entry in entries])
-    discovery = Markup('<link rel="alternate" type="application/atom+xml" '
-                       'href="%s">') % atom
-    return page(item.title, "Nyheter", "", body, solo=True, head=discovery)
-
-
 # A förarbete feed is named for its document type: "Alla propositioner". The type
 # is the browse bucket -- `facets` names it ("Propositioner"), and a feed line is
 # a sentence, so the initial drops to lower case. An abbreviation is not a word
@@ -120,11 +108,15 @@ def _feed_index_groups(con):
     of those three sources is named (the browse tree and the /myndigheter landing
     read the same table). Restating them here is what let this page call 24 803
     betänkanden "Alla bet" and Justitieombudsmannen "Riksdagens ombudsmän"."""
+    # Every unfiltered entry is named by `feeds.DATASETS`, which owns the
+    # dataset titles; only the *filtered* labels are composed here, from the
+    # facet schemes. Restating a dataset title here would be a second copy to
+    # drift, which is what "Alla bet" and "Riksdagens ombudsmän" were.
     groups = [("Nyheter", [("Nyheter om webbtjänsten", "sitenews", {})])]
     groups.append(("Lagar", [
         ("Alla förordningar", "sfs", {"rdf_type": "type/forordning"}),
         ("Alla lagar", "sfs", {"rdf_type": "type/lag"}),
-        ("Alla författningar", "sfs", {}),
+        (feeds.BY_ALIAS["sfs"].title, "sfs", {}),
     ]))
 
     dv = []
@@ -133,24 +125,24 @@ def _feed_index_groups(con):
         dv = [("Rättsfall från %s" % bucket["label"], "dv",
                {"rpubl_rattsfallspublikation": bucket["key"]})
               for bucket in tree["buckets"]]
-    dv.append(("Samtliga rättsfall", "dv", {}))
+    dv.append((feeds.BY_ALIAS["dv"].title, "dv", {}))
     groups.append(("Rättsfall", dv))
 
     fa = [(_all_label(bucket), "forarbeten", {"rdf_type": "type/" + bucket["key"]})
           for bucket in facets.tree(con, "forarbete")["buckets"]]
-    fa.append(("Samtliga förarbeten", "forarbeten", {}))
+    fa.append((feeds.BY_ALIAS["forarbeten"].title, "forarbeten", {}))
     groups.append(("Förarbeten", fa))
 
     publishers = [("Författningar utgivna av %s" % label, "myndfs",
                    {"dcterms_publisher": "publisher/" + slug})
                   for slug, label, _count in feeds.publisher_options(con)]
-    publishers.append(("Samtliga föreskrifter", "myndfs", {}))
+    publishers.append((feeds.BY_ALIAS["myndfs"].title, "myndfs", {}))
     groups.append(("Föreskrifter", publishers))
 
     praxis = [("Dokument publicerade av %s" % bucket["label"], "myndprax",
                {"dcterms_publisher": "publisher/" + bucket["key"]})
               for bucket in facets.tree(con, "avg")["buckets"]]
-    praxis.append(("Samtliga dokument", "myndprax", {}))
+    praxis.append((feeds.BY_ALIAS["myndprax"].title, "myndprax", {}))
     groups.append(("Praxis", praxis))
 
     stallningstaganden = [
@@ -158,14 +150,17 @@ def _feed_index_groups(con):
          {"dcterms_publisher": "publisher/" + bucket["key"]})
         for bucket in facets.tree(con, "rs")["buckets"]]
     stallningstaganden.append(
-        ("Samtliga rättsliga ställningstaganden", "myndrs", {}))
+        (feeds.BY_ALIAS["myndrs"].title, "myndrs", {}))
     groups.append(("Rättsliga ställningstaganden", stallningstaganden))
 
-    groups.append(("EU-rätt", [
-        ("Samtliga EU-rättsakter", "eurlex", {}),
-        ("Samtliga riktlinjer och rekommendationer", "euvagledning", {}),
-    ]))
-    groups.append(("Begrepp", [("Alla nya och ändrade begrepp", "keyword", {})]))
+    groups.append(("EU-rätt", [(feeds.BY_ALIAS[alias].title, alias, {})
+                               for alias in ("eurlex", "euvagledning")]))
+    # the folkrätt sources have no filtered feeds -- each is just its own feed,
+    # in the order the folkrätt landing introduces them
+    groups.append(("Folkrätt",
+                   [(feeds.BY_SOURCE[source].title, feeds.BY_SOURCE[source].alias, {})
+                    for source in FOLKRATT_SOURCES]))
+    groups.append(("Begrepp", [(feeds.BY_ALIAS["keyword"].title, "keyword", {})]))
     return groups
 
 
@@ -180,7 +175,8 @@ def _render_feed_index(con):
                    for label, alias, params in items]}
         for heading, items in _feed_index_groups(con)]
     return page("Alla nyhetsflöden", "Nyheter", "",
-                LISTS.feed_index_body(groups), solo=True)
+                LISTS.feed_index_body(feeds.nav(feeds.INDEX_ALIAS), groups), solo=True,
+                body_class=" browse")
 
 
 # the sources whose pages carry inline-editable content. A logged-in user edits
@@ -1114,4 +1110,4 @@ def render_aggregates(con, out_root, write_index=True):
         (target / "feed").mkdir(parents=True, exist_ok=True)
         compress.write_text(target / "feed.atom", feeds.render_atom(item, entries))
         compress.write_text(target / "feed" / "index.html",
-                            _render_feed_page(item, entries))
+                            feeds.render_page(item, entries))

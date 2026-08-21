@@ -2,9 +2,20 @@
 
 The old Ferenda site exposed each repository as ``/dataset/<alias>/feed`` and
 ``feed.atom``.  Faceted feeds used query parameters rather than new paths.  The
-rewrite's source names differ for a few repositories, so this module is the one
-compatibility map and the pure feed renderer shared by static generation and the
-live query-parameter endpoints.
+rewrite's source names differ for a few repositories, so this module holds that
+compatibility map -- and has outgrown it: every browsable source has a feed,
+the six the old site never published included, and those are named for
+themselves rather than for a legacy alias.
+
+Every feed -- the editorial news feed included -- is one screen with the same
+chrome: the entries in the reading column and the source selector in the left
+rail (`nav`), so a reader arrives at one feed and can reach every other.
+
+That screen is assembled here rather than in `lib/render.py`, the other half of
+site assembly, because `api/app.py` renders it live for a filtered request:
+importing the render driver into the serving path would drag the process pool
+and the asset shipper in with it. The dependency cannot run the other way --
+`render.py` imports this module.
 """
 
 import re
@@ -13,8 +24,13 @@ from datetime import date, datetime, timezone
 from html import escape
 from urllib.parse import urlencode
 
+from markupsafe import Markup
+
 from . import catalog, facets, labels, layout, util
+from .page import page
 from .tpl import ENV
+
+LISTS = ENV.get_template("listings.html").module
 
 BASE = catalog.BASE.rstrip("/")
 LIMIT = 200                    # legacy main feeds held up to 2 * archivesize(100)
@@ -34,11 +50,37 @@ DATASETS = (
     Dataset("myndfs", "foreskrift", "Samtliga föreskrifter"),
     Dataset("myndprax", "avg", "Samtliga dokument"),
     Dataset("myndrs", "rs", "Samtliga rättsliga ställningstaganden"),
-    Dataset("keyword", "begrepp", "Alla nya och ändrade begrepp"),
     Dataset("eurlex", "eurlex", "Samtliga EU-rättsakter"),
     Dataset("euvagledning", "edpb",
             "Samtliga riktlinjer och rekommendationer"),
+    # the folkrätt sources. They carry no legacy alias (the old site had no such
+    # repositories), so each is named for its own source.
+    Dataset("hudoc", "hudoc", "Samtliga avgöranden från Europadomstolen"),
+    Dataset("coe", "coe", "Samtliga fördrag från Europarådet"),
+    Dataset("icrc", "icrc", "Samtliga humanitärrättsliga fördrag"),
+    Dataset("untc", "untc", "Samtliga FN-fördrag"),
+    Dataset("icc", "icc",
+            "Samtliga avgöranden från Internationella brottmålsdomstolen"),
+    Dataset("icj", "icj",
+            "Samtliga avgöranden från Internationella domstolen"),
+    Dataset("keyword", "begrepp", "Alla nya och ändrade begrepp"),
 )
+# The editorial news feed. It is not a catalog source (site/render.py writes its
+# page and its Atom document from the authored artifact), but it is a feed on
+# the same URLs, so the selector lists it first. Its URL keeps the trailing
+# slash `lib/tpl.py`'s masthead entry uses: this one page is a written directory
+# index, where every other feed is an api/app.py route. Three more copies of the
+# literal live in tpl.py, site/render.py and app.py's routes -- consolidating
+# them means giving the URL grammar a home in layout.py, which is a wider change
+# than this module.
+SITENEWS_ALIAS = "sitenews"
+SITENEWS_URL = "/dataset/sitenews/feed/"
+SITENEWS_LABEL = "Nyheter"
+# the directory of every feed, the filtered ones included. It is the rail's
+# last entry, and one of the screens the rail renders on, so it needs a name of
+# its own to be marked as current on itself.
+INDEX_ALIAS = "index"
+INDEX_URL = "/dataset/sitenews/"
 BY_ALIAS = {dataset.alias: dataset for dataset in DATASETS}
 BY_SOURCE = {dataset.source: dataset for dataset in DATASETS}
 
@@ -48,7 +90,7 @@ class _Entry:
     uri: str
     url: str
     title: str
-    published: str
+    published: str | None      # None when the document carries no date at all
     updated: str
     summary: str
 
@@ -132,13 +174,22 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
             dcterms_publisher=None, limit=LIMIT):
     """Newest entries for a dataset and its legacy facet parameters.
 
+    Two different orders, on purpose. Which documents a feed *holds* is decided
+    by artifact mtime -- it is a feed of new and updated documents, and a
+    document we re-parsed is one we updated. How they are *presented* is by the
+    document's own date, newest first: a reader scanning the page reads the
+    dates, and mtime order printed them 2000, 2005, 2002, 1998 down the page.
+
+    A document that carries no date at all -- every begrepp, 29% of the
+    förarbeten, 12% of the föreskrifter -- sorts last and prints no date. It is
+    listed, not dated.
+
     A document whose declared expiry has passed is omitted, the same rule the
     browse listings and search apply: a repealed act and a withdrawn rättsligt
     ställningstagande no longer state law, and a feed of a corpus is a listing
-    of it. Ordering by artifact mtime is what made this urgent -- a re-parse
-    bumps every document it touches to the top, so re-parsing a corpus with 699
-    withdrawn positions in it would have put all 699 above the newest one that
-    still applies."""
+    of it. Selecting by artifact mtime is what made that urgent -- a re-parse
+    bumps every document it touches into the feed, so re-parsing a corpus with
+    699 withdrawn positions in it would have carried all 699 in."""
     root = catalog.data_root(con)
     expired = catalog.expired_uris(con, date.today().isoformat())
     rows = con.execute(
@@ -158,7 +209,7 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
         # filtering itself is catalog-only, including publisher filters.
         art = catalog.load_artifact(root, row[5])
         updated = _mtime(row[8]) or _rfc3339(row[7]) or "1970-01-01T00:00:00Z"
-        published = _rfc3339(row[7] or catalog.document_date(art)) or updated
+        published = _rfc3339(row[7] or catalog.document_date(art))
         title = row[6] or row[4] or row[3] or catalog.local(row[0])
         summary = (art.get("sammanfattning")
                    or art.get("metadata", {}).get("sammanfattning") or title)
@@ -168,7 +219,15 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
                          published, updated, summary))
         if len(out) == limit:
             break
-    out.sort(key=lambda entry: (entry.updated, entry.published, entry.uri), reverse=True)
+    # A document with no date of its own has no place in a date order, so it
+    # sorts behind every dated entry and prints no date at all. Falling back to
+    # the artifact mtime instead stamped it with the day we last parsed it: all
+    # 200 föreskrifter on the myndfs feed read "2026-08-20", and 39 undated SOUs
+    # led the förarbete feed ahead of this year's propositioner (rule:fail-fast
+    # -- `catalog.document_date` returns None because the corpus cannot answer,
+    # and the reader is owed that answer, not a manufactured one).
+    out.sort(key=lambda entry: (entry.published is not None, entry.published or "",
+                                entry.updated, entry.uri), reverse=True)
     return out
 
 
@@ -178,13 +237,16 @@ def render_atom(item, rows, params=None):
     updated = max((row.updated for row in rows), default="1970-01-01T00:00:00Z")
     body = []
     for row in rows:
+        # atom:published is optional and atom:updated is not, so an undated
+        # document publishes only the instant we last touched it -- there is no
+        # honest value for when it was issued
         body.append(
             "<entry><title>%s</title><id>%s</id>"
-            '<link rel="alternate" href="%s"/>'
-            "<published>%s</published><updated>%s</updated>"
+            '<link rel="alternate" href="%s"/>%s<updated>%s</updated>'
             '<summary type="text">%s</summary></entry>'
             % (escape(row.title), escape(row.uri), escape(row.url),
-               row.published, row.updated, escape(row.summary)))
+               "<published>%s</published>" % row.published if row.published else "",
+               row.updated, escape(row.summary)))
     return ('<?xml version="1.0" encoding="utf-8"?>\n'
             '<feed xmlns="http://www.w3.org/2005/Atom">'
             "<title>%s</title><id>%s</id><updated>%s</updated>"
@@ -195,11 +257,37 @@ def render_atom(item, rows, params=None):
                escape(self_url), escape(html_url), "".join(body)))
 
 
-def render_html(item, rows, params=None):
-    """Chrome-free HTML twin used for live filtered feed requests."""
-    return ENV.get_template("dataset_feed.html").render(
-        title=item.title, atom=feed_url(item.alias, atom=True, params=params),
-        rows=rows)
+def nav(current):
+    """The source selector every feed page carries in its left rail: the news
+    feed, then one entry per dataset, named as the browse tree names the source
+    (`facets.SOURCE_LABELS`). `current` is the alias of the screen being
+    rendered -- a dataset alias, `SITENEWS_ALIAS`, or `INDEX_ALIAS`.
+
+    The filtered feeds (a publisher's föreskrifter, a court's rättsfall) are not
+    in the rail -- föreskrift alone has 140 publishers -- so it ends with the
+    directory (`INDEX_ALIAS`) that lists them all."""
+    links = [{"url": SITENEWS_URL, "label": SITENEWS_LABEL,
+              "current": current == SITENEWS_ALIAS}]
+    links += [{"url": feed_url(item.alias).removeprefix(BASE),
+               "label": facets.SOURCE_LABELS[item.source],
+               "current": current == item.alias} for item in DATASETS]
+    return LISTS.feed_nav(links, INDEX_URL, current == INDEX_ALIAS)
+
+
+def render_page(item, rows, params=None):
+    """The human-readable twin of an Atom document: its entries in the site
+    chrome, the selector in the rail. Static generation (`render.render_aggregates`)
+    and a live filtered request (`api.app`) render through this one function, so
+    the generated page and the query-parameter one cannot differ."""
+    atom = feed_url(item.alias, atom=True, params=params)
+    body = LISTS.feed_page_body(nav(item.alias), item.title, atom, [
+        {"date": row.published[:10] if row.published else "", "url": row.url,
+         "title": row.title, "summary": row.summary}
+        for row in rows])
+    return page(item.title, "Nyheter", "", body, solo=True, body_class=" browse",
+                own_h1=True,
+                head=Markup('<link rel="alternate" type="application/atom+xml" '
+                            'href="%s">') % atom)
 
 
 def publisher_options(con):

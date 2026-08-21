@@ -1092,6 +1092,24 @@ body.browse .gr-body.solo { max-width: var(--page-max); }
                  color: var(--accent); font-weight: 500; }
 .browse-facets .facet-list a[aria-current] .c { color: var(--ink-4); }
 
+/* -- feed screens (/dataset/<alias>/feed, the news feed, the feed directory):
+   the browse layout, so the source selector sits in the same left rail the
+   browse pages put their facets in. */
+.feed-all { margin: 1.1rem 0 0; font-size: .86rem; }
+.feed-all a { color: var(--ink-3); text-decoration: none; }
+.feed-all a[aria-current] { color: var(--accent); }
+.feed-all a:hover { color: var(--accent); }
+.feed-link { margin: -.4rem 0 1.6rem; font-size: .86rem; }
+.news-item { margin: 0 0 1.9rem; }
+.news-item h2 { margin: .1rem 0 .35rem; font-size: 1.12rem; }
+.news-date { font-family: var(--sans); font-size: .74rem; letter-spacing: .04em;
+             color: var(--ink-4); margin: 0; }
+.feed-list { list-style: none; padding: 0; margin: 0; }
+.feed-list li { margin: .18rem 0; }
+.feed-atom { font-family: var(--sans); font-size: .64rem; letter-spacing: .06em;
+             text-transform: uppercase; padding: .05rem .3rem; border-radius: 3px;
+             background: var(--surf-2); color: var(--ink-4); text-decoration: none; }
+
 /* -- search palette (live full-text search via the REST API) -- */
 .search-overlay { position: fixed; inset: 0; z-index: 100; display: flex;
                   justify-content: center; align-items: flex-start; padding-top: 8rem;

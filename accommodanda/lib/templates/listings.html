@@ -86,26 +86,52 @@
 </ul>
 <p><a href="/rs/">Bläddra bland ställningstagandena →</a></p></section>
 {%- endmacro -%}
-{%- macro feed_page_body(atom, entries) -%}
-{#- the human-readable twin of an Atom document -#}
+{%- macro feed_nav(links, index_url, index_current) -%}
+{#- the source selector in a feed page's left rail: the news feed, then one
+    entry per dataset. The filtered feeds are not here (föreskrift alone has 140
+    publishers) -- the directory it ends with lists those -#}
+<nav class="facets"><h2 class="facet-axis">Flöden</h2><ul class="facet-list">
+{%- for l in links -%}
+<li><a href="{{ l.url }}"{% if l.current %} aria-current="page"{% endif %}>{{ l.label }}</a></li>
+{%- endfor -%}
+</ul>
+<p class="feed-all"><a href="{{ index_url }}"{% if index_current %} aria-current="page"{% endif %}>Alla nyhetsflöden →</a></p></nav>
+{%- endmacro -%}
+{%- macro feed_body(nav, heading, atom, items) -%}
+{#- the shared shape of every feed screen: the selector in the left rail, the
+    entries in the reading column. `items` is pre-rendered markup, so the
+    news feed can print each item in full where a document feed links out -#}
+<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main browse-group"><h1>{{ heading }}</h1>
 <p class="feed-link"><a href="{{ atom }}">Atom-flöde</a></p>
+{{ items }}</section></div>
+{%- endmacro -%}
+{%- macro feed_page_body(nav, heading, atom, entries) -%}
+{#- the human-readable twin of an Atom document -#}
+{{ feed_body(nav, heading, atom, feed_entries(entries)) }}
+{%- endmacro -%}
+{%- macro feed_entries(entries) -%}
 {%- if entries -%}
 {%- for e in entries -%}
-<article class="news-item"><p class="news-date">{{ e.date }}</p><h2><a href="{{ e.url }}">{{ e.title }}</a></h2><p>{{ e.summary }}</p></article>
+{#- a document with no date of its own prints none: the date line is omitted
+    rather than filled with the day we last parsed it -#}
+<article class="news-item">{% if e.date %}<p class="news-date">{{ e.date }}</p>{% endif %}<h2><a href="{{ e.url }}">{{ e.title }}</a></h2><p>{{ e.summary }}</p></article>
 {%- endfor -%}
 {%- else -%}
 <p class="empty">Inga dokument.</p>
 {%- endif -%}
 {%- endmacro -%}
-{%- macro feed_index_body(groups) -%}
-{#- the legacy all-feeds directory -#}
+{%- macro feed_index_body(nav, groups) -%}
+{#- the directory of every feed, the filtered ones included -- reached from the
+    selector on each feed page -#}
+<div class="browse-layout"><aside class="browse-facets">{{ nav }}</aside><section class="browse-main">
 {%- for g in groups -%}
-<section class="browse-group"><h2>{{ g.heading }}</h2><ul>
+<section class="browse-group"><h2>{{ g.heading }}</h2><ul class="feed-list">
 {%- for l in g.links -%}
 <li><a class="feed-atom" href="{{ l.atom }}" aria-label="Atom-flöde: {{ l.label }}">Atom</a> <a href="{{ l.html }}">{{ l.label }}</a></li>
 {%- endfor -%}
 </ul></section>
 {%- endfor -%}
+</section></div>
 {%- endmacro -%}
 {%- macro browse_item(doc) -%}
 {#- one listing entry: a <dt> (the bold linked id) + <dd> (name/description).

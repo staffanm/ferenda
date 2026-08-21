@@ -190,6 +190,18 @@ def test_sitenews_render_is_newest_first():
             'href="/dataset/sitenews/feed.atom"') in html
 
 
+def test_sitenews_renders_on_the_shared_feed_screen():
+    """The news feed is one feed among the sixteen, so its page carries the same
+    source selector as every document feed -- in the same left rail, marked on
+    itself. Asserting only the article count let the rail be dropped from
+    `sitenews_body` with the suite still green."""
+    html = render.render_sitenews(parse.artifact("sitenews", FIX))
+    assert '<aside class="browse-facets">' in html          # the shared shell
+    assert '<a href="/dataset/sitenews/feed/" aria-current="page">' in html
+    assert '"/dataset/sfs/feed"' in html                    # …and every other feed
+    assert '<a href="/dataset/sitenews/">Alla nyhetsflöden' in html
+
+
 def test_atom_is_wellformed_and_newest_first():
     art = parse.artifact("sitenews", FIX)
     atom = render.render_atom(art)

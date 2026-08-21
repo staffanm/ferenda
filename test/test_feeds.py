@@ -46,18 +46,32 @@ def _catalog(tmp_path):
     return catalog.connect(db)
 
 
-def test_sfs_feed_is_newest_first_and_uses_stable_document_ids(tmp_path):
+def test_a_feed_reads_newest_date_first_and_uses_stable_document_ids(tmp_path):
+    """The entries a reader sees are ordered by the document's own date, newest
+    first. Ordering them by artifact mtime instead printed the dv feed as 2000,
+    2005, 2002, 1998 down the page -- every line dated, no line in order."""
     con = _catalog(tmp_path)
     rows = feeds.entries(con, feeds.dataset("sfs"))
     assert [row.uri for row in rows] == [
-        "https://lagen.nu/2024:1", "https://lagen.nu/2025:2"]
+        "https://lagen.nu/2025:2", "https://lagen.nu/2024:1"]
     atom = feeds.render_atom(feeds.dataset("sfs"), rows)
     root = ET.fromstring(atom)
     assert root.find(ATOM + "id").text == "https://lagen.nu/dataset/sfs/feed.atom"
     assert [node.text for node in root.findall(ATOM + "entry/" + ATOM + "id")] \
-        == ["https://lagen.nu/2024:1", "https://lagen.nu/2025:2"]
-    assert root.find(ATOM + "entry/" + ATOM + "published").text \
+        == ["https://lagen.nu/2025:2", "https://lagen.nu/2024:1"]
+    assert root.findall(ATOM + "entry/" + ATOM + "published")[-1].text \
         == "2024-01-02T00:00:00Z"
+
+
+def test_a_feed_still_selects_the_documents_it_last_updated(tmp_path):
+    """Which documents a feed holds is a different question from how they are
+    ordered: it is a feed of new *and updated* documents, so the selection is by
+    artifact mtime. The older publication was re-parsed last, so it is the one
+    a one-entry feed carries -- even though the newer publication would lead the
+    page when both are in."""
+    con = _catalog(tmp_path)
+    assert [row.uri for row in feeds.entries(con, feeds.dataset("sfs"), limit=1)] \
+        == ["https://lagen.nu/2024:1"]
 
 
 def test_legacy_query_parameters_filter_feeds(tmp_path):
@@ -225,3 +239,37 @@ def test_an_expired_document_leaves_the_feed(tmp_path):
     got = [e.title for e in feeds.entries(con, feeds.BY_SOURCE["rs"])]
     assert got == ["Gällande"], got
     con.close()
+
+
+def test_every_feed_screen_carries_the_source_selector(tmp_path):
+    """A feed page is one screen with the same chrome, whichever feed it is:
+    the entries in the reading column, every other feed in the left rail. The
+    editorial news feed and a live filtered request render through the same two
+    macros as the generated per-dataset page, so a reader who arrives at one
+    feed can reach the other fifteen.
+
+    Before this the three drifted: the news feed was an editorial page, the
+    generated feed page a bare listing, and a filtered request a chrome-free
+    HTML twin with no stylesheet at all."""
+    con = _catalog(tmp_path)
+    item = feeds.dataset("sfs")
+    html = feeds.render_page(item, feeds.entries(con, item))
+    # the selector names every dataset, and the current one is marked
+    for other in feeds.DATASETS:
+        assert '"%s"' % feeds.feed_url(other.alias).removeprefix(feeds.BASE) in html
+    assert feeds.SITENEWS_URL in html
+    assert '<a href="/dataset/sfs/feed" aria-current="page">' in html
+    # …on the browse screen (rail + reading column), inside the site chrome
+    assert '<aside class="browse-facets">' in html
+    assert '<link rel="stylesheet" href="/style.css">' in html
+    # the news feed is a feed among the others: same rail, marked on itself
+    news = feeds.nav(feeds.SITENEWS_ALIAS)
+    assert '<a href="%s" aria-current="page">' % feeds.SITENEWS_URL in news
+    assert '"/dataset/sfs/feed"' in news
+
+
+def test_a_dataset_exists_for_every_browsable_source():
+    """Every source the site browses has a feed, so the selector is a complete
+    list of the corpus rather than the eight repositories the legacy site
+    happened to publish -- the six folkrätt sources had none at all."""
+    assert set(render.SOURCE_ORDER) <= {d.source for d in feeds.DATASETS}
