@@ -215,7 +215,7 @@ def artifact(source: str, basefile: str) -> Path:
     return artifact_dir(source) / rel.with_name(rel.name + ".json")
 
 
-def stats_snapshot(generated: Path) -> Path:
+def stats_snapshot(generated: str) -> Path:
     """Where one day's corpus measurement is archived beside the current one:
     ``artifact/stats/archive/statistik-<YYYY-MM-DD>.json``.
 
