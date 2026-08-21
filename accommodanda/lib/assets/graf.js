@@ -758,8 +758,12 @@
         hits = mount.querySelector(".graf-hits");
   let hitRows = [], hitIndex = -1, timer = null;
   function hitTarget(res) {          // a citation-resolved hit centers on its provision
-    const frag = res.fragments && res.fragments[0];
-    return frag && frag.uri && frag.uri.includes("#") ? frag.uri : res.uri;
+    // `pin`, not `fragments`: the pin is the provision the query resolved to,
+    // while a full-text hit's fragments are only where the words stand -- and
+    // centring the graph on one of those recentred "dataförordningen" on
+    // article 47 of the EU Data Act instead of on the act
+    const pin = res.pin;
+    return pin && pin.uri && pin.uri.includes("#") ? pin.uri : res.uri;
   }
   input.addEventListener("input", () => {
     clearTimeout(timer);

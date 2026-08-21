@@ -70,8 +70,10 @@ def client(tmp_path):
                 "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "lag",
                 "score": 9.1, "inbound_count": 1,
                 "highlight": ["… <em>%s</em> …" % q],
+                "pin": None,
                 "fragments": [{"uri": "https://lagen.nu/1962:700#K3P1",
-                               "pinpoint": "K3P1", "highlight": ["<em>%s</em>" % q]}]}]}
+                               "pinpoint": "K3P1", "label": "3 kap. 1 §",
+                               "highlight": ["<em>%s</em>" % q]}]}]}
     api._index = FakeIndex()
     # the citation-pinning path opens the configured catalog directly rather
     # than taking the request connection (a missing catalog must not fail a
@@ -101,7 +103,12 @@ def test_search(client):
     # singular: one hit, not a bucket. Brottsbalken is a balk, so its kind is
     # 'lag' -- SFS splits lag from förordning in the catalog (see test_facets)
     assert hit["kind_label"] == "Lag"
+    # a full-text hit carries the passages it matched -- and no pin, so the hit
+    # leads to the document (a client follows url + "#" + pin.pinpoint only
+    # where a citation-shaped query resolved a provision)
+    assert hit["pin"] is None
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
+    assert hit["highlight"] == ["… <em>mord</em> …"]     # the document's own
     # the API resolves each hit's public page path (layout.page_url): a statute
     # at lagen.nu's bare /<sfsid> address, colon kept
     assert hit["url"] == "/1962:700"
@@ -625,17 +632,19 @@ def test_search_pins_a_pinpoint_citation_with_its_provision(client):
                       params={"q": "3 kap. 1 § brottsbalken"}).json()
     hit = body["results"][0]
     assert hit["uri"] == "https://lagen.nu/1962:700"
-    frag = hit["fragments"][0]
-    assert frag["pinpoint"] == "K3P1"
-    assert frag["label"] == "3 kap. 1 §"
-    assert frag["highlight"] == ["Den som dödar annan döms för mord."]
+    pin = hit["pin"]
+    assert pin["pinpoint"] == "K3P1"
+    assert pin["label"] == "3 kap. 1 §"
+    assert pin["highlight"] == ["Den som dödar annan döms för mord."]
+    # the pin is the answer; a resolved hit has no full-text passages to fold in
+    assert hit["fragments"] == []
 
 
 def test_search_pins_the_terse_law_first_pinpoint(client):
     # "BrB 3:1" is how a lawyer types it; the grammar wants "3 kap. 1 §"
-    frag = client.get("/api/v1/search", params={"q": "BrB 3:1"}) \
-        .json()["results"][0]["fragments"][0]
-    assert frag["pinpoint"] == "K3P1" and frag["label"] == "3 kap. 1 §"
+    pin = client.get("/api/v1/search", params={"q": "BrB 3:1"}) \
+        .json()["results"][0]["pin"]
+    assert pin["pinpoint"] == "K3P1" and pin["label"] == "3 kap. 1 §"
 
 
 def test_search_explicit_offset_walks_raw_without_the_pin(client):
@@ -646,7 +655,7 @@ def test_search_explicit_offset_walks_raw_without_the_pin(client):
     q = {"q": "3 kap. 1 § brottsbalken"}
     with_pin = client.get("/api/v1/search", params=q).json()
     raw = client.get("/api/v1/search", params={**q, "offset": 0}).json()
-    assert with_pin["results"][0]["fragments"][0]["pinpoint"] == "K3P1"
+    assert with_pin["results"][0]["pin"]["pinpoint"] == "K3P1"
     # a pinned lead carries score None; the raw page is the index's hit alone
     assert [r["score"] for r in raw["results"]] == [9.1]
 

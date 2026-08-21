@@ -215,12 +215,34 @@ def fragment_ids(art):
     return {node["id"] for node in _body_id_nodes(art)}
 
 
+# Node types whose own ``text`` runs are a HEADING rather than body text, so a
+# fragment of that type can be named by the words the document itself prints
+# over it. Measured over 25 artifacts per source: `avsnitt` (förarbete, 962 of
+# 962 nodes carry one), `sektion` (kommentar), `rubrik` (SFS) and `heading`
+# (eurlex annexes: "BILAGA I") print a heading; `stycke`, `punkt` and eurlex
+# `paragraph` print body text, and `paragraf`/`kapitel` print nothing at all.
+# `artikel`/`article` do print one, and stay out: their anchor already yields a
+# citation ("artikel 47") through lib/pinpoint, which is shorter and is what a
+# reader cites.
+HEADING_TYPES = frozenset({"avsnitt", "sektion", "rubrik", "heading"})
+
+
+def fragment_texts_and_headings(art):
+    """``(fragment-uri, full text, own heading)`` for every id-bearing node in
+    the body. The heading is '' for a node type that prints none (see
+    HEADING_TYPES) -- it is what names the fragment where its anchor has no
+    citation grammar, as a förarbete's "sec745" has none."""
+    return [(art["uri"] + "#" + node["id"], node_text(node),
+             runs_text(node.get("text") or []).strip()
+             if node.get("type") in HEADING_TYPES else "")
+            for node in _body_id_nodes(art)]
+
+
 def fragment_texts(art):
     """``(fragment-uri, full text)`` for every id-bearing node in the body --
     the per-fragment children of a parent search doc. A fragment's text includes
     its descendants', so a paragraph carries its own numbered points."""
-    return [(art["uri"] + "#" + node["id"], node_text(node))
-            for node in _body_id_nodes(art)]
+    return [(uri, body) for uri, body, _ in fragment_texts_and_headings(art)]
 
 
 def fragment_text(art, frag):

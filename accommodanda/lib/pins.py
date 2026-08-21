@@ -22,7 +22,7 @@ SNIPPET_CHARS = 240
 
 def resolved_results(con, q, source=None, kind=None):
     """The resolver's hits for `q`, each shaped like a SearchResult dict
-    (uri, url, identifier, title, display, source, kind, inbound_count,
+    (uri, url, identifier, title, display, source, kind, inbound_count, pin,
     fragments). Empty when `q` reads as no known citation."""
     out = []
     for hit in resolve.resolve(q):
@@ -55,10 +55,18 @@ def resolved_results(con, q, source=None, kind=None):
             # landed on and shows that provision's own words. Without them the
             # reader saw "Brottsbalk (1962:700)" for "4 kap. 4 § brottsbalken"
             # and had no way to tell the pin had worked at all (Q2).
-            "fragments": ([{"uri": root + "#" + frag, "pinpoint": frag,
-                            "label": pinpoint_label(frag),
-                            "highlight": _provision_text(con, _path, frag)}]
-                          if frag else []),
+            #
+            # `pin`, not `fragments`: the pin IS the answer and the hit links
+            # there, while a full-text hit's `fragments` are passages inside a
+            # document that stays the link target. Both used to arrive as
+            # `fragments`, and the client could not tell a resolved provision
+            # from a place the words happened to occur -- so "dataförordningen"
+            # linked into article 47 of the EU Data Act.
+            "pin": ({"uri": root + "#" + frag, "pinpoint": frag,
+                     "label": pinpoint_label(frag),
+                     "highlight": _provision_text(con, _path, frag)}
+                    if frag else None),
+            "fragments": [],
         })
     return out
 

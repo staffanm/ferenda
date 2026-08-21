@@ -81,8 +81,10 @@ def corpus(tmp_path, monkeypatch):
                 "title": "Brottsbalk (1962:700)", "source": "sfs", "kind": "law",
                 "score": 9.1, "inbound_count": 1,
                 "highlight": ["… <em>%s</em> …" % q],
+                "pin": None,
                 "fragments": [{"uri": "https://lagen.nu/1962:700#K3P1",
-                               "pinpoint": "K3P1", "highlight": ["<em>%s</em>" % q]}]}]}
+                               "pinpoint": "K3P1", "label": "3 kap. 1 §",
+                               "highlight": ["<em>%s</em>" % q]}]}]}
     monkeypatch.setattr(mcpmod, "_index", FakeIndex())
     return cat
 
@@ -94,6 +96,8 @@ def test_search_combines_fulltext_and_pins(corpus):
     assert hit["identifier"] == "SFS 1962:700"
     assert hit["url"] == config.PUBLIC_BASE_URL + "/1962:700"
     assert hit["fragments"][0]["pinpoint"] == "K3P1"
+    # a full-text hit is a document hit: no pin, so its `fetch` id is the document
+    assert hit["pin"] is None and hit["id"] == "https://lagen.nu/1962:700"
 
 
 def test_every_tool_url_is_absolute(corpus):
@@ -135,7 +139,7 @@ def test_resolve_citation_to_fragment(corpus):
     hits = mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"]
     assert hits, "expected the nickname+pinpoint to resolve"
     assert hits[0]["uri"] == "https://lagen.nu/1962:700"
-    assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1962:700#K3P1"
+    assert hits[0]["pin"]["uri"] == "https://lagen.nu/1962:700#K3P1"
 
 
 def test_resolve_citation_bare_sfs_number(corpus):
@@ -147,7 +151,7 @@ def test_resolve_citation_bare_sfs_number(corpus):
     assert hits and hits[0]["uri"] == "https://lagen.nu/1904:48_s.1"
     # ...and a pinpoint follows the rewritten root
     hits = mcpmod.resolve_citation("1904:48 3 §")["results"]
-    assert hits[0]["fragments"][0]["uri"] == "https://lagen.nu/1904:48_s.1#P3"
+    assert hits[0]["pin"]["uri"] == "https://lagen.nu/1904:48_s.1#P3"
 
 
 def test_get_document_full_and_pinpoint(corpus):
@@ -252,36 +256,38 @@ def test_search_and_fetch_satisfy_the_openai_contract(corpus):
     """`search` and `fetch` carry the field names OpenAI's hosts require of a
     knowledge server. Those fields are a subset of what the corpus already
     answers with, so meeting the contract narrows nothing: the hit keeps its
-    citation-graph payload, and `id` pinpoints the matching provision rather
-    than costing a whole-statute read."""
+    citation-graph payload, and a citation-shaped query ids the provision it
+    resolved rather than costing a whole-statute read."""
     hit = mcpmod.search("mord", source="sfs")["results"][0]
     assert {"id", "title", "url"} <= set(hit)
-    assert hit["id"] == "https://lagen.nu/1962:700#K3P1"
+    # full text finds documents: the id is the document, and the passages it
+    # matched inside it ride along for the model to read
+    assert hit["id"] == "https://lagen.nu/1962:700"
     assert hit["inbound_count"] == 1 and hit["fragments"]   # no slot in the contract
 
-    doc = mcpmod.fetch(hit["id"])
+    # a citation-shaped query resolves a provision, and THAT is the id
+    pinned = mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"][0]
+    assert pinned["id"] == "https://lagen.nu/1962:700#K3P1"
+
+    doc = mcpmod.fetch(pinned["id"])
     assert set(doc) == {"id", "title", "text", "url", "metadata"}
-    assert doc["id"] == hit["id"]
+    assert doc["id"] == pinned["id"]
     assert doc["url"] == config.PUBLIC_BASE_URL + "/1962:700#K3P1"
     assert "berövar annan livet" in doc["text"]
     assert doc["metadata"]["source"] == "sfs"
     assert doc["metadata"]["pinpoint"] == "K3P1"
 
     # a bare document URI is an equally valid id -- then it is the whole document
-    whole = mcpmod.fetch("https://lagen.nu/1962:700")
+    whole = mcpmod.fetch(hit["id"])
     assert whole["metadata"]["pinpoint"] is None
     assert whole["url"] == config.PUBLIC_BASE_URL + "/1962:700"
 
-    # resolve_citation hands back the same handle, so its hits are fetchable too
-    assert (mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"][0]["id"]
-            == hit["id"])
-
 
 def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
-    """A match that isn't paragraph-deep (a title hit, an `is_doc` hit) carries
-    `fragments: []`, and its id is then the document URI -- the branch every
-    non-pinpointed search result takes, and the one that decides whether a host
-    fetching that id gets a document or a KeyError."""
+    """A hit with no resolved provision carries `pin: None`, and its id is then
+    the document URI -- the branch every full-text search result takes, and the
+    one that decides whether a host fetching that id gets a document or a
+    KeyError."""
     class DocLevel:
         def search(self, q, source=None, kind=None, year=None, limit=10,
                    offset=0, cursor=None):
@@ -290,7 +296,7 @@ def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
                 "identifier": "SFS 2018:585",
                 "title": "Förvaltningslag (2018:585)", "source": "sfs",
                 "kind": "law", "score": 4.2, "inbound_count": 0,
-                "highlight": [], "fragments": []}]}
+                "highlight": [], "pin": None, "fragments": []}]}
     mcpmod._index = DocLevel()
 
     hit = mcpmod.search("förvaltning")["results"][0]

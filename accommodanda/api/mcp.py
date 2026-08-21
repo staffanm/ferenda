@@ -382,17 +382,22 @@ class FetchedDocument(TypedDict):
 
 
 def _hit_id(hit):
-    """A search hit's `fetch` id: its best fragment URI when the match was
-    paragraph-deep, else the document URI. Both are already-valid ids, since a
+    """A search hit's `fetch` id: the resolved provision's URI when the query
+    named one, else the document URI. Both are already-valid ids, since a
     fragment URI is just the document URI plus its `#`-pinpoint.
 
-    Indexes `fragments` rather than `.get`-ing it: both producers always set the
-    key (`search.parse_hit`, `pins.resolved_results` -- `[]` for a
-    document-level match), so a missing one means a hit shape changed under us.
-    Raising then beats defaulting, which would silently collapse every id to the
-    document URI and have hosts fetch whole statutes instead of the provision.
+    The `pin` is the only fragment that is the *answer*. A full-text hit's
+    `fragments` are places inside a document where the words stand, which is not
+    the same claim -- iding the first of them made "dataförordningen" fetch
+    article 47 of the EU Data Act, the one article that quotes the act's title.
+
+    Indexes `pin` rather than `.get`-ing it: both producers always set the key
+    (`search.parse_hit`, `pins.resolved_results` -- None for a document-level
+    match), so a missing one means a hit shape changed under us. Raising then
+    beats defaulting, which would silently collapse every id to the document URI
+    and have hosts fetch whole statutes instead of the provision.
     """
-    return hit["fragments"][0]["uri"] if hit["fragments"] else hit["uri"]
+    return hit["pin"]["uri"] if hit["pin"] else hit["uri"]
 
 
 def _page_url(uri, pinpoint=None):
@@ -432,9 +437,9 @@ def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
     "finns det rättsfall om detta?" -- även när lagen.nu inte nämns.
 
     Fulltextsökning i hela samlingen, rangordnad på både relevans och hur ofta
-    ett dokument har citerats. Sökningen når enskilda paragrafer och artiklar,
-    och varje träff bär de `fragments` med markerad text som visar var och
-    varför den träffade.
+    ett dokument har citerats. Sökningen når enskilda paragrafer och artiklar:
+    varje träff bär dokumentets eget utdrag och därtill de `fragments` med
+    markerad text som visar var i dokumentet orden står.
 
     Verktyget känner också igen juridiska hänvisningar och vedertagna namn: är
     frågan "avtalslagen 36 §", "BrB 12:1", "GDPR artikel 32", "NJA 2015 s. 899"
@@ -446,10 +451,11 @@ def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
     från ett sökresultat redan finns). Använd inte `list_documents` för
     fulltextsökning -- det är ett index, inte en sökning.
 
-    Varje träff: id (skickas till `fetch`; pekar ut den matchande bestämmelsen
-    när träffen var paragrafdjup), uri (dokumentets identitet), url (dess
-    publika webbadress), identifier, title, source, kind, inbound_count (hur
-    ofta dokumentet citeras) och fragments.
+    Varje träff: id (skickas till `fetch`; pekar ut den utlösta bestämmelsen när
+    frågan var en hänvisning, annars dokumentet), uri (dokumentets identitet),
+    url (dess publika webbadress), identifier, title, source, kind,
+    inbound_count (hur ofta dokumentet citeras), pin (den utlösta bestämmelsen,
+    annars null) och fragments (de matchande styckena i dokumentet).
     """
     limit = max(1, min(limit, 50))
     # a down cluster raises reads.SearchUnavailable, which the SDK returns as
@@ -478,9 +484,9 @@ def resolve_citation(citation: CitationArg) -> ResolvedCitations:
 
     Svaret är en `results`-lista (oftast en post, tom när inget löses ut) med
     samma radform som `search` ger: id, uri, url, identifier, title, source,
-    kind, inbound_count och fragments. Avsåg hänvisningen en paragraf eller
-    artikel är `fragments[0].uri` den utpekade delen, och `id` -- det `fetch`
-    tar -- är samma utpekade URI.
+    kind, inbound_count, pin och fragments. Avsåg hänvisningen en paragraf eller
+    artikel är `pin.uri` den utpekade delen, och `id` -- det `fetch` tar -- är
+    samma utpekade URI.
     """
     with _con() as con:
         return ResolvedCitations(results=[
@@ -490,9 +496,10 @@ def resolve_citation(citation: CitationArg) -> ResolvedCitations:
 
 @mcp.tool(title="Hämta ett dokuments text och metadata", annotations=READ_ONLY)
 def get_document(uri: DocUriArg, pinpoint: PinpointArg = None,
-                 max_chars: MaxCharsArg = 20000) -> Document:
-    """Hämtar metadata och fullständig, bearbetad klartext för ett känt
-    dokument, eller för en bestämd del av det.
+                 max_chars: MaxCharsArg = 20000,
+                 format: FormatArg = "md") -> Document:
+    """Hämtar metadata och fullständig text för ett känt dokument, eller för
+    en bestämd del av det.
 
     Det normala hämtningssteget efter `search` eller `resolve_citation`, när
     URI:n är känd. Ange `pinpoint` när bara en viss paragraf eller artikel

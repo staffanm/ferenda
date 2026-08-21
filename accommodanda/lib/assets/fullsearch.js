@@ -60,6 +60,27 @@
     facets.innerHTML = facetGroup('source', 'Källa', f.source) +
       facetGroup('kind', 'Typ', f.kind) + facetGroup('year', 'År', f.year);
   }
+  // The places inside the document where the query matched, folded into the
+  // hit -- what the old lagen.nu search showed as inner hits. They sit UNDER
+  // the document, never in place of it: the hit's own heading and link stay the
+  // document, so Enter on "dataförordningen" opens the act, and a reader who
+  // wants the article the word stands in clicks that line instead. Each line is
+  // one link, prefixed by the pinpoint where the anchor has a citation grammar
+  // ("3 kap. 1 §", "artikel 47") and by nothing where it does not. Every
+  // passage the API sends is rendered: it already drops the empty ones and the
+  // repeats (search.distinct_passages). The label leads its line, so it starts
+  // the line's first letter in upper case -- the API keeps the wording a
+  // citation uses mid-sentence ("artikel 47", from lib/pinpoint).
+  function passageList(h) {
+    var lines = (h.passages || []).map(function (f) {
+      var label = f.label ? f.label.charAt(0).toUpperCase() + f.label.slice(1) : '';
+      return '<li><a href="' + esc(h.url + '#' + f.pinpoint) + '">' +
+        (label ? '<span class="passage-label">' + esc(label) + ':</span> ' : '') +
+        f.highlight[0] + '</a></li>';
+    }).join('');
+    return lines ? '<ul class="hit-passages">' + lines + '</ul>' : '';
+  }
+
   function renderResults(data) {
     if (!data.results.length) {
       results.innerHTML = '<p class="empty">Inga träffar med de valda avgränsningarna.</p>';
@@ -70,7 +91,8 @@
       return '<article class="full-search-hit"><h2><a href="' + esc(h.target) + '">' +
         esc(h.title) + '</a></h2>' +
         (h.sub ? '<p class="hit-id">' + esc(h.sub) + '</p>' : '') +
-        (h.snippet ? '<p class="hit-snip">' + h.snippet + '</p>' : '') + '</article>';
+        (h.snippet ? '<p class="hit-snip">' + h.snippet + '</p>' : '') +
+        passageList(h) + '</article>';
     }).join('');
   }
   function renderPagination(total) {

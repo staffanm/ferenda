@@ -110,8 +110,8 @@ grindar: utanför det publika schemat och bara samma origin.
 
 **Samma origin gäller allt internt, inte bara skrivningarna.** Grinden
 (`auth.same_origin`) avvisar en begäran vars `Sec-Fetch-Site` säger att en
-annan sida gjorde den, eller vars `Origin` inte har vår egen värd — med `403`.
-En anropare utan de huvudena (curl, testklienten, den interna klient som
+annan sida gjorde den, eller vars `Origin` inte är vår egen — med `403`. En
+anropare utan de huvudena (curl, testklienten, den interna klient som
 `generate` kör) släpps igenom; grinden stoppar webbläsare på främmande
 sidor, den är ingen autentisering. Det gör `require_editor` fortfarande.
 CORS räcker inte: det hindrar bara en främmande sida från att *läsa* svaret
@@ -155,8 +155,20 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 
 Träffarna är hela dokument, rankade på relevans kombinerat med antalet
 inkommande citeringar (`inbound_count`) — så en välträffad, ofta hänvisad lag
-slår en lika välträffad men obskyr. Varje träff innehåller även de matchande
-paragraferna/artiklarna med markerad text (`fragments`). Sökfrågan matchar
+slår en lika välträffad men obskyr. En träff pekar alltid ut sitt **dokument**:
+`highlight` är dokumentets eget utdrag och `url` dess adress.
+
+Två fält kan peka djupare, och de betyder olika saker:
+
+| Fält | Betydelse | Länken |
+|---|---|---|
+| `pin` | den bestämmelse som en hänvisningsformad fråga löste ut ("avtalslagen 36 §") — själva svaret | `url` + `#` + `pin.pinpoint` |
+| `fragments` | de ställen i dokumentet där sökorden står, högst tre, dubbletter borttagna | dokumentet; styckena visas *under* träffen |
+
+Bara `pin` flyttar träffens länk. Ett `fragments`-stycke är stödinformation:
+ordet kan stå i ett dokument av skäl som inte är det läsaren frågade efter —
+"dataförordningen" står i artikel 47 i EU:s dataförordning därför att den
+artikeln ändrar en annan förordning genom att citera titeln. Sökfrågan matchar
 även ordprefix (`upphovsr` hittar `upphovsrätt`), och svaret bär `facets`
 (räknade `source`/`kind`/`year`-hinkar över hela träffmängden, inte bara den
 returnerade sidan) som driver facettfältet på webbplatsens fullständiga
@@ -184,10 +196,12 @@ curl -G http://127.0.0.1:8001/api/v1/search \
       "score": 9.1,
       "inbound_count": 5153,
       "highlight": ["… den som <em>uppsåtligen</em> …"],
+      "pin": null,
       "fragments": [
         {
           "uri": "https://lagen.nu/1962:700#K3P1",
           "pinpoint": "K3P1",
+          "label": "3 kap. 1 §",
           "highlight": ["Den som <em>uppsåt</em>ligen berövar annan livet …"]
         }
       ]
@@ -197,7 +211,11 @@ curl -G http://127.0.0.1:8001/api/v1/search \
 ```
 
 `url` är dokumentets publika sökväg (`layout.page_url`); lägg på
-`#<pinpoint>` för att djuplänka direkt till paragrafen.
+`#<pinpoint>` för att djuplänka direkt till paragrafen. `label` namnger stället:
+pinpointen skriven som en läsare citerar den ("6 kap. 3 §", "artikel 47"), eller
+— för ankare utan hänvisningsgrammatik, som ett förarbetes `sec745` — den
+rubrik dokumentet självt sätter över avsnittet ("3.6 Sökbegrepp och
+direktåtkomst"). `null` när ankaret har ingendera (en punkt hos EDPB).
 
 > Returnerar `/api/v1/search` ett fel om OpenSearch inte är igång eller indexet
 > inte är byggt. Kör `lagen all index` och kontrollera `OPENSEARCH_URL`.
@@ -653,10 +671,12 @@ antagit det som modell — dess fält är en delmängd av vad corpuset ändå sv
 med, så anpassningen bestod i att namnge fälten, inte i att smalna av något:
 
 - `search` fick nyckeln `id` per träff. Den pekar på **den mest precisa**
-  träffen — en paragrafdjup match id:as med sitt fragment
+  träffen: löste frågan ut en bestämmelse (`pin`) id:as träffen med den
   (`https://lagen.nu/1962:700#K3P1`), inte med hela balken, så en `fetch` läser
-  paragrafen och inte 300 sidor. Övriga fält (`fragments`, `inbound_count`,
-  `source`/`kind`) ligger kvar orörda för alla andra värdar.
+  paragrafen och inte 300 sidor. En ren fulltextträff id:as med dokumentet —
+  `fragments` säger var orden står, inte att stycket är svaret. Övriga fält
+  (`fragments`, `inbound_count`, `source`/`kind`) ligger kvar orörda för alla
+  andra värdar.
 - `fetch` är ett nytt tunt omslag kring `get_document`. Allt kontraktet saknar
   fält för — källa, typ, myndighetens egen sida, citeringsantal — rider i
   `metadata`.

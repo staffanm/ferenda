@@ -227,8 +227,8 @@ class Fragment(BaseModel):
 
 
 class SearchResult(BaseModel):
-    """One hit. `url` is where to send a reader; `fragments` are the places
-    inside the document the query matched."""
+    """One hit. `url` is where to send a reader, unless `pin` is set -- then it
+    is `url + "#" + pin.pinpoint`."""
 
     uri: str = Field(description="the document's canonical uri -- its id "
                      "everywhere: this API's ?uri=, the dump line, the search "
@@ -262,6 +262,11 @@ class SearchResult(BaseModel):
     highlight: list[str] = Field(
         [], description="the document's own snippet: what this hit is about. "
         "Always the document's, never a passage's.")
+    pin: Fragment | None = Field(
+        None, description="the provision a citation-shaped query resolved to "
+        "(\"avtalslagen 36 §\"). The one thing that moves the link off the "
+        "document: follow `url + \"#\" + pin.pinpoint` when a pin is set, and "
+        "`url` otherwise.")
     fragments: list[Fragment] = Field(
         [], description="the passages inside this document where the query "
         "matched, most relevant first. Supporting detail to show under the "
@@ -540,14 +545,14 @@ def search_endpoint(
     citation (a law nickname/abbreviation + pinpoint, an EU act + article, or a
     case nickname), the exact resource is resolved and pinned as the first
     result -- so ⌘K + Enter lands on the right §/article, which plain full-text
-    can't do (the name appears nowhere in the text). The resolved provision
-    comes back as that hit's first `fragments` entry. The rest is the usual
-    full-text ranking (relevance combined with citation count); each hit
-    carries the document's own snippet plus, in `fragments`, the passages
-    inside it where the query matched.
+    can't do (the name appears nowhere in the text). That resolved provision is
+    the hit's `pin`, and it is the only thing that moves a hit's link off the
+    document. The rest is the usual full-text ranking (relevance combined with
+    citation count); each hit carries the document's own snippet plus, in
+    `fragments`, the passages inside it where the query matched.
 
     Resolution runs on the first page only, and is best-effort: an unbuilt
-    catalog costs the resolved hit, not the search.
+    catalog costs the pin, not the search.
 
     Paging: follow `next_cursor` until it comes back null. `offset` is the
     bounded random-access alternative (up to 9 900) and the two are mutually

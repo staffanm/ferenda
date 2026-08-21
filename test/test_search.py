@@ -74,6 +74,8 @@ def test_doc_actions_document_and_fragment_units(tmp_path):
     assert frag["_source"]["inbound_count"] == 1          # denormalised for ranking
     assert "title" not in frag["_source"]                 # not searchable on a frag
     assert "_routing" not in frag
+    # a paragraf prints no heading of its own -- its anchor names it (K3P1)
+    assert "heading" not in frag["_source"]
 
 
 def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
@@ -140,8 +142,8 @@ def test_doc_actions_omits_the_identifier_when_the_label_is_prose():
     assert prop["_source"]["identifier"] == "Prop. 2022/23:106"
     # emitted units changed without any artifact changing, so the version prefix
     # has to move for the incremental indexer to refresh them
-    assert search.INDEX_FORMAT == "6"
-    assert search._index_version("h1") == "6:h1"
+    assert search.INDEX_FORMAT == "7"
+    assert search._index_version("h1") == "7:h1"
 
 
 def test_doc_actions_no_fragments_carries_full_text(tmp_path):
@@ -261,9 +263,20 @@ def test_cursor_roundtrip_and_search_after_query():
 
 def test_fragment_query_is_bounded_to_page_documents():
     body = search.fragment_query_body("mord", ["u1", "u2"])
-    assert body["size"] == 2 and body["collapse"] == {"field": "doc_uri"}
+    assert body["size"] == 2
     assert {"term": {"is_doc": False}} in body["query"]["bool"]["filter"]
     assert {"terms": {"doc_uri": ["u1", "u2"]}} in body["query"]["bool"]["filter"]
+    # one group per document, and up to PASSAGES_PER_HIT passages inside it --
+    # a single passage per document reads as *the* place the query matched
+    collapse = body["collapse"]
+    assert collapse["field"] == "doc_uri"
+    assert collapse["inner_hits"]["size"] == search.PASSAGE_CANDIDATES
+    assert collapse["inner_hits"]["highlight"] == search.HIGHLIGHT
+    # every field parse_fragment reads has to come back on the inner hit: a
+    # fragment's `_source` is its whole text, so the query asks for these three
+    # by name -- and leaving `heading` out silently unnamed every förarbete
+    # passage (the label fell back to None with no error anywhere)
+    assert collapse["inner_hits"]["_source"] == ["uri", "pinpoint", "heading"]
 
 
 def test_prefix_query_handles_incomplete_legal_compounds_and_syntax():
@@ -284,9 +297,11 @@ def test_highlight_cap_stays_under_index_limit():
     # the cap has to ride every body that highlights, and the ranking query no
     # longer does: `search` asks for the page's snippets separately
     assert "highlight" not in search.query_body("mord", highlight=False)
-    for body in (search.document_highlight_body("mord", ["u1"]),
-                 search.fragment_query_body("mord", ["u1"])):
-        assert body["highlight"]["max_analyzer_offset"] == offset
+    assert (search.document_highlight_body("mord", ["u1"])
+            ["highlight"]["max_analyzer_offset"] == offset)
+    # the fragment query highlights inside the collapse, not on the outer hit
+    assert (search.fragment_query_body("mord", ["u1"])["collapse"]["inner_hits"]
+            ["highlight"]["max_analyzer_offset"] == offset)
 
 
 # the four steps of one real beredningskedja, as the live index holds their titles
@@ -399,29 +414,71 @@ def test_parse_hit_strips_the_function_word_marks_it_returns():
                                 "det ”<em>hot</em>” som <em>motiverade</em> styrkan"]
 
 
-def test_parse_hit_fragment_representative():
-    # a fragment unit won the group -> its pinpoint + highlight surface, and the
-    # document identity comes from the display-only doc_title / doc_label
-    hit = search.parse_hit({
+def test_distinct_passages_drops_what_a_passage_above_already_marked():
+    # a fragment's text includes its descendants', so 14 § and 14 § 1 st mark the
+    # same words -- one line for the two of them
+    def passage(pinpoint, *marked):
+        return {"uri": "u1#" + pinpoint, "pinpoint": pinpoint, "label": None,
+                "highlight": list(marked)}
+    kept = search.distinct_passages(
+        [passage("P14", "om <em>rekonstruktion</em>"),
+         passage("P14S1", "om <em>rekonstruktion</em>"),
+         passage("P8", "beslutet om <em>rekonstruktion</em>"),
+         passage("P3"),                                 # matched, nothing marked
+         passage("P2", "en <em>rekonstruktion</em> inleds")], 3)
+    assert [p["pinpoint"] for p in kept] == ["P14", "P8", "P2"]
+
+
+def test_doc_actions_names_a_section_fragment_by_its_heading(tmp_path):
+    # a förarbete section's anchor ("sec2") is no citation, so the fragment
+    # carries the heading the document prints over it -- trimmed, since a
+    # runaway parse would otherwise push the marked text off the result line
+    art = tmp_path / "sou.json"
+    art.write_text(json.dumps({
+        "uri": "https://lagen.nu/utr/sou/2025:1",
+        "body": [{"type": "avsnitt", "id": "sec1", "text": ["Sammanfattning"],
+                  "children": [{"text": ["Utredningen föreslår."]}]},
+                 {"type": "avsnitt", "id": "sec2",
+                  "text": ["8.5.1 " + "Samspelet mellan bestämmelserna " * 4],
+                  "children": [{"text": ["Av artikel 1.5 följer."]}]},
+                 {"type": "stycke", "id": "S1", "text": ["Ett vanligt stycke."]}]}))
+    units = {u["_id"].rsplit("#", 1)[-1]: u["_source"] for u in search.doc_actions(
+        ("https://lagen.nu/utr/sou/2025:1", "forarbete", "sou", "SOU 2025:1",
+         "En utredning", str(art)), 0, version="h1")}
+    assert units["sec1"]["heading"] == "Sammanfattning"
+    assert len(units["sec2"]["heading"]) <= search.HEADING_CHARS + 1
+    assert units["sec2"]["heading"].startswith("8.5.1 Samspelet")
+    assert units["sec2"]["heading"].endswith("…")
+    assert "heading" not in units["S1"]          # a stycke prints body, not a heading
+
+
+def test_parse_fragment_names_the_pinpoint_it_can_name():
+    # a passage says where in the document the words stand. `label` is the
+    # pinpoint as a reader cites it, and None where the anchor has no citation
+    # grammar (a förarbete section id) -- the passage then shows its text alone
+    passage = search.parse_fragment({
         "_source": {"doc_uri": "https://lagen.nu/1962:700",
-                    "uri": "https://lagen.nu/1962:700#K3P1", "is_doc": False,
-                    "pinpoint": "K3P1", "doc_label": "SFS 1962:700",
-                    "doc_title": "Brottsbalk", "doc_display": "Brottsbalk",
-                    "source": "sfs", "kind": "law", "inbound_count": 42},
-        "_score": 7.5,
+                    "uri": "https://lagen.nu/1962:700#K3P1", "pinpoint": "K3P1"},
         "highlight": {"text": ["döms för <em>mord</em>"]},
     })
-    assert hit["uri"] == "https://lagen.nu/1962:700"       # the document, not the frag
-    assert hit["identifier"] == "SFS 1962:700" and hit["title"] == "Brottsbalk"
-    assert hit["display"] == "Brottsbalk"                  # the heading, from doc_display
-    assert hit["inbound_count"] == 42 and hit["score"] == 7.5
-    assert hit["fragments"] == [{"uri": "https://lagen.nu/1962:700#K3P1",
-                                 "pinpoint": "K3P1",
-                                 "highlight": ["döms för <em>mord</em>"]}]
+    assert passage == {"uri": "https://lagen.nu/1962:700#K3P1", "pinpoint": "K3P1",
+                       "label": "3 kap. 1 §",
+                       "highlight": ["döms för <em>mord</em>"]}
+    # no citation grammar -> the heading the document prints over the section
+    assert search.parse_fragment(
+        {"_source": {"uri": "u1#sec745", "pinpoint": "sec745",
+                     "heading": "8.5.1 Samspelet mellan bestämmelserna"},
+         "highlight": {"text": ["<em>mord</em>"]}})["label"] == \
+        "8.5.1 Samspelet mellan bestämmelserna"
+    # neither: an EDPB point, whose passage shows its text alone
+    assert search.parse_fragment(
+        {"_source": {"uri": "u1#punkt5", "pinpoint": "punkt5"},
+         "highlight": {"text": ["<em>mord</em>"]}})["label"] is None
 
 
-def test_parse_hit_document_representative_has_no_fragment():
-    # the whole-document unit won (e.g. a title match) -> no pinpoint fragment
+def test_parse_hit_is_a_document_hit_with_no_pin():
+    # full text finds documents: the hit has no pin, so nothing moves its link
+    # off the document, and its passages are merged in by `search`
     hit = search.parse_hit({
         "_source": {"doc_uri": "https://lagen.nu/1962:700",
                     "uri": "https://lagen.nu/1962:700", "is_doc": True,
@@ -430,7 +487,7 @@ def test_parse_hit_document_representative_has_no_fragment():
         "highlight": {"title": ["<em>Brottsbalk</em>"]},
     })
     assert hit["uri"] == "https://lagen.nu/1962:700"
-    assert hit["fragments"] == []
+    assert hit["pin"] is None and hit["fragments"] == []
     assert hit["highlight"] == ["<em>Brottsbalk</em>"]    # falls back to title
 
 
@@ -461,7 +518,11 @@ def test_search_parses_filtered_total_and_facet_buckets():
     assert result["next_cursor"] is None
 
 
-def test_search_returns_cursor_and_merges_best_fragment():
+def test_search_adds_passages_without_moving_the_hit():
+    """The passage query ADDS to a hit. The document keeps its own snippet and
+    stays what the hit points at -- the reader who searched "dataförordningen"
+    wants the act, not article 47, which is where the act's name stands because
+    that article amends another regulation by quoting the title."""
     class Client:
         def __init__(self):
             self.calls = 0
@@ -485,22 +546,28 @@ def test_search_returns_cursor_and_merges_best_fragment():
                 assert {"terms": {"uri": ["u1"]}} in body["query"]["bool"]["filter"]
                 return {"hits": {"hits": [{
                     "_source": {"uri": "u1"},
-                    "highlight": {"title": ["<em>One</em>"]},
+                    "highlight": {"text": ["the <em>document</em> itself"]},
                 }]}}
-            assert body["collapse"] == {"field": "doc_uri"}
+            assert body["collapse"]["field"] == "doc_uri"
             return {"hits": {"hits": [{
-                "_source": {"doc_uri": "u1", "uri": "u1#P1", "is_doc": False,
-                            "pinpoint": "P1", "doc_title": "One", "source": "sfs"},
-                "highlight": {"text": ["<em>mord</em>"]},
+                "_source": {"doc_uri": "u1"},
+                "inner_hits": {"passages": {"hits": {"hits": [
+                    {"_source": {"uri": "u1#K3P1", "pinpoint": "K3P1"},
+                     "highlight": {"text": ["<em>mord</em>"]}},
+                    {"_source": {"uri": "u1#K3P2", "pinpoint": "K3P2"},
+                     "highlight": {"text": ["dråp och <em>mord</em>"]}},
+                ]}}},
             }]}}
 
     index = object.__new__(search.SearchIndex)
     index.index = "test"
     index.client = Client()
     result = index.search("mord", limit=1)
-    assert result["results"][0]["fragments"][0]["pinpoint"] == "P1"
-    # the fragment's snippet wins over the whole-document one
-    assert result["results"][0]["highlight"] == ["<em>mord</em>"]
+    top = result["results"][0]
+    assert top["pin"] is None                       # nothing moves the link
+    assert top["highlight"] == ["the <em>document</em> itself"]   # the doc's own
+    assert [(f["pinpoint"], f["label"]) for f in top["fragments"]] == [
+        ("K3P1", "3 kap. 1 §"), ("K3P2", "3 kap. 2 §")]
     sort, seen = search.decode_cursor(result["next_cursor"])
     assert sort == [5.0, "u1"] and seen == 1
 

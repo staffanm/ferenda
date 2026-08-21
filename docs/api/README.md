@@ -100,8 +100,12 @@ fail search.
       "score": 12.3,                       // null for a pinned/resolved hit
       "inbound_count": 2783,
       "highlight": ["…<em>ränta</em>…"],   // the document's own snippet
-      // where inside the document the query matched. A citation-shaped query
-      // puts the provision it resolved to first.
+      // set only when the query read as a citation. THE ONE THING THAT MOVES
+      // THE LINK: follow `url + "#" + pin.pinpoint` when it is set.
+      "pin": { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "P6",
+               "label": "6 §", "highlight": ["…"] },
+      // where inside the document the query matched — supporting detail under
+      // the hit, never its link target
       "fragments": [
         { "uri": "https://lagen.nu/1975:635#P6", "pinpoint": "P6",
           "label": "6 §", "highlight": ["…"] }

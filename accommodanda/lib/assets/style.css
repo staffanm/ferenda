@@ -1280,6 +1280,19 @@ body.browse .gr-body.solo { max-width: var(--page-max); }
 .full-search-hit .hit-snip { color: var(--ink-2); margin: .35rem 0 0;
                              font-size: .92rem; }
 .full-search-hit .hit-snip em { font-style: normal; background: var(--mark); }
+/* the passages inside the document where the query matched -- indented under
+   the hit, each its own link to that §/article, so the hit itself still leads
+   to the document */
+.full-search-hit .hit-passages { list-style: none; margin: .5rem 0 0;
+                                 padding: 0 0 0 .85rem;
+                                 border-left: 2px solid var(--rule); }
+.full-search-hit .hit-passages li + li { margin-top: .35rem; }
+.full-search-hit .hit-passages a { display: block; color: var(--ink-2);
+                                   font-size: .88rem; text-decoration: none; }
+.full-search-hit .hit-passages a:hover { text-decoration: underline; }
+.full-search-hit .hit-passages em { font-style: normal; background: var(--mark); }
+.full-search-hit .passage-label { color: var(--ink-3); font-family: var(--sans);
+                                  font-size: .8rem; white-space: nowrap; }
 .search-pagination { display: flex; justify-content: space-between; align-items: center;
                      gap: 1rem; margin: 1.25rem 0; color: var(--ink-3); font-size: .85rem; }
 .search-pagination button:disabled { visibility: hidden; }

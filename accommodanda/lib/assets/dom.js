@@ -41,27 +41,39 @@
     try { return JSON.parse(s.textContent); } catch (e) { return {}; }
   }
 
-  // One search hit -> the three things both result lists show, so the ⌘K palette
+  // One search hit -> the fields both result lists show, so the ⌘K palette
   // (search.js) and the full page (/sok/, fullsearch.js) cannot describe the
   // same hit differently (Q4). `sub` is the citation id where it adds anything
   // over the heading, else what sort of document this is -- a lagrådsremiss or
   // a promemoria carries no number, so its identifier *is* its title and the
   // full page used to show a bare heading with no hint of its kind.
+  //
+  // A hit leads to its DOCUMENT. The one exception is `r.pin`: the provision a
+  // citation-shaped query resolved to, which is the answer itself. The API's
+  // other fragment field, `r.fragments`, holds the passages full text matched
+  // inside the document -- supporting detail (`passages`, rendered under the
+  // hit on /sok/), never the link. Reading the two as one field is what sent
+  // "dataförordningen" into article 47 of the EU Data Act: the act's name
+  // stands there because that article amends another regulation by quoting the
+  // title, and the palette followed the passage instead of the act.
   function hitFields(r) {
-    var frag = r.fragments && r.fragments[0];
+    var pin = r.pin;
+    var url = r.url || '#';
     var title = r.display || r.title || r.identifier || r.uri;
     // a citation-resolved hit leads with the provision it landed on -- the
     // reader asked for "4 kap. 4 § brottsbalken", so "Brottsbalk (1962:700)"
     // alone gave no sign the pin had worked (Q2)
-    var sub = (frag && frag.label) ||
+    var sub = (pin && pin.label) ||
               ((r.identifier && r.identifier !== title) ? r.identifier
                  : (r.kind_label || ''));
     return {
-      target: (r.url || '#') + (frag && frag.pinpoint ? '#' + frag.pinpoint : ''),
+      url: url,
+      target: url + (pin && pin.pinpoint ? '#' + pin.pinpoint : ''),
       title: title,
       sub: sub,
-      snippet: (frag && frag.highlight && frag.highlight[0]) ||
-               (r.highlight && r.highlight[0]) || ''
+      snippet: (pin && pin.highlight && pin.highlight[0]) ||
+               (r.highlight && r.highlight[0]) || '',
+      passages: r.fragments || []
     };
   }
 

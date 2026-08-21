@@ -40,6 +40,7 @@ from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
 from . import catalog, compress, facets, layout, text
+from .pinpoint import pinpoint_label
 
 INDEX = "lagen"
 # bump when emitted units change without artifact changes. 5: dropped the `all`
@@ -47,8 +48,13 @@ INDEX = "lagen"
 # be recreated rather than migrated, and every unit re-emitted into it. 6: a
 # document whose label is its own title, with no number in it, no longer emits
 # `identifier` (see citation_identifier) -- emitted-unit change only, so an
-# ordinary incremental index pass refreshes the affected units.
-INDEX_FORMAT = "6"
+# ordinary incremental index pass refreshes the affected units. 7: a fragment
+# unit carries the `heading` its document prints over it, which names a passage
+# whose anchor has no citation grammar (a förarbete's "sec745"). A new field,
+# added to a live index by `_require_current_schema`'s put_mapping -- no
+# recreate -- but every unit has to be re-emitted to fill it, which the bumped
+# format forces.
+INDEX_FORMAT = "7"
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -208,6 +214,11 @@ MAPPING = {
             # (index:false so a title/identifier query matches the WHOLE-DOC unit,
             # not every one of its fragments -- otherwise a title hit would collapse
             # to a random paragraph). Returned in _source for the result label.
+            # the heading the document prints over this fragment (index:false,
+            # display only -- it names the passage in a result list; making it
+            # searchable would score a section's title as if it were the
+            # document's). Only on a fragment whose node type prints one.
+            "heading":       {"type": "keyword", "index": False},
             "doc_title":     {"type": "keyword", "index": False},
             "doc_label":     {"type": "keyword", "index": False},
             "doc_display":   {"type": "keyword", "index": False},
@@ -326,7 +337,8 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     # the reader-facing heading, shared with the page and listings: short name +
     # acronym where the artifact carries them, else the full title (catalog)
     display = catalog.display_title(art, title)
-    frags = [(fu, ft) for fu, ft in text.fragment_texts(art) if ft]
+    frags = [(fu, ft, fh) for fu, ft, fh
+             in text.fragment_texts_and_headings(art) if ft]
     # The whole-document unit also carries the complete body: result paging then
     # operates over exactly one unit per document (exact total + search_after).
     # Fragment units remain for a bounded second query that finds the best
@@ -343,13 +355,15 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     # a fragment carries the document's label as `doc_label` -- index:false, so it
     # is the hit's display identifier and never a scored field; the amplification
     # citation_identifier removes cannot arise here
-    for frag_uri, frag_text in frags:
-        yield {"_id": frag_uri,
-               "_source": {**shared, "uri": frag_uri, "is_doc": False,
-                           "text": frag_text,
-                           "pinpoint": frag_uri.split("#", 1)[1],
-                           "doc_title": title, "doc_label": label,
-                           "doc_display": display}}
+    for frag_uri, frag_text, frag_heading in frags:
+        unit = {**shared, "uri": frag_uri, "is_doc": False,
+                "text": frag_text,
+                "pinpoint": frag_uri.split("#", 1)[1],
+                "doc_title": title, "doc_label": label,
+                "doc_display": display}
+        if frag_heading:
+            unit["heading"] = fragment_heading(frag_heading)
+        yield {"_id": frag_uri, "_source": unit}
 
 
 # --------------------------------------------------------------------------
@@ -489,8 +503,30 @@ def document_highlight_body(q, uris):
     }
 
 
+# How many matching passages one result carries. A document-level hit answers
+# "this document" and a passage answers "and here is where the words stand" --
+# one passage per document made the second answer look like the first, since a
+# single §/article reads as *the* place the query matched. The old lagen.nu
+# search showed up to three (ferenda/fulltextindex.py, `has_child` inner hits);
+# three still fits under a hit without turning the result list into a page of
+# text.
+PASSAGES_PER_HIT = 3
+
+# how many the query asks for. A fragment's text includes its descendants', so
+# a §, its stycke and its chapter answer the same query with the same words:
+# "företagsrekonstruktion" returned 14 § and 14 § 1 st of SFS 2022:1328 with one
+# identical snippet. `distinct_passages` drops the repeats, and asking for more
+# than we keep leaves it something to fall back on.
+PASSAGE_CANDIDATES = PASSAGES_PER_HIT + 3
+
+
 def fragment_query_body(q, doc_uris):
-    """Best matching fragment for each document on one returned result page."""
+    """The matching passages of each document on one returned result page.
+
+    Collapsed by `doc_uri` so each document answers once, with its top
+    PASSAGES_PER_HIT fragments as that group's inner hits. The outer hit needs
+    nothing but the group key -- a fragment's `_source` carries its whole text,
+    and the passages themselves come back from `inner_hits`."""
     return {
         "size": len(doc_uris),
         "query": {"bool": {
@@ -498,8 +534,12 @@ def fragment_query_body(q, doc_uris):
             "filter": [{"term": {"is_doc": False}},
                        {"terms": {"doc_uri": doc_uris}}],
         }},
-        "collapse": {"field": "doc_uri"},
-        "highlight": HIGHLIGHT,
+        "_source": ["doc_uri"],
+        "collapse": {"field": "doc_uri",
+                     "inner_hits": {"name": "passages",
+                                    "size": PASSAGE_CANDIDATES,
+                                    "_source": ["uri", "pinpoint", "heading"],
+                                    "highlight": HIGHLIGHT}},
     }
 
 
@@ -542,30 +582,80 @@ def hit_highlight(h):
             or strip_stopword_highlights(hl.get("title", [])))
 
 
-def parse_hit(h):
-    """Shape either a document hit or a collapsed best-fragment hit.
+# How much of a fragment's heading to keep. It is a line label in a result list,
+# not a title: 935 of 962 sampled förarbete headings already fit, and the rest
+# are runaway parses ("3 Vidare har hävdats att skattefri försäljning …") that
+# would push the marked text off the line.
+HEADING_CHARS = 80
 
-    The caller merges a fragment hit's pinpoint/highlight onto its document hit,
-    which is the API/UI shape that deep-links into the matching provision.
+
+def fragment_heading(heading):
+    """A fragment's heading trimmed to HEADING_CHARS, on a word boundary."""
+    if len(heading) <= HEADING_CHARS:
+        return heading
+    return heading[:HEADING_CHARS].rsplit(" ", 1)[0] + "…"
+
+
+def parse_fragment(h):
+    """One matching passage of a document: where in it the words stand, and the
+    words themselves.
+
+    `label` names the place. First choice is the pinpoint as a reader cites it
+    ("3 kap. 1 §", "artikel 47"); where the anchor has no citation grammar -- a
+    förarbete section id ("sec745") -- it is the heading the document prints
+    over that section ("8.5.1 Samspelet mellan dataskyddsförordningens och
+    dataförordningens bestämmelser"), indexed with the fragment. None only where
+    the anchor has neither, as an EDPB stycke ("punkt5") has neither."""
+    src = h["_source"]
+    return {"uri": src["uri"], "pinpoint": src.get("pinpoint"),
+            "label": (pinpoint_label(src.get("pinpoint") or "")
+                      or src.get("heading") or None),
+            "highlight": strip_stopword_highlights(
+                h.get("highlight", {}).get("text", []))}
+
+
+def distinct_passages(passages, limit):
+    """The passages to show under one hit: the first `limit` that mark words no
+    passage above them already marked. Keyed on the first marked span, since a
+    nested provision and its parent highlight the same words in the same order.
+
+    A passage that repeats the DOCUMENT's snippet is kept: it says where those
+    words stand, which the snippet does not -- "Artikel 47" under the EU Data
+    Act names the article that quotes the act's title."""
+    seen, kept = set(), []
+    for passage in passages:
+        if not passage["highlight"] or passage["highlight"][0] in seen:
+            continue
+        seen.add(passage["highlight"][0])
+        kept.append(passage)
+        if len(kept) == limit:
+            break
+    return kept
+
+
+def parse_hit(h):
+    """Shape one whole-document hit.
+
+    `pin` is the citation-resolved target and stays None here: full text finds
+    documents, and the passages it matched inside one are `fragments`. Only
+    `pins.resolved_results` -- where the query IS a pinpoint -- sets a pin, and
+    only a pin moves the hit's link off the document (see api/README.md).
     """
     src = h["_source"]
-    hl = h.get("highlight", {})
-    fragments = ([] if src.get("is_doc") else
-                 [{"uri": src["uri"], "pinpoint": src.get("pinpoint"),
-                   "highlight": strip_stopword_highlights(hl.get("text", []))}])
     return {
         "uri": src["doc_uri"],
         # the public page path, set here rather than by each consumer: the other
         # producer of this shape (`pins.resolved_results`) has always set it, so
         # both REST and MCP were re-adding it to every full-text row
         "url": layout.page_url(src["doc_uri"]),
-        "identifier": src.get("identifier") or src.get("doc_label"),
-        "title": src.get("title") or src.get("doc_title"),
-        "display": src.get("display") or src.get("doc_display"),
+        "identifier": src.get("identifier"),
+        "title": src.get("title"),
+        "display": src.get("display"),
         "source": src.get("source"), "kind": src.get("kind"),
         "score": h.get("_score"), "inbound_count": src.get("inbound_count", 0),
         "highlight": hit_highlight(h),
-        "fragments": fragments,
+        "pin": None,
+        "fragments": [],
     }
 
 
@@ -1022,13 +1112,19 @@ class SearchIndex:
             fragment_res = _retry(lambda: self.client.search(
                 index=self.index, body=fragment_query_body(q, doc_uris)),
                 "fragment search")
-            fragments = {hit["_source"]["doc_uri"]: parse_hit(hit)
-                         for hit in fragment_res["hits"]["hits"]}
+            # the passages are ADDED to the hit; the document keeps its own
+            # snippet and stays what the hit links to. Overwriting the snippet
+            # with a passage's, and letting the client link to that passage,
+            # sent a reader who searched an act's name ("dataförordningen") into
+            # the one article that quotes the title (article 47 of the EU Data
+            # Act, which amends another regulation).
+            passages = {hit["_source"]["doc_uri"]:
+                        [parse_fragment(inner) for inner
+                         in hit["inner_hits"]["passages"]["hits"]["hits"]]
+                        for hit in fragment_res["hits"]["hits"]}
             for result in results:
-                fragment = fragments.get(result["uri"])
-                if fragment and fragment["fragments"]:
-                    result["fragments"] = fragment["fragments"]
-                    result["highlight"] = fragment["highlight"]
+                result["fragments"] = distinct_passages(
+                    passages.get(result["uri"], []), PASSAGES_PER_HIT)
 
         # the cursor resumes after the last candidate this page CONSUMED, not the
         # last one it showed -- a capped-out hit is decluttered for good, and page 2
