@@ -13,7 +13,8 @@ flow:
     eurlex, via `patchsource`) -- with any existing patch already applied, plus a
     fingerprint of the pristine text.
   * the editor edits that text; ``POST /patch/save`` diffs it against the pristine
-    intermediate, writes the *minimal* unified diff to ``patches/<source>/…``,
+    intermediate, writes the *minimal* unified diff to the content repo's
+    ``patches/<source>/…``,
     commits it attributed to the logged-in editor, and force-reparses the document
     so the fix is live. A 409 if the source drifted under the edit.
   * ``GET /patch/edit`` is a small self-contained HTML page wrapping the two --
@@ -114,18 +115,20 @@ def save(body: SaveBody, editor: Editor = Depends(require_editor)):
                   obfuscated=body.obfuscated)
     _reparse(body.source, body.basefile)
     return {"removed": removed, "sha": sha,
-            "path": None if removed else str(path.relative_to(config.PATCH_REPO))}
+            "path": None if removed else str(path.relative_to(config.WIKI_ROOT))}
 
 
 def _commit(source, basefile, editor, removed, obfuscated):
-    """Stage a document's patch files and commit them to the patch repo as the
+    """Stage a document's patch files and commit them to the content repo as the
     logged-in editor (identity = their name/email, exactly as a hand commit
     would attribute it). Returns the commit sha, or HEAD when nothing changed.
 
-    The repo is `config.PATCH_REPO`, which `layout.PATCHES` is derived from --
-    so the paths staged here and the paths written by `create_patch` come from
-    one root and cannot disagree."""
-    repo = config.PATCH_REPO
+    The repo is `config.WIKI_ROOT`, which `layout.PATCHES` is derived from -- so
+    the paths staged here and the paths written by `create_patch` come from one
+    root and cannot disagree. It is the same checkout the commentary editor next
+    door commits into: a patch is editorial knowledge about one document, and
+    both editors write to one repo, which is pushed once."""
+    repo = config.WIKI_ROOT
     rels = [str(layout.patch(source, basefile, sfx).relative_to(repo))
             for sfx in (patchlib.PLAIN_SUFFIX, patchlib.ROT18_SUFFIX, ".desc")]
     # stage only the variants that exist on disk (a write) or are tracked (a

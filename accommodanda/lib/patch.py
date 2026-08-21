@@ -19,9 +19,10 @@ A patch is an ordinary unified diff (``difflib`` / ``diff -u`` format) against
 the document's *best intermediate format* -- the representation the parser
 actually reads and that a human can meaningfully edit: plain text for SFS, the
 innehåll HTML for DV, the Formex XML for eurlex. It lives at
-``patches/<source>/<relpath>.patch`` (or ``.rot18.patch``), committed with the
-pipeline code (``layout.patch``). A single-line description rides on the first
-hunk's ``@@`` header; a multi-line one goes in a sibling ``.desc`` file.
+``patches/<source>/<relpath>.patch`` (or ``.rot18.patch``) in the git-backed
+content repo, beside the commentaries and the annotation layers
+(``layout.patch``). A single-line description rides on the first hunk's ``@@``
+header; a multi-line one goes in a sibling ``.desc`` file.
 
 This module is deliberately *mechanical* -- locate / read / apply / create a
 patch over a text string it is handed. It knows nothing about any source (lib

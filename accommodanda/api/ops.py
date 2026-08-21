@@ -231,14 +231,13 @@ def ops_overview():
     if updated and (now - _parse_iso(updated) > timedelta(hours=STALE_AFTER_H)):
         parts.append(TPL.stale_banner(updated, _age(updated, now=now)))
 
-    # system: running revision + host, push state of both checkouts the site
-    # writes into, search-index size. The patch repo is reported for the same
-    # reason the wiki is: the editor commits into it but nothing pushes it, so
-    # unpushed redactions would otherwise sit there unannounced.
+    # system: running revision + host, push state of the checkout the site
+    # writes into, search-index size. The content repo is reported because both
+    # editors commit into it -- commentaries and source patches alike -- but
+    # nothing pushes it, so unpushed redactions would sit there unannounced.
     parts.append(TPL.system_line(
         _age(updated, now=now) if updated else "never", len(errors),
-        _version(), runlog.this_host(),
-        _repo_state(config.WIKI_ROOT), _repo_state(config.PATCH_REPO),
+        _version(), runlog.this_host(), _repo_state(config.WIKI_ROOT),
         _index_size()))
 
     # one row per source: every source the catalog knows plus every source the

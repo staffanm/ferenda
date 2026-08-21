@@ -475,9 +475,9 @@ def _git(repo, *args):
 
 @pytest.fixture
 def webenv(tmp_path, monkeypatch):
-    """A git 'code repo', a configured editor, an isolated patch store keyed to a
-    single fake patchable source whose pristine text is a fixed constant, and a
-    recording reparse stub."""
+    """A checkout standing in for the content repo, a configured editor, an
+    isolated patch store keyed to a single fake patchable source whose pristine
+    text is a fixed constant, and a recording reparse stub."""
     repo = tmp_path / "repo"
     (repo / "patches").mkdir(parents=True)
     _git(repo, "init", "-q")
@@ -485,7 +485,7 @@ def webenv(tmp_path, monkeypatch):
     _git(repo, "config", "user.email", "seed@example.org")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "seed")
 
-    monkeypatch.setattr(config, "PATCH_REPO", repo)
+    monkeypatch.setattr(config, "WIKI_ROOT", repo)
     monkeypatch.setattr(layout, "PATCHES", repo / "patches")
     monkeypatch.setattr(config, "EDITOR_SECRET", "test-signing-key")
     monkeypatch.setattr(config, "COOKIE_SECURE", False)
@@ -654,31 +654,34 @@ def test_the_patch_editor_writes_nothing_outside_the_patch_tree(webenv):
 
 
 # --------------------------------------------------------------------------
-# PATCH_REPO resolution and the guard on an absent patch tree
+# where the patch tree sits, and the guard on an absent one
 # --------------------------------------------------------------------------
 
-def test_patch_repo_defaults_to_this_repo():
-    """With nothing configured, patches resolve to the tracked in-repo tree."""
-    assert config.resolve_patch_repo({}) == config.REPO
-    assert (config.REPO / "accommodanda" / "patches").is_dir()
+def test_patches_live_in_the_content_repo(monkeypatch):
+    """Patches sit in the content repo beside the commentaries and the
+    annotation layers, not in this code repo -- one checkout for everything the
+    running site writes, so there is one mount and one push."""
+    assert layout.PATCHES == config.WIKI_ROOT / "patches"
+    monkeypatch.delenv("WIKI_ROOT", raising=False)
+    assert config.resolve_wiki_root({}) == config.DEFAULT_WIKI_ROOT
 
 
-def test_patch_repo_precedence(monkeypatch, tmp_path):
+def test_wiki_root_precedence(monkeypatch, tmp_path):
     """env beats config.yml beats the default -- the precedence every other
     scalar setting in config.py follows."""
-    monkeypatch.delenv("PATCH_REPO", raising=False)
-    assert config.resolve_patch_repo({"patch_repo": str(tmp_path)}) == tmp_path
+    monkeypatch.delenv("WIKI_ROOT", raising=False)
+    assert config.resolve_wiki_root({"wiki_root": str(tmp_path)}) == tmp_path
 
-    monkeypatch.setenv("PATCH_REPO", str(tmp_path / "from-env"))
-    assert (config.resolve_patch_repo({"patch_repo": str(tmp_path)})
+    monkeypatch.setenv("WIKI_ROOT", str(tmp_path / "from-env"))
+    assert (config.resolve_wiki_root({"wiki_root": str(tmp_path)})
             == tmp_path / "from-env")
 
 
 def test_absent_patch_tree_is_fatal(monkeypatch, tmp_path):
-    """A PATCH_REPO with no patch tree must fail loudly. Returning "no patch"
+    """A WIKI_ROOT with no patch tree must fail loudly. Returning "no patch"
     instead would drop every redaction and republish the personal data the
     .rot18 patches exist to remove."""
     monkeypatch.setattr(layout, "PATCHES", tmp_path / "nope")
-    monkeypatch.setattr(config, "PATCH_REPO", tmp_path)
-    with pytest.raises(AssertionError, match="PATCH_REPO"):
+    monkeypatch.setattr(config, "WIKI_ROOT", tmp_path)
+    with pytest.raises(AssertionError, match="WIKI_ROOT"):
         layout.patch("sfs", "2020:123")

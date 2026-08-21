@@ -245,8 +245,10 @@ carries personal data that must be redacted. Rather than fork the parser with
 per-document special cases, a **patch file** is a unified diff applied to a
 document's *intermediate source text* before parsing — the plain text (SFS), the
 innehåll HTML (DV), the Formex XML (eurlex), or the extracted PDF text (the
-PDF-bodied sources). Patches live under `patches/<source>/…` and are authored
-either from the CLI or through the editor UI:
+PDF-bodied sources). Patches live under `patches/<source>/…` in the git-backed
+content repo (`WIKI_ROOT`, the sibling `../lagen-wiki`), beside the commentaries
+and the annotation layers. They are authored either from the CLI or through the
+editor UI:
 
 - `lagen <source> patch-show <basefile>` prints the document's intermediate
   source text (existing patch already applied) — the text you patch against.

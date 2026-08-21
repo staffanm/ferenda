@@ -152,33 +152,23 @@ services:
       # interface, so nothing outside it can reach uvicorn at all. uvicorn
       # matches CIDR here from 0.31 on (pinned in pyproject.toml).
       - FORWARDED_ALLOW_IPS=172.19.0.0/16
-      # The checkout the /patch editor reads and WRITES its patches in
-      # (at <PATCH_REPO>/accommodanda/patches). It commits every save, so the
-      # tree has to sit inside a real checkout -- and the image is built with
-      # `.git` excluded (.dockerignore), so the in-image accommodanda/patches
-      # can neither commit nor survive a redeploy. The mount below supplies
-      # one; see the volumes list.
-      - PATCH_REPO=/patchrepo
     volumes:
       # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
       # the roomy 2 TB /mnt/forstor NFS mount.
       - /mnt/forstor/accommodanda:/app/site/data
       # catalog_root: just catalog.sqlite (+ -wal/-shm), on the fast local disk.
       - /mnt/data/accommodanda:/app/catalog
-      # begrepp/kommentar/site markdown repo (a git clone on the host). Lives on
-      # the roomy /mnt/forstor NFS mount (only latency-sensitive SQLite is kept on
-      # local /mnt/data); it's root_squashed, so the checkout is owned 1001:3362
-      # (staffan:lagen-nfs) and pushes are done from the host, not the container.
+      # The one checkout the running site WRITES into (a clone on the host):
+      # begrepp/kommentar/site markdown, the annotation layers, and the source
+      # patches the /patch editor commits (at <WIKI_ROOT>/patches). Both editors
+      # commit every save, so the tree has to sit inside a real checkout -- and
+      # the image is built without `.git` (.dockerignore), so an in-image tree
+      # could neither commit nor survive a redeploy. Lives on the roomy
+      # /mnt/forstor NFS mount (only latency-sensitive SQLite is kept on local
+      # /mnt/data); it's root_squashed, so the checkout is owned 1001:3362
+      # (staffan:lagen-nfs), which is what the container runs as, so the editors
+      # can write and commit. Pushes are done from the host, not the container.
       - /mnt/forstor/lagen-wiki:/wiki
-      # The patch tree the editor commits into: a full checkout of THIS repo on
-      # the host, so a patch written on prod is an ordinary commit that pushes
-      # to origin and reaches dev by pull -- the same arrangement as lagen-wiki
-      # above. On local /mnt/data rather than the NFS mount: the checkout is
-      # small (~200 MB), a repo is latency-sensitive the way the catalog is,
-      # and /mnt/forstor is root:lagen-nfs, so creating a directory there needs
-      # root. Owned by uid 1001, which is what the container runs as, so the
-      # editor can write and commit; pushes are done from the host.
-      - /mnt/data/ferenda-patchrepo:/patchrepo
       # Secrets + editor registry (editor_secret, editors[].pwhash, ops_token, LLM
       # key). config.py reads config.yml from the repo root (/app); without this
       # mount the file is absent and everything falls back to defaults -- the inline

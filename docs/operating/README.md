@@ -82,7 +82,7 @@ default — an absent `config.yml` runs a dev checkout out of the box.
 ```yaml
 # --- corpus location -------------------------------------------------
 data_root: /srv/lagen/data          # downloaded + artifact + generated trees; default <repo>/site/data
-wiki_root: ../lagen-wiki             # git-backed markdown content repo (begrepp/kommentar/site); default ../lagen-wiki
+wiki_root: ../lagen-wiki             # git-backed content repo (begrepp/kommentar/site/ann/patches); default ../lagen-wiki
 legacy_root: ../ferenda.old/data     # frozen legacy corpora, referenced in place; default ../ferenda.old/data
 
 # --- services --------------------------------------------------------
@@ -127,11 +127,12 @@ editors:                             # hand-curated; there is no self-signup
 A present-but-invalid value raises `ConfigError` at startup rather than
 silently falling back — a typo must never disable auth quietly.
 
-### Content repo (wiki + site)
+### Content repo (wiki + site + patches)
 
-Commentary (`kommentar`), the concept glossary (`begrepp`), and the editorial
-chrome (frontpage / om / sitenews) are **git-backed markdown** in a separate
-repo checked out alongside this one:
+Commentary (`kommentar`), the concept glossary (`begrepp`), the editorial
+chrome (frontpage / om / sitenews), the LLM annotation layers (`ann/`) and the
+source patches (`patches/`) all live in a separate repo checked out alongside
+this one — everything the running site writes, in one checkout:
 
 ```sh
 git clone <lagen-wiki remote> ../lagen-wiki
@@ -139,7 +140,10 @@ git clone <lagen-wiki remote> ../lagen-wiki
 
 `WIKI_ROOT`/`wiki_root` points at it; the default is the sibling
 `../lagen-wiki`. Without it, the `begrepp`/`kommentar`/`site` sources have
-nothing to parse (the rest of the pipeline is unaffected).
+nothing to parse. The patch tree is different: `layout.patch` **asserts**
+`<wiki_root>/patches` exists, because an absent tree reads as "no document has
+a patch" and would silently republish every redaction. So a parse of a
+patchable source needs the checkout, not just the wiki sources.
 
 ### Editor password hashes
 

@@ -40,5 +40,11 @@ os.environ["CATALOG_ROOT"] = _ROOT
 # developer who has one would otherwise have its begrepp/kommentar markdown read
 # into tests that never wrote it
 os.environ["WIKI_ROOT"] = os.path.join(_ROOT, "wiki")
+# ...and its patches, which live in the same repo (`layout.PATCHES`). The tree
+# has to *exist* though: `layout.patch` asserts it does, because an absent tree
+# is indistinguishable from "no document has a patch" and would silently drop
+# every redaction. An empty one gives each test the same answer -- no patch --
+# on a fresh checkout and on a machine that has the real corpus.
+os.makedirs(os.path.join(_ROOT, "wiki", "patches"), exist_ok=True)
 
 atexit.register(shutil.rmtree, _ROOT, True)

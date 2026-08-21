@@ -86,16 +86,15 @@ td.none { opacity: .38; }
 {%- if st.dirty %} <span class="warn">uncommitted</span>{% endif %}
 {%- else %} up to date{% endif %}</span>
 {%- endmacro -%}
-{%- macro system_line(snapshot_age, failing, version, host, wiki, patches, index_size) -%}
-{#- one line of site health; `wiki` and `patches` are the two checkouts the
-    running site commits into -#}
+{%- macro system_line(snapshot_age, failing, version, host, wiki, index_size) -%}
+{#- one line of site health; `wiki` is the checkout the running site commits
+    into -- commentaries, annotation layers and source patches alike -#}
 <p class="sysline">
 <span><b>{{ host }}</b> &middot; <code>{{ version[:12] }}</code></span>
 <span>snapshot {{ snapshot_age }}</span>
 <span>{% if failing %}<span class="warn">{{ failing }} docs failing</span>{% else %}no failing docs{% endif %}</span>
 <span>index {{ index_size }}</span>
 {{ _repo_state("lagen-wiki", wiki) }}
-{{ _repo_state("patches", patches) }}
 </p>
 {%- endmacro -%}
 {#- One health cell: the outcome of the last run of this (source, step). -#}

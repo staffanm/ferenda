@@ -284,16 +284,19 @@ def _respell(source, basefile):
 # patch files -- curated, version-controlled fixes to a document's raw/
 # intermediate source, applied at parse time (see lib/patch.py). Unlike the
 # downloaded/artifact trees these are hand-authored knowledge that must be
-# reviewable and must ship with the pipeline, so they live in a *checkout*, not
-# under DATA. Keyed by the same (source, basefile) -> relpath rule as
-# artifact(), so a document's patch sits at a predictable location.
+# reviewable, so they live in a *checkout*, not under DATA. Keyed by the same
+# (source, basefile) -> relpath rule as artifact(), so a document's patch sits
+# at a predictable location.
 #
-# Which checkout is `config.PATCH_REPO`, not this file's own tree: the /patch
-# editor commits what it writes, and the deployed image is built without `.git`,
-# so prod mounts a real checkout and points PATCH_REPO at it. The default is
-# this repo, so a working-tree run is unaffected.
+# They sit in the content repo (`config.WIKI_ROOT`) beside `commentary/`,
+# `concept/` and `ann/`, not in this code repo: a patch is hand-authored
+# editorial knowledge about one document, the same kind of thing as a
+# commentary, and the /patch editor commits what it writes exactly as the
+# commentary editor does. One repo for everything the running site writes also
+# means one mount and one push -- the deployed image is built without `.git`,
+# so an in-image tree could neither commit nor survive a redeploy.
 # --------------------------------------------------------------------------
-PATCHES = config.PATCH_REPO / "accommodanda" / "patches"
+PATCHES = config.WIKI_ROOT / "patches"
 
 
 def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
@@ -307,9 +310,9 @@ def patch(source: str, basefile: str, suffix: str = ".patch") -> Path:
     # would be dropped -- silently republishing the personal data it removes.
     # So a missing tree fails here rather than parsing on. (rule:fail-fast)
     assert PATCHES.is_dir(), (
-        "patch tree %s missing -- PATCH_REPO (%s) must point at a checkout of "
-        "this repo; an absent tree drops every redaction without a word"
-        % (PATCHES, config.PATCH_REPO))
+        "patch tree %s missing -- WIKI_ROOT (%s) must point at a checkout of "
+        "the content repo; an absent tree drops every redaction without a word"
+        % (PATCHES, config.WIKI_ROOT))
     rel = relpath(source, basefile)
     return PATCHES / source / rel.with_name(rel.name + suffix)
 

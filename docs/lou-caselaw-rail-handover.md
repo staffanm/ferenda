@@ -50,7 +50,7 @@ below; the counts are the page's, not estimates.
 3. **Directive lineage extended to the first generation (50 → 52).**
    The 1993 codifications' correlation tables are absent from the CELEX-era
    text we hold (`/* Tables: see OJ */`), so the lineage stopped at 92/50,
-   93/36, 93/37. Two source patches (`accommodanda/patches/eurlex/1993/`)
+   93/36, 93/37. Two source patches (`patches/eurlex/1993/` in the content repo)
    restore them: 93/37's Annex VIII (71/305 → 93/37) typed from the OJ PDF
    (EUR-Lex EN — verified the only possibility: the act's EUR-Lex metadata
    lists special editions only in the 2004-accession languages, no Swedish or
