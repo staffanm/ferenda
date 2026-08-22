@@ -125,6 +125,30 @@ class Vagledning:
     amnesord: list[str] = field(default_factory=list)   # the body's own topics
     body: list[Block] = field(default_factory=list)
     fotnoter: list[Fotnot] = field(default_factory=list)
+    ersatt_av: str | None = None        # the uri of the vägledning that
+                                        # replaced this one, where the body has
+                                        # issued a later wording of the same
+                                        # document. A superseded vägledning is
+                                        # still citable and still readable --
+                                        # it governed conduct while it stood --
+                                        # but it no longer states current
+                                        # practice, so it drops out of every
+                                        # listing (`catalog._expired_date`)
+    ersatt_av_url: str | None = None    # the *body's* own page for that later
+                                        # wording. Kept apart from `ersatt_av`
+                                        # because a harvest can know that a
+                                        # document was replaced without being
+                                        # able to name what replaced it: the
+                                        # successor's page may state no number
+                                        # at all. The document is superseded
+                                        # either way, and the page says so with
+                                        # a link off-site rather than a dead one
+    ersatt_av_identifier: str | None = None  # and its printed name
+                                        # ("EBA/GL/2026/05"). Carried rather
+                                        # than derived: an address minted by
+                                        # `own_number_slug` folds every
+                                        # character class to a hyphen and
+                                        # cannot be read back as a number
     source_url: str | None = None       # the body's own page for it
     document_url: str | None = None     # the file it was published as
 
@@ -159,6 +183,20 @@ class Vagledning:
         footnotes = footnote_nodes(self.fotnoter, scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "sprak": self.sprak}
+        if self.ersatt_av or self.ersatt_av_url:
+            # the shared repeal vocabulary (`catalog._expired_date`), which is
+            # what drops a superseded document from the browse trees, the feeds,
+            # the search results and other documents' citation rails while
+            # leaving its page reachable by direct link. The EBA states no date
+            # for it -- its version pages carry no repeal marker at all -- so
+            # `status` stands alone and the column takes its date-free form.
+            metadata["status"] = "upphävt"
+            if self.ersatt_av:
+                metadata["ersattAv"] = self.ersatt_av
+            if self.ersatt_av_url:
+                metadata["ersattAvKalla"] = self.ersatt_av_url
+            if self.ersatt_av_identifier:
+                metadata["ersattAvIdentifier"] = self.ersatt_av_identifier
         for key, value in (("antagen", self.antagen),
                            ("version", self.version),
                            ("revision", self.revision),

@@ -14,10 +14,12 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 from lxml import etree
 
 from accommodanda.guidance import (
     acer_download,
+    eba_download,
     easa_download,
     edpb_download,
     euipo_download,
@@ -43,6 +45,7 @@ from accommodanda.guidance.model import (
     vagledning_identifier,
     vagledning_uri,
 )
+from accommodanda.lib import compress
 from accommodanda.lib import formex as lib_formex
 from accommodanda.lib import lagrum
 
@@ -1791,3 +1794,265 @@ def test_own_number_slug_is_shared_by_the_minter_and_the_citation_engine():
                    "BoR (11) 67", "BoR (10) 44 Rev 1"):
         assert guidance_issuers.own_number_slug(number) == \
             lagrum.own_number_slug(number)
+
+
+# --------------------------------------------------------------------------
+# the EBA's previous versions, and the number a cover states as its own
+# --------------------------------------------------------------------------
+
+VERSION_PAGE = """\
+<html><body>
+<a href="/ExternalLinks/index?id=Mg&rhversion=20251216204040-2">External</a>
+<section id="activity-versions" class="activity-versions">
+  <div class="activity-versions__inner-container">
+    <div class="activity-versions__buttons"><ul class="dropdown-menu">
+      <li><a href="/a/b/guidelines-default?version=2016#activity-versions">2016</a></li>
+      <li><a href="/a/b/guidelines-default#activity-versions">Current</a></li>
+    </ul></div>
+  </div>
+</section>
+</body></html>
+"""
+
+
+def test_version_pages_names_the_other_versions_of_one_document():
+    """The EBA does not drop a superseded riktlinje from the single rulebook --
+    it keeps it as a previous version of the same leaf. Reading only the
+    current version left 82 numbers unharvested."""
+    here = eba_download.BASE + "/a/b/guidelines-default"
+    assert eba_download.version_pages(VERSION_PAGE, here) == [here + "?version=2016"]
+    # from the old version, the walk finds its way back to the current one --
+    # the dropdown repeats on every version page, and the page's own address is
+    # never returned, so a caller can walk what it gets back
+    assert eba_download.version_pages(
+        VERSION_PAGE, here + "?version=2016") == [here]
+
+
+def test_version_pages_ignores_an_unrelated_version_parameter():
+    """`rhversion=` on an external-link redirect is not a document version."""
+    assert eba_download.version_pages(
+        '<a href="/ExternalLinks/index?id=Mg&rhversion=2025-2">x</a>',
+        eba_download.BASE + "/a/b") == []
+
+
+def test_href_identity_reads_the_number_off_the_chosen_document():
+    """Most translations carry the number in their own file name, which answers
+    for free what a cover download pays for."""
+    assert eba_download.href_identity(
+        "/x/Guidelines%20on%20default%20definition%20%28EBA-GL-2016-07%29_SV.pdf"
+    ) == ("gl", "2016/07")
+    assert eba_download.href_identity("/x/EBA-REC-2017-02_SV.pdf") == \
+        ("rec", "2017/02")
+    # the newer pages serve every file from a UUID directory naming no number
+    assert eba_download.href_identity("/x/9e95a112-179f/document_SV.pdf") is None
+
+
+def test_cover_number_is_the_one_the_document_states_as_its_own():
+    """An amending riktlinje's cover names the riktlinje it amends *first*.
+    Taking the first match filed five documents under a number that is not
+    theirs -- eba/gl/2015-12 stores the file "GL Amending on arrears and
+    foreclosure (EBA GL 2024 10)_SV_COR.pdf"."""
+    assert eba_download.cover_number(
+        "SLUTRAPPORT OM RIKTLINJER FÖR ÄNDRING AV RIKTLINJERNA "
+        "EBA/GL/2015/12 EBA/GL/2024/10") == ("gl", "2024/10")
+    assert eba_download.cover_number(
+        "RIKTLINJER OM ÄNDRING AV RIKTLINJERNA EBA/GL/2018/10 EBA Public "
+        "EBA/GL/2022/13 12 oktober 2022") == ("gl", "2022/13")
+    assert eba_download.cover_number(
+        "Final Report on Guidelines amending Guidelines EBA/GL/2018/01 "
+        "EBA/GL/2020/12") == ("gl", "2020/12")
+    # a document that amends nothing states one number and it is its own
+    assert eba_download.cover_number(
+        "EBA/GL/2017/16 23/04/2018 Riktlinjer för PD-skattning") == \
+        ("gl", "2017/16")
+    # the EBA's unfilled template states no number at all
+    assert eba_download.cover_number(
+        "Riktlinjer EBA/GL/20XX/XX DD månad ÅÅÅÅ Riktlinjer om ändring av "
+        "riktlinjerna EBA/GL/2018/05 EBA/GL/2020/01") == ("gl", "2020/01")
+    assert eba_download.cover_number("Riktlinjer utan nummer") is None
+
+
+def test_a_superseded_vagledning_carries_the_repeal_vocabulary():
+    """The shared hook: `status` plus a successor is what drops a document from
+    the browse trees, the feeds, the search results and other documents'
+    citation rails while leaving its page reachable by direct link. The EBA
+    states no repeal date -- its version pages carry no marker at all -- so the
+    artifact carries none either."""
+    art = Vagledning(
+        utgivare="eba", serie="gl", nummer="2016/07",
+        titel="Riktlinjer för tillämpningen av definitionen av fallissemang",
+        ersatt_av="https://lagen.nu/guidance/eba/gl/2026-05",
+        ersatt_av_identifier="EBA/GL/2026/05",
+    ).to_artifact(edpb_parse._fresh_parser("sv"))
+    assert art["metadata"]["status"] == "upphävt"
+    assert art["metadata"]["ersattAv"] == \
+        "https://lagen.nu/guidance/eba/gl/2026-05"
+    assert art["metadata"]["ersattAvIdentifier"] == "EBA/GL/2026/05"
+    assert "upphavd" not in art["metadata"]
+    assert catalog._expired_date(art) == catalog.EXPIRED_UNDATED
+
+
+def test_a_current_vagledning_says_nothing_about_repeal():
+    art = Vagledning(utgivare="eba", serie="gl", nummer="2017/16",
+                     titel="Riktlinjer").to_artifact(
+        edpb_parse._fresh_parser("sv"))
+    assert "status" not in art["metadata"]
+    assert catalog._expired_date(art) is None
+
+
+# --------------------------------------------------------------------------
+# the EBA's older leaves, where the riktlinje is not in the download list
+# --------------------------------------------------------------------------
+# Trimmed from the real markup of
+# …/regulatory-activities/recovery-resolution-and-dgs/guidelines-payment, whose
+# download list holds only the consultation paper and the hearing slides.
+
+OLD_LEAF = """\
+<html><body><h1>Guidelines on payment commitments</h1>
+<div class="document-download__item">
+  <a href="/sites/default/files/documents/10180/827199/2e9e/EBA_CP_2014_27.pdf">CP</a>
+</div>
+<div class="document-download__item">
+  <a href="/sites/default/files/documents/10180/827324/7bca/PUBLIC%20HEARING%20DGS.pdf">Hearing</a>
+</div>
+<div class="well">
+  <ul class="RelatedList">
+    <li><a href="/documents/10180/1064982/EBA-GL-2015-09+Guidelines+on+DGS+payment+commitments.pdf/5f45f6ab-1696-40a7-85b1-682b12abd781">Final report on the Guidelines on DGS payment commitments</a></li>
+    <li><a href="/documents/10180/1050790/EBA%20GL%202015%2009-CT-V3%20GLs.pdf">Compliance table</a></li>
+  </ul>
+  <div class="dropdown RelatedTranslations"><ul class="dropdown-menu">
+    <li><a href="/documents/10180/1187205/EBA-GL-2015-09+GL+-+BG.pdf/ca425f95">bg българск</a></li>
+    <li><a href="/documents/10180/1187205/EBA-GL-2015-09+GL+-+SV.pdf/39b2fd04">sv svenska</a></li>
+    <li><a href="/documents/10180/1187205/EBA-GL-2015-09+GL+on+payment+commitments.pdf/0a217cb9">en English</a></li>
+  </ul></div>
+</div>
+</body></html>
+"""
+
+
+def test_an_older_leaf_states_its_document_in_the_language_menu():
+    """The riktlinje is not in `.document-download__item` at all -- that list
+    holds the consultation paper and the hearing slides. It sits in
+    `ul.RelatedList` with its translations beside it, and 43 of the 209 leaves
+    this harvest declined for "carrying no EBA number" are that shape."""
+    fields = eba_download.parse_leaf(OLD_LEAF, eba_download.BASE + "/a/b")
+    sprak, document = fields["candidates"][0]
+    assert sprak == "sv"
+    assert document.endswith("EBA-GL-2015-09+GL+-+SV.pdf/39b2fd04")
+    # and the number comes off that href, so no cover download is needed
+    assert eba_download.href_identity(document) == ("gl", "2015/09")
+    # the English translation is the second choice, the way it is on a new leaf
+    assert fields["candidates"][1][0] == "en"
+
+
+def test_the_language_menu_takes_the_code_from_the_link_text():
+    """"sv svenska" -- the way the newer markup carries it in a badge, and
+    never the file name, whose language suffix the EBA spells inconsistently."""
+    soup = BeautifulSoup(OLD_LEAF, "html.parser")
+    assert set(eba_download._related_translations(soup)) == {"bg", "sv", "en"}
+
+
+def test_a_document_whose_url_carries_a_uuid_after_the_suffix_is_a_pdf():
+    """The older leaves serve a file from a path that carries its uuid after
+    the name, so it ends in no suffix at all and `href$=".pdf"` missed it."""
+    fields = eba_download.parse_leaf(OLD_LEAF, eba_download.BASE + "/a/b")
+    assert any("5f45f6ab" in document
+               for _sprak, document in fields["candidates"]), \
+        "the RelatedList document is not among the candidates"
+
+
+def test_href_identity_reads_the_file_name_and_not_the_folder():
+    """The EBA files a consolidated wording under the *amending* riktlinje's
+    folder, so the whole URL names two documents and the folder comes first.
+    Matching the whole URL read the Swedish consolidation of EBA/GL/2021/17 as
+    EBA/GL/2023/02 -- and since this path runs before the cover read, the next
+    run would have written 2021/17's text over eba-gl-2023-02."""
+    assert eba_download.href_identity(
+        "https://www.eba.europa.eu/sites/default/files/document_library/"
+        "Publications/Guidelines/2023/EBA-GL-2023-02/Translations%20"
+        "consolidated/1061418/MODIFICATION%20-%20Consolidated%20version%20-%20"
+        "GLs%20AFMs%20%28EBA%20GL%202021%2017%29_SV.pdf") is None
+    # the file's own name still answers, uuid-suffixed path or not
+    assert eba_download.href_identity(
+        "/documents/10180/1187205/EBA-GL-2015-09+GL+-+SV.pdf/39b2fd04") == \
+        ("gl", "2015/09")
+
+
+def test_the_related_list_does_not_offer_a_compliance_table():
+    """A compliance table's cover states the riktlinje's number too, and so
+    does a final report's, so no cover can reject them -- the link text is the
+    only place the distinction is written down. This module exists to avoid
+    filing reports under guideline identities."""
+    fields = eba_download.parse_leaf(OLD_LEAF, eba_download.BASE + "/a/b")
+    assert not any("CT-V3" in document
+                   for _sprak, document in fields["candidates"]), \
+        "the compliance table is offered as the document"
+
+
+def test_version_pages_only_returns_versions_of_this_document():
+    """Anything else in the dropdown would be queued and walked as a leaf, and
+    a page with no <h1> kills the run in `parse_leaf`."""
+    other_doc = ('<section id="activity-versions"><div class='
+                 '"activity-versions__buttons"><ul class="dropdown-menu">'
+                 '<li><a href="/somewhere/else?version=2016">2016</a></li>'
+                 '</ul></div></section>')
+    assert eba_download.version_pages(
+        other_doc, eba_download.BASE + "/a/b") == []
+
+
+# --------------------------------------------------------------------------
+# the version walk itself: one leaf, one previous version, two records
+# --------------------------------------------------------------------------
+
+def _eba_leaf(h1, versions, files):
+    """A leaf page in the current markup: a title, a version dropdown and one
+    badged download per language."""
+    return ("<html><body><h1>%s</h1>"
+            '<section id="activity-versions"><div class='
+            '"activity-versions__buttons"><ul class="dropdown-menu">%s'
+            "</ul></div></section>%s</body></html>"
+            % (h1,
+               "".join('<li><a href="%s#activity-versions">v</a></li>' % v
+                       for v in versions),
+               "".join('<div class="document-download__item">'
+                       '<span class="badge badge--langcode">%s</span>'
+                       '<a href="%s">d</a></div>' % (code, url)
+                       for code, url in files)))
+
+
+def test_eba_sync_stores_a_previous_version_as_its_own_document(
+        tmp_path, monkeypatch):
+    """The walk's own behaviour, which no fixture covered: a leaf names a
+    previous version, the version is walked as a document of its own, and it
+    records the current version as what replaced it."""
+    leaf = "/activities/single-rulebook/regulatory-activities/cr/gl-default"
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"/regulation-and-policy/cr"',
+        eba_download.BASE + "/regulation-and-policy/cr": '"%s"' % leaf,
+        eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines on the definition of default",
+            [leaf + "?version=2016"],
+            [("sv", "/x/Guidelines%20%28EBA-GL-2026-05%29_SV.pdf")]),
+        eba_download.BASE + leaf + "?version=2016": _eba_leaf(
+            "Guidelines on the definition of default",
+            [leaf],
+            [("sv", "/x/Guidelines%20%28EBA-GL-2016-07%29_SV.pdf")]),
+    }
+    monkeypatch.setattr(eba_download, "_fetch",
+                        lambda _s, url, _d: pages[url])
+    monkeypatch.setattr(eba_download, "make_session", lambda _ua: None)
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    eba_download.eba_sync(tmp_path, delay=0)
+
+    stored = {compress.read_json(p)["nummer"]: compress.read_json(p)
+              for p in (tmp_path / "eba").glob("*.json*")}
+    assert set(stored) == {"2026/05", "2016/07"}, \
+        "the previous version is not stored as a document of its own"
+    # the superseded wording names its successor, and never itself
+    old = stored["2016/07"]
+    assert old["ersatt_av"] == "https://lagen.nu/guidance/eba/gl/2026-05"
+    assert old["ersatt_av"] != "https://lagen.nu/guidance/eba/gl/2016-07"
+    assert old["ersatt_av_identifier"] == "EBA/GL/2026/05"
+    # ... and the current one is not marked as replaced by anything
+    assert stored["2026/05"]["ersatt_av"] is None

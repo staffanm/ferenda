@@ -1127,6 +1127,14 @@ def icj_document(art, path):
 RE_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+#: the `expired` value for a document whose issuer states that it is superseded
+#: but never when. Any date already past would do; this one reads as what it is
+#: in a database dump and cannot collide with a real repeal date. The artifact
+#: keeps the truth -- no `upphavd` -- so a page still prints no date it was
+#: never told.
+EXPIRED_UNDATED = "0001-01-01"
+
+
 def _expired_date(art: dict) -> str | None:
     """The date a document stopped stating law, if its metadata declares one --
     else None. Stored on the documents row so that once the date has passed the
@@ -1145,14 +1153,35 @@ def _expired_date(art: dict) -> str | None:
     paragraf's rail. Reading a paragraf whose rail listed thirteen
     ställningstaganden, twelve of them withdrawn, is what this covers.
 
-    Only an ISO date counts, because this column is compared against one.
-    Konkurrensverket states its withdrawals in prose ("20 oktober 2025") and for
-    one entry not at all -- all three of those publish no document at all, so
-    they carry no citation and reach no rail either way."""
+    A date has to be an ISO one, because this column is compared against one.
+    Where the issuer names a *successor* but no usable date, the document is
+    expired all the same, at `EXPIRED_UNDATED`: it said that this wording was
+    replaced, and reading the absence of a day as the absence of a repeal would
+    leave a superseded wording listed as current -- the error this column exists
+    to prevent. The EBA is the case it was added for; its version pages carry no
+    repeal marker at all and their only date is an application date.
+
+    That reaches one document outside guidance:
+    `rs/kkv/2019:1`, which Konkurrensverket declares upphävt and replaced by
+    2022:2 while dating it in prose ("20 oktober 2025"). Hiding it is what the
+    rest of this docstring already argues for -- a withdrawn ställningstagande
+    no longer says how the agency reads the rule, which is the only reason it
+    was on that paragraf's rail.
+
+    A withdrawal with neither a date nor a successor still stays listed: that is
+    an issuer saying less than it knows, not a document we can place in time."""
     metadata = art.get("metadata", {})
     if metadata.get("status") == "upphävt":
         withdrawn = metadata.get("upphavd") or ""
-        return withdrawn if RE_ISO_DATE.match(withdrawn) else None
+        if RE_ISO_DATE.match(withdrawn):
+            return withdrawn
+        # an issuer that states *that* a document is superseded but never
+        # *when*: the EBA's version pages carry no repeal marker at all, and
+        # their only date is an application date. Reading the absence of a day
+        # as the absence of a repeal would leave a superseded wording listed as
+        # current, which is the error this column exists to prevent.
+        return EXPIRED_UNDATED if (metadata.get("ersattAv")
+                                   or metadata.get("ersattAvKalla")) else None
     return metadata.get("properties", {}).get("rpubl:upphavandedatum")
 
 

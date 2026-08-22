@@ -6,7 +6,7 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 
 from markupsafe import Markup
 
-from ..lib import catalog, tpl
+from ..lib import catalog, layout, tpl
 from ..lib.page import (
     BANNERS,
     doc_meta,
@@ -51,6 +51,24 @@ SECTION = {("edpb", "riktlinjer"): "Riktlinje",
            ("euipo", "gi"): "Riktlinje"}
 
 
+def _ersatt_av(md, site):
+    """The successor as the banner needs it: ``{label, url}``.
+
+    The label is the number the issuing body printed, and the link goes to the
+    successor's page here where the corpus holds it. Where it does not -- a
+    harvest can know a wording was replaced without being able to name what
+    replaced it -- the link goes to the body's own page for it instead, and the
+    banner says only that a later wording exists. A url is never used as a
+    label: "Ersatt av https://www.eba.europa.eu/activities/…" reads as a
+    defect, which is what printing an address in place of a name is."""
+    uri = md.get("ersattAv")
+    if uri and site.has(uri):
+        return {"label": md.get("ersattAvIdentifier") or catalog.local(uri),
+                "url": layout.page_url(uri)}
+    return {"label": md.get("ersattAvIdentifier"),
+            "url": md.get("ersattAvKalla")}
+
+
 def render(art, site):
     """An EDPB riktlinje/rekommendation, or an endorsed artikel 29-gruppens
     vägledning.
@@ -85,7 +103,9 @@ def render(art, site):
         if md.get("sprak") == "en" else "",
         BANNERS.vagledning_version_banner(utgivare, md["version"],
                                           md.get("konsultation"))
-        if md.get("version") else "") if part)
+        if md.get("version") else "",
+        BANNERS.vagledning_ersatt_banner(utgivare, _ersatt_av(md, site))
+        if md.get("status") == "upphävt" else "") if part)
     return ENV.get_template("vagledning.html").render(page_context(
         md.get("title") or ident,
         SECTION.get((art.get("utgivare"), art.get("serie")), "Vägledning"),

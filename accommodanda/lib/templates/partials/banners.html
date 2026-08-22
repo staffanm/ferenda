@@ -36,6 +36,18 @@
 {%- if ersatt_av %}. Ersatt av {% if ersatt_av.url %}<a href="{{ ersatt_av.url }}">{{ ersatt_av.label }}</a>{% else %}{{ ersatt_av.label }}{% endif %}{% endif -%}
 .</span></div>
 {%- endmacro -%}
+{%- macro vagledning_ersatt_banner(utgivare, ersatt_av) -%}
+{#- a vägledning the issuing body has replaced with a later wording of the same
+    document. It stays readable because it governed conduct while it stood, but
+    it is not what the body says today. No date: the bodies that do this state
+    that a version was replaced and never when -- the EBA's version pages carry
+    no repeal marker at all -- so the banner says what is known and no more.
+    `ersatt_av` is {label, url?}. -#}
+<div class="expired-banner"><strong>Ersatt vägledning</strong><span>{{ utgivare }} har ersatt detta dokument med en senare lydelse
+{%- if ersatt_av.label %}: {% if ersatt_av.url %}<a href="{{ ersatt_av.url }}">{{ ersatt_av.label }}</a>{% else %}{{ ersatt_av.label }}{% endif %}
+{%- elif ersatt_av.url %} (<a href="{{ ersatt_av.url }}" rel="external">hos {{ utgivare }}</a>){% endif -%}
+. Texten nedan är den tidigare lydelsen.</span></div>
+{%- endmacro -%}
 {%- macro vagledning_language_banner(utgivare, source_url) -%}
 {#- a vägledning the issuing body has published in no Swedish version. The
     reader is about to read English on a Swedish site, which is worth saying

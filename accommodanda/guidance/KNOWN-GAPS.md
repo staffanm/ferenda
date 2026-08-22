@@ -31,35 +31,84 @@ language.
 ## EBA: about half the numbered corpus is missing (open, 2026-08-22)
 
 The EBA numbers `EBA/GL/ÅÅÅÅ/NN` sequentially per year, so the numbers we hold
-count what we do not. We hold **80**, and there are **82 gaps** below each
-year's own highest number:
+count the ones we do not. We hold **80**, and there are **82 gaps** below each
+year's own highest held number — a floor, not a total: seven numbers named on
+the EBA's own pages (2012/04, 2012/05, 2015/21, 2015/22, 2017/17, 2020/15,
+2022/15) sit *above* our per-year ceiling, so the real maxima are higher.
 
-| år | held | highest | missing |
-|---|---|---|---|
-| 2014 | 4 | 14 | 10 |
-| 2015 | 5 | 20 | 15 |
-| 2016 | 1 | 11 | 10 |
-| 2017 | 4 | 16 | 12 |
-| 2021 | 9 | 17 | 8 |
-| 2025 | 5 | 5 | 0 |
-| 2026 | 8 | 8 | 0 |
+Three causes, all measured, none of them scope:
 
-The shape of the loss says what it is: the recent years are complete and the
-older ones are nearly empty. `eba_download` walks the **single rulebook**, which
-is a rulebook — it lists what applies now, so a repealed or superseded riktlinje
-drops out of it. That is a defensible scope for a reader who wants current law
-and a bad one for a corpus that resolves citations, because a förarbete from
-2016 cites the riktlinje that was in force in 2016.
+**1. A repealed riktlinje is not dropped from the single rulebook — it is kept
+as a previous version of the same leaf, and the walk never follows the link.**
+Every leaf carries a "Summary of document history" block whose dropdown links
+the same path plus `?version=ÅÅÅÅ`. `…/guidelines-application-definition-default?version=2016` *is* EBA/GL/2016/07, with all 23 translations and a
+Swedish PDF named `Guidelines on default definition (EBA-GL-2016-07)_SV.pdf`.
+`eba_download` reads only the leaf's current version. On a random sample of 40
+of the 80 stored leaves, 10 have previous versions, 16 in total; 14 offer a
+Swedish PDF and together they name 11 numbers we do not hold. A previous
+version's page carries **no repeal marker** — the status field is empty and its
+`time[datetime]` is an application date, not an adoption date.
 
-Measured, not inferred: the walk sees 36 ämnessidor and 289 leaves today, 80 of
-which we store. The other 209 are a mix — tekniska standarder (adopted as
-kommissionsförordningar, and `eurlex`'s), reports, opinions and consultation
-papers — but the missing 82 numbers are *not* among them, because a leaf that
-carries an EBA/GL number is stored. They are not in the listing at all.
+**2. The older leaves use a second markup — read since 2026-08-22.** There the
+final riktlinje is not in `.document-download__item` at all — that list holds
+only the consultation paper, the BSG response and the hearing slides. The
+document sits in `ul.RelatedList`, and its translations in a
+`.RelatedTranslations` dropdown beside it, with the language in the link text
+("sv svenska") rather than in a badge and the file's uuid *after* its name in
+the path (`…-SV.pdf/39b2fd04-…`), so the href ends in no suffix at all and
+`href$=".pdf"` missed it. 43 of the 209 unstored leaves have `guideline` in
+their slug. `parse_leaf` now reads the language menu and the list: on the three
+unstored guideline leaves of one ämnessida it recovers EBA/GL/2015/09 and
+EBA/GL/2016/02, both Swedish and neither held, and the third has one English
+file naming no number and falls through to the cover read as before.
 
-Not fixed here. Taking them needs a second listing (the EBA's publications
-archive, filtered by document type) and a rule for what a repealed riktlinje's
-page should say, which is a scope decision rather than a parser fix.
+**3. Five of the 80 held records are the amending act, filed under the number it
+amends — fixed 2026-08-22.** `cover_identity` took the *first* number on the
+cover, and an
+amending riktlinje's cover names both ("SLUTRAPPORT OM RIKTLINJER FÖR ÄNDRING
+AV RIKTLINJERNA EBA/GL/2015/12 EBA/GL/2024/10"). Confirmed three ways — the
+cover title, the stored file name, and the cover regex over all 80 PDFs:
+
+| filed as | the stored file is |
+|---|---|
+| 2015/12 | `GL Amending on arrears and foreclosure (EBA GL 2024 10)_SV_COR.pdf` |
+| 2018/01 | `Guidelines amending EBAGL201801 CRR quick fix COVID_SV.pdf` (2020/12) |
+| 2018/05 | `Guidelines amending EBA GL on Fraud reporting under PSD2_COR_SV.pdf` (2020/01) |
+| 2018/10 | `GL amending EBA GL 2018 10 (EBA GL 2022 13)_SV.pdf` (2022/13) |
+| 2020/14 | `GL G-SIIs indicators (EBA GL 2023 10) amending EBA GL 2020 14_SV.pdf` (2023/10) |
+
+So the gap table is wrong in both directions: those five originals are not held,
+and five held numbers name the wrong document. `cover_number` now removes the
+amended number — the one introduced by "om/för ändring av riktlinjerna" or
+"amending Guidelines" — before it looks, and the EBA's unfilled `EBA/GL/20XX/XX`
+template with it. `parse.eba_titel` still refuses the cover title for these
+five, which is what keeps an artifact from contradicting itself where a
+document's identity and its file disagree at all.
+
+**The publications archive is not the missing listing.** Its filter parameter is
+`document_type` (Guidelines = 250, Recommendations = 255), and
+`?document_type=250` is 10 pages of 15 — 149 rows exactly. All 149 link straight
+to a file rather than to a leaf, **none of them Swedish**, and only 41 distinct
+EBA/GL numbers appear anywhere in a row. The single rulebook already holds the
+full set; it is the walk that stops short.
+
+**All three are fixed in the harvester as of 2026-08-22**, and the numbers above
+describe the corpus as it stands until the next run. `eba_sync` now walks the
+version dropdown as part of its queue, reads the older leaves' language menu,
+takes the number off the chosen document's href where it is there (which is
+free, and unlike a page-wide match cannot read a superseded document as its own
+successor), and refuses to take the first number on an amending cover. A
+superseded version is recorded with `ersatt_av`, which mints the shared repeal
+vocabulary on its artifact. A first run costs an estimated 450-500 requests, and
+at the EBA's own `Crawl-delay: 10` about 80 minutes.
+
+**Politeness — fixed 2026-08-22.** `https://www.eba.europa.eu/robots.txt` sets
+`Crawl-delay: 10` and disallows `/search`. `eba_sync` ran at `delay=0.5`, twenty
+times faster than the host asks. `lib/net.request` now waits out whatever
+Crawl-delay a host states, for every source, so the EBA is read at 10 seconds
+without `eba_sync` knowing about it. That raises the cost of a full EBA run from
+about 10 minutes to about 80. The `/search` Disallow is *not* enforced by that
+change; no harvester uses it, and the version dropdown makes it unnecessary.
 
 ## EBA: identity costs a download on the first run
 
