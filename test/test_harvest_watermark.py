@@ -335,7 +335,10 @@ def test_request_caps_timeout_to_remaining_budget():
             return Response()
 
     net.request(Session(), "GET", "https://example.invalid/")
-    assert seen_timeouts and seen_timeouts[0] <= 5.0
+    # the last call is the document; `net.request` reads the host's robots.txt
+    # first, which is capped to the same budget and would otherwise be the one
+    # this asserts on
+    assert seen_timeouts and seen_timeouts[-1] <= 5.0
 
 
 def test_walk_full_reresolves_downloaded(tmp_path):
