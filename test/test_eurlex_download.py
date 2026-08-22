@@ -378,6 +378,100 @@ def _stub_session(monkeypatch):
     monkeypatch.setattr(D, "make_session", lambda ua: object())
 
 
+def test_a_new_act_reopens_the_metadata_of_what_it_repeals(tmp_path, monkeypatch):
+    """The repeal is recorded on the *repealed* act, and the walk is bounded by
+    work date, so it never returns to a 1995 directive repealed in 2018. The
+    incoming act's repeal edge is what names it, and the target is re-read then.
+    """
+    # the directive is on disk with the notice a pre-validity harvest wrote:
+    # a work date and nothing that says it stopped applying
+    target = D.doc_dir(tmp_path, "31995L0046")
+    target.mkdir(parents=True)
+    (target / "notice.ttl").write_bytes(
+        C.notice_ttl("31995L0046", "1995-10-24", []))
+    assert C.notice_repeal_date(target) is None
+
+    monkeypatch.setattr(D, "fetch_repeals", lambda s, celexes:
+                        {"32016R0679": ["31995L0046", "31999L0000"]})
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, celexes:
+                        ({"31995L0046": "1995-10-24"}, {},
+                         {"31995L0046": ("0", "2018-05-24")}, set(celexes)))
+
+    found = D.refresh_repeal_targets(object(), tmp_path, ["32016R0679"])
+    assert found == [("31995L0046", "2018-05-24")]
+    assert C.notice_repeal_date(target) == "2018-05-24"
+    # 31999L0000 is repealed too but not held here, so it is never fetched
+    assert not D.is_downloaded(tmp_path, "31999L0000")
+
+    # run again: the notice already says 2018-05-24, so nothing *changed* and
+    # the run reports nothing -- else every sweep would re-announce every
+    # repeal it has ever recorded
+    assert D.refresh_repeal_targets(object(), tmp_path, ["32016R0679"]) == []
+
+
+def test_refresh_metadata_leaves_a_notice_cellar_answers_nothing_for(
+        tmp_path, monkeypatch):
+    """An empty answer is an endpoint hiccup as often as it is a fact. Rewriting
+    on one replaces a stored notice with a stub and reports it as done -- so the
+    document is skipped, and counted, instead (rule:fail-fast)."""
+    d = D.doc_dir(tmp_path, "31995L0046")
+    d.mkdir(parents=True)
+    (d / "notice.ttl").write_bytes(
+        C.notice_ttl("31995L0046", "1995-10-24", [], ("0", "2018-05-24")))
+    before = (d / "notice.ttl").read_bytes()
+
+    monkeypatch.setattr(D, "fetch_metadata",
+                        lambda s, c: ({}, {}, {}, set()))   # answers nothing
+    run = D.refresh_metadata(object(), tmp_path, ["31995L0046"])
+    next(run)
+    assert list(run) == [("31995L0046", None, None, False)]
+    assert (d / "notice.ttl").read_bytes() == before        # untouched
+
+
+def test_refresh_metadata_keeps_a_repeal_cellar_stops_restating(
+        tmp_path, monkeypatch):
+    """CELLAR answering about a work without restating its validity is not the
+    work becoming valid again -- a repeal never lifts. The stored pair is the
+    fallback, the way the stored work date already was; overwriting on a thin
+    answer erases the one fact this path exists for (rule:fail-fast)."""
+    d = D.doc_dir(tmp_path, "31995L0046")
+    d.mkdir(parents=True)
+    (d / "notice.ttl").write_bytes(
+        C.notice_ttl("31995L0046", "1995-10-24", [], ("0", "2018-05-24")))
+
+    # answered, but binding neither validity OPTIONAL and no work date
+    monkeypatch.setattr(D, "fetch_metadata",
+                        lambda s, c: ({}, {}, {}, set(c)))
+    run = D.refresh_metadata(object(), tmp_path, ["31995L0046"])
+    next(run)
+    assert list(run) == [("31995L0046", "2018-05-24", "0", True)]
+    assert C.notice_repeal_date(d) == "2018-05-24"
+    assert C.notice_work_date(d) == "1995-10-24"
+
+
+def test_refresh_metadata_skips_what_it_already_recorded_as_repealed(
+        tmp_path, monkeypatch):
+    # a repeal never lifts, so re-asking about one is a question CELLAR has
+    # already answered -- that is what keeps the periodic audit shrinking
+    for celex, validity in (("31995L0046", ("0", "2018-05-24")),
+                            ("32016R0679", ("1", None))):
+        d = D.doc_dir(tmp_path, celex)
+        d.mkdir(parents=True)
+        (d / "notice.ttl").write_bytes(
+            C.notice_ttl(celex, "2000-01-01", [], validity))
+
+    asked = []
+    def fake(_s, celexes):
+        asked.extend(celexes)
+        return ({}, {}, {}, set(celexes))
+    monkeypatch.setattr(D, "fetch_metadata", fake)
+
+    run = D.refresh_metadata(object(), tmp_path)
+    assert next(run) == 1                      # the work-list size comes first
+    assert len(list(run)) == 1
+    assert asked == ["32016R0679"]
+
+
 def test_sync_retries_pending_no_content_work_and_clears_it(tmp_path, monkeypatch):
     # a CELEX earlier runs stored no content for sits on the sidecar; an
     # incremental run retries it *before* the walk and, now that content exists,
@@ -388,13 +482,13 @@ def test_sync_retries_pending_no_content_work_and_clears_it(tmp_path, monkeypatc
     monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs:
                         {"62020CJ0100": [("swe", [("xhtml", "u", None)])]})
     monkeypatch.setattr(D, "fetch_metadata", lambda s, celexes:
-                        ({"62020CJ0100": "2025-06-01"}, {}))
+                        ({"62020CJ0100": "2025-06-01"}, {}, {}, set(celexes)))
 
     class Resp:
         content = b"<?xml version='1.0'?><html/>"
     monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
 
-    _seen, stored, _skipped = D.sync(tmp_path, "caselaw", delay=0)
+    _seen, stored, _skipped = D.sync(tmp_path, "caselaw")
     assert stored == 1
     assert D.is_downloaded(tmp_path, "62020CJ0100")
     assert D.read_pending(tmp_path, "caselaw") == []      # cleared on success
@@ -412,9 +506,10 @@ def test_sync_keeps_recent_pending_but_drops_aged_out(tmp_path, monkeypatch):
     recent = (today - D.RECENCY_WINDOW + timedelta(days=5)).isoformat()
     old = (today - D.RECENCY_WINDOW - timedelta(days=5)).isoformat()
     monkeypatch.setattr(D, "fetch_metadata", lambda s, c:
-                        ({"62020CJ0100": recent, "61990CJ0001": old}, {}))
+                        ({"62020CJ0100": recent, "61990CJ0001": old}, {}, {},
+                         set(c)))
 
-    D.sync(tmp_path, "caselaw", delay=0)
+    D.sync(tmp_path, "caselaw")
     assert D.read_pending(tmp_path, "caselaw") == ["62020CJ0100"]
 
 
@@ -427,7 +522,7 @@ def test_sync_records_a_recent_no_content_work_from_the_walk(tmp_path, monkeypat
     monkeypatch.setattr(D, "enumerate_celex", lambda s, sec, since, languages=None:
                         iter([(2025, [("62025CJ0009", recent)])]))
     monkeypatch.setattr(D, "fetch_selection", lambda s, c, l: {})    # no content
-    monkeypatch.setattr(D, "fetch_metadata", lambda s, c: ({}, {}))
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, c: ({}, {}, {}, set(c)))
 
-    D.sync(tmp_path, "caselaw", delay=0)
+    D.sync(tmp_path, "caselaw")
     assert D.read_pending(tmp_path, "caselaw") == ["62025CJ0009"]

@@ -23,6 +23,7 @@ because both are answers to how CELLAR actually behaves rather than choices:
 import re
 import subprocess
 from collections import defaultdict
+from pathlib import Path
 from urllib.parse import quote
 
 from . import compress
@@ -59,10 +60,20 @@ P_ITEM_MANIF = CDM + "item_belongs_to_manifestation"
 # selection needs these edges; the rest are metadata worth keeping in the subset
 SELECT_PREDICATES = {P_EXPR_WORK, P_EXPR_LANG, P_EXPR_MANIF, P_MANIF_EXPR,
                      P_MANIF_TYPE, P_ITEM_MANIF, OWL_SAMEAS}
+# whether the act still states law, and when it stopped. CELLAR names these
+# `resource_legal_in-force` ("1"/"0") and `resource_legal_date_end-of-validity`;
+# the earlier `start_of_validity`/`end_of_validity` names kept here matched no
+# triple in the graph, which is why no stored notice ever carried a repeal date.
+P_IN_FORCE = CDM + "resource_legal_in-force"
+P_END_OF_VALIDITY = CDM + "resource_legal_date_end-of-validity"
+# CELLAR writes this end-of-validity when the act has no end date at all, so it
+# is a placeholder, not a date
+OPEN_ENDED = "9999-12-31"
 META_PREDICATES = {CDM + p for p in (
     "resource_legal_id_celex", "resource_legal_id_sector", "work_date_document",
-    "expression_title", "expression_subtitle", "start_of_validity",
-    "end_of_validity", "work_is_about_concept_eurovoc")}
+    "expression_title", "expression_subtitle",
+    "resource_legal_date_entry-into-force",
+    "work_is_about_concept_eurovoc")} | {P_IN_FORCE, P_END_OF_VALIDITY}
 KEEP_PREDICATES = SELECT_PREDICATES | META_PREDICATES
 
 
@@ -94,19 +105,28 @@ def _ntriples(rdfxml):
     n-triples, returning the kept lines as (raw_line, subject, predicate, object)
     -- only lines whose predicate is in KEEP_PREDICATES. The raw lines double as
     the stored notice, since n-triples is a subset of turtle."""
-    out = subprocess.run(
+    return keep_triples(subprocess.run(
         ["rapper", "-q", "-i", "rdfxml", "-o", "ntriples", "-",
          "http://publications.europa.eu/"],
-        input=rdfxml, capture_output=True, check=True).stdout.decode()
+        input=rdfxml, capture_output=True, check=True).stdout.decode().splitlines())
+
+
+def keep_triples(lines):
+    """The n-triples lines whose predicate is in KEEP_PREDICATES, as
+    (raw_line, subject, predicate, object). Split out of `_ntriples` so it can
+    be exercised without `rapper`: this is the step that decides what a
+    dump-imported notice keeps, and a predicate name that matches nothing here
+    fails silently -- a filter that keeps nothing looks exactly like a source
+    that says nothing."""
     kept = []
-    for line in out.splitlines():
+    for line in lines:
         if not line:
             continue
-        s, p, rest = line.split(" ", 2)
-        pred = p[1:-1]
+        subject, predicate, rest = line.split(" ", 2)
+        pred = predicate[1:-1]
         if pred in KEEP_PREDICATES:
             obj = rest.rstrip()[:-1].rstrip()     # drop the trailing ' .'
-            kept.append((line, _term(s), pred, _term(obj)))
+            kept.append((line, _term(subject), pred, _term(obj)))
     return kept
 
 
@@ -182,11 +202,34 @@ def _stream_query(items):
 
 def _metadata_query(celexes):
     return (PREFIXES +
-            "SELECT ?celex ?wdate ?concept WHERE { VALUES ?celex { %s } "
+            "SELECT ?celex ?wdate ?concept ?inforce ?eov WHERE { "
+            "VALUES ?celex { %s } "
             "?w cdm:resource_legal_id_celex ?celex . "
             "OPTIONAL { ?w cdm:work_date_document ?wdate } "
-            "OPTIONAL { ?w cdm:work_is_about_concept_eurovoc ?concept } }"
+            "OPTIONAL { ?w cdm:work_is_about_concept_eurovoc ?concept } "
+            "OPTIONAL { ?w cdm:resource_legal_in-force ?inforce } "
+            "OPTIONAL { ?w cdm:resource_legal_date_end-of-validity ?eov } }"
             % _literals(celexes))
+
+
+# What a *new* act says it repeals. The repeal is recorded on both acts, but
+# asymmetrically: the new act carries the outgoing edge, and the old one carries
+# only its changed `resource_legal_in-force` / end-of-validity -- there is no
+# `repealed_by` edge to read. So an act repealed years after we harvested it
+# never tells us on its own; something has to go back and re-read it, and this
+# edge on the incoming act is what names which ones.
+REPEALS = ("cdm:resource_legal_repeals_resource_legal"
+           "|cdm:resource_legal_implicitly_repeals_resource_legal")
+
+
+def _repeals_query(celexes):
+    # kept out of _metadata_query on purpose: that query already crosses eurovoc
+    # concepts with end-of-validity dates, and a third multi-valued OPTIONAL
+    # multiplies the row count again for no gain
+    return (PREFIXES + "SELECT ?celex ?repealed WHERE { VALUES ?celex { %s } "
+            "?w cdm:resource_legal_id_celex ?celex . "
+            "?w %s ?r . ?r cdm:resource_legal_id_celex ?repealed }"
+            % (_literals(celexes), REPEALS))
 
 
 def _ranked_types(by_type):
@@ -310,25 +353,86 @@ def fetch_selection(session, celexes, languages):
 
 
 def fetch_metadata(session, celexes):
-    """celex -> (work_date or None, [eurovoc concept URIs]) -- the metadata kept
-    in the synthesized notice (the work date also feeds the per-CELEX refetch)."""
+    """The metadata kept in the synthesized notice, as
+    (work_date, eurovoc concepts, validity pair, answered) -- each of the first
+    three keyed by CELEX, the last a set. The work date also feeds the per-CELEX
+    refetch.
+
+    The validity pair is CELLAR's own answer to "does this act still state law":
+    `resource_legal_in-force` ("1"/"0") and the date it stopped
+    (`latest_end_of_validity` picks it out of everything the work states).
+    Reading the pair rather than the date alone matters: 32006L0040 carries an
+    end date of 2009-04-28 and is still in force.
+
+    `answered` is the CELEX the endpoint bound a row for at all. A caller that
+    *rewrites* stored metadata from this answer needs it: an empty answer for a
+    chunk -- an endpoint hiccup, a CELEX withdrawn from the graph -- is
+    indistinguishable from "this work carries no metadata" without it, and
+    writing the second as if it were the first quietly strips a notice."""
     wdate, concepts = {}, defaultdict(list)
+    in_force, ends, answered = {}, defaultdict(set), set()
     for row in _chunked(session, _metadata_query, celexes, SELECT_CHUNK):
         celex = row["celex"]["value"]
+        answered.add(celex)
         if "wdate" in row:
             wdate[celex] = row["wdate"]["value"][:10]
         concept = row.get("concept", {}).get("value")
         if concept and concept not in concepts[celex]:
             concepts[celex].append(concept)
-    return wdate, concepts
+        if "inforce" in row:
+            in_force[celex] = row["inforce"]["value"]
+        ends[celex].add(row.get("eov", {}).get("value", "")[:10])
+    # only the CELEX that actually stated something about validity, so a caller
+    # rewriting a notice can tell "CELLAR says it is in force" from "CELLAR said
+    # nothing this time" and keep what it already had for the second
+    validity = {celex: (in_force.get(celex), latest_end_of_validity(ends[celex]))
+                for celex in answered
+                if celex in in_force or latest_end_of_validity(ends[celex])}
+    return wdate, concepts, validity, answered
 
 
-def notice_ttl(celex, wdate, eurovoc):
+def latest_end_of_validity(dates):
+    """The end-of-validity date to believe, out of everything CELLAR states for
+    one work: the latest that is not the OPEN_ENDED placeholder, or None.
+
+    An act carries several -- 31981L0576 carries 1996-08-05 and 2014-10-31 --
+    and EUR-Lex prints the last. Both readers of the pair apply this: the SPARQL
+    answer (`fetch_metadata`) and the stored notice (`notice_repeal_date`)."""
+    return max((d for d in dates if d and d != OPEN_ENDED), default=None)
+
+
+def fetch_repeals(session, celexes):
+    """celex -> [CELEX it repeals] for those that repeal anything at all --
+    the works whose stored metadata is now out of date.
+
+    Both the express repeal clause (`repeals`) and the implied one
+    (`implicitly_repeals`) count: 32016R0679 repeals 31995L0046 expressly and
+    32003R1882 by implication, and both stopped applying.
+
+    This names 64% of the acts CELLAR reports out of force (measured over 600
+    random non-caselaw documents in the corpus: 225 out of force, 145 named by
+    a repeal edge). The rest end by their own terms with no act repealing them,
+    and nothing at download time announces those -- they need the periodic
+    re-read `refresh_metadata` does."""
+    repeals = defaultdict(list)
+    for row in _chunked(session, _repeals_query, celexes, SELECT_CHUNK):
+        target = row["repealed"]["value"]
+        celex = row["celex"]["value"]
+        if target not in repeals[celex]:
+            repeals[celex].append(target)
+    return repeals
+
+
+def notice_ttl(celex, wdate, eurovoc, validity=(None, None)):
     """The metadata we keep for a downloaded CELEX, as n-triples (a subset of
-    turtle) on the stable CELLAR celex URI: celex, sector, work date and any
-    eurovoc concepts. The live path no longer fetches the tree notice, so this
-    stands in for it -- the metadata worth keeping, and the on-disk marker the
-    harvester and parser key on."""
+    turtle) on the stable CELLAR celex URI: celex, sector, work date, any eurovoc
+    concepts, and the validity pair (in-force flag + end-of-validity date). The
+    live path no longer fetches the tree notice, so this stands in for it -- the
+    metadata worth keeping, and the on-disk marker the harvester and parser key
+    on. Both validity triples are written as CELLAR states them; reading a repeal
+    out of them is the consumer's job (`cellar.notice_repeal_date`), which
+    has to do it for a bulk-unpacked notice in any case."""
+    in_force, end_of_validity = validity
     subj = "<%s>" % (CELLAR % quote(celex, safe=""))
     triples = ['%s <%s> "%s" .' % (subj, CDM + "resource_legal_id_celex", celex),
                '%s <%s> "%s" .' % (subj, CDM + "resource_legal_id_sector",
@@ -336,10 +440,101 @@ def notice_ttl(celex, wdate, eurovoc):
     if wdate:
         triples.append('%s <%s> "%s"^^<%s> .'
                        % (subj, CDM + "work_date_document", wdate, XSD_DATE))
+    if in_force is not None:
+        triples.append('%s <%s> "%s" .' % (subj, P_IN_FORCE, in_force))
+    if end_of_validity:
+        triples.append('%s <%s> "%s"^^<%s> .'
+                       % (subj, P_END_OF_VALIDITY, end_of_validity, XSD_DATE))
     for concept in eurovoc:
         triples.append('%s <%s> <%s> .'
                        % (subj, CDM + "work_is_about_concept_eurovoc", concept))
     return ("\n".join(triples) + "\n").encode()
+
+
+# --------------------------------------------------------------------------
+# notice.ttl, read back
+# --------------------------------------------------------------------------
+
+# the work date line in a stored notice.ttl, in both its shapes: the live
+# path's synthesized n-triples ('<...cdm#work_date_document> "2016-04-27"^^...')
+# and the bulk unpacker's turtle subset ('j.0:work_date_document "1982-03-31"^^...')
+RE_NOTICE_WDATE = re.compile(r'work_date_document>?\s+"(\d{4}-\d{2}-\d{2})')
+
+
+def notice_work_date(doc_dir):
+    """The CELLAR work date kept in the document dir's notice.ttl, or None.
+    The authoritative document date for a manifestation that carries none of
+    its own (old ECR judgment Formex has an empty TITLE; pre-2004 OJ html has
+    no bibliographic markup)."""
+    text = _notice_text(doc_dir)
+    return _first(RE_NOTICE_WDATE, text) if text is not None else None
+
+
+def _notice_text(doc_dir):
+    path = Path(doc_dir) / "notice.ttl"
+    if not compress.exists(path):
+        return None
+    return compress.read_bytes(path).decode("utf-8", "replace")
+
+
+def _first(pattern, text):
+    m = pattern.search(text)
+    return m.group(1) if m else None
+
+
+# the validity pair a notice keeps (`notice_ttl` / `META_PREDICATES`), across
+# every notice shape on disk: the n-triples subset
+# ('<...cdm#resource_legal_in-force> "0"'), the bulk unpacker's prefixed turtle
+# ('j.0:resource_legal_in-force "0"'), and the older tree notices, which write
+# the flag as a turtle boolean instead of a digit
+# ('j.0:resource_legal_in-force false'). Reading only the digit form missed the
+# boolean silently -- an act out of force simply read as in force, which is the
+# failure this whole path exists to prevent.
+RE_NOTICE_IN_FORCE = re.compile(
+    r'resource_legal_in-force>?\s+"?(0|1|true|false)\b')
+OUT_OF_FORCE = ("0", "false")
+RE_NOTICE_END_OF_VALIDITY = re.compile(
+    r'resource_legal_date_end-of-validity>?\s+"(\d{4}-\d{2}-\d{2})')
+
+
+def notice_validity(doc_dir):
+    """The (in-force flag, end-of-validity date) pair a stored notice records,
+    each None when the notice does not state it. The stored counterpart of
+    `fetch_metadata`'s validity pair, so a refresh can fall back on what is
+    already on disk rather than erasing it."""
+    text = _notice_text(doc_dir)
+    if text is None:
+        return (None, None)
+    return (_first(RE_NOTICE_IN_FORCE, text),
+            latest_end_of_validity(RE_NOTICE_END_OF_VALIDITY.findall(text)))
+
+
+def notice_repeal_date(doc_dir):
+    """The date this act stopped stating law, per CELLAR's own validity
+    metadata, or None -- what the catalog stores as `expired` and every listing
+    filters on.
+
+    Two triples, and both are needed. `resource_legal_in-force` is the flag
+    EUR-Lex prints as "In force" / "No longer in force"; an act still in force
+    can carry a past end-of-validity date (32006L0040 carries 2009-04-28 and is
+    in force), so the date alone would repeal acts that are not repealed. An act
+    can also carry several dates -- 31981L0576 carries 1996-08-05 and 2014-10-31
+    -- and EUR-Lex prints the last one, so the latest wins. `9999-12-31` is
+    CELLAR's placeholder for "no end date" and never counts as one.
+
+    An act out of force with no end date at all -- CELLAR carries `false` and
+    only the OPEN_ENDED placeholder for the three Brexit withdrawal-agreement
+    documents -- yields None and stays listed. This column is a date the
+    listings compare against today; there is no date to put in it, and inventing
+    one would state a repeal the source does not. `refresh_metadata`'s caller
+    counts them instead of letting them pass silently.
+
+    A repealed act keeps its page and stays reachable through the reference
+    graph: 32016R0679 article 94 repeals 31995L0046, and that citation still
+    resolves. What the date removes is the *listing* -- browse, search, the
+    API's document enumeration and the context rail."""
+    in_force, end_of_validity = notice_validity(doc_dir)
+    return end_of_validity if in_force in OUT_OF_FORCE else None
 
 
 def content_filename(code, filetype, content):
@@ -353,7 +548,8 @@ def content_filename(code, filetype, content):
     return code + suffix
 
 
-def store_document(session, target, celex, wdate, selection, eurovoc):
+def store_document(session, target, celex, wdate, selection, eurovoc,
+                   validity=(None, None)):
     """Write a CELEX's synthesized notice and fetch its selected content per
     language. `selection` is the [(lang, [(filetype, url, accept), ...])]
     candidate list fetch_selection returns for this CELEX. Returns the languages
@@ -398,5 +594,6 @@ def store_document(session, target, celex, wdate, selection, eurovoc):
             stored.append(code)
             break
     if stored:
-        compress.write_download(target / "notice.ttl", notice_ttl(celex, wdate, eurovoc))
+        compress.write_download(target / "notice.ttl",
+                                notice_ttl(celex, wdate, eurovoc, validity))
     return stored

@@ -56,8 +56,14 @@ from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from ..lib import compress
 from ..lib.cellar import (
     LANGUAGES,
+    SELECT_CHUNK,
     fetch_metadata,
+    fetch_repeals,
     fetch_selection,
+    notice_repeal_date,
+    notice_ttl,
+    notice_validity,
+    notice_work_date,
     sparql_select,
     store_document,
 )
@@ -95,6 +101,10 @@ class Sector:
     # filter never hides a case we could actually store. Off for treaties/acts,
     # which carry every official language anyway (and would only pay the extra join).
     require_language_expression: bool = False
+    # Can a work in this sector repeal another? Only legislation does. Asking
+    # the caselaw sector what its judgments repeal is 32,000 CELEX of query for
+    # a guaranteed empty answer.
+    repeals: bool = False
 
 # The CELEX descriptor (the 2-letter code after the year) names the court and
 # document kind: first letter C/T/F = Court of Justice / General Court / Civil
@@ -113,11 +123,17 @@ SECTORS = {
     "treaties": Sector("treaties", "1", ("",),
                        re.compile(r"1\d{4}[A-Z]{1,2}/TXT"), 1951, True),
     "acts": Sector("acts", "3", ("R", "L"),
-                   re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952, True),
+                   re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952, True,
+                   repeals=True),
     "caselaw": Sector("caselaw", "6", CASELAW_TYPES,
                       re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
                       1954, False, require_language_expression=True),
 }
+
+
+# the sector digits whose works can repeal another -- `sync` reads the flag off
+# the Sector it is walking, `download_document` has only a CELEX
+REPEALING_SECTORS = frozenset(s.digit for s in SECTORS.values() if s.repeals)
 
 
 def celex_slug(celex):
@@ -316,10 +332,15 @@ def download_document(session, root, celex, languages, delay):
     languages stored (empty if none of the requested languages exist). The sweep
     (`sync`) selects in bulk; this serves the explicit per-CELEX refetch."""
     selection = fetch_selection(session, [celex], languages)
-    wdate, eurovoc = fetch_metadata(session, [celex])
+    wdate, eurovoc, validity, _answered = fetch_metadata(session, [celex])
     stored = store_document(session, doc_dir(root, celex), celex,
                             wdate.get(celex), selection.get(celex, []),
-                            eurovoc.get(celex, []))
+                            eurovoc.get(celex, []),
+                            validity.get(celex, (None, None)))
+    if stored and celex[0] in REPEALING_SECTORS:
+        for target, when in refresh_repeal_targets(session, root, [celex]):
+            print("%s repeals %s (no longer in force %s)"
+                  % (celex, target, when), flush=True)
     time.sleep(delay)
     return stored
 
@@ -348,6 +369,104 @@ def prune_empty(root, remove=True):
                 d.rmdir()
             n += 1
     return n
+
+
+def refresh_repeal_targets(session, root, celexes):
+    """Re-read the metadata of every document `celexes` repeals and we hold.
+    Returns the (celex, repeal date) pairs whose repeal date this call *changed*
+    -- compared against what the notice said before, so a target already
+    recorded as repealed is not reported again on every run.
+
+    This is what keeps the corpus current without re-reading it. A repeal is
+    recorded on the *repealed* act -- its `resource_legal_in-force` flips to 0
+    -- and our walk is bounded by work date, so it never returns to a 1995
+    directive repealed in 2018. The incoming act is the only thing that
+    announces the change while we are already talking to CELLAR about it, so
+    each newly stored act is asked what it repeals and the targets we hold are
+    re-read on the spot.
+
+    It does not catch every repeal: an act that simply ends by its own terms is
+    named by no incoming act (36% of the out-of-force acts measured), and for
+    those `refresh_metadata` over the corpus stays the backstop."""
+    targets = sorted({t for repealed in fetch_repeals(session, celexes).values()
+                      for t in repealed if is_downloaded(root, t)})
+    before = {t: notice_repeal_date(doc_dir(root, t)) for t in targets}
+    refreshed = refresh_metadata(session, root, targets)
+    next(refreshed)             # the work-list size, of no use here
+    return [(celex, repealed)
+            for celex, repealed, _in_force, _written in refreshed
+            if repealed and repealed != before[celex]]
+
+
+def refresh_metadata(session, root, celexes=None, limit=None,
+                     chunk=SELECT_CHUNK):
+    """Re-read the CELLAR metadata of already-downloaded CELEX and rewrite their
+    notice.ttl, without refetching a byte of content.
+
+    Yields the work-list size first -- it is known before any query runs, so a
+    caller's progress line can carry a real total -- then
+    (celex, repeal date or None, in-force flag, rewritten) per document. The
+    caller counts the acts CELLAR reports out of force but gives no end date
+    for (they keep no repeal date and stay listed) and the ones it answered
+    nothing about; a run that reported neither would read as complete.
+
+    This is how a corpus harvested before the notice carried the validity pair
+    learns which of its acts no longer state law. The metadata query takes a
+    VALUES list, so a thousand documents cost one round trip; the content -- the
+    expensive part -- is untouched, and the parse that follows re-reads the
+    notice each document is already parsed from.
+
+    A document CELLAR answers with no work date keeps the one its notice
+    already carries: the rewrite must not cost a document its date, which is the
+    only thing the parser reads out of a notice besides the repeal. A document
+    CELLAR does not answer for **at all** is not rewritten -- an empty answer is
+    an endpoint hiccup as often as it is a fact, and rewriting on one would
+    replace a stored notice with a stub. Such a CELEX yields `(celex, None,
+    None)` with `rewritten` False, so the caller counts it rather than reporting
+    it as done.
+
+    A named CELEX the corpus does not hold is skipped rather than given a
+    notice of its own: `is_downloaded` keys on the notice, so writing one for a
+    document with no content would mark it downloaded for ever.
+
+    `celexes` defaults to every downloaded document *whose notice does not
+    already record a repeal* -- a repeal never lifts, so re-reading one asks
+    CELLAR a question it has already answered. That is what keeps the periodic
+    audit shrinking rather than costing the whole corpus every time. `limit`
+    bounds the work either way; re-run to go deeper.
+
+    No delay of its own: every query goes out through `net.request`, which paces
+    the host to the Crawl-delay its robots.txt asks for. A second sleep here
+    would be the per-source throttle that pacing replaced.
+    """
+    root = Path(root)
+    celexes = ([c for c in celexes if is_downloaded(root, c)]
+               if celexes is not None
+               else [c for c in list_basefiles(root)
+                     if not notice_repeal_date(doc_dir(root, c))])
+    if limit:
+        celexes = celexes[:limit]
+    yield len(celexes)          # the work-list size, before any query runs
+    for i in range(0, len(celexes), chunk):
+        batch = celexes[i:i + chunk]
+        wdate, eurovoc, validity, answered = fetch_metadata(session, batch)
+        for celex in batch:
+            if celex not in answered:
+                yield celex, None, None, False
+                continue
+            target = doc_dir(root, celex)
+            # both the work date and the validity pair fall back on what the
+            # notice already holds. CELLAR answering about a work without
+            # restating its validity is not the work becoming valid again -- a
+            # repeal never lifts -- and overwriting on a thin answer would erase
+            # the one fact this whole path exists for.
+            pair = validity.get(celex) or notice_validity(target)
+            compress.write_download(target / "notice.ttl", notice_ttl(
+                celex, wdate.get(celex) or notice_work_date(target),
+                eurovoc.get(celex, []), pair))
+            # the repeal is read back off the written notice rather than derived
+            # here, so what the caller counts is what the next parse will read
+            yield celex, notice_repeal_date(target), pair[0], True
 
 
 # CELLAR indexes a document within months of its work date, so a work date
@@ -453,6 +572,11 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
          languages=LANGUAGES, source="sparql"):
     """Download a sector into root, returning (seen, stored, skipped).
 
+    Each year's newly stored acts are also asked what they repeal, and every
+    target the corpus already holds is re-read on the spot
+    (`refresh_repeal_targets`) -- the repeal is recorded on the repealed act,
+    which this walk would otherwise never revisit.
+
     Incremental by default: re-fetches only CELEX not already on disk, and
     bounds discovery by a per-sector watermark -- the max work date downloaded
     in the last clean run, with the floor reaching a lag allowance BELOW it
@@ -486,7 +610,7 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     if since is None and not full:
         since = incremental_floor(wm_high, wm_run)   # incremental discovery floor
 
-    seen = stored = skipped = 0
+    seen = stored = skipped = repealed = 0
     high = wm_high.isoformat() if wm_high else None
     truncated = False
     rep = Reporter()
@@ -500,10 +624,12 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             retry.discard(celex)                 # gained content some other way
             continue
         sel = fetch_selection(session, [celex], languages)
-        meta_wdate, meta_eurovoc = fetch_metadata(session, [celex])
+        meta_wdate, meta_eurovoc, meta_validity, _ans = fetch_metadata(
+            session, [celex])
         if store_document(session, doc_dir(root, celex), celex,
                           meta_wdate.get(celex), sel.get(celex, []),
-                          meta_eurovoc.get(celex, [])):
+                          meta_eurovoc.get(celex, []),
+                          meta_validity.get(celex, (None, None))):
             stored += 1
             retry.discard(celex)
         elif not worth_retrying(meta_wdate.get(celex)):
@@ -518,12 +644,14 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         # year (incremental steady state) queries nothing.
         pending = [celex for celex, _ in items
                    if full or not is_downloaded(root, celex)]
-        selection, eurovoc = {}, {}
+        selection, eurovoc, validity = {}, {}, {}
         if pending:
             selection = fetch_selection(session, pending, languages)
-            _meta_wdate, eurovoc = fetch_metadata(session, pending)
+            _meta_wdate, eurovoc, validity, _ans = fetch_metadata(
+                session, pending)
         rep.reset()                     # don't bill the year's queries to doc 1
         y_seen = y_stored = y_skipped = 0
+        y_new = []                      # the CELEX actually stored this year
         for celex, wdate in items:
             if limit and seen >= limit:
                 truncated = True
@@ -537,9 +665,11 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             else:
                 if store_document(session, doc_dir(root, celex), celex, wdate,
                                   selection.get(celex, []),
-                                  eurovoc.get(celex, [])):
+                                  eurovoc.get(celex, []),
+                                  validity.get(celex, (None, None))):
                     stored += 1
                     y_stored += 1
+                    y_new.append(celex)
                     retry.discard(celex)
                 else:
                     print("%s: no manifestation in %s"
@@ -559,6 +689,14 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         rep.update(y_seen, total, scope=scope, actual=y_stored,
                    stored=y_stored, skipped=y_skipped)
         rep.done()                  # finish the year's overwriting line
+        # what this year's new acts repeal: their targets' stored metadata still
+        # says "in force", and this run is the only moment anything says
+        # otherwise. Asked per year, over the acts actually stored, so a
+        # fully-downloaded year queries nothing.
+        if y_new and sector.repeals:
+            for target, when in refresh_repeal_targets(session, root, y_new):
+                repealed += 1
+                print("  %s: no longer in force %s" % (target, when), flush=True)
         if truncated:
             break
         # Resume safety net: persist progress after each completed past year, so
@@ -580,6 +718,9 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         # above, recent no-content works added; worth_retrying bounds it by work
         # date, so even a --since sweep over old years cannot bloat it.
         write_pending(root, sector_name, retry)
+    if repealed:
+        print("eurlex %s: %d held document(s) re-read as no longer in force"
+              % (sector_name, repealed), flush=True)
     return seen, stored, skipped
 
 

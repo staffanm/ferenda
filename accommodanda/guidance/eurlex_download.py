@@ -206,7 +206,7 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
     report = Reporter()
     seen = new = 0
     utan_text = 0
-    selection, dates, eurovoc = {}, {}, {}
+    selection, dates, eurovoc, validity = {}, {}, {}, {}
     for start in range(0, len(works), META_CHUNK):
         # the selection and the metadata come per chunk rather than per work:
         # both queries take a VALUES list, so a thousand works cost one round
@@ -214,7 +214,8 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
         chunk = works[start:start + META_CHUNK]
         celexes = [w[0] for w in chunk]
         selection = fetch_selection(session, celexes, languages)
-        dates, eurovoc = fetch_metadata(session, celexes)
+        dates, eurovoc, validity, _answered = fetch_metadata(
+            session, celexes)
         for celex, nummer, wdate, svensk, engelsk in chunk:
             if limit is not None and new >= limit:
                 break
@@ -225,7 +226,8 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
             stored = store_document(session, target, celex,
                                     dates.get(celex, wdate),
                                     selection.get(celex, []),
-                                    eurovoc.get(celex, []))
+                                    eurovoc.get(celex, []),
+                                    validity.get(celex, (None, None)))
             time.sleep(delay)
             if not stored:
                 # CELLAR holds the work but no text in any language we take.
