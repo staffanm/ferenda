@@ -6,11 +6,13 @@ from xml.etree import ElementTree as ET
 import pytest
 from lxml import etree
 
+from accommodanda.eurlex import parse as P
 from accommodanda.eurlex.correspond import correspondence
 from accommodanda.eurlex.parse import (
     UNCARRIED,
     content_file,
     doctype,
+    notice_repeal_date,
     notice_work_date,
     parse_dir,
     parse_document,
@@ -24,6 +26,7 @@ from accommodanda.lib.formex import (
     formex_members,
     load_formex,
 )
+from accommodanda.lib import catalog
 from accommodanda.lib.errors import SkipDocument
 from accommodanda.lib.eu_structure import anchored_blocks
 from accommodanda.lib.eu_structure import flatten as flatten_structure
@@ -958,6 +961,91 @@ def test_notice_work_date_reads_both_notice_shapes(tmp_path):
     assert notice_work_date(tmp_path) is None
 
 
+CDM = b"http://publications.europa.eu/ontology/cdm#"
+
+
+def _validity_notice(in_force, *end_dates):
+    lines = [b'<x> <' + CDM + b'resource_legal_in-force> "%b" .' % in_force]
+    lines += [b'<x> <' + CDM + b'resource_legal_date_end-of-validity> '
+              b'"%b"^^<http://www.w3.org/2001/XMLSchema#date> .' % d
+              for d in end_dates]
+    return b"\n".join(lines) + b"\n"
+
+
+def test_notice_repeal_date_needs_the_in_force_flag(tmp_path):
+    # 31995L0046: out of force, one end date -- the date the GDPR's article 94
+    # repeal took effect
+    (tmp_path / "notice.ttl").write_bytes(_validity_notice(b"0", b"2018-05-24"))
+    assert notice_repeal_date(tmp_path) == "2018-05-24"
+    # 32006L0040: in force *and* carrying a past end date. The date alone would
+    # repeal an act that is not repealed
+    (tmp_path / "notice.ttl").write_bytes(_validity_notice(b"1", b"2009-04-28"))
+    assert notice_repeal_date(tmp_path) is None
+    # a notice from before the validity pair was harvested says nothing
+    (tmp_path / "notice.ttl").write_bytes(NOTICE_NT)
+    assert notice_repeal_date(tmp_path) is None
+    (tmp_path / "notice.ttl").unlink()
+    assert notice_repeal_date(tmp_path) is None
+
+
+def test_notice_repeal_date_takes_the_latest_real_end_date(tmp_path):
+    # 31981L0576 carries two end dates; EUR-Lex prints the last one
+    (tmp_path / "notice.ttl").write_bytes(
+        _validity_notice(b"0", b"1996-08-05", b"2014-10-31"))
+    assert notice_repeal_date(tmp_path) == "2014-10-31"
+    # 9999-12-31 is CELLAR's "no end date" placeholder, never a date
+    (tmp_path / "notice.ttl").write_bytes(
+        _validity_notice(b"0", b"2014-10-31", b"9999-12-31"))
+    assert notice_repeal_date(tmp_path) == "2014-10-31"
+
+
+def test_notice_repeal_date_reads_the_bulk_turtle_shape(tmp_path):
+    (tmp_path / "notice.ttl").write_bytes(
+        b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+        b'<x> j.0:resource_legal_in-force "0" ;\n'
+        b'  j.0:resource_legal_date_end-of-validity "2018-05-24"^^xsd:date .\n')
+    assert notice_repeal_date(tmp_path) == "2018-05-24"
+
+
+def test_notice_repeal_date_reads_the_boolean_in_force_shape(tmp_path):
+    # the older tree notices on disk write the flag as a turtle boolean rather
+    # than a digit, and rapper renders the same rdf/xml as "false"^^xsd:boolean.
+    # Reading only the digit form made an act out of force read as in force
+    (tmp_path / "notice.ttl").write_bytes(
+        b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+        b'<x> j.0:in-force false ;\n'
+        b'  j.0:resource_legal_in-force false ;\n'
+        b'  j.0:resource_legal_date_end-of-validity "2018-05-24"^^xsd:date .\n')
+    assert notice_repeal_date(tmp_path) == "2018-05-24"
+
+    (tmp_path / "notice.ttl").write_bytes(
+        b'<x> <http://publications.europa.eu/ontology/cdm#'
+        b'resource_legal_in-force> "false"^^<http://www.w3.org/2001/'
+        b'XMLSchema#boolean> .\n'
+        b'<x> <http://publications.europa.eu/ontology/cdm#'
+        b'resource_legal_date_end-of-validity> "2014-10-31"'
+        b'^^<http://www.w3.org/2001/XMLSchema#date> .\n')
+    assert notice_repeal_date(tmp_path) == "2014-10-31"
+
+    # `true` is in force, whatever end dates it also carries
+    (tmp_path / "notice.ttl").write_bytes(
+        b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+        b'<x> j.0:resource_legal_in-force true ;\n'
+        b'  j.0:resource_legal_date_end-of-validity "2009-04-28"^^xsd:date .\n')
+    assert notice_repeal_date(tmp_path) is None
+
+
+def test_notice_repeal_date_is_none_when_no_end_date_is_given(tmp_path):
+    # 12019W_TXT: CELLAR says out of force but carries only the 9999 placeholder.
+    # There is no date to filter on, so it stays listed rather than being
+    # repealed on an invented date
+    (tmp_path / "notice.ttl").write_bytes(
+        b'@prefix j.0: <http://publications.europa.eu/ontology/cdm#> .\n'
+        b'<x> j.0:resource_legal_in-force false ;\n'
+        b'  j.0:resource_legal_date_end-of-validity "9999-12-31"^^xsd:date .\n')
+    assert notice_repeal_date(tmp_path) is None
+
+
 def _doc_dir(tmp_path, xml, notice=NOTICE_TTL):
     (tmp_path / "swe.fmx4").write_bytes(xml.encode())
     if notice is not None:
@@ -980,6 +1068,53 @@ def test_parse_dir_replaces_impossible_date_from_notice(tmp_path):
       <DATE ISO="19820231">31 February 1982</DATE></P></TI></TITLE></JUDGMENT>"""
     art = parse_dir(_doc_dir(tmp_path, xml), "61981CJ0025")
     assert art["date"] == "1982-03-31"
+
+
+def test_parse_dir_stamps_the_repeal_date_on_the_artifact(tmp_path):
+    # the repeal reaches the catalog (documents.expired) through the artifact,
+    # the way every other extracted fact does -- which is what drops the act out
+    # of browse, search and the API's document enumeration
+    xml = """<ACT><BIB.INSTANCE><DATE ISO="19951024">19951024</DATE>
+      </BIB.INSTANCE><TITLE><TI><P>Direktiv 95/46/EG</P></TI></TITLE></ACT>"""
+    notice = (b'<x> <http://publications.europa.eu/ontology/cdm#'
+              b'resource_legal_in-force> "0" .\n'
+              b'<x> <http://publications.europa.eu/ontology/cdm#'
+              b'resource_legal_date_end-of-validity> "2018-05-24"'
+              b'^^<http://www.w3.org/2001/XMLSchema#date> .\n')
+    art = parse_dir(_doc_dir(tmp_path, xml, notice), "31995L0046")
+    assert art["expired"] == "2018-05-24"
+    assert catalog._expired_date(art) == "2018-05-24"
+    # an act still in force carries no such key at all
+    art = parse_dir(_doc_dir(tmp_path, xml, NOTICE_NT), "31995L0046")
+    assert "expired" not in art
+    assert catalog._expired_date(art) is None
+
+
+@pytest.mark.parametrize("celex,base", [
+    ("32016R0900R(01)", "32016R0900"),      # an act's corrigendum: 'R(NN)'
+    ("12019W/TXT(01)", "12019W/TXT"),       # a treaty text's revision: '(NN)'
+])
+def test_a_revision_inherits_the_repeal_of_what_it_revises(
+        celex, base, tmp_path, monkeypatch):
+    # CELLAR flags the act, never its corrigenda -- of 537 held corrigenda whose
+    # base act we hold, none carry the flag. Without inheritance a repealed act
+    # leaves its corrigendum ranked in search, listed by /api/v1/documents and
+    # standing on a rail; a treaty revision additionally survives in the browse,
+    # where the collapse keeps it and drops the repealed base
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    (base_dir / "notice.ttl").write_bytes(
+        _validity_notice(b"0", b"2026-08-17"))
+    monkeypatch.setattr(P.layout, "eurlex_dir",
+                        lambda bf: base_dir if bf == base else tmp_path / bf)
+    assert P.revision_repeal_date(celex) == "2026-08-17"
+    # the act itself is not a revision of anything
+    assert P.revision_repeal_date(base) is None
+
+    xml = """<ACT><BIB.INSTANCE><DATE ISO="20160601">20160601</DATE>
+      </BIB.INSTANCE><TITLE><TI><P>Rättelse</P></TI></TITLE></ACT>"""
+    art = parse_dir(_doc_dir(tmp_path, xml, NOTICE_NT), celex)
+    assert art["expired"] == "2026-08-17"
 
 
 def test_parse_dir_corrigendum_takes_its_own_notice_date(tmp_path):

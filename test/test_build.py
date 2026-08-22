@@ -165,6 +165,24 @@ def test_stage_gate_is_not_recorded_by_a_dry_run(tmp_path, monkeypatch, capsys):
     assert "up to date -- skipped" not in capsys.readouterr().out
 
 
+def test_eurlex_parse_hashes_the_notice_it_reads_the_repeal_from():
+    """The repeal date lives in notice.ttl and nowhere else, and refreshing the
+    metadata rewrites the notice while leaving the content file untouched.
+    Without the notice in the freshness inputs, `parse` reads such a document as
+    fresh -- measured: a notice rewritten to a different end-of-validity left
+    the artifact's `expired` on the old date, with `parse` reporting "skipped
+    (fresh) 1". `depends="download"` does not cover it: it recurses into the
+    upstream stage but never hashes its output."""
+    inputs = build.SOURCES["eurlex"].stages["parse"].inputs
+    assert layout.eurlex_dir("31995L0046") / "notice.ttl" \
+        in inputs("31995L0046")
+    # a corrigendum takes its date from the act it corrects, so repealing the
+    # act has to restale the corrigendum too
+    corr = inputs("32016R0900R(01)")
+    assert layout.eurlex_dir("32016R0900R(01)") / "notice.ttl" in corr
+    assert layout.eurlex_dir("32016R0900") / "notice.ttl" in corr
+
+
 def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
     """A full-source run drops error entries for basefiles the source no longer
     lists (orphans that fresh-skip healing can never reach); a targeted run must

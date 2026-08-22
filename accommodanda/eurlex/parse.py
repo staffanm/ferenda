@@ -20,12 +20,12 @@ import functools
 import json
 import re
 from datetime import date
-from pathlib import Path
 
-from ..lib import compress, eucasenaming, markup, patch
+from ..lib import compress, eucasenaming, layout, markup, patch
+from ..lib.cellar import notice_repeal_date, notice_work_date
 from ..lib.datasets import NAMEDACTS
 from ..lib.errors import SkipDocument
-from ..lib.eu_structure import doctype
+from ..lib.eu_structure import doctype, revision_base
 from ..lib.formex import (
     _text,
     act_metadata,
@@ -262,26 +262,35 @@ def parse_content(path, route, celex, lang):
     raise ValueError("no parser for route %r" % route)
 
 
-# the work date line in a stored notice.ttl, in both its shapes: the live
-# path's synthesized n-triples ('<...cdm#work_date_document> "2016-04-27"^^...')
-# and the bulk unpacker's turtle subset ('j.0:work_date_document "1982-03-31"^^...')
-RE_NOTICE_WDATE = re.compile(r'work_date_document>?\s+"(\d{4}-\d{2}-\d{2})')
-
-
-def notice_work_date(doc_dir):
-    """The CELLAR work date kept in the document dir's notice.ttl, or None.
-    The authoritative document date for a manifestation that carries none of
-    its own (old ECR judgment Formex has an empty TITLE; pre-2004 OJ html has
-    no bibliographic markup)."""
-    path = Path(doc_dir) / "notice.ttl"
-    if not compress.exists(path):
-        return None
-    m = RE_NOTICE_WDATE.search(compress.read_bytes(path).decode("utf-8", "replace"))
-    return m.group(1) if m else None
-
-
 # a corrigendum CELEX: the parent act's number + 'R(NN)'
 RE_CORRIGENDUM = re.compile(r"R\(\d+\)$")
+
+
+def revision_repeal_date(celex):
+    """The repeal date a '(NN)' revision inherits from the document it revises
+    (`eu_structure.revision_base`), or None.
+
+    CELLAR records `resource_legal_in-force` on the act, never on its
+    corrigenda -- measured: of 537 held corrigenda whose base act we also hold,
+    exactly none carry the flag. So repealing an act expires the act's own row
+    and leaves its corrigenda ranked in search, listed by `/api/v1/documents`
+    and standing on a paragraf's rail as if nothing had happened. (Not in the
+    browse: `facets._is_browsable` drops every 'R(NN)' CELEX from the eurlex
+    tree, so an act's corrigendum was never a row there.) Four held acts with
+    five corrigenda are in that position today, all repealed during 2026, so it
+    is a growing set rather than a historical quirk.
+
+    A treaty revision is browsable, and is the sharper case:
+    `facets._keep_latest_eu_revision` collapses '12019W/TXT' and
+    '12019W/TXT(01)' onto one entry and keeps the *higher* revision, so there
+    the repealed base is dropped and the unflagged revision is the row that
+    survives.
+
+    Reading the base's notice (not its artifact) keeps this a metadata lookup
+    with no parse-order dependency; `build.eurlex_parse_notices` puts that file
+    in the corrigendum's freshness inputs so repealing the act restales it."""
+    base = revision_base(celex)
+    return notice_repeal_date(layout.eurlex_dir(base)) if base else None
 
 
 def _plausible_date(value):
@@ -333,6 +342,12 @@ def parse_dir(doc_dir, celex):
     its own; its notice work date (the correcting OJ's publication) is the
     document's actual date, so it wins there.
 
+    An act CELLAR reports as no longer in force carries the date it stopped
+    (`expired`, from notice_repeal_date), which is what drops it out of the
+    listings. A corrigendum inherits its base act's date
+    (`revision_repeal_date`): CELLAR flags the act, never its corrigenda, and
+    the browse shows the corrigendum in the act's place.
+
     An `UNCARRIED` act raises SkipDocument before anything is opened: its source
     is on disk and will never be servable, so the driver's empty-artifact marker
     is the honest outcome -- the alternative is a per-document failure on every
@@ -347,6 +362,9 @@ def parse_dir(doc_dir, celex):
             or RE_CORRIGENDUM.search(celex)):
         doc.date = notice_work_date(doc_dir) or doc.date
     art = to_artifact(doc)
+    repealed = notice_repeal_date(doc_dir) or revision_repeal_date(celex)
+    if repealed:
+        art["expired"] = repealed
     # the act's own jämförelsetabell, read *after* to_artifact because the
     # header's "Direktiv 2004/18/EG" is identified by the citation link minted
     # there. Empty for all but ~2% of sector-3 acts and every judgment, so this

@@ -21,7 +21,7 @@ import json
 import re
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import partial
 from pathlib import Path
 
@@ -1146,12 +1146,15 @@ def _expired_date(art: dict) -> str | None:
     the only thing between it and a reader: an advanced "search expired" option
     is a query change, not a reindex.
 
-    Two kinds of document declare one, for the same reason. A statute names its
+    Three kinds of document declare one, for the same reason. A statute names its
     repeal date (`rpubl:upphavandedatum`). A rättsligt ställningstagande is in
     force until the agency withdraws it, and a withdrawn one no longer says how
     the agency reads the rule -- which is the only reason it was on that
     paragraf's rail. Reading a paragraf whose rail listed thirteen
-    ställningstaganden, twelve of them withdrawn, is what this covers.
+    ställningstaganden, twelve of them withdrawn, is what this covers. An EU act
+    carries the date CELLAR says it stopped being in force, stamped on the
+    artifact as a plain `expired` key (`cellar.notice_repeal_date`) --
+    32016R0679 article 94 repealed 31995L0046 with effect from 2018-05-24.
 
     A date has to be an ISO one, because this column is compared against one.
     Where the issuer names a *successor* but no usable date, the document is
@@ -1182,7 +1185,9 @@ def _expired_date(art: dict) -> str | None:
         # current, which is the error this column exists to prevent.
         return EXPIRED_UNDATED if (metadata.get("ersattAv")
                                    or metadata.get("ersattAvKalla")) else None
-    return metadata.get("properties", {}).get("rpubl:upphavandedatum")
+    declared = (art.get("expired")
+                or metadata.get("properties", {}).get("rpubl:upphavandedatum"))
+    return declared if declared and RE_ISO_DATE.match(declared) else None
 
 
 def document_date(art: dict) -> str | None:
@@ -2257,8 +2262,20 @@ def document_display(con, uri):
     return row[0] if row else None
 
 
-def _doc_filter(source, kind):
-    """A (WHERE-clause, params) pair shared by `documents` and `document_count`."""
+def _doc_filter(source, kind, include_expired=False):
+    """A (WHERE-clause, params) pair shared by `documents` and `document_count`.
+
+    A document whose declared repeal date has passed is left out unless
+    `include_expired`, so an enumeration of the corpus states current law the
+    same way the browse trees and search results do (`_expired_date`). A future
+    repeal date is not yet a repeal and stays. The document itself stays
+    reachable by uri and through the reference graph.
+
+    This default reaches `document_count`'s other callers too: `render.py` uses
+    it as a "does the corpus hold any X" test before building a source's index
+    pages, which now reads "any X still stating law". That is the same question
+    `facets.tree` answers for the buckets on those pages, so the two agree; pass
+    `include_expired=True` at a call site that means held-at-all regardless."""
     clauses, params = [], []
     if source:
         clauses.append("source = ?")
@@ -2266,16 +2283,21 @@ def _doc_filter(source, kind):
     if kind:
         clauses.append("kind = ?")
         params.append(kind)
+    if not include_expired:
+        clauses.append("(expired IS NULL OR expired > ?)")
+        params.append(date.today().isoformat())
     return (" WHERE " + " AND ".join(clauses) if clauses else ""), params
 
 
-def documents(con, source=None, kind=None, limit=None, offset=0):
+def documents(con, source=None, kind=None, limit=None, offset=0,
+              include_expired=False):
     """A filtered, paginated document listing as (uri, source, kind, label,
     title, source_url, path, display) rows, ordered by uri -- the id/metadata
     index that drives /document lookups and the browse listings (not full-text
     search). `display` is the reader-facing heading (catalog.display_title).
-    `source`/`kind` filter; `limit`/`offset` page."""
-    where, params = _doc_filter(source, kind)
+    `source`/`kind` filter; `limit`/`offset` page; `include_expired` puts
+    repealed documents back in."""
+    where, params = _doc_filter(source, kind, include_expired)
     sql = ("SELECT uri, source, kind, label, title, source_url, path, display "
            "FROM documents" + where + " ORDER BY uri")
     if limit is not None:
@@ -2299,10 +2321,10 @@ def facet_documents(con, source):
 
 
 def document_count(con: sqlite3.Connection, source: str | None = None,
-                   kind: str | None = None) -> int:
-    """How many documents match the same `source`/`kind` filter -- the total for
-    a paginated `documents` listing."""
-    where, params = _doc_filter(source, kind)
+                   kind: str | None = None, include_expired: bool = False) -> int:
+    """How many documents match the same `source`/`kind`/`include_expired`
+    filter -- the total for a paginated `documents` listing."""
+    where, params = _doc_filter(source, kind, include_expired)
     return con.execute("SELECT COUNT(*) FROM documents" + where,
                        params).fetchone()[0]
 

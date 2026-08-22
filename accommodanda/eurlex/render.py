@@ -6,6 +6,7 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 """
 import json
 import re
+from datetime import date
 from html import escape
 
 from markupsafe import Markup
@@ -15,6 +16,7 @@ from ..lib.eu_structure import Anchors, citable, first_stycke
 from ..lib.eu_structure import flatten as eurlex_flatten
 from ..lib.markdown import begrepp_uri
 from ..lib.page import (
+    BANNERS,
     NODES,
     Rail,
     RailSection,
@@ -535,8 +537,17 @@ def render(art, site):
                                           casemap, editorial, key))
     rail.add_document()        # external links + commentary, the rail's default panel
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
+    # an act whose repeal has taken effect is out of every listing, so a reader
+    # only reaches it by following a citation -- the page has to say so itself.
+    # A repeal dated ahead is not yet a repeal and gets no banner, matching the
+    # `expired <= today` test the listings apply (catalog.expired_uris).
+    expired = art.get("expired")
+    if expired and expired > date.today().isoformat():
+        expired = None
     return ENV.get_template("eurlex.html").render(page_context(
         title, kind, doc_meta(meta, art.get("source_url")),
         toc=render_toc(toc, lb.short_id), eyebrow=lb.short_id, island=rail.island(),
         opinion_href=_eurlex_opinion_href(art, site),
+        banner=Markup(BANNERS.eurlex_expired_banner(expired) if expired else ""),
+        body_class=" expired expired-eu" if expired else "",
         structure=Markup("".join(parts))))

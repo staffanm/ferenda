@@ -457,6 +457,9 @@ body.expired::before { content: "Upphävd författning"; position: fixed;
                        font-family: var(--serif); font-weight: 600; white-space: nowrap;
                        font-size: min(11vw, 8rem); color: var(--accent); opacity: .08;
                        pointer-events: none; user-select: none; z-index: 1; }
+/* an EU act is not a svensk författning, and CELLAR's end-of-validity covers a
+   repeal and a lapse alike, so the watermark says what is certain */
+body.expired-eu::before { content: "Gäller inte längre"; }
 
 /* -- Historical consolidations (lydelser) + version diff -- */
 body.inaktuell .gr-main { color: var(--ink-3); }

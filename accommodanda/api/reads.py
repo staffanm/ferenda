@@ -66,16 +66,19 @@ def search(index, query, *, source=None, kind=None, year=None, limit,
             "facets": res["facets"], "results": results}
 
 
-def documents(con, *, source=None, kind=None, limit, offset):
+def documents(con, *, source=None, kind=None, limit, offset,
+              include_expired=False):
     """The catalog index page: {total, limit, offset, documents} with one
-    lightweight dict per document."""
+    lightweight dict per document. Repealed documents are left out unless
+    `include_expired` -- the same rule browse and search apply."""
     root = catalog.data_root(con)      # stored paths are data_root-relative
     docs = [{"uri": uri, "source": src, "kind": kind_, "label": label,
              "title": title, "source_url": source_url,
              "updated": catalog.artifact_updated(root, path)}
             for uri, src, kind_, label, title, source_url, path, _display
-            in catalog.documents(con, source, kind, limit, offset)]
-    return {"total": catalog.document_count(con, source, kind),
+            in catalog.documents(con, source, kind, limit, offset,
+                                 include_expired)]
+    return {"total": catalog.document_count(con, source, kind, include_expired),
             "limit": limit, "offset": offset, "documents": docs}
 
 

@@ -237,6 +237,11 @@ ListLimitArg = Annotated[int, Field(
 OffsetArg = Annotated[int, Field(
     description="Hur många rader från början av den stabila ordningen som ska "
     "hoppas över. 0 för första sidan; öka med föregående `limit` för nästa.")]
+IncludeExpiredArg = Annotated[bool, Field(
+    description="Ta med upphävda dokument -- upphävda författningar, "
+    "EU-rättsakter som inte längre gäller, återkallade ställningstaganden. "
+    "Standard är att de utelämnas, så listan visar gällande rätt. Sätt true "
+    "bara när frågan uttryckligen gäller äldre eller upphävd rätt.")]
 
 
 # every tool is a pure read of public data: readOnlyHint lets a host auto-run them
@@ -603,7 +608,8 @@ def fetch(id: FetchIdArg) -> FetchedDocument:
 @mcp.tool(title="Lista dokument i samlingen", annotations=READ_ONLY)
 def list_documents(source: SourceArg = None, kind: KindArg = None,
                    limit: ListLimitArg = 50,
-                   offset: OffsetArg = 0) -> DocumentList:
+                   offset: OffsetArg = 0,
+                   include_expired: IncludeExpiredArg = False) -> DocumentList:
     """Bläddrar i eller inventerar vad samlingen innehåller: dokument med
     grundläggande metadata, filtrerbart på källa och dokumenttyp, sidindelat.
 
@@ -616,6 +622,10 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
     Ordningen är stabil (efter URI), och `total` är antalet träffar före
     sidindelning, så hela mängden kan bläddras igenom med `limit`/`offset`.
 
+    Upphävda dokument utelämnas, så listan visar gällande rätt. De finns kvar
+    och går att hämta med `get_document` och att nå via hänvisningsgrafen;
+    `include_expired=true` tar med dem i listan.
+
     Varje post: uri, source, kind, label, title, source_url (utgivarens sida
     där den är känd) och updated (när dokumentet senast bearbetades, ISO 8601).
     """
@@ -623,7 +633,8 @@ def list_documents(source: SourceArg = None, kind: KindArg = None,
     offset = max(0, offset)
     with _con() as con:
         return reads.documents(con, source=source, kind=kind,
-                               limit=limit, offset=offset)
+                               limit=limit, offset=offset,
+                               include_expired=include_expired)
 
 
 @mcp.tool(title="Vilka källor hänvisar hit (inkommande hänvisningar)",

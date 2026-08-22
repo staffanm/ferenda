@@ -120,9 +120,11 @@ from .lib import (
     annstore,
     casenaming,
     catalog,
+    cellar,
     compress,
     dump,
     errorlog,
+    eu_structure,
     labels,
     layout,
     llm,
@@ -2224,6 +2226,9 @@ EURLEX_CODE = (PKG / "eurlex" / "parse.py", PKG / "eurlex" / "parse_html.py",
                PKG / "eurlex" / "definitions.py",
                # the shared anchor grammar the parser stamps ids from
                PKG / "lib" / "eu_structure.py",
+               # the notice.ttl readers: the work date that fills in a missing
+               # document date, and the repeal date stamped as `expired`
+               PKG / "lib" / "cellar.py",
                # the pre-Formex tier reads its body through the shared PDF
                # machinery (parse_pdf imports pdftext.flat_lines), so an edit
                # there changes those artifacts exactly as it does forarbete's
@@ -2243,6 +2248,16 @@ def _eurlex_session():
 def eurlex_notice(basefile):
     """The tree-notice graph -- the freshness marker for a downloaded CELEX."""
     return layout.eurlex_dir(basefile) / "notice.ttl"
+
+
+def eurlex_parse_notices(basefile):
+    """The notices `parse` reads for one CELEX: its own, plus the base act's
+    when this is a '(NN)' revision -- a corrigendum takes its repeal date from
+    the act it corrects (`parse.revision_repeal_date`), so repealing the act
+    must restale the corrigendum too."""
+    base = eu_structure.revision_base(basefile)
+    return ([eurlex_notice(basefile)]
+            + ([eurlex_notice(base)] if base else []))
 
 
 def eurlex_content(basefile):
@@ -2313,6 +2328,57 @@ def eurlex_prune(args=()):
     print("eurlex prune-empty: %s %d notice-only dir(s) in %s"
           % ("would remove" if RUN.dry_run else "removed", n,
              layout.EURLEX_DOWNLOADED))
+
+
+def eurlex_refresh_metadata(args):
+    """`lagen eurlex refresh-metadata [<CELEX> ...] [--limit N]` -- re-read the
+    CELLAR metadata of downloaded documents and rewrite their notice.ttl. No
+    content is refetched.
+
+    This is the *backstop*, not the mechanism. `download` already re-reads the
+    acts each newly harvested act says it repeals (`refresh_repeal_targets`),
+    which covers 64% of the repeals CELLAR records. The rest end by their own
+    terms, named by no incoming act, and only a re-read finds them.
+
+    With no CELEX named it walks every downloaded document whose notice does not
+    already record a repeal -- a repeal never lifts, so the audit shrinks each
+    time it runs. Re-run `parse` and `relate` afterwards: the repeal reaches the
+    catalog through the artifact, the way every other extracted fact does."""
+    celexes = list(args) or None
+    if RUN.dry_run:
+        print("eurlex refresh-metadata: would re-read CELLAR metadata for %s "
+              "document(s) in %s"
+              % (len(celexes) if celexes else "all not-yet-repealed",
+                 layout.EURLEX_DOWNLOADED))
+        return
+    reporter = util.Reporter()
+    # the work-list is known before the first query, so the counter can show a
+    # real total rather than pacing itself against its own progress
+    work = eurlex_download.refresh_metadata(
+        _eurlex_session(), layout.EURLEX_DOWNLOADED, celexes, limit=RUN.limit)
+    total = next(work)
+    written = repealed = undated = unanswered = 0
+    for seen, (_celex, expired, in_force, rewritten) in enumerate(work, 1):
+        if not rewritten:
+            unanswered += 1     # CELLAR bound no row: the notice is left alone
+        else:
+            written += 1
+            if expired:
+                repealed += 1
+            elif in_force in cellar.OUT_OF_FORCE:
+                undated += 1    # out of force, no end date: it stays listed
+        # `actual` paces the ETA, so it counts the notices rewritten -- the work
+        # this loop does. Pacing on `repealed` would time the run against an
+        # event most documents do not produce (145 of 600 measured, and the
+        # audit's premise is that most are not repealed)
+        reporter.update(seen, total, scope="eurlex", actual=written,
+                        repealed=repealed, undated=undated,
+                        unanswered=unanswered)
+    reporter.done()
+    print("eurlex refresh-metadata: %d notice(s) rewritten, %d repealed with a "
+          "date, %d out of force with no end date (these stay listed), "
+          "%d unanswered by CELLAR (left untouched)"
+          % (written, repealed, undated, unanswered))
 
 
 def eurlex_ai_annotate(basefiles):
@@ -2407,19 +2473,32 @@ def eurlex_casenames(args=()):
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
+    # the notice is a parse *input*, not just the download stage's output marker:
+    # the act's repeal date lives there and nowhere else, and a metadata refresh
+    # (`refresh-metadata`, or a repeal a newly downloaded act announces) rewrites
+    # the notice while leaving the content file untouched. Without it in the
+    # hash, `parse` reads such a document as fresh and the repeal never reaches
+    # the artifact -- verified: a notice rewritten to a different end-of-validity
+    # left the artifact's `expired` at the old date, with `parse` reporting
+    # "skipped (fresh) 1". `depends` alone does not cover this; it recurses into
+    # the download stage but does not hash its output.
     "parse": Stage("parse", eurlex_parse_run,
                    functools.partial(layout.artifact, "eurlex"),
-                   inputs=lambda bf: eurlex_content(bf) + _patch_input("eurlex", bf),
+                   inputs=lambda bf: eurlex_content(bf)
+                   + eurlex_parse_notices(bf) + _patch_input("eurlex", bf),
                    depends="download", code=EURLEX_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
             "prune-empty": eurlex_prune, "casenames": eurlex_casenames,
-            "backfill": eurlex_backfill},
+            "backfill": eurlex_backfill,
+            "refresh-metadata": eurlex_refresh_metadata},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
          "prune-empty: remove download dirs with only a notice.ttl (no swe/eng doc)\n"
          "ai-annotate <CELEX>: LLM-author the editorial .ann layer (sector-3 acts)\n"
+         "refresh-metadata [<CELEX> ...] [--limit N]: re-read CELLAR metadata into\n"
+         "  notice.ttl (validity, work date, eurovoc) without refetching content\n"
          "backfill [<sector>] [--limit N]: download the acts the corpus cites but\n"
          "  does not hold, most-cited first (bulk dumps ship only acts in force)\n"
          "casenames: refresh the named-EU-cases snapshot from Wikidata")

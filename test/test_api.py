@@ -208,6 +208,42 @@ def test_documents_begrepp_stub_has_no_updated_timestamp(client):
     assert body["documents"][0]["updated"] is None
 
 
+def test_documents_hides_a_repealed_act_unless_asked(client):
+    # a repealed document is out of the enumeration by default, the way it is
+    # out of browse and search -- and still retrievable by uri, so a citation
+    # to it resolves. 31995L0046 stopped applying when the GDPR replaced it.
+    con = sqlite3.connect(client.catalog_path)
+    with con:
+        con.execute(
+            "INSERT INTO documents (uri, source, kind, label, title, path, "
+            " source_url, content_hash, expired, display) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("https://lagen.nu/ext/celex/31995L0046", "eurlex", "directive",
+             "31995L0046", "Dataskyddsdirektivet", "", None, "x",
+             "2018-05-24", "Dataskyddsdirektivet"))
+        # a repeal that has not taken effect yet is not a repeal
+        con.execute(
+            "INSERT INTO documents (uri, source, kind, label, title, path, "
+            " source_url, content_hash, expired, display) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("https://lagen.nu/ext/celex/32099L0001", "eurlex", "directive",
+             "32099L0001", "Ännu gällande", "", None, "x",
+             "2099-01-01", "Ännu gällande"))
+    con.close()
+    listed = client.get("/api/v1/documents", params={"source": "eurlex"}).json()
+    assert [d["label"] for d in listed["documents"]] == ["32099L0001"]
+    assert listed["total"] == 1
+
+    both = client.get("/api/v1/documents",
+                      params={"source": "eurlex", "include_expired": True}).json()
+    assert [d["label"] for d in both["documents"]] == ["31995L0046", "32099L0001"]
+    assert both["total"] == 2
+
+    assert client.get("/api/v1/document",
+                      params={"uri": "https://lagen.nu/ext/celex/31995L0046"}
+                      ).status_code == 200
+
+
 def test_document_returns_metadata_and_artifact(client):
     r = client.get("/api/v1/document",
                    params={"uri": "https://lagen.nu/1962:700"})

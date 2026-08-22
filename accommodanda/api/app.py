@@ -712,14 +712,22 @@ def documents_endpoint(
                                  "prop, sou, directive, …)"),
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0),
+        include_expired: bool = Query(False, description="also list documents "
+                                      "whose repeal has taken effect"),
         con: sqlite3.Connection = Depends(get_con)):
     """List document ids + top-level metadata, filtered by source/kind and
     paginated -- the catalog index that drives /document lookups. This is *not*
     full-text search (that is /search, which requires a query); it enumerates the
     corpus. `source_url` is the publisher's page where known; `updated` is the
-    artifact's last-build time."""
+    artifact's last-build time.
+
+    A repealed document -- a statute upphävd, an EU act no longer in force, a
+    withdrawn ställningstagande -- is left out, so the listing states current
+    law; `include_expired=true` puts them back. Either way the document stays
+    retrievable by uri and through the citation endpoints."""
     listing = reads.documents(con, source=source, kind=kind,
-                              limit=limit, offset=offset)
+                              limit=limit, offset=offset,
+                              include_expired=include_expired)
     return DocumentList(total=listing["total"], limit=limit, offset=offset,
                         documents=[DocumentSummary(**d)
                                    for d in listing["documents"]])

@@ -14,6 +14,8 @@ eurlex parser imports these block-kind constants back from here so the producer
 and the consumers share one vocabulary.
 """
 
+import re
+
 # block kinds that carry a citable anchor (the artifact node `type` values)
 ARTICLE = "article"
 PARAGRAPH = "paragraph"
@@ -197,6 +199,29 @@ def anchored_blocks(structure, aliases=True):
 # --------------------------------------------------------------------------
 # CELEX document classification
 # --------------------------------------------------------------------------
+# A '(NN)' revision of a CELEX, and the CELEX it revises. Two shapes: an act's
+# corrigendum appends 'R(NN)' to the act ('32016R0900R(01)' revises
+# '32016R0900'), a treaty text's appends a bare '(NN)' ('12019W/TXT(01)' revises
+# '12019W/TXT'). The optional R is the whole difference, and dropping only the
+# parenthesis names a CELEX that does not exist ('32016R0900R').
+#
+# Shared because three places need the same answer and disagreed: the parse
+# (a corrigendum takes its repeal date from the act it corrects), the build
+# (which puts the act's notice in the corrigendum's freshness inputs), and the
+# browse collapse. `facets._keep_latest_eu_revision` deliberately does NOT use
+# this -- it groups on the bare-parenthesis split, so it collapses treaty
+# revisions onto their base while leaving an act and its corrigenda as separate
+# entries. Changing that changes which documents the browse lists, which is a
+# separate decision from reading a repeal (rule:second-use-goes-to-lib).
+RE_REVISION = re.compile(r"^(.+?)R?\(\d+\)$")
+
+
+def revision_base(celex):
+    """The CELEX a '(NN)' revision revises, or None when `celex` is not one."""
+    m = RE_REVISION.match(celex)
+    return m.group(1) if m else None
+
+
 # Read off the CELEX number alone, so anything holding a CELEX can classify a
 # document without the eurlex source: the parser stamps it onto the artifact,
 # the renderer picks the page's kind label from it, and the corpus statistics

@@ -84,6 +84,13 @@
 {%- if pdf_url %} — jämför med <a class="ext" href="{{ pdf_url }}" rel="external">domstolens egen PDF</a>{% endif -%}
 .</span></div>
 {%- endmacro -%}
+{%- macro eurlex_expired_banner(when) -%}
+{#- an EU act EUR-Lex marks "No longer in force". The act keeps its page and
+    stays reachable through the citation graph -- a later act's repeal clause
+    points here -- so the page has to say what the reader is looking at. The
+    date is CELLAR's own end-of-validity for the act. -#}
+<div class="expired-banner"><strong>Rättsakten gäller inte längre</strong><span>EUR-Lex anger att rättsakten upphörde att gälla {{ when }}.</span></div>
+{%- endmacro -%}
 {%- macro foreskrift_repealed_banner(links) -%}
 <div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
 {%- endmacro -%}
