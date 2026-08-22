@@ -955,13 +955,19 @@ def group(con, source):
     # case, a treaty). Sorting a numbered series by subject read as random and
     # sometimes was: `_sfs_sortname` finds the digits in an EDPB title, so
     # "Riktlinjer 3/2018" about förordning (EU) 2016/679 sorted on 1679
-    sort_key = {"dv": _id_doc_sort, "forarbete": _id_doc_sort,
-                "foreskrift": _id_doc_sort, "rs": _id_doc_sort,
-                "avg": _id_doc_sort, "guidance": _id_doc_sort,
-                "eurlex": _eu_doc_sort}.get(source, _doc_sort)
     for rows in buckets.values():
-        rows.sort(key=sort_key)
+        rows.sort(key=row_sort(source))
     return buckets
+
+
+def row_sort(source):
+    """How one bucket's documents are ordered for display. Shared with
+    `browse_view`, which re-collects a leaf that spans several buckets and has
+    to put the result back in this order."""
+    return {"dv": _id_doc_sort, "forarbete": _id_doc_sort,
+            "foreskrift": _id_doc_sort, "rs": _id_doc_sort,
+            "avg": _id_doc_sort, "guidance": _id_doc_sort,
+            "eurlex": _eu_doc_sort}.get(source, _doc_sort)
 
 
 def _natural(s):
@@ -1153,12 +1159,23 @@ def browse_view(con, source):
         return doc
 
     def attach(nodes, prefix):
+        """Hang each leaf bucket's documents on it.
+
+        A leaf's key path can be *shorter* than `grouped`'s, which always has
+        one element per level: `only_above` suppresses a level for the buckets
+        below its threshold, so a small utgivare's series bucket is a leaf while
+        its rows are still filed under (utgivare, serie, år). Collecting by
+        prefix covers both -- for a scheme whose leaves sit at the last level
+        exactly one key matches, which is the lookup this replaces."""
         for n in nodes:
             keypath = prefix + (n["key"],)
             if n["children"] is not None:
                 attach(n["children"], keypath)
-            else:
-                n["documents"] = [entry(r) for r in grouped.get(keypath, [])]
+                continue
+            rows = [r for path, under in grouped.items()
+                    if path[:len(keypath)] == keypath for r in under]
+            rows.sort(key=row_sort(source))
+            n["documents"] = [entry(r) for r in rows]
 
     attach(view["buckets"], ())
     return view

@@ -304,6 +304,41 @@ def test_a_subject_bucket_still_lists_by_subject(tmp_path):
     assert [r.label for r in buckets[("F",)]] == ["2018:1197"]
 
 
+def test_browse_view_attaches_documents_to_a_leaf_above_the_last_level(tmp_path):
+    """guidance is the only three-level scheme (Utgivare -> Serie -> År), and
+    its År level carries `only_above`, so a small utgivare's *series* bucket is
+    a leaf while its rows are still filed under (utgivare, serie, år).
+
+    Looking the leaf up by its own key path found nothing, because that path is
+    two elements and `group`'s keys are three. Every guidance browse page
+    rendered "Inga dokument." beside a facet rail that counted them correctly,
+    and no other source noticed: with two levels a leaf's path is the whole key.
+    """
+    con = _catalog(tmp_path, [
+        (U + "guidance/edpb/riktlinjer/05-2020", "guidance", "riktlinjer",
+         "Riktlinjer 05/2020", "Riktlinjer 05/2020 om samtycke"),
+        (U + "guidance/edpb/riktlinjer/03-2019", "guidance", "riktlinjer",
+         "Riktlinjer 03/2019", "Riktlinjer 03/2019 om videoövervakning"),
+        (U + "guidance/edpb/rekommendationer/01-2020", "guidance",
+         "rekommendationer", "Rekommendation 01/2020",
+         "Rekommendation 01/2020 om överföringar"),
+    ])
+    view = facets.browse_view(con, "guidance")
+    edpb = next(b for b in view["buckets"] if b["key"] == "edpb")
+    assert edpb["count"] == 3
+    serier = {c["key"]: c for c in edpb["children"]}
+    # the series buckets are the leaves: 3 documents is far below the År
+    # level's only_above, so no year bucket is built under them
+    assert serier["riktlinjer"]["children"] is None
+    assert serier["riktlinjer"]["count"] == 2
+    assert [d["display"] for d in serier["riktlinjer"]["documents"]] == [
+        "Riktlinjer 03/2019 om videoövervakning",
+        "Riktlinjer 05/2020 om samtycke"]
+    assert len(serier["rekommendationer"]["documents"]) == 1
+    # the utgivare above them is not a leaf and carries no documents of its own
+    assert "documents" not in edpb
+
+
 def test_browse_view_attaches_leaf_documents(tmp_path):
     title = "Förordning (EU) 2016/679 om skydd (allmän dataskyddsförordning)"
     con = _catalog(tmp_path, [

@@ -243,3 +243,48 @@ def test_the_split_applies_to_what_a_myndighet_issues(tmp_path):
     view = _agency_view("dv", "Domstol", {"nja": {"2024": 3, "2025": 2}})
     browse.generate_browse(_FakeClient(view), "dv", tmp_path)
     assert _written_dirs(tmp_path, "dom") == ["nja", "nja/2024", "nja/2025"]
+
+
+def test_every_ancestor_of_a_deeper_leaf_gets_a_landing(tmp_path):
+    """guidance is three levels (Utgivare -> Serie -> År), and the facet rail
+    links every series directory from every sibling page. Landing copies were
+    written only along a primary bucket's *first* depth-first path, so a second
+    series with year children -- edps/yttranden here -- got no index page while
+    the rail linked it site-wide, and `_reap_browse` deleted any index a
+    previous run had left there."""
+    def series(key, years):
+        return {"key": key, "slug": key, "label": key.upper(),
+                "count": sum(years.values()),
+                "children": [
+                    {"key": y, "slug": y, "label": y, "count": n,
+                     "children": None,
+                     "documents": [{"url": "/%s/%s/%d" % (key, y, i),
+                                    "short_id": "%s %s:%d" % (key, y, i),
+                                    "short_title": "T"} for i in range(n)]}
+                    for y, n in years.items()]}
+    view = {"source": "guidance", "levels": ["Utgivare", "Serie", "År"],
+            "default": [],
+            "buckets": [
+                {"key": "edps", "slug": "edps", "label": "EDPS", "count": 4,
+                 "children": [series("riktlinjer", {"2024": 1, "2025": 1}),
+                              series("yttranden", {"2023": 2})]},
+                # a small utgivare's series is itself a leaf: `only_above`
+                # builds no year level under it, so the tree is mixed-depth
+                {"key": "ecb", "slug": "ecb", "label": "ECB", "count": 1,
+                 "children": [{"key": "con", "slug": "con", "label": "CON",
+                               "count": 1, "children": None,
+                               "documents": [{"url": "/con/1",
+                                              "short_id": "CON 1",
+                                              "short_title": "T"}]}]}]}
+    browse.generate_browse(_FakeClient(view), "guidance", tmp_path)
+    root = tmp_path / "eurlex" / "vagledning"
+    dirs = _written_dirs(tmp_path, "eurlex/vagledning")
+    assert dirs == ["ecb", "ecb/con",
+                    "edps", "edps/riktlinjer", "edps/riktlinjer/2024",
+                    "edps/riktlinjer/2025", "edps/yttranden",
+                    "edps/yttranden/2023"]
+    for d in dirs:
+        assert any((root / d).glob("index.html*")), "%s has no index page" % d
+    # a landing shows the directory's own first leaf, not its sibling's
+    assert "yttranden 2023:0" in _page_text(root / "edps" / "yttranden")
+    assert "riktlinjer 2024:0" in _page_text(root / "edps")

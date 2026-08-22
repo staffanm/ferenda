@@ -429,6 +429,22 @@ def _year_axis(source, view, prim):
                                  for sec in prim["children"]])]
 
 
+def _leaf_paths(node):
+    """Every root-to-leaf path of node dicts under (and including) `node`,
+    depth-first, so the first path is the one its whole subtree lands on.
+
+    A facet scheme is not always two deep: `guidance` is Utgivare -> Serie ->
+    År, and its År level applies only to the issuing bodies above
+    `only_above`. Descending exactly one level published the ECB's series node
+    as if it were a leaf, and a series node above a year level carries no
+    documents -- so the page listed nothing while its own facet rail counted
+    1 617."""
+    if not node.get("children"):
+        return [[node]]
+    return [[node] + tail for child in node["children"]
+            for tail in _leaf_paths(child)]
+
+
 def generate_browse(client, source, out_root, cross_axis=None):
     """Write every leaf-bucket page of one source from the API's browse model,
     plus the landing copies: a primary bucket's directory shows its first
@@ -453,6 +469,7 @@ def generate_browse(client, source, out_root, cross_axis=None):
     view = resp.json()
     root_html = None
     written = set()
+    landed = set()          # ancestor directories already given a landing copy
     for prim in view["buckets"]:
         banner = (cross_nav(cross_axis, "%s:%s" % (source, prim["slug"]))
                   if cross_axis else "")
@@ -464,17 +481,25 @@ def generate_browse(client, source, out_root, cross_axis=None):
                                        for d in sec.get("documents") or []])
             else:
                 year_axis = _year_axis(source, view, prim)
-        leaves = [[prim, sec] for sec in prim["children"]] if prim["children"] \
-            else [[prim]]
-        for i, nodes in enumerate(leaves):
+        for nodes in _leaf_paths(prim):
             slugs = [n["slug"] for n in nodes]
             if year_axis:
                 banner = cross_nav(year_axis, nodes[1]["key"])
             html = render_facet_page(source, view, nodes, banner=banner,
                                      primary_in_banner=cross_axis is not None)
             written.add(_write_browse(out_root, source, slugs, html))
-            if len(nodes) > 1 and i == 0:        # primary landing = first child
-                written.add(_write_browse(out_root, source, slugs[:1], html))
+            # every directory above a leaf lands on its own first leaf, so
+            # /eurlex/vagledning/ecb/ and /ecb/con/ resolve as well as
+            # /ecb/con/2013/ does. The walk is depth-first, so the first leaf
+            # that reaches a prefix is that prefix's own first leaf -- each
+            # ancestor gets its landing exactly once, whichever leaf under it
+            # comes first (not only the primary bucket's first path).
+            for depth in range(1, len(slugs)):
+                prefix = tuple(slugs[:depth])
+                if prefix not in landed:
+                    landed.add(prefix)
+                    written.add(_write_browse(out_root, source,
+                                              slugs[:depth], html))
             if root_html is None:                # overall default = first leaf
                 root_html = html
     # eurlex's root is a landing over all its types rather than a copy of the
