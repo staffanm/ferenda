@@ -233,9 +233,18 @@ id + lättviktig metadata, **inte** det fullständiga innehållet.
 | `kind` | sträng | filtrera på dokumenttyp (`law`, `case`, `prop`, `directive`, …) |
 | `limit` | heltal 1–1000 (standard 100) | sidstorlek |
 | `offset` | heltal (standard 0) | paginering |
+| `include_expired` | boolean (standard `false`) | ta med upphävda dokument |
 
 `total` är antalet matchande dokument *före* paginering, så du kan stega igenom
 hela mängden. Sorteringen är på URI (stabil).
+
+Upphävda dokument utelämnas — en upphävd författning, en EU-rättsakt som inte
+längre gäller, ett återkallat ställningstagande. Listan visar alltså gällande
+rätt, på samma sätt som browse-sidorna och `/search`. Ett dokument vars
+upphävande ännu inte trätt i kraft räknas som gällande och listas. Dokumentet
+finns kvar: `/document` hämtar det på sin URI och `/document/inbound`
+respektive `/graph` når det genom hänvisningsgrafen. `include_expired=true`
+tar med dem i listan.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/documents \

@@ -1383,6 +1383,63 @@ to a future per-doc incremental generate.
   författning" watermark that stays visible at any scroll depth (`sfs/render.py`'s `_expired_banner`
   + the `body.expired` treatment). A *future* repeal date is still in force.
   `test/test_site.py`.
+- ✅ **Repealed EU acts.** The same treatment for eurlex, off CELLAR's own
+  metadata rather than the citation graph: `cdm:resource_legal_in-force` (the
+  flag EUR-Lex prints as "No longer in force") plus
+  `cdm:resource_legal_date_end-of-validity`. Both are kept in the stored
+  `notice.ttl` (`lib/cellar.py`'s `META_PREDICATES` / `notice_ttl`) and read back
+  by `cellar.notice_repeal_date`, which `eurlex/parse.parse_dir` stamps on the
+  artifact as `expired` — so the repeal reaches `documents.expired` through the
+  artifact like every other extracted fact. Both triples are needed: 32006L0040
+  carries an end date of 2009-04-28 and is still in force, and 31981L0576 carries
+  two end dates (EUR-Lex prints the last). `9999-12-31` is CELLAR's "no end date"
+  placeholder. The API's document enumeration now applies the rule browse and
+  search already did (`catalog._doc_filter`'s `include_expired`, default false;
+  `/api/v1/documents?include_expired=true` and the MCP `list_documents` argument
+  put them back), and a repealed act's page carries its own callout and a
+  "Gäller inte längre" watermark (`eurlex/render.py`, `BANNERS.eurlex_expired_banner`).
+  A corpus harvested before this stores no validity pair, so
+  `lagen eurlex refresh-metadata` re-reads CELLAR's metadata into every
+  `notice.ttl` without refetching content; `parse` + `relate` then carry it
+  through. `test/test_eurlex_parse.py`, `test/test_api.py`.
+- ✅ **Keeping the repeal current without re-reading the corpus.** The flag sits
+  on the *repealed* act and the discovery walk is bounded by work date, so it
+  never returns to a 1995 directive repealed in 2018 — read naively, the status
+  would need a periodic metadata sweep of all 64,037 documents. The repealing
+  act is the way in: it carries
+  `cdm:resource_legal_repeals_resource_legal` / `…_implicitly_repeals_…` while
+  the old act carries no inverse edge at all. So `download` asks each year's
+  newly stored acts what they repeal and re-reads the targets the corpus holds
+  (`cellar.fetch_repeals` → `download.refresh_repeal_targets`), one extra
+  batched query per year (1.3 s / 88 KB per 1,000 CELEX, measured).
+  Coverage, measured over 600 random non-caselaw documents: 225 out of force,
+  **145 (64%) named by a repeal edge**; the other 36% end by their own terms
+  with no act repealing them, and only the `refresh-metadata` audit finds those.
+  That audit skips documents already recorded as repealed — a repeal never
+  lifts — so it shrinks each run instead of costing the corpus every time.
+  The flag stays the gate rather than the date: checked against EUR-Lex's own
+  pages, 32005R0145, 32006L0040, 32014R1198 and 31978L1020 all print "In force"
+  while carrying a past end-of-validity (12 of 600), so a date-only rule would
+  hide acts that still apply. `test/test_eurlex_download.py`.
+- ✅ **Two ways the mark could still not land**, both closed:
+  *(1) The notice was not a parse input.* The repeal date lives in `notice.ttl`
+  and nowhere else, and a metadata refresh rewrites the notice while leaving the
+  content file untouched — so `parse` judged such a document fresh and the
+  repeal never reached the artifact. Verified before the fix: a notice rewritten
+  to a different end-of-validity left `expired` on the old date with `parse`
+  reporting "skipped (fresh) 1". `depends="download"` does not cover it (it
+  recurses into the upstream stage but never hashes its output), so the notice
+  is now in the parse stage's `inputs`.
+  *(2) A corrigendum carried no repeal.* CELLAR flags the act and never its
+  corrigenda — of 537 held corrigenda whose base act we hold, none carry the
+  flag — so repealing an act expired the act's row and left its corrigenda
+  listed, ranked and searchable. `parse.revision_repeal_date` inherits the base
+  act's date, for both revision shapes (`32016R0900R(01)` → `32016R0900`,
+  `12019W/TXT(01)` → `12019W/TXT`; the optional `R` is the difference, and
+  getting it wrong points at a CELEX that does not exist). The base's notice
+  joins the corrigendum's freshness inputs (`build.eurlex_parse_notices`).
+  Four held acts with five corrigenda are in that position today, all repealed
+  during 2026. `test/test_build.py`, `test/test_eurlex_parse.py`.
 - ✅ **Statute browse listing — visual hierarchy.** An SFS entry is split
   into its dropped designation/number prefix (shown subdued) and the subject it
   sorts under (emphasised), so the eye lands on the sort key (`facets._sfs_split`);
