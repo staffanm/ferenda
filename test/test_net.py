@@ -216,3 +216,163 @@ def test_omitted_chain_stops_at_an_anchored_certificate():
     _key, leaf = selfsigned("anchored.example")
     with mock.patch.object(net, "_anchored", return_value=True):
         assert net._omitted_chain(leaf, _Refuses(), 5) == []
+
+
+# --------------------------------------------------------------------------
+# robots.txt Crawl-delay
+# --------------------------------------------------------------------------
+
+ROBOTS = """\
+User-agent: *
+Disallow: /search
+Crawl-delay: 10
+
+User-agent: BadBot
+Disallow: /
+"""
+
+
+def test_crawl_delay_reads_the_star_group():
+    assert net.parse_crawl_delay(ROBOTS, net.HARVESTER_UA) == 10.0
+
+
+def test_a_group_naming_us_outranks_the_star_group():
+    """A host that asks 10 seconds of everyone and 1 of us means 1."""
+    robots = ("User-agent: *\nCrawl-delay: 10\n\n"
+              "User-agent: lagen.nu\nCrawl-delay: 1\n")
+    assert net.parse_crawl_delay(robots, net.HARVESTER_UA) == 1.0
+    # ... and a group naming somebody else does not apply to us
+    other = ("User-agent: *\nCrawl-delay: 10\n\n"
+             "User-agent: Googlebot\nCrawl-delay: 1\n")
+    assert net.parse_crawl_delay(other, net.HARVESTER_UA) == 10.0
+
+
+def test_several_agents_share_one_group():
+    robots = "User-agent: A\nUser-agent: lagen.nu\nCrawl-delay: 3\n"
+    assert net.parse_crawl_delay(robots, net.HARVESTER_UA) == 3.0
+
+
+def test_no_crawl_delay_is_no_delay():
+    """Absent, malformed and commented-out all mean the host asked for
+    nothing -- we do not invent a rate it never stated."""
+    assert net.parse_crawl_delay("User-agent: *\nDisallow: /x\n", "x") is None
+    assert net.parse_crawl_delay("User-agent: *\nCrawl-delay: soon\n", "x") is None
+    assert net.parse_crawl_delay("# Crawl-delay: 10\n", "x") is None
+    assert net.parse_crawl_delay("", "x") is None
+
+
+def test_crawl_delay_paces_requests_to_one_host(monkeypatch):
+    """The host's rate is a floor on the source's own delay, applied on the
+    request itself -- some thirty sync functions thread their own `delay` down
+    to their own sleep, and a rule added to any of them is one the next
+    harvester forgets."""
+    slept = []
+    monkeypatch.setattr(net.time, "sleep", slept.append)
+    clock = iter([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    monkeypatch.setattr(net.time, "monotonic", lambda: next(clock, 0.0))
+
+    class Session:
+        headers = {"User-Agent": net.HARVESTER_UA}
+        seen = []
+
+        def request(self, _method, url, **_kwargs):
+            self.seen.append(url)
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = ROBOTS.encode() if url.endswith("robots.txt") else b"x"
+            return resp
+
+    session = Session()
+    net.request(session, "GET", "https://example.invalid/a")
+    net.request(session, "GET", "https://example.invalid/b")
+    # robots.txt is read once for the host, not once per request
+    assert session.seen.count("https://example.invalid/robots.txt") == 1
+    # the first request pays nothing, the second waits out the host's 10 s
+    assert slept == [10.0]
+
+
+def test_a_host_asking_nothing_is_not_paced(monkeypatch):
+    slept = []
+    monkeypatch.setattr(net.time, "sleep", slept.append)
+
+    class Session:
+        headers = {"User-Agent": net.HARVESTER_UA}
+
+        def request(self, _method, url, **_kwargs):
+            resp = requests.Response()
+            resp.status_code = 404 if url.endswith("robots.txt") else 200
+            resp._content = b"x"
+            return resp
+
+    session = Session()
+    net.request(session, "GET", "https://nothing.invalid/a")
+    net.request(session, "GET", "https://nothing.invalid/b")
+    assert slept == []
+
+
+def test_an_unread_robots_txt_is_not_consent(monkeypatch):
+    """A host we failed to ask is not a host that said yes. Recording the
+    failure as "asks for nothing" let one connection blip on the first request
+    of a long harvest drop the whole run back to the source's own delay."""
+    slept = []
+    monkeypatch.setattr(net.time, "sleep", slept.append)
+
+    class Session:
+        headers = {"User-Agent": net.HARVESTER_UA}
+
+        def request(self, _method, url, **_kwargs):
+            if url.endswith("robots.txt"):
+                raise requests.ConnectionError("refused")
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = b"x"
+            return resp
+
+    session = Session()
+    net.request(session, "GET", "https://unread.invalid/a")
+    net.request(session, "GET", "https://unread.invalid/b")
+    # the wait is measured against a real clock, so it is the delay less the
+    # microseconds the first request took
+    assert slept == [pytest.approx(net.UNREAD_ROBOTS_DELAY, abs=0.01)]
+    # the failure is not remembered as an answer: the host is asked again, and
+    # the run picks up the real rate the moment its robots.txt comes back
+    assert "unread.invalid" not in net._CRAWL_DELAY
+    session.answers = True
+    assert net.crawl_delay(session, "https://unread.invalid/c") == \
+        net.UNREAD_ROBOTS_DELAY
+
+
+def test_pace_refuses_to_sleep_through_a_budgeted_deadline(monkeypatch):
+    """`lib.harvest` sets a session deadline to bound what one blocked fetch can
+    burn. A crawl-delay that reaches past it must stop the walk, not sleep
+    through the budget and issue the request late."""
+    monkeypatch.setattr(net.time, "sleep",
+                        lambda _s: pytest.fail("slept past the deadline"))
+
+    class Session:
+        headers = {"User-Agent": net.HARVESTER_UA}
+        deadline = net.time.monotonic() + 1.0
+
+        def request(self, _method, url, **_kwargs):
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = ROBOTS.encode() if url.endswith("robots.txt") else b"x"
+            return resp
+
+    session = Session()
+    net.request(session, "GET", "https://slow.invalid/a")      # the first is free
+    with pytest.raises(net.BudgetExceeded, match="crawl-delay"):
+        net.request(session, "GET", "https://slow.invalid/b")
+
+
+def test_a_browser_user_agent_does_not_answer_to_chrome():
+    """Several harvesters here send `BROWSER_UA`. A substring test over the
+    whole header read a group named Chrome, Safari, Gecko or Linux as naming
+    us, which is another crawler's terms."""
+    robots = ("User-agent: *\nCrawl-delay: 10\n\n"
+              "User-agent: Chrome\nCrawl-delay: 0.1\n")
+    assert net.parse_crawl_delay(robots, net.BROWSER_UA) == 10.0
+    # ... and the group that really does name that product still applies
+    assert net.parse_crawl_delay(
+        "User-agent: *\nCrawl-delay: 10\n\nUser-agent: Mozilla\nCrawl-delay: 1\n",
+        net.BROWSER_UA) == 1.0

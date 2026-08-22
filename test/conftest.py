@@ -48,3 +48,22 @@ os.environ["WIKI_ROOT"] = os.path.join(_ROOT, "wiki")
 os.makedirs(os.path.join(_ROOT, "wiki", "patches"), exist_ok=True)
 
 atexit.register(shutil.rmtree, _ROOT, True)
+
+# imported after DATA_ROOT is set, like everything else here
+import pytest  # noqa: E402
+
+from accommodanda.lib import net  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _forget_crawl_delays():
+    """Clear `lib.net`'s per-host robots.txt cache between tests.
+
+    It is process-global by design -- one read per host per harvest, not per
+    request -- which means it outlives the test that filled it, and a test that
+    recorded a Crawl-delay for a host leaves the next test on that host either
+    sleeping it out or raising `BudgetExceeded`. No test needs this today; it is
+    here so that the order two tests happen to run in is not what decides."""
+    net.forget_crawl_delays()
+    yield
+    net.forget_crawl_delays()

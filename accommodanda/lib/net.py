@@ -26,6 +26,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Iterator
+from urllib.parse import urlsplit, urlunsplit
 
 import certifi
 import httpx
@@ -55,6 +56,203 @@ RETRY_STATUS = frozenset({403, 408, 425, 429, 500, 502, 503, 504})
 HARVESTER_UA = "lagen.nu harvester (https://lagen.nu/, staffan.malmgren@gmail.com)"
 BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+
+# --------------------------------------------------------------------------
+# robots.txt Crawl-delay
+# --------------------------------------------------------------------------
+#
+# A host that publishes a Crawl-delay is stating the rate it wants to be read
+# at, and it outranks whatever a source passed as its own `delay`
+# (rule:respect-politeness). The EBA asks for 10 seconds and `eba_sync` ran at
+# 0.5, twenty times faster, for as long as the harvest has existed.
+#
+# It is enforced here rather than in each source because there are some thirty
+# sync functions and every one of them threads its own `delay` down to its own
+# `time.sleep`: a rule added to any of them is a rule the next harvester
+# forgets. `request` is the one call they all make, so the pacing sits on the
+# request and cannot be left out.
+#
+# It is a *floor*, never a ceiling. A source that sleeps longer than the host
+# asks keeps its own pace; this only ever adds the difference.
+
+class RobotsUnread(Exception):
+    """A host's robots.txt could not be read -- which is not the same as a host
+    that answered and asked for nothing."""
+
+
+#: host -> the Crawl-delay it asks for in seconds, or None where it asks none.
+#: Read once per host per process.
+_CRAWL_DELAY: dict[str, float | None] = {}
+#: hosts whose robots.txt could not be read, so the warning is printed once
+_UNREAD: set[str] = set()
+#: host -> when the next request to it may be issued (`time.monotonic`)
+_NEXT_REQUEST: dict[str, float] = {}
+_PACE = threading.Lock()
+
+#: how long to wait for a robots.txt before giving up on reading it. Giving up
+#: is not consent: the host is then paced at `UNREAD_ROBOTS_DELAY`, because one
+#: that will not answer promptly is the one most likely to want us slower.
+ROBOTS_TIMEOUT = 15
+
+
+def parse_crawl_delay(text: str, user_agent: str) -> float | None:
+    """The Crawl-delay in seconds a robots.txt asks of `user_agent`, or None.
+
+    robots.txt is a sequence of groups: one or more ``User-agent`` lines, then
+    the directives that apply to them. A group naming us wins over the ``*``
+    group, which is the precedence the standard sets -- a host that asks 10
+    seconds of everyone and 1 of us means 1. A malformed or absent value is no
+    value; we do not guess one."""
+    groups: dict[str, float] = {}
+    agents: list[str] = []
+    fresh = True
+    for line in text.splitlines():
+        field, _, value = line.split("#")[0].partition(":")
+        field, value = field.strip().lower(), value.strip()
+        if field == "user-agent":
+            if not fresh:                  # a new group starts here
+                agents, fresh = [], True
+            agents.append(value.lower())
+        elif field:
+            fresh = False
+            if field == "crawl-delay" and agents:
+                try:
+                    seconds = float(value)
+                except ValueError:
+                    continue               # not a number: the host asks nothing
+                for agent in agents:
+                    groups[agent] = seconds
+    named = [delay for agent, delay in groups.items()
+             if agent and agent != "*" and agent == _product_token(user_agent)]
+    return named[0] if named else groups.get("*")
+
+
+def _product_token(user_agent: str) -> str:
+    """The product token a robots.txt group would name us by: the first word of
+    the User-Agent, before its version or its parenthesis.
+
+    A substring test over the whole header is what this replaces. Several
+    harvesters here send `BROWSER_UA`, so "Mozilla/5.0 (X11; Linux x86_64) …
+    Chrome/…" would have matched a group named Chrome, Safari, Gecko or Linux
+    and read another crawler's terms as ours."""
+    return user_agent.strip().lower().split("/")[0].split(" ")[0]
+
+
+#: what a host is read at when its robots.txt could not be read at all. Not
+#: zero: a host we failed to ask is not a host that said yes, and the run this
+#: pacing exists for is long enough that one blip must not silently drop it back
+#: to the source's own delay for the rest of the process.
+UNREAD_ROBOTS_DELAY = 2.0
+
+
+def _read_crawl_delay(session, url: str, user_agent: str) -> float | None:
+    """Fetch and read one host's robots.txt. Not through `request`: a host with
+    no robots.txt answers 404, which is the normal case and not a failure to
+    retry over.
+
+    Raises `RobotsUnread` where the file could not be read at all, which is a
+    different thing from a host that answered and asked for nothing -- the
+    caller must not record a failure as consent."""
+    parts = urlsplit(url)
+    robots = urlunsplit((parts.scheme, parts.netloc, "/robots.txt", "", ""))
+    timeout = ROBOTS_TIMEOUT
+    deadline = getattr(session, "deadline", None)
+    if deadline is not None:
+        # a budgeted harvest's deadline binds this read too -- it is a request
+        # to the same host, on the same budget
+        timeout = min(timeout, max(deadline - time.monotonic(), 1.0))
+    try:
+        # counted like any other attempt: `attempts()` is the one download
+        # metric that cannot be inferred from the others, and a robots read is
+        # a request to the host
+        _attempts.n = getattr(_attempts, "n", 0) + 1
+        response = session.request("GET", robots, timeout=timeout)
+    except (requests.exceptions.RequestException, httpx.HTTPError) as exc:
+        raise RobotsUnread("%s: %s" % (robots, exc)) from exc
+    status = getattr(response, "status_code", 0)
+    if status == 404:
+        # the normal case for a host that publishes no terms at all
+        return None
+    if status != 200:
+        raise RobotsUnread("%s: HTTP %s" % (robots, status))
+    return parse_crawl_delay(getattr(response, "text", "") or "", user_agent)
+
+
+def crawl_delay(session, url: str) -> float | None:
+    """What `url`'s host asks to be read at, read once per host per process.
+
+    A host whose robots.txt could not be read is paced at
+    `UNREAD_ROBOTS_DELAY` and said so once on stderr, and is asked again on the
+    next request rather than remembered as having answered. Recording the failure as
+    "asks for nothing" would let one connection blip on the first request of a
+    long harvest drop the whole run back to the source's own delay against a
+    host that wanted ten seconds -- the exact failure this pacing exists to
+    prevent, made invisible."""
+    host = urlsplit(url).netloc
+    with _PACE:
+        if host in _CRAWL_DELAY:
+            return _CRAWL_DELAY[host]
+    agent = (getattr(session, "headers", {}) or {}).get("User-Agent") or ""
+    try:
+        delay = _read_crawl_delay(session, url, agent)
+    except RobotsUnread as exc:
+        # *not* cached: a failure is not an answer, and caching this one would
+        # pin a host that asks ten seconds at two for the rest of the process
+        # on the strength of a single blip. The next request to it asks again,
+        # and the run self-heals the moment the file comes back. Said once per
+        # host, so a persistently unreadable one does not fill the log.
+        with _PACE:
+            first = host not in _UNREAD
+            _UNREAD.add(host)
+        if first:
+            print("  robots.txt unread, pacing %s at %.1fs until it answers (%s)"
+                  % (host, UNREAD_ROBOTS_DELAY, exc), file=sys.stderr, flush=True)
+        return UNREAD_ROBOTS_DELAY
+    with _PACE:
+        # another thread may have read it first; one answer per host either way
+        return _CRAWL_DELAY.setdefault(host, delay)
+
+
+def pace(session, url: str) -> None:
+    """Wait until `url`'s host may be read again.
+
+    The slot is reserved under the lock and slept outside it, so two threads
+    harvesting one host queue behind each other instead of both sleeping the
+    same interval and arriving together.
+
+    A budgeted session's `deadline` binds the wait as it binds everything else:
+    a slot that falls past it raises `BudgetExceeded` rather than sleeping
+    through the budget and issuing the request late. Under `fan_out` the
+    reserved slot grows with the queue depth, so this is what keeps one slow
+    host from spending a whole run's budget on waiting."""
+    delay = crawl_delay(session, url)
+    if not delay:
+        return
+    host = urlsplit(url).netloc
+    deadline = getattr(session, "deadline", None)
+    with _PACE:
+        now = time.monotonic()
+        due = max(now, _NEXT_REQUEST.get(host, now))
+        if deadline is not None and due > deadline:
+            # raised *before* the slot is taken: reserving one for a request
+            # that never happens leaves every later thread on this host queued
+            # behind a wait nobody is serving
+            raise BudgetExceeded(
+                "harvest budget spent waiting out %s's %.0fs crawl-delay "
+                "before %s" % (host, delay, url))
+        _NEXT_REQUEST[host] = due + delay
+    if due > now:
+        time.sleep(due - now)
+
+
+def forget_crawl_delays() -> None:
+    """Drop the per-host robots.txt cache and pacing state. For tests, and for
+    a long-lived process that should re-read a host's terms."""
+    with _PACE:
+        _CRAWL_DELAY.clear()
+        _NEXT_REQUEST.clear()
+        _UNREAD.clear()
 
 
 def make_session(user_agent: str) -> requests.Session:
@@ -392,13 +590,17 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
     Every failed response is logged once. Returns the parsed JSON when
     ``parse_json`` is set, else the Response (e.g. for binary downloads).
 
+    Before the first attempt the request waits out whatever Crawl-delay the
+    host's robots.txt asks for (`pace`), which outranks the source's own
+    `delay` and is a floor on it, never a ceiling.
+
     A session may carry a ``deadline`` attribute (a ``time.monotonic()``
     timestamp, set by a budgeted incremental harvest): past it, no new attempt
     starts (:class:`BudgetExceeded`), a running attempt's timeout is capped to
     the time remaining, and a backoff sleep never outlives it -- so one sick
     endpoint cannot stall a walk for hours of retry burn."""
     kwargs.setdefault("timeout", 60)
-    diagnosed = False
+    diagnosed = paced = False
     for attempt in range(retries):
         deadline = getattr(session, "deadline", None)
         if deadline is not None:
@@ -407,6 +609,14 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
                 raise BudgetExceeded("harvest budget spent before %s %s"
                                      % (method, url))
             kwargs["timeout"] = min(kwargs["timeout"], max(remaining, 1.0))
+        if not paced:
+            # what the host asks to be read at, before the first attempt only:
+            # a retry has its own backoff and defers to Retry-After, which is
+            # the host talking about this request rather than about its rate.
+            # After the budget check, because a session past its deadline must
+            # issue nothing at all -- the robots.txt read included.
+            pace(session, url)
+            paced = True
         response = None
         try:
             _attempts.n = getattr(_attempts, "n", 0) + 1
