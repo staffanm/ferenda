@@ -1375,24 +1375,22 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
   .gr-body { display: block; }
   .gr-main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.25rem 8rem; }
   .gr-main h1 { font-size: 1.9rem; }
-  /* the reading column runs edge to edge here, with 1.25rem of padding and no
-     margin to hang in -- so the mark stacks above the eyebrow instead */
-  .frontmatter.branded { display: block; }
-  .site-mark { height: 58px; margin: 0 0 .6rem; }
+  /* the mark stays beside the eyebrow + h1 stack; with only 1.25rem of
+     padding to hang in, the pull is dropped so it sets flush with the text */
+  .site-mark { height: 58px; margin-left: 0; }
   /* a table wider than the screen (BrB 2:3's jurisdiction table, a prop's
      unbreakable ELI URLs) scrolls inside its own box; left to overflow it
      widens the layout viewport and the whole page zooms out to fit */
   .gr-main table { display: block; overflow-x: auto; }
   /* no sticky masthead left to clear when jumping to an anchor */
   :root { --scroll-clear: .75rem; }
-  /* the reading column runs edge to edge here, so a gutter cannot hang outside
-     it: the article/section number sets on its own line above the title */
-  h3.artikel, h1.rubrik.numrerad, h2.rubrik.numrerad, h3.rubrik.numrerad,
+  /* a förarbete section number nests ("9.2.4") and would waste a wide gutter
+     on a narrow column, so it sets inline before the title. h3.artikel keeps
+     its desktop grid: the word-over-number gutter sits inside the column. */
+  h1.rubrik.numrerad, h2.rubrik.numrerad, h3.rubrik.numrerad,
   h4.rubrik.numrerad, h5.rubrik.numrerad { display: block; }
-  h3.artikel > .k { display: inline; }
-  h3.artikel > .n, .rubrik.numrerad > .n { margin-right: .4rem; }
-  h3.artikel > .k::after { content: " "; }
-  h3.artikel > .artikel-titel, .rubrik.numrerad > .rubrik-titel { display: block; }
+  .rubrik.numrerad > .n { margin-right: .4rem; }
+  .rubrik.numrerad > .rubrik-titel { display: block; }
 
   /* TOC: an off-canvas left drawer (kept in layout, so scrollspy's active
      tracking and auto-scroll keep working while it is closed) */
