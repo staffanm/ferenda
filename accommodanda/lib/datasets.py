@@ -13,6 +13,9 @@ these). Each dataset is co-located with the vertical that owns and curates it:
   * ``NAMEDCASES`` -- HD cases by nickname ("Instagrambilden" -> NJA referat).
     Auto-harvested from Högsta domstolen's official list (dv.namedcases), with
     the harvested JSON committed as the shipped snapshot.
+  * ``CASENUMBERS`` -- held decisions by the case number they were filed under
+    ("T 3-08" -> NJA 2009 s. 672), how a citation names a decision before its
+    referat exists. Auto-generated from the parsed dv artifacts (dv.casenumbers).
   * ``NAMEDEUCASES`` -- EU cases by usual name ("Schrems II" -> CELEX). The Court
     assigns no such name as data, so it is auto-harvested from Wikidata
     (eurlex.casenames), with the harvested JSON committed as the shipped snapshot.
@@ -59,6 +62,11 @@ FS_SERIES = _PKG / "foreskrift" / "data" / "series.json"
 # that mints the decision's URI. Auto-generated from the JO artifacts
 # (avg.arsberattelse), committed as the shipped snapshot.
 JO_ARSBERATTELSE = _PKG / "avg" / "data" / "arsberattelse.json"
+# held court decisions by the case number they were filed under ("T 3-08" ->
+# NJA 2009 s. 672), for the citation engine's "Högsta domstolens dom 2009-11-03
+# T 3-08" resolution. Auto-generated from the parsed dv artifacts
+# (dv.casenumbers), committed as the shipped snapshot.
+CASENUMBERS = _PKG / "dv" / "data" / "casenumbers.json"
 
 
 def load_emd_cases(path=EMD_CASES):
@@ -79,6 +87,21 @@ def load_emd_respondents(path=EMD_RESPONDENTS):
     return {sv: keys
             for sv, keys in json.loads(path.read_text(encoding="utf-8")).items()
             if not sv.startswith("_")}
+
+
+def load_casenumbers(path=CASENUMBERS):
+    """The case-number snapshot: {"numbers": {"T 3-08": [[court, date, local
+    uri], …]}, "courts": {court code: its name}} -- candidates, not pre-picked
+    winners, because 298 of the held numbers name more than one decision and
+    only the citation's own court and date tell them apart. Pure JSON load with
+    no source dependency. The snapshot is committed and ships in the wheel, so a
+    missing file is a broken checkout and raises rather than silently unlinking
+    every case-number citation of a whole parse run (rule:fail-fast) -- the same
+    call `load_jo_arsberattelse` makes for the same kind of snapshot. An empty
+    dict here would be doubly quiet: `build.hash_files` skips a missing path, so
+    the parse recipe would not notice either, and `malnummer._index` caches, so
+    the emptiness would outlive a snapshot written mid-run."""
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_jo_arsberattelse(path=JO_ARSBERATTELSE):

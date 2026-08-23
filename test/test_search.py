@@ -174,6 +174,37 @@ def test_doc_actions_alternate_citation_is_searchable(tmp_path):
     assert unit["_source"]["text"] == "JO 1990/91 s. 70\nBeslutets text."
 
 
+def test_doc_actions_indexes_case_numbers_as_a_second_identity(tmp_path):
+    # a commentary cites the decision by date and case number ("HD:s dom
+    # 2009-11-03 T 3-08"), never by the referat number the corpus files it under
+    # -- so the case numbers are indexed as an identity of their own. Several per
+    # referat: NJA 1992 s. 740 collects T 369-91 and T 224-91, printed inside it
+    # as I and II.
+    art = tmp_path / "nja.json"
+    art.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/nja/1992s740",
+        "malnummer": ["T 369-91", "T 224-91"],
+        "structure": [{"type": "paragraf", "id": "P1",
+                       "text": ["Skadestånd för sveda och värk."]}]}))
+    doc, frag = list(search.doc_actions(
+        ("https://lagen.nu/dom/nja/1992s740", "dv", "case",
+         "NJA 1992 s. 740", "NJA 1992 s. 740", str(art)), 0))
+    assert doc["_source"]["malnummer"] == ["T 369-91", "T 224-91"]
+    # whole-document unit only: a case number names the decision, not a paragraph
+    assert "malnummer" not in frag["_source"]
+
+    # a source without the key contributes no field at all (strict mapping is
+    # fine with an absent field, and a null would match a null query)
+    plain = tmp_path / "sfs.json"
+    plain.write_text(json.dumps({"uri": "https://lagen.nu/1962:700",
+                                 "structure": [{"type": "stycke",
+                                                "text": ["Lagtext."]}]}))
+    [law] = list(search.doc_actions(
+        ("https://lagen.nu/1962:700", "sfs", "law", "SFS 1962:700",
+         "Brottsbalk (1962:700)", str(plain)), 0))
+    assert "malnummer" not in law["_source"]
+
+
 def test_doc_actions_skips_empty_artifact(tmp_path):
     # a row whose artifact file is empty yields nothing
     empty = tmp_path / "empty.json"
@@ -281,7 +312,48 @@ def test_fragment_query_is_bounded_to_page_documents():
 
 def test_prefix_query_handles_incomplete_legal_compounds_and_syntax():
     assert search.prefix_query("avtalsl") == "avtalsl*"
-    assert search.prefix_query('\"upphovsr rätt\" (36 §)') == "upphovsr* rätt* 36*"
+    assert search.prefix_query("(36 §) upphovsr") == "36* upphovsr*"
+
+
+def test_prefix_query_leaves_a_quoted_phrase_exact():
+    # quotes ask for exactly this string. Expanding their words said the
+    # opposite: '"T 3-08"' became 't* 3* 08*', which under AND matched 43,648
+    # documents and buried the one case filed under that number.
+    assert search.prefix_query('"T 3-08"') == '"T 3-08"'
+    # words outside the quotes are still completed
+    assert search.prefix_query('"T 3-08" hovr') == '"T 3-08" hovr*'
+    assert search.prefix_query('avtalsl "god sed" (36 §)') \
+        == 'avtalsl* "god sed" 36*'
+    # an unbalanced quote has no phrase to keep -- every word is prefixed, as before
+    assert search.prefix_query('"T 3-08') == "T* 3* 08*"
+    # both text branches carry the phrase, so nothing re-expands it
+    should = search._text_query('"T 3-08"')["bool"]["should"]
+    assert [c["simple_query_string"]["query"] for c in should
+            if "simple_query_string" in c] == ['"T 3-08"', '"T 3-08"']
+
+
+def test_case_number_query_is_a_phrase_over_what_the_query_names():
+    # the case number is matched whole. Per-term it would be ordinary numbers:
+    # 373 of 2,109 sampled case numbers hold a year-like token, so "brott 2009"
+    # would promote every decision whose case number contains 2009.
+    clause = {"match_phrase": {"malnummer": {
+        "query": "T 3-08", "boost": search.CASE_NUMBER_BOOST}}}
+    assert search.case_number_queries("T 3-08") == [clause]
+    # both spellings are the same number, and the citation it was lifted from
+    # carries the decision date in front of it
+    assert search.case_number_queries("T3-08") == [clause]
+    assert search.case_number_queries(
+        "Högsta domstolens dom 2009-11-03 T 3-08") == [clause]
+    # what is not a case number takes no clause: a bare year, prose, and the
+    # date on its own (whose "2009-11" is not a case number either)
+    for q in ("2009", "uppsägningstid", "brott 2009", "2009-11-03"):
+        assert search.case_number_queries(q) == [], q
+    # it rides beside the text branches, never instead of them: a document whose
+    # case number matches answers even when its body does not carry the words
+    should = search._text_query("T 3-08")["bool"]["should"]
+    assert should[-1] == clause and len(should) == 3
+    # a query that cannot be a case number keeps the two text branches alone
+    assert len(search._text_query("mord")["bool"]["should"]) == 2
 
 
 def test_highlight_cap_stays_under_index_limit():
@@ -716,6 +788,48 @@ def test_index_and_search_round_trip(tmp_path):
         assert index.search("mor")["total"] == 1
         # a scoped query still works
         assert index.search("brottsbalken", source="sfs")["total"] >= 1
+    finally:
+        if index.client.indices.exists(index="lagen-test"):
+            index.client.indices.delete(index="lagen-test")
+
+
+@pytest.mark.skipif(not os.environ.get("OPENSEARCH_URL"),
+                    reason="needs a running OpenSearch (set OPENSEARCH_URL)")
+def test_case_number_finds_the_decision(tmp_path):
+    """Against a live cluster: a decision is findable by the case number it was
+    filed under, months before its referat number exists -- how a law review
+    article cites it ("HD:s dom 2009-11-03 T 3-08"). Two numbers per referat,
+    since HD collects cases decided together."""
+    art = tmp_path / "artifact"
+    art.mkdir()
+    nja = art / "nja.json"
+    nja.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/nja/1992s740",
+        "malnummer": ["T 369-91", "T 224-91"],
+        "metadata": {"properties": {"dcterms:title": "NJA 1992 s. 740"}},
+        "structure": [{"type": "paragraf", "id": "P1",
+                       "text": ["Skadestånd för sveda och värk."]}]}))
+    other = art / "other.json"
+    other.write_text(json.dumps({
+        "uri": "https://lagen.nu/dom/nja/1993s41",
+        "malnummer": ["B 1234-92"],
+        "metadata": {"properties": {"dcterms:title": "NJA 1993 s. 41"}},
+        "structure": [{"type": "paragraf", "id": "P1",
+                       "text": ["Ansvar för misshandel."]}]}))
+    cat = tmp_path / "catalog.sqlite"
+    catalog.rebuild(cat, "dv", [nja, other])
+    con = catalog.connect(cat)
+    index = search.SearchIndex(index="lagen-test")
+    try:
+        index.index_source(con, "dv")
+        for q in ("T 224-91", "t 224-91", '"T 224-91"', "T 369-91"):
+            res = index.search(q, limit=5)
+            assert res["results"][0]["uri"] == "https://lagen.nu/dom/nja/1992s740", q
+        # the number belongs to one decision -- the other case is not a hit
+        assert [r["uri"] for r in index.search("B 1234-92")["results"]] \
+            == ["https://lagen.nu/dom/nja/1993s41"]
+        # ... and the parts of a case number never match on their own
+        assert index.search("skadestånd 92")["total"] == 0
     finally:
         if index.client.indices.exists(index="lagen-test"):
             index.client.indices.delete(index="lagen-test")

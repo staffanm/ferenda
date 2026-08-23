@@ -39,7 +39,7 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
-from . import catalog, compress, facets, layout, text
+from . import catalog, compress, facets, layout, malnummer, text
 from .pinpoint import pinpoint_label
 
 INDEX = "lagen"
@@ -55,6 +55,12 @@ INDEX = "lagen"
 # recreate -- but every unit has to be re-emitted to fill it, which the bumped
 # format forces.
 INDEX_FORMAT = "7"
+# Deliberately NOT bumped for the `malnummer` field. Only dv artifacts carry the
+# key it reads, and editing this file already restales every source's index step
+# through the INDEX_CODE fingerprint (build.py) -- so a bump would add nothing
+# but a second reason to re-emit. The mapping arrives by put_mapping as usual
+# (`_require_current_schema`); one scoped run fills the units:
+#     lagen dv index
 
 # Resilience against a busy cluster: a read timeout while OpenSearch is merging
 # segments or running a delete_by_query is transient, not fatal. Every index op
@@ -140,6 +146,18 @@ def _index_version(content_hash):
 # spanning a field boundary, which is a concatenation artefact, not a phrase.
 SEARCH_FIELDS = ["identifier^16", "title^4", "label^3", "text"]
 
+# `malnummer` is deliberately NOT in that list. It is searched as a phrase, by
+# `case_number_queries` -- see there for why a per-term field would misrank.
+#
+# 32, measured, not chosen for symmetry with `identifier^16`: a case number query
+# has to beat the noise its own words make. "T 3-08" scores 130 on NJA 2024 s.
+# 936, whose label is "FT till T (NJA 2024 s. 936)" -- one letter of it matching
+# `identifier^16` -- while the decision actually filed under T 3-08 draws 4.8
+# from its body. The phrase itself is worth 88.7 at ^16 (idf over the 23,738
+# decisions carrying a case number), which loses; at ^32 it is 177, and the right
+# decision leads.
+CASE_NUMBER_BOOST = 32
+
 # repealed acts whose repeal is in force are excluded from results; a future,
 # not-yet-in-force repeal date (and a null expired) is kept (S6/S7). Evaluated at
 # query time against `now` so it stays correct between reindexes.
@@ -192,6 +210,16 @@ MAPPING = {
             "version":       {"type": "keyword", "index": False},
             "uri":           {"type": "keyword"},   # this unit (document or fragment)
             "identifier":    {"type": "text"},
+            # the case numbers a court decision was filed under ("T 3-08"), a
+            # second citation identity beside the referat number -- multi-valued
+            # and non-unique in both directions (see doc_actions), searched as a
+            # phrase (see case_number_queries), in one spelling (lib/malnummer).
+            # `text`, not `keyword`: a keyword matches only a *quoted* query
+            # ("T 3-08" against a keyword field is two terms, T and 3-08, and
+            # neither is the value), where the analyzed form also matches
+            # "t 3-08". Array values are 100 positions apart (the text default),
+            # so a phrase never runs from one case number into the next.
+            "malnummer":     {"type": "text"},
             "title":         {"type": "text"},
             "label":         {"type": "keyword"},
             "text":          {"type": "text"},
@@ -351,6 +379,17 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     doc = {**shared, **identity, "uri": uri, "is_doc": True,
            "display": display,
            "text": ((alt + "\n") if alt else "") + text.document_text(art)}
+    # the case numbers the decision was filed under. A second way in for a reader
+    # who has the case number and not the referat number -- a commentary cites
+    # "Högsta domstolens dom 2009-11-03 T 3-08", the referat is NJA 2009 s. 672.
+    # An identity, not a key, in both directions: one referat collects several
+    # cases decided together (NJA 1992 s. 740 is T 369-91 and T 224-91, printed
+    # inside it as I and II), and the same case number reappears in another
+    # court's series. Whole-document unit only, like `identifier` -- a case
+    # number names the decision, never one paragraph of it. Field-driven on the
+    # artifact key; sources without one contribute nothing.
+    if numbers := art.get("malnummer"):
+        doc["malnummer"] = [malnummer.normalize(n) for n in numbers]
     yield {"_id": uri, "_source": doc}
     # a fragment carries the document's label as `doc_label` -- index:false, so it
     # is the hit's display identifier and never a scored field; the amplification
@@ -371,6 +410,7 @@ def doc_actions(row, inbound_count, version=None, expired=None):
 # --------------------------------------------------------------------------
 
 _QUERY_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_QUOTED = re.compile(r'"[^"]*"')
 
 
 def prefix_query(q):
@@ -379,8 +419,43 @@ def prefix_query(q):
     this branch is what lets ``upphovsr`` match the token ``upphovsrätt``.  By
     extracting words instead of appending ``*`` to the raw expression we don't
     turn quotes, parentheses or other simple-query syntax into malformed input.
+
+    A quoted span is carried over whole, never expanded: quotes are how a reader
+    asks for exactly this string, and taking its words out of the quotes said the
+    opposite.  ``"T 3-08"`` became ``t* 3* 08*``, which under AND matched 43,648
+    documents -- a third of the corpus -- and buried the one case actually filed
+    under that number.  Words outside the quotes are still prefixed, so
+    ``"T 3-08" hovr`` keeps the phrase and completes ``hovrätten``.
     """
-    return " ".join(word + "*" for word in _QUERY_WORD.findall(q))
+    out, pos = [], 0
+    for quoted in _QUOTED.finditer(q):
+        out += [word + "*" for word in _QUERY_WORD.findall(q[pos:quoted.start()])]
+        out.append(quoted.group())
+        pos = quoted.end()
+    return " ".join(out + [word + "*"
+                           for word in _QUERY_WORD.findall(q[pos:])])
+
+
+def case_number_queries(q):
+    """One clause per case number printed in the query -- ``T 3-08``, ``mål nr
+    4659-11``, ``Högsta domstolens dom 2009-11-03 T 3-08`` -- and none for a
+    query that holds no case number.
+
+    A phrase, not a field in SEARCH_FIELDS. Per-term matching would score the
+    parts of a case number separately, and the parts are ordinary numbers: 373
+    of 2,109 sampled case numbers hold a year-like token, so ``brott 2009`` would
+    have promoted every decision whose case number happens to contain 2009 over
+    the documents actually about it -- scored high, because the field is three
+    tokens long and boosted. As a phrase the whole number has to appear.
+
+    `lib/malnummer.query_numbers` decides what a case number is, and spells it
+    the way the indexed field is spelled, so ``T3-08`` and ``T 3-08`` are one
+    query. It is stricter than the printed shape on purpose: "17 kap. 17-18 §§"
+    holds no case number, though the corpus does hold a decision numbered 17-18.
+    """
+    return [{"match_phrase": {"malnummer": {"query": number,
+                                            "boost": CASE_NUMBER_BOOST}}}
+            for number in malnummer.query_numbers(q)]
 
 
 def _text_query(q):
@@ -388,12 +463,15 @@ def _text_query(q):
                                       "fields": SEARCH_FIELDS, "boost": 2}}
     prefixed = prefix_query(q)
     if not prefixed:
+        # nothing but punctuation to complete -- and then nothing to read a case
+        # number out of either, since one is at least two words of digits
         return exact
     return {"bool": {"should": [
         exact,
         {"simple_query_string": {"query": prefixed, "default_operator": "and",
                                   "analyze_wildcard": True,
                                   "fields": SEARCH_FIELDS}},
+        *case_number_queries(q),
     ], "minimum_should_match": 1}}
 
 
