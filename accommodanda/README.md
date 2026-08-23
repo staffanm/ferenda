@@ -153,7 +153,7 @@ uv run python -m pytest      # bare pytest collects exactly the new suites
 | `structure.py` | instance/ruling segmenter (delmål → instans → betänkande/dom → domskäl/domslut) |
 | `paths.py` | where a case's parseable source sits: `cases()` (the identity index, keyed by canonical id, keeping only cases with a readable source), `member`/`record` (the API record, else the frozen legacy original) and `verdict_pdf` (the court's own PDF, the body of a verdict published before its referat). Here rather than in `build.py` because none of it is orchestration — and because `patchsource` needs it, which through `build` would be an import cycle (`build` → `api.patch` → `patchsource` → `build`) |
 | `namedcases.py` | harvester for HD's named-precedent list (`data/namedcases.json`) |
-| `casenumbers.py` | `lagen dv casenumbers` — sweeps the dv artifacts' `malnummer` into the committed snapshot `data/casenumbers.json` (24,411 numbers, `[court, date, local uri]` candidates), the join surface `lib/malnummer.py` resolves "HD:s dom i mål T 3-08" through; the same snapshot shape as `avg/arsberattelse.py` |
+| `casenumbers.py` | `lagen dv casenumbers` — sweeps the dv artifacts' `malnummer` into the committed snapshot `data/casenumbers.json` (24,411 numbers, `[court, date, local uri]` candidates), the join surface `lib/malnummer.py` resolves "HD:s dom i mål T 3-08" through; the same snapshot shape as `avg/arsberattelse.py`. Runs by itself at the end of a **full-source** `dv parse`, after the R2 artifact reconcile, so a number never survives on a just-deleted artifact; `write` reports whether the file changed, and a changed snapshot re-stales the parse of dv, forarbete, avg, rs and wiki (it is one of their recipe inputs), which the run prints |
 | `legacy.py` | **legacy path** — Word referats via `lib/poi.py` (`from ..lib import poi as word`, flat `(text, bold, in_table)` stream → head/body split → `Avgorande`) and notis intermediate XML (TRIPS `<para>` / OOXML `<w:p>` flavors), for cases with no API record. Its `import_identities`/`import_notiser` one-time importers (the frozen notis bodies + the `legacy-identities.json` oracle sidecar) were deleted once run to completion (§7g teardown, 2026-07-19); only the parsers remain runtime code. `notis_summary` recovers a listing description from a notis's own first-paragraph summary line where the frozen oracle's `referatrubrik` has none |
 | `render.py` | the rättsfallssida: the referat/dom body, its keywords and the ursprunglig-dom link. Registered as this source's page renderer in `build.SOURCE_RENDERERS`; `render(art, site) -> str`, built on the `lib/page` kit, with its own page template in `templates/` |
 
@@ -668,8 +668,9 @@ uv run python -m accommodanda.build dv parse                                    
 uv run python -m accommodanda.dv.legacy --index site/data/artifact/dom/identity-index.json   # legacy path, batch report
 uv run python -m accommodanda.dv.legacy site/data/downloaded/dv/ADO/1993-100_1.doc # one Word file -> artifact
 
-# rewrite dv/data/casenumbers.json from the parsed artifacts (run after a parse
-# that added decisions, or their case numbers link nothing)
+# rewrite dv/data/casenumbers.json from the parsed artifacts. A full-source
+# `dv parse` already ends with this; run it by hand after a targeted parse, or
+# to see what the snapshot holds
 uv run python -m accommodanda.build dv casenumbers
 ```
 

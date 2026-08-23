@@ -4932,7 +4932,8 @@ in `git log`. This document is the forest-level status; section markers
   **Citations:** MALNUMMER is the second matcher-without-a-grammar parse type,
   built like EMDRATTSFALL. `lib/malnummer.spans` resolves over a new committed
   snapshot, `dv/data/casenumbers.json` (`dv/casenumbers.py`, `lagen dv
-  casenumbers`, 24,411 numbers with `[court, date, local uri]` candidates), and
+  casenumbers`, 24,411 numbers with `[court, date, local uri]` candidates,
+  rewritten by itself at the end of a full-source `dv parse`), and
   links only what it can pin down: the citation must name a court that holds the
   number. The corpus holds no tingsrätt decisions, whose case numbers fill the
   same texts ("Södertörns tingsrätt mål nr B 4318-18") and collide with the held

@@ -1856,14 +1856,41 @@ def dv_casenumbers(args=()):
     case numbers link nothing."""
     if RUN.dry_run:
         print("dv casenumbers: would sweep dv artifacts -> %s" % CASENUMBERS_JSON)
-        return
-    numbers, courts, refused = dv_casenumbers_mod.write()
-    print("dv casenumbers: %d case numbers across %d courts -> %s"
-          % (numbers, courts, CASENUMBERS_JSON))
+        return False            # nothing was written, so nothing re-stales
+    numbers, courts, refused, changed = dv_casenumbers_mod.write()
+    print("dv casenumbers: %d case numbers across %d courts -> %s%s"
+          % (numbers, courts, CASENUMBERS_JSON,
+             "" if changed else " (unchanged)"))
     if refused:
         print("dv casenumbers: %d printed values are not a readable case "
               "number, left out: %s" % (len(refused), ", ".join(
                   sorted(set(refused))[:5]) + (" ..." if len(refused) > 5 else "")))
+    if changed:
+        # the snapshot is a parse input (CASENUMBER_CODE), so new content
+        # re-stales every parse that resolves a case number -- said out loud,
+        # because that is hours of reparsing an operator did not ask for by name
+        print("dv casenumbers: snapshot changed -- the parse of dv, forarbete, "
+              "avg, rs, lawreview and wiki is now stale and re-runs on the "
+              "next `lagen <source> parse`")
+    return changed
+
+
+def _dv_casenumbers_after_parse():
+    """Refresh the case-number snapshot at the end of a full-source dv parse.
+
+    The snapshot is a view of the whole parsed dv tree, so it belongs to the
+    parse that produced the tree rather than to the harvest (`dv namedcases`
+    downloads HD's list and rides the harvest instead). It runs after
+    `dv_reconcile_artifacts`, so a case number does not survive in it on the
+    strength of an artifact that pass just deleted. ~3 s over 23,739 artifacts.
+
+    Full-source parse only. A one-document run leaves the snapshot as it is: it
+    is rebuilt from the whole tree either way, and rewriting it there would
+    re-stale five sources' parses on the strength of one document."""
+    t0 = time.perf_counter()
+    changed = dv_casenumbers()
+    _emit_segment("casenumbers", "dv", time.perf_counter() - t0,
+                  ran=int(changed), status="ok")
 
 
 def dv_parse_run(basefile):
@@ -4480,6 +4507,7 @@ def cmd_all(names, jobs, whole_corpus, download=False):
                 save_fingerprints(store)
             if name == "dv" and step == "parse":
                 dv_reconcile_artifacts()      # R2: reconcile folded verdicts
+                _dv_casenumbers_after_parse()
     cmd_relate(names)
     # a bulk item the cluster rejected is a *unit missing from search*, so it
     # belongs in the run's verdict like a failed parse -- one rebuild dropped
@@ -5530,9 +5558,11 @@ def _dispatch(args, p, jobs):
             if recorded:
                 save_fingerprints(store)
             # a full-source dv parse reconciles the artifact tree to the canonical
-            # set, pruning verdicts folded into a referat (R2)
+            # set, pruning verdicts folded into a referat (R2), then refreshes
+            # the case-number snapshot from what remains
             if name == "dv" and args.action == "parse":
                 dv_reconcile_artifacts()
+                _dv_casenumbers_after_parse()
             had_errors |= errs
             continue
         basefiles = args.basefiles or source.list_basefiles()

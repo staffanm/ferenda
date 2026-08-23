@@ -68,7 +68,18 @@ def build():
 
 
 def write(path=CASENUMBERS):
+    """Rewrite the snapshot; report what it holds, what it refused, and whether
+    the file changed.
+
+    `changed` is what the caller reports on, because the snapshot is a parse
+    input (`build.CASENUMBER_CODE`): new content re-stales the parse of every
+    source that resolves case numbers, and unchanged content costs nothing --
+    the recipe fingerprint hashes the file, not its timestamp."""
     snapshot, refused = build()
-    path.write_text(json.dumps(snapshot, ensure_ascii=False,
-                               separators=(",", ":")) + "\n", encoding="utf-8")
-    return len(snapshot["numbers"]), len(snapshot["courts"]), refused
+    serialized = json.dumps(snapshot, ensure_ascii=False,
+                            separators=(",", ":")) + "\n"
+    changed = (not path.exists()
+               or path.read_text(encoding="utf-8") != serialized)
+    if changed:
+        path.write_text(serialized, encoding="utf-8")
+    return len(snapshot["numbers"]), len(snapshot["courts"]), refused, changed
