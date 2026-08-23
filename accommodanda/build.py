@@ -63,6 +63,7 @@ from .avg import render as avg_render
 from .coe import download as coe_download
 from .coe import parse as coe_parse
 from .coe import render as coe_render
+from .dv import casenumbers as dv_casenumbers_mod
 from .dv import download as dv_download
 from .dv import identity as dv_identity
 from .dv import legacy as dv_legacy
@@ -136,6 +137,7 @@ from .lib import (
     text,
     util,
 )
+from .lib.datasets import CASENUMBERS as CASENUMBERS_JSON
 from .lib.datasets import EMD_CASES as EMD_CASES_JSON
 from .lib.datasets import JO_ARSBERATTELSE as JO_ARSBERATTELSE_JSON
 from .lib.datasets import NAMEDCASES as NAMEDCASES_JSON
@@ -988,6 +990,14 @@ PKG = Path(__file__).parent
 CITATION_DATA = (PKG / "hudoc" / "data" / "casenames.json",
                  PKG / "hudoc" / "data" / "respondents_sv.json",
                  PKG / "avg" / "data" / "arsberattelse.json")
+# The case-number matcher and its snapshot, on the recipes of the sources that
+# can actually request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, forarbete, avg,
+# rs, wiki). Kept out of CITATION_DATA because the sfs/eurlex/foreskrift/
+# guidance parsers never ask for that parse type, and listing it there would
+# reparse those four corpora in full every time `lagen dv casenumbers` rewrites
+# the snapshot, for output that cannot change.
+CASENUMBER_CODE = (PKG / "lib" / "malnummer.py",
+                   PKG / "dv" / "data" / "casenumbers.json")
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
     "parallelappendix", "register", "begrepp", "bemyndigande",
@@ -1669,7 +1679,7 @@ DV_CODE = (PKG / "dv" / "parse.py", PKG / "dv" / "model.py",
            PKG / "dv" / "legacy.py", PKG / "lib" / "poi.py",
            PKG / "lib" / "poi_worker.py", PKG / "lib" / "pdftext.py",
            PKG / "lib" / "casenaming.py", PKG / "lib" / "lagrum.py",
-           PKG / "lib" / "emdref.py", *CITATION_DATA,
+           PKG / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,
            # the innehåll is normalised through this before a patch is applied
            # to it, so it decides what a patched document parses from
            PKG / "lib" / "markup.py")
@@ -1833,6 +1843,25 @@ def dv_namedcases(args=()):
           % (len(cases), resolvable, NAMEDCASES_JSON))
 
 
+def dv_casenumbers(args=()):
+    """Refresh the case-number snapshot (`lagen dv casenumbers`): sweep the dv
+    artifacts' målnummer and rewrite dv/data/casenumbers.json, which the citation
+    engine reads to resolve "Högsta domstolens dom 2009-11-03 T 3-08" onto the
+    referat it became. Reads artifacts already on disk -- no network, no
+    per-document chain. Run it after a parse run that added decisions, or their
+    case numbers link nothing."""
+    if RUN.dry_run:
+        print("dv casenumbers: would sweep dv artifacts -> %s" % CASENUMBERS_JSON)
+        return
+    numbers, courts, refused = dv_casenumbers_mod.write()
+    print("dv casenumbers: %d case numbers across %d courts -> %s"
+          % (numbers, courts, CASENUMBERS_JSON))
+    if refused:
+        print("dv casenumbers: %d printed values are not a readable case "
+              "number, left out: %s" % (len(refused), ", ".join(
+                  sorted(set(refused))[:5]) + (" ..." if len(refused) > 5 else "")))
+
+
 def dv_parse_run(basefile):
     member = dv_paths.member(basefile)
     if member["store"] == "dv":   # legacy-only: frozen Word referat / notis XML
@@ -1873,7 +1902,8 @@ SOURCES["dv"] = Source("dv", lambda: sorted(dv_paths.cases()), {
                    inputs=lambda bf: [dv_paths.record(bf)] + _patch_input("dv", bf),
                    code=DV_CODE),
 }, harvest=dv_harvest, origin=_origin(dv_download.API),
-   actions={"reindex": dv_reindex, "namedcases": dv_namedcases})
+   actions={"reindex": dv_reindex, "namedcases": dv_namedcases,
+            "casenumbers": dv_casenumbers})
 
 
 # --------------------------------------------------------------------------
@@ -1895,7 +1925,7 @@ FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
-           PKG / "lib" / "emdref.py", *CITATION_DATA,
+           PKG / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,
            # the data the citation engine's treaty matching is configured by:
            # a new Swedish treaty name re-stales the parse like a grammar edit
            PKG / "lib" / "treaty_ids.py",
@@ -2944,7 +2974,7 @@ SOURCES["foreskrift"] = Source("foreskrift", foreskrift_list, {
 AVG_CODE = (PKG / "avg" / "parse.py", PKG / "avg" / "model.py",
             PKG / "avg" / "download.py",
             PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
-            PKG / "lib" / "emdref.py", *CITATION_DATA,
+            PKG / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,
             PKG / "lib" / "artifact.py")
 
 
@@ -3066,7 +3096,7 @@ RS_CODE = (PKG / "rs" / "parse.py", PKG / "rs" / "model.py",
            PKG / "rs" / "agencies.py", PKG / "rs" / "download.py",
            PKG / "rs" / "skv.py",
            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
-           PKG / "lib" / "emdref.py", *CITATION_DATA,
+           PKG / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,
            PKG / "lib" / "artifact.py")
 
 
@@ -3502,7 +3532,8 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
 WIKI_ROOT = layout.WIKI_ROOT
 WIKI_CODE = (PKG / "wiki" / "parse.py", PKG / "lib" / "markdown.py",
              PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
-             *CITATION_DATA, PKG / "lib" / "eu_structure.py")
+             *CITATION_DATA, *CASENUMBER_CODE,
+             PKG / "lib" / "eu_structure.py")
 
 
 def kommentar_record(basefile):
@@ -3887,7 +3918,10 @@ RELATE_CODE = (PKG / "lib" / "catalog.py", PKG / "lib" / "concepts.py",
 # index reads the catalog rows (source signature, inbound-count ranking) it
 # denormalises onto the search units, so a change to catalog.py re-stales it too.
 INDEX_CODE = (PKG / "lib" / "search.py", PKG / "lib" / "text.py",
-              PKG / "lib" / "catalog.py")
+              PKG / "lib" / "catalog.py",
+              # doc_actions stores the case number through malnummer.normalize,
+              # so a change to the shape changes what is indexed
+              PKG / "lib" / "malnummer.py")
 DUMP_CODE = (PKG / "lib" / "dump.py",)
 
 

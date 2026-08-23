@@ -42,7 +42,7 @@ from typing import NamedTuple
 from lark import Lark, Token, Tree
 from lark.exceptions import UnexpectedInput
 
-from . import datasets, emdref
+from . import datasets, emdref, malnummer
 from .coe_ids import article_fragment as coe_article_fragment
 from .treaty_ids import article_fragment as treaty_article_fragment
 from .util import fold_swedish, number_slug, own_number_slug
@@ -106,6 +106,14 @@ STALLNINGSTAGANDE = 'STALLNINGSTAGANDE'  # Skatteverket ställningstaganden (by 
 # corpus, so lib.emdref matches it over the committed snapshot and parse_text
 # merges those spans beside the grammar's (grammar wins overlaps).
 EMDRATTSFALL = 'EMDRATTSFALL'
+# A Swedish decision named by the case number it was filed under, months before
+# its referat exists: "Högsta domstolens dom 2009-11-03 T 3-08" is what SvJT
+# 2010 s. 94 calls NJA 2009 s. 672. Not a grammar type either, for the same
+# reason as EMDRATTSFALL: the number resolves to a document only through the
+# held corpus, so lib.malnummer matches it over the committed snapshot
+# (dv/data/casenumbers.json) and parse_text merges those spans beside the
+# grammar's.
+MALNUMMER = 'MALNUMMER'
 ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 
 # deterministic assembly order; kortlagrum first so its roots take
@@ -121,7 +129,7 @@ TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
 # combined with it. Import this instead of copying the list.
 ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
                    FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING,
-                   FORESKRIFT, STALLNINGSTAGANDE, EMDRATTSFALL]
+                   FORESKRIFT, STALLNINGSTAGANDE, EMDRATTSFALL, MALNUMMER]
 
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
@@ -1764,6 +1772,8 @@ class LagrumParser:
         # TRIGGER_SRC assembly skips it by absence from TYPE_ORDER; the flag
         # turns on the emdref merge in parse_text
         self.emd = EMDRATTSFALL in requested
+        # MALNUMMER is the other snapshot matcher (see the constant)
+        self.case_numbers = MALNUMMER in requested
         self.lark = parser(requested, self.parse_types,
                            abbrevs if KORTLAGRUM in self.parse_types else (),
                            eu_acts if EULAGSTIFTNING in self.parse_types else (),
@@ -1846,6 +1856,14 @@ class LagrumParser:
             emd = [Ref(s, e, orig[s:e], predicate, uri)
                    for s, e, uri in emdref.spans(text, self.base)]
             refs = sorted(refs + yield_overlaps(emd, refs),
+                          key=lambda r: r.start)
+        if self.case_numbers:
+            # a decision named by case number (see MALNUMMER), same merge: the
+            # referat form is the better identity, so "NJA 2009 s. 672 (T 3-08)"
+            # links once, on the grammar's span
+            cases = [Ref(s, e, orig[s:e], predicate, uri)
+                     for s, e, uri in malnummer.spans(text, self.base)]
+            refs = sorted(refs + yield_overlaps(cases, refs),
                           key=lambda r: r.start)
         return refs
 

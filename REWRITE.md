@@ -156,7 +156,7 @@ accommodanda/
   lib/      shared horizontal libs (full map: accommodanda/README.md "Shared library (lib/)") — lagrum (citation engine), catalog, page (the shared page kit) + render (site assembly) + tpl and the Jinja templates/ their markup lives in, layout, net, markdown, util, errors, casenaming, eucasenaming, labels, eu_structure, datasets, search, facets, feeds, dump, pins, resolve, text, compress, facsimile, pdftext, llm, annstore, wikitext, runlog, patch·patchit, markup, git, harvest, regeringen, poi, concepts, diff, history, assets, coe, coe_ids, pinpoint
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
-  dv/       court-decisions vertical — download·identity·namedcases·model·parse·structure·legacy
+  dv/       court-decisions vertical — download·identity·namedcases·casenumbers·model·parse·structure·legacy
   forarbete/ preparatory-works vertical — download·propkb·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·correspond·definitions·parse·parse_html·parse_pdf·structure·lang·model
   hudoc/    ECHR case-law vertical — download·model·parse·summaries·translations
@@ -4700,7 +4700,7 @@ rewrite work.
 | `../ferenda.old/data/sfs/parsed/` | the golden = old-pipeline parsed XHTML (11,056 docs), normalized per comparison — sibling checkout, not `site/data/` |
 | `accommodanda/lib/` | **shared** horizontal libs: `lagrum` (citation engine), `util`, `errors` (`SkipDocument`), `harvest` (shared incremental-download core — `HarvestWatermark`, `walk`), `casenaming`/`eucasenaming` (DV/EU case identity + display naming), `labels` (every source's four reader-facing name forms — eyebrow/h1/official-title/citing-form — dispatched per source over the parse-time-stamped artifact + the curated datasets, read identically by `render.py` and `catalog.py`), `facsimile` (on-demand source-PDF page → retina PNG, disk-cached; `/api/v1/facsimile` + the legacy `/prop/2022/23:10/sid1.png` grammar), `poi` (Apache POI-via-jpype legacy `.doc`/`.docx` extraction to a flat paragraph stream — moved from `dv/word.py` once förarbete became its second caller; `dv/legacy.py` and `forarbete/legacy_formats.word_paras` both read through it, the latter for `.docx` only, `.doc` going through `antiword` instead) |
 | `accommodanda/sfs/` | **acts vertical**: `{extract,reader,model,tokenizer,assembler,nf}` parser + `parallelappendix` (structurally detected, aligned bi/trilingual convention appendices, no per-law code; 95/107 detected candidates) + `register` (SFSR→amendments/förarbeten/metadata) + `graphics` (typed omitted-content detection *and* vision-localization — `collect_gaps`/`provenance_sfs`/`localize_group`) + `redaktionell` (typed publisher-editorial-note detection, retyped in place at projection time) + `pdfmirror` (`mirror-pdf`, official-PDF mirror, the crop source) + `asgit` (`history-as-git` — the corpus as a git repo, one commit per amendment event, `docs/prd-sfs-history-as-git.md`) + `__main__` (diagnostic parse/validate CLI; `mirror-pdf`/`ai-includegraphics` are `build.py` actions, not here) |
-| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
+| `accommodanda/dv/` | **court-decisions vertical**: `download`, `identity`, `model`, `parse`, `structure`, `legacy`, `namedcases` (HD named-precedent harvester), `casenumbers` (the held-case-number snapshot `lib/malnummer.py` resolves "HD:s dom i mål T 3-08" through); the legacy Word extraction itself now lives in `lib/poi.py` (shared with förarbete), `legacy.py` importing it as `poi as word`; canonical case title + HD given names live in `lib/casenaming.py` (shared with the catalog + renderer). `parse.parse_pdf_record` reads a raw pre-referat HD/HFD verdict straight off its PDF attachment (no `innehall` HTML yet), recovering the domskäl paragraph numbers from their unselectable margin bitmaps; `identity.py`'s R2 merge folds that raw record into the later referat that publishes the same målnummer once one exists |
 | `accommodanda/forarbete/` | **preparatory-works vertical**: `download` (regeringen.se, 8 types + `pm`, promemorior outside the Ds series), `model`/`structure`/`parse` (PDF/html→nested structure→artifact; `parse.tag_frontmatter` retags the prop/skr överlämnande page — ingress heading, `signatur` signer blocks; `parse.parse_record`'s one body route, `_harvested_body`, reads every §7g frozen corpus alongside live harvests — all re-housed into ordinary `files` form, 2026-07-19), `volumes` (which of a multi-PDF record's `files` are the body and in what order, read from the record's provenance and the landing page's own link text — drops errata/summaries/kortversioner/reprinted-directive/remisslista siblings, collapses a "hela dokumentet" edition published beside its own parts), `jamforelse` (extracts a re-enacting prop's jämförelsetabell/paragrafnyckel bilaga tables into old↔new provision pairs from per-run coordinates; consumed by `sfs/correspond.table_correspond`), `legacy_formats` (body adapters shared by every re-housed corpus and the live harvest — dokumentstatus XML, riksdagen text/tml + skanning2007 html, ABBYY OCR-XML, scanned-PDF OCR text, TRIPS `div.body-text`, `word_paras` for `.doc`/`.docx` — `.doc` via `antiword`, `.docx` via `lib/poi.py`), `propkb` (facsimile-only fetcher for the KB two-chamber scans, 1867–1970 — adds no documents, only page images for the 17,295 XML-only propkb records; built, not yet run at corpus scale), `soukb` (body re-downloader for the KB-digitised SOUs, 1922–1999 — no ABBYY XML sibling, so the scanned OCR'd PDF is the body; walks `https://sou.kb.se/` as the source of truth, forgetting the legacy soukb records; 5,814 basefiles, 128 multi-volume; built, verified on one doc, not yet run at corpus scale), `riksdagen` (doctype-agnostic dokumentlista harvest engine, driven for `bet`/utskottsbetänkanden off data.riksdagen.se, no frozen corpus), `rskr` (second driver over `riksdagen.py`'s engine, for riksdagsskrivelser — HTML body, no PDF), `kommentar` (författningskommentar → EU-directive *genomför* edges, prop + fm), `genomforande` (relate-time resolution pinning each statement to its SFS paragraf, preferring an authored `.ann` genomförande layer over the mechanical `implements` per covered directive), `aigenomforande` (opt-in LLM pass, `lagen forarbete ai-genomforande <prop> <CELEX>`, authoring that `.ann` layer from the prop's per-paragraf FK entries), `fk` (per-paragraf FK commentary text → `kommentarer` artifact section → `fk_kommentar` catalog layer → statute-rail "Författningskommentar"), `lydelse` (two-column nuvarande/föreslagen lydelse tables reconstructed from per-run coordinates → `tabell` blocks in the SFS `rad`/`cells` shape), `tabell` (conservative generic data-table detection for everything tabular that isn't a lydelse comparison, with cross-page continuation, §7g/finding 04) |
 | `accommodanda/eurlex/` | **EU vertical (EUR-Lex/CELLAR)**: `download` (SPARQL discovery; a multi-part Formex manifestation fetched whole, as one zip; `lagen eurlex backfill` downloads the acts the corpus cites but does not hold, ranked by `catalog.dangling_targets`), `bulk` (dump import), `correspond` (the EU-act **lineage**: a recast's own jämförelsetabell annex → article↔article pairs, mechanical, extracted by `parse` into the artifact's `correspondence` key; `catalog._index_document` writes them into `directive_correspondence` as it indexes each act, walked transitively by `catalog.predecessor_atoms` under `catalog.caselaw_anchored`, the statute-wide pinpoint-precise case-law rail assignment), `parse`/`parse_html`/`parse_pdf` (Formex/HTML/PDF → one artifact shape; `parse.parse_act_body` descends through Formex's `GENERAL`/`GR.SEQ` wrappers so a multi-file act (2004/18, the Charter) parses through the same walker as an ordinary `ACT` root; `parse.parse_opinion` reads an Advocate General opinion's Formex `CONCLUSION` structure, `parse.parse_hearing_report` a `REPORT.HEARING` -- for the oldest ECR cases the hearing report is the only text CELLAR holds; judgment paragraphs are read from both the pre-2012 plain `NP` and the later `NP.ECR` shapes; citation scanning is per-language -- `_refparser(lang)` loads the English EULAGSTIFTNING surface for the pre-accession case law that exists in no Swedish version), `definitions` (defined-terms extraction + in-act interlinking), `lang`, `model` (`doctype` splits sector-6 CELEX into judgment/opinion/order by document-type letter), `casenames` (harvest CELEX → usual name for named EU cases from Wikidata into `data/casenames.json`, read by `lib/eucasenaming.py`), `data/treaties.json` (curated Swedish names for EU primary law, keyed by CELEX stem, read by `lib/labels.py`) |
 | `accommodanda/hudoc/` | **European Court of Human Rights vertical**: HUDOC JSON result pagination + full-text HTML conversion, typed case model, article-facet references into CoE treaty provisions, `citations` (case-law cross-reference matcher), `treaties` (the Convention/protocol short forms a judgment cites, over `lib.treatyref`), `casenames` (`lagen hudoc casenames`, writes the committed `data/casenames.json` join surface `lib/emdref.py`, the Swedish `lagrum` matcher, reads) |
@@ -4853,6 +4853,51 @@ Same adjudication-ledger pattern as `golden_sfs.py` (§7d).
 The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
+
+- **lib/dv/search** (2026-08-22) — a decision is findable by the case number it
+  was filed under, months before its referat exists. A commentary names it that
+  way and never otherwise: SvJT 2010 s. 94 discusses "Högsta domstolens dom
+  2009-11-03 T 3-08", which the corpus holds as NJA 2009 s. 672, and neither
+  the search index nor the citation engine could reach it from that string.
+
+  `lib/malnummer.py` owns the printed shape, because both sides need it: one
+  number is spelled three ways ("T 3-08", "T3-08", Arbetsdomstolen's
+  "A-232-2013" — 877 of the 24,995 held numbers join the letter to the serial),
+  and `normalize` spells them alike. The letter groups are a closed vocabulary
+  (B, Ö, T, A, M, UM, P, … 29 in all), so "mål nr 4659-11" yields the number and
+  not the word "nr"; the lookarounds keep a date out, since the "2009-11" inside
+  2009-11-03 wears the same shape.
+
+  **Search:** the whole-document unit gained a `malnummer` field, filled from
+  the artifact key only dv carries. It is matched as a *phrase*, in its own
+  clause (`search.case_number_queries`, weight 32), never as a field in
+  `SEARCH_FIELDS`: per-term, the parts of a case number are ordinary numbers —
+  373 of 2,109 sampled numbers hold a year-like token, so "brott 2009" would
+  have promoted every decision numbered 2009-something over the documents about
+  the subject. Quoting also means what it says again: `prefix_query` used to
+  take the words out of the quotes, so `"T 3-08"` became `t* 3* 08*` and matched
+  43,648 documents — a third of the corpus — with the one case filed under that
+  number nowhere in the top 50. Measured after: `T 3-08`, `T3-08`, `"T 3-08"`
+  and the whole SvJT sentence all return NJA 2009 s. 672 first.
+
+  **Citations:** MALNUMMER is the second matcher-without-a-grammar parse type,
+  built like EMDRATTSFALL. `lib/malnummer.spans` resolves over a new committed
+  snapshot, `dv/data/casenumbers.json` (`dv/casenumbers.py`, `lagen dv
+  casenumbers`, 24,411 numbers with `[court, date, local uri]` candidates), and
+  links only what it can pin down: the citation must name a court that holds the
+  number. The corpus holds no tingsrätt decisions, whose case numbers fill the
+  same texts ("Södertörns tingsrätt mål nr B 4318-18") and collide with the held
+  ones, and no second court may stand between the named one and the number
+  ("HD prövade Södertörns tingsrätts dom i mål nr B 1-85" links nothing). A
+  printed date decides between candidates — 298 numbers name more than one
+  decision — but does not veto a lone one, since 12 of the 255 citations in a
+  2,000-document sample whose number is held and whose court is named print the
+  date of an interim beslut or of the föredragning instead. Over that sample the
+  matcher resolved 243 citations and left every unheld number, every unnamed
+  court and every section range unlinked. The search box reads the number by a
+  stricter rule than the printed shape (`query_numbers`): a bare number counts
+  only as the whole query, or "17 kap. 17-18 §§" would have become a hit on the
+  decision numbered 17-18.
 
 - **api** (2026-08-20) — a crop-review editor for the `.graphics` layer.
   `api/graphicsedit.py` is the content model for one entry (its

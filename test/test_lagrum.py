@@ -38,6 +38,7 @@ from accommodanda.lib.lagrum import (
     FORESKRIFT_TRIGGER_SRC,
     FS_DESIGNATIONS,
     LAGRUM,
+    MALNUMMER,
     MYNDIGHETSBESLUT,
     RATTSFALL,
     STALLNINGSTAGANDE,
@@ -154,6 +155,30 @@ def test_emdrattsfall_swedish_surface():
     # chamber + Grand Chamber (or merits + just-satisfaction) with no date
     # printed: refuse to guess
     assert parser.parse_text("se Von Hannover mot Tyskland, p. 57") == []
+
+
+def test_malnummer_resolves_a_decision_cited_before_its_referat():
+    # a decision is cited by case number for the months before its referat is
+    # published, and afterwards in law review articles: SvJT 2010 s. 94 calls
+    # NJA 2009 s. 672 "Högsta domstolens dom 2009-11-03 T 3-08". Resolved
+    # through the committed casenumbers snapshot, never from the number alone.
+    parser = LagrumParser({}, basefile="x",
+                          parse_types=[MALNUMMER, RATTSFALL])
+    refs = parser.parse_text("Högsta domstolens dom 2009-11-03 T 3-08")
+    assert [(r.text, r.uri) for r in refs] == [
+        ("T 3-08", "https://lagen.nu/dom/nja/2009s672")]
+    assert [r.uri for r in parser.parse_text("HD:s dom i mål T 3-08")] == [
+        "https://lagen.nu/dom/nja/2009s672"]
+    # the referat form is the better identity, so a citation carrying both
+    # links twice -- once on each, never twice on the same span
+    refs = parser.parse_text("NJA 2009 s. 672 (HD:s dom i mål T 3-08)")
+    assert [r.text for r in refs] == ["NJA 2009 s. 672", "T 3-08"]
+    # the corpus holds no tingsrätt decisions, and their case numbers collide
+    # with the ones it holds: an uncited court links nothing
+    assert parser.parse_text("Södertörns tingsrätt mål nr B 4318-18") == []
+    # the type is opt-in: without it the same sentence carries no case-number ref
+    plain = LagrumParser({}, basefile="x", parse_types=[RATTSFALL])
+    assert plain.parse_text("Högsta domstolens dom 2009-11-03 T 3-08") == []
 
 
 def test_ecj_letterless_form_is_year_bounded():
