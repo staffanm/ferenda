@@ -169,7 +169,7 @@ services:
       # (staffan:lagen-nfs), which is what the container runs as, so the editors
       # can write and commit. Pushes are done from the host, not the container.
       - /mnt/forstor/lagen-wiki:/wiki
-      # Secrets + editor registry (editor_secret, editors[].pwhash, ops_token, LLM
+      # Secrets + editor registry (editor_secret, editors[].pwhash, LLM
       # key). config.py reads config.yml from the repo root (/app); without this
       # mount the file is absent and everything falls back to defaults -- the inline
       # editor 403s ("editing disabled -- set editor_secret"). Kept out of the image

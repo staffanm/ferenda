@@ -110,7 +110,7 @@ services:
       - /mnt/HC_Volume_106236756/downloaded:/mnt/HC_Volume_106236756/downloaded
       # begrepp/kommentar markdown -- git-backed; the inline editor commits here.
       - /srv/ferenda/lagen-wiki:/wiki
-      # Secrets + editor registry (ops_token, editor_secret, editors) and the LLM
+      # Secrets + editor registry (editor_secret, editors) and the LLM
       # key -- kept out of the image (.dockerignore) and out of git; mounted from
       # the host at runtime. config.py reads config.yml from the repo root (/app);
       # lib/llm.py load_dotenv() reads /app/.env.
