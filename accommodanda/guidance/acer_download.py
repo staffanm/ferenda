@@ -64,7 +64,6 @@ import time
 from pathlib import Path
 from urllib.parse import urljoin
 
-import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress
@@ -138,6 +137,21 @@ SPRAK = "en"
 # a Drupal pager that repeats past its own end would otherwise walk forever;
 # the recommendations view is five pages and this is the guard, not the count
 MAX_PAGES = 40
+
+# ACER retired documents.acer.europa.eu and that host now accepts no connection
+# at all, but two of the 300 links on its own listing pages still name it.
+# www.acer.europa.eu serves the same paths -- it redirects both of them to the
+# file under /sites/default/files/documents/Publications/Opinions/ -- so the
+# address is corrected on the way in and the record files the one that answers.
+RETIRED_HOST = "https://documents.acer.europa.eu/"
+LIVE_HOST = "https://www.acer.europa.eu/"
+
+
+def live_url(link):
+    """`link` with ACER:s retired document host swapped for the one that
+    answers. Any other link is returned unchanged. Pure."""
+    return (LIVE_HOST + link[len(RETIRED_HOST):]
+            if link.startswith(RETIRED_HOST) else link)
 
 
 def basefile(serie, nummer):
@@ -325,20 +339,17 @@ class _Counts:
         self.renamed = []       # the cover overruled the listing's number
         self.conflicts = []     # the cover prints several, and not the listed one
         self.not_pdf = 0        # a .pdf address that served something else
-        self.unreachable = 0    # a link whose host does not answer at all
 
     def line(self):
         return ("acer: %d listing pages, %d candidates -> %s; declined %d "
                 "annexes, %d unnumbered, %d not a ramriktlinje, %d listed "
-                "twice, %d non-PDF bodies, %d unreachable, %d covers "
-                "conflicting; %d covers read, %d of them silent, %d renamed "
-                "by their cover"
+                "twice, %d non-PDF bodies, %d covers conflicting; %d covers "
+                "read, %d of them silent, %d renamed by their cover"
                 % (self.pages, self.candidates,
                    ", ".join("%d %s" % (n, kod)
                              for kod, n in self.taken.items()),
                    self.annexes, self.unnumbered, self.not_framework,
-                   self.duplicate, self.not_pdf, self.unreachable,
-                   len(self.conflicts),
+                   self.duplicate, self.not_pdf, len(self.conflicts),
                    self.covers, self.silent, len(self.renamed)))
 
 
@@ -387,6 +398,7 @@ def _candidates(session, serie, delay, counts):
             or [(titel, None, link, 0)
                 for titel, link in linked_documents(text, url)]
         for titel, date, link, annexes in rows:
+            link = live_url(link)
             counts.candidates += 1
             counts.annexes += annexes
             if RE_ANNEX.match(titel):
@@ -453,19 +465,7 @@ def _resolve(session, stored, serie, listed, titel, link, counts):
         # resolved from these bytes on an earlier run: the identity and the
         # date it settled on are the record's, and nothing is fetched
         return (*stored[link], _document_fetcher(session, link))
-    try:
-        body = _document_fetcher(session, link)()
-    except requests.RequestException:
-        # ACER has moved its files to www.acer.europa.eu and retired the old
-        # documents.acer.europa.eu, but two of the 314 links on its own listing
-        # pages still name the retired host, which now accepts no connection at
-        # all. That is a dead link upstream, not a document this walk failed to
-        # fetch: the cause is known and the recovery is to count it and go on,
-        # which is what makes this a catch (rule:no-catch-log-continue). It is
-        # also why it must not block -- one unanswered host held up every other
-        # ACER document behind it.
-        counts.unreachable += 1
-        return None
+    body = _document_fetcher(session, link)()
     text = cover_text(body)
     if text is None:
         # a .pdf address that served an error page. Not this harvest's to

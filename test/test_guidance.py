@@ -1056,6 +1056,25 @@ def test_acer_card_view_reads_its_own_dates_and_counts_its_annexes():
         == "02/2026"
 
 
+def test_acer_link_on_the_retired_host_is_read_off_the_one_that_answers():
+    """Two of the 300 links on ACER:s own listing pages still name
+    documents.acer.europa.eu, which ACER retired: it now accepts no connection
+    at all and every request to it burned the retry budget before failing.
+    www.acer.europa.eu serves the same path, so the address is corrected before
+    anything is fetched or filed."""
+    assert acer_download.live_url(
+        "https://documents.acer.europa.eu/Official_documents/Acts_of_the_"
+        "Agency/Opinions/Opinions/ACER%20Opinion%2001-2022%20on%20HU-AT%20"
+        "Reverse%20Flow.pdf") == (
+        "https://www.acer.europa.eu/Official_documents/Acts_of_the_Agency/"
+        "Opinions/Opinions/ACER%20Opinion%2001-2022%20on%20HU-AT%20Reverse%20"
+        "Flow.pdf")
+    # the hosts ACER does serve are left alone, bare and www alike
+    for link in ("https://www.acer.europa.eu/a.pdf",
+                 "https://acer.europa.eu/sites/default/files/b.pdf"):
+        assert acer_download.live_url(link) == link
+
+
 def test_acer_pager_ends_where_the_view_ends():
     assert acer_download.has_next_page(acer_fixture("recommendations.html"))
     assert not acer_download.has_next_page(
