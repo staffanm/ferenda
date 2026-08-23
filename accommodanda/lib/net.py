@@ -44,11 +44,13 @@ _RETRY = Retry(total=4, backoff_factor=0.5,
                raise_on_status=False)
 
 # request()-level retry: covers the gaps urllib3 cannot -- a 2xx with an
-# empty/non-JSON body, and a 403/429 throttle (some gateways send no Retry-After)
+# empty/non-JSON body, and a throttle (403/429, or a non-standard code a
+# WAF invented -- 466 is the one the Juridisk Publikation host answers a
+# rate-limited client with; some gateways send no Retry-After)
 RETRIES = 6
 RETRY_BACKOFF = 2.0        # seconds, doubled each attempt, capped at RETRY_MAX
 RETRY_MAX = 60.0
-RETRY_STATUS = frozenset({403, 408, 425, 429, 500, 502, 503, 504})
+RETRY_STATUS = frozenset({403, 408, 425, 429, 466, 500, 502, 503, 504})
 
 # the pipeline's two client identities: the honest harvester UA for services
 # that accept it, and a browser UA for the government sites that 403 bare
@@ -598,9 +600,9 @@ def counted() -> Iterator[Callable[[], int]]:
 
 def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs):
     """Perform an HTTP request, riding out the transient failures a long
-    unattended harvest meets: an empty/non-JSON 2xx body, a throttle (403/429),
-    a 5xx that outlived the session's own retries, and connection drops or
-    timeouts. Backoff is exponential (capped at RETRY_MAX) but defers to
+    unattended harvest meets: an empty/non-JSON 2xx body, a throttle
+    (403/429, or a non-standard code a WAF invented such as 466), a 5xx that
+    outlived the session's own retries, and connection drops or timeouts. Backoff is exponential (capped at RETRY_MAX) but defers to
     Retry-After. A non-throttle 4xx is a genuine error and is raised at once.
     Every failed response is logged once. Returns the parsed JSON when
     ``parse_json`` is set, else the Response (e.g. for binary downloads).

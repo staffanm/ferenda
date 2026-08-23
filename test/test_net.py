@@ -376,3 +376,61 @@ def test_a_browser_user_agent_does_not_answer_to_chrome():
     assert net.parse_crawl_delay(
         "User-agent: *\nCrawl-delay: 10\n\nUser-agent: Mozilla\nCrawl-delay: 1\n",
         net.BROWSER_UA) == 1.0
+
+
+# --------------------------------------------------------------------------
+# the non-standard throttle codes a WAF invents
+# --------------------------------------------------------------------------
+
+class _ThrottledSession:
+    """A host whose robots.txt asks for nothing (a 404) and whose pages
+    answer a rate-limited client with the WAF's own status."""
+    headers = {"User-Agent": net.HARVESTER_UA}
+    status = 466          # the one the Juridisk Publikation host answers with
+
+    def __init__(self):
+        self.calls = 0
+
+    def request(self, _method, url, **_kwargs):
+        self.calls += 1
+        resp = requests.Response()
+        if url.endswith("robots.txt"):
+            resp.status_code = 404
+        else:
+            resp.status_code = self.status
+        resp._content = b"x"
+        return resp
+
+
+def test_a_nonstandard_throttle_status_is_ridden_out(monkeypatch):
+    """A WAF may answer a rate-limited client with a status no standard has,
+    and the code for it belongs in the retry table like any other throttle:
+    the fetch waits its backoff and goes back, and the source never needs its
+    own local fetch wrapper to ride the block out."""
+    slept = []
+    monkeypatch.setattr(net.time, "sleep", slept.append)
+
+    class Session(_ThrottledSession):
+        status = 466
+
+        def request(self, method, url, **kwargs):
+            # the block lifts after the first attempt
+            if url.endswith("robots.txt") or self.calls >= 1:
+                resp = requests.Response()
+                resp.status_code = 200
+                resp._content = b"x"
+                return resp
+            return super().request(method, url, **kwargs)
+
+    session = Session()
+    resp = net.request(session, "GET", "https://wafed.invalid/a")
+    assert resp.status_code == 200
+    # the one blocked attempt waited its backoff (2 s, no Retry-After sent)
+    assert slept == [2.0]
+
+
+def test_a_nonstandard_throttle_that_outlives_the_retries_raises(monkeypatch):
+    monkeypatch.setattr(net.time, "sleep", lambda _s: None)
+    with pytest.raises(requests.exceptions.HTTPError):
+        net.request(_ThrottledSession(), "GET",
+                    "https://wafed.invalid/a", retries=2)
