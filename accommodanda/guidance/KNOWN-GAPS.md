@@ -109,6 +109,32 @@ Crawl-delay a host states, for every source, so the EBA is read at 10 seconds
 without `eba_sync` knowing about it. That raises the cost of a full EBA run from
 about 10 minutes to about 80. The `/search` Disallow is *not* enforced by that
 change; no harvester uses it, and the version dropdown makes it unnecessary.
+(The "about 80" predates the version-dropdown walk; the measured figure is ~90
+minutes of pages — see below.)
+
+**Why the run looks stuck — 2026-08-22.** The run spends all of that in one
+loop. The loop prints nothing until it ends, so a hung run looks like a normal
+one. Measured against the live site on 2026-08-22, one request costs ~12 s (10 s
+of Crawl-delay plus ~2 s of page). The whole tree is 456 pages — 1 index, 36
+ämnessidor, 289 leaves, ~130 previous versions — which is ~90 minutes of pages;
+a first run adds ~235 cover reads and comes to ~2.3 hours.
+
+`eba_sync` now reports a live line for both phases — the 36 ämnessidor, then
+the leaf queue with its `(read/queued)` counter — and stops itself on two
+checks:
+
+- `WALK_BUDGET` (4 hours) bounds the whole enumeration. It is also set as the
+  session's `deadline` — plus `DEADLINE_GRACE`, so the graceful stop wins the
+  race — and `lib/net.request` caps a single blocked fetch's timeout and its
+  backoff by it. On a trip the walk stores what it named and says how many pages
+  it left unread. It leaves `.walked.json` exactly as it found it, so the next
+  run walks the whole tree again (see below for why).
+- `MAX_QUEUED_PER_LEAF` (3) bounds the queue and raises `ValueError` past it —
+  remote data, so a raise and not an `assert`, which `-O` would remove. The
+  version dropdown is the one thing that makes the queue grow while it is being
+  walked, and it grows by whatever the EBA links there; 289 leaves named about
+  130 versions between them. A dropdown that started emitting a varying query
+  string would otherwise queue pages without bound at 12 s each.
 
 ## EBA: identity costs a download on the first run
 
@@ -118,6 +144,94 @@ states its number only on its own cover, so the first harvest downloads each
 PDF to name it. `eba_download.known_identities` keeps that from repeating: a
 leaf whose address and linked document are both unchanged is read back off the
 stored record, so a steady run fetches nothing.
+
+**And a leaf is read once — fixed 2026-08-22.** The walk re-read all 289 leaves
+and their ~130 previous versions on every run, ~90 minutes of pages that
+confirmed what cannot change. A published riktlinje is fixed: the EBA gives a
+revised wording its own number and its own leaf, and keeps the old one at
+`?version=`.
+
+`eba_download.WALKED` (`.walked.json`, beside the records) holds every leaf and
+version page already read. A steady run is the 37 index pages plus whatever is
+new — about 8 minutes, down from the ~90 minutes of pages a full walk
+reads. `--force` (`full=True`) ignores
+the memo and rebuilds it, which is how a page is looked at again. Nothing is
+pruned: a leaf the EBA takes down stops being named, and an entry no walk
+consults costs nothing.
+
+**A page is recorded only once its verdict is settled on disk**
+(`eba_download.settled_leaves`). This source keeps no watermark, so nothing else
+catches a stranded document, and there are four ways to read a page without
+harvesting it: `walk_records` counts a per-document failure and writes no
+record; `--limit N` stops after N documents; `--only` drops every other pending
+record; and a crash ends the run. A leaf whose candidate file 404'd is held back
+too — that is a riktlinje the EBA served badly this once, not a teknisk
+standard, and `carries_none` must not swallow it (rule:instrument-failures). The
+memo is written in a `finally`, so a run that stops on a spent budget or on the
+queue guard still keeps the pages it read.
+
+**Only a drained queue may add to the memo.** A page is not settled by having
+been read. A leaf's version dropdown is the only route to its previous versions,
+and the queue is FIFO — so a walk that stops early has read leaves whose version
+pages are still queued. Memoizing those leaves would skip them next run, never
+re-read their dropdowns, and strand the versions for good. Previous versions are
+what the dropdown walk was added to recover: 82 numbers, above. A truncated or
+aborted run therefore memoizes nothing and re-walks. It stops early only on the
+4-hour budget or the queue guard, and both mean something is wrong.
+
+**The trade, stated plainly.** A *new* version of a riktlinje we already hold is
+not seen until a `--force` run, because the version dropdown lives on the leaf
+page. That is not only freshness: when the EBA revises a riktlinje it moves the
+old wording to `?version=`, and with the leaf memoized the stored record never
+gets its `ersatt_av`. We keep publishing as current a wording the EBA has
+retired — the outcome the `ersatt_av` resolution in `eba_sync` exists to
+prevent.
+
+A second consequence, on our side rather than the EBA's: the "carries no EBA
+number" verdict is now permanent for the ~209 leaves that hold one. A page-shape
+bug already hid 43 riktlinjer inside that set once (the `.RelatedList` leaves,
+above), and it was found by re-reading them. After this change an equivalent bug
+— or any improvement to `parse_leaf` or `cover_number` — is invisible until
+someone runs `--force`. **Run `--force` after changing either.**
+
+Staffan accepted the trade on 2026-08-22: these are published reports, they do
+not change weekly, and `--force` is the answer when they do.
+
+**What the covers cost, before the page memo removed it.** A record exists only
+where a number was found, so the leaves naming *no* EBA number were outside
+`known_identities` and re-downloaded their candidate PDFs every run to re-learn
+that they name nothing. Measured 2026-08-22 — the 36 ämnessidor walked, then a
+random sample of 8 leaves no stored record names:
+
+| | |
+| --- | --- |
+| leaves in the single rulebook | 289 |
+| named by a stored record | 80 |
+| cover downloads per unnamed leaf | 1.1 |
+| scaled to the unnamed leaves | ~235 downloads, ~40 minutes, every run |
+
+The page memo removes all of it, because a leaf that is not read offers no
+candidates. `eba_sync` keeps a `covers` dict for the length of one run only — a
+version page links the current version's files too, so the same document is
+offered on more than one page — and persists nothing.
+
+`known_identities` globs `eba-*.json*` rather than `*.json*`, so the memo file
+in the same directory is not read as a record.
+
+## EBA: the leaf pages carry the only change signal
+
+Checked on 2026-08-22, which is why the memo above is the fix rather than a
+conditional request. There is no cheap way to ask the EBA what moved:
+
+| signal | result |
+| --- | --- |
+| `sitemap.xml` | 404 |
+| `Last-Modified` / `ETag` on a leaf | absent; `Cache-Control: must-revalidate, no-cache, private` |
+| the ämnessida's own listing | title and status per leaf, no date and no document link |
+
+A conditional GET would not help even if the EBA served validators: the cost is
+the `Crawl-delay: 10`, not the transfer, so a 304 costs what a 200 costs. A
+request measured ~12 s.
 
 ## Scope: two series plus the endorsed WP29 set
 

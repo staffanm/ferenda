@@ -10,10 +10,12 @@ exercised against what the EDPB actually publishes without network or poppler.
 
 import io
 import json
+import types
 import zipfile
 from pathlib import Path
 
 import pytest
+import requests
 from bs4 import BeautifulSoup
 from lxml import etree
 
@@ -2040,13 +2042,15 @@ def test_eba_sync_stores_a_previous_version_as_its_own_document(
     }
     monkeypatch.setattr(eba_download, "_fetch",
                         lambda _s, url, _d: pages[url])
-    monkeypatch.setattr(eba_download, "make_session", lambda _ua: None)
+    # a stand-in the walk can hang its `deadline` on, the way a real session does
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
     monkeypatch.setattr(eba_download, "_document_fetcher",
                         lambda _s, _url: (lambda: b"%PDF-1.4 x"))
     eba_download.eba_sync(tmp_path, delay=0)
 
     stored = {compress.read_json(p)["nummer"]: compress.read_json(p)
-              for p in (tmp_path / "eba").glob("*.json*")}
+              for p in (tmp_path / "eba").glob("eba-*.json*")}
     assert set(stored) == {"2026/05", "2016/07"}, \
         "the previous version is not stored as a document of its own"
     # the superseded wording names its successor, and never itself
@@ -2056,3 +2060,197 @@ def test_eba_sync_stores_a_previous_version_as_its_own_document(
     assert old["ersatt_av_identifier"] == "EBA/GL/2026/05"
     # ... and the current one is not marked as replaced by anything
     assert stored["2026/05"]["ersatt_av"] is None
+
+
+def test_eba_sync_stops_when_the_walk_outruns_its_budget(tmp_path, monkeypatch):
+    """A single-rulebook walk still running past `WALK_BUDGET` is stuck rather
+    than slow. It stops between pages, stores what it named and leaves the rest
+    for the next run -- 289 leaves at the EBA's own `Crawl-delay: 10` must not
+    be able to grind on unbounded."""
+    topic = "/regulation-and-policy/cr"
+    leaves = [topic.replace("/regulation-and-policy",
+                            "/activities/single-rulebook/regulatory-activities")
+              + "/gl-" + name for name in ("aaa", "zzz")]
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"%s"' % topic,
+        eba_download.BASE + topic: " ".join('"%s"' % leaf for leaf in leaves),
+        **{eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines %s" % leaf, [],
+            [("sv", "/x/Guidelines%%20%%28EBA-GL-201%d-01%%29_SV.pdf" % n)])
+           for n, leaf in enumerate(leaves)},
+    }
+    # a clock driven by the fetches, so the budget is spent by pages read and
+    # not by however many times the progress line asks the time: the index and
+    # its one ämnessida cost 2000 s, the first leaf another 1000, and the walk
+    # is then over its 2500 s budget with the second leaf still queued
+    clock = {"t": 0.0}
+
+    def fetch(_session, url, _delay):
+        clock["t"] += 1000.0
+        return pages[url]
+
+    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(eba_download, "WALK_BUDGET", 2500.0)
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    eba_download.eba_sync(tmp_path, delay=0)
+
+    stored = sorted(compress.read_json(p)["nummer"]
+                    for p in (tmp_path / "eba").glob("eba-*.json*"))
+    assert stored == ["2010/01"], \
+        "the trip must keep the leaf it read and drop only the unwalked rest"
+    # ... and it must remember nothing. A leaf's version dropdown is the only
+    # route to its previous versions, so a leaf memoized while pages it named
+    # are still queued would strand those versions for good.
+    assert eba_download.read_walked(tmp_path) == set(), \
+        "a truncated walk memoized the pages it read"
+
+
+def test_eba_sync_reads_each_leaf_page_once(tmp_path, monkeypatch):
+    """A published riktlinje is fixed -- the EBA gives a revised wording its own
+    number and its own leaf -- so re-reading all 289 leaves every run cost about
+    95 minutes at the host's Crawl-delay and bought nothing. A page read once is
+    not read again, and ``--force`` is what looks at it afresh."""
+    leaf = "/activities/single-rulebook/regulatory-activities/cr/gl-default"
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"/regulation-and-policy/cr"',
+        eba_download.BASE + "/regulation-and-policy/cr": '"%s"' % leaf,
+        eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines on the definition of default", [],
+            [("sv", "/x/Guidelines%20%28EBA-GL-2016-07%29_SV.pdf")]),
+    }
+    read = []
+
+    def fetch(_session, url, _delay):
+        read.append(url)
+        return pages[url]
+
+    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+
+    eba_download.eba_sync(tmp_path, delay=0)
+    assert eba_download.BASE + leaf in read
+
+    read.clear()
+    eba_download.eba_sync(tmp_path, delay=0)
+    assert read == [eba_download.SINGLE_RULEBOOK,
+                    eba_download.BASE + "/regulation-and-policy/cr"], \
+        "the second run re-read a leaf page it had already read"
+
+    read.clear()
+    eba_download.eba_sync(tmp_path, full=True, delay=0)
+    assert eba_download.BASE + leaf in read, "--force must re-read the leaf"
+
+
+def test_eba_sync_does_not_remember_a_leaf_whose_document_failed_to_store(
+        tmp_path, monkeypatch):
+    """The memo is what a *stored* document looks like from the outside, so a
+    leaf whose PDF did not store must be read again. `walk_records` counts a
+    per-document failure and leaves the record unwritten, and this source keeps
+    no watermark to catch it -- memoizing the leaf would strand the document for
+    good."""
+    leaf = "/activities/single-rulebook/regulatory-activities/cr/gl-default"
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"/regulation-and-policy/cr"',
+        eba_download.BASE + "/regulation-and-policy/cr": '"%s"' % leaf,
+        eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines on the definition of default", [],
+            [("sv", "/x/Guidelines%20%28EBA-GL-2016-07%29_SV.pdf")]),
+    }
+    read = []
+
+    def fetch(_session, url, _delay):
+        read.append(url)
+        return pages[url]
+
+    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
+    # the EBA serves an error page under the .pdf address: walk_records' verify
+    # rejects it, counts the error and writes no record
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"<html>error</html>"))
+    eba_download.eba_sync(tmp_path, delay=0)
+    assert not list((tmp_path / "eba").glob("eba-*.json*"))
+
+    read.clear()
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    eba_download.eba_sync(tmp_path, delay=0)
+    assert eba_download.BASE + leaf in read, \
+        "the leaf was memoized although its document never stored"
+    assert [compress.read_json(p)["nummer"]
+            for p in (tmp_path / "eba").glob("eba-*.json*")] == ["2016/07"]
+
+
+def test_eba_sync_does_not_remember_a_leaf_whose_candidate_file_vanished(
+        tmp_path, monkeypatch):
+    """A leaf falls to `carries_none` when no candidate cover names a number --
+    but also when the candidate's file was not there to read. The second is a
+    riktlinje the EBA served badly this once, not a teknisk standard, so it is
+    read again rather than dropped from the corpus for good."""
+    leaf = "/activities/single-rulebook/regulatory-activities/cr/gl-gone"
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"/regulation-and-policy/cr"',
+        eba_download.BASE + "/regulation-and-policy/cr": '"%s"' % leaf,
+        # a uuid path: the number is not in the file name, so only the cover
+        # can answer -- and the file is not there
+        eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines on something", [], [("sv", "/f/8b1c/gl.pdf")]),
+    }
+    read = []
+
+    def fetch(_session, url, _delay):
+        read.append(url)
+        return pages[url]
+
+    def gone(_session, _url):
+        def fetch_document():
+            raise requests.HTTPError("404 Not Found")
+        return fetch_document
+
+    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
+    monkeypatch.setattr(eba_download, "_document_fetcher", gone)
+
+    eba_download.eba_sync(tmp_path, delay=0)
+    read.clear()
+    eba_download.eba_sync(tmp_path, delay=0)
+    assert eba_download.BASE + leaf in read, \
+        "a leaf whose file 404'd was memoized as carrying no number"
+
+
+def test_eba_sync_does_not_remember_the_leaves_a_limit_left_unfetched(
+        tmp_path, monkeypatch):
+    """``--limit`` caps the documents stored, not the pages read. The pages it
+    walked past are not harvested, so they are not remembered either."""
+    topic = "/regulation-and-policy/cr"
+    leaves = ["/activities/single-rulebook/regulatory-activities/cr/gl-%s" % n
+              for n in ("aaa", "zzz")]
+    pages = {
+        eba_download.SINGLE_RULEBOOK: '"%s"' % topic,
+        eba_download.BASE + topic: " ".join('"%s"' % leaf for leaf in leaves),
+        **{eba_download.BASE + leaf: _eba_leaf(
+            "Guidelines %s" % leaf, [],
+            [("sv", "/x/Guidelines%%20%%28EBA-GL-201%d-01%%29_SV.pdf" % n)])
+           for n, leaf in enumerate(leaves)},
+    }
+    monkeypatch.setattr(eba_download, "_fetch", lambda _s, url, _d: pages[url])
+    monkeypatch.setattr(eba_download, "make_session",
+                        lambda _ua: types.SimpleNamespace())
+    monkeypatch.setattr(eba_download, "_document_fetcher",
+                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+
+    eba_download.eba_sync(tmp_path, limit=1, delay=0)
+    stored = sorted(compress.read_json(p)["nummer"]
+                    for p in (tmp_path / "eba").glob("eba-*.json*"))
+    assert stored == ["2010/01"]
+    assert eba_download.read_walked(tmp_path) == {eba_download.BASE + leaves[0]}, \
+        "the leaf the limit left unfetched was remembered as read"

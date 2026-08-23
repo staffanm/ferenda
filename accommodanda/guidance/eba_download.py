@@ -41,14 +41,18 @@ never the file name, whose language suffix the EBA spells inconsistently
 translation yet, and is published here in English with the record saying so, the
 way `edpb_download` does for an untranslated EDPB riktlinje.
 
-Neither level paginates and the whole corpus is enumerable in 37 requests plus
-one per leaf, so the EDPB/JK/ARN idiom applies: one walk per run, fetching what
-is new or changed, no watermark.
+Neither level paginates, so there is no watermark and no depth to stop short of.
+The whole tree is 37 index pages, the 289 leaves and the ~130 previous versions
+they name -- and at the EBA's own ``Crawl-delay: 10`` that is hours. A published
+riktlinje is fixed, so `WALKED` remembers every page read and a steady run reads
+the 37 index pages plus whatever is new. ``--force`` looks at all of it again.
 
-Stored per document under ``site/data/downloaded/guidance/eba/``: an
-``eba-<serie>-<slug>.json`` record and the ``.pdf`` document.
+Stored under ``site/data/downloaded/guidance/eba/``: an
+``eba-<serie>-<slug>.json`` record and the ``.pdf`` document per document, plus
+the one ``.walked.json`` memo for the whole source.
 """
 
+import json
 import re
 import tempfile
 import time
@@ -60,13 +64,21 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress
 from ..lib.harvest import (
+    pdf_path,
     select_pending,
     walk_records,
 )
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import make_session, request, set_deadline
 from ..lib.pdftext import pdf_first_page_text
-from ..lib.util import document_extension, href, normalize_space
+from ..lib.util import (
+    Reporter,
+    document_extension,
+    href,
+    normalize_space,
+    record_path,
+    write_atomic,
+)
 from .issuers import EBA
 from .model import vagledning_identifier, vagledning_uri
 
@@ -223,17 +235,69 @@ def known_identities(root):
     What makes re-reading a cover unnecessary on a steady run: a leaf whose
     address and whose linked document are both unchanged is the document we
     already named, so its number is taken from the record rather than from a
-    fresh download."""
+    fresh download.
+
+    ``eba-*.json*`` and not ``*.json*``: `WALKED` sits in the same directory and
+    is not a record."""
     directory = Path(root) / EBA.kod
     if not directory.exists():
         return {}
     known = {}
-    for path in sorted(directory.glob("*.json*")):
+    for path in sorted(directory.glob("eba-*.json*")):
         record = compress.read_json(path)
         if record.get("source_url"):
             known[record["source_url"]] = (record["serie"], record["nummer"],
                                            record.get("dokument_url"))
     return known
+
+
+# Every leaf and version page this harvest has read, stored beside the records.
+#
+# **A published riktlinje is fixed.** The EBA gives a revised wording its own
+# number and its own leaf and keeps the old one at ``?version=``, so a page that
+# has been read has nothing more to say. Re-reading all 289 leaves and their
+# ~130 previous versions cost about 90 minutes a run at the host's
+# ``Crawl-delay: 10`` and bought nothing. ``--force`` ignores the memo and
+# rebuilds it, which is how a page is looked at again.
+#
+# A page is added only once its verdict is *settled on disk* -- see
+# `settled_leaves`. Recording a page as read while its document failed to store
+# would strand the document forever, which is the failure `lib.harvest`'s
+# watermark exists to prevent and which this source has no watermark to catch.
+WALKED = ".walked.json"
+
+
+def read_walked(root, full=False):
+    """The pages already read, empty on a ``--force`` run."""
+    path = Path(root) / EBA.kod / WALKED
+    memo = {} if full or not path.exists() else json.loads(path.read_text())
+    return set(memo.get("leaves", ()))
+
+
+def write_walked(root, leaves):
+    write_atomic(Path(root) / EBA.kod / WALKED,
+                 json.dumps({"leaves": sorted(leaves)}, indent=1))
+
+
+def settled_leaves(root, final, documented):
+    """The pages it is safe to record as read.
+
+    `final` names the pages whose verdict needs no document: the leaf carries no
+    EBA number, so there is nothing to store and nothing to retry. `documented`
+    maps a page to the basefile it produced, and one of those is settled only
+    once that record and its PDF are actually on disk.
+
+    That test is what keeps the memo honest. `walk_records` counts a per-document
+    failure and leaves the record unwritten, ``--limit`` stops after N documents
+    and ``--only`` drops every other pending record -- and every one of those
+    leaves a page read but not harvested. Memoizing it would skip that page on
+    every future run.
+
+    The caller applies this only to a walk whose queue drained -- see
+    `eba_sync`."""
+    return final | {url for url, bf in documented.items()
+                    if compress.exists(record_path(root, EBA.kod, bf))
+                    and compress.exists(pdf_path(root, bf))}
 
 
 # what a leaf lists *beside* the riktlinje, named by its own link text. The
@@ -349,6 +413,34 @@ def _fetch(session, url, delay):
     return text
 
 
+# What the single-rulebook walk may cost before it is stuck rather than slow.
+# The EBA's robots.txt asks 10 seconds between requests and its pages take about
+# two more, so a request costs ~12 s (measured 2026-08-22). A steady run reads
+# the 37 index pages and whatever `WALKED` has not seen, so it is minutes; only
+# a first or `--force` run pays the whole 289 leaves, their ~130 previous
+# versions and ~235 cover reads, which comes to about 2.3 hours.
+#
+# The budget is well above that. It exists to end a run that has stopped making
+# progress, not to cap a legitimate backfill.
+WALK_BUDGET = 4 * 3600.0
+
+# The session deadline is armed this much *after* the walk's own budget, so the
+# graceful stop wins the race. Both bound the same run: the loop check breaks
+# between pages and stores what it named, while `lib.net.request` raises
+# `BudgetExceeded` from inside a fetch -- which is not a `requests.HTTPError`,
+# so the candidate loop does not catch it and the run aborts before
+# `walk_records` with every pending record lost. Armed at the same instant the
+# two are a coin flip. The deadline is still what bounds one blocked fetch.
+DEADLINE_GRACE = 300.0
+
+# The version dropdown is the one thing that makes the queue grow while it is
+# being walked, and it grows by whatever the EBA links there. A leaf has a
+# handful of previous versions; 289 leaves named about 130 between them. A walk
+# that has queued more than this per leaf is following something that is not a
+# version list, and every page it reads costs ten seconds.
+MAX_QUEUED_PER_LEAF = 3
+
+
 def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Harvest the EBA's numbered guidance off the single-rulebook tree.
 
@@ -365,121 +457,229 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
     must not look alike in a run's output (rule:instrument-failures)."""
     session = make_session(USER_AGENT)
     known = known_identities(root)
-    topics = topic_pages(_fetch(session, SINGLE_RULEBOOK, delay))
-    leaves = {url for topic in topics
-              for url in leaf_pages(_fetch(session, topic, delay))}
-    pending, carries_none, fetched, dead, versions = [], 0, 0, 0, 0
-    per_serie = dict.fromkeys(EBA.koder, 0)
-    # a queue, not a loop over `leaves`: a leaf names its own previous versions
-    # and each of those is a document of its own. Every version page names every
-    # other, so `queued` -- which no page is ever added to twice -- is what
-    # stops the walk going round in circles.
-    queue = sorted(leaves)
-    queued = set(queue)
-    # {version url: the leaf whose current version supersedes it}
-    superseded_by = {}
-    while queue:
-        url = queue.pop(0)
-        page = _fetch(session, url, delay)
-        for other in version_pages(page, url):
-            # the current version is the one at the bare path; everything with
-            # a ?version= is a wording the EBA has since replaced
-            if "?version=" in other:
-                superseded_by[other] = url.split("?")[0]
-            # against `queued`, not `seen`: every version page names every
-            # other, so a page already waiting in the queue would be added
-            # again -- and counted again -- once per sibling that names it
-            if other not in queued:
-                versions += 1
-                queued.add(other)
-                queue.append(other)
-        fields = parse_leaf(page, url)
-        chosen = None
-        for sprak, document in fields["candidates"]:
-            # the record already names this exact file: no download needed
-            if known.get(url, (None, None, None))[2] == document:
-                chosen = (*known[url][:2], sprak, document, None)
+    walked = read_walked(root, full)
+    # a leaf whose verdict needs no document (it carries no EBA number), and
+    # {leaf url: basefile} for one that produced a record. `settled_leaves` turns
+    # the two into what the memo may record -- not before `walk_records` has run.
+    final, documented = set(), {}
+    # within this run only: a version page links the current version's files too,
+    # so the same document is offered on more than one page and its cover is
+    # read once. Not persisted -- the page memo above already removes the cost
+    # this would have carried between runs.
+    covers = {}
+    try:
+        started = time.monotonic()
+        # the deadline bounds one blocked fetch -- `lib.net.request` caps both its
+        # timeout and its backoff sleeps by it -- while the budget check in the
+        # queue below stops the walk cleanly between pages. `DEADLINE_GRACE` is
+        # what lets the graceful stop go first. Cleared before `walk_records`,
+        # whose cost is bounded by the list it is handed.
+        set_deadline(session, started + WALK_BUDGET + DEADLINE_GRACE)
+        rep = Reporter()
+        topics = topic_pages(_fetch(session, SINGLE_RULEBOOK, delay))
+        leaves = set()
+        # reported page by page: 36 ämnessidor at the EBA's Crawl-delay is six
+        # minutes, and a first run's walk below is hours. A run that prints nothing
+        # until it ends cannot be told from one that has stopped.
+        for read, topic in enumerate(topics, 1):
+            leaves.update(leaf_pages(_fetch(session, topic, delay)))
+            rep.update(read, len(topics), scope="eba ämnessidor", leaves=len(leaves))
+        rep.done()
+        pending, carries_none, fetched, dead, versions = [], 0, 0, 0, 0
+        per_serie = dict.fromkeys(EBA.koder, 0)
+        # a queue, not a loop over `leaves`: a leaf names its own previous versions
+        # and each of those is a document of its own. Every version page names every
+        # other, so `queued` -- which no page is ever added to twice -- is what
+        # stops the walk going round in circles.
+        queue = sorted(leaves - walked)
+        queued = set(queue)
+        skipped = len(leaves) - len(queue)
+        # {version url: the leaf whose current version supersedes it}
+        superseded_by = {}
+        truncated = drained = False
+        while queue:
+            if time.monotonic() - started > WALK_BUDGET:
+                # not slow any more: stuck. Store what the walk did name; the
+                # memo is left alone, so the next run walks the whole tree again
+                # (see the `finally` for why an early stop memoizes nothing).
+                truncated = True
+                rep.done()
+                print("eba: sanity trip -- the single-rulebook walk is still "
+                      "running after %.0f minutes, %d of %d pages read; stopping "
+                      "and storing what it named, and leaving the memo unchanged "
+                      "so the next run re-walks"
+                      % (WALK_BUDGET / 60, len(queued) - len(queue), len(queued)),
+                      flush=True)
                 break
-            # the number is in most translations' own file name, which answers
-            # for free what a cover download pays for -- and answers it for the
-            # *chosen* document, where a page-wide match on a version page
-            # would read a superseded document as its own successor
-            named = href_identity(document)
-            if named is not None:
-                chosen = (*named, sprak, document, None)
-                break
-            try:
-                body = _document_fetcher(session, document)()
-            except requests.HTTPError:
-                # a candidate that is not there is not the document -- the older
-                # leaves link consultation responses that the EBA has since
-                # removed, and the next candidate is the one to try. A 404 on
-                # the *chosen* document still raises, in `walk_records`
-                # (rule:no-catch-log-continue: the cause is known and the
-                # recovery is defined, not a log-and-hope)
-                dead += 1
+            url = queue.pop(0)
+            page = _fetch(session, url, delay)
+            for other in version_pages(page, url):
+                # the current version is the one at the bare path; everything with
+                # a ?version= is a wording the EBA has since replaced
+                if "?version=" in other:
+                    superseded_by[other] = url.split("?")[0]
+                # against `queued`, not `seen`: every version page names every
+                # other, so a page already waiting in the queue would be added
+                # again -- and counted again -- once per sibling that names it
+                if other not in queued and other not in walked:
+                    versions += 1
+                    queued.add(other)
+                    queue.append(other)
+            if len(queued) > len(leaves) * MAX_QUEUED_PER_LEAF:
+                # remote data, so a raise and not an assert: `-O` must not remove the
+                # one guard on a dropdown that has started naming pages without end
+                # (rule:errors-drive-retry-use-raise)
+                raise ValueError(
+                    "the version dropdowns have queued %d pages for %d leaves -- "
+                    "that is not a version list, and every page costs ten seconds"
+                    % (len(queued), len(leaves)))
+            fields = parse_leaf(page, url)
+            chosen, vanished = None, False
+            for sprak, document in fields["candidates"]:
+                # the record already names this exact file: no download needed
+                if known.get(url, (None, None, None))[2] == document:
+                    chosen = (*known[url][:2], sprak, document, None)
+                    break
+                # the number is in most translations' own file name, which answers
+                # for free what a cover download pays for -- and answers it for the
+                # *chosen* document, where a page-wide match on a version page
+                # would read a superseded document as its own successor
+                named = href_identity(document)
+                if named is not None:
+                    chosen = (*named, sprak, document, None)
+                    break
+                if document in covers:
+                    # already read on another page of this run: a version page
+                    # links the current version's files too
+                    read_before = covers[document]
+                    if read_before is None:
+                        continue
+                    chosen = (*read_before, sprak, document, None)
+                    break
+                try:
+                    body = _document_fetcher(session, document)()
+                except requests.HTTPError:
+                    # a candidate that is not there is not the document -- the older
+                    # leaves link consultation responses that the EBA has since
+                    # removed, and the next candidate is the one to try. A 404 on
+                    # the *chosen* document still raises, in `walk_records`
+                    # (rule:no-catch-log-continue: the cause is known and the
+                    # recovery is defined, not a log-and-hope)
+                    dead += 1
+                    vanished = True
+                    time.sleep(delay)
+                    continue
+                fetched += 1
                 time.sleep(delay)
+                identity = cover_identity(body)
+                covers[document] = identity
+                if identity:
+                    chosen = (*identity, sprak, document, body)
+                    break
+            if chosen is None:
+                # no candidate's cover names an EBA/GL or EBA/REC number. The leaf is
+                # a document type this source does not carry -- a teknisk standard, a
+                # report, a consultation paper -- and *not* a guideline whose file
+                # went missing, which is what makes this a count rather than a raise
+                carries_none += 1
+                # ... unless a candidate's file was not there at all. That leaf may
+                # well be a riktlinje whose PDF the EBA served badly this once, and
+                # memoizing it would drop it from the corpus for good.
+                if not vanished:
+                    final.add(url)
+            else:
+                serie, nummer, sprak, document, body = chosen
+                per_serie[serie] += 1
+                documented[url] = basefile(serie, nummer)
+                pending.append(({
+                    "basefile": basefile(serie, nummer), "utgivare": EBA.kod,
+                    "serie": serie, "nummer": nummer,
+                    "sprak": sprak, "titel": fields["titel"],
+                    "antagen": fields["antagen"], "version": fields["status"],
+                    "konsultation_url": None, "amnesord": [],
+                    "source_url": url, "dokument_url": document,
+                    "ersatt_av": superseded_by.get(url),
+                    "ersatt_av_identifier": None, "ersatt_av_url": None,
+                }, (lambda got=body: got) if body is not None
+                    else _document_fetcher(session, document)))
+            # a first run is hours of requests and prints nothing of its own until
+            # it ends. `queued` grows as the version dropdowns are read, so the
+            # total rises while the counter runs.
+            rep.update(len(queued) - len(queue), len(queued), scope=EBA.kod,
+                       numrerade=sum(per_serie.values()), onumrerade=carries_none,
+                       omslag=fetched)
+        # the queue is empty, so every page the tree names has been read -- and
+        # with it every version dropdown. That is the condition the memo needs;
+        # see the `finally` below.
+        drained = not truncated
+        # a superseded version names its successor by *url* while the walk runs,
+        # because the successor's own number is not known until its page is read.
+        # Now that every page has been, the urls resolve to addresses.
+        named = {record["source_url"]:
+                 (vagledning_uri(EBA.kod, record["serie"], record["nummer"]),
+                  vagledning_identifier(EBA.kod, record["serie"],
+                                        record["nummer"], None))
+                 for record, _fetch_document in pending}
+        replaced = unnamed = 0
+        for record, _fetch_document in pending:
+            if not record["ersatt_av"]:
                 continue
-            fetched += 1
-            time.sleep(delay)
-            identity = cover_identity(body)
-            if identity:
-                chosen = (*identity, sprak, document, body)
-                break
-        if chosen is None:
-            # no candidate's cover names an EBA/GL or EBA/REC number. The leaf is
-            # a document type this source does not carry -- a teknisk standard, a
-            # report, a consultation paper -- and *not* a guideline whose file
-            # went missing, which is what makes this a count rather than a raise
-            carries_none += 1
-            continue
-        serie, nummer, sprak, document, body = chosen
-        per_serie[serie] += 1
-        pending.append(({
-            "basefile": basefile(serie, nummer), "utgivare": EBA.kod,
-            "serie": serie, "nummer": nummer,
-            "sprak": sprak, "titel": fields["titel"],
-            "antagen": fields["antagen"], "version": fields["status"],
-            "konsultation_url": None, "amnesord": [],
-            "source_url": url, "dokument_url": document,
-            "ersatt_av": superseded_by.get(url),
-            "ersatt_av_identifier": None, "ersatt_av_url": None,
-        }, (lambda got=body: got) if body is not None
-            else _document_fetcher(session, document)))
-    # a superseded version names its successor by *url* while the walk runs,
-    # because the successor's own number is not known until its page is read.
-    # Now that every page has been, the urls resolve to addresses.
-    named = {record["source_url"]:
-             (vagledning_uri(EBA.kod, record["serie"], record["nummer"]),
-              vagledning_identifier(EBA.kod, record["serie"],
-                                    record["nummer"], None))
-             for record, _fetch_document in pending}
-    replaced = unnamed = 0
-    for record, _fetch_document in pending:
-        if not record["ersatt_av"]:
-            continue
-        # what the EBA links as the current version of this leaf, kept whatever
-        # became of it: the body files this wording as a *previous* version, so
-        # it is superseded even where the successor named no number or its file
-        # 404'd. Dropping the relation there would publish a wording the body
-        # itself retired as current law.
-        record["ersatt_av_url"] = record["ersatt_av"]
-        successor = named.get(record["ersatt_av"])
-        unnamed += successor is None
-        record["ersatt_av"], record["ersatt_av_identifier"] = \
-            successor or (None, None)
-        replaced += 1
-    print("eba: %d ämnessidor, %d leaves + %d previous versions -> %s, "
-          "%d carrying no EBA number, %d covers read, %d dead candidate files"
-          % (len(topics), len(leaves), versions,
-             ", ".join("%d %s" % (n, kod) for kod, n in per_serie.items()),
-             carries_none, fetched, dead))
-    print("eba: %d superseded by a later version of the same riktlinje"
-          " (%d whose successor this run could not name)" % (replaced, unnamed))
-    return walk_records(
-        root, select_pending(pending, only,
-                             "the EBA single rulebook carries no document %s"),
-        delay=delay, full=full, limit=limit, scope=EBA.kod)
+            # what the EBA links as the current version of this leaf, kept whatever
+            # became of it: the body files this wording as a *previous* version, so
+            # it is superseded even where the successor named no number or its file
+            # 404'd. Dropping the relation there would publish a wording the body
+            # itself retired as current law.
+            record["ersatt_av_url"] = record["ersatt_av"]
+            successor = named.get(record["ersatt_av"])
+            unnamed += successor is None
+            record["ersatt_av"], record["ersatt_av_identifier"] = \
+                successor or (None, None)
+            replaced += 1
+        rep.done()
+        # the enumeration's budget is spent; `walk_records` fetches from a list that
+        # is already fixed, so it is bounded by its own length rather than by a clock
+        set_deadline(session, None)
+        print("eba: %d ämnessidor, %d of the %d leaves were already read; this run "
+              "walked %d pages -> %s, %d carrying no EBA number, %d previous "
+              "versions found, %d covers read, %d dead candidate files%s"
+              % (len(topics), skipped, len(leaves), len(queued) - len(queue),
+                 ", ".join("%d %s" % (n, kod) for kod, n in per_serie.items()),
+                 carries_none, versions, fetched, dead,
+                 " (walk truncated: %d pages unread)" % len(queue) if truncated
+                 else ""))
+        print("eba: %d superseded by a later version of the same riktlinje"
+              " (%d whose successor this run could not name)" % (replaced, unnamed))
+        return walk_records(
+            root, select_pending(pending, only,
+                                 "the EBA single rulebook carries no document %s"),
+            delay=delay, full=full, limit=limit, scope=EBA.kod)
+    finally:
+        # Only a walk whose queue drained may add to the memo, and only after
+        # `walk_records` has stored the documents.
+        #
+        # A page is not settled by having been read. A leaf's version dropdown is
+        # the *only* route to its previous versions, and the queue is FIFO -- so
+        # a walk that stops early has read leaves whose version pages are still
+        # in `queue`. Memoizing those leaves would skip them next run, never
+        # re-read their dropdowns, and strand the versions for good. Previous
+        # versions are what the dropdown walk was added to recover: 82 numbers
+        # (`KNOWN-GAPS.md`).
+        #
+        # So a truncated or aborted run leaves the memo exactly as it found it
+        # and re-walks next time. That is the right trade: the walk stops early
+        # only on the 4-hour budget or the queue guard, both of which mean
+        # something is wrong. `settled_leaves` then keeps out any page whose
+        # document did not store. Never pruned: a leaf the EBA takes down stops
+        # being named, and an entry no walk consults costs nothing.
+        if drained:
+            walked |= settled_leaves(root, final, documented)
+            write_walked(root, walked)
+            print("eba: %s remembers %d pages; --force looks at them again"
+                  % (WALKED, len(walked)), flush=True)
+        else:
+            print("eba: the walk did not finish, so %s is unchanged -- a page it "
+                  "read may have named a version page it never reached"
+                  % WALKED, flush=True)
 
 
 def _document_fetcher(session, url):
