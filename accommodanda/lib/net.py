@@ -264,6 +264,21 @@ def make_session(user_agent: str) -> requests.Session:
     return session
 
 
+def set_deadline(session: requests.Session | httpx.Client,
+                 when: float | None) -> None:
+    """Give `session` the wall-clock bound :func:`request` honours -- a
+    ``time.monotonic()`` timestamp past which no attempt starts, a running
+    attempt's timeout is capped to the time left, and a backoff sleep never
+    outlives it. `None` clears it.
+
+    A setter of its own because `deadline` is an attribute neither transport
+    declares: `request` reads it back with ``getattr(session, "deadline",
+    None)``. Writing it in one named place puts the one unchecked assignment
+    here, under a suppression that says why, instead of in every harvest that
+    arms a budget."""
+    session.deadline = when  # ty: ignore[invalid-assignment] — an extra neither transport type declares
+
+
 def make_http2_session(user_agent: str) -> httpx.Client:
     """An HTTP/2-capable client for a host that refuses HTTP/1.1. Konkurrensverket
     sits behind a Cloudflare front that 403s every HTTP/1.1 request and only serves

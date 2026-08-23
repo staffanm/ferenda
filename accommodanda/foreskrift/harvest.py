@@ -43,7 +43,13 @@ from ..lib import compress
 from ..lib.browser import DetachedChrome
 from ..lib.harvest import HarvestWatermark, ItemKey, Skip, walk, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import is_not_found, make_http2_session, make_session, request
+from ..lib.net import (
+    is_not_found,
+    make_http2_session,
+    make_session,
+    request,
+    set_deadline,
+)
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
 
@@ -624,7 +630,7 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
     # harvest short); the deadline bounds a single blocked fetch, the walk
     # budget stops the loop cleanly between items
     if only is None and not full and watermark.last_harvest is not None:
-        session.deadline = time.monotonic() + INCREMENTAL_BUDGET
+        set_deadline(session, time.monotonic() + INCREMENTAL_BUDGET)
 
     def item_key(ref):
         # basefile is always "<fs>/<year>:<lopnummer>" (built by ref, above, off
