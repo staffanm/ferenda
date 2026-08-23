@@ -117,6 +117,9 @@ from .icj import render as icj_render
 from .icrc import download as icrc_download
 from .icrc import parse as icrc_parse
 from .icrc import render as icrc_render
+from .lawreview import download as lawreview_download
+from .lawreview import journals as lawreview_journals
+from .lawreview import parse as lawreview_parse
 from .lib import (
     annstore,
     casenaming,
@@ -126,6 +129,7 @@ from .lib import (
     dump,
     errorlog,
     eu_structure,
+    harvest,
     labels,
     layout,
     llm,
@@ -992,7 +996,7 @@ CITATION_DATA = (PKG / "hudoc" / "data" / "casenames.json",
                  PKG / "avg" / "data" / "arsberattelse.json")
 # The case-number matcher and its snapshot, on the recipes of the sources that
 # can actually request MALNUMMER (`lagrum.ALL_PARSE_TYPES`: dv, forarbete, avg,
-# rs, wiki). Kept out of CITATION_DATA because the sfs/eurlex/foreskrift/
+# rs, lawreview, wiki). Kept out of CITATION_DATA because the sfs/eurlex/foreskrift/
 # guidance parsers never ask for that parse type, and listing it there would
 # reparse those four corpora in full every time `lagen dv casenumbers` rewrites
 # the snapshot, for output that cannot change.
@@ -3290,6 +3294,93 @@ SOURCES["guidance"] = Source("guidance", guidance_list, {
           "--force, each costing a 10-28 MB language ZIP")
 
 
+# --------------------------------------------------------------------------
+# lawreview source (tidskriftsartiklar -- see lawreview/journals.py)
+# --------------------------------------------------------------------------
+
+LAWREVIEW_CODE = (PKG / "lawreview" / "parse.py", PKG / "lawreview" / "model.py",
+                  PKG / "lawreview" / "journals.py",
+                  PKG / "lawreview" / "download.py",
+                  PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                  PKG / "lib" / "emdref.py", *CASENUMBER_CODE,
+                  *CITATION_DATA,
+                  PKG / "lib" / "artifact.py")
+
+
+def lawreview_list():
+    # one directory per journal under the shared root; the basefile leads
+    # with the journal, so listing per journal gives the whole source
+    return sorted(bf for journal in lawreview_journals.JOURNALS
+                  for bf in compress.list_basefiles(
+                      layout.LAWREVIEW_DOWNLOADED, journal.kod))
+
+
+def lawreview_inputs(basefile):
+    """The record JSON plus the document -- re-downloading either re-stales the
+    parse. The svjt document is the article's own page; the jp document is the
+    issue's PDF, and its record's listing-page metadata is the only text the
+    harvest could not take from the PDF itself."""
+    journal = basefile.split("/", 1)[0]
+    record = util.record_path(layout.LAWREVIEW_DOWNLOADED, journal, basefile)
+    if lawreview_journals.BY_KOD[journal].html_document:
+        content = [harvest.page_path(layout.LAWREVIEW_DOWNLOADED, basefile)]
+    else:
+        content = [harvest.pdf_path(layout.LAWREVIEW_DOWNLOADED, basefile)]
+    return [record, *content] + _patch_input("lawreview", basefile)
+
+
+def lawreview_harvest(scopes):
+    """Bulk harvest of the two journals (scopes = journal codes; empty =
+    both). `--force` refetches every document; `--only svjt/2026-104` or
+    `--only jp/2025-01-01` fetches a single article (needs its journal
+    scope)."""
+    _require_single_scope("lawreview", scopes, "journal",
+                          "lagen lawreview download svjt --only svjt/2026-104")
+    if RUN.dry_run:
+        print("lawreview download: would download %s into %s"
+              % (RUN.only or ", ".join(scopes)
+                 or "+".join(lawreview_download.SCOPES),
+                 layout.LAWREVIEW_DOWNLOADED))
+        return
+    # two journals, two hosts: fan them out the way guidance/rs/avg do
+    totals = lawreview_download.sync(layout.LAWREVIEW_DOWNLOADED,
+                                     scopes=scopes or None,
+                                     full=RUN.force, only=RUN.only,
+                                     limit=RUN.limit, jobs=RUN.jobs)
+    for scope, (seen, new) in totals.items():
+        print("lawreview %s: %d seen, %d new" % (scope, seen, new))
+    return _sum_scope_totals(totals)
+
+
+# No per-document download stage (the foreskrift/avg/rs rule): the articles
+# arrive only through the bulk `lawreview_harvest` sweep, so parse runs over
+# whatever is on disk; relate/index/dump act on the artifacts by source name.
+# The articles are not published (no renderer, no browse tree, unsearched):
+# the catalog rows exist so the citation scan of their full text feeds the
+# "Artiklar" rail, where a line links out to the journal's own page.
+SOURCES["lawreview"] = Source("lawreview", lawreview_list, {
+    "parse": _parse_stage("lawreview", lawreview_parse.parse,
+                          layout.LAWREVIEW_DOWNLOADED,
+                          inputs=lawreview_inputs, code=LAWREVIEW_CODE),
+},
+    harvest=lawreview_harvest,
+    origin=lawreview_download.ORIGIN,
+    scopes=frozenset(lawreview_download.SCOPES),
+    notes="download flag: --only journal/nummer (fetch one; needs its "
+          "journal scope). One known exception: the 1941 article promoted on "
+          "the 1916 archive page cannot be named by --only (the year page it "
+          "derives lists no such card); a full svjt sweep refreshes it\n"
+          "scopes are the journals: " + ", ".join(
+              "%s (%s)" % (j.kod, j.namn)
+              for j in lawreview_journals.JOURNALS)
+          + "; empty = both\n"
+          "svjt's document is the article's own page (the PDF, where the "
+          "journal publishes one, is a copy of it); jp's is the issue's "
+          "PDF, its metadata read off the issue page\n"
+          "jp's host rate-limits with HTTP 466, which the harvest rides out "
+          "on its own")
+
+
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden
 # arrive only through the bulk `rs_harvest` sweep, so parse runs over whatever is
 # on disk; relate/index/dump/generate act on the artifacts by source name.
@@ -4097,9 +4188,12 @@ def cmd_relate(names, force=None):
 # rail, and /kommentar/<id> serves no page -- so a search hit for one is a
 # dead link with a useless title ("Kommentar"). The rows stay in `documents`
 # (kommentar validate/relate read them), but the index holds no units for
-# them; a prior index's units are purged. Composed here, one layer above
-# lib/search, like SOURCE_RENDERERS (lib never branches on a source).
-UNSEARCHED = frozenset({"kommentar"})
+# them; a prior index's units are purged. lawreview joins it for the same
+# reason: the articles have no page on this site (their rail lines link out to
+# the journals), so a search hit for one would be a dead link. Composed here,
+# one layer above lib/search, like SOURCE_RENDERERS (lib never branches on a
+# source).
+UNSEARCHED = frozenset({"kommentar", "lawreview"})
 
 
 def cmd_index(names, jobs=1):
@@ -4438,8 +4532,10 @@ def stale_sources():
 # `render.generate_site`. Every value is a module-level `render(art, site) -> str`
 # so the table pickles by qualified name into each pool worker.
 #
-# kommentar has no entry on purpose: it is an annotation rendered into a statute's
-# rail, not a page of its own (generate_site drops its rows).
+# kommentar and lawreview have no entry on purpose: kommentar is an annotation
+# rendered into a statute's rail, and lawreview's articles are mined for
+# citations, not republished (their rail lines link to the journal's own page) --
+# neither has a page of its own (generate_site drops their rows).
 SOURCE_RENDERERS = {
     "sfs": sfs_render.render,
     "dv": dv_render.render,

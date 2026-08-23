@@ -31,8 +31,10 @@ NO_DOCUMENTS = {"remisser", "site", "stats"}
 
 # An artifact source with no renderer of its own: a kommentar is an annotation
 # rendered into its host statute's rail, not a page (lib/render.render_document,
-# which drops kommentar rows rather than looking one up).
-NO_RENDERER = {"kommentar"}
+# which drops kommentar rows rather than looking one up). A lawreview article
+# is mined for the citations it makes and surfaces as an external-linked rail
+# row on the documents it cites; the site republishes nothing of it.
+NO_RENDERER = {"kommentar", "lawreview"}
 
 
 def test_the_exception_sets_name_real_sources():

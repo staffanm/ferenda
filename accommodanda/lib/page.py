@@ -445,24 +445,25 @@ def describe_citer(from_uri, anchor, label, title, source):
 # The inbound rail's accordion rows, in display order. Ranking lives in
 # RAIL_SECTION_ORDER, keyed by these same slugs.
 INBOUND_ORDER = ("sfs", "forarbete", "foreskrift", "dv", "avg", "rs", "guidance",
-                 "hudoc", "icc", "icj", "eu-caselaw", "eu-forslag", "eurlex",
-                 "coe", "icrc", "untc", "begrepp")
+                 "lawreview", "hudoc", "icc", "icj", "eu-caselaw", "eu-forslag",
+                 "eurlex", "coe", "icrc", "untc", "begrepp")
 
 # What a group is called where that is *not* simply what the source is called
-# (`facets.SOURCE_LABELS`). Three of them differ because these are **inbound** --
-# documents pointing here: the statute group keeps lagen.nu's long-standing
-# "Lagrumshänvisningar hit", which says the direction out loud, and the two
-# treaty/act groups name what cites rather than the corpus it comes from. The
-# other two are the pseudo-sources the eurlex corpus splits into
-# (INBOUND_KIND_GROUPS), which no source label covers. Every remaining group
-# takes the source's own name unchanged -- restated here, they were a third copy
-# of that table waiting to drift (the same failure `facets.SOURCE_LABELS`
-# records in its own comment).
+# (`facets.SOURCE_LABELS`). Each entry here is a deliberate rename away from the
+# source label: the statute group keeps lagen.nu's long-standing "Lagrumshänvisningar
+# hit", which says the direction out loud; the two treaty/act groups name what
+# cites rather than the corpus it comes from; the eurlex group and the two
+# pseudo-sources it splits into (INBOUND_KIND_GROUPS) carry names no source
+# label covers; and the tidskriftsartikel group names the citing document --
+# "Artiklar" -- rather than the corpus it is mined from (the source label
+# "Tidskriftsartiklar"). Every group not listed here takes the source's own
+# name unchanged.
 _INBOUND_LABEL = {"sfs": "Lagrumshänvisningar hit",
                   "eurlex": "EU-rätt",
                   "icrc": "Humanitärrättsliga fördrag",
                   "eu-caselaw": "EU-domstolens praxis",
-                  "eu-forslag": "Generaladvokatens förslag till avgörande"}
+                  "eu-forslag": "Generaladvokatens förslag till avgörande",
+                  "lawreview": "Artiklar"}
 
 INBOUND_GROUPS = [(slug, _INBOUND_LABEL.get(slug) or facets.SOURCE_LABELS[slug])
                   for slug in INBOUND_ORDER]
@@ -562,6 +563,10 @@ class CiterStyle:
     # whether several pinpoints share one leading category word, written once
     # ("avsnitt 3, 5 och 7") instead of repeated on each
     shared_word: bool
+    # whether the line links the citer's own publisher page (the row's
+    # `source_url`) instead of a page on this site -- True only for a source
+    # whose documents the site does not render (a tidskriftsartikel)
+    external: bool = False
 
 
 # Most sources cite whole-document, under the short *descriptive* citing form
@@ -584,8 +589,25 @@ _PARAGRAF_STYLE = CiterStyle(_paragraf_pinpoint, _descriptive_name, " ", False)
 # lagrådsremiss by title alone ("Lagrådsremiss: …"), it having no number.
 _FORARBETE_STYLE = CiterStyle(forarbete_pinpoint, _forarbete_name, ", ", True)
 
+# A tidskriftsartikel is cited by its title, completed by its author and its
+# minimal citation ("En leverantörs … Systembolaget (Rickard Bergflo,
+# JP 2009 s. 37)"): the descriptive column carries the author
+# (`labels._lawreview`), the label the short_id. An article without an author
+# carries the citation itself in that column, and the line shows the
+# completion bare ("Title (JP 2009 s. 37)").
+def _lawreview_name(kind, label, title, descriptive):
+    if not title or title == label:
+        return label
+    if descriptive and descriptive != label:
+        return "%s (%s, %s)" % (title, descriptive, label)
+    return "%s (%s)" % (title, label)
+
+
+_LAWREVIEW_STYLE = CiterStyle(_whole_document_pinpoint, _lawreview_name, " ", False,
+                              external=True)
+
 CITER_STYLE = {"sfs": _PARAGRAF_STYLE, "foreskrift": _PARAGRAF_STYLE,
-               "forarbete": _FORARBETE_STYLE}
+               "forarbete": _FORARBETE_STYLE, "lawreview": _LAWREVIEW_STYLE}
 
 
 def citer_style(source):
@@ -648,11 +670,23 @@ def _citer_line(row):
     st" -> `/2009:1464#P22S2` -- not a link to the regulation beside a link to
     the stycke (S3). Two adjacent links to the same document offer the reader a
     choice they have no basis to make, and the pinpoint is the better landing."""
-    from_uri, label, title, source, kind, _date, anchors, descriptive = row
+    from_uri, label, title, source, kind, _date, anchors, descriptive, source_url = row
     style = citer_style(source)
     display = style.name(kind, label, title, descriptive)
     subtitle = _citer_subtitle(source, display, title)
-    name = '<a href="%s">%s</a>' % (escape(href(from_uri)), escape(display))
+    # an external-style citer (a tidskriftsartikel) has no page on this site:
+    # its line links to the journal's own url for the article (the row's
+    # `source_url`, the catalog's Källa). Every other source's `source_url`
+    # is the publisher page its *local* page already names, so only the
+    # style's say-so may divert the line off-site.
+    if style.external:
+        # both journals record a source_url for every article; a row without
+        # one is a broken artifact, not a case to fall back from
+        assert source_url, "external citer %s carries no source_url" % from_uri
+        url = source_url
+    else:
+        url = href(from_uri)
+    name = '<a href="%s">%s</a>' % (escape(url), escape(display))
     pins, seen = [], set()
     for entry in (anchors.split(",") if anchors else []):
         anchor, _, page = entry.rpartition("@")   # "sec17@39"; page may be empty
@@ -1324,7 +1358,8 @@ RAIL_SECTION_ORDER = (
     "kommentar", "fk", "dv", "avg", "rs", "hudoc", "icc", "icj", "eu-caselaw",
     "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
-    "eurlex", "guidance", "coe", "icrc", "untc", "begrepp", "genomfor", "remiss",
+    "eurlex", "guidance", "lawreview", "coe", "icrc", "untc", "begrepp",
+    "genomfor", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
 
 

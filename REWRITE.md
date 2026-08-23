@@ -169,6 +169,7 @@ accommodanda/
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
   rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
   guidance/ EU soft-law source, 12 issuing bodies (EDPB·EBA·EASA·ACER·ESMA·ENISA·BEREC·EDPS·EIOPA·EUIPO·ECB·ESRB) — issuers·<body>_download·eurlex_download·model·parse·render
+  lawreview/ journal-article vertical (Svensk Juristtidning + Juridisk Publikation) — journals·download·model·parse (mined for citations only: no pages, feed or index of their own; a rail line links to the journal's own page)
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
@@ -4396,7 +4397,7 @@ catalog — each number with its provenance and its status — is
   linear ramp every cell but one reads as empty). Measure 29 is a `sankey`: the
   citation graph as volume, citing group on the left, cited group on the right,
   the same groups standing on both sides so a source citing itself is a ribbon
-  like any other. The map holds fourteen groups; a group with no traffic above
+  like any other. The map holds fifteen groups; a group with no traffic above
   the drawing threshold on one side simply does not appear there, which is how
   Konventioner (1.6 M references in, 437 out) reads as the dead end it is. Its
   groups are mostly the source itself, except eurlex (three
@@ -4679,6 +4680,40 @@ They carry 75 696 references, 71 426 of which reach a document the corpus holds
   never the middle, since an amending riktlinje names the riktlinje it amends by
   number inside its own title.
 
+### 7o. lawreview source — tidskriftsartiklar ✅ (first cut)
+
+`accommodanda/lawreview/` — **journal articles from the two Swedish legal
+journals the site collects**, one source holding both journals the way `rs`
+holds its agencies: `journals.py` is the registry (journal name, base URL,
+listing page, whether the document is a web page or a PDF), `download.py` the
+two walkers, and `model`/`parse` shared. There is no renderer: the site
+republishes nothing of an article; its citations surface as external-linked
+rows on the rails of the documents it cites.
+
+- **Svensk Juristtidning (svjt)**: the archive year filter states the range
+  (1916–2026), each year page's article cards carry the title, author and
+  teaser, and the document is the article's own web page — a page exists for
+  every article, 1916 and all.
+- **Juridisk Publikation (jp)**: one menu page names all 37 issues (2009–, the
+  WordPress slug collisions and the two jubileumsnummer handled off the
+  slug/label); each issue page's text blocks carry the title (as the PDF
+  link), the abstract and the author, and the document is the issue's PDF.
+  The host answers a rate-limited client with HTTP 466, which sits in
+  `lib/net`'s retry table like any other throttle, and the issue pages are
+  paced with the walk's own delay.
+
+Identity is the journal's own coordinates — `svjt/2026-104` ("SvJT 2026
+s. 104", the article's opening page) and `jp/2025-01-03` ("JP 2025 nr 1-03",
+the article's place in its issue); the year is the only date either journal
+states, and the date projection fills the middle of it.
+
+**The articles are not republished.** The page is a pointer to the journal's
+own page (svjt) or Särtryck (jp). The parse's one job is to hand the article's
+whole text to the citation scanner — it reads no headings off it, removes
+nothing, and the footnotes stay because that is where the SOU and NJA
+references are densest — which is what puts an article on the context rails of
+the statute, förarbete or rättsfall it names.
+
 ### 7b. Vertical scope closed ✅
 
 The original lagen.nu source families are covered by SFS, DV, förarbete,
@@ -4854,6 +4889,20 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lawreview** (2026-08-23) — a new mine-only vertical, `accommodanda/lawreview/`
+  (§7o): journal articles from Svensk Juristtidning (every year since 1916,
+  the article's own web page as the document) and Juridisk Publikation (issue
+  PDFs since 2009, the issue page carrying the metadata), harvested off a
+  two-entry data-driven registry (`journals.py`) the way `rs`/`guidance` share
+  one engine over an agency/issuer table. The parse hands the article's whole
+  text — footnotes included, since that is where the SOU/NJA references sit
+  densest — to the citation scanner and does nothing else to it: there is no
+  renderer, no browse tree, no frontpage entry, no feed, and the source is
+  `UNSEARCHED`. A citation surfaces as a line on the cited document's
+  "Artiklar" rail, linking out to the journal's own page. `lib/net.RETRY_STATUS`
+  gained 466, the WAF status Juridisk Publikation answers a rate-limited
+  client with. `test/test_lawreview.py`; harvested and parsed at corpus scale
+  (16,801 svjt articles, 247 jp articles).
 - **lib/dv/search** (2026-08-22) — a decision is findable by the case number it
   was filed under, months before its referat exists. A commentary names it that
   way and never otherwise: SvJT 2010 s. 94 discusses "Högsta domstolens dom

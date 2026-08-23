@@ -54,7 +54,7 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
-              "rs": "rs", "guidance": "guidance",
+              "rs": "rs", "guidance": "guidance", "lawreview": "lawreview",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
               "icc": "icc", "icj": "icj",
               "remisser": "remisser", "kommentar": "kommentar",
@@ -75,7 +75,8 @@ def artifact_dir(source: str) -> Path:
 # catalogued" (a real fault) from "parsed and never meant to be" (these three).
 CATALOGUED_SOURCES = ("sfs", "dv", "forarbete", "kommentar", "begrepp",
                       "eurlex", "foreskrift", "avg", "rs", "guidance",
-                      "hudoc", "coe", "icrc", "untc", "icc", "icj")
+                      "lawreview", "hudoc", "coe", "icrc", "untc", "icc",
+                      "icj")
 
 
 # raw roots -- the download writers put their structure under these
@@ -89,6 +90,7 @@ FORESKRIFT_DOWNLOADED = DOWNLOADED / "foreskrift"   # <fs>/<slug>.{json,pdf}
 AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,html}
 RS_DOWNLOADED = DOWNLOADED / "rs"                   # <org>/<slug>.{json,pdf}
 GUIDANCE_DOWNLOADED = DOWNLOADED / "guidance"       # <utgivare>/<slug>.{json,pdf}
+LAWREVIEW_DOWNLOADED = DOWNLOADED / "lawreview"     # <journal>/<slug>.{json,html|pdf}
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html} + clin/<itemid>.json
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
@@ -172,9 +174,11 @@ def _relpath(source: str, basefile: str) -> Path:
     if source == "foreskrift":
         fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
         return Path(fs) / rest.replace(":", "-").replace(" ", "_")
-    if source in ("avg", "rs"):
+    if source in ("avg", "rs", "lawreview"):
         # "jo/2340-2025", "jk/2024/8082" -- and, for rs, the agency's own
-        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"
+        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"; for
+        # lawreview, the journal's issue coordinates: "svjt/2026-104",
+        # "jp/2025-01-03"
         org, rest = basefile.split("/", 1)
         return Path(org) / rest.replace("/", "-").replace(":", "-")
     if source == "guidance":

@@ -263,8 +263,8 @@ def render_document(art, source, site, renderers):
 # kommentar is an annotation layer shown in the rail (no page tree), so it is
 # not a browsable source on the frontpage
 SOURCE_ORDER = ("sfs", "dv", "hudoc", "forarbete", "foreskrift", "avg", "rs",
-                "eurlex", "guidance", "coe", "icrc", "untc", "icc", "icj",
-                "begrepp")
+                "eurlex", "guidance", "coe", "icrc", "untc",
+                "icc", "icj", "begrepp")
 # the reader-facing source names, defined once in `facets` (which this module
 # imports; the reverse would cycle) and re-exported here under the name the
 # render layer has always used
@@ -864,8 +864,10 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
         rows = [r for r in rows if r[1] == source]
     if only is not None:                         # specific-document scope
         rows = [r for r in rows if r[2] in only]
-    # commentary is an annotation rendered into statute rails, not a page of its own
-    rows = [r for r in rows if r[1] != "kommentar"]
+    # a source with no renderer (kommentar, lawreview) is an annotation or a
+    # mined-for-citations corpus: its rows reach the reader through rails, never
+    # through a page of their own
+    rows = [r for r in rows if r[1] in renderers]
     # uncatalogued pages (sfs historical consolidations) carry no catalog row, so
     # no stored content_hash -- the caller re-hashes their artifact from disk (few)
     rows += [(uri, src, path, title, None) for (uri, src, path, title)

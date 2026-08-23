@@ -26,6 +26,8 @@ formatting quirks, the citation grammar) and discards the framework.
   **foreskrift** (agency regulations), **avg** (JO/JK decisions),
   **rs** (agency legal positions), **guidance** (soft law from 12 EU
   agencies and bodies),
+  **lawreview** (journal articles from Svensk Juristtidning and Juridisk
+  Publikation, mined for the references they make),
   **remisser** (consultation responses), **wiki** (begrepp/definitions).
   We are not at full parity with the old system, but new sources beyond the
   original scope (notably eurlex and foreskrift) are now handled.
@@ -39,7 +41,7 @@ architecture and status change.
 
 Three layers, realized in the `accommodanda/` package:
 
-1. **Vertical source pipelines** (`accommodanda/{sfs,dv,hudoc,coe,icrc,untc,icc,eurlex,guidance,forarbete,foreskrift,avg,remisser,wiki}/`)
+1. **Vertical source pipelines** (`accommodanda/{sfs,dv,hudoc,coe,icrc,untc,icc,eurlex,guidance,lawreview,forarbete,foreskrift,avg,remisser,wiki}/`)
    — each owns its full chain (download → parse → typed model → JSON
    artifact) and its *own* document model.
 2. **Horizontal libraries** (`accommodanda/lib/`) — genuinely cross-source
@@ -104,7 +106,8 @@ Stop-hook ruff/ty/layer checks). The essentials:
 
 - Subject is `scope: short lowercase summary`, no trailing period.
 - `scope` is a vertical (`sfs`, `dv`, `hudoc`, `coe`, `icrc`, `untc`, `icc`,
-  `eurlex`, `guidance`, `forarbete`, `foreskrift`, `avg`, `rs`, `remisser`, `wiki`) or a
+  `eurlex`, `guidance`, `lawreview`, `forarbete`, `foreskrift`, `avg`, `rs`,
+  `remisser`, `wiki`) or a
   layer/concern (`lib`, `build`, `render`, `api`, `search`, `catalog`,
   `structure`, `golden`, `docs`, `chore`).
 - Keep the subject to one line; use `,`/`;`/`—` to separate clauses when a

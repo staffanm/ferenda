@@ -1023,6 +1023,7 @@ _LABELLED_KIND = {
     "avg": lambda art, lb: art.get("org", "avg"),      # the organ (jo/jk/…)
     "rs": lambda art, lb: art.get("org", "rs"),        # the agency (fk/imy/…)
     "guidance": lambda art, lb: art.get("serie") or art["utgivare"],
+    "lawreview": lambda art, lb: art["journal"],       # the journal (svjt/jp)
     "coe": lambda art, lb: art.get("doctype", "treaty"),
 }
 
@@ -2049,7 +2050,12 @@ def inbound_collapsed(con, uris, exclude_from=(), whole_document=False):
     dropped) the renderer turns into a pinpoint list. Each anchor is written
     `id@page`, the page empty where the citing document has none: the two travel
     as one field because two GROUP_CONCATs of the same group are not promised to
-    agree on order. Self-citations, kommentar and bemyndigande excluded, plus any
+    agree on order. The row's last column is the citer's `source_url` -- set
+    for nearly every source, since the catalog records each document's
+    publisher page. The renderer links it only for a citer style marked
+    `external` (a tidskriftsartikel, which has no page of its own on this
+    site); every other line keeps linking the local page.
+    Self-citations, kommentar and bemyndigande excluded, plus any
     `exclude_from` uris (a statute's own förarbeten, shown once in their
     preparatory-works role instead).
 
@@ -2064,7 +2070,7 @@ def inbound_collapsed(con, uris, exclude_from=(), whole_document=False):
     targets = " AND l.to_uri IN (%s)" % ",".join("?" * len(uris))
     sql = ("SELECT l.from_uri, d.label, d.title, d.source, d.kind, d.date, "
            "GROUP_CONCAT(DISTINCT l.from_anchor || '@' || "
-           "IFNULL(l.from_page, '')), d.descriptive "
+           "IFNULL(l.from_page, '')), d.descriptive, d.source_url "
            "FROM links l JOIN documents d ON d.uri = l.from_uri "
            "WHERE 1" + targets + _NOT_SELF + _NOT_TYPED
            + " AND d.source <> 'kommentar'" + excl

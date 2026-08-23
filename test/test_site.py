@@ -2198,7 +2198,7 @@ def test_citer_line_collapses_pinpoints_and_caps_at_five():
     row = ("https://lagen.nu/prop/2025/26:123", "Prop. 2025/26:123",
            "Explosiva varor", "forarbete", "prop", "2025-01-01",
            "a18.4.1@,a15.2@,a16.7@,a2@,a9@,a11@",  # six avsnitt, out of order
-           "Prop. 2025/26:123")                 # descriptive (unused for forarbete)
+           "Prop. 2025/26:123", None)              # descriptive, no source_url
     li = page._citer_line(row)
     assert 'href="/prop/2025/26:123">Prop. 2025/26:123: Explosiva varor</a>' in li
     assert "avsnitt <a" in li                             # category word once
@@ -2215,7 +2215,7 @@ def test_citer_line_with_one_pinpoint_is_a_single_link():
         ("https://lagen.nu/2009:1464", "SFS 2009:1464",
          "Förordning med instruktion för Statens jordbruksverk", "sfs",
          "forordning", "2009-12-01", "P22S2@",
-         "Förordning med instruktion för Statens jordbruksverk"))
+         "Förordning med instruktion för Statens jordbruksverk", None))
     assert li == ('<li><a href="/2009:1464#P22S2">Förordning med instruktion '
                   'för Statens jordbruksverk 22 § 2 st</a></li>')
     # a förarbete locator is an aside on where in the document it sits, so it
@@ -2223,8 +2223,22 @@ def test_citer_line_with_one_pinpoint_is_a_single_link():
     li = page._citer_line(
         ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
          "En skyldighet att erbjuda lovskola", "forarbete", "prop",
-         "2017-01-01", "a6.7@39", "Prop. 2016/17:156"))
+         "2017-01-01", "a6.7@39", "Prop. 2016/17:156", None))
     assert "En skyldighet att erbjuda lovskola, avsnitt 6.7</a>" in li
+
+
+def test_citer_line_keeps_the_local_link_when_source_url_is_set():
+    # the catalog records a publisher page for nearly every document (sfs,
+    # forarbete, eurlex, ...). Only a style marked `external` may divert the
+    # line off-site; every other citer keeps linking its page here.
+    li = page._citer_line(
+        ("https://lagen.nu/2009:1464", "SFS 2009:1464",
+         "Förordning med instruktion för Statens jordbruksverk", "sfs",
+         "forordning", "2009-12-01", "P22S2@",
+         "Förordning med instruktion för Statens jordbruksverk",
+         "https://svenskforfattningssamling.se/doc/20091464.html"))
+    assert 'href="/2009:1464#P22S2"' in li
+    assert "svenskforfattningssamling" not in li
 
 
 def test_forarbete_pinpoint_falls_back_to_the_printed_page():
@@ -2239,7 +2253,7 @@ def test_forarbete_pinpoint_falls_back_to_the_printed_page():
     li = page._citer_line(
         ("https://lagen.nu/prop/2016/17:156", "Prop. 2016/17:156",
          "En skyldighet att erbjuda lovskola", "forarbete", "prop",
-         "2017-01-01", "sec17@39", "Prop. 2016/17:156"))
+         "2017-01-01", "sec17@39", "Prop. 2016/17:156", None))
     assert 'href="/prop/2016/17:156#sid39">' in li     # the page's own anchor
     assert "En skyldighet att erbjuda lovskola, s. 39</a>" in li
 

@@ -1205,6 +1205,7 @@ FLOW_GROUPS = {
     "foreskrift": "Föreskrifter", "avg": "Myndighetsavgöranden",
     "rs": "Ställningstaganden", "kommentar": "Lagkommentarer",
     "begrepp": "Begrepp", "guidance": "EU-vägledning",
+    "lawreview": "Tidskriftsartiklar",
     "coe": "Konventioner", "icrc": "Konventioner", "untc": "Konventioner",
     "hudoc": "Folkrättslig praxis", "icj": "Folkrättslig praxis",
     "icc": "Folkrättslig praxis",
@@ -1216,7 +1217,8 @@ FLOW_GROUPS = {
 # international law
 FLOW_GROUP_NAMES = (
     "Författningar", "Förarbeten", "Rättsfall", "Föreskrifter",
-    "Myndighetsavgöranden", "Ställningstaganden", "Lagkommentarer", "Begrepp",
+    "Myndighetsavgöranden", "Ställningstaganden", "Lagkommentarer",
+    "Tidskriftsartiklar", "Begrepp",
     "EU-rättsakter", "EU-domar", "EU-fördrag", "EU-vägledning",
     "Konventioner", "Folkrättslig praxis")
 

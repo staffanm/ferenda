@@ -422,6 +422,24 @@ def _edpb(art):
 
 
 # --------------------------------------------------------------------------
+# lawreview (tidskriftsartiklar)
+# --------------------------------------------------------------------------
+
+def _lawreview(art):
+    # short_id is the minimal article citation -- abbreviated name, year,
+    # opening page ("SvJT 2026 s. 104", "JP 2009 s. 37") -- that the journal's
+    # own coordinates give it. The title is the article's own, as its listing
+    # states it. The descriptive column carries the author, so the inbound
+    # line can write "Title (Author, JP 2009 s. 37)". An article with no
+    # author carries the citation itself, which `page._lawreview_name`
+    # recognises as "the author is the label" and drops from the line.
+    md = art.get("metadata", {})
+    ident = art.get("identifier") or _local(art["uri"])
+    title = md.get("title") or ident
+    return Labels(ident, title, title, md.get("fattare") or ident)
+
+
+# --------------------------------------------------------------------------
 # icc (International Criminal Court)
 # --------------------------------------------------------------------------
 
@@ -449,6 +467,7 @@ def _icj(art):
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
              "avg": _avg, "rs": _rs, "guidance": _edpb,
+             "lawreview": _lawreview,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc, "icj": _icj, "begrepp": _begrepp,
              "kommentar": _kommentar}
