@@ -4265,12 +4265,12 @@ both no network. `untc` has run a real download+parse+relate+generate harvest:
 all 14 curated treaties are live on `/folkratt/` and `/untc/{unts}`. `icc` is
 wired the same way; see its own bullet above for its test/harvest status.
 
-### 7k. stats vertical — 53 measurements of the corpus ✅ (first cut)
+### 7k. stats vertical — 54 measurements of the corpus ✅ (first cut)
 
 `accommodanda/stats/` inverts every other vertical's direction: there is
 nothing to download and no document to parse, because the corpus *is* the
 input. It reads the finished catalog and artifact trees, writes one artifact
-holding 53 measurements, and renders that to `/statistik`. The measurement
+holding 54 measurements, and renders that to `/statistik`. The measurement
 catalog — each number with its provenance and its status — is
 [`docs/prd-stats.md`](docs/prd-stats.md).
 
@@ -4330,7 +4330,7 @@ catalog — each number with its provenance and its status — is
   **provenance markers and renumbering stubs do not** (counted naively, "*Lag
   (2011:590).*" is the shortest rule in Swedish law). It also reads
   `downloaded/sfs/` for change-act titles, which the artifact does not carry.
-- **`compute.py`** — the 53 measures in seven groups (A–G), preferring catalog
+- **`compute.py`** — the 54 measures in seven groups (A–G), preferring catalog
   SQL over the scan wherever the data is in the catalog. That preference is also
   the roadmap: every measure reaching for `scan` today is one `relate` could
   serve from SQL tomorrow (the PRD's R1–R3). Three measures the first cut left
