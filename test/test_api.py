@@ -723,6 +723,13 @@ def test_graph_neighborhood_and_pinpoint(client):
     assert d["inbound"]["total_links"] == 1
     assert d["internal"] is None
 
+    # internal=true asks for the unit graph on a document uri too -- the
+    # explorer's zoomed-in structure view -- with no focus unit among the
+    # nodes (the fixture corpus has no self-citations, so it is empty)
+    d = client.get("/api/v1/graph", params={
+        "uri": "https://lagen.nu/1962:700", "internal": "true"}).json()
+    assert d["internal"] == {"nodes": [], "edges": [], "truncated": 0}
+
     # a fragment uri answers for that provision alone and adds the (here
     # empty) internal unit graph, with the reader-facing pinpoint label --
     # and a deep arrival anchor (#K3P1S2) answers for the § its `pinpoint`
@@ -811,4 +818,26 @@ def test_graph_answers_for_a_node_nothing_cites(tmp_path):
     assert catalog.graph_labels(con, []) == {}
     assert reads.graph(con, "https://lagen.nu/x")["inbound"] \
         == {"total_links": 0, "total_docs": 0, "top": []}
+    con.close()
+
+
+def test_graph_internal_for_a_document_uri_carries_real_edges(tmp_path):
+    """`internal=True` on a document uri assembles the unit graph with no
+    focus unit: the nodes are exactly the units the self-citations touch --
+    no phantom None node -- and the edges arrive at unit level."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1962:700"
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, path) "
+                "VALUES (?, 'sfs', 'law', 'BrB', 'Brottsbalk', '')", (law,))
+    # 3 kap. 1 § cites 1 kap. 1 § twice, at stycke depth once -- both rows
+    # must collapse onto the K3P1 -> K1P1 unit edge
+    for to_frag in ("K1P1", "K1P1S1"):
+        con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                    "to_uri, to_root) VALUES (?, 'K3P1S2', "
+                    "'dcterms:references', ?, ?)",
+                    (law, law + "#" + to_frag, law))
+    d = reads.graph(con, law, internal=True)
+    assert d["internal"]["edges"] == [["K3P1", "K1P1", 2]]
+    assert [u["anchor"] for u in d["internal"]["nodes"]] == ["K1P1", "K3P1"]
+    assert d["internal"]["truncated"] == 0
     con.close()

@@ -1085,7 +1085,8 @@ class GraphResponse(BaseModel):
         None, description="what this node cites; null when ?direction= excluded it")
     internal: GraphInternal | None = Field(
         None, description="the document's own provision-to-provision graph. "
-        "Only for a fragment uri.")
+        "Present for a fragment uri, and for a document uri with "
+        "?internal=true.")
 
 
 @app.get("/api/v1/graph", response_model=GraphResponse, tags=["document"],
@@ -1098,15 +1099,21 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
                        None, description="comma-separated flow-group filter "
                                          "(Författningar, Rättsfall, …)"),
                    limit: int = Query(20, ge=1, le=300),
+                   internal: bool = Query(
+                       False, description="include the document's internal "
+                       "unit graph for a document uri too (a fragment uri "
+                       "always carries it)"),
                    con: sqlite3.Connection = Depends(get_con)):
     """One node's neighborhood in the citation graph, aggregated per neighbor
-    document and ready to draw -- what the /hanvisningar/ explorer walks.
+    document and ready to draw -- what the paraGRAF explorer
+    (para-graf.tomtebo.org) walks.
 
     Each neighbor row is a distinct document with the link count between the
     two; `/document/inbound` has the same facts one citation per row. A
     fragment uri (`...#K4P7`) answers for that provision alone and adds
     `internal`: the whole document's provision-to-provision citation graph at
-    unit (§/article) level."""
+    unit (§/article) level. `internal=true` adds that graph to a document
+    uri's answer as well."""
     wanted = None
     if groups:
         wanted = {g.strip() for g in groups.split(",") if g.strip()}
@@ -1115,7 +1122,7 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
             raise HTTPException(422, "unknown flow group(s): %s"
                                 % ", ".join(sorted(unknown)))
     data = reads.graph(con, uri, direction=direction, groups=wanted,
-                       limit=limit)
+                       limit=limit, internal=internal)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     return GraphResponse(**data)

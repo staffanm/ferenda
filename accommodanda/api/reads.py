@@ -255,7 +255,8 @@ def _graph_internal(con, root, focus_unit):
     ranked = edges.most_common()
     kept, dropped = ranked[:INTERNAL_EDGE_CAP], ranked[INTERNAL_EDGE_CAP:]
     units = {u for (a, b), _n in kept for u in (a, b)}
-    units.add(focus_unit)
+    if focus_unit:               # None on a document-level `internal` ask
+        units.add(focus_unit)
     degree = collections.Counter()
     for (a, b), n in kept:
         degree[a] += n
@@ -266,11 +267,14 @@ def _graph_internal(con, root, focus_unit):
             "truncated": len(dropped)}
 
 
-def graph(con, uri, *, direction="both", groups=None, limit=20):
+def graph(con, uri, *, direction="both", groups=None, limit=20,
+          internal=False):
     """One node's neighborhood in the citation graph, ready to draw -- or None
     when the catalog has no such document. `uri` may name a document or a
     provision (`...#K4P7`): a provision answers with the citers/targets of
-    that unit alone, plus the whole document's internal unit graph."""
+    that unit alone, plus the whole document's internal unit graph. `internal`
+    asks for that unit graph on a *document* uri too -- what the explorer's
+    zoomed-in structure view draws."""
     root, _, frag = uri.partition("#")
     row = catalog.document(con, root)
     if not row:
@@ -304,6 +308,6 @@ def graph(con, uri, *, direction="both", groups=None, limit=20):
     if direction in ("out", "both"):
         result["outbound"] = _graph_side(out_rows, groups, limit)
         result["outbound"]["unresolved"] = unresolved
-    if frag:
+    if frag or internal:
         result["internal"] = _graph_internal(con, root, unit)
     return result
