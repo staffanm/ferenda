@@ -331,6 +331,8 @@ comma-separated filter on the flow groups (`Författningar`, `Rättsfall`, …),
 `total_docs` / `unresolved` counts describe the whole side, not the page.
 
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
+`source_url`: the document's page at its own publisher -- for a source
+this site does not render (tidskriftsartiklar), the link to open.
 `internal`: the document citing itself, as a provision-to-provision graph at
 §/article level. `internal=true` asks for that same graph on a plain document
 uri too, for a zoomed-in structure view.

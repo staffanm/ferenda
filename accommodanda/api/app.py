@@ -1079,6 +1079,10 @@ class GraphResponse(BaseModel):
     source: str = Field(description="its corpus")
     kind: str | None = Field(None, description="its document kind")
     group: str = Field(description="the flow group it belongs to")
+    source_url: str | None = Field(
+        None, description="the document's page at its own publisher. For a "
+        "source this site does not render (tidskriftsartiklar), this is the "
+        "link to open -- the site has no page for it.")
     inbound: GraphSide | None = Field(
         None, description="who cites this node; null when ?direction= excluded it")
     outbound: GraphSide | None = Field(

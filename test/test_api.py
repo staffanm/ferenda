@@ -821,6 +821,28 @@ def test_graph_answers_for_a_node_nothing_cites(tmp_path):
     con.close()
 
 
+def test_graph_carries_the_publishers_source_url(tmp_path):
+    """The graph payload hands out the document's own publisher page. For a
+    tidskriftsartikel the site renders no page -- source_url is the only link
+    a consumer may show, never the /lawreview/ path."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    art = "https://lagen.nu/lawreview/lod/2022-1-01"
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                "descriptive, path, source_url) VALUES (?, 'lawreview', "
+                "'artikel', 'Lov & Data 1/2022', 'Fremtidens IT-kontraktret', "
+                "'Henrik Udsen', '', 'https://lod.lovdata.no/article/x')",
+                (art,))
+    d = reads.graph(con, art)
+    assert d["source_url"] == "https://lod.lovdata.no/article/x"
+    assert d["label"] == "Lov & Data 1/2022"
+    # a document with no recorded source_url answers None, not ''
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                "path, source_url) VALUES ('https://lagen.nu/y', 'sfs', "
+                "'law', 'Y', 'T', '', '')")
+    assert reads.graph(con, "https://lagen.nu/y")["source_url"] is None
+    con.close()
+
+
 def test_graph_internal_for_a_document_uri_carries_real_edges(tmp_path):
     """`internal=True` on a document uri assembles the unit graph with no
     focus unit: the nodes are exactly the units the self-citations touch --

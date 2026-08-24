@@ -457,6 +457,9 @@ paraGRAF-utforskaren (https://para-graf.tomtebo.org) ritar.
 `direction=in|out|both` väljer sida, `groups=` filtrerar på flödesgrupp,
 `limit` sätter topplistans längd.
 
+`source_url` är dokumentets sida hos utgivaren -- för en källa som
+sajten inte renderar (tidskriftsartiklar) är det länken att öppna.
+
 En fragment-URI (`…#K4P7`, `…#A6`) svarar för den enheten ensam och lägger
 till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå
 (§/artikel), med läsbara etiketter ("4 kap. 7 §"). `internal=true` lägger

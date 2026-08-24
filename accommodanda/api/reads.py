@@ -301,6 +301,13 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         "citation": citation_label(short_name(descriptive) or label, unit or ""),
         "label": label, "title": title, "source": source, "kind": kind,
         "group": facets.flow_group(source, kind),
+        # the publisher's own page. For a source the site does not render
+        # (tidskriftsartiklar -- page.CITER_STYLE's one external=True), this
+        # is where a reader opens the document; the site's /lawreview/ path
+        # serves nothing and must never be handed out as a link.
+        "source_url": con.execute(
+            "SELECT NULLIF(source_url, '') FROM documents WHERE uri = ?",
+            (root,)).fetchone()[0],
         "inbound": None, "outbound": None, "internal": None,
     }
     if direction in ("in", "both"):
