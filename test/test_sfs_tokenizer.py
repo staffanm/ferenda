@@ -2,6 +2,8 @@
 tokenizer-internal edge cases that the fixture-driven test_sfs_parse.py
 oracle doesn't exercise well (end-of-data lookahead, in-body TOC faking)."""
 
+from accommodanda.sfs import parse_sfs_source
+from accommodanda.sfs.model import Paragraf
 from accommodanda.sfs.reader import TextReader
 from accommodanda.sfs.tokenizer import OpenAvdelning, OpenKapitel, Tokenizer
 
@@ -118,3 +120,35 @@ def test_dash_toc_announcement_keeps_following_real_chapter():
 """)
     kapitel = [e.ordinal for e in events if isinstance(e, OpenKapitel)]
     assert kapitel == ["1", "2", "3"]
+
+
+def test_a_paragraf_glued_to_the_line_above_still_opens():
+    """The source drops the blank line before a paragraf marker, hiding 24
+    paragrafer in 23 statutes:
+    "… tillämpas. Lag (2004:197).\\n13 e § Kliniska läkemedelsprövningar …".
+    The reader splits on the blank line, so 13 e § of Lag (1992:859) om
+    läkemedel became the last words of 13 d § instead of a paragraf of its own.
+    The provenance marker is what makes the repair safe -- it always ends a
+    paragraf.
+
+    Not a `test_sfs_parse` fixture like its sibling nbsp case
+    (basic-paragraf-nbsp): the repair runs in `_assemble`, above the tokenizer,
+    and that oracle drives the tokenizer directly."""
+    doc = parse_sfs_source(
+        {"fulltext": {"forfattningstext":
+                      "13 d § Kliniska läkemedelsprövningar som inte har "
+                      "samband med sjukdom. Lag (2004:197).\n"
+                      "13 e § Kliniska läkemedelsprövningar får utföras på "
+                      "underåriga. Lag (2004:197).\n\n"
+                      "14 § Läkemedel ska förvaras."}},
+        BASEFILE)
+    got = []
+
+    def walk(node):
+        if isinstance(node, Paragraf):
+            got.append(node.ordinal)
+        for child in getattr(node, "children", None) or []:
+            walk(child)
+
+    walk(doc)
+    assert got == ["13 d", "13 e", "14"]

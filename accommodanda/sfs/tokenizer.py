@@ -52,6 +52,23 @@ re_EntryIntoForceAuthorization = re.compile(
     r"(?: genom lag \(\d{4}:\d+\).|)/")
 re_dehyphenate = re.compile(r"\b- (?!(och|eller))").sub
 
+
+def flat(text):
+    """`text` with every non-breaking space made an ordinary one, for the
+    marker regexes above to match against.
+
+    Regeringskansliet's text sets the marker with a nbsp where a line break
+    would read badly -- "25 a\xa0§", "3\xa0a §", "4 §\xa0\xa0\xa0\xa0Med förpackning
+    …" -- and a matcher spelling the separator as a plain space then reads the
+    line as body text. This recovers 44 paragrafer and kapitel in 21 statutes,
+    among them 25 a § and 25 e § of Förordning (1993:185), which the amendment
+    register introduces and never repeals.
+
+    The substitution is one character for one, so an offset taken from the
+    flattened line still indexes the raw one -- which `is_paragraf` and
+    `tok_paragraf` rely on when they step over the marker by its length."""
+    return text.replace("\xa0", " ")
+
 OB_SEPARATORS = ["Övergångsbestämmelser",
                  "Ikraftträdande- och övergångsbestämmelser",
                  "Övergångs- och ikraftträdandebestämmelser"]
@@ -355,7 +372,7 @@ class Tokenizer:
         return OpenUnderavdelning(ordinal=ordinal, rubrik=rubrik)
 
     def is_upphavt_kapitel(self):
-        return re_ChapterRevoked(self.reader.peekline()) is not None
+        return re_ChapterRevoked(flat(self.reader.peekline())) is not None
 
     def tok_upphavt_kapitel(self):
         ordinal = self.id_of_kapitel()
@@ -411,7 +428,7 @@ class Tokenizer:
         prev = first_ordinal
         for i in range(2, TOC_RUN + 1):
             try:
-                p = self.reader.peekparagraph(i).replace("\n", " ")
+                p = flat(self.reader.peekparagraph(i)).replace("\n", " ")
             except IOError:
                 return False
             if re_ChapterRevoked(p):
@@ -424,7 +441,8 @@ class Tokenizer:
 
     def id_of_kapitel(self, p=None):
         if not p:
-            p = self.reader.peekparagraph().replace("\n", " ")
+            p = self.reader.peekparagraph()
+        p = flat(p).replace("\n", " ")
         p, upphor, ikrafttrader = andrings_datum(p)
         m = re_ChapterId(p)
         if not m:
@@ -472,7 +490,7 @@ class Tokenizer:
                            upphor=upphor, ikrafttrader=ikrafttrader)
 
     def is_upphavd_paragraf(self):
-        return re_SectionRevoked(self.reader.peekline()) is not None
+        return re_SectionRevoked(flat(self.reader.peekline())) is not None
 
     def tok_upphavd_paragraf(self):
         ordinal = self.id_of_paragraf(self.reader.peekline())
@@ -499,6 +517,7 @@ class Tokenizer:
         return True
 
     def id_of_paragraf(self, p):
+        p = flat(p)
         match = re_SectionId.match(p)
         if match:
             return match.group(1)
