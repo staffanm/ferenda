@@ -211,8 +211,15 @@
   function waitOff() {
     clearTimeout(spinTimer); clearTimeout(slowTimer);
     if (spin) spin.hidden = true;
-    var note = results && results.querySelector('.search-slow');
-    if (note) note.remove();
+    // both transient notes go: the too-short one must not survive into the
+    // query that clears the floor, where `loading` keeps the old innerHTML and
+    // only dims it -- the reader would read "skriv minst 3 tecken" over a
+    // three-character search in flight
+    if (results) {
+      Array.prototype.forEach.call(
+        results.querySelectorAll('.search-slow, .search-too-short'),
+        function (note) { note.remove(); });
+    }
   }
   function run(q, andGo) {
     var mine = ++seq;
@@ -223,6 +230,30 @@
       return;
     }
     var local = localHits(q);
+    // Too short to ask the corpus as you type (lagenDom.tooShort). `andGo` is
+    // Enter -- an explicit search, which goes through at any length, so "EU"
+    // and "JO" are still askable. The page's own pinpoints answer either way:
+    // they are a local scan, not an index query. The note says both why the
+    // rest of the list is empty and how to search anyway, so a reader two
+    // letters in reads neither "nothing found" nor "refused".
+    if (!andGo && lagenDom.tooShort(q)) {
+      if (results) results.classList.remove('loading');
+      render(local, [], null, q);       // also hides the refine link (total null)
+      // The note goes out even when local pinpoints just painted: skipping the
+      // index to save cost degrades the answer exactly the way skipping it for
+      // an outage does (see the catch handler below), and a list of same-page
+      // hits with no note reads as "this is the whole answer".
+      // Enter is only an escape hatch when no local hit is selected: with one
+      // painted, `go()` jumps there and `run(q, true)` never fires, so naming
+      // Enter would promise something this state cannot do. Then the way on is
+      // the third character, which the first sentence already says.
+      if (results) {
+        results.insertAdjacentHTML('beforeend',
+          '<div class="search-note search-too-short">' +
+          lagenDom.tooShortNote(local.length ? '' : 'Tryck Enter') + '</div>');
+      }
+      return;
+    }
     // Paint local pinpoints instantly when the query has any; otherwise KEEP the
     // previous query's API hits on screen (dimmed) until the new ones arrive --
     // wiping to empty on every keystroke makes the whole list flash away and

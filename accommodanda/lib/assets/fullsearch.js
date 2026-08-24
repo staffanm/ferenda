@@ -103,16 +103,24 @@
       '</span><button type="button" data-page-action="next"' +
       (nextCursor ? '' : ' disabled') + '>Nästa →</button>';
   }
-  function load(push, state) {
+  // `typed` marks the debounced as-you-type call, the only one the
+  // lagenDom.tooShort floor applies to. Every other call -- submit,
+  // pagination, popstate, the initial load -- searches at any length. Note
+  // that the initial load is not always a query the reader committed to: the
+  // typing path writes `q` into the address bar (replaceState, below) before
+  // the floor rejects it, so reloading after typing "ab" does run that
+  // search. One reload is not the cost this floor exists to remove.
+  function load(push, state, typed) {
     var mine = ++seq;            // invalidates an older request even for empty q
     var q = (params.get('q') || '').trim();
     // note: load() must NOT write input.value -- it runs on every as-you-type
     // keystroke, and rewriting the field would strip a trailing space and jump
     // the caret. The input is synced explicitly on initial load / popstate.
     if (push) history.pushState(state || null, '', address());
-    if (!q) {
+    if (!q || (typed && lagenDom.tooShort(q))) {
       nextCursor = null;
-      status.textContent = 'Skriv ett eller flera sökord.';
+      status.textContent = q ? lagenDom.tooShortNote('Tryck Enter eller Sök')
+                             : 'Skriv ett eller flera sökord.';
       facets.innerHTML = ''; results.innerHTML = ''; pagination.innerHTML = '';
       return;
     }
@@ -143,7 +151,7 @@
     if (q) params.set('q', q); else params.delete('q');
     resetPaging();
     if (push) load(true);
-    else { history.replaceState(null, '', address()); load(false); }
+    else { history.replaceState(null, '', address()); load(false, null, true); }
   }
   input.addEventListener('input', function () {
     clearTimeout(typingTimer);

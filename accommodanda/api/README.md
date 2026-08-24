@@ -756,6 +756,17 @@ inbakad API-bas som kan peka fel om man byter port eller om en sida ligger kvar 
 webbläsarens cache. En sökning på en hänvisning ("avtalslagen 36", "GDPR art 32")
 fäster det exakta målet (§/artikel) överst, så Enter går direkt dit.
 
+Rutan söker medan man skriver, men först vid **tre tecken**
+(`MIN_QUERY` i `lib/assets/dom.js`, via `lagenDom.tooShort`). Kortare än så
+kostar en sökning sekunder utan att svara på något: `lib/search.py` prefixmatchar varje ord, så
+"N" går iväg som `N*` och Lucene expanderar det mot hela termordboken innan
+något filter tillämpas — 2,6 s och 231 076 träffar, mätt på lagen.nu. Ett
+uttryckligt Enter söker ändå, hur kort frågan än är; "EU" och "JO" är riktiga
+sökningar. Undantaget är när sidans egen paragraf redan står i listan: då går
+Enter dit, som vanligt, och tredje tecknet är vägen vidare. Sökresultatsidan
+`/sok` följer samma regel, med sin egen Sök-knapp. Gränsen sitter bara i
+webbläsaren — API:t självt tar emot vilken fråga som helst.
+
 ---
 
 ## Felkoder

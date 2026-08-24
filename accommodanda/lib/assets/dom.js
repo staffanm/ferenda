@@ -77,6 +77,31 @@
     };
   }
 
+  // Shortest query the two surfaces send to /api/v1/search *as you type*.
+  // Below it the answer is both useless and expensive: lib/search.py
+  // `_text_query` prefixes every word, so "N" leaves as `N*` and Lucene
+  // expands it against the whole term dictionary before any filter narrows
+  // anything -- measured on prod, 2.6 s and 231,076 hits for one letter, and
+  // the palette's own prefixes are the slowest queries the cluster records.
+  // An explicit search (Enter) is exempt in both: "EU" and "JO" are real
+  // queries, and a reader who submits one has asked for it. Both surfaces
+  // query as you type, so the floor lives here rather than in each
+  // (rule:second-use-goes-to-lib).
+  var MIN_QUERY = 3;
+  function tooShort(q) { return q.trim().length < MIN_QUERY; }
+
+  // The note both surfaces show below the floor. The first sentence is always
+  // true; `how` names the surface's own way to search the corpus anyway, and
+  // is left out where there is none. /sok/ carries a Sök button the palette
+  // does not have, and the palette's Enter goes to a local pinpoint when the
+  // page has one -- so the affordance is the caller's to name, while the
+  // sentence stays single (rule:second-use-goes-to-lib).
+  function tooShortNote(how) {
+    return 'Skriv minst ' + MIN_QUERY + ' tecken för att söka i hela korpuset.'
+           + (how ? ' ' + how + ' för att söka ändå.' : '');
+  }
+
   window.lagenDom = { sel: sel, ownEl: ownEl, flash: flash, island: island,
-                      hitFields: hitFields };
+                      hitFields: hitFields,
+                      tooShort: tooShort, tooShortNote: tooShortNote };
 })();

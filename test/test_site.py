@@ -1527,6 +1527,37 @@ def test_facet_nav_omits_single_bucket_primary_axis():
     assert '<h2 class="facet-axis">År</h2>' in nav
 
 
+def test_facet_nav_lists_every_level_of_a_three_deep_scheme():
+    # guidance is Utgivare -> Serie -> År, and a body above `only_above` pages
+    # by year. The rail used to stop at Serie, so a reader on /ecb/con/2020/ had
+    # no way to reach 2019 -- the year pages existed with nothing linking them.
+    year = lambda y, n: {"key": y, "label": y, "slug": y, "count": n,
+                         "children": None}
+    view = {"levels": ["Utgivare", "Serie", "År"],
+            "buckets": [{"key": "ecb", "label": "ECB", "slug": "ecb", "count": 3,
+                         "children": [
+                             {"key": "con", "label": "Yttranden", "slug": "con",
+                              "count": 3,
+                              "children": [year("2020", 2), year("2019", 1)]}]},
+                        # a body below the threshold keeps its Serie leaf
+                        {"key": "edpb", "label": "EDPB", "slug": "edpb", "count": 1,
+                         "children": [
+                             {"key": "riktlinjer", "label": "Riktlinjer",
+                              "slug": "riktlinjer", "count": 1,
+                              "children": None}]}]}
+    nav = browse._facet_nav("guidance", view, ["ecb", "con", "2020"],
+                            primary_in_banner=True)
+    assert '<h2 class="facet-axis">Serie</h2>' in nav
+    assert '<h2 class="facet-axis">År</h2>' in nav
+    assert '<a href="/eurlex/vagledning/ecb/con/2019/">' in nav
+    assert '<a href="/eurlex/vagledning/ecb/con/2020/" aria-current="page">' in nav
+    # the suppressed level adds no axis: edpb's Serie bucket is the leaf
+    nav = browse._facet_nav("guidance", view, ["edpb", "riktlinjer"],
+                            primary_in_banner=True)
+    assert '<h2 class="facet-axis">Serie</h2>' in nav
+    assert "År" not in nav
+
+
 def test_a_cross_axis_selector_can_carry_more_than_one_labelled_group():
     groups = [("EU-rättsakter", [("eurlex:regulation", "Förordningar", "/a/", 3)]),
               ("EDPB:s vägledningar", [("edpb:riktlinjer", "Riktlinjer", "/b/", 2)])]
@@ -1576,11 +1607,47 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     assert '<input autofocus' in bundle
     assert '<a class="search-refine" href="/sok/" hidden></a>' in bundle
     assert "refine.hidden = true;" in bundle
-    # fullsearch.js's own ordering guard (seq bumped before the empty-q return, so
-    # an empty query still invalidates a pending request) -- asserted against the
-    # source file, where "if (!q)" is unambiguously fullsearch's, not the bundle
+    # fullsearch.js's own ordering guard (seq bumped before the too-short/empty-q
+    # return, so either still invalidates a pending request) -- asserted against
+    # the source file, where the guard is unambiguously fullsearch's, not the bundle
     fullsearch = (render.ASSETS / "fullsearch.js").read_text(encoding="utf-8")
-    assert fullsearch.index("var mine = ++seq") < fullsearch.index("if (!q)")
+    assert fullsearch.index("var mine = ++seq") < fullsearch.index("if (!q ||")
+    # neither surface queries the API below dom.js's MIN_QUERY *as you type*: one
+    # letter leaves as `N*`, which Lucene expands against the whole term
+    # dictionary before any filter applies (2.6 s and 231k hits on prod), and the
+    # palette's prefixes are the slowest queries the cluster records. An explicit
+    # search is exempt in both -- the palette's `andGo` (Enter) and fullsearch's
+    # `typed`, which only the debounced keystroke path passes.
+    assert "var MIN_QUERY = 3;" in bundle
+    assert "minQuery" not in bundle          # the number never leaves dom.js
+    assert "if (!q || (typed && lagenDom.tooShort(q)))" in fullsearch
+    assert "load(false, null, true)" in fullsearch      # the typing path, and only it
+    assert fullsearch.count("load(false, null, true)") == 1
+    palette = (render.ASSETS / "search.js").read_text(encoding="utf-8")
+    assert "if (!andGo && lagenDom.tooShort(q))" in palette
+    assert palette.index("lagenDom.tooShort(q)") < palette.index("fetch('/api/v1/search")
+    # the reader is told the corpus was skipped even when local pinpoints painted
+    # -- skipping the index for cost degrades the answer the way an outage does,
+    # and the palette already forbids that silently. So the note is APPENDED
+    # after the render call inside the too-short branch, never written only into
+    # an empty list: assert the order, since presence alone still passes if the
+    # write moves back inside render()'s no-hits branch.
+    floor = palette[palette.index("if (!andGo && lagenDom.tooShort(q))"):]
+    floor = floor[:floor.index("\n    }")]
+    assert floor.index("render(local, [], null, q)") < floor.index(
+        "insertAdjacentHTML('beforeend',")
+    # ... and the note carries the class waitOff clears, so it cannot survive
+    # into the query that clears the floor (`loading` keeps the old innerHTML)
+    assert "search-note search-too-short" in palette
+    assert "'.search-slow, .search-too-short'" in palette
+    # Enter is named only where it reaches the corpus: with a local hit selected
+    # `go()` jumps there and run(q, true) never fires
+    assert "lagenDom.tooShortNote(local.length ? '' : 'Tryck Enter')" in palette
+    # one sentence for both surfaces, each naming its own affordance (/sok/ has a
+    # Sök button the palette lacks)
+    assert "function tooShortNote(how)" in bundle
+    assert "lagenDom.tooShortNote('Tryck Enter eller Sök')" in fullsearch
+    assert "Skriv minst" not in palette and "Skriv minst" not in fullsearch
     # The legacy all-feeds directory and repository aliases are restored.
     feed_index = compress.read_text(out / "dataset" / "sitenews" / "index.html")
     assert "/dataset/sfs/feed.atom?rdf_type=type%2Flag" in feed_index
