@@ -19,7 +19,7 @@
 {%- if id in measures -%}
 {%- set lede_text = measures[id].get("lede") if computed_lede else lede -%}
 <section class="stat" id="m{{ id }}"><h3><span class="stat-no">{{ id }}</span> {{ title }}</h3>
-{%- if lede_text %}<p class="stat-lede">{{ lede_text }}</p>{% endif -%}
+{%- if lede_text %}<p class="stat-lede">{{ lede_text | linked(measures[id].get("lede_links", {})) }}</p>{% endif -%}
 {{ figure(measures[id], title) }}
 {%- if note %}<p class="stat-note">{{ note }}</p>{% endif -%}
 </section>
@@ -67,6 +67,10 @@
         "Begreppen som definieras på flest sätt",
         computed_lede=true,
         note="Samma term, olika lydelse: NIS2 artikel 6.9 och CER-direktivet artikel 2.6 definierar båda ”risk”, och eftersom texterna skiljer sig räknas de som två.") }}
+{{ stat(55,
+        "Längsta kedjan av infogade paragrafer",
+        computed_lede=true,
+        note="Måttet är hur långt bokstäverna räcker, inte hur många paragrafer som står kvar: en kedja som nått 8 v § har fått 22 nya paragrafer även om 8 h § sedan upphävts.") }}
 {% endset %}
 {% set group_B %}
 {{ stat(10,

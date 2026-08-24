@@ -13,6 +13,8 @@ document.
 """
 
 
+from markupsafe import Markup, escape
+
 from ..lib import compress, layout
 from ..lib.page import page_context
 from . import charts
@@ -20,8 +22,33 @@ from .model import Cell, Measure, Point, Row, Tile
 
 ARTIFACT_BASEFILE = "statistik"
 
+
+def _linked(text, links):
+    """`text` with each key of `links` made a link to its uri, first occurrence
+    only.
+
+    A lede that names a document -- the repealed act holding the longest chain
+    of inserted paragrafer, say -- should let the reader go there. The linking
+    happens here rather than in `compute` so the measurement stays plain text:
+    markup in the artifact is markup in the data.
+
+    `text` is escaped first and each label matched in its escaped form, so a
+    title carrying markup cannot inject any. Replacing only the first occurrence
+    keeps the loop from reaching inside a tag it has already written -- a second
+    label that happens to appear inside an emitted href would otherwise cut the
+    markup in half."""
+    out = str(escape(text))
+    for label, uri in links.items():
+        out = out.replace(str(escape(label)),
+                          '<a href="%s">%s</a>' % (escape(uri), escape(label)), 1)
+    return Markup(out)
+
+
+charts.ENV.filters["linked"] = _linked
+
 # the page template (stats/templates/stats.html, extending lib's page.html);
-# it owns the measure catalog, order, prose and section layout
+# it owns the measure catalog, order, prose and section layout. Fetched after
+# the filter is registered, so the template can use it.
 _PAGE = charts.ENV.get_template("stats.html")
 
 
@@ -31,6 +58,7 @@ def _as_measure(d):
     return Measure(
         id=d["id"], group=d["group"], title=d["title"], kind=d["kind"],
         unit=d.get("unit", ""), lede=d.get("lede", ""),
+        lede_links=d.get("lede_links", {}),
         value=d.get("value"), display=d.get("display", ""),
         tiles=[Tile(**t) for t in d.get("tiles", [])],
         rows=[Row(**r) for r in d.get("rows", [])],

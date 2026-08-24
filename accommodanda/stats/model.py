@@ -85,6 +85,12 @@ class Measure:
                                 # | profile | matrix | sankey | table
     unit: str = ""              # what one unit of `value`/`y` is ("tecken")
     lede: str = ""              # the sentence that says what the number means
+    lede_links: dict[str, str] = field(default_factory=dict)
+                                # {text in the lede: uri}, linked at render
+                                # time. A lede that names a document should let
+                                # the reader go there; the lede itself stays
+                                # plain text, because markup in a measurement
+                                # is markup in the data
     value: float | None = None          # scalar
     display: str = ""                   # scalar: pre-formatted, when the raw
                                         # number is not what should be read

@@ -1,4 +1,4 @@
-"""Compute the 53 corpus measurements into a `Report`.
+"""Compute the 54 corpus measurements into a `Report`.
 
 Two data sources, deliberately in this order of preference:
 
@@ -35,7 +35,7 @@ from ..lib import catalog, layout, util
 from ..lib.facets import flow_group
 from ..lib.markdown import begrepp_uri
 from ..lib.page import register_anchor
-from ..lib.pinpoint import citation
+from ..lib.pinpoint import citation, human_fragment
 from . import scan
 from .model import Cell, Measure, Point, Report, Row, Tile
 
@@ -176,6 +176,39 @@ def _paragraf_uri(t):
     return "%s#%s" % (t[3]["uri"], t[1]) if t[1] else t[3]["uri"]
 
 
+# an avdelning or bilaga segment leading a paragraf anchor ("A2P116", "B1P8"):
+# no part of how the paragraf is cited -- Taxeringslagen's 116 § is "116 §" --
+# and `human_fragment` reads "A2P116" as the CoE grammar's "artikel 2 punkt 116"
+RE_CHAIN_CONTAINER = re.compile(r"^[AB]\d+[a-z]*")
+
+
+def _chain_span(chain):
+    """A chain's span as a reader would write it: "7 kap. 8 § – 8 v §". The
+    chapter is said once -- the second half of a span is read inside the
+    first."""
+    return "%s – %s %s \xa7" % (
+        human_fragment(RE_CHAIN_CONTAINER.sub("", chain["bas"])),
+        chain["nummer"], chain["sista"])
+
+
+def _chain_detail(chain):
+    """A chain's span plus what became of the links that are missing from it:
+    how many the amendment register says were repealed, and how many it does not
+    account for. The second half is what keeps the line from reading as a
+    complete account of a chain the data cannot fully explain.
+
+    Only for an act that is still in force -- "varav 1 numera upphävd" tells a
+    reader nothing about a repealed act, where every paragraf went with it."""
+    parts = []
+    if chain["upphavda"]:
+        parts.append("%d numera upphävd%s"
+                     % (chain["upphavda"], "a" if chain["upphavda"] > 1 else ""))
+    if chain["oforklarat"]:
+        parts.append("%d saknas i texten" % chain["oforklarat"])
+    return ("%s, varav %s" % (_chain_span(chain), " och ".join(parts))
+            if parts else _chain_span(chain))
+
+
 # ==========================================================================
 # the scan pass
 # ==========================================================================
@@ -213,7 +246,7 @@ def run_scans(jobs=None, progress=None):
 
 
 # ==========================================================================
-# A. the statute book: size and shape (1-9, 53-54)
+# A. the statute book: size and shape (1-9, 53-55)
 # ==========================================================================
 #
 # The size-and-shape measures share one form, the rank profile: every value
@@ -496,6 +529,46 @@ def _group_a(con, s):
                   uri if uri in concept_name else None,
                   "i %d dokument" % len(holders[uri]))
               for uri, bodies in ranked])
+
+    # Inserted paragrafer. A new rule that belongs between 52 § and 53 § never
+    # renumbers what follows it -- every later reference would break -- so it
+    # becomes 52 a §, and the next one 52 b §. The measure is how far one such
+    # run of letters reaches, which is how much law has been packed into a
+    # single place in the numbering since the act was written.
+    def by_reach(rows):
+        return sorted((r for r in rows if r["chain"]),
+                      key=lambda r: (-r["chain"]["span"], r["uri"]))
+
+    def name_of(r):
+        return _shorten(descriptive.get(r["uri"]) or r["title"], 70)
+
+    chained = by_reach(laws)
+    # the record over the whole history, named because the in-force list cannot
+    # answer "has any Swedish act ever gone further": `laws_all` by name, the
+    # way every measure that counts repealed acts has to ask for it. It is the
+    # record over the *superset*, so it can be the act the sentence before
+    # already named -- then there is nothing further to say and the clause goes
+    lede = ("%s av %s gällande författningar har minst en infogad paragraf. "
+            "Längst når %s: %s."
+            % ("{:,}".format(len(chained)).replace(",", " "),
+               "{:,}".format(len(laws)).replace(",", " "),
+               name_of(chained[0]), _chain_detail(chained[0]["chain"])))
+    ever = by_reach(s["laws_all"])[0]
+    links = {}
+    if ever["uri"] != chained[0]["uri"]:
+        lede += (" Räknas även upphävda författningar med är rekordet %s, %s."
+                 % (name_of(ever), _chain_span(ever["chain"])))
+        # that act is named but not listed, so the lede is the only place a
+        # reader can reach it from
+        links = {name_of(ever): "%s#%s" % (ever["uri"], ever["chain"]["anchor"])}
+
+    yield Measure(
+        55, "A", "Längsta kedjan av infogade paragrafer", "toplist",
+        unit="infogade paragrafer", lede=lede, lede_links=links,
+        rows=[Row(name_of(r), r["chain"]["span"],
+                  "%s#%s" % (r["uri"], r["chain"]["anchor"]),
+                  _chain_detail(r["chain"]))
+              for r in chained[:10]])
 
 
 # ==========================================================================

@@ -30,13 +30,13 @@ def law(structure, title="Testlag (2001:1)", uri="https://lagen.nu/2001:1",
 
 
 def scanned_law(paragraf_lengths=(), amendments=(), ikraft="1970-01-01",
-                utfardad=None, uri="https://lagen.nu/1970:1"):
+                utfardad=None, uri="https://lagen.nu/1970:1", chain=None):
     """A `scan.scan_sfs` result, as the measure builders read it."""
     return {"kind": "law", "uri": uri, "title": "Testlag", "clean_title": "Testlag",
             "ikraft": ikraft, "utfardad": utfardad, "chars": 0, "paragrafer": 0,
             "kapitel": 0, "stycken": 0,
             "paragraf_lengths": list(paragraf_lengths),
-            "amendments": list(amendments)}
+            "amendments": list(amendments), "chain": chain}
 
 
 def amendment(ikraft=None, ersatter=(), inforsI=(), forarbeten=(), aid="SFS 1999:1"):
@@ -653,3 +653,150 @@ def test_a_future_repeal_is_still_in_force():
     # the two are complements: every row lands in exactly one
     assert not live & dead
     assert len(live | dead) == 3
+
+
+def test_a_chain_of_inserted_paragrafer_is_measured_by_its_reach(tmp_path):
+    # 52 a §, 52 b § … 52 u §: a new rule between 52 § and 53 § never renumbers
+    # what follows, so the lettering is how much law one place in the numbering
+    # has taken on. The measure is how far it reaches, not how many survive --
+    # a repealed paragraf is removed from the consolidated text, and the
+    # amendment register is the only record that it was ever there.
+    art = law([paragraf("8", [{"type": "stycke", "text": "Avgift tas ut."}],
+                        pid="K7P8"),
+               paragraf("8 a", [{"type": "stycke", "text": "Avgiften betalas."}],
+                        pid="K7P8a"),
+               # 8 b is gone: SFS 2022:1302 repealed it
+               paragraf("8 c", [{"type": "stycke", "text": "Avgiften återbetalas."}],
+                        pid="K7P8c")],
+              amendments=[{"properties": {
+                  "dcterms:identifier": "SFS 2022:1302",
+                  "rpubl:upphaver": ["https://lagen.nu/2001:1#K7P8b"]}}])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert chain == {"anchor": "K7P8", "bas": "K7P8", "nummer": "8", "span": 3,
+                     "sista": "c", "upphavda": 1, "oforklarat": 0}
+
+
+def test_a_gap_the_register_does_not_explain_is_counted_not_absorbed(tmp_path):
+    # 4 kap. 28 d § of Lag (2000:562) stands in the source text without its §
+    # sign, so it never reads as a paragraf. The register introduces it and
+    # repeals nothing, so the gap is no upphävd paragraf -- and it is counted
+    # rather than absorbed, so the row cannot read as a complete account.
+    art = law([paragraf("28", [{"type": "stycke", "text": "Ansökan görs."}],
+                        pid="K4P28"),
+               paragraf("28 c", [{"type": "stycke", "text": "Hemlig dataavläsning."}],
+                        pid="K4P28c"),
+               # 28 d § is the one the source text loses; 28 e § stands after it
+               paragraf("28 e", [{"type": "stycke", "text": "Tekniskt bistånd."}],
+                        pid="K4P28e")],
+              amendments=[{"properties": {
+                  "dcterms:identifier": "SFS 2020:65",
+                  "rpubl:upphaver": ["https://lagen.nu/2001:1#K4P28a",
+                                     "https://lagen.nu/2001:1#K4P28b"]}}])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert (chain["span"], chain["upphavda"], chain["oforklarat"]) == (5, 2, 1)
+    assert compute._chain_detail(chain) == (
+        "4 kap. 28 § – 28 e §, varav 2 numera upphävda och 1 saknas i texten")
+
+
+def test_a_chain_is_named_the_way_a_reader_would_write_it():
+    # "7 kap. 8 § – 8 v §": the chapter is said once
+    chaptered = {"bas": "K7P8", "nummer": "8", "span": 22,
+                 "sista": "v", "upphavda": 1, "oforklarat": 0}
+    assert compute._chain_detail(chaptered) \
+        == "7 kap. 8 § – 8 v §, varav 1 numera upphävd"
+    # an unchaptered act, and a chain nothing has been taken out of
+    intact = {"bas": "P52", "nummer": "52", "span": 21,
+              "sista": "u", "upphavda": 0, "oforklarat": 0}
+    assert compute._chain_detail(intact) == "52 § – 52 u §"
+    # plural
+    assert compute._chain_detail({**chaptered, "upphavda": 3}).endswith(
+        "varav 3 numera upphävda")
+
+
+def test_the_chain_key_is_the_anchors_own_place(tmp_path):
+    # Upphovsrättslagen has chapter nodes but anchors its paragrafer "P52" …
+    # "P52u" with no K segment, because the chapters were inserted around a run
+    # that was already numbered straight through. The anchor is where that is
+    # written down, so the 52-series is one chain of 3 and not three of 1.
+    art = law([paragraf("52", [{"type": "stycke", "text": "Avtal om överlåtelse."}],
+                        pid="P52"),
+               paragraf("52 a", [{"type": "stycke", "text": "Avtalslicens."}],
+                        pid="P52a"),
+               paragraf("52 b", [{"type": "stycke", "text": "Skälig ersättning."}],
+                        pid="P52b")])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert (chain["anchor"], chain["span"]) == ("P52", 2)
+    assert compute._chain_detail(chain) == "52 § – 52 b §"
+
+
+def test_a_restarting_act_keeps_its_chapters_chains_apart(tmp_path):
+    # most chaptered acts restart the numbering in each chapter, and their
+    # anchors say so: 3 kap. 8 a § is "K3P8a" and 7 kap. 8 a § is "K7P8a", two
+    # different paragrafer that must never merge into one chain
+    art = law([paragraf("8", [{"type": "stycke", "text": "Ansökan."}], pid="K3P8"),
+               paragraf("8 a", [{"type": "stycke", "text": "Avgift."}], pid="K3P8a"),
+               paragraf("8", [{"type": "stycke", "text": "Tillsyn."}], pid="K7P8"),
+               paragraf("8 a", [{"type": "stycke", "text": "Föreläggande."}],
+                        pid="K7P8a"),
+               paragraf("8 b", [{"type": "stycke", "text": "Vite."}], pid="K7P8b")])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert (chain["anchor"], chain["span"]) == ("K7P8", 2)
+
+
+def test_a_chain_under_an_avdelning_is_counted(tmp_path):
+    # Taxeringslagen (1956:623) anchors its paragrafer under an avdelning
+    # ("A2P116t"), and its chain of 20 is the longest any repealed act reached.
+    # An anchor grammar that knew only kapitel dropped 413 paragrafer in 21 acts.
+    art = law([paragraf("116", [{"type": "stycke", "text": "Besvär."}],
+                        pid="A2P116"),
+               paragraf("116 a", [{"type": "stycke", "text": "Prövningstillstånd."}],
+                        pid="A2P116a")])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert (chain["anchor"], chain["span"]) == ("A2P116", 1)
+    # the avdelning is no part of how the paragraf is cited
+    assert compute._chain_detail(chain) == "116 § – 116 a §"
+
+
+def test_a_chain_whose_base_paragraf_is_gone_still_names_its_number(tmp_path):
+    # 32 § of Förordning (2004:1205) was repealed away, so the chain's first
+    # surviving member is 32 b §. The row still reads "32 § – 32 w §" -- the
+    # number is where the chain hangs -- while the link goes to a paragraf that
+    # is actually on the page.
+    art = law([paragraf("32 b", [{"type": "stycke", "text": "Tilldelning."}],
+                        pid="P32b"),
+               paragraf("32 c", [{"type": "stycke", "text": "Överlåtelse."}],
+                        pid="P32c")],
+              amendments=[{"properties": {
+                  "dcterms:identifier": "SFS 2009:1305",
+                  "rpubl:upphaver": ["https://lagen.nu/2001:1#P32",
+                                     "https://lagen.nu/2001:1#P32a"]}}])
+    chain = scan.scan_sfs(write_artifact(tmp_path, "t.json", art))["chain"]
+    assert (chain["anchor"], chain["bas"]) == ("P32b", "P32")
+    assert compute._chain_detail(chain) == "32 § – 32 c §, varav 1 numera upphävd"
+
+
+def test_a_repealed_acts_chain_does_not_count_its_repealed_paragrafer():
+    # "varav 1 numera upphävd" tells a reader nothing about an act that is
+    # itself repealed -- every paragraf went with it. The span alone is what
+    # says how far the chain reached.
+    chain = {"bas": "P32", "nummer": "32", "span": 23,
+             "sista": "w", "upphavda": 1, "oforklarat": 0}
+    assert compute._chain_span(chain) == "32 § – 32 w §"
+    assert compute._chain_detail(chain) == "32 § – 32 w §, varav 1 numera upphävd"
+
+
+def test_a_lede_links_the_document_it_names():
+    # the repealed record is named in the lede but not in the list, so the lede
+    # is the only place a reader can reach it from. The lede stays plain text in
+    # the artifact; the anchor is put in at render time.
+    linked = render._linked(
+        "rekordet Förordning (2004:1205) om handel med utsläppsrätter, 32 §.",
+        {"Förordning (2004:1205) om handel med utsläppsrätter":
+         "https://lagen.nu/2004:1205#P32b"})
+    assert linked == ('rekordet <a href="https://lagen.nu/2004:1205#P32b">'
+                      "Förordning (2004:1205) om handel med utsläppsrätter</a>,"
+                      " 32 §.")
+    # the text and the uri are both escaped, so a title carrying markup cannot
+    # inject any
+    assert render._linked("a <b>t</b> c", {"<b>t</b>": "/x?a=1&b=2"}) \
+        == 'a <a href="/x?a=1&amp;b=2">&lt;b&gt;t&lt;/b&gt;</a> c'

@@ -210,6 +210,86 @@ def _clean_title(title):
 # SFS
 # --------------------------------------------------------------------------
 
+# A paragraf anchor split into where it sits and what it is called: "K7P8v" ->
+# ("K7", "8", "v"), "A2P116t" -> ("A2", "116", "t"), "P52u" -> ("", "52", "u").
+# `plats` is every container segment the anchor writes -- kapitel, avdelning,
+# bilaga -- which is what keeps 3 kap. 8 a § and 7 kap. 8 a § two different
+# paragrafer. Read off the anchor rather than inferred: upphovsrättslagen has
+# chapter nodes but anchors its paragrafer "P52" … "P52u" without a K segment,
+# because the chapters were inserted around a run that was already numbered
+# straight through, and the anchor is where that fact is already written down.
+#
+# The letter is what this file calls an *inserted* paragraf: a new rule between
+# 52 § and 53 § never renumbers what follows it, it becomes 52 a §. Twelve
+# anchors in the corpus carry an upper-case tail instead ("P7L", "K1AP1"); those
+# are not insertions and are left out.
+RE_PARAGRAF_ANCHOR = re.compile(
+    r"^(?P<plats>(?:[A-Z]\d+[a-z]*)*)P(?P<nummer>\d+)(?P<bokstav>[a-z]+)?$")
+
+
+def repealed_paragrafer(amendments):
+    """{(plats, nummer, bokstav)} the amendment register says were repealed.
+
+    A repealed paragraf is *removed* from the consolidated text rather than left
+    as a stub, so what became of a missing link in a chain is a question only the
+    register answers. `sfs/register.py` has already run the lagrum parser over
+    each "upph." clause and stored the result as `rpubl:upphaver` -- resolved
+    fragment uris -- so this reads the artifact instead of parsing the same prose
+    a second time (rule:artifact-is-truth). It is also the better reading: of the
+    corpus's 182 missing chain letters the resolved field explains 146, against
+    141 for a hand-rolled grammar over the prose, which loses the chapter
+    whenever the clause writes "1 kap 2 §" without the period.
+    """
+    return {(m["plats"], m["nummer"], m["bokstav"] or "")
+            for entry in amendments for uri in entry["upphaver"]
+            if (m := RE_PARAGRAF_ANCHOR.match(uri.partition("#")[2]))}
+
+
+def longest_chain(chains, amendments):
+    """The act's longest run of inserted paragrafer -- 52 §, 52 a § … 52 u § --
+    or None where it has none. `chains` is {(plats, nummer): {bokstav: anchor}},
+    the bare paragraf keyed under "".
+
+    The measure is how far the lettering *runs*, not how many survive: a chain
+    that reached 8 v § inserted 22 paragrafer even though 8 h § has since been
+    repealed away. Only a single-letter suffix counts, which is every one in the
+    corpus -- no Swedish chain has yet reached "aa".
+
+    `upphavda` is how many of the missing ones the register accounts for, and
+    `oforklarat` how many it does not. The second number exists so a chain the
+    data cannot fully explain says so rather than reading as a complete account:
+    a letter that is neither in the text nor in the register means the source
+    text lost a paragraf (4 kap. 28 d § of Lag (2000:562) prints without its §
+    sign) or the register is silent. 29 chains carry one.
+    """
+    gone = repealed_paragrafer(amendments)
+    best = None
+    best_span = 0
+    for (plats, nummer), bokstaver in chains.items():
+        letters = sorted(b for b in bokstaver if len(b) == 1)
+        if not letters:
+            continue
+        span = ord(letters[-1]) - ord("a") + 1
+        if span <= best_span:
+            continue
+        best_span = span
+        missing = [chr(ord("a") + i) for i in range(span)
+                   if chr(ord("a") + i) not in letters]
+        upphavda = sum(1 for c in missing if (plats, nummer, c) in gone)
+        # the row links to the paragraf the chain hangs from, so the anchor is
+        # the bare one ("K7P8"); an act whose base paragraf is itself repealed
+        # falls back to the first letter still standing, while `bas` still names
+        # the number the chain hangs from ("32 §", not "32 b §")
+        anchor = bokstaver.get("")
+        bas = anchor if anchor else bokstaver[letters[0]][:-len(letters[0])]
+        best = {
+            "anchor": anchor or bokstaver[letters[0]], "bas": bas,
+            "nummer": nummer, "span": span, "sista": letters[-1],
+            "upphavda": upphavda, "oforklarat": len(missing) - upphavda,
+        }
+    return best
+
+
 def scan_sfs(path):
     """One consolidated statute -> its shape, its title forms and its whole
     amendment register. Historical consolidations (``…/konsolidering/…``) are
@@ -226,6 +306,7 @@ def scan_sfs(path):
     chars = paragrafer = kapitel = stycken = 0
     lengths = []                       # (chars, anchor, beteckning) per paragraf
     definitions = []                   # the act's explicit definition statements
+    chains = {}                        # (plats, nummer) -> {bokstav: anchor}
 
     def walk(node, paragraf=None, superseded=False):
         nonlocal chars, paragrafer, kapitel, stycken
@@ -255,6 +336,11 @@ def scan_sfs(path):
             stycken += 1
         elif kind == "paragraf":
             paragrafer += 1
+            found = RE_PARAGRAF_ANCHOR.match(node.get("id") or "")
+            if found:
+                chains.setdefault(
+                    (found["plats"], found["nummer"]), {})[
+                        found["bokstav"] or ""] = node["id"]
             body = RE_PROVENANCE.sub("", _subtree_text(node)).strip()
             # a paragraf left with nothing (its whole body was an editorial
             # note) states no rule, so it contributes no length measurement --
@@ -291,6 +377,10 @@ def scan_sfs(path):
             # so a measure must name which one it counts.
             "inforsI": p.get("rpubl:inforsI") or [],
             "ersatter": p.get("rpubl:ersatter") or [],
+            # where an existing paragraf was repealed, as resolved fragment
+            # uris -- the register's own answer to what a gap in a chain of
+            # inserted paragrafer became (`repealed_paragrafer`)
+            "upphaver": p.get("rpubl:upphaver") or [],
             "celex": p.get("rpubl:celexNummer"),
         })
 
@@ -312,6 +402,7 @@ def scan_sfs(path):
         "chars": chars, "paragrafer": paragrafer,
         "kapitel": kapitel, "stycken": stycken,
         "paragraf_lengths": lengths,
+        "chain": longest_chain(chains, amendments),
         "definitions": definitions,
         "amendments": amendments,
     }
