@@ -9,7 +9,7 @@ import pytest
 
 from accommodanda.lawpub import download, model, parse
 from accommodanda.lawpub.publishers import BY_ICON, kod_from_icon
-from accommodanda.lib import compress
+from accommodanda.lib import compress, page
 
 FILES = Path(__file__).parent / "files"
 
@@ -238,3 +238,34 @@ class TestWatermark:
         assert new == 0
         assert listings == [0, 1]                   # newest page + the stop page
         assert 2 not in listings                    # never the EOF page
+
+# --------------------------------------------------------------------------
+# the rail contract: mined, not published -- lawreview's contract, shared row
+# --------------------------------------------------------------------------
+
+class TestRailContract:
+    """A lawpub article's only publication surface is its line in the
+    "Artiklar" rail of the documents it cites -- the same row lawreview's
+    articles fill, since both sources' documents are tidskriftsartiklar and
+    an article can arrive through both (FT and SIPLR publish on their own
+    hosts and on the platform). The line links the platform's own page for
+    the article, never a lagen.nu page, which the article does not have."""
+
+    def test_lawpub_rows_fold_into_the_artiklar_group(self):
+        # the group is lawreview's, whatever publisher kind the catalog
+        # minted (the kind is the publisher's kod, an open set)
+        assert page.inbound_group("lawpub", "FT") == "lawreview"
+        assert page.inbound_group("lawpub", "SSIL") == "lawreview"
+        # lawreview's own rows are unaffected
+        assert page.inbound_group("lawreview", "ft") == "lawreview"
+
+    def test_the_rail_line_links_to_the_platform_page(self):
+        li = page._citer_line(
+            ("https://lagen.nu/lawpub/880", "FT 2015 s. 551",
+             "En upphandlingsrättslig studie", "lawpub", "FT",
+             "2015-07-15", "", "Ada Lovelace",
+             "https://www.lawpub.se/artikel/880"))
+        assert li == ('<li><a href="https://www.lawpub.se/artikel/880">'
+                      'En upphandlingsrättslig studie '
+                      '(Ada Lovelace, FT 2015 s. 551)</a></li>')
+        assert "lagen.nu" not in li

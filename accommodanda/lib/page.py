@@ -485,11 +485,22 @@ INBOUND_KIND_GROUPS = {("eurlex", "judgment"): "eu-caselaw",
 # the groups whose members are case law, ordered newest-first below
 CASELAW_GROUPS = frozenset(INBOUND_KIND_GROUPS.values())
 
+# The inverse fold: two sources whose citing documents are the same kind of
+# thing share one accordion row. lawpub's articles are tidskriftsartiklar
+# exactly like lawreview's (same artifact shape, same label function, same
+# mine-only contract), and an article can even arrive through both sources
+# -- FT and SIPLR publish on their own hosts and on the lawpub platform --
+# so a reader's rail shows one "Artiklar" row, never a second row headed by
+# an internal source name.
+INBOUND_SOURCE_GROUPS = {"lawpub": "lawreview"}
+
 
 def inbound_group(source, kind):
     """The rail accordion slug a citing document belongs to -- its source,
-    except where the source's kinds split (see `INBOUND_KIND_GROUPS`)."""
-    return INBOUND_KIND_GROUPS.get((source, kind), source)
+    except where the source's kinds split (`INBOUND_KIND_GROUPS`) or two
+    sources' documents fold into one row (`INBOUND_SOURCE_GROUPS`)."""
+    return INBOUND_KIND_GROUPS.get((source, kind),
+                                   INBOUND_SOURCE_GROUPS.get(source, source))
 
 # förarbete precedence in the inbound panel and the "Förarbeten" section:
 # propositions first, then SOU, Ds/PM, lagrådsremiss, betänkanden -- each block
@@ -607,7 +618,12 @@ _LAWREVIEW_STYLE = CiterStyle(_whole_document_pinpoint, _lawreview_name, " ", Fa
                               external=True)
 
 CITER_STYLE = {"sfs": _PARAGRAF_STYLE, "foreskrift": _PARAGRAF_STYLE,
-               "forarbete": _FORARBETE_STYLE, "lawreview": _LAWREVIEW_STYLE}
+               "forarbete": _FORARBETE_STYLE, "lawreview": _LAWREVIEW_STYLE,
+               # lawpub's articles are tidskriftsartiklar with lawreview's
+               # artifact shape and no page of their own (NO_RENDERER), so
+               # their rail line takes the same external style -- without it
+               # the line would link a lagen.nu page that does not exist
+               "lawpub": _LAWREVIEW_STYLE}
 
 
 def citer_style(source):

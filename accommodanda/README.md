@@ -826,10 +826,14 @@ so a caught-up run reads only the newest listing pages. Only open-access
 items are stored; a locked ("Stängd") item has no PDF the platform will
 serve. Like `lawreview`'s articles, these are mined for the references they
 make and are not republished: no page, no browse tree, no feed, no search
-index entry. Two of the platform's seven publishers — Förvaltningsrättslig
-tidskrift (FT) and Stockholm IP Law Review (SIPLR) — are also harvested on
-their own hosts by `lawreview`, so one article can arrive twice, catalogued
-under two separate basefiles (`lawreview/ft/...` and `lawpub/...`).
+index entry. On the context rails their lines fold into `lawreview`'s
+"Artiklar" row and link the platform's own page for the article
+(`page.INBOUND_SOURCE_GROUPS`, the external citer style). Two of the
+platform's seven publishers — Förvaltningsrättslig tidskrift (FT) and
+Stockholm IP Law Review (SIPLR) — are also harvested on their own hosts by
+`lawreview`, so one article can arrive twice, catalogued under two separate
+basefiles (`lawreview/ft/...` and `lawpub/...`); the shared row then shows
+both lines, and de-duplication is an open decision.
 
 **HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law**:
 
