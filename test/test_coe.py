@@ -237,7 +237,7 @@ def test_body_links_the_sibling_treaty_it_names_but_not_itself():
 
 def test_body_links_its_own_articles_but_only_ones_it_holds():
     """A bare "Article N" in a treaty's text cites the sibling provision --
-    the internal graph the /hanvisningar/ explorer draws for a pinpoint. An
+    the internal graph the paraGRAF explorer draws for a pinpoint. An
     article's own heading stays plain, and an ordinal the instrument does not
     hold (a mention of another treaty's article) does not bind."""
     art = parse.parse_record(

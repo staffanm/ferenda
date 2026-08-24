@@ -1522,7 +1522,11 @@ to a future per-doc incremental generate.
     `lib/inbound.py`),
     `document/outbound` (`hosted` flag for un-parsed targets), `graph` (a node's
     neighborhood aggregated per neighbor document, grouped by `lib/facets.flow_group`
-    — what the `/hanvisningar/` explorer draws), `sources`, `dumps`.
+    — drawn by paraGRAF, a standalone graph-explorer app at
+    https://para-graf.tomtebo.org (github.com/staffanm/para-graf); `internal=true`
+    on a document uri adds that document's own §/article-to-§/article graph, for
+    paraGRAF's zoomed-in structure view — a fragment uri always carried it),
+    `sources`, `dumps`.
     Auto `/openapi.json` + `/docs`. CORS-open (read-only public data) so the
     static site reaches it cross-origin. **Two apps, two path namespaces**
     (`api/internal.py`): everything above is the public `/api/v1` and is all
@@ -1565,26 +1569,24 @@ to a future per-doc incremental generate.
     helpers scrollspy/search/popover all build on, so "the page's own
     anchor" means the same thing everywhere once several documents share
     one DOM.
-  - ✅ **Graph explorer** (`/hanvisningar/`, `lib/templates/hanvisningar.html` +
-    `lib/assets/graf.js`, over `GET /api/v1/graph`) — the citation graph as a
-    page a reader can walk rather than a number in a rail. `catalog.py`'s new
-    `graph_*` queries answer per *neighbor document* (one row per citer/target
-    with its link count) instead of per citation, grouped by the same
-    `lib/facets.flow_group` map the stats sankey (§7k) uses, so both surfaces
-    agree on what a node is. `graf.js` draws a force-directed canvas layout
-    from that JSON: a degree stepper widens the walk outward, scrolling out
-    past the current degree fetches the next one, a direction toggle
-    (in/out/both) and a legend that doubles as a flow-group filter narrow the
-    view. A fragment uri (`…#K4P7`, `…#A6`) switches to **pinpoint mode**:
-    the neighborhood of that one provision, plus `internal` — the document's
-    own §/article-to-§/article graph from `graph_internal`, unit ids
-    collapsed by `pinpoint.unit_anchor` so a stycke-level citation lands on
-    its § rather than fragmenting the view. Default center is
-    `https://lagen.nu/ext/coe/005#A6`, ECHR article 6 — the corpus' most-cited
-    single provision. `coe/parse.py` gained inline linking of bare "Article N"
-    references to the instrument's own provisions (only ordinals it holds; an
-    external treaty citation wins the overlap) so the ECHR's internal graph
-    has edges to draw — 29 links recovered on that one treaty.
+  - ✅ **Citation-graph data, drawn by paraGRAF** (`GET /api/v1/graph`,
+    `api/reads.graph`, `catalog.py`'s `graph_*` queries) — the graph as JSON,
+    not a page in this repo. `catalog.py`'s `graph_*` queries answer per
+    *neighbor document* (one row per citer/target with its link count)
+    instead of per citation, grouped by the same `lib/facets.flow_group` map
+    the stats sankey (§7k) uses, so both surfaces agree on what a node is. A
+    fragment uri (`…#K4P7`, `…#A6`) switches to **pinpoint mode**: the
+    neighborhood of that one provision, plus `internal` — the document's own
+    §/article-to-§/article graph from `graph_internal`, unit ids collapsed by
+    `pinpoint.unit_anchor` so a stycke-level citation lands on its § rather
+    than fragmenting the view; `internal=true` asks for that same graph on a
+    plain document uri too. `coe/parse.py` gained inline linking of bare
+    "Article N" references to the instrument's own provisions (only ordinals
+    it holds; an external treaty citation wins the overlap) so the ECHR's
+    internal graph has edges to draw — 29 links recovered on that one treaty.
+    The in-repo explorer page (`/hanvisningar/`) that first drew this JSON is
+    retired; **paraGRAF**, a standalone app at https://para-graf.tomtebo.org
+    (github.com/staffanm/para-graf), is the endpoint's consumer now.
   - ✅ **NDJSON bulk dumps** (`lib/dump.py`, `lagen <src> dump`) — every
     `artifact/<source>/**.json` re-serialised one-per-line, gzipped, to
     `site/data/dumps/<source>.ndjson.gz`. Each line round-trips to its on-disk
@@ -4908,6 +4910,16 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **api/render** (2026-08-25) — the in-repo `/hanvisningar/` graph explorer is
+  retired: `lib/templates/hanvisningar.html`, `lib/assets/graf.js`,
+  `render._render_graph_page` and its `graf.js` asset write in
+  `render.write_assets`, and its `style.css` block are all gone. **paraGRAF**
+  (github.com/staffanm/para-graf, served at https://para-graf.tomtebo.org) is
+  a standalone app superseding it, talking to the public `/api/v1/graph` and
+  `/api/v1/search` endpoints. `GET /api/v1/graph` itself stays and gained one
+  parameter for paraGRAF's zoomed-in structure view: `internal=true` on a
+  plain document uri now includes that document's own §/article-to-§/article
+  graph too (a fragment uri already carried it).
 - **lawpub** (2026-08-24) — lawreview's tenth scope,
   `accommodanda/lawreview/lawpub.py`: the lawpub.se platform's open-access articles,
   across the seven publishers it hosts (the module's own registry) rather than one
@@ -5110,9 +5122,9 @@ in `git log`. This document is the forest-level status; section markers
   image built without `.git` (`.dockerignore`). Prod bind-mounted a second
   checkout for it. The entry above replaces that arrangement with the content
   repo the site already writes into.
-- **lib/api/coe** (2026-08-15) — a corpus-wide graph explorer,
-  `/hanvisningar/` (`lib/templates/hanvisningar.html`, `lib/assets/graf.js`)
-  over a new `GET /api/v1/graph` (`api/reads.graph`, `catalog.py`'s
+- **lib/api/coe** (2026-08-15, in-repo page superseded 2026-08-25) — a
+  corpus-wide graph explorer, `/hanvisningar/` (`lib/templates/hanvisningar.html`,
+  `lib/assets/graf.js`) over a new `GET /api/v1/graph` (`api/reads.graph`, `catalog.py`'s
   `graph_*` queries). Aggregated per neighbor document rather than per
   citation, grouped by a node vocabulary (`lib/facets.FLOW_GROUPS`/
   `flow_group`) moved out of `stats/compute.py` so the graph explorer and

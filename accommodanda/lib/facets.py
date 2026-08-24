@@ -1186,7 +1186,7 @@ def browse_view(con, source):
 # --------------------------------------------------------------------------
 
 # What one node of a cross-source citation view is (the stats flow diagram and
-# the /hanvisningar/ graph explorer both). Mostly the source itself, but two
+# the paraGRAF graph explorer both). Mostly the source itself, but two
 # places where the source is the wrong unit:
 #
 # * eurlex holds three kinds of law that behave differently and cite each other

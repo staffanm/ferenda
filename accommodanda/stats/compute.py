@@ -966,7 +966,7 @@ def _flows(con):
     """Every reference counted by (citing group, cited group), largest first.
 
     The catalog answers per (source, kind) -- 1 900 rows -- and the grouping
-    is `facets.flow_group`, shared with the /hanvisningar/ graph API, so one
+    is `facets.flow_group`, shared with the /api/v1/graph endpoint, so one
     map says what a node is. References to a document the corpus does not hold
     have no cited group and are not counted; 29's lede says how many that is."""
     flows = collections.Counter()

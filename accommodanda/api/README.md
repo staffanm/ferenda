@@ -453,12 +453,14 @@ curl -G http://127.0.0.1:8001/api/v1/document/outbound \
 Samma fakta som `inbound`/`outbound`, men aggregerat per granndokument (en
 rad per granne med länkantal) och grupperat med samma flödesgrupper som
 statistiksidans flödesdiagram (`lib/facets.flow_group`). Det är vad
-`/hanvisningar/`-utforskaren ritar. `direction=in|out|both` väljer sida,
-`groups=` filtrerar på flödesgrupp, `limit` sätter topplistans längd.
+paraGRAF-utforskaren (https://para-graf.tomtebo.org) ritar.
+`direction=in|out|both` väljer sida, `groups=` filtrerar på flödesgrupp,
+`limit` sätter topplistans längd.
 
 En fragment-URI (`…#K4P7`, `…#A6`) svarar för den enheten ensam och lägger
 till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå
-(§/artikel), med läsbara etiketter ("4 kap. 7 §").
+(§/artikel), med läsbara etiketter ("4 kap. 7 §"). `internal=true` lägger
+till samma graf även i svaret för en dokument-URI.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/graph \

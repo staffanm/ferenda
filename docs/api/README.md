@@ -321,8 +321,9 @@ guess.
 
 **Citation-graph neighbourhood — `GET /api/v1/graph?uri=…`** — the same
 citations `/document/inbound` and `/document/outbound` serve one row each,
-aggregated **per neighbour document** and ready to draw. This is what the
-`/hanvisningar/` explorer walks.
+aggregated **per neighbour document** and ready to draw. This is what
+[paraGRAF](https://para-graf.tomtebo.org) (github.com/staffanm/para-graf), a
+standalone graph-explorer app, walks.
 
 `direction` picks the sides (`in`, `out`, `both` — the default), `groups` is a
 comma-separated filter on the flow groups (`Författningar`, `Rättsfall`, …), and
@@ -331,7 +332,8 @@ comma-separated filter on the flow groups (`Författningar`, `Rättsfall`, …),
 
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
 `internal`: the document citing itself, as a provision-to-provision graph at
-§/article level.
+§/article level. `internal=true` asks for that same graph on a plain document
+uri too, for a zoomed-in structure view.
 
 **Document as PDF — `GET /api/v1/pdf?path=…`** — a generated page typeset for
 paper: A4, running heads, `n (total)` folios, a PDF outline. `path` is the
