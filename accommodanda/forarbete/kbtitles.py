@@ -85,7 +85,7 @@ RE_OPENER = re.compile(
 # it spaces it -- prop 1963:137 reads "..., m. mgiven Stockholms slott den 29
 # mars 1963", and there the glued match is the only thing that ends the title.
 # The price is that the same pattern cuts a title *containing* the letters
-# ("utgifven", "medgiven"): it would truncate 3 of the 15 889 intact propkb
+# ("utgifven", "medgiven"): it would truncate 3 of the 15 893 intact propkb
 # titles, none of which this module ever reads. Do not "fix" the boundary back.
 # The second reading is the same clause with its verb and its "den" garbled
 # ("givep Stockholms slott deri 24 fefrruapi lff33"), anchored on the word
@@ -271,14 +271,16 @@ def reader_title(title, body):
 
     Called for every förarbete document and gated on the defect, not on the
     corpus: a title carrying none of the three is returned character-for-
-    character as the record holds it, whitespace included -- 4 018 non-KB
+    character as the record holds it, whitespace included -- 4 006 non-propkb
     titles would otherwise have had theirs collapsed (rskr's trailing space, a
     newline inside a Ds title), which is a separate decision about a different
     corpus. The tuple repr and the placeholder are KB-only, but the line-break
-    hyphen is repaired wherever it stands: 37 non-KB titles carry U+00AD from a
-    CMS heading, and joining them gives what `lib.util.normalize_hints` gives
-    at harvest time, differing only where the continuation is capitalized
-    (twice in the corpus, and there this rule is the better one).
+    hyphen is repaired wherever it stands: 47 titles outside propkb carry one
+    (45 U+00AD from a CMS heading, 2 U+00AC), and on 45 of them this gives what
+    `lib.util.normalize_hints` gives at harvest time. The 2 differ because
+    `normalize_hints` removes U+00AD and the zero-width space and knows nothing
+    about U+00AC -- that character class, not the capitalization branch, is why
+    it cannot stand in for `dehyphenate` here.
 
     An absent title is the empty string, not None: 345 records (286 prop, 59
     dir, no propkb) carry ``"title": null`` because the upstream published

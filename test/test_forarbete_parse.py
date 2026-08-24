@@ -33,8 +33,11 @@ FIXTURES = Path(__file__).parent / "files" / "forarbete-legacy"
 
 
 def _harvested_rec(**kw):
+    # `title` is present on every one of the 89 674 real records (the downloader
+    # and every legacy adapter set it unconditionally, null at worst), so the
+    # fixture carries it too -- parse reads it without a default
     rec = {"type": "prop", "basefile": "1999/2000:1",
-           "identifier": "Prop. 1999/2000:1"}
+           "identifier": "Prop. 1999/2000:1", "title": "en propositionstitel"}
     rec.update(kw)
     return rec
 
@@ -305,7 +308,7 @@ def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
     monkeypatch.setattr(fa_parse, "parse_pdf", fake_parse_pdf)
     _stage(tmp_path, "sou", "2021:82", "2021-82.pdf", b"%PDF-")
     fa_parse.parse_record({"type": "sou", "basefile": "2021:82",
-                           "identifier": "SOU 2021:82",
+                           "identifier": "SOU 2021:82", "title": "en titel",
                            "files": ["2021-82.pdf"]}, tmp_path)
     assert seen["patch_key"] == ("forarbete", "sou/2021-82")
 

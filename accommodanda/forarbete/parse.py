@@ -763,7 +763,7 @@ def parse_record(record, root):
                      # the reader-facing one is this parse's output, and for the
                      # KB propositions that means undoing three defects the old
                      # ferenda entries carried -- see forarbete/kbtitles.py
-                     title=kbtitles.reader_title(record.get("title", ""), body),
+                     title=kbtitles.reader_title(record["title"], body),
                      date=record.get("date"), ocr=ocr, body=body)
 
 
