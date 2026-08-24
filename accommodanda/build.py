@@ -3358,8 +3358,8 @@ def lawreview_inputs(basefile):
 
 
 def lawreview_harvest(scopes):
-    """Bulk harvest of the two journals (scopes = journal codes; empty =
-    both). `--force` refetches every document; `--only svjt/2026-104` or
+    """Bulk harvest of the nine journals (scopes = journal codes; empty =
+    all). `--force` refetches every document; `--only svjt/2026-104` or
     `--only jp/2025-01-01` fetches a single article (needs its journal
     scope)."""
     _require_single_scope("lawreview", scopes, "journal",
@@ -3370,11 +3370,23 @@ def lawreview_harvest(scopes):
                  or "+".join(lawreview_download.SCOPES),
                  layout.LAWREVIEW_DOWNLOADED))
         return
-    # two journals, two hosts: fan them out the way guidance/rs/avg do
+    # one banner per scope in the run, each with its own host: the journals
+    # are separate upstreams and the run reads only the hosts it names, so a
+    # banner that listed every journal's origin would state requests the run
+    # never makes
+    for scope in (scopes or lawreview_download.SCOPES):
+        journal = lawreview_journals.BY_KOD[scope]
+        util.harvest_start("lawreview %s" % scope,
+                           ", ".join(journal.listings))
+    # nine journals, nine hosts: they fan out one worker per journal,
+    # regardless of the machine's worker count, so all nine walk in
+    # parallel (they ride different hosts and pace themselves), and a
+    # failing host is reported and re-run alone -- it does not take the
+    # others down
     totals = lawreview_download.sync(layout.LAWREVIEW_DOWNLOADED,
                                      scopes=scopes or None,
                                      full=RUN.force, only=RUN.only,
-                                     limit=RUN.limit, jobs=RUN.jobs)
+                                     limit=RUN.limit)
     for scope, (seen, new) in totals.items():
         print("lawreview %s: %d seen, %d new" % (scope, seen, new))
     return _sum_scope_totals(totals)
@@ -3392,7 +3404,7 @@ SOURCES["lawreview"] = Source("lawreview", lawreview_list, {
                           inputs=lawreview_inputs, code=LAWREVIEW_CODE),
 },
     harvest=lawreview_harvest,
-    origin=lawreview_download.ORIGIN,
+    self_banner=True,
     scopes=frozenset(lawreview_download.SCOPES),
     notes="download flag: --only journal/nummer (fetch one; needs its "
           "journal scope). One known exception: the 1941 article promoted on "
@@ -3401,12 +3413,17 @@ SOURCES["lawreview"] = Source("lawreview", lawreview_list, {
           "scopes are the journals: " + ", ".join(
               "%s (%s)" % (j.kod, j.namn)
               for j in lawreview_journals.JOURNALS)
-          + "; empty = both\n"
+          + "; empty = all\n"
           "svjt's document is the article's own page (the PDF, where the "
           "journal publishes one, is a copy of it); jp's is the issue's "
           "PDF, its metadata read off the issue page\n"
+          "lod's document is the article's own page; only the volumes "
+          "Lovdata publishes as pages (2022-) are walked, the earlier "
+          "volumes being full-issue PDFs\n"
           "jp's host rate-limits with HTTP 466, which the harvest rides out "
-          "on its own")
+          "on its own\n"
+          "the journals fan out one worker per scope (separate hosts); "
+          "--jobs does not apply here")
 
 
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden

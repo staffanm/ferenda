@@ -26,8 +26,8 @@ formatting quirks, the citation grammar) and discards the framework.
   **foreskrift** (agency regulations), **avg** (JO/JK decisions),
   **rs** (agency legal positions), **guidance** (soft law from 12 EU
   agencies and bodies),
-  **lawreview** (journal articles from Svensk Juristtidning and Juridisk
-  Publikation, mined for the references they make),
+  **lawreview** (journal articles from nine journals — svjt, jp, ft, nmt,
+  njel, siplr, urt, euar, lod — mined for the references they make),
   **remisser** (consultation responses), **wiki** (begrepp/definitions).
   We are not at full parity with the old system, but new sources beyond the
   original scope (notably eurlex and foreskrift) are now handled.

@@ -213,13 +213,13 @@ diagnosis, not an open item.
 | `parse.py` | one parse for both routes. **Route B** reads the document's PDF: `lib/pdftext.classify_letterhead` for the body layer, per-issuer field readers for what the cover adds, `numbered_breaks` for the punkt numbering the paragraph-gap heuristic cannot see (the number is set in a column of its own), `join_continuations` to rejoin a paragraph a page break split, and `footnotes` for the apparatus the block classifier drops — a riktlinje cites the yttranden it builds on far more often in its notes than in its running text. `eba_cover_title` reads the **Swedish** title off the EBA's own cover: 72 of its 80 documents are Swedish text but its leaf page, its link and its file name all name them in English, and the corpus cites this material by title far more often than by number. **Route A** reads whichever manifestation CELLAR served — Formex through `lib/formex.py` (`_formex_main` picks the reader off the root tag: `GENERAL`, an ECB-yttrande as printed in the C series, carries its text in CONTENTS and the act reader walks straight past it), the PDF through the same paragraph reader route B uses, and EUR-Lex HTML as the flat `<p>` run it is served as |
 | `render.py` | the riktlinjesida: the EDPB/WP29 guidance body and its sections. Registered as this source's page renderer in `build.SOURCE_RENDERERS`; `render(art, site) -> str`, built on the `lib/page` kit, with its own page template in `templates/` |
 
-**lawreview vertical (tidskriftsartiklar — Svensk Juristtidning + Juridisk Publikation)**
+**lawreview vertical (tidskriftsartiklar — nine journals of `journals.py`)**
 | File | What |
 |---|---|
-| `journals.py` | the data registry: a `Journal` states the one axis the two publishers differ on — kod, full name, citation abbreviation, base URL, archive listing page, and whether the document is a web page (svjt) or a PDF (jp). Nothing in the vertical branches on the journal code except to read one of these two entries |
-| `download.py` | one walker per journal, fanned out through `lib.harvest.dispatch_scopes` the way `guidance`/`rs`/`avg` do. **svjt** enumerates the archive's own year filter (1916–, nothing hand-kept) and reads each year page's article cards, storing the article's own web page as the document. **jp** enumerates the one menu page's 37 issues and reads each issue page's text blocks, storing the issue's PDF as the document; the host rate-limits with a non-standard WAF status (466), which `lib.net`'s retry table covers like any other throttle |
-| `model.py` | `Artikel` — the thinnest model in the corpus (no currency axis, no version axis, no relation axis: an article is a fixed historical publication). `slug`/`uri` are minted from the journal's own coordinates (svjt: the opening page, `2026-104`; jp: year-issue-sequence, `2025-01-03`), and `identifier` is the citation form itself ("SvJT 2026 s. 104", "JP 2009 s. 37", falling back to the issue place, "JP 2014 jubileumsnummer-02", only where jp records no page) |
-| `parse.py` | mining only: the article's whole text, every paragraph as an ordinary stycke, handed straight to the citation scanner — no headings classified, no cover or running head removed, footnotes kept (that is where the SOU/NJA references are densest). `_svjt_body` reads the stored page's `div.body` paragraphs; `_jp_body` reads the stored PDF's running text off `lib/pdftext`, and `_jp_start_page` recovers the Särtryck's "sida N" footer as the article's citable opening page |
+| `journals.py` | the data registry: a `Journal` states the axes the nine publishers differ on — kod, full name, citation abbreviation, base URL, archive listing page, and whether the document is a web page (svjt, euar, lod) or a PDF (the rest). Nothing in the vertical branches on the journal code except to read one of these entries |
+| `download.py` | the entry point (`sync`, one walker per journal, fanned out through `lib.harvest.dispatch_scopes` the way `guidance`/`rs`/`avg` do — a failing host is reported and the others go on). **svjt** (here) enumerates the archive's own year filter (1916–, nothing hand-kept) and reads each year page's article cards, storing the article's own web page as the document, and uses a harvest watermark so a caught-up run reads only its newest year. **jp** (here) enumerates the one menu page's issues and reads each issue page's text blocks, storing the issue's PDF as the document; the host rate-limits with a non-standard WAF status (466), which `lib.net`'s retry table covers like any other throttle. The other seven journals own modules: `ft.py`, `nmt.py`, `njel.py`, `siplr.py`, `urt.py`, `euar.py`, `lod.py`. Every one of them except `nmt` walks its archive newest-first behind a harvest watermark, so a caught-up run reads the index and its newest issue's page and stops, and never re-fetches an issue page whose records are all stored — for `njel` (whose host asks for a sixty-second crawl delay) that is the difference between minutes and an hour. `nmt` is the exception: its two listing pages are the whole archive, so they are re-read on every run and only the PDFs that move are fetched. `euar` keeps the four item addresses the journal has broken on its own side in `DEAD_ITEM_URLS` (see `KNOWN-GAPS.md`), so its store can complete clean |
+| `model.py` | `Artikel` — the thinnest model in the corpus (no currency axis, no version axis, no relation axis: an article is a fixed historical publication). `slug`/`uri` are minted from the journal's own coordinates (svjt: the opening page, `2026-104`; jp: year-issue-sequence, `2025-01-03`), and `identifier` is the citation form itself (one small rule per journal, keyed off its kod — "SvJT 2026 s. 104", "JP 2009 s. 37", "FT 2025 s. 23", …) |
+| `parse.py` | mining only: the article's whole text, every paragraph as an ordinary stycke, handed straight to the citation scanner — no headings classified, no cover or running head removed, footnotes kept (that is where the SOU/NJA references are densest). A page-bodied article (svjt, euar, lod) is read off its stored page by the reader its `page_reader` names; a PDF-bodied one off `lib/pdftext`, its citable opening page recovered per `journals.Journal.sida_kalla` (jp's Särtryck footer, ft's first-leaf table of contents, or the listing's own statement) |
 
 There is no renderer: the articles are not republished (no page, no browse
 tree, no frontpage entry, no feed, `UNSEARCHED` in `build.py`) — only the
@@ -766,15 +766,22 @@ carries their own acronym (`ESRB/2017/6`, `EBA/GL/2021/05`, `ESMA/2013/720`,
 `CON/2013/82`, `BoR (11) 67`). `guidance/KNOWN-GAPS.md` records what the grammar
 deliberately does *not* catch, and why EIOPA and ACER are left out of it.
 
-**lawreview — tidskriftsartiklar, två tidskrifter** (operates on
+**lawreview — tidskriftsartiklar, nio tidskrifter** (operates on
 `site/data/{downloaded,artifact}/lawreview/`):
 
 ```sh
-uv run python -m accommodanda.build lawreview download           # both journals
+uv run python -m accommodanda.build lawreview download           # all nine journals, fanned out one host each
 uv run python -m accommodanda.build lawreview download svjt      # one journal
 uv run python -m accommodanda.build lawreview download jp --only jp/2026-01-02
 uv run python -m accommodanda.build lawreview parse              # incremental, like every source
 ```
+
+A failing journal is reported and the run carries on with the rest (re-run
+the failed scope on its own). Every journal but nmt keeps a harvest
+watermark, so a caught-up run reads only the newest year page (svjt) or the
+first listing page(s) and the newest issue's page instead of re-walking the
+archive; nmt's two listing pages are the whole archive, so it enumerates
+them every run.
 
 The articles are not republished on the site: they are mined for the
 references they make, which is what puts an article on the context rails of
@@ -784,6 +791,12 @@ search index entries of their own. SvJT's document is the article's
 own web page (a page exists for every article, 1916 and all); JP's is the
 issue's PDF (its issue page carries the title, author and abstract). JP's
 host rate-limits with HTTP 466, which the fetch waits out on its own.
+Lov & Data's document is the article's own web page, but only its 2022 and
+later volumes exist as pages — the earlier volumes are full-issue PDFs, and
+the walk takes only the issues whose pages list articles. Its articles
+carry no page numbers, so the identifier stops at the issue
+("Lov & Data 3/2022") and the basefile's sequence number keeps the issue's
+articles apart.
 
 **HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law**:
 

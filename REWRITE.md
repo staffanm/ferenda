@@ -169,7 +169,7 @@ accommodanda/
   avg/      JO/JK/ARN/IMY/KKV-decisions vertical — download·model·parse
   rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
   guidance/ EU soft-law source, 12 issuing bodies (EDPB·EBA·EASA·ACER·ESMA·ENISA·BEREC·EDPS·EIOPA·EUIPO·ECB·ESRB) — issuers·<body>_download·eurlex_download·model·parse·render
-  lawreview/ journal-article vertical (Svensk Juristtidning + Juridisk Publikation) — journals·download·model·parse (mined for citations only: no pages, feed or index of their own; a rail line links to the journal's own page)
+  lawreview/ journal-article vertical, nine journals (svjt·jp·ft·nmt·njel·siplr·urt·euar·lod) — journals·download·<journal>·model·parse (mined for citations only: no pages, feed or index of their own; a rail line links to the journal's own page; svjt and lod walk on harvest watermarks)
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)

@@ -1,38 +1,24 @@
 """Typed model for a tidskriftsartikel -- one article in one issue of one of
-the two journals in `journals.py`.
+the nine journals in `journals.py`.
 
 An article is a fixed historical publication: it is issued in one issue, it
 revises in place nowhere, and it is withdrawn nowhere. Its model is therefore
 the thinnest in the corpus -- identity, the issue's coordinates, the author,
-the abstract, and the text. There is no currency axis, no version axis and no
-relation axis, because the publisher states none.
+and the text (the abstract where the listing states one). There is no currency
+axis, no version axis and no relation axis, because the publishers state none.
 
 The text is the mining text, not a republished edition: every paragraph in
-order, no structure read off it (see `parse`), because the site shows the
-article as a pointer to the journal's own page and PDF. The only thing the
-text must survive is the citation scan that reads it.
+order, no structure read off it (see `parse`), because the journals publish
+the article as a pointer to their own page or PDF. The only thing the text
+must survive is the citation scan that reads it.
 
 The coordinates differ with the journal, and that is data in `journals`, not
-branches here:
-
-  * **svjt** numbers each article by the page of its issue it opens on
-    ("SvJT 2026 s. 104"). `issue` is that page number and there is no
-    sequence.
-  * **jp** numbers no sequence at all; the article's place in its issue is
-    its order in the issue's table of contents, carried as a two-digit `seq`
-    ("JP 2025 nr 1-03"), and its citation page is the `sida` the Särtryck
-    prints as its page footer ("JP 2009 s. 37"). An issue is "01" or "02",
-    or "J" for the jubileumsnummer.
-
-The article's citation takes the minimal form articles get -- abbreviated
-journal name, year, opening page ("JP 2009 s. 37") -- and only when no page
-is on record does the article's place in the issue stand in for it ("JP 2014
-jubileumsnummer-02").
-
-URI scheme: ``https://lagen.nu/lawreview/{journal}/{year}-{issue}[-{seq}]`` --
-the svjt grammar with the jp sequence appended, and the basefile is the same
-address with the host off, which is why `slug` is the one field both derive
-from.
+branches here. The identifier takes the minimal article-citation form each
+journal's own references use -- see `_IDENTIFIER`, one small rule per journal
+-- and the basefile (the `slug`) is the same coordinates joined in the order
+`journals.Journal.slug_parts` states: ``svjt/2026-104`` (the issue is the
+page), ``jp/2026-01-03`` (issue, then place in the issue), ``urt/2026-1-147``
+(issue, then page -- UrT numbers no sequence at all).
 """
 
 from dataclasses import dataclass, field
@@ -64,22 +50,32 @@ class Block:
 class Artikel:
     journal: str                            # journals.JOURNALS' kods
     year: str                               # the issue's year, "2026"
-    issue: str                              # the page (svjt) or 01/02/J (jp)
+    issue: str                              # the page (svjt) or the issue's own number
     titel: str
-    seq: str | None = None                  # the jp place in its issue, "03"
-    kind: str | None = None                 # "inledning" (the jp editors' words)
+    seq: str | None = None                  # the place in the issue, "03"
+    kind: str | None = None                 # jp's "inledning"; lod's theme ("Leder")
     fattare: str | None = None              # the author, as the listing states
     sammanfattning: str | None = None       # the abstract, as the listing states
     body: list[Block] = field(default_factory=list)   # the mining text
-    sida: str | None = None                # the issue page the article opens on (jp)
+    sida: str | None = None                 # the issue page the article opens on
+    date: str | None = None                 # the day the publisher states (euar, lod)
     source_url: str | None = None           # the journal's own page for it
     document_url: str | None = None         # the PDF the journal published it as
 
     @property
     def slug(self):
-        if self.seq is None:
-            return "%s-%s" % (self.year, self.issue)
-        return "%s-%s-%s" % (self.year, self.issue, self.seq)
+        """The basefile with its journal segment off: the journal's own
+        coordinates joined in `journals.Journal.slug_parts` order."""
+        parts = BY_KOD[self.journal].slug_parts
+        out = []
+        for part in parts:
+            value = getattr(self, part)
+            if value is None:
+                raise ValueError(
+                    "%s %s-%s has no %s for its basefile"
+                    % (self.journal, self.year, self.issue, part))
+            out.append(str(value))
+        return "-".join(out)
 
     @property
     def uri(self):
@@ -87,21 +83,10 @@ class Artikel:
 
     @property
     def identifier(self):
-        """The citation form: the minimal article citation, abbreviated name,
-        year, opening page ("SvJT 2026 s. 104", "JP 2009 s. 37"). The opening
-        page is the article's `issue` (svjt) or its Särtryck footer page
-        `sida` (jp); only when a jp article has no page on record does its
-        place in the issue stand in ("JP 2014 jubileumsnummer-02")."""
-        journal = BY_KOD[self.journal]
-        page = self.sida if self.sida is not None else \
-            (self.issue if self.seq is None else None)
-        if page is not None:
-            return "%s %s s. %s" % (journal.abbrev, self.year, page)
-        issue = {"01": "nr 1", "02": "nr 2", "J": "jubileumsnummer"}
-        if self.issue not in issue:
-            raise ValueError("no jp issue label for %r" % self.issue)
-        return "%s %s %s-%s" % (journal.abbrev, self.year, issue[self.issue],
-                                self.seq)
+        """The citation form: the minimal article citation the journal's own
+        references use. One small rule per journal, keyed off its kod -- see
+        `_IDENTIFIER`."""
+        return _IDENTIFIER[self.journal](BY_KOD[self.journal], self)
 
     @property
     def publisher(self):
@@ -111,12 +96,12 @@ class Artikel:
         """The JSON artifact: the shared node convention (`structure` of
         stycke nodes with inline-run text), every text scanned for
         citations -- which is what puts an article's references on the
-        context rails of the documents it names. The year is the one date
-        the publisher states and it is widened to a representative day
-        (`lib.util.approximate_date` fills a bare year's middle), because
-        the catalog's date projection expects a 10-char ISO date, and every
-        dated document in the corpus stores one. The issue's year stays a
-        separate field."""
+        context rails of the documents it names. The catalog's date
+        projection expects a 10-char ISO date, and every dated document in
+        the corpus stores one: the day the publisher states (`date`, the
+        euar items' "Publicerad" line) stands as it is, and a bare year is
+        widened to a representative day (`lib.util.approximate_date` fills
+        its middle). The issue's year stays a separate field."""
         structure = scanned_nodes(self.body, scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "year": self.year}
@@ -128,7 +113,7 @@ class Artikel:
             metadata["sida"] = self.sida
         art = {"uri": self.uri, "type": "juridisk_artikel",
                "journal": self.journal,
-               "date": approximate_date(self.year),
+               "date": self.date or approximate_date(self.year),
                "identifier": self.identifier,
                "metadata": metadata, "structure": structure}
         if self.sammanfattning:
@@ -138,3 +123,114 @@ class Artikel:
         if self.document_url:
             art["document_url"] = self.document_url
         return art
+
+
+# --------------------------------------------------------------------------
+# one identifier rule per journal
+# --------------------------------------------------------------------------
+
+def _id_svjt(journal, artikel):
+    """The issue's number *is* the article's opening page ("SvJT 2026 s. 104")."""
+    return "%s %s s. %s" % (journal.abbrev, artikel.year, artikel.issue)
+
+
+def _id_jp(journal, artikel):
+    """The opening page the Särtryck's footer prints ("JP 2009 s. 37"); only
+    when no page is on record does the place in the issue stand in
+    ("JP 2014 jubileumsnummer-02")."""
+    if artikel.sida is not None:
+        return "%s %s s. %s" % (journal.abbrev, artikel.year, artikel.sida)
+    if artikel.seq is None:
+        raise ValueError("jp %s %s has neither page nor place"
+                         % (artikel.year, artikel.issue))
+    label = journal.issue_labels[artikel.issue]
+    return "%s %s %s-%s" % (journal.abbrev, artikel.year, label, artikel.seq)
+
+
+def _id_ft(journal, artikel):
+    """The page the PDF's first leaf prints as the issue's running table of
+    contents ("FT 2025 s. 23"); when that line states no page, the place in
+    the issue stands in ("FT 2026 nr 1-02")."""
+    if artikel.sida is not None:
+        return "%s %s s. %s" % (journal.abbrev, artikel.year, artikel.sida)
+    if artikel.seq is None:
+        raise ValueError("ft %s %s has neither page nor place"
+                         % (artikel.year, artikel.issue))
+    return "%s %s nr %s-%s" % (journal.abbrev, artikel.year, artikel.issue,
+                               artikel.seq)
+
+
+def _id_nmt(journal, artikel):
+    """The issue's own number and the page the issue's table of contents
+    states ("NMT 2025:2 s. 5"; the special issues are ":s"). The journal's
+    oldest hands set no page on some of the lines of a table of contents,
+    and where the line states none, the article's place in the issue takes
+    the page's turn ("NMT 2017:1 nr 1")."""
+    if artikel.sida is None:
+        return "%s %s:%s nr %s" % (journal.abbrev, artikel.year,
+                                   artikel.issue, artikel.seq)
+    return "%s %s:%s s. %s" % (journal.abbrev, artikel.year, artikel.issue,
+                               artikel.sida)
+
+
+def _id_njel(journal, artikel):
+    """Issue in parentheses, then the first page of the issue range the
+    issue's table of contents gives ("NJEL 2024(1) s. 213"). The journal's
+    editorial notes set no page range in the listing (two on record, the
+    2019(2) and 2021(1) notes), and where the line states none, the
+    article's place in the issue takes the page's turn
+    ("NJEL 2019(2) nr 01")."""
+    if artikel.sida is None:
+        if artikel.seq is None:
+            raise ValueError("njel %s(%s) has neither page nor place"
+                             % (artikel.year, artikel.issue))
+        return "%s %s(%s) nr %s" % (journal.abbrev, artikel.year,
+                                    artikel.issue, artikel.seq)
+    return "%s %s(%s) s. %s" % (journal.abbrev, artikel.year, artikel.issue,
+                                artikel.sida)
+
+
+def _id_siplr(journal, artikel):
+    """The opening page the article's PDF footer prints ("SIPLR 2025 s. 5");
+    only where the journal's one scanned article prints no footer does the
+    place in the issue stand in ("SIPLR 2020 #1-04")."""
+    if artikel.sida is not None:
+        return "%s %s s. %s" % (journal.abbrev, artikel.year, artikel.sida)
+    if artikel.seq is None:
+        raise ValueError("siplr %s %s has neither page nor place"
+                         % (artikel.year, artikel.issue))
+    return "%s %s #%s-%s" % (journal.abbrev, artikel.year, artikel.issue,
+                             artikel.seq)
+
+
+def _id_urt(journal, artikel):
+    """The journal's own form, issue and page both from its listing's
+    citation ("UrT 2026 no 1 p. 147")."""
+    if artikel.sida is None:
+        raise ValueError("urt %s %s states no page"
+                         % (artikel.year, artikel.issue))
+    return "%s %s no %s p. %s" % (journal.abbrev, artikel.year,
+                                  artikel.issue, artikel.sida)
+
+
+def _id_lod(journal, artikel):
+    """The journal's own masthead form, number over year ("Lov & Data
+    3/2022"). The web edition prints no page numbers, so the citation stops
+    at the issue, and the basefile's sequence number alone keeps the
+    issue's articles apart."""
+    return "%s %s/%s" % (journal.abbrev, artikel.issue, artikel.year)
+
+
+def _id_euar(journal, artikel):
+    """The newsletter's own number, then the item's place in it
+    ("EU & arbetsrätt 2026 nr 2-01")."""
+    if artikel.seq is None:
+        raise ValueError("euar %s %s has no place in the issue"
+                         % (artikel.year, artikel.issue))
+    return "%s %s nr %s-%s" % (journal.abbrev, artikel.year, artikel.issue,
+                               artikel.seq)
+
+
+_IDENTIFIER = {"svjt": _id_svjt, "jp": _id_jp, "ft": _id_ft, "nmt": _id_nmt,
+               "njel": _id_njel, "siplr": _id_siplr, "urt": _id_urt,
+               "euar": _id_euar, "lod": _id_lod}

@@ -1,38 +1,61 @@
 """Entry point for the lawreview harvest: one run per journal scope.
 
-The two journals are separate upstreams sharing nothing but this entry point,
-so they are two scopes in `lib.harvest.dispatch_scopes`' sense and fan out the
-way `guidance`/`rs`/`avg` do. Storage is ``site/data/downloaded/lawreview/
-{svjp}/`` -- the journal is the directory, and the slugged basefile the file
-stem (``svjt/svjt-2026-104.html``, ``jp/jp-2025-01-01.pdf``).
+The journals are separate upstreams sharing nothing but this entry point, so
+they are as many scopes in `lib.harvest.dispatch_scopes`' sense and fan out
+the way `guidance`/`rs`/`avg` do. Storage is
+``site/data/downloaded/lawreview/{journal}/`` -- the journal is the directory,
+and the slugged basefile the file stem (``svjt/svjt-2026-104.html``,
+``jp/jp-2025-01-01.pdf``, ``urt/urt-2026-1-147.pdf``).
 
-The two walks differ only in what the listing is and what an entry names:
+Each journal walks its own archive in its own module -- `svjt` and `jp` here,
+the six newer ones in their own files, each one the shape of that journal's
+listing: the svjt archive's year pages carry the article cards; the jp menu
+page its issues; the ft platform's archive page its issue buttons, the
+issue page its open-access cards; the nmt listing pages their issues' tables
+of contents in full; the njel platform's one archive page its issues; the
+siplr issues page its issues, the issue page its article headings beside
+their PDFs; the urt listing its entries, the entry's own page its PDF; the
+euar index page its issues, the issue page its item links, the item's own
+page its document; the lod index page its years, the year pages their
+issues, the issue page its table of contents, the article's own page its
+document.
 
-  * **svjt** enumerates the archive year by year (the archive page's own year
-    filter states the range, so nothing is hand-kept): each year page's
-    article cards carry the title, the author, the teaser and the PDF link,
-    and each entry's document is the article's own web page. A page exists for
-    every article, 1916 and all.
+The deep listings walk newest-first and stop on the harvest watermark's
+caught-up gate. svjt is the deepest: 1916 to now, ~17,000 article pages. A
+year, once out, receives no new article after it -- the journal revises its
+newest year in place and opens the next in January -- so a caught-up run
+reads its newest year page and stops, and only a first run or a `--full` run
+walks the whole depth. lod, njel, siplr, jp, ft, urt and euar walk their
+shallower issue archives on the same gate: a caught-up run reads the index
+and its newest issue's page and stops, and the archive behind it -- and the
+issue pages in it -- are never re-read. nmt is the exception: its two
+listing pages are the whole archive, so it re-reads them on every run and
+fetches only the PDFs that moved.
 
-  * **jp** enumerates its issues off one menu page (the 37 issues since 2009,
-    newest first), and each issue page's text blocks carry the title (as the
-    PDF link), the abstract and the author: the entry's document is the PDF.
-    The host answers a rate-limited client with a non-standard WAF status
-    (466), which `lib.net`'s retry table covers like any other throttle.
+The jp host answers a rate-limited client with a non-standard WAF status
+(466), which `lib.net`'s retry table covers like any other throttle.
 """
 
 import re
 import time
+from pathlib import Path
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
 from ..lib.harvest import select_pending
-from ..lib.util import normalize_space
-from .journals import JOURNALS, JP, SVJT
+from ..lib.util import approximate_date, normalize_space, record_path
+from .euar import euar_sync
+from .ft import ft_sync
+from .journals import JP, SVJT
+from .lod import lod_sync
+from .njel import njel_sync
+from .nmt import nmt_sync
+from .siplr import siplr_sync
+from .urt import urt_sync
 
-__all__ = ["ORIGIN", "SCOPES", "SYNC", "sync"]
+__all__ = ["SCOPES", "SYNC", "sync"]
 
 # the svjt archive's year filter, as a <select> of four-digit <option>s. The
 # sibling filter (the häfte) offers one- and two-digit values, which is what
@@ -54,7 +77,7 @@ def _svjt_years(session):
     """The archive's own year range, read off the archive page's year filter --
     a new issue year appears there the day it publishes, so nothing here has to
     be re-kept when the journal reaches a new year."""
-    html = net.request(session, "GET", SVJT.listing).text
+    html = net.request(session, "GET", SVJT.listings[0]).text
     years = {m for m in RE_YEAR_OPTION.findall(html)
              if 1900 <= int(m) < 2100}
     return sorted(years)
@@ -158,36 +181,66 @@ def _svjt_records(session, year, delay):
             for r in _svjt_records_from_page(html, year)]
 
 
-def verify_page(data):
-    """The default `walk_records` check is PDF-shaped; svjt's document is a
-    page. A WAF challenge page serves no article at all, but so does a listing
-    the mirror serves in an article's place -- and a listing carries the
-    article-node marker as often as an article does (its cards each link one),
-    so that marker alone cannot tell them apart. An article page is the only
-    kind that sets its running text in `div.body`, which is what `_svjt_body`
-    reads, so the check asks for that."""
-    assert isinstance(data, str), "a page body must be text, not bytes"
-    if 'class="body"' not in data:
-        raise ValueError("served a non-article page; record left unwritten")
+# A WAF challenge page serves no article at all, but so does a listing the
+# mirror serves in an article's place -- and a listing carries the
+# article-node marker as often as an article does (its cards each link one),
+# so that marker alone cannot tell them apart. An article page is the only
+# kind that sets its running text in `div.body`, which is what
+# `parse._svjt_body` reads, so the check asks for that.
+verify_page = harvest.page_verifier('class="body"')
 
 
 def svjt_sync(root, full=False, only=None, limit=None, delay=0.5):
     """The whole svjt archive, every year page, every article page behind it.
-    `--only svjt/2026-104` names its own year, so that one page is the only
-    listing fetched and the walk stores that one document."""
+    The walk runs newest-first and stops on the harvest watermark's
+    caught-up gate: the newest year's article pages all downloaded already
+    say the archive is caught up, and the walk stops there, well short of
+    the 1916 depth. `--only svjt/2026-104` names its own year instead, so
+    that one page is the only listing fetched and the walk stores that one
+    document, the watermark untouched."""
     session = net.make_session(net.BROWSER_UA)
     if only:
-        years = [only.split("/", 1)[1][:4]]
-    else:
-        years = _svjt_years(session)
-    pending = []
-    for year in years:
-        pending.extend(_svjt_records(session, year, delay))
-    return harvest.walk_records(
-        root, select_pending(pending, only,
-                             "the svjt archive carries no article %s"),
-        delay=delay, full=full, limit=limit, scope="svjt",
-        document=harvest.page_path, verify=verify_page)
+        year = only.split("/", 1)[1][:4]
+        pending = _svjt_records(session, year, delay)
+        return harvest.walk_records(
+            root, select_pending(pending, only,
+                                 "the svjt archive carries no article %s"),
+            delay=delay, full=full, limit=limit, scope="svjt",
+            document=harvest.page_path, verify=verify_page)
+    watermark = harvest.HarvestWatermark(
+        Path(root) / "svjt" / ".watermark.json",
+        lookahead_limit=3, safety_days=30)
+
+    def items():
+        # newest year first; within a year, the cards' own page numbers
+        # newest first -- the year pages set their cards in no order at all
+        for year in reversed(_svjt_years(session)):
+            html = net.request(session, "GET",
+                               "%s/arkiv/%s" % (SVJT.base, year)).text
+            time.sleep(delay)
+            records = _svjt_records_from_page(html, year)
+            records.sort(key=lambda r: (int(r["year"]), int(r["issue"])),
+                         reverse=True)
+            yield from records
+
+    def item_key(record):
+        return harvest.document_item_key(
+            record, record_path(root, "svjt", record["basefile"]),
+            harvest.page_path(root, record["basefile"]),
+            # the journal states the year, not the day: the year's middle
+            date=approximate_date(record["year"]))
+
+    def resolve(record):
+        return harvest.resolve_document(
+            record, record_path(root, "svjt", record["basefile"]),
+            harvest.page_path(root, record["basefile"]),
+            lambda: net.request(session, "GET", record["source_url"]).text,
+            verify_page, full=full, delay=delay)
+
+    result = harvest.walk(
+        items(), resolve=resolve, item_key=item_key, watermark=watermark,
+        full=full, limit=limit, only=only, scope="svjt")
+    return result.seen, result.new
 
 
 # --------------------------------------------------------------------------
@@ -205,7 +258,7 @@ def _jp_issues(session):
     """The journal's whole issue inventory: the menu the one listing page
     states, newest first. The menu is set twice on the page, so an issue is
     kept once, on its first link."""
-    html = net.request(session, "GET", JP.listing).text
+    html = net.request(session, "GET", JP.listings[0]).text
     soup = BeautifulSoup(html, "html.parser")
     issues = {}
     for a in soup.find_all("a", href=RE_JP_ISSUE_HREF):
@@ -326,7 +379,9 @@ def _jp_issue_records(session, slug, label, delay):
     lazy fetch, so a run that walks a subset fetches only that subset's
     documents. The listing fetch sleeps `delay` like every other fetch in
     the walk (the edpb rule) -- this is the host that answers a rate-limited
-    client with 466, so the issue pages are paced rather than ridden out."""
+    client with 466, so the issue pages are paced rather than ridden out.
+    The `--only` path is the one that takes the page this way: a named issue
+    is the whole run, and a page that serves no article list fails it loud."""
     html = net.request(session, "GET",
                        "%s/tidskriften/%s/" % (JP.base, slug)).text
     time.sleep(delay)
@@ -338,56 +393,99 @@ def _jp_issue_records(session, slug, label, delay):
 
 
 def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
-    """The journal's whole issue inventory: the one listing page, then every
-    issue page behind it and every PDF the issue names. `--only
-    jp/2025-01-01` names its own issue, which is then the only issue page
-    fetched and the walk stores that one document."""
+    """The journal's whole issue inventory: the one listing page, then the
+    issue pages newest-first and every PDF the issue names. A watermark on
+    the issue's year stops a caught-up run once its newest issues are on
+    disk in full, and never re-fetches an issue page whose records are all
+    stored. `--only jp/2025-01-01` names its own issue, which is then the
+    only issue page fetched and the walk stores that one document."""
     session = net.make_session(net.BROWSER_UA)
+    issues = _jp_issues(session)
     if only:
         year, code = only.split("/", 1)[1].split("-")[:2]
-        issues = [(s, l) for s, l in _jp_issues(session)
+        issues = [(s, l) for s, l in issues
                   if _jp_issue_code(s, l) == (code, year)]
-    else:
-        issues = _jp_issues(session)
-    pending, holes = [], []
-    for slug, label in issues:
-        # the slug rule runs outside the try: a slug shape the registry does
-        # not hold is a code gap and fails the run loud, never a skip
-        _jp_issue_code(slug, label)
-        try:
+        pending = []
+        for slug, label in issues:
             pending.extend(_jp_issue_records(session, slug, label, delay))
-        except ValueError as err:
-            # a challenged or template-less page can read as an articleless
-            # issue: one issue that serves no page must not stop the sweep
-            # over the others. The Skip is the record of the miss: `walk`
-            # logs it as an enumerate line, and the next run re-walks the
-            # whole listing anyway, so nothing is stranded.
-            if only:
-                raise    # the named issue is the whole run
-            holes.append(harvest.Skip("jp %s served no article list: %s"
-                                      % (slug, err)))
-    return harvest.walk_records(
-        root, [*select_pending(pending, only,
-                               "the jp listing carries no document %s"),
-               *holes],
-        delay=delay, full=full, limit=limit, scope="jp")
+        return harvest.walk_records(
+            root, select_pending(pending, only,
+                                 "the jp listing carries no document %s"),
+            delay=delay, full=full, limit=limit, scope="jp")
+    # the slug rule runs before the walk: a slug shape the registry does not
+    # hold is a code gap and fails the run loud, never a skip
+    for slug, label in issues:
+        _jp_issue_code(slug, label)
+    watermark = harvest.HarvestWatermark(
+        Path(root) / "jp" / ".watermark.json",
+        lookahead_limit=3, safety_days=30)
+
+    def items():
+        # the menu sets the issues newest first: a caught-up run proves its
+        # newest issues are complete and stops, and the backlist is never
+        # re-read
+        for slug, label in issues:
+            try:
+                html = net.request(session, "GET",
+                                   "%s/tidskriften/%s/" % (JP.base, slug)).text
+                time.sleep(delay)
+                records = _jp_records_from_page(html, slug, label)
+            except ValueError as err:
+                # a challenged or template-less page can read as an
+                # articleless issue: one issue that serves no page must not
+                # stop the sweep over the others. The Skip is the record of
+                # the miss: `walk` logs it, the store stays dirty, and the
+                # next run re-meets the page
+                yield harvest.Skip("jp %s served no article list: %s"
+                                   % (slug, err))
+                continue
+            yield from records
+
+    def item_key(record):
+        return harvest.document_item_key(
+            record, record_path(root, "jp", record["basefile"]),
+            harvest.pdf_path(root, record["basefile"]),
+            # the journal states the year, not the day: the year's middle
+            date=approximate_date(record["year"]))
+
+    def resolve(record):
+        return harvest.resolve_document(
+            record, record_path(root, "jp", record["basefile"]),
+            harvest.pdf_path(root, record["basefile"]),
+            lambda: net.request(session, "GET",
+                                record["document_url"]).content,
+            harvest.verify_pdf, full=full, delay=delay)
+
+    result = harvest.walk(
+        items(), resolve=resolve, item_key=item_key, watermark=watermark,
+        full=full, limit=limit, only=only, scope="jp")
+    return result.seen, result.new
 
 
 # --------------------------------------------------------------------------
 # the shared entry point
 # --------------------------------------------------------------------------
 
-SYNC = {"svjt": svjt_sync, "jp": jp_sync}
+SYNC = {"svjt": svjt_sync, "jp": jp_sync, "ft": ft_sync, "nmt": nmt_sync,
+        "njel": njel_sync, "siplr": siplr_sync, "urt": urt_sync,
+        "euar": euar_sync, "lod": lod_sync}
 SCOPES = tuple(SYNC)
-
-ORIGIN = ", ".join(j.listing for j in JOURNALS)
 
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5,
-         jobs=1):
-    """Download the named scopes (default both journals). The journals are
-    separate hosts, so they fan out the way `guidance` does: concurrency is
-    across scopes only, and each runner paces its own host."""
+         jobs=None):
+    """Download the named scopes (default all nine journals). The journals
+    are separate hosts, so they fan out the way `guidance` does: concurrency
+    is across scopes only, and each runner paces its own host. With no
+    `jobs` the run fans out one worker per scope, so the wall time is the
+    slowest journal alone. A scope that fails is reported and the run carries
+    on with the rest, ending with an error that names it: one broken host
+    does not take the others down, and the failed one is re-run on its
+    own afterwards (`walk_records` has already stored everything it got)."""
+    run = list(scopes or SCOPES)
+    if jobs is None:
+        jobs = len(run)
     return harvest.dispatch_scopes(root, scopes, SYNC, SCOPES, full=full,
                                    only=only, limit=limit, delay=delay,
-                                   jobs=jobs, label="lawreview download")
+                                   jobs=jobs, label="lawreview download",
+                                   strict=False)
