@@ -116,37 +116,55 @@ def _facet_links(source, buckets, parent_slugs, active_keys, depth):
 
 
 def _facet_nav(source, view, active_keys, primary_in_banner=False):
-    """The navigator: the primary buckets as links, plus -- under the active
-    primary -- its secondary buckets (the year/… within a court/type). A primary
-    axis with a single bucket is not navigable (nothing to choose), so it is
-    omitted -- e.g. HUDOC's lone 'Domar' type. It is omitted too when the page
-    carries a cross-source selector that already lists the same buckets
-    (`primary_in_banner`): eurlex's document types and edpb's series appear in
-    the EU-rätt banner above, and a rail repeating them below is the same
-    choice offered twice. The years of what a myndighet issues never list here
-    either (`YEAR_SPLIT_SOURCES`): a large bucket's year axis rides on top of
-    the list (F4), and a small one has no year split at all (F3) -- listing them
-    here would offer a reader years that are not pages."""
+    """The navigator: the primary buckets as links, plus -- under each active
+    bucket -- the buckets of the level below it (the year/… within a court/type).
+    Every level of the scheme lists, not only the first two: `guidance` is
+    Utgivare -> Serie -> År, and a body above `only_above` pages by year, so a
+    rail that stopped at Serie gave a reader on /ecb/con/2020/ no way to reach
+    2019. A primary axis with a single bucket is not navigable (nothing to
+    choose), so it is omitted -- e.g. HUDOC's lone 'Domar' type. It is omitted
+    too when the page carries a cross-source selector that already lists the
+    same buckets (`primary_in_banner`): the EU-rätt banner carries eurlex's
+    document types and guidance's utgivare -- both sources' *primary* buckets
+    (`render.eurlex_axis` reads `facets.tree(...)["buckets"]`) -- and a rail
+    repeating them below is the same choice offered twice. So on a guidance page
+    the banner takes the Utgivare axis and the loop below renders Serie and År.
+    The years of what a myndighet issues never list here either
+    (`YEAR_SPLIT_SOURCES`): a large bucket's year axis rides on top of the list
+    (F4), and a small one has no year split at all (F3) -- listing them here
+    would offer a reader years that are not pages."""
     levels, buckets = view["levels"], view["buckets"]
     parts = ([{"axis": levels[0]},
               {"axis": None,
                "links": _facet_links(source, buckets, [], active_keys, 0)}]
              if len(buckets) > 1 and not primary_in_banner else [])
-    if len(levels) > 1 and source not in YEAR_SPLIT_SOURCES:
-        cur = next((b for b in buckets if b["key"] == active_keys[0]), None)
-        if cur and cur["children"]:
-            parts.append({"axis": _secondary_axis(source, active_keys[0],
-                                                  levels[1])})
-            parts.append({"axis": None,
-                          "links": _facet_links(source, cur["children"],
-                                                [cur["slug"]], active_keys, 1)})
+    if source in YEAR_SPLIT_SOURCES:
+        return LISTS.facet_nav(parts)
+    # `active_keys` is a leaf path of this very `view` (`render_facet_page`
+    # reads it off the nodes), so the bucket at each depth must be there -- a
+    # miss is a programming error and raises rather than truncating the rail
+    # silently (rule:fail-fast). The one caller that passes a key of its own,
+    # `_write_succeeded_series`, is foreskrift and returned above.
+    parent_slugs, here = [], buckets
+    for depth in range(1, len(levels)):
+        cur = next(b for b in here if b["key"] == active_keys[depth - 1])
+        # no children: this page's bucket is a leaf, either because the scheme
+        # ends here or because `only_above` suppressed the level below for it
+        if not cur["children"]:
+            break
+        parent_slugs.append(cur["slug"])
+        parts.append({"axis": _axis_heading(source, active_keys[0], levels[depth])})
+        parts.append({"axis": None,
+                      "links": _facet_links(source, cur["children"],
+                                            parent_slugs, active_keys, depth)})
+        here = cur["children"]
     return LISTS.facet_nav(parts)
 
 
-def _secondary_axis(source, primary_key, default):
-    """The heading for the second facet axis. Usually the level's own name ('År'),
-    but the eurlex Fördrag are grouped by treaty family, not year (E1), so that
-    branch is headed neutrally instead of mislabelled 'År'."""
+def _axis_heading(source, primary_key, default):
+    """The heading for a facet axis below the primary one. Usually the level's own
+    name ('År'), but the eurlex Fördrag are grouped by treaty family, not year
+    (E1), so that branch is headed neutrally instead of mislabelled 'År'."""
     return "Kategori" if source == "eurlex" and primary_key == "treaty" else default
 
 
