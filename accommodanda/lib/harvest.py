@@ -32,6 +32,11 @@ un-fetched records. This module is the one hardened mechanism they share:
     is a short, complete listing of records that each name one document (edpb,
     rs): where the record and its document go, how ``--only`` narrows the
     listing, and the walk that stores both.
+  * :func:`fan_out` / :func:`dispatch_scopes` -- one harvest per scope of a
+    multi-scope source (its agencies, organs or series), concurrently across
+    the separate hosts, each runner pacing its own. With ``strict=False`` a
+    scope that fails is reported and re-run alone instead of taking the whole
+    run down (lawreview's nine journals run this way).
 
 A vertical supplies its own enumeration (how to list the upstream) and its own
 resolve (how to fetch + store one item) as callables, plus an ``item_key`` that
@@ -43,6 +48,7 @@ parameters -- publication cadence differs, so each call site states its own.
 import json
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -379,6 +385,36 @@ def store_record(path: Path, record: dict, *companions: Path,
     return True
 
 
+def document_item_key(record: dict, record_file: Path, *documents: Path,
+                      date: str | None = None) -> "ItemKey":
+    """The watermark walkers' shared ``item_key``: an item is current only
+    when its stored record matches `record` and every named document file is
+    on disk. `documents` is empty for a record that names no document (a
+    print-only article), whose record alone is then the state."""
+    return ItemKey(record["basefile"],
+                   record_unchanged(record_file, record, *documents),
+                   date=date)
+
+
+def resolve_document(record: dict, record_file: Path, document_file: Path,
+                     fetch: Callable[[], bytes | str] | None,
+                     verify: Callable[[bytes | str], None], *,
+                     full: bool = False, delay: float = 0.0) -> bool:
+    """The watermark walkers' shared ``resolve``: fetch, verify and store the
+    document when it is missing or the run is full, then store the record.
+    `fetch` is None for a record that names no document. The document is
+    re-read only when it is missing (`walk_records` without
+    `refetch_when_changed`: these publications revise nothing in place), and
+    a repaired document under an unchanged record counts as nothing new, the
+    `walk_records` rule."""
+    if fetch is not None and (full or not compress.exists(document_file)):
+        data = fetch()
+        time.sleep(delay)
+        verify(data)
+        compress.write_download(document_file, data)
+    return store_record(record_file, record, full=full)
+
+
 # --------------------------------------------------------------------------
 # a complete listing of records, each naming one document
 # --------------------------------------------------------------------------
@@ -414,6 +450,23 @@ def page_path(root: Path | str, basefile: str) -> Path:
                                 basefile, str(root))
 
 
+def page_verifier(marker: str,
+                  what: str = "article") -> Callable[[bytes | str], None]:
+    """A document check for a source whose publisher issues its documents as
+    web pages: the served body must carry `marker`, the one string only the
+    real document's layout sets -- a WAF challenge, an error page and a
+    listing served in the document's place all lack it. (The default
+    ``walk_records``/``resolve_document`` check is PDF-shaped; see
+    :func:`verify_pdf`.) `what` is the source's own noun for the document,
+    for the error line."""
+    def verify(data: bytes | str) -> None:
+        assert isinstance(data, str), "a page body must be text, not bytes"
+        if marker not in data:
+            raise ValueError("served a non-%s page; record left unwritten"
+                             % what)
+    return verify
+
+
 def verify_pdf(data: bytes | str) -> None:
     """Reject a body that is not a PDF -- a WAF challenge or an error page
     served 200 under a ``.pdf`` URL. The default ``walk_records`` check."""
@@ -447,7 +500,7 @@ def select_pending(pending: list[Pending], only: str | None,
     return picked
 
 
-def walk_records(root: Path | str, pending: Iterable[Pending], *,
+def walk_records(root: Path | str, pending: Iterable[Pending | Skip], *,
                  delay: float, full: bool = False, limit: int | None = None,
                  scope: str = "", total: int | None = None,
                  document: Callable[[Path | str, str], Path] = pdf_path,
@@ -461,7 +514,10 @@ def walk_records(root: Path | str, pending: Iterable[Pending], *,
     one HTTP GET, a ZIP fetch and a member extraction, a browser navigation,
     whatever the source's route is -- or is None for a record that names no
     document at all (a register entry: a repealed statement kept in a
-    förteckning with its text withdrawn).
+    förteckning with its text withdrawn). An item may instead be a
+    :class:`Skip`, an enumeration hole the source met and wants recorded
+    (a listing page the upstream failed to serve) -- ``walk`` logs it and
+    keeps walking.
 
     `document` says where one basefile's document is stored and `verify` what it
     must be: :func:`pdf_path` / :func:`verify_pdf` for a publisher that issues
@@ -540,6 +596,7 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
                                                   tuple[int, int]],
             *, jobs: int = 1, serial: Container[str] = (),
             label: str = "harvest", log: Callable[[str], None] = print,
+            strict: bool = True,
             ) -> dict[str, tuple[int, int]]:
     """Run `work(scope, log)` once per scope, concurrently when `jobs > 1`, and
     return ``{scope: (seen, new)}``.
@@ -561,12 +618,21 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
     corrupt each other's display and stall. They still overlap the HTTP scopes,
     which are the overwhelming majority.
 
+    `strict` says a scope that raises takes the whole run down with it. A run
+    over separate hosts (`strict=False`) instead reports the failure -- the
+    scope's own lines, then its error with the traceback -- and carries on with
+    the remaining scopes. When every scope has finished it raises one error
+    naming every scope that failed, so the run ends red: the failed scope is
+    the one to fix and re-run, and the ones that succeeded keep the data they
+    already stored.
+
     Sequential whenever there is nothing to gain (`jobs <= 1`, one scope), and
     then each scope keeps its own live progress line."""
     scopes = list(scopes)
     elapsed: dict[str, float] = {}
     requests_made: dict[str, int] = {}
     totals: dict[str, tuple[int, int]] = {}
+    failures: dict[str, str] = {}
 
     def timed(scope, into):
         started = time.monotonic()
@@ -578,11 +644,30 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
                 elapsed[scope] = time.monotonic() - started
                 requests_made[scope] = made()
 
+    def note_failure(scope, err, lines=()):
+        failures[scope] = "%s: %s" % (type(err).__name__, err)
+        for line in lines:
+            log(line)
+        log("%s %s: FAILED %s" % (label, scope, failures[scope]))
+        log(traceback.format_exc())
+
     if jobs <= 1 or len(scopes) <= 1:
         for scope in scopes:
-            totals[scope] = timed(scope, log)
+            try:
+                totals[scope] = timed(scope, log)
+            # scope-level resilience (rule:no-catch-log-continue, catalogued):
+            # one broken host must not take the other scopes down; the failure
+            # is logged with its traceback and the run still ends red with a
+            # RuntimeError naming every failed scope
+            except Exception as err:
+                if strict:
+                    raise
+                note_failure(scope, err)
+                continue
             log("%s %s: %d seen, %d new" % (label, scope, *totals[scope]))
         _log_scope_costs(elapsed, requests_made, label, log)
+        if failures:
+            raise RuntimeError(_failure_summary(label, scopes, failures))
         return totals
 
     buffers: dict[str, list[str]] = {scope: [] for scope in scopes}
@@ -607,7 +692,22 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
         futures = {pool.submit(worker, scope): scope for scope in scopes}
         for future in as_completed(futures):
             scope = futures[future]
-            totals[scope] = seen, new = future.result()
+            try:
+                seen, new = future.result()
+            # the same catalogued scope-level resilience as the serial path
+            except Exception as err:
+                if strict:
+                    raise
+                note_failure(scope, err, buffers[scope])
+                done += 1
+                rep.clear()               # lift the live line off the row
+                with state:
+                    busy = sorted(running)
+                rep.update(done, len(scopes), scope=label, new=new_total,
+                           note="  [running: %s]" % ", ".join(busy) if busy
+                           else "")
+                continue
+            totals[scope] = seen, new
             new_total += new
             done += 1
             rep.clear()               # lift the live line off the row
@@ -620,7 +720,19 @@ def fan_out(scopes: Sequence[str], work: Callable[[str, Callable[[str], None]],
                        note="  [running: %s]" % ", ".join(busy) if busy else "")
     rep.done()
     _log_scope_costs(elapsed, requests_made, label, log)
+    if failures:
+        raise RuntimeError(_failure_summary(label, scopes, failures))
     return totals
+
+
+def _failure_summary(label, scopes, failures):
+    """The one error a non-strict fan_out raises when every scope has finished
+    and at least one failed: the run ends red, naming each failed scope with
+    its error, in the order the run took them."""
+    failed = ["%s (%s)" % (scope, failures[scope])
+              for scope in scopes if scope in failures]
+    return ("%s: %d of %d scopes failed -- %s" %
+            (label, len(failed), len(scopes), "; ".join(failed)))
 
 
 def _log_scope_costs(elapsed, requests_made, label, log):
@@ -646,7 +758,7 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
                     only: str | None = None, limit: int | None = None,
                     delay: float = 0.5, jobs: int = 1,
                     serial: Container[str] = (), label: str = "harvest",
-                    log: Callable[[str], None] = print,
+                    log: Callable[[str], None] = print, strict: bool = True,
                     ) -> dict[str, tuple[int, int]]:
     """Run one harvest per named scope -- all of `default` when `scopes` is
     None -- and return ``{scope: (seen, new)}``, the shape `build` expects of a
@@ -657,7 +769,8 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
     ("fk/2025:01"), so it names its own scope -- it is passed to the runner it
     belongs to and withheld from every other, which is what lets a whole-source
     run narrow to one document without every runner having to recognise a
-    basefile that is not its own."""
+    basefile that is not its own. ``strict=False`` reports a failing scope and
+    carries on with the rest, the way `fan_out` does."""
     run = list(scopes or default)
     # an --only whose scope is not in the run would otherwise be withheld from
     # every runner -- and the run silently harvests everything BUT the one
@@ -675,5 +788,5 @@ def dispatch_scopes(root: Path | str, scopes: Iterable[str] | None,
             str(root), full=full, limit=limit, delay=delay,
             only=only if only and only.startswith(scope + "/") else None)
     return fan_out(run, one, jobs=1 if only else jobs, serial=serial,
-                   label=label, log=log)
+                   label=label, log=log, strict=strict)
 

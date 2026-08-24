@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from datetime import date, timedelta
 
@@ -10,6 +11,7 @@ from accommodanda.lib.harvest import (
     ItemKey,
     Skip,
     dispatch_scopes,
+    fan_out,
     pdf_path,
     select_pending,
     walk,
@@ -470,3 +472,56 @@ def test_dispatch_scopes_hands_only_to_the_scope_that_owns_it(tmp_path):
     with pytest.raises(ValueError, match="names no scope in this run"):
         dispatch_scopes(tmp_path, ["fi"], runners, ("fi", "fk"),
                         only="fk/2025:01")
+
+
+def test_fan_out_strict_a_failing_scope_takes_the_run_down():
+    def work(scope, log):
+        if scope == "b":
+            raise ValueError("b is broken")
+        return (1, 1)
+
+    with pytest.raises(ValueError, match="b is broken"):
+        fan_out(["a", "b", "c"], work, jobs=1, label="t",
+                log=lambda line: None)
+
+
+def test_fan_out_non_strict_serial_runs_the_rest_and_ends_red():
+    ran = []
+    lines = []
+
+    def work(scope, log):
+        ran.append(scope)
+        if scope == "b":
+            raise ValueError("b is broken")
+        return (1, 2)
+
+    with pytest.raises(RuntimeError, match="1 of 3 scopes failed") as ei:
+        fan_out(["a", "b", "c"], work, jobs=1, label="t",
+                log=lines.append, strict=False)
+    # the failure withholds nothing: the scope after it still ran
+    assert ran == ["a", "b", "c"]
+    assert "b is broken" in str(ei.value)
+    # and the run's log carries the scope's failure line, traceback and all
+    assert "t b: FAILED ValueError: b is broken" in lines
+    assert any("Traceback" in line for line in lines)
+
+
+def test_fan_out_non_strict_fanned_out_runs_the_rest_and_ends_red():
+    ran = []
+    lock = threading.Lock()
+
+    def work(scope, log):
+        with lock:
+            ran.append(scope)
+        if scope == "b":
+            raise ValueError("b is broken")
+        time.sleep(0.02)
+        return (1, 1)
+
+    with pytest.raises(RuntimeError, match="1 of 4 scopes failed") as ei:
+        fan_out(["a", "b", "c", "d"], work, jobs=4, label="t",
+                log=lambda line: None, strict=False)
+    # the raising worker's exception reached the coordinator, and the other
+    # workers finished their scopes behind it
+    assert sorted(ran) == ["a", "b", "c", "d"]
+    assert "b is broken" in str(ei.value)

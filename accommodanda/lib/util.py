@@ -599,7 +599,8 @@ def drop_leading_title_echo(blocks, titel, *, text_of, lead=None):
     the title. Only leading blocks go -- a later heading echoing the title
     stays, as the real section it is. The union of the two shapes was
     measured over both corpora (315 documents, 2026-08-08): it removed six
-    real echoes the single-shape rules each missed, and no genuine content."""
+    real echoes the single-shape rules each missed, and no genuine
+    content."""
     folded_title = match_fold(titel or "")
     while blocks:
         text = text_of(blocks[0])
