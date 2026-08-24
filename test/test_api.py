@@ -863,3 +863,14 @@ def test_graph_internal_for_a_document_uri_carries_real_edges(tmp_path):
     assert [u["anchor"] for u in d["internal"]["nodes"]] == ["K1P1", "K3P1"]
     assert d["internal"]["truncated"] == 0
     con.close()
+
+
+def test_json_answers_declare_their_charset(client):
+    """`application/json` without a charset makes a browser viewing the raw
+    answer guess, and Safari guesses Latin-1 -- "säkerhetsskyddslagen" came
+    out as "sÃ¤kerhetsskyddslagen". Every JSON endpoint states utf-8."""
+    for path in ("/api/v1/graph?uri=https://lagen.nu/1962:700",
+                 "/api/v1/sources"):
+        r = client.get(path)
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "application/json; charset=utf-8"

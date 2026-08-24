@@ -35,7 +35,13 @@ from typing import Literal
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -113,11 +119,21 @@ TAGS = [
                     "directions, its versions, and its pages as images or PDF."},
 ]
 
+class UTF8JSONResponse(JSONResponse):
+    """JSONResponse declaring its charset. The body is UTF-8 with non-ASCII
+    literals (`ensure_ascii=False`), but bare `application/json` makes a
+    browser viewing the raw answer guess -- and Safari guesses Latin-1,
+    rendering "säkerhetsskyddslagen" as "sÃ¤kerhetsskyddslagen". Starlette
+    appends the charset only for text/* media types, so JSON states it here."""
+    media_type = "application/json; charset=utf-8"
+
+
 app = FastAPI(
     title="lagen.nu API",
     version="1.0",
     description=DESCRIPTION,
     openapi_tags=TAGS,
+    default_response_class=UTF8JSONResponse,
     # runs the MCP server's Streamable HTTP session manager (a no-op for the
     # in-process TestClient path, which never calls /mcp) -- see api/mcp.py
     lifespan=mcp_server.lifespan,
