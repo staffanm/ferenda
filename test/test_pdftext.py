@@ -35,6 +35,7 @@ from accommodanda.lib.pdftext import (
     is_italic_subheading,
     is_page_number,
     letterhead_footnotes,
+    ruled_footnotes,
     line_body_support,
     line_from_runs,
     page_boxes,
@@ -1260,3 +1261,74 @@ def test_rebuilt_line_keeps_its_own_foot():
     runs = [Run(10, 90, "kvar", False, False, 14)]
     assert line_from_runs(runs, 100, 113).bottom == 113
     assert line_from_runs(runs, 100).bottom == 100    # never above its top
+
+
+# --- ruled_footnotes: notes under a page-foot rule, split off the body -------
+
+def _placed(text, top, size, left=170, right=700):
+    return Line(text, top, False, False, False, size,
+                [Run(left, right, text, False, False, size)])
+
+
+def test_ruled_footnotes_splits_the_notes_under_the_rule():
+    # a föreskrift prints its "Jfr … direktiv" note below a row of underscores,
+    # set smaller than the body; the marker sits on its own line at the margin
+    lines = [_placed("Dessa föreskrifter innehåller bestämmelser om skydd.", 800, 18),
+             _placed("De gäller för varje verksamhetsutövare i sektorn.", 830, 18),
+             _placed("Om annan författning innehåller strängare krav.", 900, 18),
+             _placed("_" * 75, 1065, 13),
+             _placed("1", 1078, 8),
+             _placed("Europaparlamentets och rådets direktiv (EU) 2022/2555", 1080, 13),
+             _placed("om åtgärder för cybersäkerhet.", 1095, 13),
+             _placed("1", 1206, 14, left=450, right=461)]     # the folio
+    body, notes = ruled_footnotes(lines)
+    assert [l.text for l in body] == [
+        "Dessa föreskrifter innehåller bestämmelser om skydd.",
+        "De gäller för varje verksamhetsutövare i sektorn.",
+        "Om annan författning innehåller strängare krav."]
+    assert notes == [("1", "Europaparlamentets och rådets direktiv (EU) 2022/2555"
+                           " om åtgärder för cybersäkerhet.")]
+
+
+def test_ruled_footnotes_leaves_the_ikrafttradande_rule_alone():
+    # the same row of underscores separates the operative text from the
+    # ikraftträdande clause -- which is body text at body size, not a note.
+    # 3 920 of the parsed regulations carry such a rule.
+    lines = [_placed("Transportstyrelsen kan medge undantag.", 700, 18),
+             _placed("_" * 20, 760, 18),
+             _placed("Dessa föreskrifter träder i kraft den 1 juli 2024.", 790, 18)]
+    body, notes = ruled_footnotes(lines)
+    assert len(body) == 3 and notes == []
+
+
+def test_ruled_footnotes_keeps_a_page_whose_notes_the_filter_rejects():
+    """The split *removes* everything below the rule, so it may only happen
+    where the reader actually took those lines as notes. A rule whose text the
+    note filter rejects — too short, or no prose — would otherwise drop that
+    text from the document altogether: neither body nor note."""
+    lines = [_placed("Dessa föreskrifter innehåller bestämmelser om skydd.", 800, 18),
+             _placed("De gäller för varje verksamhetsutövare i sektorn.", 830, 18),
+             _placed("Om annan författning innehåller strängare krav.", 900, 18),
+             _placed("_" * 75, 1065, 13),
+             _placed("Antagna", 1080, 13)]        # one word: not a note
+    body, notes = ruled_footnotes(lines)
+    assert notes == []
+    assert [l.text for l in body] == [l.text for l in lines]
+
+
+# --- render: a table's header row --------------------------------------------
+
+def test_a_th_row_renders_header_cells():
+    """`lib/artifact.scanned_nodes` writes `th` on a table's header row for
+    every letterhead source; the row renderer used to ignore it and emit `td`.
+    Honouring it changes markup for the artifacts that already carry the flag
+    (4 of 400 sampled rs artifacts), which is the point: a column header is a
+    header cell."""
+    from accommodanda.lib.page import Site, _render_rad
+    head = {"type": "rad", "th": True, "cells": [["Begrepp"], ["Betydelse"]]}
+    body = {"type": "rad", "cells": [["personal"], ["egna anställda"]]}
+    site = Site(None, set())
+    assert _render_rad(head, site, "u", False) == \
+        "<tr><th>Begrepp</th><th>Betydelse</th></tr>"
+    assert _render_rad(body, site, "u", False) == \
+        "<tr><td>personal</td><td>egna anställda</td></tr>"

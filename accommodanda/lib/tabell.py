@@ -1,21 +1,30 @@
-"""General table detection for förarbete PDFs (rewrite-parity finding 04).
+"""Table detection from pdftohtml Line/run geometry, shared by the PDF sources.
 
-`lydelse.py` reconstructs the nuvarande/föreslagen two-column comparison
-tables; everything else tabular -- budget tables, bilaga listings, the
-multi-column enumerations scattered through props and SOUs -- used to flow
-line-by-line through the prose reflow and flatten into stycken, losing rows
-and columns. This module detects those *generic* tabular regions from the
-same Line/run geometry pdftohtml gives us, and `merge_continued` joins a
-table that continues across a page break (its repeated header dropped).
+Two detectors, because a PDF prints two unrelated kinds of table:
 
-Deliberately conservative: a region must hold at least MIN_ROWS consecutive
-multi-cell lines agreeing on at least two column start positions before it is
+* :func:`split_generic` -- a **data table** (a förarbete budget table, a bilaga
+  listing, a multi-column enumeration). Its evidence is numeric: the non-leading
+  columns hold amounts, years and rates. Prose that merely happens to break into
+  wide-gapped runs fails that test and stays prose.
+* :func:`split_two_column` -- a **two-column prose table**, which is what a
+  föreskrift's ordförklaringar table is: a bold "Begrepp / Betydelse" header row,
+  then a term in the left column and a sentence-long definition in the right.
+  Numeric evidence would reject it, so this one keys on the layout instead: two
+  columns and two only, a wide gutter, and a left column of short terms.
+
+`merge_continued` joins a table that continues across a page break (its repeated
+header dropped) for either detector.
+
+Both are deliberately conservative: a region must hold at least MIN_ROWS
+consecutive multi-cell lines agreeing on column start positions before it is
 believed. Prose runs abut (their gaps are kerning, far below CELL_GAP), TOC
 dot-leader lines and page-margin markers are excluded, so a false table over
 running text costs more evidence than a page ever offers.
 """
 
 import re
+
+from .pdftext import dehyphenate, join_runs
 
 CELL_GAP = 40   # a horizontal gap this wide between runs splits a line into cells
 COL_TOL = 20    # cell starts within this many x-units are the same column
@@ -198,4 +207,115 @@ def merge_continued(blocks):
             prev.rows = list(prev.rows) + rows
             continue
         out.append(b)
+    return out
+
+
+# --------------------------------------------------------------------------
+# the two-column prose table (a föreskrift's ordförklaringar)
+# --------------------------------------------------------------------------
+
+GUTTER = 60       # the empty space between a term column and its definition column
+TERM_MAX = 60     # a left-column cell longer than this is prose, not a term
+TWO_COL_ROWS = 3  # term/definition rows needed to believe the layout
+TERM_RUNS = 2     # font runs a term cell may be assembled from
+ROW_GAP = 1.35    # x the font size: a wider vertical step than this opens a row
+
+
+def _two_col_cells(line, left, right):
+    """`line`'s text placed in the two columns starting at `left`/`right`, or
+    None where a run falls left of both.
+
+    Placed run by run against the known column positions, not by
+    :func:`line_cells`' gap split: a long term reaches to within a few units of
+    the gutter ("information i behov av utökat" ends at 395, the definition
+    column starts at 414), and the gap rule then reads the whole line as one
+    cell and loses the column boundary the page is actually set on."""
+    columns = ([], [])
+    for r in sorted(line.runs, key=lambda r: r.left):
+        if r.left >= right - COL_TOL:
+            columns[1].append(r)
+        elif r.left >= left - COL_TOL:
+            columns[0].append(r)
+        else:
+            return None
+    # `join_runs`, not a space between every run: a run boundary is not a word
+    # boundary -- poppler splits a line at each font change, and a space there
+    # writes "bilaga 1 ." and breaks a word whose first letter the page set in
+    # its own face ("S akområdesutbildning"). It spaces by geometry instead.
+    placed = [join_runs(c)[0].strip() for c in columns]
+    terms = len(columns[0])
+    # a term is one printed phrase, so it is one or two font runs. More than
+    # that is not a term column: MSBFS 2020:9 sets the ADR dangerous-goods
+    # tables in landscape with rotated headers, and poppler returns each of
+    # their many narrow columns as its own fragment ("t or änd- sp ng Anv ni
+    # ran") -- read as a two-column table those become rows of syllables.
+    if terms > TERM_RUNS:
+        return None
+    return tuple(placed) if any(placed) else None
+
+
+def _two_col_start(lines, i):
+    """The (left, right) column positions a two-column region starting at
+    `lines[i]` would use, or None: the line splits into exactly two cells with a
+    gutter between them, and its left cell is short enough to be a term."""
+    cells = line_cells(lines[i])
+    if len(cells) != 2 or cells[1][0] - cells[0][1] < GUTTER:
+        return None
+    return None if len(cells[0][2]) > TERM_MAX else (cells[0][0], cells[1][0])
+
+
+def _new_row(line, prev):
+    """Whether `line` opens a new term/definition row rather than continuing the
+    one above. The signal is the vertical step: a föreskrift's ordförklaringar
+    table sets its rows a blank line apart and wraps *both* columns inside a row
+    -- "information i behov av utökat / skydd" is one term over two lines, and
+    reading each line as a row splits the term from its definition."""
+    step = line.top - prev.top
+    return step > ROW_GAP * (line.size or prev.size or step)
+
+
+def split_two_column(lines):
+    """A page's [Line] -> [("lines", [Line], None) | ("tabell", th, rows)] in
+    document order, the tabell regions being **two-column prose tables**: a term
+    in the left column, its definition wrapping in the right.
+
+    A region runs while every line places into the two columns the opening line
+    fixed, and is believed once it holds TWO_COL_ROWS rows. It ends at the first
+    line that reaches only the left column at a row-opening step -- which is what
+    stops it running on into the body text below, whose margin sits within
+    COL_TOL of the term column. `th` is True when the opening line is bold (a
+    "Begrepp / Betydelse" header row)."""
+    out, plain = [], []
+    i = 0
+    while i < len(lines):
+        cols = _two_col_start(lines, i)
+        rows, j = [], i
+        while cols and j < len(lines) and not RE_DOTS.search(lines[j].text):
+            placed = _two_col_cells(lines[j], *cols)
+            if placed is None:
+                break
+            if not rows or (placed[0] and _new_row(lines[j], lines[j - 1])):
+                if not placed[1]:       # a term with no definition beside it:
+                    break               # body text at the term column's margin
+                rows.append(placed)
+            else:
+                # `dehyphenate`, not a plain space: a cell wraps like any other
+                # prose and the reflow closes the soft hyphen ("Jord-\nbruks-
+                # verket"). Joining with a space instead published the break --
+                # 583 words across a 371-document sample -- because the cells
+                # bypass `page_paragraphs`, which is where that rule normally is.
+                rows[-1] = tuple(dehyphenate(a, b).strip()
+                                 for a, b in zip(rows[-1], placed, strict=True))
+            j += 1
+        if len(rows) >= TWO_COL_ROWS:
+            if plain:
+                out.append(("lines", plain, None))
+                plain = []
+            out.append(("tabell", lines[i].bold, rows))
+            i = j
+        else:
+            plain.append(lines[i])
+            i += 1
+    if plain:
+        out.append(("lines", plain, None))
     return out

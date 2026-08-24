@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress, layout
+from ..lib import compress, layout, tabell
 
 # font-aware extraction + paragraph reflow are shared across the PDF verticals
 # (re-exported here so this module's existing import sites keep working)
@@ -45,7 +45,7 @@ from ..lib.pdftext import (
     printed_pages,
 )
 from ..lib.util import approximate_date, basefile_slug
-from . import kbtitles, legacy_formats, lydelse, tabell, volumes
+from . import kbtitles, legacy_formats, lydelse, volumes
 from .model import Block, Forarbete
 from .structure import RE_TRAILING_PAREN, nest
 

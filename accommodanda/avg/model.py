@@ -122,7 +122,7 @@ class Beslut:
         rubrik/stycke nodes with inline-run text) so catalog/render/search reuse
         their generic walkers; every text scanned for citations."""
         structure = scanned_nodes(self.body, scanner)
-        footnotes = footnote_nodes(self.fotnoter, scanner)
+        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
         metadata = {"title": self.titel,
                     "publisher": ORG_NAME[self.org],
                     "diarienummer": self.diarienummer}

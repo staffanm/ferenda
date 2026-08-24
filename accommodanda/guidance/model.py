@@ -180,7 +180,7 @@ class Vagledning:
         for b, node in zip(self.body, structure, strict=True):
             if b.punkt:
                 node["punkt"] = b.punkt
-        footnotes = footnote_nodes(self.fotnoter, scanner)
+        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "sprak": self.sprak}
         if self.ersatt_av or self.ersatt_av_url:

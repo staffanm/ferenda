@@ -99,10 +99,14 @@ def numbered_nodes(blocks, refs_for=None):
     return out
 
 
-def footnote_nodes(fotnoter, scanner):
-    """The notes set below a document's running text, citation-scanned like the
-    body: an agency grounds in a note the vägledning its prose only names, so a
-    dropped note costs the document exactly the reference a scan could resolve."""
-    return [{"mark": f.mark,
-             "text": interleave(f.text, scanner.parse_text(f.text, context={}))}
-            for f in fotnoter]
+def footnote_nodes(notes, scanner):
+    """``[(mark, text)]`` -> the artifact's footnote nodes, citation-scanned like
+    the body: an agency grounds in a note the vägledning its prose only names, so
+    a dropped note costs the document exactly the reference a scan could resolve.
+
+    Pairs rather than a source's own Fotnot, because that is what both extractors
+    in `lib.pdftext` return (`letterhead_footnotes`, `ruled_footnotes`) and a
+    source that keeps its notes typed unwraps them in one comprehension."""
+    return [{"mark": mark,
+             "text": interleave(text, scanner.parse_text(text, context={}))}
+            for mark, text in notes]

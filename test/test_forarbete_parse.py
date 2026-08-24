@@ -758,7 +758,7 @@ def _row_line(top, cells, bold=False):
 
 
 def test_split_generic_detects_aligned_columns():
-    from accommodanda.forarbete import tabell
+    from accommodanda.lib import tabell
     lines = [
         Line("En vanlig prosarad utan kolumner.", 90, False, False, False, 11,
              [__import__('accommodanda.lib.pdftext', fromlist=['Run']).Run(
@@ -777,7 +777,7 @@ def test_split_generic_detects_aligned_columns():
 
 
 def test_split_generic_wrapped_cell_merges_into_previous_row():
-    from accommodanda.forarbete import tabell
+    from accommodanda.lib import tabell
     lines = [
         _row_line(120, [(100, "Myndighet"), (300, "Anslag")]),
         _row_line(140, [(100, "Riksrevisionen"), (300, "12 000")]),
@@ -792,7 +792,7 @@ def test_split_generic_wrapped_cell_merges_into_previous_row():
 
 
 def test_split_generic_leaves_prose_and_toc_alone():
-    from accommodanda.forarbete import tabell
+    from accommodanda.lib import tabell
     from accommodanda.lib.pdftext import Run
     prose = [Line("Text %d." % i, 100 + 20*i, False, False, False, 11,
                   [Run(100, 400, "Text %d." % i, False, False, 11)])
@@ -806,7 +806,7 @@ def test_split_generic_leaves_prose_and_toc_alone():
 
 
 def test_merge_continued_joins_cross_page_table_and_drops_repeated_header():
-    from accommodanda.forarbete import tabell
+    from accommodanda.lib import tabell
     a = Block("tabell", "", 14, rows=[("Ålder", "Belopp"), ("22 år", "25 000")],
               th=True)
     b = Block("tabell", "", 15, rows=[("Ålder", "Belopp"), ("23 år", "27 500")],
@@ -1093,3 +1093,89 @@ def test_written_date_falls_back_to_the_basefile():
     assert fa_parse.written_date(_fa("2017/18:89")) == "2018-01-01"   # riksmöte
     assert fa_parse.written_date(_fa("1987:53", typ="dir")) == "1987-07-01"
     assert fa_parse.written_date(_fa("2000:2", typ="sou")) == "2000-07-01"
+
+
+# --- two-column prose tables (a föreskrift's ordförklaringar) ----------------
+
+def _defrow(top, term, definition, term_left=178, def_left=414, bold=False):
+    """One line of a two-column term/definition table. An empty `term` marks a
+    continuation line of the definition above."""
+    from accommodanda.lib.pdftext import Run
+    runs = ([Run(term_left, term_left + 8 * len(term), term, bold, False, 18)]
+            if term else []) \
+        + [Run(def_left, def_left + 8 * len(definition), definition, bold,
+               False, 18)]
+    return Line(" ".join(r.text for r in runs), top, bold, bold, False, 18, runs)
+
+
+def test_split_two_column_reads_a_term_definition_table():
+    from accommodanda.lib import tabell
+    lines = [
+        _defrow(285, "Begrepp", "Betydelse", bold=True),
+        _defrow(316, "digital miljö", "den samlade mängden system som"),
+        _defrow(337, "", "verksamhetsutövaren använder,"),
+        _defrow(378, "it-segment", "ett nätverkssegment för andra system,"),
+        _defrow(420, "personal", "egna anställda och uppdragstagare."),
+    ]
+    [(kind, th, rows)] = tabell.split_two_column(lines)
+    assert kind == "tabell" and th is True
+    assert rows == [
+        ("Begrepp", "Betydelse"),
+        ("digital miljö", "den samlade mängden system som "
+                          "verksamhetsutövaren använder,"),
+        ("it-segment", "ett nätverkssegment för andra system,"),
+        ("personal", "egna anställda och uppdragstagare.")]
+
+
+def test_split_two_column_keeps_a_term_that_wraps_with_its_definition():
+    # "information i behov av utökat / skydd" is one term over two lines: the
+    # row boundary is the vertical step, not the presence of a left-column cell
+    from accommodanda.lib import tabell
+    lines = [
+        _defrow(285, "Begrepp", "Betydelse", bold=True),
+        _defrow(316, "digital miljö", "den samlade mängden system,"),
+        _defrow(461, "information i behov av utökat", "information som på grund"),
+        _defrow(482, "skydd", "av externa krav kräver skydd,"),
+        _defrow(627, "it-segment", "ett nätverkssegment,"),
+    ]
+    [(_kind, _th, rows)] = tabell.split_two_column(lines)
+    assert rows[2] == ("information i behov av utökat skydd",
+                       "information som på grund av externa krav kräver skydd,")
+
+
+def test_split_two_column_stops_before_the_body_text_below_it():
+    # the body margin (170) sits within COL_TOL of the term column (178), so a
+    # heading under the table places into the term column and would run the
+    # region on -- a left cell with no definition beside it ends it instead
+    from accommodanda.lib import tabell
+    from accommodanda.lib.pdftext import Run
+    heading = Line("2 kap. Ledningens utbildning", 642, True, True, False, 24,
+                   [Run(170, 500, "2 kap. Ledningens utbildning", True, False, 24)])
+    lines = [
+        _defrow(190, "sektorsverksamhet", "sådan verksamhet som omfattas,"),
+        _defrow(253, "system", "nätverks- och informationssystem,"),
+        _defrow(316, "personal", "egna anställda och uppdragstagare."),
+        heading,
+    ]
+    segs = tabell.split_two_column(lines)
+    assert [s[0] for s in segs] == ["tabell", "lines"]
+    assert len(segs[0][2]) == 3
+    assert [l.text for l in segs[1][1]] == ["2 kap. Ledningens utbildning"]
+
+
+def test_split_two_column_rejects_a_landscape_table_of_rotated_fragments():
+    # MSBFS 2020:9 sets the ADR dangerous-goods tables in landscape with
+    # rotated headers; poppler returns each narrow column as its own fragment,
+    # so a "term" cell arrives as a dozen runs of syllables
+    from accommodanda.lib import tabell
+    from accommodanda.lib.pdftext import Run
+
+    def fragmented(top):
+        runs = [Run(178 + 20 * i, 194 + 20 * i, frag, False, False, 18)
+                for i, frag in enumerate(("t", "or", "änd-", "sp", "ng", "Anv"))]
+        runs.append(Run(414, 700, "9 9 9 4 9 9", False, False, 18))
+        return Line(" ".join(r.text for r in runs), top, False, False, False,
+                    18, runs)
+
+    segs = tabell.split_two_column([fragmented(100 + 40 * i) for i in range(5)])
+    assert [s[0] for s in segs] == ["lines"]

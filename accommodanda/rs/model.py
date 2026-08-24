@@ -156,7 +156,7 @@ class Stallningstagande:
         citations -- which is what puts a ställningstagande on the rail of the
         paragraf it interprets."""
         structure = scanned_nodes(self.body, scanner)
-        footnotes = footnote_nodes(self.fotnoter, scanner)
+        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
         metadata = {"title": self.titel, "publisher": self.publisher,
                     "nummer": self.nummer, "status": self.status}
         for key, value in (("beslutsdatum", self.beslutsdatum),

@@ -346,7 +346,7 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
             # printed line had a space at that seam is recorded only there --
             # the geometry cannot say, since a font change with a space
             # ("finns i " + "bilaga 2") and one without ("bilaga 2" + ".")
-            # both leave the runs touching. `_join_runs` reads them; the Line's
+            # both leave the runs touching. `join_runs` reads them; the Line's
             # own text is normalized after assembly, so no edge survives.
             text = re.sub(r"\s+", " ", "".join(t.itertext()))
             if text.strip():
@@ -364,7 +364,7 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
 def pdf_paragraph_texts(pdf_path, patch_key=None):
     """A PDF's body as plain paragraph strings, page by page reflowed
     (`page_paragraphs` with no running header to strip): the reading order a
-    vertical whose text carries no structure (`lawpub`'s articles) wraps into
+    vertical whose text carries no structure (lawreview's lawpub scope) wraps into
     its own blocks, and the text the citation scanner reads. (`lawreview`'s
     PDF reader keeps its own copy of this loop: it needs the pages
     themselves, for the opening-page footers its journals print.) Blank
@@ -628,7 +628,7 @@ def _normalized_with_spans(text, spans):
     return "".join(out), [(a, b, s) for a, b, s in remapped if a < b]
 
 
-def _join_runs(runs):
+def join_runs(runs):
     """One line's runs as `(text, style spans)` -- the one way to rebuild a
     line's text from its runs, so the text and the spans over it cannot get out
     of step. (dv drops a line's sub-body-size runs and rebuilds it; joining
@@ -739,7 +739,7 @@ def line_from_runs(runs, top, bottom=None):
     """A `Line` built from its runs -- text, style spans *and* the whole-line
     style flags all derived from the same run set, so they cannot disagree.
 
-    The one constructor, for the same reason `_join_runs` is the one way to
+    The one constructor, for the same reason `join_runs` is the one way to
     rebuild the text: a caller that drops runs from a line (dv strips the
     sub-body-size marginalia its verdicts share a baseline with) and then
     patches only `text` leaves `bold`/`lead_bold`/`italic` describing the run
@@ -755,7 +755,7 @@ def line_from_runs(runs, top, bottom=None):
     # the head. A caller rebuilding a *converted* line must pass that line's own
     # `bottom`: dropping it silently shortens the box, and nothing complains
     # until something reads it.
-    text, spans = _join_runs(runs)
+    text, spans = join_runs(runs)
     # The line's size is the size *most of its characters* are set in, not its
     # largest run's. Both readings keep a raised footnote marker from shrinking
     # the line it rides on -- the marker is one or two characters -- but only
@@ -1099,20 +1099,20 @@ def _strip_header_runs(runs, header_re):
     go; a match inside a longer run is prose naming the identifier and stays
     whole.
 
-    The offsets are taken from `_join_runs`, which is what actually assembles
+    The offsets are taken from `join_runs`, which is what actually assembles
     the line: computing them here as "each run plus a joining space" was right
     only while that was the join. Once runs were butted together and spaced by
     geometry, every boundary was off by however many spaces the line did not
     have, no match lined up, and the header stopped being stripped at all --
     it appeared inside the body text of every page whose header shares a
     baseline with the first line of prose."""
-    joined, _ = _join_runs(runs)
+    joined, _ = join_runs(runs)
     starts, ends, pos = set(), set(), 0
     for run in runs:
-        text, _ = _join_runs([run])
+        text, _ = join_runs([run])
         offset = joined.find(text, pos)
         # every run's own normalisation is a substring of the line's, since
-        # `_join_runs` collapses both the same way. If that ever stops holding
+        # `join_runs` collapses both the same way. If that ever stops holding
         # the header silently reappears inside body prose corpus-wide, which is
         # the bug this function was rewritten to fix -- so it fails loudly
         # instead (rule:fail-fast).
@@ -1124,7 +1124,7 @@ def _strip_header_runs(runs, header_re):
             if m.start() in starts and m.end() in ends]
     kept, pos = [], 0
     for run in runs:
-        text, _ = _join_runs([run])
+        text, _ = join_runs([run])
         offset = joined.find(text, pos)
         pos = offset + len(text)
         if not any(s <= offset and offset + len(text) <= e for s, e in drop):
@@ -1378,7 +1378,7 @@ def drop_footnotes(pages):
             if line.runs:
                 runs = _marker_runs(line.runs, body)
                 if len(runs) != len(line.runs):
-                    text, spans = _join_runs(runs)
+                    text, spans = join_runs(runs)
                     line = replace(line, text=text, spans=spans, runs=runs)
             kept.append(line)
         out.append((pageno, kept))
@@ -1925,7 +1925,7 @@ MAX_HEADING_LEVEL = 4
 RE_SUSPENDED_HYPHEN = re.compile(r"-\s*,.*-$")
 
 
-def _modal_size(paras):
+def modal_size(paras):
     """The running-text font size: the commonest size among the non-bold
     paragraphs. It is the yardstick everything else in a letterhead document is
     read against -- smaller is a footnote or the masthead, bold-and-larger is a
@@ -1981,7 +1981,7 @@ def classify_letterhead(paras, margin, masthead, by_size=False):
     larger than the body -- see :func:`heading_levels`), and consecutive headings
     of one level are one heading, which is how a title set across three lines
     arrives."""
-    body = _modal_size(paras)
+    body = modal_size(paras)
     levels = heading_levels(paras, body, by_size)
     blocks = []
     for p in paras:
@@ -2044,7 +2044,7 @@ def letterhead_footnotes(paras, margin, masthead):
 
     Additive on purpose: the block stream every caller already consumes is
     unchanged, so a vertical opts into footnotes by calling this as well."""
-    body = _modal_size(paras)
+    body = modal_size(paras)
     notes = []
     for p in paras:
         if not (body and p.size and p.size < body):
@@ -2060,6 +2060,73 @@ def letterhead_footnotes(paras, margin, masthead):
             continue
         notes.append((mark, body_text))
     return notes
+
+
+# the horizontal rule a typeset page draws above its footnotes, which pdftohtml
+# renders as a row of underscores. Not evidence of a footnote on its own -- see
+# `ruled_footnotes`.
+RE_FOOTNOTE_RULE = re.compile(r"^_{8,}$")
+NOTE_INDENT = 25    # x units a note's marker may sit off the notes' own margin
+
+
+def _ruled_notes(lines):
+    """The lines below a footnote rule -> ``[(mark, text)]``.
+
+    The marker is set on its own line where the template superscripts it, so a
+    bare-number line at the notes' own left margin opens a note. The page folio
+    is a bare number too, and is dropped: it is centred, and so sits well off
+    that margin."""
+    margin = min((l.runs[0].left for l in lines
+                  if l.runs and not l.text.strip().isdigit()), default=0)
+    notes = []
+    for l in lines:
+        text = normalize_space(l.text)
+        if not text:
+            continue
+        at_margin = bool(l.runs) and abs(l.runs[0].left - margin) <= NOTE_INDENT
+        if text.isdigit():
+            if at_margin:
+                notes.append([text, ""])
+            continue                    # else: the folio, centred under the notes
+        match = RE_FOOTNOTE_MARK.match(text)
+        if notes and not notes[-1][1]:                  # marker line, then text
+            notes[-1][1] = text
+        elif match and at_margin:
+            notes.append([match.group(1), text[match.end():]])
+        elif notes:
+            notes[-1][1] = dehyphenate(notes[-1][1], text)
+        else:
+            notes.append(["", text])
+    return [(mark, text) for mark, text in notes
+            if len(text) >= FOOTNOTE_MIN and RE_FOOTNOTE_PROSE.search(text)]
+
+
+def ruled_footnotes(lines):
+    """A page's ``[Line]`` -> ``(body lines, [(mark, text)])``: the notes the
+    page sets below a horizontal rule at its foot, split off the body.
+
+    The rule alone is not evidence. A Swedish föreskrift draws the same row of
+    underscores above its ikraftträdande clause -- 3 920 of the 11 899 parsed
+    regulations carry one -- and that clause is body text at body size, not a
+    note. So the lines below the rule must *also* be set smaller than the page's
+    running size, which is what separates the two uses. A page with no rule, or
+    whose rule has body-size text under it, comes back unchanged."""
+    body = modal_size(lines)
+    if not body:
+        return lines, []
+    for i, l in enumerate(lines):
+        if not RE_FOOTNOTE_RULE.match(l.text.strip()):
+            continue
+        below = [x for x in lines[i + 1:] if x.size and x.text.strip()]
+        if below and all(x.size < body for x in below):
+            # only split where the reader actually took the lines as notes:
+            # the split *removes* everything below the rule, so a rule whose
+            # text the note filter rejects would otherwise drop that text from
+            # the document altogether -- neither body nor note
+            notes = _ruled_notes(lines[i + 1:])
+            if notes:
+                return lines[:i], notes
+    return lines, []
 
 
 def _heading_wrap(prev, l, marker, heading):
