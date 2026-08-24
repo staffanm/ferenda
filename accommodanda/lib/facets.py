@@ -1206,6 +1206,7 @@ FLOW_GROUPS = {
     "rs": "Ställningstaganden", "kommentar": "Lagkommentarer",
     "begrepp": "Begrepp", "guidance": "EU-vägledning",
     "lawreview": "Tidskriftsartiklar",
+    "lawpub": "Tidskriftsartiklar",
     "coe": "Konventioner", "icrc": "Konventioner", "untc": "Konventioner",
     "hudoc": "Folkrättslig praxis", "icj": "Folkrättslig praxis",
     "icc": "Folkrättslig praxis",

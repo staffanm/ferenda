@@ -170,6 +170,7 @@ accommodanda/
   rs/       rättsliga-ställningstaganden vertical (7 myndigheter) — agencies·download·skv·model·parse
   guidance/ EU soft-law source, 12 issuing bodies (EDPB·EBA·EASA·ACER·ESMA·ENISA·BEREC·EDPS·EIOPA·EUIPO·ECB·ESRB) — issuers·<body>_download·eurlex_download·model·parse·render
   lawreview/ journal-article vertical, nine journals (svjt·jp·ft·nmt·njel·siplr·urt·euar·lod) — journals·download·<journal>·model·parse (mined for citations only: no pages, feed or index of their own; a rail line links to the journal's own page; svjt and lod walk on harvest watermarks)
+  lawpub/   journal-article vertical, the lawpub.se platform (seven publishers) — publishers·download·model·parse (mined for citations only, same shape as lawreview; FT and SIPLR overlap lawreview's own hosts, so those two publishers' articles can arrive via either vertical)
   remisser/ remiss (referral-response) vertical — model·download·parse·ai_analyze
   site/     editorial-chrome vertical (frontpage/om/sitenews) — model·parse·render (markdown content repo, WIKI_ROOT)
   stats/    corpus-measurement vertical (/statistik) — model·scan·compute·charts·render (reads the finished corpus; nothing to download or parse)
@@ -4889,6 +4890,26 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lawpub** (2026-08-24) — a second mine-only journal-article vertical,
+  `accommodanda/lawpub/`: the lawpub.se platform's own open-access articles,
+  across the seven publishers it hosts (`publishers.py`) rather than one
+  journal's own site (Nordisk socialrättslig tidskrift, Förvaltningsrättslig
+  tidskrift, Europarättslig tidskrift, the Swedish Law and Informatics
+  Research Institute, Stockholm IP Law Review, Stiftelsen Juridisk
+  Fakultetslitteratur, Scandinavian studies in law). One paginated listing
+  (`POST /sv/sections/getsectionpage`), newest first, ended by the platform's
+  own `EOF` page and gated by a harvest watermark the way `lawreview`'s svjt
+  scope is; only open-access items are stored, a locked ("Stängd") item
+  skipped. The document is the article's own PDF; the basefile is the
+  platform's own handle, a section number or a DOI. Same thin `Artikel`
+  model and mining-only parse as `lawreview` — no headings, no structure,
+  footnotes kept, handed straight to the citation scanner — wired the same
+  way (`build._simple_source`, `UNSEARCHED`, no renderer, no browse tree, no
+  feed). Two of the seven publishers — Förvaltningsrättslig tidskrift (FT)
+  and Stockholm IP Law Review (SIPLR) — are also harvested on their own
+  hosts by `lawreview`, so one article can arrive twice, catalogued under
+  two separate basefiles (`lawreview/ft/...` and `lawpub/...`).
+  `test/test_lawpub.py`.
 - **lib/lagrum: `ENGLAGRUM`** (2026-08-24) — a parse type for Swedish
   statutes cited from *English* text, not Swedish (the language part of the
   pan-Nordic journal corpus writes in). Two fixed shapes, no grammar: the

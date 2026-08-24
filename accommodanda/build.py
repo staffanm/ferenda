@@ -117,6 +117,8 @@ from .icj import render as icj_render
 from .icrc import download as icrc_download
 from .icrc import parse as icrc_parse
 from .icrc import render as icrc_render
+from .lawpub import download as lawpub_download
+from .lawpub import parse as lawpub_parse
 from .lawreview import download as lawreview_download
 from .lawreview import journals as lawreview_journals
 from .lawreview import parse as lawreview_parse
@@ -3426,6 +3428,59 @@ SOURCES["lawreview"] = Source("lawreview", lawreview_list, {
           "--jobs does not apply here")
 
 
+# lawpub (the platform's open-access tidskriftsartiklar -- see
+# lawpub/publishers.py)
+# --------------------------------------------------------------------------
+# The platform (lawpub.se) hosts the open-access articles of several
+# publishers, two of which (Förvaltningsrättslig tidskrift, Stockholm IP Law
+# Review) this repository already harvests on their own hosts under
+# `lawreview`. Those articles arrive a second time here with a separate
+# basefile (``lawpub/...``); the catalog collapses the two basefiles of one
+# article to a single context-rail line, so the overlap is not double-listed.
+# The articles are mined for the references they make, the way lawreview's are:
+# cataloged so the citation scan feeds the "Artiklar" rail, unsearched because
+# they have no page on this site (their rail lines link out to the platform).
+
+LAW_PUB_CODE = (PKG / "lawpub" / "parse.py", PKG / "lawpub" / "model.py",
+                PKG / "lawpub" / "publishers.py", PKG / "lawpub" / "download.py",
+                PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
+                PKG / "lib" / "emdref.py", *CASENUMBER_CODE,
+                *CITATION_DATA,
+                PKG / "lib" / "artifact.py")
+
+
+def lawpub_inputs(basefile):
+    """The record JSON plus the article's own PDF -- re-downloading either
+    re-stales the parse. The PDF is the mined text's only home; the record
+    carries the coordinates the platform states (publisher, edition, month-year,
+    page span)."""
+    root = layout.LAW_PUB_DOWNLOADED
+    return [lawpub_download.record_path(root, basefile),
+            lawpub_download.pdf_path(root, basefile)
+            ] + _patch_input("lawpub", basefile)
+
+
+SOURCES["lawpub"] = _simple_source(
+    "lawpub", lawpub_download, lawpub_parse.parse,
+    layout.LAW_PUB_DOWNLOADED, LAW_PUB_CODE,
+    inputs=lawpub_inputs,
+    origin=lawpub_download.ORIGIN,
+    notes="download flag: --only <nummer|doi> (fetch one; no scope "
+          "needed -- the platform is a single listing)\n"
+          "the walk stops on the harvest watermark: a caught-up run reads only "
+          "the newest listing pages and never re-walks the platform's full "
+          "depth\n"
+          "the listing holds only the platform's OPEN-access articles; a "
+          "locked one (\"Stängd\") has no PDF the platform will serve\n"
+          "an article's publisher is its listing icon (lawpub/publishers.py); "
+          "two of them -- FT and SIPLR -- are also harvested on their own hosts "
+          "by lawreview, so an article they share arrives twice and the context "
+          "rail collapses it to one line\n"
+          "the article's PDF comes from /utils/downloadsection/<id>; a DOI "
+          "item's id is read off its article page first",
+    dry_label="the platform's open-access articles")
+
+
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden
 # arrive only through the bulk `rs_harvest` sweep, so parse runs over whatever is
 # on disk; relate/index/dump/generate act on the artifacts by source name.
@@ -4238,7 +4293,7 @@ def cmd_relate(names, force=None):
 # the journals), so a search hit for one would be a dead link. Composed here,
 # one layer above lib/search, like SOURCE_RENDERERS (lib never branches on a
 # source).
-UNSEARCHED = frozenset({"kommentar", "lawreview"})
+UNSEARCHED = frozenset({"kommentar", "lawreview", "lawpub"})
 
 
 def cmd_index(names, jobs=1):

@@ -227,6 +227,19 @@ citation scan of their full text feeds the "Artiklar" rail line
 (`lib/page.py`) on the statute, förarbete or rättsfall they name, which links
 out to the journal's own page for the article.
 
+**lawpub vertical (tidskriftsartiklar — the lawpub.se platform, seven publishers)**
+| File | What |
+|---|---|
+| `publishers.py` | the data registry: a `Publisher` states kod, the platform's `/utgivare/<n>` number, full name and publisher icon; `kod_from_icon` reads the identifier off the icon file's own stem rather than restating it. Two of its seven publishers overlap `lawreview` journals hosted a second way — Förvaltningsrättslig tidskrift (`ft`) and Stockholm IP Law Review (`siplr`) — so an FT or SIPLR article can arrive by either vertical, catalogued under two separate basefiles |
+| `download.py` | one paginated listing (`POST /sv/sections/getsectionpage`), newest first, ended by the platform's own `EOF` page; an item downloads only when marked open (`svg.icon.open`) — a locked (`Stängd`) item is skipped. `sync` walks it behind a harvest watermark like `lawreview`'s svjt scope, so a caught-up run reads only the newest listing pages. The document is the article's own PDF, served at `/utils/downloadsection/<id>`; an item keyed by DOI rather than a section number reads its id off its own article page first, and only when its PDF is actually being fetched |
+| `model.py` | `Artikel` — the same thin shape as `lawreview`'s (no currency/version/relation axis). `identifier` is the citation form the platform's own "Publicerad i" line yields (`FT 2015 s. 551`), the edition's name standing in for the page where the line states none |
+| `parse.py` | mining only, the same as `lawreview`'s: the stored PDF's running text, every paragraph an ordinary stycke, handed straight to the citation scanner — no headings, no cover, no structure read off it |
+
+Like `lawreview`, there is no renderer: no page, no browse tree, no
+frontpage entry, no feed, `UNSEARCHED` in `build.py` — only the citation
+scan feeds the cited document's context rail, linking out to the platform's
+own page for the article.
+
 **foreskrift vertical (agency regulations)**
 | File | What |
 |---|---|
@@ -797,6 +810,26 @@ the walk takes only the issues whose pages list articles. Its articles
 carry no page numbers, so the identifier stops at the issue
 ("Lov & Data 3/2022") and the basefile's sequence number keeps the issue's
 articles apart.
+
+**lawpub — tidskriftsartiklar, the lawpub.se platform** (operates on
+`site/data/{downloaded,artifact}/lawpub/`):
+
+```sh
+uv run python -m accommodanda.build lawpub download          # the whole listing, newest first
+uv run python -m accommodanda.build lawpub download --only 880
+uv run python -m accommodanda.build lawpub parse              # incremental, like every source
+```
+
+The platform is a single listing across seven publishers (`publishers.py`),
+so there is no per-publisher scope. The walk stops on a harvest watermark,
+so a caught-up run reads only the newest listing pages. Only open-access
+items are stored; a locked ("Stängd") item has no PDF the platform will
+serve. Like `lawreview`'s articles, these are mined for the references they
+make and are not republished: no page, no browse tree, no feed, no search
+index entry. Two of the platform's seven publishers — Förvaltningsrättslig
+tidskrift (FT) and Stockholm IP Law Review (SIPLR) — are also harvested on
+their own hosts by `lawreview`, so one article can arrive twice, catalogued
+under two separate basefiles (`lawreview/ft/...` and `lawpub/...`).
 
 **HUDOC + Council of Europe treaties + ICRC IHL treaties + UN Treaty Collection + ICC case law**:
 

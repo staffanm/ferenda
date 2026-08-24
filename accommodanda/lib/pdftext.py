@@ -361,6 +361,22 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
         yield int(page.get("number")), _lines(spans)
 
 
+def pdf_paragraph_texts(pdf_path, patch_key=None):
+    """A PDF's body as plain paragraph strings, page by page reflowed
+    (`page_paragraphs` with no running header to strip): the reading order a
+    vertical whose text carries no structure (`lawpub`'s articles) wraps into
+    its own blocks, and the text the citation scanner reads. (`lawreview`'s
+    PDF reader keeps its own copy of this loop: it needs the pages
+    themselves, for the opening-page footers its journals print.) Blank
+    paragraphs (a page the reflow grouped into nothing) are dropped."""
+    out = []
+    for pageno, lines in pdf_pages(pdf_path, patch_key):
+        for para in page_paragraphs(lines, None, pageno):
+            if para.text:
+                out.append(para.text)
+    return out
+
+
 def page_boxes(pdf_path):
     """``{pageno: (width, height)}`` in pdftohtml's own pixel space -- the space
     every geometry in `pdf_pages` is expressed in. Paired with the page as
