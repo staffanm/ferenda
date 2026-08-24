@@ -15,6 +15,7 @@ from ..lib.page import (
     Rail,
     Toc,
     doc_meta,
+    footnote_items,
     page_context,
     ref_link,
     ref_list,
@@ -155,6 +156,10 @@ def render(art, site):
     base_uri = art["uri"].removesuffix("/grund") if grund else art["uri"]
     cons = None if grund else presented_consolidation(art)
     structure = cons["structure"] if cons else art.get("structure", [])
+    # the notes that belong to *that* body: a presented consolidation is its own
+    # document, so listing the base regulation's notes under it would print
+    # numbered notes about a text the reader is not looking at
+    notes = cons.get("footnotes", []) if cons else art.get("footnotes", [])
     ident = art.get("identifier") or catalog.local(base_uri)
     lb = labels.document_labels("foreskrift", art)
     title = lb.short_title or ident
@@ -213,4 +218,8 @@ def render(art, site):
         eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
         island=rail.island(), body_class=" inaktuell" if grund else "",
         banner=Markup(banner), refs=Markup(refs), structure=body,
+        # poppler drops the superscript marker a föreskrift prints in its
+        # ingress -- it shares a baseline with the prose -- so there is no
+        # inline anchor to return to and the note lists its printed number
+        footnotes=footnote_items(notes, site, backref=False),
         amendments=amendments))

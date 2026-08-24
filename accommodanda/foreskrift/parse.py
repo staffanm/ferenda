@@ -31,6 +31,8 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from ..lib import tabell
+from ..lib.artifact import footnote_nodes
 from ..lib.lagrum import (
     EULAGSTIFTNING,
     FORESKRIFT,
@@ -39,10 +41,17 @@ from ..lib.lagrum import (
     interleave,
     sfs_parser,
 )
-from ..lib.pdftext import RE_KAP_MARK, RE_PARA_MARK, Para, page_paragraphs, pdf_pages
+from ..lib.pdftext import (
+    RE_KAP_MARK,
+    RE_PARA_MARK,
+    Para,
+    page_paragraphs,
+    pdf_pages,
+    ruled_footnotes,
+)
 from ..lib.util import MONTHS, approximate_date, confine, fold_swedish
 from .agencies import AAFS_SERIES, REGISTRY
-from .model import Amendment, Consolidation, Regulation, regulation_uri
+from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
 from .structure import nest
 
 # a föreskrift cites SFS (the empowering law), EU directives (what it
@@ -57,6 +66,10 @@ PARSE_TYPES = [LAGRUM, EULAGSTIFTNING, FORESKRIFT, KORTLAGRUM]
 
 RE_RUBRIK_NUM = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")     # "2.1 Heading"
 RE_LIST_ITEM = re.compile(r"^(?:\d+[.)]|[-–—•])\s")       # "1." / "– " list rows
+# a heading has to say something: MCFFS 2026:11 sets a stray bold 8-point "."
+# on page 12, which is a typesetting artifact and listed in the table of
+# contents as a heading named "."
+RE_HAS_LETTER = re.compile(r"[^\W\d_]")
 # the årsutgåva inside a föreskrift designation ("PMFS 2023:12" -> 2023), which
 # is what dates a consolidation: its newest amendment is its own cutoff
 RE_FS_YEAR = re.compile(r"\b(\d{4}):\d")
@@ -218,55 +231,259 @@ def _iso(day, month_word, year):
 # body: page paragraphs -> typed blocks
 # --------------------------------------------------------------------------
 
-def classify(paras):
+def _rank_rubriker(blocks, start):
+    """Give every rubrik of the operative body its depth, in place.
+
+    The depth is the rank of the heading's font size among the sizes the body's
+    *other* headings use, largest first, which is how a template's own nesting
+    survives without anyone naming its point sizes. Level 1 is the kapitel
+    heading, so a chaptered föreskrift's rubriker start at 2 -- without that
+    every heading of a chaptered document was level 1 and its whole table of
+    contents read flat, chapter and subheading side by side (all 1 370 chaptered
+    regulations in the corpus).
+
+    Ranked over `blocks[start:]`, not the whole PDF: the masthead sets the
+    document title in the same size as a kapitel heading, and counting it pushed
+    every real rubrik one level deeper than it is. A size the scheme does not
+    know (a heading found by its number rather than its font, or a scanned PDF
+    with no font at all) takes the deepest level in use."""
+    body = blocks[start:]
+    has_kapitel = any(b.kind == "kapitel" for b in body)
+    sizes = sorted({b.size for b in body if b.kind == "rubrik" and b.size},
+                   reverse=True)
+    for b in body:
+        if b.kind == "rubrik":
+            rank = sizes.index(b.size) if b.size in sizes \
+                else max(len(sizes) - 1, 0)
+            b.level = (2 if has_kapitel else 1) + rank
+
+
+def classify(paras, pageno):
     """A page's paragraphs -> föreskrift blocks. Structural markers are read from
     the text (``N §`` / ``N kap.`` at the block start), so the classification
     survives a scanned PDF with no font; bold and short length back up an
-    *unnumbered* heading (``Definitioner``). Returns ``[(kind, text, num)]``."""
+    *unnumbered* heading (``Definitioner``)."""
     out = []
     for p in paras:
         text = p.text
         mk, mp = RE_KAP_MARK.match(text), RE_PARA_MARK.match(text)
         if mk:
-            out.append(("kapitel", text, mk.group(1)))
+            out.append(Block("kapitel", text, pageno, num=mk.group(1), size=p.size))
         elif mp:
-            out.append(("paragraf", text, re.sub(r"\s+", "", mp.group(1))))
+            out.append(Block("paragraf", text, pageno,
+                             num=re.sub(r"\s+", "", mp.group(1)), size=p.size))
         elif (p.bold or RE_RUBRIK_NUM.match(text)) and len(text) < 120 \
-                and not RE_LIST_ITEM.match(text):
+                and RE_HAS_LETTER.search(text) and not RE_LIST_ITEM.match(text):
             m = RE_RUBRIK_NUM.match(text)
-            num = m.group(1) if m else None
-            out.append(("rubrik", text, num))
+            out.append(Block("rubrik", text, pageno, size=p.size,
+                             num=m.group(1) if m else None))
         else:
-            out.append(("stycke", text, None))
+            out.append(Block("stycke", text, pageno, size=p.size))
     return out
 
 
+# a bullet list the reflow glued into one paragraph. Poppler sets the bullet as
+# its own run, so the character survives extraction and the item boundaries with
+# it -- 7 688 blocks of the corpus carry at least one. Only the bullet is split
+# on: an en dash is Swedish punctuation as often as it is a list marker, and a
+# leading "1." is already the shape `RE_LIST_ITEM` guards headings against.
+# Both characters are real: an agency that sets its bullets in Symbol prints
+# U+F0B7, and SKSFS 2014:7 uses it 90 times with not one U+2022 -- tested for
+# with the pattern itself, since a guard naming only U+2022 left that document
+# (and DVFS 2014:19's six Symbol bullets, mixed in with 141 ordinary ones) with
+# every item glued into running text.
+RE_BULLET = re.compile(r"\s*[•\uf0b7]\s*")
+
+
+def _split_bullets(block):
+    """`block` as itself, or as the intro stycke plus the ``lista`` its text runs
+    into. The lead-in keeps its own block ("Ledningens utbildning bör omfatta"),
+    since it is the sentence the items complete."""
+    if block.kind != "stycke" or not RE_BULLET.search(block.text):
+        return [block]
+    lead, *items = RE_BULLET.split(block.text)
+    items = [i.strip() for i in items if i.strip()]
+    if not items:
+        return [block]
+    out = [Block("stycke", lead.strip(), block.page, size=block.size)] \
+        if lead.strip() else []
+    return out + [Block("lista", "", block.page, size=block.size,
+                        children=[Block("punkt", i, block.page, size=block.size)
+                                  for i in items])]
+
+
+# the heading a föreskrift sets over the advisory text under a paragraf. It is
+# the whole line, and the documents themselves state the status it marks:
+# "Allmänna råd har en annan juridisk status än föreskrifter. De är inte
+# tvingande." The optional "till …" names the provision the råd explains
+# ("Allmänna råd till 2 kap. 1 § andra stycket häkteslagen (2010:611)"), which
+# is the heading's own words and is kept as the section's label.
+RE_ALLMANNA_RAD = re.compile(r"^Allmänn[at]\s+råd(?:\s+till\s+.+)?$", re.IGNORECASE)
+# the rule of underscores a föreskrift draws above its closing block, and the
+# sentence boundary the closing clause starts after
+RE_SLUTRULE = re.compile(r"_{5,}")
+RE_SENTENCE_END = re.compile(r"[.!?]\s+")
+
+
+def _closing_split(text):
+    """`text` cut into (what still belongs to the råd, the closing matter), the
+    second empty where the block carries none.
+
+    The **closing matter** is the ikraftträdande/övergångsbestämmelser and the
+    signature that follow the operative body. A råd cannot reach past the body
+    it explains: without this cut it did, and the page then set binding text
+    inside the advisory box under a label saying it is not binding -- the exact
+    inverse of what the section is for (TFS 2009:2, KVFS 2021:2, RPSFS 2011:12;
+    ~180 regulations print a råd in that position).
+
+    Cutting inside the block, not moving the whole block, because the reflow
+    glues the råd's last paragraph to the clause that follows it: KVFS 2021:2
+    prints "… Ett sådant behov föreligger normalt för en intagen som är dömd
+    för sexualbrott … ___________ Dessa föreskrifter … träder i kraft den 1 maj
+    2021." as one paragraph, and moving it out ended the råd mid-sentence while
+    IAFFS 2025:5 -- whose råd is that one paragraph -- lost its råd entirely.
+
+    Two signals: the rule of underscores drawn above the closing block, and a
+    "träder i kraft" sentence whose subject is *this* document -- the same pair
+    `ikrafttradande_date` uses to tell the document's own date from one it
+    quotes, so a råd that discusses another act's entry into force stays a råd.
+    """
+    cut = None
+    if rule := RE_SLUTRULE.search(text):
+        cut = rule.start()
+    if (m := RE_IKRAFT.search(text)) and RE_IKRAFT_SUBJECT.search(text[:m.start()]):
+        # the clause starts at its own sentence, not at the verb
+        ends = [e.end() for e in RE_SENTENCE_END.finditer(text, 0, m.start())]
+        start = ends[-1] if ends else 0
+        cut = start if cut is None else min(cut, start)
+    if cut is None:
+        return text, ""
+    return text[:cut].rstrip(), text[cut:].lstrip()
+
+
+def _group_allmanna_rad(blocks):
+    """The run with each allmänt råd folded into its own ``allmanna_rad`` block.
+
+    A råd opens on the heading line and runs to the next structural marker --
+    the next kapitel, paragraf or rubrik, a second råd, or the document's
+    closing matter (:func:`_closes_rad`). That is the printed convention: a råd
+    explains the § above it and the next § ends it. Left flat, its text read as
+    further stycken of a binding paragraf (6 419 blocks across 895
+    regulations)."""
+    out = []
+    for b in blocks:
+        if RE_ALLMANNA_RAD.match(b.text.strip()):
+            out.append(Block("allmanna_rad", b.text.strip(), b.page, size=b.size))
+        elif out and out[-1].kind == "allmanna_rad" \
+                and b.kind not in ("kapitel", "paragraf", "rubrik"):
+            head, tail = _closing_split(b.text)
+            if not tail:
+                # the common case, and the only one a container block can take:
+                # a lista's or tabell's own text is empty and its content hangs
+                # in `children`, so it must pass through whole
+                out[-1].children.append(b)
+            else:
+                if head:
+                    out[-1].children.append(
+                        Block(b.kind, head, b.page, size=b.size))
+                out.append(Block("stycke", tail, b.page, size=b.size))
+        else:
+            out.append(b)
+    # a heading whose råd turned out to be empty (the page broke under it) is
+    # not a section -- keep the text rather than dropping it (rule:fail-fast)
+    return [Block("rubrik", b.text, b.page, size=b.size)
+            if b.kind == "allmanna_rad" and not b.children else b
+            for b in out]
+
+
 def _body_start(blocks):
-    """The index where the operative body begins, i.e. past the masthead
-    (författningssamling name, utgivare, ISSN, the Utkom/beslutade/med-stöd-av
-    lines). The first ``kapitel``/``paragraf`` marker is the reliable boundary;
-    a föreskrift with no §§ at all (a short declarative, a förteckning) has none,
-    so we fall back to the block just after the closing preamble verb ('…
-    föreskriver följande'), and failing even that keep everything."""
-    for i, (kind, *_rest) in enumerate(blocks):
-        if kind in ("kapitel", "paragraf"):
+    """The index where the operative body begins, i.e. past the masthead and the
+    ingress (författningssamling name, utgivare, ISSN, the Utkom/beslutade/
+    med-stöd-av lines). The first ``kapitel``/``paragraf`` marker is the reliable
+    boundary; a föreskrift with no §§ at all (a short declarative, a förteckning)
+    has none, so we fall back to the block just after the closing preamble verb
+    ('… föreskriver följande'), and failing even that keep everything."""
+    for i, b in enumerate(blocks):
+        if b.kind in ("kapitel", "paragraf"):
             return i
-    for i, (_kind, text, *_rest) in enumerate(blocks):
-        if RE_PREAMBLE_END.search(text):
+    for i, b in enumerate(blocks):
+        if RE_PREAMBLE_END.search(b.text):
             return i + 1
     return 0
 
 
+# the masthead lines that are the *samling's* furniture rather than this
+# document's own words: the samling title, its publisher and ISSN, the "Utkom
+# från trycket" stamp and the FS number. The title sentence ends the masthead --
+# a föreskrift's title is printed as the opening of a sentence the preamble
+# completes ("… för väsentliga och viktiga verksamhetsutövare; beslutade den 15
+# juni 2026.") -- so the ingress opens at the first block past it.
+RE_MASTHEAD_LINE = re.compile(
+    r"författningssamling|Utgivare|ISSN|Utkom\s+från\s+trycket"
+    r"|^[A-ZÅÄÖ][A-ZÅÄÖ\-]*\s*\d{4}:\d+\s*$", re.IGNORECASE)
+
+
+def _ingress_start(blocks, body_start):
+    """The index where the föreskrift's **ingress** begins -- the preamble that
+    states the day it was decided and the bemyndigande it rests on ("Myndigheten
+    för civilt försvar föreskriver … med stöd av 38 § p. 5 …").
+
+    That text is required by 18 b § författningssamlingsförordningen (1976:725)
+    and it is the document's own opening words, but the parser used to drop it
+    with the masthead: `_body_start` skips to the first ``N §``, so 11 538 of the
+    corpus's 11 899 regulations published no preamble at all. It is found by
+    walking *back* from the body to the last thing that cannot be ingress. Three
+    signals stop the walk, measured over 250 random regulations:
+
+      * a **rubrik** -- 150 of 229. The commonest by far: a heading before the
+        first § ends the masthead, and everything after it is the document
+        speaking.
+      * a **masthead furniture line** -- 47. The samling name, the utgivare,
+        the ISSN, the "Utkom från trycket" stamp, the FS number
+        (:data:`RE_MASTHEAD_LINE`).
+      * the **title sentence's semicolon** -- 30. A föreskrift's title is
+        printed as the opening of a sentence the preamble completes ("… för
+        väsentliga och viktiga verksamhetsutövare; beslutade den 15 juni 2026.").
+
+    The remaining 2 reach the top without meeting any of them -- the thin-
+    masthead population `role_declaration` documents, whose first ``N §`` sits
+    inside a running head. Those blocks may well *be* an ingress, but nothing
+    here separates them from the title, so they return `body_start` (no ingress)
+    rather than publishing the title as a preamble stycke.
+    """
+    for i in range(body_start - 1, -1, -1):
+        if RE_MASTHEAD_LINE.search(blocks[i].text) or blocks[i].kind == "rubrik" \
+                or blocks[i].text.rstrip().endswith(";"):
+            return i + 1
+    return body_start
+
+
 def parse_body(pages, identifier):
     """All blocks of a föreskrift, page by page, masthead included (the caller
-    reads metadata from the masthead, then drops it via :func:`_body_start`). The
-    running header is the identifier (``FFFS 2013:10``), which the printed pages
-    repeat, so ``page_paragraphs`` strips it. Returns ``[(kind, text, page, num)]``."""
-    blocks = []
+    reads metadata from the masthead, then drops it via :func:`_body_start`),
+    plus the page-foot footnotes split off the body. The running header is the
+    identifier (``FFFS 2013:10``), which the printed pages repeat, so
+    ``page_paragraphs`` strips it.
+
+    Three page-level shapes are read before the prose reflow, because each is
+    lost once the lines are folded into paragraphs: the notes under a page's
+    footnote rule, the two-column ordförklaringar table, and (after the reflow)
+    the bullet lists and allmänna råd the reflow glues into one stycke."""
+    blocks, notes = [], []
     for pageno, lines in pages:
-        for kind, text, num in classify(page_paragraphs(lines, identifier, pageno)):
-            blocks.append((kind, text, pageno, num))
-    return blocks
+        body_lines, page_notes = ruled_footnotes(lines)
+        notes += page_notes
+        for kind, th_or_lines, rows in tabell.split_two_column(body_lines):
+            if kind == "tabell":
+                blocks.append(Block("tabell", "", pageno, rows=list(rows),
+                                    th=bool(th_or_lines)))
+                continue
+            for block in classify(page_paragraphs(th_or_lines, identifier, pageno),
+                                  pageno):
+                blocks += _split_bullets(block)
+    blocks = _group_allmanna_rad(tabell.merge_continued(blocks))
+    _rank_rubriker(blocks, _body_start(blocks))
+    return blocks, notes
 
 
 # --------------------------------------------------------------------------
@@ -378,21 +595,53 @@ def extract_metadata(text, declaration, parser):
 # record -> Regulation -> artifact
 # --------------------------------------------------------------------------
 
+def _node(block, parser):
+    """One :class:`Block` -> its artifact node dict, its text scanned for SFS/EU
+    citations and spliced into inline runs. A ``tabell`` carries cells instead of
+    text; a container (``lista``, ``allmanna_rad``) carries its children."""
+    def scan(text):
+        return interleave(text, parser.parse_text(text, context={}))
+
+    if block.kind == "tabell":
+        # `th` sits on the header *row*, the way a förarbete lydelse table
+        # carries it, so the shared row renderer needs no table-level state
+        rows = [dict({"type": "rad", "cells": [scan(c) for c in row]},
+                     **({"th": True} if i == 0 and block.th else {}))
+                for i, row in enumerate(block.rows or [])]
+        return {"type": "tabell", "page": block.page, "children": rows}
+    node = {"type": block.kind, "page": block.page}
+    if block.children:
+        node["children"] = [_node(c, parser) for c in block.children]
+    # a råd carries both: its children and its own printed heading. The heading
+    # goes under `text` like any other node's words, not a key of its own --
+    # `lib.text` collects `text`, and the whole document's plain text is what
+    # feeds the search index; and the heading names a provision ("Allmänna råd
+    # till 2 kap. 1 § häkteslagen (2010:611)"), so it is scanned for citations.
+    if block.kind == "allmanna_rad" or not block.children:
+        node["text"] = scan(block.text)
+    if block.num:
+        node["num"] = block.num
+    if block.level:
+        node["level"] = block.level
+    return node
+
+
 def _structure(blocks, parser):
-    """Flat ``(kind, text, page, num)`` blocks -> the nested ``structure`` list,
-    each block's text scanned for SFS/EU citations and spliced into inline runs."""
-    dicts = []
-    for kind, text, page, num in blocks:
-        block = {"type": kind, "page": page,
-                 "text": interleave(text, parser.parse_text(text, context={}))}
-        if num:
-            block["num"] = num
-        dicts.append(block)
-    return nest(dicts)
+    """A :class:`Block` run -> the nested ``structure`` list."""
+    return nest([_node(b, parser) for b in blocks])
 
 
 def _full_text(blocks):
-    return "\n".join(text for _, text, _, _ in blocks)
+    """Every block's printed text in document order, containers walked and table
+    cells included -- the metadata scan reads dates and the bemyndigande clause
+    off this, and an ikraftträdande sentence must not go missing because the page
+    set it inside an allmänt råd or a table cell."""
+    out = []
+    for b in blocks:
+        out.append(b.text)
+        out += [c for row in b.rows or [] for c in row]
+        out.append(_full_text(b.children))
+    return "\n".join(t for t in out if t)
 
 
 # The title a föreskrift prints in its masthead: '<Agency>s föreskrifter om …;
@@ -580,21 +829,30 @@ def title_from_masthead(blocks, start):
 
 
 def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
-    """One föreskrift PDF -> (structure tree, its metadata dict). Metadata is read
+    """One föreskrift PDF -> (structure tree, its metadata dict, its footnotes).
+    Metadata is read
     from the whole text (the masthead up front, ikraftträdande at the end); the
     structure is built from the operative body only, the masthead dropped.
     `patch_key=(source, basefile)` patches the pdftohtml XML before extraction."""
-    blocks = parse_body(pdf_pages(path, patch_key), identifier)
+    blocks, notes = parse_body(pdf_pages(path, patch_key), identifier)
     start = _body_start(blocks)
     masthead = _full_text(blocks[:start])
-    meta = extract_metadata(_full_text(blocks),
+    # the notes are read for metadata with the body: the "Jfr … direktiv" clause
+    # that names what a föreskrift genomför is *printed as* a page-foot note, so
+    # a scan of the blocks alone would lose the very relation it exists to find
+    meta = extract_metadata("\n".join([_full_text(blocks)]
+                                      + [text for _mark, text in notes]),
                             role_declaration(masthead, harvest_title), parser)
     # the publisher is a masthead fact only (a body citation to another agency's
     # föreskrifter must not be mistaken for it), so read it from the masthead blocks
     meta["publisher"] = extract_publisher(masthead or _full_text(blocks))
     # the body's own rubric, for records whose harvest title is link chrome (F7)
     meta["title"] = title_from_masthead(blocks, start)
-    return _structure(blocks[start:], parser), meta
+    ingress = _ingress_start(blocks, start)
+    body = ([Block("ingress", "", blocks[ingress].page,
+                   children=blocks[ingress:start])] if ingress < start else []) \
+        + blocks[start:]
+    return _structure(body, parser), meta, footnote_nodes(notes, parser)
 
 
 # printed designation (lowercased, hyphens/spaces dropped, Swedish vowels
@@ -645,13 +903,18 @@ def konsoliderad_tom(masthead, fs, base_ars, base_lop):
 
 
 def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
-    """A konsoliderad PDF -> (structure tree, konsolideradTom uri, masthead
-    amendment triples). The amendment list sits in the masthead (the blocks
-    before the body), so it is read there."""
-    blocks = parse_body(pdf_pages(path), identifier)
+    """A konsoliderad PDF -> (structure tree, its footnotes, konsolideradTom uri,
+    masthead amendment triples). The amendment list sits in the masthead (the
+    blocks before the body), so it is read there.
+
+    The notes are carried rather than dropped: `parse_body` *cuts* the below-rule
+    lines out of the body, so discarding them here would put that text in no
+    artifact key at all. No konsoliderad PDF in the corpus prints one today
+    (0 of 150 sampled), which is why the discard went unnoticed."""
+    blocks, notes = parse_body(pdf_pages(path), identifier)
     start = _body_start(blocks)
     masthead = _full_text(blocks[:start]) or _full_text(blocks)
-    return (_structure(blocks[start:], parser),
+    return (_structure(blocks[start:], parser), footnote_nodes(notes, parser),
             konsoliderad_tom(masthead, fs, base_ars, base_lop),
             masthead_amendments(masthead, fs, base_ars, base_lop))
 
@@ -669,8 +932,8 @@ RE_HTML_PREAMBLE = re.compile(r"(?:Observera att|Senaste lydelse:)")
 def parse_consolidation_html(path, parser):
     """A Socialstyrelsen konsoliderad HTML page (the frozen SOSFS/HSLF-FS
     ``konsolidering`` corpus; the old site rendered the consolidated fulltext
-    on-page rather than as a PDF) -> the same (structure, konsolideradTom,
-    masthead refs) contract as :func:`parse_consolidation`. The page is
+    on-page rather than as a PDF) -> the same (structure, footnotes,
+    konsolideradTom, masthead refs) contract as :func:`parse_consolidation`. The page is
     regular: ``<main>`` holds an h1 page title, three preamble lines, then
     h2/h3 headings over ``p``/``li`` body text -- headings classify as bold
     paragraphs, everything else by its textual ``N §``/``N kap.`` markers."""
@@ -691,11 +954,13 @@ def parse_consolidation_html(path, parser):
         if RE_HTML_PREAMBLE.match(text):
             continue
         paras.append(Para(text, bold=el.name not in ("p", "li")))
-    blocks = [(kind, text, None, num) for kind, text, num in classify(paras)]
+    blocks = classify(paras, None)
+    _rank_rubriker(blocks, _body_start(blocks))
     refs.sort(key=lambda r: (int(r[1]), int(r[2])))
     tom = (regulation_uri(_fs_key(refs[-1][0]), refs[-1][1], refs[-1][2])
            if refs else None)
-    return _structure(blocks[_body_start(blocks):], parser), tom, refs
+    # an HTML consolidation has no page-foot rule, so it carries no notes
+    return _structure(blocks[_body_start(blocks):], parser), [], tom, refs
 
 
 def andrar_target(title, fs, self_uri):
@@ -759,9 +1024,9 @@ def parse_record(record, root):
                         written=approximate_date(arsutgava))
 
     reg_file = files.get("regulation") or None
-    structure, meta = [], {}
+    structure, meta, notes = [], {}, []
     if reg_file:
-        structure, meta = parse_pdf(
+        structure, meta, notes = parse_pdf(
             body_path(root, fs, reg_file), record["identifier"], parser,
             ("foreskrift", basefile), record.get("title"))
 
@@ -778,7 +1043,7 @@ def parse_record(record, root):
         arsutgava=arsutgava, lopnummer=lopnummer,
         title=title, publisher=publisher,
         source_url=record.get("url"),
-        structure=structure, **meta)
+        structure=structure, footnotes=notes, **meta)
     # the resolved title, not the raw harvest one: for a chrome-titled record
     # the ändring declaration lives in the body rubric just adopted above
     if target := andrar_target(title or "", fs, reg.uri):
@@ -808,7 +1073,7 @@ def parse_record(record, root):
     for cons in files.get("consolidation", []):
         if cons.get("name"):
             path = Path(root) / fs / cons["name"]
-            cstruct, tom, refs = (
+            cstruct, cnotes, tom, refs = (
                 parse_consolidation_html(
                     path, sfs_parser("foreskrift", PARSE_TYPES, written=cons_written))
                 if path.suffix == ".html"
@@ -821,7 +1086,7 @@ def parse_record(record, root):
                 continue          # the landing page listed the same PDF twice
             reg.consolidations.append(Consolidation(
                 of=reg.uri, konsolideradTom=tom, url=cons.get("url"),
-                structure=cstruct))
+                structure=cstruct, footnotes=cnotes))
             # the masthead's amendment list is register evidence the landing
             # page often lacks -- fold the unlisted ones into the register
             # (each ref minted under its own printed samling: a SOSFS base

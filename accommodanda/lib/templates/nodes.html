@@ -17,11 +17,16 @@
 {%- macro tabell(rows) -%}
 <table>{{ rows }}</table>
 {%- endmacro -%}
-{%- macro rad(notice, width, grafik_cell, cells) -%}
+{%- macro rad(notice, width, grafik_cell, cells, tag="td") -%}
 {#- a pending/expiring row variant prints its temporal marker as a full-width
-    row above the row itself -#}
+    row above the row itself; `tag` is "th" for a column-header row -#}
 {%- if notice %}<tr class="temporal-status-rad"><td colspan="{{ width }}">{{ notice }}</td></tr>{% endif -%}
-<tr>{{ grafik_cell }}{% for c in cells %}<td>{{ c }}</td>{% endfor %}</tr>
+<tr>{{ grafik_cell }}{% for c in cells %}<{{ tag }}>{{ c }}</{{ tag }}>{% endfor %}</tr>
+{%- endmacro -%}
+{%- macro allmanna_rad(label, inner) -%}
+{#- a föreskrift's allmänt råd, set apart from the binding provision above it
+    and labelled with the heading the printed page carries -#}
+<aside class="allmanna-rad"><p class="rad-etikett">{{ label }}</p>{{ inner }}</aside>
 {%- endmacro -%}
 {%- macro grafik_cell(gid, img) -%}
 <td class="grafik" data-grafik="{{ gid }}">{{ img }}</td>

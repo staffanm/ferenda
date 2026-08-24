@@ -117,8 +117,6 @@ from .icj import render as icj_render
 from .icrc import download as icrc_download
 from .icrc import parse as icrc_parse
 from .icrc import render as icrc_render
-from .lawpub import download as lawpub_download
-from .lawpub import parse as lawpub_parse
 from .lawreview import download as lawreview_download
 from .lawreview import journals as lawreview_journals
 from .lawreview import parse as lawreview_parse
@@ -1955,7 +1953,7 @@ SOURCES["dv"] = Source("dv", lambda: sorted(dv_paths.cases()), {
 FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "structure.py", PKG / "forarbete" / "kommentar.py",
            PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
-           PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
+           PKG / "forarbete" / "lydelse.py", PKG / "lib" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
            PKG / "forarbete" / "kbtitles.py",
            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
@@ -2913,6 +2911,10 @@ FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
                    PKG / "foreskrift" / "structure.py",
                    PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
                    PKG / "lib" / "emdref.py", *CITATION_DATA,
+                   # the ordförklaringar table is reconstructed from the page
+                   # geometry, and the footnotes under a page's rule are scanned
+                   # into artifact nodes
+                   PKG / "lib" / "tabell.py", PKG / "lib" / "artifact.py",
                    # picks the presented consolidation, which decides whether
                    # the parse run emits a .grund.json sidecar
                    PKG / "lib" / "text.py")
@@ -3331,6 +3333,7 @@ SOURCES["guidance"] = Source("guidance", guidance_list, {
 LAWREVIEW_CODE = (PKG / "lawreview" / "parse.py", PKG / "lawreview" / "model.py",
                   PKG / "lawreview" / "journals.py",
                   PKG / "lawreview" / "download.py",
+                  PKG / "lawreview" / "lawpub.py",
                   PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
                   PKG / "lib" / "emdref.py", *CASENUMBER_CODE,
                   *CITATION_DATA,
@@ -3338,11 +3341,12 @@ LAWREVIEW_CODE = (PKG / "lawreview" / "parse.py", PKG / "lawreview" / "model.py"
 
 
 def lawreview_list():
-    # one directory per journal under the shared root; the basefile leads
-    # with the journal, so listing per journal gives the whole source
-    return sorted(bf for journal in lawreview_journals.JOURNALS
+    # one directory per scope under the shared root; the basefile leads
+    # with the scope, so listing per scope gives the whole source (the
+    # nine journals plus the lawpub platform)
+    return sorted(bf for scope in lawreview_download.SCOPES
                   for bf in compress.list_basefiles(
-                      layout.LAWREVIEW_DOWNLOADED, journal.kod))
+                      layout.LAWREVIEW_DOWNLOADED, scope))
 
 
 def lawreview_inputs(basefile):
@@ -3352,7 +3356,7 @@ def lawreview_inputs(basefile):
     harvest could not take from the PDF itself."""
     journal = basefile.split("/", 1)[0]
     record = util.record_path(layout.LAWREVIEW_DOWNLOADED, journal, basefile)
-    if lawreview_journals.BY_KOD[journal].html_document:
+    if journal != "lawpub" and lawreview_journals.BY_KOD[journal].html_document:
         content = [harvest.page_path(layout.LAWREVIEW_DOWNLOADED, basefile)]
     else:
         content = [harvest.pdf_path(layout.LAWREVIEW_DOWNLOADED, basefile)]
@@ -3377,9 +3381,8 @@ def lawreview_harvest(scopes):
     # banner that listed every journal's origin would state requests the run
     # never makes
     for scope in (scopes or lawreview_download.SCOPES):
-        journal = lawreview_journals.BY_KOD[scope]
         util.harvest_start("lawreview %s" % scope,
-                           ", ".join(journal.listings))
+                           ", ".join(lawreview_download.SCOPE_ORIGINS[scope]))
     # nine journals, nine hosts: they fan out one worker per journal,
     # regardless of the machine's worker count, so all nine walk in
     # parallel (they ride different hosts and pace themselves), and a
@@ -3425,60 +3428,12 @@ SOURCES["lawreview"] = Source("lawreview", lawreview_list, {
           "jp's host rate-limits with HTTP 466, which the harvest rides out "
           "on its own\n"
           "the journals fan out one worker per scope (separate hosts); "
-          "--jobs does not apply here")
-
-
-# lawpub (the platform's open-access tidskriftsartiklar -- see
-# lawpub/publishers.py)
-# --------------------------------------------------------------------------
-# The platform (lawpub.se) hosts the open-access articles of several
-# publishers, two of which (Förvaltningsrättslig tidskrift, Stockholm IP Law
-# Review) this repository already harvests on their own hosts under
-# `lawreview`. Those articles arrive a second time here with a separate
-# basefile (``lawpub/...``); the catalog collapses the two basefiles of one
-# article to a single context-rail line, so the overlap is not double-listed.
-# The articles are mined for the references they make, the way lawreview's are:
-# cataloged so the citation scan feeds the "Artiklar" rail, unsearched because
-# they have no page on this site (their rail lines link out to the platform).
-
-LAW_PUB_CODE = (PKG / "lawpub" / "parse.py", PKG / "lawpub" / "model.py",
-                PKG / "lawpub" / "publishers.py", PKG / "lawpub" / "download.py",
-                PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
-                PKG / "lib" / "emdref.py", *CASENUMBER_CODE,
-                *CITATION_DATA,
-                PKG / "lib" / "artifact.py")
-
-
-def lawpub_inputs(basefile):
-    """The record JSON plus the article's own PDF -- re-downloading either
-    re-stales the parse. The PDF is the mined text's only home; the record
-    carries the coordinates the platform states (publisher, edition, month-year,
-    page span)."""
-    root = layout.LAW_PUB_DOWNLOADED
-    return [lawpub_download.record_path(root, basefile),
-            lawpub_download.pdf_path(root, basefile)
-            ] + _patch_input("lawpub", basefile)
-
-
-SOURCES["lawpub"] = _simple_source(
-    "lawpub", lawpub_download, lawpub_parse.parse,
-    layout.LAW_PUB_DOWNLOADED, LAW_PUB_CODE,
-    inputs=lawpub_inputs,
-    origin=lawpub_download.ORIGIN,
-    notes="download flag: --only <nummer|doi> (fetch one; no scope "
-          "needed -- the platform is a single listing)\n"
-          "the walk stops on the harvest watermark: a caught-up run reads only "
-          "the newest listing pages and never re-walks the platform's full "
-          "depth\n"
-          "the listing holds only the platform's OPEN-access articles; a "
-          "locked one (\"Stängd\") has no PDF the platform will serve\n"
-          "an article's publisher is its listing icon (lawpub/publishers.py); "
-          "two of them -- FT and SIPLR -- are also harvested on their own hosts "
-          "by lawreview, so an article they share arrives twice and the context "
-          "rail collapses it to one line\n"
-          "the article's PDF comes from /utils/downloadsection/<id>; a DOI "
-          "item's id is read off its article page first",
-    dry_label="the platform's open-access articles")
+          "--jobs does not apply here\n"
+          "the lawpub scope is the lawpub.se platform, not a journal: one "
+          "paginated listing of several publishers' open-access articles, "
+          "walked newest-first on its watermark; --only lawpub/<nummer|doi> "
+          "fetches one. FT and SIPLR publish on their own hosts and on the "
+          "platform, so one article can arrive under two basefiles")
 
 
 # No per-document download stage (the foreskrift/avg rule): ställningstaganden
@@ -4293,7 +4248,7 @@ def cmd_relate(names, force=None):
 # the journals), so a search hit for one would be a dead link. Composed here,
 # one layer above lib/search, like SOURCE_RENDERERS (lib never branches on a
 # source).
-UNSEARCHED = frozenset({"kommentar", "lawreview", "lawpub"})
+UNSEARCHED = frozenset({"kommentar", "lawreview"})
 
 
 def cmd_index(names, jobs=1):

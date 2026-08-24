@@ -608,6 +608,24 @@ section.paragraf.rail-active { background:
    linear-gradient(90deg, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%);
    border-radius: 4px; }
 
+/* -- Föreskrift: the ingress and the allmänna råd --
+   A föreskrift opens with its ingress -- the day it was decided and the
+   bemyndigande it rests on -- which is the document speaking about itself, not
+   a provision, so it is set apart from the §§ that follow.
+   An allmänt råd is the advisory text under a paragraf. The documents state
+   its status themselves ("Allmänna råd har en annan juridisk status än
+   föreskrifter. De är inte tvingande."), so the page has to show at a glance
+   that it is not the binding rule: smaller, indented, and labelled. */
+section.ingress { margin: 0 0 2rem; color: var(--ink-2); font-size: .95rem; }
+section.ingress p:last-child { margin-bottom: 0; }
+aside.allmanna-rad { margin: .9rem 0 1.2rem; padding: .1rem 0 .1rem 1rem;
+                     border-left: 3px solid var(--rule); font-size: .93rem; }
+aside.allmanna-rad > .rad-etikett { font: 600 .68rem var(--sans);
+                     color: var(--ink-3); letter-spacing: .07em;
+                     text-transform: uppercase; margin-bottom: .35rem; }
+aside.allmanna-rad p:last-child, aside.allmanna-rad ul:last-child
+                   { margin-bottom: 0; }
+
 /* -- Incorporated conventions rendered as multilingual parallel corpora --
    Every heading and legal paragraph is one row with one cell per language. The
    column count is driven by --n-languages (2 or 3), set inline on the

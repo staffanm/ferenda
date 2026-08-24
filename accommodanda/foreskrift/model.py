@@ -57,6 +57,28 @@ def printed_designation(uri):
 
 
 @dataclass
+class Block:
+    """One typed block of a föreskrift's printed body, in document order, before
+    :func:`structure.nest` folds the run into the kapitel/paragraf tree.
+
+    Flat except for ``children``, which carries the one nesting the page layout
+    states rather than the statute does: an **allmänt råd**, the advisory text a
+    föreskrift sets in smaller type under the paragraf it explains. A råd is not
+    binding (the documents say so themselves), so it must not read as another
+    stycke of the § above it."""
+    kind: str                   # kapitel | paragraf | rubrik | stycke | lista
+                                # | punkt | tabell | allmanna_rad | ingress
+    text: str = ""
+    page: int | None = None
+    num: str | None = None      # kapitel/paragraf number ("3", "3 a")
+    size: int = 0               # the opening line's font size (0 = unknown)
+    level: int | None = None    # rubrik depth, ranked over the document's sizes
+    rows: list[tuple[str, ...]] | None = None   # tabell: its cell rows
+    th: bool = False            # tabell: row 0 is the column header
+    children: list["Block"] = field(default_factory=list)
+
+
+@dataclass
 class Amendment:
     """An ändringsförfattning: a later regulation that changes the base one.
     Captured as a reference (identity + its own PDF); its body, when we parse
@@ -86,6 +108,9 @@ class Consolidation:
     file: str | None = None      # stored konsoliderad PDF
     url: str | None = None       # the agency's own link for the konsoliderad PDF
     structure: list[dict] = field(default_factory=list)
+    # its own page-foot notes, beside its own body: the consolidated text is a
+    # different document from the base, so the base's notes do not describe it
+    footnotes: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -111,6 +136,11 @@ class Regulation:
     genomfor: list[str] = field(default_factory=list)       # EU directive uris
 
     structure: list[dict] = field(default_factory=list)  # förarbete-style §§ tree
+    # the notes the printed pages set below a rule at their foot, already
+    # citation-scanned into runs like `structure`: a föreskrift grounds the EU
+    # directive it transposes in exactly such a note ("Jfr Europaparlamentets
+    # och rådets direktiv …")
+    footnotes: list[dict] = field(default_factory=list)
     consolidations: list["Consolidation"] = field(default_factory=list)
     amendments: list["Amendment"] = field(default_factory=list)
     file: str | None = None              # the original grundförfattning PDF
@@ -144,7 +174,8 @@ class Regulation:
             "structure": self.structure,
             "consolidations": [
                 {"of": c.of, "konsolideradTom": c.konsolideradTom,
-                 "url": c.url, "structure": c.structure}
+                 "url": c.url, "structure": c.structure,
+                 "footnotes": c.footnotes}
                 for c in self.consolidations
             ],
             "amendments": [
@@ -153,6 +184,8 @@ class Regulation:
                 for a in self.amendments
             ],
         }
+        if self.footnotes:
+            art["footnotes"] = self.footnotes
         if self.source_url:
             art["source_url"] = self.source_url
         return art

@@ -1,5 +1,7 @@
 {#- An agency-regulation (föreskrift) page: status banner (repealed /
     consolidation cutoff / grund way-back), the typed outbound relation
-    lists, the regulation text, and the amendment register. -#}
+    lists, the regulation text, the notes its printed pages set below the
+    rule at their foot, and the amendment register. -#}
 {% extends "page.html" %}
-{% block body %}{{ banner }}{{ refs }}{{ structure }}{{ amendments }}{% endblock %}
+{% import "partials/footnotes.html" as notes %}
+{% block body %}{{ banner }}{{ refs }}{{ structure }}{% if footnotes %}{{ notes.footnote_list(footnotes) }}{% endif %}{{ amendments }}{% endblock %}

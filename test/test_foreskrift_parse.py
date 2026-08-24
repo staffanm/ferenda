@@ -4,21 +4,25 @@ masthead metadata extraction. The live PDF extraction (``lib.pdftext``) is
 exercised against the downloaded corpus during a batch parse, not here."""
 
 import shutil
+import sqlite3
 from pathlib import Path
 
 from accommodanda.lib.pdftext import Para
-from accommodanda.lib.text import node_text
+from accommodanda.lib.text import node_text, runs_text
 from accommodanda.foreskrift import structure
 from accommodanda.foreskrift import parse as fp
 from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
                                            extract_metadata, _iso,
-                                           _body_start, _dedupe_bemyndigande,
+                                           _body_start, _ingress_start,
+                                           _dedupe_bemyndigande,
                                            konsoliderad_tom, amendment_uri,
                                            andrar_target,
                                            masthead_amendments, parse_record,
                                            clean_title, title_from_masthead)
-from accommodanda.foreskrift.model import printed_designation
+from accommodanda.foreskrift.model import Block, printed_designation
+from accommodanda.foreskrift import render as fs_render
 from accommodanda.foreskrift.render import _andrad_genom, _konsoliderad_banner
+from accommodanda.lib import catalog
 from accommodanda.lib.page import Site
 from accommodanda.lib.lagrum import sfs_parser
 
@@ -31,7 +35,7 @@ def test_classify_reads_markers_from_text_not_font():
              Para("2 a § Vid tillämpning av 1 § gäller följande.", bold=False),
              Para("Definitioner", bold=True),
              Para("Ett vanligt stycke som bara är löpande text.", bold=False)]
-    assert classify(paras) == [
+    assert [(b.kind, b.text, b.num) for b in classify(paras, 1)] == [
         ("kapitel", "1 kap. Inledande bestämmelser", "1"),
         ("paragraf", "1 § Dessa föreskrifter gäller för x.", "1"),
         ("paragraf", "2 a § Vid tillämpning av 1 § gäller följande.", "2a"),
@@ -41,8 +45,8 @@ def test_classify_reads_markers_from_text_not_font():
 
 def test_classify_does_not_take_a_list_row_as_a_heading():
     # a short bold-less numbered list row must stay a stycke, not a numbered rubrik
-    [(kind, _t, _n)] = classify([Para("1. första punkten i en lista", bold=True)])
-    assert kind == "stycke"
+    [block] = classify([Para("1. första punkten i en lista", bold=True)], 1)
+    assert block.kind == "stycke"
 
 
 # --- structure.nest: statute-shaped tree + SFS anchors ----------------------
@@ -124,18 +128,31 @@ def test_pinpointed_abbreviation_links_bare_mention_does_not():
 
 
 def test_body_start_skips_the_masthead_to_the_first_marker():
-    blocks = [("rubrik", "Finansinspektionens författningssamling", 1, None),
-              ("stycke", "beslutade den 25 juni 2013. … föreskriver följande", 1, None),
-              ("kapitel", "1 kap. Innehåll", 1, "1"),
-              ("paragraf", "1 § …", 1, "1")]
+    blocks = [Block("rubrik", "Finansinspektionens författningssamling", 1),
+              Block("stycke", "beslutade den 25 juni 2013. … föreskriver följande", 1),
+              Block("kapitel", "1 kap. Innehåll", 1, num="1"),
+              Block("paragraf", "1 § …", 1, num="1")]
     assert _body_start(blocks) == 2          # drop the two masthead blocks
 
 
 def test_body_start_no_marker_falls_back_to_preamble_verb():
-    blocks = [("stycke", "Naturvårdsverkets författningssamling", 1, None),
-              ("stycke", "Med stöd av 1 § kungör Naturvårdsverket följande", 1, None),
-              ("stycke", "den egentliga förteckningen börjar här", 1, None)]
+    blocks = [Block("stycke", "Naturvårdsverkets författningssamling", 1),
+              Block("stycke", "Med stöd av 1 § kungör Naturvårdsverket följande", 1),
+              Block("stycke", "den egentliga förteckningen börjar här", 1)]
     assert _body_start(blocks) == 2          # past the "kungör" preamble verb
+
+
+def test_ingress_is_kept_as_the_documents_own_opening_words():
+    # the preamble states the bemyndigande the föreskrift rests on (18 b §
+    # författningssamlingsförordningen). It sits between the masthead's last
+    # furniture line and the first §, and used to be dropped with the masthead.
+    blocks = [Block("rubrik", "Myndigheten för civilt försvars författningssamling", 1),
+              Block("stycke", "Utgivare: Anna Asp ISSN 3119-2394", 1),
+              Block("stycke", "Myndighetens föreskrifter om säkerhetsåtgärder;", 1),
+              Block("stycke", "beslutade den 15 juni 2026.", 1),
+              Block("stycke", "Myndigheten föreskriver följande med stöd av 38 §.", 1),
+              Block("paragraf", "1 § …", 1, num="1")]
+    assert _ingress_start(blocks, _body_start(blocks)) == 3
 
 
 # --- konsolideradTom: the one fact that pins a consolidation -----------------
@@ -268,10 +285,10 @@ def test_ikraft_date_reads_the_declaration_from_the_title_when_the_masthead_is_g
     # ändring i" declaration never reaches the parser. 259 föreskrifter have a
     # masthead this thin; for 38 of them the harvest title is the only place the
     # declaration survives, and without it they fall back to the first date.
-    blocks = [("rubrik", "GRUNDLÄGGANDE BESTÄMMELSER", 1, None),
-              ("paragraf", "1 § Dessa föreskrifter gäller stöd.", 1, "1"),
-              ("stycke", "Denna författning träder i kraft den 12 mars 2015.", 2, None),
-              ("stycke", "Denna författning träder i kraft den 11 maj 2015.", 2, None)]
+    blocks = [Block("rubrik", "GRUNDLÄGGANDE BESTÄMMELSER", 1),
+              Block("paragraf", "1 § Dessa föreskrifter gäller stöd.", 1, num="1"),
+              Block("stycke", "Denna författning träder i kraft den 12 mars 2015.", 2),
+              Block("stycke", "Denna författning träder i kraft den 11 maj 2015.", 2)]
     masthead = fp._full_text(blocks[:_body_start(blocks)])
     assert masthead == "GRUNDLÄGGANDE BESTÄMMELSER"      # the declaration is not in it
     title = "Föreskrifter om ändring i Statens jordbruksverks föreskrifter (SJVFS 2015:2)"
@@ -407,16 +424,16 @@ def test_title_is_read_from_the_masthead_not_the_body():
     used to search the blocks *past* `_body_start`, where it has already been
     left behind, and so found one only where the body happened to repeat it --
     1,736 föreskrifter were left titled by their own number."""
-    blocks = [("rubrik", "Åklagarmyndighetens författningssamling", 1, None),
-              ("rubrik", "Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
+    blocks = [Block("rubrik", "Åklagarmyndighetens författningssamling", 1),
+              Block("rubrik", "Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
                          "lokalisering och verksamhetsområden; beslutade den "
-                         "1 december 2006.", 1, None),
-              ("stycke", "Åklagarmyndigheten föreskriver följande.", 1, None),
-              ("kapitel", "1 kap. Inledande bestämmelser", 1, None)]
+                         "1 december 2006.", 1),
+              Block("stycke", "Åklagarmyndigheten föreskriver följande.", 1),
+              Block("kapitel", "1 kap. Inledande bestämmelser", 1)]
     assert title_from_masthead(blocks, 3) == \
         ("Åklagarmyndighetens föreskrifter om åklagarkamrarnas "
          "lokalisering och verksamhetsområden")
-    assert title_from_masthead([("stycke", "1 § Denna föreskrift.", 1, None)],
+    assert title_from_masthead([Block("stycke", "1 § Denna föreskrift.", 1)],
                                1) is None
 
 
@@ -425,12 +442,11 @@ def test_title_survives_the_second_column_landing_inside_it():
     column's standing text into the middle of the title sentence. Cutting there
     would keep "Skolverkets föreskrifter" and lose the subject; the standing
     text is deleted instead, which rejoins the sentence that was printed."""
-    blocks = [("rubrik", "Statens skolverks författningssamling ISSN 1102-1950",
-               1, None),
-              ("stycke", "Skolverkets föreskrifter Utkom från trycket den 21 "
+    blocks = [Block("rubrik", "Statens skolverks författningssamling ISSN 1102-1950", 1),
+              Block("stycke", "Skolverkets föreskrifter Utkom från trycket den 21 "
                          "mars 2012 om betygskatalog för vuxenutbildning; "
-                         "beslutade den 8 mars 2012.", 1, None),
-              ("kapitel", "1 kap. Inledande bestämmelser", 1, None)]
+                         "beslutade den 8 mars 2012.", 1),
+              Block("kapitel", "1 kap. Inledande bestämmelser", 1)]
     assert title_from_masthead(blocks, 2) == \
         "Skolverkets föreskrifter om betygskatalog för vuxenutbildning"
 
@@ -439,12 +455,11 @@ def test_the_amended_regulations_number_stays_in_the_title():
     """An ändringsförfattning names the regulation it amends by number, which is
     the one place a designation belongs in a title -- so a parenthesis is held
     back from the removal that strips the masthead's own FS number."""
-    blocks = [("rubrik", "Läkemedelsverkets författningssamling ISSN 1101-5225",
-               1, None),
-              ("stycke", "Föreskrifter om ändring i Läkemedelsverkets "
+    blocks = [Block("rubrik", "Läkemedelsverkets författningssamling ISSN 1101-5225", 1),
+              Block("stycke", "Föreskrifter om ändring i Läkemedelsverkets "
                          "föreskrifter (LVFS 1997:13) om förskrivning av vissa "
-                         "livsmedel; beslutade den 5 mars 2013.", 1, None),
-              ("kapitel", "1 kap. Inledande", 1, None)]
+                         "livsmedel; beslutade den 5 mars 2013.", 1),
+              Block("kapitel", "1 kap. Inledande", 1)]
     assert title_from_masthead(blocks, 2) == \
         ("Föreskrifter om ändring i Läkemedelsverkets föreskrifter "
          "(LVFS 1997:13) om förskrivning av vissa livsmedel")
@@ -454,13 +469,12 @@ def test_the_utgivare_does_not_become_part_of_the_agency_name():
     """Two adjacent capitalised words are a boundary, not one name: the second
     column puts "Utgivare: Gunilla Hedwall" directly before "Säkerhetspolisens
     föreskrifter om säkerhetsskydd"."""
-    blocks = [("rubrik", "Polismyndighetens författningssamling", 1, None),
-              ("stycke", "ISSN 2002-0139 Utgivare: Gunilla Hedwall", 1, None),
-              ("rubrik", "Säkerhetspolisens föreskrifter om säkerhetsskydd;",
-               1, None),
-              ("stycke", "Utkom från trycket beslutade den 31 januari 2022. "
-                         "den 4 februari 2022", 1, None),
-              ("kapitel", "1 kap. Allmänna bestämmelser", 1, None)]
+    blocks = [Block("rubrik", "Polismyndighetens författningssamling", 1),
+              Block("stycke", "ISSN 2002-0139 Utgivare: Gunilla Hedwall", 1),
+              Block("rubrik", "Säkerhetspolisens föreskrifter om säkerhetsskydd;", 1),
+              Block("stycke", "Utkom från trycket beslutade den 31 januari 2022. "
+                         "den 4 februari 2022", 1),
+              Block("kapitel", "1 kap. Allmänna bestämmelser", 1)]
     assert title_from_masthead(blocks, 4) == \
         "Säkerhetspolisens föreskrifter om säkerhetsskydd"
 
@@ -473,7 +487,7 @@ def test_parse_record_mints_andrar_from_the_pdf_rubric(tmp_path, monkeypatch):
                  "(KKVFS 2021:1) om kartellbekämpning",
         "upphaver": [], "bemyndigande": [], "genomfor": [], "andrar": [],
         "beslutsdatum": None, "utkomFranTryck": None,
-        "ikrafttradandedatum": None, "publisher": None}))
+        "ikrafttradandedatum": None, "publisher": None}, []))
     record = {"fs": "kkvfs", "basefile": "kkvfs/2025:2",
               "identifier": "KKVFS 2025:2",
               "title": "KKVFS 2025:2 (pdf, 90 kB)",
@@ -488,7 +502,7 @@ def test_parse_record_prefers_pdf_rubric_over_chrome_title(tmp_path, monkeypatch
         "title": "Konkurrensverkets föreskrifter om kartellbekämpning",
         "upphaver": [], "bemyndigande": [], "genomfor": [], "andrar": [],
         "beslutsdatum": None, "utkomFranTryck": None,
-        "ikrafttradandedatum": None, "publisher": None}))
+        "ikrafttradandedatum": None, "publisher": None}, []))
     record = {"fs": "kkvfs", "basefile": "kkvfs/2025:1",
               "identifier": "KKVFS 2025:1", "title": "KKVFS 2025:1",
               "files": {"regulation": {"name": "r.pdf"}}}
@@ -537,7 +551,7 @@ def test_parse_record_drops_self_upphaver(tmp_path, monkeypatch):
                      "https://lagen.nu/livsfs/2005:20"],
         "bemyndigande": [], "genomfor": [], "andrar": [],
         "beslutsdatum": None, "utkomFranTryck": None,
-        "ikrafttradandedatum": None, "publisher": None}))
+        "ikrafttradandedatum": None, "publisher": None}, []))
     record = {"fs": "livsfs", "basefile": "livsfs/2022:4",
               "identifier": "LIVSFS 2022:4",
               "files": {"regulation": {"name": "r.pdf"}}}
@@ -550,9 +564,9 @@ def test_parse_record_dedupes_twice_listed_consolidation(tmp_path, monkeypatch):
     # identical Consolidations would masquerade as two historical versions.
     # A *distinct* second consolidation (a genuinely archived older one, as on
     # bfs/2007:5) must survive. The agency url rides into the model.
-    bodies = {"a.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13", []),
-              "b.pdf": ([{"id": "P1"}], "https://lagen.nu/fffs/2016:13", []),
-              "c.pdf": ([{"id": "P1", "old": True}],
+    bodies = {"a.pdf": ([{"id": "P1"}], [], "https://lagen.nu/fffs/2016:13", []),
+              "b.pdf": ([{"id": "P1"}], [], "https://lagen.nu/fffs/2016:13", []),
+              "c.pdf": ([{"id": "P1", "old": True}], [],
                         "https://lagen.nu/fffs/2014:2", [])}
     monkeypatch.setattr(fp, "parse_consolidation",
                         lambda path, *a: bodies[path.name])
@@ -574,7 +588,7 @@ def test_parse_record_folds_masthead_amendments_into_the_register(tmp_path,
     # landing page didn't list join the register (with minted uris), ones it
     # did stay single entries (the landing url wins)
     monkeypatch.setattr(fp, "parse_consolidation", lambda path, *a: (
-        [{"id": "P1"}], "https://lagen.nu/fffs/2017:7",
+        [{"id": "P1"}], [], "https://lagen.nu/fffs/2017:7",
         [("FFFS", "2014", "29"), ("FFFS", "2017", "7")]))
     record = {"fs": "fffs", "basefile": "fffs/2013:10",
               "identifier": "FFFS 2013:10",
@@ -627,12 +641,13 @@ KONSOLIDERING_HTML = Path(__file__).parent / "files/foreskrift/konsolidering.htm
 
 
 def test_parse_consolidation_html_builds_statute_tree_and_cutoff():
-    struct, tom, refs = fp.parse_consolidation_html(KONSOLIDERING_HTML,
+    struct, notes, tom, refs = fp.parse_consolidation_html(KONSOLIDERING_HTML,
                                                     sfs_parser("foreskrift", PARSE_TYPES))
     # the cutoff is the numerically latest ref on the "Ändrad:" line, minted
     # under its own samling (HSLF-FS beats SOSFS 2013:6: the series transition)
     assert tom == "https://lagen.nu/hslffs/2017:27"
     assert refs == [("SOSFS", "2013", "6"), ("HSLF-FS", "2017", "27")]
+    assert notes == []          # an HTML page has no page-foot rule
     # h2 -> kapitel, h3 -> rubrik, p with "N §" -> paragraf; the h1 page title
     # and the three preamble lines never reach the body
     assert [n["id"] for n in struct] == ["K1", "K2"]
@@ -734,3 +749,264 @@ def test_bemyndigande_verb_boundary_keeps_the_delegating_act():
 
 def test_no_bemyndigande_clause_is_not_an_empty_one():
     assert _bemyndigande("Riksdagsdirektören föreskriver följande.") is None
+
+
+# --- the page shapes the prose reflow used to lose ---------------------------
+
+def test_a_bullet_list_glued_into_one_stycke_becomes_a_lista():
+    # poppler sets the bullet as its own run, so the character survives the
+    # reflow that folds the items into one paragraph -- 7 688 blocks of the
+    # corpus carried at least one, all read as running text
+    [lead, lista] = fp._split_bullets(Block(
+        "stycke", "Ledningens utbildning bör omfatta • ledningens roll, "
+                  "• riskhantering, samt • interna regler.", 3))
+    assert (lead.kind, lead.text) == ("stycke", "Ledningens utbildning bör omfatta")
+    assert lista.kind == "lista"
+    assert [c.text for c in lista.children] == [
+        "ledningens roll,", "riskhantering, samt", "interna regler."]
+
+
+def test_a_stycke_without_a_bullet_is_left_alone():
+    block = Block("stycke", "Verksamhetsutövaren ska bedriva arbetet.", 4)
+    assert fp._split_bullets(block) == [block]
+
+
+def test_allmanna_rad_are_grouped_under_the_paragraf_they_explain():
+    # a råd runs from its heading to the next structural marker: it is advisory
+    # text, and left flat it read as further stycken of the binding paragraf
+    blocks = fp._group_allmanna_rad([
+        Block("paragraf", "1 § Utbildningen ska ge ledningen kunskap.", 3, num="1"),
+        Block("stycke", "Allmänna råd", 3),
+        Block("stycke", "Ledningens utbildning bör omfatta terminologi.", 3),
+        Block("kapitel", "3 kap. Organisatoriska säkerhetsåtgärder", 4, num="3"),
+        Block("paragraf", "1 § Verksamhetsutövaren ska bedriva arbetet.", 4, num="1"),
+    ])
+    assert [b.kind for b in blocks] == \
+        ["paragraf", "allmanna_rad", "kapitel", "paragraf"]
+    assert [c.text for c in blocks[1].children] == \
+        ["Ledningens utbildning bör omfatta terminologi."]
+
+
+def test_the_rad_heading_keeps_the_provision_it_names():
+    # "Allmänna råd till 3 §" is the heading's own words and names what the råd
+    # explains, so it becomes the section's label rather than being discarded
+    blocks = fp._group_allmanna_rad([
+        Block("paragraf", "3 § Den intagne ska underrättas.", 2, num="3"),
+        Block("stycke", "Allmänna råd till 3 §", 2),
+        Block("stycke", "Underrättelsen bör lämnas skriftligen.", 2),
+    ])
+    assert blocks[1].kind == "allmanna_rad"
+    assert blocks[1].text == "Allmänna råd till 3 §"
+
+
+def test_a_rad_heading_with_nothing_under_it_stays_a_heading():
+    # the page broke under the heading: keep the text rather than drop it
+    [para, head] = fp._group_allmanna_rad([
+        Block("paragraf", "1 § …", 1, num="1"),
+        Block("stycke", "Allmänna råd", 1),
+    ])
+    assert (head.kind, head.text) == ("rubrik", "Allmänna råd")
+
+
+def test_rubriker_are_ranked_by_size_under_the_chapter_heading():
+    # every heading of a chaptered föreskrift used to come out level 1, so the
+    # table of contents read flat -- chapter and subheading side by side
+    blocks = [Block("rubrik", "Myndighetens författningssamling", 1, size=24),
+              Block("kapitel", "1 kap. Inledande bestämmelser", 1, num="1", size=24),
+              Block("rubrik", "Tillämpningsområde", 1, size=22),
+              Block("paragraf", "1 § …", 1, num="1", size=18),
+              Block("rubrik", "Undantag", 1, size=20)]
+    fp._rank_rubriker(blocks, _body_start(blocks))
+    # the masthead heading is outside the body and stays unranked; inside it the
+    # 22-point rubrik is level 2 and the 20-point one level 3
+    assert [b.level for b in blocks] == [None, None, 2, None, 3]
+
+
+def test_a_stray_bold_glyph_is_not_a_heading():
+    # MCFFS 2026:11 sets a bold 8-point "." on page 12, which reached the table
+    # of contents as a heading named "."
+    assert classify([Para(".", bold=True)], 12)[0].kind == "stycke"
+
+
+# --- end to end over a real PDF (MCFFS 2026:11) ------------------------------
+
+MCFFS_PDF = Path(__file__).parent / "files/foreskrift/mcffs-2026-11.pdf"
+
+
+def test_mcffs_2026_11_reads_every_page_shape():
+    """One document that prints all six shapes the reflow used to flatten: an
+    ingress, a footnote under a page-foot rule, an ordförklaringar table over a
+    page break, nested headings, allmänna råd and bullet lists."""
+    struct, meta, notes = fp.parse_pdf(MCFFS_PDF, "MCFFS 2026:11",
+                                       sfs_parser("foreskrift", PARSE_TYPES))
+    nodes = list(structure.flatten(struct))
+
+    # the ingress opens the document, past the masthead's title sentence
+    assert struct[0]["type"] == "ingress"
+    assert node_text(struct[0]["children"][0]) == "beslutade den 15 juni 2026."
+    assert "med stöd av 38 § p. 5" in node_text(struct[0]["children"][1])
+
+    # the "Jfr … direktiv" note sits under the rule, not inside 1 kap. 2 §
+    assert [n["mark"] for n in notes] == ["1", "2"]
+    assert "2022/2555" in node_text(notes[0])
+    # …and its text no longer trails 1 kap. 2 § as a stycke of the provision.
+    # The rule before the ikraftträdande clause (page 27) is body text and stays.
+    assert not any("2022/2555" in node_text(n) for n in nodes)
+
+    # the chapter heading is level 1 and its subheadings level 2
+    kap1 = struct[1]
+    assert kap1["id"] == "K1" and kap1["children"][0]["level"] == 1
+    assert [n["level"] for n in kap1["children"] if n["type"] == "rubrik"] == \
+        [1, 2, 2]
+
+    # the ordförklaringar table is one table across the page break, its repeated
+    # "Begrepp / Betydelse" header dropped
+    [tabell] = [n for n in nodes if n["type"] == "tabell"]
+    rows = tabell["children"]
+    assert len(rows) == 14 and rows[0].get("th") is True
+    assert runs_text(rows[0]["cells"][0]).strip() == "Begrepp"
+    # a term that wraps in the left column keeps its definition beside it
+    assert runs_text(rows[2]["cells"][0]).strip() == \
+        "information i behov av utökat skydd"
+
+    # the advisory text under 2 kap. 1 § is a råd, and its bullets a list
+    [rad] = [n for n in structure.flatten(struct[2]["children"])
+             if n["type"] == "allmanna_rad"]
+    assert node_text(rad).startswith("Allmänna råd")
+    [lista] = [n for n in rad["children"] if n["type"] == "lista"]
+    assert len(lista["children"]) == 4
+    assert node_text(lista["children"][0]).startswith("ledningens roll")
+
+    # and none of it moved the metadata the masthead carries
+    assert meta["beslutsdatum"] == "2026-06-15"
+    assert meta["ikrafttradandedatum"] == "2026-10-01"
+    assert meta["bemyndigande"] == ["https://lagen.nu/2025:1507"]
+
+
+def test_the_rad_heading_is_citation_scanned_and_reaches_the_document_text():
+    """The råd's heading is held under `text`, not a key of its own: `lib.text`
+    collects `text` and nothing else, and the whole document's plain text is
+    what feeds the search index — held as a `label` it left 687 words of a
+    371-document sample unsearchable. Under `text` it is also scanned, so
+    "Allmänna råd till 2 kap. 1 § … häkteslagen (2010:611)" links the provision
+    it explains."""
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    [rad] = fp._structure([Block("allmanna_rad",
+                                 "Allmänna råd till 2 kap. 1 § andra stycket "
+                                 "häkteslagen (2010:611)", 2,
+                                 children=[Block("stycke", "Bör lämnas.", 2)])],
+                          parser)
+    assert node_text(rad).startswith("Allmänna råd till 2 kap. 1 §")
+    assert [r["uri"] for r in rad["text"] if isinstance(r, dict)] == \
+        ["https://lagen.nu/2010:611#K2P1S2"]
+
+
+SKVFS_PDF = Path(__file__).parent / "files/foreskrift/skvfs-2006-32.pdf"
+
+
+def test_a_page_foot_note_still_reaches_the_metadata_scan():
+    """The notes are read for metadata with the body, because a föreskrift
+    prints metadata *as* a page-foot note: SKVFS 2006:32 sets its own
+    ikraftträdande clause under the rule, in the small type its template uses,
+    and KIFS 2017:7 grounds the directive it transposes in a "Jfr …" note.
+    Measured over 1 500 regulations, the notes changed metadata on exactly those
+    two shapes and never replaced a value the body had stated."""
+    struct, meta, notes = fp.parse_pdf(SKVFS_PDF, "SKVFS 2006:32",
+                                       sfs_parser("foreskrift", PARSE_TYPES))
+    assert notes and "träder i kraft den 1 januari 2007" in node_text(notes[0])
+    assert meta["ikrafttradandedatum"] == "2007-01-01"
+    # and the note is not left in the body as a stycke of the last provision
+    assert not any("tillämpas för beskattningsåret 2007" in node_text(n)
+                   for n in structure.flatten(struct))
+
+
+def test_a_rad_stops_at_the_documents_closing_matter():
+    """A råd explains the § above it; it cannot reach past the operative body
+    into the ikraftträdande clause and the signature. Left running, TFS 2009:2,
+    KVFS 2021:2 and RPSFS 2011:12 each set binding text inside the advisory box,
+    under a label saying it is not binding — the inverse of what the section is
+    for. ~180 regulations print a råd in that position."""
+    for closer in ("Denna författning träder i kraft den 1 juni 2009.",
+                   "___________",
+                   "Dessa föreskrifter och allmänna råd träder i kraft "
+                   "den 1 maj 2021."):
+        blocks = fp._group_allmanna_rad([
+            Block("paragraf", "36 § En ansökan ska göras till Tullverket.", 9,
+                  num="36"),
+            Block("stycke", "Allmänna råd", 9),
+            Block("stycke", "Ansökan bör prövas med stor noggrannhet.", 9),
+            Block("stycke", closer, 9),
+            Block("stycke", "TULLVERKET KARIN STARRIN", 9),
+        ])
+        assert [b.kind for b in blocks] == \
+            ["paragraf", "allmanna_rad", "stycke", "stycke"], closer
+        assert [c.text for c in blocks[1].children] == \
+            ["Ansökan bör prövas med stor noggrannhet."], closer
+
+
+def test_a_rad_ending_inside_the_closing_block_is_cut_not_moved():
+    """The reflow glues a råd's last paragraph to the clause that follows it.
+    KVFS 2021:2 prints the råd's closing sentence and "___________ Dessa
+    föreskrifter … träder i kraft den 1 maj 2021." as one paragraph; moving the
+    whole block out ended the råd mid-sentence, and IAFFS 2025:5 — whose råd is
+    that one paragraph — lost its råd entirely."""
+    blocks = fp._group_allmanna_rad([
+        Block("paragraf", "4 § En intagen får meddelas särskilda villkor.", 3,
+              num="4"),
+        Block("stycke", "Allmänna råd", 3),
+        Block("stycke", "Ett sådant behov föreligger normalt inte. "
+                        "___________ Dessa föreskrifter och allmänna råd "
+                        "träder i kraft den 1 maj 2021.", 3),
+    ])
+    assert [b.kind for b in blocks] == ["paragraf", "allmanna_rad", "stycke"]
+    assert [c.text for c in blocks[1].children] == \
+        ["Ett sådant behov föreligger normalt inte."]
+    assert blocks[2].text == ("___________ Dessa föreskrifter och allmänna råd "
+                              "träder i kraft den 1 maj 2021.")
+
+
+def test_a_rad_keeps_an_ikrafttradande_it_only_quotes():
+    # the closer tests for *this* document's entry into force, the same way
+    # `ikrafttradande_date` does — a råd discussing another act's stays a råd
+    blocks = fp._group_allmanna_rad([
+        Block("paragraf", "3 § Tillstånd får ges.", 4, num="3"),
+        Block("stycke", "Allmänna råd", 4),
+        Block("stycke", "Bestämmelsen bör läsas mot den ändring som "
+                        "träder i kraft den 1 juli 2020.", 4),
+    ])
+    assert [b.kind for b in blocks] == ["paragraf", "allmanna_rad"]
+    assert len(blocks[1].children) == 1
+
+
+def test_a_symbol_font_bullet_splits_like_an_ordinary_one():
+    # SKSFS 2014:7 sets its bullets in Symbol (U+F0B7) and prints not one
+    # U+2022; a guard naming only U+2022 left all 90 of its items glued
+    [lead, lista] = fp._split_bullets(Block(
+        "stycke", "Utbildningen bör omfatta  första punkten, "
+                  " andra punkten.", 2))
+    assert lead.text == "Utbildningen bör omfatta"
+    assert [c.text for c in lista.children] == ["första punkten,", "andra punkten."]
+
+
+def test_a_presented_consolidation_prints_its_own_notes_not_the_bases():
+    """A konsoliderad version is a different document from the base regulation,
+    so listing the base's page-foot notes under it would print numbered notes
+    about a text the reader is not looking at. `presented_consolidation` picks
+    the body; the notes have to follow the same pick."""
+    art = {
+        "uri": "https://lagen.nu/fffs/2013:10", "identifier": "FFFS 2013:10",
+        "type": "foreskrift", "metadata": {},
+        "structure": [{"type": "stycke", "text": ["Ursprunglig lydelse."]}],
+        "footnotes": [{"mark": "1", "text": ["Basregelns egen not."]}],
+        "consolidations": [{
+            "of": "https://lagen.nu/fffs/2013:10", "konsolideradTom": None,
+            "structure": [{"type": "stycke", "text": ["Konsoliderad lydelse."]}],
+            "footnotes": [{"mark": "1", "text": ["Konsolideringens egen not."]}],
+        }],
+        "amendments": [],
+    }
+    con = sqlite3.connect(":memory:")
+    con.executescript(catalog.SCHEMA)          # an empty but real catalog
+    html = fs_render.render(art, Site(con, set()))
+    assert "Konsolideringens egen not." in html
+    assert "Basregelns egen not." not in html

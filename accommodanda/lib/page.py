@@ -485,22 +485,11 @@ INBOUND_KIND_GROUPS = {("eurlex", "judgment"): "eu-caselaw",
 # the groups whose members are case law, ordered newest-first below
 CASELAW_GROUPS = frozenset(INBOUND_KIND_GROUPS.values())
 
-# The inverse fold: two sources whose citing documents are the same kind of
-# thing share one accordion row. lawpub's articles are tidskriftsartiklar
-# exactly like lawreview's (same artifact shape, same label function, same
-# mine-only contract), and an article can even arrive through both sources
-# -- FT and SIPLR publish on their own hosts and on the lawpub platform --
-# so a reader's rail shows one "Artiklar" row, never a second row headed by
-# an internal source name.
-INBOUND_SOURCE_GROUPS = {"lawpub": "lawreview"}
-
 
 def inbound_group(source, kind):
     """The rail accordion slug a citing document belongs to -- its source,
-    except where the source's kinds split (`INBOUND_KIND_GROUPS`) or two
-    sources' documents fold into one row (`INBOUND_SOURCE_GROUPS`)."""
-    return INBOUND_KIND_GROUPS.get((source, kind),
-                                   INBOUND_SOURCE_GROUPS.get(source, source))
+    except where the source's kinds split (see `INBOUND_KIND_GROUPS`)."""
+    return INBOUND_KIND_GROUPS.get((source, kind), source)
 
 # förarbete precedence in the inbound panel and the "Förarbeten" section:
 # propositions first, then SOU, Ds/PM, lagrådsremiss, betänkanden -- each block
@@ -618,12 +607,7 @@ _LAWREVIEW_STYLE = CiterStyle(_whole_document_pinpoint, _lawreview_name, " ", Fa
                               external=True)
 
 CITER_STYLE = {"sfs": _PARAGRAF_STYLE, "foreskrift": _PARAGRAF_STYLE,
-               "forarbete": _FORARBETE_STYLE, "lawreview": _LAWREVIEW_STYLE,
-               # lawpub's articles are tidskriftsartiklar with lawreview's
-               # artifact shape and no page of their own (NO_RENDERER), so
-               # their rail line takes the same external style -- without it
-               # the line would link a lagen.nu page that does not exist
-               "lawpub": _LAWREVIEW_STYLE}
+               "forarbete": _FORARBETE_STYLE, "lawreview": _LAWREVIEW_STYLE}
 
 
 def citer_style(source):
@@ -1944,7 +1928,14 @@ def temporal_state(node, today):
 def _render_rad(node, site, doc_uri, image_column):
     """One table row. `image_column` says the whole table carries a road-sign
     image column, which this row must fill even when it has no sign of its own
-    (the header row, and a row the published PDF draws nothing for)."""
+    (the header row, and a row the published PDF draws nothing for).
+
+    A row flagged `th` emits header cells. `lib/artifact.scanned_nodes` has been
+    writing that flag all along (rs, avg, guidance, lawreview) and this walk
+    ignored it, so those column headers rendered as ordinary `td`; föreskrift's
+    ordförklaringar table is the first artifact whose header row is *read* as
+    one. Honouring it changes rendered markup for the sources that already carry
+    the flag -- 4 of 400 sampled rs artifacts, ~29 documents corpus-wide."""
     cells = [Markup(render_runs(c, site)) for c in node.get("cells", [])]
     g = node.get("grafik")
     grafik_cell = ""
@@ -1964,7 +1955,8 @@ def _render_rad(node, site, doc_uri, image_column):
     # printed as a marker row above, spanning the full width
     return NODES.rad(_temporal_notice(node),
                      len(node.get("cells", [])) + (1 if grafik_cell else 0),
-                     grafik_cell, cells)
+                     grafik_cell, cells,
+                     "th" if node.get("th") else "td")
 
 
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
@@ -1992,6 +1984,21 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return render_grafik(node, site, doc_uri)
     if t == "avskiljare":
         return "<hr>"
+    if t == "allmanna_rad":
+        # a föreskrift's allmänt råd: advisory text under the paragraf it
+        # explains. The documents state its status themselves ("Allmänna råd
+        # har en annan juridisk status än föreskrifter. De är inte tvingande"),
+        # so the råd is set apart and labelled with the heading the page
+        # printed -- which often names the provision ("Allmänna råd till 3 §").
+        # No TOC entry: a chaptered föreskrift prints one råd per §, and listing
+        # them would bury the headings the reader navigates by.
+        # `text` is the heading the page printed ("Allmänna råd", or "Allmänna
+        # råd till 3 §"); the parser always writes it, and a råd left without
+        # one is demoted to a rubrik rather than reaching here
+        return NODES.allmanna_rad(
+            Markup(render_runs(node["text"], site)),
+            Markup("".join(render_node(c, site, doc_uri, toc, rail)
+                           for c in node.get("children", []))))
     if t == "lista":
         items = "".join(render_node(c, site, doc_uri, toc, rail)
                         for c in node.get("children", []))
