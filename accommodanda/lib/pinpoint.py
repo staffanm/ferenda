@@ -28,6 +28,14 @@ import re
 
 FRAG_LABEL = {"K": "kap.", "P": "§", "O": "mom.", "S": "st", "N": "p", "M": "men."}
 _FRAG_SEG = re.compile(r"([KPOSNM])([0-9a-zåäö]+)")
+# an anchor writes an inserted paragraf's letter tight against its number
+# ("P52u", "K6bP52c") because it is an id; a citation writes it apart -- "52 u §",
+# "6 b kap.". Restoring the space is what makes the label citable.
+_FRAG_LETTER = re.compile(r"^(\d+)([a-zåäö]+)$")
+
+
+def _spaced(val):
+    return _FRAG_LETTER.sub(r"\1 \2", val)
 
 
 def human_fragment(frag):
@@ -51,7 +59,8 @@ def human_fragment(frag):
             parts.append("variant %s" % instance)
         return " ".join(parts)
     segs = _FRAG_SEG.findall(frag)
-    return " ".join("%s %s" % (val, FRAG_LABEL[letter]) for letter, val in segs)
+    return " ".join("%s %s" % (_spaced(val), FRAG_LABEL[letter])
+                    for letter, val in segs)
 
 
 # an EU act anchors an article on its bare number ("32", "6.1", "6.1.c") -- a

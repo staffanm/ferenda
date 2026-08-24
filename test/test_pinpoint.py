@@ -4,6 +4,7 @@ reader-facing label both the graph explorer and the search pins print."""
 from accommodanda.lib.pinpoint import (
     citation,
     citation_label,
+    human_fragment,
     is_change_marker,
     pinpoint_label,
     short_name,
@@ -84,3 +85,16 @@ def test_citation_falls_back_to_the_address_it_cannot_name():
         == "Artikel 6 ext/coe/005"
     assert citation("https://lagen.nu/ext/coe/005#A6", "Europakonventionen") \
         == "Artikel 6 Europakonventionen"
+
+
+def test_an_inserted_paragrafs_letter_is_written_apart_from_its_number():
+    # an anchor writes the letter tight against the number because it is an id;
+    # a citation writes it apart. "52u §" is not a form anyone writes, and this
+    # label carries the context rail, the "Ändrad genom" lines and the search
+    # pins, so the space is the difference between citable and not.
+    assert human_fragment("P52u") == "52 u §"
+    assert human_fragment("K7P8v") == "7 kap. 8 v §"
+    assert human_fragment("K6bP52c") == "6 b kap. 52 c §"
+    # a number with no letter is untouched, and so is a stycke tail
+    assert human_fragment("P52") == "52 §"
+    assert human_fragment("K2P16S5") == "2 kap. 16 § 5 st"
