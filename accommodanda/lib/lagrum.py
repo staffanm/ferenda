@@ -114,6 +114,17 @@ EMDRATTSFALL = 'EMDRATTSFALL'
 # (dv/data/casenumbers.json) and parse_text merges those spans beside the
 # grammar's.
 MALNUMMER = 'MALNUMMER'
+# SFS citations as English-language text writes them: the register's own
+# prefix before a number ("SFS 1979:429" -- nothing else in the corpus writes
+# "SFS" before a year:number), and an English chapter/section pinpoint bound
+# to the act reference directly before it ("Miljöbalken, Chapter 5,
+# Section 2" -> #K5P2). Not a grammar type: two fixed shapes, matched by
+# `english_sfs_spans` / `english_pinpoint_spans` and merged in parse_text
+# beside the grammar's (grammar wins overlaps). A free-standing English
+# pinpoint never links -- in the pan-Nordic journals "Chapter N, Section N"
+# names Finnish or Norwegian law as often as Swedish, so the anchor
+# requirement is the false-positive guard, not an implementation shortcut.
+ENGLAGRUM = 'ENGLAGRUM'
 ENKLALAGRUM = 'ENKLALAGRUM'        # absolute-only SFS refs (förarbete-safe)
 
 # deterministic assembly order; kortlagrum first so its roots take
@@ -129,7 +140,8 @@ TYPE_ORDER = [KORTLAGRUM, ENKLALAGRUM, LAGRUM, EULAGSTIFTNING, RATTSFALL,
 # combined with it. Import this instead of copying the list.
 ALL_PARSE_TYPES = [LAGRUM, KORTLAGRUM, EULAGSTIFTNING, RATTSFALL,
                    FORARBETEN, EURATTSFALL, MYNDIGHETSBESLUT, VAGLEDNING,
-                   FORESKRIFT, STALLNINGSTAGANDE, EMDRATTSFALL, MALNUMMER]
+                   FORESKRIFT, STALLNINGSTAGANDE, EMDRATTSFALL, MALNUMMER,
+                   ENGLAGRUM]
 
 # types each requested type pulls in (kortlagrum/enklalagrum reuse the
 # generic_ref / external_law / piece_ref productions defined by lagrum)
@@ -1417,6 +1429,66 @@ def lagrum_uri(attrs, base='https://lagen.nu/'):
     return uri + ('#' + fragment if fragment else '')
 
 
+# --------------------------------------------------------------------------
+# the English-text half (ENGLAGRUM): two fixed shapes, no grammar
+# --------------------------------------------------------------------------
+
+# the SFS register's own prefix before a number ("SFS 1979:429",
+# "(SFS 2008:1075)", "SFS: 1993:1212")
+RE_ENG_SFS = re.compile(r"\bSFS[:\s]\s*(\d{4}:\d{1,4})\b")
+
+# an English chapter/section pinpoint ("Chapter 5, Section 2", "chapter 15
+# section 27", "ch. 4 s. 2 para. 5", "ch. 16 s. 4 a"). The section may carry
+# a letter the way "4 a §" does; "para." is the stycke.
+RE_ENG_PINPOINT = re.compile(
+    r"(?:chapter|chap\.|ch\.)\s*(\d+)"
+    r"[,\s]+(?:sections?|sec\.|s\.)\s*(\d+(?:\s?[a-h])?)\b"
+    r"(?:\s*,?\s*(?:para\.|paragraph)\s*(\d+)\b)?", re.I)
+
+# what may stand between the act reference and its pinpoint: the closing
+# parenthesis the act's number sat in, a comma, spaces. Never a period --
+# past one the pinpoint is the next sentence's, which may cite another act.
+RE_ENG_GAP = re.compile(r"[\s,)]{0,6}")
+
+# a bare statute URI ("…/1998:808", "…/1902:71_s.1"), the only anchor an
+# English pinpoint binds to -- never an EU act or a decision, whose
+# fragments are not K/P/S-shaped
+RE_SFS_URI_TAIL = re.compile(r"/\d{4}:\d{1,4}(?:_s\.\d+)?$")
+
+
+def english_sfs_spans(text, base='https://lagen.nu/'):
+    """Every "SFS <nummer>" citation as (start, end, uri) spans, the whole
+    "SFS 1979:429" the link. The prefix is the Swedish-statute marker that
+    English text otherwise lacks, so the number needs no other context."""
+    return [(m.start(), m.end(), lagrum_uri({'law': m.group(1)}, base))
+            for m in RE_ENG_SFS.finditer(text)]
+
+
+def english_pinpoint_spans(text, anchors):
+    """Every English chapter/section pinpoint standing directly after a
+    resolved statute reference, as (start, end, uri) spans pinned under that
+    statute ("Miljöbalken, Chapter 5, Section 2" -> …/1998:808#K5P2).
+    `anchors` are the (end, uri) of the references already found in this
+    text; the nearest one whose URI is a bare statute binds, across a gap of
+    comma, closing parenthesis and spaces only. A pinpoint with no such
+    anchor stays unlinked."""
+    out = []
+    for m in RE_ENG_PINPOINT.finditer(text):
+        anchor = max((
+            (end, uri) for end, uri in anchors
+            if end <= m.start() and '#' not in uri
+            and RE_SFS_URI_TAIL.search(uri)
+            and RE_ENG_GAP.fullmatch(text, end, m.start())),
+            default=None)
+        if anchor is None:
+            continue
+        fragment = 'K%sP%s' % (m.group(1), m.group(2).replace(' ', ''))
+        if m.group(3):
+            fragment += 'S%s' % m.group(3)
+        out.append((m.start(), m.end(), anchor[1] + '#' + fragment))
+    return out
+
+
 def celex_year(value):
     """A parsed act number interpreted as a CELEX year (a two-digit year is
     1900s -- the oldest EU acts are from the 1950s), or None when it falls
@@ -1759,6 +1831,12 @@ class LagrumParser:
             if abbreviations:
                 parse_types.append(KORTLAGRUM)
         requested = frozenset(parse_types)
+        # the snapshot/regex matchers (EMDRATTSFALL, MALNUMMER, ENGLAGRUM)
+        # ride beside the grammar and contribute no ?ref roots: a parser
+        # with no grammar type at all would assemble an empty alternation,
+        # which never terminates the Lark compile
+        assert requested & set(TYPE_ORDER), \
+            "parse_types must include at least one grammar type"
         self.parse_types = _expand_types(parse_types)
         assert KORTLAGRUM not in self.parse_types or self.abbreviations, \
             "KORTLAGRUM parse type requires abbreviations"
@@ -1774,6 +1852,8 @@ class LagrumParser:
         self.emd = EMDRATTSFALL in requested
         # MALNUMMER is the other snapshot matcher (see the constant)
         self.case_numbers = MALNUMMER in requested
+        # ENGLAGRUM is the English-text matcher (see the constant)
+        self.eng = ENGLAGRUM in requested
         self.lark = parser(requested, self.parse_types,
                            abbrevs if KORTLAGRUM in self.parse_types else (),
                            eu_acts if EULAGSTIFTNING in self.parse_types else (),
@@ -1850,6 +1930,21 @@ class LagrumParser:
                 pos = m.start() + length
             else:
                 pos = m.start() + 1
+        if self.eng:
+            # English-text SFS citations (see ENGLAGRUM): the register's
+            # "SFS <nummer>" prefix, then the chapter/section pinpoints each
+            # bound to the reference directly before it -- the grammar's or
+            # a just-matched SFS-prefixed one. A span overlapping a grammar
+            # match yields to it.
+            sfs = yield_overlaps(
+                [Ref(s, e, orig[s:e], predicate, uri)
+                 for s, e, uri in english_sfs_spans(text, self.base)], refs)
+            pins = yield_overlaps(
+                [Ref(s, e, orig[s:e], predicate, uri)
+                 for s, e, uri in english_pinpoint_spans(
+                     text, [(r.end, r.uri) for r in refs + sfs])],
+                refs + sfs)
+            refs = sorted(refs + sfs + pins, key=lambda r: r.start)
         if self.emd:
             # ECHR citations from the snapshot matcher (see EMDRATTSFALL);
             # a span overlapping a grammar match yields to it

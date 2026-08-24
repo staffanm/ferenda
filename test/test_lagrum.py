@@ -31,6 +31,7 @@ from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from accommodanda.lib.lagrum import (
     ALL_PARSE_TYPES,
     EMDRATTSFALL,
+    ENGLAGRUM,
     ENKLALAGRUM,
     EULAGSTIFTNING,
     EURATTSFALL,
@@ -179,6 +180,73 @@ def test_malnummer_resolves_a_decision_cited_before_its_referat():
     # the type is opt-in: without it the same sentence carries no case-number ref
     plain = LagrumParser({}, basefile="x", parse_types=[RATTSFALL])
     assert plain.parse_text("Högsta domstolens dom 2009-11-03 T 3-08") == []
+
+
+def test_english_sfs_prefixed_number():
+    # English-language articles cite Swedish statutes by the register's own
+    # prefix ("The Swedish Patent Act (SFS 1967:837)") -- the prefix is the
+    # Swedish-statute marker English text otherwise lacks, so the number
+    # needs no other context and the whole "SFS 1967:837" is the link
+    parser = LagrumParser({}, basefile="x",
+                          parse_types=[ENGLAGRUM, RATTSFALL])
+    for text, want in [
+            ("Swedish Forestry Act, SFS 1979:429, requires",
+             ("SFS 1979:429", "https://lagen.nu/1979:429")),
+            ("The Swedish Patent Act (SFS 1967:837) provides",
+             ("SFS 1967:837", "https://lagen.nu/1967:837"))]:
+        assert [(r.text, r.uri) for r in parser.parse_text(text)] == [want]
+    # a year:number without the prefix is as often an ECLI year, a Finnish
+    # case, an ISO standard or the journal's own issue -- never linked here
+    assert parser.parse_text("Nordisk miljörättslig tidskrift 2021:1") == []
+    assert parser.parse_text("(SAC 2015:116), under heading") == []
+    assert parser.parse_text("ISO/IEC 42001:2023 - Information") == []
+    # the type is opt-in: without it the prefixed form carries no ref
+    plain = LagrumParser({}, basefile="x", parse_types=[RATTSFALL])
+    assert plain.parse_text("under SFS 1979:429 and later") == []
+
+
+def test_english_pinpoint_binds_to_the_preceding_act():
+    # "Miljöbalken, Chapter 5, Section 2" pins under the act reference
+    # directly before it -- the grammar's, or a just-matched SFS-prefixed
+    # one -- as a second link beside the act's own, the way "3 kap. 2 §
+    # skadeståndslagen" carries its pinpoint
+    parser = LagrumParser(NAMEDLAWS, basefile="x",
+                          parse_types=[LAGRUM, ENGLAGRUM])
+    for text, want in [
+            ("Miljöbalken, Chapter 5, Section 2, lays down obligations.",
+             "https://lagen.nu/1998:808#K5P2"),
+            ("Environmental Code (SFS 1998:808), chapter 15 section 27",
+             "https://lagen.nu/1998:808#K15P27"),
+            ("Miljötillsynsförordningen (2011:13), chapter 2, section 31",
+             "https://lagen.nu/2011:13#K2P31"),
+            # "para." is the stycke, and a lettered section keeps its letter
+            ("minerallagen (1991:45) ch. 4 s. 2 para. 5",
+             "https://lagen.nu/1991:45#K4P2S5"),
+            ("vattenlagen (1983:291), ch. 16 s. 4 a",
+             "https://lagen.nu/1983:291#K16P4a")]:
+        refs = parser.parse_text(text)
+        assert refs[-1].uri == want, text
+        assert len(refs) == 2, text          # the act's own link stays beside it
+        parser.reset()
+
+
+def test_english_pinpoint_without_an_anchor_stays_unlinked():
+    # a free-standing "Chapter N, Section N" in the pan-Nordic journals
+    # names Finnish or Norwegian law as often as Swedish: without a resolved
+    # statute directly before it, it links nothing
+    parser = LagrumParser(NAMEDLAWS, basefile="x",
+                          parse_types=[LAGRUM, ENGLAGRUM])
+    assert parser.parse_text(
+        "obligations under Chapter 3 Section 2 of the Finnish act") == []
+    parser.reset()
+    # an unresolved English act name is no anchor either
+    assert parser.parse_text("the Minerals Act ch. 4 s. 2 para. 5") == []
+    parser.reset()
+    # a period ends the binding: the pinpoint past it is the next
+    # sentence's, which may cite another country's act
+    refs = parser.parse_text(
+        "miljöbalken gäller. Chapter 2, Section 3 of the Finnish Act")
+    assert [r.uri for r in refs] == ["https://lagen.nu/1998:808"]
 
 
 def test_ecj_letterless_form_is_year_bounded():

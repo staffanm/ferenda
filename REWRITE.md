@@ -4889,6 +4889,19 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **lib/lagrum: `ENGLAGRUM`** (2026-08-24) — a parse type for Swedish
+  statutes cited from *English* text, not Swedish (the language part of the
+  pan-Nordic journal corpus writes in). Two fixed shapes, no grammar: the
+  SFS register's own prefix anywhere in the text ("SFS 1979:429"), and an
+  English chapter/section pinpoint ("Chapter 5, Section 2", "ch. 4 s. 2
+  para. 5") bound to the resolved statute reference directly before it
+  ("Miljöbalken, Chapter 5, Section 2" → `.../1998:808#K5P2`). A
+  free-standing pinpoint with no such anchor stays unlinked on purpose: "Chapter
+  N, Section N" names Finnish or Norwegian law as often as Swedish in that
+  corpus, so the anchor requirement is the false-positive guard, not an
+  implementation shortcut. Added to `ALL_PARSE_TYPES`, so every vertical
+  running the full parse-type set (including `lawreview` and `lawpub`) picks
+  it up on its next parse. `test/test_lagrum.py`.
 - **lawreview** (2026-08-23) — a new mine-only vertical, `accommodanda/lawreview/`
   (§7o): journal articles from Svensk Juristtidning (every year since 1916,
   the article's own web page as the document) and Juridisk Publikation (issue
