@@ -1955,6 +1955,7 @@ FA_CODE = (PKG / "forarbete" / "parse.py", PKG / "forarbete" / "model.py",
            PKG / "forarbete" / "fk.py", PKG / "forarbete" / "volumes.py",
            PKG / "forarbete" / "lydelse.py", PKG / "forarbete" / "tabell.py",
            PKG / "forarbete" / "legacy_formats.py",
+           PKG / "forarbete" / "kbtitles.py",
            PKG / "lib" / "pdftext.py", PKG / "lib" / "lagrum.py",
            PKG / "lib" / "emdref.py", *CITATION_DATA, *CASENUMBER_CODE,
            # the data the citation engine's treaty matching is configured by:

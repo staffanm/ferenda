@@ -45,7 +45,7 @@ from ..lib.pdftext import (
     printed_pages,
 )
 from ..lib.util import approximate_date, basefile_slug
-from . import legacy_formats, lydelse, tabell, volumes
+from . import kbtitles, legacy_formats, lydelse, tabell, volumes
 from .model import Block, Forarbete
 from .structure import RE_TRAILING_PAREN, nest
 
@@ -759,8 +759,12 @@ def parse_record(record, root):
         body = tag_frontmatter(body)
     return Forarbete(type=typ, basefile=basefile,
                      identifier=record["identifier"], uri=mint_uri(typ, basefile),
-                     title=record.get("title", ""), date=record.get("date"),
-                     ocr=ocr, body=body)
+                     # the record keeps the upstream's title, defects and all;
+                     # the reader-facing one is this parse's output, and for the
+                     # KB propositions that means undoing three defects the old
+                     # ferenda entries carried -- see forarbete/kbtitles.py
+                     title=kbtitles.reader_title(record.get("title", ""), body),
+                     date=record.get("date"), ocr=ocr, body=body)
 
 
 def _scan(text, parser, spans=()):

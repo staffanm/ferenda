@@ -157,7 +157,7 @@ accommodanda/
   config.py runtime config (config.yml / data_root / catalog_root / wiki_root)
   sfs/      acts vertical — download·graphics·redaktionell·pdfmirror·extract·reader·model·tokenizer·assembler·nf·parallelappendix·register·versions·correspond·asgit·begrepp·_validate (+ __main__)
   dv/       court-decisions vertical — download·identity·namedcases·casenumbers·model·parse·structure·legacy
-  forarbete/ preparatory-works vertical — download·propkb·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
+  forarbete/ preparatory-works vertical — download·propkb·kbtitles·soukb·riksdagen·rskr·model·parse·volumes·structure·kommentar·genomforande·aigenomforande·fk·jamforelse·lydelse·tabell·legacy_formats
   eurlex/   EU vertical (EUR-Lex/CELLAR) — download·bulk·annotate·casenames·correspond·definitions·parse·parse_html·parse_pdf·structure·lang·model
   hudoc/    ECHR case-law vertical — download·model·parse·summaries·translations
   coe/      Council of Europe Treaty Office vertical — download·model·parse
