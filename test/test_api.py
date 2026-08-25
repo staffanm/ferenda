@@ -1036,3 +1036,57 @@ def test_graph_depth_expands_rings_in_one_answer(tmp_path):
     d = reads.graph(con, C, depth=1, limit=10)
     assert d["expansion"] is None and d["depth"] == 1
     con.close()
+
+
+def test_graph_inbound_ranks_off_the_csr_without_the_join(tmp_path):
+    """With the CSR at hand, sort=citations/grouplimit answer from the
+    counts-only query + the arrays, labelling only the reply's rows -- the
+    12k-citer documents join is what 504:ed depth-2 brottsbalken on prod.
+    Ranking is by CSR in-degree; the row still displays the stamped count."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1900:1"
+    a, b = "https://lagen.nu/dom/nja/A", "https://lagen.nu/dom/nja/B"
+    c = "https://lagen.nu/sou/1900:2"
+    for uri, source, kind, label in [
+            (law, "sfs", "law", "L"), (a, "dv", "verdict", "NJA A"),
+            (b, "dv", "verdict", "NJA B"), (c, "forarbete", "sou", "SOU C")]:
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, ?, ?, ?, 'T', '')",
+                    (uri, source, kind, label))
+    def link(f, t, n=1):
+        for i in range(n):
+            con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                        "to_uri, to_root) VALUES (?, ?, 'dcterms:references', "
+                        "?, ?)", (f, "P%d" % i, t, t))
+    link(a, law, 5)
+    link(b, law, 1)
+    link(c, law, 1)
+    link(c, b, 3)        # b is the cited authority (CSR in-degree 1, stamped 3)
+    catalog.stamp_inbound_counts(con)
+    csr = pathgraph.build(con)
+
+    d = reads.graph(con, law, direction="in", limit=10, sort="citations",
+                    csr=csr)
+    top = d["inbound"]["top"]
+    assert top[0]["uri"] == b and top[0]["inbound_count"] == 3
+    assert d["inbound"]["total_docs"] == 3
+    capped = reads.graph(con, law, direction="in", limit=10, grouplimit=1,
+                         csr=csr)
+    assert [r["group"] for r in capped["inbound"]["top"]] \
+        == ["Rättsfall", "Förarbeten"]
+    filtered = reads.graph(con, law, direction="in", limit=10,
+                           groups={"Förarbeten"}, csr=csr)
+    assert [r["uri"] for r in filtered["inbound"]["top"]] == [c]
+    con.close()
+
+
+def test_an_empty_groups_filter_fails_visibly(client):
+    # `?groups=,` used to survive as an empty set, which the two answer
+    # paths read oppositely (filter-everything vs no-filter)
+    for path, params in (
+            ("/api/v1/graph", {"uri": "https://lagen.nu/1962:700"}),
+            ("/api/v1/path", {"from": "https://lagen.nu/1962:700",
+                              "to": "https://lagen.nu/2018:585"})):
+        r = client.get(path, params={**params, "groups": ","})
+        assert r.status_code == 422
+        assert "no flow group" in r.json()["detail"]

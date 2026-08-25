@@ -1213,26 +1213,39 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
     `internal`: the whole document's provision-to-provision citation graph at
     unit (§/article) level. `internal=true` adds that graph to a document
     uri's answer as well."""
-    wanted = None
-    if groups:
-        wanted = {g.strip() for g in groups.split(",") if g.strip()}
-        unknown = wanted - set(facets.FLOW_GROUP_NAMES)
-        if unknown:
-            raise HTTPException(422, "unknown flow group(s): %s"
-                                % ", ".join(sorted(unknown)))
-    csr = None
-    if depth > 1:
-        csr = paths.graph_if_ready(db.CATALOG)
-        if csr is None:
-            raise HTTPException(
-                503, "the citation graph is still loading -- try again "
-                     "shortly", headers={"Retry-After": "30"})
+    wanted = _parse_groups(groups)
+    # the CSR serves every depth when it is loaded: hop 1's group filter,
+    # citations-ranking and grouplimit come off the arrays instead of a
+    # 12k-row documents join. depth 1 falls back to the joined path while
+    # the graph loads; depth > 1 cannot answer without it and says so
+    csr = paths.graph_if_ready(db.CATALOG)
+    if depth > 1 and csr is None:
+        raise HTTPException(
+            503, "the citation graph is still loading -- try again "
+                 "shortly", headers={"Retry-After": "30"})
     data = reads.graph(con, uri, direction=direction, groups=wanted,
                        limit=limit, internal=internal, sort=sort,
                        grouplimit=grouplimit, depth=depth, csr=csr)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     return GraphResponse(**data)
+
+
+def _parse_groups(groups):
+    """The ?groups= filter as a set of flow-group names, or None for no
+    filter. `?groups=,` used to survive as an *empty* set -- which one answer
+    path read as "filter everything out" and another as "no filter"; an
+    empty or unknown filter now fails visibly instead."""
+    if not groups:
+        return None
+    wanted = {g.strip() for g in groups.split(",") if g.strip()}
+    if not wanted:
+        raise HTTPException(422, "groups named no flow group")
+    unknown = wanted - set(facets.FLOW_GROUP_NAMES)
+    if unknown:
+        raise HTTPException(422, "unknown flow group(s): %s"
+                            % ", ".join(sorted(unknown)))
+    return wanted
 
 
 class PathStep(BaseModel):
@@ -1289,13 +1302,7 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
     tens of milliseconds. The graph loads in the background (relate's
     sidecar, or one sequential catalog scan); until it is ready the endpoint
     answers 503 rather than making the request wait."""
-    wanted = None
-    if groups:
-        wanted = {g.strip() for g in groups.split(",") if g.strip()}
-        unknown = wanted - set(facets.FLOW_GROUP_NAMES)
-        if unknown:
-            raise HTTPException(422, "unknown flow group(s): %s"
-                                % ", ".join(sorted(unknown)))
+    wanted = _parse_groups(groups)
     ends = []
     for uri in (from_uri, to_uri):
         root = uri.partition("#")[0]

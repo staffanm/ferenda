@@ -225,6 +225,16 @@ def _graph_side(rows, groups, limit, sort="links", grouplimit=None):
             "top": top}
 
 
+def _labelled_row(uri, labels, **extra):
+    """One neighbour/ring row off a `graph_labels` answer -- the one shape
+    every counts-first path fills in after it knows which rows it carries."""
+    label, title, source, kind, descriptive, cited = labels[uri]
+    return {"uri": uri, "label": label, "title": title,
+            "descriptive": descriptive, "source": source, "kind": kind,
+            "group": facets.flow_group(source, kind),
+            "inbound_count": cited, **extra}
+
+
 def _graph_side_unfiltered(con, counts, limit):
     """The same answer as `_graph_side` with no group filter, labelling only
     the `limit` rows the reply carries.
@@ -236,35 +246,62 @@ def _graph_side_unfiltered(con, counts, limit):
     ECHR only to discard them cost most of that reply -- see the note above
     `catalog.graph_inbound_counts`."""
     labels = catalog.graph_labels(con, [uri for uri, _n in counts[:limit]])
-    top = []
-    for uri, n in counts[:limit]:
-        label, title, source, kind, descriptive, cited = labels[uri]
-        top.append({"uri": uri, "label": label, "title": title,
-                    "descriptive": descriptive, "source": source,
-                    "kind": kind, "group": facets.flow_group(source, kind),
-                    "links": n, "inbound_count": cited})
+    top = [_labelled_row(uri, labels, links=n) for uri, n in counts[:limit]]
     return {"total_links": sum(n for _uri, n in counts),
             "total_docs": len(counts), "top": top}
 
 
-def _graph_inbound_side(con, root, unit, groups, limit, sort, grouplimit):
+def _graph_inbound_side(con, root, unit, groups, limit, sort, grouplimit,
+                        csr=None):
     """The inbound direction for a document (`unit` None) or one provision.
 
-    Only this direction takes the counts-only path, and only for the default
-    shape: a group filter, `sort=citations` and `grouplimit` all need every
-    neighbour's documents row, so they take the joined queries. A document's
-    *outbound* neighbors are bounded by the length of its own text --
-    brottsbalken cites thousands, article 6 ECHR is cited by 50,624 -- and
-    there the join is also the filter that drops targets the corpus does not
-    hold."""
-    if groups or sort != "links" or grouplimit is not None:
+    A group filter, `sort=citations` and `grouplimit` all need every
+    neighbour's group -- and joining `documents` for that measured 5+ s over
+    brottsbalken's 12,754 citers on prod's disk (a depth-2 ask 504:ed at
+    nginx's 60 s). With the in-memory CSR at hand the same answer comes from
+    the counts-only query: group and authority (citing-degree) per candidate
+    off the arrays, and `graph_labels` for just the rows the reply carries.
+    Ranking under sort=citations is then by CSR in-degree (distinct citing
+    documents) while the row still *displays* the stamped inbound_count --
+    the same trade the depth rings already make. Without a CSR (not yet
+    loaded, or a direct reads caller) the joined path answers as before."""
+    if not groups and sort == "links" and grouplimit is None:
+        return _graph_side_unfiltered(
+            con, catalog.graph_anchor_inbound_counts(con, root, unit)
+            if unit else catalog.graph_inbound_counts(con, root), limit)
+    if csr is None:
         return _graph_side(
             catalog.graph_anchor_inbound(con, root, unit) if unit
             else catalog.graph_inbound(con, root), groups, limit,
             sort=sort, grouplimit=grouplimit)
-    return _graph_side_unfiltered(
-        con, catalog.graph_anchor_inbound_counts(con, root, unit)
-        if unit else catalog.graph_inbound_counts(con, root), limit)
+    counts_q = (catalog.graph_anchor_inbound_counts(con, root, unit) if unit
+                else catalog.graph_inbound_counts(con, root))
+    allowed = None if not groups \
+        else {pathgraph.GROUP_ID[name] for name in groups}
+    kept = []
+    total_links = 0
+    for uri, n in counts_q:
+        i = csr.ids.get(uri)
+        if i is None:
+            continue             # a citer the CSR predates: next build has it
+        if allowed is not None and csr.group[i] not in allowed:
+            continue
+        total_links += n
+        kept.append((uri, n, pathgraph.degree_in(csr, i), csr.group[i]))
+    if sort == "citations":
+        kept.sort(key=lambda r: (-r[2], -r[1]))
+    top_rows = []
+    per_group = collections.Counter()
+    for uri, n, _deg, gid in kept:
+        if grouplimit is not None and per_group[gid] >= grouplimit:
+            continue
+        per_group[gid] += 1
+        top_rows.append((uri, n))
+        if len(top_rows) == limit:
+            break
+    labels = catalog.graph_labels(con, [uri for uri, _n in top_rows])
+    top = [_labelled_row(uri, labels, links=n) for uri, n in top_rows]
+    return {"total_links": total_links, "total_docs": len(kept), "top": top}
 
 
 # how the per-side `limit` is split across the rings of a deep
@@ -305,15 +342,8 @@ def _graph_expansion(con, csr, root, result, *, direction, depth, limit,
             included |= set(frontier)
             nodes.extend((uri, hop, side_name) for uri, _t, _d in ring)
     labels = catalog.graph_labels(con, [uri for uri, _h, _s in nodes])
-    shaped = []
-    for uri, hop, side_name in nodes:
-        label, title, source, kind, descriptive, cited = labels[uri]
-        shaped.append({"uri": uri, "label": label, "title": title,
-                       "descriptive": descriptive, "source": source,
-                       "kind": kind,
-                       "group": facets.flow_group(source, kind),
-                       "inbound_count": cited, "hop": hop,
-                       "side": side_name})
+    shaped = [_labelled_row(uri, labels, hop=hop, side=side_name)
+              for uri, hop, side_name in nodes]
     edges = [list(row)
              for row in catalog.graph_induced_edges(con, sorted(included))]
     return {"nodes": shaped, "edges": edges}
@@ -401,7 +431,8 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
     hop1 = max(1, int(limit * RING_SHARE[depth][0]))
     if direction in ("in", "both"):
         result["inbound"] = _graph_inbound_side(con, root, unit, groups,
-                                                hop1, sort, grouplimit)
+                                                hop1, sort, grouplimit,
+                                                csr=csr)
     if direction in ("out", "both"):
         result["outbound"] = _graph_side(out_rows, groups, hop1,
                                          sort=sort, grouplimit=grouplimit)
