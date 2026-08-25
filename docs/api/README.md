@@ -65,6 +65,7 @@ there is no separate `/resolve` endpoint.
 | `limit` | 10 | 1–100 |
 | `offset` | 0 | ≥ 0, capped at 9900; use `cursor` for deep paging |
 | `cursor` | — | opaque cursor from a previous response's `next_cursor`; mutually exclusive with `offset` |
+| `sort` | `relevance` | `citations` orders the matches by their own `inbound_count` instead of the relevance score; a `cursor` is bound to the order that minted it |
 
 On the first page (`offset == 0`) the query is *also* run through the citation
 resolver: if `q` reads as a citation (`avtalslagen 36`, `BrB 12:1`, `GDPR art

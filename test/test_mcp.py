@@ -74,7 +74,7 @@ def corpus(tmp_path, monkeypatch):
     # next_cursor + facets off every reply.
     class FakeIndex:
         def search(self, q, source=None, kind=None, year=None, limit=10,
-                   offset=0, cursor=None):
+                   offset=0, cursor=None, sort="relevance"):
             return {"total": 1, "next_cursor": None, "facets": {}, "results": [{
                 "uri": "https://lagen.nu/1962:700", "url": "/1962:700",
                 "identifier": "SFS 1962:700",
@@ -318,7 +318,7 @@ def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
     KeyError."""
     class DocLevel:
         def search(self, q, source=None, kind=None, year=None, limit=10,
-                   offset=0, cursor=None):
+                   offset=0, cursor=None, sort="relevance"):
             return {"total": 1, "next_cursor": None, "facets": {}, "results": [{
                 "uri": "https://lagen.nu/2018:585", "url": "/2018:585",
                 "identifier": "SFS 2018:585",

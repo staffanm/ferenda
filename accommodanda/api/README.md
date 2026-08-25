@@ -152,6 +152,7 @@ curl -G http://127.0.0.1:8001/api/v1/document \
 | `limit` | heltal 1–100 (standard 10) | antal träffar |
 | `offset` | heltal (standard 0) | paginering, begränsad till 9900 |
 | `cursor` | sträng | ogenomskinlig kursor från föregående svars `next_cursor`, för djup paginering bortom `offset`-taket (ömsesidigt uteslutande med `offset`) |
+| `sort` | sträng | `relevance` (standard) eller `citations` — det senare ordnar träffarna efter deras eget `inbound_count` i stället för relevans; en `cursor` är bunden till den ordning som skapade den |
 
 Träffarna är hela dokument, rankade på relevans kombinerat med antalet
 inkommande citeringar (`inbound_count`) — så en välträffad, ofta hänvisad lag

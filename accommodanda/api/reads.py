@@ -38,16 +38,19 @@ class InboundUnavailable(RuntimeError):
 
 
 def search(index, query, *, source=None, kind=None, year=None, limit,
-           offset=None, cursor=None):
+           offset=None, cursor=None, sort="relevance"):
     """Full-text hits plus the pinned citation resolution:
     {query, total, next_cursor, facets, results}. `offset=None` is the
     forward stream (title-cluster capped, cursor-paged); an explicit offset
     (0 included) is raw bounded random access -- see SearchIndex.search.
-    A client error (bad cursor, bad field) raises ValueError; an unreachable
-    cluster raises SearchUnavailable."""
+    `sort="citations"` orders the matches by their stored inbound_count
+    instead of relevance (the cursor remembers its order and refuses to be
+    replayed under another). A client error (bad cursor, bad field) raises
+    ValueError; an unreachable cluster raises SearchUnavailable."""
     try:
         res = index.search(query, source=source, kind=kind, year=year,
-                           limit=limit, offset=offset, cursor=cursor)
+                           limit=limit, offset=offset, cursor=cursor,
+                           sort=sort)
     except OpenSearchException as exc:
         raise SearchUnavailable("full-text search is unavailable (%s)"
                                 % type(exc).__name__) from exc

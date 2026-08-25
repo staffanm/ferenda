@@ -587,7 +587,12 @@ def search_endpoint(
                             "stream (no related-hit decluttering); omit it "
                             "and page by cursor for the decluttered stream"),
         cursor: str | None = Query(None, max_length=2048,
-                                   description="opaque cursor returned by the previous page")):
+                                   description="opaque cursor returned by the previous page"),
+        sort: str = Query("relevance", pattern="^(relevance|citations)$",
+                          description="result order: 'relevance' (text score "
+                          "+ authority boost), 'citations' by each hit's own "
+                          "inbound_count alone. A cursor is bound to the "
+                          "order that minted it")):
     """Full-text search, with a citation-aware twist: when the query reads as a
     citation (a law nickname/abbreviation + pinpoint, an EU act + article, or a
     case nickname), the exact resource is resolved and pinned as the first
@@ -613,7 +618,8 @@ def search_endpoint(
         raise HTTPException(422, "cursor and offset are mutually exclusive")
     try:
         res = reads.search(_index, q, source=source, kind=kind, year=year,
-                           limit=limit, offset=offset, cursor=cursor)
+                           limit=limit, offset=offset, cursor=cursor,
+                           sort=sort)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except reads.SearchUnavailable as exc:

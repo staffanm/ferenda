@@ -481,8 +481,9 @@ def _facet_filters(source=None, kind=None, year=None, exclude=None):
             if value and field != exclude]
 
 
-def encode_cursor(sort, seen):
-    raw = json.dumps({"sort": sort, "seen": seen}, separators=(",", ":")).encode()
+def encode_cursor(sort, seen, by="relevance"):
+    raw = json.dumps({"sort": sort, "seen": seen, "by": by},
+                     separators=(",", ":")).encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
@@ -491,23 +492,44 @@ def decode_cursor(cursor):
         raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
         value = json.loads(raw)
         sort, seen = value["sort"], value["seen"]
+        # a cursor minted before orders existed carries no "by": relevance
+        by = value.get("by", "relevance")
         if not isinstance(sort, list) or len(sort) != 2:
             raise ValueError
         if not isinstance(seen, int) or seen < 0:
             raise ValueError
-        return sort, seen
+        if by not in ("relevance", "citations"):
+            raise ValueError
+        return sort, seen, by
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise ValueError("invalid search cursor") from exc
 
 
+def cursor_state(cursor, sort, offset):
+    """(search_after, consumed) off a cursor -- or the fresh-page state. The
+    cursor's opaque `sort` values are positions in ONE sort order: replayed
+    under another they would bind to different fields, so a mismatch is the
+    client's error, said out loud."""
+    if not cursor:
+        return None, offset or 0
+    after, seen, by = decode_cursor(cursor)
+    if by != sort:
+        raise ValueError("cursor was made under sort=%s -- repeat that sort "
+                         "or start over without the cursor" % by)
+    return after, seen
+
+
 def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
-               search_after=None, highlight=True):
+               search_after=None, highlight=True, sort="relevance"):
     """Search one whole-document unit per result.
 
     The stable ``(_score, doc_uri)`` sort supports ``search_after`` beyond the
     bounded result window, and ``track_total_hits`` gives an exact document
     total. ``fragment_query_body`` separately recovers the best pinpoint for the
-    small set of documents on this page.
+    small set of documents on this page. ``sort="citations"`` orders by the
+    unit's stored ``inbound_count`` alone (doc_uri tiebreak, so search_after
+    still holds); the text query still gates *which* documents match, and
+    ``track_scores`` keeps the relevance score on each hit.
 
     ``highlight=False`` drops the snippets, for a query that ranks more documents
     than the page shows (``SearchIndex.search``'s candidate window): highlighting
@@ -548,7 +570,9 @@ def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
             "boost_mode": "sum",
         }},
         "post_filter": {"bool": {"filter": filters}},
-        "sort": [{"_score": "desc"}, {"doc_uri": "asc"}],
+        "sort": ([{"inbound_count": {"order": "desc", "missing": 0}},
+                  {"doc_uri": "asc"}] if sort == "citations"
+                 else [{"_score": "desc"}, {"doc_uri": "asc"}]),
         "aggs": {
             "source": facet_agg("source"),
             "kind": facet_agg("kind"),
@@ -557,6 +581,8 @@ def query_body(q, source=None, kind=None, limit=10, offset=0, year=None,
     }
     if highlight:
         body["highlight"] = HIGHLIGHT
+    if sort == "citations":
+        body["track_scores"] = True
     if search_after is not None:
         body.pop("from")
         body["search_after"] = search_after
@@ -1133,9 +1159,8 @@ class SearchIndex:
         return len(rows), indexed, errors, missing, skipped, deleted
 
     def search(self, q, source=None, kind=None, limit=10, offset=None,
-               year=None, cursor=None):
-        search_after, seen = (decode_cursor(cursor) if cursor
-                              else (None, offset or 0))
+               year=None, cursor=None, sort="relevance"):
+        search_after, seen = cursor_state(cursor, sort, offset)
         # A wider candidate window than the page, so the beredningskedja cap below
         # has hits to fill the slots it frees. Only where the page reads the result
         # stream forward: the cursorless first page, and every cursor page (the
@@ -1156,7 +1181,8 @@ class SearchIndex:
             # `from` must be an int: the mode sentinel None means "first page"
             # here (a None reaching the body is an OpenSearch 400)
             body=query_body(q, source, kind, window, offset or 0, year,
-                            search_after, highlight=False)), "search")
+                            search_after, highlight=False, sort=sort)),
+            "search")
         candidates = res["hits"]["hits"]
         # `total` and the facet counts stay the raw query's throughout: the cap is
         # presentation, not a filter -- the documents it holds back are still hits.
@@ -1208,7 +1234,8 @@ class SearchIndex:
         # last one it showed -- a capped-out hit is decluttered for good, and page 2
         # picks up where page 1 stopped reading
         consumed = seen + used
-        next_cursor = (encode_cursor(candidates[used - 1]["sort"], consumed)
+        next_cursor = (encode_cursor(candidates[used - 1]["sort"], consumed,
+                                     sort)
                        if used and consumed < total else None)
         return {"total": total,
                 "next_cursor": next_cursor,

@@ -3,6 +3,7 @@ bulk actions, the query body, and hit parsing. The cluster round-trip needs a
 running OpenSearch and is exercised by the integration test at the bottom, gated
 on OPENSEARCH_URL."""
 
+import base64
 import json
 import os
 import threading
@@ -284,8 +285,9 @@ def test_query_body_no_filters_when_unscoped():
 
 def test_cursor_roundtrip_and_search_after_query():
     cursor = search.encode_cursor([7.5, "https://lagen.nu/1962:700"], 20)
-    sort, seen = search.decode_cursor(cursor)
+    sort, seen, by = search.decode_cursor(cursor)
     assert sort == [7.5, "https://lagen.nu/1962:700"] and seen == 20
+    assert by == "relevance"                 # the default order, stamped in
     body = search.query_body("mord", search_after=sort)
     assert body["search_after"] == sort and "from" not in body
     with pytest.raises(ValueError, match="invalid search cursor"):
@@ -640,7 +642,7 @@ def test_search_adds_passages_without_moving_the_hit():
     assert top["highlight"] == ["the <em>document</em> itself"]   # the doc's own
     assert [(f["pinpoint"], f["label"]) for f in top["fragments"]] == [
         ("K3P1", "3 kap. 1 §"), ("K3P2", "3 kap. 2 §")]
-    sort, seen = search.decode_cursor(result["next_cursor"])
+    sort, seen, _by = search.decode_cursor(result["next_cursor"])
     assert sort == [5.0, "u1"] and seen == 1
 
 
@@ -691,7 +693,7 @@ def test_search_caps_one_project_per_page_and_keeps_the_cursor_coherent():
         "Skydd mot avlyssning", "Skadeståndsanspråk mot staten"]
     assert len(result["results"]) == 5       # the cap costs the page nothing
     assert result["total"] == 747            # the raw query's count, not the page's
-    sort, seen = search.decode_cursor(result["next_cursor"])
+    sort, seen, _by = search.decode_cursor(result["next_cursor"])
     assert sort == [94.0, "u6"] and seen == 7    # the 7th candidate, not the 5th hit
 
 
@@ -994,3 +996,26 @@ def test_threaded_bulk_does_not_hang_when_the_final_flush_dies(monkeypatch):
     with pytest.raises(RuntimeError, match="final chunk flush"):
         index._threaded_bulk(iter([{"_id": str(i)} for i in range(50)]), 2,
                              {"index": "lagen-test"})
+
+
+def test_sort_citations_query_shape_and_cursor_binding():
+    """`sort=citations` swaps the sort clause to the stored inbound_count
+    (doc_uri tiebreak kept, so search_after still works) and keeps relevance
+    scores on the hits. A cursor is bound to the order that minted it: its
+    opaque sort values are positions in ONE order, and replayed under another
+    they would bind to different fields."""
+    body = search.query_body("mord", sort="citations")
+    assert body["sort"] == [{"inbound_count": {"order": "desc", "missing": 0}},
+                            {"doc_uri": "asc"}]
+    assert body["track_scores"] is True
+    assert "track_scores" not in search.query_body("mord")
+
+    cur = search.encode_cursor([42, "u1"], 10, "citations")
+    assert search.decode_cursor(cur) == ([42, "u1"], 10, "citations")
+    assert search.cursor_state(cur, "citations", None) == ([42, "u1"], 10)
+    with pytest.raises(ValueError, match="made under sort=citations"):
+        search.cursor_state(cur, "relevance", None)
+    # a cursor minted before orders existed carries no "by": relevance
+    legacy = base64.urlsafe_b64encode(json.dumps(
+        {"sort": [7.5, "u1"], "seen": 3}).encode()).decode().rstrip("=")
+    assert search.decode_cursor(legacy) == ([7.5, "u1"], 3, "relevance")

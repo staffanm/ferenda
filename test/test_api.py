@@ -59,7 +59,8 @@ def client(tmp_path):
     # a fake search backend -- the API must not require a live OpenSearch
     class FakeIndex:
         def search(self, q, source=None, kind=None, year=None, limit=10, offset=0,
-                   cursor=None):
+                   cursor=None, sort="relevance"):
+            self.last_sort = sort
             if cursor == "bad":
                 raise ValueError("invalid search cursor")
             return {"total": 1, "next_cursor": None, "facets": {
@@ -113,6 +114,15 @@ def test_search(client):
     # the API resolves each hit's public page path (layout.page_url): a statute
     # at lagen.nu's bare /<sfsid> address, colon kept
     assert hit["url"] == "/1962:700"
+
+
+def test_search_sort_citations_reaches_the_index(client):
+    # the order is the index's to apply; the endpoint validates and forwards
+    r = client.get("/api/v1/search", params={"q": "mord", "sort": "citations"})
+    assert r.status_code == 200
+    assert api._index.last_sort == "citations"
+    assert client.get("/api/v1/search", params={
+        "q": "mord", "sort": "nonsens"}).status_code == 422
 
 
 def test_search_accepts_year_facet(client):
