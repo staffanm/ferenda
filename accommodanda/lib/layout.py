@@ -55,7 +55,6 @@ OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",
               "eurlex": "eurlex", "foreskrift": "foreskrift", "avg": "avg",
               "rs": "rs", "guidance": "guidance", "lawreview": "lawreview",
-              "lawpub": "lawpub",
               "hudoc": "hudoc", "coe": "coe", "icrc": "icrc", "untc": "untc",
               "icc": "icc", "icj": "icj",
               "remisser": "remisser", "kommentar": "kommentar",
@@ -76,7 +75,7 @@ def artifact_dir(source: str) -> Path:
 # catalogued" (a real fault) from "parsed and never meant to be" (these three).
 CATALOGUED_SOURCES = ("sfs", "dv", "forarbete", "kommentar", "begrepp",
                       "eurlex", "foreskrift", "avg", "rs", "guidance",
-                      "lawreview", "lawpub", "hudoc", "coe", "icrc", "untc", "icc",
+                      "lawreview", "hudoc", "coe", "icrc", "untc", "icc",
                       "icj")
 
 
@@ -92,7 +91,6 @@ AVG_DOWNLOADED = DOWNLOADED / "avg"                 # <org>/<slug>.{json,pdf,htm
 RS_DOWNLOADED = DOWNLOADED / "rs"                   # <org>/<slug>.{json,pdf}
 GUIDANCE_DOWNLOADED = DOWNLOADED / "guidance"       # <utgivare>/<slug>.{json,pdf}
 LAWREVIEW_DOWNLOADED = DOWNLOADED / "lawreview"     # <journal>/<slug>.{json,html|pdf}
-LAW_PUB_DOWNLOADED = DOWNLOADED / "lawpub"          # <handle>.{json,pdf} (the platform's own section id or DOI)
 HUDOC_DOWNLOADED = DOWNLOADED / "hudoc"             # <itemid>.{json,html} + clin/<itemid>.json
 COE_DOWNLOADED = DOWNLOADED / "coe"                 # <CETS>.{json,pdf|html}
 ICRC_DOWNLOADED = DOWNLOADED / "icrc"               # <ICRC-number>.json (JSON:API envelope)
@@ -189,7 +187,7 @@ def _relpath(source: str, basefile: str) -> Path:
         # so the artifact tree reads like the URI: guidance/edpb/riktlinjer/
         # 05-2020, guidance/eba/gl/2021-05
         return Path(basefile)
-    if source in ("hudoc", "coe", "icrc", "untc", "icc", "icj", "lawpub"):
+    if source in ("hudoc", "coe", "icrc", "untc", "icc", "icj"):
         return Path(basefile)
     if source == "remisser":
         # "<typ>/<referred document id>/<org-slug>" -- the ärende is keyed on the

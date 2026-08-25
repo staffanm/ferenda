@@ -26,18 +26,19 @@ from dataclasses import dataclass, field
 from ..lib.artifact import scanned_nodes
 from ..lib.catalog import BASE
 from ..lib.util import approximate_date
-from .journals import BY_KOD
+from .journals import BY_KOD, SCOPES
 
 __all__ = ["Block", "Artikel", "lawreview_uri"]
 
 
-def lawreview_uri(journal, slug):
-    """The published document URI, minted from the journal's own coordinates,
+def lawreview_uri(scope, slug):
+    """The published document URI, minted from the scope's own coordinates,
     so the address reproduces the citation by construction -- the rule
-    `rs.model.rs_uri` follows for an agency's number."""
-    if journal not in BY_KOD:
-        raise ValueError("no such journal: %r" % journal)
-    return "%slawreview/%s/%s" % (BASE, journal, slug)
+    `rs.model.rs_uri` follows for an agency's number. The scope is a journal's
+    kod or the platform scope `lawpub`, whose handle mints the same way."""
+    if scope not in SCOPES:
+        raise ValueError("no such lawreview scope: %r" % scope)
+    return "%slawreview/%s/%s" % (BASE, scope, slug)
 
 
 @dataclass

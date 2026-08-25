@@ -4951,8 +4951,8 @@ in `git log`. This document is the forest-level status; section markers
   N, Section N" names Finnish or Norwegian law as often as Swedish in that
   corpus, so the anchor requirement is the false-positive guard, not an
   implementation shortcut. Added to `ALL_PARSE_TYPES`, so every vertical
-  running the full parse-type set (including `lawreview` and `lawpub`) picks
-  it up on its next parse. `test/test_lagrum.py`.
+  running the full parse-type set (including `lawreview`, its lawpub scope
+  among them) picks it up on its next parse. `test/test_lagrum.py`.
 - **lawreview** (2026-08-23) — a new mine-only vertical, `accommodanda/lawreview/`
   (§7o): journal articles from Svensk Juristtidning (every year since 1916,
   the article's own web page as the document) and Juridisk Publikation (issue

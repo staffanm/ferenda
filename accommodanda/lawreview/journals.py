@@ -1,4 +1,7 @@
-"""The nine journals this source collects, as data.
+"""The nine journals this source collects, as data. (The source's tenth
+scope, the lawpub platform, is not a journal and holds no entry here: its
+coordinates are per-article -- publisher, edition, month-year -- and its
+record shape, model and parse live in `lawpub.py`.)
 
 The shape of a harvested document does not vary with the journal, and what
 does vary is data: where the journal publishes, where its documents are pages
@@ -40,7 +43,7 @@ at all), and the rest ``year-issue-seq``.
 from dataclasses import dataclass
 
 __all__ = ["Journal", "SVJT", "JP", "FT", "NMT", "NJEL", "SIPLR", "URT",
-           "EUAR", "LOD", "JOURNALS", "BY_KOD"]
+           "EUAR", "LOD", "JOURNALS", "BY_KOD", "SCOPES"]
 
 
 @dataclass(frozen=True)
@@ -128,3 +131,9 @@ LOD = Journal(kod="lod", namn="Lov & Data",
 
 JOURNALS = (SVJT, JP, FT, NMT, NJEL, SIPLR, URT, EUAR, LOD)
 BY_KOD = {j.kod: j for j in JOURNALS}
+
+# every scope the source harvests: the nine journals above plus lawpub, the
+# platform scope, which holds no Journal entry because its coordinates are
+# per-article (`lawpub.py`). This is what a scope name is checked against --
+# the download's SYNC table names the same ten.
+SCOPES = tuple(BY_KOD) + ("lawpub",)

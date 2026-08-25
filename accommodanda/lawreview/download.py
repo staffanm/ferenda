@@ -18,7 +18,8 @@ their PDFs; the urt listing its entries, the entry's own page its PDF; the
 euar index page its issues, the issue page its item links, the item's own
 page its document; the lod index page its years, the year pages their
 issues, the issue page its table of contents, the article's own page its
-document.
+document; and the lawpub platform's one paginated listing its per-article
+PDFs (the tenth scope is a platform, not a journal -- see `lawpub.py`).
 
 The deep listings walk newest-first and stop on the harvest watermark's
 caught-up gate. svjt is the deepest: 1916 to now, ~17,000 article pages. A
@@ -48,7 +49,9 @@ from ..lib.harvest import select_pending
 from ..lib.util import approximate_date, normalize_space, record_path
 from .euar import euar_sync
 from .ft import ft_sync
-from .journals import JP, SVJT
+from .journals import JOURNALS, JP, SCOPES, SVJT
+from .lawpub import LISTING as LAWPUB_LISTING
+from .lawpub import lawpub_sync
 from .lod import lod_sync
 from .njel import njel_sync
 from .nmt import nmt_sync
@@ -468,13 +471,24 @@ def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
 
 SYNC = {"svjt": svjt_sync, "jp": jp_sync, "ft": ft_sync, "nmt": nmt_sync,
         "njel": njel_sync, "siplr": siplr_sync, "urt": urt_sync,
-        "euar": euar_sync, "lod": lod_sync}
-SCOPES = tuple(SYNC)
+        "euar": euar_sync, "lod": lod_sync, "lawpub": lawpub_sync}
+# `journals.SCOPES` is the one list of what this source harvests (re-exported
+# here, where the CLI reads it); this table is what runs them, so a scope
+# added to one and not the other is a fault, said here rather than as a
+# missing key mid-run
+assert set(SYNC) == set(SCOPES), \
+    "scope registry and SYNC disagree: %s" % (set(SYNC) ^ set(SCOPES))
+
+# each scope's listing origin(s), for the per-scope harvest banner: the
+# journals state theirs in the registry, the lawpub platform its one listing
+SCOPE_ORIGINS = {**{j.kod: j.listings for j in JOURNALS},
+                 "lawpub": (LAWPUB_LISTING,)}
 
 
 def sync(root, scopes=None, full=False, only=None, limit=None, delay=0.5,
          jobs=None):
-    """Download the named scopes (default all nine journals). The journals
+    """Download the named scopes (default all ten: the nine journals and
+    the lawpub platform). The journals
     are separate hosts, so they fan out the way `guidance` does: concurrency
     is across scopes only, and each runner paces its own host. With no
     `jobs` the run fans out one worker per scope, so the wall time is the

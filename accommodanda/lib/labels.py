@@ -439,11 +439,6 @@ def _lawreview(art):
     return Labels(ident, title, title, md.get("fattare") or ident)
 
 
-# lawpub's articles are tidskriftsartiklar with the same artifact shape as
-# lawreview's (an `identifier`, a `metadata.title`, a `metadata.fattare`), so
-# they take the article label off the same function
-_lawpub = _lawreview
-
 
 # --------------------------------------------------------------------------
 # icc (International Criminal Court)
@@ -473,7 +468,7 @@ def _icj(art):
 _DISPATCH = {"sfs": _sfs, "eurlex": _eurlex, "dv": _dv,
              "forarbete": _forarbete, "foreskrift": _foreskrift,
              "avg": _avg, "rs": _rs, "guidance": _edpb,
-             "lawreview": _lawreview, "lawpub": _lawpub,
+             "lawreview": _lawreview,
              "hudoc": _hudoc, "coe": _coe, "icrc": _icrc,
              "untc": _untc, "icc": _icc, "icj": _icj, "begrepp": _begrepp,
              "kommentar": _kommentar}

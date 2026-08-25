@@ -1024,7 +1024,6 @@ _LABELLED_KIND = {
     "rs": lambda art, lb: art.get("org", "rs"),        # the agency (fk/imy/…)
     "guidance": lambda art, lb: art.get("serie") or art["utgivare"],
     "lawreview": lambda art, lb: art["journal"],       # the journal (svjt/jp)
-    "lawpub": lambda art, lb: art.get("utgivare", "lawpub"),  # the publisher (FT/…)
     "coe": lambda art, lb: art.get("doctype", "treaty"),
 }
 

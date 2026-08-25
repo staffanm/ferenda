@@ -15,7 +15,7 @@ walker module, tests against trimmed fixtures.
 - **NST** — Nordisk socialrättslig tidskrift (nordisksocialrattslig.se).
 - **Sc.St.L.** — Scandinavian Studies in Law (scandinavianlaw.se). Its
   articles are open on the LAWPUB platform and therefore reachable from the
-  `lawpub` source; a dedicated walker is parked.
+  `lawpub` scope; a dedicated walker is parked.
 - **SNEF** — parked, no walker.
 - **ERT** — Europarättslig tidskrift (ert.se).
 - **JT open-access subsets** — the open-access slices of the Juristtidningen

@@ -29,6 +29,12 @@ A record that names no document (a print-only article the nmt, njel and urt
 listings list, and the siplr heading that sets no article PDF) carries no
 text to mine: its artifact's structure stays empty rather than the parse
 reading a file that is not on disk.
+
+That holds for the nine journal scopes. The source's tenth scope is the
+lawpub platform, whose record states the platform's coordinates rather than a
+journal's, so it keeps its own record shape, model and parse in `lawpub.py`
+and `parse` hands a `lawpub/...` basefile straight there. The one branch is
+on the scope, not on the journal.
 """
 
 import re
@@ -46,6 +52,7 @@ from ..lib.util import (
     normalize_space,
     record_path,
 )
+from . import lawpub
 from .journals import BY_KOD
 from .model import Artikel, Block
 
@@ -289,9 +296,13 @@ def _ft_start_page(pages):
 # --------------------------------------------------------------------------
 
 def parse(basefile, root):
-    """One basefile ("svjt/2026-104", "jp/2025-01-03", "urt/2026-1-147") ->
-    artifact dict, body citation-scanned."""
+    """One basefile ("svjt/2026-104", "jp/2025-01-03", "urt/2026-1-147",
+    "lawpub/880") -> artifact dict, body citation-scanned. The lawpub scope
+    is a platform, not a journal (its record shape carries the platform's
+    coordinates), so its basefiles go to its own module's parse."""
     journal = basefile.split("/", 1)[0]
+    if journal == "lawpub":
+        return lawpub.parse(basefile, root)
     assert journal in BY_KOD, "no such journal %r" % journal
     conf = BY_KOD[journal]
     record = compress.read_json(record_path(root, journal, basefile))

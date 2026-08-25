@@ -1,4 +1,5 @@
-"""lawreview: tidskriftsartiklar from the two journals the site collects --
-Svensk Juristtidning (svjt, whose article pages are the documents) and
-Juridisk Publikation (jp, whose issue PDFs are the documents and whose issue
-pages carry the metadata). See `journals.py`."""
+"""lawreview: tidskriftsartiklar the site mines for the references they make.
+
+Ten scopes: the nine journals `journals.py` states as data -- svjt, jp, ft,
+nmt, njel, siplr, urt, euar, lod -- and the lawpub platform, which is not a
+journal and holds its own record shape, model and parse in `lawpub.py`."""
