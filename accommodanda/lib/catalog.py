@@ -28,6 +28,7 @@ from pathlib import Path
 from .. import config
 from . import compress, concepts, labels, text, util
 from .markdown import begrepp_uri
+from .pinpoint import pinpoint_label
 
 BASE = "https://lagen.nu/"
 
@@ -1235,33 +1236,199 @@ def _document_description(art, source):
 _SNIPPET_LEN = 340
 
 
+# node types that read as furniture, not prose: headings in both grammars,
+# an EU act's preamble formalities ("med beaktande av …" citation nodes) and
+# footnotes. The first *recital* is the act's own opening statement and wins.
+_NOT_PROSE = frozenset({"heading", "citation", "note"})
+
+
+def _node_text(node):
+    return "".join(run if isinstance(run, str) else (run.get("text") or "")
+                   for run in node.get("text") or []).strip()
+
+
+def _cut(text):
+    if len(text) > _SNIPPET_LEN:
+        return text[:_SNIPPET_LEN].rsplit(" ", 1)[0] + " …"
+    return text
+
+
+def _prose_candidates(nodes):
+    """Depth-first over an artifact tree: every non-furniture node whose text
+    runs join to a real paragraph (>= 80 chars), uncut."""
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        kind = node.get("type") or ""
+        if "rubrik" not in kind and kind not in _NOT_PROSE:
+            text = _node_text(node)
+            # an ISSN line is a författningssamling's masthead, not
+            # prose; and a low alphanumerics-and-spaces ratio is OCR debris
+            # off a scanned page (".-lascs.srii<~nt I J / …"), not a
+            # paragraph -- digits stay welcome, lagtext is full of them
+            if (len(text) >= 80 and not text.startswith("ISSN ")
+                    and sum(c.isalnum() or c == " " for c in text)
+                    / len(text) >= .8):
+                yield text
+        yield from _prose_candidates(node.get("children") or [])
+
+
 def first_prose(art):
-    """The document's own opening prose: the first non-heading node whose text
-    runs join to a real paragraph (>= 80 chars), cut at a word boundary around
-    340 chars. Structure-generic -- an SFS lands on 1 kap. 1 §'s first stycke,
-    a förarbete on its first running paragraph -- so no per-source walker to
-    maintain. None when the artifact opens with nothing prose-like (scanned
-    page-image documents, bare registries)."""
-    def walk(nodes):
-        for node in nodes:
-            if not isinstance(node, dict):
-                continue
-            if "rubrik" not in (node.get("type") or ""):
-                text = "".join(
-                    run if isinstance(run, str) else (run.get("text") or "")
-                    for run in node.get("text") or [])
-                if len(text.strip()) >= 80:
-                    return text.strip()
-            found = walk(node.get("children") or [])
+    """The document's own opening prose: the first non-furniture node whose
+    text runs join to a real paragraph (>= 80 chars), cut at a word boundary
+    around 340 chars. Structure-generic -- a förarbete lands on its first
+    running paragraph, a wiki concept on its defining paragraph (`body` is
+    the wiki artifacts' tree). None when the artifact opens with nothing
+    prose-like (scanned page-image documents, bare registries)."""
+    for prose in _prose_candidates(art.get("structure") or
+                                   art.get("body") or []):
+        return _cut(prose)
+    return None
+
+
+def _first_of_type(nodes, kind):
+    for node in nodes:
+        if isinstance(node, dict):
+            if node.get("type") == kind:
+                return node
+            found = _first_of_type(node.get("children") or [], kind)
             if found:
                 return found
+    return None
+
+
+def _paragraf_prose(art):
+    """An författning's opening as a reader cites it: the first paragraf's
+    first stycke, led by its designation -- "1 kap. 1 § Fast egendom är
+    jord. …". The walk to the paragraf skips every heading by construction;
+    a paragraf carries its stycken as children (or, in older shapes, its own
+    text runs)."""
+    par = _first_of_type(art.get("structure") or [], "paragraf")
+    if not par:
         return None
-    text = walk(art.get("structure") or [])
-    if not text:
+    stycke = _first_of_type(par.get("children") or [], "stycke")
+    body = _node_text(stycke) if stycke else _node_text(par)
+    if not body:
         return None
-    if len(text) > _SNIPPET_LEN:
-        text = text[:_SNIPPET_LEN].rsplit(" ", 1)[0] + " …"
-    return text
+    # a stycke that introduces a list carries the items as punkt children --
+    # quote the first item and say with an ellipsis that the list goes on
+    punkt = _first_of_type((stycke or par).get("children") or [], "punkt")
+    if punkt and _node_text(punkt):
+        body = "%s %s …" % (body, _node_text(punkt))
+    where = pinpoint_label(par.get("id") or "")
+    return _cut(("%s %s" % (where, body)) if where else body)
+
+
+def _word_cap(text, words=50):
+    """A narrative snippet capped at `words` words, ellipsis when cut."""
+    parts = text.split()
+    if len(parts) <= words:
+        return text
+    return " ".join(parts[:words]) + " …"
+
+
+def _numbered_ground(art):
+    """An EU court decision's own opening: its first numbered paragraph --
+    "Begäran om förhandsavgörande avser tolkningen av artikel 4.1 …" --
+    capped at 50 words. The keyword strings and quoted legislation that
+    precede it (a judgment quotes whole recitals) are passed over."""
+    def walk(nodes):
+        for node in nodes:
+            if isinstance(node, dict):
+                if node.get("type") == "paragraph" and node.get("num"):
+                    body = _node_text(node)
+                    # an old judgment numbers its section headings too
+                    # ("Facts and procedure") -- a ground is a sentence
+                    if len(body) >= 40:
+                        return _word_cap(body)
+                found = walk(node.get("children") or [])
+                if found:
+                    return found
+        return None
+    return walk(art.get("structure") or [])
+
+
+def _recital_prose(art):
+    """An EU act's own opening statement: the first preamble recital, led by
+    its number -- "(1) Skyddet för fysiska personer …"."""
+    recital = _first_of_type(art.get("structure") or [], "recital")
+    if not recital:
+        return None
+    body = _node_text(recital)
+    if not body:
+        return None
+    num = recital.get("num")
+    return _cut(("(%s) %s" % (num, body)) if num else body)
+
+
+# how an international court's decision opens before any substance: bench
+# rosters, composition lines and the ICC's cover-page furniture ("Decision
+# to be notified …", "SITUATION IN …") -- all census-found, none prose
+_ROSTER = re.compile(r"^(Before\s*:|Before\s+(?:Judge|President)\b"
+                     r"|Present\s*:"
+                     r"|Present\s+(?:President|Vice-President|Judges?)\b"
+                     r"|Composed\b|Composée\b"
+                     r"|The Court,|The International Court of Justice,"
+                     r"|Decision to be notified|Judgment to be notified"
+                     r"|To be notified"
+                     r"|SITUATION IN |IN THE CASE OF )")
+
+
+def _document_snippet(art, source):
+    """What the details panel opens with, per what each source actually has:
+    the dv sammanfattning; an författning's (SFS or föreskrift) first
+    paragraf with its "1 §"/"1 kap. 1 §" designation; an EU act's first
+    recital with its "(1)" and an EU court decision its first numbered
+    ground; a hudoc case's conclusions ("Violation of P1-1"
+    -- its body text opens with procedural boilerplate); an ICC/ICJ
+    decision's first paragraph past the bench roster; a journal article's
+    first paragraph capped at 50 words; and the opening prose for everyone
+    else."""
+    described = _document_description(art, source)
+    if described:
+        return described
+    if source in ("sfs", "foreskrift"):
+        return _paragraf_prose(art) or first_prose(art)
+    if source == "hudoc":
+        return "; ".join(
+            art.get("metadata", {}).get("conclusions") or []) or None
+    if source == "lawreview":
+        # the article's own first paragraph, capped at 50 words -- long
+        # enough to say what it is about, short enough that mined OCR text
+        # cannot ramble (the garbage gate in _prose_candidates still refuses
+        # debris outright)
+        for prose in _prose_candidates(art.get("structure") or []):
+            return _word_cap(prose)
+        return None
+    if source in ("icc", "icj"):
+        for candidate in _prose_candidates(art.get("structure") or []):
+            if not _ROSTER.match(candidate):
+                return _cut(candidate)
+        return None
+    if source == "eurlex":
+        # case law opens on its first numbered ground; only the *acts* take
+        # the recital path -- a judgment quotes whole recitals of the act it
+        # interprets, and the recital finder would happily serve those.
+        # Case law is the CELEX's own sector: a 6-leading number, AG
+        # opinions included
+        if art["uri"].rsplit("/", 1)[-1].startswith("6"):
+            ground = _numbered_ground(art)
+            if ground:
+                return ground
+        else:
+            recital = _recital_prose(art)
+            if recital:
+                return recital
+    # a pre-Formex EU act (and the odd treaty) opens with its own title as a
+    # plain text node -- a snippet that echoes the title says nothing the
+    # panel does not already show, so skip past it to the next paragraph
+    title = (art.get("title") or "").strip().casefold()
+    for prose in _prose_candidates(art.get("structure") or
+                                   art.get("body") or []):
+        if title and prose[:60].strip().casefold() == title[:60].strip():
+            continue
+        return _cut(prose)
+    return None
 
 
 def _document_publisher(art: dict) -> str | None:
@@ -1373,9 +1540,7 @@ def _index_document(con, art, path, source):
          # source's own one-line description (a case's sammanfattning)
          lb.descriptive_label, lb.short_id, lb.short_title,
          _document_description(art, source),
-         # the details-panel snippet: the case's own sammanfattning where the
-         # source writes one, else the document's opening prose
-         _document_description(art, source) or first_prose(art)))
+         _document_snippet(art, source)))
     # the metadata producers describe the document, not a place in it, so they
     # pad the body walk's (anchor, page, run) shape with a pageless entry
     edges = artifact_links(art) + [
