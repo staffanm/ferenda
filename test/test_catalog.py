@@ -441,3 +441,22 @@ def test_anchor_glob_covers_both_fragment_grammars(tmp_path):
     rows = catalog.graph_anchor_outbound(con, eu, "6.1")
     assert [(r[0], r[1]) for r in rows] == [(law, 1)]
     assert catalog.graph_anchor_out_totals(con, eu, "6.1") == (2, 2)
+
+
+def test_first_prose_skips_headings_and_cuts_at_a_word(tmp_path):
+    long = ("Den som med uppsåt eller av oaktsamhet vållar annan person skada "
+            "skall ersätta skadan i den omfattning som följer av denna lag, "
+            "om inte annat är särskilt föreskrivet i annan författning eller avtal.")
+    art = {"structure": [
+        {"type": "rubrik", "text": ["Första avdelningen"]},
+        {"type": "kapitel", "children": [
+            {"type": "rubrik", "text": ["1 kap. Inledande bestämmelser"]},
+            {"type": "paragraf", "text": ["Kort."]},
+            {"type": "paragraf", "text": [long[:50], {"uri": "x", "text": long[50:]}]},
+        ]}]}
+    got = catalog.first_prose(art)
+    assert got.startswith("Den som med uppsåt")
+    assert len(got) <= catalog._SNIPPET_LEN + 2
+    # nothing prose-like: no snippet, not a heading masquerading as one
+    assert catalog.first_prose({"structure": [
+        {"type": "rubrik", "text": ["Bara rubriker här i detta dokument, inga stycken alls någonstans"]}]}) is None

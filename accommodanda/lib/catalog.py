@@ -65,9 +65,13 @@ CREATE TABLE IF NOT EXISTS documents (
     expired      TEXT,             -- repeal-effective date (SFS upphavandedatum), if any
     date         TEXT,             -- the document's own date (förarbete/statute/decision), ISO
     publisher    TEXT,             -- issuing organization, for feed filtering
-    inbound_count INTEGER          -- document_inbound_count materialized at
+    inbound_count INTEGER,         -- document_inbound_count materialized at
                                    -- relate (stamp_inbound_counts); NULL on a
                                    -- catalog no relate has stamped yet
+    snippet      TEXT              -- the document's own opening prose (or the
+                                   -- dv sammanfattning), for the graph
+                                   -- explorer's details panel; stamped at
+                                   -- (re)extraction, NULL until then
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -288,6 +292,8 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE documents ADD COLUMN publisher TEXT")
     if "inbound_count" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN inbound_count INTEGER")
+    if "snippet" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN snippet TEXT")
     corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
     if "ikrafttrader" not in corr_cols:
         con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
@@ -1226,6 +1232,38 @@ def _document_description(art, source):
     return None
 
 
+_SNIPPET_LEN = 340
+
+
+def first_prose(art):
+    """The document's own opening prose: the first non-heading node whose text
+    runs join to a real paragraph (>= 80 chars), cut at a word boundary around
+    340 chars. Structure-generic -- an SFS lands on 1 kap. 1 §'s first stycke,
+    a förarbete on its first running paragraph -- so no per-source walker to
+    maintain. None when the artifact opens with nothing prose-like (scanned
+    page-image documents, bare registries)."""
+    def walk(nodes):
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if "rubrik" not in (node.get("type") or ""):
+                text = "".join(
+                    run if isinstance(run, str) else (run.get("text") or "")
+                    for run in node.get("text") or [])
+                if len(text.strip()) >= 80:
+                    return text.strip()
+            found = walk(node.get("children") or [])
+            if found:
+                return found
+        return None
+    text = walk(art.get("structure") or [])
+    if not text:
+        return None
+    if len(text) > _SNIPPET_LEN:
+        text = text[:_SNIPPET_LEN].rsplit(" ", 1)[0] + " …"
+    return text
+
+
 def _document_publisher(art: dict) -> str | None:
     """The issuing organization, normalized only structurally (not renamed).
 
@@ -1323,8 +1361,8 @@ def _index_document(con, art, path, source):
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
         " expired, display, date, publisher, descriptive, "
-        " short_id, short_title, description) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " short_id, short_title, description, snippet) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          _expired_date(art),
@@ -1334,7 +1372,10 @@ def _index_document(con, art, path, source):
          # I1/I2): descriptive citing form, the bare id, the short name, and the
          # source's own one-line description (a case's sammanfattning)
          lb.descriptive_label, lb.short_id, lb.short_title,
-         _document_description(art, source)))
+         _document_description(art, source),
+         # the details-panel snippet: the case's own sammanfattning where the
+         # source writes one, else the document's opening prose
+         _document_description(art, source) or first_prose(art)))
     # the metadata producers describe the document, not a place in it, so they
     # pad the body walk's (anchor, page, run) shape with a pageless entry
     edges = artifact_links(art) + [

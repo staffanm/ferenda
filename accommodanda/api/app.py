@@ -1153,6 +1153,10 @@ class GraphResponse(BaseModel):
         None, description="the document's page at its own publisher. For a "
         "source this site does not render (tidskriftsartiklar), this is the "
         "link to open -- the site has no page for it.")
+    snippet: str | None = Field(
+        None, description="the document's own opening prose (a court "
+        "decision's sammanfattning) -- one paragraph for a details panel. "
+        "Null until relate has stamped the document")
     inbound: GraphSide | None = Field(
         None, description="who cites this node; null when ?direction= excluded it")
     outbound: GraphSide | None = Field(

@@ -369,6 +369,10 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         out_rows = catalog.graph_outbound(con, root)
         raw_links, _raw_docs = catalog.graph_out_totals(con, root)
     unresolved = raw_links - sum(r[1] for r in out_rows)
+    extras = con.execute(
+        "SELECT NULLIF(source_url, ''), "
+        "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')) "
+        "FROM documents WHERE uri = ?", (root,)).fetchone()
     result = {
         "uri": uri, "root": root, "anchor": frag or None, "unit": unit,
         "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
@@ -384,9 +388,12 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         # (tidskriftsartiklar -- page.CITER_STYLE's one external=True), this
         # is where a reader opens the document; the site's /lawreview/ path
         # serves nothing and must never be handed out as a link.
-        "source_url": con.execute(
-            "SELECT NULLIF(source_url, '') FROM documents WHERE uri = ?",
-            (root,)).fetchone()[0],
+        "source_url": extras[0],
+        # the document's own opening words (or a case's sammanfattning) --
+        # what the explorer's details panel opens with. COALESCEd with
+        # `description` so a catalog stamped before the snippet column still
+        # answers for every court decision
+        "snippet": extras[1],
         "inbound": None, "outbound": None, "internal": None,
     }
     # under a deeper view the whole per-side limit is a budget across the

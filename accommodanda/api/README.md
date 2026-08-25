@@ -467,6 +467,9 @@ returnerade dokumenten. Djup > 1 svarar 503 medan grafen laddas.
 
 `source_url` är dokumentets sida hos utgivaren -- för en källa som
 sajten inte renderar (tidskriftsartiklar) är det länken att öppna.
+`snippet` är dokumentets egen inledande text (ett rättsfalls
+sammanfattning) -- ett stycke för detaljpanelen; null tills relate stämplat
+dokumentet.
 
 En fragment-URI (`…#K4P7`, `…#A6`) svarar för den enheten ensam och lägger
 till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå

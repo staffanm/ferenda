@@ -344,6 +344,12 @@ spokes. Depth > 1 answers 503 while the in-memory graph is still loading.
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
 `source_url`: the document's page at its own publisher -- for a source
 this site does not render (tidskriftsartiklar), the link to open.
+`snippet`: the document's own opening prose (a court decision's
+sammanfattning) -- one details-panel paragraph; null until relate has
+stamped the document. Under `sort=citations` the ranking is by citing
+degree off the in-memory graph when it is loaded (the stamped
+`inbound_count` still rides each row); the joined fallback ranks by the
+stamped count.
 `internal`: the document citing itself, as a provision-to-provision graph at
 §/article level. `internal=true` asks for that same graph on a plain document
 uri too, for a zoomed-in structure view.
