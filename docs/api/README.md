@@ -337,6 +337,17 @@ this site does not render (tidskriftsartiklar), the link to open.
 §/article level. `internal=true` asks for that same graph on a plain document
 uri too, for a zoomed-in structure view.
 
+**Shortest citation chain — `GET /api/v1/path?from=…&to=…`** — the
+six-degrees walk: one shortest chain of citations connecting two documents,
+endpoints included, at document level (a hop exists when any provision of one
+document cites any provision of the other; a fragment uri is answered for its
+document). `direction=out|in|both` says which links a step may follow — with
+`both` a hop may run either way, and each step's `forward` says which way it
+ran; `n` is how many citations carry the hop. `groups=` filters the
+*intermediate* documents by flow group (the endpoints are always allowed).
+`distance` is null when no chain exists. The whole document-level graph
+(~2.6M edges) is held in memory, so an answer is one breadth-first search.
+
 **Document as PDF — `GET /api/v1/pdf?path=…`** — a generated page typeset for
 paper: A4, running heads, `n (total)` folios, a PDF outline. `path` is the
 public page path (`/1998:204`), not a uri. `toc=1` prepends the document's own
@@ -367,6 +378,7 @@ expect a slow response on a big document.
 | a statute's omitted graphic (PNG) | `GET /api/v1/sfs-graphic?uri=…&node=…` |
 | the original verdict PDF | `GET /api/v1/dv-verdict?court=…&id=…&file=…` |
 | draw the citation graph | `GET /api/v1/graph?uri=…` |
+| shortest chain between two documents | `GET /api/v1/path?from=…&to=…` |
 | a document as PDF | `GET /api/v1/pdf?path=…` |
 | bulk download | `GET /api/v1/dumps` + static fetch |
 | machine schema | `GET /openapi.json`, `GET /docs` |

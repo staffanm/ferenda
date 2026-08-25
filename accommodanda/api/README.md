@@ -465,6 +465,15 @@ till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå
 (§/artikel), med läsbara etiketter ("4 kap. 7 §"). `internal=true` lägger
 till samma graf även i svaret för en dokument-URI.
 
+### `GET /api/v1/path` — kortaste kedjan av hänvisningar mellan två dokument
+
+"Six degrees"-vandringen: en kortaste kedja av hänvisningar som binder ihop
+`from` och `to`, på dokumentnivå. `direction=out|in|both` säger vilka länkar
+ett steg får följa — med `both` kan ett steg gå åt båda hållen, och varje
+stegs `forward` säger åt vilket håll det gick; `n` är antalet hänvisningar
+som bär steget. `groups=` filtrerar *mellanliggande* dokument på flödesgrupp
+(ändpunkterna är alltid tillåtna). `distance` är null när ingen kedja finns.
+
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/graph \
      --data-urlencode "uri=https://lagen.nu/ext/coe/005#A6" \

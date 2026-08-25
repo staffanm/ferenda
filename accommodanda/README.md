@@ -459,7 +459,12 @@ page with a progress bar, rather than on a request nginx times out at 60 s;
 `api/pdfcollection.py` and `/samling` assemble up to 1,000 browser-owned
 documents into one exact WeasyPrint layout, with localStorage drafts,
 bookmark-fragment recipes, per-document section/start choices, an optional
-cover and a document-only printed TOC)
+cover and a document-only printed TOC). `api/paths.py` answers
+`GET /api/v1/path` — the shortest citation chain between two documents —
+off the whole document-level graph (~2.6M distinct citing→cited pairs) held
+in memory as CSR integer arrays, built lazily from the catalog on the first
+request and rebuilt when the catalog file changes, so an arbitrary-pair
+query is one in-process breadth-first search
 that also serves the static site under `lagen serve`. Its API surface is
 `/api/v1` and nothing else — search, facets, browse, documents, one document (+versions/diff/
 inbound/outbound), sources, graph, facsimile, `sfs-graphic`, `dv-verdict`,

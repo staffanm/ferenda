@@ -66,10 +66,12 @@ from ..lib import (
 )
 from . import (
     analytics,
+    db,
     errors,
     facsimiles,
     internal,
     ops,
+    paths,
     pdf,
     pdfcollection,
     pdfjob,
@@ -1146,6 +1148,102 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     return GraphResponse(**data)
+
+
+class PathStep(BaseModel):
+    """One document on the chain. `n`/`forward` describe the hop to the NEXT
+    step (null on the last): how many citations carry it, and whether it runs
+    in citing direction from this document to the next (false: the next
+    document cites this one -- a hop a direction=both walk may take)."""
+    uri: str
+    label: str | None = None
+    title: str | None = None
+    descriptive: str | None = None
+    group: str = Field(description="the flow group it belongs to")
+    n: int | None = Field(None, description="citations carrying the hop to "
+                                            "the next step; null on the last")
+    forward: bool | None = Field(
+        None, description="whether the hop to the next step follows citing "
+        "direction; null on the last")
+
+
+class PathResponse(BaseModel):
+    from_uri: str = Field(serialization_alias="from")
+    to_uri: str = Field(serialization_alias="to")
+    direction: str
+    distance: int | None = Field(description="steps on the shortest chain; "
+                                             "null when no chain exists")
+    path: list[PathStep] = Field(description="the chain, endpoints included; "
+                                             "empty when no chain exists")
+
+
+@app.get("/api/v1/path", response_model=PathResponse, tags=["document"],
+         summary="The shortest citation chain between two documents")
+def path_endpoint(from_uri: str = Query(..., alias="from",
+                                        description="start document uri"),
+                  to_uri: str = Query(..., alias="to",
+                                      description="end document uri"),
+                  direction: str = Query(
+                      "both", pattern="^(in|out|both)$",
+                      description="which links a step may follow: 'out' "
+                      "citations, 'in' citers, 'both' either"),
+                  groups: str | None = Query(
+                      None, description="comma-separated flow-group filter "
+                      "for the intermediate documents (endpoints are always "
+                      "allowed)"),
+                  con: sqlite3.Connection = Depends(get_con)):
+    """The shortest chain of citations connecting two documents -- the
+    six-degrees walk paraGRAF draws when an end point is set. The chain is
+    document-level: a hop exists when any provision of one document cites any
+    provision of the other. A fragment uri is answered for its document.
+
+    The whole citation graph (2.6M document pairs) is held in memory as
+    integer adjacency arrays, so the answer is one breadth-first search --
+    tens of milliseconds; the first request after a catalog rebuild pays a
+    few seconds to reload it."""
+    wanted = None
+    if groups:
+        wanted = {g.strip() for g in groups.split(",") if g.strip()}
+        unknown = wanted - set(facets.FLOW_GROUP_NAMES)
+        if unknown:
+            raise HTTPException(422, "unknown flow group(s): %s"
+                                % ", ".join(sorted(unknown)))
+    ends = []
+    for uri in (from_uri, to_uri):
+        root = uri.partition("#")[0]
+        if not catalog.document(con, root):
+            raise HTTPException(404, "no document %r in the catalog" % root)
+        ends.append(root)
+    chain = paths.shortest(paths.graph_for(db.CATALOG), ends[0], ends[1],
+                           direction=direction, groups=wanted)
+    steps = []
+    if chain:
+        labels = catalog.graph_labels(con, chain)
+        for i, uri in enumerate(chain):
+            label, title, source, kind, descriptive = labels[uri]
+            n = forward = None
+            if i + 1 < len(chain):
+                n, forward = _hop_count(con, uri, chain[i + 1], direction)
+            steps.append(PathStep(
+                uri=uri, label=label, title=title, descriptive=descriptive,
+                group=facets.flow_group(source, kind), n=n, forward=forward))
+    return PathResponse(from_uri=ends[0], to_uri=ends[1], direction=direction,
+                        distance=len(chain) - 1 if chain else None,
+                        path=steps)
+
+
+def _hop_count(con, a, b, direction):
+    """(citations, forward) for one hop of a chain: how many links carry it,
+    and in which citing direction. A 'both' walk prefers the forward reading
+    when the two documents cite each other."""
+    count = lambda x, y: con.execute(
+        "SELECT count(*) FROM links WHERE from_uri = ? AND to_root = ?",
+        (x, y)).fetchone()[0]
+    if direction != "in":
+        fwd = count(a, b)
+        if fwd:
+            return fwd, True
+    return count(b, a), False
 
 
 # --------------------------------------------------------------------------

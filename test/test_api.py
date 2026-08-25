@@ -874,3 +874,57 @@ def test_json_answers_declare_their_charset(client):
         r = client.get(path)
         assert r.status_code == 200
         assert r.headers["content-type"] == "application/json; charset=utf-8"
+
+
+def test_path_walks_the_shortest_chain(client):
+    """/api/v1/path: fl cites bb, so the out-chain fl->bb is one step, the
+    in-chain bb->fl mirrors it, and out from bb reaches nothing."""
+    bb, fl = "https://lagen.nu/1962:700", "https://lagen.nu/2018:585"
+    r = client.get("/api/v1/path", params={"from": fl, "to": bb,
+                                           "direction": "out"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["from"] == fl and d["to"] == bb and d["distance"] == 1
+    assert [s["uri"] for s in d["path"]] == [fl, bb]
+    # the hop carries one citation, in citing direction; the last step has no hop
+    assert (d["path"][0]["n"], d["path"][0]["forward"]) == (1, True)
+    assert (d["path"][1]["n"], d["path"][1]["forward"]) == (None, None)
+
+    d = client.get("/api/v1/path", params={"from": bb, "to": fl,
+                                           "direction": "in"}).json()
+    assert d["distance"] == 1 and d["path"][0]["forward"] is False
+
+    d = client.get("/api/v1/path", params={"from": bb, "to": fl,
+                                           "direction": "out"}).json()
+    assert d["distance"] is None and d["path"] == []
+
+    # a fragment uri answers for its document; from==to is a zero-step chain
+    d = client.get("/api/v1/path", params={"from": fl + "#P1",
+                                           "to": fl}).json()
+    assert d["distance"] == 0 and [s["uri"] for s in d["path"]] == [fl]
+
+    assert client.get("/api/v1/path", params={
+        "from": "https://lagen.nu/x", "to": bb}).status_code == 404
+    assert client.get("/api/v1/path", params={
+        "from": fl, "to": bb, "groups": "Nonsens"}).status_code == 422
+
+
+def test_path_group_filter_gates_the_intermediates(client):
+    """The groups filter constrains the documents a chain may pass through --
+    never its endpoints. A dv citer two steps from bb loses its chain when
+    the intermediate författning is filtered away."""
+    bb, fl = "https://lagen.nu/1962:700", "https://lagen.nu/2018:585"
+    dom = "https://lagen.nu/dom/nja/2020s1"
+    con = sqlite3.connect(client.catalog_path)
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                "path) VALUES (?, 'dv', 'verdict', 'NJA 2020 s. 1', 'T', '')",
+                (dom,))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES (?, 'dcterms:references', ?, ?)", (dom, fl, fl))
+    con.commit(); con.close()
+    q = {"from": dom, "to": bb, "direction": "out"}
+    d = client.get("/api/v1/path", params=q).json()
+    assert [s["uri"] for s in d["path"]] == [dom, fl, bb]
+    d = client.get("/api/v1/path", params={
+        **q, "groups": "Rättsfall,Förarbeten"}).json()
+    assert d["distance"] is None
