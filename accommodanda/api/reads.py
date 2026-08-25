@@ -207,7 +207,7 @@ def _graph_side(rows, groups, limit, sort="links", grouplimit=None):
             continue
         kept.append({"uri": uri, "label": label, "title": title,
                      "descriptive": descriptive, "source": source,
-                     "kind": kind, "group": group, "n": n,
+                     "kind": kind, "group": group, "links": n,
                      "inbound_count": cited})
     if sort == "citations":
         # stable: equally-cited neighbours keep their ties-to-center order
@@ -221,7 +221,7 @@ def _graph_side(rows, groups, limit, sort="links", grouplimit=None):
         top.append(r)
         if len(top) == limit:
             break
-    return {"total_links": sum(r["n"] for r in kept), "total_docs": len(kept),
+    return {"total_links": sum(r["links"] for r in kept), "total_docs": len(kept),
             "top": top}
 
 
@@ -242,7 +242,7 @@ def _graph_side_unfiltered(con, counts, limit):
         top.append({"uri": uri, "label": label, "title": title,
                     "descriptive": descriptive, "source": source,
                     "kind": kind, "group": facets.flow_group(source, kind),
-                    "n": n, "inbound_count": None})
+                    "links": n, "inbound_count": None})
     return {"total_links": sum(n for _uri, n in counts),
             "total_docs": len(counts), "top": top}
 

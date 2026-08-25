@@ -1063,7 +1063,7 @@ class GraphNeighbor(BaseModel):
     group: str = Field(description="the flow group it belongs to "
                        "(\"Författningar\", \"Rättsfall\", …) -- the same "
                        "names ?groups= filters on")
-    n: int = Field(description="links between the two documents")
+    links: int = Field(description="citations between the two documents -- the side's total_links is their sum (this field was `n` before 2026-08-26)")
     inbound_count: int | None = Field(
         None, description="how many documents cite the neighbour itself -- "
         "the authority signal ?sort=citations ranks by. Null on the "
@@ -1187,8 +1187,8 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
 
 
 class PathStep(BaseModel):
-    """One document on the chain. `n`/`forward` describe the hop to the NEXT
-    step (null on the last): how many citations carry it, and whether it runs
+    """One document on the chain. `links`/`forward` describe the hop to the
+    NEXT step (null on the last): how many citations carry it, and whether it runs
     in citing direction from this document to the next (false: the next
     document cites this one -- a hop a direction=both walk may take)."""
     uri: str
@@ -1196,8 +1196,10 @@ class PathStep(BaseModel):
     title: str | None = None
     descriptive: str | None = None
     group: str = Field(description="the flow group it belongs to")
-    n: int | None = Field(None, description="citations carrying the hop to "
-                                            "the next step; null on the last")
+    links: int | None = Field(
+        None, description="citations carrying the hop to the next step; "
+                          "null on the last (this field was `n` before "
+                          "2026-08-26)")
     forward: bool | None = Field(
         None, description="whether the hop to the next step follows citing "
         "direction; null on the last")
@@ -1268,7 +1270,7 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
                 n, forward = _hop_count(con, uri, chain[i + 1], direction)
             steps.append(PathStep(
                 uri=uri, label=label, title=title, descriptive=descriptive,
-                group=facets.flow_group(source, kind), n=n, forward=forward))
+                group=facets.flow_group(source, kind), links=n, forward=forward))
     return PathResponse(from_uri=ends[0], to_uri=ends[1], direction=direction,
                         distance=len(chain) - 1 if chain else None,
                         path=steps)

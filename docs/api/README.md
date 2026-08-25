@@ -348,7 +348,7 @@ endpoints included, at document level (a hop exists when any provision of one
 document cites any provision of the other; a fragment uri is answered for its
 document). `direction=out|in|both` says which links a step may follow — with
 `both` a hop may run either way, and each step's `forward` says which way it
-ran; `n` is how many citations carry the hop. `groups=` filters the
+ran; `links` is how many citations carry the hop. `groups=` filters the
 *intermediate* documents by flow group (the endpoints are always allowed).
 `distance` is null when no chain exists. The whole document-level graph
 (~2.6M edges) is held in memory, so an answer is one breadth-first search.

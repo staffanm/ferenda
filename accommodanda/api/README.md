@@ -474,7 +474,7 @@ till samma graf även i svaret för en dokument-URI.
 "Six degrees"-vandringen: en kortaste kedja av hänvisningar som binder ihop
 `from` och `to`, på dokumentnivå. `direction=out|in|both` säger vilka länkar
 ett steg får följa — med `both` kan ett steg gå åt båda hållen, och varje
-stegs `forward` säger åt vilket håll det gick; `n` är antalet hänvisningar
+stegs `forward` säger åt vilket håll det gick; `links` är antalet hänvisningar
 som bär steget. `groups=` filtrerar *mellanliggande* dokument på flödesgrupp
 (ändpunkterna är alltid tillåtna). `distance` är null när ingen kedja finns.
 

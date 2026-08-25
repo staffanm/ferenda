@@ -813,7 +813,7 @@ def test_graph_labels_only_the_rows_the_reply_carries(tmp_path):
         side = unfiltered["inbound"]
         # the totals describe the whole neighborhood, not the two rows drawn
         assert (side["total_docs"], side["total_links"]) == (5, 15)
-        assert [(r["label"], r["n"]) for r in side["top"]] \
+        assert [(r["label"], r["links"]) for r in side["top"]] \
             == [("HFD 4", 5), ("HFD 3", 4)]
         assert side["top"][0]["group"] == "Rättsfall"
     con.close()
@@ -909,8 +909,8 @@ def test_path_walks_the_shortest_chain(client):
     assert d["from"] == fl and d["to"] == bb and d["distance"] == 1
     assert [s["uri"] for s in d["path"]] == [fl, bb]
     # the hop carries one citation, in citing direction; the last step has no hop
-    assert (d["path"][0]["n"], d["path"][0]["forward"]) == (1, True)
-    assert (d["path"][1]["n"], d["path"][1]["forward"]) == (None, None)
+    assert (d["path"][0]["links"], d["path"][0]["forward"]) == (1, True)
+    assert (d["path"][1]["links"], d["path"][1]["forward"]) == (None, None)
 
     d = client.get("/api/v1/path", params={"from": bb, "to": fl,
                                            "direction": "in"}).json()
