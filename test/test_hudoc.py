@@ -457,7 +457,7 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
     site = page.Site(con, {treaty["uri"], case["uri"]})
     html = coe_render.render(treaty, site)
     assert "Europadomstolens praxis" in html
-    assert "CASE OF EXAMPLE v. SWEDEN" in html
+    assert "Example v. Sweden" in html      # the rail prints the citing form
     assert 'id="A8"' in html
     # the citing side names the article, never the raw fragment id: the treaty
     # lives under ext/ but is hosted here, so the reference links to our own

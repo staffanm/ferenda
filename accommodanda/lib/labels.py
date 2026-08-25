@@ -310,14 +310,41 @@ def _foreskrift(art):
 # hudoc (European Court of Human Rights)
 # --------------------------------------------------------------------------
 
+# the Court prints its captions shouted -- judgments as "CASE OF VLASOV
+# v. RUSSIA", decisions without the prefix ("DOBRE v. ROMANIA"). The artifact
+# keeps the official form; every reader-facing label de-shouts to "Vlasov
+# v. Russia": drop the filing prefix, title-case the parties, keep the "v."
+# and the small words down. The gate is shoutedness itself (>= 90 % of the
+# letters uppercase), so a decision caption is treated and an already-mixed
+# caption passes through. Known costs, recorded in the tests: particles and
+# company suffixes lose their casing ("MCCANN" -> "Mccann", "OOD" -> "Ood"),
+# and a party initial "V." mid-caption reads as the separator and drops its
+# case ("A.V. v. UKRAINE" -> "A.v. v. Ukraine").
+_CASE_PREFIX = re.compile(r"^CASE OF ")
+_WORD = re.compile(r"[^\W\d_]+")
+
+
+def case_name(caption):
+    if not caption:
+        return caption
+    stripped = _CASE_PREFIX.sub("", caption)
+    letters = [c for c in stripped if c.isalpha()]
+    if not letters or sum(c.isupper() for c in letters) / len(letters) < .9:
+        return caption
+    name = _WORD.sub(lambda m: m.group(0).capitalize(), stripped.lower())
+    name = re.sub(r"\bV\.\s", "v. ", name)
+    name = re.sub(r"\b(And|Of|The)\b", lambda m: m.group(0).lower(), name)
+    return name[:1].upper() + name[1:]
+
+
 def _hudoc(art):
     # eyebrow is the application number ("no. 48786/09"); the case caption is the
     # heading. The stamped applicationNumber is authoritative; fall back to the
     # itemid only if it is somehow absent.
     appno = (art.get("metadata", {}).get("applicationNumber") or [None])[0]
     short_id = "no. %s" % appno if appno else (art.get("itemid") or "")
-    title = art.get("title") or short_id
-    return Labels(short_id, title, title, title)
+    title = case_name(art.get("title")) or short_id
+    return Labels(short_id, title, art.get("title") or short_id, title)
 
 
 # --------------------------------------------------------------------------

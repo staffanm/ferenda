@@ -141,7 +141,10 @@ def test_hudoc_eyebrow_is_the_application_number():
            "metadata": {"applicationNumber": ["48786/09"]}}
     lb = labels.document_labels("hudoc", art)
     assert lb.short_id == "no. 48786/09"
-    assert lb.short_title == "CASE OF AVENDI OOD v. BULGARIA"
+    # de-shouted for readers (the official title keeps the Court's form);
+    # a company suffix's casing is the known cost ("OOD" -> "Ood")
+    assert lb.short_title == "Avendi Ood v. Bulgaria"
+    assert lb.official_title == "CASE OF AVENDI OOD v. BULGARIA"
 
 
 def test_coe_treaty_name_comes_from_the_dataset():
@@ -200,3 +203,32 @@ def test_begrepp_without_a_title_falls_back_to_the_uri_tail():
     art = {"uri": "https://lagen.nu/begrepp/Allmän_handling"}
     assert labels.document_labels("begrepp", art).descriptive_label \
         == "Allmän_handling"
+
+
+def test_hudoc_captions_are_deshouted_for_readers():
+    """The Court prints "CASE OF VLASOV v. RUSSIA"; every reader-facing label
+    reads "Vlasov v. Russia" while the official title keeps the Court's own
+    form. Initials, small words and multi-party captions all survive; a
+    caption without the filing prefix passes through untouched."""
+    assert labels.case_name("CASE OF VLASOV v. RUSSIA") == "Vlasov v. Russia"
+    assert labels.case_name("CASE OF GILLAN AND QUINTON v. THE UNITED KINGDOM") \
+        == "Gillan and Quinton v. the United Kingdom"
+    assert labels.case_name("CASE OF S.W. v. THE UNITED KINGDOM") \
+        == "S.W. v. the United Kingdom"
+    # decisions shout without the filing prefix -- the gate is shoutedness
+    assert labels.case_name("DOBRE v. ROMANIA") == "Dobre v. Romania"
+    # ...so an already-mixed caption passes through
+    assert labels.case_name("Affaire linguistique belge") \
+        == "Affaire linguistique belge"
+    # the recorded cost of blind title-casing: particles and Mc-names
+    assert labels.case_name("CASE OF MCCANN AND OTHERS v. THE UNITED KINGDOM") \
+        == "Mccann and Others v. the United Kingdom"
+    # ...and a party initial "V." mid-caption reads as the separator
+    assert labels.case_name("CASE OF A.V. v. UKRAINE") == "A.v. v. Ukraine"
+    lb = labels.document_labels("hudoc", {
+        "title": "CASE OF VLASOV v. RUSSIA",
+        "metadata": {"applicationNumber": ["78146/01"]}})
+    assert lb.short_title == "Vlasov v. Russia"
+    assert lb.descriptive_label == "Vlasov v. Russia"
+    assert lb.official_title == "CASE OF VLASOV v. RUSSIA"
+    assert lb.short_id == "no. 78146/01"
