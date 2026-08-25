@@ -455,7 +455,10 @@ rad per granne med länkantal) och grupperat med samma flödesgrupper som
 statistiksidans flödesdiagram (`lib/facets.flow_group`). Det är vad
 paraGRAF-utforskaren (https://para-graf.tomtebo.org) ritar.
 `direction=in|out|both` väljer sida, `groups=` filtrerar på flödesgrupp,
-`limit` sätter topplistans längd.
+`limit` sätter topplistans längd. `sort=citations` rangordnar grannarna
+efter hur citerade de själva är (radens `inbound_count`) i stället för
+antalet länkar till mittpunkten, och `grouplimit` sätter ett tak per
+flödesgrupp — bredd i stället för en dominerande källtyp.
 
 `source_url` är dokumentets sida hos utgivaren -- för en källa som
 sajten inte renderar (tidskriftsartiklar) är det länken att öppna.

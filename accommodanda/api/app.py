@@ -1058,6 +1058,10 @@ class GraphNeighbor(BaseModel):
                        "(\"Författningar\", \"Rättsfall\", …) -- the same "
                        "names ?groups= filters on")
     n: int = Field(description="links between the two documents")
+    inbound_count: int | None = Field(
+        None, description="how many documents cite the neighbour itself -- "
+        "the authority signal ?sort=citations ranks by. Null on the "
+        "default-shape inbound side, which skips the per-neighbour join")
 
 
 class GraphSide(BaseModel):
@@ -1136,6 +1140,16 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
                        None, description="comma-separated flow-group filter "
                                          "(Författningar, Rättsfall, …)"),
                    limit: int = Query(20, ge=1, le=300),
+                   sort: str = Query(
+                       "links", pattern="^(links|citations)$",
+                       description="order of `top`: 'links' by ties to the "
+                       "center, 'citations' by how cited the neighbour "
+                       "itself is (the inbound_count relate stamps; a "
+                       "catalog no relate has stamped yet ranks all as 0)"),
+                   grouplimit: int | None = Query(
+                       None, ge=1, le=300,
+                       description="max neighbours per flow group in `top` "
+                       "-- diversity over one dominating source type"),
                    internal: bool = Query(
                        False, description="include the document's internal "
                        "unit graph for a document uri too (a fragment uri "
@@ -1159,7 +1173,8 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
             raise HTTPException(422, "unknown flow group(s): %s"
                                 % ", ".join(sorted(unknown)))
     data = reads.graph(con, uri, direction=direction, groups=wanted,
-                       limit=limit, internal=internal)
+                       limit=limit, internal=internal, sort=sort,
+                       grouplimit=grouplimit)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     return GraphResponse(**data)

@@ -939,3 +939,44 @@ def test_path_group_filter_gates_the_intermediates(client):
     assert [s["uri"] for s in d["path"]] == [dom, fl, bb]
     d = _path(client, {**q, "groups": "Rättsfall,Förarbeten"}).json()
     assert d["distance"] is None
+
+
+def test_graph_sort_citations_and_grouplimit(tmp_path):
+    """`sort=citations` ranks neighbours by their own (stamped) citedness
+    instead of their ties to the center; `grouplimit` caps how many of one
+    flow group `top` carries. The totals keep describing the whole side."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    law = "https://lagen.nu/1900:1"
+    a, b = "https://lagen.nu/dom/nja/A", "https://lagen.nu/dom/nja/B"
+    c = "https://lagen.nu/sou/1900:2"
+    rows = [(law, "sfs", "law", "L"), (a, "dv", "verdict", "NJA A"),
+            (b, "dv", "verdict", "NJA B"), (c, "forarbete", "sou", "SOU C")]
+    for uri, source, kind, label in rows:
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, ?, ?, ?, 'T', '')",
+                    (uri, source, kind, label))
+    def link(f, t, n=1):
+        for i in range(n):
+            con.execute("INSERT INTO links (from_uri, from_anchor, predicate, "
+                        "to_uri, to_root) VALUES (?, ?, 'dcterms:references', "
+                        "?, ?)", (f, "P%d" % i, t, t))
+    link(a, law, 5)      # A holds the most ties to the center...
+    link(b, law, 1)
+    link(c, law, 1)
+    link(c, b, 3)        # ...but B is the cited authority
+    catalog.stamp_inbound_counts(con)
+
+    by_links = reads.graph(con, law, direction="in", limit=10)
+    assert [r["uri"] for r in by_links["inbound"]["top"]] == [a, b, c]
+    by_cite = reads.graph(con, law, direction="in", limit=10,
+                          sort="citations")
+    assert [r["uri"] for r in by_cite["inbound"]["top"]][0] == b
+    # same semantics as everywhere else inbound_count appears: (citer,
+    # pinpoint) entries -- C cites B from three distinct anchors
+    assert by_cite["inbound"]["top"][0]["inbound_count"] == 3
+    capped = reads.graph(con, law, direction="in", limit=10, grouplimit=1)
+    assert [r["group"] for r in capped["inbound"]["top"]] \
+        == ["Rättsfall", "Förarbeten"]
+    # grouplimit narrows `top`, never the totals
+    assert capped["inbound"]["total_docs"] == 3
+    con.close()

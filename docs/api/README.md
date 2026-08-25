@@ -327,8 +327,12 @@ standalone graph-explorer app, walks.
 
 `direction` picks the sides (`in`, `out`, `both` — the default), `groups` is a
 comma-separated filter on the flow groups (`Författningar`, `Rättsfall`, …), and
-`limit` (default 20, max 300) bounds each side's `top` list. The `total_links` /
-`total_docs` / `unresolved` counts describe the whole side, not the page.
+`limit` (default 20, max 300) bounds each side's `top` list. `sort=citations`
+ranks `top` by each neighbour's own citedness (`inbound_count`, carried on the
+row) instead of its ties to the center, and `grouplimit` caps how many
+neighbours one flow group may take — diversity over one dominating source
+type. The `total_links` / `total_docs` / `unresolved` counts describe the
+whole side, not the page.
 
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
 `source_url`: the document's page at its own publisher -- for a source

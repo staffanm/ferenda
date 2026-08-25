@@ -186,20 +186,40 @@ def sources(con):
 INTERNAL_EDGE_CAP = 600
 
 
-def _graph_side(rows, groups, limit):
+def _graph_side(rows, groups, limit, sort="links", grouplimit=None):
     """One direction of a node's neighborhood: the catalog's aggregated rows
     shaped and group-filtered, totals counted over the *filtered* set so the
-    reply's numbers describe what its list is drawn from."""
+    reply's numbers describe what its list is drawn from.
+
+    `sort="citations"` ranks by the neighbour's own citedness (the stamped
+    `inbound_count`) instead of its ties to the center -- what puts NJA
+    landmark cases ahead of one prolific self-referencing SOU. `grouplimit`
+    caps how many of one flow group `top` carries, so a node drowning in one
+    source type still shows the breadth of its neighborhood; the totals keep
+    describing the whole filtered set."""
     kept = []
-    for uri, n, label, title, source, kind, descriptive in rows:
+    for uri, n, label, title, source, kind, descriptive, cited in rows:
         group = facets.flow_group(source, kind)
         if groups and group not in groups:
             continue
         kept.append({"uri": uri, "label": label, "title": title,
                      "descriptive": descriptive, "source": source,
-                     "kind": kind, "group": group, "n": n})
+                     "kind": kind, "group": group, "n": n,
+                     "inbound_count": cited})
+    if sort == "citations":
+        # stable: equally-cited neighbours keep their ties-to-center order
+        kept.sort(key=lambda r: -(r["inbound_count"] or 0))
+    top = []
+    per_group = collections.Counter()
+    for r in kept:
+        if grouplimit is not None and per_group[r["group"]] >= grouplimit:
+            continue
+        per_group[r["group"]] += 1
+        top.append(r)
+        if len(top) == limit:
+            break
     return {"total_links": sum(r["n"] for r in kept), "total_docs": len(kept),
-            "top": kept[:limit]}
+            "top": top}
 
 
 def _graph_side_unfiltered(con, counts, limit):
@@ -219,25 +239,29 @@ def _graph_side_unfiltered(con, counts, limit):
         top.append({"uri": uri, "label": label, "title": title,
                     "descriptive": descriptive, "source": source,
                     "kind": kind, "group": facets.flow_group(source, kind),
-                    "n": n})
+                    "n": n, "inbound_count": None})
     return {"total_links": sum(n for _uri, n in counts),
             "total_docs": len(counts), "top": top}
 
 
-def _graph_inbound_side(con, root, unit, groups, limit):
+def _graph_inbound_side(con, root, unit, groups, limit, sort, grouplimit):
     """The inbound direction for a document (`unit` None) or one provision.
 
-    Only this direction takes the counts-only path. A document's *outbound*
-    neighbors are bounded by the length of its own text -- brottsbalken cites
-    thousands, article 6 ECHR is cited by 50,624 -- and there the join is also
-    the filter that drops targets the corpus does not hold."""
-    if groups:
+    Only this direction takes the counts-only path, and only for the default
+    shape: a group filter, `sort=citations` and `grouplimit` all need every
+    neighbour's documents row, so they take the joined queries. A document's
+    *outbound* neighbors are bounded by the length of its own text --
+    brottsbalken cites thousands, article 6 ECHR is cited by 50,624 -- and
+    there the join is also the filter that drops targets the corpus does not
+    hold."""
+    if groups or sort != "links" or grouplimit is not None:
         return _graph_side(
             catalog.graph_anchor_inbound(con, root, unit) if unit
-            else catalog.graph_inbound(con, root), groups, limit)
+            else catalog.graph_inbound(con, root), groups, limit,
+            sort=sort, grouplimit=grouplimit)
     return _graph_side_unfiltered(
-        con, catalog.graph_anchor_inbound_counts(con, root, unit) if unit
-        else catalog.graph_inbound_counts(con, root), limit)
+        con, catalog.graph_anchor_inbound_counts(con, root, unit)
+        if unit else catalog.graph_inbound_counts(con, root), limit)
 
 
 def _graph_internal(con, root, focus_unit):
@@ -268,7 +292,7 @@ def _graph_internal(con, root, focus_unit):
 
 
 def graph(con, uri, *, direction="both", groups=None, limit=20,
-          internal=False):
+          internal=False, sort="links", grouplimit=None):
     """One node's neighborhood in the citation graph, ready to draw -- or None
     when the catalog has no such document. `uri` may name a document or a
     provision (`...#K4P7`): a provision answers with the citers/targets of
@@ -311,9 +335,11 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         "inbound": None, "outbound": None, "internal": None,
     }
     if direction in ("in", "both"):
-        result["inbound"] = _graph_inbound_side(con, root, unit, groups, limit)
+        result["inbound"] = _graph_inbound_side(con, root, unit, groups,
+                                                limit, sort, grouplimit)
     if direction in ("out", "both"):
-        result["outbound"] = _graph_side(out_rows, groups, limit)
+        result["outbound"] = _graph_side(out_rows, groups, limit,
+                                         sort=sort, grouplimit=grouplimit)
         result["outbound"]["unresolved"] = unresolved
     if frag or internal:
         result["internal"] = _graph_internal(con, root, unit)

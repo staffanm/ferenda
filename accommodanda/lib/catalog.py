@@ -2384,7 +2384,7 @@ def graph_outbound(con, uri):
     neighbor."""
     return con.execute(
         "SELECT l.to_root, count(*) n, d.label, d.title, d.source, d.kind, "
-        "       d.descriptive "
+        "       d.descriptive, d.inbound_count "
         "FROM links l JOIN documents d ON d.uri = l.to_root "
         "WHERE l.from_uri = ? AND l.to_root != l.from_uri "
         "GROUP BY l.to_root ORDER BY n DESC", (uri,)).fetchall()
@@ -2399,7 +2399,7 @@ def graph_inbound(con, uri):
     and wants `graph_inbound_counts` + `graph_labels` instead: see those."""
     return con.execute(
         "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
-        "       d.descriptive "
+        "       d.descriptive, d.inbound_count "
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.to_root = ? AND l.from_uri != l.to_root "
         "GROUP BY l.from_uri ORDER BY n DESC", (uri,)).fetchall()
@@ -2458,7 +2458,7 @@ def graph_anchor_inbound(con, uri, frag):
     letter, dot = _frag_globs(uri + "#" + frag)
     return con.execute(
         "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
-        "       d.descriptive "
+        "       d.descriptive, d.inbound_count "
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
         "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
         "                         OR l.to_uri GLOB ?) "
@@ -2486,7 +2486,7 @@ def graph_anchor_outbound(con, uri, frag):
     letter, dot = _frag_globs(frag)
     return con.execute(
         "SELECT l.to_root, count(*) n, d.label, d.title, d.source, d.kind, "
-        "       d.descriptive "
+        "       d.descriptive, d.inbound_count "
         "FROM links l JOIN documents d ON d.uri = l.to_root "
         "WHERE l.from_uri = ? AND (l.from_anchor = ? OR l.from_anchor GLOB ? "
         "                          OR l.from_anchor GLOB ?) "
