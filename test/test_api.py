@@ -1090,3 +1090,32 @@ def test_an_empty_groups_filter_fails_visibly(client):
         r = client.get(path, params={**params, "groups": ","})
         assert r.status_code == 422
         assert "no flow group" in r.json()["detail"]
+
+
+def test_card_answers_names_address_and_opening_words(client):
+    """/api/v1/card: the one-row identity for a selected/hovered item. The
+    fixture statute's snippet is its first paragraf, designation included
+    (stamped at relate by _document_snippet)."""
+    bb = "https://lagen.nu/1962:700"
+    r = client.get("/api/v1/card", params={"uri": bb})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["citation"] == "Brottsbalken"
+    assert d["url"] == "/1962:700"
+    assert d["snippet"] == "3 kap. 1 § Den som dödar annan döms för mord."
+    # stamped by relate's cross-pass, which the per-source fixture skips
+    assert d["inbound_count"] is None
+
+    # a fragment uri answers with the provision's citation and pinpoint
+    d = client.get("/api/v1/card", params={"uri": bb + "#K3P1S2"}).json()
+    assert d["pinpoint"] == "3 kap. 1 §" and d["url"] == "/1962:700#K3P1S2"
+
+    # a public page path resolves to the same card (popovers know paths)
+    d = client.get("/api/v1/card", params={"path": "/1962:700#K3P1"}).json()
+    assert d["root"] == bb and d["pinpoint"] == "3 kap. 1 §"
+
+    assert client.get("/api/v1/card").status_code == 422
+    assert client.get("/api/v1/card", params={
+        "uri": bb, "path": "/1962:700"}).status_code == 422
+    assert client.get("/api/v1/card", params={
+        "uri": "https://lagen.nu/x"}).status_code == 404

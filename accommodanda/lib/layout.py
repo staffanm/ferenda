@@ -824,20 +824,27 @@ def page_url(uri: str) -> str:
     return "/" + loc
 
 
+def page_uri(path: str) -> str:
+    """Inverse of page_url: the document uri a public lagen.nu URL path
+    addresses. /celex/<id> is the public form of ext/celex/<id>, and the
+    other ext/ namespaces likewise."""
+    loc = unquote(path).lstrip("/")
+    ns, sep, _rest = loc.partition("/")
+    if sep and ns in _EXT_NS:
+        loc = "ext/" + loc
+    return BASE + loc
+
+
 def url_to_relpath(path: str) -> str | None:
     """Inverse of page_url: the on-disk static file for a public lagen.nu URL path.
     The path is a document's URI local form, so reattach the host and reuse the
     page_relpath rule; /celex/<id> is the public address of ext/celex/<id>."""
-    loc = unquote(path).lstrip("/")
     # the path is an attacker-controlled request: refuse traversal-shaped
     # segments here (no rewrite -> the miss stays a 404) rather than relying
     # on the static server's containment check alone
-    if ".." in loc.split("/"):
+    if ".." in unquote(path).lstrip("/").split("/"):
         return None
-    ns, sep, _rest = loc.partition("/")
-    if sep and ns in _EXT_NS:      # /celex/<id> is the public form of ext/celex/<id>
-        loc = "ext/" + loc
-    return page_relpath(BASE + loc)
+    return page_relpath(page_uri(path))
 
 
 # a föreskrift loc is "<fs>/<år>:<nr>"; every författningssamling code ends in FS

@@ -467,14 +467,23 @@ returnerade dokumenten. Djup > 1 svarar 503 medan grafen laddas.
 
 `source_url` är dokumentets sida hos utgivaren -- för en källa som
 sajten inte renderar (tidskriftsartiklar) är det länken att öppna.
-`snippet` är dokumentets egen inledande text (ett rättsfalls
-sammanfattning) -- ett stycke för detaljpanelen; null tills relate stämplat
-dokumentet.
 
 En fragment-URI (`…#K4P7`, `…#A6`) svarar för den enheten ensam och lägger
 till `internal`: hela dokumentets interna paragrafgraf på enhetsnivå
 (§/artikel), med läsbara etiketter ("4 kap. 7 §"). `internal=true` lägger
 till samma graf även i svaret för en dokument-URI.
+
+### `GET /api/v1/card` — ett dokuments identitetskort
+
+Enradssvaret för det enda objekt läsaren valt eller hovrar: citerande namn
+(`citation`), `short_id`, `title`, sidans adress (`url`, samt `source_url`
+för källor sajten inte renderar), `inbound_count` och `snippet` --
+dokumentets egen inledande text (ett rättsfalls sammanfattning, en
+författnings 1 § med beteckning, en EU-rättsakts första skäl; null tills
+relate stämplat dokumentet). Tar `path=/1962:700#K3P1` som alternativ till
+`uri` -- det sajtens länk-popovers använder för hela-dokument-förhandsvisning
+i stället för att hämta målsidan. Grafsvaret bär avsiktligt inte dessa fält:
+av 300 grannar väljs en, och detta är anropet för den.
 
 ### `GET /api/v1/path` — kortaste kedjan av hänvisningar mellan två dokument
 

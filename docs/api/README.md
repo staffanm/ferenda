@@ -344,15 +344,25 @@ spokes. Depth > 1 answers 503 while the in-memory graph is still loading.
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
 `source_url`: the document's page at its own publisher -- for a source
 this site does not render (tidskriftsartiklar), the link to open.
-`snippet`: the document's own opening prose (a court decision's
-sammanfattning) -- one details-panel paragraph; null until relate has
-stamped the document. Under `sort=citations` the ranking is by citing
+Under `sort=citations` the ranking is by citing
 degree off the in-memory graph when it is loaded (the stamped
 `inbound_count` still rides each row); the joined fallback ranks by the
 stamped count.
 `internal`: the document citing itself, as a provision-to-provision graph at
 §/article level. `internal=true` asks for that same graph on a plain document
 uri too, for a zoomed-in structure view.
+
+**Document identity card — `GET /api/v1/card?uri=…`** — the one-row
+answer for the ONE item a reader selected or hovers: citing name
+(`citation`), `short_id`, `title`, the reader-facing `url` (and
+`source_url` for sources this site does not render), `inbound_count`, and
+`snippet` — the document's own opening words (a court decision's
+sammanfattning, a statute's 1 § with designation, an EU act's first
+recital; null until relate has stamped it). Takes `path=/1962:700#K3P1`
+as an alternative to `uri`, which is what the site's link popovers use for
+whole-document previews instead of fetching the target page. The graph
+payload deliberately does not carry these fields — of 300 neighbours one
+gets selected, and this is the call for that one.
 
 **Shortest citation chain — `GET /api/v1/path?from=…&to=…`** — the
 six-degrees walk: one shortest chain of citations connecting two documents,

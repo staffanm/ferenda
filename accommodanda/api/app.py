@@ -1153,10 +1153,6 @@ class GraphResponse(BaseModel):
         None, description="the document's page at its own publisher. For a "
         "source this site does not render (tidskriftsartiklar), this is the "
         "link to open -- the site has no page for it.")
-    snippet: str | None = Field(
-        None, description="the document's own opening prose (a court "
-        "decision's sammanfattning) -- one paragraph for a details panel. "
-        "Null until relate has stamped the document")
     inbound: GraphSide | None = Field(
         None, description="who cites this node; null when ?direction= excluded it")
     outbound: GraphSide | None = Field(
@@ -1246,6 +1242,65 @@ def _parse_groups(groups):
         raise HTTPException(422, "unknown flow group(s): %s"
                             % ", ".join(sorted(unknown)))
     return wanted
+
+
+class CardResponse(BaseModel):
+    """One document's (or provision's) identity card: names, address and the
+    document's own opening words -- what a popover or a details panel shows
+    for the ONE item a reader selected, without loading the artifact."""
+    uri: str
+    root: str = Field(description="the document uri, fragment stripped")
+    source: str
+    kind: str | None = None
+    group: str
+    label: str | None = None
+    short_id: str | None = None
+    title: str | None = None
+    descriptive: str | None = None
+    citation: str = Field(description="the whole citation a reader "
+                          "recognises (\"12 kap. 42 § jordabalken\")")
+    pinpoint: str | None = Field(
+        None, description="the provision part, for a fragment uri")
+    url: str = Field(description="the reader-facing page path on this site")
+    source_url: str | None = Field(
+        None, description="the publisher's own page; for a source this site "
+        "does not render (tidskriftsartiklar), the link to open")
+    snippet: str | None = Field(
+        None, description="the document's own opening words (a court "
+        "decision's sammanfattning, a statute's 1 §, an EU act's first "
+        "recital). Null until relate has stamped the document")
+    inbound_count: int | None = None
+
+
+@app.get("/api/v1/card", response_model=CardResponse, tags=["document"],
+         summary="One document's identity card")
+def card_endpoint(uri: str | None = Query(
+                      None, description="document or fragment uri"),
+                  path: str | None = Query(
+                      None, description="a public page path (/1962:700, "
+                      "/celex/32016R0679, with or without #fragment) as an "
+                      "alternative to uri"),
+                  con: sqlite3.Connection = Depends(get_con)):
+    """The one-row answer for the ONE item a reader selected or hovers: the
+    citing name, short id, page address and the document's own opening words.
+    The graph payload deliberately does not carry these -- of 300 neighbours
+    one gets selected, and this is the call for that one. The site's link
+    popovers use it for whole-document previews instead of fetching the
+    target page."""
+    if uri is not None and path is not None:
+        raise HTTPException(422, "give exactly one of uri and path")
+    if path is not None:
+        frag = ""
+        if "#" in path:
+            path, _, frag = path.partition("#")
+        uri = layout.page_uri(path) + (("#" + frag) if frag else "")
+    if uri is None:
+        raise HTTPException(422, "give exactly one of uri and path")
+    data = reads.card(con, uri)
+    if data is None:
+        raise HTTPException(404, "no document %r in the catalog"
+                            % uri.partition("#")[0])
+    return CardResponse(**data)
 
 
 class PathStep(BaseModel):

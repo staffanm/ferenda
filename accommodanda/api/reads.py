@@ -15,7 +15,7 @@ import collections
 
 from opensearchpy.exceptions import OpenSearchException
 
-from ..lib import catalog, facets, inbound, pathgraph, pins
+from ..lib import catalog, facets, inbound, layout, pathgraph, pins
 from ..lib.pinpoint import (
     citation_label,
     is_change_marker,
@@ -376,6 +376,44 @@ def _graph_internal(con, root, focus_unit):
             "truncated": len(dropped)}
 
 
+def card(con, uri):
+    """One document's (or provision's) identity card -- what a link popover
+    or a details panel shows without loading the artifact: the citing name,
+    the short id, the reader-facing address, the citedness, and the
+    document's own opening words (`snippet`, stamped at relate; COALESCEd
+    with `description` so a catalog stamped before the snippet column still
+    answers for every court decision). One indexed row lookup; the graph
+    payload deliberately does NOT carry this -- of 300 neighbours one gets
+    selected, and this is the call for that one. None for a uri the catalog
+    does not hold."""
+    root, _, frag = uri.partition("#")
+    row = con.execute(
+        "SELECT source, kind, label, title, descriptive, short_id, "
+        "       NULLIF(source_url, ''), "
+        "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')), "
+        "       inbound_count FROM documents WHERE uri = ?",
+        (root,)).fetchone()
+    if not row:
+        return None
+    (source, kind, label, title, descriptive,
+     short_id, source_url, snippet, cited) = row
+    unit = unit_anchor(frag) if frag else None
+    return {
+        "uri": uri, "root": root,
+        "source": source, "kind": kind,
+        "group": facets.flow_group(source, kind),
+        "label": label, "short_id": short_id, "title": title,
+        "descriptive": descriptive or None,
+        "citation": citation_label(short_name(descriptive) or label,
+                                   unit or ""),
+        "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
+        "url": layout.page_url(root) + (("#" + frag) if frag else ""),
+        "source_url": source_url,
+        "snippet": snippet,
+        "inbound_count": cited,
+    }
+
+
 def graph(con, uri, *, direction="both", groups=None, limit=20,
           internal=False, sort="links", grouplimit=None, depth=1, csr=None):
     """One node's neighborhood in the citation graph, ready to draw -- or None
@@ -400,9 +438,8 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         raw_links, _raw_docs = catalog.graph_out_totals(con, root)
     unresolved = raw_links - sum(r[1] for r in out_rows)
     extras = con.execute(
-        "SELECT NULLIF(source_url, ''), "
-        "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')) "
-        "FROM documents WHERE uri = ?", (root,)).fetchone()
+        "SELECT NULLIF(source_url, '') FROM documents WHERE uri = ?",
+        (root,)).fetchone()
     result = {
         "uri": uri, "root": root, "anchor": frag or None, "unit": unit,
         "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
@@ -419,11 +456,6 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         # is where a reader opens the document; the site's /lawreview/ path
         # serves nothing and must never be handed out as a link.
         "source_url": extras[0],
-        # the document's own opening words (or a case's sammanfattning) --
-        # what the explorer's details panel opens with. COALESCEd with
-        # `description` so a catalog stamped before the snippet column still
-        # answers for every court decision
-        "snippet": extras[1],
         "inbound": None, "outbound": None, "internal": None,
     }
     # under a deeper view the whole per-side limit is a budget across the

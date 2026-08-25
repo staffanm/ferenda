@@ -188,6 +188,35 @@
     title.href = t.path + (t.frag ? '#' + t.frag : '');
     title.textContent = a.textContent.trim();
     position(a);
+    // a whole-document preview asks the API for the document's card -- one
+    // small JSON with the citing name and the document's own opening words
+    // (relate's snippet) -- instead of fetching the entire target page,
+    // which for a statute is megabytes. A page without a catalog row (an
+    // om/ page) or a document relate has not stamped yet falls through to
+    // the page-fetch lede below, which is the pre-card behavior.
+    if (!t.frag) {
+      fetch('/api/v1/card?path=' + encodeURIComponent(t.path))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (c) {
+          if (!pop || anchorA !== a) return;
+          if (!c || !c.snippet) { pageLede(a, t, title); return; }
+          title.textContent = c.citation || c.title || title.textContent;
+          var body = pop.querySelector('.pop-body');
+          body.innerHTML = '';
+          var p = document.createElement('p');
+          p.textContent = c.snippet;
+          body.appendChild(p);
+          position(a);
+        }, function () {
+          if (!pop || anchorA !== a) return;
+          pageLede(a, t, title);
+        });
+      return;
+    }
+    pageLede(a, t, title);
+  }
+
+  function pageLede(a, t, title) {
     // two-arg then, not .catch: the error handler covers the fetch only. A
     // bug in the assembly below must surface as an uncaught rejection, not
     // masquerade as a network problem (rule:narrow-what-you-catch).
