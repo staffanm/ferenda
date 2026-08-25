@@ -28,6 +28,7 @@ import os
 import re
 import sqlite3
 import threading
+from contextlib import asynccontextmanager
 from html import escape
 from pathlib import Path
 from typing import Literal
@@ -62,6 +63,7 @@ from ..lib import (
     history,
     layout,
     mdtext,
+    pathgraph,
     search,
 )
 from . import (
@@ -121,6 +123,18 @@ TAGS = [
                     "directions, its versions, and its pages as images or PDF."},
 ]
 
+@asynccontextmanager
+async def _lifespan(application):
+    # start loading the path graph before anyone asks for it -- the load runs
+    # in its own thread (api/paths), never under a request, and /path answers
+    # 503 until it lands. Skipped when no catalog is built (dev serve on an
+    # empty tree).
+    if db.catalog_ready():
+        paths.graph_if_ready(db.CATALOG)
+    async with mcp_server.lifespan(application):
+        yield
+
+
 class UTF8JSONResponse(JSONResponse):
     """JSONResponse declaring its charset. The body is UTF-8 with non-ASCII
     literals (`ensure_ascii=False`), but bare `application/json` makes a
@@ -136,9 +150,10 @@ app = FastAPI(
     description=DESCRIPTION,
     openapi_tags=TAGS,
     default_response_class=UTF8JSONResponse,
-    # runs the MCP server's Streamable HTTP session manager (a no-op for the
-    # in-process TestClient path, which never calls /mcp) -- see api/mcp.py
-    lifespan=mcp_server.lifespan,
+    # warms the path graph, then runs the MCP server's Streamable HTTP
+    # session manager (a no-op for the in-process TestClient path, which
+    # never calls /mcp) -- see api/mcp.py
+    lifespan=_lifespan,
 )
 
 # the generated static site (served on another port) reaches the API from the
@@ -1199,8 +1214,9 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
 
     The whole citation graph (2.6M document pairs) is held in memory as
     integer adjacency arrays, so the answer is one breadth-first search --
-    tens of milliseconds; the first request after a catalog rebuild pays a
-    few seconds to reload it."""
+    tens of milliseconds. The graph loads in the background (relate's
+    sidecar, or one sequential catalog scan); until it is ready the endpoint
+    answers 503 rather than making the request wait."""
     wanted = None
     if groups:
         wanted = {g.strip() for g in groups.split(",") if g.strip()}
@@ -1214,8 +1230,13 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
         if not catalog.document(con, root):
             raise HTTPException(404, "no document %r in the catalog" % root)
         ends.append(root)
-    chain = paths.shortest(paths.graph_for(db.CATALOG), ends[0], ends[1],
-                           direction=direction, groups=wanted)
+    g = paths.graph_if_ready(db.CATALOG)
+    if g is None:
+        raise HTTPException(
+            503, "the citation graph is still loading -- try again shortly",
+            headers={"Retry-After": "30"})
+    chain = pathgraph.shortest(g, ends[0], ends[1],
+                               direction=direction, groups=wanted)
     steps = []
     if chain:
         labels = catalog.graph_labels(con, chain)

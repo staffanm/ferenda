@@ -135,6 +135,7 @@ from .lib import (
     llm,
     markdown,
     patch,
+    pathgraph,
     render,
     runlog,
     search,
@@ -4199,6 +4200,11 @@ def cmd_relate(names, force=None):
         # distinct target artifact, so calling it again only to count them cost
         # the whole walk twice inside the nightly build
         dangling = catalog.dangling_anchors(con, ANCHOR_EXACT)
+        # materialize each document's inbound count: the serving layer reads a
+        # column instead of counting an index range per request (the ECHR's is
+        # 1.4M entries -- tens of seconds cold on prod's disk)
+        stamped = catalog.stamp_inbound_counts(con)
+        con.commit()
         con.close()
         _emit_segment("relate", "__corr__", time.perf_counter() - t0, status="ok")
         record_fingerprint(store, "relate", "__corr__", corr_wm)
@@ -4214,6 +4220,7 @@ def cmd_relate(names, force=None):
               % folded)
         print("relate: %d concept stubs minted from defined terms + nyckelord"
               % concepts)
+        print("relate: inbound counts stamped on %d cited documents" % stamped)
         for bf, host, anchors in anchor_warnings:
             print("relate: WARNING kommentar %s annotates %s but has no matching "
                   "node for %s -- check the heading numbering"
@@ -4233,6 +4240,15 @@ def cmd_relate(names, force=None):
     # no artifact-backed source was requested and nothing was written.)
     if full_rebuild and target.exists():
         _swap_catalog(target, CATALOG)
+    if dirty and CATALOG.exists():
+        # the /api/v1/path graph as a sidecar beside the catalog (rsync'd with
+        # it): the serving process then loads arrays in under a second instead
+        # of scanning 15.6M link rows -- which on prod's ~80-IOPS disk is the
+        # difference between a warm start and hours (lib/pathgraph)
+        t0 = time.perf_counter()
+        n, m = pathgraph.write_sidecar(CATALOG)
+        print("relate: path graph sidecar written -- %d documents, %d edges "
+              "(%.1fs)" % (n, m, time.perf_counter() - t0))
     if dirty:
         save_fingerprints(store)
     print("catalog: %s" % CATALOG)

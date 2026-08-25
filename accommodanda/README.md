@@ -461,10 +461,16 @@ documents into one exact WeasyPrint layout, with localStorage drafts,
 bookmark-fragment recipes, per-document section/start choices, an optional
 cover and a document-only printed TOC). `api/paths.py` answers
 `GET /api/v1/path` — the shortest citation chain between two documents —
-off the whole document-level graph (~2.6M distinct citing→cited pairs) held
-in memory as CSR integer arrays, built lazily from the catalog on the first
-request and rebuilt when the catalog file changes, so an arbitrary-pair
-query is one in-process breadth-first search
+off the whole document-level graph (~2.6M distinct citing→cited pairs, 271k
+documents) held in memory as CSR integer arrays (`lib/pathgraph.py`): relate
+writes the arrays as a sidecar beside the catalog (`graph-edges.bin`, ~31 MB,
+loaded in ~0.04 s), any (re)load runs in a background thread keyed on the
+catalog file's identity, and the endpoint answers 503 until the graph is
+ready — a request never waits on a build. The sidecar-less fallback is ONE
+sequential scan of `links` filtered in Python, never per-document index
+probes: the probe-shaped query measured 2 s on dev NVMe and *hours* on
+prod's ~80-IOPS disk (2026-08-26), where it held the module lock, 504:ed
+every /path request at nginx's 60 s and pinned the disk at 100 %
 that also serves the static site under `lagen serve`. Its API surface is
 `/api/v1` and nothing else — search, facets, browse, documents, one document (+versions/diff/
 inbound/outbound), sources, graph, facsimile, `sfs-graphic`, `dv-verdict`,

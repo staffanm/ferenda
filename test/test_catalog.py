@@ -42,14 +42,16 @@ def _link(con, from_uri="https://lagen.nu/a", anchor="P1"):
 
 
 def test_inbound_count_is_answered_from_the_index_alone(tmp_path):
-    """`document_inbound_count` groups by (to_root, from_uri, from_anchor).
-    Reading the latter two out of the links *table* means one random row lookup
-    per link -- 228 297 of them for Rättegångsbalken, landing on ~48 500
-    scattered pages. The index has to carry all three."""
+    """The live count -- `document_inbound_count`'s fallback on a catalog no
+    relate has stamped, and the whole of `inbound_counts_for` -- groups by
+    (to_root, from_uri, from_anchor). Reading the latter two out of the links
+    *table* means one random row lookup per link -- 228 297 of them for
+    Rättegångsbalken, landing on ~48 500 scattered pages. The index has to
+    carry all three."""
     con = catalog.connect(tmp_path / "catalog.sqlite")
     _link(con)
     plan = _plan_of_last_query(
-        con, lambda: catalog.document_inbound_count(con, "https://lagen.nu/b"))
+        con, lambda: catalog.inbound_counts_for(con, ["https://lagen.nu/b"]))
     assert "COVERING INDEX idx_links_to_root" in plan, plan
     con.close()
 
@@ -69,7 +71,7 @@ def test_a_narrow_to_root_index_is_widened(tmp_path):
     con = catalog.connect(path)
     assert catalog.widen_to_root_index(con) is True
     plan = _plan_of_last_query(
-        con, lambda: catalog.document_inbound_count(con, "https://lagen.nu/b"))
+        con, lambda: catalog.inbound_counts_for(con, ["https://lagen.nu/b"]))
     assert "COVERING INDEX idx_links_to_root" in plan, plan
     assert catalog.document_inbound_count(con, "https://lagen.nu/b") == 1
     # idempotent: a second relate must not pay the rebuild again

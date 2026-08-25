@@ -64,7 +64,10 @@ CREATE TABLE IF NOT EXISTS documents (
     content_hash TEXT,             -- sha256 of the artifact bytes (incremental relate)
     expired      TEXT,             -- repeal-effective date (SFS upphavandedatum), if any
     date         TEXT,             -- the document's own date (förarbete/statute/decision), ISO
-    publisher    TEXT              -- issuing organization, for feed filtering
+    publisher    TEXT,             -- issuing organization, for feed filtering
+    inbound_count INTEGER          -- document_inbound_count materialized at
+                                   -- relate (stamp_inbound_counts); NULL on a
+                                   -- catalog no relate has stamped yet
 );
 CREATE TABLE IF NOT EXISTS links (
     from_uri    TEXT NOT NULL,   -- document making the citation (doc-level uri)
@@ -283,6 +286,8 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE documents ADD COLUMN date TEXT")
     if "publisher" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN publisher TEXT")
+    if "inbound_count" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN inbound_count INTEGER")
     corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
     if "ikrafttrader" not in corr_cols:
         con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
@@ -2148,8 +2153,29 @@ def document_inbound_count(con: sqlite3.Connection, root_uri: str) -> int:
     """How many (citing document, pinpoint) entries cite a document *as a whole*
     -- any of its fragments or its bare uri. The 'most-hänvisade' authority
     signal (search ranking, the API's headline count), broader than
-    `inbound_count`, which counts one exact uri. Self-citations excluded."""
+    `inbound_count`, which counts one exact uri. Self-citations excluded.
+
+    Answered from the `inbound_count` column relate stamps: the live count
+    walks the to_root index range, and the ECHR's is 1.4M entries -- tens of
+    seconds cold on prod's disk, per pinned search hit. A catalog no relate
+    has stamped yet (NULL) still counts live, until its next relate."""
+    row = con.execute("SELECT inbound_count FROM documents WHERE uri = ?",
+                      (root_uri,)).fetchone()
+    if row and row[0] is not None:
+        return row[0]
     return inbound_counts_for(con, [root_uri]).get(root_uri, 0)
+
+
+def stamp_inbound_counts(con: sqlite3.Connection) -> int:
+    """Materialize `document_inbound_count` for every document -- run at the
+    end of every relate that changed anything (an incremental relate moves
+    other documents' counts too: the re-related document's own citations).
+    One whole-corpus pass (~9 s) instead of a per-request index-range count."""
+    counts = document_inbound_counts(con)
+    con.execute("UPDATE documents SET inbound_count = 0")
+    con.executemany("UPDATE documents SET inbound_count = ? WHERE uri = ?",
+                    [(n, uri) for uri, n in counts.items()])
+    return len(counts)
 
 
 def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:

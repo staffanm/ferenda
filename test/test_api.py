@@ -4,6 +4,7 @@ no network."""
 
 import json
 import sqlite3
+import time
 
 import pytest
 from fastapi.staticfiles import StaticFiles
@@ -876,12 +877,23 @@ def test_json_answers_declare_their_charset(client):
         assert r.headers["content-type"] == "application/json; charset=utf-8"
 
 
+def _path(client, params):
+    """GET /api/v1/path, riding out the 503s while the graph loads in its
+    background thread -- a request never waits on the build (the lock-and-
+    build-under-request shape 504:ed for hours on prod's disk)."""
+    for _ in range(300):
+        r = client.get("/api/v1/path", params=params)
+        if r.status_code != 503:
+            return r
+        time.sleep(0.02)
+    raise AssertionError("the path graph never became ready")
+
+
 def test_path_walks_the_shortest_chain(client):
     """/api/v1/path: fl cites bb, so the out-chain fl->bb is one step, the
     in-chain bb->fl mirrors it, and out from bb reaches nothing."""
     bb, fl = "https://lagen.nu/1962:700", "https://lagen.nu/2018:585"
-    r = client.get("/api/v1/path", params={"from": fl, "to": bb,
-                                           "direction": "out"})
+    r = _path(client, {"from": fl, "to": bb, "direction": "out"})
     assert r.status_code == 200
     d = r.json()
     assert d["from"] == fl and d["to"] == bb and d["distance"] == 1
@@ -923,8 +935,7 @@ def test_path_group_filter_gates_the_intermediates(client):
                 "VALUES (?, 'dcterms:references', ?, ?)", (dom, fl, fl))
     con.commit(); con.close()
     q = {"from": dom, "to": bb, "direction": "out"}
-    d = client.get("/api/v1/path", params=q).json()
+    d = _path(client, q).json()
     assert [s["uri"] for s in d["path"]] == [dom, fl, bb]
-    d = client.get("/api/v1/path", params={
-        **q, "groups": "Rättsfall,Förarbeten"}).json()
+    d = _path(client, {**q, "groups": "Rättsfall,Förarbeten"}).json()
     assert d["distance"] is None
