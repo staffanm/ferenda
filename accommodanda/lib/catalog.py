@@ -2425,14 +2425,28 @@ def graph_inbound_counts(con, uri):
 
 
 def graph_labels(con, uris):
-    """{uri: (label, title, source, kind, descriptive)} for a handful of
-    documents -- what the counts-only queries leave for the caller to fetch,
-    once the reply knows which rows it carries. A uri absent from `documents`
-    is absent from the result; both inbound queries join, so none is. An empty
-    `uris` asks `IN ()`, which SQLite accepts and nothing matches."""
+    """{uri: (label, title, source, kind, descriptive, inbound_count)} for a
+    handful of documents -- what the counts-only queries leave for the caller
+    to fetch, once the reply knows which rows it carries. A uri absent from
+    `documents` is absent from the result. An empty `uris` asks `IN ()`,
+    which SQLite accepts and nothing matches."""
     return {row[0]: row[1:] for row in con.execute(
-        "SELECT uri, label, title, source, kind, descriptive FROM documents "
-        "WHERE uri IN (%s)" % ",".join("?" * len(uris)), tuple(uris))}
+        "SELECT uri, label, title, source, kind, descriptive, inbound_count "
+        "FROM documents WHERE uri IN (%s)" % ",".join("?" * len(uris)),
+        tuple(uris))}
+
+
+def graph_induced_edges(con, uris):
+    """Every document-level citation among `uris`: (from_uri, to_root, n).
+    The deep neighbourhood view draws these instead of only spoke edges, so
+    citers citing each other show as structure. Bounded by the caller (a few
+    hundred uris -- two IN lists must stay under SQLite's variable cap)."""
+    assert len(uris) <= 5000, "induced-edge query asked for %d uris" % len(uris)
+    marks = ",".join("?" * len(uris))
+    return con.execute(
+        "SELECT from_uri, to_root, count(*) FROM links "
+        "WHERE from_uri IN (%s) AND to_root IN (%s) AND from_uri != to_root "
+        "GROUP BY 1, 2" % (marks, marks), (*uris, *uris)).fetchall()
 
 
 def graph_out_totals(con, uri):

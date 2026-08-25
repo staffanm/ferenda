@@ -15,7 +15,7 @@ import collections
 
 from opensearchpy.exceptions import OpenSearchException
 
-from ..lib import catalog, facets, inbound, pins
+from ..lib import catalog, facets, inbound, pathgraph, pins
 from ..lib.pinpoint import (
     citation_label,
     is_change_marker,
@@ -238,11 +238,11 @@ def _graph_side_unfiltered(con, counts, limit):
     labels = catalog.graph_labels(con, [uri for uri, _n in counts[:limit]])
     top = []
     for uri, n in counts[:limit]:
-        label, title, source, kind, descriptive = labels[uri]
+        label, title, source, kind, descriptive, cited = labels[uri]
         top.append({"uri": uri, "label": label, "title": title,
                     "descriptive": descriptive, "source": source,
                     "kind": kind, "group": facets.flow_group(source, kind),
-                    "links": n, "inbound_count": None})
+                    "links": n, "inbound_count": cited})
     return {"total_links": sum(n for _uri, n in counts),
             "total_docs": len(counts), "top": top}
 
@@ -265,6 +265,58 @@ def _graph_inbound_side(con, root, unit, groups, limit, sort, grouplimit):
     return _graph_side_unfiltered(
         con, catalog.graph_anchor_inbound_counts(con, root, unit)
         if unit else catalog.graph_inbound_counts(con, root), limit)
+
+
+# how the per-side `limit` is split across the rings of a deep
+# neighbourhood: zooming out trades hop-1 breadth for hop-2/3 reach
+RING_SHARE = {1: (1.0,), 2: (0.6, 0.4), 3: (0.5, 0.3, 0.2)}
+
+
+def _graph_expansion(con, csr, root, result, *, direction, depth, limit,
+                     groups, grouplimit, sort):
+    """The rings beyond hop 1, expanded server-side off the in-memory CSR
+    (lib/pathgraph), plus EVERY document-level citation among the returned
+    documents -- so the client draws one payload instead of recursively
+    asking each frontier node for its own neighbourhood (7 nodes a side and
+    a handful of citers each was all the old client-side walk showed).
+    Rings rank by each candidate's own citedness (sort=citations) or by how
+    many frontier documents it connects to (sort=links); `groups` and
+    `grouplimit` gate the rings the same way they gate hop 1."""
+    allowed = None if groups is None \
+        else {pathgraph.GROUP_ID[name] for name in groups}
+    included = {root}
+    for side in ("inbound", "outbound"):
+        if result[side]:
+            included |= {r["uri"] for r in result[side]["top"]}
+    nodes = []
+    shares = RING_SHARE[depth]
+    for side_name, reverse in (("in", True), ("out", False)):
+        key = "inbound" if side_name == "in" else "outbound"
+        if not result[key]:
+            continue
+        frontier = [r["uri"] for r in result[key]["top"]]
+        for hop in range(2, depth + 1):
+            budget = max(1, int(limit * shares[hop - 1]))
+            ring = pathgraph.expand(
+                csr, frontier, included, reverse=reverse, budget=budget,
+                allowed=allowed, grouplimit=grouplimit,
+                prefer_ties=(sort == "links"))
+            frontier = [uri for uri, _t, _d in ring]
+            included |= set(frontier)
+            nodes.extend((uri, hop, side_name) for uri, _t, _d in ring)
+    labels = catalog.graph_labels(con, [uri for uri, _h, _s in nodes])
+    shaped = []
+    for uri, hop, side_name in nodes:
+        label, title, source, kind, descriptive, cited = labels[uri]
+        shaped.append({"uri": uri, "label": label, "title": title,
+                       "descriptive": descriptive, "source": source,
+                       "kind": kind,
+                       "group": facets.flow_group(source, kind),
+                       "inbound_count": cited, "hop": hop,
+                       "side": side_name})
+    edges = [list(row)
+             for row in catalog.graph_induced_edges(con, sorted(included))]
+    return {"nodes": shaped, "edges": edges}
 
 
 def _graph_internal(con, root, focus_unit):
@@ -295,7 +347,7 @@ def _graph_internal(con, root, focus_unit):
 
 
 def graph(con, uri, *, direction="both", groups=None, limit=20,
-          internal=False, sort="links", grouplimit=None):
+          internal=False, sort="links", grouplimit=None, depth=1, csr=None):
     """One node's neighborhood in the citation graph, ready to draw -- or None
     when the catalog has no such document. `uri` may name a document or a
     provision (`...#K4P7`): a provision answers with the citers/targets of
@@ -337,13 +389,23 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
             (root,)).fetchone()[0],
         "inbound": None, "outbound": None, "internal": None,
     }
+    # under a deeper view the whole per-side limit is a budget across the
+    # rings: hop 1 gives up breadth so hops 2-3 have room (RING_SHARE)
+    hop1 = max(1, int(limit * RING_SHARE[depth][0]))
     if direction in ("in", "both"):
         result["inbound"] = _graph_inbound_side(con, root, unit, groups,
-                                                limit, sort, grouplimit)
+                                                hop1, sort, grouplimit)
     if direction in ("out", "both"):
-        result["outbound"] = _graph_side(out_rows, groups, limit,
+        result["outbound"] = _graph_side(out_rows, groups, hop1,
                                          sort=sort, grouplimit=grouplimit)
         result["outbound"]["unresolved"] = unresolved
+    result["depth"] = depth
+    result["expansion"] = None
+    if depth > 1:
+        assert csr is not None, "depth > 1 needs the pathgraph CSR"
+        result["expansion"] = _graph_expansion(
+            con, csr, root, result, direction=direction, depth=depth,
+            limit=limit, groups=groups, grouplimit=grouplimit, sort=sort)
     if frag or internal:
         result["internal"] = _graph_internal(con, root, unit)
     return result

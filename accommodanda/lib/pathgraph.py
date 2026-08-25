@@ -22,7 +22,7 @@ from pathlib import Path
 from . import facets
 
 # every flow group gets a small integer; BFS filters on these
-_GROUP_ID = {name: i for i, name in enumerate(facets.FLOW_GROUP_NAMES)}
+GROUP_ID = {name: i for i, name in enumerate(facets.FLOW_GROUP_NAMES)}
 
 SIDECAR = "graph-edges.bin"
 _MAGIC = b"lagen-pathgraph-1\n"
@@ -84,7 +84,7 @@ def build(con):
             "SELECT uri, source, kind FROM documents"):
         i = ids.get(uri)
         if i is not None:
-            group[i] = _GROUP_ID[facets.flow_group(source, kind)]
+            group[i] = GROUP_ID[facets.flow_group(source, kind)]
     return Graph(uris, ids, _csr(len(ids), pairs),
                  _csr(len(ids), [(b, a) for a, b in pairs]), group)
 
@@ -161,6 +161,51 @@ def load(catalog_path):
         con.close()
 
 
+def degree_in(g, i):
+    """How many documents cite node `i` -- the CSR's own authority signal,
+    read without touching the catalog."""
+    return g.rev_off[i + 1] - g.rev_off[i]
+
+
+def expand(g, frontier_uris, exclude, *, reverse, budget, allowed=None,
+           grouplimit=None, prefer_ties=False):
+    """One more ring of a neighbourhood: the documents adjacent to
+    `frontier_uris` (their citation targets, or their citers when `reverse`),
+    ranked and cut to `budget`. `exclude` is everything already on the stage.
+    `allowed` filters on flow-group ids, `grouplimit` caps one group's share
+    of the ring, and the ranking is the caller's sort: each node's own
+    citedness (`degree_in`), or with `prefer_ties` how many frontier
+    documents it connects to. Returns [(uri, ties, degree), ...]."""
+    off, dst = (g.rev_off, g.rev_dst) if reverse else (g.fwd_off, g.fwd_dst)
+    ties = {}
+    for uri in frontier_uris:
+        u = g.ids.get(uri)
+        if u is None:
+            continue
+        for i in range(off[u], off[u + 1]):
+            v = dst[i]
+            if g.uris[v] in exclude:
+                continue
+            if allowed is not None and g.group[v] not in allowed:
+                continue
+            ties[v] = ties.get(v, 0) + 1
+    ranked = sorted(
+        ties.items(),
+        key=(lambda kv: (-kv[1], -degree_in(g, kv[0]))) if prefer_ties
+        else (lambda kv: (-degree_in(g, kv[0]), -kv[1])))
+    ring = []
+    per_group = {}
+    for v, t in ranked:
+        gid = g.group[v]
+        if grouplimit is not None and per_group.get(gid, 0) >= grouplimit:
+            continue
+        per_group[gid] = per_group.get(gid, 0) + 1
+        ring.append((g.uris[v], t, degree_in(g, v)))
+        if len(ring) == budget:
+            break
+    return ring
+
+
 # --------------------------------------------------------------------------
 # the walk
 # --------------------------------------------------------------------------
@@ -177,7 +222,7 @@ def shortest(g, from_uri, to_uri, *, direction="both", groups=None):
     if s == t:
         return [from_uri]
     allowed = None if groups is None \
-        else {_GROUP_ID[name] for name in groups}
+        else {GROUP_ID[name] for name in groups}
     sides = []
     if direction in ("out", "both"):
         sides.append((g.fwd_off, g.fwd_dst))

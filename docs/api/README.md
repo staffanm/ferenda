@@ -333,7 +333,13 @@ ranks `top` by each neighbour's own citedness (`inbound_count`, carried on the
 row) instead of its ties to the center, and `grouplimit` caps how many
 neighbours one flow group may take — diversity over one dominating source
 type. The `total_links` / `total_docs` / `unresolved` counts describe the
-whole side, not the page.
+whole side, not the page. `depth` (1–3, default 1) answers with a deeper
+neighbourhood in one call: the per-side `limit` becomes a whole-view budget
+split across the rings (60/40 at depth 2, 50/30/20 at 3), the outer rings
+arrive in `expansion.nodes` (each with its `hop`, `side` and
+`inbound_count`), and `expansion.edges` lists every document-level citation
+among the returned documents — so the picture shows structure, not just
+spokes. Depth > 1 answers 503 while the in-memory graph is still loading.
 
 Pass a **fragment** uri (`…#K4P7`) to ask for one provision, and the answer adds
 `source_url`: the document's page at its own publisher -- for a source

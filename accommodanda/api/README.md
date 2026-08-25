@@ -459,7 +459,11 @@ paraGRAF-utforskaren (https://para-graf.tomtebo.org) ritar.
 `limit` sätter topplistans längd. `sort=citations` rangordnar grannarna
 efter hur citerade de själva är (radens `inbound_count`) i stället för
 antalet länkar till mittpunkten, och `grouplimit` sätter ett tak per
-flödesgrupp — bredd i stället för en dominerande källtyp.
+flödesgrupp — bredd i stället för en dominerande källtyp. `depth` (1–3)
+svarar med en djupare omgivning i ett enda anrop: `limit` blir en budget
+över hela vyn (60/40 på djup 2, 50/30/20 på 3), de yttre ringarna kommer i
+`expansion.nodes` och `expansion.edges` listar varje hänvisning mellan de
+returnerade dokumenten. Djup > 1 svarar 503 medan grafen laddas.
 
 `source_url` är dokumentets sida hos utgivaren -- för en källa som
 sajten inte renderar (tidskriftsartiklar) är det länken att öppna.

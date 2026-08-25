@@ -14,7 +14,7 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from accommodanda import config
 from accommodanda.api import app as api
 from accommodanda.api import db, reads
-from accommodanda.lib import catalog, compress, facets, inbound
+from accommodanda.lib import catalog, compress, facets, inbound, pathgraph
 
 
 @pytest.fixture
@@ -989,4 +989,50 @@ def test_graph_sort_citations_and_grouplimit(tmp_path):
         == ["Rättsfall", "Förarbeten"]
     # grouplimit narrows `top`, never the totals
     assert capped["inbound"]["total_docs"] == 3
+    con.close()
+
+
+def test_graph_depth_expands_rings_in_one_answer(tmp_path):
+    """depth=2 answers with the outer ring and the whole neighbourhood's
+    induced edge list in ONE call -- the old client-side walk asked each
+    frontier node separately and starved the view. The per-side limit is a
+    whole-view budget: hop 1 gives up rows so the rings have room."""
+    con = catalog.connect(tmp_path / "catalog.sqlite")
+    C, A, Z = ("https://lagen.nu/c", "https://lagen.nu/dom/a",
+               "https://lagen.nu/sou/z")
+    D, E = "https://lagen.nu/d", "https://lagen.nu/dom/e"
+    rows = [(C, "sfs", "law"), (A, "dv", "verdict"), (Z, "forarbete", "sou"),
+            (D, "sfs", "law"), (E, "dv", "verdict")]
+    for uri, source, kind in rows:
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, ?, ?, 'L', 'T', '')",
+                    (uri, source, kind))
+    for f, to in [(A, C), (Z, A), (C, D), (D, E)]:
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, 'dcterms:references', ?, ?)", (f, to, to))
+    catalog.stamp_inbound_counts(con)
+    csr = pathgraph.build(con)
+
+    d = reads.graph(con, C, depth=2, limit=10, csr=csr)
+    assert d["depth"] == 2
+    assert [r["uri"] for r in d["inbound"]["top"]] == [A]
+    assert [r["uri"] for r in d["outbound"]["top"]] == [D]
+    exp = d["expansion"]
+    assert {(n["uri"], n["hop"], n["side"]) for n in exp["nodes"]} \
+        == {(Z, 2, "in"), (E, 2, "out")}
+    # the induced edges cover the whole view: spokes AND the outer hops
+    assert sorted(map(tuple, exp["edges"])) == sorted(
+        [(A, C, 1), (Z, A, 1), (C, D, 1), (D, E, 1)])
+    # the ring node carries its stamped citedness
+    assert {n["uri"]: n["inbound_count"] for n in exp["nodes"]}[E] == 1
+
+    # the group filter gates the rings like it gates hop 1: with only
+    # rättsfall + författningar allowed, Z (a sou) falls out of the ring
+    d = reads.graph(con, C, depth=2, limit=10, csr=csr,
+                    groups={"Rättsfall", "Författningar"})
+    assert {n["uri"] for n in d["expansion"]["nodes"]} == {E}
+
+    # depth=1 keeps the old shape: no expansion, full hop-1 budget
+    d = reads.graph(con, C, depth=1, limit=10)
+    assert d["expansion"] is None and d["depth"] == 1
     con.close()

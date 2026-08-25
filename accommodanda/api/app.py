@@ -1070,6 +1070,33 @@ class GraphNeighbor(BaseModel):
         "default-shape inbound side, which skips the per-neighbour join")
 
 
+class GraphRingNode(BaseModel):
+    """One document on an outer ring (hop 2 or 3) of a deep neighbourhood."""
+    uri: str
+    label: str | None = None
+    title: str | None = None
+    descriptive: str | None = None
+    source: str
+    kind: str | None = None
+    group: str
+    inbound_count: int | None = Field(
+        None, description="how many documents cite it -- what the ring is "
+                          "ranked by under sort=citations")
+    hop: int = Field(description="2 or 3: how many steps from the center")
+    side: str = Field(description="'in': it reaches the center by citing; "
+                                  "'out': the center's citations reach it")
+
+
+class GraphExpansion(BaseModel):
+    """The rings beyond hop 1 (depth >= 2), plus EVERY document-level
+    citation among the returned documents -- center and hop 1 included -- so
+    citers citing each other draw as structure, not just spokes."""
+    nodes: list[GraphRingNode]
+    edges: list[tuple[str, str, int]] = Field(
+        description="[citing uri, cited uri, citations] over the whole "
+                    "returned neighbourhood")
+
+
 class GraphSide(BaseModel):
     """One direction of the neighbourhood. `top` is the `limit` biggest
     neighbours; the totals describe the whole side."""
@@ -1134,6 +1161,10 @@ class GraphResponse(BaseModel):
         None, description="the document's own provision-to-provision graph. "
         "Present for a fragment uri, and for a document uri with "
         "?internal=true.")
+    depth: int = Field(1, description="how many rings this answer holds")
+    expansion: GraphExpansion | None = Field(
+        None, description="the outer rings and the whole neighbourhood's "
+        "edge list; only when ?depth > 1")
 
 
 @app.get("/api/v1/graph", response_model=GraphResponse, tags=["document"],
@@ -1156,6 +1187,13 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
                        None, ge=1, le=300,
                        description="max neighbours per flow group in `top` "
                        "-- diversity over one dominating source type"),
+                   depth: int = Query(
+                       1, ge=1, le=3,
+                       description="rings to answer with in ONE call. limit "
+                       "becomes a whole-view budget split across the rings "
+                       "(60/40 at 2, 50/30/20 at 3); the outer rings and "
+                       "the induced edge list arrive in `expansion`. 503 "
+                       "while the in-memory graph is still loading"),
                    internal: bool = Query(
                        False, description="include the document's internal "
                        "unit graph for a document uri too (a fragment uri "
@@ -1178,9 +1216,16 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
         if unknown:
             raise HTTPException(422, "unknown flow group(s): %s"
                                 % ", ".join(sorted(unknown)))
+    csr = None
+    if depth > 1:
+        csr = paths.graph_if_ready(db.CATALOG)
+        if csr is None:
+            raise HTTPException(
+                503, "the citation graph is still loading -- try again "
+                     "shortly", headers={"Retry-After": "30"})
     data = reads.graph(con, uri, direction=direction, groups=wanted,
                        limit=limit, internal=internal, sort=sort,
-                       grouplimit=grouplimit)
+                       grouplimit=grouplimit, depth=depth, csr=csr)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog" % uri)
     return GraphResponse(**data)
@@ -1264,7 +1309,7 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
     if chain:
         labels = catalog.graph_labels(con, chain)
         for i, uri in enumerate(chain):
-            label, title, source, kind, descriptive = labels[uri]
+            label, title, source, kind, descriptive, _cited = labels[uri]
             n = forward = None
             if i + 1 < len(chain):
                 n, forward = _hop_count(con, uri, chain[i + 1], direction)
