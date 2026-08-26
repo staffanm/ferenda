@@ -1,0 +1,9 @@
+I såväl 1 kap. 5 § och 5 kap. 2 § ÄPBL som Europakonventionen finns krav på rimliga intresseavvägningar.
+
+<list>
+  <str>I såväl </str>
+  <Link uri="https://lagen.nu/1987:10#K1P5">1 kap. 5 §</Link>
+  <str> och </str>
+  <Link uri="https://lagen.nu/1987:10#K5P2">5 kap. 2 §</Link>
+  <str> ÄPBL som Europakonventionen finns krav på rimliga intresseavvägningar.</str>
+</list>

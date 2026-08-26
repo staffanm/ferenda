@@ -994,12 +994,13 @@ def save_fingerprints(store):
 # --------------------------------------------------------------------------
 
 PKG = Path(__file__).parent
-# The data snapshots the citation scan reads: emdref's ECHR case registry and
-# the JO ämbetsberättelse page table. A refreshed snapshot changes parse
-# output exactly like a grammar edit, so it rides every recipe that carries
-# lagrum.py/emdref.py -- the same policy treaty_names.json gets on the
-# treaty-linking recipes.
-CITATION_DATA = (PKG / "hudoc" / "data" / "casenames.json",
+# The data snapshots the citation scan reads: the named-law/abbreviation table
+# every LagrumParser is built from, emdref's ECHR case registry and the JO
+# ämbetsberättelse page table. A refreshed snapshot changes parse output exactly
+# like a grammar edit, so it rides every recipe that carries lagrum.py/emdref.py
+# -- the same policy treaty_names.json gets on the treaty-linking recipes.
+CITATION_DATA = (NAMEDLAWS_JSON,
+                 PKG / "hudoc" / "data" / "casenames.json",
                  PKG / "hudoc" / "data" / "respondents_sv.json",
                  PKG / "avg" / "data" / "arsberattelse.json")
 # The case-number matcher and its snapshot, on the recipes of the sources that

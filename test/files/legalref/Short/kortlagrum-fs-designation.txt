@@ -1,0 +1,11 @@
+Av 4 kap. 1-3 §§ HSLF-FS 2016:40 framgår att vårdgivaren ska ansvara för att varje användare tilldelas behörighet.
+
+<list>
+  <str>Av </str>
+  <Link uri="https://lagen.nu/9999:999#K4">4 kap.</Link>
+  <str> </str>
+  <Link uri="https://lagen.nu/9999:999#K4P1">1</Link>
+  <str>-</str>
+  <Link uri="https://lagen.nu/9999:999#K4P3">3 §§</Link>
+  <str> HSLF-FS 2016:40 framgår att vårdgivaren ska ansvara för att varje användare tilldelas behörighet.</str>
+</list>

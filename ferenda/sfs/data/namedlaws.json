@@ -132,7 +132,7 @@
   "1985:716": {"label": "konsumenttjänstlagen", "abbr": "KTjL"},
   "1985:1100": {"label": "skollagen", "until": "2010-08-01"},
   "1986:223": {"label": "förvaltningslagen", "abbr": "FL", "until": "2018-07-01"},
-  "1987:10": {"label": "plan- och bygglagen", "abbr": "PBL", "until": "2011-05-02"},
+  "1987:10": {"label": "plan- och bygglagen", "abbr": ["PBL", "ÄPBL"], "until": "2011-05-02"},
   "1987:11": {"abbr": "ESL"},
   "1987:230": {"label": "äktenskapsbalken", "abbr": "ÄktB"},
   "1987:259": {"label": "jaktlagen"},

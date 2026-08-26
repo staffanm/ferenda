@@ -149,7 +149,8 @@ DEPENDS = {KORTLAGRUM: [LAGRUM], ENKLALAGRUM: [LAGRUM]}
 
 # root-rule alternatives each parse type contributes to ?ref
 ROOTS = {
-    KORTLAGRUM: ['kortlagrum_short', 'kortlagrum_normal'],
+    KORTLAGRUM: ['kortlagrum_short', 'kortlagrum_normal',
+                 'kortlagrum_refs'],
     LAGRUM: ['change_ref', 'external_refs', 'external_ref',
              'multiple_generic_refs', 'sfs_nr', 'named_external_law_ref',
              'piece_item_refs', 'piece_item_ref', 'piece_and_item_refs'],
@@ -493,6 +494,12 @@ DATUM_EN: /\d{1,2} (?:January|February|March|April|May|June|July|August|Septembe
 KORTLAGRUM_RULES = r"""
 kortlagrum_normal.9: generic_ref _W LAW_ABBREV
                    | LAW_ABBREV _W generic_ref
+// "1 kap. 5 § och 5 kap. 2 § ÄPBL" -- the abbreviated form of external_refs:
+// the trailing abbreviation governs every ref in the list, not just the last.
+// Without it multiple_generic_refs matched the list and left the abbreviation
+// unconsumed, so each ref fell back to the anaphora -- HFD 2013 ref. 66 sent
+// both refs to regeringsformen, named one sentence earlier.
+kortlagrum_refs.8: multiple_generic_refs _W LAW_ABBREV
 kortlagrum_short.9: LAW_ABBREV _W NUMBER COLON NUMBER (_W piece_ref)?
 """
 
@@ -1660,7 +1667,16 @@ def parser(requested, expanded, abbrevs=(), eu_acts=(), lang="swe"):
     if EULAGSTIFTNING in expanded:
         grammar += EU_TERMINALS[lang]
     if KORTLAGRUM in expanded:
-        grammar += "\nLAW_ABBREV: %s\n" % " | ".join('"%s"' % a for a in abbrevs)
+        # One regex alternation rather than a list of literals, so the whole
+        # terminal can carry a word boundary: an abbreviation only counts when
+        # nothing continues the token after it. "HSL" is hälso- och
+        # sjukvårdslagen, and without the lookahead it matched inside the
+        # föreskrift designation "HSLF-FS 2016:40" -- turning "4 kap. 1-3 §§
+        # HSLF-FS 2016:40" into three links to 2017:30 and dropping the
+        # föreskrift's own. Alternation is ordered, and `abbrevs` arrives
+        # longest-first, so "MBL" still wins over "MB" as before.
+        grammar += "\nLAW_ABBREV: /(?:%s)(?![\\w-])/\n" % "|".join(
+            re.escape(a) for a in abbrevs)
     if EULAGSTIFTNING in expanded and lang != "eng":
         grammar += EU_EXTRA_RULES
         grammar += "\nEU_TREATY: %s\n" % " | ".join(
@@ -2327,6 +2343,8 @@ class LagrumParser:
         match.currentlaw = self.abbrev_to_sfsid(node)
         genref = next(c for c in node.children if isinstance(c, Tree))
         self.dispatch(genref, match, out, context)
+
+    fmt_kortlagrum_refs = fmt_kortlagrum_normal
 
     def fmt_kortlagrum_short(self, node, match, out, context):
         match.currentlaw = self.abbrev_to_sfsid(node)
