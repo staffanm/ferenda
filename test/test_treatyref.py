@@ -9,7 +9,7 @@ wrong files them against the wrong treaty rather than against none.
 
 import re
 
-from accommodanda.lib import treatyref
+from ferenda.lib import treatyref
 
 STATUTE = (("the Statute", "icrc/585"),)
 EXT = "https://lagen.nu/ext/"

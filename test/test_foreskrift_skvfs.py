@@ -3,10 +3,10 @@
 import json
 from pathlib import Path
 
-from accommodanda.foreskrift import skvfs
-from accommodanda.foreskrift.agencies import REGISTRY
-from accommodanda.lib import compress
-from accommodanda.lib.util import record_path
+from ferenda.foreskrift import skvfs
+from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.lib import compress
+from ferenda.lib.util import record_path
 
 FILES = Path(__file__).parent / "files" / "skvfs"
 

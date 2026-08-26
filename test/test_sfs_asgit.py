@@ -8,8 +8,8 @@ import subprocess
 
 import pytest
 
-from accommodanda.lib import layout
-from accommodanda.sfs.asgit import (
+from ferenda.lib import layout
+from ferenda.sfs.asgit import (
     Change,
     Event,
     RebuildRequired,

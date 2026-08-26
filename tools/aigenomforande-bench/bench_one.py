@@ -10,8 +10,8 @@ import sys
 import time
 import traceback
 
-from accommodanda.forarbete import aigenomforande as A
-from accommodanda.lib import compress, layout, llm
+from ferenda.forarbete import aigenomforande as A
+from ferenda.lib import compress, layout, llm
 
 if os.environ.get("BENCH_MAX_TOKENS"):    # e.g. Kimi's long reasoning chains
     A.MAX_TOKENS = int(os.environ["BENCH_MAX_TOKENS"])

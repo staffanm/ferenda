@@ -1,9 +1,9 @@
-"""accommodanda/lib/git.py -- the push_state probe the ops dashboard reads.
+"""ferenda/lib/git.py -- the push_state probe the ops dashboard reads.
 Real temp git repos (a bare 'remote' + a working clone), no network."""
 
 import subprocess
 
-from accommodanda.lib import git
+from ferenda.lib import git
 
 
 def _run(repo, *args):

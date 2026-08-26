@@ -4,8 +4,8 @@ against synthetic Line/Run geometry modelled on the two real table families
 (OSL prop 2008/09:150 bilaga 7/8, socialtjänstlagen prop 2024/25:89 bilaga
 16/17)."""
 
-from accommodanda.forarbete import jamforelse as J
-from accommodanda.lib.pdftext import Line, Run
+from ferenda.forarbete import jamforelse as J
+from ferenda.lib.pdftext import Line, Run
 
 
 def _line(top, *runs):

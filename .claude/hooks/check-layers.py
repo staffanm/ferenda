@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Layer-boundary checker for accommodanda/ (rule:lib-never-imports-vertical).
+Layer-boundary checker for ferenda/ (rule:lib-never-imports-vertical).
 
 The load-bearing architecture rule made mechanical: `lib/` must never import
 a vertical (or `api`); a vertical must never import a sibling vertical or
@@ -29,11 +29,11 @@ VERTICALS = {"sfs", "dv", "eurlex", "forarbete", "foreskrift", "avg", "wiki",
              "rs", "stats"}
 RESTRICTED = VERTICALS | {"api"}
 
-# (module file relative to the package, imported accommodanda-submodule
+# (module file relative to the package, imported ferenda-submodule
 # truncated to two components). Review §3.1 OPEN items; delete entries as
 # the fixes land. Empty since the browse generator -- the last lib/ module that
 # imported api.app, to render the browse pages through the in-process REST
-# client -- moved out of lib/ into accommodanda/browse.py, where importing both
+# client -- moved out of lib/ into ferenda/browse.py, where importing both
 # the API and the render layer is the normal direction.
 ALLOWLIST: set[tuple[str, str]] = set()
 
@@ -48,23 +48,23 @@ def zone(rel: Path) -> str:
 
 
 def package_imports(tree: ast.AST, module_parts: tuple[str, ...]):
-    """Package-internal imports as dotted paths relative to accommodanda
+    """Package-internal imports as dotted paths relative to ferenda
     ('dv.naming'), resolving explicit relative imports against the module's
     own package."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith("accommodanda."):
-                    yield alias.name.removeprefix("accommodanda.")
+                if alias.name.startswith("ferenda."):
+                    yield alias.name.removeprefix("ferenda.")
         elif isinstance(node, ast.ImportFrom):
             if node.level:
                 base = module_parts[:len(module_parts) - node.level]
                 target = ".".join(base + ((node.module,) if node.module else ()))
             else:
                 target = node.module or ""
-            if target != "accommodanda" and not target.startswith("accommodanda."):
+            if target != "ferenda" and not target.startswith("ferenda."):
                 continue
-            stem = target.removeprefix("accommodanda").lstrip(".")
+            stem = target.removeprefix("ferenda").lstrip(".")
             for alias in node.names:
                 yield f"{stem}.{alias.name}".lstrip(".")
 
@@ -75,7 +75,7 @@ def check_file(path: Path, pkg: Path):
     src_zone = zone(rel)
     if src_zone in ("top", "api"):
         return [], set()
-    module_parts = ("accommodanda",) + rel.parts[:-1]
+    module_parts = ("ferenda",) + rel.parts[:-1]
     if rel.name != "__init__.py":
         module_parts += (rel.stem,)
     try:
@@ -97,7 +97,7 @@ def check_file(path: Path, pkg: Path):
                 else f"vertical {src_zone}/ must never import "
                      f"{'api' if target_zone == 'api' else 'a sibling vertical'}")
         violations.append(
-            f"{rel.as_posix()}: imports accommodanda.{imported} — {rule} "
+            f"{rel.as_posix()}: imports ferenda.{imported} — {rule} "
             f"(rule:lib-never-imports-vertical). Move the shared machinery "
             f"to lib/, or compose in build.py.")
     return violations, matched
@@ -105,7 +105,7 @@ def check_file(path: Path, pkg: Path):
 
 def main(argv: list[str]) -> int:
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
-    pkg = (project / "accommodanda").resolve()
+    pkg = (project / "ferenda").resolve()
     assert pkg.is_dir(), f"not a ferenda checkout: {pkg} missing"
     if argv:
         files = [f for f in (Path(a).resolve() for a in argv)

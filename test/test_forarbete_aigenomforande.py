@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-from accommodanda.forarbete import aigenomforande as A
-from accommodanda.forarbete import genomforande as G
-from accommodanda.lib import annstore
+from ferenda.forarbete import aigenomforande as A
+from ferenda.forarbete import genomforande as G
+from ferenda.lib import annstore
 
 NIS2 = "32022L2555"
 CER = "32022L2557"

@@ -20,8 +20,8 @@ from types import SimpleNamespace
 import brotli
 import pytest
 
-from accommodanda.lib import layout, pdftext
-from accommodanda.lib.pdftext import (
+from ferenda.lib import layout, pdftext
+from ferenda.lib.pdftext import (
     FIGURE_MIN,
     PAGE_STRIDE,
     Figure,
@@ -1324,7 +1324,7 @@ def test_a_th_row_renders_header_cells():
     Honouring it changes markup for the artifacts that already carry the flag
     (4 of 400 sampled rs artifacts), which is the point: a column header is a
     header cell."""
-    from accommodanda.lib.page import Site, _render_rad
+    from ferenda.lib.page import Site, _render_rad
     head = {"type": "rad", "th": True, "cells": [["Begrepp"], ["Betydelse"]]}
     body = {"type": "rad", "cells": [["personal"], ["egna anställda"]]}
     site = Site(None, set())

@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from accommodanda.lib import annstore
+from ferenda.lib import annstore
 
 REQUIRED = ("basefile", "overall", "sections", "has_criticism")
 

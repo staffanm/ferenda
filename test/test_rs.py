@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 import requests
 
-from accommodanda import patchsource
-from accommodanda.lib import (
+from ferenda import patchsource
+from ferenda.lib import (
     catalog,
     compress,
     facets,
@@ -25,14 +25,14 @@ from accommodanda.lib import (
     page,
     util,
 )
-from accommodanda.lib import browser, harvest
-from accommodanda.lib.pdftext import Para, classify_letterhead
-from accommodanda.lib.util import record_path
-from accommodanda.rs import download as rs_download
-from accommodanda.rs import parse as rs_parse
-from accommodanda.rs import render as rs_render
-from accommodanda.rs import skv
-from accommodanda.rs.agencies import (
+from ferenda.lib import browser, harvest
+from ferenda.lib.pdftext import Para, classify_letterhead
+from ferenda.lib.util import record_path
+from ferenda.rs import download as rs_download
+from ferenda.rs import parse as rs_parse
+from ferenda.rs import render as rs_render
+from ferenda.rs import skv
+from ferenda.rs.agencies import (
     BROWSER_ORGS,
     BY_ORG,
     DEFAULT_ORGS,
@@ -40,7 +40,7 @@ from accommodanda.rs.agencies import (
     REGISTRY,
     number_slug,
 )
-from accommodanda.rs.model import (
+from ferenda.rs.model import (
     Block,
     Stallningstagande,
     rs_designation,

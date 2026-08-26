@@ -7,9 +7,9 @@ itself now lives in lib/pdftext (`ocr_pdf`) and is tested there."""
 
 import pytest
 
-from accommodanda.eurlex import parse_pdf as pp
-from accommodanda.eurlex.parse_html import eu_date
-from accommodanda.lib.pdftext import Line
+from ferenda.eurlex import parse_pdf as pp
+from ferenda.eurlex.parse_html import eu_date
+from ferenda.lib.pdftext import Line
 
 
 def _line(text, top, bold=False):

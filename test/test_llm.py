@@ -1,4 +1,4 @@
-"""Tests for the shared LLM client (`accommodanda.lib.llm`): the validate/
+"""Tests for the shared LLM client (`ferenda.lib.llm`): the validate/
 self-repair-retry loop `author`, the truncation guard, and the endpoint/sampling
 config (local vs remote auth, temperature/top_p on the payload). The network call
 is faked -- it is the one deliberately network-bound, on-demand step."""
@@ -7,8 +7,8 @@ import json
 
 import pytest
 
-from accommodanda import config
-from accommodanda.lib import llm
+from ferenda import config
+from ferenda.lib import llm
 
 
 def test_author_returns_validator_result_on_first_success(monkeypatch):

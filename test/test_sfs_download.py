@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from accommodanda.sfs import download as d
+from ferenda.sfs import download as d
 
 
 def src(beteckning, andring, body, **extra):
@@ -31,8 +31,7 @@ def test_version_id_unamended_act_is_its_own_version():
 def test_paths():
     dest = d.Path("/data/downloaded/sfs")
     assert d.source_path(dest, "2018:585") == dest / "2018/585.json"
-    # archived versions live in the download dir's own archive/ subtree, in the
-    # old site's per-document .versions/{vyear}/{vnr} layout (.json for .html)
+    # Archived versions use a per-document .versions/{vyear}/{vnr} layout.
     assert d.archive_path(dest, "2018:585", "2020:1007") == \
         dest / "archive/2018/585/.versions/2020/1007.json"
 

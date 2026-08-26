@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.avg import download as avg_download
-from accommodanda.avg import parse as avg_parse
-from accommodanda.avg.model import Beslut, Block, Fotnot, beslut_uri
-from accommodanda.lib import catalog, compress, facets, layout
-from accommodanda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
-from accommodanda.lib.pdftext import Para
-from accommodanda.lib.util import document_extension, record_path, write_atomic
-from accommodanda.lib.lagrum import sfs_parser
+from ferenda.avg import download as avg_download
+from ferenda.avg import parse as avg_parse
+from ferenda.avg.model import Beslut, Block, Fotnot, beslut_uri
+from ferenda.lib import catalog, compress, facets, layout
+from ferenda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
+from ferenda.lib.pdftext import Para
+from ferenda.lib.util import document_extension, record_path, write_atomic
+from ferenda.lib.lagrum import sfs_parser
 
 ARN_FIXTURES = Path(__file__).parent / "files" / "avg" / "arn"
 
@@ -1340,9 +1340,9 @@ def test_avg_patch_intermediate_routes_the_new_organs(tmp_path, monkeypatch):
     # a patch is authored against the *intermediate the parse reads*, so adding
     # organs to avg means teaching patchsource their document routes -- without
     # this, an imy/kkv basefile fell through to the ARN path
-    from accommodanda import patchsource
-    from accommodanda.lib import layout
-    from accommodanda.lib.errors import SkipDocument
+    from ferenda import patchsource
+    from ferenda.lib import layout
+    from ferenda.lib.errors import SkipDocument
     monkeypatch.setattr(layout, "AVG_DOWNLOADED", tmp_path)
     monkeypatch.setattr(patchsource, "_pdf_xml", lambda p: "<pdf2xml>%s</pdf2xml>" % Path(p).name)
 

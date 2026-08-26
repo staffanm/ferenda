@@ -11,8 +11,8 @@ sidecar seam and the metadata-only degenerate.
 import json
 from pathlib import Path
 
-from accommodanda.forarbete import parse
-from accommodanda.lib import compress, layout
+from ferenda.forarbete import parse
+from ferenda.lib import compress, layout
 
 FIXTURES = Path(__file__).parent / "files" / "forarbete-legacy"
 PDF_MAGIC = b"%PDF-1.4\n%stub\n"     # magic-valid but textless/unparseable body

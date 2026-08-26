@@ -1,17 +1,16 @@
-"""DV golden cross-check (REWRITE.md §4).
+"""DV golden cross-check.
 
-The old pipeline's distilled RDF (`site/data/dv/distilled/{COURT}/{id}.rdf`,
-15,858 files) is a frozen oracle for court-decision parsing: per case it
+The retained distilled RDF (`site/data/dv/distilled/{COURT}/{id}.rdf`, 15,858
+files) is a frozen oracle for court-decision parsing. Per case, it
 records the document URI and its `dcterms:references` set. This compares the
-new artifacts against it -- primarily the reference graph (the citation
+Ferenda artifacts against it, primarily the reference graph (the citation
 extraction that powers the inbound links), and as a free side-effect it
 confirms the document URIs agree (the case-URI re-minting).
 
 Cases are matched by document URI, which both representations now share
 (`dom/{serie}/{year}:{nr}` / `dom/nja/{year}s{page}`). Following the golden
 methodology, this is a *change detector*: differences are investigated, not
-assumed to be regressions -- the new scanner is known to fill all-or-nothing
-holes the old engine left.
+assumed to be regressions.
 
     python tools/golden_dv.py [--limit N]
 """
@@ -30,11 +29,11 @@ from rdflib.namespace import DCTERMS, RDF
 RPUBL = "http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.dv.identity import norm_malnr
-from accommodanda.dv.model import Stycke
-from accommodanda.dv.parse import decision_date_from_text
-from accommodanda.dv.structure import flatten
-from accommodanda.lib import (
+from ferenda.dv.identity import norm_malnr
+from ferenda.dv.model import Stycke
+from ferenda.dv.parse import decision_date_from_text
+from ferenda.dv.structure import flatten
+from ferenda.lib import (
     casenaming,
     catalog,
     compress,
@@ -42,7 +41,7 @@ from accommodanda.lib import (
 )
 
 # The distilled RDF oracle is temporary scaffolding, not a long-lived artifact,
-# so it is NOT under data_root -- it lives in the old checkout (source-first
+# so it is NOT under data_root -- it lives in the sibling reference checkout (source-first
 # layout). This is only the default; override with --distilled.
 DISTILLED_DEFAULT = "../ferenda.old/data/dv/distilled"
 BASE = "https://lagen.nu/"
@@ -95,8 +94,8 @@ def old_case(rdf_path):
 def old_refs(rdf_path):
     """(doc_uri, set of referenced uris) from one distilled RDF. The canonical
     case is the subject typed rpubl:Rattsfallsreferat/-notis (the referat URI
-    the new pipeline also uses) -- not the separate VagledandeDomstolsavgorande
-    *verdict* resource (dom/{court}/{malnr}/{date}) the old pipeline also
+    Ferenda also uses) -- not the separate VagledandeDomstolsavgorande
+    *verdict* resource (dom/{court}/{malnr}/{date}) the reference projection also
     emitted. References (attached to the case or its #-fragment court
     instances) are collected document-wide."""
     doc, refs, _ = old_case(rdf_path)
@@ -238,7 +237,7 @@ def main():
     ap.add_argument("--limit", type=int)
     ap.add_argument("--show", type=int, default=10, help="example diffs")
     ap.add_argument("--distilled", default=DISTILLED_DEFAULT,
-                    help="old-pipeline distilled RDF oracle tree (scaffolding; "
+                    help="reference-projection distilled RDF oracle tree (scaffolding; "
                          "default %(default)s)")
     args = ap.parse_args()
 

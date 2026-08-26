@@ -1,13 +1,13 @@
 """Offline tests for the pure parsing helpers of the Track-B guidance proposer
-(accommodanda.wiki.guidance_discover, wired as `lagen kommentar propose-guidance`).
+(ferenda.wiki.guidance_discover, wired as `lagen kommentar propose-guidance`).
 The scraping itself is network-bound and exercised by hand; what is worth locking
 is the CELEX derivation (ELI mapping + the consolidated-text exclusion), the
 YAML-scalar quoting, and the link collection that shape the draft frontmatter."""
 
 import lxml.html
 
-from accommodanda.lib import markdown
-from accommodanda.wiki import guidance_discover as pg
+from ferenda.lib import markdown
+from ferenda.wiki import guidance_discover as pg
 
 
 def test_celex_from_explicit_uri():

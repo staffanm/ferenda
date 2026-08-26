@@ -1,4 +1,4 @@
-"""The per-document inbound-citation artifact (accommodanda/lib/inbound.py):
+"""The per-document inbound-citation artifact (ferenda/lib/inbound.py):
 what goes in a document's file, and in what order.
 
 The order is the point of most of these. A citation panel is always read as a
@@ -7,7 +7,7 @@ page of itself, so whichever rows sort first *are* the answer for most callers.
 
 import json
 
-from accommodanda.lib import catalog, compress, inbound
+from ferenda.lib import catalog, compress, inbound
 
 
 def _catalog(tmp_path, links, docs):

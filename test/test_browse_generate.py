@@ -8,8 +8,8 @@ Hermetic -- no catalog and no API client; both units take the browse *view*
 
 import re
 
-from accommodanda import browse
-from accommodanda.lib import compress
+from ferenda import browse
+from ferenda.lib import compress
 
 # the shape /api/v1/browse returns: one level, the live series as buckets
 VIEW = {"levels": ["Serie"],

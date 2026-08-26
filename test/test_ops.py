@@ -1,4 +1,4 @@
-"""The ops dashboard (accommodanda/api/ops.py) over FastAPI's TestClient: a
+"""The ops dashboard (ferenda/api/ops.py) over FastAPI's TestClient: a
 fixture ledger/errors/status written into tmp_path with the runlog emit_*
 helpers and the ops path constants monkeypatched. The dashboard rides the inline
 editor's session (auth.require_editor), so tests log in as an editor rather than
@@ -12,10 +12,10 @@ import pytest
 from fastapi.testclient import TestClient
 from opensearchpy.exceptions import OpenSearchException
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import auth, db, ops
-from accommodanda.lib import catalog, runlog
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import auth, db, ops
+from ferenda.lib import catalog, runlog
 
 
 @pytest.fixture
@@ -187,7 +187,7 @@ def test_system_section_renders_version_wiki_and_index_size(client, monkeypatch)
     """The system facts are one line above the table now, not a table of their
     own -- and it names the host, so a dashboard open on two machines says
     which one it is describing."""
-    monkeypatch.setattr("accommodanda.api.ops.git.push_state", lambda repo: (2, True))
+    monkeypatch.setattr("ferenda.api.ops.git.push_state", lambda repo: (2, True))
     body = client.get("/ops").text
     assert "lagen-wiki" in body and runlog.this_host() in body
     assert "2 unpushed" in body and "uncommitted" in body
@@ -195,7 +195,7 @@ def test_system_section_renders_version_wiki_and_index_size(client, monkeypatch)
 
 
 def test_system_section_wiki_up_to_date(client, monkeypatch):
-    monkeypatch.setattr("accommodanda.api.ops.git.push_state", lambda repo: (0, False))
+    monkeypatch.setattr("ferenda.api.ops.git.push_state", lambda repo: (0, False))
     assert "up to date" in client.get("/ops").text
 
 

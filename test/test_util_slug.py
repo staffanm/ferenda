@@ -3,8 +3,8 @@ truncation contract, shared by `forarbete/download.title_slug` and
 `feeds._slug`. Locks the behaviour that replaced two private copies + a lossy
 hand-rolled fold map (rule:lock-in-with-fixture)."""
 
-from accommodanda.lib import util
-from accommodanda.lib.util import text_slug
+from ferenda.lib import util
+from ferenda.lib.util import text_slug
 
 
 def test_folds_swedish_diacritics_to_ascii():

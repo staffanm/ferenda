@@ -1,7 +1,7 @@
 """lib/pinpoint's anchor vocabulary: the unit a fragment belongs to, and the
 reader-facing label both the graph explorer and the search pins print."""
 
-from accommodanda.lib.pinpoint import (
+from ferenda.lib.pinpoint import (
     citation,
     citation_label,
     human_fragment,

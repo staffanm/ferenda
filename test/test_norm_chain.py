@@ -15,8 +15,8 @@ import sqlite3
 
 import pytest
 
-from accommodanda.lib import catalog
-from accommodanda.sfs import bemyndigande
+from ferenda.lib import catalog
+from ferenda.sfs import bemyndigande
 
 
 @pytest.fixture

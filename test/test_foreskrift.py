@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup
 
-from accommodanda.foreskrift import harvest
-from accommodanda.foreskrift.agencies import REGISTRY
-from accommodanda.foreskrift.harvest import (
+from ferenda.foreskrift import harvest
+from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.foreskrift.harvest import (
     DocRef,
     Skip,
     classify_file,
@@ -20,9 +20,9 @@ from accommodanda.foreskrift.harvest import (
 
 # aliased: the tests below bind a local `ref` to each result, which would
 # otherwise shadow the imported function
-from accommodanda.foreskrift.harvest import ref as _ref
-from accommodanda.foreskrift.parse import extract_publisher
-from accommodanda.lib.harvest import guarded_enumerate
+from ferenda.foreskrift.harvest import ref as _ref
+from ferenda.foreskrift.parse import extract_publisher
+from ferenda.lib.harvest import guarded_enumerate
 
 
 def anchor(html):

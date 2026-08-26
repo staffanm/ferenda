@@ -10,8 +10,8 @@ a field, which it did twice while these tests were being written."""
 
 import sqlite3
 
-from accommodanda.lib import catalog, page
-from accommodanda.lib.page import (
+from ferenda.lib import catalog, page
+from ferenda.lib.page import (
     _inbound_groups,
     _reassigned_before,
     corresponding_cases_margin,

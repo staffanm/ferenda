@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib.datasets import NAMEDLAWS
-from accommodanda.lib.lagrum import FORARBETEN, LagrumParser, load_namedlaws
-from accommodanda.sfs import load_inputs
-from accommodanda.sfs.nf import to_normalform
-from accommodanda.sfs.register import (
+from ferenda.lib.datasets import NAMEDLAWS
+from ferenda.lib.lagrum import FORARBETEN, LagrumParser, load_namedlaws
+from ferenda.sfs import load_inputs
+from ferenda.sfs.nf import to_normalform
+from ferenda.sfs.register import (
     amendment_properties,
     build_metadata,
     forarbete_identifier,
@@ -32,8 +32,8 @@ from accommodanda.sfs.register import (
 ROOT = Path(__file__).parent.parent
 
 # the golden-diff tests read two data trees that only exist on a full dev
-# checkout: the downloaded SFS JSON corpus and the old pipeline's parsed XHTML
-# oracle in a sibling ferenda.old checkout. Skip (not fail) where either is
+# checkout: the downloaded SFS JSON corpus and the reference projection's parsed XHTML
+# oracle in a sibling reference checkout. Skip (not fail) where either is
 # absent; the pure-helper tests below run everywhere.
 needs_json_corpus = pytest.mark.skipif(
     not (ROOT / "site/data/downloaded/sfs").is_dir(),
@@ -58,7 +58,7 @@ def json_path(basefile):
 
 def parsed_path(basefile):
     year, rest = basefile.split(":")
-    # old-pipeline parsed XHTML oracle -- temporary scaffolding in the old checkout
+    # reference-projection parsed XHTML oracle -- temporary scaffolding in the sibling reference checkout
     return (ROOT.parent / "ferenda.old/data/sfs/parsed"
             / year / (rest.replace(" ", "_") + ".xhtml"))
 
@@ -87,7 +87,7 @@ def normalform(basefile):
 
 
 def golden(basefile):
-    """The old pipeline's parsed XHTML, normalized to NF on the fly -- the
+    """The reference projection's parsed XHTML, normalized to NF on the fly -- the
     golden the corpus run compares against (there is no frozen golden tree)."""
     module = golden_module()
     gold = module.normalize(str(parsed_path(basefile)))

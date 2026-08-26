@@ -8,11 +8,11 @@ the cases stay corpus-independent; the real shapes are 1919:878 and 1994:1283
 bara i tryckt version/".
 """
 
-from accommodanda.lib import diff
-from accommodanda.lib.page import plain
-from accommodanda.sfs import redaktionell
-from accommodanda.sfs.model import Forfattning, Paragraf, Stycke
-from accommodanda.sfs.nf import inline_references, to_normalform
+from ferenda.lib import diff
+from ferenda.lib.page import plain
+from ferenda.sfs import redaktionell
+from ferenda.sfs.model import Forfattning, Paragraf, Stycke
+from ferenda.sfs.nf import inline_references, to_normalform
 
 BASEFILE = "2001:1"
 

@@ -1,6 +1,6 @@
-"""Structural version diff (accommodanda/lib/diff.py)."""
+"""Structural version diff (ferenda/lib/diff.py)."""
 
-from accommodanda.lib.diff import blocks, diff_html
+from ferenda.lib.diff import blocks, diff_html
 
 
 def _stycke(text, nid=None, **extra):

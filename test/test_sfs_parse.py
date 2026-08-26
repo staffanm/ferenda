@@ -1,14 +1,14 @@
 """Run the old SFS parser's hand-authored fixture corpus against the new
-structural parser (accommodanda).
+structural parser (ferenda).
 
 test/files/sfs/parse/ holds ~110 plaintext → expected-tree pairs, one
 formatting feature each (basic, lists, table, temporal, definition,
 regression, tricky). Unlike the golden corpus (whole documents derived
-from the old pipeline's output, so a change-detector), these are
+from the reference projection's output, so a change-detector), these are
 hand-authored: they state the *desired* structure, so they are an oracle.
 
 The expected tree is the old `ferenda.elements` serialization. We map it
-to the same normal-form JSON that `accommodanda.nf.to_normalform` produces
+to the same normal-form JSON that `ferenda.nf.to_normalform` produces
 and reuse the golden comparator's `diff_nodelists`. Only the structural
 projection is checked here:
 
@@ -35,14 +35,14 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from accommodanda.sfs import parse_sfs  # noqa: F401  (ensures package import)
-from accommodanda.sfs.extract import sanitize_body
-from accommodanda.sfs.reader import TextReader
-from accommodanda.sfs.tokenizer import Tokenizer
-from accommodanda.sfs.assembler import assemble
-from accommodanda.sfs.nf import to_normalform
-from accommodanda.lib.lagrum import LagrumParser, load_namedlaws
-from accommodanda.lib.util import normalize_space
+from ferenda.sfs import parse_sfs  # noqa: F401  (ensures package import)
+from ferenda.sfs.extract import sanitize_body
+from ferenda.sfs.reader import TextReader
+from ferenda.sfs.tokenizer import Tokenizer
+from ferenda.sfs.assembler import assemble
+from ferenda.sfs.nf import to_normalform
+from ferenda.lib.lagrum import LagrumParser, load_namedlaws
+from ferenda.lib.util import normalize_space
 
 import importlib.util
 
@@ -280,10 +280,10 @@ def test_sfs_parse(txt):
 # inlines against them, as a whole-document multiset of (covered text,
 # target). Definition links (dcterms:subject) are a separate, not-yet-ported
 # feature, so they are excluded on both sides. URIs are base-normalized: the
-# fixtures were frozen with a localhost res-URI base, the new pipeline mints
+# fixtures were frozen with a localhost res-URI base, Ferenda mints
 # lagen.nu URIs.
 
-from accommodanda.lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
+from ferenda.lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 
 
 def norm_uri(uri):
@@ -304,7 +304,7 @@ def nf_links(nodes, out, parent_type=None):
     """Collect (text, norm_uri) for every reference link the new parser
     inlines, restricted to the node kinds the *old* pipeline also scanned --
     so this stays an exact-equality oracle against the frozen fixtures.
-    Skipped because the old pipeline never scanned them (the new one does,
+    Skipped because the reference projection never scanned them (the new one does,
     per the scan-all-text-nodes design): rubrik (headings), upphavd
     (repealed-provision placeholders), and top-level tables (tables that are
     not nested inside a stycke)."""
@@ -314,7 +314,7 @@ def nf_links(nodes, out, parent_type=None):
             continue
         if ntype == "tabell":
             if parent_type != "stycke":
-                continue  # old pipeline never linked top-level tables
+                continue  # the reference projection excludes top-level tables
             for row in node.get("children", []):
                 for cell in row.get("cells", []):
                     collect_runs(cell, out)

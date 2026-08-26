@@ -11,9 +11,9 @@ curated store (lib.annstore), and keys the feedback onto the förarbete's own ur
 
 import json
 
-from accommodanda.lib import annstore, catalog, layout, render
-from accommodanda.lib import page
-from accommodanda.forarbete import render as forarbete_render
+from ferenda.lib import annstore, catalog, layout, render
+from ferenda.lib import page
+from ferenda.forarbete import render as forarbete_render
 
 
 def _scenario(tmp_path, monkeypatch):

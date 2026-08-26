@@ -151,7 +151,7 @@ ett genomförandepåstående visar nu äldre EU-praxis de inte hade.
      artiklar. 2004/18 har nu sina 84 artiklar, stadgan sina 54.
    - dessutom: `_emit_table` behåller nu *inre* tomma celler, eftersom en
      jämförelsetabells kolumn är det som säger vilken akt värdet hör till.
-3. **Korrespondenslagret** `accommodanda/eurlex/correspond.py` +
+3. **Korrespondenslagret** `ferenda/eurlex/correspond.py` +
    körs av `eurlex parse` — mekaniskt, inget LLM, och eftersom det är aktens
    egen strukturerade data hamnar resultatet i aktens **artefakt**
    (`correspondence`-nyckeln), inte i ett författat lager. Tabellen

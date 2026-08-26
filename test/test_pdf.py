@@ -1,4 +1,4 @@
-"""The PDF export (accommodanda/api/pdf.py, api/pdfjob.py + the /api/v1/pdf
+"""The PDF export (ferenda/api/pdf.py, api/pdfjob.py + the /api/v1/pdf
 routes): the transform that recasts a generated page for paper, the export
 as a background job, and the endpoints driven through FastAPI's TestClient
 over a tiny generated tree -- no corpus, no network."""
@@ -13,12 +13,12 @@ import pytest
 import weasyprint
 from fastapi.testclient import TestClient
 
-from accommodanda import build, config
-from accommodanda.api import app as api
-from accommodanda.api import facsimiles, pdf, pdfjob
-from accommodanda.lib import catalog, compress, render
-from accommodanda.lib import page as page_layout
-from accommodanda.lib.catalog import BASE
+from ferenda import build, config
+from ferenda.api import app as api
+from ferenda.api import facsimiles, pdf, pdfjob
+from ferenda.lib import catalog, compress, render
+from ferenda.lib import page as page_layout
+from ferenda.lib.catalog import BASE
 
 # a minimal but structurally faithful generated page: chrome, TOC column,
 # frontmatter, one § carrying a rail marker, and the context island with a

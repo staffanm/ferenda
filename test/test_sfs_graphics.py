@@ -13,11 +13,11 @@ import json
 import pytest
 from PIL import Image
 
-from accommodanda.lib import annstore, facsimile, page
-from accommodanda.lib.page import plain
-from accommodanda.lib.pdftext import Line, Run
-from accommodanda.sfs import graphics
-from accommodanda.sfs.model import (
+from ferenda.lib import annstore, facsimile, page
+from ferenda.lib.page import plain
+from ferenda.lib.pdftext import Line, Run
+from ferenda.sfs import graphics
+from ferenda.sfs.model import (
     Bilaga,
     Forfattning,
     Kapitel,
@@ -27,7 +27,7 @@ from accommodanda.sfs.model import (
     Tabell,
     Tabellrad,
 )
-from accommodanda.sfs.nf import to_normalform
+from ferenda.sfs.nf import to_normalform
 
 BASEFILE = "9999:998"
 

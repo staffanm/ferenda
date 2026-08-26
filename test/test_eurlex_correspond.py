@@ -4,8 +4,8 @@ statute rail resolves its case law through."""
 
 import pytest
 
-from accommodanda.eurlex import correspond as C
-from accommodanda.lib import catalog
+from ferenda.eurlex import correspond as C
+from ferenda.lib import catalog
 
 BASE = "https://lagen.nu/ext/celex/"
 

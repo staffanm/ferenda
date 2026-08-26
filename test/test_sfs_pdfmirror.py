@@ -9,8 +9,8 @@ import json
 import pytest
 import requests
 
-from accommodanda.lib import compress, layout
-from accommodanda.sfs import pdfmirror as m
+from ferenda.lib import compress, layout
+from ferenda.sfs import pdfmirror as m
 
 
 class _Resp:

@@ -1,7 +1,8 @@
-"""DV structural golden -- the instance/ruling skeleton oracle (REWRITE.md §4).
+"""DV structural golden: the instance/ruling skeleton oracle.
 
-The old pipeline's parsed XHTML+RDFa (``site/data/parsed/dv/{COURT}/{id}.xhtml``)
-segmented each referat into its decision structure, which the distilled-RDF
+The retained parsed XHTML+RDFa
+(``site/data/parsed/dv/{COURT}/{id}.xhtml``) segments each referat into its
+decision structure, which the distilled-RDF
 oracle (``golden_dv.py``) does not capture:
 
   delmal[ordinal]            split case (I, II) -- wraps the instances
@@ -59,13 +60,13 @@ from pathlib import Path
 from lxml import etree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.lib import (
+from ferenda.lib import (
     layout,
 )
 
 XHTML = "http://www.w3.org/1999/xhtml"
 # The parsed-XHTML oracle is temporary scaffolding, not a long-lived artifact,
-# so it is NOT under data_root -- it lives in the old checkout (source-first
+# so it is NOT under data_root -- it lives in the sibling reference checkout (source-first
 # layout). This is only the default; override with --parsed.
 PARSED_DEFAULT = "../ferenda.old/data/dv/parsed"
 
@@ -75,7 +76,7 @@ PARSED_DEFAULT = "../ferenda.old/data/dv/parsed"
 STRUCTURE_KINDS = ("delmal", "instans", "betankande", "dom",
                    "domskal", "domslut", "skiljaktig", "tillagg")
 
-# the two referat document types the new pipeline also mints (the third old
+# the two referat document types Ferenda also mints (the third old
 # rdf:type, VagledandeDomstolsavgorande, is the verdict resource, not the case)
 REFERAT_TYPES = ("Rattsfallsreferat", "Rattsfallsnotis")
 
@@ -141,7 +142,7 @@ def normalize(path):
 
 
 def empty_golden(path):
-    """Whether a parsed file is an old-pipeline removed-document dummy."""
+    """Whether a parsed file is an reference-projection removed-document dummy."""
     return not Path(path).read_bytes().strip()
 
 
@@ -312,7 +313,7 @@ def main():
     v.add_argument("--limit", type=int)
     v.add_argument("--top", type=int, default=20)
     v.add_argument("--parsed", default=PARSED_DEFAULT,
-                   help="old-pipeline parsed XHTML oracle tree (scaffolding; "
+                   help="reference-projection parsed XHTML oracle tree (scaffolding; "
                         "default %(default)s)")
     args = ap.parse_args()
 

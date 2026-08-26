@@ -2,8 +2,8 @@
 
 Working notes for the LLM directive→paragraf transposition pass and the
 riksmöte-2025/26 mapping task. Written 2026-07-23. Not a spec; the durable
-description lives in the module docstring (`accommodanda/forarbete/aigenomforande.py`),
-`REWRITE.md` §7d and `accommodanda/README.md`.
+description lives in the module docstring
+(`ferenda/forarbete/aigenomforande.py`) and `ferenda/README.md`.
 
 ## What the pass does
 

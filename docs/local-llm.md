@@ -4,7 +4,7 @@ How to run a local, vision-capable reasoning model on the workstation and point
 the opt-in `ai-*` passes at it instead of Berget. This is the operator's guide:
 build, model files, launch, verify, and the measured limits. For what the `ai-*`
 passes *are* read [`operating/README.md`](operating/README.md#5-per-source-pipelines);
-for the client itself read `accommodanda/lib/llm.py`.
+for the client itself read `ferenda/lib/llm.py`.
 
 **Why bother.** The `ai-*` passes are metered API calls against Berget
 (`llm_model`, default `openai/gpt-oss-120b`). A local model is unmetered and
@@ -191,7 +191,7 @@ Three things that bite, in descending order of how much time they cost:
    in thinking mode tends to loop. Set `llm_temperature`/`llm_top_p` alongside
    `llm_base_url` (§7). `top_k` is not plumbed — no caller has needed it.
 
-## 7. Pointing accommodanda at it
+## 7. Pointing ferenda at it
 
 Three config keys aim the `ai-*` passes at the local server. Each has the usual
 env → `config.yml` → default precedence:

@@ -12,9 +12,9 @@ import sqlite3
 
 import pytest
 
-from accommodanda.lib import facets, layout
-from accommodanda.stats import charts, compute, render, scan
-from accommodanda.stats.model import Cell, Measure, Point, Report, Row, Tile
+from ferenda.lib import facets, layout
+from ferenda.stats import charts, compute, render, scan
+from ferenda.stats.model import Cell, Measure, Point, Report, Row, Tile
 
 
 def write_artifact(tmp_path, name, art):

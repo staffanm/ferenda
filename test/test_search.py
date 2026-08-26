@@ -1,4 +1,4 @@
-"""The OpenSearch indexer's pure parts (accommodanda/lib/search.py): artifact ->
+"""The OpenSearch indexer's pure parts (ferenda/lib/search.py): artifact ->
 bulk actions, the query body, and hit parsing. The cluster round-trip needs a
 running OpenSearch and is exercised by the integration test at the bottom, gated
 on OPENSEARCH_URL."""
@@ -10,7 +10,7 @@ import threading
 
 import pytest
 
-from accommodanda.lib import catalog, search
+from ferenda.lib import catalog, search
 
 
 def _build_catalog(tmp_path):

@@ -1,11 +1,11 @@
-"""Direct unit tests for accommodanda.sfs.tokenizer.Tokenizer, targeting
+"""Direct unit tests for ferenda.sfs.tokenizer.Tokenizer, targeting
 tokenizer-internal edge cases that the fixture-driven test_sfs_parse.py
 oracle doesn't exercise well (end-of-data lookahead, in-body TOC faking)."""
 
-from accommodanda.sfs import parse_sfs_source
-from accommodanda.sfs.model import Paragraf
-from accommodanda.sfs.reader import TextReader
-from accommodanda.sfs.tokenizer import OpenAvdelning, OpenKapitel, Tokenizer
+from ferenda.sfs import parse_sfs_source
+from ferenda.sfs.model import Paragraf
+from ferenda.sfs.reader import TextReader
+from ferenda.sfs.tokenizer import OpenAvdelning, OpenKapitel, Tokenizer
 
 BASEFILE = "9999:998"
 

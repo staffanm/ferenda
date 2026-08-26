@@ -1,6 +1,6 @@
 # Documentation
 
-Documentation for the accommodanda pipeline behind lagen.nu, by audience.
+Documentation for Ferenda and lagen.nu, grouped by audience.
 
 | I am… | Read |
 |---|---|
@@ -12,10 +12,8 @@ Documentation for the accommodanda pipeline behind lagen.nu, by audience.
 End-user help pages live in the git-backed content repo (`lagen-wiki`, `site/om/`),
 not here — they are published at `/om/<slug>` and edited as wiki markdown.
 
-Background and reference (not audience guides):
+Reference documents:
 
-- [`../REWRITE.md`](../REWRITE.md) — why the system is shaped this way; done vs. pending.
-- [`../accommodanda/README.md`](../accommodanda/README.md) — the module map.
+- [`../ferenda/README.md`](../ferenda/README.md) — developer setup and module map.
 - [`conventions.md`](conventions.md) — the citable coding-rule catalog.
-- [`deploy-vps.md`](deploy-vps.md) — the production deployment runbook.
 - [`local-llm.md`](local-llm.md) — running a local vision/reasoning model (Qwen3.6 on llama.cpp) for the `ai-*` passes.

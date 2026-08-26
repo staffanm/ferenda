@@ -1,5 +1,4 @@
-"""Tests for the derived layer: the SQLite catalog (relate) and the static
-HTML renderer (generate) -- REWRITE.md §6."""
+"""Tests for the derived layer: the SQLite catalog and static HTML renderer."""
 
 import hashlib
 import json
@@ -9,17 +8,17 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda import browse, build
-from accommodanda.lib import catalog, compress, inbound, page, render
-from accommodanda.lib.eu_structure import Anchors, subarticle_key
-from accommodanda.lib.pinpoint import pinpoint_label
-from accommodanda.avg import render as avg_render
-from accommodanda.dv import render as dv_render
-from accommodanda.eurlex import render as eurlex_render
-from accommodanda.forarbete import render as forarbete_render
-from accommodanda.foreskrift import render as foreskrift_render
-from accommodanda.sfs import render as sfs_render
-from accommodanda.wiki import render as wiki_render
+from ferenda import browse, build
+from ferenda.lib import catalog, compress, inbound, page, render
+from ferenda.lib.eu_structure import Anchors, subarticle_key
+from ferenda.lib.pinpoint import pinpoint_label
+from ferenda.avg import render as avg_render
+from ferenda.dv import render as dv_render
+from ferenda.eurlex import render as eurlex_render
+from ferenda.forarbete import render as forarbete_render
+from ferenda.foreskrift import render as foreskrift_render
+from ferenda.sfs import render as sfs_render
+from ferenda.wiki import render as wiki_render
 
 
 # a minimal SFS-shaped artifact: one paragraph whose stycke cites another law,
@@ -936,7 +935,7 @@ def test_dv_listing_groups_sorts_and_formats():
 
 
 def test_repealed_foreskrift_is_subdued_in_the_browse_listing(tmp_path):
-    from accommodanda.lib import facets
+    from ferenda.lib import facets
     con = _foreskrift_catalog(tmp_path)
     view = facets.browse_view(con, "foreskrift")
 
@@ -987,7 +986,7 @@ def _fs_browse_catalog(tmp_path):
 def test_foreskrift_browse_nests_amendments_under_base(tmp_path):
     # F5: an ändringsförfattning lists under its base regulation, on the
     # base's year -- its own year bucket disappears
-    from accommodanda.lib import facets
+    from ferenda.lib import facets
     view = facets.browse_view(_fs_browse_catalog(tmp_path), "foreskrift")
     serie = next(b for b in view["buckets"] if b["key"] == "AAFS")
     assert serie["label"] == "ÅFS"                       # F1: designation, not key
@@ -1003,7 +1002,7 @@ def test_foreskrift_amendment_chain_folds_to_the_top_level_base(tmp_path):
     # 2006:11)") follows the chain to the regulation that stays listed --
     # nothing nests under a row that itself folded away, and no document
     # silently vanishes from the browse
-    from accommodanda.lib import facets
+    from ferenda.lib import facets
     chain = {"uri": "https://lagen.nu/aafs/2007:1", "type": "foreskrift",
              "identifier": "ÅFS 2007:1", "fs": "aafs",
              "metadata": {"title": "Föreskrifter om ändring i föreskrifterna "
@@ -1029,7 +1028,7 @@ def test_foreskrift_amendment_chain_folds_to_the_top_level_base(tmp_path):
 
 def test_foreskrift_succeeded_series_folds_into_successor(tmp_path):
     # F8: DIFS documents list under IMYFS, and the IMYFS page says so
-    from accommodanda.lib import facets
+    from ferenda.lib import facets
     view = facets.browse_view(_fs_browse_catalog(tmp_path), "foreskrift")
     keys = [b["key"] for b in view["buckets"]]
     assert "DIFS" not in keys and "IMYFS" in keys
@@ -1215,7 +1214,7 @@ def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
     assert re.search(r'class="sammanfattning">Frågan gällde.*'
                      r'konsumentköplagen gällde\.', html)
     # the listing name form is the same first sentence (A2)
-    from accommodanda.lib import labels
+    from ferenda.lib import labels
     lb = labels.document_labels("avg", art)
     assert lb.short_title.endswith("blandat avtal.")
     jo = {"uri": "https://lagen.nu/avg/jo/1-23", "org": "jo",
@@ -1228,7 +1227,7 @@ def test_arn_page_heads_with_first_sentence_and_keeps_preamble(tmp_path):
 # --- authoritative source url ---------------------------------------------
 
 def test_eurlex_source_url_derives_eli():
-    from accommodanda.lib import layout
+    from ferenda.lib import layout
     # sector-3 regulation/directive/decision -> ELI (number's leading zeros gone)
     assert (layout.source_url("eurlex", "32023R2854")
             == "https://eur-lex.europa.eu/eli/reg/2023/2854/oj")
@@ -1242,7 +1241,7 @@ def test_eurlex_source_url_derives_eli():
 
 
 def test_sfs_source_url_derives_from_basefile():
-    from accommodanda.lib import layout
+    from ferenda.lib import layout
     # the colon in the basefile is percent-encoded into the bet= query param
     assert (layout.source_url("sfs", "2025:1506")
             == "https://beta.rkrattsbaser.gov.se/sfs/item"
@@ -1250,7 +1249,7 @@ def test_sfs_source_url_derives_from_basefile():
 
 
 def test_dv_source_url_uses_publication_group():
-    from accommodanda.lib import layout
+    from ferenda.lib import layout
     # keyed by the record's gruppKorrelationsnummer, not derivable from basefile
     assert (layout.dv_source_url("50ca363e-bff6-4048-b68f-9409e72381b2")
             == "https://rattspraxis.etjanst.domstol.se/sok/publicering/"
@@ -1260,9 +1259,9 @@ def test_dv_source_url_uses_publication_group():
 
 
 def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
-    from accommodanda.lib import layout
+    from ferenda.lib import layout
     monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
-    from accommodanda import browse, build
+    from ferenda import browse, build
 
     # derived: eurlex gets its ELI even with nothing recorded
     out = layout.artifact("eurlex", "32023R2854")
@@ -2447,7 +2446,7 @@ def test_forarbete_inbound_sorted_by_kind_then_date(tmp_path):
     assert order == sorted(order)
 
 
-# --- förarbete genomför-direktiv edges (REWRITE.md §7d) -------------------
+# --- förarbete genomför-direktiv references -------------------------------
 
 # a proposition whose författningskommentar transposes a directive article,
 # and the EU directive it points at (article 21 is a citation target).
@@ -2538,7 +2537,7 @@ def test_genomforande_panel_absent_without_implements(tmp_path):
     assert "Typ" in html and "Proposition" in html
 
 
-# --- genomför-direktiv pinned to SFS paragrafs (REWRITE.md §7d) -----------
+# --- genomför-direktiv pinned to SFS paragrafs ----------------------------
 
 DIR = "https://lagen.nu/ext/celex/32022L2555"
 
@@ -2607,7 +2606,7 @@ def _primed_margin(site, sfs_uri, anchor):
 
 
 def build_pin_catalog(tmp_path, extra_eurlex=()):
-    from accommodanda.forarbete import fk, genomforande
+    from ferenda.forarbete import fk, genomforande
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
     prop.write_text(json.dumps(PROP_PIN))
@@ -3189,7 +3188,7 @@ def test_defined_term_links_to_begrepp_page(tmp_path):
 def test_genomfor_pinpoints_split_per_article(tmp_path):
     # a single statement transposing two articles (2 and 26): each genomforande
     # row shows only its own article's pinpoints, not the whole statement's
-    from accommodanda.forarbete import genomforande
+    from ferenda.forarbete import genomforande
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
     prop.write_text(json.dumps({
@@ -3224,7 +3223,7 @@ def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
     # a pinpoint the paragraf doesn't have (the model said "S5" on a two-stycke
     # paragraf) is disregarded and the paragraf-level reference stands (the
     # reference itself is never dropped -- forgiving by design)
-    from accommodanda.forarbete import genomforande
+    from ferenda.forarbete import genomforande
     db = str(tmp_path / "catalog.sqlite")
     prop = tmp_path / "prop.json"
     law_rubrik = "15.1 Förslaget till lag om ändring i testlagen (1999:100)"
@@ -3509,7 +3508,7 @@ def test_concept_stub_styles_are_reachable_css():
     """The lede shipped unstyled once: a comment closed with `*/` and three more
     prose lines followed, so CSS read them as a selector and swallowed the
     `.stub-lede` rule that came after."""
-    css = (Path("accommodanda/lib/assets/style.css")).read_text()
+    css = (Path("ferenda/lib/assets/style.css")).read_text()
     depth, stray = 0, []
     for i, line in enumerate(css.splitlines(), 1):
         depth += line.count("/*") - line.count("*/")

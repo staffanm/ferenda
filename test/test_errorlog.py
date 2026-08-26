@@ -13,8 +13,8 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from accommodanda.api import errors as api_errors
-from accommodanda.lib import errorlog
+from ferenda.api import errors as api_errors
+from ferenda.lib import errorlog
 
 
 @pytest.fixture
@@ -198,7 +198,7 @@ def test_the_ledger_does_not_live_on_the_data_root(monkeypatch):
     """The ledger must sit on CATALOG_ROOT, the path config guarantees is local
     disk -- not under the data root, which is NFS on prod and is precisely the
     storage whose failure this ledger exists to record."""
-    from accommodanda import config
-    from accommodanda.lib import layout
+    from ferenda import config
+    from ferenda.lib import layout
     assert api_errors.LEDGER.parent != layout.DATA / ".build"
     assert api_errors.LEDGER.is_relative_to(config.CATALOG_ROOT)

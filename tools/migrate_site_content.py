@@ -34,10 +34,10 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
-# a standalone tool: add the repo root so `accommodanda` imports resolve when run
+# a standalone tool: add the repo root so `ferenda` imports resolve when run
 # directly, before importing from it (this file lives in tools/, excluded from ruff)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda import config
+from ferenda import config
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO / "mediawiki-db" / "db" / "lagen.sqlite"

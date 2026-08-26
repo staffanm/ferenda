@@ -3,16 +3,16 @@ number move out of the heading text into a gutter of their own, and an all-caps
 EU division title is re-set in sentence case.
 
 Every case below is one the corpus actually produces
-(accommodanda/eurlex/render.py, accommodanda/forarbete/render.py)."""
+(ferenda/eurlex/render.py, ferenda/forarbete/render.py)."""
 
-from accommodanda.eurlex.render import (
+from ferenda.eurlex.render import (
     _article_parts,
     _case_map,
     _division_label,
     _sentence_case,
 )
-from accommodanda.forarbete.render import _numbered, _outline
-from accommodanda.lib.text import runs_text
+from ferenda.forarbete.render import _numbered, _outline
+from ferenda.lib.text import runs_text
 
 
 def _prose(*sentences):

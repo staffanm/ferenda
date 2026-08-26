@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
-from accommodanda.coe import download, parse
-from accommodanda.lib import catalog, coe, layout, render
+from ferenda.coe import download, parse
+from ferenda.lib import catalog, coe, layout, render
 
 FIXTURES = Path(__file__).parent / "files" / "coe"
 

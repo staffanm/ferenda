@@ -11,16 +11,16 @@ documents.
 
 from pathlib import Path
 
-from accommodanda.forarbete import parse
-from accommodanda.forarbete.kbtitles import (
+from ferenda.forarbete import parse
+from ferenda.forarbete.kbtitles import (
     MISSING,
     dehyphenate,
     title_from_paras,
     untuple,
 )
-from accommodanda.forarbete.legacy_formats import abbyy_pages
-from accommodanda.lib import layout
-from accommodanda.lib.util import basefile_slug
+from ferenda.forarbete.legacy_formats import abbyy_pages
+from ferenda.lib import layout
+from ferenda.lib.util import basefile_slug
 
 FIXTURES = Path(__file__).parent / "files" / "forarbete-legacy"
 

@@ -1,4 +1,4 @@
-"""The public MCP server (accommodanda/api/mcp.py) over a fixture catalog + a
+"""The public MCP server (ferenda/api/mcp.py) over a fixture catalog + a
 faked search backend -- the tool functions directly (fast, no network) plus
 end-to-end Streamable HTTP round-trips through real MCP clients of *both*
 protocol eras, to prove the mounted /mcp endpoint and the transport wiring."""
@@ -16,11 +16,11 @@ from mcp.server.mcpserver.exceptions import ToolError
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from starlette.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import analytics, db, reads
-from accommodanda.api import app as api
-from accommodanda.api import mcp as mcpmod
-from accommodanda.lib import catalog, facets, inbound
+from ferenda import config
+from ferenda.api import analytics, db, reads
+from ferenda.api import app as api
+from ferenda.api import mcp as mcpmod
+from ferenda.lib import catalog, facets, inbound
 
 
 @pytest.fixture
@@ -380,7 +380,7 @@ def test_end_to_end_streamable_http(corpus, caplog):
     `initialize` and negotiates down; hosts upgrade on their own schedule, so
     dropping them would silently unpublish the corpus.
     """
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
 
     async def scenario():
         async with _served(8791):
@@ -479,7 +479,7 @@ def test_end_to_end_streamable_http(corpus, caplog):
     # shows POST /mcp/); each carries the envelope id, and a tools/call line the
     # tool name + its arguments
     logged = [r.message for r in caplog.records
-              if r.name == "accommodanda.api.mcp"]
+              if r.name == "ferenda.api.mcp"]
     assert any("server/discover id=" in m for m in logged)      # the 2026 opener
     assert any("initialize id=" in m for m in logged)           # the 2025 opener
     assert any("tools/call id=" in m and "get_document" in m
@@ -505,7 +505,7 @@ def test_every_request_logs_arrival_and_completion(monkeypatch, caplog):
     that answered a JSON-RPC error, and a call that never produced a response.
     A GET or DELETE -- streamable HTTP uses both -- was invisible altogether,
     which is the blind spot a client-side "the tool failed" report lands in."""
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
 
     async def jsonrpc(scope, receive, send):
         if scope["method"] == "POST":
@@ -549,7 +549,7 @@ def test_a_cancellation_names_the_call_it_abandons(caplog):
     cannot be paired with the call it refers to -- and a client-side timeout is
     otherwise invisible here: it is reported to the model, not to us, and the
     model relays it as a server fault."""
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
 
     async def ack(scope, receive, send):
         await receive()
@@ -582,7 +582,7 @@ def test_a_response_past_the_proxy_timeout_says_so(monkeypatch, caplog):
     it emits `http.response.start` with 200 regardless. Measured on prod: a tool
     call arrived 12:28:20 and nginx logged "upstream timed out" at 12:29:20. So a
     bare `status=200` past that mark would be a lie by omission."""
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
     monkeypatch.setattr(mcpmod, "PROXY_READ_TIMEOUT", 0.0)   # everything is late
 
     async def slow(scope, receive, send):
@@ -606,7 +606,7 @@ def test_a_caller_that_stopped_waiting_is_recorded(monkeypatch, caplog):
     what an nginx read timeout looks like from in here, since it drops the
     upstream connection. Only seen when something polls the channel, so the flag
     confirms the duration signal rather than replacing it."""
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
 
     async def polls_until_disconnect(scope, receive, send):
         await receive()                      # the buffered body
@@ -646,7 +646,7 @@ def test_a_request_that_dies_inside_the_app_is_logged(monkeypatch, caplog):
     it, an app-side failure and a request that never arrived look identical --
     which is exactly the ambiguity that made a client's error report
     unfalsifiable from our side."""
-    caplog.set_level("INFO", logger="accommodanda.api.mcp")
+    caplog.set_level("INFO", logger="ferenda.api.mcp")
 
     async def boom(scope, receive, send):
         await receive()

@@ -1,5 +1,5 @@
 """Tests for the editorial `site` vertical: markdown -> typed artifacts
-(accommodanda.site.parse) and artifacts -> HTML + Atom (accommodanda.site.render),
+(ferenda.site.parse) and artifacts -> HTML + Atom (ferenda.site.render),
 against a small fixture site/ tree under test/files/sitecontent/."""
 
 import json
@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import compress, markdown
-from accommodanda.lib import render as lib_render
-from accommodanda.site import parse, render
+from ferenda.lib import compress, markdown
+from ferenda.lib import render as lib_render
+from ferenda.site import parse, render
 
 FIX = str(Path(__file__).resolve().parent / "files" / "sitecontent")
 

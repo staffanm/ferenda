@@ -1,4 +1,4 @@
-"""The editor's REST surface (accommodanda/api/auth.py + edit.py) over FastAPI's
+"""The editor's REST surface (ferenda/api/auth.py + edit.py) over FastAPI's
 TestClient: the auth gate, and a full login -> edit -> cart -> commit round-trip
 with the page rebuild stubbed (the real relate/generate is build's concern)."""
 
@@ -8,10 +8,10 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import auth, edit, editcart
-from accommodanda.wiki import parse as wiki
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import auth, edit, editcart
+from ferenda.wiki import parse as wiki
 
 
 def _git(repo, *args):
@@ -44,7 +44,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "EDITORS", {"anna": {
         "name": "Anna Ek", "email": "anna@example.org",
         "pwhash": auth.hash_password("hunter2", rounds=1000)}})
-    monkeypatch.setattr("accommodanda.config.WIKI_ROOT", root)
+    monkeypatch.setattr("ferenda.config.WIKI_ROOT", root)
     monkeypatch.setattr(editcart, "EDITS", tmp_path / "edits")
 
     rebuilt = []

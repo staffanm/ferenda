@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from accommodanda.lib import annstore, compress, layout
+from ferenda.lib import annstore, compress, layout
 
 
 @pytest.fixture

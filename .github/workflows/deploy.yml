@@ -1,7 +1,7 @@
 # Continuous deploy to the lagen.nu prod host (ferenda.lagen.nu).
 #
 # Runs on a SELF-HOSTED runner (`lagen-nu`) installed on the host as the
-# `staffan` user, in the docker group -- see docs/deploy-vps.md for registration.
+# `staffan` user, in the docker group -- see docs/operating/README.md.
 #
 # The host runs ONE merged docker compose project that fronts both sites behind a
 # single nginx: the legacy lagen.nu stack AND the rebuilt accommodanda site

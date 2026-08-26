@@ -3,7 +3,7 @@
 `lib/layout` derives every stage root (`DOWNLOADED`, `ARTIFACT`, `GENERATED`,
 …) from `config.DATA` at *import* time, and `config.DATA` reads the `DATA_ROOT`
 environment variable. Setting it here -- before any test module imports
-`accommodanda` -- is what keeps a test run off the developer's live corpus.
+`ferenda` -- is what keeps a test run off the developer's live corpus.
 pytest imports this file first, so the assignment lands in time.
 
 Two reasons this matters, and the speed one is the lesser:
@@ -52,7 +52,7 @@ atexit.register(shutil.rmtree, _ROOT, True)
 # imported after DATA_ROOT is set, like everything else here
 import pytest  # noqa: E402
 
-from accommodanda.lib import net  # noqa: E402
+from ferenda.lib import net  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

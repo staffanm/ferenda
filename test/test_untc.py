@@ -11,11 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog, compress, facets, layout, page, render
-from accommodanda.untc import download, parse
-from accommodanda.untc import render as untc_render
-from accommodanda.untc import text as untc_text
-from accommodanda.untc.model import Provision, Treaty, load_treaties, treaty_uri
+from ferenda.lib import catalog, compress, facets, layout, page, render
+from ferenda.untc import download, parse
+from ferenda.untc import render as untc_render
+from ferenda.untc import text as untc_text
+from ferenda.untc.model import Provision, Treaty, load_treaties, treaty_uri
 
 FIXTURES = Path(__file__).parent / "files" / "untc"
 

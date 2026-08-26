@@ -1,4 +1,4 @@
-"""The edit cart + commit engine (accommodanda/api/editcart.py): drafts persist
+"""The edit cart + commit engine (ferenda/api/editcart.py): drafts persist
 per user, a checkout is one git commit authored as the editor, and a hunk that
 went stale under a draft fails the commit rather than clobbering."""
 
@@ -7,9 +7,9 @@ import threading
 
 import pytest
 
-from accommodanda.api import editcart, editcontent
-from accommodanda.api.auth import Editor
-from accommodanda.wiki import parse as wiki
+from ferenda.api import editcart, editcontent
+from ferenda.api.auth import Editor
+from ferenda.wiki import parse as wiki
 
 
 def _git(repo, *args):
@@ -31,7 +31,7 @@ def repo(tmp_path, monkeypatch):
     _git(root, "config", "user.email", "seed@example.org")
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "seed")
-    monkeypatch.setattr("accommodanda.config.WIKI_ROOT", root)
+    monkeypatch.setattr("ferenda.config.WIKI_ROOT", root)
     monkeypatch.setattr(editcart, "EDITS", tmp_path / "edits")
     wiki.kommentar_index.cache_clear()
     wiki.begrepp_index.cache_clear()

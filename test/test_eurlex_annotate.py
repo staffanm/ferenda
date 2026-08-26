@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from accommodanda.eurlex import annotate
-from accommodanda.lib import annstore, compress, layout, llm
+from ferenda.eurlex import annotate
+from ferenda.lib import annstore, compress, layout, llm
 
 ART = {
     "celex": "32099R0001", "title": "Testförordning", "lang": "swe",

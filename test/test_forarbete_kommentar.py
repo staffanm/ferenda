@@ -1,6 +1,6 @@
 """Tests for the författningskommentar implements-extractor."""
 
-from accommodanda.forarbete.kommentar import (
+from ferenda.forarbete.kommentar import (
     article_of,
     extract,
     fk_section,
@@ -11,9 +11,9 @@ from accommodanda.forarbete.kommentar import (
     resolve_directives,
     sfs_number,
 )
-from accommodanda.forarbete.structure import flatten, nest
-from accommodanda.forarbete.parse import PARSE_TYPES
-from accommodanda.lib.lagrum import sfs_parser
+from ferenda.forarbete.structure import flatten, nest
+from ferenda.forarbete.parse import PARSE_TYPES
+from ferenda.lib.lagrum import sfs_parser
 
 CELEX = "https://lagen.nu/ext/celex/"
 
@@ -387,7 +387,7 @@ def test_directive_alias_ignores_co_cited_regulation():
 def test_extract_survives_in_fk_chapter_pseudo_rubrik():
     # an in-FK "1 kap." heading mis-tagged as a level-1 rubrik used to end the
     # extraction span (the old level-1-bounded find_kommentar); the unified
-    # fk_span bound (rewrite-parity finding 04) scans past it, so an implements
+    # The fk_span bound scans past it, so an implements
     # statement deeper in the chapter is found -- while a statement inside the
     # trailing bilagor still is not
     art = {"doctype": "prop", "structure": nest([

@@ -156,13 +156,13 @@ below; the counts are the page's, not estimates.
 ```python
 # 1. how many canon judgments reach the page
 import re
-from accommodanda.lib import compress
+from ferenda.lib import compress
 html = compress.read_text("site/data/generated/2016:1145.html")
 present = set(re.findall(r"6\d{4}[A-Z]{2}\d{4}", html))
 
 # 2. is a given judgment even a candidate for some LOU paragraf -- and where?
-from accommodanda import build
-from accommodanda.lib import catalog
+from ferenda import build
+from ferenda.lib import catalog
 con = catalog.connect(build.CATALOG)
 LOU = "https://lagen.nu/2016:1145"
 assigned = catalog.caselaw_anchored(con, LOU)   # anchor -> [(case row, prov)]

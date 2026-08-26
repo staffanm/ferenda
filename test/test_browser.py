@@ -15,7 +15,7 @@ import shutil
 
 import pytest
 
-from accommodanda.lib.browser import (
+from ferenda.lib.browser import (
     DetachedChrome,
     IncompleteNavigation,
     WafRejected,

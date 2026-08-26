@@ -1,0 +1,714 @@
+"""Parse a court decision (DV) into the Avgorande model and project it to
+a JSON artifact.
+
+Driven by the identity index (ferenda.dv_identity): each canonical
+case may have several source records, and metadata is merged field by
+field rather than picking one source whole. The API path is implemented
+(body from the record's `innehall` HTML, metadata from its curated
+fields), and the body is scanned for citations across every ported
+grammar (DV_PARSE_TYPES) to populate `references`. The legacy Word/OOXML
+path (for the ~1,600 legacy-only cases) remains the next increment; its
+seam is marked below.
+
+The body HTML is flat: each <p> is either a section heading (a short,
+all-caps or known-label paragraph) or a body paragraph (optionally
+numbered, as in HFD/HD prejudikat). We classify generously -- a
+misclassified heading still keeps its text, so nothing is lost.
+"""
+
+import functools
+import html as htmllib
+import json
+import re
+from dataclasses import replace
+from datetime import date
+
+from bs4 import BeautifulSoup
+
+from ..lib import markup, patch
+from ..lib.casenaming import COURT_URI_SLUG, case_uri, verdict_uri
+from ..lib.datasets import NAMEDACTS
+from ..lib.lagrum import (
+    ALL_PARSE_TYPES,
+    Ref,
+    interleave,
+    lagrum_uri,
+    load_namedacts,
+    sfs_parser,
+)
+from ..lib.pdftext import (
+    line_body_size,
+    line_from_runs,
+    page_paragraphs,
+    pdf_images,
+    pdf_pages,
+)
+from ..lib.util import MONTHS, approximate_date, shouted
+from .model import Avgorande, Fotnot, Hanvisning, Lagrum, Rubrik, Stycke
+from .structure import nest
+
+# Court decisions cite across the whole spectrum of legal sources, so the
+# DV citation scanner enables every ported grammar.
+DV_PARSE_TYPES = ALL_PARSE_TYPES
+
+# section labels that are headings even when not all-caps
+KNOWN_HEADINGS = {
+    "bakgrund", "yrkanden", "yrkanden m.m.", "skälen för avgörandet",
+    "domskäl", "domslut", "slut", "avgörande", "saken", "klagande",
+    "motpart", "motparter", "sökande", "parter", "rättslig reglering",
+    "rättslig reglering m.m.", "frågan i målet", "bakgrund och frågor",
+    "överklagat avgörande", "förhandsbesked", "beslut", "dom",
+}
+
+# leading numbered-paragraph marker, e.g. "1.    text" (HD/HFD prejudikat)
+RE_NUMPARA = re.compile(r"^(\d+)\.\s+(.*)", re.S)
+
+# stray separator punctuation the frozen registers leave on keyword entries:
+# a truncated continuation's trailing dash ("Allmän handling -"), a list's
+# trailing ";"/","/":" and a continuation line's leading dash. Terminal
+# periods are deliberately NOT stripped ("Personlig integritet m.m.").
+RE_NYCKELORD_JUNK = re.compile(r"^[\s\-–—]+|[\s\-–—;,:]+$")
+
+
+def clean_nyckelord(values):
+    """Keyword strings normalized for concept minting: stray edge punctuation
+    stripped, entries that are nothing but punctuation dropped. Every keyword
+    becomes a /begrepp/ page, so 'Allmän handling -' must not mint a concept
+    beside 'Allmän handling'."""
+    cleaned = (RE_NYCKELORD_JUNK.sub("", v).strip() for v in values)
+    return [v for v in cleaned if v]
+RE_SEPARATOR = re.compile(r"^[\W_]+$")
+
+# a printed underscore divider ("_________"), alone in its paragraph or glued
+# onto the end of one. It is furniture, never text, so it is removed before the
+# whitespace collapse -- a paragraph that is nothing else then collapses to
+# empty and RE_SEPARATOR drops it.
+RE_UNDERSCORE_RULE = re.compile(r"[ \t]*_{3,}[ \t]*")
+
+# the composition of a postal address: a box number or a postnummer followed by
+# a place name. A party/authority address block printed as a single line
+# ("Riksåklagaren Box 5553 114 85 Stockholm") is short, capitalized and carries
+# no terminal punctuation, so is_heading's last rule would promote it to a
+# Rubrik. It is body text.
+RE_ADDRESS_LINE = re.compile(
+    r"\b(?i:box)\s+\d+\b|\b\d{3}\s?\d{2}\s+[A-ZÅÄÖ][a-zåäöA-ZÅÄÖ]+")
+
+# an end-of-document footnote definition (HD's 2023+ format): "[N] text", the
+# marker often a stray <sup>[N]</sup>N pair so the digit leaks in doubled
+RE_FOOTDEF = re.compile(r"^\[(\d{1,2})\]\s*(.*)", re.S)
+
+# an inline footnote reference in body text: "[N]", optionally preceded by the
+# same OOXML artifact -- a duplicated single digit glued onto the word before it
+# (with at most one separating punctuation): "C-268/213,[3]" is "C-268/21" + ref
+# 3, "C-520/184[4]" is "C-520/18" + ref 4. The duplicate must equal N to count
+# as the artifact; an unrelated trailing digit is kept as real text.
+RE_FOOTREF = re.compile(r"(\d)?([.,]?)\[(\d{1,2})\]")
+
+COURT_DATE_ALIASES = {
+    "HDO": ("HD", "Högsta domstolen"),
+    "HFD": ("HFD", "Högsta förvaltningsdomstolen", "Regeringsrätten"),
+    "ADO": ("Arbetsdomstolen",),
+    "MIOD": ("Migrationsöverdomstolen",),
+    "MOD": ("Mark- och miljööverdomstolen", "Miljööverdomstolen"),
+    "PMOD": ("Patent- och marknadsöverdomstolen",),
+}
+
+
+def collapse(text):
+    text = text.replace("\xa0", " ")
+    text = RE_UNDERSCORE_RULE.sub(" ", text)
+    # collapse runs of spaces/tabs but keep explicit newlines (from <br>)
+    text = re.sub(r"[ \t]+", " ", text)
+    return "\n".join(line.strip() for line in text.split("\n")).strip()
+
+
+def is_heading(text):
+    # a trailing footnote marker must not make a short sentence look like a
+    # heading ("Brödtext.[1]" is body, not a rubrik)
+    text = re.sub(r"\[\d+\]", "", text).strip()
+    if "\n" in text or len(text) > 80:
+        return False
+    if RE_ADDRESS_LINE.search(text):
+        return False
+    if text.lower().rstrip(".") in KNOWN_HEADINGS:
+        return True
+    if shouted(text):
+        return True
+    # short, capitalized, no terminal sentence punctuation -> heading
+    return (text[:1].isupper() and text[-1:] not in ".!?:,"
+            and len(text.split()) <= 7)
+
+
+def _footnote(m):
+    """A Fotnot from an `RE_FOOTDEF` match, stripping the leading digit the
+    OOXML `<sup>[N]</sup>N` artifact duplicates into the footnote body."""
+    num, text = m.group(1), m.group(2)
+    text = re.sub(r"^%s\b[\s.,]*" % re.escape(num), "", text)
+    return Fotnot(num=num, text=collapse(text))
+
+
+def parse_body(html):
+    """`(blocks, footnotes)`: the Rubrik/Stycke body in document order plus the
+    end-of-document footnote definitions lifted out of the block stream.
+
+    Headings come from the source's own `<h1>`–`<h4>` tags as well as the `<p>`
+    heuristic (legacy records carry no heading tags); an `<h1>` is an instance
+    name ("Svea hovrätt"), `<h2>/<h3>` a section, and a `<p>` heading gets level
+    0. `<li>` content is still skipped, as it always was."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    blocks, footnotes = [], []
+    for el in soup.find_all(["h1", "h2", "h3", "h4", "p"]) or [soup]:
+        for br in el.find_all("br"):
+            br.replace_with("\n")
+        text = collapse(htmllib.unescape(el.get_text()))
+        if not text or RE_SEPARATOR.match(text):
+            continue
+        if el.name in ("h1", "h2", "h3", "h4"):
+            blocks.append(Rubrik(text=text, level=int(el.name[1])))
+            continue
+        fd = RE_FOOTDEF.match(text)
+        if fd:
+            footnotes.append(_footnote(fd))
+            continue
+        m = RE_NUMPARA.match(text)
+        if m:
+            blocks.append(Stycke(text=collapse(m.group(2)), ordinal=m.group(1)))
+        elif is_heading(text):
+            blocks.append(Rubrik(text=text))
+        else:
+            blocks.append(Stycke(text=text))
+    return blocks, footnotes
+
+
+def parse_innehall(html):
+    """The body blocks alone (footnotes dropped) -- the contract the structural
+    tests and any prose-only caller rely on."""
+    return parse_body(html)[0]
+
+
+def decision_dates_from_text(body, court, court_namn, referat, metadata_date=None,
+                             today=None):
+    """Return sane dates explicitly stated for the publishing court.
+
+    Publisher metadata occasionally contains a typo. Text wins only when the
+    publishing court itself is named in the formal final-ruling formula
+    ``meddelade den [date] följande [dom/beslut]``; lower-instance, cited-case
+    and earlier procedural dates are therefore not candidates. A malformed or
+    future date, one incompatible with the referat year, or multiple distinct
+    candidates are all retained: one referat can publish several decisions.
+    """
+    aliases = set(COURT_DATE_ALIASES.get(court, ()))
+    aliases.add(court_namn)
+    if "hovrätt" in court_namn.lower():
+        aliases.add("Hovrätten")
+    court_pattern = "|".join(re.escape(alias) for alias in
+                             sorted(aliases, key=len, reverse=True) if alias)
+    assert court_pattern, "publishing court name required for textual date"
+    prefix = (r"(?:^|[.!?]\s)(?:%s)(?:\s*\([^)]{0,500}\))?\s+"
+              % court_pattern)
+    date_pattern = r"(\d{1,2})\s+(%s)\s+((?:19|20)\d{2})" % "|".join(MONTHS)
+    patterns = [
+        re.compile(prefix + r"meddelade\s+den\s+" + date_pattern
+                   + r"\s+följande\s+(?:slutliga\s+)?(?:dom|beslut)\b",
+                   re.I),
+        re.compile(prefix + r"anförde\s+i\s+(?:slutligt\s+)?(?:dom|beslut)\s+"
+                   r"den\s+" + date_pattern
+                   + r"(?:\s+i\s+huvudsak)?\s+följande\b", re.I),
+    ]
+    iso_pattern = re.compile(
+        r"(?:^|[.!?]\s)(?:%s)\s*\(((?:19|20)\d{2})-(\d{2})-(\d{2})"
+        r"(?:,|\))" % court_pattern, re.I)
+    iso_group_pattern = re.compile(
+        r"(?:^|[.!?]\s)(?:%s)\s*\(([^)]{0,500})\)" % court_pattern,
+        re.I)
+    candidates = set()
+    limit = today or date.today()
+    referat_years = {int(year) for value in referat
+                     for year in re.findall(r"\b((?:19|20)\d{2})\b", value)}
+    try:
+        metadata_year = date.fromisoformat(metadata_date).year if metadata_date else None
+    except ValueError:
+        metadata_year = None
+
+    def accept(candidate):
+        if candidate > limit:
+            return
+        # A referat may be published the calendar year after the decision.
+        if referat_years and not any(candidate.year in (refyear - 1, refyear)
+                                     for refyear in referat_years):
+            return
+        if not referat_years and (metadata_year is None
+                                  or abs(candidate.year - metadata_year) > 2):
+            return
+        candidates.add(candidate.isoformat())
+
+    for block in body:
+        found = [match for pattern in patterns for match in pattern.findall(block.text)]
+        if re.match(r"^HD:s\s+(?:dom|domar|beslut)\s+meddelades\b",
+                    block.text, re.I):
+            found += re.findall(r"(?:den|d\.?)\s*" + date_pattern,
+                                block.text, re.I)
+        if ("hovrätt" in court_namn.lower()
+                and re.match(r"^Hovrättens\s+(?:domar|beslut)\s+meddelade?:",
+                             block.text, re.I)):
+            found += re.findall(r"(?:den|d\.?)\s*" + date_pattern,
+                                block.text, re.I)
+        for day, month, year in found:
+            try:
+                candidate = date(int(year), MONTHS[month.lower()], int(day))
+            except ValueError:
+                continue
+            accept(candidate)
+        for year, month, day in iso_pattern.findall(block.text):
+            try:
+                candidate = date(int(year), int(month), int(day))
+            except ValueError:
+                continue
+            accept(candidate)
+        for group in iso_group_pattern.findall(block.text):
+            for year, month, day in re.findall(
+                    r"((?:19|20)\d{2})-(\d{2})-(\d{2})", group):
+                try:
+                    candidate = date(int(year), int(month), int(day))
+                except ValueError:
+                    continue
+                accept(candidate)
+        if court == "PMOD":
+            for year, month, day in re.findall(
+                    r"^(?:DOM|BESLUT)\s*\(att meddelas\s+"
+                    r"((?:19|20)\d{2})-(\d{2})-(\d{2})\)", block.text, re.I):
+                try:
+                    candidate = date(int(year), int(month), int(day))
+                except ValueError:
+                    continue
+                accept(candidate)
+    return sorted(candidates)
+
+
+def decision_date_from_text(body, court, court_namn, referat, metadata_date=None,
+                            today=None):
+    """A single text-confirmed date, or None for zero/multiple decisions."""
+    candidates = decision_dates_from_text(
+        body, court, court_namn, referat, metadata_date, today)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+# court boilerplate on a raw verdict PDF: the running "HÖGSTA (FÖRVALTNINGS)?
+# DOMSTOLEN … Sida N (M)" header (also merged with the protokoll masthead on
+# page 1), a bare "Sida N (M)" page marker, and the address footer ("Dok.Id …
+# Postadress …" / "Postadress … Expeditionstid …"). Dropped before classification.
+RE_VERDICT_NOISE = re.compile(
+    r"^(?:HÖGSTA (?:FÖRVALTNINGS)?DOMSTOLEN\b.*)?Sida \d+\s*\(\d+\)"
+    r"|\bDok\.Id\b.*\bPostadress\b"
+    r"|\bPostadress\b.*\bExpeditionstid\b",
+    re.IGNORECASE)
+
+
+def classify_pdf(paged_paras):
+    """`(pageno, lib.pdftext.Para)` pairs (a raw verdict's PDF) -> body blocks,
+    each tagged with its source PDF page (for the facsimile links). Pure over the
+    stream so the rules are testable without poppler. A bold para is a heading; a
+    "N. text" para is a numbered domskäl stycke (the number injected from the
+    margin bitmap, see `parse_pdf_record`); every other para is a stycke. Court
+    running headers/footers and page markers are dropped (`RE_VERDICT_NOISE`)."""
+    blocks = []
+    for pageno, p in paged_paras:
+        text = collapse(p.text)
+        if not text or RE_SEPARATOR.match(text) or RE_VERDICT_NOISE.search(text):
+            continue
+        m = RE_NUMPARA.match(text)
+        if m:
+            blocks.append(Stycke(text=collapse(m.group(2)), ordinal=m.group(1),
+                                 page=pageno))
+        elif p.bold or is_heading(text):
+            blocks.append(Rubrik(text=text, page=pageno))
+        else:
+            blocks.append(Stycke(text=text, page=pageno))
+    return blocks
+
+
+def _body_lines(lines, body_size):
+    """Drop each line's sub-body-size runs, then any line left empty. A HD/HFD
+    verdict PDF sets its body at one dominant font size; everything smaller is
+    marginalia -- the "Sida N (M)" / "HÖGSTA DOMSTOLEN … {målnr}" running header
+    and the address footer, and critically the *vertical* "Dok.Id …" stamp whose
+    characters share a baseline with the last body line of each page (so they'd
+    otherwise splice a stray "1 3 " onto the text). Rebuilt from the surviving
+    runs in reading order, through `line_from_runs` -- text, style spans *and*
+    the whole-line style flags are derived from the same surviving runs, so none
+    of them can describe the run set that was dropped. The spans pointing past
+    the shorter text crashed 44 MMOD/PMOD verdicts; `bold`/`lead_bold` kept
+    describing the marginalia, so a bold heading sharing a baseline with the
+    vertical Dok.Id stamp came out non-bold and shipped as a `Stycke`."""
+    if not body_size:
+        return lines
+    out = []
+    for l in lines:
+        runs = [r for r in l.runs if r.size >= body_size]
+        if not runs:
+            continue
+        line = line_from_runs(runs, l.top, l.bottom)
+        if line.text:
+            out.append(line)
+    return out
+
+
+# the paragraph-number bitmap sits on its paragraph's first-line baseline; match
+# a number to the body line within this many page units of its top
+NUMBER_TOP_TOL = 6
+
+
+def _paragraph_numbers(pdf_path):
+    """`{page: [(top, n), …]}` for a raw verdict's domskäl paragraph numbers. HD/HFD
+    print these as tiny left-margin bitmaps (unselectable -- they never reach the
+    text layer), so the numbering vanished from the parse. They are the only small
+    images in the body (the one page-1 seal is large), and the numbering is
+    contiguous, so their reading order *is* the value: no OCR, just count. Returns
+    the assigned number keyed by page + vertical position, for `_inject_numbers`."""
+    small = sorted((page, top) for page, top, left, w, h in pdf_images(pdf_path)
+                   # a number bitmap: small, in the left margin -- not the page-1
+                   # seal (large) nor an inline figure (out in the text column)
+                   if 0 < h < 30 and 0 < w < 100 and left < 260)
+    by_page = {}
+    for n, (page, top) in enumerate(small, start=1):
+        by_page.setdefault(page, []).append((top, n))
+    return by_page
+
+
+def _inject_numbers(lines, numbers):
+    """Prepend "N. " to the body line each paragraph-number bitmap sits on, so
+    `RE_NUMPARA` recovers it as the stycke's ordinal. Returns `(lines, tops)` --
+    the tops are the injected lines' positions, handed to `page_paragraphs` as
+    forced paragraph breaks (HD numbers its paragraphs with no extra vertical gap,
+    so the reflow's gap heuristic would otherwise merge them and bury the number).
+    `numbers` is this page's `[(top, n), …]`."""
+    out, breaks = [], set()
+    for l in lines:
+        n = next((num for top, num in numbers
+                  if abs(l.top - top) <= NUMBER_TOP_TOL), None)
+        if n is not None:
+            # the number is prepended to the text, so the emphasis spans over it
+            # slide by exactly what was inserted
+            prefix = "%d. " % n
+            l = replace(l, text=prefix + l.text,
+                        spans=[(a + len(prefix), b + len(prefix), style)
+                               for a, b, style in l.spans])
+            breaks.add(l.top)
+        out.append(l)
+    return out, breaks
+
+
+def parse_pdf_record(d, pdf_path, basefile):
+    """A raw verdict whose text is only in a PDF attachment -> Avgorande. Before
+    the NJA referat is published a HD/HFD decision has no `innehall` HTML, only the
+    court's own PDF (`{målnummer}.pdf`); its body comes from `lib.pdftext` instead,
+    each block tagged with its PDF page (facsimile links) and the domskäl paragraph
+    numbers recovered from their margin bitmaps. Metadata (court, målnummer, date,
+    lagrum, …) is the record's, exactly as for the HTML path.
+
+    The patch hook is the PDF one: `pdf_pages` applies the document's patch to
+    the pdftohtml XML, as it does for every other PDF-bodied source. A case on
+    this path is exactly the kind that needs it -- an unpublished verdict has
+    had no editorial pass at all, and its party block prints in the clear."""
+    court_namn = d["domstol"]["domstolNamn"]
+    # `basefile` is required, not defaulted: the only thing a caller could
+    # achieve by omitting it is publishing an unredacted verdict silently.
+    # Pass None explicitly to parse without a patch key.
+    pages = list(pdf_pages(str(pdf_path),
+                           patch_key=("dv", basefile) if basefile else None))
+    body_size = line_body_size([l for _pageno, lines in pages for l in lines])
+    numbers = _paragraph_numbers(pdf_path)
+    paged = []
+    for pageno, lines in pages:
+        clean, breaks = _inject_numbers(_body_lines(lines, body_size),
+                                        numbers.get(pageno, []))
+        paged += [(pageno, p) for p in page_paragraphs(clean, court_namn, pageno,
+                                                       force_break_tops=breaks)]
+    return _avgorande(d, classify_pdf(paged), [])
+
+
+def record_intermediate(d):
+    """The API record as the text a dv patch is diffed against: the record's own
+    JSON, pretty-printed one field per line, with the innehåll HTML split into
+    one block element per line so a paragraph is one line of the diff.
+
+    The *whole record*, not just its body, because the two are one document. A
+    målnummer a court published in the clear appears both in `malNummerLista`
+    and in the running text, and a redaction reaching only one of them leaves
+    the other to be found — which is exactly how a redacted party finds their
+    own case again. On this route everything parse reads is patchable.
+
+    Two things the patch does *not* reach, both stated here because the editor
+    is handed the whole record and would otherwise expect it to.
+    `gruppKorrelationsnummer` is read off the raw record by the driver
+    (`build.dv_parse_run`, for the artifact's source_url) before this function
+    ever sees it, so editing that field has no effect. And on the PDF route
+    (`parse_pdf_record`) — a verdict published before its referat, with no
+    innehåll — the patch targets the pdftohtml XML, so no record field is
+    reachable at all and a målnummer can only be redacted in the body. Those
+    documents would need both texts under one patch key, which one diff cannot
+    span.
+
+    The innehåll is split rather than left as one JSON string because the API
+    ships a tenth of its records with the whole decision on a single line (see
+    `lib.markup`); as a list of block elements each paragraph is its own line."""
+    innehall = d.get("innehall")
+    return json.dumps(
+        {**d, "innehall": markup.block_lines(innehall).split("\n") if innehall else innehall},
+        indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def record_from_intermediate(text):
+    """Inverse of `record_intermediate`: the patched intermediate back to the
+    record dict the rest of parse reads."""
+    d = json.loads(text)
+    if isinstance(d.get("innehall"), list):
+        d["innehall"] = "\n".join(d["innehall"])
+    return d
+
+
+def parse_api_record(d, basefile=None):
+    """API record dict -> Avgorande. When `basefile` is given, apply any curated
+    patch to the record (a correction, or an obfuscated redaction of a party)
+    before it is parsed — over the whole record, see `record_intermediate`.
+    Only a document that actually has a patch is round-tripped through that
+    form, so the common path stays untouched."""
+    if basefile is not None and patch.has_patch("dv", basefile):
+        d = record_from_intermediate(
+            patch.apply("dv", basefile, record_intermediate(d)))
+    body, footnotes = parse_body(d.get("innehall"))
+    return _avgorande(d, body, footnotes)
+
+
+def _avgorande(d, body, footnotes):
+    """Assemble the `Avgorande` from a record's metadata plus an already-parsed
+    body/footnotes -- shared by the innehåll-HTML path and the raw-verdict PDF
+    path, so both produce byte-identical metadata."""
+    text_dates = decision_dates_from_text(
+        body, d["domstol"]["domstolKod"], d["domstol"]["domstolNamn"],
+        d.get("referatNummerLista", []), d.get("avgorandedatum"))
+    return Avgorande(
+        court=d["domstol"]["domstolKod"],
+        court_namn=d["domstol"]["domstolNamn"],
+        malnummer=[m.strip() for m in d.get("malNummerLista", [])],
+        referat=[r.strip() for r in d.get("referatNummerLista", [])],
+        avgorandedatum=max(text_dates) if text_dates else d.get("avgorandedatum"),
+        avgorandedatum_lista=text_dates if len(text_dates) > 1 else [],
+        publiceringsform=d.get("publiceringsform"),
+        typ=d.get("typ"),
+        rattsomrade=[r.strip() for r in d.get("rattsomradeLista", [])],
+        nyckelord=clean_nyckelord(d.get("nyckelordLista", [])),
+        lagrum=[Lagrum(referens=l.get("referens", "").strip(),
+                       sfsnummer=l.get("sfsNummer"))
+                for l in d.get("lagrumLista", [])],
+        forarbeten=[f.strip() for f in d.get("forarbeteLista", [])
+                    if f.strip() and not RE_SEPARATOR.match(f.strip())],
+        sammanfattning=(d.get("sammanfattning") or "").strip() or None,
+        # europarattsligaAvgorandenLista never holds citations, only coarse
+        # topic labels (3 distinct values corpus-wide, 2026-07-18) -- kept as
+        # labels beside rattsomrade, never projected as relation edges
+        europarattslig=[e.strip() for e in
+                        d.get("europarattsligaAvgorandenLista", [])
+                        if e.strip()],
+        related=[Hanvisning(fritext=p["fritext"].strip(),
+                            grupp=p.get("gruppKorrelationsnummer"))
+                 for p in d.get("hanvisadePubliceringarLista", [])],
+        litteratur=[", ".join(part for part in
+                              (l.get("forfattare", "").strip(),
+                               l.get("titel", "").strip()) if part)
+                    for l in d.get("litteraturLista", [])],
+        body=body,
+        footnotes=footnotes,
+        sources=["domstol"],
+    )
+
+
+def extract_footrefs(text):
+    """`(clean, marks)`: `text` with its inline footnote markers removed (and
+    the OOXML duplicated-digit artifact undone, so the citation scanner sees the
+    real case number), plus `[(position, num), …]` for each marker -- the
+    position being where the superscript sits in `clean`."""
+    parts, marks, last, clean_len = [], [], 0, 0
+    for m in RE_FOOTREF.finditer(text):
+        gap = text[last:m.start()]
+        parts.append(gap)
+        clean_len += len(gap)
+        stray, punct, num = m.group(1), m.group(2), m.group(3)
+        if not (stray is not None and stray == num):  # drop only the doubled digit
+            kept = (stray or "") + punct              # stray/punct here is real text
+            parts.append(kept)
+            clean_len += len(kept)
+        marks.append((clean_len, num))
+        last = m.end()
+    parts.append(text[last:])
+    return "".join(parts), marks
+
+
+def scan_body(body, written):
+    """Each body block's text as an inline-run list (plain `str` runs
+    interleaved with `{"predicate", "uri", "text"}` link dicts at their
+    exact positions) -- the same shape SFS emits for its text nodes, so the
+    discovered citations live inline rather than in a flat list. A court
+    decision has no base law, so the scanner runs with an empty context
+    (relative refs without a named law stay unlinked); one parser threads
+    the whole body in document order so "samma lag" and in-document
+    law-name learning carry across blocks. Inline footnote markers are lifted
+    out as zero-width `kind="footnote"` runs."""
+    parser = _scanner()
+    # fresh per-document state, and the decision's own date: a verdict citing
+    # "11 kap. 1 § socialtjänstlagen" means the act in force when it was
+    # decided, not the one that replaced it years later
+    parser.reset(written=written)
+    runs = []
+    for b in body:
+        clean, marks = extract_footrefs(b.text)
+        refs = parser.parse_text(clean, context={})
+        refs += [Ref(p, p, num, "dcterms:references", "#fn-%s" % num,
+                     kind="footnote") for p, num in marks]
+        runs.append(interleave(clean, refs))
+    return runs
+
+
+def scan_footnotes(footnotes, written):
+    """Footnote-body texts as inline-run lists, citation-scanned like the body
+    (HD's footnotes cite CJEU case law and EU regulations)."""
+    parser = _scanner()
+    parser.reset(written=written)
+    return [interleave(fn.text, parser.parse_text(fn.text, context={}))
+            for fn in footnotes]
+
+
+@functools.cache
+def _scanner():
+    """The body citation scanner, built once (grammar compilation is the
+    expensive part); scan_body resets its per-document state each call.
+    KORTLAGRUM is enabled (court decisions cite both full law names and
+    abbreviations -- "12 kap. 57 § JB", "10 kap. 10 § RB"); the EU-act table lets
+    "artikel 6 i dataskyddsförordningen" pinpoint the regulation's article."""
+    return sfs_parser("dom", DV_PARSE_TYPES,
+                      named_acts=load_namedacts(NAMEDACTS))
+
+
+def curated_runs(text, predicate, written, fallback_uri=None):
+    """One curated metadata string normalized to an inline-run list through the
+    same citation grammar the body uses, every resolved reference carrying the
+    field's typed `predicate`. Unresolved text survives as plain runs -- a
+    failed normalization retains the editor's string, it never erases it. When
+    the grammar finds nothing and the source supplies an authoritative identity
+    beside the string (lagrumLista's sfsNummer, a hanvisning's grupp join), the
+    whole string links to that `fallback_uri` instead.
+
+    Dated like the body: `lagrum` is the most law-name-dense field a decision
+    has, and it is projected as the `rpubl:lagrum` relation edges *and* the
+    displayed lagrum list, so an undated scan here left the decision's most
+    prominent citations resolving against today's act while its prose no longer
+    did."""
+    parser = _scanner()
+    parser.reset(written=written)
+    refs = parser.parse_text(text, context={}, predicate=predicate)
+    if not refs and fallback_uri:
+        return [{"predicate": predicate, "uri": fallback_uri, "text": text}]
+    return interleave(text, refs)
+
+
+def _related_entry(h, grupp_uris, written):
+    """A hanvisad publicering as a curated artifact entry. The fritext grammar
+    resolves the published citation form; a fritext the grammar cannot read
+    falls back to the grupp join (the cited case's publication group), which is
+    authoritative but only present on newer records. When both resolve and
+    *disagree* -- a grammar mis-read, or an editor's string citing a different
+    case than the group names -- the grammar's link stands but the conflict is
+    recorded as `grupp_konflikt`, so the acceptance pass can list exactly the
+    edges that may be wrong instead of the disagreement being undetectable."""
+    grupp_id = grupp_uris.get(h.grupp) if h.grupp else None
+    grupp_uri = case_uri(grupp_id) if grupp_id else None
+    runs = curated_runs(h.fritext, "rpubl:rattsfallshanvisning", written,
+                        grupp_uri)
+    entry = {"text": h.fritext, "runs": runs}
+    if h.grupp:
+        entry["grupp"] = h.grupp
+    if grupp_uri and grupp_uri not in [r["uri"] for r in runs
+                                       if isinstance(r, dict)]:
+        entry["grupp_konflikt"] = grupp_uri
+    return entry
+
+
+def to_artifact(av, canonical_id=None, grupp_uris=None):
+    grupp_uris = grupp_uris or {}
+    # the decision's own date, threaded to every scan the artifact makes: the
+    # body, the curated metadata fields and the footnotes
+    written = approximate_date(av.avgorandedatum)
+    runs = scan_body(av.body, written=written)
+    def block(b, text):
+        # `page` (the source PDF page) is carried only for a raw verdict parsed
+        # from its PDF -- it drives the facsimile links; the HTML path leaves it None
+        page = {"page": b.page} if b.page else {}
+        if isinstance(b, Rubrik):
+            return {"type": "rubrik", "level": b.level, "text": text, **page}
+        return {"type": "stycke", "ordinal": b.ordinal, "text": text, **page}
+    cid = canonical_id or (av.referat[0] if av.referat
+                           else "%s %s" % (av.court, av.malnummer[0])
+                           if av.malnummer else av.court)
+    # a referat case mints through the citation grammar; a raw verdict gets
+    # the old published /dom/{publisher}/{malnummer}/{date} scheme when all
+    # three facts are known, and only a fact-less stray keeps the slug URI
+    uri = (verdict_uri(av.court, av.malnummer[0], av.avgorandedatum)
+           if not av.referat and av.malnummer and av.avgorandedatum
+           and av.court in COURT_URI_SLUG
+           else case_uri(cid))
+    return {
+        "uri": uri,
+        "court": av.court,
+        "court_namn": av.court_namn,
+        "malnummer": av.malnummer,
+        "referat": av.referat,
+        "avgorandedatum": av.avgorandedatum,
+        "avgorandedatum_lista": av.avgorandedatum_lista,
+        "metadata": {
+            "publiceringsform": av.publiceringsform,
+            "typ": av.typ,
+            "rattsomrade": av.rattsomrade,
+            "europarattslig": av.europarattslig,
+            "nyckelord": av.nyckelord,
+            # the curated fields, normalized through the citation grammar into
+            # the same inline-run shape body text uses ({"text": raw string,
+            # "runs": [...]}) -- the typed relation edges the catalog projects
+            # (rpubl:lagrum / rpubl:forarbete / rpubl:rattsfallshanvisning /
+            # dcterms:relation), with unresolved strings retained as plain runs
+            "lagrum": [{"text": l.referens, "sfsnummer": l.sfsnummer,
+                        "runs": curated_runs(
+                            l.referens, "rpubl:lagrum", written,
+                            lagrum_uri({"law": l.sfsnummer})
+                            if l.sfsnummer else None)}
+                       for l in av.lagrum if l.referens],
+            "forarbeten": [{"text": f,
+                            "runs": curated_runs(f, "rpubl:forarbete", written)}
+                           for f in av.forarbeten],
+            "sammanfattning": av.sammanfattning,
+            "related": [_related_entry(h, grupp_uris, written)
+                        for h in av.related],
+            "litteratur": [{"text": t,
+                            "runs": curated_runs(t, "dcterms:relation", written)}
+                           for t in av.litteratur if t],
+        },
+        # the content-bearing instance/ruling tree (delmål → instans →
+        # betänkande/dom → domskäl/domslut → …) with the prose attached as leaves
+        # (the DV structural golden's reducer drops the prose, comparing only the
+        # skeleton); the renderer walks it to show the instance structure
+        "structure": nest([block(b, text)
+                           for b, text in zip(av.body, runs, strict=True)]),
+        "footnotes": [{"mark": fn.num, "text": runs}
+                      for fn, runs in zip(av.footnotes,
+                                          scan_footnotes(av.footnotes, written),
+                                          strict=True)],
+        "sources": av.sources,
+    }
+
+
+def api_member(case):
+    """The API (domstol) record parse reads for a case. When a raw verdict is
+    folded into its published referat (R2) there are several domstol members;
+    prefer the referat member -- it carries the innehåll HTML -- over the raw
+    verdict, whose text is only a PDF attachment."""
+    api = [m for m in case["members"] if m["store"] == "domstol"]
+    return next((m for m in api if m.get("referat")), api[0] if api else None)

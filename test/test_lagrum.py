@@ -1,5 +1,4 @@
-"""Run the original legalref test corpus against the new Lark-based
-lagrum recognizer (accommodanda.lagrum).
+"""Run the legalref reference corpus against the Lark-based lagrum recognizer.
 
 Each test file (windows-1252) holds plaintext input, a blank line, and
 the expected output as a <list> serialization of alternating <str> and
@@ -7,14 +6,12 @@ the expected output as a <list> serialization of alternating <str> and
 by "---" lines, optionally prefixed with state directives (BASE:{...},
 NOBASE:, RESET:).
 
-The new recognizer reports one span per reference *expression* rather
-than the old engine's per-token spans, so the comparison here is the
+The recognizer reports one span per reference *expression* rather
+than the reference scanner's per-token spans, so the comparison here is the
 ordered sequence of link URIs, which both engines agree on.
 
-Only the grammars the new pipeline has ported are driven: SFS (lagrum)
-and EGLag (EU legislation). The other directories (Short, Simple,
-Regpubl, DV, ECJ, Avg) cover parser types that belong to later stages
-of the rewrite.
+Only the SFS and EU legislation grammars are used here. Other directories
+cover parser types tested by their own maintained suites.
 """
 
 import ast
@@ -25,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import catalog
-from accommodanda.lib.datasets import NAMEDACTS
-from accommodanda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
-from accommodanda.lib.lagrum import (
+from ferenda.lib import catalog
+from ferenda.lib.datasets import NAMEDACTS
+from ferenda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
+from ferenda.lib.lagrum import (
     ALL_PARSE_TYPES,
     EMDRATTSFALL,
     ENGLAGRUM,
@@ -55,15 +52,15 @@ from accommodanda.lib.lagrum import (
     with_indefinite_aliases,
     yield_overlaps,
 )
-from accommodanda.lib.text import runs_text
-from accommodanda.lib.util import normalize_space
+from ferenda.lib.text import runs_text
+from ferenda.lib.util import normalize_space
 
 TESTROOT = Path(__file__).parent / "files" / "legalref"
 NAMEDLAWS = load_namedlaws(SFS_NAMEDLAWS)
 ABBREVIATIONS = load_abbreviations(SFS_NAMEDLAWS)
 NAMEDACTS_MAP = load_namedacts(NAMEDACTS)
 
-# Tests the old engine also failed (its driver listed them as broken);
+# Tests the reference scanner also failed (its driver listed them as broken);
 # the expected output in these files is hand-authored desired behavior.
 OLD_BROKEN = {
     "sfs-tricky-bokstavslista",
@@ -106,7 +103,7 @@ def run_testfile(path, abbreviations=None, parse_types=None):
 
 def make_params(subdir):
     for path in sorted((TESTROOT / subdir).glob("*.txt")):
-        marks = ([pytest.mark.xfail(reason="old engine failed this too",
+        marks = ([pytest.mark.xfail(reason="reference expectation is unresolved",
                                     strict=False)]
                  if path.stem in OLD_BROKEN else [])
         yield pytest.param(path, id=path.stem, marks=marks)
@@ -412,12 +409,9 @@ def test_avg_multi_dnr_spans(text, links):
 def test_anonymous_law_ref_is_one_pinpointed_link():
     """S2: "1 kap. 18 § lagen (2016:1145) om offentlig upphandling" is one link.
 
-    The old engine split it — a pinpoint link plus a bare link to the act as a
-    whole — because it could not tell where the law's name ended and the
-    sentence resumed. That is only an argument against extending the link past
-    the SFS number, and this does not: the span ends at the closing paren and
-    the trailing "om …" stays plain text. The second edge was pure noise, and it
-    made every pinpointed citation also count as a whole-act citation.
+    The span ends at the closing parenthesis. The trailing "om …" stays plain
+    text. A second whole-act reference would be noise because the pinpointed
+    citation already identifies the act.
     """
     parser = LagrumParser(NAMEDLAWS, basefile="9999:999", parse_types=[LAGRUM])
 

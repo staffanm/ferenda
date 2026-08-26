@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import poi
+from ferenda.lib import poi
 
 JARS = sorted((Path(__file__).parents[1] / "vendor" / "poi").glob("*.jar"))
 
@@ -21,7 +21,7 @@ JARS = sorted((Path(__file__).parents[1] / "vendor" / "poi").glob("*.jar"))
 def test_importing_build_loads_no_native_bridges():
     # a fresh interpreter, because this test process may legitimately have
     # imported anything; the claim is about what build.py *itself* drags in
-    code = ("import sys; import accommodanda.build; "
+    code = ("import sys; import ferenda.build; "
             "bad = [m for m in ('_jpype', 'greenlet') if m in sys.modules]; "
             "sys.exit(repr(bad) if bad else 0)")
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)

@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lawreview import lawpub
-from accommodanda.lawreview import parse as lawreview_parse
-from accommodanda.lawreview.lawpub import BY_ICON, kod_from_icon
-from accommodanda.lib import compress, page
+from ferenda.lawreview import lawpub
+from ferenda.lawreview import parse as lawreview_parse
+from ferenda.lawreview.lawpub import BY_ICON, kod_from_icon
+from ferenda.lib import compress, page
 
 FILES = Path(__file__).parent / "files"
 

@@ -6,7 +6,7 @@ enskilda firmor and personal names in the clear.
 The courts anonymise parties to initials as a matter of course, so what survives
 into a published referat is what that anonymisation *missed* -- a number in an
 exhibit list, a fastighet in a bodelning, a firm carrying its owner's name.
-Those are the ones worth a curated patch (`accommodanda/patches/`), and each is
+Those are the ones worth a curated patch (`ferenda/patches/`), and each is
 an editorial call: this only finds and ranks candidates, it changes nothing.
 
   python tools/pii_scan.py [--source dv] [--out report.md] [--since 30d]
@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.lib import compress, layout
+from ferenda.lib import compress, layout
 
 # --------------------------------------------------------------------------
 # patterns

@@ -37,7 +37,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.lib import (
+from ferenda.lib import (
     git,  # noqa: E402  (shared git-CLI wrapper)
     layout,  # noqa: E402  (basefile -> storage relpath)
     wikitext,  # noqa: E402  (reused for faithful conversion)

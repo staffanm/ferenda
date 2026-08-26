@@ -10,10 +10,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from accommodanda.forarbete import aigenomforande as A
-from accommodanda.forarbete import kommentar
-from accommodanda.lib import annstore, compress, layout
-from accommodanda.lib.util import normalize_fold as _norm
+from ferenda.forarbete import aigenomforande as A
+from ferenda.forarbete import kommentar
+from ferenda.lib import annstore, compress, layout
+from ferenda.lib.util import normalize_fold as _norm
 
 SP = Path(__file__).parent
 PROPS = [3, 16, 28, 43, 84, 108, 118, 124, 129, 146, 159, 183, 186, 202,

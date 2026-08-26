@@ -2,7 +2,7 @@
 from an EU act's official title (shown in the browse index instead of the bare
 CELEX, and stored on the artifact)."""
 
-from accommodanda.eurlex.model import official_short_title, short_label
+from ferenda.eurlex.model import official_short_title, short_label
 
 # the cyberresilience regulation (CRA): its short title is a single compound
 # word in the trailing parenthesis, ahead of the EEA-relevance boilerplate

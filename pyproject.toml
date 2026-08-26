@@ -61,7 +61,7 @@ dependencies = [
     # It reached the venv transitively via rich; declared here because we import
     # it directly, the same reason httpx is spelled out above.
     "markdown-it-py",
-    # the public MCP server mounted at /mcp (accommodanda/api/mcp.py) -- MCPServer +
+    # the public MCP server mounted at /mcp (ferenda/api/mcp.py) -- MCPServer +
     # the Streamable HTTP transport. >=2.0 is what speaks the 2026-07-28 protocol
     # revision (no initialize handshake, no Mcp-Session-Id); the 1.x line stops at
     # 2025-11-25 and is maintenance-only. One server still serves both eras.
@@ -112,7 +112,7 @@ dev = [
 ]
 
 [project.scripts]
-lagen = "accommodanda.build:main"
+lagen = "ferenda.build:main"
 
 [project.urls]
 Homepage = "https://github.com/staffanm/ferenda/"
@@ -134,17 +134,15 @@ zip-safe = false
        "data/*"]
 
 # --- Linting / type checking ---
-# Scoped to the active accommodanda/ package; the legacy ferenda/ and lagen/
-# trees are out of scope. The .claude Stop hook runs `ruff check` + `ty check`
-# on the accommodanda/ files edited each turn. Run the whole package by hand:
-#   uv run ruff check accommodanda
-#   uv run ty check accommodanda
+# Scoped to the ferenda/ package. The .claude Stop hook runs `ruff check` +
+# `ty check` on the package files edited each turn. Run the whole package:
+#   uv run ruff check ferenda
+#   uv run ty check ferenda
 
 [tool.ruff]
 target-version = "py314"
-# Only the rebuilt package; never lint the legacy tree.
-include = ["accommodanda/**/*.py"]
-extend-exclude = ["ferenda", "lagen", "site", "doc", "tools", "test"]
+include = ["ferenda/**/*.py"]
+extend-exclude = ["tools", "test"]
 
 [tool.ruff.lint]
 # High-signal sets, enforced by the Stop hook (see docs/conventions.md):
@@ -162,27 +160,24 @@ select = ["F", "I", "B", "BLE", "PLC0415", "S110", "S112", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI's `Depends(...)`-in-default idiom.
-"accommodanda/api/app.py" = ["B008"]
-"accommodanda/api/ops.py" = ["B008"]
-"accommodanda/api/auth.py" = ["B008"]
-"accommodanda/api/edit.py" = ["B008"]
-"accommodanda/api/patch.py" = ["B008"]
-"accommodanda/api/graphics.py" = ["B008"]
+"ferenda/api/app.py" = ["B008"]
+"ferenda/api/ops.py" = ["B008"]
+"ferenda/api/auth.py" = ["B008"]
+"ferenda/api/edit.py" = ["B008"]
+"ferenda/api/patch.py" = ["B008"]
+"ferenda/api/graphics.py" = ["B008"]
 # Sanctioned in-function-import sites (rule:no-infunction-imports): POI/jpype
 # classes resolve only after startJVM (poi_worker), and the playwright import
 # is deferred so build workers never load the greenlet C extension they
 # don't use.
-"accommodanda/lib/poi_worker.py" = ["PLC0415"]
-"accommodanda/lib/browser.py" = ["PLC0415"]
+"ferenda/lib/poi_worker.py" = ["PLC0415"]
+"ferenda/lib/browser.py" = ["PLC0415"]
 
 [tool.ty.src]
-include = ["accommodanda"]
+include = ["ferenda"]
 
 [tool.pytest.ini_options]
-# Make a bare `pytest` (or `pytest test/`) collect exactly the new suites.
-# The legacy unittest files (test/integration*.py, test/test[A-Z]*.py,
-# test/functional*.py, examplerepos.py, quiet.py) don't import under modern
-# Python and are out of scope -- never "fix" them (rule:legacy-read-only).
+# Make a bare `pytest` (or `pytest test/`) collect the maintained suites.
 testpaths = ["test"]
 python_files = ["test_*.py"]
 # test/files/ is fixture data (some of it happens to be named test_*.py)

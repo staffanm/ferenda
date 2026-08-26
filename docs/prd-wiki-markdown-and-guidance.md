@@ -1,7 +1,7 @@
 # PRD — Git-backed markdown authoring + curated/AI guidance linking
 
 Status: **Steps 1–4 landed** · Owner: Staffan · Scope:
-`accommodanda/wiki`, `accommodanda/lib`, build driver, a new content repo
+`ferenda/wiki`, `ferenda/lib`, build driver, a new content repo
 (`../lagen-wiki`, a sibling).
 
 ## 0. Summary
@@ -36,7 +36,7 @@ for the next:
 
 - Source of truth: a MediaWiki XML export under
   `site/data/mediawiki/downloaded/` (`dump.xml` plus per-page splits).
-- `accommodanda/wiki/parse.py` projects two **annotation/value-add sources**:
+- `ferenda/wiki/parse.py` projects two **annotation/value-add sources**:
   - **`begrepp`** (`begrepp_artifact`) — a concept page published at
     `begrepp/<Name>`; `{uri, type, title, categories, body[]}`.
   - **`kommentar`** (`kommentar_artifact`) — per-paragraph statute commentary;
@@ -529,8 +529,7 @@ assembly, and an end-to-end render of sub-article + recital guidance.
 - **Rollback.** Step 1 has landed (the markdown sibling repo is the source of
   truth); `lib/wikitext.py` is retained as the converter/diff reference, so the
   conversion remains re-runnable from the DB.
-- **Docs.** README documents the sibling checkout + content layout; `REWRITE.md`
-  reflects the markdown source.
+- **Docs.** README documents the sibling checkout and content layout.
 
 ## 6. Open questions
 

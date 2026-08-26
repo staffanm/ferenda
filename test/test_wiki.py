@@ -1,5 +1,5 @@
 """Tests for the markdown commentary/concept parsing
-(accommodanda.lib.markdown + accommodanda.wiki.parse), the wikitext->markdown
+(ferenda.lib.markdown + ferenda.wiki.parse), the wikitext->markdown
 conversion's losslessness (tools/mediawiki_to_markdown), and the
 concept-synthesis that unifies extracted definitions/keywords with the wiki
 concepts."""
@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.lib import annstore, catalog, markdown
-from accommodanda.wiki import annotate
-from accommodanda.wiki import parse as wiki
-from accommodanda.lib import page
-from accommodanda.eurlex import render as eurlex_render
+from ferenda.lib import annstore, catalog, markdown
+from ferenda.wiki import annotate
+from ferenda.wiki import parse as wiki
+from ferenda.lib import page
+from ferenda.eurlex import render as eurlex_render
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 import mediawiki_to_markdown as conv  # noqa: E402
@@ -678,7 +678,7 @@ def test_synthesize_concepts_mints_stubs_for_unauthored(tmp_path):
         con, "https://lagen.nu/begrepp/Uppsåt")] == ["https://lagen.nu/1962:700"]
 
 
-# -- Step 4: AI guidance linker (accommodanda.wiki.annotate) --------------------
+# -- Step 4: AI guidance linker (ferenda.wiki.annotate) --------------------
 
 _HOST = {"structure": [
     {"type": "recital", "num": "15", "text": ["Skäl om säkerhet och skydd."]},

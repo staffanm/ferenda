@@ -6,8 +6,8 @@ policy surface added for the raw ``downloaded/`` tree."""
 
 import json
 
-from accommodanda import config
-from accommodanda.lib import compress
+from ferenda import config
+from ferenda.lib import compress
 
 
 def test_write_download_large_text_stores_only_br(tmp_path, monkeypatch):

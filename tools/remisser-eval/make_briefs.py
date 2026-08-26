@@ -15,9 +15,9 @@ import json
 import sys
 from pathlib import Path
 
-from accommodanda.lib import compress, layout
-from accommodanda.lib.util import basefile_slug
-from accommodanda.remisser import ai_analyze
+from ferenda.lib import compress, layout
+from ferenda.lib.util import basefile_slug
+from ferenda.remisser import ai_analyze
 
 BRIEF = """REMISSVAR: %s
 ORGANISATION: %s

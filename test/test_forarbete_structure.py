@@ -1,7 +1,7 @@
 """Förarbete hierarchy: the flat block run grouped into a nested section tree
-(accommodanda/forarbete/structure.py)."""
+(ferenda/forarbete/structure.py)."""
 
-from accommodanda.forarbete.structure import flatten, nest
+from ferenda.forarbete.structure import flatten, nest
 
 
 def _blocks():

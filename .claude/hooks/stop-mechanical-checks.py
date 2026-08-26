@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Stop hook: run ruff + ty on the accommodanda/ files edited this session.
+Stop hook: run ruff + ty on the ferenda/ files edited this session.
 
 Extracts file_path values from Edit/Write/MultiEdit tool calls in the session
-transcript, keeps existing .py files under accommodanda/ (the active package --
-legacy ferenda/ and lagen/ are deliberately out of scope), and runs
+transcript, keeps existing .py files under ferenda/, and runs
 `ruff check` and `ty check` on just those files. Findings are fed back to
 Claude via the Stop hook block mechanism so they get addressed before the turn
 ends. Skips itself when `stop_hook_active` is true to avoid loops on issues
@@ -12,7 +11,7 @@ that genuinely cannot be auto-fixed (suppress with a localized
 `# ty: ignore[rule]  # reason` instead).
 
 Adapted from the vibe repo's stop-mechanical-checks.py, trimmed to one repo
-root (no worktree grouping) and scoped to the accommodanda/ package.
+root (no worktree grouping) and scoped to the ferenda/ package.
 """
 from __future__ import annotations
 
@@ -112,7 +111,7 @@ def _main() -> int:
         return 0
 
     project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
-    pkg = (project_dir / "accommodanda").resolve()
+    pkg = (project_dir / "ferenda").resolve()
 
     files: set[str] = set()
     for raw in _edited_paths(transcript):
@@ -154,7 +153,7 @@ def _main() -> int:
         return 0
 
     parts = [
-        "Mechanical checks failed on accommodanda/ files edited this session.",
+        "Mechanical checks failed on ferenda/ files edited this session.",
         "Fix these before stopping. Prefer a real fix; suppressions need a "
         "same-line rationale naming the constraint (rule:fix-dont-annotate); "
         "see docs/conventions.md.",

@@ -1,20 +1,19 @@
-# Running accommodanda
+# Running Ferenda
 
 How to go from a fresh checkout to a running `lagen all serve`. This is the
 operator's guide: prerequisites, services, `config.yml`, the build pipeline,
-and deployment. For *why* the system is shaped this way read
-[`../../REWRITE.md`](../../REWRITE.md); for the module map read
-[`../../accommodanda/README.md`](../../accommodanda/README.md).
+and deployment. For the architecture and module map, read
+[`../../ferenda/README.md`](../../ferenda/README.md).
 
 ## 1. Prerequisites
 
 | Requirement | Why | Needed for |
 |---|---|---|
-| **Python 3.10+** | the codebase targets 3.10+ only | everything |
+| **Python 3.14+** | the codebase targets Python 3.14 or later | everything |
 | **[uv](https://docs.astral.sh/uv/)** | dependency + venv management; `uv sync` installs all of `pyproject.toml` | everything |
-| **OpenSearch 2.x** | full-text search index (`lib/search.py`) | `index`, search API |
+| **OpenSearch 3.7** | full-text search index (`lib/search.py`) | `index`, search API |
 | **poppler-utils** (`pdftohtml`, `pdftotext`) | PDF body extraction | eurlex/coe/forarbete/foreskrift/avg parse |
-| **A JVM (OpenJDK 21) + POI jars** | reads binary `.doc`/`.docx` via Apache POI | **legacy DV Word path only** |
+| **A JVM (OpenJDK 21) + POI jars** | reads binary `.doc`/`.docx` via Apache POI | DV Word inputs only |
 | **tesseract (+ swe), ocrmypdf** | OCR of scanned PDFs | forarbete re-OCR sidecars (optional) |
 | **git** | the wiki/site content repo is git-backed; the inline editor commits to it | wiki/site parse, inline editing |
 
@@ -30,7 +29,7 @@ uv sync
 This creates a virtual environment (`.venv/` in the repo root) and installs
 everything into it, including `jpype1` (the JVM bridge). It also installs the
 project itself, which registers a console script named **`lagen`** — the single
-entry point for the whole pipeline (it maps to `accommodanda.build:main`).
+entry point for the whole pipeline (it maps to `ferenda.build:main`).
 
 The `lagen` script lives at `.venv/bin/lagen`. To call it as just `lagen`,
 **activate the environment** so `.venv/bin` is on your `PATH`:
@@ -46,7 +45,7 @@ and `python …` directly. If you'd rather not activate, prefix any command with
 resolves the command inside `.venv` without touching your shell's `PATH`. The
 two are equivalent; use whichever you prefer.
 
-### JVM + POI (only if you parse legacy DV Word documents)
+### JVM + POI for DV Word documents
 
 ```sh
 sudo apt-get install -y openjdk-21-jdk-headless   # Ubuntu 24.04
@@ -60,7 +59,7 @@ entirely if you only run the API-backed DV path (the default).
 ### OpenSearch
 
 Search (`lagen … index`, the `/api/v1/search` endpoint, and the ⌘K palette)
-needs OpenSearch 2.x reachable at `opensearch_url` (default
+needs OpenSearch 3.7 reachable at `opensearch_url` (default
 `http://localhost:9200`). The repo ships a compose file that starts it:
 
 ```sh
@@ -83,7 +82,6 @@ default — an absent `config.yml` runs a dev checkout out of the box.
 # --- corpus location -------------------------------------------------
 data_root: /srv/lagen/data          # downloaded + artifact + generated trees; default <repo>/site/data
 wiki_root: ../lagen-wiki             # git-backed content repo (begrepp/kommentar/site/ann/patches); default ../lagen-wiki
-legacy_root: ../ferenda.old/data     # frozen legacy corpora, referenced in place; default ../ferenda.old/data
 
 # --- services --------------------------------------------------------
 opensearch_url: http://localhost:9200   # search cluster
@@ -112,7 +110,6 @@ editors:                             # hand-curated; there is no self-signup
 |---|---|---|
 | `data_root` | — | `<repo>/site/data` |
 | `wiki_root` | `WIKI_ROOT` | `<repo>/../lagen-wiki` |
-| `legacy_root` | `LEGACY_ROOT` | `<repo>/../ferenda.old/data` |
 | `opensearch_url` | `OPENSEARCH_URL` | `http://localhost:9200` |
 | `llm_model` | `BERGET_MODEL` | `openai/gpt-oss-120b` |
 | `llm_base_url` | `LLM_BASE_URL` | `https://api.berget.ai/v1` |
@@ -151,7 +148,7 @@ Editors are a hand-curated registry; there is no self-signup. Mint a `pwhash`
 (nothing is ever stored in the clear):
 
 ```sh
-python -m accommodanda.api.auth hash '<the password>'   # prints the pbkdf2$… line
+python -m ferenda.api.auth hash '<the password>'   # prints the pbkdf2$… line
 ```
 
 Paste the line into the editor's entry. A password change plus a restart
@@ -161,12 +158,11 @@ fingerprint of the current hash).
 ## 3. Verify the checkout
 
 ```sh
-python -m pytest      # bare pytest collects exactly the new suites
+python -m pytest      # run the maintained suites
 ```
 
 `pyproject.toml` scopes collection to `test/test_*.py`, excluding the
-`test/files/` fixture tree and the legacy unittest files, so a bare `pytest`
-never touches code that doesn't import under modern Python.
+`test/files/` fixture tree.
 
 ## 4. The build pipeline
 
@@ -243,9 +239,8 @@ lagen dv parse                # each source's parse has its own specifics (DV is
 ```
 
 Beyond those standard actions, a source can define **source-specific actions**
-that do something meaningful only for that source. Examples: `lagen sfs
-versions` builds a statute's historical consolidations (only statutes have
-those); `lagen avg import-legacy arn <path>` imports a frozen legacy corpus.
+that do something meaningful only for that source. For example, `lagen sfs
+versions` builds a statute's historical consolidations.
 Run `lagen <source> --help` to see what a given source offers.
 
 One recurring family is the **`ai-*` actions**. Any action whose name starts
@@ -273,7 +268,7 @@ runbook, including the sampling keys it wants and the measured limits, is
 
 The full per-source command reference (every source's exact arguments and
 actions) is in
-[`../../accommodanda/README.md`](../../accommodanda/README.md#running-the-pipelines).
+[`../../ferenda/README.md`](../../ferenda/README.md#running-the-pipelines).
 
 Status and instrumentation:
 
@@ -316,25 +311,22 @@ host where those absolute paths are valid. Run `lagen all relate` on dev once
 
 ## 7. Production deployment (Docker)
 
-The authoritative runbook — host bootstrap, disk layout, secrets, CI, cron — is
-[`../deploy-vps.md`](../deploy-vps.md). The shape of it:
-
 The repo-root `docker-compose.yml` defines four services selected by a Compose
 profile:
 
 | invocation | services | use |
 |---|---|---|
 | `docker compose up -d` | `opensearch` only | dev — run `lagen all serve` from the working tree |
-| `docker compose --profile prod up -d` | `opensearch` + `accommodanda` + `nginx` + `certbot` | prod |
+| `docker compose --profile prod up -d` | `opensearch` + `ferenda` + `nginx` + `certbot` | prod |
 
-`opensearch` carries no profile so it starts in both. The `accommodanda` image
+`opensearch` carries no profile so it starts in both. The `ferenda` image
 is built on the box from the checkout and carries the full pipeline toolchain
 (poppler, tesseract+swe, ocrmypdf, raptor2, a JRE + POI jars), so download and
 rebuild run in the container against the read-write corpus mount:
 
 ```sh
-docker compose exec accommodanda lagen all rebuild   # parse→relate→index→dump→generate
-docker compose exec accommodanda lagen all all       # download too, then rebuild
+docker compose exec ferenda lagen all rebuild   # parse→relate→index→dump→generate
+docker compose exec ferenda lagen all all       # download too, then rebuild
 ```
 
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
@@ -343,7 +335,7 @@ resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
 rules. TLS is issued once with `tools/prod/issue-cert.sh` and renewed by the
 `certbot` sidecar.
 
-**Continuous deploy + nightly sync.** Pushes to `modernization` trigger
+**Continuous deploy + nightly sync.** Pushes to `main` trigger
 `.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
 checkout → build → `up -d` → `lagen all rebuild`). `staffan`'s crontab runs the
 pipeline as inlined `docker compose exec` lines: `lagen all all` nightly (which
@@ -365,16 +357,13 @@ jobs **one at a time**: they share the process-global `DISPLAY`.
 `data/cache/facsimile` holds the page PNGs `lib/facsimile` renders on demand.
 It is a **pure cache**. Nothing else reads it. A deleted file is re-rendered on
 the next request, in about half a second. Eviction is therefore a crontab line,
-by age, as the legacy tree does it — not code:
+by publication age, not by source-specific code:
 
 ```sh
 0 1 * * * find <data_root>/cache/facsimile -name "*.png" -mtime +15 -delete
 ```
 
-The legacy line covers `/mnt/data/lagen/data/*/intermediate` only. It does not
-reach this tree. On the live box `<data_root>` is `/mnt/forstor/accommodanda`.
-Measured 2026-08-19: 245 PNGs, 34 MB. There is no pressure yet, so the line is
-written down here and not installed.
+Measured 2026-08-19: 245 PNGs use 34 MB. There is no pressure yet, so this command is documented but not installed.
 
 Its siblings under `cache/` are not pure caches on the same terms.
 `cache/pdfconv` (9.9 GB) holds the poppler conversions the parsers read. A lost

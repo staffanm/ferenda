@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from accommodanda.lib import eucasenaming
+from ferenda.lib import eucasenaming
 
 
 def test_case_number_court_of_justice():

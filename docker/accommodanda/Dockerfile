@@ -123,7 +123,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # The deployed revision, baked in: .git is dockerignored so there's no repo to
 # `git rev-parse` at runtime -- the deploy passes GIT_SHA (the pushed commit),
-# and the ops dashboard reads ACCOMMODANDA_GIT_SHA. Unset -> "unknown".
+# and the ops dashboard reads FERENDA_GIT_SHA. Unset -> "unknown".
 ARG GIT_SHA=unknown
 
 # venv console scripts (incl. `lagen`) on PATH; point search + wiki at the
@@ -131,7 +131,7 @@ ARG GIT_SHA=unknown
 ENV PATH="/app/.venv/bin:$PATH" \
     OPENSEARCH_URL="http://opensearch:9200" \
     WIKI_ROOT="/wiki" \
-    ACCOMMODANDA_GIT_SHA="${GIT_SHA}"
+    FERENDA_GIT_SHA="${GIT_SHA}"
 
 USER app
 

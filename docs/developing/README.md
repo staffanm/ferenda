@@ -1,15 +1,15 @@
-# Developing accommodanda
+# Developing ferenda
 
-Everything a developer needs to work in the `accommodanda/` package: how the
+Everything a developer needs to work in the `ferenda/` package: how the
 pipeline is structured, how sources and stages work, and how to add a new source
 or a source-specific action. This guide is self-contained; the two companion
-references are [`../../accommodanda/README.md`](../../accommodanda/README.md)
+references are [`../../ferenda/README.md`](../../ferenda/README.md)
 (the module map — which file does what) and [`../conventions.md`](../conventions.md)
 (the citable coding-rule catalog).
 
-## 0. What accommodanda is
+## 0. What ferenda is
 
-accommodanda is a pipeline that **downloads, parses and finds
+ferenda is a pipeline that **downloads, parses and finds
 references between documents in large repositories of Swedish legal
 documents** — statutes, court decisions, preparatory works, EU law,
 agency regulations, and more — and publishes them as a static,
@@ -42,7 +42,7 @@ preferences.
   you can't reconstruct it by re-reading the artifacts, it doesn't belong in a
   derived store.
 - **Sources are programs; shared code is libraries.** A source (a vertical under
-  `accommodanda/<name>/`) may import from `lib/`; `lib/` must **never** import
+  `ferenda/<name>/`) may import from `lib/`; `lib/` must **never** import
   from, or branch on, a specific source. Shared code never calls back into a
   source. This keeps each source understandable on its own and keeps `lib/`
   reusable.
@@ -77,7 +77,7 @@ Coding conventions worth internalising:
 
 ## 2. The three layers
 
-Realized in the `accommodanda/` package:
+Realized in the `ferenda/` package:
 
 1. **Vertical source pipelines** (`sfs/`, `dv/`, `hudoc/`, `coe/`, `eurlex/`,
    `forarbete/`, `foreskrift/`, `avg/`, `remisser/`, `wiki/`, `site/`) — each owns its full
@@ -100,8 +100,8 @@ dependency is one-way and confined to aggregate-page generation.
 
 ## 3. Sources and stages
 
-Everything runs through the `lagen` CLI (`accommodanda/build.py`, the
-`accommodanda.build:main` console script):
+Everything runs through the `lagen` CLI (`ferenda/build.py`, the
+`ferenda.build:main` console script):
 
 ```
 lagen <source> <action> [basefile…]
@@ -269,7 +269,7 @@ re-stales exactly that document's `parse`.
 
 ## 4. Adding a new source
 
-Write, in a new `accommodanda/<source>/` package:
+Write, in a new `ferenda/<source>/` package:
 
 1. **A typed model** (`model.py`) — dataclasses in Swedish domain vocabulary,
    with a `to_artifact()` (or an `nf.py` normal-form projection) that returns

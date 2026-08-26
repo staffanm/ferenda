@@ -1,10 +1,10 @@
-"""The case-number snapshot (accommodanda/dv/casenumbers.py): what it keeps, what
+"""The case-number snapshot (ferenda/dv/casenumbers.py): what it keeps, what
 it refuses, and whether it rewrote the file -- which is what a full-source dv
 parse reports on, since the snapshot is a parse input for five sources."""
 
 import json
 
-from accommodanda.dv import casenumbers
+from ferenda.dv import casenumbers
 
 
 def _artifact(uri, court, namn, date, numbers):

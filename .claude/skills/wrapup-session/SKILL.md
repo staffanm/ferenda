@@ -16,8 +16,8 @@ needs the subagent.
 ## 1. Mechanical pass (whole package, not just edited files)
 
 ```
-.venv/bin/ruff check accommodanda
-.venv/bin/ty check accommodanda
+.venv/bin/ruff check ferenda
+.venv/bin/ty check ferenda
 python3 .claude/hooks/check-layers.py          # package-wide: also flags stale allowlist entries
 .venv/bin/python -m pytest -q                  # bare pytest collects exactly the new suites
 ```

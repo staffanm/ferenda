@@ -155,7 +155,7 @@ services:
   # --- prod: ACME cert issuance/renewal for ferenda.lagen.nu ---------------
   # Renews every 12h via the http-01 webroot challenge (nginx serves the shared
   # webroot on :80). The FIRST issuance is done out-of-band with --standalone
-  # before nginx exists -- see docs/deploy-vps.md. Renewed certs are picked up by
+  # before nginx exists. Renewed certs are picked up by
   # nginx on its next reload (a weekly host cron, harmless if nothing changed;
   # certbot has no docker.sock access to reload nginx itself, by design).
   certbot:

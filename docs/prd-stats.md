@@ -18,8 +18,8 @@ Alla mätta siffror är från korpusen som den såg ut 2026-07-27.
 
 ## Hur källan ser ut
 
-> **Status: byggd.** `accommodanda/stats/` (`model`·`scan`·`compute`·`charts`
-> ·`render`) renderar `/statistik`; se REWRITE.md §7k.
+> **Status: byggd.** `ferenda/stats/` (`model`·`scan`·`compute`·`charts`
+> ·`render`) renderar `/statistik`.
 >
 > Sidan har **52 mätvärden**, inte 51: fem nya tillkom under och efter bygget
 > (längsta EU-artikeln, lagar med äldst kvarvarande text, vilken dag lagar

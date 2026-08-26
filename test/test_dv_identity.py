@@ -3,7 +3,7 @@ Word feed and the new courts' API)."""
 
 import json
 
-from accommodanda.dv.identity import (
+from ferenda.dv.identity import (
     build_index,
     canonical_court,
     grupp_map,
@@ -12,7 +12,7 @@ from accommodanda.dv.identity import (
     norm_referat,
     scan_api,
 )
-from accommodanda.lib import layout
+from ferenda.lib import layout
 
 
 def test_court_canonicalization():
@@ -227,7 +227,7 @@ def test_legacy_notis_filenames_mint_series_referat():
 
 
 def test_enrich_legacy_malnummer_gains_oracle_referat():
-    from accommodanda.dv.identity import enrich_legacy
+    from ferenda.dv.identity import enrich_legacy
     recs = [{"store": "dv", "court": "REGR", "path": "x",
              "malnummer": ["1000-01"], "referat": []}]
     enrich_legacy(recs, [{"court": "REGR", "malnummer": ["1000-01"],
@@ -240,7 +240,7 @@ def test_enrich_legacy_malnummer_gains_oracle_referat():
 def test_enrich_legacy_ambiguous_malnummer_stays_bare():
     # målnummer reuse across years (AD): guessing would publish one decision
     # under another referat's URI
-    from accommodanda.dv.identity import enrich_legacy
+    from ferenda.dv.identity import enrich_legacy
     recs = [{"store": "dv", "court": "ADO", "path": "x",
              "malnummer": ["A 112-92"], "referat": []}]
     enrich_legacy(recs, [
@@ -253,7 +253,7 @@ def test_enrich_legacy_ambiguous_malnummer_stays_bare():
 
 
 def test_enrich_legacy_referat_gains_malnummer_and_date():
-    from accommodanda.dv.identity import enrich_legacy
+    from ferenda.dv.identity import enrich_legacy
     recs = [{"store": "dv", "court": "HDO", "path": "x",
              "malnummer": [], "referat": ["NJA 2008 not 20"]}]
     enrich_legacy(recs, [{"court": "HDO", "malnummer": ["Ö 528-08"],
@@ -269,7 +269,7 @@ def test_enrich_legacy_referat_gains_malnummer_and_date():
 def test_build_index_does_not_fuse_referats_on_oracle_malnummer():
     # AD 1993 nr 22 and AD 1994 nr 13 are distinct decisions under A 112-92;
     # their files' oracle-enriched målnummer must not merge them
-    from accommodanda.dv.identity import build_index, enrich_legacy
+    from ferenda.dv.identity import build_index, enrich_legacy
     recs = [{"store": "dv", "court": "ADO", "path": "a",
              "malnummer": [], "referat": ["AD 1993 nr 22"]},
             {"store": "dv", "court": "ADO", "path": "b",
@@ -288,7 +288,7 @@ def test_build_index_does_not_fuse_referats_on_oracle_malnummer():
 def test_build_index_malnummer_bridge_respects_conflicting_referat():
     # one API record lists both RH 2016:61 and :62 case numbers under :62; the
     # legacy :61 component must stay its own publication
-    from accommodanda.dv.identity import build_index
+    from ferenda.dv.identity import build_index
     api = [{"store": "domstol", "court": "HSV", "path": "api", "uuid": "u",
             "grupp": None, "malnummer": ["B 100-16", "B 200-16"],
             "referat": ["RH 2016:62"], "avgorandedatum": "2016-05-01",
@@ -301,7 +301,7 @@ def test_build_index_malnummer_bridge_respects_conflicting_referat():
 
 
 def test_norm_referat_spelling_variants_one_identity():
-    from accommodanda.dv.identity import norm_referat
+    from ferenda.dv.identity import norm_referat
     assert (norm_referat("RÅ 1994:69") == norm_referat("RÅ 1994 ref. 69")
             == norm_referat("RÅ1994 ref 69"))
     assert norm_referat("AD 1993 nr 100") == norm_referat("AD 1993:100")
@@ -314,8 +314,8 @@ def test_apply_adjudications_attaches_ledger_referat(tmp_path):
     # a withheld original whose målnummer is ambiguous gains the referat its
     # ledger entry content-matched, hash-verified against the store
     import hashlib
-    from accommodanda.dv import identity
-    from accommodanda.dv.identity import apply_adjudications
+    from ferenda.dv import identity
+    from ferenda.dv.identity import apply_adjudications
     (tmp_path / "HDO").mkdir()
     (tmp_path / "HDO" / "B1-14.docx").write_bytes(b"frozen body")
     ledger = {"version": 1, "cases": [{
@@ -338,8 +338,8 @@ def test_apply_adjudications_attaches_ledger_referat(tmp_path):
 
 def test_apply_adjudications_hash_mismatch_raises(tmp_path):
     import pytest
-    from accommodanda.dv import identity
-    from accommodanda.dv.identity import apply_adjudications
+    from ferenda.dv import identity
+    from ferenda.dv.identity import apply_adjudications
     (tmp_path / "HDO").mkdir()
     (tmp_path / "HDO" / "B1-14.docx").write_bytes(b"drifted body")
     ledger = {"version": 1, "cases": [{

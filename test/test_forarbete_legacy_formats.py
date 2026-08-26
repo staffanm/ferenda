@@ -1,4 +1,4 @@
-"""Tests for the frozen-corpus förarbete format adapters (REWRITE.md §7g).
+"""Tests for the historical-corpus förarbete format adapters.
 
 Hermetic: every case runs against a small trimmed fixture under
 ``test/files/forarbete-legacy/`` (real slices of the frozen ferenda.old trees),
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.forarbete.legacy_formats import (
+from ferenda.forarbete.legacy_formats import (
     abbyy_pages,
     dokumentstatus_meta,
     riksdagen_bet_paras,

@@ -1,12 +1,12 @@
 """The numbering-gap fix (§3d): a provision whose id the minter suppressed by
 content-equality dedup is *unanchored* -- it has no fragment of its own and no
 id-bearing ancestor, so a self-reference would attribute to an empty source.
-The old pipeline omitted those, so `Projection.inline` drops self-links from
+The reference projection omitted those, so `Projection.inline` drops self-links from
 unanchored provisions (an empty `context`) while keeping references to other
 laws. Anchored provisions are unaffected."""
 
-from accommodanda.sfs.nf import Projection
-from accommodanda.lib.lagrum import LagrumParser
+from ferenda.sfs.nf import Projection
+from ferenda.lib.lagrum import LagrumParser
 
 
 def _proj(basefile="1962:700"):
@@ -22,7 +22,7 @@ def test_self_law_uri_is_the_self_reference_prefix():
     assert LagrumParser({}, "1962:700").self_law_uri == "https://lagen.nu/1962:700"
     # a balk basefile keeps its bare numeric suffix, so self-references mint
     # against the full id ("1736:0123 1" -> ".../1736:0123_1", not ".../1736:0123",
-    # which the old pipeline collapsed -- losing the _1/_2 distinction)
+    # which the reference projection collapsed -- losing the _1/_2 distinction)
     assert LagrumParser({}, "1736:0123 1").self_law_uri == "https://lagen.nu/1736:0123_1"
     assert LagrumParser({}, "1736:0123 2").self_law_uri == "https://lagen.nu/1736:0123_2"
 

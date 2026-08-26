@@ -6,9 +6,9 @@ from xml.etree import ElementTree as ET
 import pytest
 from lxml import etree
 
-from accommodanda.eurlex import parse as P
-from accommodanda.eurlex.correspond import correspondence
-from accommodanda.eurlex.parse import (
+from ferenda.eurlex import parse as P
+from ferenda.eurlex.correspond import correspondence
+from ferenda.eurlex.parse import (
     UNCARRIED,
     content_file,
     doctype,
@@ -19,17 +19,17 @@ from accommodanda.eurlex.parse import (
     parse_formex,
     to_artifact,
 )
-from accommodanda.lib.formex import (
+from ferenda.lib.formex import (
     XML_PARSER,
     _annex_anchor,
     flatten,
     formex_members,
     load_formex,
 )
-from accommodanda.lib import catalog
-from accommodanda.lib.errors import SkipDocument
-from accommodanda.lib.eu_structure import anchored_blocks
-from accommodanda.lib.eu_structure import flatten as flatten_structure
+from ferenda.lib import catalog
+from ferenda.lib.errors import SkipDocument
+from ferenda.lib.eu_structure import anchored_blocks
+from ferenda.lib.eu_structure import flatten as flatten_structure
 
 
 def _flat(xml):

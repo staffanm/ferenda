@@ -10,9 +10,9 @@ from datetime import date, timedelta
 
 import pytest
 
-from accommodanda.eurlex import download as D
-from accommodanda.lib import cellar as C
-from accommodanda.lib import catalog
+from ferenda.eurlex import download as D
+from ferenda.lib import cellar as C
+from ferenda.lib import catalog
 
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
 

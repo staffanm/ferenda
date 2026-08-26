@@ -3,8 +3,8 @@ inventory, old-law detection, FK slicing, and edge validation)."""
 
 import json
 
-from accommodanda.forarbete import kommentar
-from accommodanda.sfs import correspond as C
+from ferenda.forarbete import kommentar
+from ferenda.sfs import correspond as C
 
 CELEX = "https://lagen.nu/"
 

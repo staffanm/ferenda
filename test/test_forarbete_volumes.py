@@ -1,9 +1,9 @@
-"""Which of a förarbete record's PDFs are its body (accommodanda/forarbete/
+"""Which of a förarbete record's PDFs are its body (ferenda/forarbete/
 volumes.py). The record's `files` is every PDF the landing page linked, so the
 rule has to tell a volume from a rättelseblad, an English summary, a reprinted
 EU directive and a duplicate 'hela dokumentet' edition."""
 
-from accommodanda.forarbete import volumes
+from ferenda.forarbete import volumes
 
 
 def _rec(files, typ="prop", basefile="2015/16:195", labels=None, **extra):
@@ -156,10 +156,9 @@ def test_a_curated_skip_entry_takes_the_document_out_entirely():
 
 
 def test_the_historical_corpus_is_not_skipped():
-    # the old codebase marked 19,571 propositions "metadataonly", nearly all of
-    # them the 1860s-1950s scans. That was a resource-constraint workaround, not
-    # a judgement about the documents, and is deliberately not ported -- the
-    # rewrite parses them in full.
+    # Historical source metadata marked 19,571 propositions "metadataonly",
+    # mostly scans from the 1860s-1950s. That reflected processing cost, not a
+    # judgement about the documents. Ferenda parses them in full.
     for basefile in ("1867:1", "1912:52", "1949:100"):
         assert volumes.population(_rec([], basefile=basefile)) == "live"
 

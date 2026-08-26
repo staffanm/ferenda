@@ -1,9 +1,0 @@
-# ferenda.lagen.nu is the rebuilt site, still a not-yet-promoted duplicate of the
-# production lagen.nu content. Crawling is ALLOWED on purpose: search engines
-# must fetch each page to see the host-level `X-Robots-Tag: noindex, nofollow`
-# (docker/vps/nginx/common-headers.conf), which keeps these URLs out of the index
-# so they are never mistaken for the canonical lagen.nu ones. A blanket
-# `Disallow: /` would hide that noindex and risk the URLs being indexed url-only.
-# When this site is promoted to be the canonical host, drop the noindex header.
-User-agent: *
-Disallow:

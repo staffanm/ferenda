@@ -1,5 +1,5 @@
 """Unit tests for the incremental build driver's freshness engine
-(accommodanda.build), exercised through a synthetic two-stage source over
+(ferenda.build), exercised through a synthetic two-stage source over
 temp files -- no real corpus, no JVM, fast."""
 
 
@@ -12,12 +12,12 @@ from urllib.parse import urlparse
 
 import pytest
 
-from accommodanda import build, config
-from accommodanda.build import RunOptions, Source, Stage, build_one, is_fresh
-from accommodanda.foreskrift.agencies import REGISTRY
-from accommodanda.foreskrift.model import Consolidation, Regulation
-from accommodanda.lib import annstore, catalog, compress, layout, runlog
-from accommodanda.lib.errors import SkipDocument
+from ferenda import build, config
+from ferenda.build import RunOptions, Source, Stage, build_one, is_fresh
+from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.foreskrift.model import Consolidation, Regulation
+from ferenda.lib import annstore, catalog, compress, layout, runlog
+from ferenda.lib.errors import SkipDocument
 
 
 @pytest.fixture(autouse=True)

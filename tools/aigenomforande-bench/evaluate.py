@@ -8,7 +8,7 @@ token usage at the per-model EUR/MT prices.
 import json
 from pathlib import Path
 
-from accommodanda.lib import annstore
+from ferenda.lib import annstore
 
 SP = Path(__file__).parent
 PROPS = [3, 16, 28, 43, 84, 108, 118, 124, 129, 146, 159, 183, 186, 202,

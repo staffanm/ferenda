@@ -1,8 +1,8 @@
 """Golden-corpus comparator for SFS documents.
 
-Reduces a parsed SFS document (the old pipeline's XHTML+RDFa output) to a
+Reduces a parsed SFS document (the reference projection's XHTML+RDFa output) to a
 canonical JSON normal form, and diffs two normal forms. The normal form is
-the regression contract for the new pipeline: a port of the SFS parser is
+the regression contract for Ferenda: a port of the SFS parser is
 correct for a document when its normalized output matches the frozen one.
 
 The normal form has four sections:
@@ -30,9 +30,9 @@ from pathlib import Path
 
 from lxml import etree
 
-from accommodanda.lib.util import normalize_space
-from accommodanda.sfs import graphics as sfs_graphics
-from accommodanda.sfs import redaktionell as sfs_redaktionell
+from ferenda.lib.util import normalize_space
+from ferenda.sfs import graphics as sfs_graphics
+from ferenda.sfs import redaktionell as sfs_redaktionell
 
 XHTML = "http://www.w3.org/1999/xhtml"
 
@@ -381,7 +381,7 @@ def diff_dicts(old, new, path, problems):
 
 ALL_SECTIONS = ("metadata", "structure", "references", "amendments")
 
-# The old pipeline's citation parser escaped "X- och Y-lagen" compounds to
+# The reference projection's citation parser escaped "X- och Y-lagen" compounds to
 # "X-_och_Y-lagen" before grammar matching and did not reliably undo it;
 # 1021 documents in the corpus carry the corruption. Canonicalize both
 # sides so the contract enforces neither variant.
@@ -402,7 +402,7 @@ def canonicalize_node_texts(nodes):
         canonicalize_node_texts(node.get("children", []))
 
 
-# Page-numbered laws (1845:50 s.1): the old pipeline derived the law id
+# Page-numbered laws (1845:50 s.1): the reference projection derived the law id
 # for in-document relative references from its own minted URI ("50_s.1"),
 # then split it on "s." leaving the underscore behind -- producing
 # "1845:50__s._1" with a doubled underscore. Canonicalize to the form its
@@ -544,7 +544,7 @@ def compare(old, new, sections=ALL_SECTIONS):
                        problems)
 
     if "references" in sections and "references" in old and "references" in new:
-        # the new pipeline inlines links into the text nodes instead of
+        # Ferenda inlines links into the text nodes instead of
         # emitting a flat reference list, so this oracle only applies when
         # both sides are old-style normal forms
         oldrefs = canonicalize_refs(old["references"])
@@ -562,8 +562,8 @@ def compare(old, new, sections=ALL_SECTIONS):
 # --- adjudication -------------------------------------------------------
 #
 # The golden corpus is a change-detector, not an oracle (§2): a fraction of
-# the diffs are the new pipeline being *right* where the golden is stale or
-# carries an old-pipeline defect. Rather than re-investigate those every run,
+# the diffs are Ferenda being *right* where the golden is stale or
+# carries an reference-projection defect. Rather than re-investigate those every run,
 # classify whole *families* of them with a few predicates. An adjudicated diff
 # is still reported (so a class that suddenly grows stays visible) but does not
 # count as a regression -- only the *unexplained* residual does.
@@ -632,7 +632,7 @@ re_balk_law = re.compile(r"\d+:\d+_\d+$")   # "1736:0123_1" -- a 1734-lag balk
 
 def balk_self_ref(uri, own_base, collapsed_base):
     """Whether `uri` is a self-reference into a 1734 års lag balk -- 'full'
-    (the corrected ".../1736:0123_1#…") or 'collapsed' (the old pipeline's
+    (the corrected ".../1736:0123_1#…") or 'collapsed' (the reference projection's
     ".../1736:0123#…", which lost the balk suffix), else None."""
     if collapsed_base is None:
         return None
@@ -657,11 +657,11 @@ def paragraf_of(fragment):
 
 def golden_chapter_collapsed(golden):
     """True when the golden piled essentially every paragraf into a single
-    chapter -- the old pipeline's table-of-contents collapse, where a chapter
+    chapter -- the reference projection's table-of-contents collapse, where a chapter
     list ("N kap. - Title" lines) was mis-read as chapter openings and the body
-    fell into the last one. The new pipeline distributes the chapters correctly,
+    fell into the last one. Ferenda distributes the chapters correctly,
     so its references carry the right chapter prefixes and no longer match the
-    golden's collapsed ones; that divergence is the new pipeline being right."""
+    golden's collapsed ones; that divergence is Ferenda being right."""
     counts = []
 
     def walk(nodes):
@@ -695,7 +695,7 @@ def chapter_collapse_key(source, uri, own_base):
     return (src, uri)
 
 
-# A well-formed sector-3 CELEX in the new pipeline's URI: 3 + year(4) + type
+# A well-formed sector-3 CELEX in Ferenda's URI: 3 + year(4) + type
 # (1-2 letters) + number(4, zero-padded), with an optional pinpoint fragment.
 re_celex_uri = re.compile(
     r"(.*/ext/celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
@@ -717,15 +717,15 @@ def celex_descramble(uri):
 
 
 def celex_old_scrambles(uri):
-    """Every string the old pipeline could have rendered for the well-formed
+    """Every string the reference projection could have rendered for the well-formed
     sector-3 CELEX `uri` (empty for a non sector-3 URI):
 
     * the year/number field-swap it always applied (`celex_descramble`); plus
     * when `uri` is a *directive* (type ``L``), the same swap with the type letter
-      forced to ``R``. The old engine -- like the pre-fix grammar -- defaulted a
+      forced to ``R``. The reference scanner defaulted a
       parenthesised designation cited bare as "direktiv (EU) YYYY/NNNN" to a
       regulation, so its scramble for such a directive is ``3<number>R<year>``.
-      Pairing that against the new pipeline's corrected ``3<year>L<number>`` lets
+      Pairing that against Ferenda's corrected ``3<year>L<number>`` lets
       the directive-letter correction be forgiven as a mirror, the way the plain
       year/number scramble already is (lagrum.rattsakt_part fix)."""
     primary = celex_descramble(uri)
@@ -754,7 +754,7 @@ ENVELOPE_PREFIXES = (
 
 
 def _post_freeze_amendment(problem, ctx):
-    """An amending act the new pipeline has and the golden lacks, whose SFS
+    """An amending act Ferenda has and the golden lacks, whose SFS
     number postdates everything the golden knew = added after the freeze."""
     if not problem.startswith("amendments: extra "):
         return False
@@ -820,7 +820,7 @@ re_node_mismatch = re.compile(r"^structure(?:/.*)?: node mismatch: (\S+) != (\S+
 
 def is_marker_only(text):
     """Whether `text` is *only* an omission marker (+ an optional trailing
-    change note) -- the shape the new pipeline replaces with a grafik node. A
+    change note) -- the shape Ferenda replaces with a grafik node. A
     stycke with real prose around a marker is NOT marker-only and its removal
     stays a real regression."""
     return isinstance(text, str) and sfs_graphics.marker_gap(text) is not None
@@ -923,7 +923,7 @@ def _post_freeze_structure(problem, ctx):
 #
 # The SFST text database drops graphics/formulas/maps/road signs; the old
 # pipeline carried the editorial omission marker ("/Formeln är inte med här/")
-# through as inline text, while the new pipeline lifts it into a typed grafik
+# through as inline text, while Ferenda lifts it into a typed grafik
 # node (sfs.graphics + nf). Against a golden built from the old output that
 # surfaces as three mirrored, new-is-right diffs: an extra grafik node, the
 # missing marker-only stycke it replaced, and -- for a marker that trailed a
@@ -963,7 +963,7 @@ def _is_grafik_heading(problem):
 # The publisher writes a repeal notice ("4 § har upphävts genom lag
 # (1982:1101)") or a corpus gap ("/Författningens text finns bara i tryckt
 # version/") as an ordinary stycke, indistinguishable from statute text. The
-# new pipeline retypes it as a typed `redaktionell` node (sfs.redaktionell +
+# Ferenda retypes it as a typed `redaktionell` node (sfs.redaktionell +
 # nf.retype_editorial), keeping the id, the inline runs and the beteckning --
 # only `type` changes. Against a golden built from the old output that surfaces
 # as one "node mismatch" per retyped node, with the *same* label on both sides
@@ -1026,7 +1026,7 @@ def _grafik_heading_marker(problem, ctx):
 # "1, 3, 5 eller 6 §", "26 eller 26 a §". By Swedish drafting convention an "och"
 # list ends in double §§ ("4, 5 och 6 §§") and an "eller" list in single §; the
 # old SimpleParse grammar parsed the former but never the latter, so the members
-# the new pipeline extracts from an "eller …  §" list are extras it is right about.
+# Ferenda extracts from an "eller …  §" list are extras it is right about.
 re_eller_enum = re.compile(
     r"(\d+(?: ?[a-z])?(?: ?, ?\d+(?: ?[a-z])?)* ?eller ?\d+(?: ?[a-z])?) ?§(?! ?§)")
 re_target_paragraf = re.compile(r"#(?:K[0-9a-z]+)?P(\d+[a-z]?)(?:$|[SNO])")
@@ -1043,10 +1043,10 @@ def eller_enum_paragrafs(clause):
 
 
 def _eller_enumeration(problem, ctx):
-    """An extra paragraf reference the new pipeline read from an "eller … §"
+    """An extra paragraf reference Ferenda read from an "eller … §"
     enumeration the old grammar could not parse: the target's paragraf number is
     one of the enumerated members and its chapter, if any, is named in the same
-    clause. A clear old-pipeline grammar gap -- new-is-right."""
+    clause. A clear reference-projection grammar gap -- new-is-right."""
     parsed = reference_diff(problem)
     if parsed is None or parsed[0] != "extra":
         return False
@@ -1064,8 +1064,8 @@ def _eller_enumeration(problem, ctx):
 
 def _balk_basefile_correction(problem, ctx):
     """A 1734 års lag balk ("1736:0123 1" = byggningabalken, "… 2" =
-    handelsbalken) whose self-references the new pipeline mints against the full
-    basefile (".../1736:0123_1#…"), where the old pipeline collapsed the bare
+    handelsbalken) whose self-references Ferenda mints against the full
+    basefile (".../1736:0123_1#…"), where the reference projection collapsed the bare
     suffix to ".../1736:0123#…" -- losing the _1/_2 distinction. The corrected
     extra and the collapsed golden miss form a mirror pair; forgive each only
     when its counterpart shares the source stycke (so a genuine new drop or a
@@ -1082,7 +1082,7 @@ def _balk_basefile_correction(problem, ctx):
 
 def _golden_chapter_collapse(problem, ctx):
     """A reference diff that is purely the golden's TOC-collapse chapter relabel:
-    the new pipeline's distributed link (extra) mirrors a collapsed golden one
+    Ferenda's distributed link (extra) mirrors a collapsed golden one
     (missing) modulo chapter prefix, or vice versa. Fires only when the golden is
     collapsed; the mirror requirement keeps a genuine new drop/add visible -- the
     residual is real reference-resolution drift, not the structural collapse."""
@@ -1099,11 +1099,11 @@ def _golden_chapter_collapse(problem, ctx):
 
 
 def _celex_correction(problem, ctx):
-    """A CELEX reference the new pipeline mints in the correct sector-3 form
-    where the old pipeline scrambled the year/number fields (§7d). The
+    """A CELEX reference Ferenda mints in the correct sector-3 form
+    where the reference projection scrambled the year/number fields (§7d). The
     corrected extra (".../32017R0625") and the golden's scrambled miss
     (".../3625R2017") are a mirror pair from the same source stycke; forgive
-    each only when its counterpart is present, so a CELEX the new pipeline
+    each only when its counterpart is present, so a CELEX Ferenda
     genuinely added (no scrambled mirror) or one it dropped stays visible."""
     parsed = reference_diff(problem)
     if parsed is None:
@@ -1141,7 +1141,7 @@ def _stycke_pinpoint_drift(problem, ctx):
 
 
 # brottsrubricering definition clauses ("... döms för <offence> till böter/
-# fängelse", "För <offence> döms till ..."); replicated from accommodanda.sfs
+# fängelse", "För <offence> döms till ..."); replicated from ferenda.sfs
 # .begrepp so this standalone comparator stays import-free of the package.
 re_begrepp_diff = re.compile(r"begrepp: (extra|missing) (\S+)")
 re_brottsdef_clause = re.compile(
@@ -1152,9 +1152,9 @@ re_brottsdef_alt_clause = re.compile(
 
 
 def _brottsrubricering_begrepp(problem, ctx):
-    """A begreppsdefinition the new pipeline extracted that the golden lacks,
+    """A begreppsdefinition Ferenda extracted that the golden lacks,
     whose defining clause is a criminal-offence definition ("... döms för X till
-    böter/fängelse"). The old pipeline missed these crime names whenever the
+    böter/fängelse"). The reference projection missed these crime names whenever the
     offence clause sat in a list continuation -- the new parser folds that
     continuation back into the stycke (assembler.py), so the brottsrubricering
     fires and the crime becomes a concept. A new-is-right gain, scoped to the
@@ -1241,7 +1241,7 @@ def adjudicate(problems, golden, new=None):
         for kind, src, uri in filter(None, map(reference_diff, problems))
         if kind == "extra" for scrambled in celex_old_scrambles(uri)}
     # golden TOC-collapse: when the golden dumped the whole body into one chapter,
-    # pair the new pipeline's distributed link with the collapsed golden one by
+    # pair Ferenda's distributed link with the collapsed golden one by
     # their chapter-stripped (source, uri) -- a mirror, so unpaired diffs survive.
     ctx["golden_collapsed"] = golden_chapter_collapsed(golden)
     ctx["collapse_missing_keys"], ctx["collapse_extra_keys"] = set(), set()

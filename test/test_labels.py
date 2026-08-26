@@ -1,6 +1,6 @@
 """The four reader-facing name forms (lib/labels.py) -- short_id / short_title /
 official_title / descriptive_label -- per source (C2 / I2)."""
-from accommodanda.lib import labels
+from ferenda.lib import labels
 
 
 def test_sfs_named_law_short_title_is_the_colloquial_name():

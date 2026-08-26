@@ -3,8 +3,8 @@
 from datetime import date
 from pathlib import Path
 
-from accommodanda.dv.model import Avgorande, Fotnot, Rubrik, Stycke
-from accommodanda.dv.parse import (
+from ferenda.dv.model import Avgorande, Fotnot, Rubrik, Stycke
+from ferenda.dv.parse import (
     _body_lines,
     _inject_numbers,
     case_uri,
@@ -20,9 +20,9 @@ from accommodanda.dv.parse import (
     parse_pdf_record,
     to_artifact,
 )
-from accommodanda.dv.structure import flatten
-from accommodanda.lib import catalog
-from accommodanda.lib.pdftext import Line, Para, Run, page_paragraphs, pdf_images
+from ferenda.dv.structure import flatten
+from ferenda.lib import catalog
+from ferenda.lib.pdftext import Line, Para, Run, page_paragraphs, pdf_images
 
 FIXTURES = Path(__file__).parent / "files" / "dv"
 

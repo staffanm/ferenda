@@ -1,6 +1,6 @@
-"""The shared artifact text flattener (accommodanda/lib/text.py)."""
+"""The shared artifact text flattener (ferenda/lib/text.py)."""
 
-from accommodanda.lib import catalog, text
+from ferenda.lib import catalog, text
 
 ART = {
     "uri": "https://lagen.nu/1962:700",

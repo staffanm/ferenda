@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-from accommodanda.lib import annstore, layout
+from ferenda.lib import annstore, layout
 
 ARENDE, LAYERS = sys.argv[1], Path(sys.argv[2])
 LABEL = sys.argv[3] if len(sys.argv) > 3 else "layers"

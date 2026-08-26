@@ -1,23 +1,10 @@
 ## Project overview
 
-Ferenda is a Python framework for downloading, parsing and connecting large
-repositories of interconnected documents. It is primarily used for Swedish
-legal information (it powers lagen.nu).
+Ferenda downloads, parses, connects, and publishes large document
+repositories. It powers the Swedish legal information service lagen.nu.
+Active code lives in `ferenda/` and targets Python 3.14 or later.
 
-The project is being **rebuilt**. The original framework was overengineered
-in the wrong places — its central mistake was inheritance, with a
-`DocumentRepository` / `SwedishLegalSource` god class exposing ~50
-overridable hooks that entangled every source with the whole call graph.
-The rewrite keeps two decades of accumulated domain knowledge (SFS/DV
-formatting quirks, the citation grammar) and discards the framework.
-
-- **Active code lives in `accommodanda/`.** This is where all new work
-  happens. Target Python 3.14+ only.
-- **`ferenda/` and `lagen/` are the legacy codebase** being replaced. Treat
-  them as read-only reference — port knowledge out of them; don't extend
-  them. (The Python 2/3 modernization of the legacy tree is *done*; there
-  is nothing left to modernize there.)
-- Implemented verticals: **SFS** (statutes), **DV** (court decisions),
+Implemented verticals include **SFS** (statutes), **DV** (court decisions),
   **forarbete** (legislative preparatory works), **eurlex** (EU law),
   **HUDOC** (European Court of Human Rights case law), **CoE** (Council of
   Europe treaties), **ICRC** (international humanitarian law treaties),
@@ -28,23 +15,20 @@ formatting quirks, the citation grammar) and discards the framework.
   agencies and bodies),
   **lawreview** (journal articles from nine journals — svjt, jp, ft, nmt,
   njel, siplr, urt, euar, lod — mined for the references they make),
-  **remisser** (consultation responses), **wiki** (begrepp/definitions).
-  We are not at full parity with the old system, but new sources beyond the
-  original scope (notably eurlex and foreskrift) are now handled.
+  **remisser** (consultation responses), and **wiki**
+  (begrepp/definitions).
 
-Read [`REWRITE.md`](REWRITE.md) for *why* the new system is shaped this way
-and what's done vs. pending. Read [`accommodanda/README.md`](accommodanda/README.md)
-for how to run the pipelines and the module map. Keep both updated as
-architecture and status change.
+Read [`ferenda/README.md`](ferenda/README.md) for pipeline commands and the
+module map. Keep it current when architecture or source status changes.
 
 ## Architecture
 
-Three layers, realized in the `accommodanda/` package:
+Three layers, realized in the `ferenda/` package:
 
-1. **Vertical source pipelines** (`accommodanda/{sfs,dv,hudoc,coe,icrc,untc,icc,eurlex,guidance,lawreview,forarbete,foreskrift,avg,remisser,wiki}/`)
+1. **Vertical source pipelines** (`ferenda/{sfs,dv,hudoc,coe,icrc,untc,icc,eurlex,guidance,lawreview,forarbete,foreskrift,avg,remisser,wiki}/`)
    — each owns its full chain (download → parse → typed model → JSON
    artifact) and its *own* document model.
-2. **Horizontal libraries** (`accommodanda/lib/`) — genuinely cross-source
+2. **Horizontal libraries** (`ferenda/lib/`) — genuinely cross-source
    machinery: the citation engine (`lagrum.py`), catalog, search, render,
    layout, resolve, facets, datasets, the incremental build driver, etc.
 3. **Corpus-wide derived layer** — the `relate`/index/dump phases that read
@@ -95,9 +79,8 @@ Stop-hook ruff/ty/layer checks). The essentials:
 
 ## Testing
 
-- A bare `pytest` runs exactly the new suites (pyproject scopes collection
-  to `test/test_*.py`, excluding the `test/files/` fixture tree and the
-  legacy unittest files, which stay out of scope).
+- A bare `pytest` runs the maintained suites. Pyproject scopes collection
+  to `test/test_*.py` and excludes the `test/files/` fixture tree.
 - Parser correctness is validated against the golden corpus and small
   regression fixtures; many tests are golden/adjudication checks rather
   than unit assertions.

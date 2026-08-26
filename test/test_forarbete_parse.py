@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.forarbete import parse as fa_parse
-from accommodanda.forarbete.model import Block
-from accommodanda.forarbete.parse import (
+from ferenda.forarbete import parse as fa_parse
+from ferenda.forarbete.model import Block
+from ferenda.forarbete.parse import (
     censor_future_citations,
     classify,
     figure_index,
@@ -14,9 +14,9 @@ from accommodanda.forarbete.parse import (
     rskr_body,
     tag_frontmatter,
 )
-from accommodanda.forarbete.structure import ingress, nest, signers
-from accommodanda.lib import compress, layout, pdftext
-from accommodanda.lib.pdftext import (Line, Para, Run, line_body_size,
+from ferenda.forarbete.structure import ingress, nest, signers
+from ferenda.lib import compress, layout, pdftext
+from ferenda.lib.pdftext import (Line, Para, Run, line_body_size,
                                       page_paragraphs)
 
 
@@ -294,7 +294,7 @@ def test_parse_record_patch_key_is_typ_qualified_slug(monkeypatch, tmp_path):
     # record's own basefile ("2021:82") has no typ segment, which crashed
     # layout.relpath for every SOU (and silently computed a wrong patch path
     # for props, whose riksmöte slash made the split "succeed")
-    from accommodanda.forarbete import parse as fa_parse
+    from ferenda.forarbete import parse as fa_parse
 
     seen = {}
 
@@ -447,7 +447,7 @@ def test_body_size_is_mode_of_sized_paras():
     assert line_body_size([Para("a"), Para("b")]) == 0
 
 
-# --- OCR chronology sanity check (rewrite-parity finding 05) -----------------
+# --- OCR chronology sanity check --------------------------------------------
 
 def _ocr_fa(basefile, text, ocr=True):
     return fa_parse.Forarbete(
@@ -494,7 +494,7 @@ def test_born_digital_body_is_never_censored():
     assert "suspect_citations" not in art
 
 
-# --- truncated "lag om ändring i" rubriks (rewrite-parity finding 04) --------
+# --- truncated "lag om ändring i" rubriks -----------------------------------
 
 def test_dangling_rubrik_joins_next_statute_line():
     # prop 1993/94:38: "12.2 Förslaget till lag om ändring i" + "sekretesslagen"
@@ -567,7 +567,7 @@ def test_dangling_rubrik_splits_a_glued_continuation():
         "14 § Från ett fordons trafikförsäkring avräknas."]
 
 
-# --- printed-page offsets (rewrite-parity finding 04) ------------------------
+# --- printed-page offsets ---------------------------------------------------
 
 def _margin(text):
     """A margin line, as page_number_candidates sees it."""
@@ -748,20 +748,20 @@ def test_printed_pages_covers_every_page_when_a_bilaga_restarts_again():
     assert m[50] == (50, None) and m[51] == (1, "1") and m[66] == (1, "1")
 
 
-# --- generic tables (rewrite-parity finding 04) ------------------------------
+# --- generic tables ---------------------------------------------------------
 
 def _row_line(top, cells, bold=False):
-    from accommodanda.lib.pdftext import Run
+    from ferenda.lib.pdftext import Run
     runs = [Run(left, left + 90, text, bold, False, 11)
             for left, text in cells]
     return Line(" ".join(c[1] for c in cells), top, bold, bold, False, 11, runs)
 
 
 def test_split_generic_detects_aligned_columns():
-    from accommodanda.lib import tabell
+    from ferenda.lib import tabell
     lines = [
         Line("En vanlig prosarad utan kolumner.", 90, False, False, False, 11,
-             [__import__('accommodanda.lib.pdftext', fromlist=['Run']).Run(
+             [__import__('ferenda.lib.pdftext', fromlist=['Run']).Run(
                  100, 400, "En vanlig prosarad utan kolumner.", False, False, 11)]),
         _row_line(120, [(100, "Ålder"), (300, "Belopp")], bold=True),
         _row_line(140, [(100, "22 år"), (300, "25 000")]),
@@ -777,7 +777,7 @@ def test_split_generic_detects_aligned_columns():
 
 
 def test_split_generic_wrapped_cell_merges_into_previous_row():
-    from accommodanda.lib import tabell
+    from ferenda.lib import tabell
     lines = [
         _row_line(120, [(100, "Myndighet"), (300, "Anslag")]),
         _row_line(140, [(100, "Riksrevisionen"), (300, "12 000")]),
@@ -792,8 +792,8 @@ def test_split_generic_wrapped_cell_merges_into_previous_row():
 
 
 def test_split_generic_leaves_prose_and_toc_alone():
-    from accommodanda.lib import tabell
-    from accommodanda.lib.pdftext import Run
+    from ferenda.lib import tabell
+    from ferenda.lib.pdftext import Run
     prose = [Line("Text %d." % i, 100 + 20*i, False, False, False, 11,
                   [Run(100, 400, "Text %d." % i, False, False, 11)])
              for i in range(5)]
@@ -806,7 +806,7 @@ def test_split_generic_leaves_prose_and_toc_alone():
 
 
 def test_merge_continued_joins_cross_page_table_and_drops_repeated_header():
-    from accommodanda.lib import tabell
+    from ferenda.lib import tabell
     a = Block("tabell", "", 14, rows=[("Ålder", "Belopp"), ("22 år", "25 000")],
               th=True)
     b = Block("tabell", "", 15, rows=[("Ålder", "Belopp"), ("23 år", "27 500")],
@@ -1077,7 +1077,7 @@ def test_classify_ends_the_signature_block_at_the_next_numbered_heading():
 # ---- dating a förarbete's citations ------------------------------------------
 
 def _fa(basefile, date=None, typ="prop"):
-    from accommodanda.forarbete.model import Forarbete
+    from ferenda.forarbete.model import Forarbete
     return Forarbete(type=typ, basefile=basefile, identifier="x", uri="u",
                      title="t", date=date)
 
@@ -1100,7 +1100,7 @@ def test_written_date_falls_back_to_the_basefile():
 def _defrow(top, term, definition, term_left=178, def_left=414, bold=False):
     """One line of a two-column term/definition table. An empty `term` marks a
     continuation line of the definition above."""
-    from accommodanda.lib.pdftext import Run
+    from ferenda.lib.pdftext import Run
     runs = ([Run(term_left, term_left + 8 * len(term), term, bold, False, 18)]
             if term else []) \
         + [Run(def_left, def_left + 8 * len(definition), definition, bold,
@@ -1109,7 +1109,7 @@ def _defrow(top, term, definition, term_left=178, def_left=414, bold=False):
 
 
 def test_split_two_column_reads_a_term_definition_table():
-    from accommodanda.lib import tabell
+    from ferenda.lib import tabell
     lines = [
         _defrow(285, "Begrepp", "Betydelse", bold=True),
         _defrow(316, "digital miljö", "den samlade mängden system som"),
@@ -1130,7 +1130,7 @@ def test_split_two_column_reads_a_term_definition_table():
 def test_split_two_column_keeps_a_term_that_wraps_with_its_definition():
     # "information i behov av utökat / skydd" is one term over two lines: the
     # row boundary is the vertical step, not the presence of a left-column cell
-    from accommodanda.lib import tabell
+    from ferenda.lib import tabell
     lines = [
         _defrow(285, "Begrepp", "Betydelse", bold=True),
         _defrow(316, "digital miljö", "den samlade mängden system,"),
@@ -1147,8 +1147,8 @@ def test_split_two_column_stops_before_the_body_text_below_it():
     # the body margin (170) sits within COL_TOL of the term column (178), so a
     # heading under the table places into the term column and would run the
     # region on -- a left cell with no definition beside it ends it instead
-    from accommodanda.lib import tabell
-    from accommodanda.lib.pdftext import Run
+    from ferenda.lib import tabell
+    from ferenda.lib.pdftext import Run
     heading = Line("2 kap. Ledningens utbildning", 642, True, True, False, 24,
                    [Run(170, 500, "2 kap. Ledningens utbildning", True, False, 24)])
     lines = [
@@ -1167,8 +1167,8 @@ def test_split_two_column_rejects_a_landscape_table_of_rotated_fragments():
     # MSBFS 2020:9 sets the ADR dangerous-goods tables in landscape with
     # rotated headers; poppler returns each narrow column as its own fragment,
     # so a "term" cell arrives as a dozen runs of syllables
-    from accommodanda.lib import tabell
-    from accommodanda.lib.pdftext import Run
+    from ferenda.lib import tabell
+    from ferenda.lib.pdftext import Run
 
     def fragmented(top):
         runs = [Run(178 + 20 * i, 194 + 20 * i, frag, False, False, 18)

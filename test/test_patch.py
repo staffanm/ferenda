@@ -13,19 +13,19 @@ import pytest
 from fastapi.testclient import TestClient
 from lxml import etree
 
-import accommodanda.sfs as sfs
-from accommodanda import build, config, patchsource
-from accommodanda.api import app as api
-from accommodanda.api import auth
-from accommodanda.api import patch as patch_api
-from accommodanda.dv import legacy as dv_legacy
-from accommodanda.dv import parse as dv_parse
-from accommodanda.dv import paths as dv_paths
-from accommodanda.eurlex import parse as eurlex_parse
-from accommodanda.foreskrift import parse as fs_parse
-from accommodanda.lib import formex as lib_formex
-from accommodanda.lib import harvest, layout, markup, patch, pdftext, util
-from accommodanda.lib.errors import SkipDocument
+import ferenda.sfs as sfs
+from ferenda import build, config, patchsource
+from ferenda.api import app as api
+from ferenda.api import auth
+from ferenda.api import patch as patch_api
+from ferenda.dv import legacy as dv_legacy
+from ferenda.dv import parse as dv_parse
+from ferenda.dv import paths as dv_paths
+from ferenda.eurlex import parse as eurlex_parse
+from ferenda.foreskrift import parse as fs_parse
+from ferenda.lib import formex as lib_formex
+from ferenda.lib import harvest, layout, markup, patch, pdftext, util
+from ferenda.lib.errors import SkipDocument
 
 ORIG = "line one\nSECRET NAME\nline three\nline four\n"
 EDITED = "line one\n[redacted]\nline three\nline four\n"
@@ -643,7 +643,7 @@ def test_the_patch_editor_writes_nothing_outside_the_patch_tree(webenv):
     repo, reparsed = webenv
     c = TestClient(api.app)
     _login(c)
-    escaping = {"source": "sfs", "basefile": "../../accommodanda/config"}
+    escaping = {"source": "sfs", "basefile": "../../ferenda/config"}
     # the load looks for an existing patch first, and that lookup is the refusal
     assert c.get("/internal-api/v1/patch/document", params=escaping).status_code == 404
     r = c.post("/internal-api/v1/patch/save",

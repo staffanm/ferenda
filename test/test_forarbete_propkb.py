@@ -11,9 +11,9 @@ import json
 
 import pytest
 
-from accommodanda.forarbete import propkb
-from accommodanda.forarbete.propkb import scan_url, wanted
-from accommodanda.lib import layout
+from ferenda.forarbete import propkb
+from ferenda.forarbete.propkb import scan_url, wanted
+from ferenda.lib import layout
 
 XML = ("https://weburn.kb.se/riks/tvåkammarriksdagen/xml/1937/"
        "web_prop_1937____141/prop_1937____141.xml")

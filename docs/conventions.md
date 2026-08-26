@@ -1,11 +1,9 @@
 # Conventions catalog
 
-The citable rulebook for work on `accommodanda/`. Each rule has a slug.
+The citable rulebook for work on `ferenda/`. Each rule has a slug.
 Cite slugs in code where an exception is exercised
 (`# noqa: BLE001 — walk must survive one bad agency page (rule:no-catch-log-continue)`)
-and in review findings. The catalog records *judgment*, not just style —
-most rules exist because their violation was actually found and paid for
-(see `docs/review-accommodanda-2026-07-01.md`).
+and in review findings. The catalog records judgment, not only style.
 
 Enforcement map: **[hook]** = blocked/injected by a `.claude/hooks/` hook,
 **[ruff]** = a ruff rule fails the Stop check, **[checker]** = the
@@ -31,8 +29,8 @@ in the wrong place* — move it to `lib/` (as `case_slug` moved from
 
 A source owns its full chain (download → parse → typed model → JSON
 artifact) and exposes only its artifacts plus the tiny orchestrator
-protocol. No source base class, no inheritance, no framework hooks — the
-old codebase died of ~50 overridable methods. Share behaviour as small
+protocol. No source base class, no inheritance, and no framework hooks.
+Share behaviour as small
 `lib/` functions configured by **data**, not by subclassing:
 `foreskrift/agencies.py` drives one harvest engine for 17 agencies; that
 is the template for variation between sources.
@@ -58,19 +56,10 @@ home for anything generic — the `foreskrift` harvest engine belongs in
 ### rule:respect-politeness
 
 Every action for any source that downloads more than a single resource
-must respect `accommodanda.build.POLITENESS` (or accept a `delay` parameter
+must respect `ferenda.build.POLITENESS` (or accept a `delay` parameter
 that defaults to it). Multi-item network operations — harvests, scan
 downloads, index walks, and body refetches — must sleep between network
 fetches to avoid overwhelming upstream servers or triggering rate limits.
-
-### rule:legacy-read-only  [hook]
-
-`ferenda/` and `lagen/` are frozen reference — port knowledge out of
-them; never extend, fix, or modernize them. Edits there are blocked. If
-legacy behaviour is wrong, the fix belongs in the `accommodanda/`
-replacement (with the legacy quirk documented where it matters).
-
----
 
 ## Error handling
 
@@ -298,16 +287,15 @@ contract, not the hook's.
 ### rule:docs-follow-structure
 
 A change that alters architecture, module layout, or a vertical's status
-updates `REWRITE.md` (status markers + progress log) and
-`accommodanda/README.md` (module map) *in the same change* — both drift
-otherwise (the README's test list went stale within weeks). The
-`docs-sync` agent exists for exactly this; bug fixes and internal
-refactors don't qualify.
+updates `ferenda/README.md` in the same change. A change to public or
+operator behaviour also updates the applicable audience guide under
+`docs/`. The `docs-sync` agent checks these documents. Bug fixes and
+internal refactors do not qualify.
 
 ### rule:commit-shape
 
 Subject `scope: short lowercase summary`, no trailing period; scope is a
-vertical or a layer/concern (see CLAUDE.md). Body explains the *why* when
+vertical or a layer/concern (see AGENTS.md). Body explains the *why* when
 the change is broad. One commit = one coherent change; the
 `commit-planner` agent groups a messy tree into a plan and, only after
 the user approves it, executes the commits (rule:no-unrequested-git —

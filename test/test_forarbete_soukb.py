@@ -16,9 +16,9 @@ import json
 
 import pytest
 
-from accommodanda.forarbete import soukb
-from accommodanda.forarbete.soukb import basefile_of
-from accommodanda.lib import compress, layout
+from ferenda.forarbete import soukb
+from ferenda.forarbete.soukb import basefile_of
+from ferenda.lib import compress, layout
 
 
 @pytest.mark.parametrize("label, basefile", [

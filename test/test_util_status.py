@@ -1,4 +1,4 @@
-"""The live progress counter (accommodanda.lib.util.status) and its one-row
+"""The live progress counter (ferenda.lib.util.status) and its one-row
 line clipping -- the fix for long sö/lr förarbete basefiles wrapping the
 terminal so the leading '\\r' could no longer overwrite them -- plus the
 whole-run ETA paced on the work actually performed."""
@@ -7,7 +7,7 @@ import io
 
 import pytest
 
-from accommodanda.lib import util
+from ferenda.lib import util
 
 
 class FakeClock:

@@ -4,9 +4,8 @@ PreToolUse hook (Edit|Write|MultiEdit): conventions guardrail.
 
 Two tiers, per docs/conventions.md:
 
-- Hard blocks (permissionDecision "deny"): edits under the read-only legacy
-  trees ferenda/ and lagen/ (rule:legacy-read-only), and bare lint/type
-  suppressions without a rationale (rule:fix-dont-annotate).
+- Hard blocks (permissionDecision "deny"): bare lint/type suppressions without
+  a rationale (rule:fix-dont-annotate).
 - Soft reminders (additionalContext): the two or three catalog rules relevant
   to the file being edited, injected at the moment they matter.
 
@@ -19,9 +18,6 @@ import os
 import re
 import sys
 from pathlib import Path
-
-# Read-only legacy trees, relative to the project root (rule:legacy-read-only).
-LEGACY_TREES = ("ferenda", "lagen")
 
 # A suppression comment with nothing after the code(s) is "bare" unless a
 # comment on one of the two preceding lines carries the rationale (the
@@ -53,15 +49,15 @@ VERTICALS = "sfs|dv|eurlex|forarbete|foreskrift|avg|wiki"
 # (path regex, reminder) — first the specific, then the general; all matches
 # are injected, deduped, in order.
 PATH_REMINDERS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"accommodanda/lib/[^/]+\.py$"),
+    (re.compile(r"ferenda/lib/[^/]+\.py$"),
      "lib/ is source-agnostic: never import from a vertical — keying on "
      "artifact metadata is fine, importing source code is not "
      "(rule:lib-never-imports-vertical)."),
-    (re.compile(rf"accommodanda/(?:{VERTICALS})/[^/]+\.py$"),
+    (re.compile(rf"ferenda/(?:{VERTICALS})/[^/]+\.py$"),
      "Verticals: check lib/ (util, net) before writing a helper; on second "
      "use, promote to lib/ instead of copying (rule:second-use-goes-to-lib); "
      "never import a sibling vertical (rule:lib-never-imports-vertical)."),
-    (re.compile(r"accommodanda/(?:[^/]+/)?(?:extract|reader|tokenizer|"
+    (re.compile(r"ferenda/(?:[^/]+/)?(?:extract|reader|tokenizer|"
                 r"assembler|parse[^/]*|structure|register|nf)\.py$"),
      "Parser/extraction change: lock fixes in with a regression fixture or "
      "golden check (rule:lock-in-with-fixture); prove against the frozen "
@@ -70,7 +66,7 @@ PATH_REMINDERS: tuple[tuple[re.Pattern[str], str], ...] = (
      "Tests: never loosen an assertion/fixture/golden expectation to make a "
      "failure pass — adjudicate deliberately or fix the regression "
      "(rule:never-weaken-tests)."),
-    (re.compile(r"accommodanda/.*\.py$"),
+    (re.compile(r"ferenda/.*\.py$"),
      "Asserts over fallbacks (rule:fail-fast); don't catch what you can't "
      "fix (rule:no-catch-log-continue); load-bearing validation raises "
      "ValueError, never assert (rule:errors-drive-retry-use-raise). "
@@ -108,12 +104,6 @@ def _main() -> int:
         rel = path.as_posix()
 
     blocks: list[str] = []
-    if rel.split("/", 1)[0] in LEGACY_TREES:
-        blocks.append(
-            f"{rel} is in the frozen legacy tree — ferenda/ and lagen/ are "
-            "read-only reference (rule:legacy-read-only). Port the knowledge "
-            "into accommodanda/ instead; if you believe the legacy tree "
-            "itself must change, ask the user.")
     added = added_content(data.get("tool_name") or "", tool_input)
     if rel.endswith(".py") and bare_suppression_lines(added):
         blocks.append(

@@ -1,10 +1,10 @@
-"""Legacy-compatible Atom feeds over the accommodanda catalog."""
+"""Legacy-compatible Atom feeds over the ferenda catalog."""
 
 import json
 import os
 import xml.etree.ElementTree as ET
 
-from accommodanda.lib import catalog, feeds, render
+from ferenda.lib import catalog, feeds, render
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 
@@ -103,7 +103,7 @@ def test_nonmatching_publisher_filter_does_not_open_artifacts(tmp_path, monkeypa
         dcterms_publisher="publisher/finns_inte") == []
 
 
-def test_legacy_aliases_map_to_rebuilt_sources():
+def test_public_aliases_map_to_source_names():
     assert feeds.dataset("forarbeten").source == "forarbete"
     assert feeds.dataset("myndfs").source == "foreskrift"
     assert feeds.dataset("myndprax").source == "avg"

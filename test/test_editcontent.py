@@ -1,11 +1,11 @@
-"""The inline editor's content model (accommodanda/api/editcontent.py) and the
+"""The inline editor's content model (ferenda/api/editcontent.py) and the
 `fragment_heading` inverse it relies on: locating and rewriting one markdown
 region in a scratch lagen-wiki tree without disturbing anything around it."""
 
 import pytest
 
-from accommodanda.api import editcontent
-from accommodanda.wiki import parse as wiki
+from ferenda.api import editcontent
+from ferenda.wiki import parse as wiki
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def wiki_root(tmp_path, monkeypatch):
     (tmp_path / "site" / "om").mkdir(parents=True)
     (tmp_path / "site" / "om" / "kontakt.md").write_text(
         "---\ntitle: Kontakt\n---\nHör av dig.\n", encoding="utf-8")
-    monkeypatch.setattr("accommodanda.config.WIKI_ROOT", tmp_path)
+    monkeypatch.setattr("ferenda.config.WIKI_ROOT", tmp_path)
     wiki.kommentar_index.cache_clear()
     wiki.begrepp_index.cache_clear()
     yield tmp_path

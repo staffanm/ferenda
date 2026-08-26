@@ -1,7 +1,7 @@
 """One-off migration to the uniform on-disk layout (layout consolidation step 2).
 
 Relocates each source's existing files to the convention now expected by the
-code (accommodanda/lib/layout.py):
+code (ferenda/lib/layout.py):
 
     DATA/<dir>/downloaded/<relpath>      raw fetched bytes
     DATA/<dir>/artifact/<relpath>.json   parsed
@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from accommodanda.lib import layout                                  # noqa: E402
+from ferenda.lib import layout                                  # noqa: E402
 
 RESERVED = {"downloaded", "artifact"}
 

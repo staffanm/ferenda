@@ -1,4 +1,4 @@
-"""The crop-review content model (accommodanda/api/graphicsedit.py) and its
+"""The crop-review content model (ferenda/api/graphicsedit.py) and its
 carriage through the shared edit cart: approving a crop flips the one flag that
 lets it reach the public render, and leaves everything else in the layer alone.
 """
@@ -9,10 +9,10 @@ import subprocess
 
 import pytest
 
-from accommodanda.api import editcart, editcontent, graphicsedit
-from accommodanda.api.auth import Editor
-from accommodanda.lib import annstore
-from accommodanda.wiki import parse as wiki
+from ferenda.api import editcart, editcontent, graphicsedit
+from ferenda.api.auth import Editor
+from ferenda.lib import annstore
+from ferenda.wiki import parse as wiki
 
 EDITOR = Editor("anna", {"name": "Anna Ek", "email": "anna@example.org"})
 
@@ -54,7 +54,7 @@ def layer(tmp_path, monkeypatch):
     _git(root, "config", "user.email", "seed@example.org")
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "seed")
-    monkeypatch.setattr("accommodanda.config.WIKI_ROOT", root)
+    monkeypatch.setattr("ferenda.config.WIKI_ROOT", root)
     monkeypatch.setattr(editcart, "EDITS", tmp_path / "edits")
     return p
 

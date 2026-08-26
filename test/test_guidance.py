@@ -19,7 +19,7 @@ import requests
 from bs4 import BeautifulSoup
 from lxml import etree
 
-from accommodanda.guidance import (
+from ferenda.guidance import (
     acer_download,
     eba_download,
     easa_download,
@@ -27,29 +27,29 @@ from accommodanda.guidance import (
     euipo_download,
     eurlex_download,
 )
-from accommodanda.guidance import download as guidance_download
-from accommodanda.guidance import issuers as guidance_issuers
-from accommodanda.guidance import parse as edpb_parse
-from accommodanda.guidance import render as guidance_render
-from accommodanda.guidance.edpb_data import HBDI, WP29, WP29_BY_SLUG
-from accommodanda.guidance.edpb_download import HARVESTED
-from accommodanda.guidance.issuers import (
+from ferenda.guidance import download as guidance_download
+from ferenda.guidance import issuers as guidance_issuers
+from ferenda.guidance import parse as edpb_parse
+from ferenda.guidance import render as guidance_render
+from ferenda.guidance.edpb_data import HBDI, WP29, WP29_BY_SLUG
+from ferenda.guidance.edpb_download import HARVESTED
+from ferenda.guidance.issuers import (
     EASA,
     EDPB,
     EUIPO,
     LOPNUMMER_FORST,
 )
-from accommodanda.guidance.issuers import number_slug as _number_slug
-from accommodanda.guidance.model import (
+from ferenda.guidance.issuers import number_slug as _number_slug
+from ferenda.guidance.model import (
     Block,
     Fotnot,
     Vagledning,
     vagledning_identifier,
     vagledning_uri,
 )
-from accommodanda.lib import compress
-from accommodanda.lib import formex as lib_formex
-from accommodanda.lib import lagrum
+from ferenda.lib import compress
+from ferenda.lib import formex as lib_formex
+from ferenda.lib import lagrum
 
 # the EDPB's series data now lives on its registry entry, and its numbering
 # rule takes the component order as an argument (the EBA writes the year first)
@@ -59,14 +59,14 @@ REGISTRY = EDPB.series
 
 def number_slug(number):
     return _number_slug(number, LOPNUMMER_FORST)
-from accommodanda.lib import catalog, facets, labels, layout, render, tpl
-from accommodanda.lib.lagrum import (
+from ferenda.lib import catalog, facets, labels, layout, render, tpl
+from ferenda.lib.lagrum import (
     EULAGSTIFTNING,
     VAGLEDNING,
     LagrumParser,
     vagledning_slug,
 )
-from accommodanda.lib.pdftext import Para, Run, line_from_runs, page_paragraphs
+from ferenda.lib.pdftext import Para, Run, line_from_runs, page_paragraphs
 
 FIXTURES = Path(__file__).parent / "files" / "edpb"
 

@@ -12,9 +12,9 @@ from pathlib import Path
 import pytest
 import requests
 
-from accommodanda.lib import compress, layout
-from accommodanda.remisser import download
-from accommodanda.remisser.model import Remiss, Remissinstans
+from ferenda.lib import compress, layout
+from ferenda.remisser import download
+from ferenda.remisser.model import Remiss, Remissinstans
 
 
 def _redirect(tmp_path, monkeypatch):

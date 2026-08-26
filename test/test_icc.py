@@ -7,18 +7,18 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from accommodanda.icc import download, parse, treaties
-from accommodanda.icc import parse as icc_parse
-from accommodanda.icc import render as icc_render
-from accommodanda.icc.model import (
+from ferenda.icc import download, parse, treaties
+from ferenda.icc import parse as icc_parse
+from ferenda.icc import render as icc_render
+from ferenda.icc.model import (
     Block,
     Decision,
     decision_uri,
     doc_basefile,
     load_types,
 )
-from accommodanda.lib import catalog, facets, layout, page, render
-from accommodanda.lib.pdftext import Line
+from ferenda.lib import catalog, facets, layout, page, render
+from ferenda.lib.pdftext import Line
 
 FIXTURES = Path(__file__).parent / "files" / "icc"
 

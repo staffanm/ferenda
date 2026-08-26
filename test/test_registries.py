@@ -17,8 +17,8 @@ consolidations as if each were a separate act.
 
 import pytest
 
-from accommodanda import build
-from accommodanda.lib import facets, layout
+from ferenda import build
+from ferenda.lib import facets, layout
 
 # Sources that publish no catalogued documents, so they have no ARTIFACTS entry
 # and are never related/indexed/dumped:

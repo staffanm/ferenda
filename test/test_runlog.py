@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from accommodanda.lib import runlog
+from ferenda.lib import runlog
 
 
 def _write_run(path, run, pid=4711, segments=(), end=True, base_t="2026-07-04T10:00:0"):

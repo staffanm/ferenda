@@ -1,4 +1,4 @@
-"""The crop-review editor's HTTP surface (accommodanda/api/graphics.py): the
+"""The crop-review editor's HTTP surface (ferenda/api/graphics.py): the
 auth gate, the deliberate `publishable` bypass for a logged-in editor, and the
 conflict check that stops a reviewer signing off a crop that moved under them.
 """
@@ -9,10 +9,10 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import auth, editcart, graphicsedit
-from accommodanda.lib import annstore, facsimile
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import auth, editcart, graphicsedit
+from ferenda.lib import annstore, facsimile
 
 LAYER = {
     "meta": {"status": "generated", "model": "moonshotai/Kimi-K2.6",
@@ -57,7 +57,7 @@ def webenv(tmp_path, monkeypatch):
     png.write_bytes(b"\x89PNG\r\n\x1a\n")
     monkeypatch.setattr(facsimile, "cached",
                         lambda *a, **kw: png)
-    monkeypatch.setattr("accommodanda.api.graphics._source_pdf",
+    monkeypatch.setattr("ferenda.api.graphics._source_pdf",
                         lambda src: tmp_path / "fake.pdf")
     return p
 

@@ -4,8 +4,8 @@ old-flavour text-structure fallback."""
 
 from pathlib import Path
 
-from accommodanda.eurlex import lang as L
-from accommodanda.eurlex.parse_html import normalize_case, parse_html
+from ferenda.eurlex import lang as L
+from ferenda.eurlex.parse_html import normalize_case, parse_html
 
 FILES = Path(__file__).parent / "files/eurlex"
 

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from accommodanda.coe import render as coe_render
-from accommodanda.hudoc import (
+from ferenda.coe import render as coe_render
+from ferenda.hudoc import (
     citations,
     download,
     parse,
@@ -14,10 +14,10 @@ from accommodanda.hudoc import (
     translations,
     treaties,
 )
-from accommodanda.hudoc import render as hudoc_render
-from accommodanda.lib import catalog, coe, facets, layout, page
-from accommodanda.lib.errors import SkipDocument
-from accommodanda.wiki import parse as wiki_parse
+from ferenda.hudoc import render as hudoc_render
+from ferenda.lib import catalog, coe, facets, layout, page
+from ferenda.lib.errors import SkipDocument
+from ferenda.wiki import parse as wiki_parse
 
 FIXTURES = Path(__file__).parent / "files" / "hudoc"
 

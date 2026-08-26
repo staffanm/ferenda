@@ -14,10 +14,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from accommodanda.lib import pdftext
-from accommodanda.lib.errors import SkipDocument
-from accommodanda.remisser import parse
-from accommodanda.remisser.model import Remiss, Remissinstans, Remissvar, org_slug
+from ferenda.lib import pdftext
+from ferenda.lib.errors import SkipDocument
+from ferenda.remisser import parse
+from ferenda.remisser.model import Remiss, Remissinstans, Remissvar, org_slug
 
 FIXTURE_PDF = Path(__file__).parent / "files" / "remisser" / "instance.pdf"
 

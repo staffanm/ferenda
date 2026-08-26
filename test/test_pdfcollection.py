@@ -9,10 +9,10 @@ import lxml.html
 import pytest
 from fastapi.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import pdfcollection, pdfjob
-from accommodanda.lib import compress
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import pdfcollection, pdfjob
+from ferenda.lib import compress
 
 
 def _page(identifier, title, *, preamble=False, amendments=False):
@@ -233,7 +233,7 @@ global.window = {};
 global.document = {querySelector: function () { return null; }};
 global.location = {pathname: '/'};
 global.localStorage = {getItem: function () { return null; }};
-require('./accommodanda/lib/assets/collection.js');
+require('./ferenda/lib/assets/collection.js');
 var state = {version: 1, title: 'Arbetsrätt – urval', subtitle: 'År 2026',
   cover: false, toc: true, columns: 2, context: [], items: [
     {path: '/prop/2020/21:22', start: 'recto', amendments: false,

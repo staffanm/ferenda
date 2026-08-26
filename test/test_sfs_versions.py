@@ -1,4 +1,4 @@
-"""Historical SFS consolidations (accommodanda/sfs/versions.py + the layout
+"""Historical SFS consolidations (ferenda/sfs/versions.py + the layout
 archive rules): enumerating the download archive, recovering version ids from
 the three raw generations, and building version artifacts + the sidecar."""
 
@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from accommodanda.api import app as app_module
-from accommodanda.api.app import app
-from accommodanda.lib import compress, diff, layout
-from accommodanda.sfs import versions
+from ferenda.api import app as app_module
+from ferenda.api.app import app
+from ferenda.lib import compress, diff, layout
+from ferenda.sfs import versions
 
 FILES = Path(__file__).parent / "files" / "sfs" / "versions"
 

@@ -3,7 +3,7 @@ collapses inflected surface forms onto one canonical begrepp (lib/concepts.py)."
 
 import pytest
 
-from accommodanda.lib import concepts
+from ferenda.lib import concepts
 
 
 @pytest.fixture(autouse=True)

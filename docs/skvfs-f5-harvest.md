@@ -50,7 +50,7 @@ Relevant register URLs:
 
 ## What was tried
 
-### Plain HTTP clients (`accommodanda/lib/net`)
+### Plain HTTP clients (`ferenda/lib/net`)
 | Attempt | Result |
 | --- | --- |
 | `HARVESTER_UA` (honest UA) | ASM hard-block, 245 B |
@@ -205,10 +205,10 @@ that channel. Keep the RSFS entry (the SKVFS register is its only source).
   SKVFS.
 
 ## Pointers
-- SKVFS Agency config: `accommodanda/foreskrift/agencies.py`
-- SKVFS register/detail semantics: `accommodanda/foreskrift/skvfs.py`
-- MTFS register/direct-PDF semantics: `accommodanda/foreskrift/mtfs.py`
-- Detached headful transport: `accommodanda/lib/browser.py`
+- SKVFS Agency config: `ferenda/foreskrift/agencies.py`
+- SKVFS register/detail semantics: `ferenda/foreskrift/skvfs.py`
+- MTFS register/direct-PDF semantics: `ferenda/foreskrift/mtfs.py`
+- Detached headful transport: `ferenda/lib/browser.py`
 - Shared frozen-import core (other verticals): `lib/legacy_import.py`
 - HTTP/2 transport (KKVFS precedent, wrong tool for this wall):
   `Agency.http2`, `lib/net.make_http2_session`

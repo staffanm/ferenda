@@ -5,8 +5,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from accommodanda.lib import compress, net
-from accommodanda.lib.harvest import (
+from ferenda.lib import compress, net
+from ferenda.lib.harvest import (
     HarvestWatermark,
     ItemKey,
     Skip,

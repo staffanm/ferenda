@@ -7,8 +7,8 @@ from datetime import date
 
 import pytest
 
-from accommodanda.lib import annstore, compress, layout
-from accommodanda.remisser import ai_analyze
+from ferenda.lib import annstore, compress, layout
+from ferenda.remisser import ai_analyze
 
 STRUCTURE = [
     {"type": "avsnitt", "id": "a3.1", "text": ["3.1 Utredningens uppdrag"],

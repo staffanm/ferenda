@@ -2,11 +2,11 @@
 
 from xml.etree import ElementTree as ET
 
-from accommodanda.eurlex.definitions import (_term_of, build_matcher,
+from ferenda.eurlex.definitions import (_term_of, build_matcher,
                                              extract_definitions, term_refs)
-from accommodanda.eurlex.model import Block
-from accommodanda.eurlex.parse import parse_formex, to_artifact
-from accommodanda.lib.eu_structure import flatten
+from ferenda.eurlex.model import Block
+from ferenda.eurlex.parse import parse_formex, to_artifact
+from ferenda.lib.eu_structure import flatten
 
 
 # a directive with a definitions article (art. 5) and a later article (art. 7)

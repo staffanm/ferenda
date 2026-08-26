@@ -2,7 +2,7 @@
 and the MCP get_document tool. Small constructed artifacts per source shape --
 the same node vocabulary docs/api/README.md documents."""
 
-from accommodanda.lib import mdtext, text
+from ferenda.lib import mdtext, text
 
 
 def test_sfs_shape_reads_as_a_statute():

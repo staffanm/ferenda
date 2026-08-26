@@ -25,11 +25,11 @@ from pathlib import Path
 import pytest
 import requests
 
-from accommodanda.build import SOURCE_RENDERERS, UNSEARCHED
-from accommodanda.lawreview import download, euar, ft, lod, njel, nmt, parse, siplr, urt
-from accommodanda.lawreview.journals import BY_KOD, JOURNALS
-from accommodanda.lawreview.model import Artikel
-from accommodanda.lib import compress, facets, feeds, harvest, page, render
+from ferenda.build import SOURCE_RENDERERS, UNSEARCHED
+from ferenda.lawreview import download, euar, ft, lod, njel, nmt, parse, siplr, urt
+from ferenda.lawreview.journals import BY_KOD, JOURNALS
+from ferenda.lawreview.model import Artikel
+from ferenda.lib import compress, facets, feeds, harvest, page, render
 
 FILES = Path(__file__).parent / "files" / "lawreview"
 

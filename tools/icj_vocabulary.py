@@ -13,7 +13,7 @@ Every document whose pages are image-free contributes its words.
 
     .venv/bin/python tools/icj_vocabulary.py
 
-Writes ``accommodanda/icj/data/vocabulary.txt``, one lower-cased word per line.
+Writes ``ferenda/icj/data/vocabulary.txt``, one lower-cased word per line.
 Rerun it after a harvest that adds a year of decisions; the file is committed,
 so the build never depends on this tool having been run.
 """
@@ -24,13 +24,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from accommodanda.icj import parse
-from accommodanda.icj.download import body_path, list_basefiles
-from accommodanda.lib import compress, layout
-from accommodanda.lib.pdftext import pdf_info, pdftotext_text
-from accommodanda.lib.util import status
+from ferenda.icj import parse
+from ferenda.icj.download import body_path, list_basefiles
+from ferenda.lib import compress, layout
+from ferenda.lib.pdftext import pdf_info, pdftotext_text
+from ferenda.lib.util import status
 
-OUT = (Path(__file__).resolve().parent.parent / "accommodanda" / "icj"
+OUT = (Path(__file__).resolve().parent.parent / "ferenda" / "icj"
        / "data" / "vocabulary.txt")
 # a word for repair purposes: letters and the apostrophe the Court sets in
 # "State's". Digits are never part of one, so a token carrying any is skipped.

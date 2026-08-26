@@ -1,9 +1,9 @@
-"""NDJSON bulk dumps (accommodanda/lib/dump.py)."""
+"""NDJSON bulk dumps (ferenda/lib/dump.py)."""
 
 import gzip
 import json
 
-from accommodanda.lib import dump
+from ferenda.lib import dump
 
 
 def _artifact(tmp_path, name, obj):

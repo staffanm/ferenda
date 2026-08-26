@@ -13,18 +13,18 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from accommodanda.icj import download, reports, ocr, parse, treaties
-from accommodanda.icj import render as icj_render
-from accommodanda.icj.model import (
+from ferenda.icj import download, reports, ocr, parse, treaties
+from ferenda.icj import render as icj_render
+from ferenda.icj.model import (
     Block,
     Decision,
     decision_uri,
     doc_basefile,
     parse_stem,
 )
-from accommodanda.lib import catalog, facets, layout, render
-from accommodanda.lib.page import BANNERS
-from accommodanda.lib.pdftext import (
+from ferenda.lib import catalog, facets, layout, render
+from ferenda.lib.page import BANNERS
+from ferenda.lib.pdftext import (
     Line,
     join_across_pages,
     paragraph_texts,

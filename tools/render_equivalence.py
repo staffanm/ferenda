@@ -41,11 +41,11 @@ from pathlib import Path
 
 import html5lib
 
-from accommodanda import browse
-from accommodanda.build import SOURCE_RENDERERS, sfs_version_pages
-from accommodanda.lib import catalog, compress, layout, page, render
-from accommodanda.site import render as site_render
-from accommodanda.stats import render as stats_render
+from ferenda import browse
+from ferenda.build import SOURCE_RENDERERS, sfs_version_pages
+from ferenda.lib import catalog, compress, layout, page, render
+from ferenda.site import render as site_render
+from ferenda.stats import render as stats_render
 
 SNAP_ROOT = layout.DATA / "render-eq"
 CATALOG = layout.DATA / "catalog.sqlite"

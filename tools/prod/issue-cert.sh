@@ -9,7 +9,7 @@
 # and can't answer the http-01 challenge without the cert -- so certbot binds
 # :80 itself this once). After this succeeds, `docker compose --profile prod up`
 # starts nginx with the cert present, and the certbot sidecar handles all future
-# renewals over the webroot. See docs/deploy-vps.md.
+# renewals over the webroot..
 #
 # Idempotent: certbot no-ops if a valid cert already exists (drop --force unless
 # you mean to reissue).

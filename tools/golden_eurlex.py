@@ -1,8 +1,7 @@
-"""EUR-Lex metadata cross-check (REWRITE.md §7d).
+"""EUR-Lex metadata cross-check.
 
-There is no legacy oracle for EUR-Lex (the old pipeline never supported it
-beyond an experimental module), so this validates the *carried* metadata
-fields -- CELEX, date, title, OJ reference, ECLI and doctype -- against the
+This validates the metadata fields -- CELEX, date, title, OJ reference, ECLI
+and doctype -- against the
 authoritative CELLAR metadata itself, frozen to a retained snapshot so a
 compare run is reproducible and diffable offline.
 
@@ -38,14 +37,14 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from accommodanda.eurlex.download import (
+from ferenda.eurlex.download import (
     SPARQL,
     list_basefiles,
     sparql_select,
 )
-from accommodanda.eurlex.parse import parse_dir
-from accommodanda.lib import compress, layout
-from accommodanda.lib.net import HARVESTER_UA, make_session
+from ferenda.eurlex.parse import parse_dir
+from ferenda.lib import compress, layout
+from ferenda.lib.net import HARVESTER_UA, make_session
 
 SNAPSHOT_DEFAULT = "test/files/eurlex/cellar-snapshot.json"
 

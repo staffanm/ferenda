@@ -1,8 +1,8 @@
-"""Begreppsdefinitioner detection (accommodanda.sfs.begrepp) -- the ported
+"""Begreppsdefinitioner detection (ferenda.sfs.begrepp) -- the ported
 find_definitions heuristics. Unit tests over the five definition cases plus
 mode detection and URI minting; no corpus needed."""
 
-from accommodanda.sfs import begrepp as b
+from ferenda.sfs import begrepp as b
 
 
 def test_term_to_subject():

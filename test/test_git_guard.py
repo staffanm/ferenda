@@ -50,7 +50,7 @@ def test_irreversible_is_denied(command):
     "git commit -m x",
     'git commit -m "fix the thing"',
     "git add .",
-    "git add docs/ REWRITE.md",
+    "git add docs/ README.rst",
     "git add . && git commit -m x",
     "cd /tmp && git commit -m x",
     "git -C /repo add .",

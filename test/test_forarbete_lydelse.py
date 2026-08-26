@@ -5,8 +5,8 @@ Geometry taken from prop 2013/14:116 p. 5: left column at x 172-390, right at
 the columns, footnotes small-font at the page bottom.
 """
 
-from accommodanda.forarbete.lydelse import split_page
-from accommodanda.lib.pdftext import Line, Run
+from ferenda.forarbete.lydelse import split_page
+from ferenda.lib.pdftext import Line, Run
 
 
 def _line(top, *runs, size=15, italic=False):

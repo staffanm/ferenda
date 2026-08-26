@@ -22,8 +22,8 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-from accommodanda import config
-from accommodanda.lib import compress
+from ferenda import config
+from ferenda.lib import compress
 
 DOWNLOADED = config.DATA / "downloaded"
 

@@ -4,8 +4,8 @@ innehåll panel and typeset in the reading column (D6)."""
 
 import sqlite3
 
-from accommodanda.dv import render as dv_render
-from accommodanda.lib import catalog, page
+from ferenda.dv import render as dv_render
+from ferenda.lib import catalog, page
 
 # --- D6: the court-instance walk -------------------------------------------
 #

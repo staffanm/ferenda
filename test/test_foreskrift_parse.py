@@ -7,11 +7,11 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from accommodanda.lib.pdftext import Para
-from accommodanda.lib.text import node_text, runs_text
-from accommodanda.foreskrift import structure
-from accommodanda.foreskrift import parse as fp
-from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
+from ferenda.lib.pdftext import Para
+from ferenda.lib.text import node_text, runs_text
+from ferenda.foreskrift import structure
+from ferenda.foreskrift import parse as fp
+from ferenda.foreskrift.parse import (PARSE_TYPES, classify,
                                            extract_metadata, _iso,
                                            _body_start, _ingress_start,
                                            _dedupe_bemyndigande,
@@ -19,12 +19,12 @@ from accommodanda.foreskrift.parse import (PARSE_TYPES, classify,
                                            andrar_target,
                                            masthead_amendments, parse_record,
                                            clean_title, title_from_masthead)
-from accommodanda.foreskrift.model import Block, printed_designation
-from accommodanda.foreskrift import render as fs_render
-from accommodanda.foreskrift.render import _andrad_genom, _konsoliderad_banner
-from accommodanda.lib import catalog
-from accommodanda.lib.page import Site
-from accommodanda.lib.lagrum import sfs_parser
+from ferenda.foreskrift.model import Block, printed_designation
+from ferenda.foreskrift import render as fs_render
+from ferenda.foreskrift.render import _andrad_genom, _konsoliderad_banner
+from ferenda.lib import catalog
+from ferenda.lib.page import Site
+from ferenda.lib.lagrum import sfs_parser
 
 
 # --- classify: text-based markers survive a fontless (scanned) PDF ----------

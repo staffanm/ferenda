@@ -2,25 +2,25 @@
 
 These check that a bi-/tri-lingual convention appendix parses into a
 `Konventionsbilaga` whose languages line up — not any particular byte-for-byte
-shape. See accommodanda/sfs/parallelappendix.md for scope and known gaps.
+shape. See ferenda/sfs/parallelappendix.md for scope and known gaps.
 """
 import json
 
 import pytest
 
-from accommodanda.lib import catalog, render
-from accommodanda.lib.page import LANGUAGE_LABELS
-from accommodanda.sfs import parallelappendix as pa
-from accommodanda.sfs import parse_sfs_source
-from accommodanda.sfs.model import (
+from ferenda.lib import catalog, render
+from ferenda.lib.page import LANGUAGE_LABELS
+from ferenda.sfs import parallelappendix as pa
+from ferenda.sfs import parse_sfs_source
+from ferenda.sfs.model import (
     Bilaga,
     Konventionsartikel,
     Konventionsavdelning,
     Konventionsbilaga,
 )
-from accommodanda.sfs.nf import to_normalform
-from accommodanda.lib import page
-from accommodanda.sfs import render as sfs_render
+from ferenda.sfs.nf import to_normalform
+from ferenda.lib import page
+from ferenda.sfs import render as sfs_render
 
 FIXTURE = "test/files/sfs/echr-appendix.txt"
 LAYOUT_FIXTURE = "test/files/sfs/parallelappendix-layout.txt"

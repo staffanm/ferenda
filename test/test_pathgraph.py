@@ -2,7 +2,7 @@
 
 import os
 
-from accommodanda.lib import catalog, pathgraph
+from ferenda.lib import catalog, pathgraph
 
 
 def _catalog(tmp_path):

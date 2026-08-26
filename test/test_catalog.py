@@ -15,7 +15,7 @@ import sqlite3
 
 import pytest
 
-from accommodanda.lib import catalog
+from ferenda.lib import catalog
 
 
 def _plan_of_last_query(con, call):

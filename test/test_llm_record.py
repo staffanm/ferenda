@@ -7,10 +7,10 @@ import json
 
 import pytest
 
-from accommodanda import build
-from accommodanda.build import RunOptions
-from accommodanda.lib import annstore, layout, llm
-from accommodanda.remisser import ai_analyze as remisser_analyze
+from ferenda import build
+from ferenda.build import RunOptions
+from ferenda.lib import annstore, layout, llm
+from ferenda.remisser import ai_analyze as remisser_analyze
 
 
 @pytest.fixture

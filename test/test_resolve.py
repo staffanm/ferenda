@@ -8,9 +8,9 @@ dv/data/namedcases.json); no network, no OpenSearch, no catalog.
 
 import threading
 
-from accommodanda.dv import namedcases
-from accommodanda.lib import resolve
-from accommodanda.lib.lagrum import LagrumParser
+from ferenda.dv import namedcases
+from ferenda.lib import resolve
+from ferenda.lib.lagrum import LagrumParser
 
 # --- SFS: nickname/abbreviation + chapter/§ pinpoint, in ⌘K (law-first) order
 

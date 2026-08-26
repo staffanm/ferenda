@@ -31,7 +31,7 @@ import re
 import sys
 from collections import defaultdict
 
-from accommodanda.lib import compress, datasets, layout
+from ferenda.lib import compress, datasets, layout
 
 
 def sfs_index():

@@ -1,4 +1,4 @@
-"""The REST/OpenAPI service (accommodanda/api/app.py), driven through FastAPI's
+"""The REST/OpenAPI service (ferenda/api/app.py), driven through FastAPI's
 TestClient over a fixture catalog + a faked search backend -- no live cluster,
 no network."""
 
@@ -11,10 +11,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.testclient import TestClient
 from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import db, reads
-from accommodanda.lib import catalog, compress, facets, inbound, pathgraph
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import db, reads
+from ferenda.lib import catalog, compress, facets, inbound, pathgraph
 
 
 @pytest.fixture

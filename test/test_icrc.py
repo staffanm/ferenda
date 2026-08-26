@@ -7,10 +7,10 @@ Convention I envelope) plus small synthetic dicts -- no network.
 import json
 from pathlib import Path
 
-from accommodanda.icrc import download, parse
-from accommodanda.icrc import render as icrc_render
-from accommodanda.icrc.model import Treaty, treaty_uri
-from accommodanda.lib import catalog, compress, facets, layout, page, render
+from ferenda.icrc import download, parse
+from ferenda.icrc import render as icrc_render
+from ferenda.icrc.model import Treaty, treaty_uri
+from ferenda.lib import catalog, compress, facets, layout, page, render
 
 FIXTURES = Path(__file__).parent / "files" / "icrc"
 
@@ -314,7 +314,7 @@ def test_cross_treaty_citations_link_and_self_is_excluded():
     the full official citation. The family reference lands in `references`
     (four instruments, no inline guess); the parenthesised short form links
     inline because the family is named beside it (generic-name context rule)."""
-    from accommodanda.icrc.model import Provision
+    from ferenda.icrc.model import Provision
     treaty = Treaty(
         number="475", title="Protocol Additional (II) …",
         treaty_type="additional_protocols",

@@ -5,10 +5,10 @@ exercise the format-parsing and model-mapping logic over synthetic
 paragraph streams, so they run without Java.
 """
 
-from accommodanda.lib.poi import Para
-from accommodanda.dv.legacy import (
+from ferenda.lib.poi import Para
+from ferenda.dv.legacy import (
     build_avgorande, notis_summary, parse_head_body, _classify, _split_malnummer)
-from accommodanda.dv.model import Hanvisning, Rubrik, Stycke
+from ferenda.dv.model import Hanvisning, Rubrik, Stycke
 
 
 def P(text, bold=False, in_table=True):
@@ -156,7 +156,7 @@ def test_build_avgorande_prefers_index_identity():
 # ---------------------------------------------------------------------------
 # POI text cleanup (pure -- no JVM)
 
-from accommodanda.lib.poi import _clean  # noqa: E402
+from ferenda.lib.poi import _clean  # noqa: E402
 
 
 def test_clean_strips_field_instruction_keeps_result():
@@ -177,7 +177,7 @@ def test_clean_strips_stray_field_markers():
 # ---------------------------------------------------------------------------
 # Notisfall (frozen intermediate XML)
 
-from accommodanda.dv.legacy import notis_paras, parse_notis  # noqa: E402
+from ferenda.dv.legacy import notis_paras, parse_notis  # noqa: E402
 
 TRIPS_XML = """<body>
 <para>R4      M:REGR        Unr:g               Lnr:RÅ2001not122</para>

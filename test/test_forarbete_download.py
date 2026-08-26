@@ -6,16 +6,16 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-from accommodanda.forarbete import download
-from accommodanda.forarbete.download import (
+from ferenda.forarbete import download
+from ferenda.forarbete.download import (
     basefile_slug,
     find_content_links,
     has_live_record,
     iter_listing,
     parse_listing,
 )
-from accommodanda.lib import compress, layout
-from accommodanda.lib.util import write_atomic
+from ferenda.lib import compress, layout
+from ferenda.lib.util import write_atomic
 
 # the real regeringen.se listing-item shape: ul.list--block > li >
 # div.sortcompact > a (link text = "Title, <Identifier>") + a <time>

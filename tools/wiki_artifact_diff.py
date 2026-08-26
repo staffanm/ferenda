@@ -28,8 +28,8 @@ from mediawiki_to_markdown import (  # noqa: E402
     render_file,
 )
 
-from accommodanda.lib import wikitext  # noqa: E402
-from accommodanda.wiki import parse as wiki  # noqa: E402
+from ferenda.lib import wikitext  # noqa: E402
+from ferenda.wiki import parse as wiki  # noqa: E402
 
 # -- the legacy wikitext artifact builders (ported verbatim from the pre-markdown
 #    wiki/parse.py; kept here only as the equality reference) -------------------

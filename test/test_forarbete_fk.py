@@ -6,8 +6,8 @@ recovery rules for parse defects the corpus exhibits. See fk.py's module
 docstring for which prop motivates which rule.
 """
 
-from accommodanda.forarbete.fk import extract, fk_span, parse_marks
-from accommodanda.forarbete.structure import flatten
+from ferenda.forarbete.fk import extract, fk_span, parse_marks
+from ferenda.forarbete.structure import flatten
 
 
 def prop(*blocks):

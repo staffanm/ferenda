@@ -1,7 +1,7 @@
 """Tests for eurlex.casenames.parse_bindings -- Wikidata SPARQL result bindings
 projected to the {celex, name} snapshot records (no network)."""
 
-from accommodanda.eurlex.casenames import parse_bindings
+from ferenda.eurlex.casenames import parse_bindings
 
 
 def _rows(*pairs):

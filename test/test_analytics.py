@@ -1,4 +1,4 @@
-"""Server-side Matomo tracking (accommodanda/api/analytics.py): which requests
+"""Server-side Matomo tracking (ferenda/api/analytics.py): which requests
 become a hit, what the hit says, and what never leaves the process."""
 
 import httpx
@@ -11,9 +11,9 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import analytics
-from accommodanda.api import app as apimod
+from ferenda import config
+from ferenda.api import analytics
+from ferenda.api import app as apimod
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fetch the Apache POI jar stack (+ runtime deps) into vendor/poi/.
 #
-# The legacy DV Word path (accommodanda/dv/word.py) reads binary .doc (HWPF)
+# The DV Word input path (`ferenda/lib/poi.py`) reads binary .doc (HWPF)
 # and .docx (XWPF) through POI via jpype. The jars are not committed; run
 # this once after checkout. Idempotent — already-present jars are skipped.
 set -euo pipefail

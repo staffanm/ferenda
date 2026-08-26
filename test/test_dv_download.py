@@ -10,8 +10,8 @@ import json
 
 import pytest
 
-from accommodanda.dv import download
-from accommodanda.lib.harvest import HarvestWatermark
+from ferenda.dv import download
+from ferenda.lib.harvest import HarvestWatermark
 
 
 def rec(n, datum, innehall="<p>x</p>"):

@@ -3,8 +3,8 @@ the one spelling the index and the citation engine both key on."""
 
 import pytest
 
-from accommodanda.lib import datasets, malnummer
-from accommodanda.lib.malnummer import (
+from ferenda.lib import datasets, malnummer
+from ferenda.lib.malnummer import (
     COURT_LETTERS,
     COURT_PHRASES,
     find,

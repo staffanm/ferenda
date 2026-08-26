@@ -143,7 +143,7 @@ traps to avoid:
 
 For interaction — hovers, keyboard, clicking a rail stub, opening the
 palette — write a throwaway Playwright script in the scratchpad. Read the
-asset JS first (`accommodanda/lib/assets/*.js`) to get the real selectors
+asset JS first (`ferenda/lib/assets/*.js`) to get the real selectors
 and key bindings; guessing them produces "feature is broken" findings
 about features that work.
 

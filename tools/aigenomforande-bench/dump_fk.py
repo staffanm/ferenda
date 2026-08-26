@@ -11,8 +11,8 @@ import json
 import sys
 from pathlib import Path
 
-from accommodanda.forarbete import aigenomforande as A
-from accommodanda.lib import compress, layout
+from ferenda.forarbete import aigenomforande as A
+from ferenda.lib import compress, layout
 
 PROPS = [3, 16, 28, 43, 84, 108, 118, 124, 129, 146, 159, 183, 186, 202,
          240, 253, 262, 265, 278, 303]

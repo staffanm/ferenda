@@ -13,11 +13,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from accommodanda.forarbete import parse as fa_parse
-from accommodanda.forarbete import riksdagen
-from accommodanda.forarbete.parse import mint_uri
-from accommodanda.lib import layout
-from accommodanda.lib.util import basefile_slug, write_atomic
+from ferenda.forarbete import parse as fa_parse
+from ferenda.forarbete import riksdagen
+from ferenda.forarbete.parse import mint_uri
+from ferenda.lib import layout
+from ferenda.lib.util import basefile_slug, write_atomic
 
 FIXTURES = Path(__file__).parent / "files" / "forarbete"
 PAGE1 = json.loads((FIXTURES / "bet_dokumentlista_page1.json").read_text())

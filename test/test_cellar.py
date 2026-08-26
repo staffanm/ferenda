@@ -12,7 +12,7 @@ says nothing (rule:lock-in-with-fixture).
 
 import pytest
 
-from accommodanda.lib import cellar
+from ferenda.lib import cellar
 
 CDM = "http://publications.europa.eu/ontology/cdm#"
 XSD = "http://www.w3.org/2001/XMLSchema#"

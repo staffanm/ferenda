@@ -1,4 +1,4 @@
-"""Tests for the shared HTTP helpers (`accommodanda.lib.net`): the failed-response
+"""Tests for the shared HTTP helpers (`ferenda.lib.net`): the failed-response
 description and the raising wrapper `request()` and every direct caller use.
 
 The responses are REAL `requests`/`httpx` objects, built offline. That matters
@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from accommodanda.lib import net
+from ferenda.lib import net
 
 OVER_CONTEXT = ('{"error":{"code":400,"message":"request (98435 tokens) exceeds '
                 'the available context size (65536 tokens), try increasing it"}}')

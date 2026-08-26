@@ -1,0 +1,315 @@
+"""Harvester for consolidated SFS (Svensk författningssamling) from the new
+rättsdatabaser at beta.rkrattsbaser.gov.se.
+
+The site is an ASP.NET SPA over a raw-Elasticsearch passthrough:
+
+  POST /elasticsearch/SearchEsByRawJson
+       body {"searchIndexes":["Sfs"], "api":"search", "json": <ES query>}
+
+The ES `_source` is the *entire* consolidated act in one JSON object: the
+plain-text body (``fulltext.forfattningstext``, already in the exact layout
+the parser consumes), the register (förarbeten/CELEX/departement) and the
+list of amending acts (``andringsforfattningar``). One request per document
+replaces the old two-page SFST+SFSR HTML scrape.
+
+Enumeration: the corpus is ~13.8k acts and there is no advanced search to
+drive, but the raw ES query lets us walk the whole set with ``match_all`` +
+a sort key + ``search_after`` (which pages past ES's 10k ``from``+``size``
+window). No blind SFS-number guessing like the old system.
+
+Versioning: unlike a court decision, a consolidated act's *content* changes
+over time as amending acts are folded in. Each distinct consolidation is
+identified by ``fulltext.andringInford`` ("t.o.m. SFS 2026:764"). When a
+re-download carries a different ``andringInford`` than the copy on disk, the
+old copy is moved to the archive under its own version id before the new one
+overwrites it, so every historical consolidation stays retrievable -- the
+job the old downloader's get_archive_version/archive machinery did.
+
+The harvest writes the beta-API JSON flat under the download root, with
+superseded consolidations preserved under a top-level ``archive/`` tree that
+mirrors the live categories (any legacy SFST/SFSR HTML lives in its own
+sfst/, sfsr/ siblings of the download root):
+
+  downloaded/{year}/{nr}.json                              the current consolidation
+  archive/downloaded/{year}/{nr}/.versions/{vy}/{vn}.json  superseded ones
+
+  python -m ferenda.sfs.download DESTDIR [--full] [--limit N]
+"""
+
+import argparse
+import datetime
+import json
+import re
+import time
+from pathlib import Path
+
+from ..lib import compress, layout
+from ..lib.net import HARVESTER_UA as USER_AGENT
+from ..lib.net import make_session, request
+from ..lib.util import Reporter, write_atomic
+
+ENDPOINT = "https://beta.rkrattsbaser.gov.se/elasticsearch/SearchEsByRawJson"
+PAGE_SIZE = 100
+PAGE_DELAY = 1.0           # seconds between pages -- conservative vs. throttling
+WATERMARK = ".watermark"   # file under destdir: max uppdateradDateTime harvested
+FETCHED = ".fetched.json"  # file under destdir: {beteckning: "YYYY-MM-DD"} last fetch
+
+# fulltext.andringInford looks like "t.o.m. SFS 2026:764"; pull the SFS nr
+RE_VERSION = re.compile(r"(\d+:\s?\d+)")
+
+
+def _es(session, esquery):
+    """Run an ES query through the rkrattsbaser passthrough and return the
+    parsed response, with lib.net's retry/throttle/diagnostics handling."""
+    return request(session, "POST", ENDPOINT, parse_json=True, json={
+        "searchIndexes": ["Sfs"], "api": "search", "json": esquery})
+
+
+def fetch_one(session, beteckning):
+    """Fetch a single published act's ``_source`` by beteckning, or None if
+    the beta database has no published act with that number."""
+    hits = _es(session, {"query": {"bool": {"must": [
+        {"term": {"beteckning.keyword": beteckning}},
+        {"term": {"publicerad": True}}]}}, "size": 1})["hits"]["hits"]
+    return hits[0]["_source"] if hits else None
+
+
+def search(session, query, search_after=None):
+    """POST one page (PAGE_SIZE hits) for the given ES `query`, which must
+    carry its own `sort`; returns the parsed response. search_after pages past
+    ES's 10k from+size ceiling."""
+    body = dict(query, size=PAGE_SIZE, track_total_hits=True)
+    if search_after is not None:
+        body["search_after"] = search_after
+    return _es(session, body)
+
+
+def read_watermark(destdir):
+    """The max uppdateradDateTime harvested by a previous clean run, or None
+    when there is no prior run (so a full backfill is due)."""
+    path = Path(destdir) / WATERMARK
+    return path.read_text().strip() if path.exists() else None
+
+
+def write_watermark(destdir, value):
+    write_atomic(Path(destdir) / WATERMARK, value.encode())
+
+
+def read_fetched(destdir):
+    """The {beteckning: "YYYY-MM-DD"} last-fetch map, or {} on a first run."""
+    path = Path(destdir) / FETCHED
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def write_fetched(destdir, fetched):
+    write_atomic(Path(destdir) / FETCHED,
+                 json.dumps(fetched, ensure_ascii=False, sort_keys=True).encode())
+
+
+class MalformedBeteckning(ValueError):
+    """A document's beteckning is missing or unusable as a path segment.
+    Raised so the harvest can skip the one record instead of aborting the
+    whole sweep."""
+
+
+def _split_beteckning(beteckning):
+    """Split a beteckning ("year:nr") into the two path segments it becomes
+    on disk. The year is not always purely numeric -- some acts carry a
+    letter-prefixed series (e.g. 'N2026:3') -- so we validate *path safety*
+    rather than a digit year: a beteckning that could escape destdir is a
+    corrupt record, not something to store."""
+    if not isinstance(beteckning, str) or ":" not in beteckning:
+        raise MalformedBeteckning("missing or malformed beteckning: %r" % beteckning)
+    year, nr = beteckning.split(":", 1)
+    nr = nr.replace(" ", "_")
+    for seg in (year, nr):
+        if not seg or seg.startswith(".") or "/" in seg or "\\" in seg:
+            raise MalformedBeteckning("unsafe beteckning: %r" % beteckning)
+    return year, nr
+
+
+def source_path(destdir, beteckning):
+    year, nr = _split_beteckning(beteckning)
+    return destdir / year / ("%s.json" % nr)
+
+
+def archive_path(destdir, beteckning, version):
+    """A superseded consolidation's write path. The archive/.versions grammar is
+    owned by layout; here we only validate the beteckning first -- a corrupt id
+    must not escape the tree -- before layout derives the path from the injected
+    download root's sibling archive tree."""
+    _split_beteckning(beteckning)
+    return layout.sfs_archive_version_download(destdir, beteckning, version)
+
+
+def version_id(source):
+    """The consolidation's identity: the last amending act folded in. An
+    un-amended base act has no andringInford and is its own version.
+
+    Version ids are space-free by construction (the `.replace(" ", "")` below);
+    `layout.sfs_version_file` relies on this -- its single .versions/ path
+    grammar slugs both the colon and legacy-counter branches identically, so a
+    spaceful id can never split the writer and reader trees."""
+    andring = (source.get("fulltext") or {}).get("andringInford")
+    if andring:
+        match = RE_VERSION.search(andring)
+        if match:
+            return match.group(1).replace(" ", "")
+    return source["beteckning"]
+
+
+def serialize(source):
+    return json.dumps(source, ensure_ascii=False, indent=2,
+                      sort_keys=True).encode()
+
+
+def save_document(destdir, source):
+    """Store the act, archiving any superseded consolidation first.
+    Returns "new", "updated" or "unchanged"."""
+    path = source_path(destdir, source["beteckning"])
+    new = serialize(source)
+    if not compress.exists(path):
+        compress.write_download(path, new)
+        return "new"
+    old = compress.read_bytes(path)
+    if old == new:
+        return "unchanged"
+    old_version = version_id(json.loads(old))
+    if old_version != version_id(source):
+        # the on-disk copy is a genuinely older consolidation -- preserve
+        # it. A re-fetch of the same version (data correction) just
+        # overwrites current, mirroring the old archive(overwrite=True).
+        compress.write_download(archive_path(destdir, source["beteckning"], old_version),
+                                old)
+    compress.write_download(path, new)
+    return "updated"
+
+
+def sync(destdir, full=False, limit=None, delay=PAGE_DELAY, resume_after=None):
+    """Harvest published acts into destdir, returning (seen, new, updated,
+    skipped). The mode is chosen automatically from the stored watermark (the
+    max uppdateradDateTime harvested by the last clean run):
+
+    * **Backfill** -- `full` is set, or no watermark exists yet. Sweeps the
+      whole corpus oldest-first by the immutable grundforfattningId, so even
+      acts with no uppdateradDateTime are captured. The watermark is written
+      only on clean completion; a crashed backfill leaves none and restarts
+      from page 1 unless `resume_after` is given (see below).
+
+    * **Incremental** -- a watermark exists. Asks the server for only the acts
+      changed since (uppdateradDateTime >= watermark), oldest-change-first.
+      Changes therefore arrive in timestamp order, so the watermark is
+      checkpointed after every page and an interrupted run resumes where it
+      stopped. An amendment to an old base act bumps that act's
+      uppdateradDateTime, so it surfaces here despite its old SFS number.
+
+    `resume_after` is the raw ES `search_after` cursor (a list, matching the
+    query's `sort`) to start paging from, letting a backfill interrupted by
+    e.g. a network error skip the pages it already fetched instead of
+    re-walking them. If the run is interrupted again, the cursor for the last
+    page it completed is printed so it can be passed back in.
+    """
+    destdir = Path(destdir)
+    session = make_session(USER_AGENT)
+    watermark = read_watermark(destdir)
+    backfill = full or watermark is None
+    if backfill:
+        query = {"query": {"term": {"publicerad": True}},
+                 "sort": [{"grundforfattningId": "asc"}]}
+    else:
+        query = {"query": {"bool": {"must": [
+                     {"term": {"publicerad": True}},
+                     {"range": {"uppdateradDateTime": {"gte": watermark}}}]}},
+                 "sort": [{"uppdateradDateTime": "asc"},
+                          {"grundforfattningId": "asc"}]}
+    print("sfs download: %s (since %s)%s"
+          % ("full backfill" if backfill else "incremental",
+             watermark or "scratch",
+             " resuming after %s" % resume_after if resume_after else ""),
+          flush=True)
+
+    after = resume_after
+    seen = new = updated = skipped = page_no = 0
+    high = watermark
+    truncated = False
+    today = datetime.date.today().isoformat()
+    fetched = read_fetched(destdir)
+    rep = Reporter()
+    try:
+        while True:
+            page = search(session, query, after)
+            hits = page["hits"]["hits"]
+            if not hits:
+                break
+            page_no += 1
+            for hit in hits:
+                after = hit["sort"]
+                seen += 1
+                try:
+                    status = save_document(destdir, hit["_source"])
+                except MalformedBeteckning as exc:
+                    skipped += 1
+                    print("  skipped: %s" % exc, flush=True)
+                    continue
+                new += status == "new"
+                updated += status == "updated"
+                # record the fetch date even for an unchanged act -- it WAS
+                # fetched, the content just didn't move (drives "Senast hämtad")
+                fetched[hit["_source"]["beteckning"]] = today
+                ts = hit["_source"].get("uppdateradDateTime")
+                if ts and (high is None or ts > high):
+                    high = ts
+                if limit and seen >= limit:
+                    truncated = True
+                    break
+            rep.update(seen, page["hits"]["total"]["value"], page=page_no,
+                       new=new, updated=updated)
+            # incremental arrives in timestamp order, so the running max is a
+            # safe resume point -- checkpoint each page. Backfill arrives in
+            # base-id order, so its max is only valid once the whole sweep
+            # completes; use --resume-after to resume it instead.
+            if not backfill and high and high != watermark:
+                write_watermark(destdir, high)
+                watermark = high
+            write_fetched(destdir, fetched)      # checkpoint the last-fetch map too
+            if truncated:
+                break
+            time.sleep(delay)
+    except BaseException:
+        print("interrupted after page %d (%d seen) -- resume with "
+              "--resume-after '%s'" % (page_no, seen, json.dumps(after)),
+              flush=True)
+        raise
+    rep.done()
+    if backfill and high and not truncated:
+        write_watermark(destdir, high)
+    write_fetched(destdir, fetched)
+    return seen, new, updated, skipped
+
+
+def main():
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    parser.add_argument("destdir", help="target dir, e.g. site/data/sfs")
+    parser.add_argument("--full", action="store_true",
+                        help="force a full corpus backfill (oldest-first by "
+                             "base-act id) even when a watermark exists, "
+                             "instead of the incremental changed-since-"
+                             "watermark sync")
+    parser.add_argument("--limit", type=int, help="stop after N documents")
+    parser.add_argument("--delay", type=float, default=PAGE_DELAY,
+                        help="seconds between pages (default %s)" % PAGE_DELAY)
+    parser.add_argument("--resume-after", metavar="JSON",
+                        help="resume a backfill interrupted mid-sweep, from "
+                             "the ES search_after cursor printed when it was "
+                             "interrupted")
+    args = parser.parse_args()
+    resume_after = json.loads(args.resume_after) if args.resume_after else None
+    seen, new, updated, skipped = sync(args.destdir, full=args.full,
+                                       limit=args.limit, delay=args.delay,
+                                       resume_after=resume_after)
+    print("%d seen, %d new, %d updated, %d skipped"
+          % (seen, new, updated, skipped))
+
+
+if __name__ == "__main__":
+    main()

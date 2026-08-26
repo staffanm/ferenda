@@ -1,8 +1,8 @@
 """lib.casenaming -- the canonical, name-prefixed case title shared by the case
 page heading, the listings and every inbound citation, plus the case-URI minter."""
 
-from accommodanda.lib import casenaming as naming
-from accommodanda.lib.casenaming import case_uri
+from ferenda.lib import casenaming as naming
+from ferenda.lib.casenaming import case_uri
 
 
 def _art(referat=(), malnummer=(), uri=None, court="HDO"):
@@ -43,7 +43,7 @@ def test_given_name_leads_the_label(monkeypatch):
 
 
 def test_verdict_uri_old_coin_template():
-    from accommodanda.lib.casenaming import verdict_uri
+    from ferenda.lib.casenaming import verdict_uri
     assert (verdict_uri("HDO", "Ö 528-08", "2008-03-13")
             == "https://lagen.nu/dom/hd/OE528-08/2008-03-13".replace("OE", "Ö"))
     # the abbrSlug mapping is a URI contract, not a lowercasing rule

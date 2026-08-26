@@ -9,10 +9,10 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from accommodanda import config
-from accommodanda.api import app as api
-from accommodanda.api import facsimiles
-from accommodanda.lib import annstore, compress, facsimile, layout
+from ferenda import config
+from ferenda.api import app as api
+from ferenda.api import facsimiles
+from ferenda.lib import annstore, compress, facsimile, layout
 
 # a minimal one-page A4 PDF poppler accepts (blank page)
 MINI_PDF = (b"%PDF-1.4\n"

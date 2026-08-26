@@ -10,9 +10,9 @@ import json
 import pytest
 import requests
 
-from accommodanda.forarbete import propriksdagen as pr
-from accommodanda.lib import compress, layout
-from accommodanda.lib.util import write_atomic
+from ferenda.forarbete import propriksdagen as pr
+from ferenda.lib import compress, layout
+from ferenda.lib.util import write_atomic
 
 BODY = ('<div class="brask">Observera att dokumentet är inskannat</div>'
         '<div class=Section1><p class=MsoNormal>Regeringens proposition</p></div>')

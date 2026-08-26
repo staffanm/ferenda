@@ -1,10 +1,10 @@
-"""The faceted-navigation data layer (accommodanda/lib/facets.py): per-source
+"""The faceted-navigation data layer (ferenda/lib/facets.py): per-source
 bucket-key extraction and the tree/group scans over a hand-built catalog."""
 
 import json
 
-from accommodanda.lib import catalog, facets
-from accommodanda.lib.facets import Row
+from ferenda.lib import catalog, facets
+from ferenda.lib.facets import Row
 
 
 def row(uri, kind="", label="", title="", display=""):
@@ -40,7 +40,7 @@ def test_hd_verdict_without_referat_files_under_nja_with_its_date_year():
 
 def test_every_verdict_slug_has_a_bucket():
     # drift guard: every COURT_URI_SLUG the minter can emit must map to a bucket
-    from accommodanda.lib.casenaming import COURT_URI_SLUG
+    from ferenda.lib.casenaming import COURT_URI_SLUG
     assert set(COURT_URI_SLUG.values()) <= set(facets.VERDICT_BUCKET)
 
 

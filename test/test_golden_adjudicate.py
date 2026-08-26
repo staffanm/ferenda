@@ -48,7 +48,7 @@ def test_post_freeze_amendment_accepted():
 
 def test_mid_sequence_extra_amendment_not_forgiven():
     # an extra amendment *below* the horizon is not stale-golden -- it is a
-    # real divergence (a phantom amendment, or an old-pipeline drop) and must
+    # real divergence (a phantom amendment, or an reference-projection drop) and must
     # stay unexplained
     problems = ["amendments: extra https://lagen.nu/2019:500"]
     unexplained, accepted = golden_sfs.adjudicate(problems, GOLDEN)
@@ -259,7 +259,7 @@ def test_change_ref_missing_forgiven_only_when_same_source_bumped():
 
 
 def test_change_ref_missing_without_bump_stays_unexplained():
-    # golden has a change-reference the new pipeline dropped, with no post-freeze
+    # golden has a change-reference Ferenda dropped, with no post-freeze
     # replacement on the same stycke -- a genuine discrepancy, not staleness
     p = [_ref("missing", "K26P5S2", "https://lagen.nu/1962:700#L2018:1253")]
     unexplained, accepted = golden_sfs.adjudicate(p, REFS_GOLDEN)
@@ -316,7 +316,7 @@ def test_balk_lone_extra_full_not_forgiven():
 
 
 def test_balk_lone_missing_collapsed_not_forgiven():
-    # golden has a collapsed self-ref the new pipeline did not replace -> a real
+    # golden has a collapsed self-ref Ferenda did not replace -> a real
     # drop, stays visible
     collapsed = [_ref("missing", "K9P1S2", "https://lagen.nu/1736:0123#P2")]
     unexplained, accepted = golden_sfs.adjudicate(collapsed, BALK_GOLDEN)
@@ -402,7 +402,7 @@ def test_eller_enum_only_extras():
     assert unexplained == p and accepted == []
 
 
-# --- celex-correction (§7d): the old engine scrambled sector-3 CELEX year/number ---
+# --- celex-correction (§7d): the reference scanner scrambled sector-3 CELEX year/number ---
 
 CELEX_GOLDEN = {"uri": "https://lagen.nu/2007:1091", "amendments": []}
 
@@ -438,7 +438,7 @@ def test_celex_correction_lone_extra_stays():
 
 
 def test_celex_correction_lone_missing_stays():
-    # golden has a CELEX (here well-formed) the new pipeline dropped: a coverage
+    # golden has a CELEX (here well-formed) Ferenda dropped: a coverage
     # gap, not a scramble it corrected -- stays visible
     p = [_ref("missing", "K3P1S1", "https://lagen.nu/ext/celex/32016R0679")]
     unexplained, accepted = golden_sfs.adjudicate(p, CELEX_GOLDEN)
@@ -454,7 +454,7 @@ def test_celex_correction_requires_same_source():
 
 
 def test_celex_old_scrambles_adds_directive_letter_flip():
-    # a directive also has the old engine's "defaulted to R" scramble as a variant
+    # a directive also has the reference scanner's "defaulted to R" scramble as a variant
     assert golden_sfs.celex_old_scrambles(
         "https://lagen.nu/ext/celex/32018L1808") == {
             "https://lagen.nu/ext/celex/31808L2018",   # plain year/number swap
@@ -466,7 +466,7 @@ def test_celex_old_scrambles_adds_directive_letter_flip():
 
 
 def test_celex_correction_forgives_directive_letter_flip():
-    # new mints the correct directive 32018L1808; the old pipeline rendered the
+    # new mints the correct directive 32018L1808; the reference projection rendered the
     # bare "direktiv (EU) 2018/1808" as a scrambled *regulation* 31808R2018
     new = _ref("extra", "K2P4S1", "https://lagen.nu/ext/celex/32018L1808")
     old = _ref("missing", "K2P4S1", "https://lagen.nu/ext/celex/31808R2018")
@@ -477,8 +477,8 @@ def test_celex_correction_forgives_directive_letter_flip():
 
 # --- golden-chapter-collapse (TOC mis-read as chapter openings) ----------
 #
-# The old pipeline mis-read a chapter list ("N kap. - Title" lines) as chapter
-# openings and dumped the body into one chapter; the new pipeline distributes
+# The reference projection mis-read a chapter list ("N kap. - Title" lines) as chapter
+# openings and dumped the body into one chapter; Ferenda distributes
 # them. The golden's structure shows the collapse (one chapter holds nearly
 # every paragraf), which gates the rule.
 
@@ -533,7 +533,7 @@ def test_collapse_named_chapter_target_mirror_forgiven():
 
 
 def test_collapse_lone_diff_stays_unexplained():
-    # a golden link the new pipeline never re-emitted (no distributed mirror) is
+    # a golden link Ferenda never re-emitted (no distributed mirror) is
     # a genuine resolution difference, not the structural collapse -> visible
     lone = [_ref("missing", "K9P5S1", "https://lagen.nu/2005:551#K11P2")]
     unexplained, accepted = golden_sfs.adjudicate(lone, COLLAPSE_GOLDEN)
@@ -563,7 +563,7 @@ def test_paragraf_of_helper():
 
 def test_post_freeze_source_amendment_forgives_whole_paragraf():
     # the paragraf's note bumped to a post-horizon act (2021:50 > 2020:100), so
-    # every other reference the new pipeline read from that paragraf -- a
+    # every other reference Ferenda read from that paragraf -- a
     # renumbered cross-reference here -- is stale on the golden side
     bump = _ref("extra", "K2P1S5", "https://lagen.nu/1962:700#L2021:50")
     renum_new = _ref("extra", "K2P1S2", "https://lagen.nu/1962:700#K9P67")
@@ -603,7 +603,7 @@ PIN_GOLDEN = {"uri": "https://lagen.nu/1962:700", "amendments": []}
 
 def test_pinpoint_drift_mirror_pair_forgiven():
     # golden read the closing change-ref from stycke 3 (it split a continuation
-    # into its own stycke); the new pipeline folds the continuation, so the same
+    # into its own stycke); Ferenda folds the continuation, so the same
     # edge is read from stycke 2 -- same paragraf, same target
     old = _ref("missing", "K13P5cS3", "https://lagen.nu/1962:700#L2019:1162")
     new = _ref("extra", "K13P5cS2", "https://lagen.nu/1962:700#L2019:1162")
@@ -637,8 +637,8 @@ def test_pinpoint_drift_bilaga_out_of_scope():
     assert set(unexplained) == {old, new} and accepted == []
 
 
-# --- brottsrubricering-begrepp: a crime-name concept the new pipeline extracts
-# from a "döms för X till böter/fängelse" clause that the old pipeline missed ---
+# --- brottsrubricering-begrepp: a crime-name concept Ferenda extracts
+# from a "döms för X till böter/fängelse" clause that the reference projection missed ---
 
 def _beg(kind, name, clause):
     line = "begrepp: %s https://lagen.nu/begrepp/%s" % (kind, name)
@@ -669,7 +669,7 @@ def test_non_brottsrubricering_begrepp_stays():
 
 
 def test_brottsrubricering_begrepp_missing_not_forgiven():
-    # the predicate only forgives an `extra`; a term the new pipeline dropped
+    # the predicate only forgives an `extra`; a term Ferenda dropped
     # (begrepp: missing) is a real regression and stays visible
     p = [_beg("missing", "Kapning",
               "Den som bemäktigar sig ett fartyg döms för kapning till fängelse.")]
@@ -678,7 +678,7 @@ def test_brottsrubricering_begrepp_missing_not_forgiven():
 
 
 # --- grafik-node-replaces-marker: a graphic the SFST text drops, recovered as a
-# typed grafik node where the old pipeline carried the omission marker as text --
+# typed grafik node where the reference projection carried the omission marker as text --
 
 GRAFIK_GOLDEN = {"uri": "https://lagen.nu/2002:780", "amendments": [],
                  "structure": [{"type": "bilaga", "id": "B1", "children": [
@@ -686,7 +686,7 @@ GRAFIK_GOLDEN = {"uri": "https://lagen.nu/2002:780", "amendments": [],
                      {"type": "stycke", "id": "B1S2",
                       "text": "/Formeln är inte med här/ Förordning (2021:734)."},
                  ]}]}
-# the new pipeline: B1S2 became a grafik node G1
+# Ferenda: B1S2 became a grafik node G1
 GRAFIK_NEW = {"structure": [{"type": "bilaga", "id": "B1", "children": [
     {"type": "stycke", "id": "B1S1", "text": "1 Balanstalet, BT"},
     {"type": "grafik", "id": "G1", "sort": "formel", "satt_av": "2021:734"},
@@ -762,7 +762,7 @@ def test_grafik_heading_real_text_change_stays():
 
 
 # --- redaktionell-retype: a publisher's editorial note carried as an ordinary
-# stycke by the old pipeline, retyped in place as a typed redaktionell node --
+# stycke by the reference projection, retyped in place as a typed redaktionell node --
 
 REDAKTIONELL_GOLDEN = {
     "uri": "https://lagen.nu/1919:878", "amendments": [],
@@ -770,7 +770,7 @@ REDAKTIONELL_GOLDEN = {
         {"type": "stycke", "id": "P4S1", "beteckning": "4 §",
          "text": "4 § har upphävts genom lag (1982:1101)"},
     ]}]}
-# the new pipeline: same id, same text, only `type` changed
+# Ferenda: same id, same text, only `type` changed
 REDAKTIONELL_NEW = {
     "structure": [{"type": "paragraf", "id": "P4", "ordinal": "4", "children": [
         {"type": "redaktionell", "id": "P4S1", "beteckning": "4 §",
