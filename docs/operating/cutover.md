@@ -32,7 +32,7 @@ The layout this file expects:
 |---|---|
 | `~/wds/ferenda` | this branch — the compose project AND the image build context |
 | `~/wds/ferenda-legacy` | the `legacy` branch, bind-mounted into `ferenda-legacy` |
-| `/mnt/forstor/ferenda` | the corpus (`downloaded/`, `artifact/`, `generated/`, `dumps/`) |
+| `/mnt/forstor/accommodanda` | the corpus (`downloaded/`, `artifact/`, `generated/`, `dumps/`) — the old name; see step 4 |
 | `/mnt/data/ferenda` | `catalog.sqlite` on the fast local disk |
 
 Four things move, and each is a rename of what is there today:
@@ -42,15 +42,25 @@ Four things move, and each is a rename of what is there today:
 2. `~/wds/accommodanda` becomes `~/wds/ferenda`. Keeping the directory named
    `ferenda` keeps the compose project name, so the existing volumes
    (`ferenda_opensearch-data`, `ferenda_db`, …) stay addressable by name.
-3. `/mnt/forstor/accommodanda` becomes `/mnt/forstor/ferenda`. The corpus tree
-   holds a `downloaded` symlink to an absolute path — check and re-point it.
-4. `/mnt/data/accommodanda` becomes `/mnt/data/ferenda`. **A `/mnt/data/ferenda`
+3. `/mnt/data/accommodanda` becomes `/mnt/data/ferenda`. **A `/mnt/data/ferenda`
    already exists**: a 92 MB checkout from 2020. Move it aside first, or the
    rename fails and the catalog mount silently binds the wrong directory.
+4. `/mnt/forstor/accommodanda` keeps its name, and the compose file still says
+   so. Renaming it needs write permission on `/mnt/forstor`, which is
+   `root:lagen-nfs` mode 775; the deploy user is not in that group, and the
+   export is root_squashed, so `sudo` is `nobody` there as well. Ask the
+   Lysator host admins to rename it, then change the one `data_root` line and
+   the `dumps` line in `docker-compose.yml`.
 
-The untracked `sync-up` and `sync-data` scripts in `~/.bin` on the dev box name
-the two `/mnt` paths. Update them in the same session, or the next sync writes
-into a directory nothing reads.
+Three things on the host name a service or a path that this migration changes,
+and each keeps running on the old name until it is edited:
+
+- the crontab — five jobs run `docker compose exec -T ferenda build …`, which is
+  the *legacy* application. They become `ferenda-legacy`.
+- `~/bin/keepwarm.sh` and `~/bin/mcptail.sh` — both name the
+  `ferenda-accommodanda-1` container, now `ferenda`.
+- the untracked `sync-up` and `sync-data` scripts in `~/.bin` on the dev box —
+  they name `/mnt/data/accommodanda`, now `/mnt/data/ferenda`.
 
 Stop the stack for the renames, and start it again with
 `docker compose --profile prod up -d`. The service names changed, so compose

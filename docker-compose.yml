@@ -183,7 +183,13 @@ services:
     volumes:
       # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
       # the roomy 2 TB /mnt/forstor NFS mount.
-      - /mnt/forstor/ferenda:/app/site/data
+      #
+      # The directory keeps its old name. Renaming it needs write permission on
+      # /mnt/forstor itself, which is root:lagen-nfs and mode 775 -- the deploy
+      # user is not in that group, and the export is root_squashed, so sudo is
+      # nobody there too. Only the Lysator host admins can rename it. The
+      # catalog on local disk (/mnt/data/ferenda, below) did get renamed.
+      - /mnt/forstor/accommodanda:/app/site/data
       # catalog_root: just catalog.sqlite (+ -wal/-shm), on the fast local disk.
       - /mnt/data/ferenda:/app/catalog
       # The one checkout the running site WRITES into (a clone on the host):
@@ -271,7 +277,7 @@ services:
       # the NDJSON bulk dumps `lagen all dump` writes into the rebuilt site's
       # data_root, served as static files by the ferenda.lagen.nu vhost's
       # /dumps/ block (multi-GB files nginx should stream, not uvicorn)
-      - /mnt/forstor/ferenda/dumps:/usr/share/nginx/dumps:ro
+      - /mnt/forstor/accommodanda/dumps:/usr/share/nginx/dumps:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
       - certbot-webroot:/var/www/certbot                    # serves ACME http-01 challenges for certbot
       - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
