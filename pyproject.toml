@@ -118,7 +118,11 @@ lagen = "ferenda.build:main"
 Homepage = "https://github.com/staffanm/ferenda/"
 
 [tool.setuptools.packages.find]
-exclude = ["test", "docs", "site", "data"]
+# Include, don't exclude. In pyproject.toml this finder treats every directory
+# as a namespace package, so an exclude list has to name each one: without this
+# the wheel shipped `tools/corpus/...` and `test/files/dv/...` as importable
+# top-level packages. `ferenda*` is the whole distribution and nothing else.
+include = ["ferenda*"]
 
 [tool.setuptools]
 include-package-data = true
