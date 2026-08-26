@@ -45,7 +45,7 @@ needs_golden_corpus = pytest.mark.skipif(
 
 def golden_module():
     spec = importlib.util.spec_from_file_location(
-        "golden_sfs", ROOT / "tools" / "golden_sfs.py")
+        "golden_sfs", ROOT / "tools" / "corpus" / "golden_sfs.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

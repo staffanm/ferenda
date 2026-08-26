@@ -30,8 +30,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from tools.pii_scan import scan_source
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.corpus.pii_scan import scan_source
 
 # what each kind is worth on its own. An identifier that pins a *natural person*
 # scores; one that names a company or a place does not.

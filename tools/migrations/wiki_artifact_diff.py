@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Artifact-equality check for the wiki markdown migration (PRD §4.1, the
-linchpin safety property): for every ns0 content page, the artifact produced by
+"""Artifact-equality check for the wiki markdown migration (its central
+safety property): for every ns0 content page, the artifact produced by
 the **new** markdown path (`convert_page` -> markdown file -> `wiki.parse`) must
 be byte-identical to the **old** wikitext path (`lib.wikitext`), except for the
 additive `aliases` field on begrepp (from redirects, which the old path dropped).
@@ -18,7 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from mediawiki_to_markdown import (  # noqa: E402
     _connect,
     _u,

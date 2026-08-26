@@ -17,7 +17,7 @@ threads/signal handlers. One worker per process, amortizing JVM startup over a
 whole legacy corpus; it exits on stdin EOF when its parent goes away.
 
 The jars are not committed (`vendor/poi/*.jar`, gitignored); fetch once with
-`tools/fetch_poi.sh`, which populates the repo-root `vendor/poi/` the worker
+`tools/operations/fetch_poi.sh`, which populates the repo-root `vendor/poi/` the worker
 globs. A JVM (Java 9+, jpype's floor; the README pins openjdk-21-jdk-headless)
 must be discoverable -- jpype auto-finds `libjvm.so`.
 """

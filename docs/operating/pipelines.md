@@ -326,7 +326,7 @@ HTTP, but every decision PDF under `/sites/default/files/case-related/` returns
 a Cloudflare challenge that no header or cookie from the index clears, so the
 bodies come through `lib.browser.DetachedChrome` — one headful session for the
 whole run, about 9 s per document, ~40 minutes for the 255 in scope. Rerun
-`tools/icj_vocabulary.py` after a harvest that adds a year of decisions: it
+`tools/corpus/icj_vocabulary.py` after a harvest that adds a year of decisions: it
 rebuilds `icj/data/vocabulary.txt`, the word list that guides the OCR repair of
 the pre-2002 scans, and the file is a recipe input so a rebuild re-stales every
 scanned decision.
@@ -487,9 +487,8 @@ The repo was seeded from the live MediaWiki SQLite DB, replaying the full
 per-revision history as one git commit per revision:
 
 ```sh
-uv run python tools/mediawiki_to_markdown.py path/to/lagen.sqlite ../lagen-wiki
-uv run python tools/wiki_artifact_diff.py path/to/lagen.sqlite   # losslessness check
-uv run python tools/unfold_wiki_lists.py ../lagen-wiki --apply   # repair folded lists (one-off)
+uv run python tools/migrations/mediawiki_to_markdown.py path/to/lagen.sqlite ../lagen-wiki
+uv run python tools/migrations/wiki_artifact_diff.py path/to/lagen.sqlite   # losslessness check
 ```
 
 `wiki_artifact_diff.py` asserts the migration's safety property: for every
@@ -499,14 +498,9 @@ script) plus one deliberate exception: a wikitext list line, which the old
 parser read as literal prose with its marker left in the text (`# Numrerad
 punkt …`), now reads as a `lista`/`punkt` artifact node instead — a content
 *fix*, so `wiki_artifact_diff.py` reports it as a mismatch rather than
-normalising it away. `unfold_wiki_lists.py` is a separate, one-off repair
-over the already-converted `lagen-wiki` markdown: `wikitext.blocks()` (used
-by both the old parser and the converter) joins consecutive non-blank source
-lines into one paragraph, so a MediaWiki list spanning several source lines
-converted to one run-on markdown line with its markers still inside it
-(`\# a # b`, `* a * b`, `1) a 2) b`); the tool re-splits each into one item
-per line (86 lists across 66 files in `commentary/`+`concept/`, applied
-once). `lib/wikitext.py` is retired from the pipeline and kept only as the
+normalising it away.
+
+`lib/wikitext.py` is retired from the pipeline and kept only as the
 converter's/diff's reference.
 
 ### Site content (frontpage + om + sitenews)

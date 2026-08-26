@@ -28,7 +28,7 @@ from rdflib.namespace import DCTERMS, RDF
 
 RPUBL = "http://rinfo.lagrummet.se/ns/2008/11/rinfo/publ#"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ferenda.dv.identity import norm_malnr
 from ferenda.dv.model import Stycke
 from ferenda.dv.parse import decision_date_from_text

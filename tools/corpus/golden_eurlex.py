@@ -36,12 +36,12 @@ from datetime import date
 from difflib import SequenceMatcher
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ferenda.eurlex.download import (
-    SPARQL,
     list_basefiles,
     sparql_select,
 )
+from ferenda.lib.cellar import SPARQL
 from ferenda.eurlex.parse import parse_dir
 from ferenda.lib import compress, layout
 from ferenda.lib.net import HARVESTER_UA, make_session

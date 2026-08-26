@@ -6,7 +6,7 @@
 # this once after checkout. Idempotent — already-present jars are skipped.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST="$REPO_ROOT/vendor/poi"
 BASE="https://repo1.maven.org/maven2"
 

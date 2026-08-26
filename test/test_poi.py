@@ -38,7 +38,7 @@ def test_read_rejects_junk_without_spawning_worker(tmp_path):
     assert poi._WORKER is before, "junk input must not cost a JVM subprocess"
 
 
-@pytest.mark.skipif(not JARS, reason="POI jars not fetched (tools/fetch_poi.sh)")
+@pytest.mark.skipif(not JARS, reason="POI jars not fetched (tools/operations/fetch_poi.sh)")
 def test_read_extracts_via_subprocess_only():
     paras = poi.read(Path(__file__).parent / "files" / "wordreader" / "sample.doc")
     assert paras[0] == poi.Para("Document title", True, False)
@@ -46,7 +46,7 @@ def test_read_extracts_via_subprocess_only():
     assert poi._WORKER is not None and poi._WORKER.poll() is None
 
 
-@pytest.mark.skipif(not JARS, reason="POI jars not fetched (tools/fetch_poi.sh)")
+@pytest.mark.skipif(not JARS, reason="POI jars not fetched (tools/operations/fetch_poi.sh)")
 def test_worker_survives_a_failed_document(tmp_path):
     # a Java-side failure (Word 95 is too old for HWPF) surfaces as a
     # RuntimeError naming the file, and the persistent worker keeps serving

@@ -21,7 +21,7 @@ Quick start
 ::
 
     uv sync
-    ./tools/fetch_poi.sh
+    ./tools/operations/fetch_poi.sh
     uv run pytest
 
 Run ``uv run lagen --help`` for the pipeline command line.

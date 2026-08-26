@@ -1,6 +1,6 @@
 """Tests for the markdown commentary/concept parsing
 (ferenda.lib.markdown + ferenda.wiki.parse), the wikitext->markdown
-conversion's losslessness (tools/mediawiki_to_markdown), and the
+conversion's losslessness (tools/migrations/mediawiki_to_markdown), and the
 concept-synthesis that unifies extracted definitions/keywords with the wiki
 concepts."""
 
@@ -16,7 +16,7 @@ from ferenda.wiki import parse as wiki
 from ferenda.lib import page
 from ferenda.eurlex import render as eurlex_render
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools" / "migrations"))
 import mediawiki_to_markdown as conv  # noqa: E402
 import wiki_artifact_diff as diff  # noqa: E402  (legacy reference builders + _norm)
 
@@ -409,7 +409,7 @@ def test_begrepp_artifact(tmp_path):
 
 def test_conversion_is_lossless(tmp_path):
     # the migration's safety property in miniature (the full corpus check is
-    # tools/wiki_artifact_diff.py): wikitext -> markdown -> artifact equals the
+    # tools/migrations/wiki_artifact_diff.py): wikitext -> markdown -> artifact equals the
     # old wikitext -> artifact, modulo the adjudicated normalisations (_norm).
     # Exercises templates, plain/labelled wikilinks, a citation, a category and
     # a byline. A list line is *not* part of the equality any more -- see

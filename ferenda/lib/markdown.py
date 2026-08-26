@@ -1,6 +1,6 @@
 """Parse the git-backed markdown the hand-authored lagen.nu commentary + concept
 pages are now stored as (replacing the MediaWiki dump; see
-``tools/mediawiki_to_markdown.py``) into the same inline-run shape every other
+``tools/migrations/mediawiki_to_markdown.py``) into the same inline-run shape every other
 source uses.
 
 This is the markdown counterpart of :mod:`ferenda.lib.wikitext`: it offers

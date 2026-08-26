@@ -21,7 +21,7 @@ neither becomes a word under any rule. A token that two rules turn into two
 different words is left alone -- an ambiguous reading is not a repair.
 
 The vocabulary is the Court's own, harvested from the decisions it published
-*born-digital* (2002 onward, `tools/icj_vocabulary.py`). Those need no repair,
+*born-digital* (2002 onward, `tools/corpus/icj_vocabulary.py`). Those need no repair,
 so the corpus that defines "a word" never depends on the repair being right.
 """
 

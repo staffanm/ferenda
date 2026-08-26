@@ -304,8 +304,7 @@ def _site_dir(root):
     d = Path(root) / "site"
     assert d.is_dir(), (
         "site content dir %s missing -- WIKI_ROOT (%s) must point at the "
-        "lagen-wiki markdown repo; run tools/migrate_site_content.py to populate "
-        "site/ or clone the content repo next to this one" % (d, root))
+        "lagen-wiki markdown repo; clone the content repo next to this one" % (d, root))
     return d
 
 

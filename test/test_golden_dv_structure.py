@@ -1,4 +1,4 @@
-"""Tests for the DV structural golden (tools/golden_dv_structure.py).
+"""Tests for the DV structural golden (tools/corpus/golden_dv_structure.py).
 
 Hermetic: a synthetic parsed referat exercising the full decision vocabulary
 (delmål, instances, betänkande vs dom, domskäl/domslut, dissent), so it runs
@@ -10,7 +10,7 @@ from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
     "golden_dv_structure",
-    Path(__file__).parent.parent / "tools" / "golden_dv_structure.py")
+    Path(__file__).parent.parent / "tools" / "corpus" / "golden_dv_structure.py")
 gds = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gds)
 

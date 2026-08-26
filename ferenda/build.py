@@ -2773,7 +2773,7 @@ SOURCES["icc"] = _simple_source(
 # ICJ decisions: the Court's /decisions view scopes the harvest to judgments,
 # advisory opinions and provisional-measures orders; each decision's page range
 # from the printed I.C.J. Reports is the body. The OCR vocabulary is a recipe
-# input -- rebuilding it (tools/icj_vocabulary.py) changes how every scanned
+# input -- rebuilding it (tools/corpus/icj_vocabulary.py) changes how every scanned
 # decision reads.
 ICJ_CODE = (PKG / "icj" / "parse.py", PKG / "icj" / "model.py",
             PKG / "icj" / "ocr.py", PKG / "icj" / "treaties.py",

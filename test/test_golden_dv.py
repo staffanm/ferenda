@@ -7,7 +7,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import DCTERMS, RDF
 
 _spec = importlib.util.spec_from_file_location(
-    "golden_dv", Path(__file__).parent.parent / "tools" / "golden_dv.py")
+    "golden_dv", Path(__file__).parent.parent / "tools" / "corpus" / "golden_dv.py")
 golden_dv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(golden_dv)
 

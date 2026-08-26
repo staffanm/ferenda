@@ -36,7 +36,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from ferenda.lib import (
     git,  # noqa: E402  (shared git-CLI wrapper)
     layout,  # noqa: E402  (basefile -> storage relpath)

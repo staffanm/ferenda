@@ -20,7 +20,7 @@ check matter here:
   used as a **change-detector, not an oracle**: when the current parser and the
   reference disagree, it is *investigated*, not blindly accepted — the current
   parser is right a fair share of the time (the reference has its own stale and
-  defective entries). The comparison tools live in `tools/golden_*.py`, and
+  defective entries). The comparison tools live in `tools/corpus/golden_*.py`, and
   known-benign difference families are catalogued so a real regression stands
   out against them.
 

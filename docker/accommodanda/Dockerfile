@@ -69,11 +69,11 @@ RUN git config --system --add safe.directory /wiki \
 
 WORKDIR /app
 
-# POI jar stack in its OWN layer -- only tools/fetch_poi.sh is needed, so a code
+# POI jar stack in its OWN layer -- only tools/operations/fetch_poi.sh is needed, so a code
 # change never re-downloads the jars (they're uncommitted, fetched from Maven).
 # They land in /app/vendor/poi (where dv/word.py globs) and survive `COPY . .`.
-COPY --chown=app:app tools/fetch_poi.sh tools/fetch_poi.sh
-RUN bash tools/fetch_poi.sh && chown -R app:app /app/vendor
+COPY --chown=app:app tools/operations/fetch_poi.sh tools/operations/fetch_poi.sh
+RUN bash tools/operations/fetch_poi.sh && chown -R app:app /app/vendor
 
 # 1) dependencies only -- cached until pyproject.toml/uv.lock change (README.rst
 #    is copied because pyproject points its readme at it). The venv is chowned to

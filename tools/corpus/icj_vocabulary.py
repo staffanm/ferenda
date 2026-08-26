@@ -30,7 +30,7 @@ from ferenda.lib import compress, layout
 from ferenda.lib.pdftext import pdf_info, pdftotext_text
 from ferenda.lib.util import status
 
-OUT = (Path(__file__).resolve().parent.parent / "ferenda" / "icj"
+OUT = (Path(__file__).resolve().parents[2] / "ferenda" / "icj"
        / "data" / "vocabulary.txt")
 # a word for repair purposes: letters and the apostrophe the Court sets in
 # "State's". Digits are never part of one, so a token carrying any is skipped.

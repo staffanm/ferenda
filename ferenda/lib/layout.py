@@ -49,7 +49,7 @@ ARTIFACT = DATA / "artifact"        # parsed JSON -- the source of truth
 OCR = DATA / "ocr"                  # re-OCR sidecar PDFs (forarbete parse input)
 # NB: the reference-projection parsed/distilled "golden" oracles are temporary
 # scaffolding, deliberately NOT a data_root stage -- they live in the old
-# checkout (see tools/golden_dv*.py, which take an oracle path arg).
+# checkout (see tools/corpus/golden_dv*.py, which take an oracle path arg).
 
 # the on-disk source-dir name under each stage; "dv" -> "dom" (see above)
 SOURCE_DIR = {"sfs": "sfs", "dv": "dom", "forarbete": "forarbete",

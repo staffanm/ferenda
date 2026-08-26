@@ -217,7 +217,7 @@ stay `%`-format Python and return `Markup`. Macros take raw values (a
 node id, a label), never pre-built attribute strings — piecemeal
 attribute assembly is where escaping bugs sneak past autoescape. Template
 edits re-stale generate via `GENERATE_CODE`; browser-level output
-equivalence is checked with `tools/render_equivalence.py`.
+equivalence is checked with `tools/corpus/render_equivalence.py`.
 
 ### rule:chain-dont-hold
 

@@ -20,13 +20,13 @@ import jpype.imports
 from .poi import _OLE2_MAGIC, _ZIP_MAGIC, _clean
 
 # repo-root vendor/poi (ferenda/lib/poi_worker.py -> parents[2] is the
-# repo root), the location tools/fetch_poi.sh writes to.
+# repo root), the location tools/operations/fetch_poi.sh writes to.
 _JARS = sorted((Path(__file__).parents[2] / "vendor" / "poi").glob("*.jar"))
 
 
 def _ensure_jvm():
     if not jpype.isJVMStarted():
-        assert _JARS, "no POI jars found under vendor/poi/ (run tools/fetch_poi.sh)"
+        assert _JARS, "no POI jars found under vendor/poi/ (run tools/operations/fetch_poi.sh)"
         # We ship only log4j-api (no -core); point it at the built-in
         # SimpleLogger so it stops printing "could not find a logging
         # provider" to stdout, and silence that logger.

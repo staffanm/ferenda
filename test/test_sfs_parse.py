@@ -47,7 +47,7 @@ from ferenda.lib.util import normalize_space
 import importlib.util
 
 _spec = importlib.util.spec_from_file_location(
-    "golden_sfs", Path(__file__).parent.parent / "tools" / "golden_sfs.py")
+    "golden_sfs", Path(__file__).parent.parent / "tools" / "corpus" / "golden_sfs.py")
 golden_sfs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(golden_sfs)
 

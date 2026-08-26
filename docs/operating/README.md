@@ -62,7 +62,7 @@ two are equivalent; use whichever you prefer.
 
 ```sh
 sudo apt-get install -y openjdk-21-jdk-headless   # Ubuntu 24.04
-./tools/fetch_poi.sh                               # POI 5.4.1 + deps into vendor/poi/ (gitignored, idempotent)
+./tools/operations/fetch_poi.sh                               # POI 5.4.1 + deps into vendor/poi/ (gitignored, idempotent)
 ```
 
 jpype auto-discovers `libjvm.so`; you normally do not need `JAVA_HOME`. The
@@ -348,8 +348,8 @@ docker compose exec ferenda lagen all all       # download too, then rebuild
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
 image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000`. The app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
-rules. TLS is issued once with `tools/prod/issue-cert.sh` and renewed by the
-`certbot` sidecar.
+rules. The merged compose on the prod host holds the certificates for both
+vhosts; the `certbot` sidecar renews them.
 
 **Continuous deploy + nightly sync.** Pushes to `main` trigger
 `.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update
