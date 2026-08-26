@@ -1647,6 +1647,32 @@ def test_generate_browse_writes_faceted_pages(tmp_path):
     assert "function tooShortNote(how)" in bundle
     assert "lagenDom.tooShortNote('Tryck Enter eller Sök')" in fullsearch
     assert "Skriv minst" not in palette and "Skriv minst" not in fullsearch
+    # The palette also searches the page's own text, so a word query typed while
+    # reading an act answers with the places in THAT act first -- the corpus
+    # index ranks the whole document and links to the top of it, and an EU act's
+    # recitals are not indexed as fragments at all. It runs on the corpus side of
+    # the floor: a two-letter substring matches everywhere and would fill the
+    # palette with noise, so the too-short branch returns before it.
+    assert palette.index("if (!andGo && lagenDom.tooShort(q))") < palette.index(
+        "var onPage = textHits(q, taken)")
+    # a place already offered as a pinpoint hit is not offered twice ...
+    assert "local.forEach(function (h) { taken[h.id] = true; });" in palette
+    # ... and the on-page list is capped so the corpus answer keeps its room.
+    # The cap is not silent: textHits collects one past it purely so the note
+    # can say there are more.
+    assert "var MAX_TEXT = 3;" in palette
+    assert "while (out.length <= MAX_TEXT" in palette
+    assert "moreOnPage = onPage.length > MAX_TEXT;" in palette
+    assert "Fler träffar på " in palette
+    # the on-page index reads the page's own document only -- the same
+    # exclusions ownEl makes, or an imported split-view pane's text would be
+    # searched as if it were this page's
+    assert "'script, style, [data-pane], .search-overlay, '" in palette
+    # the anchor labels are lib/pinpoint.py's forms, client-side: a recital is
+    # "Skäl N", an EU stycke anchor is named by its article, and an id with no
+    # reader form yields '' so the hit is anchored somewhere citable instead
+    assert "'Skäl ' + m[1]" in palette
+    assert "{ K: 'kap.', P: '§', O: 'mom.', S: 'st', N: 'p', M: 'men.' }" in palette
     # The legacy all-feeds directory and repository aliases are restored.
     feed_index = compress.read_text(out / "dataset" / "sitenews" / "index.html")
     assert "/dataset/sfs/feed.atom?rdf_type=type%2Flag" in feed_index

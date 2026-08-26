@@ -2,7 +2,9 @@
    by instant *local* hits: a terse pinpoint typed on a document page ("4",
    "4 §", "11:2", "4:", "art 5", "(42", "skäl 42", "bilaga III") resolves
    against the anchors of the page itself, no network, and shows the target's
-   own text so the reader knows where Enter will land. Its own script: the
+   own text so the reader knows where Enter will land; a word query is looked
+   for in the page's own text as well, and the places it occurs lead the list
+   the same way. Its own script: the
    search UI is unrelated to the TOC scrollspy and is global to every page,
    so it does not ride along in scrollspy.js. The API is always same-origin
    (the site and the API are served by one process, lagen serve), so requests
@@ -11,7 +13,7 @@
    the top hits as links to each document's matching paragraph. */
 (function () {
   var overlay = null, results = null, refine = null, timer = null, seq = 0, sel = 0;
-  var spin = null, spinTimer = null, slowTimer = null;
+  var spin = null, spinTimer = null, slowTimer = null, moreOnPage = false;
 
   // the API returns raw field values (correct for an API); the indexed text is
   // parsed remote content, so everything interpolated into innerHTML is escaped
@@ -97,6 +99,142 @@
     history.replaceState(null, '', '#' + id);
   }
 
+  /* -- on-page full text: the words of THIS document, answered as citable
+     places. A word query typed while reading an act is usually about the act in
+     front of the reader, and the corpus index answers it badly: it ranks the
+     document as a whole and links to the top of it, and an EU act's recitals are
+     not indexed as fragments at all. "senaste utvecklingen" on the GDPR page
+     means skäl 83, artikel 25.1 and artikel 32.1 -- three places a reader could
+     otherwise reach only with the browser's own find, which names none of them.
+     Phrase match, like that find: the query is looked for as typed. */
+
+  var MAX_TEXT = 3;        // on-page text hits shown before the corpus answer
+  var SNIP = 60;           // characters of context on each side of the match
+  var pageText = null;     // the page's text index, rebuilt on each palette open
+
+  // An anchor id -> the pinpoint a reader recognises, in the palette's own
+  // forms: the inverse of `candidates`, which mints the same labels from a
+  // query. It reads the anchor grammars lib/pinpoint.py reads, but it is NOT
+  // that function ported -- a hit row heads its own line, so the label is
+  // capitalised ("Skäl 83" where Python writes "skäl 83"); a tail that only
+  // disambiguates is dropped from the label though the jump keeps it in the id
+  // ("25.1.S1" -> "Artikel 25.1", "A5-2" -> "Artikel 5"); and an annex
+  // ("bilaga-3") has a form here and none there. '' for an id with no reader
+  // form -- page furniture, an editorial section slug -- which is what keeps an
+  // on-page hit anchored to a place the reader can cite.
+  var SEG = { K: 'kap.', P: '§', O: 'mom.', S: 'st', N: 'p', M: 'men.' };
+  function anchorLabel(id) {
+    var m;
+    if ((m = id.match(/^recital-(\d+)$/))) return 'Skäl ' + m[1];
+    if ((m = id.match(/^bilaga-(\d+)$/))) return 'Bilaga ' + m[1];
+    if ((m = id.match(/^sid(\d+)$/))) return 's. ' + m[1];
+    // an EU article anchor is all digits and dots; a trailing ".S<n>" is the
+    // stycke the words sit in, which the jump keeps and the label leaves off
+    if ((m = id.match(/^(\d+[a-z]?(?:\.\d+)*)(?:\.([a-z]))?(?:\.S\d+)?$/)))
+      return 'Artikel ' + m[1] + (m[2] ? ' ' + m[2] : '');
+    // the CoE treaty grammar: "A6" -> "Artikel 6", "A6P1" -> "Artikel 6
+    // punkt 1", "A3Lh" -> "Artikel 3 led h". A treaty anchors every
+    // provision this way and nothing else in the corpus does, so without
+    // this branch the folkrätt pages answered no on-page word search at
+    // all -- every one of EKMR's 201 anchors landed here and got ''.
+    if ((m = id.match(
+        /^A(\d+[A-Za-z]?|[IVXLCDM]+)(?:\.(\d+))?(?:-\d+)?(?:P(\d+)(?:-\d+)?)?(?:L([a-z])(?:-\d+)?)?$/)))
+      return 'Artikel ' + m[1] + (m[2] ? '.' + m[2] : '') +
+        (m[3] ? ' punkt ' + m[3] : '') + (m[4] ? ' led ' + m[4] : '');
+    var segs = id.match(/[KPOSNM][0-9a-zåäö]+/g);
+    if (segs && segs.join('') === id) {
+      return segs.map(function (seg) {
+        // an anchor writes an inserted paragraf's letter tight against its
+        // number ("P52u"); a citation writes it apart ("52 u §")
+        return seg.slice(1).replace(/^(\d+)([a-zåäö]+)$/, '$1 $2') +
+          ' ' + SEG[seg[0]];
+      }).join(' ');
+    }
+    return '';
+  }
+
+  // the page's own body text as one whitespace-normalised string, with the text
+  // node each offset falls in. Built once per palette open, so a query costs one
+  // indexOf over it rather than a walk of a 3 MB document per keystroke.
+  function textIndex() {
+    if (pageText) return pageText;
+    var root = document.querySelector('.gr-main');
+    var walk = root && document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], starts = [], text = '', block = null, prev = null, n;
+    while (walk && (n = walk.nextNode())) {
+      var p = n.parentElement;
+      // the exclusions ownEl makes, for the same reason: an imported pane or a
+      // popover is another document's text, not this page's
+      if (!p || p.closest('script, style, [data-pane], .search-overlay, ' +
+                          '.lagen-popover')) continue;
+      // the permalink pilcrow and the comment marker are affordances, not
+      // text -- the same two localHits keeps out of a pinpoint's snippet
+      var v = n.nodeValue.replace(/[💬¶]/g, '').replace(/\s+/g, ' ');
+      if (!v) continue;
+      // Inside a block the markup's own whitespace separates the words, with
+      // doubles collapsed -- so a phrase still matches across an inline link
+      // ("senaste <a>utvecklingen</a>"), and a comma after one is not pushed
+      // off it ("artikel 32 ,"). Between blocks the markup carries no
+      // whitespace at all ("…24.3.</p><h3>Artikel 25"), so one space goes in.
+      block = p.closest('p, li, h1, h2, h3, h4, h5, td, th, blockquote, div');
+      if (text) {
+        if (/ $/.test(text)) v = v.replace(/^ /, '');
+        else if (block !== prev && !/^ /.test(v)) v = ' ' + v;
+      }
+      prev = block;
+      nodes.push(n); starts.push(text.length); text += v;
+    }
+    pageText = { nodes: nodes, starts: starts, text: text,
+                 low: text.toLowerCase() };
+    return pageText;
+  }
+
+  function nodeAt(idx, off) {
+    var lo = 0, hi = idx.starts.length - 1, best = 0;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (idx.starts[mid] <= off) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    return idx.nodes[best];
+  }
+
+  // the citable place a match sits in -- the nearest ancestor whose id the
+  // palette can both name and jump to
+  function anchorOf(node) {
+    for (var el = node.parentElement; el; el = el.parentElement) {
+      if (el.id && anchorLabel(el.id) && lagenDom.ownEl(el.id) === el)
+        return el.id;
+      if (el.classList.contains('gr-main')) break;
+    }
+    return null;
+  }
+
+  function snippet(idx, at, len) {
+    var s = Math.max(0, at - SNIP), e = Math.min(idx.text.length, at + len + SNIP);
+    return (s ? '…' : '') + esc(idx.text.slice(s, at)) +
+      '<em>' + esc(idx.text.slice(at, at + len)) + '</em>' +
+      esc(idx.text.slice(at + len, e)) + (e < idx.text.length ? '…' : '');
+  }
+
+  // Up to MAX_TEXT + 1 places on this page where `q` occurs, in document order,
+  // one per anchor and none already offered as a pinpoint hit (`taken`). The
+  // extra one is not shown: it is how `run` knows to say there are more, so a
+  // capped list never reads as the whole answer.
+  function textHits(q, taken) {
+    var needle = q.trim().toLowerCase().replace(/\s+/g, ' ');
+    var idx = textIndex(), out = [], seen = {}, at = 0, i;
+    while (out.length <= MAX_TEXT && (i = idx.low.indexOf(needle, at)) >= 0) {
+      at = i + needle.length;
+      var id = anchorOf(nodeAt(idx, i));
+      if (!id || seen[id] || taken[id]) continue;
+      seen[id] = true;
+      out.push({ id: id, label: anchorLabel(id),
+                 snipHtml: snippet(idx, i, needle.length) });
+    }
+    return out;
+  }
+
   function choices() {
     if (!overlay) return [];
     var out = Array.prototype.slice.call(results.querySelectorAll('.search-hit'));
@@ -142,13 +280,22 @@
     if (!results) return;
     var docTitle = document.querySelector('.gr-main h1');
     var localHtml = local.map(function (h) {
+      // a pinpoint hit shows the target's own opening words (escaped); a text
+      // hit shows the match in its context, with the match itself marked
+      var snip = h.snipHtml || (h.snip ? esc(h.snip) : '');
       return '<a class="search-hit local" data-local="' + esc(h.id) + '" ' +
         'href="#' + esc(h.id) + '">' +
         '<span class="hit-title">' + esc(h.label) +
         '<span class="hit-here">på denna sida</span></span>' +
         (docTitle ? '<span class="hit-sub">' + esc(docTitle.textContent) + '</span>' : '') +
-        (h.snip ? '<span class="hit-snip">' + esc(h.snip) + '</span>' : '') + '</a>';
+        (snip ? '<span class="hit-snip">' + snip + '</span>' : '') + '</a>';
     }).join('');
+    // the on-page list is capped at MAX_TEXT so the corpus answer is never
+    // pushed off the palette -- say so, or the cap reads as "that is all there
+    // is on this page"
+    if (moreOnPage && local.length)
+      localHtml += '<div class="search-note search-more">Fler träffar på ' +
+        'denna sida än de ' + MAX_TEXT + ' som visas.</div>';
     if (!local.length && !items.length) {
       refine.hidden = true;
       results.innerHTML = total === null ? '' :
@@ -224,6 +371,7 @@
   function run(q, andGo) {
     var mine = ++seq;
     waitOff();
+    moreOnPage = false;
     if (!q.trim()) {
       if (results) results.innerHTML = '';
       if (refine) refine.hidden = true;
@@ -254,6 +402,15 @@
       }
       return;
     }
+    // The page's own text answers the same query the corpus does, under the same
+    // floor: it is a local scan, but a two-letter substring matches everywhere
+    // and would fill the palette with noise. A place already offered as a
+    // pinpoint hit is not offered twice.
+    var taken = {};
+    local.forEach(function (h) { taken[h.id] = true; });
+    var onPage = textHits(q, taken);
+    moreOnPage = onPage.length > MAX_TEXT;
+    local = local.concat(onPage.slice(0, MAX_TEXT));
     // Paint local pinpoints instantly when the query has any; otherwise KEEP the
     // previous query's API hits on screen (dimmed) until the new ones arrive --
     // wiping to empty on every keystroke makes the whole list flash away and
@@ -282,6 +439,9 @@
   }
   function open() {
     if (overlay) return;
+    // the page may have changed since the last open (a split-view pane, a
+    // lydelse switch), so the text index is built fresh for this session
+    pageText = null;
     overlay = document.createElement('div');
     overlay.className = 'search-overlay';
     // the refine link sits to the *right* of the input (S2)
