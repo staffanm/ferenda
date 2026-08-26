@@ -47,7 +47,7 @@ from ..lib.pdftext import (
 from ..lib.util import approximate_date, basefile_slug
 from . import kbtitles, legacy_formats, lydelse, volumes
 from .model import Block, Forarbete
-from .structure import RE_TRAILING_PAREN, nest
+from .structure import RE_LEAD_NUM, RE_TRAILING_PAREN, nest
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = ALL_PARSE_TYPES
@@ -502,16 +502,32 @@ def figure_index(on_page, fig_top):
     return after
 
 
+# the lowercase particles a Swedish name carries -- "Björn von Sydow", "Gustaf
+# von Essen", "Margaretha af Ugglas". Every other word of a name is
+# capitalised, and that is what separates a signer from the lines printed after
+# one ("Kopia till Jordbruksdepartementet", "På regeringens vägnar")
+NAME_PARTICLES = frozenset({"von", "af", "de", "van", "der", "la", "le", "di"})
+
+
 def _is_signer_name(text):
-    """A signer line: 2-5 capitalized-ish words ("Stefan Löfven", "Gustaf von
-    Essen"), optionally a trailing departement parenthetical ("Mikael Damberg
-    (Justitiedepartementet)"). No digits, no sentence punctuation."""
+    """A signer line: 2-5 words, each capitalised bar a nobiliary particle
+    ("Stefan Löfven", "Gustaf von Essen"), optionally with a trailing
+    departement parenthetical ("Mikael Damberg (Justitiedepartementet)"). No
+    digits, no sentence punctuation.
+
+    Every word has to be capitalised because a riksdagsskrivelse prints its
+    dispatch list right under the talman's name, and "Kopia till
+    Jordbruksdepartementet" is otherwise the same shape as a name. Measured
+    over the corpus: 44 365 rskr signatur blocks fall to 32 552, and 19 733 of
+    the 19 735 riksdagsskrivelser that have a signer keep one."""
     text = RE_TRAILING_PAREN.sub("", text)
     words = text.split()
     return (1 < len(words) <= 5 and len(text) < 60
-            and text[:1].isupper() and not text.endswith(".")
-            and all(w[:1].isalpha() for w in words)
-            and not any(ch.isdigit() for ch in text))
+            and not text.endswith(".")
+            and not any(ch.isdigit() for ch in text)
+            and words[0][:1].isupper() and words[-1][:1].isupper()
+            and all(w[:1].isupper() or w.lower() in NAME_PARTICLES
+                    for w in words))
 
 
 def tag_frontmatter(blocks):
@@ -520,10 +536,31 @@ def tag_frontmatter(blocks):
     heading becomes a level-1 rubrik so the ingress nests into its own avsnitt,
     and the signer names after the ort/datum line become `signatur` blocks --
     the authors the sfs history-as-git export mines. Front matter ends at the
-    first real rubrik ("1 Förslag till riksdagsbeslut"); signer tagging also
-    requires the handover sentence, so bodies without the modern överlämnande
-    (old riksdagen-format props) are left untouched."""
-    end = next((i for i, b in enumerate(blocks) if b.kind == "rubrik"),
+    first *numbered* rubrik ("1 Förslag till riksdagsbeslut"); signer tagging
+    also requires the handover sentence, so bodies without the modern
+    överlämnande (old riksdagen-format props) are left untouched.
+
+    The end must be the first *numbered* rubrik, not the first rubrik of any
+    kind: a proposition sets its own title in the same bold face ("Ett starkare
+    skydd för Sveriges säkerhet"), which the classifier reads as a rubrik on
+    line 2 -- ahead of the handover sentence, the ort/datum line and the
+    signers. That collapsed the window to the "Regeringens proposition
+    2020/21:194" line alone and tagged no signer at all; prop. 2020/21:194,
+    the worked example in the history-as-git PRD, was authored by
+    `Regeringen <regeringen@lagen.nu>` rather than by Stefan Löfven. Measured
+    over the corpus: 2 803 -> 4 175 propositions with a signature block, none
+    lost (2025: 93 -> 189 of 224).
+
+    A body with no numbered rubrik at all leaves the window open over the whole
+    document, so a dateline quoted in its prose could in principle start signer
+    tagging. Measured in the other direction too: 46 of the 29 406 prop/skr
+    bodies have no numbered rubrik but do carry the handover sentence, and
+    across all 46 the open window tags 27 names -- every one of them a real
+    signer sitting at block 3 to 7, the överlämnande page. Nothing deeper in a
+    body reached the test, so the window is left unbounded rather than cut at a
+    block count the corpus gives no evidence for."""
+    end = next((i for i, b in enumerate(blocks)
+                if b.kind == "rubrik" and RE_LEAD_NUM.match(b.text)),
                len(blocks))
     front = blocks[:end]
     for b in front:
@@ -669,10 +706,16 @@ def _harvested_body(record, root):
 def rskr_body(html):
     """The API's own HTML rendering of a riksdagsskrivelse -> Blocks. The body
     is a handful of heading/paragraph elements in both feed generations (the
-    modern Section1 layout and the plain pre-2000s one); everything after the
-    ort/datum line ("Stockholm den 17 juni 2026") is a signer -- the talman,
+    modern Section1 layout and the plain pre-2000s one); after the ort/datum
+    line ("Stockholm den 17 juni 2026") come the signers -- the talman,
     countersigned by a tjänsteman in the modern layout. Page-less by nature
-    (no citation points into an rskr), so every block carries page=None."""
+    (no citation points into an rskr), so every block carries page=None.
+
+    Only the blocks that read as a name are signers. Taking *everything* after
+    the dateline filed the dispatch list and the printer's imprint as signatures
+    too ("Kopia till Jordbruksdepartementet", "Rskr. 1997/98", "Gotab,
+    Stockholm 1997"), which the history-as-git export reads for its committer
+    identity."""
     soup = BeautifulSoup(html, "html.parser")
     texts = [re.sub(r"\s+", " ", el.get_text(" ", strip=True))
              for el in soup.find_all(["h1", "h2", "p"])]
@@ -680,7 +723,8 @@ def rskr_body(html):
     for i, b in enumerate(blocks):
         if RE_ORT_DATUM.match(b.text):
             for nxt in blocks[i + 1:]:
-                nxt.kind = "signatur"
+                if _is_signer_name(nxt.text):
+                    nxt.kind = "signatur"
             break
     return blocks
 
