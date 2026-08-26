@@ -50,7 +50,7 @@ SUB_INDENT_MAX = 4
 EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble",
                 "paragraph": "paragraph", "stycke": "stycke",
                 "point": "point", "ruling": "ruling",
-                "note": "note", "row": "row"}
+                "note": "note", "row": "row", "citat": "citat"}
 
 
 # --------------------------------------------------------------------------
@@ -170,7 +170,12 @@ def _eurlex_marker(t, num):
     ("1."), a lettered/roman point the list-parenthesis ("a)", "i)"). A point
     marked with a typographic bullet rather than an enumerator keeps it bare --
     the parenthesis belongs to a letter or a numeral, not to "—". Other numbered
-    kinds (ruling, note) keep the bare token."""
+    kinds (ruling, note) keep the bare token.
+
+    A quoted act's block passes the kind it had *inside* the quotation, so the
+    quotation reproduces the act's own numbering: directive 95/46 art. 25 reads
+    "1.", "2.", "6." inside Schrems II's paragraph 4 exactly as it does on the
+    directive's own page."""
     if t == "recital":
         return "(%s)" % num
     if t == "point":
@@ -438,13 +443,24 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
                                 else escape(b.get("label") or ""))
     runs = render_runs(b["text"], site)
     classes = [EURLEX_CLASS.get(t, "")]
+    # a quotation prints its marker in the *quoted* act's convention -- "(6)"
+    # for a recital, "1." for a numbered paragraph, "a)" for a point -- so the
+    # kind the block had inside the quotation decides its punctuation and its
+    # hang width, and rides along as a second class
+    quoted = b.get("quoted") if t == "citat" else None
+    if quoted:
+        classes.append("citat-%s" % quoted)
     # a marked recital/paragraph/point hangs its marker in the left margin
-    if num and t in ("recital", "paragraph", "point"):
+    if num and t in ("recital", "paragraph", "point", "citat"):
         classes.append("hang")
     # a point nested inside another point (a definition's own sub-list) steps its
     # indent in, graded by the depth its anchor records -- and saturating, since
-    # points nest to seven and the text would otherwise run off a narrow screen
+    # points nest to seven and the text would otherwise run off a narrow screen.
+    # A quotation grades the same way, from its own first indent (depth 1: the
+    # list the quoted paragraph introduces).
     if t == "point" and (b.get("depth") or 1) > 1:
+        classes.append("sub%d" % min(b["depth"], SUB_INDENT_MAX))
+    elif t == "citat" and b.get("depth"):
         classes.append("sub%d" % min(b["depth"], SUB_INDENT_MAX))
     # a definitions-article point is a citation target (#<article>.<point>) and
     # the begrepp the act defines -- emit its id and emphasise the defined term
@@ -455,7 +471,7 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
     return NODES.eu_block(bid, " ".join(c for c in classes if c) or None,
                            rail_id,
                            bid if num and bid else None,
-                           _eurlex_marker(t, num) if num else None,
+                           _eurlex_marker(quoted or t, num) if num else None,
                            Markup(runs),
                            first_stycke(t, num, key) or "")
 

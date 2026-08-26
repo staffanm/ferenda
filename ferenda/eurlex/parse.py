@@ -27,6 +27,7 @@ from ..lib.datasets import NAMEDACTS
 from ..lib.errors import SkipDocument
 from ..lib.eu_structure import doctype, revision_base
 from ..lib.formex import (
+    QUOTATION,
     _text,
     act_metadata,
     append_annex,
@@ -43,6 +44,8 @@ from ..lib.lagrum import (
     EULAGSTIFTNING,
     EURATTSFALL,
     LagrumParser,
+    celex_of,
+    eu_akttyp,
     interleave,
     yield_overlaps,
 )
@@ -140,6 +143,18 @@ def _isodate(value):
     return value
 
 
+def _last_eu_act(cites):
+    """The CELEX of the last EU *act* a block's citations name -- the act a
+    quotation following that block reproduces. None where the block names no
+    act: a judgment, a treaty and a Charter article all carry no act type, and
+    none of them is something a quotation of this shape reproduces."""
+    for ref in reversed(cites):
+        celex = celex_of(str(ref.uri))
+        if celex and eu_akttyp(celex):
+            return celex
+    return None
+
+
 def to_artifact(doc):
     """Project to the artifact JSON: metadata + body blocks whose text is an
     inline-run list (plain runs + {predicate,uri,text} citation links). Defined
@@ -156,14 +171,37 @@ def to_artifact(doc):
     matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
                                    doc.lang)
     body = []
+    lead_act = None
     for b in doc.body:
+        # inside a verbatim quotation, a bare "artikel N" is an article of the
+        # *quoted* act -- the act the paragraph introducing the quotation named
+        # ("Artikel 23 i förordningen har följande lydelse:"). Left to the
+        # running anaphora it pins on whatever act the judgment last named
+        # instead: Schrems II quotes GDPR article 23's reference to "artiklarna
+        # 12-22 och 34" and linked all three to directive 95/46, which has 34
+        # articles and none of that content.
+        # neither a keyword nor a quotation is the judgment speaking, so what
+        # they name must not stay in the document's anaphoric focus. A keyword
+        # is an index entry: Schrems II's list ends on the Privacy Shield
+        # decision, and its paragraph 1 -- "tolkningen av artikel 3.2 första
+        # strecksatsen, artiklarna 25, 26 och artikel 28.3 i ... direktiv
+        # 95/46/EG", which names its act only at the end -- pinned the first
+        # three of those articles on that decision. A quotation is another
+        # act's text, and is additionally *given* the act its lead-in named, so
+        # its own bare "artikel N" is that act's article.
+        borrowed = b.kind in ("keyword", QUOTATION)
+        focus = parser.state.eu_focus() if borrowed else None
+        if b.kind == QUOTATION and lead_act:
+            parser.state.remember_eu_act(lead_act)
         cites = parser.parse_text(b.text, context={})
+        if borrowed:
+            parser.state.restore_eu_focus(focus)
         # term-use links yield to a citation wherever the spans overlap (a
         # citation is the stronger, cross-document link)
         uses = yield_overlaps(
             term_refs(b.text, matcher, index, doc.uri, b.anchor), cites)
         block = {"type": b.kind, "text": interleave(b.text, cites + uses)}
-        for key in ("num", "level", "depth", "label"):
+        for key in ("num", "level", "depth", "label", "quoted"):
             if getattr(b, key) is not None:
                 block[key] = getattr(b, key)
         # the citation anchor is the artifact `id` -- the key the catalog
@@ -174,6 +212,13 @@ def to_artifact(doc):
             block["id"] = b.anchor
         if b.defines is not None:
             block["defines"] = b.defines
+        if b.kind == "paragraph":
+            # only a numbered paragraph introduces a quotation, and a run of
+            # them is usually introduced once and referred back to thereafter
+            # ("I artikel 3 i direktiv 95/46", then "i detta direktiv", "i
+            # nämnda direktiv"), so the act carries forward until a later
+            # paragraph names another one
+            lead_act = _last_eu_act(cites) or lead_act
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": _isodate(doc.date),

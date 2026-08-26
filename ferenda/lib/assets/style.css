@@ -1058,6 +1058,39 @@ p.point { margin-left: 2.2rem; }
 p.point.sub2 { margin-left: 4rem; }
 p.point.sub3 { margin-left: 5.8rem; }
 p.point.sub4 { margin-left: 7.6rem; }
+/* An act quoted verbatim inside a judgment paragraph ("I artikel 25 i detta
+   direktiv föreskrevs följande:" — Schrems II's sections 3 to 42 are almost all
+   this shape). The quotation is another document's text, so it is set apart
+   rather than run in: a rule down the left, a step in, one size smaller and a
+   shade lighter. It keeps the quoted act's own numbering, hung in the margin
+   the way the act's own page hangs it, so a reader can follow "1.", "2.", "6."
+   back to the directive. The official PDF only indents; the rule and the
+   lighter setting are what tell the eye where the court stops speaking. */
+p.citat { --citat-step: 0rem;
+          margin-left: 1.2rem; padding-left: calc(.9rem + var(--citat-step));
+          font-size: .92em; color: var(--ink-2);
+          border-left: 2px solid var(--rule);
+          margin-top: .35rem; margin-bottom: .35rem; }
+/* consecutive blocks are one quotation: close the gap, and step the quoted
+   act's own nesting with padding rather than margin, so the rule stays at one
+   x and reads as a single unbroken stroke down the whole quotation. Graded and
+   saturating like the enacting terms' points. */
+p.citat + p.citat { margin-top: 0; }
+p.citat.sub1 { --citat-step: 1.8rem; }
+p.citat.sub2 { --citat-step: 3.6rem; }
+p.citat.sub3 { --citat-step: 5.4rem; }
+p.citat.sub4 { --citat-step: 7.2rem; }
+p.citat.hang { padding-left: calc(2.4rem + var(--citat-step));
+               text-indent: -1.5rem; }
+p.citat.citat-recital.hang { text-indent: -2.4rem; }
+/* the quoted act's own marker is the quoted document numbering itself, not the
+   court numbering its judgment: it takes the quotation's colour, so the eye
+   still finds the judgment's own paragraph numbers first */
+p.citat .num { color: var(--ink-3); }
+/* a heading inside the quotation (the quoted act's own division title) is the
+   quoted document speaking, not the court: it keeps the quotation's setting and
+   is marked by weight alone */
+p.citat.citat-heading { font-weight: 600; color: var(--ink); }
 /* every addressable enacting-terms block clears the sticky masthead when a
    #4.22.a permalink scrolls to it */
 p.hang { scroll-margin-top: var(--scroll-clear); }
