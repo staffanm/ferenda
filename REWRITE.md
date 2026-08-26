@@ -543,9 +543,17 @@ fields and the selectively-emitted `rdfs:label` are canonicalized away.
   and scope changes raise `RebuildRequired` — answered with
   `--rebuild-history`, which recreates `main` from the complete corpus (also
   the migration path for legacy `Lagen-Event:`-only repos). A full export
-  requires every selected artifact and snapshot to be valid and a clean
-  non-bare target with `main` checked out. Implements
-  `docs/prd-sfs-history-as-git.md`. `test/test_sfs_asgit.py`
+  requires a clean non-bare target with `main` checked out and every selected
+  artifact's *current* download to be valid; an unusable *archived*
+  consolidation is instead a reported gap the export drops and works around
+  (junk the old downloader saved instead of the document, a snapshot whose own
+  Rubrik names another act, a cutoff whose year is not a year — 107 in all).
+  `resolve_order_conflicts` ungroups the 423 propositions whose commit cannot
+  hold one position in every statute's timeline (two statutes it amends in
+  conflicting orders) onto the per-SFS-number key an amendment with no known
+  proposition already takes; commit messages mark an omtryck and name the act
+  a replacement act succeeds. A full run over the whole corpus writes 30 214
+  commits. Implements `docs/prd-sfs-history-as-git.md`. `test/test_sfs_asgit.py`
   (golden fast-import stream + git round-trip + real two-run export tests).
 - 🚧 **Adjudication overlay** (`golden_sfs.adjudicate`, `test/test_golden_adjudicate.py`)
   — the "change-detector, not oracle" posture (§2) as code: a `PREDICATES` table where
@@ -1828,11 +1836,17 @@ them resolve.
   innehåll" heading is promoted to a level-1 rubrik (so the ingress becomes its
   own avsnitt), and the signer names after the ort/datum line ("Stockholm den
   20 maj 2021") are retagged as a new `signatur` block kind (`model.Block`).
-  `structure.signers()`/`structure.ingress()` read them back off the parsed
-  artifact. This is the data `sfs/asgit.py`'s `history-as-git` export (§3d)
-  mines for commit authorship and message body — reading a förarbete artifact
-  stays förarbete's job, composed in by `build.py` like `ai-correspond`.
-  `test/test_forarbete_parse.py`.
+  Front matter ends at the first *numbered* rubrik ("1 Förslag till
+  riksdagsbeslut"), not the first rubrik of any kind — a proposition's own
+  title sets in the same bold face and otherwise reads as a rubrik ahead of the
+  handover sentence and the signers, collapsing the window to the
+  "Regeringens proposition" line alone and tagging no signer at all
+  (2 803 → 4 175 propositions with a signature block, none lost; 2025:
+  93 → 189 of 224). `structure.signers()`/`structure.ingress()` read them back
+  off the parsed artifact. This is the data `sfs/asgit.py`'s `history-as-git`
+  export (§3d) mines for commit authorship and message body — reading a
+  förarbete artifact stays förarbete's job, composed in by `build.py` like
+  `ai-correspond`. `test/test_forarbete_parse.py`.
 - ✅ **Ruled boxes, emphasis spans and embedded figures (2026-08-03).** A
   förarbete's stated proposal/assessment ("Regeringens förslag:", a SOU's
   "Förslag:"/"Bedömning:") is set inside a ruled box whose rule `pdftohtml`
@@ -1900,12 +1914,18 @@ them resolve.
   entirely. Also no planned/published upgrade cycle: every feed entry is
   published and final (an rskr records a decision already taken), so the
   watermark runs with the default window. `parse.rskr_body()` turns the HTML
-  into the ordinary block stream (everything after the ort/datum line tagged
-  `signatur`), so `bet`/`rskr` parse through the same forarbete `parse.py`
-  pipeline. Wired into `fa_harvest` as scope `"rskr"` alongside `bet` (neither
-  supports `--only`; both support `--riksmote`). No frozen legacy corpus
-  covers it. These signer names are what `sfs/asgit.py`'s `history-as-git`
-  export uses for commit authorship (§3d).
+  into the ordinary block stream, tagging `signatur` only the blocks after the
+  ort/datum line that read as a name (`_is_signer_name` — every word
+  capitalised bar a nobiliary particle, "Björn von Sydow"); taking
+  *everything* after the dateline had filed the dispatch list and the
+  printer's imprint as signatures too ("Kopia till Jordbruksdepartementet",
+  "Gotab, Stockholm 1997") — 44,365 rskr signatur blocks fall to 32,552, and
+  19,733 of the 19,735 riksdagsskrivelser that have a signer keep one — so
+  `bet`/`rskr` parse through the same forarbete `parse.py` pipeline. Wired
+  into `fa_harvest` as scope `"rskr"` alongside `bet` (neither supports
+  `--only`; both support `--riksmote`). No frozen legacy corpus covers it.
+  These signer names are what `sfs/asgit.py`'s `history-as-git` export uses
+  for commit authorship (§3d).
 
 ### 7c. Wiki value-add — kommentar + begrepp ✅ (first cut)
 
@@ -4910,6 +4930,72 @@ The blow-by-blow development history (dates, individual fixes, edge cases) lives
 in `git log`. This document is the forest-level status; section markers
 (✅/🚧/⬜) carry the current state. Milestones, newest first:
 
+- **eurlex** (2026-08-25) — the case-law body walk: `lib/formex.py`'s
+  `parse_judgment`/`parse_opinion`/`parse_hearing_report` now share one
+  document-order walker, `_case_contents`, replacing three separate passes
+  over `CONTENTS.JUDGMENT` (every heading, then every NP.ECR, then every NP)
+  that put the whole body after the *last* heading and dropped unnumbered `P`
+  prose entirely — Costa mot E.N.E.L. (61964CJ0006) published five empty
+  section headings and no text, and every modern judgment hung its paragraphs
+  under "Rättegångskostnader". Opinions additionally ignored `NP.ECR` outright
+  and forced every heading to level 1; 1 948 opinions had no body text at all.
+  A new quotation model: `parse_quotation` lifts a `QUOT.S` — an act
+  reproduced verbatim inside a case-law numbered paragraph — into its own
+  `citat` blocks, keeping the quoted act's own marker, indent step and the
+  kind it had inside the quotation (which decides its marker punctuation);
+  `eurlex/structure.py`'s `nest` hangs a `citat` off the paragraph that
+  introduces it, and `eurlex/render.py` sets it apart (a rule at a fixed left
+  edge, a size down, a shade lighter, the quoted act's marker in the
+  quotation's own colour). 674 327 quotation blocks land across 32 878 of the
+  corpus's 40 507 case-law manifestations. Two more rules in `parse.py`'s
+  `to_artifact` fix what may hold anaphoric focus while a block's citations are
+  scanned: a `keyword` block is an index entry, not the judgment speaking, so
+  the acts it names never enter focus (Schrems II's keyword list ends on the
+  Privacy Shield decision, and its own paragraph 1 — naming its act only at the
+  end — had pinned three articles onto that decision instead); and inside a
+  `citat` a bare "artikel N" is an article of the *quoted* act, so the block
+  is scanned with the act its lead-in paragraph named (`_last_eu_act`) rather
+  than whatever the judgment last mentioned — Schrems II quotes GDPR article
+  23's own "artiklarna 12–22 och 34" and, without this, all three linked to
+  directive 95/46, which has 34 articles and none of that content.
+- **forarbete** (2026-08-25) — two extraction fixes that feed
+  `sfs/asgit.py`'s author and committer identities through
+  `build._forarbete_meta`. `parse.tag_frontmatter` ended the front matter at
+  the first rubrik of any kind; a proposition sets its own title in the same
+  bold face, so the classifier read it as a rubrik on line 2 — ahead of the
+  handover sentence, the ort/datum line and the signers, collapsing the window
+  to the "Regeringens proposition" line alone and tagging no signer at all.
+  The end is now the first *numbered* rubrik ("1 Förslag till
+  riksdagsbeslut"): 2 803 → 4 175 propositions gained a signature block, none
+  lost (2025: 93 → 189 of 224). `parse.rskr_body` marked *everything* after the
+  dateline as a signer, so a riksdagsskrivelse's dispatch list and the
+  printer's imprint were filed as signatures ("Kopia till
+  Jordbruksdepartementet", "Gotab, Stockholm 1997"). `_is_signer_name` now
+  requires every word capitalised bar a nobiliary particle ("Björn von
+  Sydow", "Margaretha af Ugglas" pass; "Kopia till Finansdepartementet" does
+  not): 44 365 rskr signature blocks fall to 32 552, and 19 733 of the 19 735
+  riksdagsskrivelser that have a signer keep one.
+- **sfs** (2026-08-25) — `history-as-git` now exports to completion over the
+  whole corpus: 30 214 commits. Three behaviour changes: a zero-byte artifact
+  (the parse's `SkipDocument` placeholder) is passed over rather than read as
+  JSON; an unusable *archived* consolidation is now a reported gap the export
+  drops and works around — 107 in all, junk the old downloader saved instead
+  of the document, 20 snapshots whose own Rubrik names another act, one
+  cutoff whose year is not a year — while only an unreadable *current*
+  download still refuses the export; and `resolve_order_conflicts` ungroups
+  the 423 propositions whose commit cannot hold one position in every
+  statute's timeline, falling back to the per-SFS-number key the export
+  already uses where no proposition is known. Commit messages also now mark
+  an omtryck and name the act a replacement act succeeds. Details and the
+  open-question resolutions in `docs/prd-sfs-history-as-git.md`.
+- **lib/lagrum** (2026-08-25) — a definite generic noun ("förordningen",
+  "direktivet") names a *kind* of act, not just "the last act named": the
+  anaphora now keys the act in focus by the CELEX act-type letter as well as
+  by the last-named act, and refuses to link where no act of that kind has
+  been named yet. One shared slot for both nouns had pinned 9 747 references
+  in the corpus onto an act of the other kind — Schrems II's "Artikel 23 i
+  förordningen" landing on directive 95/46, whose 34 articles include no
+  article 23 of that content.
 - **api/render** (2026-08-25) — the in-repo `/hanvisningar/` graph explorer is
   retired: `lib/templates/hanvisningar.html`, `lib/assets/graf.js`,
   `render._render_graph_page` and its `graf.js` asset write in
