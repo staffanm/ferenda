@@ -7,6 +7,7 @@ import pytest
 from accommodanda.forarbete import parse as fa_parse
 from accommodanda.forarbete.model import Block
 from accommodanda.forarbete.parse import (
+    _is_signer_name,
     censor_future_citations,
     classify,
     figure_index,
@@ -108,7 +109,20 @@ def test_tag_frontmatter_needs_the_handover_sentence():
         "rubrik", "stycke", "rubrik"]
 
 
-def test_tag_frontmatter_stops_at_first_rubrik():
+def test_tag_frontmatter_reaches_past_the_propositions_own_title():
+    # the classifier reads a prop's own title as a rubrik -- it is set in the
+    # same bold face as a heading -- and it stands on line 2, ahead of the
+    # handover sentence and the signers. Ending the front matter at the first
+    # rubrik of any kind collapsed the window to the "Regeringens proposition
+    # 2020/21:194" line and tagged no signer at all, so the history-as-git
+    # export credited `Regeringen` rather than Stefan Löfven.
+    blocks = _frontmatter()
+    blocks[1].kind, blocks[1].level = "rubrik", 1
+    assert [b.text for b in tag_frontmatter(blocks) if b.kind == "signatur"] \
+        == ["Stefan Löfven", "Mikael Damberg (Justitiedepartementet)"]
+
+
+def test_tag_frontmatter_stops_at_the_first_numbered_rubrik():
     # an ort/datum line in the body proper ("Stockholm den 1 januari 2021"
     # quoted in a section) must not trigger signer tagging
     blocks = [Block("rubrik", "3 Ärendet och dess beredning", 9, level=1),
@@ -129,6 +143,8 @@ RSKR_MODERN = """
   <p class="Stockholm"><span>Stockholm den 17 juni 2026</span></p>
   <p class="AvsTalman"><span>Andreas Norlén</span></p>
   <p class="AvsTjnsteman"><span>Kristina Svartz</span></p>
+  <p><span>Kopia till Finansdepartementet</span></p>
+  <p><span>1 Riksdagsskrivelse 2025/26:430 till Riksrevisionen</span></p>
 </div>"""
 
 RSKR_OLD = """<h2>Nr 361</h2>
@@ -152,6 +168,19 @@ def test_rskr_body_tags_signers_after_ort_datum():
 def test_rskr_body_handles_the_pre_2000s_layout():
     assert [b.text for b in rskr_body(RSKR_OLD) if b.kind == "signatur"] == \
         ["HENRY ALLARD"]
+
+
+def test_signer_name_keeps_a_particle_and_refuses_a_dispatch_line():
+    # "Björn von Sydow" and "Kopia till Finansdepartementet" are the same
+    # shape bar the particle, and both stand under a riksdagsskrivelse's
+    # dateline
+    assert _is_signer_name("Björn von Sydow")
+    assert _is_signer_name("Margaretha af Ugglas")
+    assert _is_signer_name("Mikael Damberg (Justitiedepartementet)")
+    assert not _is_signer_name("Kopia till Finansdepartementet")
+    assert not _is_signer_name("På regeringens vägnar")
+    assert not _is_signer_name("Rskr. 1997/98")
+    assert not _is_signer_name("Gotab, Stockholm 1997")
 
 
 def test_structure_signers_and_ingress():
