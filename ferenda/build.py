@@ -975,6 +975,14 @@ def load_fingerprints():
 
 
 def save_fingerprints(store):
+    # A plan is not a run. Six call sites record a gate once their step
+    # finishes, and none of them knew about --dry-run, so `lagen all rebuild -n`
+    # wrote the store: the plan printed every stale document and then marked
+    # each source current, and the real run that followed skipped the whole
+    # stale tree. The guard belongs here rather than at the call sites, so a
+    # seventh one cannot reintroduce it.
+    if RUN.dry_run:
+        return
     global _FINGERPRINTS_CACHE
     _FINGERPRINTS_CACHE = store
     util.write_atomic(FINGERPRINTS, json.dumps(store, ensure_ascii=False,

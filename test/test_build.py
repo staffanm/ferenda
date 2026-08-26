@@ -1483,3 +1483,19 @@ def test_forarbete_meta_reads_a_prop_and_passes_over_a_placeholder(
     assert meta["ingress"] == "För att stärka skyddet."
     assert build._forarbete_meta("Prop. 2020/21:1") is None
     assert build._forarbete_meta("Prop. 2020/21:999") is None
+
+
+def test_a_dry_run_never_records_a_fingerprint_gate(tmp_path, monkeypatch):
+    """`lagen … -n` prints a plan. A plan that also writes the coarse gate makes
+    the next real run skip the very work it just listed."""
+    store = {"parse/__fp__/sfs": {"digest": "abc"}}
+    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(build, "_FINGERPRINTS_CACHE", None)
+
+    monkeypatch.setattr(build.RUN, "dry_run", True)
+    build.save_fingerprints(store)
+    assert not (tmp_path / "fingerprints.json").exists()
+
+    monkeypatch.setattr(build.RUN, "dry_run", False)
+    build.save_fingerprints(store)
+    assert json.loads((tmp_path / "fingerprints.json").read_text()) == store
