@@ -473,12 +473,19 @@ till samma graf även i svaret för en dokument-URI.
 Enradssvaret för det enda objekt läsaren valt eller hovrar: citerande namn
 (`citation`), `short_id`, `title`, sidans adress (`url`, samt `source_url`
 för källor sajten inte renderar), `inbound_count` och `snippet` --
-dokumentets egen inledande text (ett rättsfalls sammanfattning, en
-författnings 1 § med beteckning, en EU-rättsakts första skäl; null tills
-relate stämplat dokumentet). Tar `path=/1962:700#K3P1` som alternativ till
-`uri` -- det sajtens länk-popovers använder för hela-dokument-förhandsvisning
-i stället för att hämta målsidan. Grafsvaret bär avsiktligt inte dessa fält:
-av 300 grannar väljs en, och detta är anropet för den.
+texten på platsen själv. För ett dokument är det dess inledande text (ett
+rättsfalls sammanfattning, en författnings 1 § med beteckning, en
+EU-rättsakts första skäl; null tills relate stämplat dokumentet). För en
+**fragment-URI** är det bestämmelsens egen text under sitt lagrum ("1 kap.
+5 § Konungen eller drottning som enligt successionsordningen ..."), vilket
+kostar en artefaktläsning. `uri` tar båda formerna sajten skriver: URI:n
+(`https://lagen.nu/1962:700#K3P1`) eller sidadressen för samma plats
+(`/1962:700#K3P1`) -- det en webbläsare har i en href och inte kan bilda
+URI:n av (en EU-rättsakt serveras på `/celex/<id>` och identifieras som
+`ext/celex/<id>`). Sajtens länk-popovers använder anropet för varje mål
+utanför sidan läsaren är på, i stället för att hämta den sidan. Grafsvaret
+bär avsiktligt inte dessa fält: av 300 grannar väljs en, och detta är
+anropet för den.
 
 ### `GET /api/v1/path` — kortaste kedjan av hänvisningar mellan två dokument
 
@@ -488,6 +495,9 @@ ett steg får följa — med `both` kan ett steg gå åt båda hållen, och varj
 stegs `forward` säger åt vilket håll det gick; `links` är antalet hänvisningar
 som bär steget. `groups=` filtrerar *mellanliggande* dokument på flödesgrupp
 (ändpunkterna är alltid tillåtna). `distance` är null när ingen kedja finns.
+`paths=N` (1--5) ber om fler vägar: den kortaste är fortfarande `path`, de
+övriga kommer som `alternatives` (`{distance, path}`), näst kortast först.
+Färre kommer tillbaka när grafen inte håller fler slingfria kedjor.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/graph \

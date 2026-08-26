@@ -25,8 +25,12 @@ def client(tmp_path):
     bb.write_text(json.dumps({
         "uri": "https://lagen.nu/1962:700", "source_url": "https://example/bb",
         "metadata": {"properties": {"dcterms:title": "Brottsbalk (1962:700)"}},
+        # two paragrafer, so a card for one of them is provably not the
+        # document's own opening snippet
         "structure": [{"type": "paragraf", "id": "K3P1",
-                       "text": ["Den som dödar annan döms för mord."]}]}))
+                       "text": ["Den som dödar annan döms för mord."]},
+                      {"type": "paragraf", "id": "K3P2",
+                       "text": ["Är brottet mindre grovt, döms för dråp."]}]}))
     fl = art_dir / "fl.json"
     fl.write_text(json.dumps({
         "uri": "https://lagen.nu/2018:585",
@@ -951,6 +955,37 @@ def test_path_group_filter_gates_the_intermediates(client):
     assert d["distance"] is None
 
 
+def test_path_returns_the_alternatives_it_is_asked_for(client):
+    """`paths` asks for more than one route, shortest first: `path` stays the
+    shortest chain and the rest arrive as `alternatives`. Fewer come back when
+    the graph holds no further loopless chain -- never a repeat of one already
+    returned."""
+    bb, fl = "https://lagen.nu/1962:700", "https://lagen.nu/2018:585"
+    dom = "https://lagen.nu/dom/nja/2020s1"
+    con = sqlite3.connect(client.catalog_path)
+    # a second route from dom to bb, one step longer than dom -> bb
+    con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                "path) VALUES (?, 'dv', 'verdict', 'NJA 2020 s. 1', 'T', '')",
+                (dom,))
+    for f, t in ((dom, bb), (dom, fl)):
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, 'dcterms:references', ?, ?)", (f, t, t))
+    con.commit(); con.close()
+    q = {"from": dom, "to": bb, "direction": "out"}
+    d = _path(client, q).json()
+    assert [s["uri"] for s in d["path"]] == [dom, bb]
+    assert d["alternatives"] == []          # the default asks for one chain
+
+    d = _path(client, {**q, "paths": 3}).json()
+    assert d["distance"] == 1 and [s["uri"] for s in d["path"]] == [dom, bb]
+    assert [(a["distance"], [s["uri"] for s in a["path"]])
+            for a in d["alternatives"]] == [(2, [dom, fl, bb])]
+    # the cap is a budget, not a suggestion: Yen's runs a search per node of
+    # every chain already found
+    assert client.get("/api/v1/path", params={
+        **q, "paths": api.MAX_PATHS + 1}).status_code == 422
+
+
 def test_graph_sort_citations_and_grouplimit(tmp_path):
     """`sort=citations` ranks neighbours by their own (stamped) citedness
     instead of their ties to the center; `grouplimit` caps how many of one
@@ -1106,16 +1141,27 @@ def test_card_answers_names_address_and_opening_words(client):
     # stamped by relate's cross-pass, which the per-source fixture skips
     assert d["inbound_count"] is None
 
-    # a fragment uri answers with the provision's citation and pinpoint
+    # A fragment uri answers for the provision itself, not for the document:
+    # its citation, its pinpoint, and its OWN words -- the document's opening
+    # snippet says nothing about the place the reader selected.
+    d = client.get("/api/v1/card", params={"uri": bb + "#K3P2"}).json()
+    assert d["pinpoint"] == "3 kap. 2 §" and d["url"] == "/1962:700#K3P2"
+    assert d["snippet"] == "3 kap. 2 § Är brottet mindre grovt, döms för dråp."
+    # a deeper arrival anchor answers for the § it names, like `pinpoint`
     d = client.get("/api/v1/card", params={"uri": bb + "#K3P1S2"}).json()
     assert d["pinpoint"] == "3 kap. 1 §" and d["url"] == "/1962:700#K3P1S2"
+    assert d["snippet"] == "3 kap. 1 § Den som dödar annan döms för mord."
+    # an anchor the presented body does not publish keeps the document's own
+    # opening words rather than answering with nothing
+    d = client.get("/api/v1/card", params={"uri": bb + "#K9P9"}).json()
+    assert d["snippet"] == "3 kap. 1 § Den som dödar annan döms för mord."
 
-    # a public page path resolves to the same card (popovers know paths)
-    d = client.get("/api/v1/card", params={"path": "/1962:700#K3P1"}).json()
+    # one parameter, in either form the site writes: a page path names the same
+    # place as the uri (popovers hold hrefs, and /celex/<id> is not a prefix of
+    # ext/celex/<id>, so the client cannot compose the uri itself)
+    d = client.get("/api/v1/card", params={"uri": "/1962:700#K3P1"}).json()
     assert d["root"] == bb and d["pinpoint"] == "3 kap. 1 §"
 
     assert client.get("/api/v1/card").status_code == 422
-    assert client.get("/api/v1/card", params={
-        "uri": bb, "path": "/1962:700"}).status_code == 422
     assert client.get("/api/v1/card", params={
         "uri": "https://lagen.nu/x"}).status_code == 404

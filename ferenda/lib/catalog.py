@@ -1247,7 +1247,11 @@ def _node_text(node):
                    for run in node.get("text") or []).strip()
 
 
-def _cut(text):
+def cut_snippet(text):
+    """A snippet cut to one length, on a word boundary, with an ellipsis where
+    it was cut. Relate stamps every `documents.snippet` through this, and
+    /api/v1/card cuts a provision's own words the same way, so the two read
+    alike in the same popover (rule:second-use-goes-to-lib)."""
     if len(text) > _SNIPPET_LEN:
         return text[:_SNIPPET_LEN].rsplit(" ", 1)[0] + " …"
     return text
@@ -1282,7 +1286,7 @@ def first_prose(art):
     prose-like (scanned page-image documents, bare registries)."""
     for prose in _prose_candidates(art.get("structure") or
                                    art.get("body") or []):
-        return _cut(prose)
+        return cut_snippet(prose)
     return None
 
 
@@ -1316,7 +1320,7 @@ def _paragraf_prose(art):
     if punkt and _node_text(punkt):
         body = "%s %s …" % (body, _node_text(punkt))
     where = pinpoint_label(par.get("id") or "")
-    return _cut(("%s %s" % (where, body)) if where else body)
+    return cut_snippet(("%s %s" % (where, body)) if where else body)
 
 
 def _word_cap(text, words=50):
@@ -1358,7 +1362,7 @@ def _recital_prose(art):
     if not body:
         return None
     num = recital.get("num")
-    return _cut(("(%s) %s" % (num, body)) if num else body)
+    return cut_snippet(("(%s) %s" % (num, body)) if num else body)
 
 
 # how an international court's decision opens before any substance: bench
@@ -1403,7 +1407,7 @@ def _document_snippet(art, source):
     if source in ("icc", "icj"):
         for candidate in _prose_candidates(art.get("structure") or []):
             if not _ROSTER.match(candidate):
-                return _cut(candidate)
+                return cut_snippet(candidate)
         return None
     if source == "eurlex":
         # case law opens on its first numbered ground; only the *acts* take
@@ -1427,7 +1431,7 @@ def _document_snippet(art, source):
                                    art.get("body") or []):
         if title and prose[:60].strip().casefold() == title[:60].strip():
             continue
-        return _cut(prose)
+        return cut_snippet(prose)
     return None
 
 

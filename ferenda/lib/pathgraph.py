@@ -210,24 +210,27 @@ def expand(g, frontier_uris, exclude, *, reverse, budget, allowed=None,
 # the walk
 # --------------------------------------------------------------------------
 
-def shortest(g, from_uri, to_uri, *, direction="both", groups=None):
-    """The uris of one shortest chain from `from_uri` to `to_uri`, endpoints
-    included -- or None when no chain exists. `direction` says which links a
-    step may follow: "out" follows citations, "in" follows citers, "both"
-    walks the graph undirected. `groups` (a set of flow-group names) filters
-    the *intermediate* documents; the endpoints are always allowed."""
-    s, t = g.ids.get(from_uri), g.ids.get(to_uri)
-    if s is None or t is None:
-        return None
-    if s == t:
-        return [from_uri]
-    allowed = None if groups is None \
-        else {GROUP_ID[name] for name in groups}
+def _sides(g, direction):
+    """The CSR arrays a step may follow: "out" citations, "in" citers, "both"
+    either (the graph walked undirected)."""
     sides = []
     if direction in ("out", "both"):
         sides.append((g.fwd_off, g.fwd_dst))
     if direction in ("in", "both"):
         sides.append((g.rev_off, g.rev_dst))
+    return sides
+
+
+def _bfs(g, s, t, sides, allowed, banned_nodes=frozenset(),
+         banned_hops=frozenset()):
+    """One shortest chain of node ids from `s` to `t`, or None. `allowed`
+    gates the *intermediate* nodes by flow-group id (the endpoints always
+    pass). `banned_nodes` and `banned_hops` (ordered `(u, v)` pairs) are what
+    `k_shortest` closes off to force the walk onto a different route -- a hop
+    is the ordered pair of documents, whichever CSR side carries it, since
+    that is what makes two chains different to a reader."""
+    if s == t:
+        return [s]
     prev = {s: -1}
     q = deque([s])
     while q:
@@ -235,15 +238,69 @@ def shortest(g, from_uri, to_uri, *, direction="both", groups=None):
         for off, dst in sides:
             for i in range(off[u], off[u + 1]):
                 v = dst[i]
-                if v in prev:
+                if v in prev or v in banned_nodes or (u, v) in banned_hops:
                     continue
                 if v == t:
                     path = [t, u]
                     while path[-1] != s:
                         path.append(prev[path[-1]])
-                    return [g.uris[i] for i in reversed(path)]
+                    path.reverse()
+                    return path
                 if allowed is not None and g.group[v] not in allowed:
                     continue
                 prev[v] = u
                 q.append(v)
     return None
+
+
+def k_shortest(g, from_uri, to_uri, *, direction="both", groups=None, k=1):
+    """Up to `k` loopless chains from `from_uri` to `to_uri`, shortest first,
+    endpoints included -- Yen's algorithm over `_bfs`. `[]` when no chain
+    exists. Each chain is a list of uris and no two are the same.
+
+    Yen's costs one BFS per node of each chain already found, so `k` is the
+    caller's budget, not a free parameter: /api/v1/path caps it. `k=1` is the
+    single BFS `shortest` has always run."""
+    s, t = g.ids.get(from_uri), g.ids.get(to_uri)
+    if s is None or t is None:
+        return []
+    allowed = None if groups is None else {GROUP_ID[name] for name in groups}
+    sides = _sides(g, direction)
+    first = _bfs(g, s, t, sides, allowed)
+    if first is None:
+        return []
+    found = [first]
+    candidates = []                     # (length, chain), Yen's B set
+    while len(found) < k:
+        prev_chain = found[-1]
+        for i in range(len(prev_chain) - 1):
+            root, spur = prev_chain[:i + 1], prev_chain[i]
+            # every chain already found that starts the same way gives up its
+            # next hop, so the spur walk cannot re-find it; the root's own
+            # nodes go too, which is what keeps the chain loopless
+            hops = {(c[i], c[i + 1]) for c in found
+                    if len(c) > i + 1 and c[:i + 1] == root}
+            rest = _bfs(g, spur, t, sides, allowed,
+                        banned_nodes=frozenset(root[:-1]), banned_hops=hops)
+            if rest is None:
+                continue
+            chain = root[:-1] + rest
+            if chain not in found and chain not in [c for _n, c in candidates]:
+                candidates.append((len(chain), chain))
+        if not candidates:
+            break
+        # shortest first; the chain itself breaks ties, so the answer does not
+        # depend on the order the spurs happened to be tried
+        candidates.sort()
+        found.append(candidates.pop(0)[1])
+    return [[g.uris[i] for i in chain] for chain in found]
+
+
+def shortest(g, from_uri, to_uri, *, direction="both", groups=None):
+    """The uris of one shortest chain from `from_uri` to `to_uri`, endpoints
+    included -- or None when no chain exists. `direction` says which links a
+    step may follow: "out" follows citations, "in" follows citers, "both"
+    walks the graph undirected. `groups` (a set of flow-group names) filters
+    the *intermediate* documents; the endpoints are always allowed."""
+    chains = k_shortest(g, from_uri, to_uri, direction=direction, groups=groups)
+    return chains[0] if chains else None

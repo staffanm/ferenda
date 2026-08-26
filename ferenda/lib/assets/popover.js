@@ -188,18 +188,27 @@
     title.href = t.path + (t.frag ? '#' + t.frag : '');
     title.textContent = a.textContent.trim();
     position(a);
-    // a whole-document preview asks the API for the document's card -- one
-    // small JSON with the citing name and the document's own opening words
-    // (relate's snippet) -- instead of fetching the entire target page,
-    // which for a statute is megabytes. A page without a catalog row (an
-    // om/ page) or a document relate has not stamped yet falls through to
-    // the page-fetch lede below, which is the pre-card behavior.
-    if (!t.frag) {
-      fetch('/api/v1/card?path=' + encodeURIComponent(t.path))
+    // Another document's words come from the API, not from its page: /card is
+    // one small JSON -- the citing name and the words of the place itself,
+    // a document's opening snippet or the cited provision's own text -- where
+    // fetching the page is megabytes for a statute (konsumenttjänstlagen's one
+    // reference to 10 kap. 9 § plan- och bygglagen pulled the whole PBL).
+    //
+    // Not for a document already in hand: this page's own text is in this DOM,
+    // and a target opened in a split pane sits in the fetched-page cache. Both
+    // read from the DOM for free, and the lifted element keeps its markup and
+    // its inner links, which the card's plain snippet cannot. A card without a
+    // snippet (a page with no catalog row, an anchor the body does not publish)
+    // falls through the same way -- the pre-card behavior.
+    if (t.path !== location.pathname && !docs[t.path]) {
+      fetch('/api/v1/card?uri=' + encodeURIComponent(
+              t.path + (t.frag ? '#' + t.frag : '')))
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (c) {
           if (!pop || anchorA !== a) return;
           if (!c || !c.snippet) { pageLede(a, t, title); return; }
+          // the citation names both the provision and the document it is in
+          // ("10 kap. 9 § plan- och bygglagen"), which is the whole head line
           title.textContent = c.citation || c.title || title.textContent;
           var body = pop.querySelector('.pop-body');
           body.innerHTML = '';

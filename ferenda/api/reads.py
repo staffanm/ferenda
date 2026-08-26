@@ -15,7 +15,7 @@ import collections
 
 from opensearchpy.exceptions import OpenSearchException
 
-from ..lib import catalog, facets, inbound, layout, pathgraph, pins
+from ..lib import catalog, facets, inbound, layout, pathgraph, pins, text
 from ..lib.pinpoint import (
     citation_label,
     is_change_marker,
@@ -376,28 +376,55 @@ def _graph_internal(con, root, focus_unit):
             "truncated": len(dropped)}
 
 
+def _pinpoint_snippet(con, path, unit, document_snippet):
+    """The provision's own words, named by their pinpoint: "1 kap. 5 § Konungen
+    eller drottning som enligt successionsordningen innehar Sveriges tron är
+    rikets statschef. Lag (2010:1408)."
+
+    A card for a whole document shows the opening words relate stamped on it. On
+    a fragment uri those say nothing about the place the reader selected --
+    /1974:152#K1P5 answered with 1 kap. 1 §, the first § of the document. Costs
+    the one artifact read the stamped snippet exists to avoid, so it is paid
+    only when the uri carries a fragment; a fragment the presented body
+    publishes no anchor for -- and a stub row with no artifact at all, which
+    `load_artifact` answers with `{}` -- keeps the document's own snippet."""
+    body = text.anchor_text(
+        catalog.load_artifact(catalog.data_root(con), path), unit)
+    if not body:
+        return document_snippet
+    where = pinpoint_label(unit)
+    if not where:
+        return catalog.cut_snippet(body)
+    # the pinpoint opens the line, so its first letter is raised -- the rule
+    # citation_label states for a citation standing on its own ("Skäl 83 För
+    # att …"). An SFS pinpoint opens with its number and is unaffected.
+    return catalog.cut_snippet("%s%s %s" % (where[:1].upper(), where[1:], body))
+
+
 def card(con, uri):
     """One document's (or provision's) identity card -- what a link popover
-    or a details panel shows without loading the artifact: the citing name,
-    the short id, the reader-facing address, the citedness, and the
-    document's own opening words (`snippet`, stamped at relate; COALESCEd
-    with `description` so a catalog stamped before the snippet column still
-    answers for every court decision). One indexed row lookup; the graph
-    payload deliberately does NOT carry this -- of 300 neighbours one gets
-    selected, and this is the call for that one. None for a uri the catalog
-    does not hold."""
+    or a details panel shows: the citing name, the short id, the reader-facing
+    address, the citedness, and the opening words (`snippet`, stamped at
+    relate; COALESCEd with `description` so a catalog stamped before the
+    snippet column still answers for every court decision). A fragment uri
+    answers with that provision's own words instead (`_pinpoint_snippet`, the
+    one artifact read here). The graph payload deliberately does NOT carry any
+    of this -- of 300 neighbours one gets selected, and this is the call for
+    that one. None for a uri the catalog does not hold."""
     root, _, frag = uri.partition("#")
     row = con.execute(
         "SELECT source, kind, label, title, descriptive, short_id, "
         "       NULLIF(source_url, ''), "
         "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')), "
-        "       inbound_count FROM documents WHERE uri = ?",
+        "       inbound_count, path FROM documents WHERE uri = ?",
         (root,)).fetchone()
     if not row:
         return None
     (source, kind, label, title, descriptive,
-     short_id, source_url, snippet, cited) = row
+     short_id, source_url, snippet, cited, path) = row
     unit = unit_anchor(frag) if frag else None
+    if unit:
+        snippet = _pinpoint_snippet(con, path, unit, snippet)
     return {
         "uri": uri, "root": root,
         "source": source, "kind": kind,

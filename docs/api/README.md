@@ -356,13 +356,19 @@ uri too, for a zoomed-in structure view.
 answer for the ONE item a reader selected or hovers: citing name
 (`citation`), `short_id`, `title`, the reader-facing `url` (and
 `source_url` for sources this site does not render), `inbound_count`, and
-`snippet` — the document's own opening words (a court decision's
-sammanfattning, a statute's 1 § with designation, an EU act's first
-recital; null until relate has stamped it). Takes `path=/1962:700#K3P1`
-as an alternative to `uri`, which is what the site's link popovers use for
-whole-document previews instead of fetching the target page. The graph
-payload deliberately does not carry these fields — of 300 neighbours one
-gets selected, and this is the call for that one.
+`snippet` — the words of the place itself. For a document that is its own
+opening words (a court decision's sammanfattning, a statute's 1 § with
+designation, an EU act's first recital; null until relate has stamped it);
+for a **fragment uri** it is that provision's own text under its pinpoint
+("1 kap. 5 § Konungen eller drottning som enligt successionsordningen …"),
+which costs one artifact read. `uri` takes either form the site writes — the
+uri (`https://lagen.nu/1962:700#K3P1`) or the page path for the same place
+(`/1962:700#K3P1`), which is what a browser has in an href and cannot compose
+the uri from (an EU act is served at `/celex/<id>` and identified as
+`ext/celex/<id>`). The site's link popovers use it for every target outside
+the page in hand, instead of fetching that page. The graph payload
+deliberately does not carry these fields — of 300 neighbours one gets
+selected, and this is the call for that one.
 
 **Shortest citation chain — `GET /api/v1/path?from=…&to=…`** — the
 six-degrees walk: one shortest chain of citations connecting two documents,
@@ -372,8 +378,12 @@ document). `direction=out|in|both` says which links a step may follow — with
 `both` a hop may run either way, and each step's `forward` says which way it
 ran; `links` is how many citations carry the hop. `groups=` filters the
 *intermediate* documents by flow group (the endpoints are always allowed).
-`distance` is null when no chain exists. The whole document-level graph
-(~2.6M edges) is held in memory, so an answer is one breadth-first search.
+`distance` is null when no chain exists. `paths=N` (1–5) asks for more than
+one route: the shortest stays `path`, the rest arrive as `alternatives`
+(`{distance, path}`), next-shortest first, and fewer come back when the graph
+holds no further loopless chain. The whole document-level graph (~2.6M edges)
+is held in memory, so one chain is one breadth-first search; further chains
+are Yen's algorithm over the same graph, which is why `paths` is capped.
 
 **Document as PDF — `GET /api/v1/pdf?path=…`** — a generated page typeset for
 paper: A4, running heads, `n (total)` folios, a PDF outline. `path` is the

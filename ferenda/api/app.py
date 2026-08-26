@@ -1273,28 +1273,26 @@ class CardResponse(BaseModel):
 
 @app.get("/api/v1/card", response_model=CardResponse, tags=["document"],
          summary="One document's identity card")
-def card_endpoint(uri: str | None = Query(
-                      None, description="document or fragment uri"),
-                  path: str | None = Query(
-                      None, description="a public page path (/1962:700, "
-                      "/celex/32016R0679, with or without #fragment) as an "
-                      "alternative to uri"),
+def card_endpoint(uri: str = Query(
+                      ..., description="the document, or one provision of it: "
+                      "a uri (https://lagen.nu/1962:700#K3P1) or the public "
+                      "page path for the same place (/1962:700#K3P1)"),
                   con: sqlite3.Connection = Depends(get_con)):
     """The one-row answer for the ONE item a reader selected or hovers: the
-    citing name, short id, page address and the document's own opening words.
-    The graph payload deliberately does not carry these -- of 300 neighbours
-    one gets selected, and this is the call for that one. The site's link
-    popovers use it for whole-document previews instead of fetching the
-    target page."""
-    if uri is not None and path is not None:
-        raise HTTPException(422, "give exactly one of uri and path")
-    if path is not None:
-        frag = ""
-        if "#" in path:
-            path, _, frag = path.partition("#")
+    citing name, short id, page address, and the words of the place itself --
+    the document's own opening words, or, for a fragment uri, that provision's
+    text under its pinpoint. The graph payload deliberately does not carry
+    these -- of 300 neighbours one gets selected, and this is the call for that
+    one. The site's link popovers use it instead of fetching the target page.
+
+    One parameter names the place, in either of the two forms the site writes:
+    the uri everything else here speaks (`/graph?uri=`, a search hit's `uri`),
+    or the page path the browser has in an href -- which is not a prefix of the
+    uri (an EU act is served at /celex/<id> and identified as ext/celex/<id>),
+    so a client holding one cannot be asked to compose the other."""
+    if uri.startswith("/"):
+        path, _, frag = uri.partition("#")
         uri = layout.page_uri(path) + (("#" + frag) if frag else "")
-    if uri is None:
-        raise HTTPException(422, "give exactly one of uri and path")
     data = reads.card(con, uri)
     if data is None:
         raise HTTPException(404, "no document %r in the catalog"
@@ -1321,6 +1319,18 @@ class PathStep(BaseModel):
         "direction; null on the last")
 
 
+# How many chains /path will walk for. Yen's runs one BFS per node of every
+# chain already found, and each returned chain costs a hop query per step, so
+# this is a budget: the prod host reads its catalog off a ~80-IOPS disk.
+MAX_PATHS = 5
+
+
+class PathChain(BaseModel):
+    """One further chain between the same two documents (see `alternatives`)."""
+    distance: int = Field(description="steps on this chain")
+    path: list[PathStep] = Field(description="the chain, endpoints included")
+
+
 class PathResponse(BaseModel):
     from_uri: str = Field(serialization_alias="from")
     to_uri: str = Field(serialization_alias="to")
@@ -1329,6 +1339,11 @@ class PathResponse(BaseModel):
                                              "null when no chain exists")
     path: list[PathStep] = Field(description="the chain, endpoints included; "
                                              "empty when no chain exists")
+    alternatives: list[PathChain] = Field(
+        default_factory=list,
+        description="the further chains `paths` asked for, next-shortest "
+        "first; empty for the default paths=1 (and whenever the graph holds "
+        "no other route)")
 
 
 @app.get("/api/v1/path", response_model=PathResponse, tags=["document"],
@@ -1345,11 +1360,21 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
                       None, description="comma-separated flow-group filter "
                       "for the intermediate documents (endpoints are always "
                       "allowed)"),
+                  # `paths` to the caller; the local name would shadow the
+                  # api.paths module this function reads the graph from
+                  wanted_paths: int = Query(
+                      1, alias="paths", ge=1, le=MAX_PATHS,
+                      description="how many chains to return, shortest "
+                      "first: the first is `path`, the rest `alternatives`"),
                   con: sqlite3.Connection = Depends(get_con)):
     """The shortest chain of citations connecting two documents -- the
     six-degrees walk paraGRAF draws when an end point is set. The chain is
     document-level: a hop exists when any provision of one document cites any
     provision of the other. A fragment uri is answered for its document.
+
+    `paths` asks for more than one route (Yen's algorithm: one breadth-first
+    search per node of each chain already found, so it is capped rather than
+    free). Fewer come back when the graph holds no further loopless chain.
 
     The whole citation graph (2.6M document pairs) is held in memory as
     integer adjacency arrays, so the answer is one breadth-first search --
@@ -1368,22 +1393,32 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
         raise HTTPException(
             503, "the citation graph is still loading -- try again shortly",
             headers={"Retry-After": "30"})
-    chain = pathgraph.shortest(g, ends[0], ends[1],
-                               direction=direction, groups=wanted)
+    chains = pathgraph.k_shortest(g, ends[0], ends[1], direction=direction,
+                                  groups=wanted, k=wanted_paths)
+    steps = [_chain_steps(con, chain, direction) for chain in chains]
+    return PathResponse(
+        from_uri=ends[0], to_uri=ends[1], direction=direction,
+        distance=len(chains[0]) - 1 if chains else None,
+        path=steps[0] if steps else [],
+        alternatives=[PathChain(distance=len(chain) - 1, path=chain_steps)
+                      for chain, chain_steps in zip(chains[1:], steps[1:],
+                                                    strict=True)])
+
+
+def _chain_steps(con, chain, direction):
+    """One chain of uris as PathSteps: each document's names, plus the hop to
+    the next one."""
+    labels = catalog.graph_labels(con, chain)
     steps = []
-    if chain:
-        labels = catalog.graph_labels(con, chain)
-        for i, uri in enumerate(chain):
-            label, title, source, kind, descriptive, _cited = labels[uri]
-            n = forward = None
-            if i + 1 < len(chain):
-                n, forward = _hop_count(con, uri, chain[i + 1], direction)
-            steps.append(PathStep(
-                uri=uri, label=label, title=title, descriptive=descriptive,
-                group=facets.flow_group(source, kind), links=n, forward=forward))
-    return PathResponse(from_uri=ends[0], to_uri=ends[1], direction=direction,
-                        distance=len(chain) - 1 if chain else None,
-                        path=steps)
+    for i, uri in enumerate(chain):
+        label, title, source, kind, descriptive, _cited = labels[uri]
+        n = forward = None
+        if i + 1 < len(chain):
+            n, forward = _hop_count(con, uri, chain[i + 1], direction)
+        steps.append(PathStep(
+            uri=uri, label=label, title=title, descriptive=descriptive,
+            group=facets.flow_group(source, kind), links=n, forward=forward))
+    return steps
 
 
 def _hop_count(con, a, b, direction):
