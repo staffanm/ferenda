@@ -1331,9 +1331,11 @@ def _forarbete_meta(identifier):
     path = layout.artifact("forarbete",
                            "%s/%s" % (typ.rstrip(".").lower(),
                                       util.basefile_slug(ident)))
-    if not compress.exists(path):
+    # a placeholder artifact (the budget propositions, prop 1 and prop 100) is
+    # no readable document, which is exactly what "not in the corpus" means
+    art = compress.read_json(path, default=None, empty=None)
+    if art is None:
         return None
-    art = compress.read_json(path)
     return {"title": art.get("title") or "",
             "signers": fa_structure.signers(art["structure"]),
             "ingress": fa_structure.ingress(art["structure"])}

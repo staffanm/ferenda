@@ -180,13 +180,30 @@ def read_text(path: Path | str, encoding: str = "utf-8") -> str:
 _RAISE = object()
 
 
-def read_json(path: Path | str, default=_RAISE):
+def read_json(path: Path | str, default=_RAISE, empty=_RAISE):
     """`json.loads` over the decompressed content behind `path` -- the single
     most common read in the package. With `default`, a missing file yields it
-    instead of raising."""
+    instead of raising.
+
+    `empty` is the answer for a **zero-byte artifact**, which is meaningful
+    rather than corrupt: it is the placeholder `write_bytes` records for a
+    document the parse raised `SkipDocument` on (an SFS act the register holds
+    with no forfattningstext, a budget proposition). Without it a reader has to
+    know that rule and check the bytes itself -- and two that did not,
+    `sfs.asgit.collect` and `build._forarbete_meta`, aborted the whole
+    history-as-git export on a `JSONDecodeError`. Left unset it still raises,
+    so a caller that has no answer for a placeholder is not quietly given one.
+
+    Three readers still check the bytes by hand and could move here
+    (`lib/search.py`, `remisser/ai_analyze.py`, `stats/scan.py`); three cannot,
+    because they want the raw bytes rather than the JSON -- `lib/catalog.py`
+    hashes them, and `build.py` twice reads only the size."""
     if default is not _RAISE and not exists(path):
         return default
-    return json.loads(read_bytes(path))
+    raw = read_bytes(path)
+    if empty is not _RAISE and not raw.strip():
+        return empty
+    return json.loads(raw)
 
 
 def _clear_variants(logical_path, keep=()):

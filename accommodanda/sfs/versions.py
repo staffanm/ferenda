@@ -34,8 +34,15 @@ from .nf import BASE, to_normalform
 
 # the consolidation cutoff in an SFST header: "t.o.m. SFS 2003:466" (the year
 # is occasionally dropped in the source; a yearless cutoff is unusable here
-# since there is no register to resolve it against)
-RE_CUTOFF = re.compile(r"t\.o\.m\.\s*SFS\s*(\d+:\s?\d+)")
+# since there is no register to resolve it against).
+#
+# Two of the source's own typing slips are read rather than refused, because
+# refusing them leaves the act with no cutoff at all and its whole version
+# history unkeyed: the abbreviation written without its last dot ("t.o.m SFS
+# 2018:1409", 1962:627) and the SFS number written with a dot for its colon
+# ("t.o.m. SFS 2026.1467", 2007:1175). Measured over every header in the
+# corpus: 49 gain a cutoff, none read differently.
+RE_CUTOFF = re.compile(r"t\.o\.m\.?\s*SFS\s*(\d+)\s*[:.]\s?(\d+)")
 
 # a header line in the latin-1 archival <pre> block: "  Rubrik: value"
 RE_HEADER_LINE = re.compile(r"^\s*([^:]+):(.*)$")
@@ -76,7 +83,7 @@ def header_cutoff(header):
     """The consolidation cutoff SFS number named in an SFST header, or None
     when the header carries none (an un-amended act) or only a yearless one."""
     m = RE_CUTOFF.search(header.get("Ändring införd", ""))
-    return m.group(1).replace(" ", "") if m else None
+    return "%s:%s" % (m.group(1), m.group(2)) if m else None
 
 
 def version_metadata(basefile, version, header):

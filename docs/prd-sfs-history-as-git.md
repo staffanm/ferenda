@@ -4,14 +4,16 @@
 Reads the download archive directly (no `versions`-stage dependency) plus the
 parsed SFS artifacts for amendment metadata. Prop signers/ingress come from
 the förarbete artifacts (`signatur` blocks + the promoted ingress avsnitt,
-tagged at parse time); rskr signers from the new rskr corpus
+tagged at parse time); rskr signers from the rskr corpus
 (`forarbete/rskr.py`, `lagen forarbete download rskr`). Open questions below
-resolved: omtryck renames not modelled (v1), filename slugs follow
-`layout.relpath` (`N1988/1.txt`, `1827/60_s.1007.txt`), övergångsbestämmelser
-excluded (body = forfattningstext only). One deviation from the sketch:
-per-amendment utfärdandedatum turned out to be almost never available in the
-register, so the author date falls back to ikraftträdandedatum (noted in the
-commit body), then July 1 of the SFS year.*
+resolved: filename slugs follow `layout.relpath` (`N1988/1.txt`,
+`1827/60_s.1007.txt`), övergångsbestämmelser excluded (body = forfattningstext
+only), and an omtryck turns out not to be a rename at all (see below). One
+deviation from the sketch: per-amendment utfärdandedatum turned out to be
+almost never available in the register, so the author date falls back to
+ikraftträdandedatum (noted in the commit body), then July 1 of the SFS year.*
+
+*A full export of the corpus writes 30 214 commits (2026-08-25).*
 
 ## Idea
 
@@ -95,10 +97,45 @@ meaningful commits.
   usually already consolidated ("t.o.m. SFS 2003:466"), not the original
   as-enacted text — the add-commit message should say so.
 
+## What the corpus forces the model to admit
+
+Four things the first scoping pass did not foresee, each measured against the
+whole corpus and each visible in the export's own output.
+
+- **An omtryck is not a rename.** `rinfoex:omtryck` names the amending act
+  whose text was printed as a reprint of the whole statute. The statute keeps
+  its SFS number, and the file is named by that number, so no path moves. The
+  omtryck is named on the transition it falls on instead ("ändrad t.o.m. SFS
+  1992:1769, omtryckt") — 47 of the corpus's 445 omtryck fall on a
+  consolidation the archive holds; the rest predate it.
+- **Neither is a replacement act, though it is the case a reader wants.** Git
+  records no renames: a commit stores a tree, and `git log --follow` recovers a
+  move by comparing content when it reads. A new act is newly written text, so
+  the similarity never reaches even `-M40%` (the new vapenlag, SFS 2026:408,
+  against the SFS 1996:67 it replaces). The succession is stated in the message
+  instead ("ersätter SFS 1996:67"), for the 1 685 of 5 887 repeals whose
+  successor enters the corpus in the same event.
+- **One commit per proposition cannot always hold one position.** A proposition
+  may amend statute X before another proposition does and statute Y after it,
+  and a single proposition may produce two amending acts to the *same* statute
+  (prop. 2007/08:13 and prop. 2007/08:21 interleave twice in 1997:483). 423
+  propositions fall back to the per-SFS-number key — the key an amendment with
+  no known proposition already takes. The commit still names the proposition
+  and is still authored by its signers; it is simply not merged with that
+  proposition's other statutes.
+- **An unusable archived consolidation is a gap, not incompleteness.** 107 of
+  them: junk the old downloader saved instead of the document (a rkrattsbaser
+  search-results page, a FELMEDDELANDE page), 20 snapshots whose own Rubrik
+  names *another act* (one shifted chain an old import left behind, 1982:787's
+  newest archive holding 2008:313's text and so on down to 1982:801), and one
+  cutoff whose year is not a year. They are reported and dropped; the
+  amendments they would have separated are named as folded in the next commit,
+  which is what the archive's known gaps already produce. Only an unreadable
+  *current* download still refuses the export.
+
 ## Open questions
 
-- Handle base-act renames/omtryck (`rinfoex:omtryck`) as git renames?
 - Letter-series acts (`N1988:1`) and space-carrying ids ("1827:60 s.1007")
-  need filename slugs consistent with `layout.relpath`.
+  need filename slugs consistent with `layout.relpath`. *(Resolved: they do.)*
 - Should övergångsbestämmelser be part of the file body (they are not in
-  `forfattningstext`)?
+  `forfattningstext`)? *(Resolved: no.)*

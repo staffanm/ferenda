@@ -13,6 +13,12 @@ from accommodanda.sfs.asgit import (
     Change,
     Event,
     RebuildRequired,
+    collect,
+    cycle_members,
+    misfiled_as,
+    refinable,
+    resolve_order_conflicts,
+    ungroup,
     email_slug,
     event_dates,
     existing_ledger,
@@ -107,6 +113,139 @@ def test_message_add_commit_notes_consolidation_caveat():
     assert "inte den ursprungliga lydelsen" in msg
 
 
+def test_message_marks_an_omtryck_and_the_act_a_new_one_replaces():
+    # an omtryck reprints the whole act under its own unchanged SFS number, so
+    # it renames no file -- it is named on the transition it falls on. A
+    # replacement act's succession is stated for the same reason: git records
+    # no renames, and a new act's text is too unlike the one it replaces for
+    # rename detection to recover the move by similarity.
+    ev = Event(key="Prop. 2025/26:141", prop="Prop. 2025/26:141",
+               ikraft="2026-07-01",
+               changes=[Change(path="1987/10.txt", src=None,
+                               basefile="1987:10",
+                               title="Plan- och bygglag (1987:10)",
+                               cutoff="1992:1769", omtryck=True,
+                               body_hash="0" * 64),
+                        Change(path="2026/408.txt", src=None,
+                               basefile="2026:408",
+                               title="Vapenlag (2026:408)",
+                               cutoff="2026:408", add=True,
+                               body_hash="1" * 64)],
+               deletes=[("1996/67.txt", "1996:67", "2026:408")])
+    msg = message(ev, _meta)
+    assert ("SFS 1987:10: Plan- och bygglag (1987:10) -- ändrad t.o.m. "
+            "SFS 1992:1769, omtryckt") in msg
+    assert "SFS 2026:408: Vapenlag (2026:408)" in msg
+    assert "  ersätter SFS 1996:67" in msg
+    assert "SFS 1996:67: upphävd genom SFS 2026:408" in msg
+
+
+def _order_event(key, prop, *changes):
+    return Event(key=key, prop=prop, ikraft="2020-01-01",
+                 changes=[_change(path, cutoff) for path, cutoff in changes])
+
+
+def test_conflicting_propositions_are_ungrouped_per_sfs_number():
+    # prop A amends 1985:1100 before prop B does and 1994:741 after it, so
+    # neither commit can precede the other. One commit per proposition cannot
+    # express that; the per-SFS-number key -- the key an amendment with no
+    # known proposition already takes -- can.
+    a = _order_event("Prop. 2005/06:148", "Prop. 2005/06:148",
+                     ("1985/1100.txt", "2006:1"), ("1994/741.txt", "2006:9"))
+    b = _order_event("Prop. 2006/07:1", "Prop. 2006/07:1",
+                     ("1985/1100.txt", "2006:5"), ("1994/741.txt", "2006:3"))
+    events, gaps = {a.key: a, b.key: b}, []
+    assert cycle_members([a, b]) == {0, 1}
+
+    out = resolve_order_conflicts(events, {}, gaps)
+    assert sorted(out) == ["SFS 2006:1", "SFS 2006:3",
+                           "SFS 2006:5", "SFS 2006:9"]
+    # the proposition is attribution, not grouping: each part keeps it
+    assert out["SFS 2006:1"].prop == "Prop. 2005/06:148"
+    assert [g["kind"] for g in gaps] == ["order", "order"]
+    assert not cycle_members(list(out.values()))
+
+
+def test_ungrouping_stops_at_a_single_amending_act():
+    # `ungroup` keeps each part's proposition, so a "has no proposition" guard
+    # never fires on a part and the loop re-ungroups it into the identical
+    # single key forever. Refinability is about the grouping, not the
+    # attribution: an event carrying one amending act is already as fine as it
+    # gets, and a cycle of nothing but those has to raise.
+    part = _order_event("SFS 2006:1", "Prop. 2005/06:148",
+                        ("1985/1100.txt", "2006:1"))
+    assert not refinable(part)
+    assert refinable(_order_event("Prop. X", "Prop. X",
+                                  ("a.txt", "2006:1"), ("b.txt", "2006:2")))
+    assert list(ungroup(part, {})) == ["SFS 2006:1"]
+
+
+def test_an_unresolvable_cycle_raises_rather_than_ungrouping_forever():
+    # a repeal that outranks a later amendment of the same statute: neither
+    # event groups more than one amending act, so there is nothing left to
+    # refine and the corpus itself disagrees about the order. This is the
+    # branch that makes the loop's termination argument sound.
+    a = Event(key="SFS 2006:1", ikraft="2020-01-01",
+              changes=[_change("1994/741.txt", "2006:1")],
+              deletes=[("1985/1100.txt", "1985:1100", "2006:1")])
+    b = Event(key="SFS 2006:5", ikraft="2020-01-01",
+              changes=[_change("1985/1100.txt", "2006:5"),
+                       _change("1994/741.txt", "2006:5")])
+    assert not refinable(a) and not refinable(b)
+    with pytest.raises(ValueError, match="cycle"):
+        resolve_order_conflicts({a.key: a, b.key: b}, {}, [])
+
+
+def test_an_unusable_archived_consolidation_is_a_gap_not_incompleteness(
+        export_corpus):
+    # the archive is already known to be incomplete, so a snapshot it cannot
+    # read is a gap the export reports and works around; the amendments it
+    # would have separated are named as folded in the next commit. Only an
+    # unreadable *current* download refuses the corpus.
+    basefile, repo = "1999:175", export_corpus / "repo"
+    _write_current(basefile, "2003:1", "1 § Nu gällande lydelse.")
+    _write_archive(basefile, "2001:1", "1 § Äldre lydelse.")
+    # an archived snapshot holding another act's text
+    path = layout.sfs_archive_version_download(layout.SFS_DOWNLOADED,
+                                               basefile, "2002:1")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(_source("1998:204", "2002:1", "1 § Fel akt.")),
+                    encoding="utf-8")
+    _write_artifact(basefile, ("2001:1", None), ("2002:1", None),
+                    ("2003:1", "Prop. 2020/21:194"))
+
+    events, skipped, gaps = collect([basefile])
+    assert skipped == []
+    assert [(g["kind"], g["error"]) for g in gaps] == [
+        ("archive", "archived consolidation holds SFS 1998:204")]
+    # the dropped snapshot's amendment is named as folded, not lost
+    assert any("2002:1" in change.folded
+               for event in events.values() for change in event.changes)
+    assert export([basefile], repo, forarbete_meta=_meta) == 2
+
+
+def test_an_unreadable_current_download_still_refuses_the_corpus(export_corpus):
+    basefile, repo = "1999:175", export_corpus / "repo"
+    layout.sfs_source(basefile).parent.mkdir(parents=True, exist_ok=True)
+    layout.sfs_source(basefile).write_text(
+        json.dumps(_source(basefile, "2001:1", None)), encoding="utf-8")
+    _write_artifact(basefile, ("2001:1", None))
+
+    with pytest.raises(ValueError, match="current download"):
+        export([basefile], repo, forarbete_meta=_meta)
+    assert not repo.exists()
+
+
+def test_misfiled_archive_snapshot_is_read_off_its_own_rubrik():
+    # 20 archived consolidations hold another act's text, in one shifted chain
+    # an old import left behind. Nothing but the snapshot's own Rubrik says so.
+    assert misfiled_as({"Rubrik": "Förordning (1998:1473) om "
+                        "miljöskadeförsäkring"}, "1982:798") == "1998:1473"
+    assert misfiled_as({"Rubrik": "Förordning (1982:798) om kompensation"},
+                       "1982:798") is None
+    assert misfiled_as({}, "1982:798") is None
+
+
 def _change(path, cutoff):
     return Change(path=path, src=None, basefile=path[:-4].replace("/", ":"),
                   title="Testlag", cutoff=cutoff)
@@ -194,10 +333,10 @@ SFS 1999:175: Testlag (1999:175)
 
 Författardatum är ikraftträdandedatum (utfärdandedatum saknas i registret).
 
-Lagen-History-Format: 2
+Lagen-History-Format: 3
 Lagen-Scope: full
 Lagen-Event: SFS 1999:175
-Lagen-Transition: {"basefile":"1999:175","body":"3ac7bd549a70b015cb19de21fb124eeb12339f5e2bc98e6fcfdcc4baef3ededc","cutoff":"1999:175","event":"SFS 1999:175","id":"write:1999:175@1999:175","metadata":"8a7677bb17b09ab9e4fb68ca59133909866ddaf4ee5579e59b669c27a2f24ca4","op":"write"}
+Lagen-Transition: {"basefile":"1999:175","body":"3ac7bd549a70b015cb19de21fb124eeb12339f5e2bc98e6fcfdcc4baef3ededc","cutoff":"1999:175","event":"SFS 1999:175","id":"write:1999:175@1999:175","metadata":"f56ae4b17cf92c441a5a37901905316007557e2426439826ca53a98ec771e9ed","op":"write"}
 
 M 644 inline 1999/175.txt
 data 26
@@ -211,10 +350,10 @@ SFS 2001:9: Testlag (1999:175)
 
 SFS 1999:175: Testlag (1999:175) -- ändrad t.o.m. SFS 2001:9
 
-Lagen-History-Format: 2
+Lagen-History-Format: 3
 Lagen-Scope: full
 Lagen-Event: SFS 2001:9
-Lagen-Transition: {"basefile":"1999:175","body":"91b338fb696624b474f8a79b73cb529b5b668b7412a453310d9fe62e71890087","cutoff":"2001:9","event":"SFS 2001:9","id":"write:1999:175@2001:9","metadata":"64ca7aa14045074955960f85ac241bdd8a45134b21ad8384f0840da06c64556f","op":"write"}
+Lagen-Transition: {"basefile":"1999:175","body":"91b338fb696624b474f8a79b73cb529b5b668b7412a453310d9fe62e71890087","cutoff":"2001:9","event":"SFS 2001:9","id":"write:1999:175@2001:9","metadata":"2e5b5782b147647a31d600a98ee9576894953d315c798de184bcaa41d347e538","op":"write"}
 
 M 644 inline 1999/175.txt
 data 22
@@ -230,7 +369,7 @@ SFS 1999:175: upphävd genom SFS 2005:100
 
 Författardatum är ikraftträdandedatum (utfärdandedatum saknas i registret).
 
-Lagen-History-Format: 2
+Lagen-History-Format: 3
 Lagen-Scope: full
 Lagen-Event: SFS 2005:100
 Lagen-Transition: {"basefile":"1999:175","body":null,"cutoff":"2005:100","event":"SFS 2005:100","id":"delete:1999:175@2005:100","metadata":"4d4ef825ea307a82a4e0886ec3d7ce81ff76a2954bdaf3b294648e0e191ef3a6","op":"delete"}
@@ -320,6 +459,24 @@ def _write_artifact(basefile, *amendments):
     path.write_text(json.dumps({"metadata": {"properties": {
                         "dcterms:title": "Testlag (%s)" % basefile}},
                         "amendments": entries}), encoding="utf-8")
+
+
+def test_export_passes_over_an_empty_artifact_placeholder(export_corpus):
+    # a zero-byte artifact is the parse's SkipDocument placeholder: the act is
+    # in the register but carries no forfattningstext (repealed long ago, or
+    # withdrawn before entering force). Reading it as JSON aborted the whole
+    # export with a JSONDecodeError; it has no body to export and is not an
+    # incomplete input either, so the statute is simply not in the repository.
+    empty, live, repo = "1942:937", "1999:175", export_corpus / "repo"
+    _write_current(empty, "1942:937", "1 § Text.")
+    path = layout.artifact("sfs", empty)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    _write_current(live, "2001:1", "1 § Text.")
+    _write_artifact(live, ("2001:1", "Prop. 2020/21:194"))
+
+    assert export([empty, live], repo, forarbete_meta=_meta) == 1
+    assert _git(repo, "ls-files") == "1999/175.txt"
 
 
 def test_export_requires_every_selected_artifact(export_corpus):

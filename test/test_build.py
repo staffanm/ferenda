@@ -1460,3 +1460,26 @@ def test_catalog_falls_back_to_the_configured_root_when_the_recorded_one_is_gone
     assert catalog.load_artifact(catalog.data_root(con), stored)["title"].startswith(
         "Testlag")
     con.close()
+
+
+def test_forarbete_meta_reads_a_prop_and_passes_over_a_placeholder(
+        tmp_path, monkeypatch):
+    # the prop/rskr metadata the sfs history-as-git export mines. A zero-byte
+    # artifact is the parse's SkipDocument placeholder (the budget
+    # propositions, prop 1 and prop 100); reading it as JSON aborted the export
+    # with a JSONDecodeError, where "not in the corpus" is the right answer.
+    monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
+    real = tmp_path / "forarbete" / "prop" / "2020" / "2020-21-194.json"
+    real.parent.mkdir(parents=True)
+    real.write_text(json.dumps({"title": "Ett starkare skydd", "structure": [
+        {"type": "signatur", "text": ["Stefan Löfven"]},
+        {"type": "avsnitt", "text": ["Propositionens huvudsakliga innehåll"],
+         "children": [{"type": "stycke", "text": ["För att stärka skyddet."]}]},
+    ]}), encoding="utf-8")
+    (real.parent / "2020-21-1.json").write_bytes(b"")
+
+    meta = build._forarbete_meta("Prop. 2020/21:194")
+    assert meta["signers"] == ["Stefan Löfven"]
+    assert meta["ingress"] == "För att stärka skyddet."
+    assert build._forarbete_meta("Prop. 2020/21:1") is None
+    assert build._forarbete_meta("Prop. 2020/21:999") is None
