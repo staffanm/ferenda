@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """One-time converter: the lagen.nu MediaWiki SQLite DB -> a git-backed markdown
-content repo (PRD step 1, `docs/prd-wiki-markdown-and-guidance.md`).
+content repo.
 
 It replays the wiki's **full per-revision history** as one git commit per
 revision, in global chronological order, so `git log`/`git blame` mirror the

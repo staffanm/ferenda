@@ -29,7 +29,7 @@ Run ``uv run lagen --help`` for the pipeline command line.
 Documentation
 -------------
 
-* `Developer setup and module map <ferenda/README.md>`_
+* `Development guide <docs/developing/README.md>`_
 * `Documentation index <docs/README.md>`_
 * `Development guide <docs/developing/README.md>`_
 * `Operations guide <docs/operating/README.md>`_

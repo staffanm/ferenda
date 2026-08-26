@@ -286,11 +286,13 @@ contract, not the hook's.
 
 ### rule:docs-follow-structure
 
-A change that alters architecture, module layout, or a vertical's status
-updates `ferenda/README.md` in the same change. A change to public or
-operator behaviour also updates the applicable audience guide under
-`docs/`. The `docs-sync` agent checks these documents. Bug fixes and
-internal refactors do not qualify.
+A change that alters module layout or a vertical's status updates
+`docs/developing/source-map.md` in the same change. A change to the layer
+rules or the source-and-stage model updates
+`docs/developing/architecture.md`. A change to public or operator behaviour
+updates the applicable guide under `docs/operating/` or `docs/api/`. The
+`docs-sync` agent checks these documents. Bug fixes and internal refactors
+do not qualify.
 
 ### rule:commit-shape
 

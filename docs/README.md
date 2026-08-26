@@ -14,6 +14,7 @@ not here — they are published at `/om/<slug>` and edited as wiki markdown.
 
 Reference documents:
 
-- [`../ferenda/README.md`](../ferenda/README.md) — developer setup and module map.
+- [`developing/source-map.md`](developing/source-map.md) — every module in the package and what it owns.
 - [`conventions.md`](conventions.md) — the citable coding-rule catalog.
+- [`prd-stats.md`](prd-stats.md) — the corpus-measurement catalog for the `stats` source, with the unmet measurements marked.
 - [`local-llm.md`](local-llm.md) — running a local vision/reasoning model (Qwen3.6 on llama.cpp) for the `ai-*` passes.

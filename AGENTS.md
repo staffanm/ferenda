@@ -18,8 +18,10 @@ Implemented verticals include **SFS** (statutes), **DV** (court decisions),
   **remisser** (consultation responses), and **wiki**
   (begrepp/definitions).
 
-Read [`ferenda/README.md`](ferenda/README.md) for pipeline commands and the
-module map. Keep it current when architecture or source status changes.
+Read [`docs/developing/README.md`](docs/developing/README.md) for the layer
+rules and the module map, and
+[`docs/operating/README.md`](docs/operating/README.md) for the pipeline
+commands. Keep them current when architecture or source status changes.
 
 ## Architecture
 

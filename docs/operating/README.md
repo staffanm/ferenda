@@ -3,7 +3,18 @@
 How to go from a fresh checkout to a running `lagen all serve`. This is the
 operator's guide: prerequisites, services, `config.yml`, the build pipeline,
 and deployment. For the architecture and module map, read
-[`../../ferenda/README.md`](../../ferenda/README.md).
+[`../developing/README.md`](../developing/README.md).
+
+## The rest of this guide
+
+| Document | Covers |
+|---|---|
+| [`pipelines.md`](pipelines.md) | the per-source command reference |
+| [`data-layout.md`](data-layout.md) | what lives under `site/data/` |
+| [`operations.md`](operations.md) | the run ledger, the error stores, the `/ops` dashboard |
+| [`editing.md`](editing.md) | the inline editor and the crop review UI |
+| [`patches.md`](patches.md) | correcting and redacting source material |
+| [`skvfs-harvest.md`](skvfs-harvest.md) | the SKVFS/MTFS bot-wall and its browser transport |
 
 ## 1. Prerequisites
 
@@ -16,6 +27,8 @@ and deployment. For the architecture and module map, read
 | **A JVM (OpenJDK 21) + POI jars** | reads binary `.doc`/`.docx` via Apache POI | DV Word inputs only |
 | **tesseract (+ swe), ocrmypdf** | OCR of scanned PDFs | forarbete re-OCR sidecars (optional) |
 | **git** | the wiki/site content repo is git-backed; the inline editor commits to it | wiki/site parse, inline editing |
+| **antiword** | reads the Word 6/95 binaries POI refuses | förarbete `.doc` bodies |
+| **Xvfb** | private framebuffer for the headful-Chrome transport | SKVFS/MTFS download on a headless host |
 
 Everything except the DV Word path is pure Python. SFS, the citation engine,
 the DV API path, search and the web service need no Java.
@@ -268,7 +281,7 @@ runbook, including the sampling keys it wants and the measured limits, is
 
 The full per-source command reference (every source's exact arguments and
 actions) is in
-[`../../ferenda/README.md`](../../ferenda/README.md#running-the-pipelines).
+[`pipelines.md`](pipelines.md).
 
 Status and instrumentation:
 
@@ -278,6 +291,9 @@ lagen all runs [N]        # recent runs from the ledger
 ```
 
 ## 6. Operations
+
+The detail — the fingerprint gates, the serving-side error ledger, every
+`/ops` route — is in [`operations.md`](operations.md).
 
 `lib/runlog.py` writes three state files under `DATA/.build/`, consumed by the
 `/ops` dashboard:

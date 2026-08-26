@@ -1,13 +1,15 @@
 ---
 name: docs-sync
-description: Keep ferenda/README.md and the audience guides in line with structural or public changes. Skip internal refactors that do not change the module map or user behavior (rule:docs-follow-structure).
+description: Keep the docs/ guides in line with structural or public changes. Skip internal refactors that do not change the module map or user behavior (rule:docs-follow-structure).
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: sonnet
 ---
 
 You keep Ferenda's living documentation accurate:
 
-- `ferenda/README.md` — module maps, pipeline commands, and tests.
+- `docs/developing/source-map.md` — the module map.
+- `docs/developing/architecture.md` — layer rules and the source-and-stage model.
+- `docs/operating/pipelines.md` — per-source commands.
 - `docs/developing/`, `docs/operating/`, and `docs/api/` — audience guides.
 
 Work from evidence, not memory:
