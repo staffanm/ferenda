@@ -59,7 +59,11 @@
   function hitFields(r) {
     var pin = r.pin;
     var url = r.url || '#';
-    var title = r.display || r.title || r.identifier || r.uri;
+    // a pinned hit spends its second line on the provision, so the first is
+    // the shortest name the reader still recognises: "EKMR", where the display
+    // heading ("Convention for the Protection of Human Rights and Fundamental
+    // Freedoms") fills the row and says nothing the pin does not
+    var title = (pin && r.abbr) || r.display || r.title || r.identifier || r.uri;
     // a citation-resolved hit leads with the provision it landed on -- the
     // reader asked for "4 kap. 4 § brottsbalken", so "Brottsbalk (1962:700)"
     // alone gave no sign the pin had worked (Q2)

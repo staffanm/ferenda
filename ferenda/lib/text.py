@@ -228,6 +228,12 @@ def fragment_ids(art):
 # reader cites.
 HEADING_TYPES = frozenset({"avsnitt", "sektion", "rubrik", "heading"})
 
+# The same question asked for a *resolved pinpoint*, where `artikel`/`article`
+# do belong: there the pinpoint stands on the row already ("artikel 6"), and the
+# heading is the only thing that says what the article is about -- "Article 6 –
+# Right to a fair trial" rather than a number the reader still has to look up.
+PROVISION_HEADING_TYPES = HEADING_TYPES | {"artikel", "article"}
+
 
 def fragment_texts_and_headings(art):
     """``(fragment-uri, full text, own heading)`` for every id-bearing node in
@@ -256,6 +262,19 @@ def fragment_node(art, frag):
     subtree (rule:second-use-goes-to-lib)."""
     return next((node for node in _body_id_nodes(art)
                  if node["id"] == frag), None)
+
+
+def provision_heading(art, frag):
+    """The heading one id-bearing node prints over itself ("Right to a fair
+    trial", "8.5.1 Samspelet mellan …"), or '' when its type prints none.
+
+    A treaty article writes its own designation into that heading ("Article 6 –
+    Right to a fair trial") where an EU act keeps designation and rubric apart
+    (eurlex/parse_html._emit_structural_row), so the caller composing a name for
+    the provision has to allow for both."""
+    node = fragment_node(art, frag)
+    return (runs_text(node.get("text") or []).strip()
+            if node and node.get("type") in PROVISION_HEADING_TYPES else "")
 
 
 def anchor_text(art, frag):

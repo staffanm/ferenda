@@ -12,8 +12,10 @@ filter, and the document's own label/title/inbound_count are attached so a
 pinned hit ranks and renders like any other search hit.
 """
 
+import re
+
 from . import catalog, layout, resolve, text
-from .pinpoint import pinpoint_label
+from .pinpoint import acronym, pinpoint_label
 
 # how much of the resolved provision's own text to carry as the hit's snippet --
 # enough to recognise the rule, short enough to sit on two lines in the palette
@@ -38,7 +40,7 @@ def resolved_results(con, q, source=None, kind=None):
                 root = row[0]
         if not row:
             continue
-        _uri, src, kind_, label, title, _path, _descriptive = row
+        _uri, src, kind_, label, title, _path, descriptive = row
         if kind and kind_ != kind:
             continue
         # the same reader-facing heading the page and full-text hits show (short
@@ -48,6 +50,11 @@ def resolved_results(con, q, source=None, kind=None):
         out.append({
             "uri": root, "url": layout.page_url(root),
             "identifier": label, "title": title, "display": display,
+            # the acronym is the whole name line for a hit that spends its
+            # second line on the pinpoint: "EKMR", where the display heading
+            # ("Convention for the Protection of Human Rights and Fundamental
+            # Freedoms") would fill the row and say nothing the pin does not
+            "abbr": acronym(display) or acronym(descriptive) or None,
             "source": src, "kind": kind_,
             "score": None, "inbound_count": catalog.document_inbound_count(con, root),
             "highlight": [],
@@ -62,26 +69,48 @@ def resolved_results(con, q, source=None, kind=None):
             # `fragments`, and the client could not tell a resolved provision
             # from a place the words happened to occur -- so "dataförordningen"
             # linked into article 47 of the EU Data Act.
-            "pin": ({"uri": root + "#" + frag, "pinpoint": frag,
-                     "label": pinpoint_label(frag),
-                     "highlight": _provision_text(con, _path, frag)}
-                    if frag else None),
+            "pin": _pin(con, _path, root, frag) if frag else None,
             "fragments": [],
         })
     return out
 
 
-def _provision_text(con, path, frag):
-    """`[the provision's own text]` for a resolved pinpoint, or `[]` when the
-    document's presented body has no node with that id. One artifact read per
-    citation-shaped query -- there is at most one pinned hit, and it is the
-    query's answer."""
-    body = text.anchor_text(
-        catalog.load_artifact(catalog.data_root(con), path), frag)
-    if not body:
-        return []
-    return [body[:SNIPPET_CHARS].rstrip() + "…" if len(body) > SNIPPET_CHARS
-            else body]
+# an article heading that opens with the article's own designation, as a treaty
+# article's does ("Article 6 - Right to a fair trial") where an EU act keeps the
+# two apart ("Säkerhet i samband med behandlingen" under "Artikel 32")
+_DESIGNATION = re.compile(r"(?:article|artikel|art\.)\s*\d", re.I)
+
+
+def _pin_label(frag, heading):
+    """What names the resolved provision: the pinpoint as a reader cites it
+    ("4 kap. 5 §", "artikel 32"), and the heading the document prints over it
+    where there is one -- "artikel 32 - Säkerhet i samband med behandlingen",
+    which says what the article is about where the bare number does not.
+
+    A heading that already opens with its own designation stands alone: "artikel
+    6 - Article 6 - Right to a fair trial" says the number twice. An anchor with
+    no citation grammar (a förarbete's "sec745") is named by its heading only."""
+    label = pinpoint_label(frag)
+    if not heading:
+        return label
+    if not label or _DESIGNATION.match(heading):
+        return heading
+    return "%s - %s" % (label, heading)
+
+
+def _pin(con, path, root, frag):
+    """The resolved provision as a Fragment: where it is, what it is called, and
+    its own words -- `[]` for a fragment the presented body publishes no anchor
+    for. One artifact read per citation-shaped query -- there is at most one
+    pinned hit, and it is the query's answer."""
+    art = catalog.load_artifact(catalog.data_root(con), path)
+    body = text.anchor_text(art, frag)
+    return {
+        "uri": root + "#" + frag, "pinpoint": frag,
+        "label": _pin_label(frag, text.provision_heading(art, frag)),
+        "highlight": ([body[:SNIPPET_CHARS].rstrip() + "…"
+                       if len(body) > SNIPPET_CHARS else body] if body else []),
+    }
 
 
 def merge_pinned(pinned, results, total, limit):

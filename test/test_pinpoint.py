@@ -2,6 +2,7 @@
 reader-facing label both the graph explorer and the search pins print."""
 
 from ferenda.lib.pinpoint import (
+    acronym,
     citation,
     citation_label,
     human_fragment,
@@ -65,6 +66,17 @@ def test_short_name_reads_back_the_acronym_a_label_was_composed_with():
     assert short_name("lag om ändring i brottsbalken (1962:700)") \
         == "lag om ändring i brottsbalken (1962:700)"
     assert short_name(None) == ""
+
+
+def test_acronym_is_empty_where_short_name_falls_back_to_the_whole_label():
+    # the two differ exactly where a hit row has to choose: an acronym can be
+    # the whole name line, a nickname cannot ("brottsbalken" is not what the
+    # row should say when it could say "Brottsbalk (1962:700)")
+    assert acronym("Europakonventionen (EKMR)") == "EKMR"
+    assert acronym("Dataskyddsförordningen (GDPR)") == "GDPR"
+    assert acronym("brottsbalken") == ""
+    assert acronym("Brottsbalk (1962:700)") == ""
+    assert acronym(None) == ""
 
 
 def test_a_citation_names_the_document_as_well_as_the_place():

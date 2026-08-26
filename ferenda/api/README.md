@@ -208,10 +208,17 @@ curl -G http://127.0.0.1:8001/api/v1/search \
 
 `url` är dokumentets publika sökväg (`layout.page_url`); lägg på
 `#<pinpoint>` för att djuplänka direkt till paragrafen. `label` namnger stället:
-pinpointen skriven som en läsare citerar den ("6 kap. 3 §", "artikel 47"), eller
-— för ankare utan hänvisningsgrammatik, som ett förarbetes `sec745` — den
-rubrik dokumentet självt sätter över avsnittet ("3.6 Sökbegrepp och
-direktåtkomst"). `null` när ankaret har ingendera (en punkt hos EDPB).
+pinpointen skriven som en läsare citerar den ("6 kap. 3 §", "artikel 47"), följd
+av den rubrik dokumentet självt sätter över den när det finns en ("artikel 32 -
+Säkerhet i samband med behandlingen") — eller enbart den rubriken, både för
+ankare utan hänvisningsgrammatik (ett förarbetes `sec745` → "3.6 Sökbegrepp och
+direktåtkomst") och när rubriken redan inleds med sin egen beteckning (en
+fördragsartikels "Article 6 - Right to a fair trial"). `null` när ankaret har
+ingendera (en punkt hos EDPB).
+
+En träff bär också `abbr`: den förkortning dokumentets rubrik eller citernamn
+har ("GDPR", "EKMR"), annars `null`. Det är namnraden för en träffrad som lägger
+sin andra rad på `pin` — visa `display` när `abbr` är `null`.
 
 > Returnerar `/api/v1/search` ett fel om OpenSearch inte är igång eller indexet
 > inte är byggt. Kör `lagen all index` och kontrollera `OPENSEARCH_URL`.

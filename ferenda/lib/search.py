@@ -39,7 +39,7 @@ from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
 from . import catalog, compress, facets, layout, malnummer, text
-from .pinpoint import pinpoint_label
+from .pinpoint import acronym, pinpoint_label
 
 INDEX = "lagen"
 # bump when emitted units change without artifact changes. 5: dropped the `all`
@@ -754,6 +754,9 @@ def parse_hit(h):
         "identifier": src.get("identifier"),
         "title": src.get("title"),
         "display": src.get("display"),
+        # the name line where a hit row has one line for the document: the
+        # acronym its display heading carries ("GDPR"), None where it has none
+        "abbr": acronym(src.get("display")) or None,
         "source": src.get("source"), "kind": src.get("kind"),
         "score": h.get("_score"), "inbound_count": src.get("inbound_count", 0),
         "highlight": hit_highlight(h),

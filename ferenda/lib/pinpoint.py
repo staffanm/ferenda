@@ -133,13 +133,23 @@ def pinpoint_label(frag):
 _ACRONYM = re.compile(r".+\s\(([A-ZÅÄÖ][A-ZÅÄÖ0-9 .-]{1,15})\)$")
 
 
+def acronym(name):
+    """The acronym a composed name carries at its end, or '' when it carries
+    none: "Europakonventionen (EKMR)" -> "EKMR"; "räntelagen" -> "".
+
+    A hit row that has one line for the document names it by this: an acronym is
+    what the reader cites and it leaves the second line to the pinpoint, where
+    the full heading would fill both."""
+    m = _ACRONYM.fullmatch(name or "")
+    return m.group(1) if m else ""
+
+
 def short_name(descriptive):
     """The shortest name for a document that a reader still recognises: the
     acronym its descriptive label ends in, or the label itself.
 
     "Europakonventionen (EKMR)" -> "EKMR"; "räntelagen" -> "räntelagen"."""
-    m = _ACRONYM.fullmatch(descriptive or "")
-    return m.group(1) if m else (descriptive or "")
+    return acronym(descriptive) or (descriptive or "")
 
 
 def citation_label(name, frag):

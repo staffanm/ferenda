@@ -163,3 +163,18 @@ def test_a_footnote_citation_reaches_the_link_graph():
 
 def test_a_footnote_reaches_the_indexed_document_text():
     assert "punkt 42" in text.document_text(FOOTNOTED)
+
+
+def test_provision_heading_reads_the_types_that_print_one():
+    art = {"uri": "https://lagen.nu/ext/coe/005", "structure": [
+        {"type": "artikel", "id": "A6", "ordinal": "6",
+         "text": ["Article 6 – Right to a fair trial"],
+         "children": [{"type": "stycke", "id": "A6S1",
+                       "text": ["In the determination of his civil rights …"]}]},
+        {"type": "paragraf", "id": "K4P5", "text": ["Den som hotar någon annan …"]}]}
+    # an article prints a heading; the pinned hit is named by it
+    assert text.provision_heading(art, "A6") == "Article 6 – Right to a fair trial"
+    # a paragraf prints none, and a stycke's own text is body text
+    assert text.provision_heading(art, "K4P5") == ""
+    assert text.provision_heading(art, "A6S1") == ""
+    assert text.provision_heading(art, "A9") == ""

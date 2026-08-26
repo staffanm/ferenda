@@ -251,10 +251,13 @@ class Fragment(BaseModel):
         "\"A32\") -- the part after the #")
     label: str | None = Field(
         None, description="what names this place: the pinpoint written the way "
-        "a reader cites it (\"4 kap. 4 §\", \"artikel 32\"), or -- where the "
-        "anchor has no citation grammar, as a förarbete's \"sec745\" has none "
-        "-- the heading the document prints over that section. Null where "
-        "there is neither.")
+        "a reader cites it (\"4 kap. 4 §\", \"artikel 32\"), followed by the "
+        "heading the document prints over it where there is one (\"artikel 32 - "
+        "Säkerhet i samband med behandlingen\") -- or that heading alone, both "
+        "where the anchor has no citation grammar (a förarbete's \"sec745\") and "
+        "where the heading already opens with its own designation (a treaty "
+        "article's \"Article 6 - Right to a fair trial\"). Null where there is "
+        "neither.")
     highlight: list[str] = Field(
         [], description="query matches in this passage, as HTML with the "
         "matched terms in <em>")
@@ -277,6 +280,11 @@ class SearchResult(BaseModel):
     display: str | None = Field(
         None, description="the reader-facing heading: the short name plus its "
         "acronym where there is one, else the title")
+    abbr: str | None = Field(
+        None, description="the acronym that heading (or the document's citing "
+        "name) carries -- \"GDPR\", \"EKMR\". The name line for a hit row that "
+        "spends its second line on `pin`, where the full heading would fill "
+        "both. Null for a document with no acronym; show `display` then.")
     source: str | None = Field(
         None, description="which corpus it comes from (sfs, dv, forarbete, …)")
     kind: str | None = Field(
