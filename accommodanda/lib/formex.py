@@ -53,6 +53,15 @@ class Block:
                                # heading carries no designation of its own.
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
     defines: str | None = None # a definitions-article point: the term it defines
+    quoted: str | None = None  # a `citat` block: the kind it had inside the
+                               # quotation -- "recital", "paragraph", "point",
+                               # "article", "heading" or "row" -- which is what
+                               # its marker's punctuation follows ("(6)", "1.",
+                               # "a)") and what the page keys its class off
+                               # (`citat-heading`). Kept as the kind rather
+                               # than as the finished marker because the
+                               # punctuation is presentational and settled by
+                               # the renderer (see `_eurlex_marker`).
 
 
 # the manifestation is remote-supplied: no DTD/entity expansion (stdlib
@@ -184,14 +193,22 @@ def formex_roots(path, source, key):
 # text extraction
 # --------------------------------------------------------------------------
 
-def flatten(elem, skip=SKIP_INLINE):
+def flatten(elem, skip=SKIP_INLINE, drop=()):
     """The element's mixed text content as one string, recursively: footnote
     subtrees dropped, inline elements spliced in place, block-level children
     space-separated, element tails kept, whitespace normalised. `skip` widens the
-    dropped set to the nested lists a caller emits as their own blocks."""
+    dropped set to the nested lists a caller emits as their own blocks.
+
+    `drop` leaves out `elem`'s children at those *indices*, for text a caller
+    emits elsewhere -- the block quotations `_lifted_quotations` finds. By
+    index rather than by element because lxml frees an element proxy as soon as
+    the last reference to it goes and builds a new one on the next pass (the
+    trap `_stycke_units` documents), and by a parameter here rather than a
+    second copy of this walk because the two would then have to be kept in step
+    by hand."""
     parts = [elem.text or ""]
-    for child in elem:
-        if child.tag in skip:
+    for i, child in enumerate(elem):
+        if i in drop or child.tag in skip:
             pass
         elif child.tag in ATOMIC:
             # the widened skip stops at an atomic region -- `_sublists` does not
@@ -622,7 +639,7 @@ def parse_judgment(root, blocks):
         parse_preamble(preamble, blocks)
     contents = root.find("CONTENTS.JUDGMENT")
     if contents is not None:
-        _parse_judgment_contents(contents, blocks)
+        _case_contents(contents, blocks)
     # the ruling normally sits inside CONTENTS.JUDGMENT, not at the root
     jurisdiction = root.find(".//JURISDICTION")
     if jurisdiction is not None:
@@ -630,27 +647,9 @@ def parse_judgment(root, blocks):
         if intro:
             blocks.append(Block("paragraph", intro))
         for np in jurisdiction.findall(".//NP"):
-            marker = _text(np, "NO.P").strip(". ") or None
-            blocks.append(Block("ruling", _text(np, "TXT", "P"), num=marker))
+            marker, text = _numbered_text(np)
+            blocks.append(Block("ruling", text, num=marker))
     return title
-
-
-def _seq_paragraphs(parent, blocks):
-    """The free-prose contents shape opinions and hearing reports share:
-    opening prose (``P``), numbered paragraphs (``NP`` = NO.P marker + TXT)
-    and section groupings (``GR.SEQ`` with a TITLE heading)."""
-    for el in parent:
-        if el.tag == "NP":
-            blocks.append(_np_paragraph(el))
-        elif el.tag == "P":
-            text = flatten(el)
-            if text:
-                blocks.append(Block("paragraph", text))
-        elif el.tag == "GR.SEQ":
-            heading = _text(el, "TITLE")
-            if heading:
-                blocks.append(Block("heading", heading, level=1))
-            _seq_paragraphs(el, blocks)
 
 
 def parse_opinion(root, blocks):
@@ -664,9 +663,8 @@ def parse_opinion(root, blocks):
     title = _text(contents.find("TITLE") if contents is not None else None, "HT") \
         or _text(root, "CURR.TITLE")
     if contents is not None:
-        for el in contents:
-            if el.tag != "TITLE":            # the opinion's own title (= doc.title)
-                _seq_paragraphs([el], blocks)
+        # a TITLE here is the opinion's own (= doc.title), not a section heading
+        _case_contents([el for el in contents if el.tag != "TITLE"], blocks)
     return title
 
 
@@ -678,43 +676,227 @@ def parse_hearing_report(root, blocks):
     title = _text(root.find("TITLE"), "TI") or _text(root, "CURR.TITLE")
     contents = root.find("CONTENTS")
     if contents is not None:
-        _seq_paragraphs(contents, blocks)
+        _case_contents(contents, blocks)
     return title
 
 
-def _np_paragraph(np):
-    """A numbered paragraph (``NP``: ``NO.P`` marker + ``TXT``) -> a paragraph
-    Block. The shape opinions always use and judgments used until ca 2012,
-    when judgments switched to ``NP.ECR`` with an IDENTIFIER attribute."""
-    marker = _text(np, "NO.P").strip(". ") or None
-    return Block("paragraph", _text(np, "TXT", "P"), num=marker)
+def _numbered_text(elem, drop=()):
+    """A case-law numbered paragraph -> (marker, text): its own ``NO.P`` marker,
+    which the block carries as `num`, and everything else it says.
+
+    The text is the whole element, not its first ``TXT`` alone. A paragraph that
+    introduces a quotation writes the lead-in as ``TXT`` and the quoted act as a
+    ``P`` beside it, so reading only the first dropped the quotation -- T-59/11
+    lost the whole of the FP6 general conditions it quotes. `_emit_list`
+    documents the same trap for a list item.
+
+    The marker comes off the front of that text rather than out of `flatten`'s
+    skip set, which works by tag name: dropping ``NO.P`` everywhere would also
+    erase the "a)", "b)" of a list the paragraph quotes.
+
+    `drop` names the children whose text is emitted elsewhere -- the block
+    quotations `_lifted_quotations` finds."""
+    no = elem.find("NO.P")
+    marker = flatten(no) if no is not None else ""
+    text = flatten(elem, drop=drop)
+    if marker and text.startswith(marker):
+        text = text[len(marker):].lstrip()
+    return marker.strip(". ") or None, text
 
 
-def _judgment_nps(el):
-    """The judgment body's own ``NP`` paragraphs, in document order. Does not
-    descend into NP/NP.ECR (an inner NP is a quoted list item of a cited act,
-    not a numbered paragraph of the judgment) nor into JURISDICTION (the
-    ruling, which parse_judgment reads separately)."""
+def _lifted_quotations(np):
+    """The quotations a case-law numbered paragraph introduces, as `(indices of
+    the children to leave out of the paragraph's own text, the ``QUOT.S``
+    elements)`.
+
+    A quotation counts as its own block when it is a direct child of the
+    paragraph or the whole of a direct ``P`` child -- 201 732 of the 205 212
+    inside a numbered paragraph. The rest sit *in* a sentence (inside the
+    lead-in ``TXT``, or beside prose in a ``P``); those are part of what the
+    paragraph says and stay in its text."""
+    drop, quotations = set(), []
+    for i, child in enumerate(np):
+        if child.tag == "QUOT.S":
+            quotation = child
+        elif (child.tag == "P" and len(child) == 1 and child[0].tag == "QUOT.S"
+              and not (child.text or "").strip()
+              and not (child[0].tail or "").strip()):
+            quotation = child[0]
+        else:
+            continue
+        drop.add(i)
+        quotations.append(quotation)
+    return drop, quotations
+
+
+def _numbered_paragraph(el, blocks, marker=None):
+    """A case-law numbered paragraph -> the judgment's (or opinion's) own block,
+    followed by the quotations it introduces. `marker` overrides the element's
+    own ``NO.P`` -- ``NP.ECR`` carries its number in an attribute instead.
+
+    The paragraph is emitted even when it says nothing of its own beyond the
+    quotation, because its number is what the judgment is cited by."""
+    drop, quotations = _lifted_quotations(el)
+    own, text = _numbered_text(el, drop)
+    blocks.append(Block("paragraph", text, num=marker or own))
+    for quotation in quotations:
+        parse_quotation(quotation, blocks)
+
+
+# a quotation's blocks are all retyped to this one kind. The text of *another*
+# act reproduced inside a judgment paragraph is not part of the judgment's own
+# outline, and a block that kept its act kind would be read as one: `nest` would
+# open an article context on a quoted `article` and hang every judgment
+# paragraph after it inside that article, and the anchor grammar would mint
+# sub-article ids for text this document does not contain.
+QUOTATION = "citat"
+
+
+def _quoted_unit(el, blocks):
+    """The children of one element of a quoted act, through the act's own
+    emitters -- a quotation holds exactly the shapes an act holds."""
     for child in el:
-        if child.tag == "NP":
-            yield child
-        elif child.tag not in ("NP.ECR", "JURISDICTION"):
-            yield from _judgment_nps(child)
+        tag = child.tag
+        if tag == "ARTICLE":
+            # the designation and title, then the article's own paragraphs
+            # through the quotation's emitter. `parse_article` cannot be reused
+            # here: it numbers stycken, and "2."/"3." are ordinals the quoted
+            # act never prints -- invented numbering attributed to another
+            # document, which is exactly what the retype exists to prevent
+            blocks.append(Block("article", _text(child, "STI.ART"),
+                                label=_text(child, "TI.ART") or None))
+            for parag in child.findall("PARAG"):
+                _emit_quoted_alineas(parag.findall("ALINEA") or [parag],
+                                     _text(parag, "NO.PARAG").strip(". ")
+                                     or None, blocks)
+            if not child.findall("PARAG"):
+                _emit_quoted_alineas(child.findall("ALINEA"), None, blocks)
+        elif tag == "PARAG":
+            _emit_quoted_alineas(child.findall("ALINEA") or [child],
+                                 _text(child, "NO.PARAG").strip(". ") or None,
+                                 blocks)
+        elif tag == "CONSID":
+            # a quoted recital numbers itself "(6)" inside its own NP, the way
+            # `parse_preamble` reads it for an act: the number is the block's
+            # marker, not the opening of its text
+            np = child.find("NP")
+            if np is None:
+                _emit_quoted_alineas([child], None, blocks)
+            else:
+                marker, text = _numbered_text(np)
+                blocks.append(Block("recital", text,
+                                    num=(marker or "").strip("()") or None))
+        elif tag in ("ALINEA", "P", "TXT"):
+            _emit_quoted_alineas([child], None, blocks)
+        elif tag == "NP":
+            marker, text = _numbered_text(child)
+            blocks.append(Block("paragraph", text, num=marker))
+        elif tag == "LIST":
+            _emit_list(child, blocks)
+        elif tag == "DLIST":
+            _emit_dlist(child, blocks)
+        elif tag == "TBL":
+            _emit_table(child, blocks)
+        elif tag in ("TITLE", "TI", "STI"):
+            text = flatten(child)
+            if text:
+                blocks.append(Block("heading", text, level=1))
+        elif tag in ("NOTE", "GR.NOTES", "BIB.INSTANCE"):
+            pass
+        else:                     # GR.SEQ, DIVISION, GR.CONSID, a nested QUOT.S
+            _quoted_unit(child, blocks)
 
 
-def _parse_judgment_contents(contents, blocks):
-    for seq in contents.iter("GR.SEQ"):
-        title = _text(seq, "TITLE")
-        if title:
-            blocks.append(Block("heading", title,
-                                level=int(seq.get("LEVEL", "1"))))
-    for np in contents.findall(".//NP.ECR"):
-        marker = (np.get("IDENTIFIER") or "").lstrip("NP0") or None
-        blocks.append(Block("paragraph", _text(np, "TXT", "P"), num=marker))
-    # pre-2012 ECR Formex wraps the same paragraphs in plain NP instead;
-    # two thirds of the judgment corpus parsed to nothing without this
-    for np in _judgment_nps(contents):
-        blocks.append(_np_paragraph(np))
+def _emit_quoted_alineas(alineas, marker, blocks):
+    """The stycken of one quoted paragraph: the first carries the quoted act's
+    own marker ("1."), the rest none. A quotation reproduces the act's
+    numbering, and a stycke ordinal is an anchor -- which a quotation, being
+    another document's text, has no business minting."""
+    for i, unit in enumerate(u for alinea in alineas
+                             for u in _stycke_units(alinea)):
+        _emit_alinea(unit, marker if i == 0 else None, blocks)
+
+
+def parse_quotation(quot, blocks):
+    """A ``QUOT.S`` -- an act reproduced verbatim inside a case-law numbered
+    paragraph -- as `citat` blocks that keep the quoted act's own structure.
+
+    Schrems II (62018CJ0311) quotes three numbered paragraphs of directive
+    95/46 article 25 inside its paragraph 4. Reading only the paragraph's first
+    ``TXT``, as the parser did, published the lead-in ("I artikel 25 i detta
+    direktiv föreskrevs följande:") and nothing after it; folding the quotation
+    into the paragraph's own text instead runs all three together and loses the
+    act's "1.", "2." and "6.". Its sections 3 to 42 are almost all this shape.
+
+    Every block the act emitters produce is retyped to `QUOTATION`; a point
+    keeps its indent step as `depth`, which is all the page needs from its
+    kind, and a quoted article folds its designation into its text so no stray
+    article number is hung in the margin."""
+    inner = []
+    _quoted_unit(quot, inner)
+    for b in inner:
+        blocks.append(Block(
+            QUOTATION,
+            " ".join(x for x in (b.label, b.text) if x) if b.kind == "article"
+            else b.text,
+            num=None if b.kind == "article" else b.num,
+            level=b.level,
+            depth=b.depth or (1 if b.kind == "point" else None),
+            quoted=b.kind))
+
+
+# regions inside a case-law body that are not its running prose: the ruling
+# (parse_judgment emits it as `ruling` blocks of its own), an opinion's table of
+# contents and its keyword index, and the footnote apparatus (collect_notes
+# re-emits it as `note` blocks)
+_CASE_SKIP = {"JURISDICTION", "TOC", "INDEX", "NOTE", "GR.NOTES", "BIB.INSTANCE"}
+
+
+def _case_contents(parent, blocks, level=1):
+    """A case-law document's body -- a judgment's ``CONTENTS.JUDGMENT``, an
+    opinion's ``CONTENTS.CONCLUSION``, a hearing report's ``CONTENTS`` -- walked
+    in **document order**.
+
+    All three share one shape: ``GR.SEQ`` sections, each a ``TITLE`` heading plus
+    its contents and carrying its depth in ``LEVEL``, holding the numbered
+    paragraphs -- ``NP.ECR`` since ca 2012, plain ``NP`` before that -- and, in
+    the oldest ECR judgments, unnumbered ``P`` prose.
+
+    Reading that in three separate passes (every heading, then every NP.ECR, then
+    every NP) put the whole body after the *last* heading and dropped the bare
+    ``P`` prose altogether. Costa mot E.N.E.L. (61964CJ0006) published five empty
+    section headings and no text at all; every modern judgment hung its
+    paragraphs under "Rättegångskostnader". One walk fixes both."""
+    for el in parent:
+        tag = el.tag
+        if tag == "TITLE":
+            heading = flatten(el)
+            if heading:
+                blocks.append(Block("heading", heading, level=level))
+        elif tag == "GR.SEQ":
+            _case_contents(el, blocks, int(el.get("LEVEL") or level))
+        elif tag == "NP.ECR":
+            # the paragraph number is in the attribute ("NP0012"), not the text
+            _numbered_paragraph(
+                el, blocks, (el.get("IDENTIFIER") or "").lstrip("NP0") or None)
+        elif tag == "NP":
+            _numbered_paragraph(el, blocks)
+        elif tag in ("P", "QUOT.S"):
+            # a QUOT.S here hangs off a *section*, not off a numbered paragraph,
+            # so `parse_quotation` never sees it. Measured over 600 random swe
+            # case files: 7 of them, none holding a PARAG or an ARTICLE -- there
+            # is no act structure in one to keep, so it reads as a run of text
+            text = flatten(el)
+            if text:
+                blocks.append(Block("paragraph", text))
+        elif tag == "LIST":
+            _emit_list(el, blocks)
+        elif tag == "TBL":
+            _emit_table(el, blocks)
+        elif tag in _CASE_SKIP:
+            pass
+        else:
+            _case_contents(el, blocks, level)   # unknown wrapper: descend
 
 
 def judgment_metadata(root):

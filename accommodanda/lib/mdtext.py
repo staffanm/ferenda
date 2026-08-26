@@ -195,6 +195,18 @@ def _block(n, depth, out):
         out.append(indent + "- " + marker + body)
         _walk(children, depth, out)
         return
+    if t == "citat":                        # an act quoted inside a judgment
+        # a blockquote, keeping the quoted act's own marker and its indent, so
+        # the reader (or the model reading the MCP answer) can tell the court's
+        # words from the directive's
+        indent = "  " * (n.get("depth") or 0)
+        num = str(n.get("num") or "")
+        marker = ("(%s) " % num if n.get("quoted") == "recital"
+                  else "%s) " % num if n.get("quoted") == "point"
+                  else "%s. " % num if num else "")
+        out.append("> " + indent + marker + body)
+        _walk(children, depth, out)
+        return
     if t == "note":                         # OJ footnote, printed "(1) EUT C …"
         out.append("(%s) %s" % (n["num"], body) if n.get("num") else body)
         return

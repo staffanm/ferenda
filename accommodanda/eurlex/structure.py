@@ -31,6 +31,7 @@ from ..lib.eu_structure import ARTICLE as _ARTICLE
 from ..lib.eu_structure import PARAGRAPH as _PARAGRAPH
 from ..lib.eu_structure import POINT as _POINT
 from ..lib.eu_structure import STYCKE as _STYCKE
+from ..lib.formex import QUOTATION as _QUOTATION
 
 # block kinds that contain others (everything else is a leaf)
 _DIVISION = "heading"
@@ -75,6 +76,13 @@ def nest(blocks):
         elif t == _POINT:
             target = parag or article
             (target["children"] if target else parent()).append(dict(b))
+        elif t == _QUOTATION:
+            # an act quoted verbatim belongs to the paragraph that introduces
+            # it ("I artikel 25 i detta direktiv föreskrevs följande:"), so it
+            # hangs off that paragraph rather than off the section around it.
+            # It opens nothing: the paragraph stays current, and the quoted
+            # act's own points are already inside the quotation's own blocks
+            (parag["children"] if parag else parent()).append(dict(b))
         else:
             parent().append(dict(b))
             if t in _CLOSERS:

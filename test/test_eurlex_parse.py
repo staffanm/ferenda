@@ -677,13 +677,218 @@ def test_parse_old_judgment_np_paragraphs_and_nested_ruling():
     assert ("heading", None, "Dom") in seen
     assert ("paragraph", "1", "Högsta förvaltningsdomstolen har ställt tre frågor"
             " om tolkningen av artikel 36.1 i rådets direktiv 92/50/EEG.") in seen
+    # the paragraph keeps its own lead-in, and the act it quotes in the P
+    # beside it becomes a `citat` block keeping that act's own marker
     assert ("paragraph", "3",
             "I artikel 1 i direktiv 92/50 föreskrivs följande:") in seen
-    # a quoted act's own list items (NP inside NP) are not judgment paragraphs
-    assert not any(b.num == "a)" for b in doc.body)
+    assert ("citat", "a", "offentliga tjänsteavtal: skriftliga avtal med "
+            "ekonomiska villkor") in seen
+    # a quoted act's own list items are not judgment paragraphs
+    assert not any(b.kind == "paragraph" and b.num == "a" for b in doc.body)
     # the ruling is found even though JURISDICTION sits inside CONTENTS.JUDGMENT
     assert ("ruling", "1)",
             "Artikel 36.1 a i direktiv 92/50/EEG skall tolkas så.") in seen
+
+
+# trimmed from the real C-311/18 (Schrems II) swe.fmx4: a numbered paragraph
+# that introduces a verbatim quotation of another act, which is the shape of
+# almost every one of its sections 3 to 42
+QUOTING_JUDGMENT_XML = """<JUDGMENT>
+  <BIB.JUDGMENT><NO.CELEX>62018J0311</NO.CELEX></BIB.JUDGMENT>
+  <CURR.TITLE><LEFT>DOM AV DEN <DATE ISO="20200716">16.7.2020</DATE></LEFT></CURR.TITLE>
+  <TITLE><TI><P>Domstolens dom</P></TI></TITLE>
+  <INTERMEDIATE><KEYWORD>Direktiv 2002/58/EG</KEYWORD></INTERMEDIATE>
+  <CONTENTS.JUDGMENT>
+    <GR.SEQ LEVEL="1"><TITLE><TI><P>Dom</P></TI></TITLE>
+      <NP.ECR IDENTIFIER="NP0001"><NO.P>1</NO.P>
+        <TXT>Begäran avser tolkningen av artikel 3.2 och artikel 28.3 i
+        direktiv 95/46/EG.</TXT></NP.ECR>
+      <NP.ECR IDENTIFIER="NP0004"><NO.P>4</NO.P>
+        <TXT>I artikel 25 i direktiv 95/46/EG föreskrevs följande:</TXT>
+        <P><QUOT.S LEVEL="1">
+          <PARAG IDENTIFIER="025.001"><NO.PARAG>1.</NO.PARAG>
+            <ALINEA>Medlemsstaterna skall föreskriva att överföringen får ske
+            om ifrågavarande tredje land säkerställer en adekvat
+            skyddsnivå.</ALINEA></PARAG>
+          <PARAG IDENTIFIER="025.002"><NO.PARAG>2.</NO.PARAG>
+            <ALINEA>Bedömningen skall ske på grundval av alla de
+            förhållanden som har samband med en överföring.</ALINEA>
+            <ALINEA>Hänsyn skall särskilt tas till artikel 31.2.</ALINEA></PARAG>
+          <ALINEA><P>Detta direktiv gäller inte för</P>
+            <LIST TYPE="alpha"><ITEM><NP><NO.P>a)</NO.P>
+              <TXT>verksamhet som inte omfattas av gemenskapsrätten</TXT>
+            </NP></ITEM></LIST></ALINEA>
+        </QUOT.S></P>
+      </NP.ECR>
+    </GR.SEQ>
+  </CONTENTS.JUDGMENT>
+</JUDGMENT>"""
+
+
+def test_quoted_act_keeps_its_own_structure_and_numbering():
+    # the parser published the lead-in ("I artikel 25 ... föreskrevs följande:")
+    # and nothing after it, because it read only the paragraph's first TXT.
+    # Folding the quotation into the paragraph instead runs the quoted act's
+    # numbered paragraphs together and loses its "1." and "2.".
+    doc = parse_formex(ET.fromstring(QUOTING_JUDGMENT_XML), "62018CJ0311", "swe")
+    assert [(b.kind, b.num, b.depth, b.quoted, b.text[:34]) for b in doc.body] == [
+        ("keyword", None, None, None, "Direktiv 2002/58/EG"),
+        ("heading", None, None, None, "Dom"),
+        ("paragraph", "1", None, None, "Begäran avser tolkningen av artike"),
+        ("paragraph", "4", None, None, "I artikel 25 i direktiv 95/46/EG f"),
+        ("citat", "1", None, "paragraph", "Medlemsstaterna skall föreskriva a"),
+        ("citat", "2", None, "paragraph", "Bedömningen skall ske på grundval "),
+        # the quoted paragraph's second sub-paragraph: the act's own marker
+        # belongs to the first, and a stycke ordinal is an anchor a quotation
+        # has no business minting
+        ("citat", None, None, "paragraph", "Hänsyn skall särskilt tas till art"),
+        ("citat", None, None, "paragraph", "Detta direktiv gäller inte för"),
+        ("citat", "a", 1, "point", "verksamhet som inte omfattas av ge"),
+    ]
+
+
+def test_quotation_hangs_off_the_paragraph_that_introduces_it():
+    art = to_artifact(parse_formex(ET.fromstring(QUOTING_JUDGMENT_XML),
+                                   "62018CJ0311", "swe"))
+    dom = next(n for n in art["structure"] if n.get("type") == "heading")
+    parag = next(c for c in dom["children"] if c.get("num") == "4")
+    assert parag["type"] == "paragraph"
+    assert [c["type"] for c in parag["children"]] == ["citat"] * 5
+
+
+QUOTED_ARTICLE_XML = """<JUDGMENT>
+  <BIB.JUDGMENT><NO.CELEX>62018J0311</NO.CELEX></BIB.JUDGMENT>
+  <CURR.TITLE><LEFT>DOM AV DEN <DATE ISO="20200716">16.7.2020</DATE></LEFT></CURR.TITLE>
+  <CONTENTS.JUDGMENT>
+    <GR.SEQ LEVEL="1"><TITLE><TI><P>Dom</P></TI></TITLE>
+      <NP.ECR IDENTIFIER="NP0011"><NO.P>11</NO.P>
+        <TXT>Artikel 23 i förordning (EU) 2016/679 lyder, i den lydelse som
+        avses i beslutet:</TXT>
+        <P><QUOT.S LEVEL="1"><ARTICLE IDENTIFIER="023">
+          <TI.ART>Artikel 23</TI.ART><STI.ART>Begränsningar</STI.ART>
+          <PARAG IDENTIFIER="023.001"><NO.PARAG>1.</NO.PARAG>
+            <ALINEA>Det ska vara möjligt att införa en
+            lagstiftningsåtgärd.</ALINEA>
+            <ALINEA>Begränsningen ska ske med respekt för rättigheterna.</ALINEA>
+          </PARAG>
+          <PARAG IDENTIFIER="023.002"><NO.PARAG>2.</NO.PARAG>
+            <ALINEA>Varje lagstiftningsåtgärd ska innehålla bestämmelser.</ALINEA>
+          </PARAG>
+        </ARTICLE></QUOT.S></P>
+      </NP.ECR>
+      <NP.ECR IDENTIFIER="NP0012"><NO.P>12</NO.P>
+        <TXT>Domstolen erinrar om att uttrycket <QUOT.S>adekvat
+        skyddsnivå</QUOT.S> ska förstås i vid mening.</TXT></NP.ECR>
+    </GR.SEQ>
+  </CONTENTS.JUDGMENT>
+</JUDGMENT>"""
+
+
+def test_a_quoted_article_keeps_the_acts_numbering_and_mints_no_ordinal():
+    # `parse_article` numbers stycken, and "2."/"3." are ordinals the quoted
+    # act never prints -- invented numbering attributed to another document
+    doc = parse_formex(ET.fromstring(QUOTED_ARTICLE_XML), "62018CJ0311", "swe")
+    quoted = [(b.num, b.quoted, b.text[:30]) for b in doc.body
+              if b.kind == "citat"]
+    assert quoted == [
+        (None, "article", "Artikel 23 Begränsningar"),
+        ("1", "paragraph", "Det ska vara möjligt att inför"),
+        (None, "paragraph", "Begränsningen ska ske med resp"),
+        ("2", "paragraph", "Varje lagstiftningsåtgärd ska "),
+    ]
+
+
+def test_a_quotation_inside_a_sentence_stays_in_the_paragraphs_text():
+    # 3 480 of the 205 212 quotations inside a numbered paragraph sit in a
+    # sentence rather than standing as their own block; lifting one out would
+    # cut the sentence in half
+    doc = parse_formex(ET.fromstring(QUOTED_ARTICLE_XML), "62018CJ0311", "swe")
+    twelve = next(b for b in doc.body if b.num == "12")
+    assert twelve.kind == "paragraph"
+    assert twelve.text == ("Domstolen erinrar om att uttrycket adekvat "
+                           "skyddsnivå ska förstås i vid mening.")
+
+
+def test_a_keyword_does_not_put_an_act_in_anaphoric_focus():
+    # a keyword is an index entry, not the judgment speaking. Schrems II's list
+    # ends on the Privacy Shield decision, and its paragraph 1 -- which names
+    # its own act only at the end of a coordination -- pinned that paragraph's
+    # leading bare articles on the decision.
+    art = to_artifact(parse_formex(ET.fromstring(QUOTING_JUDGMENT_XML),
+                                   "62018CJ0311", "swe"))
+    blocks = flatten_structure(art["structure"])
+    body = [b for b in blocks if b.get("type") != "keyword"]
+    assert not any("32002L0058" in run["uri"] for block in body
+                   for run in block.get("text", []) if isinstance(run, dict))
+    # the keyword's own phrase still links: it names the act, it just does not
+    # leave it in focus
+    assert any("32002L0058" in run["uri"] for block in blocks
+               if block.get("type") == "keyword"
+               for run in block.get("text", []) if isinstance(run, dict))
+
+
+def test_a_quotations_bare_article_pins_to_the_act_it_quotes():
+    # "Hänsyn skall särskilt tas till artikel 31.2" is directive 95/46's own
+    # article 31.2, because that is the act the paragraph introducing the
+    # quotation named -- not whatever act the judgment last happened to mention
+    art = to_artifact(parse_formex(ET.fromstring(QUOTING_JUDGMENT_XML),
+                                   "62018CJ0311", "swe"))
+    uris = [run["uri"] for block in flatten_structure(art["structure"])
+            if block.get("type") == "citat"
+            for run in block.get("text", []) if isinstance(run, dict)]
+    assert uris == ["https://lagen.nu/ext/celex/31995L0046#31.2"]
+    # ... and the quotation's own act is not left in the judgment's focus
+    # afterwards: the acts a quoted document names are its business, not the
+    # court's
+
+
+# trimmed from the real 6/64 (Costa mot E.N.E.L.) swe.fmx4: the oldest ECR
+# judgments number nothing -- their sections hold plain P prose, and the section
+# nesting is in the GR.SEQ LEVEL attribute
+COSTA_XML = """<JUDGMENT>
+  <BIB.JUDGMENT><REF.CASE FILE="ECRCJ1954SVA.0100021101.case.xml"><NO.CASE>6/64</NO.CASE></REF.CASE><NO.CELEX>61964J0006</NO.CELEX></BIB.JUDGMENT>
+  <CURR.TITLE><LEFT>DOM AV DEN <DATE ISO="19640715">15.7.1964</DATE> — MÅL 6/64</LEFT><RIGHT>COSTA MOT E. N. E. L.</RIGHT></CURR.TITLE>
+  <TITLE><TI><P>Domstolens dom</P><P>av den <DATE ISO="19640715">15 juli 1964</DATE></P></TI></TITLE>
+  <CONTENTS.JUDGMENT>
+    <GR.SEQ LEVEL="1"><TITLE><TI><P>dom</P></TI></TITLE>
+      <GR.SEQ LEVEL="2"><TITLE><TI><P>DOMSKÄL</P></TI></TITLE>
+        <P>Giudice Conciliatore i Milano har förklarat målet vilande.</P>
+        <GR.SEQ LEVEL="3"><TITLE><TI><P>Tillämpningen av artikel 177</P></TI></TITLE>
+          <GR.SEQ LEVEL="4"><TITLE><TI><P>Invändning på grund av frågans lydelse</P></TI></TITLE>
+            <P>Invändning har gjorts mot frågan.</P>
+          </GR.SEQ>
+        </GR.SEQ>
+      </GR.SEQ>
+    </GR.SEQ>
+    <JURISDICTION><INTRO><P>DOMSTOLEN förordnar följande:</P></INTRO>
+      <LIST TYPE="ARAB"><ITEM><NP><NO.P>1)</NO.P><TXT>Artikel 102 innehåller inte
+        några bestämmelser som kan ge upphov till rättigheter.</TXT></NP></ITEM></LIST>
+    </JURISDICTION>
+  </CONTENTS.JUDGMENT>
+</JUDGMENT>"""
+
+
+def test_judgment_body_keeps_document_order_and_unnumbered_prose():
+    # the contents were read in three passes -- every heading, then every
+    # NP.ECR, then every NP -- which put the whole body after the *last*
+    # heading and dropped unnumbered P prose entirely. Costa mot E.N.E.L.
+    # published five empty section headings and no text at all.
+    doc = parse_formex(ET.fromstring(COSTA_XML), "61964CJ0006", "swe")
+    assert [(b.kind, b.level, b.text) for b in doc.body] == [
+        ("heading", 1, "dom"),
+        ("heading", 2, "DOMSKÄL"),
+        ("paragraph", None, "Giudice Conciliatore i Milano har förklarat målet vilande."),
+        ("heading", 3, "Tillämpningen av artikel 177"),
+        ("heading", 4, "Invändning på grund av frågans lydelse"),
+        ("paragraph", None, "Invändning har gjorts mot frågan."),
+        ("paragraph", None, "DOMSTOLEN förordnar följande:"),
+        ("ruling", None, "Artikel 102 innehåller inte några bestämmelser som kan"
+         " ge upphov till rättigheter."),
+    ]
+    # each heading nests under the one above it, not beside it
+    tree = to_artifact(doc)["structure"]
+    assert [n["text"] for n in tree] == [["dom"]]
+    assert tree[0]["children"][0]["text"] == ["DOMSKÄL"]
 
 
 # trimmed from the real 61987CJ0031 (Beentjes) eng.fmx4: for the oldest ECR
