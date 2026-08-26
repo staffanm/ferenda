@@ -1,9 +1,0 @@
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-
-<http://example.org/base/123/c> a bibo:Standard;
-    dcterms:title "Of needles and haystacks"@en;
-    dcterms:identifier "123(C)";
-    dcterms:issued "2014-05-06"^^xsd:date;
-    dcterms:publisher <http://example.org/publisher/B> .

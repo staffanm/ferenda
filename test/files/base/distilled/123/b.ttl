@@ -1,9 +1,0 @@
-@prefix bibo: <http://purl.org/ontology/bibo/> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-
-<http://example.org/base/123/b> a bibo:Standard;
-    dcterms:title "Example 2"@en;
-    dcterms:identifier "123(B)";
-    dcterms:issued "2013-09-23"^^xsd:date;
-    dcterms:publisher <http://example.org/publisher/B> .
