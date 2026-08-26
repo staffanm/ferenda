@@ -20,7 +20,7 @@
 # to stderr, so the 2>&1 is load-bearing, and every stage must flush per line or
 # matches sit in a buffer while the screen looks idle.
 set -eu
-CONTAINER=${MCPTAIL_CONTAINER:-ferenda-accommodanda-1}
+CONTAINER=${MCPTAIL_CONTAINER:-ferenda}
 tail_n=500
 mode=done
 while [ $# -gt 0 ]; do

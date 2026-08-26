@@ -6,8 +6,8 @@
 # Prod host is ferenda.lagen.nu (= lagen.nu = 130.236.254.142, LiU/Lysator; NOT
 # the retired Hetzner `ferenda-vps`). Login is ssh as `staffan` (no root); reads
 # only, so no ownership fixup is needed here. The corpus (data_root) lives on the
-# root_squashed NFS at /mnt/forstor/accommodanda and the catalog on the fast local
-# disk at /mnt/data/accommodanda. NB: verify these paths + the on-host tree shape
+# root_squashed NFS at /mnt/forstor/ferenda and the catalog on the fast local
+# disk at /mnt/data/ferenda. NB: verify these paths + the on-host tree shape
 # against the deploy config in ~/wds/ferenda -- the merged-host layout is newer
 # than this script.
 #
@@ -27,8 +27,8 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 DEST="$REPO/site/data"
 REMOTE=staffan@lagen.nu
-REMOTE_DATA=/mnt/forstor/accommodanda     # data_root (downloaded/, artifact/, generated/, …)
-REMOTE_CATALOG=/mnt/data/accommodanda     # catalog.sqlite on the fast local disk
+REMOTE_DATA=/mnt/forstor/ferenda     # data_root (downloaded/, artifact/, generated/, …)
+REMOTE_CATALOG=/mnt/data/ferenda     # catalog.sqlite on the fast local disk
 
 mkdir -p "$DEST"
 

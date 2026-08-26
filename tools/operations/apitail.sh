@@ -22,7 +22,7 @@
 #   apitail.sh -n 5000      look this far back before following (default 1000)
 #   apitail.sh -p /api/v1/search   only paths starting with this
 set -eu
-CONTAINER=${APITAIL_CONTAINER:-ferenda-nginx-1}
+CONTAINER=${APITAIL_CONTAINER:-lagen-nginx}
 tail_n=1000
 mode=all
 prefix=/api/

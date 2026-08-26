@@ -11,7 +11,7 @@
 # Install: copy to ~/bin/keepwarm.sh on prod and add to the crontab
 #   scp tools/prod/keepwarm.sh staffan@ferenda.lagen.nu:bin/keepwarm.sh
 #   */15 * * * * /home/staffan/bin/keepwarm.sh
-# It runs from ~/bin rather than from the ~/wds/accommodanda checkout because
+# It runs from ~/bin rather than from the ~/wds/ferenda checkout because
 # CI fast-forwards that checkout: an untracked file sitting on a path an
 # incoming commit adds makes the merge refuse. Re-copy after editing here.
 #
@@ -34,7 +34,7 @@ eval "q=\${$slot}"
 
 # --max-time bounds a cold probe so a stalled one cannot overlap the next; the
 # header tells the API's Matomo tracker this is our own probe, not an audience
-# (see accommodanda/api/analytics.py `_keep_warm`).
+# (see ferenda/api/analytics.py `_keep_warm`).
 out=$(curl -sS -o /dev/null \
         -w '%{http_code} %{time_total}' \
         --max-time 120 \

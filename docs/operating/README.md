@@ -15,6 +15,7 @@ and deployment. For the architecture and module map, read
 | [`editing.md`](editing.md) | the inline editor and the crop review UI |
 | [`patches.md`](patches.md) | correcting and redacting source material |
 | [`skvfs-harvest.md`](skvfs-harvest.md) | the SKVFS/MTFS bot-wall and its browser transport |
+| [`cutover.md`](cutover.md) | moving lagen.nu from the legacy site to the rebuilt one |
 
 ## 1. Prerequisites
 
@@ -76,7 +77,7 @@ needs OpenSearch 3.7 reachable at `opensearch_url` (default
 `http://localhost:9200`). The repo ships a compose file that starts it:
 
 ```sh
-docker compose up -d          # starts the `opensearch` service (no profile → always on)
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 The rest of the pipeline (download, parse, relate, generate, serve) works
@@ -223,7 +224,7 @@ lagen all serve      # serve generated/ + the REST API on one uvicorn process
 ```sh
 uv sync                          # 1. deps (installs the `lagen` command into .venv)
 source .venv/bin/activate        #    put `lagen` on PATH for this shell
-docker compose up -d             # 2. OpenSearch
+docker compose -f docker-compose.dev.yml up -d   # 2. OpenSearch
 git clone <lagen-wiki> ../lagen-wiki   # 3. content repo (for wiki/site)
 # 4. obtain a corpus — either harvest it, or rsync a prebuilt one (§6). To harvest:
 lagen all download        #    fetch raw material (long)
@@ -327,15 +328,27 @@ host where those absolute paths are valid. Run `lagen all relate` on dev once
 
 ## 7. Production deployment (Docker)
 
-The repo-root `docker-compose.yml` defines four services selected by a Compose
-profile:
+The prod host runs one compose project that starts **both** lagen.nu sites.
+`docker-compose.yml` is that project. It is not the file to use on a
+workstation — its OpenSearch volume binds an NFS path that exists on the prod
+host only.
 
 | invocation | services | use |
 |---|---|---|
-| `docker compose up -d` | `opensearch` only | dev — run `lagen all serve` from the working tree |
-| `docker compose --profile prod up -d` | `opensearch` + `ferenda` + `nginx` + `certbot` | prod |
+| `docker compose -f docker-compose.dev.yml up -d` | `opensearch` | dev — run `lagen all serve` from the working tree |
+| `docker compose --profile prod up -d` | all nine | prod |
 
-`opensearch` carries no profile so it starts in both. The `ferenda` image
+The prod project holds two applications. `ferenda` is the rebuilt site, built
+on the box from this checkout. `ferenda-legacy` is the old application: its
+code is the `legacy` branch, checked out at `~/wds/ferenda-legacy` and
+bind-mounted in, and its image is a pre-built tag on the host. Beside them run
+`fuseki` and `mediawiki` (legacy), `matomo` and `db` (analytics), and the
+shared `nginx` and `certbot`.
+
+Which hostname reaches which application is nginx's business, and it changes at
+the September cutover — see [`cutover.md`](cutover.md).
+
+The `ferenda` image
 is built on the box from the checkout and carries the full pipeline toolchain
 (poppler, tesseract+swe, ocrmypdf, raptor2, a JRE + POI jars), so download and
 rebuild run in the container against the read-write corpus mount:
@@ -348,8 +361,7 @@ docker compose exec ferenda lagen all all       # download too, then rebuild
 One uvicorn process serves the static site + REST API (`lagen all serve`, the
 image `CMD`); the `nginx` vhost reverse-proxies to it on `:8000`. The app
 resolves lagen.nu's bare-URL grammar itself, so nginx needs no `try_files`
-rules. The merged compose on the prod host holds the certificates for both
-vhosts; the `certbot` sidecar renews them.
+rules. One SAN certificate covers both vhosts; the `certbot` sidecar renews it.
 
 **Continuous deploy + nightly sync.** Pushes to `main` trigger
 `.github/workflows/deploy.yml` on a self-hosted runner on the prod host (update

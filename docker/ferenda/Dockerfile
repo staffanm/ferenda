@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
-# accommodanda (the rebuilt lagen.nu) -- serve AND run the pipeline.
+# ferenda (the rebuilt lagen.nu) -- serve AND run the pipeline.
 #
 # One image both serves the site+API (`lagen all serve`, the CMD) and carries
 # the full download/rebuild toolchain, so maintenance runs in-container:
-#     docker compose exec accommodanda lagen all rebuild
-#     docker compose exec accommodanda lagen all index
+#     docker compose exec ferenda lagen all rebuild
+#     docker compose exec ferenda lagen all index
 # The code is baked in; the corpus (data_root, default /app/site/data) and the
 # wiki content repo (WIKI_ROOT) are read-write bind-mounts -- see
 # docker-compose.yml.

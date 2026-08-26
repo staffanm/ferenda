@@ -4,20 +4,18 @@
 # `staffan` user, in the docker group -- see docs/operating/README.md.
 #
 # The host runs ONE merged docker compose project that fronts both sites behind a
-# single nginx: the legacy lagen.nu stack AND the rebuilt accommodanda site
-# (ferenda.lagen.nu). Two on-box checkouts, distinct roles:
+# single nginx: the legacy site AND the rebuilt one. Two on-box checkouts:
 #
-#   ~/wds/accommodanda  the modernization code + build context for the
-#                       accommodanda image (this repo/branch). THIS is what the
-#                       deploy fast-forwards to the pushed commit.
-#   ~/wds/ferenda       the operational compose project. Its docker-compose.yml
-#                       builds the accommodanda service from `../accommodanda`,
-#                       and owns the legacy services + the shared nginx/certbot.
-#                       Mostly frozen -- the deploy only drives compose from here,
-#                       it does NOT reset this tree.
+#   ~/wds/ferenda         this branch. It is BOTH the compose project and the
+#                         build context for the `ferenda` image, so the deploy
+#                         resets this tree to the pushed commit and drives
+#                         compose from it.
+#   ~/wds/ferenda-legacy  the `legacy` branch, bind-mounted into the
+#                         `ferenda-legacy` service. Frozen; nothing here
+#                         touches it.
 #
-# On every push to the deployed branch the deploy fast-forwards ~/wds/accommodanda
-# and rebuilds + restarts ONLY the accommodanda service (the legacy stack is left
+# On every push to the deployed branch the deploy fast-forwards ~/wds/ferenda and
+# rebuilds + restarts ONLY the `ferenda` service (the legacy stack is left
 # untouched), then publishes the static browser chrome. It is a PURE CODE DEPLOY --
 # it processes no data.
 #
@@ -44,7 +42,7 @@ name: deploy
 
 on:
   push:
-    branches: [modernization]
+    branches: [main]
   workflow_dispatch: {}   # allow a manual redeploy from the Actions tab
 
 # Never let two deploys run at once (a rebuild can take a while); queue instead
@@ -59,8 +57,9 @@ jobs:
     # No actions/checkout: we deploy the persistent on-box checkout, not the
     # runner's throwaway workspace.
     env:
-      CODE: /home/staffan/wds/accommodanda   # git checkout + accommodanda build context
-      COMPOSE: /home/staffan/wds/ferenda      # the merged operational compose project
+      # one directory now: the checkout, the image build context and the
+      # compose project are all this branch.
+      CODE: /home/staffan/wds/ferenda
     steps:
       - name: Update the on-box code checkout to the pushed commit
         run: |
@@ -80,19 +79,19 @@ jobs:
           done
           git reset --hard "${GITHUB_SHA}"
 
-      - name: Build the accommodanda image
+      - name: Build the ferenda image
         run: |
           set -euo pipefail
-          cd "$COMPOSE"
+          cd "$CODE"
           # bake the deployed revision into the image (the ops dashboard reads it);
           # .git is dockerignored, so there's no repo to rev-parse at runtime.
-          GIT_SHA="${GITHUB_SHA}" docker compose build accommodanda
+          GIT_SHA="${GITHUB_SHA}" docker compose build ferenda
 
-      - name: Restart the accommodanda service (legacy stack left untouched)
+      - name: Restart the ferenda service (legacy stack left untouched)
         run: |
           set -euo pipefail
-          cd "$COMPOSE"
-          docker compose --profile prod up -d accommodanda
+          cd "$CODE"
+          docker compose --profile prod up -d ferenda
 
       # The pages link /style.css and /script.js by URL, and the serve reads them
       # from `generated/` -- a bind-mounted host tree, not the image. Without this
@@ -100,7 +99,7 @@ jobs:
       #
       # Runs INSIDE the container on purpose: generated/ lives on the root_squashed
       # /mnt/forstor NFS export, writable only by gid 3362, which the image's `app`
-      # user carries (docker-compose.prod.yml build args). A host-side `lagen` would
+      # user carries (docker-compose.yml build args). A host-side `lagen` would
       # EPERM. It writes four files (script.js, style.css, graf.js, robots.txt, each
       # Brotli-precompressed) plus the font woff2s, reads no catalog and re-renders
       # no page, so it costs seconds -- see build.cmd_generate's `--assets-only`
@@ -112,7 +111,7 @@ jobs:
       - name: Publish the static browser chrome (style.css + the script bundle)
         run: |
           set -euo pipefail
-          cd "$COMPOSE"
+          cd "$CODE"
           # `up -d` returns once the container is started, but a recreate can still
           # be a moment short of accepting an exec ("container is restarting").
           # Wait for `running` first, so a real failure below is the command's own
@@ -122,10 +121,10 @@ jobs:
             # calls, and pipefail would turn that race into a failed deploy. An
             # empty state just means "not yet" -- retry, and let the exec below be
             # the thing that fails if it never comes up.
-            state="$(docker compose ps -q accommodanda \
+            state="$(docker compose ps -q ferenda \
                      | xargs -r docker inspect -f '{{.State.Status}}' || true)"
             [ "$state" = running ] && break
-            echo "accommodanda is '${state:-absent}' -- waiting ($attempt/30)"
+            echo "ferenda is '${state:-absent}' -- waiting ($attempt/30)"
             sleep 2
           done
-          docker compose exec -T accommodanda lagen all generate --assets-only
+          docker compose exec -T ferenda lagen all generate --assets-only

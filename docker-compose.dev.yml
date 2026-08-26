@@ -1,0 +1,51 @@
+# DEV compose -- the one service a workstation needs.
+#
+#     docker compose -f docker-compose.dev.yml up -d
+#
+# The pipeline's `index` stage and the site's /search need OpenSearch. Nothing
+# else here is containerised in dev: run the site straight from the working
+# tree with `lagen all serve`, because it is continuously re-edited.
+#
+# docker-compose.yml is the prod host's file. It starts both lagen.nu sites and
+# binds an NFS path for the index that exists on that host only. Do not use it
+# on a workstation.
+
+services:
+  opensearch:
+    # Same pin as prod (Lucene 10). The index is derived and rebuildable, so a
+    # major bump is a nuke-and-rebuild -- delete the index, `lagen all index`.
+    image: opensearchproject/opensearch:3.7.0
+    container_name: lagen-opensearch-dev
+    environment:
+      - discovery.type=single-node           # one node; relaxes the bootstrap checks
+      - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
+      - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
+      - bootstrap.memory_lock=true            # keep the JVM heap out of swap
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      # loopback only. A bare "9200:9200" publishes on 0.0.0.0, and Docker's
+      # iptables rules bypass the host firewall -- that mistake let a ransom bot
+      # wipe the prod index on 2026-08-15.
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18          # first boot can take a couple of minutes
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+volumes:
+  opensearch-data:

@@ -1,51 +1,104 @@
-# DEV compose for accommodanda -- the search backend the pipeline needs.
+# lagen.nu — one compose project, two sites, selected by Compose profiles.
 #
-#   DEV  (workstation; just the search backend the pipeline needs):
-#       docker compose up -d
-#     -> starts *only* opensearch (it carries no profile). Run accommodanda
-#        itself straight from the working tree -- `lagen all serve` -- since in
-#        dev it is continuously re-edited and restarted; no point containerising.
+# This file is the whole host. It starts the rebuilt site AND the legacy site,
+# because both are live and one nginx fronts them. The legacy application's
+# code is not in this repository: it is the `legacy` branch, checked out on the
+# host at ~/wds/ferenda-legacy and bind-mounted into the `ferenda-legacy`
+# service. This project directory (~/wds/ferenda) holds the new code.
 #
-# PROD note: production is ferenda.lagen.nu (= lagen.nu = 130.236.254.142,
-# LiU/Lysator -- NOT the retired Hetzner `ferenda-vps`). There the host runs ONE
-# merged compose project that serves BOTH the legacy lagen.nu stack and
-# accommodanda behind a single nginx; that authoritative deploy config lives on
-# the host in ~/wds/ferenda, not here. The `prod` profile below dates from the
-# earlier standalone-accommodanda-only setup and is being reconciled with the
-# merged layout -- treat it as historical, not the current prod topology.
+#   DEV  (only the search backend the rebuilt pipeline needs):
+#       docker compose -f docker-compose.dev.yml up -d
+#     -> starts just opensearch, on a plain named volume. Run the site itself
+#        straight from the working tree -- `lagen all serve` -- because it is
+#        continuously re-edited and restarted; there is no point containerising
+#        it in dev. Use the dev file, not this one: the opensearch volume here
+#        binds an NFS path that exists on the prod host only.
 #
-# Rule of thumb: a service with NO `profiles:` key starts in every invocation
-# (that's opensearch, shared by dev and prod); everything tagged
-# `profiles: [prod]` starts only under `--profile prod`.
+#   PROD (the full host):
+#       docker compose --profile prod up -d
+#     -> everything below. Services with no `profiles:` key start in every
+#        invocation; everything tagged `profiles: [prod]` needs the flag.
+#
+# Who serves what, today:
+#
+#   lagen.nu          -> ferenda-legacy (uwsgi), the legacy site
+#   ferenda.lagen.nu  -> ferenda (uvicorn), the rebuilt site + API
+#
+# THE SEPTEMBER CUTOVER
+# ---------------------
+# The two sites swap hostnames: lagen.nu becomes the rebuilt site, the legacy
+# site moves to old.lagen.nu, and every ferenda.lagen.nu URL answers 301 to the
+# same path on lagen.nu. The switch is a comment edit, in this order:
+#
+#   1. Point old.lagen.nu at this host in DNS, and wait for it to resolve.
+#   2. Add it to the certificate (the `certbot` service documents the command;
+#      add `-d old.lagen.nu` to the existing -d list and re-run it once).
+#   3. In docker/nginx/default.conf, swap the two `server_name` lines marked
+#      CUTOVER: the legacy vhost answers to old.lagen.nu.
+#   4. In docker/nginx/ferenda.lagen.nu.conf, swap the two `server_name` lines
+#      marked CUTOVER and uncomment the redirect server block at the foot of
+#      the file: the rebuilt site answers to lagen.nu, and ferenda.lagen.nu
+#      redirects to it.
+#   5. `docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload`
+#
+# Nothing in this file changes at the cutover. Both containers keep running;
+# only which hostname reaches which one moves. To roll back, put the comment
+# markers back and reload nginx again.
 
 services:
   # --- shared: the rebuilt full-text index (dev + prod) --------------------
-  # Single-node, security-disabled OpenSearch at the code's default endpoint.
-  # Security is OFF on purpose: a local index over public data. Port 9200 is
-  # published to 127.0.0.1 ONLY (never the public interface) so a dev box can
-  # reach it at localhost:9200 while the VPS keeps it off the internet; the
-  # accommodanda container reaches it over the compose network as
-  # http://opensearch:9200 regardless.
+  # A single-node, security-disabled OpenSearch 2.x at the code's default
+  # endpoint (config.DEFAULT_OPENSEARCH_URL = http://localhost:9200). Security
+  # is OFF on purpose: a local index over public data, plain HTTP, no auth.
+  # Do NOT expose port 9200 to the internet. The ports below bind to loopback
+  # explicitly: a bare "9200:9200" publishes on 0.0.0.0 and Docker's iptables
+  # rules BYPASS the host firewall -- that exact mistake let a ransom bot wipe
+  # the index on 2026-08-15. Only the ferenda container talks to it (over
+  # the compose network as http://opensearch:9200); loopback is for host-side
+  # admin/sync only. On WSL2, if it won't boot, raise vm.max_map_count:
+  # `sudo sysctl -w vm.max_map_count=262144`.
   opensearch:
-    # Pinned to 3.7.0 (Lucene 10). Was frozen at 2.9.0 because 2.10.0+ images
-    # require the x86-64-v2 CPU baseline the host's virtualized CPU didn't expose
-    # (2.10.0 died with "Fatal glibc error: CPU does not support x86-64-v2"). The
-    # hypervisor CPU model was upgraded to x86-64-v3 in 2026-07, lifting the block;
-    # 3.7.0 boots clean + green. The index is derived & rebuildable, so the
-    # 2.x->3.x major bump is a nuke-and-rebuild, not an in-place migration. Pin a
-    # specific patch, not floating 3.
+    # Pinned to 3.7.0 (Lucene 10). Frozen at 2.9.0 for years because 2.10.0+
+    # images require the x86-64-v2 CPU baseline and the prod host's virtualized
+    # CPU didn't expose it -- 2.10.0 died with "Fatal glibc error: CPU does not
+    # support x86-64-v2". The hypervisor CPU model was upgraded to x86-64-v3 in
+    # 2026-07, lifting the block: 3.7.0 boots clean + green on the host (verified
+    # in an isolated throwaway container). The index is derived & rebuildable, so
+    # the 2.x->3.x major bump is a nuke-and-rebuild (delete the index, `lagen all
+    # index`), never an in-place migration. Pin a specific patch, not floating 3.
     image: opensearchproject/opensearch:3.7.0
     container_name: lagen-opensearch
     environment:
-      - discovery.type=single-node           # one node; relaxes the bootstrap checks
-      - DISABLE_SECURITY_PLUGIN=true          # -> plain http://opensearch:9200, no auth
+      # one node; relaxes the bootstrap checks. One consequence worth knowing:
+      # the security-analytics plugin creates .opensearch-sap-* indices with a
+      # replica, which can never allocate here, so the CLUSTER reads `yellow`
+      # while `lagen` itself is green -- a standing false alarm that hides a real
+      # one. Fixed on prod 2026-08-17 with an index template pinning those to 0
+      # replicas: PUT _index_template/sap-single-node {"index_patterns":
+      # [".opensearch-sap-*"], "priority": 500, "template": {"settings":
+      # {"number_of_replicas": 0}}}. Reapply after a nuke-and-rebuild.
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true          # -> plain http://localhost:9200, no auth
       - DISABLE_INSTALL_DEMO_CONFIG=true      # skip the demo TLS certs/users
       - bootstrap.memory_lock=true            # keep the JVM heap out of swap
-      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g    # this VPS has ~7.5GB RAM and, unlike
-                                              # the old shared host, no legacy
-                                              # Elasticsearch competing for it, so
-                                              # 2g is comfortable for the ~1M-doc
-                                              # index. Raise if heap pressure shows.
+      # 15GB host, and every byte here is taken FROM the page cache: memory_lock
+      # pins the whole heap, and Xms == Xmx commits it at startup. That trade is
+      # the wrong way round for this workload -- the index is ~31GB on a disk
+      # doing ~100 random IOPS, so latency is decided by how much of it the OS
+      # can cache (a cold search costs 10+ s, a warm one ~100 ms), not by heap.
+      #
+      # Measured on prod 2026-08-17 at 2g: 0.65GB used (32%), ZERO old GCs in
+      # 4.2h, zero query-cache and fielddata evictions. Nothing was short of
+      # heap, so 1536m keeps >2x headroom over observed use and hands 512MB back
+      # to the cache. The collapse index is deliberately not heap-hungry (no
+      # parent-child join). Raise it only against evidence -- an old-GC count
+      # that climbs, or fielddata/query-cache evictions in _nodes/stats.
+      #
+      # Room came from retiring the legacy Elasticsearch container entirely
+      # (2026-08-17: it held 3g of heap and a 15GB index) and from fuseki (2g)
+      # now running ONLY during the nightly legacy regen, which the host cron
+      # start/stops around `build all all`, so it isn't resident by day.
+      - OPENSEARCH_JAVA_OPTS=-Xms1536m -Xmx1536m
     ulimits:
       memlock:
         soft: -1
@@ -54,7 +107,8 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "127.0.0.1:9200:9200"   # REST API -- loopback only (dev convenience; off the public NIC)
+      - "127.0.0.1:9200:9200"   # REST API -- loopback only, never the public NIC
+      - "127.0.0.1:9600:9600"   # performance analyzer (optional), loopback only
     volumes:
       - opensearch-data:/usr/share/opensearch/data   # persist the index across restarts
     healthcheck:
@@ -68,115 +122,127 @@ services:
         max-size: "10m"
         max-file: "10"
 
-  # --- prod: the rebuilt site + the in-container pipeline -------------------
+  # --- prod: the rebuilt site (ferenda.lagen.nu today, lagen.nu after the cutover)
   # The code is baked into the image (which also carries the full pipeline
-  # toolchain); the corpus, the bulky downloaded/ tree (on the mounted volume)
-  # and the git-backed wiki content repo are read-write bind-mounts. One uvicorn
-  # process serves the static site + REST API (`lagen all serve`, the CMD); the
-  # same container runs maintenance in place:
-  #     docker compose exec accommodanda lagen all rebuild   # CI, after a push
-  #     docker compose exec accommodanda lagen all all       # nightly cron
-  # Runs as uid 1001 / gid 3362 (see the image's USER app) -- the host bind mounts
-  # are owned by that uid, and the gid is REQUIRED to write the data_root.
-  accommodanda:
+  # toolchain); the corpus and the wiki content repo are read-write bind-mounts.
+  # One uvicorn process serves the static site + REST API (`lagen all serve`,
+  # the image CMD), and the same container runs maintenance in place:
+  #     docker compose exec ferenda lagen all rebuild
+  #     docker compose exec ferenda lagen all index
+  ferenda:
     build:
       context: .
-      dockerfile: docker/accommodanda/Dockerfile
+      dockerfile: docker/ferenda/Dockerfile
       args:
-        # uid 1001 = the host `staffan` user that owns the bind-mounted corpus
-        # (both /mnt/forstor/accommodanda and the /mnt/data catalog dir).
+        # uid 1001 = host `staffan`, who owns the bind-mounted corpus + catalog.
+        # gid 3362 = host `lagen-nfs`. data_root now lives on the /mnt/forstor NFS
+        # export, which is root_squashed (root -> nobody, no write) and writable
+        # only by the lagen-nfs group -- so the in-container pipeline (`lagen all
+        # rebuild`/`all`, which writes downloaded/, artifact/, generated/) must run
+        # under gid 3362, NOT root, or it EPERMs against the NFS mount.
         UID: "1001"
-        # gid 3362 = the host `lagen-nfs` group. The data_root lives on the
-        # Forstor NFS mount, which is root_squashed (root -> nobody, no write) and
-        # group-writable only by lagen-nfs -- so the in-container pipeline writes
-        # (lagen all all / rebuild: downloaded/, artifact/, generated/) must run
-        # under gid 3362, NOT root, or they get EPERM against the NFS export.
         GID: "3362"
         # the deployed revision, baked into the image for the ops dashboard;
         # the deploy passes GIT_SHA=$GITHUB_SHA (see .github/workflows/deploy.yml).
         GIT_SHA: ${GIT_SHA:-unknown}
-    container_name: accommodanda
+    container_name: ferenda
     profiles: [prod]
     environment:
       - OPENSEARCH_URL=http://opensearch:9200
       - WIKI_ROOT=/wiki
+      # catalog.sqlite is decoupled from data_root onto the fast local /mnt/data
+      # disk: SQLite's per-statement locking becomes slow synchronous round-trips
+      # over NFS. See config.resolve_catalog_root (CATALOG_ROOT env).
+      - CATALOG_ROOT=/app/catalog
+      # Server-side analytics for the machine-facing surfaces (/api/v1 and /mcp),
+      # which have no browser to run the pages' tracker snippet in -- see
+      # ferenda/api/analytics.py. The Matomo container over the compose
+      # network, so the hit never leaves the host. MATOMO_SITE_API is a separate
+      # Matomo site from the two human ones (1 = legacy lagen.nu, 2 = the
+      # rebuilt site): agent traffic would otherwise poison the reader numbers.
+      # Unset either variable and no server-side tracking happens at all.
+      - MATOMO_URL=http://matomo/matomo.php
+      - MATOMO_SITE_API=3
+      # The machine name a run id carries (lib/runlog.this_host). The corpus is
+      # built on dev and rsynced here, and also built here directly, so one
+      # ledger holds runs from both and each has to say where it ran. Without
+      # this the container's own hostname is used -- a 12-hex container id that
+      # changes on every `up -d`, which names nothing.
+      - LAGEN_HOST=lagen
+      # Which peers uvicorn accepts X-Forwarded-For/-Proto from. It defaults to
+      # 127.0.0.1 -- the same *host*, not the same compose network -- so nginx
+      # (its own container) was an untrusted peer and every request arrived as
+      # the proxy's address: one login-rate-limit bucket for the whole internet,
+      # and one Matomo visitor id. The value is the compose network's subnet,
+      # declared under `networks:` at the foot of this file so the two cannot
+      # drift; nginx's own container IP would not survive a recreate. Trusting
+      # the whole network is safe because the API port is published to no host
+      # interface, so nothing outside it can reach uvicorn at all. uvicorn
+      # matches CIDR here from 0.31 on (pinned in pyproject.toml).
+      - FORWARDED_ALLOW_IPS=172.19.0.0/16
     volumes:
-      # data_root: everything except downloaded/ (artifacts, catalog, generated,
-      # dumps) on the fast fixed disk.
-      - /srv/ferenda/site/data:/app/site/data
-      # The bulky downloaded/ tree lives on the mounted volume; /app/site/data
-      # contains a `downloaded` symlink pointing at THIS absolute path, so we
-      # mount it at the same path inside the container for the symlink to resolve.
-      - /mnt/HC_Volume_106236756/downloaded:/mnt/HC_Volume_106236756/downloaded
-      # begrepp/kommentar markdown -- git-backed; the inline editor commits here.
-      - /srv/ferenda/lagen-wiki:/wiki
-      # Secrets + editor registry (editor_secret, editors) and the LLM
-      # key -- kept out of the image (.dockerignore) and out of git; mounted from
-      # the host at runtime. config.py reads config.yml from the repo root (/app);
-      # lib/llm.py load_dotenv() reads /app/.env.
-      - /srv/ferenda/config.yml:/app/config.yml:ro
-      - /srv/ferenda/.env:/app/.env:ro
+      # data_root: the bulk corpus (artifact/ generated/ downloaded/ dumps/) on
+      # the roomy 2 TB /mnt/forstor NFS mount.
+      - /mnt/forstor/ferenda:/app/site/data
+      # catalog_root: just catalog.sqlite (+ -wal/-shm), on the fast local disk.
+      - /mnt/data/ferenda:/app/catalog
+      # The one checkout the running site WRITES into (a clone on the host):
+      # begrepp/kommentar/site markdown, the annotation layers, and the source
+      # patches the /patch editor commits (at <WIKI_ROOT>/patches). Both editors
+      # commit every save, so the tree has to sit inside a real checkout -- and
+      # the image is built without `.git` (.dockerignore), so an in-image tree
+      # could neither commit nor survive a redeploy. Lives on the roomy
+      # /mnt/forstor NFS mount (only latency-sensitive SQLite is kept on local
+      # /mnt/data); it's root_squashed, so the checkout is owned 1001:3362
+      # (staffan:lagen-nfs), which is what the container runs as, so the editors
+      # can write and commit. Pushes are done from the host, not the container.
+      - /mnt/forstor/lagen-wiki:/wiki
+      # Secrets + editor registry (editor_secret, editors[].pwhash, LLM
+      # key). config.py reads config.yml from the repo root (/app); without this
+      # mount the file is absent and everything falls back to defaults -- the inline
+      # editor 403s ("editing disabled -- set editor_secret"). Kept out of the image
+      # and out of git; mounted read-only from the host. Adding/removing this line
+      # needs `up -d ferenda` (recreate) to attach; editing the file's contents
+      # afterwards only needs `restart ferenda` (config.yml is read once at import).
+      - /home/staffan/wds/ferenda/config.yml:/app/config.yml:ro
     depends_on:
       - opensearch   # start order only, not a health gate: serving + the CLI don't
-                     # need a live OpenSearch (see api/app.py), only /search does
+                      # need a live OpenSearch (see api/app.py), only /search does
     restart: always
     logging:
       options:
         max-size: "10m"
         max-file: "10"
 
-  # --- prod: the public front (ferenda.lagen.nu) ---------------------------
-  # Unprivileged nginx (uid 101): listens on 8080/8443, host maps 80/443 onto
-  # them. Serves the precompressed generated/ site's .br files directly
-  # (Content-Encoding: br, stock image -- see ferenda.conf); proxies the API,
-  # editor, browse indexes, transformed-namespace URLs and non-brotli clients to
-  # accommodanda:8000. Reads the live cert + ACME webroot the certbot sidecar writes.
-  nginx:
-    build:
-      context: docker/vps/nginx
-    container_name: lagen-nginx
-    profiles: [prod]
-    ports:
-      - "80:8080"
-      - "443:8443"
-    volumes:
-      - letsencrypt:/etc/letsencrypt:ro          # live cert (certbot writes, nginx reads)
-      - certbot-webroot:/var/www/certbot:ro       # ACME http-01 challenge files
-      # the precompressed rendered site, read-only -- nginx streams the .br as-is
-      - /srv/ferenda/site/data/generated:/srv/generated:ro
-    depends_on:
-      - accommodanda
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "10"
-
-  # --- prod: ACME cert issuance/renewal for ferenda.lagen.nu ---------------
-  # Renews every 12h via the http-01 webroot challenge (nginx serves the shared
-  # webroot on :80). The FIRST issuance is done out-of-band with --standalone
-  # before nginx exists. Renewed certs are picked up by
-  # nginx on its next reload (a weekly host cron, harmless if nothing changed;
-  # certbot has no docker.sock access to reload nginx itself, by design).
+  # --- prod: ACME cert issuance/renewal (lagen.nu + ferenda.lagen.nu) ------
+  # Official, actively maintained certbot image -- replaces the certbot 0.30.2
+  # baked into the old andreilhicas/nginx-letsencrypt nginx image, which is
+  # ACME-API-incompatible with current Let's Encrypt (missing Content-Type
+  # header on POST-as-GET; every renewal failed). Certbot only writes files
+  # here -- it does not serve anything -- via two volumes shared with nginx:
+  # the ACME http-01 webroot (challenge files nginx serves back to LE) and the
+  # cert output dir nginx's ssl_certificate directives read from.
+  #
+  # One-time SAN cert covering both vhosts (run once; `renew` below only
+  # renews an existing cert, it doesn't create one):
+  #   docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+  #     -d lagen.nu -d ferenda.lagen.nu \
+  #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
+  #
+  # CUTOVER: add `-d old.lagen.nu` to that list and re-run it once, after
+  # old.lagen.nu resolves to this host. Certbot expands the existing
+  # certificate in place, so nginx's ssl_certificate paths do not change.
   certbot:
-    # Pinned, not :latest -- the old stack learned this the hard way (a frozen
-    # certbot 0.30.2 went ACME-API-incompatible and every renewal silently
-    # failed). Pin for reproducibility, same rationale as the opensearch pin.
     image: certbot/certbot:v3.1.0
-    container_name: lagen-certbot
     profiles: [prod]
     volumes:
-      - letsencrypt:/etc/letsencrypt
-      - certbot-webroot:/var/www/certbot
-    # After each renew, relax read perms on live/ + archive/ so the UNPRIVILEGED
-    # nginx (uid 101) can read the cert + key -- certbot writes privkey 0600 root,
-    # which nginx otherwise can't open ("Permission denied"). a+rX only adds read
-    # (files) / traverse (dirs); on this single-tenant box the letsencrypt volume
-    # is mounted by certbot + nginx only. Runs every loop, so it's self-healing.
+      - /mnt/data/lagen/letsencrypt:/etc/letsencrypt        # certbot's own state: account + live/archive certs
+      - certbot-webroot:/var/www/certbot                    # shared ACME http-01 webroot with nginx
+      - /mnt/data/lagen/certificates:/usr/share/nginx/certificates  # nginx's cert dir; deploy-hook copies here
     entrypoint: >
       sh -c "trap exit TERM; while :; do
-      certbot renew --webroot -w /var/www/certbot --quiet;
-      chmod -R a+rX /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null || true;
+      certbot renew --webroot -w /var/www/certbot --quiet
+      --deploy-hook 'cp /etc/letsencrypt/live/lagen.nu/fullchain.pem /etc/letsencrypt/live/lagen.nu/privkey.pem /usr/share/nginx/certificates/';
       sleep 12h & wait $${!}; done"
     restart: unless-stopped
     logging:
@@ -184,7 +250,219 @@ services:
         max-size: "10m"
         max-file: "10"
 
+  # --- prod: the shared front for both sites -------------------------------
+  nginx:
+    build:
+      context: docker/nginx
+      # Base image + config: default.conf = lagen.nu, ferenda.lagen.nu.conf =
+      # the rebuilt site. Cert issuance lives in the `certbot` service above;
+      # nginx only reads the files it writes -- see /mnt/data/lagen/certificates
+      # below. nginx does NOT auto-reload on renewal (no docker.sock access by
+      # design -- see `certbot` service comment); reload periodically, e.g. a
+      # host cron `docker compose exec nginx nginx -s reload` weekly, harmless
+      # if no cert changed.
+    container_name: lagen-nginx
+    profiles: [prod]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /mnt/data/lagen/data:/usr/share/nginx/html:ro
+      # the NDJSON bulk dumps `lagen all dump` writes into the rebuilt site's
+      # data_root, served as static files by the ferenda.lagen.nu vhost's
+      # /dumps/ block (multi-GB files nginx should stream, not uvicorn)
+      - /mnt/forstor/ferenda/dumps:/usr/share/nginx/dumps:ro
+      - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
+      - certbot-webroot:/var/www/certbot                    # serves ACME http-01 challenges for certbot
+      - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/staffan/wds/ferenda/docker/nginx/ferenda.lagen.nu.conf:/etc/nginx/conf.d/ferenda.lagen.nu.conf:ro
+    depends_on:
+      - ferenda-legacy
+      - mediawiki
+      - matomo
+      - ferenda
+      - certbot
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+  ferenda-legacy:
+    # The legacy lagen.nu application. Its code is NOT in this repository any
+    # more -- it lives on the `legacy` branch, checked out on the host at
+    # ~/wds/ferenda-legacy, and is bind-mounted in below. This file only starts
+    # and stops it.
+    #
+    # The image cannot be built from here either: the legacy root Dockerfile
+    # does `COPY requirements.txt .`, and this branch replaced requirements.txt
+    # with pyproject.toml + uv.lock. The tag is made by hand on the host, once:
+    #     docker tag <the running legacy image> lagen-ferenda:legacy
+    # For as long as a container exists compose never resolves that reference,
+    # so a missing tag stays invisible. It surfaces the first time the service
+    # is created from cold -- which is how a `down`/`up` took the site down on
+    # 2026-08-19: with no local match and no `build:`, compose fell back to a
+    # registry and reported "pull access denied", which reads like an auth
+    # problem rather than the missing local tag it is. `pull_policy: never`
+    # keeps that failure honest: no registry, just "image not found locally".
+    image: lagen-ferenda:legacy
+    pull_policy: never
+    container_name: ferenda-legacy
+    profiles: [prod]
+    volumes:
+      - /mnt/data/lagen:/usr/share/site
+      # the `legacy` branch checkout -- the old application's code and its
+      # source patches. This project directory holds the new code only.
+      - /home/staffan/wds/ferenda-legacy:/usr/share/ferenda
+      - /home/staffan/wds/ferenda-legacy/lagen/nu/res/patches:/usr/share/lagen/nu/res/patches
+    restart: always
+    depends_on:
+      - fuseki
+    stdin_open: true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+  # elasticsearch (7.7.1) retired 2026-08-17: it held 3 GB of RAM and a 15 GB
+  # index on this 16 GB host, starving the page cache that the rebuilt site's
+  # OpenSearch index needs. The legacy site no longer reads it -- /search/ and
+  # the free-text half of /api/ answer 410 (ferenda/wsgiapp.py
+  # handle_retired_search) and ferenda.ini sets fulltextindex = False, so relate
+  # writes nothing. The data is still at /mnt/data/elasticsearch (15 GB) if the
+  # decision has to be revisited; git history holds the service definition.
+  fuseki:
+    # The legacy triple store. Its build context (docker/fuseki/) lives on the
+    # `legacy` branch, not here, and it no longer builds anyway: the base image
+    # is old enough that its `apt-get` step fails (exit 100, 2026-08-19). The
+    # tag is the artifact. `pull_policy: never` makes a missing tag say "image
+    # not found locally" instead of a misleading "pull access denied".
+    image: lagen-fuseki:legacy
+    pull_policy: never
+    container_name: lagen-fuseki
+    profiles: [prod]
+    volumes:
+      - fuseki:/fuseki
+    environment:
+      - "JVM_ARGS=-Xmx2g"
+      - "FUSEKI_DATASET_1=lagen"
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+  mediawiki:
+    # The legacy wiki, still serving /wiki/ and /w/ on lagen.nu. Same
+    # arrangement as fuseki: the build context is on the `legacy` branch and the
+    # pre-built tag is the artifact.
+    image: lagen-mediawiki:legacy
+    pull_policy: never
+    container_name: lagen-mediawiki
+    profiles: [prod]
+    volumes:
+      - /mnt/data/mediawiki/db:/var/www/data
+      - /mnt/data/mediawiki/images:/var/www/html/w/images
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+  # --- Matomo's database ---------------------------------------------------
+  # Credentials live in the untracked `.env` beside this file; copy
+  # `.env.example` and fill it in. NOTE: the entrypoint reads these ONLY when
+  # the `db` volume is first created. On the existing prod volume they are
+  # inert -- rotating a password there is an `ALTER USER` against the running
+  # server, and `.env` must then be updated to match. See .env.example.
+  db:
+    image: mariadb
+    command: --max-allowed-packet=64MB
+    profiles: [prod]
+    volumes:
+      - db:/var/lib/mysql
+    environment:
+      # root is reachable only over the container's unix socket (`docker exec
+      # ferenda_db_1 mariadb -uroot -p`); the `root`@`%` grant that let any
+      # peer on the compose network log in as root is dropped.
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD in .env}
+      # the least-privilege account Matomo actually connects with
+      - MARIADB_DATABASE=matomo
+      - MARIADB_USER=matomo
+      - MARIADB_PASSWORD=${MATOMO_DB_PASSWORD:?set MATOMO_DB_PASSWORD in .env}
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+  matomo:
+    # Pinned to a patch version, not floating `5`: the application tree lives in
+    # the volume below, so the running Matomo and the image tag can silently
+    # disagree -- exactly what happened before 2026-08-19, when the tag said 5
+    # and the volume had been serving 5.1.2 since 2024. Bump this deliberately,
+    # and follow the upgrade steps in the volume comment.
+    image: matomo:5.12.0
+    profiles: [prod]
+    volumes:
+      # Matomo's application tree. NAMED -- it used to be an anonymous volume,
+      # which put the only copy of config/config.ini.php (the database
+      # credentials, and the `salt` that signs sessions) somewhere a
+      # `down -v` or a volume prune would take without saying so.
+      #
+      # This volume also SHADOWS the image's code, and the entrypoint seeds it
+      # only `if [ ! -e matomo.php ]`. So pulling a newer image upgrades
+      # nothing on its own. An upgrade is three steps: repopulate this volume
+      # from the new image's /usr/src/matomo, put config/config.ini.php and
+      # misc/DBIP-City.mmdb back, then run `console core:update` for the
+      # database migration.
+      - matomo-app:/var/www/html
+    environment:
+      # These seed the installer only; once `config/config.ini.php` exists in
+      # the service's volume that file is authoritative, so a credential change
+      # has to be written there too (.env.example).
+      - MATOMO_DATABASE_HOST=db
+      - MATOMO_DATABASE_ADAPTER=mysql
+      - MATOMO_DATABASE_DBNAME=matomo
+      - MATOMO_DATABASE_USERNAME=matomo
+      - MATOMO_DATABASE_PASSWORD=${MATOMO_DB_PASSWORD:?set MATOMO_DB_PASSWORD in .env}
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "10"
+
 volumes:
+  db:
+  # Matomo's application tree -- see the matomo service for why it is named and
+  # what an upgrade of it involves.
+  matomo-app:
+  fuseki:
+  # The OpenSearch index (~28 G) lives on the roomy /mnt/forstor NFS, not the
+  # local docker-root disk. A bind-type local volume keeps the volume NAME
+  # (ferenda_opensearch-data) stable -- so `sync-up index` still targets it by
+  # name -- while its storage is the NFS path. The dir is owned 1000:3362
+  # (opensearch uid + lagen-nfs gid) so the container can write the root_squashed
+  # export; see .bin/sync-up for the matching -u 1000:3362 on the remote unpack.
   opensearch-data:
-  letsencrypt:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/forstor/opensearch
   certbot-webroot:
+
+networks:
+  # The project's default network, with its address range stated rather than
+  # left to the daemon's allocator. Every service joins this one -- naming it
+  # `default` keeps that implicit, so no service needs a `networks:` key.
+  #
+  # It is declared because `FORWARDED_ALLOW_IPS` above is this subnet. An
+  # allocated range is not a promise: recreate the network while another
+  # project holds 172.19, and the daemon hands out a different /16. uvicorn
+  # would then trust nobody, every request would arrive as nginx's address,
+  # and the login rate limit would collapse to a single bucket again -- with
+  # the startup log still cheerfully printing the value it was given. Stating
+  # the subnet makes the constant a fact of this file.
+  #
+  # Changing it means recreating the network, which means `docker compose
+  # down` first: a network in use cannot be re-addressed in place.
+  default:
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
