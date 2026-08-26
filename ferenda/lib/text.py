@@ -11,6 +11,8 @@ DV / förarbete / eurlex ``body``. Everything here is pure.
 
 import re
 
+from . import eu_structure
+
 # the top-level sections that carry renderable body text, across all sources
 # "footnotes" is presented body text like the rest: it renders at the foot of
 # the page, so the reader sees it, the index must store it and the link walk must
@@ -254,6 +256,26 @@ def fragment_node(art, frag):
     subtree (rule:second-use-goes-to-lib)."""
     return next((node for node in _body_id_nodes(art)
                  if node["id"] == frag), None)
+
+
+def anchor_text(art, frag):
+    """The presented body text behind one anchor -- what the pinpoint says.
+
+    Two lookups, because an EU act's anchors are not all node ids: the artifact
+    stamps one on every article and on nothing finer, while the renderer mints
+    `25.1`, `25.1.S1` and `recital-83` from the block's own type and number
+    (lib.eu_structure). So an id lookup answers for the Swedish grammar and the
+    EU articles, and the anchor walk for everything else the act publishes an
+    anchor for. '' when the document has neither.
+
+    The one place that question is answered, for the search pins and
+    /api/v1/card alike (rule:second-use-goes-to-lib)."""
+    body = fragment_text(art, frag)
+    if body or "structure" not in art:
+        return body
+    return next((node_text(block) for anchor, block
+                 in eu_structure.anchored_blocks(art["structure"])
+                 if anchor == frag), "")
 
 
 def fragment_text(art, frag):

@@ -71,6 +71,32 @@ FORESKRIFT = {
 }
 
 
+def test_anchor_text_reaches_what_the_artifact_stamps_no_id_on():
+    """An EU act's articles carry an id; its recitals and sub-articles do not --
+    the renderer mints `25.1` and `recital-83` from the block's own type and
+    number. A resolved "GDPR (83" pinned the right anchor and showed the act
+    with no words under it, because the id lookup finds no recital at all."""
+    act = {"uri": "https://lagen.nu/ext/celex/32099R0001", "structure": [
+        {"type": "recital", "num": "82", "text": ["Om att styrka efterlevnad."]},
+        {"type": "recital", "num": "83", "text": ["Om att upprätthålla "
+                                                  "säkerheten."]},
+        {"type": "article", "id": "25", "num": "25", "text": ["Inbyggt "
+                                                              "dataskydd"],
+         "children": [{"type": "paragraph", "num": "1",
+                       "text": ["Med beaktande av den senaste utvecklingen."]}]},
+    ]}
+    assert text.anchor_text(act, "recital-83") == "Om att upprätthålla säkerheten."
+    assert text.anchor_text(act, "25.1") == ("Med beaktande av den senaste "
+                                             "utvecklingen.")
+    # the id lookup still wins where there is an id: an article answers with
+    # its whole subtree, not with the heading the anchor walk would find
+    assert text.anchor_text(act, "25").startswith("Inbyggt dataskydd")
+    assert "senaste utvecklingen" in text.anchor_text(act, "25")
+    # an anchor the act does not publish is empty, not a guess
+    assert text.anchor_text(act, "recital-99") == ""
+    assert text.anchor_text(act, "K1P1") == ""
+
+
 def test_presented_consolidation_is_latest_parsed():
     cons = text.presented_consolidation(FORESKRIFT)
     assert cons["konsolideradTom"] == "https://lagen.nu/fffs/2016:13"

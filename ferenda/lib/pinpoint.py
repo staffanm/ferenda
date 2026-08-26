@@ -102,15 +102,25 @@ def eu_article_label(frag):
     return "artikel %s %s stycket" % (article, ordinal) if ordinal else ""
 
 
-def pinpoint_label(frag):
-    """A fragment id -> the pinpoint to *show a reader*, covering the bare EU
-    article anchor as well as the Swedish and CoE forms `human_fragment` types.
-    Returns '' for an id with no reader-facing form.
+# a numbered recital of an EU act, anchored `recital-N` by eurlex/render (and
+# by the wiki commentary that annotates one). The act's own preamble numbers it
+# "(83)" and everyone citing it writes "skäl 83".
+_EU_RECITAL = re.compile(r"recital-(\d+)")
 
-    An EU anchor is decided by shape and never falls through: it is all digits and
-    dots, which no Swedish or CoE fragment is (those lead with K/P/O/S/N/M, "sid"
-    or "A"), while `human_fragment`'s segment scan *does* match the "S2" inside
-    "9.2.S2" and would read a stycke anchor as the bare "2 st"."""
+
+def pinpoint_label(frag):
+    """A fragment id -> the pinpoint to *show a reader*, covering the EU act's
+    article and recital anchors as well as the Swedish and CoE forms
+    `human_fragment` types. Returns '' for an id with no reader-facing form.
+
+    Both EU forms are decided by shape and never fall through. A recital says so
+    in the anchor itself; an article anchor is all digits and dots, which no
+    Swedish or CoE fragment is (those lead with K/P/O/S/N/M, "sid" or "A"),
+    while `human_fragment`'s segment scan *does* match the "S2" inside "9.2.S2"
+    and would read a stycke anchor as the bare "2 st"."""
+    m = _EU_RECITAL.fullmatch(frag or "")
+    if m:
+        return "skäl " + m.group(1)
     if _EU_ARTICLE.fullmatch(frag or ""):
         return eu_article_label(frag)
     return human_fragment(frag)

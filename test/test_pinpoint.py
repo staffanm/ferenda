@@ -49,6 +49,11 @@ def test_pinpoint_labels_match_the_pages():
     assert pinpoint_label("K4P7") == "4 kap. 7 §"
     assert pinpoint_label("A6") == "artikel 6"
     assert pinpoint_label("9.2.S2") == "artikel 9.2 andra stycket"
+    # an EU act's preamble numbers a recital "(83)"; everyone citing it writes
+    # "skäl 83", and the raw anchor is what the search pin printed before
+    assert pinpoint_label("recital-83") == "skäl 83"
+    assert citation_label("dataskyddsförordningen", "recital-83") \
+        == "Skäl 83 dataskyddsförordningen"
 
 
 def test_short_name_reads_back_the_acronym_a_label_was_composed_with():

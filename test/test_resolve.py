@@ -159,6 +159,22 @@ def test_eu_swedish_label_and_artikel():
             == "https://lagen.nu/ext/celex/32022R2554#5")
 
 
+def test_eu_recital_pinpoint():
+    # A recital is a citation target of its own (`#recital-N`), and the palette
+    # already jumps to "(83" from the act's own page. Naming the act must reach
+    # the same place from anywhere -- in the act's own numbering "(83)", in
+    # Swedish and in English.
+    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    assert resolve.resolve_eu("GDPR (83") == gdpr + "#recital-83"
+    assert resolve.resolve_eu("GDPR (83)") == gdpr + "#recital-83"
+    assert resolve.resolve_eu("GDPR skäl 83") == gdpr + "#recital-83"
+    assert resolve.resolve_eu("GDPR recital 83") == gdpr + "#recital-83"
+    assert (resolve.resolve_eu("dataskyddsförordningen skäl 83")
+            == gdpr + "#recital-83")
+    # and a tail that only starts like one is not a pinpoint -- the act root
+    assert resolve.resolve_eu("GDPR (83 och lite till") == gdpr
+
+
 def test_eu_bare_shortname_is_the_act_root():
     assert resolve.resolve_eu("IPRED") == "https://lagen.nu/ext/celex/32004L0048"
 

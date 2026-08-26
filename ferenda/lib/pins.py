@@ -76,7 +76,7 @@ def _provision_text(con, path, frag):
     document's presented body has no node with that id. One artifact read per
     citation-shaped query -- there is at most one pinned hit, and it is the
     query's answer."""
-    body = text.fragment_text(
+    body = text.anchor_text(
         catalog.load_artifact(catalog.data_root(con), path), frag)
     if not body:
         return []

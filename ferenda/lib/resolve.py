@@ -177,17 +177,29 @@ def _named_acts():
 # pinpoint and must not mint a wrong article.
 _BARE_ART = re.compile(r"(\d+)(?:[.\s:]+(\d+))?")
 
+# a recital pinpoint after the act name. The three forms are the ones the act
+# and its readers use: the preamble's own "(83)", the Swedish "skäl 83" and the
+# English "recital 83". The palette resolves "(83" against the page's anchors
+# when the reader is already on the act; naming the act ("GDPR (83") must reach
+# the same recital from anywhere.
+_RECITAL = re.compile(r"\(\s*(\d+)\s*\)?|(?:sk[äa]l|recital)\.?\s*(\d+)",
+                      re.IGNORECASE)
+
 
 def resolve_eu(q):
     """An EU act URI for `q`, deep-linked to an article when the query names one
-    ("GDPR art 32" or the terse "GDPR 32" -> .../32016R0679#32), else the act
-    root ("IPRED"). None when no act short name leads the query."""
+    ("GDPR art 32" or the terse "GDPR 32" -> .../32016R0679#32) or to a recital
+    ("GDPR (83", "GDPR skäl 83" -> .../32016R0679#recital-83), else the act root
+    ("IPRED"). None when no act short name leads the query."""
     low = q.lower()
     for label, celex in _named_acts():
         a = label.lower()
         if low.startswith(a) and (len(low) == len(a) or not low[len(a)].isalnum()):
             uri = CELEX_BASE + celex
             rest = q[len(label):].strip()
+            recital = _RECITAL.fullmatch(rest)
+            if recital:
+                return uri + "#recital-" + (recital.group(1) or recital.group(2))
             m = _ART.match(rest) or _BARE_ART.fullmatch(rest)
             if m:
                 uri += "#" + m.group(1) + ("." + m.group(2) if m.group(2) else "")

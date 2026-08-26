@@ -3366,7 +3366,10 @@ def test_pinpoint_label_reads_every_anchor_grammar():
     assert pinpoint_label("K2P16S5") == "2 kap. 16 § 5 st"
     assert pinpoint_label("sid39") == "s. 39"
     assert pinpoint_label("A6P3Lc") == "artikel 6 punkt 3 led c"
-    assert pinpoint_label("recital-15") == ""
+    # a recital is a citable place of its own: the preamble numbers it "(15)"
+    # and everyone citing it writes "skäl 15", which is what the search pin and
+    # the graph node print now that "GDPR (15" resolves to one
+    assert pinpoint_label("recital-15") == "skäl 15"
 
 
 def test_pinpoint_label_refuses_prose_it_cannot_write():
