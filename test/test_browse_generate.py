@@ -206,6 +206,42 @@ def _written_dirs(out_root, source):
                   if p.is_dir())
 
 
+def test_begrepp_bucket_lists_terms_in_columns_and_bolds_the_described(tmp_path):
+    """A concept has no identifier apart from its name, so the two-column
+    dt/dd listing had nothing for the second column and printed the term
+    twice. It did so for 571 of 30 882 concepts -- the ones with a wiki page,
+    which are the only ones with an artifact and so the only ones with labels;
+    the other 30 311 are stub rows for a term the corpus merely uses. The term
+    alone is the entry; bold is what says which ones are described."""
+    view = {"source": "begrepp", "levels": ["Bokstav"], "default": [],
+            "buckets": [{"key": "a", "slug": "a", "label": "A", "count": 2,
+                         "children": None,
+                         "documents": [
+                             # a wiki page describes this one: it has an
+                             # artifact, so relate stamped it labels
+                             # (labels._begrepp makes the term every form)
+                             {"url": "/begrepp/Abandonering",
+                              "short_id": "Abandonering",
+                              "short_title": "Abandonering"},
+                             # a stub row for a term the corpus only uses: no
+                             # artifact, so no short_title -- which is the
+                             # whole difference, since facets._browse_doc
+                             # fills a stub's short_id from its label
+                             {"url": "/begrepp/Abonnemangsavtal",
+                              "short_id": "Abonnemangsavtal"}]}]}
+    browse.generate_browse(_FakeClient(view), "begrepp", tmp_path)
+    page = _page_text(tmp_path / "begrepp" / "a")
+    assert ('<li><a href="/begrepp/Abandonering"><strong>Abandonering</strong>'
+            '</a></li>') in page
+    assert ('<li><a href="/begrepp/Abonnemangsavtal">Abonnemangsavtal'
+            '</a></li>') in page
+    # the term list is its own form -- no dt/dd, so no repeated term
+    assert '<ul class="browse-list terms">' in page
+    assert "<dd>" not in page
+    # the term is printed once, as the link -- not again as its own definition
+    assert page.count(">Abandonering<") == 1
+
+
 def test_a_small_agency_lists_on_one_page(tmp_path):
     """A myndighet whose whole output fits on a screen should not be spread over
     a year selector: Kronofogdens 22 ställningstaganden across 11 years is two

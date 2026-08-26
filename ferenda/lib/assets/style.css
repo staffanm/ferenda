@@ -1161,6 +1161,13 @@ dl.browse-list.def dd { align-self: baseline; }
     dl.browse-list.def { display: block; }
     dl.browse-list.def dt { margin: .45rem 0 0; }
 }
+/* A glossary bucket (/begrepp/<letter>/): one-word entries, thousands of them,
+   so this is the listing where multi-column is clearly useful -- `columns:
+   <width> <count>` like the frontpage, which keeps a column readable and drops
+   to one on a phone without a media query. A term the wiki describes is bold;
+   the rest only occur in the corpus's own texts. */
+ul.browse-list.terms { columns: 14rem 3; column-gap: 2rem; }
+ul.browse-list.terms li { break-inside: avoid; overflow-wrap: break-word; }
 /* the case-law form headings (Domar / Referat / Notiser) within a bucket */
 .dv-variant { font-family: var(--sans); text-transform: uppercase; letter-spacing: .06em;
               font-size: .72rem; font-weight: 600; color: var(--ink-3); margin: 1.75rem 0 .2rem; }

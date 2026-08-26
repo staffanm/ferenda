@@ -152,6 +152,20 @@
 </dd>
 {%- endif -%}
 {%- endmacro -%}
+{%- macro browse_terms(docs) -%}
+{#- a glossary bucket. The term IS the entry, so there is no second column to
+    fill: the dt/dd list printed every described concept twice, once as the link
+    and once as its own "definition". A term the wiki describes is set bold, one
+    the corpus only uses stays plain -- that is 571 of 30 882, findable in a
+    2 236-entry bucket only if they look different. One-word entries also mean
+    the list flows in columns instead of down one line each. -#}
+<ul class="browse-list terms">
+{%- for d in docs -%}
+<li><a href="{{ d.url }}">{% if d.described %}<strong>{{ d.term }}</strong>
+{%- else %}{{ d.term }}{% endif %}</a></li>
+{%- endfor -%}
+</ul>
+{%- endmacro -%}
 {%- macro browse_items(docs) -%}
 {%- for d in docs %}{{ browse_item(d) }}{% endfor -%}
 {%- endmacro -%}

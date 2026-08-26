@@ -86,6 +86,24 @@ def _browse_item(doc):
                        for a in doc.get("amendments") or []]})
 
 
+def _terms_listing(docs):
+    """A begrepp bucket as a column-flowed term list. A concept has no
+    identifier apart from its name (labels._begrepp makes the term all four
+    forms), so the two-column dt/dd listing had nothing to put in the second
+    column and repeated the term there.
+
+    It repeated it for 571 of 30 882 concepts, which is the split the bold
+    marks: only a concept with a wiki page of its own has an artifact, and only
+    an artifact-backed row gets a `short_title`. The other 30 311 are the stub
+    rows relate mints for a term the corpus merely *uses* (`path = ''`,
+    identity columns only). Both kinds carry the term as `short_id`, which
+    `facets._browse_doc` fills from the row's `label` where the column is
+    empty."""
+    return LISTS.browse_terms(
+        [{"url": d["url"], "term": d["short_id"],
+          "described": bool(d.get("short_title"))} for d in docs])
+
+
 # the DV browse buckets group into these forms, in this reading order; a bucket
 # with only one present shows no headers (nothing to distinguish)
 _DV_VARIANTS = (("dom", "Domar"), ("referat", "Referat"), ("notis", "Notiser"))
@@ -280,6 +298,8 @@ def render_facet_page(source, view, nodes, banner="", primary_in_banner=False):
         listing = LISTS.empty()
     elif source == "dv":                                 # grouped Domar/Referat/Notiser
         listing = _dv_listing(docs)
+    elif source == "begrepp":                            # a column-flowed glossary
+        listing = _terms_listing(docs)
     else:
         # SFS is a dt-only split title (single column); every other source is a
         # two-column dt/dd definition list (the bold id left, its name/desc right)
