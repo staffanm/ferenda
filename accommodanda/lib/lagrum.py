@@ -1134,11 +1134,52 @@ class _DocState:
     abbrev_uses: dict[str, int] = field(default_factory=dict)
     last_forarbete: str | None = None  # base URI of last prop ("a. prop.")
     last_eu_act: str | None = None     # CELEX of the last named EU act (anaphora)
+    # ... and the last one of each *kind* (CELEX act-type letter -> CELEX).
+    # "förordningen" and "direktivet" name a kind, so the act they refer back to
+    # has to be of that kind; one slot for both pinned 9 747 references in the
+    # corpus onto an act of the other kind, Schrems II's "Artikel 23 i
+    # förordningen" landing on directive 95/46 (`remember_eu_act`).
+    last_eu_act_by_akttyp: dict[str, str] = field(default_factory=dict)
     # CELEX of the document being parsed, when it is itself an EU act. Set so a
     # bare "artikel N" in an EU regulation self-refers to it rather than
     # anaphora-pinning onto some external act named earlier (e.g. a recital's
     # "artikel N i förordning (EG) nr 45/2001").
     self_eu_act: str | None = None
+
+    def remember_eu_act(self, celex):
+        """Put an EU act in anaphoric focus: as the act in focus generally, and
+        as the last one of its own kind."""
+        self.last_eu_act = celex
+        akttyp = eu_akttyp(celex)
+        if akttyp:
+            self.last_eu_act_by_akttyp[akttyp] = celex
+
+    def eu_focus(self):
+        """The EU-act anaphora focus, for a caller that has to scan a run of
+        text without letting it change what the document is talking about."""
+        return self.last_eu_act, dict(self.last_eu_act_by_akttyp)
+
+    def restore_eu_focus(self, focus):
+        """Put back what `eu_focus` returned."""
+        self.last_eu_act, self.last_eu_act_by_akttyp = focus[0], dict(focus[1])
+
+
+def eu_akttyp(celex):
+    """The act-type letter of a sector-3 CELEX -- "32016R0679" -> "R" for a
+    förordning, "31995L0046" -> "L" for a direktiv, "D" for a beslut. None where
+    the CELEX names no act type at all (a treaty, a judgment, a proposal)."""
+    return celex[5] if celex and len(celex) > 5 and celex[0] == "3" else None
+
+
+# the kind of act each definite generic noun names, as its CELEX letter --
+# both grammar surfaces, since the English one has its own EU_GENERIC terminal
+# ("the directive", "the regulation") and a `.get` miss there would silently
+# leave the whole mis-pin class unfixed for the 7 398 English-only case-law
+# manifestations. "rättsakten"/"the act" names no kind: the None is the answer,
+# not a miss, and an unlisted noun is table drift that should surface.
+EU_GENERIC_AKTTYP = {"förordningen": "R", "direktivet": "L",
+                     "rättsakten": None,
+                     "regulation": "R", "directive": "L"}
 
 
 class NoLink(Exception):
@@ -1495,6 +1536,14 @@ def celex_year(value):
     outside 1950-2050 and so cannot be a year."""
     year = int(value) + (1900 if len(value) <= 2 else 0)
     return year if 1950 <= year <= 2050 else None
+
+
+def celex_of(uri):
+    """The CELEX an `ext/celex/` uri names, without its fragment
+    ("…/ext/celex/32016R0679#23" -> "32016R0679"), or None for a uri that names
+    no CELEX. The read half of `celex_uri`."""
+    return uri.split('ext/celex/')[1].split('#')[0] \
+        if 'ext/celex/' in uri else None
 
 
 def celex_uri(attrs, base='https://lagen.nu/'):
@@ -1915,8 +1964,7 @@ class LagrumParser:
                             uri = celex_uri(attrs, self.base)
                             # remember a formally-named act so a later bare
                             # "artikel N" anaphora can pinpoint it
-                            self.state.last_eu_act = uri.split(
-                                'ext/celex/')[-1].split('#')[0]
+                            self.state.remember_eu_act(celex_of(uri))
                         elif is_placeholder_sfsid(str(attrs.get('law', ''))):
                             raise NoLink()      # a draft's "(2018:000)" (L1)
                         else:
@@ -2389,7 +2437,7 @@ class LagrumParser:
         The fragment is the dotted grammar the eurlex renderer mints for the
         target anchor (#6.1.c, #9.2.S2)."""
         if remember:
-            self.state.last_eu_act = celex
+            self.state.remember_eu_act(celex)
         frag = eu_fragment(pin)
         return self.base + 'ext/celex/' + celex + ('#' + frag if frag else '')
 
@@ -2593,6 +2641,20 @@ class LagrumParser:
                     raise NoLink()
             target = (self.state.self_eu_act if bare else None) \
                 or self.state.last_eu_act
+            if 'eu_generic' in parts:
+                # the noun names a kind of act, so the act in focus has to be of
+                # that kind -- else the last one that was, and nothing if no act
+                # of the kind has been named (unlinked over mis-pinned, the rule
+                # this branch already follows for the of-guard above)
+                # the terminal, not the node's text: `_W` is filtered out of
+                # the tree, so "det direktivet" flattens to "detdirektivet"
+                # and no split finds the noun in it
+                akttyp = EU_GENERIC_AKTTYP[next(
+                    t.value.lower()
+                    for t in _tree_tokens(subtree(node, 'eu_generic'))
+                    if t.type == 'EU_GENERIC')]
+                if akttyp and eu_akttyp(target) != akttyp:
+                    target = self.state.last_eu_act_by_akttyp.get(akttyp)
             if not target:
                 raise NoLink()
             # recitals reach here too, via the generic noun ("skäl 108 i
