@@ -741,64 +741,6 @@ def test_eu_namedact_articles_and_anaphora():
         assert [r.uri for r in parser.parse_text(text, context={})] == want, text
 
 
-# the definite generic noun names a *kind* of act, so the act it refers back to
-# has to be of that kind. One anaphora slot for both nouns pinned 9 747
-# references in the corpus onto an act of the other kind -- Schrems II's
-# "Artikel 23 i förordningen har följande lydelse:" landed on directive 95/46,
-# whose 34 articles include no article 23 of that content.
-EU_GENERIC_KIND_SEQUENCE = [
-    ("enligt förordning (EU) 2016/679 gäller", [GDPR]),
-    ("och enligt direktiv 95/46/EG gällde",
-     ["https://lagen.nu/ext/celex/31995L0046"]),
-    # the directive is the act most recently named; "förordningen" still means
-    # the regulation
-    ("artikel 23 i förordningen har följande lydelse", ["%s#23" % GDPR]),
-    ("artikel 28.3 i direktivet angav",
-     ["https://lagen.nu/ext/celex/31995L0046#28.3"]),
-]
-
-
-def test_eu_generic_noun_refers_back_to_an_act_of_its_own_kind():
-    parser = _eu_parser()
-    for text, want in EU_GENERIC_KIND_SEQUENCE:
-        assert [r.uri for r in parser.parse_text(text, context={})] == want, text
-
-
-def test_eu_generic_noun_names_a_kind_on_the_english_surface_too():
-    # the English grammar has its own EU_GENERIC terminal, and the 7 398
-    # English-only case-law manifestations need the same constraint
-    parser = LagrumParser(NAMEDLAWS, basefile="dom",
-                          parse_types=[EULAGSTIFTNING],
-                          named_acts=NAMEDACTS_MAP, lang="eng")
-    parser.reset()
-    uris = lambda t: [r.uri for r in parser.parse_text(t, context={})]
-    assert uris("under Regulation (EU) 2016/679") == [GDPR]
-    assert uris("and under Directive 95/46/EC") == \
-        ["https://lagen.nu/ext/celex/31995L0046"]
-    assert uris("Article 23 of the regulation reads") == ["%s#23" % GDPR]
-    assert uris("Article 28(3) of the directive provided") == \
-        ["https://lagen.nu/ext/celex/31995L0046#28.3"]
-
-
-def test_the_kindless_generic_noun_still_takes_the_last_act_named():
-    # "rättsakten" names no kind, so it constrains nothing and refers back to
-    # whatever act is in focus
-    parser = _eu_parser()
-    parser.parse_text("enligt förordning (EU) 2016/679 gäller", context={})
-    parser.parse_text("och enligt direktiv 95/46/EG gällde", context={})
-    assert [r.uri for r in parser.parse_text(
-        "artikel 28 i rättsakten angav", context={})] == \
-        ["https://lagen.nu/ext/celex/31995L0046#28"]
-
-
-def test_eu_generic_noun_refuses_when_no_act_of_that_kind_was_named():
-    # unlinked over mis-pinned: nothing has named a förordning, so
-    # "förordningen" links nothing rather than pinning on the directive
-    parser = _eu_parser()
-    parser.parse_text("enligt direktiv 95/46/EG gällde", context={})
-    assert parser.parse_text("artikel 23 i förordningen anger", context={}) == []
-
-
 def _eu_parser():
     parser = LagrumParser(NAMEDLAWS, basefile="dom", parse_types=[EULAGSTIFTNING],
                           named_acts=NAMEDACTS_MAP)
