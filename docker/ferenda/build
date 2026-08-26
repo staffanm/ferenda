@@ -1,4 +1,0 @@
-#!/bin/sh
-
-cd /usr/share/site
-/usr/share/.virtualenv/bin/python ./ferenda-build.py $@
