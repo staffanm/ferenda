@@ -344,8 +344,7 @@ def _graph_expansion(con, csr, root, result, *, direction, depth, limit,
     labels = catalog.graph_labels(con, [uri for uri, _h, _s in nodes])
     shaped = [_labelled_row(uri, labels, hop=hop, side=side_name)
               for uri, hop, side_name in nodes]
-    edges = [list(row)
-             for row in catalog.graph_induced_edges(con, sorted(included))]
+    edges = [list(row) for row in pathgraph.induced_edges(csr, included)]
     return {"nodes": shaped, "edges": edges}
 
 

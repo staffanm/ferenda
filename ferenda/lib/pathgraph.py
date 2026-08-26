@@ -25,7 +25,10 @@ from . import facets
 GROUP_ID = {name: i for i, name in enumerate(facets.FLOW_GROUP_NAMES)}
 
 SIDECAR = "graph-edges.bin"
-_MAGIC = b"lagen-pathgraph-1\n"
+# bumped when the file layout changes: an older sidecar is refused
+# (load_sidecar returns None) and the graph is rebuilt from the catalog,
+# which the next relate then writes back in the new layout.
+_MAGIC = b"lagen-pathgraph-2\n"
 
 
 class Graph:
@@ -33,17 +36,23 @@ class Graph:
     cited), `rev` the other way. `group[i]` is the node's flow-group id."""
 
     __slots__ = ("uris", "ids", "fwd_off", "fwd_dst", "rev_off", "rev_dst",
-                 "group")
+                 "group", "weight")
 
-    def __init__(self, uris, ids, fwd, rev, group):
+    def __init__(self, uris, ids, fwd, rev, group, weight):
         self.uris, self.ids = uris, ids
+        # citations per forward edge, parallel to `fwd_dst`: the weight the
+        # graph explorer draws an edge with. Kept here rather than counted per
+        # request -- see `induced_edges`.
+        self.weight = weight
         self.fwd_off, self.fwd_dst = fwd
         self.rev_off, self.rev_dst = rev
         self.group = group
 
 
-def _csr(n, pairs):
-    """(src, dst) int pairs -> (offsets, destinations) arrays."""
+def _csr(n, pairs, weights=None):
+    """(src, dst) int pairs -> (offsets, destinations) arrays. With `weights`
+    (one per pair) the same permutation is applied to them, so `w[i]` belongs
+    to `dst[i]`; the returned weights are then a third element."""
     deg = array("i", bytes(4 * (n + 1)))
     for s, _d in pairs:
         deg[s + 1] += 1
@@ -52,10 +61,17 @@ def _csr(n, pairs):
         off[i + 1] = off[i] + deg[i + 1]
     dst = array("i", bytes(4 * len(pairs)))
     fill = array("i", off)
-    for s, d in pairs:
+    if weights is None:
+        for s, d in pairs:
+            dst[fill[s]] = d
+            fill[s] += 1
+        return off, dst
+    w = array("i", bytes(4 * len(pairs)))
+    for j, (s, d) in enumerate(pairs):
         dst[fill[s]] = d
+        w[fill[s]] = weights[j]
         fill[s] += 1
-    return off, dst
+    return off, dst, w
 
 
 def build(con):
@@ -65,17 +81,21 @@ def build(con):
     docs = {uri for (uri,) in con.execute("SELECT uri FROM documents")}
     ids = {}
     pairs = []
-    seen = set()
+    counts = []
+    at = {}                              # packed pair -> its slot in `pairs`
     for a, b in con.execute("SELECT from_uri, to_root FROM links"):
         if a == b or b not in docs:
             continue
         ia = ids.setdefault(a, len(ids))
         ib = ids.setdefault(b, len(ids))
         key = ia << 32 | ib
-        if key in seen:
-            continue
-        seen.add(key)
-        pairs.append((ia, ib))
+        slot = at.get(key)
+        if slot is None:
+            at[key] = len(pairs)
+            pairs.append((ia, ib))
+            counts.append(1)
+        else:
+            counts[slot] += 1
     uris = [None] * len(ids)
     for uri, i in ids.items():
         uris[i] = uri
@@ -85,8 +105,9 @@ def build(con):
         i = ids.get(uri)
         if i is not None:
             group[i] = GROUP_ID[facets.flow_group(source, kind)]
-    return Graph(uris, ids, _csr(len(ids), pairs),
-                 _csr(len(ids), [(b, a) for a, b in pairs]), group)
+    fwd_off, fwd_dst, weight = _csr(len(ids), pairs, counts)
+    return Graph(uris, ids, (fwd_off, fwd_dst),
+                 _csr(len(ids), [(b, a) for a, b in pairs]), group, weight)
 
 
 # --------------------------------------------------------------------------
@@ -113,7 +134,8 @@ def write_sidecar(catalog_path):
         f.write(b"%d %d %d\n" % (len(g.uris), len(g.fwd_dst), len(names)))
         f.write(names + b"\n")
         f.write("\n".join(g.uris).encode() + b"\n")
-        for arr in (g.fwd_off, g.fwd_dst, g.rev_off, g.rev_dst, g.group):
+        for arr in (g.fwd_off, g.fwd_dst, g.rev_off, g.rev_dst, g.group,
+                    g.weight):
             arr.tofile(f)
     tmp.replace(out)                     # atomic: readers see old or new
     return len(g.uris), len(g.fwd_dst)
@@ -144,8 +166,10 @@ def load_sidecar(catalog_path):
         rev_off = array("i"); rev_off.fromfile(f, n + 1)
         rev_dst = array("i"); rev_dst.fromfile(f, m)
         group = array("b"); group.fromfile(f, n)
+        weight = array("i"); weight.fromfile(f, m)
     ids = {uri: i for i, uri in enumerate(uris)}
-    return Graph(uris, ids, (fwd_off, fwd_dst), (rev_off, rev_dst), group)
+    return Graph(uris, ids, (fwd_off, fwd_dst), (rev_off, rev_dst), group,
+                 weight)
 
 
 def load(catalog_path):
@@ -204,6 +228,38 @@ def expand(g, frontier_uris, exclude, *, reverse, budget, allowed=None,
         if len(ring) == budget:
             break
     return ring
+
+
+def induced_edges(g, uris):
+    """Every citation among `uris` as `(citing, cited, citations)` -- the edge
+    list the deep neighbourhood view draws, so citers citing each other show as
+    structure and not just spokes.
+
+    Answered from the arrays, not from the catalog. The SQL this replaces asked
+    `from_uri IN (…) AND to_root IN (…)` over 16M link rows, which SQLite plans
+    as a two-column seek per *pair* of the two lists: 458 returned documents
+    meant 209 764 b-tree descents into a 15.9M-entry index. Warm on dev that is
+    58 ms and invisible; on prod, where the catalog sits on an ~80-IOPS disk and
+    a cold descent is a physical read, it is the whole cost of a depth=2 request
+    on a well-cited node (32014L0024 timed out). Here it is `len(uris)` walks of
+    an in-memory adjacency run -- the same arrays the rings were expanded from,
+    which the endpoint has already loaded.
+
+    A uri the graph does not hold contributes no edges: hop 1 is read live from
+    the catalog while these arrays are relate's snapshot, so a document
+    catalogued since the last relate is a node with no edges rather than an
+    error."""
+    want = {g.ids[u] for u in uris if u in g.ids}
+    out = []
+    for u in want:
+        for i in range(g.fwd_off[u], g.fwd_off[u + 1]):
+            v = g.fwd_dst[i]
+            if v in want:
+                out.append((g.uris[u], g.uris[v], g.weight[i]))
+    # by uri pair, not by the internal ids -- those are assigned in link-scan
+    # order and move on every relate, and the payload should not
+    out.sort()
+    return out
 
 
 # --------------------------------------------------------------------------

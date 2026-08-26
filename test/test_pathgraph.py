@@ -42,6 +42,26 @@ def test_build_walk_and_directions(tmp_path):
     assert pathgraph.shortest(g, a, c, groups={"Rättsfall"}) == [a, b, c]
 
 
+def test_induced_edges_carry_the_citation_count(tmp_path):
+    """The edge list the deep neighbourhood view draws, answered off the arrays
+    the rings were expanded from. It used to be a SQL query asking `from_uri IN
+    (…) AND to_root IN (…)`, which SQLite plans as one two-column seek per pair
+    of the two lists -- 458 returned documents meant 209 764 b-tree descents
+    into a 15.9M-entry index, and on prod's ~80-IOPS disk that timed out."""
+    cat = _catalog(tmp_path)
+    g = pathgraph.load(cat)
+    a, b, c = ("https://lagen.nu/%s" % x for x in "abc")
+    # a cites b twice (the duplicate row the graph dedupes into one edge), b
+    # cites c once -- the weight is the citations behind the edge
+    assert pathgraph.induced_edges(g, {a, b, c}) == [(a, b, 2), (b, c, 1)]
+    # only edges with BOTH ends in the set, and a uri the graph does not hold
+    # is simply not there
+    assert pathgraph.induced_edges(g, {a, c}) == []
+    assert pathgraph.induced_edges(g, {b, c, "https://lagen.nu/nowhere"}) \
+        == [(b, c, 1)]
+    assert pathgraph.induced_edges(g, set()) == []
+
+
 def test_sidecar_roundtrip_and_staleness(tmp_path):
     cat = _catalog(tmp_path)
     n, m = pathgraph.write_sidecar(cat)
@@ -49,6 +69,10 @@ def test_sidecar_roundtrip_and_staleness(tmp_path):
     g = pathgraph.load_sidecar(cat)
     a, c = "https://lagen.nu/a", "https://lagen.nu/c"
     assert pathgraph.shortest(g, a, c) == [a, "https://lagen.nu/b", c]
+    # the weights ride the sidecar too, or a reloaded graph would draw every
+    # edge as a single citation
+    assert pathgraph.induced_edges(g, {a, "https://lagen.nu/b"}) \
+        == [(a, "https://lagen.nu/b", 2)]
     # a catalog written after the sidecar makes the sidecar stale: refused,
     # so `load` falls back to building from the catalog itself
     side = pathgraph.sidecar_path(cat)

@@ -408,10 +408,19 @@ cover and a document-only printed TOC). `api/paths.py` answers
 with `paths=N` the next-shortest routes beside it (Yen's over the same arrays) —
 off the whole document-level graph (~2.6M distinct citing→cited pairs, 271k
 documents) held in memory as CSR integer arrays (`lib/pathgraph.py`): relate
-writes the arrays as a sidecar beside the catalog (`graph-edges.bin`, ~31 MB,
-loaded in ~0.04 s), any (re)load runs in a background thread keyed on the
+writes the arrays as a sidecar beside the catalog (`graph-edges.bin`, ~43 MB,
+loaded in ~0.06 s), any (re)load runs in a background thread keyed on the
 catalog file's identity, and the endpoint answers 503 until the graph is
-ready — a request never waits on a build. The sidecar-less fallback is ONE
+ready — a request never waits on a build. The same arrays answer
+`/api/v1/graph`'s deep view: `pathgraph.induced_edges` returns every citation
+among the documents a depth≥2 reply carries, weight included (the citations
+per pair, kept in the CSR since 2026-08-26 — hence the format bump, which
+makes an older sidecar rebuild once). That replaced a `from_uri IN (…) AND
+to_root IN (…)` query over 16M link rows, which SQLite plans as one
+two-column seek per *pair* of the two lists: a 458-document neighbourhood
+meant 209 764 b-tree descents, 58 ms warm on dev NVMe and a timeout on prod
+(32014L0024 at depth=2). The whole request is now 12 ms warm, ~6 ms of it in
+SQL. The sidecar-less fallback is ONE
 sequential scan of `links` filtered in Python, never per-document index
 probes: the probe-shaped query measured 2 s on dev NVMe and *hours* on
 prod's ~80-IOPS disk (2026-08-26), where it held the module lock, 504:ed

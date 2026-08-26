@@ -2646,19 +2646,6 @@ def graph_labels(con, uris):
         tuple(uris))}
 
 
-def graph_induced_edges(con, uris):
-    """Every document-level citation among `uris`: (from_uri, to_root, n).
-    The deep neighbourhood view draws these instead of only spoke edges, so
-    citers citing each other show as structure. Bounded by the caller (a few
-    hundred uris -- two IN lists must stay under SQLite's variable cap)."""
-    assert len(uris) <= 5000, "induced-edge query asked for %d uris" % len(uris)
-    marks = ",".join("?" * len(uris))
-    return con.execute(
-        "SELECT from_uri, to_root, count(*) FROM links "
-        "WHERE from_uri IN (%s) AND to_root IN (%s) AND from_uri != to_root "
-        "GROUP BY 1, 2" % (marks, marks), (*uris, *uris)).fetchall()
-
-
 def graph_out_totals(con, uri):
     """(links, distinct targets) for everything `uri` cites beyond itself,
     targets outside the corpus included."""
