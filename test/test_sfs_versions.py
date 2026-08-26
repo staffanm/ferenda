@@ -88,6 +88,23 @@ def test_archival_header_wrapped_key_and_value():
     assert versions.header_cutoff(header) == "2000:1270"
 
 
+def test_header_cutoff_reads_the_sources_own_typing_slips():
+    # refusing these left the act with no cutoff at all and its whole version
+    # history unkeyed. Measured over every header in the corpus: 49 gain a
+    # cutoff, none read differently.
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m SFS 2018:1409"}) == "2018:1409"   # 1962:627
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m. SFS 2026.1467"}) == "2026:1467"  # 2007:1175
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m. SFS1986:1067"}) == "1986:1067"   # 1982:785
+    assert versions.header_cutoff(
+        {"Ändring införd": "t.o.m. SFS 2003: 466"}) == "2003:466"
+    # a yearless cutoff is still unusable -- there is no register to resolve it
+    assert versions.header_cutoff({"Ändring införd": "t.o.m. SFS 466"}) is None
+    assert versions.header_cutoff({}) is None
+
+
 def test_parse_version_archival_sfst():
     recovered, art = versions.parse_version(
         "1998:204", "2003:466", FILES / "sfst-archival.html")

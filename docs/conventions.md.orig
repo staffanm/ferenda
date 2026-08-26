@@ -91,10 +91,8 @@ must not kill a corpus run:
   sidecar, not a permanently stale stage
 - the history-as-git export's per-snapshot preflight (`sfs/asgit.py`) —
   every failed snapshot is recorded and reported before any fast-import
-  starts. An unusable *archived* consolidation is a gap the export drops and
-  works around, the same answer the versions stage gives a corrupt archive
-  file; an unreadable *current* download refuses the corpus rather than
-  writing a history that a later repair would append out of order
+  starts; the export then refuses the incomplete corpus rather than writing
+  a history that a later repair would append out of order
 - `remisser ai-analyze`'s per-answer boundary (`build.py`) — one answer the
   model twice fails to analyse usably must not abandon the other fifty of
   its ärende. This one catches a *named* exception, not `Exception`:

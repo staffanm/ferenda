@@ -32,6 +32,7 @@ twice -- once at collect time (validating and hashing it) and once lazily at
 emit time (the whole corpus never sits in memory at once).
 """
 
+import collections
 import hashlib
 import heapq
 import json
@@ -51,7 +52,7 @@ from .versions import archival_header, header_cutoff
 BRANCH = "main"
 BRANCH_REF = "refs/heads/" + BRANCH
 STAGING_REF = "refs/lagen/history-as-git-staging"
-FORMAT = "2"
+FORMAT = "3"
 RE_EVENT = re.compile(r"^Lagen-Event: (.+)$", re.MULTILINE)
 RE_TRANSITION = re.compile(r"^Lagen-Transition: (.+)$", re.MULTILINE)
 RE_SCOPE = re.compile(r"^Lagen-Scope: (.+)$", re.MULTILINE)
@@ -73,6 +74,7 @@ class Change:
     cutoff: str          # the transition's cutoff amendment ("2008:187")
     folded: list[str] = field(default_factory=list)  # amendments in between
     add: bool = False    # first known consolidation of the statute
+    omtryck: bool = False  # this cutoff reprinted the whole act (rinfoex:omtryck)
     body_hash: str | None = None
 
 
@@ -111,30 +113,71 @@ def snapshot_text(path):
     return text.rstrip("\n") + "\n"
 
 
+def snapshot_header(path):
+    """The SFST header of one downloaded consolidation, across the three raw
+    generations the archive holds (beta JSON, utf-8 HTML, latin-1 HTML)."""
+    if path.suffix == ".json":
+        return register_mod.sfst_header_from_source(compress.read_json(path))
+    if sniff_encoding(compress.read_bytes(path)) == "latin-1":
+        return archival_header(path)
+    return register_mod.parse_sfst_header(path)
+
+
 def snapshot_cutoff(path, basefile):
     """The consolidation cutoff ("t.o.m. SFS ...") the snapshot itself names,
     or the basefile for an un-amended act."""
-    if path.suffix == ".json":
-        header = register_mod.sfst_header_from_source(
-            compress.read_json(path))
-    elif sniff_encoding(compress.read_bytes(path)) == "latin-1":
-        header = archival_header(path)
-    else:
-        header = register_mod.parse_sfst_header(path)
-    return header_cutoff(header) or basefile
+    return header_cutoff(snapshot_header(path)) or basefile
 
 
-def statute_snapshots(basefile, skipped):
-    """Every available consolidation of one statute, oldest first: the
-    download archive plus the current download, each as
-    ``(cutoff, path, plaintext_hash)``. Explicitly keyed archive files win over
-    counter-keyed duplicates, but the current download wins over an archive of
-    the same cutoff: it is the source the downloader has just corrected.
+# the SFS number a snapshot's own Rubrik names -- "Förordning (1982:798) om
+# kompensation i vissa fall" -- which says which act the file actually holds
+RE_RUBRIK_SFS = re.compile(r"\((\d{4}:\s?\d+)\)")
+# an SFS number's year has four digits. "20120:354" is the source's own typo
+# for 2020:354 (1991:1128, which also holds the correctly keyed file), and
+# sorting it as a year 20120 put it after every real consolidation.
+RE_PLAUSIBLE_CUTOFF = re.compile(r"^\d{4}:\d+$")
 
-    A bad snapshot is recorded here so `collect` can report every problem in
-    one pass. `export` deliberately refuses to write history from that
-    incomplete collection; skipping it and appending a later repair would put
-    historical text at the branch tip."""
+
+def misfiled_as(header, basefile):
+    """The SFS number this snapshot really holds, when that is not `basefile` --
+    else None.
+
+    Twenty archived consolidations hold a *different act's* text, in one shifted
+    chain an old archive import left behind: 1982:787's newest archive is
+    2008:313, 2008:313's is 1982:789, and so on down to 1998:1473's, which is
+    1982:801. Nothing but the snapshot's own Rubrik says so, and exporting one
+    would write another statute's wording into this statute's file."""
+    m = RE_RUBRIK_SFS.search(header.get("Rubrik") or "")
+    named = m.group(1).replace(" ", "") if m else None
+    return named if named and named != basefile else None
+
+
+def statute_snapshots(basefile, skipped, gaps, repealed=False):
+    """Every usable consolidation of one statute, oldest first: the download
+    archive plus the current download, each as ``(cutoff, path,
+    plaintext_hash)``. Explicitly keyed archive files win over counter-keyed
+    duplicates, but the current download wins over an archive of the same
+    cutoff: it is the source the downloader has just corrected.
+
+    Two kinds of bad input are told apart, because they need different answers.
+
+    An unusable *archived* consolidation is a **gap** (`gaps`): the archive is
+    already known to be incomplete, and a transition that folds several
+    amendments is the ordinary case the commit message names. It is recorded
+    and dropped, the same answer `versions.build` gives a corrupt archive file.
+    Three shapes turn up: junk the old downloader saved instead of the document
+    (a rkrattsbaser search-results page, a FELMEDDELANDE page), a snapshot whose
+    own Rubrik names another act (`misfiled_as`), and a cutoff whose year is not
+    a year (`RE_PLAUSIBLE_CUTOFF`).
+
+    An unusable *current* download is **incompleteness** (`skipped`): the act
+    has no text at all, so `export` refuses to write history rather than
+    committing a hole that a later repair would have to append at the tip.
+
+    Cutoff order is likewise required only of a live act. A repealed act's
+    current page serves the wording as it stood at repeal and stops naming a
+    cutoff -- the newest consolidation is then the last archived one, and
+    demanding that the current file be newest rejected ten repealed acts."""
     current = layout.sfs_source(basefile)
     if not compress.exists(current):
         current = layout.sfs_sfst(basefile)
@@ -145,15 +188,30 @@ def statute_snapshots(basefile, skipped):
     snapshots = {}
     for _, path in archive:
         try:
-            cutoff = snapshot_cutoff(path, basefile)
+            header = snapshot_header(path)
+            other = misfiled_as(header, basefile)
+            if other:
+                gaps.append({"kind": "archive", "basefile": basefile,
+                             "file": str(path),
+                             "error": "archived consolidation holds SFS "
+                                      + other})
+                continue
+            cutoff = header_cutoff(header) or basefile
+            if not RE_PLAUSIBLE_CUTOFF.match(cutoff):
+                gaps.append({"kind": "archive", "basefile": basefile,
+                             "file": str(path),
+                             "error": "archived cutoff %s is not an SFS number"
+                                      % cutoff})
+                continue
             text = snapshot_text(path)
         except SkipDocument as exc:
-            skipped.append({"basefile": basefile, "file": str(path),
-                            "error": str(exc)})
+            gaps.append({"kind": "archive", "basefile": basefile,
+                         "file": str(path), "error": str(exc)})
             continue
-        except Exception as exc:  # noqa: BLE001 — per-snapshot resilience point, mirroring versions.build's: a corrupt decades-old archive file becomes a recorded skip, not an aborted corpus export (rule:no-catch-log-continue)
-            skipped.append({"basefile": basefile, "file": str(path),
-                            "error": "%s: %s" % (type(exc).__name__, exc)})
+        except Exception as exc:  # noqa: BLE001 — per-snapshot resilience point, mirroring versions.build's: a corrupt decades-old archive file becomes a recorded gap, not an aborted corpus export (rule:no-catch-log-continue)
+            gaps.append({"kind": "archive", "basefile": basefile,
+                         "file": str(path),
+                         "error": "%s: %s" % (type(exc).__name__, exc)})
             continue
         snapshots.setdefault(cutoff, (path, _hash(text)))
     try:
@@ -169,7 +227,7 @@ def statute_snapshots(basefile, skipped):
         return []
     snapshots[cutoff] = (current, _hash(text))
     ordered = sorted(snapshots.items(), key=lambda cp: layout.sfs_version_key(cp[0]))
-    if ordered and ordered[-1][0] != cutoff:
+    if not repealed and ordered and ordered[-1][0] != cutoff:
         skipped.append({"basefile": basefile, "file": str(current),
                         "error": "current cutoff %s predates archived cutoff %s"
                                  % (cutoff, ordered[-1][0])})
@@ -197,10 +255,11 @@ def _amendment_index(art):
 
 def collect(basefiles):
     """All events across `basefiles`, keyed by proposition (else cutoff SFS
-    nr), plus incomplete-input records. The caller must reject an incomplete
-    collection before it writes history; keeping the records here lets one
-    preflight report every bad snapshot and missing artifact at once."""
-    events, skipped, repeals = {}, [], []
+    nr), plus the two record lists `statute_snapshots` separates: `skipped`,
+    the incomplete inputs `export` refuses to write history from, and `gaps`,
+    the unusable archived consolidations it reports and exports around. Keeping
+    both here lets one preflight report every problem at once."""
+    events, skipped, gaps, repeals = {}, [], [], []
     # global nr -> (utfärdad, ikraft, prop identifier, rskr identifier)
     amendment_meta: dict[str, tuple[str | None, str | None,
                                     str | None, str | None]] = {}
@@ -209,17 +268,35 @@ def collect(basefiles):
         if not compress.exists(art_path):
             skipped.append({"basefile": basefile, "error": "no parsed artifact"})
             continue
-        art = compress.read_json(art_path)
+        # an empty artifact is the parse's SkipDocument placeholder: the act
+        # stands in the register but carries no forfattningstext -- repealed
+        # long ago, or published and withdrawn before it entered force (19
+        # acts, 1942:937 to 2023:592). There is no body to put in a file, so
+        # the statute stays out of the export altogether; that is a
+        # deliberately empty document, not an incomplete input, so it is not a
+        # skip record either.
+        art = compress.read_json(art_path, empty=None)
+        if art is None:
+            continue
         index = _amendment_index(art)
         for nr, meta in index.items():
             amendment_meta.setdefault(nr, meta)
         meta_props = art["metadata"]["properties"]
+        repealed = "rinfoex:upphavdAv" in meta_props
+        # the amending act whose text was printed as a reprint of the whole
+        # statute. The base act keeps its number, so this renames no file --
+        # it marks the one transition that restated the act rather than
+        # amending it. 47 of the corpus's 445 omtryck fall on a consolidation
+        # the archive holds; the rest predate it.
+        omtryck = RE_SFS_NR.search(meta_props.get("rinfoex:omtryck", ""))
+        omtryck = omtryck.group(1) if omtryck else None
         title = meta_props.get("dcterms:title", "")
         # append, never with_suffix: "1827/60_s.1007" would lose its ".1007"
         rel = layout.relpath("sfs", basefile)
         path = str(rel.parent / (rel.name + ".txt"))
         prev = None
-        for cutoff, src, body_hash in statute_snapshots(basefile, skipped):
+        for cutoff, src, body_hash in statute_snapshots(basefile, skipped, gaps,
+                                                        repealed):
             utf, ikraft, prop, rskr = index.get(cutoff, (None, None, None, None))
             key = prop or ("SFS " + cutoff)
             ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
@@ -231,9 +308,10 @@ def collect(basefiles):
                       if prev is not None else [])
             ev.changes.append(Change(path=path, src=src, basefile=basefile,
                                      title=title, cutoff=cutoff, folded=folded,
-                                     add=prev is None, body_hash=body_hash))
+                                     add=prev is None, omtryck=cutoff == omtryck,
+                                     body_hash=body_hash))
             prev = cutoff
-        if "rinfoex:upphavdAv" in meta_props:
+        if repealed:
             m = RE_SFS_NR.search(meta_props["rinfoex:upphavdAv"])
             if m:
                 repeals.append((path, basefile, title, m.group(1),
@@ -247,7 +325,147 @@ def collect(basefiles):
         ev = events.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
         ev.merge_dates(utf, ikraft or upphavd)
         ev.deletes.append((path, basefile, repealer))
-    return events, skipped
+    return resolve_order_conflicts(events, amendment_meta, gaps), skipped, gaps
+
+
+def cycle_members(evs):
+    """The events *on* a precedence cycle: every member of a strongly connected
+    component of more than one node.
+
+    Tarjan rather than "what Kahn's algorithm left over", which also returns
+    everything merely downstream of a cycle -- that read 2 093 propositions as
+    conflicting where 52 are. Iterative, because the corpus has tens of
+    thousands of events and the recursion would not fit the stack."""
+    successors, _ = order_graph(evs)
+    index: list[int | None] = [None] * len(evs)
+    low = [0] * len(evs)
+    on_stack = [False] * len(evs)
+    stack: list[int] = []
+    counter, out = 0, set()
+    for root in range(len(evs)):
+        if index[root] is not None:
+            continue
+        index[root] = low[root] = counter
+        counter += 1
+        stack.append(root)
+        on_stack[root] = True
+        work = [(root, iter(sorted(successors[root])))]
+        while work:
+            v, pending = work[-1]
+            for w in pending:
+                if index[w] is None:
+                    index[w] = low[w] = counter
+                    counter += 1
+                    stack.append(w)
+                    on_stack[w] = True
+                    work.append((w, iter(sorted(successors[w]))))
+                    break
+                if on_stack[w]:
+                    low[v] = min(low[v], index[w])
+            else:
+                work.pop()
+                if work:
+                    low[work[-1][0]] = min(low[work[-1][0]], low[v])
+                if low[v] == index[v]:
+                    component = []
+                    while True:
+                        w = stack.pop()
+                        on_stack[w] = False
+                        component.append(w)
+                        if w == v:
+                            break
+                    if len(component) > 1:
+                        out.update(component)
+    return out
+
+
+def refinable(ev):
+    """Whether ungrouping this event can still change anything: it groups more
+    than one amending act.
+
+    A part `ungroup` has already minted carries exactly one, so ungrouping it
+    again returns the same single key and the same graph. Testing "has no
+    proposition" instead sent the loop round forever, because `ungroup` keeps
+    each part's proposition -- it is the attribution, not the grouping."""
+    return len({change.cutoff for change in ev.changes}
+               | {delete[2] for delete in ev.deletes}) > 1
+
+
+def ungroup(ev, amendment_meta):
+    """`ev` split into one event per amending SFS number -- the key an event
+    already takes where no proposition is known -- keeping each part's own
+    proposition attribution and dates."""
+    parts: dict[str, Event] = {}
+
+    def part(nr):
+        utf, ikraft, prop, rskr = amendment_meta.get(
+            nr, (ev.utfardad, ev.ikraft, ev.prop, ev.rskr))
+        key = "SFS " + nr
+        out = parts.setdefault(key, Event(key=key, prop=prop, rskr=rskr))
+        out.merge_dates(utf, ikraft)
+        return out
+
+    for c in ev.changes:
+        part(c.cutoff).changes.append(c)
+    for delete in ev.deletes:
+        part(delete[2]).deletes.append(delete)
+    return parts
+
+
+def resolve_order_conflicts(events, amendment_meta, gaps):
+    """Ungroup the propositions whose commit cannot hold one position in every
+    statute's timeline, and record why.
+
+    Grouping by proposition assumes a proposition's amendments land in the same
+    relative order in every statute they touch. Twenty-six pairs in the corpus
+    break that: prop. 2005/06:148 amends 1985:1100 before prop. 2006/07:1 does
+    and 1994:741 after it, so neither commit can precede the other; and a single
+    proposition can produce two amending acts to the *same* statute (prop.
+    2007/08:13 and prop. 2007/08:21 interleave twice in 1997:483). One commit
+    per proposition cannot express either, so the conflicting propositions fall
+    back to the per-SFS-number key -- the same key an amendment with no known
+    proposition already takes. The commit still names the proposition and is
+    still authored by its signers; it is simply not merged with that
+    proposition's other statutes.
+
+    Ungrouping strictly refines the order (each part carries one cutoff, which
+    every statute's timeline agrees on), so the loop terminates -- but a part
+    may merge into an existing per-SFS event and pull that one into a new
+    conflict, which is why it repeats until the graph is acyclic. `refinable`
+    is what makes that termination real: an event already down to one amending
+    act is left alone, and a cycle of nothing but those is raised rather than
+    ungrouped forever."""
+    while (stuck := cycle_members(list(events.values()))):
+        # a snapshot taken before this round mutates `events`: the indices
+        # `cycle_members` returned are into it. A part that merges into an
+        # event this round already visited reaches the live object, not this
+        # copy, because `ungroup`'s parts are merged in rather than replacing.
+        by_index = list(events.items())
+        if not any(refinable(by_index[i][1]) for i in stuck):
+            # every event on the cycle already carries a single amending act,
+            # so there is nothing left to refine: the corpus itself disagrees
+            # about a statute's order and the export must not paper over it
+            raise ValueError("conflicting per-statute event order (cycle) "
+                             "among: " + ", ".join(sorted(by_index[i][0]
+                                                          for i in stuck)))
+        for i in sorted(stuck):
+            key, ev = by_index[i]
+            if not refinable(ev):
+                continue
+            del events[key]
+            gaps.append({"kind": "order", "basefile": ev.prop or key,
+                         "error": "amends %d statute(s) in an order no single "
+                                  "commit can hold; ungrouped per SFS number"
+                                  % (len(ev.changes) + len(ev.deletes))})
+            for part_key, part in ungroup(ev, amendment_meta).items():
+                if part_key in events:
+                    into = events[part_key]
+                    into.changes.extend(part.changes)
+                    into.deletes.extend(part.deletes)
+                    into.merge_dates(part.utfardad, part.ikraft)
+                else:
+                    events[part_key] = part
+    return events
 
 
 def email_slug(name):
@@ -317,7 +535,9 @@ def transition_records(event, forarbete_meta):
     records = []
     for change in sorted(event.changes, key=lambda c: c.path):
         metadata = {"event": event_metadata, "title": change.title,
-                    "folded": change.folded, "add": change.add}
+                    "folded": change.folded, "add": change.add,
+                    "omtryck": change.omtryck,
+                    "replaces": replaced_by(event, change)}
         records.append({
             "id": "write:%s@%s" % (change.basefile, change.cutoff),
             "basefile": change.basefile,
@@ -358,6 +578,21 @@ def scope_id(basefiles, *, full):
     return "partial:" + _hash("\x1e".join(sorted(basefiles)))
 
 
+def replaced_by(event, change):
+    """The statutes this event repeals that name `change`'s act as the
+    repealer -- the acts it succeeds.
+
+    Git records no renames: a commit stores a tree, and `git log --follow`
+    recovers a move by comparing content at read time. A replacement act is
+    newly written text, so the similarity never reaches even `-M40%` (the new
+    vapenlag, SFS 2026:408, against the 1996:67 it replaces). The succession is
+    therefore stated in the message rather than expressed as a rename. It is
+    known for 1 685 of the corpus's 5 887 repeals -- the ones whose successor
+    also enters the corpus in the same event."""
+    return sorted(basefile for _path, basefile, repealer in event.deletes
+                  if repealer == change.basefile)
+
+
 def message(event, forarbete_meta, scope="full"):
     """The commit message: the proposition's own summary paragraph as body
     (its title as subject), the affected statutes listed, the granularity and
@@ -379,14 +614,17 @@ def message(event, forarbete_meta, scope="full"):
     body = []
     for c in sorted(event.changes, key=lambda c: c.path):
         if c.add and c.cutoff != c.basefile:
-            body.append("SFS %s: %s -- första kända konsolidering (i lydelse "
-                        "enligt SFS %s), inte den ursprungliga lydelsen"
-                        % (c.basefile, c.title, c.cutoff))
+            line = ("SFS %s: %s -- första kända konsolidering (i lydelse "
+                    "enligt SFS %s), inte den ursprungliga lydelsen"
+                    % (c.basefile, c.title, c.cutoff))
         elif c.add:
-            body.append("SFS %s: %s" % (c.basefile, c.title))
+            line = "SFS %s: %s" % (c.basefile, c.title)
         else:
-            body.append("SFS %s: %s -- ändrad t.o.m. SFS %s"
-                        % (c.basefile, c.title, c.cutoff))
+            line = ("SFS %s: %s -- ändrad t.o.m. SFS %s"
+                    % (c.basefile, c.title, c.cutoff))
+        body.append((line + ", omtryckt") if c.omtryck else line)
+        if replaced := replaced_by(event, c):
+            body.append("  ersätter SFS %s" % ", ".join(replaced))
         if c.folded:
             body.append("  innefattar även SFS %s (mellanliggande ändringar "
                         "utan arkiverad konsolidering)" % ", ".join(c.folded))
@@ -432,19 +670,10 @@ def _data(text):
     return b"data %d\n%s\n" % (len(payload), payload)
 
 
-def ordered_events(events):
-    """The emission order: globally by (author date, key), constrained so each
-    statute's consolidations emit oldest-cutoff-first and its repeal last.
-    The dates alone cannot carry this -- they come from a lossy fallback chain
-    (utfärdad -> ikraft -> synthetic July 1) and ikraft is not monotonic in
-    SFS-nr order (delayed entry into force is common) -- and a date inversion
-    would silently overwrite a newer consolidation with older text, or
-    resurrect a repealed statute at the tip. Kahn's algorithm over the
-    per-statute precedence edges, ties broken by (date, key) so the global
-    chronology holds wherever the constraints allow; a precedence cycle
-    (conflicting orders through two statutes' shared events) is a data
-    conflict the export must not paper over, raised as ValueError."""
-    evs = list(events.values())
+def order_graph(evs):
+    """The per-statute precedence over `evs`: `(successors, indegree)`, an edge
+    from each of a statute file's transitions to the next in cutoff order, and
+    from its last transition to its deletion."""
     per_path: dict[str, list[tuple[tuple, int, int]]] = {}
     for i, ev in enumerate(evs):
         for c in ev.changes:
@@ -462,6 +691,23 @@ def ordered_events(events):
             if a != b and b not in successors[a]:
                 successors[a].add(b)
                 indegree[b] += 1
+    return successors, indegree
+
+
+def ordered_events(events):
+    """The emission order: globally by (author date, key), constrained so each
+    statute's consolidations emit oldest-cutoff-first and its repeal last.
+    The dates alone cannot carry this -- they come from a lossy fallback chain
+    (utfärdad -> ikraft -> synthetic July 1) and ikraft is not monotonic in
+    SFS-nr order (delayed entry into force is common) -- and a date inversion
+    would silently overwrite a newer consolidation with older text, or
+    resurrect a repealed statute at the tip. Kahn's algorithm over the
+    per-statute precedence edges, ties broken by (date, key) so the global
+    chronology holds wherever the constraints allow; a precedence cycle
+    (conflicting orders through two statutes' shared events) is a data
+    conflict the export must not paper over, raised as ValueError."""
+    evs = list(events.values())
+    successors, indegree = order_graph(evs)
     ready = [(event_dates(ev)[0], ev.key, i)
              for i, ev in enumerate(evs) if indegree[i] == 0]
     heapq.heapify(ready)
@@ -626,18 +872,31 @@ def _append_reasons(existing, desired):
     return reasons
 
 
-def _require_complete(basefiles, events, skipped, log):
+def _require_complete(basefiles, events, skipped, gaps, log):
+    for gap in gaps:
+        log("  asgit %s: %s %s (%s)"
+            % (gap["basefile"], gap["kind"], gap.get("file", ""), gap["error"]))
+    kinds = collections.Counter(gap["kind"] for gap in gaps)
+    if kinds["archive"]:
+        log("  asgit: %d unusable archived consolidation(s) dropped; the "
+            "amendments they would have separated are named as folded in the "
+            "next commit" % kinds["archive"])
+    if kinds["order"]:
+        log("  asgit: %d proposition(s) ungrouped per SFS number (their "
+            "amendments land in conflicting orders across statutes)"
+            % kinds["order"])
     for skip in skipped:
         log("  asgit %s: incomplete %s (%s)"
             % (skip["basefile"], skip.get("file", ""), skip["error"]))
-    # collect is the one owner of incompleteness: missing artifacts and bad
-    # snapshots both arrive as skip records
+    # collect is the one owner of incompleteness: a missing artifact and an
+    # unreadable *current* download both arrive as skip records. An unusable
+    # archived consolidation does not -- it is a gap, reported above.
     missing = sum(1 for skip in skipped
                   if skip["error"] == "no parsed artifact")
     bad = len(skipped) - missing
     if skipped:
         details = ["%d parsed artifact(s) missing" % missing if missing else "",
-                   "%d snapshot(s) unreadable or inconsistent" % bad
+                   "%d current download(s) unreadable or inconsistent" % bad
                    if bad else ""]
         raise ValueError("history-as-git needs a complete corpus (%s)" %
                          "; ".join(part for part in details if part))
@@ -689,8 +948,8 @@ def export(basefiles, repodir, *, forarbete_meta, scope="full", rebuild=False,
     events. `rebuild=True` is the explicit, atomic answer to corrected text,
     backfills, attribution changes and legacy event-only repositories.
     """
-    events, skipped = collect(basefiles)
-    _require_complete(basefiles, events, skipped, log)
+    events, skipped, gaps = collect(basefiles)
+    _require_complete(basefiles, events, skipped, gaps, log)
     forarbete_meta = _cached_meta(forarbete_meta)
     desired = event_records(events, forarbete_meta)
     tip = _prepare_repo(repodir)
