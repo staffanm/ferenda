@@ -399,7 +399,19 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
     if t == "heading":
         level = b.get("level") or 1
         label, title = _division_label(b, casemap)
-        anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x), level)
+        # A division opens a level for everything that follows it. GDPR's
+        # Avsnitt sits between the Kapitel and its articles, and with the
+        # article's TOC level fixed at 2 the two listed side by side: "Avsnitt 1
+        # Insyn och villkor" read as a sibling of "Artikel 12" rather than as
+        # the heading over it, for the 33 sections of chapters III, IV, VI and
+        # VII. `Toc.depth` is the same offset dv opens per court instance; the
+        # block walk here is flat, so the heading sets it instead of a recursive
+        # call bracketing it.
+        # `Toc.add` adds `depth` to what it is given, so the heading's own
+        # entry is 1 + (level - 1) = its own level, unchanged; only what
+        # follows moves
+        toc.depth = level - 1
+        anchor = toc.add(bid, " ".join(x for x in (label, plain(title)) if x), 1)
         return NODES.eu_heading(min(level + 1, 5), anchor, label,
                                 Markup(render_runs(title, site)))
     if t == "keyword":
@@ -435,6 +447,8 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
     rail_id = bid if bid and bid in rail.data else None
     if t == "article":
         word, number, title = _article_parts(b)
+        # one step under the division it sits in (`Toc.depth`, set by the
+        # heading): level 2 directly under a Kapitel, 3 under an Avsnitt
         anchor = toc.add(bid, " ".join(x for x in (b.get("label"),
                                                    plain(b["text"])) if x), 2)
         # an article with no designation prints its label as the plain heading

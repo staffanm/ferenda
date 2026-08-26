@@ -3010,6 +3010,66 @@ def test_act_toc_has_preamble_section_with_group_titles(monkeypatch, tmp_path):
     assert "Skäl" not in nav and "jfr art" not in nav
 
 
+# an act divided Kapitel > Avsnitt > Artikel, which is how the GDPR writes its
+# chapters III, IV, VI and VII -- and how any EU act with a section level does
+DIVIDED_ACT = {
+    "uri": "https://lagen.nu/ext/celex/32099R0002", "celex": "32099R0002",
+    "doctype": "regulation", "title": "Indelad testförordning",
+    "structure": [
+        {"type": "heading", "level": 1, "label": "KAPITEL I",
+         "text": ["Allmänna bestämmelser"], "children": [
+             {"type": "article", "id": "1", "num": "1", "label": "Artikel 1",
+              "text": ["Syfte"]}]},
+        {"type": "heading", "level": 1, "label": "KAPITEL II",
+         "text": ["Den registrerades rättigheter"], "children": [
+             {"type": "heading", "level": 2, "label": "Avsnitt 1",
+              "text": ["Insyn och villkor"], "children": [
+                  {"type": "article", "id": "2", "num": "2",
+                   "label": "Artikel 2", "text": ["Insyn"]}]},
+             {"type": "heading", "level": 2, "label": "Avsnitt 2",
+              "text": ["Rättelse"], "children": [
+                  {"type": "article", "id": "3", "num": "3",
+                   "label": "Artikel 3", "text": ["Rättelse"]}]}]},
+        {"type": "heading", "level": 1, "label": "KAPITEL III",
+         "text": ["Slutbestämmelser"], "children": [
+             {"type": "article", "id": "4", "num": "4", "label": "Artikel 4",
+              "text": ["Ikraftträdande"]}]},
+    ],
+}
+
+
+def test_act_toc_nests_articles_under_their_section(tmp_path):
+    # The Avsnitt between a Kapitel and its articles is a level of the act's own
+    # outline. The article's TOC level was fixed at 2, so "Avsnitt 1" listed
+    # beside "Artikel 2" instead of over it -- 33 sections of the GDPR alone read
+    # as siblings of the articles they head.
+    db = str(tmp_path / "catalog.sqlite")
+    act = tmp_path / "act.json"
+    act.write_text(json.dumps(DIVIDED_ACT))
+    catalog.rebuild(db, "eurlex", [act])
+    html = eurlex_render.render(DIVIDED_ACT,
+                                page.Site.from_catalog(catalog.connect(db)))
+    nav = re.search(r'<nav class="toc">.*?</nav>', html, re.S).group(0)
+    entries = [(m.group(2), m.group(3)) for m in
+               re.finditer(r'<a href="([^"]+)" class="(lvl\d)[^"]*">([^<]*)</a>',
+                           nav)]
+    assert entries == [
+        ("lvl1", "32099R0002"),                      # the document's own short id
+        ("lvl1", "Kapitel I Allmänna bestämmelser"),
+        ("lvl2", "Artikel 1 Syfte"),                 # straight under the chapter
+        ("lvl1", "Kapitel II Den registrerades rättigheter"),
+        ("lvl2", "Avsnitt 1 Insyn och villkor"),
+        ("lvl3", "Artikel 2 Insyn"),                 # ... and under the section
+        ("lvl2", "Avsnitt 2 Rättelse"),
+        ("lvl3", "Artikel 3 Rättelse"),
+        ("lvl1", "Kapitel III Slutbestämmelser"),
+        ("lvl2", "Artikel 4 Ikraftträdande"),        # the next chapter resets it
+    ]
+    # the body says the same thing with its heading levels: chapter h2, section h3
+    assert '<h2 id="sec1" class="rubrik">' in html
+    assert '<h3 id="sec3" class="rubrik">' in html
+
+
 def test_act_without_annotation_has_no_recital_groups(tmp_path):
     # default _load_editorial: no .ann sidecar for this synthetic celex -> plain page
     db = str(tmp_path / "catalog.sqlite")
