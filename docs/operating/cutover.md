@@ -32,7 +32,7 @@ The layout this file expects:
 |---|---|
 | `~/wds/ferenda` | this branch — the compose project AND the image build context |
 | `~/wds/ferenda-legacy` | the `legacy` branch, bind-mounted into `ferenda-legacy` |
-| `/mnt/forstor/accommodanda` | the corpus (`downloaded/`, `artifact/`, `generated/`, `dumps/`) — the old name; see step 4 |
+| `/mnt/forstor/ferenda` | the corpus (`downloaded/`, `artifact/`, `generated/`, `dumps/`) |
 | `/mnt/data/ferenda` | `catalog.sqlite` on the fast local disk |
 
 Four things move, and each is a rename of what is there today:
@@ -45,12 +45,13 @@ Four things move, and each is a rename of what is there today:
 3. `/mnt/data/accommodanda` becomes `/mnt/data/ferenda`. **A `/mnt/data/ferenda`
    already exists**: a 92 MB checkout from 2020. Move it aside first, or the
    rename fails and the catalog mount silently binds the wrong directory.
-4. `/mnt/forstor/accommodanda` keeps its name, and the compose file still says
-   so. Renaming it needs write permission on `/mnt/forstor`, which is
-   `root:lagen-nfs` mode 775; the deploy user is not in that group, and the
-   export is root_squashed, so `sudo` is `nobody` there as well. Ask the
-   Lysator host admins to rename it, then change the one `data_root` line and
-   the `dumps` line in `docker-compose.yml`.
+4. `/mnt/forstor/accommodanda` becomes `/mnt/forstor/ferenda`. A rename edits
+   the parent directory, and `/mnt/forstor` is `root:lagen-nfs` mode 775, so
+   the deploy user needs `lagen-nfs` (gid 3362): `sudo usermod -aG lagen-nfs
+   staffan`, then a new login, or `sg lagen-nfs -c '…'` in the current one.
+   `sudo` alone does not work — the export is root_squashed
+   (`maproot="nobody":"nobody"`), so root has *fewer* rights there than the
+   deploy user.
 
 Three things on the host name a service or a path that this migration changes,
 and each keeps running on the old name until it is edited:
