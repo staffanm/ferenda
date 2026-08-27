@@ -60,8 +60,9 @@ and each keeps running on the old name until it is edited:
   the *legacy* application. They become `ferenda-legacy`.
 - `~/bin/keepwarm.sh` and `~/bin/mcptail.sh` — both name the
   `ferenda-accommodanda-1` container, now `ferenda`.
-- the untracked `sync-up` and `sync-data` scripts in `~/.bin` on the dev box —
-  they name `/mnt/data/accommodanda`, now `/mnt/data/ferenda`.
+- the untracked `sync-up` script in the repo's `.bin/` on the dev box — it named
+  `/mnt/forstor/accommodanda` and `/mnt/data/accommodanda`, now
+  `/mnt/forstor/ferenda` and `/mnt/data/ferenda`. Done 2026-08-26.
 
 Stop the stack for the renames, and start it again with
 `docker compose --profile prod up -d`. The service names changed, so compose
