@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-from ferenda.lib import facets, layout
+from ferenda.lib import catalog, facets, layout, pathgraph
 from ferenda.stats import charts, compute, render, scan
 from ferenda.stats.model import Cell, Measure, Point, Report, Row, Tile
 
@@ -328,6 +328,59 @@ def test_bars_are_scaled_inside_a_group_not_across_it():
     assert "--w:100.00%" in html
     assert html.count("--w:100.00%") == 2          # each group tops out at 100
     assert "<th scope=\"rowgroup\" colspan=\"2\">Längst</th>" in html
+
+
+def test_a_row_with_steps_folds_the_whole_chain_out():
+    """A "23 steg" row is not checkable from its two ends: the reader cannot
+    tell a chain of annual reissues from a chain of substance without seeing
+    what stands between them, and those are different facts about the law."""
+    html = charts.toplist_html(Measure(
+        56, "D", "Längst mellan två författningar", "toplist", unit="steg",
+        rows=[Row("PFS 2025:2", 2, "https://lagen.nu/pfs/2025:2",
+                  detail="→ PFS 2023:1",
+                  steps=[Row("PFS 2025:2", 0, "https://lagen.nu/pfs/2025:2",
+                             detail="Pensionsmyndighetens föreskrifter …"),
+                         Row("PFS 2024:3", 1, "https://lagen.nu/pfs/2024:3",
+                             detail="Pensionsmyndighetens föreskrifter …"),
+                         Row("PFS 2023:1", 2, "https://lagen.nu/pfs/2023:1",
+                             detail="Pensionsmyndighetens föreskrifter …")])]))
+    assert '<details class="viz-steps"><summary>Visa kedjan</summary>' in html
+    assert html.count("<li>") == 3                  # every act in the chain
+    assert '<a href="/pfs/2024:3">PFS 2024:3</a>' in html   # the middle links
+    assert html.count("Pensionsmyndighetens föreskrifter …") == 3
+    # the row itself is unchanged: label, detail, bar, value
+    assert '<span class="viz-detail">→ PFS 2023:1</span>' in html
+    assert '<span class="viz-val">2</span>' in html
+
+
+def test_a_chain_survives_the_round_trip_through_the_artifact():
+    """The steps are nested rows, and the artifact stores them as plain dicts.
+    Rebuilding with `Row(**r)` left them dicts and the page raised on the
+    first foldout -- so the page is rendered from the artifact here, not from
+    the dataclasses."""
+    art = Report(generated="2026-08-27", measures=[Measure(
+        56, "D", "Längst mellan två författningar", "toplist", unit="steg",
+        rows=[Row("PFS 2025:2", 1, "https://lagen.nu/pfs/2025:2",
+                  detail="→ PFS 2024:3",
+                  steps=[Row("PFS 2025:2", 0, "https://lagen.nu/pfs/2025:2"),
+                         Row("PFS 2024:3", 1, "https://lagen.nu/pfs/2024:3",
+                             detail="Om förvaltningskostnadsfaktor")])])
+    ]).to_artifact()
+    assert art["measures"][0]["rows"][0]["steps"][1]["label"] == "PFS 2024:3"
+    html = render.render_stats(art)
+    assert '<summary>Visa kedjan</summary>' in html
+    assert '<a href="/pfs/2024:3">PFS 2024:3</a>' in html
+    assert "Om förvaltningskostnadsfaktor" in html
+
+
+def test_a_row_without_steps_gets_no_foldout():
+    """Every other toplist keeps the plain row -- an empty <details> saying
+    "Visa kedjan" on 30 measures that have no chain is noise."""
+    html = charts.toplist_html(Measure(
+        30, "D", "Mest hänvisade dokument", "toplist", unit="hänvisningar",
+        rows=[Row("Brottsbalken", 4155, "https://lagen.nu/1962:700")]))
+    assert "viz-steps" not in html
+    assert "<details" not in html
 
 
 def test_the_heat_table_flips_its_ink_on_the_dark_steps():
@@ -800,3 +853,140 @@ def test_a_lede_links_the_document_it_names():
     # inject any
     assert render._linked("a <b>t</b> c", {"<b>t</b>": "/x?a=1&b=2"}) \
         == 'a <a href="/x?a=1&amp;b=2">&lt;b&gt;t&lt;/b&gt;</a> c'
+
+
+def _legislation_catalog(tmp_path):
+    """Four acts in the legislation groups: a base act (a), a föreskrift chain
+    b -> c, and an amending act (x) whose rpubl:andrar keeps it out of the
+    population. a cites x, x cites b -- so the longest chain runs a -> x -> b
+    -> c only while the amending act is counted."""
+    path = tmp_path / "catalog.sqlite"
+    con = catalog.connect(path)
+    docs = {"https://lagen.nu/a": ("sfs", "lag"),
+            "https://lagen.nu/xfs/1": ("foreskrift", "xfs"),
+            "https://lagen.nu/xfs/2": ("foreskrift", "xfs"),
+            "https://lagen.nu/xfs/3": ("foreskrift", "xfs")}
+    for uri, (source, kind) in docs.items():
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "short_id, path) VALUES (?, ?, ?, 'L', ?, ?, '')",
+                    (uri, source, kind, "Om %s" % uri.rsplit("/", 1)[-1],
+                     uri.replace("https://lagen.nu/", "").upper()))
+    refs = [("https://lagen.nu/a", "https://lagen.nu/xfs/1"),
+            ("https://lagen.nu/xfs/1", "https://lagen.nu/xfs/2"),
+            ("https://lagen.nu/xfs/2", "https://lagen.nu/xfs/3")]
+    for f, t in refs:
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, 'dcterms:references', ?, ?)", (f, t, t))
+    # xfs/1 amends xfs/2: it maintains another föreskrift rather than stating
+    # a rule of its own
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES ('https://lagen.nu/xfs/1', 'rpubl:andrar', "
+                "'https://lagen.nu/xfs/2', 'https://lagen.nu/xfs/2')")
+    con.commit()
+    con.close()
+    return path
+
+
+def test_base_acts_exclude_what_only_maintains_another_act(tmp_path):
+    """The filter measure 56 rests on. Leaving an amending act in does not
+    lengthen the answer a little -- it is the whole ladder, and in the real
+    corpus the difference is 71 references against 23."""
+    path = _legislation_catalog(tmp_path)
+    graph = pathgraph.load(path)
+    con = catalog.connect_ro(str(path))
+    base = compute._base_acts(con, graph)
+    assert "https://lagen.nu/xfs/1" not in base          # it amends xfs/2
+    assert set(base) == {"https://lagen.nu/a", "https://lagen.nu/xfs/2",
+                         "https://lagen.nu/xfs/3"}
+    # the chain through the amending act goes with it: a reaches nothing
+    assert pathgraph.longest_shortest(graph, base) == [
+        ["https://lagen.nu/xfs/2", "https://lagen.nu/xfs/3"]]
+    # with it, the same graph answers a three-step chain
+    assert pathgraph.longest_shortest(graph, graph.uris, k=1) == [
+        ["https://lagen.nu/a", "https://lagen.nu/xfs/1",
+         "https://lagen.nu/xfs/2", "https://lagen.nu/xfs/3"]]
+    con.close()
+
+
+def test_base_acts_refuses_a_catalog_that_cannot_filter_the_eu_acts(tmp_path):
+    """A corpus whose eurlex acts have never been told which of them only
+    amend another is not the population measure 56 claims: the sweep answers
+    with the al-Qaida sanctions ladder at 71 steps under a lede saying
+    amending acts do not count, and a wrong published statistic reads exactly
+    like a right one. The relations reach the catalog through
+    `lagen eurlex refresh-metadata`, then parse and relate."""
+    path = tmp_path / "eu.sqlite"
+    con = catalog.connect(path)
+    acts = ["https://lagen.nu/ext/celex/32002R0881",
+            "https://lagen.nu/ext/celex/32008R0803"]
+    for uri in acts:
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "short_id, path) VALUES (?, 'eurlex', 'regulation', 'L', "
+                    "'T', ?, '')", (uri, uri.rsplit("/", 1)[-1]))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES (?, 'dcterms:references', ?, ?)",
+                (acts[1], acts[0], acts[0]))
+    con.commit()
+    con.close()
+    graph = pathgraph.load(path)
+    ro = catalog.connect_ro(str(path))
+    with pytest.raises(AssertionError, match="refresh-metadata"):
+        compute._base_acts(ro, graph)
+
+    # one eurlex act publishing the relation is what says the sweep has run
+    rw = catalog.connect(path)
+    rw.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+               "VALUES (?, 'rpubl:andrar', ?, ?)",
+               (acts[1], acts[0], acts[0]))
+    rw.commit()
+    rw.close()
+    assert compute._base_acts(catalog.connect_ro(str(path)), graph) == [acts[0]]
+    ro.close()
+
+
+def test_group_d_assembles_measure_56_with_its_chains(tmp_path):
+    """The measure end to end: population, sweep, the `WHERE uri IN (…)` label
+    lookup, the rows and their folded-out steps. Every piece has its own test;
+    nothing drove the assembly, so the query built from
+    `",".join("?" * sum(len(c) for c in chains))` never ran in the suite."""
+    path = _legislation_catalog(tmp_path)
+    graph = pathgraph.load(path)
+    con = catalog.connect_ro(str(path))
+    measure = next(m for m in compute._group_d(con, {"graph": graph})
+                   if m.id == 56)
+    con.close()
+    assert measure.kind == "toplist" and measure.unit == "steg"
+    # one chain survives the base-act filter: xfs/2 -> xfs/3
+    assert [(r.label, r.value, r.detail) for r in measure.rows] == [
+        ("XFS/2", 1, "→ XFS/3")]
+    # the foldout names every act in the chain, labelled off short_id and
+    # carrying the title -- what tells a run of reissues from a run of substance
+    assert [(t.label, t.uri, t.detail) for t in measure.rows[0].steps] == [
+        ("XFS/2", "https://lagen.nu/xfs/2", "Om 2"),
+        ("XFS/3", "https://lagen.nu/xfs/3", "Om 3")]
+    # the lede counts the population it actually walked
+    assert "3 grundförfattningar" in measure.lede
+
+
+def test_base_acts_only_covers_the_legislation_groups(tmp_path):
+    """A verdict and a förarbete are not legislation. Both cite the act here,
+    so both are nodes in the graph -- the population still holds only the act,
+    or a chain between two statutes could route through a judgment."""
+    path = tmp_path / "mixed.sqlite"
+    con = catalog.connect(path)
+    for uri, source, kind in (("https://lagen.nu/a", "sfs", "lag"),
+                              ("https://lagen.nu/dom/x/1", "dv", "case"),
+                              ("https://lagen.nu/sou/1", "forarbete", "sou")):
+        con.execute("INSERT INTO documents (uri, source, kind, label, title, "
+                    "path) VALUES (?, ?, ?, 'L', 'T', '')", (uri, source, kind))
+    for citing in ("https://lagen.nu/dom/x/1", "https://lagen.nu/sou/1"):
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, 'dcterms:references', 'https://lagen.nu/a', "
+                    "'https://lagen.nu/a')", (citing,))
+    con.commit()
+    con.close()
+    graph = pathgraph.load(path)
+    assert len(graph.uris) == 3                 # all three are in the graph
+    ro = catalog.connect_ro(str(path))
+    assert compute._base_acts(ro, graph) == ["https://lagen.nu/a"]
+    ro.close()

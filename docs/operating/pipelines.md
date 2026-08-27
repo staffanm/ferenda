@@ -541,3 +541,24 @@ has been computed; a statistics page without measurements would publish an
 empty claim. `lagen all rebuild` runs `compute` automatically on a whole-corpus
 run, between `dump` and `generate` (not on a single-source rebuild).
 
+**Measure 56 needs the EU amendment relations first.** "Längst mellan två
+författningar" walks base acts only, and it knows which EU acts merely amend or
+implement another one from the `rpubl:andrar` / `rinfoex:genomforRattsakt`
+links parse mints off each act's `notice.ttl`. A corpus harvested before those
+relations existed carries none, and `compute` raises rather than publishing the
+71-step al-Qaida sanctions ladder under a lede saying amending acts do not
+count. Give the corpus its relations once:
+
+```sh
+lagen eurlex refresh-metadata --all      # rewrites every notice.ttl, no content refetched
+lagen eurlex parse --force               # the relations reach the artifact
+lagen all relate                         # and the catalog
+```
+
+`--all` is the point: without it `refresh-metadata` walks only the documents
+whose notice records no repeal, which is right for a repeal audit (a repeal
+never lifts, so the audit shrinks) and wrong for a new metadata field — a
+repealed act amends things too. The refresh is metadata-only, one SPARQL round
+trip per chunk, about 15 minutes for 64 043 documents. The endpoint throttles
+under a long run, so re-run it if it stops short.
+

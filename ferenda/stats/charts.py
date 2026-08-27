@@ -81,7 +81,11 @@ def toplist_html(measure, bars=True):
     does not draw its short end as an invisible sliver against the long
     end's maximum. `bars=False` drops the bars -- the plain-list form a
     profile's named extremes take, where drawing bars again would only
-    repeat the columns above."""
+    repeat the columns above.
+
+    A row carrying `steps` gets them as a foldout under its label: the value
+    is a count of something the reader cannot see, and the foldout is where
+    they see it."""
     rows = measure.rows
     if not rows:
         return TPL.empty()
@@ -98,6 +102,9 @@ def toplist_html(measure, bars=True):
         items.append({"split": None,
                       "href": _href(r.uri) if r.uri else None,
                       "label": r.label, "detail": r.detail,
+                      "steps": [{"href": _href(t.uri) if t.uri else None,
+                                 "label": t.label, "detail": t.detail}
+                                for t in r.steps],
                       "width": "%.2f" % (100.0 * abs(r.value)
                                          / (tops[r.group] or 1)) if bars
                       else None,

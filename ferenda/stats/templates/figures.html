@@ -31,6 +31,13 @@
 {%- else -%}
 <tr><th scope="row">{% if it.href %}<a href="{{ it.href }}">{{ it.label }}</a>{% else %}{{ it.label }}{% endif %}
 {%- if it.detail %} <span class="viz-detail">{{ it.detail }}</span>{% endif -%}
+{%- if it.steps %}<details class="viz-steps"><summary>Visa kedjan</summary><ol>
+{%- for step in it.steps -%}
+<li>{% if step.href %}<a href="{{ step.href }}">{{ step.label }}</a>{% else %}{{ step.label }}{% endif %}
+{%- if step.detail %} <span class="viz-detail">{{ step.detail }}</span>{% endif -%}
+</li>
+{%- endfor -%}
+</ol></details>{% endif -%}
 </th><td class="num">{% if it.width %}<span class="viz-bar" style="--w:{{ it.width }}%"></span>{% endif %}<span class="viz-val">{{ it.val }}</span></td></tr>
 {%- endif -%}
 {%- endfor -%}

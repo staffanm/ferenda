@@ -31,7 +31,7 @@ import re
 import statistics
 from concurrent.futures import ProcessPoolExecutor
 
-from ..lib import catalog, layout, util
+from ..lib import catalog, layout, pathgraph, util
 from ..lib.facets import flow_group
 from ..lib.markdown import begrepp_uri
 from ..lib.page import register_anchor
@@ -959,8 +959,66 @@ def _ikraft_months(laws):
 
 
 # ==========================================================================
-# D. the citation graph (29-36)
+# D. the citation graph (29-36, 56)
 # ==========================================================================
+
+# The five flow groups that are legislation: what an act, a föreskrift, an EU
+# act, an EU treaty and a convention have in common is that they state binding
+# rules, which is the population a chain of citations between statutes should
+# walk. The EU treaties are in for the same reason regeringsformen is -- a
+# constitution is statutory law like any other, not a separate kind of thing
+# the acts beneath it are merely made under.
+LEGISLATION_GROUPS = ("Författningar", "Föreskrifter", "EU-rättsakter",
+                      "EU-fördrag", "Konventioner")
+# An act that only maintains another one is not a base act, and the corpus says
+# so in its own typed relations: rpubl:andrar for an ändringsföreskrift and for
+# an EU amending act, rinfoex:genomforRattsakt for an EU implementing act (both
+# read off the CELLAR notice -- lib/cellar.notice_relations). No title test can
+# stand in for this. The same terrorist-list regulation is titled "om ändring
+# för nittioåttonde gången av" one year and "om genomförande av artikel 2.3 i"
+# the next, and either wording ladders one act per half-year back a decade.
+BASE_ACT_SQL = ("SELECT DISTINCT from_uri FROM links WHERE predicate IN "
+                "('rpubl:andrar', 'rinfoex:genomforRattsakt')")
+# one row means the corpus holds EU acts that have never been told which of
+# them only maintain another -- the relations are harvested into each act's
+# notice.ttl by `lagen eurlex refresh-metadata` and reach the catalog through
+# parse and relate. Until then the population is not the one measure 56 claims
+EURLEX_UNFILTERED_SQL = (
+    "SELECT 1 FROM documents WHERE source = 'eurlex' AND NOT EXISTS "
+    "(SELECT 1 FROM links WHERE predicate IN ('rpubl:andrar', "
+    "'rinfoex:genomforRattsakt') AND from_uri LIKE "
+    "'https://lagen.nu/ext/celex/%') LIMIT 1")
+
+
+def _base_acts(con, graph):
+    """The legislation uris that state rules of their own, as the population
+    for measure 56 -- every act in the five legislation groups except the ones
+    the catalog records as amending or implementing another.
+
+    Leaving the amending acts in does not lengthen the answer a little: it
+    changes what is measured. With them the longest chain runs 71 references
+    and 62 % of all sources sit 20 or more from something, because each rung of
+    the al-Qaida sanctions ladder (98 successive amendments of förordning
+    881/2002) cites the rung below it. Without them the longest runs 23 and the
+    figure is 0.02 %."""
+    maintaining = {u for (u,) in _q(con, BASE_ACT_SQL)}
+    allowed = {pathgraph.GROUP_ID[name] for name in LEGISLATION_GROUPS}
+    base = [uri for i, uri in enumerate(graph.uris)
+            if graph.group[i] in allowed and uri not in maintaining]
+    # every source in the population has to publish the relation, or the
+    # measure prints a number its own lede denies: with the EU acts unfiltered
+    # the longest chain is the al-Qaida sanctions ladder at 71, under a lede
+    # that says amending acts do not count. The relations are on disk in each
+    # act's notice; they reach the catalog through parse and relate
+    # (rule:fail-fast -- a wrong published statistic reads exactly like a right
+    # one)
+    assert not _q(con, EURLEX_UNFILTERED_SQL), (
+        "measure 56: the catalog holds eurlex acts but no eurlex rpubl:andrar "
+        "or rinfoex:genomforRattsakt, so amending acts are still in the "
+        "population. Run `lagen eurlex refresh-metadata --all`, then parse "
+        "and relate eurlex.")
+    return base
+
 
 def _flows(con):
     """Every reference counted by (citing group, cited group), largest first.
@@ -1078,6 +1136,43 @@ def _group_d(con, s):
                       "LEFT JOIN documents d ON d.uri = l.from_uri "
                       "WHERE l.from_uri = l.to_root "
                       "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
+
+    base = _base_acts(con, s["graph"])
+    chains = pathgraph.longest_shortest(s["graph"], base)
+    # named by uri, not by loading `documents` whole: ten chains name 129
+    # documents, and the full-table dicts the measures above build are read
+    # across a whole population where this one is not (291 647 rows, 118 MB)
+    named = _q(con, "SELECT uri, short_id, title FROM documents WHERE uri IN "
+                    "(%s)" % ",".join("?" * sum(len(c) for c in chains)),
+               [uri for chain in chains for uri in chain])
+    # short_id, not descriptive: both ends of a chain have to be citable and
+    # tellable apart, and two förordningar can share a descriptive name --
+    # SFS 2020:405 and SFS 2021:163 are both "Förordning om undantag från
+    # förlängning av tidsfrister i fråga om färdskrivare och förarkort"
+    ids = {uri: short_id for uri, short_id, _ in named if short_id}
+    # the foldout prints the whole chain, and there the title is what tells a
+    # run of annual reissues from a run of substance -- 24 rows of "PFS
+    # 2025:2, PFS 2024:3, …" name the acts without saying what they are
+    titles = {uri: title for uri, _, title in named if title}
+    yield Measure(
+        56, "D", "Längst mellan två författningar", "toplist", unit="steg",
+        lede="Hur många hänvisningar man minst måste följa för att ta sig "
+             "från den ena författningen till den andra. Populationen är "
+             "%s grundförfattningar — lagar, föreskrifter, EU-rättsakter, "
+             "EU-fördrag och konventioner. Ändrings- och genomförandeakter "
+             "räknas inte: de "
+             "ändrar en annan författning i stället för att själva ange en "
+             "regel, och en föreskrift som görs om varje år bygger annars en "
+             "kedja som är lång utan att räcka längre."
+             % "{:,}".format(len(base)).replace(",", " "),
+        rows=[Row(ids.get(chain[0]) or catalog.local(chain[0]),
+                  len(chain) - 1, chain[0],
+                  detail="→ " + (ids.get(chain[-1])
+                                 or catalog.local(chain[-1])),
+                  steps=[Row(ids.get(uri) or catalog.local(uri), step, uri,
+                             detail=titles.get(uri))
+                         for step, uri in enumerate(chain)])
+              for chain in chains])
 
     yield Measure(
         36, "D", "Mest omtalade begrepp", "toplist", unit="hänvisningar",
@@ -1342,6 +1437,11 @@ def compute(catalog_path, progress=None):
     con = catalog.connect_ro(str(catalog_path))
     try:
         scans = _in_force(con, scans)       # once, not once per group
+        # the citation graph as arrays, from the sidecar relate wrote beside
+        # this catalog (lib/pathgraph). Measure 56 walks it; loading it here
+        # rather than inside the group keeps the group functions taking the
+        # same two arguments, and the sidecar load is under a second.
+        scans["graph"] = pathgraph.load(catalog_path)
         measures = [m for group in _GROUPS for m in group(con, scans)]
     finally:
         con.close()

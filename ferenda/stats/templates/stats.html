@@ -152,6 +152,10 @@
 {{ stat(36,
         "Mest omtalade begrepp",
         lede="Begreppen rankade på antalet inkommande länkar: vilka begrepp resten av databasen hänvisar till.") }}
+{{ stat(56,
+        "Längst mellan två författningar",
+        computed_lede=true,
+        note="Vägen är den kortaste som finns mellan just de två författningarna, och den följer hänvisningarna framåt: från den som citerar till den som citeras. Samma slutpunkt kan stå i flera rader — det är en föreskrift som görs om varje år och där varje ny version hänvisar till den förra.") }}
 {% endset %}
 {% set group_E %}
 {{ stat(37,

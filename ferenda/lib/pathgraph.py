@@ -313,7 +313,11 @@ def _bfs(g, s, t, sides, allowed, banned_nodes=frozenset(),
     pass). `banned_nodes` and `banned_hops` (ordered `(u, v)` pairs) are what
     `k_shortest` closes off to force the walk onto a different route -- a hop
     is the ordered pair of documents, whichever CSR side carries it, since
-    that is what makes two chains different to a reader."""
+    that is what makes two chains different to a reader.
+
+    `g` is read only for `allowed`, so a caller walking arrays in a numbering
+    of its own (`longest_shortest`) passes `g=None` with `allowed=None`. Any
+    new use of `g` here has to keep working for that caller."""
     if s == t:
         return [s]
     prev = {s: -1}
@@ -389,3 +393,76 @@ def shortest(g, from_uri, to_uri, *, direction="both", groups=None):
     the *intermediate* documents; the endpoints are always allowed."""
     chains = k_shortest(g, from_uri, to_uri, direction=direction, groups=groups)
     return chains[0] if chains else None
+
+
+def longest_shortest(g, uris, k=10):
+    """The `k` longest of the shortest chains of citations, over the subgraph
+    induced on `uris` -- each a list of uris from the citing end to the cited
+    one, longest first.
+
+    This is the graph's diameter and the chains that hold it, computed exactly:
+    one forward BFS per node, keeping the farthest node each one reaches, then
+    a second BFS for the `k` winners alone to read their chain back. There is
+    no shortcut that stays exact, and none is needed at this size -- measured
+    over the legislation subgraph on dev 2026-08-27: the whole five groups are
+    50 841 nodes and 314 452 references in 100 s, and the base acts alone are
+    34 559 nodes and 145 649 references in 32 s.
+
+    A source may reach several documents at the same maximum distance; the one
+    reported is the lowest node id among them, so two runs over the same
+    catalog name the same chain. Chains are *not* deduplicated by endpoint:
+    three rungs of one ladder ending on the same act is what the corpus looks
+    like, and hiding two of them would make a chain of annual reissues read as
+    three unrelated long chains.
+
+    `uris` is the caller's population, and choosing it is the whole measurement
+    -- see stats.compute's base-act filter for why an amending act in the set
+    measures how often a list is reissued rather than how far the law reaches.
+    """
+    keep = [g.ids[u] for u in uris if u in g.ids]
+    renumber = {old: new for new, old in enumerate(keep)}
+    n = len(keep)
+    off = array("i", [0]) * (n + 1)
+    dst = array("i")
+    for new, old in enumerate(keep):
+        for p in range(g.fwd_off[old], g.fwd_off[old + 1]):
+            target = renumber.get(g.fwd_dst[p])
+            if target is not None:
+                dst.append(target)
+        off[new + 1] = len(dst)
+
+    # `stamp[v] == s` marks v as seen by the sweep from source s, so the visited
+    # set costs no allocation per BFS -- at 36k sources a fresh bytearray each
+    # time is most of the run
+    stamp = array("i", [-1]) * n
+    best = []
+    for s in range(n):
+        stamp[s] = s
+        frontier = [s]
+        hops = 0
+        farthest = s
+        while frontier:
+            hops += 1
+            nxt = []
+            for u in frontier:
+                for p in range(off[u], off[u + 1]):
+                    v = dst[p]
+                    if stamp[v] != s:
+                        stamp[v] = s
+                        nxt.append(v)
+            if nxt:
+                farthest = min(nxt)
+            frontier = nxt
+        if hops > 1:
+            best.append((hops - 1, s, farthest))
+    best.sort(key=lambda row: (-row[0], g.uris[keep[row[1]]],
+                               g.uris[keep[row[2]]]))
+    # the chains are read back with `_bfs` over the same induced arrays, run
+    # only for the ones that won the sweep -- keeping a predecessor array
+    # through all 50k sweeps would cost a write per node visited and be thrown
+    # away for every source but k. `g` is passed as None on purpose: these node
+    # ids are the induced numbering, not the graph's, so a future `_bfs` that
+    # reaches for `g.uris[v]` fails loudly here rather than quietly building a
+    # chain out of the wrong documents.
+    return [[g.uris[keep[i]] for i in _bfs(None, s, t, [(off, dst)], None)]
+            for _hops, s, t in best[:k]]

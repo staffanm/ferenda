@@ -52,6 +52,15 @@ charts.ENV.filters["linked"] = _linked
 _PAGE = charts.ENV.get_template("stats.html")
 
 
+def _as_row(d):
+    """One artifact row back as a `Row`, its `steps` with it -- a row that
+    carries a chain holds rows of its own, and `Row(**d)` would leave them as
+    the dicts they are on disk."""
+    row = Row(**{k: v for k, v in d.items() if k != "steps"})
+    row.steps = [Row(**step) for step in d.get("steps", [])]
+    return row
+
+
 def _as_measure(d):
     """The artifact dict back as the dataclass `charts` reads. Kept here rather
     than in `charts` so the figure code never sees the on-disk shape."""
@@ -61,7 +70,7 @@ def _as_measure(d):
         lede_links=d.get("lede_links", {}),
         value=d.get("value"), display=d.get("display", ""),
         tiles=[Tile(**t) for t in d.get("tiles", [])],
-        rows=[Row(**r) for r in d.get("rows", [])],
+        rows=[_as_row(r) for r in d.get("rows", [])],
         points=[Point(**p) for p in d.get("points", [])],
         cells=[Cell(**c) for c in d.get("cells", [])],
         xlabel=d.get("xlabel", ""), ylabel=d.get("ylabel", ""))

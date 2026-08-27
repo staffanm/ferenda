@@ -1652,6 +1652,18 @@ body.split .pane-stack { flex: 1 1 0; min-height: 0; display: flex;
 .viz-heat td.on-dark { color:var(--viz-on-heat); }
 .viz-heat td.viz-nil { background:var(--surf-2); }
 
+/* the chain behind a row's count, folded away until asked for. The row's
+   header cell is the anchor, so the list indents under the label rather than
+   pushing the value column around. */
+.viz-steps { margin:.35rem 0 .1rem; font-weight:400; }
+.viz-steps summary { font:600 .74rem/1.4 var(--sans); color:var(--ink-3);
+  cursor:pointer; }
+.viz-steps summary:hover { color:var(--ink); }
+.viz-steps ol { margin:.45rem 0 .2rem; padding-left:1.6rem;
+  font:400 .84rem/1.5 var(--sans); color:var(--ink-2); }
+.viz-steps li { margin:.15rem 0; }
+.viz-steps li .viz-detail { display:block; font-size:.92em; }
+
 .viz-data { margin:.6rem 0 0; }
 .viz-data summary { font:600 .78rem/1.4 var(--sans); color:var(--ink-3);
   cursor:pointer; }

@@ -133,3 +133,23 @@ def test_inbound_count_is_stamped_at_relate_and_read_first(tmp_path):
                 (b, b))
     assert catalog.document_inbound_count(con, b) == live
     con.close()
+
+
+def test_longest_shortest_measures_the_induced_subgraph(tmp_path):
+    """The diameter measure walks only the population it is given. Dropping a
+    node does not just shorten the answer -- it removes the chain that ran
+    through it, which is why the base-act filter in stats.compute changes 71
+    hops into 23 rather than trimming a few."""
+    cat = _catalog(tmp_path)
+    g = pathgraph.load(cat)
+    a, b, c = ("https://lagen.nu/%s" % x for x in "abc")
+    # the whole chain, not just its ends: the reader checks a "2 steg" row by
+    # reading what stands between them
+    assert pathgraph.longest_shortest(g, [a, b, c]) == [[a, b, c], [b, c]]
+    # b carries the whole chain: without it a reaches nothing
+    assert pathgraph.longest_shortest(g, [a, c]) == []
+    # k bounds the answer, longest first
+    assert pathgraph.longest_shortest(g, [a, b, c], k=1) == [[a, b, c]]
+    # a uri the graph does not hold is not in the population
+    assert pathgraph.longest_shortest(g, [a, b, c, "https://lagen.nu/nowhere"]) \
+        == [[a, b, c], [b, c]]

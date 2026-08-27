@@ -42,6 +42,15 @@ class Row:
                                 # ("Längst" / "Kortast"). Bars are scaled inside
                                 # a group, never across: 55 313 and 24 on one
                                 # scale draws the short end as nothing at all.
+    steps: list["Row"] = field(default_factory=list)
+                                # what the row's value counts, in order, shown
+                                # in a foldout under the row. A row that says
+                                # "23 steg from PFS 2025:2 to RFFS 2002:21" is
+                                # not checkable without them: the reader cannot
+                                # tell a chain of annual reissues from a chain
+                                # of substance, and those are different facts
+                                # about the law. Each step's `value` is its
+                                # place in the chain, counting from 0.
 
 
 @dataclass
