@@ -8,6 +8,7 @@ from lxml import etree
 
 from ferenda.eurlex import parse as P
 from ferenda.eurlex.correspond import correspondence
+from ferenda.lib.cellar import notice_ttl
 from ferenda.eurlex.parse import (
     UNCARRIED,
     content_file,
@@ -1031,6 +1032,35 @@ def test_parse_dir_stores_the_lineage_on_the_artifact(tmp_path):
     assert {(e["newArticle"], e["oldArticle"], e["oldLaw"].rsplit("/", 1)[1])
             for e in art["correspondence"]} == {
         ("1", "1", "31993L0037"), ("1", "1", "31992L0050")}
+
+
+def test_parse_dir_publishes_what_the_act_amends_and_implements(tmp_path):
+    """The notice's relations reach the artifact under the same metadata keys
+    lib/catalog.relation_links already mints typed edges from, so an EU
+    amending act publishes the rpubl:andrar a Swedish ändringsföreskrift does
+    -- and every measure over base acts can exclude it."""
+    d = tmp_path / "2008" / "32008R0803"
+    d.mkdir(parents=True)
+    (d / "swe.fmx4").write_text(ACT_XML)
+    (d / "notice.ttl").write_bytes(notice_ttl(
+        "32008R0803", "2008-08-08", [], ("1", None),
+        {"amends": ["32002R0881"], "implements": ["32001R2580"]}))
+    art = parse_dir(d, "32008R0803")
+    assert art["metadata"] == {
+        "andrar": ["https://lagen.nu/ext/celex/32002R0881"],
+        "genomfor_akt": ["https://lagen.nu/ext/celex/32001R2580"]}
+
+
+def test_parse_dir_leaves_no_metadata_key_on_a_base_act(tmp_path):
+    """A base act carries neither relation, and gets no key at all rather than
+    two empty lists -- an act with an empty `andrar` would read as one the
+    harvest asked about and found nothing for."""
+    d = tmp_path / "2002" / "32002R0881"
+    d.mkdir(parents=True)
+    (d / "swe.fmx4").write_text(ACT_XML)
+    (d / "notice.ttl").write_bytes(
+        notice_ttl("32002R0881", "2002-05-27", [], ("1", None)))
+    assert "metadata" not in parse_dir(d, "32002R0881")
 
 
 def test_parse_dir_leaves_no_lineage_key_on_an_act_without_a_table(tmp_path):

@@ -58,8 +58,10 @@ from ..lib.cellar import (
     LANGUAGES,
     SELECT_CHUNK,
     fetch_metadata,
+    fetch_relations,
     fetch_repeals,
     fetch_selection,
+    notice_relations,
     notice_repeal_date,
     notice_ttl,
     notice_validity,
@@ -333,10 +335,12 @@ def download_document(session, root, celex, languages, delay):
     (`sync`) selects in bulk; this serves the explicit per-CELEX refetch."""
     selection = fetch_selection(session, [celex], languages)
     wdate, eurovoc, validity, _answered = fetch_metadata(session, [celex])
+    relations = fetch_relations(session, [celex])
     stored = store_document(session, doc_dir(root, celex), celex,
                             wdate.get(celex), selection.get(celex, []),
                             eurovoc.get(celex, []),
-                            validity.get(celex, (None, None)))
+                            validity.get(celex, (None, None)),
+                            relations.get(celex))
     if stored and celex[0] in REPEALING_SECTORS:
         for target, when in refresh_repeal_targets(session, root, [celex]):
             print("%s repeals %s (no longer in force %s)"
@@ -403,6 +407,10 @@ def refresh_metadata(session, root, celexes=None, limit=None,
     """Re-read the CELLAR metadata of already-downloaded CELEX and rewrite their
     notice.ttl, without refetching a byte of content.
 
+    This is also how a corpus harvested before the notice carried the amends /
+    implements relations learns which of its acts are base acts and which only
+    maintain another one.
+
     Yields the work-list size first -- it is known before any query runs, so a
     caller's progress line can carry a real total -- then
     (celex, repeal date or None, in-force flag, rewritten) per document. The
@@ -433,7 +441,9 @@ def refresh_metadata(session, root, celexes=None, limit=None,
     already record a repeal* -- a repeal never lifts, so re-reading one asks
     CELLAR a question it has already answered. That is what keeps the periodic
     audit shrinking rather than costing the whole corpus every time. `limit`
-    bounds the work either way; re-run to go deeper.
+    bounds the work either way; re-run to go deeper. Pass the whole corpus
+    (`celexes=list_basefiles(root)`) for the one-off backfill that gives every
+    act its relations.
 
     No delay of its own: every query goes out through `net.request`, which paces
     the host to the Crawl-delay its robots.txt asks for. A second sleep here
@@ -450,6 +460,7 @@ def refresh_metadata(session, root, celexes=None, limit=None,
     for i in range(0, len(celexes), chunk):
         batch = celexes[i:i + chunk]
         wdate, eurovoc, validity, answered = fetch_metadata(session, batch)
+        relations = fetch_relations(session, batch)
         for celex in batch:
             if celex not in answered:
                 yield celex, None, None, False
@@ -461,9 +472,13 @@ def refresh_metadata(session, root, celexes=None, limit=None,
             # repeal never lifts -- and overwriting on a thin answer would erase
             # the one fact this whole path exists for.
             pair = validity.get(celex) or notice_validity(target)
+            # the relations fall back on the notice for the same reason the date
+            # and the validity pair do: CELLAR answering about a work without
+            # restating what it amends is not the act becoming a base act.
             compress.write_download(target / "notice.ttl", notice_ttl(
                 celex, wdate.get(celex) or notice_work_date(target),
-                eurovoc.get(celex, []), pair))
+                eurovoc.get(celex, []), pair,
+                relations.get(celex) or notice_relations(target)))
             # the repeal is read back off the written notice rather than derived
             # here, so what the caller counts is what the next parse will read
             yield celex, notice_repeal_date(target), pair[0], True
@@ -626,10 +641,12 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         sel = fetch_selection(session, [celex], languages)
         meta_wdate, meta_eurovoc, meta_validity, _ans = fetch_metadata(
             session, [celex])
+        meta_relations = fetch_relations(session, [celex])
         if store_document(session, doc_dir(root, celex), celex,
                           meta_wdate.get(celex), sel.get(celex, []),
                           meta_eurovoc.get(celex, []),
-                          meta_validity.get(celex, (None, None))):
+                          meta_validity.get(celex, (None, None)),
+                          meta_relations.get(celex)):
             stored += 1
             retry.discard(celex)
         elif not worth_retrying(meta_wdate.get(celex)):
@@ -644,11 +661,12 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
         # year (incremental steady state) queries nothing.
         pending = [celex for celex, _ in items
                    if full or not is_downloaded(root, celex)]
-        selection, eurovoc, validity = {}, {}, {}
+        selection, eurovoc, validity, relations = {}, {}, {}, {}
         if pending:
             selection = fetch_selection(session, pending, languages)
             _meta_wdate, eurovoc, validity, _ans = fetch_metadata(
                 session, pending)
+            relations = fetch_relations(session, pending)
         rep.reset()                     # don't bill the year's queries to doc 1
         y_seen = y_stored = y_skipped = 0
         y_new = []                      # the CELEX actually stored this year
@@ -666,7 +684,8 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
                 if store_document(session, doc_dir(root, celex), celex, wdate,
                                   selection.get(celex, []),
                                   eurovoc.get(celex, []),
-                                  validity.get(celex, (None, None))):
+                                  validity.get(celex, (None, None)),
+                                  relations.get(celex)):
                     stored += 1
                     y_stored += 1
                     y_new.append(celex)

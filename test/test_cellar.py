@@ -152,3 +152,68 @@ def test_fetch_repeals_collects_both_edge_kinds(monkeypatch):
     ])
     assert cellar.fetch_repeals(None, ["32016R0679"]) == {
         "32016R0679": ["31995L0046", "32003R1882"]}
+
+
+def test_a_notice_round_trips_what_the_act_amends_and_implements(tmp_path):
+    """The relation that separates a base act from an act that only maintains
+    another one. Both predicates matter: CELLAR tags the 2026 terrorist-list
+    regulation `amends` and the 2025 one `implements`, so reading only one of
+    them keeps half the ladder in the population."""
+    (tmp_path / "notice.ttl").write_bytes(cellar.notice_ttl(
+        "32008R0803", "2008-08-08", [], ("1", None),
+        {"amends": ["32002R0881"], "implements": ["32001R2580"]}))
+    assert cellar.notice_relations(tmp_path) == {
+        "amends": ["32002R0881"], "implements": ["32001R2580"]}
+    # the other metadata is unaffected by the new triples
+    assert cellar.notice_work_date(tmp_path) == "2008-08-08"
+    assert cellar.notice_repeal_date(tmp_path) is None
+
+
+def test_a_notice_without_relations_says_so(tmp_path):
+    """A base act carries neither relation, and "carries none" has to be
+    distinguishable from "was never asked" -- refresh_metadata falls back on
+    the stored relations exactly the way it falls back on the stored date."""
+    (tmp_path / "notice.ttl").write_bytes(
+        cellar.notice_ttl("32002R0881", "2002-05-27", []))
+    assert cellar.notice_relations(tmp_path) == {}
+    assert cellar.notice_relations(tmp_path / "nonexistent") == {}
+
+
+def test_a_treaty_celex_survives_the_relation_round_trip(tmp_path):
+    """A treaty CELEX carries a document suffix of its own -- 11992M/TXT,
+    11997D/TXTR(01) -- and 1 902 of the eurlex documents we hold are keyed
+    that way. `notice_ttl` percent-encodes the target, so a read that did not
+    unquote produced `11997D%2FTXTR%2801%29`, and the artifact got a uri no
+    document has. Taking the last path segment instead of everything after
+    `celex/` reads 12007L/TXT as the CELEX "TXT"."""
+    relations = {"amends": ["11997D/TXTR(01)"], "implements": ["12007L/TXT"]}
+    (tmp_path / "notice.ttl").write_bytes(
+        cellar.notice_ttl("32008R0803", "2008-08-08", [], ("1", None),
+                          relations))
+    assert cellar.notice_relations(tmp_path) == relations
+
+
+def test_a_dump_notice_states_the_relation_target_unencoded(tmp_path):
+    """The bulk unpacker keeps CELLAR's own object uri, which is not
+    percent-encoded. One read has to serve both shapes -- `unquote` is a no-op
+    on this one."""
+    (tmp_path / "notice.ttl").write_bytes(
+        b'<x> <' + CDM.encode() + b'resource_legal_amends_resource_legal> '
+        b'<http://publications.europa.eu/resource/celex/12007L/TXT> .\n')
+    assert cellar.notice_relations(tmp_path) == {"amends": ["12007L/TXT"]}
+
+
+def test_the_filter_keeps_the_relations_in_a_dump_notice():
+    """A bulk-unpacked notice has to carry the relations too, or an act
+    imported from a dump reads as a base act while the same act harvested live
+    reads as an amending one."""
+    ntriples = NTRIPLES + "\n".join([
+        '<http://x> <%sresource_legal_amends_resource_legal> '
+        '<http://publications.europa.eu/resource/celex/32002R0881> .' % CDM,
+        '<http://x> <%sresource_legal_implements_resource_legal> '
+        '<http://publications.europa.eu/resource/celex/32001R2580> .' % CDM,
+    ]) + "\n"
+    kept = [line for line, *_ in cellar.keep_triples(ntriples.splitlines())]
+    assert any("resource_legal_amends_resource_legal" in line for line in kept)
+    assert any("resource_legal_implements_resource_legal" in line
+               for line in kept)

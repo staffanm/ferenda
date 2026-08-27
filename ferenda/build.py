@@ -544,6 +544,8 @@ class RunOptions:
     obfuscated: bool = False     # mkpatch: obfuscate the patch (PII redactions)
     resume_after: str | None = None  # sfs download: resume an interrupted backfill
     rebuild_history: bool = False  # sfs history-as-git: rewrite main from corpus
+    every: bool = False            # eurlex refresh-metadata: the whole corpus,
+                                   # repealed acts included, not just the audit
     update: bool = False         # remisser ai-analyze: refresh every open ärende
     jobs: int = 1                # worker count for harvests that fan out (foreskrift)
 
@@ -2415,9 +2417,14 @@ def eurlex_refresh_metadata(args):
 
     With no CELEX named it walks every downloaded document whose notice does not
     already record a repeal -- a repeal never lifts, so the audit shrinks each
-    time it runs. Re-run `parse` and `relate` afterwards: the repeal reaches the
-    catalog through the artifact, the way every other extracted fact does."""
-    celexes = list(args) or None
+    time it runs. `--all` widens that to the whole corpus, repealed acts
+    included: the audit's skip is right for repeals but wrong for a *new*
+    metadata field, and the amends/implements relations measure 56 needs are
+    one (a repealed act amends things too). Re-run `parse` and `relate`
+    afterwards: the metadata reaches the catalog through the artifact, the way
+    every other extracted fact does."""
+    celexes = (eurlex_download.list_basefiles(layout.EURLEX_DOWNLOADED)
+               if RUN.every else list(args) or None)
     if RUN.dry_run:
         print("eurlex refresh-metadata: would re-read CELLAR metadata for %s "
               "document(s) in %s"
@@ -5246,6 +5253,10 @@ def main(argv=None):
                    help="sfs history-as-git: rebuild main from the complete "
                         "current corpus when corrected or backfilled history "
                         "cannot be appended safely")
+    p.add_argument("--all", action="store_true", dest="every",
+                   help="eurlex refresh-metadata: re-read every downloaded "
+                        "document, repealed ones included -- the one-off "
+                        "backfill, not the shrinking repeal audit")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
@@ -5260,6 +5271,7 @@ def main(argv=None):
     RUN.obfuscated = args.obfuscated
     RUN.resume_after = args.resume_after
     RUN.rebuild_history = args.rebuild_history
+    RUN.every = args.every
     RUN.update = args.update
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)

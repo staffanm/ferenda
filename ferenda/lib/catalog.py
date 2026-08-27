@@ -813,20 +813,26 @@ def _bemyndigande_links(art):
 # metadata relation-list keys -> the stable typed predicate each publishes.
 # andradAv is the register inverse (the listed ändringsförfattning X ändrar
 # this document); genomforDirektiv is the same predicate the förarbete
-# implements-edges and the SFS genomförande layer use.
+# implements-edges and the SFS genomförande layer use. genomforRattsakt is the
+# EU's own implementing relation and is deliberately not genomforDirektiv: a
+# rådets genomförandeförordning carries out a *regulation*, and calling that
+# "genomför direktiv" would state a transposition that never happened.
 _RELATION_PREDICATES = (("andrar", "rpubl:andrar"),
                         ("upphaver", "rpubl:upphaver"),
                         ("genomfor", "rpubl:genomforDirektiv"),
+                        ("genomfor_akt", "rinfoex:genomforRattsakt"),
                         ("andradAv", "rinfoex:andradAv"))
 
 
 def relation_links(art):
     """The typed relation edges a document's metadata carries as plain uri
     lists: what it amends (`andrar`), replaces/repeals (`upphaver`), transposes
-    (`genomfor`) and is amended by (`andradAv`, the amendment register's
-    inverse). These are metadata, not body text, so the inline-link walk misses
-    them. Field-driven: any source whose metadata stores uri lists under these
-    keys contributes (today the föreskrift vertical). Unanchored -- the
+    a directive (`genomfor`), carries out another EU act (`genomfor_akt`) and
+    is amended by (`andradAv`, the amendment register's inverse). These are
+    metadata, not body text, so the inline-link walk misses them. Field-driven:
+    any source whose metadata stores uri lists under these keys contributes --
+    today the föreskrift vertical from its own harvest, and eurlex from the
+    amends/implements relations its CELLAR notice carries. Unanchored -- the
     relation belongs to the document; `text` carries the document's own id so
     the target's mirror display can name it."""
     label = art.get("identifier") or local(art["uri"])

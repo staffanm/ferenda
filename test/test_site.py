@@ -814,6 +814,7 @@ ANDRINGSFS = {
                  "andrar": ["https://lagen.nu/aafs/2005:5"],
                  "upphaver": ["https://lagen.nu/aafs/1999:1"],
                  "genomfor": ["https://lagen.nu/ext/celex/32011L0061"],
+                 "genomfor_akt": ["https://lagen.nu/ext/celex/32001R2580"],
                  "andradAv": ["https://lagen.nu/aafs/2007:2"]},
     "structure": [],
 }
@@ -850,6 +851,10 @@ def test_relation_links_publishes_typed_predicates():
                 "predicate": "rpubl:upphaver", "text": "ÅFS 2006:11"}),
         (None, {"uri": "https://lagen.nu/ext/celex/32011L0061",
                 "predicate": "rpubl:genomforDirektiv", "text": "ÅFS 2006:11"}),
+        # the EU's own implementing relation, deliberately not
+        # genomforDirektiv: a genomförandeförordning carries out a regulation
+        (None, {"uri": "https://lagen.nu/ext/celex/32001R2580",
+                "predicate": "rinfoex:genomforRattsakt", "text": "ÅFS 2006:11"}),
         (None, {"uri": "https://lagen.nu/aafs/2007:2",
                 "predicate": "rinfoex:andradAv", "text": "ÅFS 2006:11"})]
     # sources without these metadata keys contribute nothing (SFS keeps its
@@ -859,12 +864,13 @@ def test_relation_links_publishes_typed_predicates():
 
 def test_foreskrift_relation_edges_and_inbound_mirrors(tmp_path):
     con = _foreskrift_catalog(tmp_path)
-    # outbound: all four typed predicates land in the links table
+    # outbound: every typed predicate lands in the links table
     preds = {row[0] for row in con.execute(
         "SELECT predicate FROM links WHERE from_uri = ?",
         (ANDRINGSFS["uri"],))}
     assert preds == {"rpubl:andrar", "rpubl:upphaver",
-                     "rpubl:genomforDirektiv", "rinfoex:andradAv"}
+                     "rpubl:genomforDirektiv", "rinfoex:genomforRattsakt",
+                     "rinfoex:andradAv"}
     # inbound mirror: the replaced regulation knows its replacer
     assert catalog.upphaver_inbound(con, UPPHAVDFS["uri"]) == [
         ("https://lagen.nu/aafs/2006:11", "ÅFS 2006:11",

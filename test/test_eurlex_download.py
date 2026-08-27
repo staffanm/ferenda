@@ -17,6 +17,14 @@ from ferenda.lib import catalog
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
 
 
+@pytest.fixture(autouse=True)
+def no_relation_query(monkeypatch):
+    """Every download path asks CELLAR what an act amends or implements. That
+    is a second endpoint round trip, and a test that does not care about the
+    relations must not make one -- the tests that do care override this."""
+    monkeypatch.setattr(D, "fetch_relations", lambda session, celexes: {})
+
+
 def test_store_document_skips_a_work_with_no_manifestation(tmp_path):
     # empty selection -> no swe/eng manifestation: nothing is written, not even a
     # notice (session is never touched, so None is fine)
@@ -449,6 +457,45 @@ def test_refresh_metadata_keeps_a_repeal_cellar_stops_restating(
     assert C.notice_work_date(d) == "1995-10-24"
 
 
+def test_refresh_metadata_backfills_what_an_act_amends(tmp_path, monkeypatch):
+    """The one-off pass that tells a corpus harvested before the relations
+    existed which of its acts are base acts. No content is refetched -- only
+    the notice is rewritten."""
+    d = D.doc_dir(tmp_path, "32008R0803")
+    d.mkdir(parents=True)
+    (d / "notice.ttl").write_bytes(
+        C.notice_ttl("32008R0803", "2008-08-08", [], ("1", None)))
+    assert C.notice_relations(d) == {}
+
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, c: ({}, {}, {}, set(c)))
+    monkeypatch.setattr(D, "fetch_relations",
+                        lambda s, c: {"32008R0803": {"amends": ["32002R0881"]}})
+    run = D.refresh_metadata(object(), tmp_path, ["32008R0803"])
+    next(run)
+    assert list(run) == [("32008R0803", None, "1", True)]
+    assert C.notice_relations(d) == {"amends": ["32002R0881"]}
+    assert C.notice_work_date(d) == "2008-08-08"
+
+
+def test_refresh_metadata_keeps_relations_cellar_stops_restating(
+        tmp_path, monkeypatch):
+    """CELLAR answering about a work without restating what it amends is not
+    the act becoming a base act -- the same fallback the validity pair gets.
+    Overwriting on a thin answer would put an amending act back in the
+    population every measure over base acts excludes it from."""
+    d = D.doc_dir(tmp_path, "32008R0803")
+    d.mkdir(parents=True)
+    (d / "notice.ttl").write_bytes(
+        C.notice_ttl("32008R0803", "2008-08-08", [], ("1", None),
+                     {"amends": ["32002R0881"]}))
+
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, c: ({}, {}, {}, set(c)))
+    run = D.refresh_metadata(object(), tmp_path, ["32008R0803"])
+    next(run)
+    assert list(run) == [("32008R0803", None, "1", True)]
+    assert C.notice_relations(d) == {"amends": ["32002R0881"]}
+
+
 def test_refresh_metadata_skips_what_it_already_recorded_as_repealed(
         tmp_path, monkeypatch):
     # a repeal never lifts, so re-asking about one is a question CELLAR has
@@ -492,6 +539,58 @@ def test_sync_retries_pending_no_content_work_and_clears_it(tmp_path, monkeypatc
     assert stored == 1
     assert D.is_downloaded(tmp_path, "62020CJ0100")
     assert D.read_pending(tmp_path, "caselaw") == []      # cleared on success
+
+
+def test_sync_stores_the_relations_with_the_document(tmp_path, monkeypatch):
+    """The walk is the path that runs over the whole corpus, so it is the one
+    that has to write the relations -- an act it stores without them reads as
+    a base act for ever after, since the walk never returns to it. Note the
+    walk does *not* ratchet the way `refresh_metadata` does: a `full=True` run
+    re-enters `store_document` and rewrites the notice from the fresh answer
+    alone, exactly as it already does for the validity pair. Overrides the
+    module's no_relation_query fixture on purpose."""
+    _stub_session(monkeypatch)
+    monkeypatch.setattr(D, "enumerate_celex", lambda s, sec, since, languages=None:
+                        iter([(2008, [("32008R0803", "2008-08-08")])]))
+    monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs:
+                        {"32008R0803": [("swe", [("xhtml", "u", None)])]})
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, celexes:
+                        ({"32008R0803": "2008-08-08"}, {}, {}, set(celexes)))
+    monkeypatch.setattr(D, "fetch_relations", lambda s, celexes:
+                        {"32008R0803": {"amends": ["32002R0881"]}})
+    # sector 3 acts announce what they repeal; that path is its own test
+    monkeypatch.setattr(D, "refresh_repeal_targets", lambda s, r, c: iter(()))
+
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+    monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
+
+    _seen, stored, _skipped = D.sync(tmp_path, "acts")
+    assert stored == 1
+    assert C.notice_relations(D.doc_dir(tmp_path, "32008R0803")) == {
+        "amends": ["32002R0881"]}
+
+
+def test_download_document_stores_the_relations(tmp_path, monkeypatch):
+    """The explicit per-CELEX refetch, the other path a stored notice comes
+    from. A document refetched by hand must not lose the relations the walk
+    would have given it."""
+    monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs:
+                        {"32008R0803": [("swe", [("xhtml", "u", None)])]})
+    monkeypatch.setattr(D, "fetch_metadata", lambda s, celexes:
+                        ({"32008R0803": "2008-08-08"}, {}, {}, set(celexes)))
+    monkeypatch.setattr(D, "fetch_relations", lambda s, celexes:
+                        {"32008R0803": {"implements": ["32001R2580"]}})
+    monkeypatch.setattr(D, "refresh_repeal_targets", lambda s, r, c: iter(()))
+
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+    monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
+
+    assert D.download_document(object(), tmp_path, "32008R0803", ["swe"], 0) \
+        == ["swe"]
+    assert C.notice_relations(D.doc_dir(tmp_path, "32008R0803")) == {
+        "implements": ["32001R2580"]}
 
 
 def test_sync_keeps_recent_pending_but_drops_aged_out(tmp_path, monkeypatch):

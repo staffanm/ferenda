@@ -22,7 +22,7 @@ import re
 from datetime import date
 
 from ..lib import compress, eucasenaming, layout, markup, patch
-from ..lib.cellar import notice_repeal_date, notice_work_date
+from ..lib.cellar import notice_relations, notice_repeal_date, notice_work_date
 from ..lib.datasets import NAMEDACTS
 from ..lib.errors import SkipDocument
 from ..lib.eu_structure import doctype, revision_base
@@ -410,6 +410,19 @@ def parse_dir(doc_dir, celex):
     repealed = notice_repeal_date(doc_dir) or revision_repeal_date(celex)
     if repealed:
         art["expired"] = repealed
+    # what the act amends or carries out, off its notice. `andrar` is the key
+    # lib/catalog.relation_links already mints rpubl:andrar from (the föreskrift
+    # vertical fills the same key), so an EU amending act publishes the same
+    # typed edge a Swedish ändringsföreskrift does. `genomfor_akt` is the EU's
+    # own implementing relation -- carrying out a regulation, not transposing a
+    # directive, which is what rpubl:genomforDirektiv means.
+    relations = notice_relations(doc_dir)
+    metadata = {key: [BASE % target for target in relations[source]]
+                for key, source in (("andrar", "amends"),
+                                    ("genomfor_akt", "implements"))
+                if relations.get(source)}
+    if metadata:
+        art["metadata"] = metadata
     # the act's own jämförelsetabell, read *after* to_artifact because the
     # header's "Direktiv 2004/18/EG" is identified by the citation link minted
     # there. Empty for all but ~2% of sector-3 acts and every judgment, so this

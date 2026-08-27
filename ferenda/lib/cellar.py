@@ -24,7 +24,7 @@ import re
 import subprocess
 from collections import defaultdict
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from . import compress
 from .net import request
@@ -66,6 +66,13 @@ SELECT_PREDICATES = {P_EXPR_WORK, P_EXPR_LANG, P_EXPR_MANIF, P_MANIF_EXPR,
 # triple in the graph, which is why no stored notice ever carried a repeal date.
 P_IN_FORCE = CDM + "resource_legal_in-force"
 P_END_OF_VALIDITY = CDM + "resource_legal_date_end-of-validity"
+# What an act does to another act instead of stating law of its own. CELLAR
+# tags the same maintenance job either way -- the 2026 terrorist-list
+# regulation (32026R1878) carries `amends`, the 2025 one (32025R1578) carries
+# `implements` -- so a consumer asking "is this a base act" has to read both.
+P_AMENDS = CDM + "resource_legal_amends_resource_legal"
+P_IMPLEMENTS = CDM + "resource_legal_implements_resource_legal"
+RELATION_PREDICATES = {"amends": P_AMENDS, "implements": P_IMPLEMENTS}
 # CELLAR writes this end-of-validity when the act has no end date at all, so it
 # is a placeholder, not a date
 OPEN_ENDED = "9999-12-31"
@@ -73,7 +80,8 @@ META_PREDICATES = {CDM + p for p in (
     "resource_legal_id_celex", "resource_legal_id_sector", "work_date_document",
     "expression_title", "expression_subtitle",
     "resource_legal_date_entry-into-force",
-    "work_is_about_concept_eurovoc")} | {P_IN_FORCE, P_END_OF_VALIDITY}
+    "work_is_about_concept_eurovoc")} | {P_IN_FORCE, P_END_OF_VALIDITY,
+                                         P_AMENDS, P_IMPLEMENTS}
 KEEP_PREDICATES = SELECT_PREDICATES | META_PREDICATES
 
 
@@ -230,6 +238,50 @@ def _repeals_query(celexes):
             "?w cdm:resource_legal_id_celex ?celex . "
             "?w %s ?r . ?r cdm:resource_legal_id_celex ?repealed }"
             % (_literals(celexes), REPEALS))
+
+
+# What an act amends or implements, as CELEX. Kept out of _metadata_query for
+# the same reason the repeals query is: that query already crosses eurovoc
+# concepts with end-of-validity dates, and a fourth multi-valued OPTIONAL
+# multiplies the row count again. One query answers for both relations -- an
+# act that maintains another usually carries only one of them, and asking twice
+# doubles the round trips for no gain.
+def _relations_query(celexes):
+    return (PREFIXES + "SELECT ?celex ?p ?target WHERE { VALUES ?celex { %s } "
+            "?w cdm:resource_legal_id_celex ?celex . "
+            "VALUES ?p { <%s> <%s> } ?w ?p ?r . "
+            "?r cdm:resource_legal_id_celex ?target }"
+            % (_literals(celexes), P_AMENDS, P_IMPLEMENTS))
+
+
+def fetch_relations(session, celexes):
+    """``{celex: {"amends": [celex, ...], "implements": [...]}}`` for the acts
+    that carry either relation. An act carrying neither is simply absent, and
+    so is one CELLAR did not answer for: this makes no distinction between the
+    two, unlike `fetch_metadata`'s `answered` set. `refresh_metadata` therefore
+    treats a stored relation as a ratchet -- once written it is never cleared,
+    the way a repeal never lifts. That is deliberate: an empty answer from the
+    endpoint is a hiccup as often as it is a fact, and clearing on one would
+    put an amending act back into every population that excludes it.
+
+    This is what separates a base act from the acts that only maintain it. The
+    corpus needs it because the wording never settles: the same terrorist-list
+    regulation is titled "om ändring för nittioåttonde gången av" one year and
+    "om genomförande av artikel 2.3 i" the next, and a title test built on one
+    form silently keeps every act written in the other.
+
+    A relation whose target CELLAR states without a CELEX is dropped -- we key
+    documents by CELEX everywhere, and a target we cannot name is a relation we
+    cannot store."""
+    out = defaultdict(lambda: defaultdict(list))
+    by_uri = {uri: key for key, uri in RELATION_PREDICATES.items()}
+    for row in _chunked(session, _relations_query, celexes, SELECT_CHUNK):
+        key = by_uri[row["p"]["value"]]
+        target = row["target"]["value"]
+        if target not in out[row["celex"]["value"]][key]:
+            out[row["celex"]["value"]][key].append(target)
+    return {celex: {k: sorted(v) for k, v in rel.items()}
+            for celex, rel in out.items()}
 
 
 def _ranked_types(by_type):
@@ -423,10 +475,11 @@ def fetch_repeals(session, celexes):
     return repeals
 
 
-def notice_ttl(celex, wdate, eurovoc, validity=(None, None)):
+def notice_ttl(celex, wdate, eurovoc, validity=(None, None), relations=None):
     """The metadata we keep for a downloaded CELEX, as n-triples (a subset of
     turtle) on the stable CELLAR celex URI: celex, sector, work date, any eurovoc
-    concepts, and the validity pair (in-force flag + end-of-validity date). The
+    concepts, the validity pair (in-force flag + end-of-validity date), and what
+    the act amends or implements (`fetch_relations`, as CELEX targets). The
     live path no longer fetches the tree notice, so this stands in for it -- the
     metadata worth keeping, and the on-disk marker the harvester and parser key
     on. Both validity triples are written as CELLAR states them; reading a repeal
@@ -448,6 +501,13 @@ def notice_ttl(celex, wdate, eurovoc, validity=(None, None)):
     for concept in eurovoc:
         triples.append('%s <%s> <%s> .'
                        % (subj, CDM + "work_is_about_concept_eurovoc", concept))
+    # the target is written as its CELLAR celex URI, the same subject shape this
+    # notice uses, so the triple reads the same way whether it was synthesized
+    # here or unpacked from a dump notice
+    for key, pred in RELATION_PREDICATES.items():
+        for target in (relations or {}).get(key, ()):
+            triples.append('%s <%s> <%s> .'
+                           % (subj, pred, CELLAR % quote(target, safe="")))
     return ("\n".join(triples) + "\n").encode()
 
 
@@ -537,6 +597,45 @@ def notice_repeal_date(doc_dir):
     return end_of_validity if in_force in OUT_OF_FORCE else None
 
 
+# What the notice records about maintenance relations, across every notice
+# shape on disk: the n-triples subset this module synthesizes
+# ('<...cdm#resource_legal_amends_resource_legal> <...celex/32002R0881>') and
+# the bulk unpacker's prefixed turtle ('j.0:resource_legal_amends... <...>').
+# The target is everything after 'celex/', NOT the last path segment: a treaty
+# CELEX carries a document suffix of its own ('11992M/TXT', '12007L/TXTR(01)'),
+# and 1 902 of the eurlex documents we hold are keyed that way. Taking the last
+# segment reads 12007L/TXT as the CELEX "TXT" -- the trap facets._eu_celex
+# already documents.
+RE_NOTICE_RELATION = re.compile(
+    r"resource_legal_(amends|implements)_resource_legal>?\s+"
+    r"<[^>]*/celex/([^>]+)>")
+
+
+def notice_relations(doc_dir):
+    """``{"amends": [celex, ...], "implements": [...]}`` for the acts the
+    stored notice says this one maintains -- each key absent when the notice
+    records none.
+
+    An act carrying either relation is not a base act: it changes or carries
+    out another act rather than stating law of its own. That distinction is the
+    difference between measuring how deep the law reaches and measuring how
+    often a list is reissued -- the EU amendment ladders run to 71 references
+    where the base acts alone run to 23.
+
+    The CELEX is unquoted on the way out because `notice_ttl` percent-encodes
+    it on the way in (as it does the subject). Without that, 11997D/TXTR(01)
+    round-trips as `11997D%2FTXTR%2801%29` and the artifact gets a uri no
+    document has. `unquote` is a no-op on a plain CELEX and on the unencoded
+    form a dump notice carries, so one read serves every notice shape."""
+    text = _notice_text(doc_dir)
+    out = defaultdict(list)
+    for key, target in RE_NOTICE_RELATION.findall(text or ""):
+        celex = unquote(target)
+        if celex not in out[key]:
+            out[key].append(celex)
+    return {k: sorted(v) for k, v in out.items()}
+
+
 def content_filename(code, filetype, content):
     """The stored filename for a fetched item. CELLAR often returns a Formex
     manifestation not as a single .fmx4 but as a zip of several .fmx4 files (the
@@ -549,7 +648,7 @@ def content_filename(code, filetype, content):
 
 
 def store_document(session, target, celex, wdate, selection, eurovoc,
-                   validity=(None, None)):
+                   validity=(None, None), relations=None):
     """Write a CELEX's synthesized notice and fetch its selected content per
     language. `selection` is the [(lang, [(filetype, url, accept), ...])]
     candidate list fetch_selection returns for this CELEX. Returns the languages
@@ -595,5 +694,6 @@ def store_document(session, target, celex, wdate, selection, eurovoc,
             break
     if stored:
         compress.write_download(target / "notice.ttl",
-                                notice_ttl(celex, wdate, eurovoc, validity))
+                                notice_ttl(celex, wdate, eurovoc, validity,
+                                           relations))
     return stored
