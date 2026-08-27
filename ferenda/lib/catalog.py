@@ -1890,11 +1890,19 @@ def set_genomforande(con, rows):
         "INSERT INTO genomforande (sfs_uri, sfs_anchor, directive, article, "
         "prop_uri, prop_label, pinpoint, partial, sfs_pinpoint) "
         "VALUES (?,?,?,?,?,?,?,?,?)", rows)
+    # `directive` reaches this table with a stray pinpoint on 289 of its rows
+    # ("...32001L0034#5.3.b" for a row whose `article` column says 7), and
+    # appending the article to that wrote a two-# `to_uri` -- 1,011 link rows
+    # filed under the wrong provision, or under a `to_root` that is itself a
+    # fragment and so belongs to no document at all. The edge names the
+    # directive and the article, so the document uri is what `to_root` and the
+    # stem of `to_uri` take.
     con.executemany(
         "INSERT INTO links (from_uri, from_anchor, predicate, to_uri, to_root, "
         "text) VALUES (?,?,?,?,?,?)",
         [(sfs_uri, anchor, "rpubl:genomforDirektiv",
-          directive + "#" + article, directive, prop_label)
+          directive.partition("#")[0] + "#" + article,
+          directive.partition("#")[0], prop_label)
          for (sfs_uri, anchor, directive, article, prop_uri,
               prop_label, pin, partial, sfs_pin) in rows])
     con.commit()

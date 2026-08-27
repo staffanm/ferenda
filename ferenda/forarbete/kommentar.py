@@ -126,8 +126,13 @@ def _refparser():
 
 def _first_directive(parser, text):
     """The first CELEX *directive* the parser finds in `text` (regulations and
-    other acts skipped), or None."""
-    return next((r.uri for r in parser.parse_text(text, context={})
+    other acts skipped), or None. The act, never a provision of it: an alias
+    sentence that opens on a pinpoint ("artikel 5.3 b i direktiv 2001/34/EG")
+    resolves to ".../32001L0034#5.3.b", and every consumer here names the
+    directive as a whole -- appending an article to the pinpoint wrote 1,011
+    two-# link targets, filed under a provision the sentence never mentions."""
+    return next((r.uri.partition("#")[0]
+                 for r in parser.parse_text(text, context={})
                  if is_directive(r.uri)), None)
 
 
