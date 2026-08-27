@@ -264,18 +264,32 @@ def _graph_inbound_side(con, root, unit, groups, limit, sort, grouplimit,
     Ranking under sort=citations is then by CSR in-degree (distinct citing
     documents) while the row still *displays* the stamped inbound_count --
     the same trade the depth rings already make. Without a CSR (not yet
-    loaded, or a direct reads caller) the joined path answers as before."""
-    if not groups and sort == "links" and grouplimit is None:
-        return _graph_side_unfiltered(
-            con, catalog.graph_anchor_inbound_counts(con, root, unit)
-            if unit else catalog.graph_inbound_counts(con, root), limit)
+    loaded, or a direct reads caller) the joined path answers as before.
+
+    On a *document* uri the counts themselves come off the CSR too
+    (`pathgraph.inbound_counts`), so no shape of this reply reads the links
+    table any more. The aggregate never depended on `limit` -- miljöbalken's
+    220,617 link rows were walked to answer with 300, 19.6 MB of
+    idx_links_to_root cold, and 37 s of a 37.8 s reply on prod. A fragment
+    uri keeps the SQL path: the CSR is document-level and knows nothing about
+    #K4P7."""
     if csr is None:
+        if not groups and sort == "links" and grouplimit is None:
+            return _graph_side_unfiltered(
+                con, catalog.graph_anchor_inbound_counts(con, root, unit)
+                if unit else catalog.graph_inbound_counts(con, root), limit)
         return _graph_side(
             catalog.graph_anchor_inbound(con, root, unit) if unit
             else catalog.graph_inbound(con, root), groups, limit,
             sort=sort, grouplimit=grouplimit)
+    # a document the CSR has no node for cites nothing and is cited by nothing
+    # (`graph` has already established it IS in `documents`, and every cited
+    # corpus document is a node), so its inbound side is empty
     counts_q = (catalog.graph_anchor_inbound_counts(con, root, unit) if unit
-                else catalog.graph_inbound_counts(con, root))
+                else pathgraph.inbound_counts(csr, root) if root in csr.ids
+                else [])
+    if not groups and sort == "links" and grouplimit is None:
+        return _graph_side_unfiltered(con, counts_q, limit)
     allowed = None if not groups \
         else {pathgraph.GROUP_ID[name] for name in groups}
     kept = []

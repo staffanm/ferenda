@@ -161,12 +161,12 @@ CREATE INDEX IF NOT EXISTS idx_dircorr_new
 CREATE INDEX IF NOT EXISTS idx_corr_new ON correspondence(new_uri);
 CREATE INDEX IF NOT EXISTS idx_corr_old ON correspondence(old_uri);
 CREATE INDEX IF NOT EXISTS idx_genomf_sfs ON genomforande(sfs_uri, sfs_anchor);
-CREATE INDEX IF NOT EXISTS idx_links_to_uri  ON links(to_uri);
 CREATE INDEX IF NOT EXISTS idx_links_from    ON links(from_uri);
--- their `to_root` sibling is deliberately NOT here: it is covering, and building
--- it over a populated table is minutes of work that `executescript(SCHEMA)`
--- would do on the serving path. `connect` creates it while the table is still
--- empty; `widen_to_root_index` rebuilds it later. See INDEX_TO_ROOT_COLUMNS.
+-- the `to_root` and `to_uri` siblings are deliberately NOT here: both are
+-- covering, and building either over a populated table is minutes of work that
+-- `executescript(SCHEMA)` would do on the serving path. `connect` creates them
+-- while the table is still empty; `widen_to_root_index` and `widen_to_uri_index`
+-- rebuild them later. See INDEX_TO_ROOT_COLUMNS and INDEX_TO_URI_COLUMNS.
 -- `idx_docs_source` is deliberately NOT here: it covers (source, art_size), and
 -- `art_size` is an ALTER-added column this script cannot reference. `connect`
 -- creates it below, after the migrations. See INDEX_DOCS_SOURCE_COLUMNS.
@@ -228,6 +228,22 @@ _CREATE_DOCS_SOURCE = ("CREATE INDEX IF NOT EXISTS idx_docs_source ON documents(
 INDEX_TO_ROOT_COLUMNS = ("to_root", "from_uri", "from_anchor")
 _CREATE_TO_ROOT = ("CREATE INDEX IF NOT EXISTS idx_links_to_root ON links(%s)"
                    % ", ".join(INDEX_TO_ROOT_COLUMNS))
+
+# The provision-level inbound queries (`graph_anchor_inbound*`) ask for the
+# citers of one #fragment. They used to find the *document* by `to_root` and
+# then test `to_uri` per row -- and `to_uri` is not in the to_root index, so
+# every one of the document's link rows was fetched out of the 2.5 GB table.
+# Article 6 ECHR sits under 1,439,778 of them: 588 MB read, 143,662 scattered
+# pages, 6.5 s cold on dev's NVMe and minutes on prod's disk, to answer with
+# 300 rows. Seeking `to_uri` directly reads only the provision's own range --
+# 160,061 rows for article 6, 2,216 pages -- and carrying `from_uri` makes that
+# range covering, so the group-by never touches the table either.
+#
+# `to_uri` stays leftmost, so every plain `to_uri = ?` and `to_uri` range this
+# index already served keeps it; the second column only widens the rows.
+INDEX_TO_URI_COLUMNS = ("to_uri", "from_uri")
+_CREATE_TO_URI = ("CREATE INDEX IF NOT EXISTS idx_links_to_uri ON links(%s)"
+                  % ", ".join(INDEX_TO_URI_COLUMNS))
 
 
 def connect(path: Path | str, data_root: Path | None = None,
@@ -322,6 +338,7 @@ def connect(path: Path | str, data_root: Path | None = None,
     # puts it right (`widen_to_root_index`).
     if not con.execute("SELECT 1 FROM links LIMIT 1").fetchone():
         con.execute(_CREATE_TO_ROOT)
+        con.execute(_CREATE_TO_URI)
     # Hand back a connection with no transaction in flight. `_record_data_root`
     # runs a DELETE or an INSERT, and sqlite3's legacy isolation_level opens an
     # implicit transaction before DML -- so without this, `connect` returned
@@ -374,6 +391,22 @@ def widen_to_root_index(con: sqlite3.Connection) -> bool:
     con.execute("BEGIN IMMEDIATE")
     con.execute("DROP INDEX IF EXISTS idx_links_to_root")
     con.execute(_CREATE_TO_ROOT)
+    con.execute("COMMIT")
+    return True
+
+
+def widen_to_uri_index(con: sqlite3.Connection) -> bool:
+    """Rebuild `idx_links_to_uri` covering (INDEX_TO_URI_COLUMNS) if it is not
+    already, returning whether it had to -- the `widen_to_root_index` pattern,
+    for the reason given at INDEX_TO_URI_COLUMNS and with the same transaction
+    discipline. A catalog no relate has widened yet answers the provision-level
+    inbound queries correctly and slowly, exactly as before."""
+    if tuple(row[2] for row in con.execute(
+            "PRAGMA index_info(idx_links_to_uri)")) == INDEX_TO_URI_COLUMNS:
+        return False
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("DROP INDEX IF EXISTS idx_links_to_uri")
+    con.execute(_CREATE_TO_URI)
     con.execute("COMMIT")
     return True
 
@@ -1624,6 +1657,7 @@ def rebuild(catalog_path, source, artifact_paths, progress=None, force=False,
     sync, and how many documents were (re)written this run."""
     con = connect(catalog_path, data_root=data_root, exclusive=exclusive)
     widen_to_root_index(con)     # build-cost work belongs here, not in serving
+    widen_to_uri_index(con)        # ... and so does its provision-level sibling
     widen_docs_source_index(con)   # ... and so does its documents-side sibling
     # artifact paths are stored data_root-relative (portable catalog); the root is
     # what `connect` just recorded (or the catalog file's own directory when the two
@@ -2663,32 +2697,63 @@ def _frag_globs(frag):
     return (frag + "[A-Z]*", frag + ".*")
 
 
+# The same three matches as a `to_uri` range, so the provision-level inbound
+# queries seek their own rows instead of walking every link into the document
+# (INDEX_TO_URI_COLUMNS). Every match starts with the pinpoint itself and
+# continues with nothing, a capital, or a dot -- so all of them sort below the
+# pinpoint plus "[", the character after "Z". The GLOBs still run, on index
+# rows: the range also admits "A60" where "A6" must not match it. Same trick as
+# the "#"/"$" bound in `caselaw_anchored`, and the same BINARY collation.
+#
+# The third pattern is what `to_root = ?` used to say, spelled on `to_uri` so
+# the query stays covering: a target inside this document carries exactly one
+# "#". 289 link rows corpus-wide carry two -- `set_genomforande` writes
+# `directive + "#" + article` over a `directive` that is already a pinpoint uri
+# ("...31995L0046#8.4.a" + "#1"), so their `to_root` is a fragment. Those rows
+# never counted towards a provision and still don't.
+def _frag_range(prefix, root):
+    return (prefix, prefix + "[", root + "#*#*")
+
+
 def graph_anchor_inbound(con, uri, frag):
     """The documents citing one provision -- rows naming `uri#frag` or a
     subdivision of it -- largest first."""
-    letter, dot = _frag_globs(uri + "#" + frag)
+    pinpoint = uri + "#" + frag
+    letter, dot = _frag_globs(pinpoint)
+    lo, hi, nested = _frag_range(pinpoint, uri)
     return con.execute(
         "SELECT l.from_uri, count(*) n, d.label, d.title, d.source, d.kind, "
         "       d.descriptive, d.inbound_count "
         "FROM links l JOIN documents d ON d.uri = l.from_uri "
-        "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
-        "                         OR l.to_uri GLOB ?) "
-        "AND l.from_uri != l.to_root "
+        "WHERE l.to_uri >= ? AND l.to_uri < ? "
+        "AND (l.to_uri = ? OR l.to_uri GLOB ? OR l.to_uri GLOB ?) "
+        "AND l.to_uri NOT GLOB ? AND l.from_uri != ? "
         "GROUP BY l.from_uri ORDER BY n DESC",
-        (uri, uri + "#" + frag, letter, dot)).fetchall()
+        (lo, hi, pinpoint, letter, dot, nested, uri)).fetchall()
 
 
 def graph_anchor_inbound_counts(con, uri, frag):
     """(from_uri, n) per distinct citer of one provision, largest first,
-    unlabelled -- `graph_anchor_inbound` without the join to `documents`."""
-    letter, dot = _frag_globs(uri + "#" + frag)
+    unlabelled -- `graph_anchor_inbound` without the join to `documents`.
+
+    The whole query is answered from `idx_links_to_uri`: the range picks the
+    provision's own rows out of the document's, and `from_uri` rides along in
+    the index, so nothing reads the links table. `to_root` no longer appears --
+    the range and `_frag_range`'s third pattern say the same thing about
+    `to_uri`, and the self-citation test compares against `uri` itself. Article
+    6 ECHR went from 143,662 scattered pages (the whole document's 1,439,778
+    link rows, fetched out of the table for a `to_uri` the to_root index does
+    not carry) to its own 2,216."""
+    pinpoint = uri + "#" + frag
+    letter, dot = _frag_globs(pinpoint)
+    lo, hi, nested = _frag_range(pinpoint, uri)
     return con.execute(
         "SELECT l.from_uri, count(*) n FROM links l "
-        "WHERE l.to_root = ? AND (l.to_uri = ? OR l.to_uri GLOB ? "
-        "                         OR l.to_uri GLOB ?) "
-        "AND l.from_uri != l.to_root "
+        "WHERE l.to_uri >= ? AND l.to_uri < ? "
+        "AND (l.to_uri = ? OR l.to_uri GLOB ? OR l.to_uri GLOB ?) "
+        "AND l.to_uri NOT GLOB ? AND l.from_uri != ? "
         "GROUP BY l.from_uri ORDER BY n DESC",
-        (uri, uri + "#" + frag, letter, dot)).fetchall()
+        (lo, hi, pinpoint, letter, dot, nested, uri)).fetchall()
 
 
 def graph_anchor_outbound(con, uri, frag):

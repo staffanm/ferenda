@@ -191,6 +191,35 @@ def degree_in(g, i):
     return g.rev_off[i + 1] - g.rev_off[i]
 
 
+def inbound_counts(g, uri):
+    """(citing document, citations) per citer of `uri`, most citations first --
+    `catalog.graph_inbound_counts` answered off the arrays, with no disk at all.
+
+    The CSR holds exactly the same edge set: `build` drops self-citations and
+    targets outside the corpus, which is what that query's WHERE clause does.
+    The weight lives on the *forward* edges, so each citer's own run is scanned
+    for the one edge back to `uri` -- most citers cite it once and have a short
+    run, so the corpus' worst node (article 6 ECHR, 51,139 citers) costs 20 ms.
+    Ties break on the uri. `build`'s scan already returns the links in
+    (to_root, from_uri) order, so the runs arrive sorted and the key only
+    pins that -- it stops the reply's `top` from moving if a later index
+    change reorders the scan.
+
+    KeyError for a uri the graph has no node for -- a document with no
+    corpus-internal citation either way. The caller keeps the SQL path for
+    those (and for every fragment uri: the CSR is document-level)."""
+    i = g.ids[uri]
+    out = []
+    for k in range(g.rev_off[i], g.rev_off[i + 1]):
+        j = g.rev_dst[k]
+        for e in range(g.fwd_off[j], g.fwd_off[j + 1]):
+            if g.fwd_dst[e] == i:
+                out.append((g.uris[j], g.weight[e]))
+                break
+    out.sort(key=lambda r: (-r[1], r[0]))
+    return out
+
+
 def expand(g, frontier_uris, exclude, *, reverse, budget, allowed=None,
            grouplimit=None, prefer_ties=False):
     """One more ring of a neighbourhood: the documents adjacent to

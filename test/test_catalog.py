@@ -79,6 +79,92 @@ def test_a_narrow_to_root_index_is_widened(tmp_path):
     con.close()
 
 
+def test_a_provision_inbound_query_reads_only_that_provisions_rows(tmp_path):
+    """`graph_anchor_inbound_counts` used to find the *document* by `to_root`
+    and then test `to_uri` per row -- and `to_uri` is not in the to_root index,
+    so every link into the document was fetched out of the 2.5 GB table.
+    Article 6 ECHR sits under 1,439,778 of them: 143,662 scattered pages to
+    answer with 300 rows, 6.5 s cold on dev's NVMe and minutes on prod's disk.
+    Seeking `to_uri` reads the provision's own range, and `from_uri` in the
+    index keeps the group-by off the table: 3,112 pages, 0.04 s."""
+    path = tmp_path / "catalog.sqlite"
+    con = catalog.connect(path)
+    plan = _plan_of_last_query(
+        con, lambda: catalog.graph_anchor_inbound_counts(
+            con, "https://lagen.nu/b", "P2"))
+    assert "COVERING INDEX idx_links_to_uri" in plan, plan
+    assert "to_root" not in plan, plan
+    con.close()
+
+
+def test_a_provision_counts_its_subdivisions_and_no_neighbour(tmp_path):
+    """The `to_uri` range is wider than the three matches (it admits "A60"
+    where "A6" must not match it), so the GLOBs still decide -- on index rows,
+    which costs nothing. And a `to_uri` carrying a second "#" belongs to no
+    provision: `set_genomforande` wrote 1,011 of those, which `to_root = ?`
+    used to exclude for the 289 whose to_root was itself a fragment and count
+    for the other 722."""
+    path = tmp_path / "catalog.sqlite"
+    con = catalog.connect(path)
+    root = "https://lagen.nu/ext/coe/005"
+    for frag in ("A6", "A6P1", "A60", "A6.2"):
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES ('https://lagen.nu/a', 'dcterms:references', ?, ?)",
+                    ("%s#%s" % (root, frag), root))
+    # the two shapes of the nested-fragment defect, neither of them article 6
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES ('https://lagen.nu/a', 'rpubl:genomforDirektiv', ?, ?)",
+                ("%s#A6.4.a#1" % root, root))
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES ('https://lagen.nu/a', 'rpubl:genomforDirektiv', ?, ?)",
+                ("%s#A6.4.a#2" % root, "%s#A6.4.a" % root))
+    con.commit()
+    # A6 itself, A6P1 and A6.2 -- not A60, and neither nested row
+    assert catalog.graph_anchor_inbound_counts(con, root, "A6") \
+        == [("https://lagen.nu/a", 3)]
+    assert catalog.graph_anchor_inbound_counts(con, root, "A60") \
+        == [("https://lagen.nu/a", 1)]
+    # a document citing its own provision is not its own neighbour
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES (?, 'dcterms:references', ?, ?)",
+                (root, "%s#A6" % root, root))
+    con.commit()
+    assert catalog.graph_anchor_inbound_counts(con, root, "A6") \
+        == [("https://lagen.nu/a", 3)]
+    con.close()
+
+
+def test_a_narrow_to_uri_index_is_widened(tmp_path):
+    """The `to_root` widening's sibling, and the same trap: every catalog built
+    before it carries `idx_links_to_uri` narrow, and `CREATE INDEX IF NOT
+    EXISTS` keeps that definition. Narrow, the provision query reads the same
+    rows out of the table -- 232 MB for article 6 ECHR against the covering
+    index's 12.7 MB."""
+    path = tmp_path / "catalog.sqlite"
+    con = sqlite3.connect(path)
+    con.executescript(catalog.SCHEMA)
+    con.execute("CREATE INDEX idx_links_to_uri ON links(to_uri)")
+    _link(con)
+    con.commit()
+    con.close()
+
+    con = catalog.connect(path)
+    assert catalog.widen_to_uri_index(con) is True
+    plan = _plan_of_last_query(
+        con, lambda: catalog.graph_anchor_inbound_counts(
+            con, "https://lagen.nu/b", "P2"))
+    assert "COVERING INDEX idx_links_to_uri" in plan, plan
+    assert catalog.graph_anchor_inbound_counts(con, "https://lagen.nu/b", "P2") \
+        == [("https://lagen.nu/a", 1)]
+    # to_uri stays leftmost, so a plain equality lookup keeps its index
+    lookup = _plan_of_last_query(
+        con, lambda: con.execute("SELECT from_uri FROM links WHERE to_uri = ?",
+                                 ("https://lagen.nu/b#P2",)).fetchall())
+    assert "idx_links_to_uri" in lookup, lookup
+    assert catalog.widen_to_uri_index(con) is False   # idempotent
+    con.close()
+
+
 def test_a_narrow_docs_source_index_is_widened(tmp_path):
     """`idx_docs_source` must cover (source, art_size). Narrow, the ops
     dashboard's per-source totals read `art_size` out of the 173.8 MB

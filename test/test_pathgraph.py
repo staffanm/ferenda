@@ -62,6 +62,38 @@ def test_induced_edges_carry_the_citation_count(tmp_path):
     assert pathgraph.induced_edges(g, set()) == []
 
 
+def test_inbound_counts_answer_what_the_catalog_aggregate_did(tmp_path):
+    """The inbound side of /api/v1/graph, off the arrays. The SQL it replaces
+    walked every link row pointing at the document however few the reply
+    carried -- miljöbalken's 220,617 of them were 19.6 MB of idx_links_to_root
+    cold, and 37 s of a 37.8 s reply on prod."""
+    cat = _catalog(tmp_path)
+    con = catalog.connect(cat)
+    # one more citer of b, so the ordering has something to order
+    con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                "VALUES ('https://lagen.nu/c', 'dcterms:references', "
+                "'https://lagen.nu/b', 'https://lagen.nu/b')")
+    con.commit()
+    g = pathgraph.build(con)
+    a, b, c = ("https://lagen.nu/%s" % x for x in "abc")
+    # a cites b twice (deduped to one edge of weight 2), c once
+    assert pathgraph.inbound_counts(g, b) == [(a, 2), (c, 1)]
+    assert pathgraph.inbound_counts(g, c) == [(b, 1)]
+    assert pathgraph.inbound_counts(g, a) == []
+    for uri in (a, b, c):
+        assert pathgraph.inbound_counts(g, uri) \
+            == catalog.graph_inbound_counts(con, uri)
+    # equally-cited citers come out in uri order
+    for citer in ("https://lagen.nu/z", a):
+        con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
+                    "VALUES (?, 'dcterms:references', "
+                    "'https://lagen.nu/c', 'https://lagen.nu/c')", (citer,))
+    con.commit()
+    assert pathgraph.inbound_counts(pathgraph.build(con), c) \
+        == [(a, 1), (b, 1), ("https://lagen.nu/z", 1)]
+    con.close()
+
+
 def test_sidecar_roundtrip_and_staleness(tmp_path):
     cat = _catalog(tmp_path)
     n, m = pathgraph.write_sidecar(cat)
