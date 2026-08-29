@@ -1660,6 +1660,17 @@ def test_a_quoted_bare_article_links_into_the_amended_act():
                        "https://lagen.nu/ext/celex/32014R0910#5"}
 
 
+def test_amending_act_markdown_keys_on_the_quoted_articles():
+    """ai-annotate's prompt for an unpacked amending act: the quoted (base
+    act's) articles are the ## headings the model keys articleToRecitals on;
+    the act's own instruction articles are demoted to plain lines."""
+    from ferenda.eurlex.annotate import act_markdown
+    art = to_artifact(parse_formex(_lxml(AMENDING_UNPACK_XML), "32024R1183", "swe"))
+    md = act_markdown(art)
+    assert "\n## Artikel 5a" in md
+    assert "\n## Artikel 1" not in md and "\n## Artikel 2" not in md
+
+
 def test_article_number_takes_the_printed_letter_case():
     xml = """<ARTICLE IDENTIFIER="005A"><TI.ART>Artikel 5a</TI.ART></ARTICLE>"""
     from ferenda.lib.formex import _article_number

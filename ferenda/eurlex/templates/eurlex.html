@@ -6,8 +6,11 @@
 {% extends "page.html" %}
 {% block body %}
 {{ banner }}
+{%- if has_lydelser %}<h2 class="lydelser-status" hidden></h2>{% endif -%}
 {%- if opinion_href -%}
 <aside class="ag-opinion"><a href="{{ opinion_href }}">Generaladvokatens förslag till avgörande</a></aside>
 {%- endif -%}
-{{ structure }}
+{#- versions.js swaps the on-demand lydelse diff into #dokument, exactly as
+    on a statute page -#}
+<div id="dokument">{{ structure }}</div>
 {% endblock %}

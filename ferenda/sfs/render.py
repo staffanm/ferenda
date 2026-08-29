@@ -157,10 +157,11 @@ def _versions_panel(art, base_id, own_version, versions):
         return ""
     notes = _version_notes(art)
     return PANELS.versions_panel(
-        [{"value": v, "note": notes.get(v, "")}
+        [{"value": v, "label": "SFS %s" % v, "note": notes.get(v, "")}
          for v, _vuri in reversed(versions)],          # newest first
         "denna" if own_version else "aktuell",
-        BASE + base_id, own_version or "")
+        BASE + base_id, own_version or "",
+        "SFS %s" % own_version if own_version else "")
 
 
 def _act_source_links(nr):
@@ -332,7 +333,7 @@ def render(art, site):
     # ("SFS 2018:585 i lydelse enligt SFS 2026:764"); omitted when unamended
     amended = re.search(r"i lydelse enligt SFS (\S+)",
                         props.get("dcterms:identifier") or "")
-    versions = history.versions(base_id)
+    versions = history.versions("sfs", base_id)
     # the compare affordance rides the cutoff row it compares against (S1); with
     # no cutoff to hang it on (an unamended act that still has consolidations)
     # it earns a row of its own

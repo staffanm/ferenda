@@ -11,21 +11,24 @@ from html import escape
 
 from markupsafe import Markup
 
-from ..lib import annstore, catalog, labels, tpl
-from ..lib.eu_structure import Anchors, citable, first_stycke
+from ..lib import annstore, catalog, history, labels, tpl
+from ..lib.eu_structure import Anchors, citable, first_stycke, revision_base
 from ..lib.eu_structure import flatten as eurlex_flatten
 from ..lib.markdown import begrepp_uri
 from ..lib.page import (
     BANNERS,
     NODES,
+    PANELS,
     Rail,
     RailSection,
     Toc,
+    chain_meta,
     doc_meta,
     href,
     page_context,
     plain,
     render_runs,
+    render_tabell,
     render_toc,
     swedish_join,
 )
@@ -51,6 +54,8 @@ EURLEX_CLASS = {"recital": "recital", "citation": "visa", "preamble": "preamble"
                 "paragraph": "paragraph", "stycke": "stycke",
                 "point": "point", "ruling": "ruling",
                 "note": "note", "row": "row", "citat": "citat"}
+# a `row` block is what a table quoted inside a judgment's paragraph still
+# emits; an act's own table is a `tabell` node and renders as one table
 
 
 # --------------------------------------------------------------------------
@@ -137,20 +142,35 @@ def _recital_group_heading(g):
                                    Markup(_artlist(refs)) if refs else None)
 
 
-def _recital_links_sections(recitals):
-    """Rail section for an article/sub-article: links to its relevant recitals."""
-    links = "".join('<a href="#recital-%d">skäl %d</a>' % (n, n) for n in recitals)
-    return [RailSection("skal", "Relevanta skäl", len(recitals),
+def _recital_links_sections(recitals, external=(), titles=None):
+    """Rail section for an article/sub-article: links to its relevant recitals
+    -- the base act's on this page, an amending act's on that act's own page
+    (its `.ann` is keyed by the base act's article numbers, section 6 of the
+    konsolidering design), labeled "skäl 29 i (EU) 2024/1183". The links are
+    ordinary internal fragment links, so popover.js previews the recital in
+    place and can open the amending act in the split view."""
+    links = "".join('<a href="#recital-%d">skäl %d</a>' % (n, n)
+                    for n in recitals or ())
+    links += "".join(
+        '<a href="%s#recital-%d">skäl %d i %s</a>'
+        % (escape(href(catalog.BASE + "ext/celex/" + celex)), n, n,
+           escape(_act_designation(celex, (titles or {}).get(celex)) or celex))
+        for celex, n in external)
+    count = len(recitals or ()) + len(external)
+    return [RailSection("skal", "Relevanta skäl", count,
                         '<div class="skal-links">%s</div>' % links)]
 
 
-def _recital_context_sections(editorial, n):
+def _recital_context_sections(editorial, n, present):
     """Rail panel for a recital: the articles it underpins (the back half of
     the article<->recital round-trip), inline rather than behind a fold --
     one or two links carry their own weight. The thematic group is *not*
     repeated here: the group heading inserted in the recital text already
-    says it."""
-    articles = editorial.recital_articles.get(n)
+    says it. `present` is the page's own article anchors: an amending act's
+    `.ann` is keyed by the *base* act's article numbers, so on the amending
+    act's own page those back-links would dangle and are dropped."""
+    articles = [a for a in editorial.recital_articles.get(n) or ()
+                if a in present]
     if not articles:
         return []
     links = "".join('<a href="#%s">artikel %s</a>' % (escape(a), escape(a))
@@ -161,6 +181,107 @@ def _recital_context_sections(editorial, n):
                         len(articles),
                         '<div class="skal-links">%s</div>' % links,
                         flat=True)]
+
+
+# --------------------------------------------------------------------------
+# consolidated wordings: the version panel, the amendment register and the
+# per-article "changed by" line (the artifact's `consolidation` / `mod` keys)
+# --------------------------------------------------------------------------
+
+_AKT_ORD = {"R": "förordning", "L": "direktiv", "D": "beslut"}
+# the "förordning (EU) 2024/1183" segment of an official title -- the citable
+# act label, taken from the register's own words where the register carries
+# the title
+_RE_TITLE_CITE = re.compile(
+    r"(förordning|direktiv|beslut)\s+"
+    r"((?:\((?:EU|EG|EEG|Euratom)[^)]*\)\s*)?(?:nr\s+)?"
+    r"\d[\d/]*(?:/(?:EU|EG|EEG|Euratom))?)", re.IGNORECASE)
+
+
+def _act_designation(celex, title=None):
+    """The bare number designation of a sector-3 act -- "(EU) 2024/1183",
+    "(EU) nr 910/2014", "2009/138/EG"-style for a pre-2015 directive -- read
+    off the official title where one is given, else constructed from the
+    CELEX coordinates. None where `celex` is not a plain sector-3 act."""
+    if title:
+        m = _RE_TITLE_CITE.search(title)
+        if m:
+            return m.group(2).strip()
+    if not (len(celex) > 6 and celex[0] == "3" and celex[1:5].isdigit()):
+        return None
+    year, letter, number = celex[1:5], celex[5], celex[6:].lstrip("0")
+    if int(year) >= 2015:
+        return "(EU) %s/%s" % (year, number)
+    if letter == "L":
+        return "%s/%s/EU" % (year, number)
+    return "(EU) nr %s/%s" % (number, year)
+
+
+def _act_label(celex, title=None):
+    """A citable Swedish label for a sector-3 act: read off its official
+    title where the amendment register carries one ("förordning (EU)
+    2024/1183"), else constructed from the CELEX coordinates. A corrigendum
+    ("...R(10)") names the act it corrects."""
+    base = revision_base(celex)
+    if base:
+        return "rättelse till %s" % _act_label(base)
+    if title:
+        m = _RE_TITLE_CITE.search(title)
+        if m:
+            return "%s %s" % (m.group(1).lower(), m.group(2).strip())
+    designation = _act_designation(celex)
+    # not a sector-3 act -- a treaty amends too (the accession treaty
+    # 12012J/ACT amends the VAT directive) -- so its CELEX has to name it
+    if designation is None:
+        return celex
+    return "%s %s" % (_AKT_ORD.get(celex[5], "rättsakt"), designation)
+
+
+def _act_link(celex, titles, site):
+    """One amending act as link-or-text html, linked where the corpus holds
+    its page."""
+    label = _act_label(celex, titles.get(celex))
+    uri = catalog.BASE + "ext/celex/" + celex
+    return ('<a href="%s">%s</a>' % (escape(href(uri)), escape(label))
+            if site.has(uri) else escape(label))
+
+
+# how the "changed by" line names what the consolidation's provenance span
+# did to the article -- the vocabulary the SFS rail uses for the same events
+_MOD_VERB = {"inserted": "Införd genom", "replaced": "Ändrad genom",
+             "amended": "Ändrad genom", "deleted": "Upphävd genom"}
+
+
+def _changed_line(mod, titles, site):
+    """The provenance line under a consolidated article's heading: which act
+    introduced, changed or deleted it, linked to that act's page (where its
+    recitals -- the legislative reasoning -- live)."""
+    links = [_act_link(celex, titles, site) for celex in mod["by"]]
+    return '<p class="artikel-mod">%s %s.</p>' % (
+        _MOD_VERB.get(mod["action"], "Ändrad genom"), swedish_join(links))
+
+
+def _load_amending_editorials(cons):
+    """The `.ann` layers of the acts a consolidation folds in, as
+    (celex, Editorial) pairs -- their articleToRecitals keys are the *base*
+    act's article numbers (an amending act is annotated against the articles
+    it rewrites), so they join this page's keys directly."""
+    return [(m["celex"], e) for m in (cons or {}).get("amending", [])
+            if (e := _load_editorial(m["celex"]))]
+
+
+def _versions_panel(celex, own_version, versions):
+    """The compare panel for an EU act's consolidated wordings -- the same
+    `details.lydelser` affordance the SFS page carries, version ids being the
+    ISO consolidation dates."""
+    versions = [(v, u) for v, u in versions if v != own_version]
+    if not versions:
+        return ""
+    return PANELS.versions_panel(
+        [{"value": v, "label": v, "note": ""} for v, _u in reversed(versions)],
+        "denna" if own_version else "aktuell",
+        catalog.BASE + "ext/celex/" + celex, own_version or "",
+        own_version or "")
 
 
 def _eurlex_marker(t, num):
@@ -390,7 +511,8 @@ def _eurlex_pin(t, num, bid):
 
 
 def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
-                         editorial=None, key=None):
+                         editorial=None, key=None, amending=(), titles=None,
+                         present=frozenset()):
     bid = b.get("id")
     t = b["type"]
     num = b.get("num")
@@ -416,6 +538,10 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
                                 Markup(render_runs(title, site)))
     if t == "keyword":
         return NODES.eu_keyword(Markup(render_runs(b["text"], site)))
+    if t == "tabell":
+        # an annex table -- NIS2 bilaga I's three columns of sectors, subsectors
+        # and entity types -- through the shared table renderer, spans and all
+        return render_tabell(b, site, doc_uri, toc, rail)
     # editorial layer (.ann): wire this block into the article<->recital graph.
     # A recital gets a back-link panel (its articles + group); an article/
     # sub-article (paragraph/point, keyed like the .ann's "4.5") gets a forward
@@ -427,7 +553,7 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
         if key:
             bid = key
             if editorial:
-                extra = _recital_context_sections(editorial, int(num))
+                extra = _recital_context_sections(editorial, int(num), present)
     elif key:
         # an article's key is its own id; a sub-article's is the dotted form. Every
         # numbered sub-article (paragraph/point) gets that id, so a reader can link
@@ -436,10 +562,12 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
         # marker is then omitted), so ubiquitous ids don't clutter the margin. The
         # editorial layer additionally gives a block a forward panel of its recitals.
         recitals = editorial.recitals_for(key) if editorial else None
+        external = [(celex, n) for celex, e in amending
+                    for n in (e.recitals_for(key) or ())]
         if t != "article":
             bid = bid or key           # synthesise the sub-article citation id
-        if recitals:
-            extra = _recital_links_sections(recitals)
+        if recitals or external:
+            extra = _recital_links_sections(recitals, external, titles)
     # the article is a citation target (id == its number); its inbound (incl.
     # implementing förarbeten) drives the rail, like an SFS paragraph
     pin = _eurlex_pin(t, num, bid)
@@ -452,9 +580,14 @@ def _render_eurlex_block(b, site, doc_uri, toc, rail, casemap,
         anchor = toc.add(bid, " ".join(x for x in (b.get("label"),
                                                    plain(b["text"])) if x), 2)
         # an article with no designation prints its label as the plain heading
-        return NODES.eu_article(anchor, rail_id, word, number,
-                                Markup(render_runs(title, site)) if number
-                                else escape(b.get("label") or ""))
+        out = NODES.eu_article(anchor, rail_id, word, number,
+                               Markup(render_runs(title, site)) if number
+                               else escape(b.get("label") or ""))
+        # a consolidated article says what changed it, right under its heading
+        mod = b.get("mod")
+        if mod:
+            out += Markup(_changed_line(mod, titles or {}, site))
+        return out
     runs = render_runs(b["text"], site)
     classes = [EURLEX_CLASS.get(t, "")]
     # a quotation prints its marker in the *quoted* act's convention -- "(6)"
@@ -535,15 +668,44 @@ def render(art, site):
         # it would just repeat it)
         ("Titel", lb.official_title if lb.official_title != title else None),
         ("CELEX", art.get("celex")),
+        ("Normkedja", chain_meta(site, art["uri"])),
         ("Datum", art.get("date")),
         ("ECLI", art.get("ecli")),
     ]
     editorial = _load_editorial(art["celex"])
+    # a consolidated wording: the register it folds in, the amending acts'
+    # editorial layers, and -- on a historical lydelse -- its own version date
+    version = art.get("version")
+    cons = art.get("consolidation")
+    amending = _load_amending_editorials(cons)
+    titles = {m["celex"]: m.get("title")
+              for m in (cons or {}).get("amending", [])}
+    versions = (history.versions("eurlex", art["celex"])
+                if cons or version else [])
+    lydelser = _versions_panel(art["celex"], version, versions)
+    if cons:
+        meta.append(("Konsoliderad t.o.m.",
+                     Markup(escape(cons["date"])) + lydelser))
+    elif lydelser:
+        meta.append(("Lydelser", lydelser))
+    # the preamble shown is the base act's own (a consolidation carries none);
+    # each amending act's recitals live on that act's page, so the preamble
+    # opens with the way there -- the reader picks which recital set to read,
+    # and popover.js previews/split-views the links like any internal link
+    preamble_note = None
+    if cons and cons.get("amending"):
+        held = [{"url": href(catalog.BASE + "ext/celex/" + m["celex"]),
+                 "label": _act_label(m["celex"], m.get("title"))}
+                for m in cons["amending"]
+                if site.has(catalog.BASE + "ext/celex/" + m["celex"])]
+        if held:
+            preamble_note = NODES.eu_preamble_note(held)
     toc = Toc()
     rail = Rail(site, art["uri"])
     parts = []
     anchors = Anchors()                  # running context for sub-article keys
     preamble_in_toc = False              # the "Preambel" TOC parent is added once
+    deleted_open = False                 # a DELETED article's subdued region
     # read once for the whole act: how it writes its own words, which is what
     # re-sets an all-caps division heading in sentence case (_case_map)
     # the artifact is a nested structure (divisions > articles > paragraphs >
@@ -551,9 +713,16 @@ def render(art, site):
     # TOC already convey the hierarchy, so no nested <section> markup is needed
     blocks = list(eurlex_flatten(art.get("structure", [])))
     casemap = _case_map(blocks)
+    # the page's own article anchors, for the recital back-links (an amending
+    # act's `.ann` names articles this page does not carry)
+    present = frozenset(b.get("id") for b in blocks
+                        if b["type"] == "article" and b.get("id"))
     for b in blocks:
         t = b["type"]
         key = anchors.key(t, b.get("num"), b.get("id"), b.get("depth"))
+        if t == "recital" and preamble_note:
+            parts.append(Markup(preamble_note))
+            preamble_note = None
         if editorial and t == "recital" and (b.get("num") or "").isdigit():
             group = editorial.group_start.get(int(b["num"]))
             if group:
@@ -563,9 +732,23 @@ def render(art, site):
                     preamble_in_toc = True
                 toc.add(anchor, group.get("label", ""), 2)
                 parts.append(_recital_group_heading(group))
+        # a deleted article keeps its text and its anchor, read subdued under
+        # its "Upphävd genom" line, the way an upphävd paragraf reads
+        if t in ("article", "heading") and deleted_open:
+            parts.append(Markup("</section>"))
+            deleted_open = False
+        if t == "article" and (b.get("mod") or {}).get("action") == "deleted":
+            parts.append(Markup('<section class="artikel-upphavd">'))
+            deleted_open = True
         parts.append(_render_eurlex_block(b, site, art["uri"], toc, rail,
-                                          casemap, editorial, key))
-    rail.add_document()        # external links + commentary, the rail's default panel
+                                          casemap, editorial, key,
+                                          amending, titles, present))
+    if deleted_open:
+        parts.append(Markup("</section>"))
+    # external links + commentary, the rail's default panel. A lydelse page is
+    # not the citable document (citations target the current wording), so it
+    # shows no inbound sections.
+    rail.add_document(inbound=not version)
     kind = EURLEX_KIND.get(art.get("doctype"), "EU-rättsakt")
     # an act whose repeal has taken effect is out of every listing, so a reader
     # only reaches it by following a citation -- the page has to say so itself.
@@ -574,10 +757,38 @@ def render(art, site):
     expired = art.get("expired")
     if expired and expired > date.today().isoformat():
         expired = None
+    # a forward-dated wording (CELLAR publishes it on adoption, dated the day
+    # it begins to apply) is coming, not old -- the banner and the eyebrow
+    # must say the same thing
+    future = bool(version) and version > date.today().isoformat()
+    if version:
+        macro = (BANNERS.eurlex_future_version_banner if future
+                 else BANNERS.eurlex_version_banner)
+        banner = macro(version,
+                       href(catalog.BASE + "ext/celex/" + art["celex"]))
+        body_class = " inaktuell"
+    elif expired:
+        banner = BANNERS.eurlex_expired_banner(expired)
+        body_class = " expired expired-eu"
+    elif cons and cons.get("amending"):
+        banner = BANNERS.eurlex_consolidated_banner(
+            [{"url": (href(catalog.BASE + "ext/celex/" + m["celex"])
+                      if site.has(catalog.BASE + "ext/celex/" + m["celex"])
+                      else None),
+              "label": _act_label(m["celex"], m.get("title"))}
+             for m in cons["amending"]])
+        body_class = ""
+    else:
+        banner = ""
+        body_class = ""
     return ENV.get_template("eurlex.html").render(page_context(
         title, kind, doc_meta(meta, art.get("source_url")),
-        toc=render_toc(toc, lb.short_id), eyebrow=lb.short_id, island=rail.island(),
+        toc=render_toc(toc, lb.short_id),
+        eyebrow=("%s · %s lydelse" % (lb.short_id,
+                                      "kommande" if future else "äldre")
+                 if version else lb.short_id),
+        island=rail.island(),
         opinion_href=_eurlex_opinion_href(art, site),
-        banner=Markup(BANNERS.eurlex_expired_banner(expired) if expired else ""),
-        body_class=" expired expired-eu" if expired else "",
+        banner=Markup(banner),
+        body_class=body_class, has_lydelser=bool(lydelser),
         structure=Markup("".join(parts))))

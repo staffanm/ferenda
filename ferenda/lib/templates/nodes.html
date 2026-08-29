@@ -218,6 +218,11 @@
 {%- endif -%}
 {% if stycke_id %}<span id="{{ stycke_id }}">{{ body }}</span>{% else %}{{ body }}{% endif %}</p>
 {%- endmacro -%}
+{%- macro eu_preamble_note(acts) -%}
+{#- a consolidated act's way into the amending acts' recital sets: the
+    preamble shown is the base act's own (a consolidation carries none) -#}
+<p class="preamble-note">Skälen nedan är grundrättsaktens. Ändringsrättsakternas skäl: {% for a in acts %}<a href="{{ a.url }}#recital-1">{{ a.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}.</p>
+{%- endmacro -%}
 {%- macro eu_recital_group(anchor, range_label, label, refs) -%}
 {#- the thematic recital-group lead: a subdued outdented editorial line -#}
 <p id="{{ anchor }}" class="recital-group"><span class="rg-range">{{ range_label }}:</span> <b>{{ label }}</b>{% if refs %} <span class="jfr">(jfr art {{ refs }})</span>{% endif %}</p>

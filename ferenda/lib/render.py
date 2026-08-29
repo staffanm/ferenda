@@ -684,6 +684,10 @@ def browse_url(source, slugs):
 # own once and renders many pages against it (mirrors build.run_action's pattern)
 _RENDER: dict = {}
 
+# a date-keyed lydelse page's uri tail (an EU consolidated wording); an SFS
+# lydelse id is an SFS number and never matches
+_RE_DATED_LYDELSE = re.compile(r"/konsolidering/(\d{4}-\d{2}-\d{2})$")
+
 
 def _render_init(catalog_path, out_root, renderers):
     con = catalog.connect(catalog_path)
@@ -882,6 +886,19 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     # current in-force status: the day the date passes, the fold flips and the
     # page re-renders (rule:respect-source-temporality)
     expired = catalog.expired_uris(con, date.today().isoformat())
+    # a date-keyed lydelse page (an EU consolidated wording, uri tail
+    # /konsolidering/YYYY-MM-DD) renders as
+    # "Kommande lydelse" while its date lies ahead and as "Äldre lydelse"
+    # after -- the same today-relative presentation a repeal is, so its
+    # freshness carries the same kind of flip bit: the day the date passes,
+    # the fold changes and the page re-renders (rule:respect-source-
+    # temporality). The date is read off the uri itself; an SFS lydelse id is
+    # an SFS number, never date-shaped, so this matches only the dated form.
+    today = date.today().isoformat()
+
+    def future_lydelse(uri):
+        m = _RE_DATED_LYDELSE.search(uri)
+        return bool(m) and m.group(1) > today
 
     # Freshness planning is single-threaded: it reads the catalog + manifest and
     # hashes inputs (the manifest lives here in the parent). Fresh pages advance
@@ -910,10 +927,12 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
             continue
         out = out_root / rel
         dep = deps.get(uri, catalog.EMPTY_DEP_DIGEST)
-        if uri in cross or uri in expired:
+        future = future_lydelse(uri)
+        if uri in cross or uri in expired or future:
             dep = hashlib.sha256(
-                ("%s\x1f%s\x1f%s" % (dep, cross.get(uri, ""),
-                                     "expired" if uri in expired else "")
+                ("%s\x1f%s\x1f%s%s" % (dep, cross.get(uri, ""),
+                                       "expired" if uri in expired else "",
+                                       "future" if future else "")
                  ).encode()).hexdigest()
         if fresh and fresh(uri, out, path, dep, chash):
             done += 1

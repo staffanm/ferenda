@@ -48,6 +48,7 @@ from . import (
     compress,
     facets,
     facsimile,
+    history,
     layout,
 )
 from .catalog import BASE
@@ -352,6 +353,32 @@ def site_cross_digests(site):
     # 2025:400 -> 2001:453 -> 1980:620), every page whose law is a transitive
     # *successor* of the row's new side: editing the 1980:620 layer must
     # re-render the 2025:400 page that now shows its case law
+    # an amending act's `.ann` maps its recitals onto the *amended* act's
+    # article numbers (eurlex ai-annotate over an unpacked amending act), and
+    # the renderer draws those links on the amended act's page -- and on every
+    # /konsolidering/ lydelse page of it, which are extra pages with the same
+    # per-uri freshness -- so authoring or editing one must re-render them
+    # all. The amends edge is the catalog's rpubl:andrar, which comes off the
+    # amending act's CELLAR notice; the renderer joins the consolidation's
+    # own FAM.COMP register, and the two can disagree in principle -- an
+    # amending act FAM.COMP names but whose notice carries no amends relation
+    # escapes this fold (accepted: the notice relation is what the catalog
+    # holds, and reading every eurlex artifact's register here would cost the
+    # whole tree per generate). The layer bytes come from the store.
+    amended = {}
+    for from_uri, to_uri in site.con.execute(
+            "SELECT DISTINCT from_uri, to_uri FROM links "
+            "WHERE predicate = 'rpubl:andrar'"):
+        amended.setdefault(from_uri, []).append(to_uri)
+    for p in annstore.tree("eurlex").rglob("*.ann"):
+        hosts = amended.get(BASE + "ext/celex/" + p.stem.replace("_", "/"))
+        if hosts:
+            digest = hashlib.sha256(p.read_bytes()).hexdigest()
+            for host in hosts:
+                feed(host, "amending_ann", p.stem, digest)
+                celex = host.rsplit("/celex/", 1)[-1]
+                for _v, vuri in history.versions("eurlex", celex):
+                    feed(vuri, "amending_ann", p.stem, digest)
     corr_rows = site.con.execute(
         "SELECT new_uri, old_uri, relation, scope, prop_uri, ikrafttrader "
         "FROM correspondence").fetchall()

@@ -84,6 +84,19 @@
 {%- if pdf_url %} — jämför med <a class="ext" href="{{ pdf_url }}" rel="external">domstolens egen PDF</a>{% endif -%}
 .</span></div>
 {%- endmacro -%}
+{%- macro eurlex_version_banner(version, current_url) -%}
+<div class="version-banner"><strong>Äldre lydelse</strong><span>Rättsakten i dess konsoliderade lydelse per {{ version }}. <a href="{{ current_url }}">Visa gällande lydelse</a>.</span></div>
+{%- endmacro -%}
+{%- macro eurlex_future_version_banner(version, current_url) -%}
+{#- CELLAR publishes a consolidation as soon as the amending act is adopted,
+    dated the day its wording begins to apply -- which can lie ahead -#}
+<div class="version-banner"><strong>Kommande lydelse</strong><span>Rättsakten i den konsoliderade lydelse som börjar tillämpas {{ version }}. <a href="{{ current_url }}">Visa gällande lydelse</a>.</span></div>
+{%- endmacro -%}
+{%- macro eurlex_consolidated_banner(acts) -%}
+{#- the act's own uri serves its latest consolidated wording; the acts it
+    folds in are linked where the corpus holds them ({url?, label} each) -#}
+<div class="version-banner"><strong>Konsoliderad version</strong><span>Texten nedan är Publikationsbyråns konsoliderade version, med ändringar införda genom {% for a in acts %}{% if a.url %}<a href="{{ a.url }}">{{ a.label }}</a>{% else %}{{ a.label }}{% endif %}{% if not loop.last %}{% if loop.revindex == 2 %} och {% else %}, {% endif %}{% endif %}{% endfor %}. Grundrättsakten och ändringsrättsakterna är de officiella texterna.</span></div>
+{%- endmacro -%}
 {%- macro eurlex_expired_banner(when) -%}
 {#- an EU act EUR-Lex marks "No longer in force". The act keeps its page and
     stays reachable through the citation graph -- a later act's repeal clause

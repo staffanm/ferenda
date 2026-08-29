@@ -591,6 +591,15 @@ h4.rubrik.numrerad, h5.rubrik.numrerad {
 .rubrik.numrerad > .pilcrow { grid-area: 2 / 1; }
 section.artikel { margin: 2rem 0 .5rem; scroll-margin-top: var(--scroll-clear); }
 section.artikel > h2 { margin-top: 0; }
+/* A consolidated act's provenance: the "Ändrad genom förordning ..." line
+   under an amended article's heading, and the subdued treatment of an
+   article the register marks DELETED -- the text and its anchor survive
+   (an inbound "artikel 19" still lands), it just must not read as law in
+   force (same idea as the temporal-expired paragraf variant). */
+p.artikel-mod { margin: -.35rem 0 .75rem 4.15rem; font-family: var(--sans);
+                font-size: .8rem; color: var(--ink-3); }
+section.artikel-upphavd > :not(h3):not(p.artikel-mod) { color: var(--ink-3); }
+section.artikel-upphavd p.artikel-mod { font-weight: 600; }
 
 /* -- Paragraphs (SFS § with hanging numeral) -- */
 section.paragraf { display: grid; grid-template-columns: 3.25rem minmax(0,1fr);
@@ -1037,6 +1046,11 @@ p.definition dfn { font-style: normal; font-weight: 600; color: var(--accent); }
 .recital-group .rg-range { font-variant-numeric: oldstyle-nums; }
 .recital-group .jfr { color: var(--ink-4); }
 .recital-group a { color: var(--ink-3); }
+/* the consolidated page's way into the amending acts' recital sets: a
+   subdued editorial line opening the (base act's) preamble */
+p.preamble-note { margin: 1.5rem 0 .75rem; font-family: var(--sans);
+                  font-size: .8rem; color: var(--ink-3); }
+p.preamble-note a { color: var(--ink-2); }
 p.recital { scroll-margin-top: var(--scroll-clear); }
 /* EU enacting terms: a numbered recital/paragraph or lettered point hangs its
    marker in the left margin (.hang); points sit indented under their paragraph

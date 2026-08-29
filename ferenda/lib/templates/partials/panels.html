@@ -2,12 +2,14 @@
     preparatory-works section, the typed reference lists and the amendment
     registers (SFS and föreskrift). Values that are already links arrive as
     Markup; plain values are escaped here. -#}
-{%- macro versions_panel(options, compare_word, base_uri, own_version) -%}
+{%- macro versions_panel(options, compare_word, base_uri, own_version, own_label="") -%}
 {#- the <select> versions.js turns into the on-demand diff view; `options`
-    newest first as {value, text} -#}
-<details class="lydelser"><summary>Jämför lydelser <span class="count">{{ options | length }}</span></summary><label>Jämför {{ compare_word }} lydelse med <select data-diff data-uri="{{ base_uri }}" data-to="{{ own_version }}"><option value="">– välj lydelse –</option>
+    newest first as {value, label, note?} -- the label is the version id the
+    way the source cites it ("SFS 2003:466" / "2024-05-20"), minted by the
+    caller so this panel serves every versioned source -#}
+<details class="lydelser"><summary>Jämför lydelser <span class="count">{{ options | length }}</span></summary><label>Jämför {{ compare_word }} lydelse med <select data-diff data-uri="{{ base_uri }}" data-to="{{ own_version }}"{% if own_label %} data-to-label="{{ own_label }}"{% endif %}><option value="">– välj lydelse –</option>
 {%- for o in options -%}
-<option value="{{ o.value }}">SFS {{ o.value }}{% if o.note %} ({{ o.note }}){% endif %}</option>
+<option value="{{ o.value }}" data-label="{{ o.label }}">{{ o.label }}{% if o.note %} ({{ o.note }}){% endif %}</option>
 {%- endfor -%}
 </select></label></details>
 {%- endmacro -%}

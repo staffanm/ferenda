@@ -35,13 +35,15 @@
   var original = null;
 
   // the human name of the version being compared against: another named
-  // lydelse (data-to) or, by default, the current consolidation
-  var against = sel.dataset.to ? 'SFS ' + sel.dataset.to : 'aktuell lydelse';
+  // lydelse (data-to-label) or, by default, the current consolidation
+  var against = sel.dataset.toLabel || 'aktuell lydelse';
 
   function setStatus(version) {
     if (!status) return;
     if (version) {
-      status.textContent = 'SFS ' + version + ' jämfört med ' + against;
+      var opt = sel.selectedOptions[0];
+      var label = (opt && opt.dataset.label) || version;
+      status.textContent = label + ' jämfört med ' + against;
       status.hidden = false;
     } else {
       status.hidden = true;

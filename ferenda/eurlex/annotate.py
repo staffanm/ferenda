@@ -87,6 +87,15 @@ def act_markdown(art):
     # whose title never got extracted, in which case the CELEX is the heading
     lines = ["# %s" % (art["title"] or art["celex"]), ""]
     blocks = flatten(art["structure"])
+    # an amending act's real articles are the ones it quotes: its own body is
+    # two instruction articles, and the recitals explain the *quoted* text
+    # (the base act's inserted/replaced articles). Where the parse unpacked
+    # quoted articles (`citat`/quoted=article), those become the ## headings
+    # the model keys articleToRecitals on -- so the `.ann` is keyed by the
+    # base act's article numbers, which is what the consolidated page joins on
+    # -- and the act's own instruction articles are demoted to plain lines.
+    unpacked = any(b["type"] == "citat" and b.get("quoted") == "article"
+                   for b in blocks)
     for b in blocks[:_annex_cut(blocks, art["lang"])]:
         text = runs_text(b["text"]).strip()
         t, num = b["type"], b.get("num")
@@ -97,11 +106,15 @@ def act_markdown(art):
         elif t == "heading":
             lines.append("\n%s %s" % ("#" * min((b.get("level") or 1) + 1, 4),
                                       _designated(b, text)))
+        elif t == "citat" and b.get("quoted") == "article":
+            # the quoted article folds its designation into its text
+            # ("Artikel 5a Europeiska digitala identitetsplånböcker")
+            lines.append("\n## %s" % text)
         elif t == "article":
             # the designation and the title are separate fields; the prompt wants
             # the pair, and the bare number where the block carries neither
-            lines.append("\n## %s" % (_designated(b, text)
-                                      or "Artikel %s" % (num or "")))
+            designated = _designated(b, text) or "Artikel %s" % (num or "")
+            lines.append(designated if unpacked else "\n## %s" % designated)
         elif t == "paragraph":
             lines.append("%s%s" % ("%s. " % num if num else "", text))
         elif t == "point":
