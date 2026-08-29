@@ -122,6 +122,7 @@ from .lawreview import download as lawreview_download
 from .lawreview import journals as lawreview_journals
 from .lawreview import parse as lawreview_parse
 from .lib import (
+    aihierarki,
     annstore,
     casenaming,
     catalog,
@@ -1637,6 +1638,62 @@ def _sfs_roadsigns_one(basefile, art, register, gaps, out):
           "verified), wrote %s" % (basefile, len(placed), len(keep), out))
 
 
+def sfs_ai_hierarki(basefiles):
+    """`lagen sfs ai-hierarki <lag-basefile> ...` -- run the regleringshierarki
+    LLM passes (A subject span, D chain subject, B alignment/probe, C role;
+    lib.aihierarki) over each lag's chain component, batched, and write the
+    rows as `.ann` layers in the curated store -- what relate merges into the
+    `regleringshierarki` table with source 'llm'. Seeded per lag because the
+    component is the unit of work: the lag, its förordningar (stated and
+    delegation-derived), their gällande föreskrifter and any EU rung. One-shot
+    like the other ai-* commands: the LLM is never called from
+    parse/relate/generate, and a verified layer refuses regeneration without
+    --force."""
+    con = catalog.connect(CATALOG)
+    if not basefiles and RUN.every:
+        # every gällande lag whose component reaches a föreskrift, plus the
+        # EU-pair tier (an EU rung above, nothing below) -- 524 of 1,768
+        # lagar, measured 2026-08-29
+        basefiles = aihierarki.candidate_lagar(con)
+        print("%d candidate lagar (chains reaching a föreskrift, "
+              "or an EU rung above)" % len(basefiles))
+    if not basefiles:
+        sys.exit("usage: lagen sfs ai-hierarki <lag-basefile> ... "
+                 "(e.g. 2018:585), or --all for every lag whose chain "
+                 "reaches a föreskrift -- one component per lag")
+    llm.start_record()
+    eligible = aihierarki.layer_sources(con)
+    for i, bf in enumerate(basefiles, 1):
+        docs, clauses = aihierarki.component(con, catalog.BASE + bf)
+        if RUN.dry_run:
+            print("would run %s: %d documents, %d pinned delegation clauses"
+                  % (bf, len(docs), len(clauses)))
+            continue
+        # resume: a component whose documents all carry a hierarki layer is
+        # done -- a restarted corpus run (this one runs for weeks) must never
+        # re-pay finished components. --force re-runs them.
+        if not RUN.force and all(d not in eligible
+                                 or aihierarki.layer_path(eligible[d],
+                                                          d).exists()
+                                 for d in docs):
+            print("(%d/%d) %s: layers present, skipped" % (i, len(basefiles),
+                                                           bf), flush=True)
+            continue
+        rows, stats = aihierarki.run_component(con, docs, clauses,
+                                               batched=True)
+        written = aihierarki.write_layers(con, rows, force=RUN.force,
+                                          all_docs=docs)
+        tasks = ("a", "b1", "b2", "c", "d")
+        print("(%d/%d) %s: %d rows over %d documents -> %d layers "
+              "(%d calls, %d discarded, %d+%d tokens)"
+              % (i, len(basefiles), bf, len(rows), len(docs), written,
+                 sum(stats[t + "_calls"] for t in tasks),
+                 sum(stats[t + "_discarded"] for t in tasks),
+                 llm.USAGE["prompt_tokens"], llm.USAGE["completion_tokens"]),
+              flush=True)
+    con.close()
+
+
 SOURCES["sfs"] = Source("sfs", sfs_list, {
     # download has no input files (the input is the remote DB) and its output
     # is valid regardless of the fetcher's version, so inputs/code stay empty:
@@ -1652,6 +1709,7 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
                       inputs=sfs_versions_inputs, code=SFS_VERSIONS_CODE),
 }, harvest=sfs_harvest, origin=_origin(sfs_download.ENDPOINT),
    actions={"ai-correspond": sfs_ai_correspond,
+            "ai-hierarki": sfs_ai_hierarki,
             "table-correspond": sfs_table_correspond,
             "renumber-correspond": sfs_renumber_correspond,
             "history-as-git": sfs_history_as_git,
@@ -1659,6 +1717,10 @@ SOURCES["sfs"] = Source("sfs", sfs_list, {
             "ai-includegraphics": sfs_ai_includegraphics},
    notes="ai-correspond <new-sfs> <prop> [<old-sfs>]: LLM-derive the old->new "
          "paragraf correspondence map into a .corr layer (WIKI_ROOT/ann)\n"
+         "ai-hierarki <lag> [...]: LLM-author the regleringshierarki rows for "
+         "the lag's whole chain component (förordningar, föreskrifter, EU "
+         "rung) into .ann layers; relate merges them as source 'llm'. "
+         "--all = every lag whose chain reaches a föreskrift\n"
          "table-correspond <new-sfs> <prop> [<old-sfs>[=TAG] ...]: the same "
          ".corr layer read mechanically from the prop's jämförelsetabell/"
          "paragrafnyckel tables; several old laws merge into one layer, =TAG "
@@ -5373,7 +5435,9 @@ def main(argv=None):
     p.add_argument("--all", action="store_true", dest="every",
                    help="eurlex refresh-metadata: re-read every downloaded "
                         "document, repealed ones included -- the one-off "
-                        "backfill, not the shrinking repeal audit")
+                        "backfill, not the shrinking repeal audit. "
+                        "sfs ai-hierarki: every lag whose chain reaches a "
+                        "föreskrift")
     args = p.parse_args(argv)
 
     RUN.dry_run, RUN.force, RUN.no_deps = args.dry_run, args.force, args.no_deps
