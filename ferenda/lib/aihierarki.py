@@ -128,7 +128,7 @@ def _reply_json(reply):
 # task A -- subject spans
 # --------------------------------------------------------------------------
 
-def run_a(clauses, batched, stats, cache=None):
+def run_a(clauses, batched, stats, cache=None, progress=None):
     """clauses: [(doc, anchor, text)] -> {(doc, anchor): [span, ...]}.
     Batched: all clauses in one call; single: one call per clause."""
     out = {}
@@ -159,7 +159,7 @@ def run_a(clauses, batched, stats, cache=None):
                 result[(doc, anchor)] = kept
             return result
 
-        out.update(_call(prompt, validate, stats, "a", cache))
+        out.update(_call(prompt, validate, stats, "a", cache, progress))
     return out
 
 
@@ -167,7 +167,8 @@ def run_a(clauses, batched, stats, cache=None):
 # task B1 -- phrase alignment
 # --------------------------------------------------------------------------
 
-def run_b1(units, candidates, batched, stats, cache=None):
+def run_b1(units, candidates, batched, stats, cache=None,
+           progress=None):
     """units: [(doc, anchor, phrase, context_text)] against the ordered
     candidate term list -> {(doc, anchor, phrase): term or None}."""
     if not units or not candidates:
@@ -201,7 +202,7 @@ def run_b1(units, candidates, batched, stats, cache=None):
                 result[(doc, anchor, phrase)] = candidates[v["val"] - 1]
             return result
 
-        out.update(_call(prompt, validate, stats, "b1", cache))
+        out.update(_call(prompt, validate, stats, "b1", cache, progress))
     return out
 
 
@@ -209,7 +210,8 @@ def run_b1(units, candidates, batched, stats, cache=None):
 # task B2 -- silent-rung probe
 # --------------------------------------------------------------------------
 
-def run_b2(doc, label, outline, terms, batched, stats, cache=None):
+def run_b2(doc, label, outline, terms, batched, stats, cache=None,
+           progress=None):
     """One document's outline probed for `terms` -> {term: fragment id}.
     `outline` is [(fragment id, opening words)]. Batched: every term in one
     call; single: one call per term."""
@@ -239,7 +241,7 @@ def run_b2(doc, label, outline, terms, batched, stats, cache=None):
                     stats["b2_discarded"] += 1
             return result
 
-        out.update(_call(prompt, validate, stats, "b2", cache))
+        out.update(_call(prompt, validate, stats, "b2", cache, progress))
     return out
 
 
@@ -247,7 +249,7 @@ def run_b2(doc, label, outline, terms, batched, stats, cache=None):
 # task D -- the chain's subject, a verbatim span from its own text
 # --------------------------------------------------------------------------
 
-def run_d(material, stats, cache=None):
+def run_d(material, stats, cache=None, progress=None):
     """One chain's document outlines -> up to three subject spans. One call
     per chain; the guard is the usual one -- every span must be a verbatim
     substring of the material the model saw, so a composed name ("brandskydd
@@ -268,14 +270,14 @@ def run_d(material, stats, cache=None):
         return {"amnen": kept}
 
     return _call(PROMPT_D % material, validate, stats, "d",
-                 cache)["amnen"]
+                 cache, progress)["amnen"]
 
 
 # --------------------------------------------------------------------------
 # task C -- roles
 # --------------------------------------------------------------------------
 
-def run_c(units, batched, stats, cache=None):
+def run_c(units, batched, stats, cache=None, progress=None):
     """units: [(doc, anchor, term, provision_text)] -> {(doc, anchor, term):
     role} (ascii role values)."""
     out = {}
@@ -299,11 +301,11 @@ def run_c(units, batched, stats, cache=None):
                 result[(doc, anchor, term)] = role
             return result
 
-        out.update(_call(prompt, validate, stats, "c", cache))
+        out.update(_call(prompt, validate, stats, "c", cache, progress))
     return out
 
 
-def _call(prompt, validate, stats, task, cache=None):
+def _call(prompt, validate, stats, task, cache=None, progress=None):
     """One validated LLM exchange. With a `cache` (a mapping persisting on
     write, keyed by the prompt's hash) a finished request is never paid
     twice; the bench wires one (tools/hierarki-bench). The production
@@ -322,6 +324,8 @@ def _call(prompt, validate, stats, task, cache=None):
     stats[task + "_completion_tokens"] += llm.USAGE["completion_tokens"] - c0
     if cache is not None:
         cache[key] = result
+    if progress:
+        progress(task)
     return result
 
 
@@ -352,7 +356,8 @@ def _deepest(anchors):
             if not any(o != a and _anchor_within(o, a) for o in anchors)]
 
 
-def run_component(con, docs, clauses, batched, cache=None):
+def run_component(con, docs, clauses, batched, cache=None,
+                  progress=None):
     """The A -> mint -> verbatim -> B1 -> B2 -> C pipeline over one chain.
 
     `docs` are the chain's document uris in rung order; `clauses` the
@@ -386,7 +391,7 @@ def run_component(con, docs, clauses, batched, cache=None):
         text.fragment_text(arts[doc], anchor).split()))
         for doc, anchor in clauses]
     clause_units = [u for u in clause_units if u[2]]
-    spans = run_a(clause_units, batched, stats, cache)
+    spans = run_a(clause_units, batched, stats, cache, progress)
 
     rows = {}           # (doc, anchor, folded term) -> [role, label]
 
@@ -426,7 +431,7 @@ def run_component(con, docs, clauses, batched, cache=None):
         material.append("== %s ==\n%s" % (
             labels.get(doc) or doc,
             "\n".join("%s: %s" % r for r in rows_)))
-    for phrase in run_d("\n\n".join(material), stats, cache):
+    for phrase in run_d("\n\n".join(material), stats, cache, progress):
         folded = normalize_fold(phrase)
         if not any(concepts.term_pattern(terms[f]).fullmatch(folded)
                    for f in terms):
@@ -456,7 +461,7 @@ def run_component(con, docs, clauses, batched, cache=None):
                 if anchor and len(phrase.split()) > 2:
                     b1_units.append((doc, anchor, phrase, ftext))
     menu = [terms[f] for f in sorted(terms)]
-    aligned = run_b1(b1_units, menu, batched, stats, cache)
+    aligned = run_b1(b1_units, menu, batched, stats, cache, progress)
     for (doc, anchor, phrase), term in aligned.items():
         if term:
             add(doc, anchor, normalize_fold(term), role="definierar",
@@ -482,7 +487,7 @@ def run_component(con, docs, clauses, batched, cache=None):
             stats["b2_skipped"] += len(missing)
             continue
         probed = run_b2(doc, labels.get(doc) or doc, outline,
-                        missing, batched, stats, cache)
+                        missing, batched, stats, cache, progress)
         for term, anchor in probed.items():
             if anchor:
                 add(doc, anchor, normalize_fold(term))
@@ -499,7 +504,7 @@ def run_component(con, docs, clauses, batched, cache=None):
             c_units.append((doc, anchor, terms[folded], " ".join(
                 text.fragment_text(arts[doc], anchor).split())[:1200]))
     for (doc, anchor, term), role in run_c(c_units, batched, stats,
-                                           cache).items():
+                                           cache, progress).items():
         rows[(doc, anchor, normalize_fold(term))][0] = role
 
     return [(doc, anchor, terms[folded], role, label)

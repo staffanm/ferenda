@@ -1678,11 +1678,29 @@ def sfs_ai_hierarki(basefiles):
                                  or aihierarki.layer_path(eligible[d],
                                                           d).exists()
                                  for d in docs):
-            print("(%d/%d) %s: layers present, skipped" % (i, len(basefiles),
-                                                           bf), flush=True)
+            util.status(i, len(basefiles),
+                        "sfs ai-hierarki %s: layers present, skipped" % bf,
+                        actual=paid or None)
             continue
+        ncalls = [0]
+
+        def progress(task, i=i, bf=bf, ncalls=ncalls, paid=paid):
+            # the standard overwriting status line (util.status: \r + erase,
+            # width-clipped, right-aligned ETA paced on run components): a
+            # 70-document component takes hours before its completion line,
+            # and a silent terminal reads as a hang
+            ncalls[0] += 1
+            util.status(i, len(basefiles),
+                        "sfs ai-hierarki %s  call %d (task %s), %dk+%dk tok"
+                        % (bf, ncalls[0], task,
+                           llm.USAGE["prompt_tokens"] // 1000,
+                           llm.USAGE["completion_tokens"] // 1000),
+                        actual=paid + 1)
+
         rows, stats = aihierarki.run_component(con, docs, clauses,
-                                               batched=True)
+                                               batched=True,
+                                               progress=progress)
+        util.progress_break()
         written = aihierarki.write_layers(con, rows, force=RUN.force,
                                           all_docs=docs)
         paid += 1
