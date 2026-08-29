@@ -19,7 +19,8 @@ from .nf import inline_references, temporal_dates, to_normalform
 
 def load_golden_module():
     spec = importlib.util.spec_from_file_location(
-        "golden_sfs", Path(__file__).parent.parent.parent / "tools" / "golden_sfs.py")
+        "golden_sfs",
+        Path(__file__).parent.parent.parent / "tools" / "corpus" / "golden_sfs.py")
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

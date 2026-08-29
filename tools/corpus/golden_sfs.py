@@ -409,9 +409,18 @@ def canonicalize_node_texts(nodes):
 # own test suite expects ("1910:103_s._1").
 re_sidnr_slug = re.compile(r"(\d):(\d+)_*\s*s\._?\s*(\d+)")
 
+# The oracle is the legacy checkout's output and keeps the `ext/` segment those
+# uris carried until 2026-08-29 (`lib/layout._EXT_NS`); the current pipeline
+# mints the bare form. The two spell the same document, so the segment is
+# folded away here -- the single normalisation point both sides pass through --
+# rather than taught to each comparison. Without it every already-correct EU
+# reference in every golden document reads as an unexplained extra+missing
+# pair, and `celex_correction` can never fire.
+re_ext_segment = re.compile(r"/ext/(celex|coe|icrc|untc|icc|icj)/")
+
 
 def canonicalize_ref_uri(uri):
-    return re_sidnr_slug.sub(r"\1:\2_s._\3", uri)
+    return re_ext_segment.sub(r"/\1/", re_sidnr_slug.sub(r"\1:\2_s._\3", uri))
 
 
 def canonicalize_refs(refs):
@@ -698,7 +707,7 @@ def chapter_collapse_key(source, uri, own_base):
 # A well-formed sector-3 CELEX in Ferenda's URI: 3 + year(4) + type
 # (1-2 letters) + number(4, zero-padded), with an optional pinpoint fragment.
 re_celex_uri = re.compile(
-    r"(.*/(?:ext/)?celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
+    r"(.*/celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
 
 
 def celex_descramble(uri):

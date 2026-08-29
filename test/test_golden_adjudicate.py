@@ -820,3 +820,33 @@ def test_a_genuine_identity_change_is_never_a_retype():
         ["structure/P4: node mismatch: P4S1 != P5S1"],
         REDAKTIONELL_GOLDEN, REDAKTIONELL_NEW)
     assert unexplained == ["structure/P4: node mismatch: P4S1 != P5S1"]
+
+
+def test_canonicalize_bridges_the_oracle_s_legacy_ext_segment():
+    """The oracle is the legacy checkout's output and spells the pre-2026-08-29
+    grammar (`ext/celex/…`); the current pipeline mints the bare form. The two
+    name the same document, so canonicalization folds the segment away -- the
+    single point both sides pass through before any comparison.
+
+    Without the fold every already-correct EU reference in every golden
+    document reads as an unexplained extra+missing pair, and the
+    celex-correction rule can never fire: the corrected extra descrambles to
+    `celex/3625R2017` while the oracle's miss stays `ext/celex/3625R2017`."""
+    old = "https://lagen.nu/ext/celex/32016R0679"
+    new = "https://lagen.nu/celex/32016R0679"
+    assert golden_sfs.canonicalize_ref_uri(old) \
+        == golden_sfs.canonicalize_ref_uri(new) == new
+    # the mirror pair the celex-correction rule joins on
+    assert golden_sfs.celex_descramble(new.replace("32016R0679", "32017R0625")) \
+        == golden_sfs.canonicalize_ref_uri(
+            "https://lagen.nu/ext/celex/3625R2017")
+    # every namespace the prefix covered, and a pinpoint fragment survives
+    for legacy, bare in (("ext/coe/005#A8", "coe/005#A8"),
+                         ("ext/untc/I-20378", "untc/I-20378"),
+                         ("ext/icrc/585#A74", "icrc/585#A74"),
+                         ("ext/icc/1", "icc/1"), ("ext/icj/070", "icj/070")):
+        assert golden_sfs.canonicalize_ref_uri("https://lagen.nu/" + legacy) \
+            == "https://lagen.nu/" + bare
+    # an SFS uri is untouched (the fold is namespace-scoped, not a blind strip)
+    assert golden_sfs.canonicalize_ref_uri("https://lagen.nu/1962:700#K3P1") \
+        == "https://lagen.nu/1962:700#K3P1"
