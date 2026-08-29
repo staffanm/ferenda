@@ -131,6 +131,73 @@ def test_a_neighbouring_provisions_citation_is_not_swept_in(con):
 
 
 # --------------------------------------------------------------------------
+# derive_delegation_edges: the förordning->lag rung from the title pair
+# --------------------------------------------------------------------------
+
+ARKIVLAG = "https://lagen.nu/1990:782"
+ARKIVFORORDNING = "https://lagen.nu/1991:446"
+TF = "https://lagen.nu/1949:105"
+
+
+def titled(con, uri, kind, title):
+    con.execute("INSERT INTO documents (uri, source, kind, title, path) "
+                "VALUES (?,'sfs',?,?,'x')", (uri, kind, title))
+
+
+def test_the_title_pair_is_the_forordnings_parent(con):
+    """Arkivförordningen states no authority at all, and its name is the
+    only place the couple is written down."""
+    titled(con, ARKIVLAG, "lag", "Arkivlag (1990:782)")
+    titled(con, ARKIVFORORDNING, "forordning", "Arkivförordning (1991:446)")
+    assert hierarki.derive_delegation_edges(con) == (1, 0)
+    assert _edges(con) == [(ARKIVFORORDNING, "", ARKIVLAG, None)]
+
+
+def test_the_shared_subject_shape_pairs_too(con):
+    """The couple is as often named "Lag om X" beside "Förordning om X"."""
+    titled(con, "https://lagen.nu/2004:1100", "lag",
+           "Lag (2004:1100) om luftfartsskydd")
+    titled(con, "https://lagen.nu/2004:1101", "forordning",
+           "Förordning (2004:1101) om luftfartsskydd")
+    assert hierarki.derive_delegation_edges(con) == (1, 0)
+    assert _edges(con) == [("https://lagen.nu/2004:1101", "",
+                            "https://lagen.nu/2004:1100", None)]
+
+
+def test_the_title_pair_replaces_the_clauses_citations(con):
+    """Arkivförordningen 3 § cites 2 kap. 12 § tryckfrihetsförordningen for
+    the handlingar a myndighet must weigh, not as its own authority. That one
+    citation rooted Riksarkivet's whole 368-document hierarchy under TF."""
+    titled(con, ARKIVLAG, "lag", "Arkivlag (1990:782)")
+    titled(con, ARKIVFORORDNING, "forordning", "Arkivförordning (1991:446)")
+    titled(con, TF, "lag", "Tryckfrihetsförordning (1949:105)")
+    chain_row(con, FORESKRIFT, None, ARKIVFORORDNING, "P3",
+              "rpubl:bemyndigande", 3, 2)
+    link(con, ARKIVFORORDNING, "P3S1", "dcterms:references", TF + "#K2P12")
+    assert hierarki.derive_delegation_edges(con) == (1, 0)
+    assert _edges(con) == [(ARKIVFORORDNING, "", ARKIVLAG, None)]
+
+
+def test_two_matching_lagar_pair_with_neither(con):
+    """3 of 3,540 gällande förordningar match two lagar by name; a guess
+    between them would root a hierarchy on a coin toss."""
+    titled(con, ARKIVLAG, "lag", "Arkivlag (1990:782)")
+    titled(con, "https://lagen.nu/1994:1", "lag", "Arkivlag (1994:1)")
+    titled(con, ARKIVFORORDNING, "forordning", "Arkivförordning (1991:446)")
+    assert hierarki.derive_delegation_edges(con) == (0, 0)
+
+
+def test_a_stated_parent_needs_no_name_edge(con):
+    """The bemyndigandeupplysning already names the lag; deriving the same
+    parent a second way would print the rung twice."""
+    titled(con, ARKIVLAG, "lag", "Arkivlag (1990:782)")
+    titled(con, ARKIVFORORDNING, "forordning", "Arkivförordning (1991:446)")
+    chain_row(con, ARKIVFORORDNING, "P1", ARKIVLAG, "P7",
+              "rpubl:bemyndigande", 2, 1)
+    assert hierarki.derive_delegation_edges(con) == (0, 1)
+
+
+# --------------------------------------------------------------------------
 # rebuild_regleringshierarki: the ladder rows
 # --------------------------------------------------------------------------
 
@@ -440,7 +507,6 @@ def test_term_pattern_inflects_every_word():
     pattern missed "nationella bedömningsstöd" for the term "nationellt
     bedömningsstöd" -- measured on the golden-ten bench, where it cost all
     five bedömningsstöd rungs."""
-    from ferenda.lib.util import normalize_fold
     p = term_pattern("nationellt bedömningsstöd")
     assert p.search(normalize_fold("Nationella bedömningsstöd ska användas"))
     assert p.search(normalize_fold("ett nationellt bedömningsstöd"))
@@ -455,7 +521,6 @@ def test_a_specializing_span_mints_its_own_concept():
     distinct concept; only a pure inflection variant ("incidenter") folds.
     The .search() dedupe swallowed the D-minted span into *incident* --
     found live 2026-08-28 on the first curated publish."""
-    from ferenda.lib.util import normalize_fold
     assert not term_pattern("incident").fullmatch(
         normalize_fold("betydande incident"))
     assert term_pattern("incident").fullmatch(normalize_fold("incidenter"))

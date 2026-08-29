@@ -4367,7 +4367,8 @@ def cmd_relate(names, force=None):
         dirty = True
         print("relate: %d norm-chain relations" % chain)
         print("relate: %d förordning->lag delegation edges derived from the "
-              "delegation clauses (%d already stated)" % (delegated, deleg_dup))
+              "title pair and the delegation clauses (%d already stated)"
+              % (delegated, deleg_dup))
         print("relate: %d regleringshierarki rows over %d ladders "
               "(verbatim %d, aligned labels %d, genomförande %d; %d chain "
               "documents offer no concept, %d definitions sit off the chain, "

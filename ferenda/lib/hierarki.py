@@ -5,14 +5,19 @@ förordning -> föreskrift), and no level tells the reader that. This module
 builds the two derived catalog tables that make the ladder renderable:
 
 * ``delegation_edge`` -- the förordning->lag rung that Swedish förordningar
-  mostly do not state (286 of 300 sampled carry neither ingress formula). The
-  delegation clause states it instead: the empowering provision a föreskrift
-  stands on cites, in its own text, the lag it delegates under
-  ("Transportstyrelsen får meddela föreskrifter **enligt 7 kap. 2 § 1
-  fartygssäkerhetslagen** om hur ett fartyg skall vara konstruerat ...").
-  Those citations are already ``links`` rows at stycke granularity, so the
-  rung is one SQL join -- no artifact is re-read and no text is re-parsed
-  (rule:artifact-is-truth: the inline link the page renders *is* the edge).
+  mostly do not state (286 of 300 sampled carry neither ingress formula).
+  Two things say it anyway. The **title pair**: the couple is named twice
+  over, "Arkivförordning (1991:446)" under "Arkivlag (1990:782)", "Förordning
+  (2004:1101) om luftfartsskydd" under "Lag (2004:1100) om luftfartsskydd".
+  The **delegation clause**: the empowering provision a föreskrift stands on
+  cites, in its own text, the lag it delegates under ("Transportstyrelsen får
+  meddela föreskrifter **enligt 7 kap. 2 § 1 fartygssäkerhetslagen** om hur
+  ett fartyg skall vara konstruerat ..."). Those citations are already
+  ``links`` rows at stycke granularity, so that rung is one SQL join -- no
+  artifact is re-read and no text is re-parsed (rule:artifact-is-truth: the
+  inline link the page renders *is* the edge). The title pair is the stronger
+  basis, and where it exists the clause citations of that förordning are
+  dropped rather than published beside it.
 
 * ``regleringshierarki`` -- one row per (concept, provision), grouped into
   ladders by ``chain_root``. Built from ``definitions`` + the chain
@@ -40,19 +45,88 @@ REGERINGSFORMEN = catalog.BASE + "1974:152"
 # relate, deliberately NOT in catalog.CHAIN_PREDICATES (no document states it)
 DELEGATION = "rinfoex:delegationskedja"
 
+# the SFS number a title carries ("Arkivlag (1990:782)")
+RE_TITLE_NR = re.compile(r"\s*\(\d{4}:\d+\s*\w*\)")
+
+
+def _title_keys(title, tail):
+    """The name keys of one act title, for the general/specific title pair.
+
+    Swedish drafting names the couple twice over, and both shapes appear:
+    compound ("Arkivförordning" beside "Arkivlag") and shared subject
+    ("Förordning om luftfartsskydd" beside "Lag om luftfartsskydd"). `tail`
+    is the alternation for the instrument word, so the same reading serves
+    both ends of the pair."""
+    text_ = " ".join(RE_TITLE_NR.sub(" ", title).split()).lower()
+    keys = set()
+    rest = re.match(r"^(?:%s)\b\s*(.+)$" % tail, text_)
+    if rest:
+        keys.add(("om", rest.group(1)))
+    compound = re.match(r"^(\w+?)(?:%s)$" % tail, text_)
+    # a stem of three letters or fewer is not a subject ("Sjölag")
+    if compound and len(compound.group(1)) > 3:
+        keys.add(("stam", compound.group(1)))
+    return keys
+
+
+def name_pairs(con):
+    """``{förordning uri: lag uri}`` -- the general/specific title pair.
+
+    A förordning that details a lag mostly says so only in its name:
+    Arkivförordning (1991:446) under Arkivlag (1990:782), Säkerhetsskydds-
+    förordning (2021:955) under Säkerhetsskyddslag (2018:585), Förordning
+    (2004:1101) om luftfartsskydd under Lag (2004:1100) om luftfartsskydd.
+    Only an unambiguous match counts (3 of 3,540 gällande förordningar match
+    two lagar, and those get no edge).
+
+    Measured 2026-08-29 on the dev catalog: 615 pairs. Where the delegation
+    clauses also name a lag the two agree in 218 of 225 förordningar, and
+    the rule supplies a parent for 337 förordningar no clause reached."""
+    lagar, forordningar = {}, []
+    for uri, title, kind in con.execute(
+            "SELECT uri, title, kind FROM documents WHERE source = 'sfs' "
+            "AND expired IS NULL AND kind IN ('lag', 'forordning') "
+            "AND title IS NOT NULL"):
+        if kind == "lag":
+            for key in _title_keys(title, r"lag|balk"):
+                lagar.setdefault(key, set()).add(uri)
+        else:
+            forordningar.append((uri, _title_keys(title, r"förordning")))
+    pairs = {}
+    for uri, keys in forordningar:
+        hits = set().union(*[lagar.get(k, set()) for k in keys]) if keys \
+            else set()
+        if len(hits) == 1:
+            pairs[uri] = hits.pop()
+    return pairs
+
 
 def derive_delegation_edges(con):
-    """Fill ``delegation_edge`` from the delegation clauses' own citations:
-    for every förordning provision a föreskrift stands on (the pinned upper
-    end of a föreskrift->förordning ``norm_chain`` row), the lag references
-    that provision's text carries in ``links``. Returns ``(inserted,
-    stated_duplicates)`` -- an edge the förordning already *states* in its
-    bemyndigandeupplysning (an exact förordning->lag ``norm_chain`` row) is
-    counted, not re-inserted.
+    """Fill ``delegation_edge`` from the title pair and the delegation
+    clauses' own citations.
 
-    The pinned-beats-bare rule from the föreskrift parse applies per clause:
-    when the clause cites both "7 kap. 2 § fartygssäkerhetslagen" and the bare
-    law, the paragraf pin is the edge and the bare mention is dropped."""
+    The title pair (``name_pairs``) is the stronger basis and wins outright:
+    where a förordning has one, its citation-derived parents are dropped
+    rather than published beside it. A delegation clause cites a lag for
+    reasons other than delegating -- arkivförordningen 3 § names 2 kap. 12 §
+    tryckfrihetsförordningen for the handlingar the myndighet must weigh, and
+    that citation made TF the root of Riksarkivet's whole 368-document
+    hierarchy. Measured 2026-08-29: the rule drops 62 such parents over 42
+    förordningar, and 10 of 10 hand-read were cross-references (jaktför-
+    ordningen under lagen om tillsyn över hundar och katter, polisförordningen
+    under ordningslagen).
+
+    The citation basis reads, for every förordning provision a föreskrift
+    stands on (the pinned upper end of a föreskrift->förordning
+    ``norm_chain`` row), the lag references that provision's text carries in
+    ``links``. The pinned-beats-bare rule from the föreskrift parse applies
+    per clause: when the clause cites both "7 kap. 2 § fartygssäkerhetslagen"
+    and the bare law, the paragraf pin is the edge and the bare mention is
+    dropped.
+
+    Returns ``(inserted, stated_duplicates)`` -- an edge the förordning
+    already *states* in its bemyndigandeupplysning (an exact förordning->lag
+    ``norm_chain`` row) is counted, not re-inserted."""
     con.execute("DELETE FROM delegation_edge")
     rows = con.execute(
         "SELECT DISTINCT nc.upper_uri, nc.upper_pin, l.to_root, l.to_uri "
@@ -75,8 +149,22 @@ def derive_delegation_edges(con):
         "SELECT lower_uri, lower_pin, upper_uri, upper_pin FROM norm_chain "
         "WHERE predicate = 'rpubl:bemyndigande' "
         "  AND lower_level = 2 AND upper_level = 1"))
+    pairs = name_pairs(con)
+    stated_pairs = {(lower, upper) for lower, _lp, upper, _up in stated}
     edges, duplicates = [], 0
+    for forordning, lag in sorted(pairs.items()):
+        # a förordning that states its parent in the bemyndigandeupplysning
+        # needs no derived edge to the same lag, whatever the pins
+        if (forordning, lag) in stated_pairs:
+            duplicates += 1
+            continue
+        # the title pair is a statement about the two documents, not about a
+        # provision: an empty lower_pin is what a document-level edge looks
+        # like here, and it matches no clause in `fyller_ut_index`
+        edges.append((forordning, "", lag, None))
     for (lower_uri, lower_pin), targets in sorted(clauses.items()):
+        if lower_uri in pairs:
+            continue            # the title pair already names this parent
         pinned_laws = {law for law, target in targets if "#" in target}
         for law, target in sorted(targets):
             if "#" not in target and law in pinned_laws:
