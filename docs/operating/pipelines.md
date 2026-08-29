@@ -124,8 +124,14 @@ acts sweep ends by discovering every consolidated version of every held plain
 sector-3 R/L act, all versions and not only the latest, into
 `site/data/downloaded/eurlex/{year}/{celex}/.versions/{date}/` (a per-CELEX
 `download <CELEX> --force` fetches that one act's versions the same way). A
-version already on disk is skipped, so the walk is resumable, and a version is
-immutable once published, so a re-fetch buys nothing; a `--limit` or
+version already settled is skipped, so the walk is resumable: content stored,
+or a dated `.no-content` marker recording that CELLAR held no swe/eng
+manifestation for that wording. That negative is cached, not permanent — the
+Publications Office translates a wording after minting it — so the version is
+asked again once the marker ages past the indexing-lag window, which is what
+keeps the thousands of never-translated wordings to one question per window
+instead of one per run. A version is immutable once published, so a re-fetch
+buys nothing; a `--limit` or
 `--source soap` run skips the sweep. `parse` then serves the
 *latest* Formex-bearing consolidation at the act's own uri, with the base
 act's own preamble spliced in front; the `versions` stage parses every

@@ -340,10 +340,14 @@ def enumerate_celex_soap(session, sector, since=None, languages=None):
 
 
 
-def download_document(session, root, celex, languages, delay):
+def download_document(session, root, celex, languages, delay, full=False):
     """Fetch a single CELEX's content, selecting over SPARQL. Returns the
     languages stored (empty if none of the requested languages exist). The sweep
-    (`sync`) selects in bulk; this serves the explicit per-CELEX refetch."""
+    (`sync`) selects in bulk; this serves the explicit per-CELEX refetch.
+
+    `full` (the run's --force) carries into the act's consolidation walk, so
+    a per-CELEX refetch can clear a recorded no-content answer for one act --
+    without it the only way past one was a corpus-wide --force sweep."""
     selection = fetch_selection(session, [celex], languages)
     wdate, eurovoc, validity, _answered = fetch_metadata(session, [celex])
     relations = fetch_relations(session, [celex])
@@ -357,9 +361,10 @@ def download_document(session, root, celex, languages, delay):
             print("%s repeals %s (no longer in force %s)"
                   % (celex, target, when), flush=True)
     # a plain act's consolidated wordings ride the refetch: all its versions,
-    # the ones already on disk skipped (a published version is immutable)
+    # the ones already settled skipped (a published version is immutable)
     if RE_PLAIN_ACT.match(celex):
-        download_consolidations(session, root, [celex], languages, delay)
+        download_consolidations(session, root, [celex], languages, delay,
+                                full=full)
     time.sleep(delay)
     return stored
 
@@ -373,11 +378,43 @@ def download_document(session, root, celex, languages, delay):
 RE_PLAIN_ACT = re.compile(r"^3\d{4}[RL]\d{4}$")
 
 
+# What a version dir holds once the sweep has settled it: CELLAR's own
+# metadata beside the stored content, or -- when CELLAR has no swe/eng
+# manifestation for that wording -- this marker, naming the day we asked.
+# Without the second, the ~10,000 wordings CELLAR never translated were
+# re-selected and re-attempted on every single run, forever.
+NO_CONTENT = ".no-content"
+# ... but the negative is *cached, not permanent*: the Publications Office
+# mints a wording and translates it afterwards, so "no swe/eng today" can
+# become "swe next month". The marker's date is what decides, and the version
+# is asked again once that answer is `NO_CONTENT_TTL` old (defined with
+# RECENCY_WINDOW, whose span it borrows). The wording's own date cannot serve
+# as the key -- it says when the wording began to apply, not when its text was
+# published, and 20,158 of the 20,494 wordings on disk are already older than
+# that window, so keying on it would mark almost every version dead on sight
+# (rule:respect-source-temporality).
+
+
+def version_settled(target, today=None):
+    """Whether this version needs no attempt this run: its content is stored
+    (the notice marks that, as for an act), or CELLAR answered that it has
+    none recently enough to believe (`NO_CONTENT_TTL`).
+
+    A marker we cannot read as a date is treated as absent -- asking again
+    is the recovery, and the answer rewrites it."""
+    if compress.exists(target / "notice.ttl"):
+        return True
+    marker = target / NO_CONTENT
+    return (marker.exists()
+            and marker.read_text().strip()
+            >= ((today or date.today()) - NO_CONTENT_TTL).isoformat())
+
+
 def version_dir(root, celex, version):
     """One consolidated version's storage dir, under its base act's document
     dir: ``{root}/{year}/{celex}/.versions/{date}/`` -- the same notice.ttl +
-    content-per-language layout the act itself uses (layout.
-    eurlex_version_downloads reads the tree back)."""
+    content-per-language layout the act itself uses (`parse.version_dirs`
+    reads the tree back)."""
     return doc_dir(root, celex) / ".versions" / version
 
 
@@ -387,13 +424,22 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
     ``.versions/`` trees -- all versions, not only the latest, each selected
     with the same language and format preferences (and content verification)
     as the acts themselves (`fetch_selection`/`store_document`). Returns
-    (versions found, stored, already on disk, without swe/eng content,
-    failed on a persistent CELLAR error).
+    (versions found, stored, already settled, without swe/eng content,
+    failed on a persistent CELLAR error). `settled` counts both a version
+    whose content is on disk and one recorded as having none.
 
-    Incremental like the act harvest: a version whose dir already holds a
-    notice.ttl is skipped unless `full`. A consolidation is immutable once
-    published (a later amendment is a *new* version with its own date), so
-    re-fetching one buys nothing."""
+    Incremental like the act harvest: a version already settled -- content
+    stored, or recorded as having none (`version_settled`) -- is skipped
+    unless `full`. A consolidation is immutable once published (a later
+    amendment is a *new* version with its own date), so re-fetching one buys
+    nothing.
+
+    A version CELLAR holds no swe/eng manifestation for is recorded as such,
+    dated, and skipped until that answer ages out (`NO_CONTENT_TTL`) -- so
+    the wordings CELLAR never translated are asked about once a window
+    instead of once a run, while one that gains a translation is still found.
+    A version whose fetch *failed* is left unrecorded: that is a CELLAR
+    fault, not an answer about the wording, so it always retries."""
     found = fetch_consolidations(session, sorted(set(celexes)))
     seen = stored = skipped = empty = failed = 0
     pending = []
@@ -406,7 +452,7 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
                 continue
             seen += 1
             target = version_dir(root, base, parts[1])
-            if not full and compress.exists(target / "notice.ttl"):
+            if not full and version_settled(target):
                 skipped += 1
             else:
                 pending.append((cons, parts[1], target))
@@ -417,12 +463,19 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
                                 languages) if pending else {}
     rep = Reporter()
     for done, (cons, version, target) in enumerate(pending, 1):
+        fetched = bool(selection.get(cons))    # no candidates = no round trip
         try:
             if store_document(session, target, cons, version,
                               selection.get(cons, []), []):
                 stored += 1
+                # the wording gained a text: the recorded negative is now a
+                # lie, and it is what the operator reads off the tree
+                (target / NO_CONTENT).unlink(missing_ok=True)
             else:
                 empty += 1
+                # record the answer, dated: the next run skips this version
+                # until the answer ages out (NO_CONTENT_TTL)
+                write_atomic(target / NO_CONTENT, date.today().isoformat())
                 print("%s: no manifestation in %s"
                       % (cons, "/".join(languages)), flush=True)
         except requests.HTTPError as exc:
@@ -445,7 +498,8 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
             failed += 1
             print("%s: CELLAR error, version left unstored: %s"
                   % (cons, exc), flush=True)
-        time.sleep(delay)
+        if fetched:
+            time.sleep(delay)   # politeness is owed for a real fetch only
         rep.update(done, len(pending), scope="konsolideringar", actual=stored,
                    stored=stored, no_content=empty, failed=failed)
     rep.done()
@@ -593,6 +647,12 @@ def refresh_metadata(session, root, celexes=None, limit=None,
 # instead of staying pinned to a quiet sector's last document (treaties: none
 # published since 2022, which used to mean re-querying 2022..today every run).
 RECENCY_WINDOW = timedelta(days=183)
+# How long a "CELLAR holds no swe/eng text for this wording" answer is
+# believed before the consolidation sweep asks again (see NO_CONTENT). The
+# indexing lag is the right span for it too: a translation that is coming
+# lands within it, so re-asking sooner only repeats a question CELLAR has
+# already answered.
+NO_CONTENT_TTL = RECENCY_WINDOW
 
 
 def read_watermark(root, sector_name):
@@ -860,7 +920,8 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
             download_consolidations(session, root, bases, languages, delay,
                                     full=full)
         print("eurlex %s: %d consolidated version(s) known, %d stored, "
-              "%d already on disk, %d with no %s manifestation, %d failed "
+              "%d already settled (stored or recorded empty), %d with no %s "
+              "manifestation, %d failed "
               "on a CELLAR error (re-attempted next run)"
               % (sector_name, v_seen, v_stored, v_skipped, v_empty,
                  "/".join(languages), v_failed), flush=True)

@@ -10,6 +10,7 @@ site/data/artifact/sfs/                       # parsed JSON artifacts (+ .versio
 site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed
 site/data/downloaded/eurlex/                  # CELLAR harvest: {year}/{celex}/notice.ttl + content per language
 site/data/downloaded/eurlex/*/*/.versions/    # consolidated wordings (CONSLEG), one dated dir per version
+site/data/downloaded/eurlex/*/*/.versions/*/.no-content  # dated: CELLAR had no swe/eng text for this wording (re-asked when stale)
 site/data/artifact/eurlex/                    # parsed JSON artifacts (+ .versions.json sidecars)
 site/data/artifact/eurlex/archive/            # superseded consolidations, parsed (lydelse pages)
 site/data/downloaded/dom/                     # DV new-API harvest (per court)

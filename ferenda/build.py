@@ -2479,7 +2479,7 @@ def eurlex_download_run(basefile):
     Discovery of new CELEX is eurlex_harvest (bare `lagen eurlex download`)."""
     stored = eurlex_download.download_document(
         _eurlex_session(), layout.EURLEX_DOWNLOADED, basefile,
-        eurlex_download.LANGUAGES, POLITENESS)
+        eurlex_download.LANGUAGES, POLITENESS, full=RUN.force)
     if not stored:
         print("%s: no manifestation in %s" % (
             basefile, "/".join(eurlex_download.LANGUAGES)), flush=True)

@@ -737,3 +737,78 @@ def test_consolidation_sweep_survives_a_persistent_500(tmp_path, monkeypatch):
                 / "notice.ttl").exists()
     assert (D.version_dir(tmp_path, "32014R0910", "2024-10-18")
             / "notice.ttl").exists()
+
+
+def test_a_contentless_version_is_recorded_and_re_asked_only_when_stale(
+        tmp_path, monkeypatch):
+    """CELLAR holds no swe/eng manifestation for thousands of wordings. The
+    success marker (notice.ttl) says nothing about them, so every run
+    re-selected and re-attempted the lot -- 400 of the first 418 versions of
+    one sweep, each also paying the politeness delay for a fetch that never
+    happened. The answer is now recorded and dated.
+
+    Dated, not permanent: the Publications Office mints a wording and
+    translates it afterwards, so the version's own date says nothing about
+    when its text lands (20,158 of 20,494 stored wordings are already older
+    than the window). The marker is believed for NO_CONTENT_TTL and then
+    re-asked."""
+    cons = "02014R0910-19980101"
+    monkeypatch.setattr(D, "fetch_consolidations",
+                        lambda s, c: {"32014R0910": [cons]})
+    asked, slept = [], []
+
+    def fake_selection(_s, celexes, _langs):
+        asked.append(sorted(celexes))
+        return {}                        # no swe/eng content for it
+
+    monkeypatch.setattr(D, "fetch_selection", fake_selection)
+    monkeypatch.setattr(D.time, "sleep", lambda d: slept.append(d))
+
+    seen, stored, skipped, empty, failed = D.download_consolidations(
+        object(), tmp_path, ["32014R0910"], ("swe",), 0.3)
+    assert (seen, stored, skipped, empty, failed) == (1, 0, 0, 1, 0)
+    marker = D.version_dir(tmp_path, "32014R0910", "1998-01-01") / D.NO_CONTENT
+    assert marker.read_text() == date.today().isoformat()
+    # no candidates means no round trip, so no politeness delay is owed
+    assert slept == []
+
+    # the next run does not ask CELLAR about it at all
+    seen, _stored, skipped, empty, _failed = D.download_consolidations(
+        object(), tmp_path, ["32014R0910"], ("swe",), 0)
+    assert (seen, skipped, empty) == (1, 1, 0)
+    assert len(asked) == 1
+
+    # ... until the recorded answer ages out
+    stale = (date.today() - D.NO_CONTENT_TTL - timedelta(days=1)).isoformat()
+    marker.write_text(stale)
+    D.download_consolidations(object(), tmp_path, ["32014R0910"], ("swe",), 0)
+    assert asked[1] == [cons]
+    assert marker.read_text() == date.today().isoformat()   # refreshed
+
+    # --force looks past a fresh marker too
+    D.download_consolidations(object(), tmp_path, ["32014R0910"], ("swe",), 0,
+                              full=True)
+    assert asked[2] == [cons]
+
+
+def test_a_version_that_gains_content_drops_its_no_content_marker(tmp_path,
+                                                                  monkeypatch):
+    """The marker is what the operator reads off the tree, so it must not
+    outlive the answer it records."""
+    cons = "02014R0910-19980101"
+    monkeypatch.setattr(D, "fetch_consolidations",
+                        lambda s, c: {"32014R0910": [cons]})
+    monkeypatch.setattr(D, "fetch_selection", lambda s, c, l:
+                        {cons: [("swe", [("xhtml", "u", None)])]})
+
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+    monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
+
+    target = D.version_dir(tmp_path, "32014R0910", "1998-01-01")
+    target.mkdir(parents=True)
+    (target / D.NO_CONTENT).write_text("1999-01-01")
+    _seen, stored, _skipped, _empty, _failed = D.download_consolidations(
+        object(), tmp_path, ["32014R0910"], ("swe",), 0, full=True)
+    assert stored == 1
+    assert not (target / D.NO_CONTENT).exists()
