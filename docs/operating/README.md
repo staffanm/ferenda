@@ -258,19 +258,24 @@ versions` builds a statute's historical consolidations.
 Run `lagen <source> --help` to see what a given source offers.
 
 One recurring family is the **`ai-*` actions**. Any action whose name starts
-with `ai-` works on a *single specified document* within a source: it sends that
-document to a large language model together with a purpose-built prompt to
-create *new* data — most often to discover connections between that document and
-others — and writes the result as a `.ann` sidecar next to the artifact (a layer
-kept separate from the parsed text, so it can be reviewed and corrected by hand).
-These passes are **opt-in and never run automatically**: a normal
-`download`/`parse`/`rebuild` never calls an LLM. They need `llm_model` set and a
-Berget API key in the environment.
+with `ai-` works on a *single specified document* within a source (`sfs
+ai-hierarki` is the exception: it takes a lag basefile but works over that
+lag's whole chain component — the lag, its förordningar and föreskrifter, any
+EU rung — since the ladder it authors spans documents): it sends the document
+(or component) to a large language model together with a purpose-built prompt
+to create *new* data — most often to discover connections between that
+document and others — and writes the result as a `.ann` sidecar next to the
+artifact (a layer kept separate from the parsed text, so it can be reviewed
+and corrected by hand). These passes are **opt-in and never run
+automatically**: a normal `download`/`parse`/`rebuild` never calls an LLM.
+They need `llm_model` set and a Berget API key in the environment.
 
 ```sh
 lagen eurlex ai-annotate 32016R0679       # author the editorial recital/article layer for one EU act
 lagen kommentar ai-annotate <basefile>    # link an act's articles to external guidance documents
 lagen remisser ai-analyze <case>/<org>    # map one remiss answer onto the referred förarbete's sections
+lagen sfs ai-hierarki 2018:585            # author regleringshierarki rows for one lag's chain component
+lagen sfs ai-hierarki --all               # every lag whose chain reaches a föreskrift
 ```
 
 These calls go to Berget by default, and are metered. Pointing them at a local,

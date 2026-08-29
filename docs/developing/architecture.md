@@ -200,6 +200,16 @@ tiers:
    cheap. A per-doc watermark is recorded only on a **clean sweep** — a failed
    doc leaves the source unmarked so the next run retries it.
 
+Relate's cross-document block (`__corr__`) has its **own recipe**,
+`CORR_CODE`, folded into its watermark (`_corr_watermark`) beside the
+authored layers it reads: an edit to `lib/hierarki.py` or
+`forarbete/genomforande.py` re-runs only the cross passes (seconds), where an
+entry in `RELATE_CODE` re-extracts every document of every source. The block
+runs its passes in a fixed order that is an invariant, not a convenience:
+`canonicalize_concepts` before the concept-keyed `regleringshierarki` build
+(rows store canonical uris), and `rebuild_norm_chain` — which DELETEs its
+table — before `derive_delegation_edges` re-inserts the derived edges.
+
 Driver flags:
 - `--force` — skip the freshness short-circuit for the named stage (not its
   recursive deps).
