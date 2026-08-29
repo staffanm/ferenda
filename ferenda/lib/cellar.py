@@ -453,6 +453,35 @@ def latest_end_of_validity(dates):
     return max((d for d in dates if d and d != OPEN_ENDED), default=None)
 
 
+# The consolidated versions of an act. CELLAR holds each as a sector-0 work
+# ('02014R0910-20241018'), linked to its base act by this one predicate. The
+# inverse-direction predicate (`act_consolidated_consolidates_resource_legal`)
+# is deliberately not read: it lists what a version folds in -- the base act,
+# the previous consolidation and every corrigendum mixed together -- not the
+# amending acts, which the consolidation's own FAM.COMP register names.
+P_CONSOLIDATED_BASE = CDM + "act_consolidated_based_on_resource_legal"
+
+
+def _consolidations_query(celexes):
+    return (PREFIXES + "SELECT ?base ?cons WHERE { VALUES ?base { %s } "
+            "?w cdm:resource_legal_id_celex ?base . "
+            "?c <%s> ?w ; cdm:resource_legal_id_celex ?cons }"
+            % (_literals(celexes), P_CONSOLIDATED_BASE))
+
+
+def fetch_consolidations(session, celexes):
+    """base CELEX -> its consolidated versions' sector-0 CELEX, sorted -- and
+    the version date with them, since the CELEX carries it
+    ('02014R0910-20241018'). An act never consolidated is simply absent."""
+    out = defaultdict(list)
+    for row in _chunked(session, _consolidations_query, sorted(celexes),
+                        SELECT_CHUNK):
+        cons = row["cons"]["value"]
+        if cons not in out[row["base"]["value"]]:
+            out[row["base"]["value"]].append(cons)
+    return {base: sorted(v) for base, v in out.items()}
+
+
 def fetch_repeals(session, celexes):
     """celex -> [CELEX it repeals] for those that repeal anything at all --
     the works whose stored metadata is now out of date.

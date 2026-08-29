@@ -560,6 +560,8 @@ def test_sync_stores_the_relations_with_the_document(tmp_path, monkeypatch):
                         {"32008R0803": {"amends": ["32002R0881"]}})
     # sector 3 acts announce what they repeal; that path is its own test
     monkeypatch.setattr(D, "refresh_repeal_targets", lambda s, r, c: iter(()))
+    # the acts sweep ends with the consolidation walk; none exist here
+    monkeypatch.setattr(D, "fetch_consolidations", lambda s, c: {})
 
     class Resp:
         content = b"<?xml version='1.0'?><html/>"
@@ -582,6 +584,8 @@ def test_download_document_stores_the_relations(tmp_path, monkeypatch):
     monkeypatch.setattr(D, "fetch_relations", lambda s, celexes:
                         {"32008R0803": {"implements": ["32001R2580"]}})
     monkeypatch.setattr(D, "refresh_repeal_targets", lambda s, r, c: iter(()))
+    # a plain act's refetch also asks for its consolidations; none exist here
+    monkeypatch.setattr(D, "fetch_consolidations", lambda s, c: {})
 
     class Resp:
         content = b"<?xml version='1.0'?><html/>"
@@ -625,3 +629,34 @@ def test_sync_records_a_recent_no_content_work_from_the_walk(tmp_path, monkeypat
 
     D.sync(tmp_path, "caselaw")
     assert D.read_pending(tmp_path, "caselaw") == ["62025CJ0009"]
+
+
+def test_sync_acts_sweep_ends_with_the_consolidation_walk(tmp_path, monkeypatch):
+    """The consolidation walk rides `download`: after the year walk, every held
+    plain R/L act is asked what CONSLEG versions exist and the missing ones are
+    fetched -- and the versions join the run's counts. Corrigenda and other
+    non-plain basefiles stay out of the ask."""
+    for celex in ("32014R0910", "32014R0910R(01)"):
+        d = D.doc_dir(tmp_path, celex)
+        d.mkdir(parents=True)
+        (d / "notice.ttl").write_bytes(C.notice_ttl(celex, "2014-07-23", []))
+    _stub_session(monkeypatch)
+    monkeypatch.setattr(D, "enumerate_celex", lambda *a, **k: iter(()))
+    asked = []
+    def fake_consolidations(_s, celexes):
+        asked.extend(celexes)
+        return {"32014R0910": ["02014R0910-20241018"]}
+    monkeypatch.setattr(D, "fetch_consolidations", fake_consolidations)
+    monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs:
+                        {"02014R0910-20241018":
+                         [("swe", [("xhtml", "u", None)])]})
+
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+    monkeypatch.setattr(C, "request", lambda *a, **k: Resp())
+
+    seen, stored, _skipped = D.sync(tmp_path, "acts")
+    assert asked == ["32014R0910"]
+    assert (seen, stored) == (1, 1)
+    vdir = D.version_dir(tmp_path, "32014R0910", "2024-10-18")
+    assert (vdir / "notice.ttl").exists() or (vdir / "notice.ttl.br").exists()

@@ -26,6 +26,8 @@ per year-slice of CELEX rather than one notice per document, and store:
   {root}/{year}/{celex}/notice.ttl       the metadata we keep (celex, sector,
                                          work date, eurovoc), synthesized
   {root}/{year}/{celex}/{lang}.{ext}     content per language (e.g. swe.fmx4)
+  {root}/{year}/{celex}/.versions/{date}/  a consolidated wording (CONSLEG),
+                                         same notice + content layout
 
 CELEX is the basefile throughout (treaty CELEX contain '/', stored with '/'
 mapped to '_' in the path -- the only substitution, so it is reversible).
@@ -57,6 +59,7 @@ from ..lib import compress
 from ..lib.cellar import (
     LANGUAGES,
     SELECT_CHUNK,
+    fetch_consolidations,
     fetch_metadata,
     fetch_relations,
     fetch_repeals,
@@ -69,6 +72,7 @@ from ..lib.cellar import (
     sparql_select,
     store_document,
 )
+from ..lib.eu_structure import consolidation_parts
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import Reporter, write_atomic
@@ -107,6 +111,12 @@ class Sector:
     # the caselaw sector what its judgments repeal is 32,000 CELEX of query for
     # a guaranteed empty answer.
     repeals: bool = False
+    # Does CELLAR maintain consolidated wordings (CONSLEG) for this sector's
+    # works? Only legislation. The acts sweep ends with a consolidation walk
+    # over every held plain R/L act (`download_consolidations`) -- a new
+    # version appears whenever any amendment takes effect, unrelated to the
+    # base act's own work date, so the year walk can never see it.
+    consolidations: bool = False
 
 # The CELEX descriptor (the 2-letter code after the year) names the court and
 # document kind: first letter C/T/F = Court of Justice / General Court / Civil
@@ -126,7 +136,7 @@ SECTORS = {
                        re.compile(r"1\d{4}[A-Z]{1,2}/TXT"), 1951, True),
     "acts": Sector("acts", "3", ("R", "L"),
                    re.compile(r"3\d{4}[RL]\d{4}(\(\d+\))?$"), 1952, True,
-                   repeals=True),
+                   repeals=True, consolidations=True),
     "caselaw": Sector("caselaw", "6", CASELAW_TYPES,
                       re.compile(r"6\d{4}(?:%s)\d{4}$" % "|".join(CASELAW_TYPES)),
                       1954, False, require_language_expression=True),
@@ -345,8 +355,78 @@ def download_document(session, root, celex, languages, delay):
         for target, when in refresh_repeal_targets(session, root, [celex]):
             print("%s repeals %s (no longer in force %s)"
                   % (celex, target, when), flush=True)
+    # a plain act's consolidated wordings ride the refetch: all its versions,
+    # the ones already on disk skipped (a published version is immutable)
+    if RE_PLAIN_ACT.match(celex):
+        download_consolidations(session, root, [celex], languages, delay)
     time.sleep(delay)
     return stored
+
+
+# --------------------------------------------------------------------------
+# consolidated versions -- the CONSLEG wordings of an act, stored under it
+# --------------------------------------------------------------------------
+
+# a plain sector-3 R/L act -- the base-act population the consolidation walk
+# covers (a corrigendum or a treaty text is never the base of a CONSLEG)
+RE_PLAIN_ACT = re.compile(r"^3\d{4}[RL]\d{4}$")
+
+
+def version_dir(root, celex, version):
+    """One consolidated version's storage dir, under its base act's document
+    dir: ``{root}/{year}/{celex}/.versions/{date}/`` -- the same notice.ttl +
+    content-per-language layout the act itself uses (layout.
+    eurlex_version_downloads reads the tree back)."""
+    return doc_dir(root, celex) / ".versions" / version
+
+
+def download_consolidations(session, root, celexes, languages=LANGUAGES,
+                            delay=0.3, full=False):
+    """Fetch every consolidated version of the named base acts into their
+    ``.versions/`` trees -- all versions, not only the latest, each selected
+    with the same language and format preferences (and content verification)
+    as the acts themselves (`fetch_selection`/`store_document`). Returns
+    (versions found, stored, already on disk, without swe/eng content).
+
+    Incremental like the act harvest: a version whose dir already holds a
+    notice.ttl is skipped unless `full`. A consolidation is immutable once
+    published (a later amendment is a *new* version with its own date), so
+    re-fetching one buys nothing."""
+    found = fetch_consolidations(session, sorted(set(celexes)))
+    seen = stored = skipped = empty = 0
+    pending = []
+    for base in sorted(found):
+        for cons in found[base]:
+            parts = consolidation_parts(cons)
+            if parts is None:
+                print("%s: not a consolidation CELEX shape, skipped" % cons,
+                      flush=True)
+                continue
+            seen += 1
+            target = version_dir(root, base, parts[1])
+            if not full and compress.exists(target / "notice.ttl"):
+                skipped += 1
+            else:
+                pending.append((cons, parts[1], target))
+    # one chunked selection query stream for everything pending; the version's
+    # work date is the consolidation date the CELEX itself carries, so no
+    # metadata query is needed
+    selection = fetch_selection(session, [c for c, _, _ in pending],
+                                languages) if pending else {}
+    rep = Reporter()
+    for done, (cons, version, target) in enumerate(pending, 1):
+        if store_document(session, target, cons, version,
+                          selection.get(cons, []), []):
+            stored += 1
+        else:
+            empty += 1
+            print("%s: no manifestation in %s"
+                  % (cons, "/".join(languages)), flush=True)
+        time.sleep(delay)
+        rep.update(done, len(pending), scope="konsolideringar", actual=stored,
+                   stored=stored, no_content=empty)
+    rep.done()
+    return seen, stored, skipped, empty
 
 
 # --------------------------------------------------------------------------
@@ -592,6 +672,11 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     (`refresh_repeal_targets`) -- the repeal is recorded on the repealed act,
     which this walk would otherwise never revisit.
 
+    A sector with consolidated wordings (acts) ends with a consolidation
+    sweep: every held plain R/L act's CONSLEG versions are discovered and the
+    ones not on disk fetched (`download_consolidations`). Skipped under
+    `--limit` and `--source soap`.
+
     Incremental by default: re-fetches only CELEX not already on disk, and
     bounds discovery by a per-sector watermark -- the max work date downloaded
     in the last clean run, with the floor reaching a lag allowance BELOW it
@@ -740,6 +825,25 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     if repealed:
         print("eurlex %s: %d held document(s) re-read as no longer in force"
               % (sector_name, repealed), flush=True)
+    # the sector's consolidated wordings ride the same sweep: every held plain
+    # act is asked what CONSLEG versions exist (a new version appears whenever
+    # any amendment takes effect, which the work-date-bounded year walk can
+    # never see), and only versions not on disk are fetched. Skipped on a
+    # --limit test run -- the walk is corpus-sized -- and under --source soap,
+    # whose point is to avoid the SPARQL endpoint this discovery queries.
+    if sector.consolidations and source == "sparql" and not limit:
+        bases = [c for c in list_basefiles(root) if RE_PLAIN_ACT.match(c)]
+        v_seen, v_stored, v_skipped, v_empty = download_consolidations(
+            session, root, bases, languages, delay, full=full)
+        print("eurlex %s: %d consolidated version(s) known, %d stored, "
+              "%d already on disk, %d with no %s manifestation"
+              % (sector_name, v_seen, v_stored, v_skipped, v_empty,
+                 "/".join(languages)), flush=True)
+        # versions are downloads like any other: they join the run's counts
+        # (and, through them, the ledger's seen/changed pair)
+        seen += v_seen
+        stored += v_stored
+        skipped += v_skipped
     return seen, stored, skipped
 
 
