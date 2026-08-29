@@ -21,9 +21,10 @@ from lxml import etree
 
 from ferenda.guidance import (
     acer_download,
-    eba_download,
     easa_download,
+    eba_download,
     edpb_download,
+    enisa_download,
     euipo_download,
     eurlex_download,
 )
@@ -47,9 +48,10 @@ from ferenda.guidance.model import (
     vagledning_identifier,
     vagledning_uri,
 )
-from ferenda.lib import compress
+from ferenda.lib import compress, lagrum
 from ferenda.lib import formex as lib_formex
-from ferenda.lib import lagrum
+from ferenda.lib.harvest import pdf_path
+from ferenda.lib.util import record_path
 
 # the EDPB's series data now lives on its registry entry, and its numbering
 # rule takes the component order as an argument (the EBA writes the year first)
@@ -1555,6 +1557,47 @@ def test_euipo_is_wired_into_the_source():
     assert not EDPB.feta_rubriker and not EDPB.upprepat_sidhuvud
 
 
+def test_enisa_skips_a_report_it_already_holds(tmp_path):
+    """The gate that keeps a caught-up ENISA run to its index pages. ENISA gives
+    its reports no number, so the slug in the listing IS the identity -- which
+    means the walk can answer "have I got this one" without opening the leaf.
+    Reading all 587 leaves at MIN_DELAY to learn that nothing moved cost 4 096 s
+    over 649 requests, the slowest harvest in the source."""
+    key = "enisa/rapporter/enisa-threat-landscape-2025"
+    assert not enisa_download.already_stored(tmp_path, key)
+    compress.write_download(
+        record_path(tmp_path, "enisa", key), b'{"basefile": "x"}')
+    # the record alone is not enough: a record asserts its document is on disk
+    assert not enisa_download.already_stored(tmp_path, key)
+    compress.write_download(pdf_path(tmp_path, key), b"%PDF-1.4 ...")
+    assert enisa_download.already_stored(tmp_path, key)
+
+
+def test_cellar_walk_fetches_only_what_it_does_not_have(tmp_path):
+    """The gate that makes a caught-up route-A run cheap. Without it the walker
+    re-fetched every manifestation of every work: the ECB's 1 617 yttranden
+    cost 1 917 requests and 19 minutes to store nothing, 93% of the whole
+    guidance download."""
+    body = eurlex_download.BODIES["ecb"]
+    serie = guidance_issuers.BY_KOD["ecb"].serie(body.serie)
+    works = [("52013AB0082", "2013/82", "2013-11-19", "Yttrande", None),
+             ("52014AB0009", "2014/9", "2014-02-05", None, "Opinion"),
+             ("52015AB0001", "2015/1", "2015-01-07", None, "Opinion")]
+    # one work stored whole, one CELLAR holds no swe/eng text for (content
+    # dir but no notice), one never seen
+    stored = eurlex_download.content_dir(tmp_path, "ecb/con/2013-82")
+    compress.write_download(stored / "notice.ttl", b"<> a <Work> .")
+    textless = eurlex_download.content_dir(tmp_path, "ecb/con/2014-9")
+    textless.mkdir(parents=True, exist_ok=True)
+
+    pending = eurlex_download.pending_works(body, serie, tmp_path, works)
+    assert [w[1] for w in pending] == ["2014/9", "2015/1"], \
+        "the stored work is skipped; the one with no notice is retried"
+    # --force looks at everything again
+    assert len(eurlex_download.pending_works(
+        body, serie, tmp_path, works, full=True)) == 3
+
+
 def test_eurlex_amending_act_is_filed_under_its_own_number():
     """An amending act names the act it amends first and prints its own number
     in the trailing parenthesis. Reading the first match filed nine ESRB
@@ -2126,6 +2169,65 @@ def test_eba_sync_stops_when_the_walk_outruns_its_budget(tmp_path, monkeypatch):
     # are still queued would strand those versions for good.
     assert eba_download.read_walked(tmp_path) == set(), \
         "a truncated walk memoized the pages it read"
+
+
+def test_easa_skips_a_leaf_whose_annex_is_already_stored(tmp_path):
+    """EASA prints an annex's identity only on its leaf, so this walk opened all
+    566 leaves every night to rebuild records `walk_records` then found
+    unchanged: 580 requests and 614 s for 0 new documents. A record carries the
+    leaf it came from, which answers the question from the listing alone."""
+    key = "easa/amc-gm/aerodromes-amendment-1"
+    leaf = ("https://www.easa.europa.eu/en/document-library/"
+            "acceptable-means-of-compliance-and-guidance-material/amc-gm-x")
+    compress.write_download(
+        record_path(tmp_path, "easa", key),
+        json.dumps({"basefile": key, "serie": "amc-gm",
+                    "nummer": "aerodromes-amendment-1",
+                    "source_url": leaf}).encode())
+    # a record without its document is not "stored": the record asserts the
+    # document is on disk, so a missing PDF must send the walk back to the leaf
+    assert easa_download.already_stored(tmp_path) == {}
+    compress.write_download(pdf_path(tmp_path, key), b"%PDF-1.4 x")
+    assert easa_download.already_stored(tmp_path) == {
+        leaf: ("amc-gm", "aerodromes-amendment-1")}
+
+
+def test_eba_dead_candidate_list_is_ours_and_shaped(tmp_path, monkeypatch):
+    """A file the EBA has removed for good costs a fetch on every run and holds
+    its leaf open forever, because a live 404 must not memoize the leaf (a
+    riktlinje served badly once would drop out of the corpus). The adjudicated
+    list is the way out: listed urls are skipped without a fetch."""
+    urls = json.loads(
+        eba_download.DEAD_CANDIDATES.read_text(encoding="utf-8"))
+    assert set(urls) == {"_comment", "urls"}, \
+        "the list says what it is and who curates it"
+    assert all(u.startswith("https://") for u in urls["urls"])
+    # the loader is cached, so a test that seeds it has to clear it
+    monkeypatch.setattr(eba_download, "dead_candidates",
+                        lambda: frozenset({"https://x/gone.pdf"}))
+    assert "https://x/gone.pdf" in eba_download.dead_candidates()
+
+
+def test_eba_remembers_what_a_cover_download_bought(tmp_path):
+    """A leaf whose verdict never settles is re-walked every run by design --
+    and re-walking it used to re-download every candidate file to read a cover
+    whose answer had not changed. Measured on the real store: 5 of the 299
+    leaves sit outside the page memo, and they cost one run 23 cover downloads
+    at the EBA's Crawl-delay of 10 s."""
+    pdf = "https://www.eba.europa.eu/x/EBA-GL-2016-07_SV.pdf"
+    other = "https://www.eba.europa.eu/x/compliance-table.pdf"
+    eba_download.write_walked(tmp_path, {"https://www.eba.europa.eu/leaf"},
+                              {pdf: ("gl", "2016/07"), other: None})
+    # both verdicts come back, the negative one included -- "this file names no
+    # EBA number" is exactly the answer that was being re-bought every night
+    assert eba_download.read_covers(tmp_path) == {pdf: ("gl", "2016/07"),
+                                                 other: None}
+    assert other in eba_download.read_covers(tmp_path)
+    # the page memo still reads as it did, from the same file
+    assert eba_download.read_walked(tmp_path) == {"https://www.eba.europa.eu/leaf"}
+    # --force pays for every cover again
+    assert eba_download.read_covers(tmp_path, full=True) == {}
+    assert eba_download.read_walked(tmp_path, full=True) == set()
 
 
 def test_eba_sync_reads_each_leaf_page_once(tmp_path, monkeypatch):

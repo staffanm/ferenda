@@ -51,6 +51,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..lib import compress
 from ..lib.cellar import (
     LANGUAGES,
     PREFIXES,
@@ -191,6 +192,33 @@ def enumerate_works(session, body, log=print):
     return [seen[n] for n in sorted(seen)]
 
 
+def _basefile(body, serie, nummer):
+    """The document's basefile -- ``ecb/con/2013-82``. Read twice: once to ask
+    whether the work is already on disk, once to store it."""
+    return "/".join(x for x in (body.kod, body.serie, serie.slug(nummer)) if x)
+
+
+def pending_works(body, serie, root, works, full=False):
+    """The works this run still has to fetch -- everything CELLAR named that is
+    not already stored. Settled before a single manifestation is requested, and
+    the whole reason a caught-up run is cheap.
+
+    This walker had no such gate, so it re-fetched every manifestation of every
+    work on every run: the ECB's 1 617 yttranden cost 1 917 requests and 19
+    minutes to store nothing, 93% of the entire guidance download (measured
+    2026-08-26). `eurlex.download` has gated its own CELLAR walk this way all
+    along (`is_downloaded`, "a fully-downloaded year queries nothing").
+
+    Keyed on the notice, like that one, because `store_document` writes the
+    notice only *after* content lands. A work CELLAR holds with no swe/eng text
+    therefore stays ungated and is retried on every run -- which is what lets a
+    translation that lands later be picked up, the property the eurlex side
+    keeps a retry sidecar for."""
+    return [w for w in works
+            if full or not compress.exists(
+                content_dir(root, _basefile(body, serie, w[1])) / "notice.ttl")]
+
+
 def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
           languages=LANGUAGES, log=print):
     """Harvest one body's guidance out of CELLAR into this source's store."""
@@ -206,12 +234,14 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
     report = Reporter()
     seen = new = 0
     utan_text = 0
+    pending = pending_works(body, serie, root, works, full=full)
+    redan = len(works) - len(pending)
     selection, dates, eurovoc, validity = {}, {}, {}, {}
-    for start in range(0, len(works), META_CHUNK):
+    for start in range(0, len(pending), META_CHUNK):
         # the selection and the metadata come per chunk rather than per work:
         # both queries take a VALUES list, so a thousand works cost one round
         # trip each instead of two thousand
-        chunk = works[start:start + META_CHUNK]
+        chunk = pending[start:start + META_CHUNK]
         celexes = [w[0] for w in chunk]
         selection = fetch_selection(session, celexes, languages)
         dates, eurovoc, validity, _answered = fetch_metadata(
@@ -220,8 +250,7 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
             if limit is not None and new >= limit:
                 break
             seen += 1
-            basefile = "/".join(x for x in (body.kod, body.serie,
-                                            serie.slug(nummer)) if x)
+            basefile = _basefile(body, serie, nummer)
             target = content_dir(root, basefile)
             stored = store_document(session, target, celex,
                                     dates.get(celex, wdate),
@@ -234,7 +263,7 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
                 # Not a failure to record: the document is simply not readable
                 # here yet, and a later run finds it if a translation lands.
                 utan_text += 1
-                report.update(seen, len(works), scope=body.kod, actual=new,
+                report.update(seen, len(pending), scope=body.kod, actual=new,
                               utan_text=utan_text)
                 continue
             new += store_record(
@@ -250,13 +279,14 @@ def _sync(body, root, full=False, only=None, limit=None, delay=0.5,
                  "dokument_url": EURLEX_PAGE % celex,
                  "manifestationer": sorted(stored)},
                 full=full)
-            report.update(seen, len(works), scope=body.kod, actual=new,
+            report.update(seen, len(pending), scope=body.kod, actual=new,
                           utan_text=utan_text)
         if limit is not None and new >= limit:
             break
     report.done()
-    log("%s: %d works, %d stored, %d holding no swe/eng text"
-        % (body.kod, seen, new, utan_text))
+    log("%s: %d works, %d already stored, %d fetched, %d stored, "
+        "%d holding no swe/eng text"
+        % (body.kod, len(works), redan, seen, new, utan_text))
     return seen, new
 
 

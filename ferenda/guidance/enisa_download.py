@@ -67,10 +67,11 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..lib.harvest import walk_records
+from ..lib import compress
+from ..lib.harvest import pdf_path, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
-from ..lib.util import MONTHS_EN, href, normalize_space
+from ..lib.util import MONTHS_EN, href, normalize_space, record_path
 from .issuers import ENISA
 
 BASE = ENISA.base
@@ -270,7 +271,23 @@ def _slugged(leaves):
     return filed
 
 
-def _pending(session, filed, only, delay, counts):
+def already_stored(root, key):
+    """Whether this report's record *and* its document are both on disk -- the
+    question the index alone can answer, since the slug ENISA files a report
+    under is in the listing.
+
+    Asked before the leaf is fetched, which is the whole point: the leaf costs a
+    request at `MIN_DELAY`, and reading all 587 of them to learn that nothing
+    moved is what made this the slowest harvest in the source -- 4 096 s over
+    649 requests for 0 new documents (measured 2026-08-26). A report ENISA
+    revises under the same slug is therefore picked up by ``--force``, not by
+    the nightly run; that is the same trade `eba_download` makes with its
+    ``.walked.json`` and the reason ``--force`` exists."""
+    return (compress.exists(record_path(root, ENISA.kod, key))
+            and compress.exists(pdf_path(root, key)))
+
+
+def _pending(session, root, filed, only, full, delay, counts):
     """The listing as a lazy stream of ``(record, body)``, so a capped run stops
     reading leaves where it stops fetching documents.
 
@@ -281,6 +298,9 @@ def _pending(session, filed, only, delay, counts):
     for nummer, leaf in filed.items():
         key = basefile(nummer)
         if only is not None and key != only:
+            continue
+        if not full and already_stored(root, key):
+            counts["redan hämtade"] += 1
             continue
         url = urljoin(BASE, leaf)
         fields = parse_leaf(_fetch(session, url, delay), url)
@@ -310,7 +330,9 @@ def enisa_sync(root, full=False, only=None, limit=None, delay=0.5):
 
     One scope: the body has one series and one listing, and the listing is
     enumerable whole in 59 requests, so the EDPB/EBA idiom applies -- one walk
-    per run, fetching what is new or changed, no watermark.
+    per run, fetching what is new or changed, no watermark. A caught-up run
+    costs those 59 requests and nothing else: the slug in the listing is the
+    identity, so `already_stored` answers for a report without opening its leaf.
 
     Every leaf that is not taken is counted under the reason it was not, so a
     declined document type and a page shape this harvest has not seen never look
@@ -327,7 +349,7 @@ def enisa_sync(root, full=False, only=None, limit=None, delay=0.5):
                          % only)
     counts = Counter()
     seen, new = walk_records(
-        root, _pending(session, filed, only, delay, counts),
+        root, _pending(session, root, filed, only, full, delay, counts),
         delay=delay, full=full, limit=limit, scope=ENISA.kod,
         total=1 if only is not None else len(filed))
     print("enisa: %d index pages, %d publications listed, %d leaves read -> %s"

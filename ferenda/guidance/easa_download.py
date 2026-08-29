@@ -72,10 +72,12 @@ Stored per document under ``site/data/downloaded/guidance/easa/``: an
 
 import re
 import time
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib.harvest import select_pending, walk_records
+from ..lib import compress
+from ..lib.harvest import pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import href, normalize_space
@@ -214,6 +216,33 @@ def walk_library(session, delay, log=print):
         "(%d so far) -- its pager no longer terminates" % (PAGE_CAP, len(seen)))
 
 
+def already_stored(root):
+    """``{leaf url: (serie, nummer)}`` for the documents already harvested --
+    the question the listing alone can answer, since a record carries the leaf
+    it came from as its `source_url`.
+
+    Asked before the leaf is opened, which is the whole cost of a caught-up run:
+    the identity is only printed on the leaf, so this walk read all 566 of them
+    every night to rebuild records `walk_records` then found unchanged -- 580
+    requests and 614 s for 0 new documents (measured 2026-08-26). A leaf is
+    skipped only when its document is on disk too, since a stored record is the
+    assertion that the document behind it is there.
+
+    An annex EASA revises under the same leaf is therefore picked up by
+    ``--force``, not by the nightly run -- the trade `eba_download` and
+    `enisa_download` already make, and the reason ``--force`` exists."""
+    directory = Path(root) / EASA.kod
+    if not directory.exists():
+        return {}
+    known = {}
+    for path in sorted(directory.glob("easa-*.json*")):
+        record = compress.read_json(path)
+        if record.get("source_url") and compress.exists(
+                pdf_path(root, record["basefile"])):
+            known[record["source_url"]] = (record["serie"], record["nummer"])
+    return known
+
+
 def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
     """Harvest EASA:s AMC/GM off its document library.
 
@@ -229,12 +258,21 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
     has already used are five different things; a run that merged them would
     hide the shape it has not seen behind the four it has."""
     session = make_session(USER_AGENT)
+    known = {} if full else already_stored(root)
     leaves, pages = walk_library(session, delay)
     pending, taken = [], set()
+    redan = 0
     per_serie = dict.fromkeys(EASA.koder, 0)
     declined = dict.fromkeys(("ej bilaga", "namnlös serie", "utan fil",
                               "inte pdf", "dubblett"), 0)
     for url in leaves:
+        if BASE + url in known:
+            # already harvested: its identity is taken (so a later leaf naming
+            # the same annex is still counted as the duplicate it is) and its
+            # page is not opened
+            taken.add(known[BASE + url])
+            redan += 1
+            continue
         fields = parse_leaf(_fetch(session, BASE + url, delay), BASE + url)
         identity = series_number(fields["titel"])
         if not fields["bilaga"]:
@@ -263,8 +301,9 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
                 "source_url": BASE + url,
                 "dokument_url": fields["dokument_url"],
             }, _document_fetcher(session, fields["dokument_url"])))
-    print("easa: %d listing pages, %d documents -> %s; declined %s"
-          % (pages, len(leaves),
+    print("easa: %d listing pages, %d documents, %d already stored -> %s; "
+          "declined %s"
+          % (pages, len(leaves), redan,
              ", ".join("%d %s" % (n, kod) for kod, n in per_serie.items()),
              ", ".join("%d %s" % (n, why) for why, n in declined.items())))
     return walk_records(

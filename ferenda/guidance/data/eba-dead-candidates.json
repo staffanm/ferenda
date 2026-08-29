@@ -1,0 +1,11 @@
+{
+  "_comment": "OUR list, not the EBA's: candidate files linked from a single-rulebook leaf that the EBA has taken down for good. A leaf lists its riktlinje beside consultation responses, annexes and compliance tables; when one of those files 404s, guidance/eba_download deliberately does NOT memoize the leaf (settled_leaves), because a riktlinje whose PDF was served badly once must not drop out of the corpus. That retry is unbounded, so a permanently-removed file is re-fetched on every run at the EBA's Crawl-delay of 10 s and keeps its leaf in the walk forever. A url listed here is adjudicated gone: it is not fetched, and it does not hold its leaf open. The six below are the ones the walk met on 2026-08-26; all sit under the /documents/10180/ path of the Liferay CMS the EBA has retired, and they are a CEBS-era guideline (the committee dissolved in 2011), a draft RTS, two reports, a consultation feedback document and one bank's consultation response. eba_sync prints each 404'd candidate url under 'eba: dead candidate'; add one only after a run has named it. Removing an entry makes the next run try it again.",
+  "urls": [
+    "https://eba.europa.eu/documents/10180/674176/Instructions+for+CVA+data+collection+exercise.pdf",
+    "https://www.eba.europa.eu/documents/10180/105101/EBA-DraftRTS-2012-01--Draft-RTS-on-capital-requirements-for-CCPs---WITH-CORRECTED-TYPOS_1.pdf",
+    "https://www.eba.europa.eu/documents/10180/105237/CEBSGuidelinesonSupervisoryDisclosurerevisedJan.pdf",
+    "https://www.eba.europa.eu/documents/10180/2087449/Report+on+the+implementation+of+the+EBA+Guidelines+on+methods+for+calculating+contributions+to+DGS.pdf",
+    "https://www.eba.europa.eu/documents/10180/37070/CP29Feedbackdocument.pdf",
+    "https://www.eba.europa.eu/sites/default/files/documents/10180/204980/b264e9d9-3f8b-4547-92fc-ac7f881dacf3/3.%2520British%2520Bankers%25E2%2580%2599%2520Association%2520%2528BBA%2529.PDF.pdf"
+  ]
+}

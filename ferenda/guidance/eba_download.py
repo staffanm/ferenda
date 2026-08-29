@@ -52,6 +52,7 @@ Stored under ``site/data/downloaded/guidance/eba/``: an
 the one ``.walked.json`` memo for the whole source.
 """
 
+import functools
 import json
 import re
 import tempfile
@@ -266,17 +267,58 @@ def known_identities(root):
 # watermark exists to prevent and which this source has no watermark to catch.
 WALKED = ".walked.json"
 
+# Our adjudication of which candidate files are gone for good -- see the file's
+# own `_comment`. A leaf whose only unresolved candidate 404s is deliberately
+# left unmemoized (`settled_leaves`), so a file the EBA has removed permanently
+# is re-fetched on every run and holds its leaf in the walk forever. Listing it
+# here says "we have looked, it is not coming back": no fetch, and the leaf
+# settles. Kept as data next to the harvester rather than as a set in the code,
+# because it grows by adjudication and every entry is a judgement about one
+# publisher's file (rule:curation-is-ours).
+DEAD_CANDIDATES = Path(__file__).resolve().parent / "data" / "eba-dead-candidates.json"
+
+
+@functools.cache
+def dead_candidates():
+    """The candidate urls adjudicated permanently gone, as a set."""
+    return frozenset(json.loads(
+        DEAD_CANDIDATES.read_text(encoding="utf-8"))["urls"])
+
+
+def _memo(root, full):
+    path = Path(root) / EBA.kod / WALKED
+    return {} if full or not path.exists() else json.loads(path.read_text())
+
 
 def read_walked(root, full=False):
     """The pages already read, empty on a ``--force`` run."""
-    path = Path(root) / EBA.kod / WALKED
-    memo = {} if full or not path.exists() else json.loads(path.read_text())
-    return set(memo.get("leaves", ()))
+    return set(_memo(root, full).get("leaves", ()))
 
 
-def write_walked(root, leaves):
+def read_covers(root, full=False):
+    """``{document url: (serie, nummer) | None}`` -- what a cover download has
+    already been paid for, empty on a ``--force`` run.
+
+    The page memo does not cover this. A leaf whose verdict never settles is
+    re-walked on every run *by design* (see `settled_leaves`), and re-walking it
+    re-downloaded every candidate file to read a cover whose answer had not
+    changed: 5 of the 299 leaves are outside the memo today, and they cost this
+    run 23 cover downloads at the EBA's ``Crawl-delay: 10`` -- 230 of its 731
+    seconds, to learn again that those files name no EBA number.
+
+    Safe to remember for the same reason the page memo is: the EBA gives a
+    revised wording its own number and its own file, so a document at a fixed
+    url is fixed. ``--force`` reads every cover again."""
+    return {url: tuple(v) if v else None
+            for url, v in _memo(root, full).get("covers", {}).items()}
+
+
+def write_walked(root, leaves, covers):
     write_atomic(Path(root) / EBA.kod / WALKED,
-                 json.dumps({"leaves": sorted(leaves)}, indent=1))
+                 json.dumps({"leaves": sorted(leaves),
+                             "covers": {url: list(v) if v else None
+                                        for url, v in sorted(covers.items())}},
+                            indent=1))
 
 
 def settled_leaves(root, final, documented):
@@ -462,11 +504,13 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
     # {leaf url: basefile} for one that produced a record. `settled_leaves` turns
     # the two into what the memo may record -- not before `walk_records` has run.
     final, documented = set(), {}
-    # within this run only: a version page links the current version's files too,
-    # so the same document is offered on more than one page and its cover is
-    # read once. Not persisted -- the page memo above already removes the cost
-    # this would have carried between runs.
-    covers = {}
+    # {document url: the (serie, nummer) its cover states, or None}. A version
+    # page links the current version's files too, so within one run the same
+    # document is offered on more than one page and its cover is read once --
+    # and across runs the memo keeps a leaf that can never settle from
+    # re-downloading its candidates every night (see `read_covers`).
+    covers = read_covers(root, full)
+    memoized = len(covers)
     try:
         started = time.monotonic()
         # the deadline bounds one blocked fetch -- `lib.net.request` caps both its
@@ -486,6 +530,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
             rep.update(read, len(topics), scope="eba ämnessidor", leaves=len(leaves))
         rep.done()
         pending, carries_none, fetched, dead, versions = [], 0, 0, 0, 0
+        gone = 0                     # candidates skipped by the dead list
         per_serie = dict.fromkeys(EBA.koder, 0)
         # a queue, not a loop over `leaves`: a leaf names its own previous versions
         # and each of those is a document of its own. Every version page names every
@@ -548,6 +593,11 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
                 if named is not None:
                     chosen = (*named, sprak, document, None)
                     break
+                if document in dead_candidates():
+                    # adjudicated gone: not fetched, and -- unlike a live 404 --
+                    # it does not set `vanished`, so this leaf can finally settle
+                    gone += 1
+                    continue
                 if document in covers:
                     # already read on another page of this run: a version page
                     # links the current version's files too
@@ -567,6 +617,10 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
                     # recovery is defined, not a log-and-hope)
                     dead += 1
                     vanished = True
+                    # named, not just counted: a 404 that keeps coming back is
+                    # what `DEAD_CANDIDATES` is for, and a run that prints only
+                    # the count leaves nothing to put in the list
+                    print("eba: dead candidate %s" % document, flush=True)
                     time.sleep(delay)
                     continue
                 fetched += 1
@@ -641,14 +695,17 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
         set_deadline(session, None)
         print("eba: %d ämnessidor, %d of the %d leaves were already read; this run "
               "walked %d pages -> %s, %d carrying no EBA number, %d previous "
-              "versions found, %d covers read, %d dead candidate files%s"
+              "versions found, %d covers read, %d dead candidate files, "
+              "%d skipped as gone for good%s"
               % (len(topics), skipped, len(leaves), len(queued) - len(queue),
                  ", ".join("%d %s" % (n, kod) for kod, n in per_serie.items()),
-                 carries_none, versions, fetched, dead,
+                 carries_none, versions, fetched, dead, gone,
                  " (walk truncated: %d pages unread)" % len(queue) if truncated
                  else ""))
         print("eba: %d superseded by a later version of the same riktlinje"
               " (%d whose successor this run could not name)" % (replaced, unnamed))
+        print("eba: %d cover verdicts remembered from earlier runs, %d added"
+              % (memoized, len(covers) - memoized), flush=True)
         return walk_records(
             root, select_pending(pending, only,
                                  "the EBA single rulebook carries no document %s"),
@@ -673,7 +730,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
         # being named, and an entry no walk consults costs nothing.
         if drained:
             walked |= settled_leaves(root, final, documented)
-            write_walked(root, walked)
+            write_walked(root, walked, covers)
             print("eba: %s remembers %d pages; --force looks at them again"
                   % (WALKED, len(walked)), flush=True)
         else:
