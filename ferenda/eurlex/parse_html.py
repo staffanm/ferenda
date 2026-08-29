@@ -26,6 +26,7 @@ import re
 from bs4 import BeautifulSoup
 
 from ..lib.eu_structure import CASELAW, doctype
+from ..lib.formex import TABLE, Cell, Row
 from ..lib.util import normalize_space
 from . import lang as L
 from .model import BASE, Block, EurlexDoc, looks_like_act_title
@@ -238,15 +239,20 @@ def _emit_table(table, blocks, in_body, voc):
                 _emit_structural_row(_flat(cells[0]), _flat(cells[1]),
                                      blocks, in_body, voc)
             return
-    for cells in rows:                       # real data table -> row blocks
+    out = []
+    for cells in rows:                       # real data table -> one tabell block
         # interior empty cells are kept, trailing ones dropped -- in a
         # correspondence table a value's column is what identifies which act it
-        # belongs to (see parse._emit_table)
-        fields = [_flat(c) for c in cells]
-        while fields and not fields[-1]:
+        # belongs to (see formex._emit_table)
+        fields = [Cell(_flat(c), int(c.get("rowspan") or 1),
+                       int(c.get("colspan") or 1)) for c in cells]
+        while fields and not (fields[-1].text or fields[-1].rowspan > 1
+                              or fields[-1].colspan > 1):
             fields.pop()
         if fields:
-            blocks.append(Block("row", " | ".join(fields)))
+            out.append(Row(fields, all(c.name == "th" for c in cells)))
+    if out:
+        blocks.append(Block(TABLE, "", rows=out))
 
 
 # a `<p>` containing any of these is a wrapper produced by the parser, not a

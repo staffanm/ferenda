@@ -119,6 +119,13 @@ def act_markdown(art):
             lines.append("%s%s" % ("%s. " % num if num else "", text))
         elif t == "point":
             lines.append("  (%s) %s" % (num, text) if num else "  %s" % text)
+        elif t == "tabell":
+            # the caption, then a line per row with its cells joined -- the
+            # shape the prompt saw when a table was a run of `row` blocks
+            lines.extend([text] if text else [])
+            lines.extend(" | ".join(runs_text(cell).replace("\n", " ")
+                                    for cell in rad.get("cells") or [])
+                         for rad in b.get("children") or [])
         else:                       # preamble, ruling, note, row, keyword
             lines.append(text)
     return "\n".join(lines)

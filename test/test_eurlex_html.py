@@ -186,8 +186,11 @@ def test_recital_and_point_tables_vs_data_table():
              <tr><td>Pears</td><td>5</td></tr></table>
     </body>"""
     doc = parse_html(html, "31968R0001", "eng")
-    # the (a)/(b) table is a point list; the Apples/Pears table is data -> rows
-    assert kinds(doc) == ["article", "point", "point", "row", "row"]
+    # the (a)/(b) table is a point list; the Apples/Pears table is data -> one
+    # `tabell` block holding both its rows
+    assert kinds(doc) == ["article", "point", "point", "tabell"]
+    assert [[c.text for c in row.cells] for row in doc.body[-1].rows] == [
+        ["Apples", "3"], ["Pears", "5"]]
 
 
 def test_heading_table_marker():
@@ -384,13 +387,15 @@ def test_paragraph_wrapping_a_table_is_not_emitted_twice():
     # legacy `TXT_TE` marker (62011TJ0366, ~187 documents of this shape).
     doc = parse_fixture("judgment-p-wraps-table.html", "62011TJ0366", "swe")
     texts = [b.text if isinstance(b.text, str) else "" for b in doc.body]
+    texts += [cell.text for b in doc.body for row in b.rows or []
+              for cell in row.cells]
     assert not [t for t in set(texts) if t and texts.count(t) > 1], texts
     # the operative part survives exactly once, through the table's own emission
     # (the numbered domslut is a 2-column marker table, so its rows become
-    # `point` blocks; the unnumbered "Saken" table is a data table -> `row`)
+    # `point` blocks; the unnumbered "Saken" table is a data table -> a `tabell`)
     assert sum("ogiltigförklaras" in t for t in texts) == 1
     assert [b.kind for b in doc.body] == [
-        "paragraph", "row", "paragraph", "point", "point"]
+        "paragraph", "tabell", "paragraph", "point", "point"]
 
 
 def test_amending_prose_is_not_an_article_heading():

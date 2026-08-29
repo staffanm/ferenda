@@ -31,6 +31,7 @@ from ferenda.lib import catalog
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.eu_structure import anchored_blocks
 from ferenda.lib.eu_structure import flatten as flatten_structure
+from ferenda.lib.text import runs_text
 
 
 def _flat(xml):
@@ -982,8 +983,11 @@ def test_parse_document_embeds_annex_as_single_doc():
     # ... followed by the annex as a level-1 heading with a bilaga anchor ...
     head = next(b for b in doc.body if b.text == "BILAGA III")
     assert head.kind == "heading" and head.level == 1 and head.anchor == "bilaga-3"
-    # ... and the annex table flattened to row blocks
-    assert any(b.kind == "row" and "Energi" in b.text for b in doc.body)
+    # ... and the annex table as a `tabell` block holding its rows
+    table = next(b for b in doc.body if b.kind == "tabell")
+    assert [[c.text for c in row.cells] for row in table.rows] == [
+        ["Sektor", "Undersektor"], ["Energi", "El"]]
+    assert [row.header for row in table.rows] == [True, False]
 
 
 # 2004/18's jämförelsetabell: a blank spacer column sits between the three
@@ -1006,19 +1010,74 @@ SPACER_TABLE_XML = """<ANNEX>
 
 
 def _rows(doc):
-    return [b.text for b in doc.body if b.kind == "row"]
+    return [[c.text for c in row.cells]
+            for b in doc.body if b.kind == "tabell" for row in b.rows]
 
 
 def test_table_rows_keep_interior_empty_cells_and_drop_trailing_ones():
     doc = parse_formex(ET.fromstring(SPACER_TABLE_XML), "32004L0018", "swe")
     assert _rows(doc) == [
         # header: the trailing empty cell goes, so the row ends at column 4
-        "Detta direktiv | Direktiv 93/37/EEG | Direktiv 92/50/EEG | "
-        "Andra rättsakter",
+        ["Detta direktiv", "Direktiv 93/37/EEG", "Direktiv 92/50/EEG",
+         "Andra rättsakter"],
         # data: the *interior* blank survives, so "Ändrad" stays in column 6
-        "Artikel 1.2 a | Artikel 1 a | Artikel 1 a |  | Ändrad",
+        ["Artikel 1.2 a", "Artikel 1 a", "Artikel 1 a", "", "Ändrad"],
         # both trailing blanks go
-        "Artikel 1.2 b | Artikel 1 c | —"]
+        ["Artikel 1.2 b", "Artikel 1 c", "—"]]
+
+
+# NIS2 bilaga I in miniature: a sector cell spanning the rows it covers, a
+# header row, and a dash list of several entity kinds inside one cell
+SPAN_TABLE_XML = """<ANNEX>
+  <TITLE><TI><P>BILAGA I</P></TI></TITLE>
+  <CONTENTS>
+    <TBL COLS="3"><TITLE><P>Högkritiska sektorer</P></TITLE><CORPUS>
+      <ROW TYPE="HEADER"><CELL COL="1" TYPE="HEADER">Sektor</CELL>
+        <CELL COL="2" TYPE="HEADER">Delsektor</CELL>
+        <CELL COL="3" TYPE="HEADER">Typ av entitet</CELL></ROW>
+      <ROW><CELL COL="1" ROWSPAN="2"><NP><NO.P>1.</NO.P><TXT>Energi</TXT></NP></CELL>
+        <CELL COL="2"><LIST TYPE="alpha"><ITEM><NP><NO.P>a)</NO.P>
+          <TXT>Elektricitet</TXT></NP></ITEM></LIST></CELL>
+        <CELL COL="3"><LIST TYPE="DASH"><ITEM><P>Elföretag</P></ITEM>
+          <ITEM><P>Producenter</P></ITEM></LIST></CELL></ROW>
+      <ROW><CELL COL="2"><LIST TYPE="alpha"><ITEM><NP><NO.P>b)</NO.P>
+          <TXT>Gas</TXT></NP></ITEM></LIST></CELL>
+        <CELL COL="3"><LIST TYPE="DASH"><ITEM><P>Naturgasföretag</P></ITEM></LIST></CELL></ROW>
+    </CORPUS></TBL>
+  </CONTENTS>
+</ANNEX>"""
+
+
+def test_table_keeps_its_spans_header_and_per_item_cell_lines():
+    """The OJ annex table is only readable with its spans: "1. Energi" is written
+    once and the rows it covers omit the cell, exactly as HTML does it. And a
+    cell's dash list names one entity per item -- run together, three kinds of
+    marknadsaktör read as one."""
+    doc = parse_formex(ET.fromstring(SPAN_TABLE_XML), "32022L2555", "swe")
+    table = next(b for b in doc.body if b.kind == "tabell")
+    assert table.text == "Högkritiska sektorer"          # the TBL's own caption
+    assert [row.header for row in table.rows] == [True, False, False]
+    assert [[(c.text, c.rowspan) for c in row.cells] for row in table.rows] == [
+        [("Sektor", 1), ("Delsektor", 1), ("Typ av entitet", 1)],
+        [("1. Energi", 2), ("a) Elektricitet", 1),
+         ("\u2014 Elföretag\n\u2014 Producenter", 1)],
+        [("b) Gas", 1), ("\u2014 Naturgasföretag", 1)]]
+
+
+def test_table_artifact_node_is_the_shared_tabell_rad_pair():
+    """The artifact writes the `tabell`/`rad` nodes sfs, förarbete and föreskrift
+    already write, so one renderer, one markdown projection and one link walk
+    serve them all -- the spans ride as a per-row list."""
+    art = to_artifact(parse_formex(ET.fromstring(SPAN_TABLE_XML),
+                                   "32022L2555", "swe"))
+    table = next(b for b in flatten_structure(art["structure"])
+                 if b["type"] == "tabell")
+    assert runs_text(table["text"]) == "Högkritiska sektorer"
+    assert table["children"][0]["th"] is True
+    assert "th" not in table["children"][1]
+    assert table["children"][1]["rowspan"] == [2, 1, 1]
+    assert "rowspan" not in table["children"][2]   # written only where it spans
+    assert runs_text(table["children"][2]["cells"][0]) == "b) Gas"
 
 
 def test_parse_dir_stores_the_lineage_on_the_artifact(tmp_path):

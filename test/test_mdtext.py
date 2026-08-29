@@ -139,6 +139,34 @@ def test_forarbete_shape_reads_as_a_proposition():
     assert "| gammal \\| text | ny text |" in md      # a pipe in a cell escapes
 
 
+def test_a_spanning_cell_is_written_out_into_the_rows_it_covers():
+    """A pipe table has no rowspan. NIS2 bilaga I writes "1. Energi" once with
+    ROWSPAN="17"; printed as-is, the 16 rows it covers put their third-column
+    cell in column 1, under the sector name it is not."""
+    md = mdtext.node_markdown({"type": "tabell", "text": [], "children": [
+        {"type": "rad", "th": True,
+         "cells": [["Sektor"], ["Delsektor"], ["Typ av entitet"]]},
+        {"type": "rad", "rowspan": [2, 2, 1],
+         "cells": [["1. Energi"], ["a) Elektricitet"], ["Elföretag"]]},
+        {"type": "rad", "cells": [["Producenter"]]},
+        {"type": "rad", "cells": [["2. Transporter"], ["a) Luft"], ["Flygplatser"]]},
+    ]})
+    assert md.split("\n") == [
+        "| Sektor | Delsektor | Typ av entitet |",
+        "| --- | --- | --- |",
+        "| 1. Energi | a) Elektricitet | Elföretag |",
+        "|  |  | Producenter |",
+        "| 2. Transporter | a) Luft | Flygplatser |"]
+
+
+def test_a_colspan_widens_the_row_it_sits_in():
+    md = mdtext.node_markdown({"type": "tabell", "text": [], "children": [
+        {"type": "rad", "colspan": [2, 1], "cells": [["Båda"], ["Tredje"]]},
+        {"type": "rad", "cells": [["a"], ["b"], ["c"]]},
+    ]})
+    assert md.split("\n")[-2:] == ["| Båda |  | Tredje |", "| a | b | c |"]
+
+
 def test_generic_shape_numbered_stycken_and_footnotes():
     # the dv/hudoc shape: rubrik levels, ordinal-numbered stycken, footnotes
     art = {

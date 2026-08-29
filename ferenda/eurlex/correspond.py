@@ -40,6 +40,7 @@ import re
 
 from ..lib import lagrum, layout
 from ..lib.eu_structure import flatten
+from ..lib.text import runs_text
 
 BASE = lagrum.CELEX_BASE
 
@@ -83,26 +84,15 @@ RANGE = re.compile(r"[-–—]")
 CELEX_URI = re.compile(re.escape(BASE) + r"([0-9][A-Z0-9()/._-]+)")
 
 
-def _cells(node):
-    """One `row` block's cells as `(text, [celex, ...])`.
+def _cells(rad):
+    """One `rad` node's cells as `(text, [celex, ...])`.
 
-    The parser joins a table row's cells with " | " *inside* the inline-run
-    list, so a cell boundary can fall in the middle of a run sequence: the
-    string runs are split on the separator and the link runs accumulate into
-    whichever cell is open. Empty interior cells survive the join (see
-    `parse._emit_table`), so a cell's index is its column."""
-    cells = [([], [])]
-    for run in node.get("text") or []:
-        if isinstance(run, str):
-            head, *rest = run.split(" | ")
-            cells[-1][0].append(head)
-            for part in rest:
-                cells.append(([part], []))
-        else:
-            cells[-1][0].append(run.get("text", ""))
-            if m := CELEX_URI.fullmatch(run.get("uri", "")):
-                cells[-1][1].append(m.group(1))
-    return [("".join(t).strip(), celexes) for t, celexes in cells]
+    Empty interior cells survive parsing (see `formex._emit_table`), so a
+    cell's index is its column."""
+    return [(runs_text(cell).strip(),
+             [m.group(1) for run in cell if isinstance(run, dict)
+              and (m := CELEX_URI.fullmatch(run.get("uri", "")))])
+            for cell in rad.get("cells") or []]
 
 
 def _articles(cell):
@@ -173,38 +163,48 @@ def _header_celex(text, celexes):
     return uri[len(BASE):]
 
 
+def _columns(header):
+    """One row read as a table header: `(self_column, {column: celex})`, or None
+    when it is not one. A header names this act in exactly one column and an
+    identifiable act in at least one other."""
+    if len(header) < 2:
+        return None
+    selves = [c for c, (text, _) in enumerate(header) if SELF_COLUMN.match(text)]
+    if len(selves) != 1:
+        return None                 # not a header (or an unreadable one)
+    others = {c: found for c, (text, celexes) in enumerate(header)
+              if c != selves[0] and (found := _header_celex(text, celexes))}
+    return (selves[0], others) if others else None  # else a free-text column
+
+
 def _tables(art):
     """Every correspondence table in one parsed act: `(self_column,
     {column: celex}, [row cells, ...])`.
 
-    A table is located by its header row -- the row naming this act in one
-    column and another act in the others -- rather than by the annex heading,
-    which is unreliable: Formex splits "BILAGA XV" and "JÄMFÖRELSETABELL" into
-    separate nodes and 2014/24's last "jämförelsetabell" mention is in article
-    91, nowhere near the table. The table runs from the header to the first
-    block that is not a row."""
-    blocks, tables = flatten(art["structure"]), []
-    for i, block in enumerate(blocks):
-        if block.get("type") != "row":
+    The columns are identified from a header row -- the row naming this act in
+    one column and another act in the others -- rather than from the annex
+    heading, which is unreliable: Formex splits "BILAGA XV" and
+    "JÄMFÖRELSETABELL" into separate nodes and 2014/24's last "jämförelsetabell"
+    mention is in article 91, nowhere near the table.
+
+    One header does not own every row that follows it, in either direction the
+    source writes them. 32008R1249 sets its 11 repealed regulations as 11
+    separate tables; 32009R1224 sets its 12 in *one* table, each opened by its
+    own header row. So a header owns the rows up to the next header, and never
+    reaches past its own table. Read otherwise, 1224 attributed all 118 rows to
+    the first of the twelve acts (496 edges where 133 are real) and 1249's first
+    table swallowed the other ten (309 where 58 are real)."""
+    tables = []
+    for node in flatten(art["structure"]):
+        if node.get("type") != "tabell":
             continue
-        header = _cells(block)
-        if len(header) < 2:
-            continue
-        selves = [c for c, (text, _) in enumerate(header)
-                  if SELF_COLUMN.match(text)]
-        if len(selves) != 1:
-            continue                # not a header (or an unreadable one)
-        others = {c: found for c, (text, celexes) in enumerate(header)
-                  if c != selves[0]
-                  and (found := _header_celex(text, celexes))}
-        if not others:
-            continue                # e.g. an "Andra rättsakter" free-text column
-        rows = []
-        for follower in blocks[i + 1:]:
-            if follower.get("type") != "row":
-                break
-            rows.append(_cells(follower))
-        tables.append((selves[0], others, rows))
+        rows = [_cells(rad) for rad in node.get("children") or []
+                if rad.get("type") == "rad"]
+        heads = [(i, columns) for i, cells in enumerate(rows)
+                 if (columns := _columns(cells))]
+        for n, (i, (self_column, others)) in enumerate(heads):
+            end = heads[n + 1][0] if n + 1 < len(heads) else len(rows)
+            tables.append((self_column, others, rows[i + 1:end]))
     return tables
 
 

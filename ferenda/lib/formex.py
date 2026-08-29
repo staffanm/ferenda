@@ -35,6 +35,22 @@ from .util import from_roman
 
 
 @dataclass
+class Cell:
+    """One table cell: its text, and the rows/columns it spans in the printed
+    table. A cell that spans is written once and the rows it covers omit it --
+    Formex and HTML agree on that, so the spans ride to the page unchanged."""
+    text: str
+    rowspan: int = 1
+    colspan: int = 1
+
+
+@dataclass
+class Row:
+    cells: list[Cell]
+    header: bool = False       # a ROW/CELL the source marks TYPE="HEADER"
+
+
+@dataclass
 class Block:
     kind: str                  # see KINDS below
     text: str
@@ -62,6 +78,11 @@ class Block:
                                # than as the finished marker because the
                                # punctuation is presentational and settled by
                                # the renderer (see `_eurlex_marker`).
+    rows: list[Row] | None = None  # a `tabell` block: its rows. The block's
+                               # `text` is then the table's own caption (its
+                               # Formex TITLE), not its contents -- the shape
+                               # the artifact's `tabell`/`rad` nodes already
+                               # have across the other sources.
 
 
 # the manifestation is remote-supplied: no DTD/entity expansion (stdlib
@@ -1095,6 +1116,15 @@ def parse_quotation(quot, blocks):
     inner = []
     _quoted_unit(quot, inner)
     for b in inner:
+        if b.kind == TABLE:
+            # a quoted act's table: the quotation is another document's text and
+            # gets no table markup of its own, so each row is one quoted run
+            # with its cells joined, which is what the page has always printed
+            blocks.extend(Block(QUOTATION,
+                                " | ".join(c.text for c in row.cells),
+                                quoted="row")
+                          for row in b.rows)
+            continue
         blocks.append(Block(
             QUOTATION,
             " ".join(x for x in (b.label, b.text) if x) if b.kind == "article"
@@ -1182,21 +1212,85 @@ def judgment_metadata(root):
 # annexes (embedded as part of the single document) and footnotes
 # --------------------------------------------------------------------------
 
+# the block kind a TBL becomes. The artifact writes it as the `tabell`/`rad`
+# node pair the other sources already produce (sfs, förarbete, föreskrift), so
+# one renderer, one markdown projection and one link walk serve them all.
+TABLE = "tabell"
+# a cell's own block-level children: each one is a line of its own, so a cell
+# holding several of them does not read as a single sentence
+_CELL_BLOCKS = {"P", "NP", "ALINEA", "TXT", "LIST", "DLIST"}
+# the bullet the OJ prints for a Formex dash list, which sets no marker of its own
+_DASH = "\u2014 "
+
+
+def _cell_text(cell):
+    """One CELL's text: one line per block-level child, a dash list's items each
+    on a line of their own.
+
+    NIS2 bilaga I column 3 lists three kinds of marknadsaktör as three ITEMs of
+    one DASH list in a single cell. Flattening the whole cell ran them into one
+    sentence -- "Nominerade elmarknadsoperatörer ... Marknadsaktörer ...
+    Laddningsoperatörer ..." -- which reads as one entity where the act names
+    three. A cell that holds no block-level child (the overwhelming majority:
+    212 000 of the 226 000 cells in a 400-act sample) is flattened exactly as
+    before."""
+    if not any(child.tag in _CELL_BLOCKS for child in cell):
+        return flatten(cell)
+    lines, inline = [], [cell.text or ""]
+
+    def close():
+        lines.append("".join(inline))
+        inline.clear()
+
+    for child in cell:
+        if child.tag in SKIP_INLINE:
+            pass
+        elif child.tag in ("LIST", "DLIST"):
+            close()
+            # an alpha/arab list carries its own NO.P marker in the item text; a
+            # DASH list carries none, so the bullet the OJ prints is added here
+            bullet = _DASH if (child.get("TYPE") or "").upper() == "DASH" else ""
+            lines.extend(bullet + flatten(item) for item in child)
+        elif child.tag in _CELL_BLOCKS:
+            close()
+            lines.append(flatten(child))
+        else:
+            inline.append(flatten(child))
+        inline.append(child.tail or "")
+    close()
+    return "\n".join(line for line in
+                     (" ".join(raw.split()) for raw in lines) if line)
+
+
 def _emit_table(tbl, blocks):
-    """A TBL -> one `row` block per ROW (cells joined by ' | '); enough to keep
-    the text searchable and citation-scannable without a full table model.
+    """A TBL -> one `tabell` block holding its rows, each cell keeping the
+    ROWSPAN/COLSPAN the source sets and the header flag it carries.
+
+    The spans are what make an OJ annex table readable: NIS2 bilaga I writes
+    "1. Energi" once with ROWSPAN="17" and the 16 rows it covers omit the cell
+    entirely. Read without them, the sector name disappears from every row but the
+    first and column 3's entries slide left into column 1.
 
     An *interior* empty cell is kept as an empty field, because in a
     correspondence table the column a value sits in is what it means: 2004/18's
     jämförelsetabell has a blank spacer column between the three repealed
     directives and the "Ny/Ändrad" column, and dropping it slides the latter
-    into the former's place. Trailing empties carry no such meaning and go."""
+    into the former's place. A trailing empty cell carries no such meaning and
+    goes -- unless it spans, where the span is the meaning."""
+    rows = []
     for row in tbl.iter("ROW"):
-        cells = [flatten(cell) for cell in row.findall("CELL")]
-        while cells and not cells[-1]:
+        cells = [Cell(_cell_text(cell), int(cell.get("ROWSPAN") or 1),
+                      int(cell.get("COLSPAN") or 1))
+                 for cell in row.findall("CELL")]
+        while cells and not (cells[-1].text or cells[-1].rowspan > 1
+                             or cells[-1].colspan > 1):
             cells.pop()
         if cells:
-            blocks.append(Block("row", " | ".join(cells)))
+            rows.append(Row(cells, row.get("TYPE") == "HEADER"
+                            or all(c.get("TYPE") == "HEADER"
+                                   for c in row.findall("CELL"))))
+    if rows:
+        blocks.append(Block(TABLE, _text(tbl, "TITLE"), rows=rows))
 
 
 def walk_content(elem, blocks, level=2):

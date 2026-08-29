@@ -2152,7 +2152,8 @@ def _render_rad(node, site, doc_uri, image_column):
     ordförklaringar table is the first artifact whose header row is *read* as
     one. Honouring it changes rendered markup for the sources that already carry
     the flag -- 4 of 400 sampled rs artifacts, ~29 documents corpus-wide."""
-    cells = [Markup(render_runs(c, site)) for c in node.get("cells", [])]
+    cells = [_render_cell(c, site, node, i)
+             for i, c in enumerate(node.get("cells", []))]
     g = node.get("grafik")
     grafik_cell = ""
     if g:  # a dropped road-sign image (2007:90): the sign beside its code
@@ -2175,6 +2176,41 @@ def _render_rad(node, site, doc_uri, image_column):
                      "th" if node.get("th") else "td")
 
 
+def _render_cell(runs, site, row, i):
+    """One cell: its runs, plus the rows and columns it spans.
+
+    A cell holding several things -- an OJ annex cell lists three kinds of
+    marknadsaktör as three dash items -- carries them as separate lines, which
+    the parser writes as newlines and the cell prints as line breaks. Every
+    other source's cells are single runs of text with no newline in them, so
+    this is inert for them."""
+    def span(key):
+        spans = row.get(key) or []
+        return spans[i] if i < len(spans) else 1
+
+    return {"html": Markup(render_runs(runs, site).replace("\n", "<br>")),
+            "rowspan": span("rowspan"), "colspan": span("colspan")}
+
+
+def render_tabell(node, site, doc_uri, toc, rail):
+    """A `tabell` node -> one `<table>`: its `rad` children as rows, anything
+    else through the ordinary node walk, and its own `text` as the caption.
+
+    Public because eurlex walks its own document tree (`eurlex/render.py`) and
+    reads the same node pair -- one table renderer for every source that writes
+    one (rule:second-use-goes-to-lib)."""
+    # a road-sign table gains a leading image column. Its header row carries
+    # no sign of its own, so it needs the column too -- without it "Märke"
+    # and "Närmare föreskrifter" sit one column left of the cells they name.
+    image_column = any(c.get("grafik") for c in node.get("children", []))
+    return NODES.tabell(Markup("".join(
+        _render_rad(c, site, doc_uri, image_column)
+        if c.get("type") == "rad"
+        else render_node(c, site, doc_uri, toc, rail)
+        for c in node.get("children", []))),
+        Markup(render_runs(node.get("text") or [], site)))
+
+
 def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
     t = node.get("type")
     nid = node.get("id")
@@ -2183,15 +2219,7 @@ def render_node(node, site, doc_uri, toc, rail, drop_marker=False):
         return _render_konventionsbilaga(node, site, doc_uri, toc, rail)
 
     if t == "tabell":
-        # a road-sign table gains a leading image column. Its header row carries
-        # no sign of its own, so it needs the column too -- without it "Märke"
-        # and "Närmare föreskrifter" sit one column left of the cells they name.
-        image_column = any(c.get("grafik") for c in node.get("children", []))
-        return NODES.tabell(Markup("".join(
-            _render_rad(c, site, doc_uri, image_column)
-            if c.get("type") == "rad"
-            else render_node(c, site, doc_uri, toc, rail)
-            for c in node.get("children", []))))
+        return render_tabell(node, site, doc_uri, toc, rail)
     if t == "rad":
         # a row reached outside its table: it can only speak for itself, and
         # `image_column` is unread whenever the row carries a sign of its own

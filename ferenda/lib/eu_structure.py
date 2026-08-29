@@ -33,13 +33,20 @@ STYCKE_SEG = "S"
 _CLOSERS = ("heading", "ruling", "signature")
 
 
+# a table renders, prints and reads as one element: its rows belong to it, not
+# to the document order around it, so the walk hands it over whole
+_ATOMIC = {"tabell"}
+
+
 def flatten(structure):
     """The inverse of `eurlex.structure.nest`: the document-order flat block list (a
     container becomes its own block, sans `children`, followed by its flattened
-    children)."""
+    children). A `tabell` is yielded whole, rows and all."""
     out = []
     for node in structure:
-        if "children" in node:
+        if node.get("type") in _ATOMIC:
+            out.append(node)
+        elif "children" in node:
             out.append({k: v for k, v in node.items() if k != "children"})
             out.extend(flatten(node["children"]))
         else:

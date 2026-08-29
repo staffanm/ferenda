@@ -14,14 +14,16 @@
 {%- if rail_id %} data-rail="{{ rail_id }}"{% endif -%}
 {%- endmacro -%}
 {#- ============================== render_node ============================ -#}
-{%- macro tabell(rows) -%}
-<table>{{ rows }}</table>
+{%- macro tabell(rows, caption="") -%}
+<table>{% if caption %}<caption>{{ caption }}</caption>{% endif %}{{ rows }}</table>
 {%- endmacro -%}
 {%- macro rad(notice, width, grafik_cell, cells, tag="td") -%}
 {#- a pending/expiring row variant prints its temporal marker as a full-width
-    row above the row itself; `tag` is "th" for a column-header row -#}
+    row above the row itself; `tag` is "th" for a column-header row. A cell is
+    {html, rowspan, colspan}: an OJ annex table writes a sector name once and
+    spans it down the rows it covers, and the rows it covers omit the cell. -#}
 {%- if notice %}<tr class="temporal-status-rad"><td colspan="{{ width }}">{{ notice }}</td></tr>{% endif -%}
-<tr>{{ grafik_cell }}{% for c in cells %}<{{ tag }}>{{ c }}</{{ tag }}>{% endfor %}</tr>
+<tr>{{ grafik_cell }}{% for c in cells %}<{{ tag }}{% if c.rowspan > 1 %} rowspan="{{ c.rowspan }}"{% endif %}{% if c.colspan > 1 %} colspan="{{ c.colspan }}"{% endif %}>{{ c.html }}</{{ tag }}>{% endfor %}</tr>
 {%- endmacro -%}
 {%- macro allmanna_rad(label, inner) -%}
 {#- a föreskrift's allmänt råd, set apart from the binding provision above it

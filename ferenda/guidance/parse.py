@@ -50,8 +50,8 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, util
 from ..lib.datasets import NAMEDACTS
-from ..lib.formex import Block as FormexBlock
 from ..lib.formex import (
+    TABLE,
     _text,
     append_annex,
     collect_notes,
@@ -59,6 +59,7 @@ from ..lib.formex import (
     parse_act,
     walk_content,
 )
+from ..lib.formex import Block as FormexBlock
 from ..lib.lagrum import (
     EMDRATTSFALL,
     EULAGSTIFTNING,
@@ -1105,6 +1106,16 @@ def _from_formex_blocks(raw, sprak):
     for block in raw:
         if block.kind == "note":
             noter.append(Fotnot(block.num, block.text))
+        elif block.kind == TABLE:
+            # a vägledning's page has no table markup, so a table reads as its
+            # caption (where the source sets one) plus one stycke per row with
+            # the row's cells joined
+            if block.text:
+                blocks.append(Block("stycke", block.text))
+            blocks.extend(Block("stycke",
+                                " | ".join(cell.text.replace("\n", " ")
+                                           for cell in row.cells))
+                          for row in block.rows)
         elif block.kind in FORMEX_SKIP or not block.text:
             continue
         elif block.kind == "heading":

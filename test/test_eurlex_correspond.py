@@ -15,7 +15,24 @@ def _link(text, uri):
 
 
 def _row(*runs):
-    return {"type": "row", "text": list(runs)}
+    """One `rad` node, written the way the row reads: the cells of its plain-text
+    runs separated by " | ", link runs landing in whichever cell is open."""
+    cells, current = [], []
+    for run in runs:
+        if not isinstance(run, str):
+            current.append(run)
+            continue
+        head, *rest = run.split(" | ")
+        current.append(head)
+        for part in rest:
+            cells.append(current)
+            current = [part]
+    cells.append(current)
+    return {"type": "rad", "cells": cells}
+
+
+def _tbl(*rows):
+    return {"type": "tabell", "text": [], "children": list(rows)}
 
 
 def _act(celex, structure):
@@ -48,7 +65,7 @@ def test_articles_ignores_cells_that_cite_no_article():
         assert C._articles(cell) == [], cell
 
 
-def test_cells_splits_on_the_joined_runs_keeping_interior_gaps():
+def test_cells_reads_a_rows_cells_keeping_interior_gaps():
     node = _row(_link("Artikel 2.1", BASE + "32014L0024#2.1"),
                 ", led 4 a | ", "—", " |  | Ny")
     assert [t for t, _ in C._cells(node)] == ["Artikel 2.1, led 4 a", "—",
@@ -59,20 +76,20 @@ def test_cells_splits_on_the_joined_runs_keeping_interior_gaps():
 
 FORWARD = _act("32014L0024", [
     {"type": "heading", "text": ["BILAGA XV"]},
-    _row("Detta direktiv | Direktiv ",
-         _link("2004/18/EG", BASE + "32004L0018")),
-    _row("Artikel 57 | Artikel 45"),
-    _row("Artikel 12 | —"),
+    _tbl(_row("Detta direktiv | Direktiv ",
+              _link("2004/18/EG", BASE + "32004L0018")),
+         _row("Artikel 57 | Artikel 45"),
+         _row("Artikel 12 | —")),
     {"type": "paragraph", "text": ["Utfärdat i Bryssel."]},
-    _row("Något helt annat | i en annan tabell"),
+    _tbl(_row("Något helt annat | i en annan tabell")),
 ])
 
 # the *common* layout is the other way round: the repealed act in column 1
 REVERSED = _act("32017L2110", [
     {"type": "heading", "text": ["JÄMFÖRELSETABELL"]},
-    _row("Direktiv ", _link("1999/35/EG", BASE + "31999L0035"),
-         " | Detta direktiv"),
-    _row("Artikel 3 | Artikel 1"),
+    _tbl(_row("Direktiv ", _link("1999/35/EG", BASE + "31999L0035"),
+              " | Detta direktiv"),
+         _row("Artikel 3 | Artikel 1")),
 ])
 
 
@@ -83,8 +100,47 @@ def test_correspond_reads_a_table_whose_self_column_is_first():
     # a "—" row is a read row with no pair, not a parse failure
     assert stats["rows"] == 2 and stats["empty"] == 1
     assert edges[0]["oldUri"] == BASE + "32004L0018#45"
-    # the table stops at the first non-row block: the later row is another table
+    # the second table names no act of ours in any column, so it is not a
+    # correspondence table and is not counted as one
     assert stats["tables"] == 1
+
+
+# 32009R1224 sets its twelve repealed regulations as twelve sections of ONE
+# table, each opened by its own header row. 32008R1249 sets its eleven as
+# eleven separate tables. Both shapes have to read as what they are.
+SECTIONED = _act("32009R1224", [_tbl(
+    _row("Förordning ", _link("(EEG) nr 2847/93", BASE + "31993R2847"),
+         " | Denna förordning"),
+    _row("Artikel 1.1 | Artikel 2"),
+    _row("Förordning ", _link("(EG) nr 847/96", BASE + "31996R0847"),
+         " | Denna förordning"),
+    _row("Artikel 5 | Artikel 106"),
+)])
+
+
+def test_a_header_owns_only_the_rows_up_to_the_next_header():
+    """One table, two sections. Reading the first header as owner of every row
+    after it put article 5 under 2847/93 as well -- 1224 attributed all 118 of
+    its rows to the first of twelve acts that way (496 edges where 139 are
+    real)."""
+    edges, stats = C.correspondence(SECTIONED)
+    assert stats["tables"] == 2
+    assert {(e["oldLaw"].rsplit("/", 1)[1], e["newArticle"], e["oldArticle"])
+            for e in edges} == {("31993R2847", "2", "1"),
+                                ("31996R0847", "106", "5")}
+
+
+def test_a_table_never_reads_the_rows_of_the_next_table():
+    """The same lineage written as two tables instead of two sections. Before a
+    table was a node of its own, the first header swallowed every row block that
+    followed it -- 1249's first of eleven tables claimed 309 edges where 58 are
+    real."""
+    edges, _ = C.correspondence(_act("32009R1224",
+                                     [_tbl(*SECTIONED["structure"][0]["children"][:2]),
+                                      _tbl(*SECTIONED["structure"][0]["children"][2:])]))
+    assert {(e["oldLaw"].rsplit("/", 1)[1], e["newArticle"], e["oldArticle"])
+            for e in edges} == {("31993R2847", "2", "1"),
+                                ("31996R0847", "106", "5")}
 
 
 def test_correspond_reads_a_reversed_table():
@@ -144,12 +200,12 @@ def test_correspond_reads_an_english_table():
     # SELF_COLUMN already admitted "This Directive", and the header act
     # designation is read by HEADER_ACT alone since "Directive 71/305/EEC"
     # never gets a link run
-    english = _act("31993L0037", [
+    english = _act("31993L0037", [_tbl(
         _row("Directive 71/305/EEC | This Directive"),
         _row("Article 10 | Article 10"),
         _row("Article 29 ( 1 ) | Article 30 ( 1 )"),
         _row("Article 31 | —"),
-    ])
+    )])
     edges, stats = C.correspondence(english)
     assert [(e["newArticle"], e["oldArticle"]) for e in edges] == [
         ("10", "10"), ("30", "29")]
@@ -161,11 +217,11 @@ def test_correspond_skips_a_column_naming_a_later_act():
     # a table can point forward, at the act that replaced this one; that copy of
     # the relation belongs to the successor's own layer, not to this one. The
     # message must say so -- the pairs read fine, they were deliberately dropped
-    forward_only = _act("31999L0035", [
+    forward_only = _act("31999L0035", [_tbl(
         _row("Detta direktiv | Direktiv ",
              _link("2017/2110", BASE + "32017L2110")),
         _row("Artikel 3 | Artikel 1"),
-    ])
+    )])
     # nothing to raise about at parse time: the act simply has no lineage of
     # its own, and the successor's artifact carries the same relation
     assert C.correspondence(forward_only)[0] == []

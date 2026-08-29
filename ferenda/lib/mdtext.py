@@ -76,10 +76,41 @@ def _cell(runs):
     return _inline(runs).replace("|", "\\|")
 
 
+def _placed_rows(node):
+    """The table's rows with every cell in the column it actually occupies:
+    `[(cells, is_header), ...]`, a covered column standing as an empty cell.
+
+    A pipe table has no rowspan, so a spanning cell has to be written out. NIS2
+    bilaga I writes "1. Energi" once with ROWSPAN="17"; the 16 rows it covers
+    carry only their third-column cell, and printed as-is that cell lands in
+    column 1 under the sector name it is not. A colspan widens the same way."""
+    rows, carry = [], {}              # column -> rows still covered from above
+    for rad in node.get("children") or []:
+        if not isinstance(rad, dict):
+            continue
+        cells = rad.get("cells") or []
+        rowspan, colspan = rad.get("rowspan") or [], rad.get("colspan") or []
+        out, column, i = [], 0, 0
+        while i < len(cells):
+            if carry.get(column):
+                out.append([])        # a cell in an earlier row covers this one
+                column += 1
+                continue
+            width = colspan[i] if i < len(colspan) else 1
+            height = rowspan[i] if i < len(rowspan) else 1
+            out.append(cells[i])
+            out.extend([[]] * (width - 1))
+            if height > 1:
+                carry.update(dict.fromkeys(range(column, column + width), height))
+            column += width
+            i += 1
+        rows.append((out, rad.get("th")))
+        carry = {c: n - 1 for c, n in carry.items() if n > 1}
+    return rows
+
+
 def _table(node, out):
-    rows = [(r.get("cells") or [], r.get("th"))
-            for r in node.get("children") or [] if isinstance(r, dict)]
-    rows = [(cells, th) for cells, th in rows if cells]
+    rows = [(cells, th) for cells, th in _placed_rows(node) if cells]
     if not rows:
         return
     width = max(len(cells) for cells, _ in rows)

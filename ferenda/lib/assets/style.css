@@ -1124,6 +1124,11 @@ p.hang { scroll-margin-top: var(--scroll-clear); }
 a.ext { color: var(--accent); }
 a.ext::after { content: " \2197"; font-size: .8em; color: var(--ink-4); }
 table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: .92rem; }
+/* a table's own heading, where the source gives it one (an OJ annex table's
+   Formex TITLE): it names the table, so it reads like one, left where the
+   first column starts rather than centred over the whole width */
+caption { text-align: left; font-family: var(--serif); font-style: italic;
+          color: var(--ink-2); padding: 0 0 .35rem; }
 td { border-top: 1px solid var(--rule); padding: .35rem .7rem; vertical-align: top; }
 th { border-bottom: 1px solid var(--ink-4); padding: .35rem .7rem;
      vertical-align: bottom; text-align: left; font-weight: 600; }
