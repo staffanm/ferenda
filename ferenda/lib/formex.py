@@ -72,6 +72,16 @@ XML_PARSER = etree.XMLParser(resolve_entities=False, load_dtd=False,
                              no_network=True, remove_comments=True,
                              remove_pis=True)
 
+# the consolidated-act route keeps processing instructions: the per-provision
+# provenance of a CONSLEG text rides as `CLG.MDFO`/`CLG.MDFC` PI pairs
+# bracketing every amended span, which XML_PARSER's remove_pis discards.
+# `cons_provenance` reads them off this tree; the block walk then runs on the
+# same tree after `strip_pis` removes them, so the emitters never see a PI
+# (flatten would read a PI's pseudo-attributes as body text).
+CONS_PARSER = etree.XMLParser(resolve_entities=False, load_dtd=False,
+                              no_network=True, remove_comments=True,
+                              remove_pis=False)
+
 # footnote subtrees are dropped from the running text (their content is a note,
 # not body prose)
 SKIP_INLINE = {"NOTE"}
@@ -240,10 +250,23 @@ def _text(parent, *tags):
 
 def _article_number(article):
     """The bare article number for the anchor: from IDENTIFIER ('001' -> '1')
-    or, failing that, the title ('Artikel 5' -> '5')."""
+    or, failing that, the title ('Artikel 5' -> '5').
+
+    An inserted article's IDENTIFIER writes its letter in capitals ('005A')
+    where the act itself prints it lowercase ('Artikel 5a') -- and lowercase is
+    how every citation, dotted anchor and `.ann` key writes it, so the printed
+    form wins where the two agree letter-for-letter. An identifier the title
+    does not corroborate is kept as written."""
     ident = article.get("IDENTIFIER")
     if ident and ident.lstrip("0"):
-        return ident.lstrip("0")
+        num = ident.lstrip("0")
+        if not num.isdigit():
+            m = re.search(r"(\d+\s?[^\W\d_]{1,2})\s*$",
+                          _text(article, "TI.ART"))
+            printed = m.group(1).replace(" ", "") if m else ""
+            if printed.lower() == num.lower():
+                return printed
+        return num
     title = _text(article, "TI.ART")
     digits = "".join(c for c in title if c.isdigit())
     return digits or None
@@ -328,9 +351,17 @@ def _emit_list(lst, blocks, kind="point", depth=1):
     for item in lst.findall("ITEM"):
         np = item.find("NP")
         holder = np if np is not None else item
-        blocks.append(Block(kind, flatten(holder, _ITEM_SKIP),
+        # an amending act writes its instructions as list items whose quoted
+        # replacement text is a block-level QUOT.S ("5. Följande artiklar ska
+        # införas:" + the articles 5a-5f). Lifted as `citat` blocks the same way
+        # a judgment's quotations are, instead of folding 28,000 characters of
+        # another act into the item's own text
+        drop, quotations = _lifted_quotations(holder)
+        blocks.append(Block(kind, flatten(holder, _ITEM_SKIP, drop=drop),
                             num=_marker(_text(np, "NO.P")) if np is not None else None,
                             depth=_point_depth(kind, depth)))
+        for quotation in quotations:
+            parse_quotation(quotation, blocks)
         _emit_sublists(holder, blocks, _sub_depth(kind, depth))
 
 
@@ -432,12 +463,39 @@ def _unit_lists(unit):
             for lst in ([el] if el.tag in ("LIST", "DLIST") else _sublists(el))]
 
 
+def _lifted_unit(unit):
+    """A stycke run's own block quotations, split off: `(the run without them,
+    the QUOT.S elements)`. The same direct-child / whole-of-a-`P` shapes
+    `_lifted_quotations` lifts inside a case-law paragraph, applied to the run
+    of sibling elements a stycke is -- an amending act's "Artikel 19 ska
+    ersättas med följande:" writes the replacement text as a `P`-wrapped
+    QUOT.S beside the lead-in. An element with a tail of its own stays: the
+    tail is prose between the run's members, and dropping the element drops it."""
+    kept, quotations = [], []
+    for el in unit:
+        if el.tag == "QUOT.S":
+            quotation = el
+        elif (el.tag == "P" and len(el) == 1 and el[0].tag == "QUOT.S"
+              and not (el.text or "").strip()
+              and not (el[0].tail or "").strip()):
+            quotation = el[0]
+        else:
+            kept.append(el)
+            continue
+        if (el.tail or "").strip():
+            kept.append(el)
+            continue
+        quotations.append(quotation)
+    return kept, quotations
+
+
 def _emit_alinea(unit, num, blocks, stycke=None):
     """One stycke -- a run of sibling elements (`_stycke_units`) -- as a plain
     paragraph, or a lead paragraph followed by a list. A numbered list that is the
     article's own enumeration (not inside a numbered paragraph) is paragraph-level
     -- so its items nest their own points and read as "1." like the official act;
-    any other list is points.
+    any other list is points. A block-level quotation in the run (`_lifted_unit`)
+    is emitted after it as `citat` blocks that keep the quoted act's structure.
 
     `stycke` is the ordinal of a *second or later* sub-paragraph of the same
     numbered paragraph; the block is then a `stycke` carrying that ordinal rather
@@ -447,9 +505,16 @@ def _emit_alinea(unit, num, blocks, stycke=None):
     # ordinal must not stand in for it
     kind = "stycke" if stycke else "paragraph"
     block_num = str(stycke) if stycke else num
+    unit, quotations = _lifted_unit(unit)
     lists = _unit_lists(unit)
     if not lists:
-        blocks.append(Block(kind, _unit_text(unit, _PARAG_SKIP), num=block_num))
+        text = _unit_text(unit, _PARAG_SKIP)
+        # a run that was nothing but its quotation emits no empty block --
+        # unless it carries a number, which is a citation target either way
+        if text or block_num:
+            blocks.append(Block(kind, text, num=block_num))
+        for quotation in quotations:
+            parse_quotation(quotation, blocks)
         return
     # everything the block says in its own right -- reading only its direct P
     # children instead dropped whatever else it holds (2022/1636's annex tables
@@ -466,6 +531,8 @@ def _emit_alinea(unit, num, blocks, stycke=None):
         list_kind = ("paragraph" if num is None and _is_numbered_list(lst)
                      else "point")
         (_emit_dlist if lst.tag == "DLIST" else _emit_list)(lst, blocks, list_kind)
+    for quotation in quotations:
+        parse_quotation(quotation, blocks)
 
 
 def parse_article(article, blocks):
@@ -621,6 +688,199 @@ def act_metadata(root):
             no = no.lstrip("0") or no
             oj = ("%s %s" % (coll, no)).strip() or None
     return date, oj
+
+
+# --------------------------------------------------------------------------
+# CONS.ACT (a consolidated act -- the sector-0 CONSLEG text the Publications
+# Office maintains, with every amendment folded in)
+# --------------------------------------------------------------------------
+
+def load_cons(path):
+    """The Formex roots of a downloaded consolidation, main `CONS.ACT` first,
+    with the provenance PIs still in the tree (see CONS_PARSER). Read the
+    register and the spans off the first root, then `strip_pis` before the
+    block walk. A CONSLEG zip normally holds one member (the annexes ride
+    inline as CONS.ANNEX); any further members parse like an act's."""
+    roots = [etree.fromstring(data, CONS_PARSER)
+             for _, data in formex_members(path)]
+    if roots[0].tag != "CONS.ACT":
+        raise ValueError("%s: expected a CONS.ACT root, got %s"
+                         % (path, roots[0].tag))
+    return roots
+
+
+def strip_pis(root):
+    """Remove every processing instruction from the tree, merging tails, so
+    the block emitters see only real elements -- `flatten` would otherwise
+    read a PI's pseudo-attributes as body text."""
+    etree.strip_tags(root, etree.ProcessingInstruction)
+
+
+def parse_cons_act(root, blocks):
+    """A consolidated act -> title + body blocks: descend to `CONS.DOC`, walk
+    its (empty) preamble and enacting terms with the plain act walkers, then
+    embed each `CONS.ANNEX` -- a TITLE + CONTENTS pair, the exact shape of a
+    separate ANNEX file. The caller strips the PIs first."""
+    doc = root.find("CONS.DOC")
+    if doc is None:
+        # a recorded per-document parse failure, not a broken program
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError("CONS.ACT has no CONS.DOC")
+    title = parse_act(doc, blocks)
+    for annex in doc.findall("CONS.ANNEX"):
+        append_annex(blocks, annex)
+    return title
+
+
+def cons_metadata(root):
+    """(consolidation date, act date, OJ ref) of a consolidated act, each as
+    Formex writes it ('20241018'). The consolidation date is INFO.CONSLEG's
+    START.DATE -- the day this wording began to apply, the version key CELLAR
+    itself uses in the sector-0 CELEX. The act date and the OJ coordinate come
+    from the base act's own bibliography in FAM.COMP: the consolidation is the
+    same act at another moment, so the document keeps the act's date."""
+    info = root.find("INFO.CONSLEG")
+    start = info.get("START.DATE") if info is not None else None
+    bib = root.find("CONS.DOC/FAM.COMP/BIB.DATA")
+    date = oj = None
+    if bib is not None:
+        node = bib.find("DATE")
+        date = node.get("ISO") if node is not None else None
+        ref = bib.find(".//DOCUMENT.REF.CONS")
+        if ref is not None:
+            coll, no = _text(ref, "COLL"), _text(ref, "NO.OJ")
+            no = no.lstrip("0") or no
+            oj = ("%s %s" % (coll, no)).strip() or None
+    return start, date, oj
+
+
+def _mod_entry(bib):
+    """One FAM.COMP act entry -> {celex, date?, title?}."""
+    entry = {"celex": _expand_celex(_text(bib, "NO.CELEX"))}
+    node = bib.find("DATE")
+    if node is not None and node.get("ISO"):
+        entry["date"] = node.get("ISO")
+    title = bib.find("TITLE")
+    if title is not None:
+        entry["title"] = flatten(title)
+    return entry
+
+
+def cons_register(root):
+    """`FAM.COMP` -> the amendment register, ready-made: the base act, one
+    entry per amending act (`GR.MOD.ACT`), and the corrigenda folded in
+    (`GR.CORRIG`, kept apart -- a corrigendum corrects the text, it does not
+    amend the law)."""
+    fam = root.find("CONS.DOC/FAM.COMP")
+    if fam is None:
+        raise ValueError("CONS.ACT has no FAM.COMP amendment register")
+    # a corrigendum hangs off whichever act it corrects -- the base act's sit
+    # in the register's own GR.CORRIG, an amending act's inside its MOD.ACT --
+    # so they are collected at any depth
+    return {"base": _expand_celex(_text(fam.find("BIB.DATA"), "NO.CELEX"))
+                    or None,
+            "amending": [_mod_entry(mod.find("BIB.DATA"))
+                         for mod in fam.findall("GR.MOD.ACT/MOD.ACT")],
+            "corrigenda": [_expand_celex(_text(corr.find("BIB.DATA"),
+                                               "NO.CELEX"))
+                           for corr in fam.iter("CORRIG")]}
+
+
+# the pseudo-attributes of a CLG.MDFO provenance PI ('ACTION="INSERTED"
+# ACTIVE.DOC="32024R1183" ...')
+RE_PI_ATTRS = re.compile(r'([\w.]+)="([^"]*)"')
+
+# the older CELEX shape CONSLEG provenance and registers write for a
+# sector-3 act: a two-digit year ('306L0138', '306L0112R(02)')
+RE_SHORT_CELEX = re.compile(r"^3(\d{2})([A-Z])(\d{3,4})(R\(\d+\))?$")
+
+
+def _expand_celex(celex):
+    """A CONSLEG-written CELEX in the modern form the corpus keys on --
+    '306L0138' -> '32006L0138', corrigendum suffix kept. 1952 is sector 3's
+    first year, so a two-digit year 52-99 is 19xx and the rest 20xx. Any
+    other shape (already modern, or a treaty like '12012J/ACT') passes
+    through unchanged."""
+    m = RE_SHORT_CELEX.match(celex)
+    if not m:
+        return celex
+    yy, letter, number, rev = m.groups()
+    return "3%s%s%s%s%s" % ("19" if int(yy) >= 52 else "20", yy,
+                            letter, number.zfill(4), rev or "")
+
+
+def _pi_attrs(pi):
+    return dict(RE_PI_ATTRS.findall(pi.text or ""))
+
+
+def cons_provenance(root):
+    """article number -> what the consolidation says changed it:
+    ``{"action": "replaced"|"inserted"|"deleted"|"amended", "by": [celex, ...]}``.
+
+    Every amended span is bracketed by a `CLG.MDFO`/`CLG.MDFC` PI pair whose
+    `ACTIVE.DOC` names the amending act (a corrigendum included) -- properly
+    nested, so a plain stack pairs them. A span *covering* an article (open at
+    the article's start) decides its action: the innermost one, lowercased. An
+    article touched only by spans *inside* it (a replaced paragraph, an
+    inserted point) is `amended`. `by` lists every act the article's spans
+    name, covering spans first.
+
+    `ACTIVE.LOC` is deliberately not read: it is precise to the point of the
+    amending act, and one point inserts several articles (`AR:1;PT:5` covers
+    5a-5f), so it cannot key anything here."""
+    per_article = {}
+
+    def note(num, kind, span):
+        entry = per_article.setdefault(num, {"covering": [], "inside": []})
+        entry[kind].append(span)
+
+    def walk(el, stack, article):
+        for child in el:
+            if isinstance(child, etree._ProcessingInstruction):
+                if child.target == "CLG.MDFO":
+                    stack.append(_pi_attrs(child))
+                    if article is not None:
+                        note(article, "inside", stack[-1])
+                elif child.target == "CLG.MDFC":
+                    if not stack:
+                        # a close with no open span breaks the pairing this
+                        # walk stands on; guessing on would mis-attribute
+                        # every later article's provenance, so the document
+                        # records a parse failure instead
+                        # (rule:errors-drive-retry-use-raise)
+                        raise ValueError(
+                            "CLG.MDFC with no open CLG.MDFO span (%s)"
+                            % (child.text or "").strip())
+                    stack.pop()
+            elif not isinstance(child.tag, str):
+                continue
+            elif child.tag == "ARTICLE":
+                num = _article_number(child)
+                for span in stack:
+                    note(num, "covering", span)
+                walk(child, stack, num)
+            else:
+                walk(child, stack, article)
+
+    stack = []
+    walk(root, stack, None)
+    if stack:
+        # the mirror of the stray-close guard: a span that never closes has
+        # already marked every article after its open point as covered by it
+        raise ValueError("unclosed CLG.MDFO span(s): %s"
+                         % ", ".join(s.get("ID", "?") for s in stack))
+    out = {}
+    for num, spans in per_article.items():
+        covering, inside = spans["covering"], spans["inside"]
+        action = (covering[-1].get("ACTION", "").lower() if covering
+                  else "amended")
+        by = []
+        for span in covering + inside:
+            doc = _expand_celex(span.get("ACTIVE.DOC") or "")
+            if doc and doc not in by:
+                by.append(doc)
+        out[num] = {"action": action, "by": by}
+    return out
 
 
 # --------------------------------------------------------------------------

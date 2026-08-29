@@ -1387,3 +1387,253 @@ def test_an_uncarried_act_is_skipped_before_its_source_is_opened(monkeypatch):
     # would return None rather than raise if the guard were not the first statement
     with pytest.raises(SkipDocument, match="32099R9999: because"):
         parse_dir("/nonexistent", "32099R9999")
+
+
+# --------------------------------------------------------------------------
+# consolidated wordings (CONSLEG): the CONS.ACT reader, the FAM.COMP register,
+# the CLG.MDFO/CLG.MDFC provenance spans, and the parse_dir swap
+# --------------------------------------------------------------------------
+
+CONS_XML = """<CONS.ACT>
+ <INFO.CONSLEG CONSLEG.DATE="20250409" START.DATE="20241018" LEG.VAL="REG"/>
+ <CONS.DOC>
+  <BIB.INSTANCE><DATE ISO="20241018">20241018</DATE></BIB.INSTANCE>
+  <FAM.COMP LEG.VAL="REG">
+   <BIB.DATA>
+    <BIB.INSTANCE.CONS><DOCUMENT.REF.CONS><COLL>L</COLL><NO.OJ>257</NO.OJ>
+    </DOCUMENT.REF.CONS></BIB.INSTANCE.CONS>
+    <NO.CELEX>32014R0910</NO.CELEX><DATE ISO="20140723">20140723</DATE>
+    <TITLE><TI><P>Europaparlamentets och r&#229;dets f&#246;rordning (EU)
+      nr 910/2014</P></TI></TITLE>
+   </BIB.DATA>
+   <GR.CORRIG><CORRIG><BIB.DATA><NO.CELEX>32014R0910R(10)</NO.CELEX>
+   </BIB.DATA></CORRIG></GR.CORRIG>
+   <GR.MOD.ACT>
+    <MOD.ACT><BIB.DATA><NO.CELEX>32022L2555</NO.CELEX>
+      <DATE ISO="20221214">20221214</DATE>
+      <TITLE><TI><P>Europaparlamentets och r&#229;dets direktiv (EU)
+        2022/2555</P></TI></TITLE></BIB.DATA></MOD.ACT>
+    <MOD.ACT><BIB.DATA><NO.CELEX>32024R1183</NO.CELEX>
+      <DATE ISO="20240411">20240411</DATE>
+      <TITLE><TI><P>Europaparlamentets och r&#229;dets f&#246;rordning (EU)
+        2024/1183</P></TI></TITLE></BIB.DATA>
+      <GR.CORRIG><CORRIG><BIB.DATA><NO.CELEX>32024R1183R(02)</NO.CELEX>
+      </BIB.DATA></CORRIG></GR.CORRIG></MOD.ACT>
+   </GR.MOD.ACT>
+  </FAM.COMP>
+  <TITLE><TI><P>Europaparlamentets och r&#229;dets f&#246;rordning (EU)
+    nr 910/2014</P><P>om elektronisk identifiering</P></TI></TITLE>
+  <PREAMBLE><PREAMBLE.INIT/><PREAMBLE.FINAL/></PREAMBLE>
+  <ENACTING.TERMS>
+   <ARTICLE IDENTIFIER="005"><TI.ART>Artikel 5</TI.ART>
+     <ALINEA>Basartikelns text.</ALINEA></ARTICLE>
+   <?CLG.MDFO ID="O1" IDREF="C1" ACTION="INSERTED" LEVEL="STRUCTURE"
+      ACTIVE.DOC="32024R1183" ACTIVE.LOC="AR:1;PT:5"?>
+   <ARTICLE IDENTIFIER="005A"><TI.ART>Artikel 5a</TI.ART>
+     <STI.ART>Europeiska digitala identitetspl&#229;nb&#246;cker</STI.ART>
+     <ALINEA>Den nya artikelns text.</ALINEA></ARTICLE>
+   <?CLG.MDFC ID="C1" IDREF="O1"?>
+   <?CLG.MDFO ID="O2" IDREF="C2" ACTION="DELETED" LEVEL="STRUCTURE"
+      ACTIVE.DOC="32022L2555" ACTIVE.LOC="AR:42"?>
+   <ARTICLE IDENTIFIER="019"><TI.ART>Artikel 19</TI.ART>
+     <ALINEA>Den upph&#228;vda artikelns kvarst&#229;ende text.</ALINEA></ARTICLE>
+   <?CLG.MDFC ID="C2" IDREF="O2"?>
+   <ARTICLE IDENTIFIER="020"><TI.ART>Artikel 20</TI.ART><PARAG>
+     <NO.PARAG>1.</NO.PARAG>
+     <?CLG.MDFO ID="O3" IDREF="C3" ACTION="REPLACED" LEVEL="STRUCTURE"
+        ACTIVE.DOC="32024R1183" ACTIVE.LOC="AR:1;PT:19;PT:a"?>
+     <ALINEA>Den ersatta punktens text.</ALINEA>
+     <?CLG.MDFC ID="C3" IDREF="O3"?>
+   </PARAG></ARTICLE>
+  </ENACTING.TERMS>
+  <FINAL><P>Denna f&#246;rordning &#228;r bindande.</P></FINAL>
+  <CONS.ANNEX><TITLE><TI><P>BILAGA I</P></TI></TITLE>
+    <CONTENTS><P>Kraven i bilagan.</P></CONTENTS></CONS.ANNEX>
+ </CONS.DOC>
+</CONS.ACT>"""
+
+
+def _cons_root():
+    from ferenda.lib.formex import CONS_PARSER
+    return etree.fromstring(CONS_XML.encode(), CONS_PARSER)
+
+
+def test_doctype_and_parts_of_a_sector0_celex():
+    from ferenda.lib.eu_structure import consolidation_parts
+    assert doctype("02014R0910-20241018") == "regulation"
+    assert doctype("01995L0046-19951124") == "directive"
+    assert consolidation_parts("02014R0910-20241018") \
+        == ("32014R0910", "2024-10-18")
+    assert consolidation_parts("32014R0910") is None
+
+
+def test_cons_register_reads_fam_comp():
+    from ferenda.lib.formex import cons_register
+    reg = cons_register(_cons_root())
+    assert reg["base"] == "32014R0910"
+    assert [m["celex"] for m in reg["amending"]] \
+        == ["32022L2555", "32024R1183"]
+    assert reg["amending"][1]["date"] == "20240411"
+    # a corrigendum hangs off whichever act it corrects: the base act's in the
+    # register's own GR.CORRIG, an amending act's inside its MOD.ACT
+    assert reg["corrigenda"] == ["32014R0910R(10)", "32024R1183R(02)"]
+
+
+def test_cons_provenance_attributes_each_article():
+    from ferenda.lib.formex import cons_provenance
+    prov = cons_provenance(_cons_root())
+    assert prov["5a"] == {"action": "inserted", "by": ["32024R1183"]}
+    assert prov["19"] == {"action": "deleted", "by": ["32022L2555"]}
+    # a span *inside* the article (a replaced paragraph) makes it amended
+    assert prov["20"] == {"action": "amended", "by": ["32024R1183"]}
+    assert "5" not in prov          # untouched base text carries nothing
+
+
+def test_parse_cons_act_walks_body_and_annexes():
+    from ferenda.lib.formex import Block, parse_cons_act, strip_pis
+    root = _cons_root()
+    strip_pis(root)
+    blocks: list[Block] = []
+    title = parse_cons_act(root, blocks)
+    assert title.startswith("Europaparlamentets och rådets")
+    arts = [b for b in blocks if b.kind == "article"]
+    # the inserted article anchors by its printed lowercase form, not the
+    # IDENTIFIER's uppercase ('005A')
+    assert [b.anchor for b in arts] == ["5", "5a", "19", "20"]
+    # a deleted article keeps its text (its anchor must survive)
+    i = next(i for i, b in enumerate(blocks) if b.anchor == "19")
+    assert "kvarstående text" in blocks[i + 1].text
+    # the CONS.ANNEX embeds like a separate ANNEX file would
+    annex = [b for b in blocks if b.kind == "heading" and b.anchor]
+    assert annex[0].anchor == "bilaga-1"
+    # no PI pseudo-attributes leak into any block's text
+    assert not any("ACTIVE.DOC" in b.text for b in blocks)
+
+
+def test_cons_metadata_dates_and_oj():
+    from ferenda.lib.formex import cons_metadata
+    assert cons_metadata(_cons_root()) == ("20241018", "20140723", "L 257")
+
+
+# a minimal base act with a preamble, for the parse_dir swap test
+BASE_ACT_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20140723">20140723</DATE>
+    <DOCUMENT.REF><COLL>L</COLL><NO.OJ>257</NO.OJ></DOCUMENT.REF></BIB.INSTANCE>
+  <TITLE><TI><P>F&#246;rordning (EU) nr 910/2014 av den
+    <DATE ISO="20140723">23 juli 2014</DATE> om elektronisk
+    identifiering</P></TI></TITLE>
+  <PREAMBLE>
+    <GR.VISA><VISA>med beaktande av f&#246;rdraget</VISA></GR.VISA>
+    <GR.CONSID><CONSID><NP><NO.P>(1)</NO.P><TXT>Det f&#246;rsta
+      sk&#228;let.</TXT></NP></CONSID></GR.CONSID>
+  </PREAMBLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001"><TI.ART>Artikel 1</TI.ART>
+      <ALINEA>Ursprunglig text.</ALINEA></ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+CONS_NOTICE = (b'<x> <http://publications.europa.eu/ontology/cdm#'
+               b'work_date_document> "2024-10-18" .\n')
+
+
+# --------------------------------------------------------------------------
+# an amending act's quoted articles, lifted as citat blocks (the act path)
+# --------------------------------------------------------------------------
+
+AMENDING_UNPACK_XML = """<ACT>
+  <BIB.INSTANCE><DATE ISO="20240411">20240411</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>F&#246;rordning (EU) 2024/1183 om &#228;ndring av
+    f&#246;rordning (EU) nr 910/2014</P></TI></TITLE>
+  <ENACTING.TERMS>
+    <ARTICLE IDENTIFIER="001"><TI.ART>Artikel 1</TI.ART>
+      <STI.ART>&#196;ndringar av f&#246;rordning (EU) nr 910/2014</STI.ART>
+      <ALINEA><P>F&#246;rordning (EU) nr 910/2014 ska &#228;ndras p&#229;
+        f&#246;ljande s&#228;tt:</P>
+        <LIST TYPE="ARAB">
+          <ITEM><NP><NO.P>5.</NO.P><TXT>F&#246;ljande artikel ska
+            inf&#246;ras:</TXT>
+            <P><QUOT.S><ARTICLE IDENTIFIER="005A">
+              <TI.ART>Artikel 5a</TI.ART>
+              <STI.ART>Pl&#229;nb&#246;cker</STI.ART>
+              <PARAG><NO.PARAG>1.</NO.PARAG><ALINEA>Den citerade artikelns
+                f&#246;rsta punkt h&#228;nvisar till artikel 2.</ALINEA></PARAG>
+            </ARTICLE></QUOT.S></P></NP></ITEM>
+        </LIST></ALINEA></ARTICLE>
+    <ARTICLE IDENTIFIER="002"><TI.ART>Artikel 2</TI.ART>
+      <ALINEA>Ikrafttr&#228;dande.</ALINEA></ARTICLE>
+  </ENACTING.TERMS>
+</ACT>"""
+
+
+def test_an_amending_acts_quoted_articles_are_lifted():
+    """The 28,000-character wall: article 1's list items hold whole quoted
+    articles in block-level QUOT.S, which the act path used to fold into the
+    item's own text. They lift as `citat` blocks that keep the quoted act's
+    structure, exactly as a judgment's quotations do."""
+    doc = parse_formex(_lxml(AMENDING_UNPACK_XML), "32024R1183", "swe")
+    items = [b for b in doc.body if b.kind == "paragraph" and b.num == "5"]
+    assert len(items) == 1
+    assert items[0].text == "Följande artikel ska införas:"
+    citat = [b for b in doc.body if b.kind == "citat"]
+    assert citat[0].quoted == "article"
+    assert citat[0].text.startswith("Artikel 5a")
+    # the quoted article's own numbering rides along, but mints no anchor
+    assert all(b.anchor is None for b in citat)
+    assert citat[1].num == "1"
+
+
+def test_a_quoted_bare_article_links_into_the_amended_act():
+    """Inside the quotation, a bare "artikel N" is the *amended* act's article.
+    The amending act's own celex is its self-act (bare articles in its running
+    text self-refer), and the item's self-resolved "Artikel 5a..." must not
+    stand in as the quoted act either -- both used to pin the quoted article
+    references back onto the amending act itself."""
+    art = to_artifact(parse_formex(_lxml(AMENDING_UNPACK_XML), "32024R1183",
+                                   "swe"))
+    quoted = [run for b in flatten_structure(art["structure"])
+              if b["type"] == "citat" for run in b["text"]
+              if isinstance(run, dict) and run.get("uri", "").count("celex")]
+    targets = {run["uri"] for run in quoted}
+    # the quoted heading's own "Artikel 5a" and the body's "artikel 2" both
+    # resolve into the amended act (a glued letter carries no pinpoint today)
+    assert targets == {"https://lagen.nu/ext/celex/32014R0910#2",
+                       "https://lagen.nu/ext/celex/32014R0910#5"}
+
+
+def test_article_number_takes_the_printed_letter_case():
+    xml = """<ARTICLE IDENTIFIER="005A"><TI.ART>Artikel 5a</TI.ART></ARTICLE>"""
+    from ferenda.lib.formex import _article_number
+    assert _article_number(_lxml(xml)) == "5a"
+    # an identifier the title does not corroborate stays as written
+    xml = """<ARTICLE IDENTIFIER="005A"><TI.ART>Artikel 6</TI.ART></ARTICLE>"""
+    assert _article_number(_lxml(xml)) == "5A"
+
+
+def test_expand_celex_normalises_the_short_conslegs_form():
+    """CONSLEG provenance writes an older two-digit-year CELEX ('306L0138');
+    the artifact keys on the modern form, or a `mod.by` never matches a held
+    act's page. A treaty ref passes through -- the accession treaty
+    (12012J/ACT) amends the VAT directive."""
+    from ferenda.lib.formex import _expand_celex
+    assert _expand_celex("306L0138") == "32006L0138"
+    assert _expand_celex("306L0112R(02)") == "32006L0112R(02)"
+    assert _expand_celex("398L0080") == "31998L0080"
+    assert _expand_celex("32024R1183") == "32024R1183"
+    assert _expand_celex("12012J/ACT") == "12012J/ACT"
+
+
+def test_provenance_rejects_a_broken_span_pairing():
+    """The provenance walk stands on properly nested CLG.MDFO/CLG.MDFC pairs.
+    A close with no open span, or a span never closed, would mis-attribute
+    every later article's provenance -- both reject as a recorded per-document
+    parse failure instead of guessing on."""
+    from ferenda.lib.formex import CONS_PARSER, cons_provenance
+    unclosed = CONS_XML.replace('<?CLG.MDFC ID="C1" IDREF="O1"?>', "")
+    with pytest.raises(ValueError, match="unclosed CLG.MDFO"):
+        cons_provenance(etree.fromstring(unclosed.encode(), CONS_PARSER))
+    stray = CONS_XML.replace(
+        '<?CLG.MDFO ID="O1" IDREF="C1" ACTION="INSERTED" LEVEL="STRUCTURE"\n'
+        '      ACTIVE.DOC="32024R1183" ACTIVE.LOC="AR:1;PT:5"?>', "")
+    with pytest.raises(ValueError, match="CLG.MDFC with no open"):
+        cons_provenance(etree.fromstring(stray.encode(), CONS_PARSER))

@@ -227,18 +227,38 @@ def revision_base(celex):
 # the renderer picks the page's kind label from it, and the corpus statistics
 # scan separates acts from case law by it (rule:second-use-goes-to-lib).
 
+# A sector-0 CELEX: the consolidated version of a sector-3 act, keyed by the
+# date its wording began to apply -- '02014R0910-20241018' is regulation
+# 910/2014 as it stood from 2024-10-18. The base act's CELEX is the same
+# coordinates in sector 3.
+RE_CONSOLIDATION = re.compile(r"^0(\d{4}[A-Z]\d{4}(?:\(\d+\))?)-(\d{8})$")
+
+
+def consolidation_parts(celex):
+    """(base-act CELEX, consolidation date) of a sector-0 CELEX --
+    ('02014R0910-20241018' -> ('32014R0910', '2024-10-18')) -- or None when
+    `celex` is not one."""
+    m = RE_CONSOLIDATION.match(celex)
+    if not m:
+        return None
+    d = m.group(2)
+    return "3" + m.group(1), "%s-%s-%s" % (d[:4], d[4:6], d[6:8])
+
+
 def doctype(celex):
     """The document family from the CELEX sector digit (+ the act/case descriptor).
     Sector 6 (case law) is split by its two-letter document code -- CJ/TJ/FJ are
     judgments, CC an Advocate General's opinion (förslag till avgörande), CO/TO an
-    order -- so an opinion is not listed as a judgment (E4)."""
+    order -- so an opinion is not listed as a judgment (E4). A sector-0 CELEX (a
+    consolidated version) is the same act at another moment, so it classifies by
+    its type letter exactly as the base act does."""
     if celex.startswith("6"):
         return {"CC": "opinion", "CV": "opinion", "CP": "opinion",
                 "CO": "order", "TO": "order", "FO": "order"}.get(
                     celex[5:7], "judgment")
     if celex.startswith("1"):
         return "treaty"
-    if celex.startswith("3") and len(celex) > 5:
+    if celex.startswith(("0", "3")) and len(celex) > 5:
         return {"R": "regulation", "L": "directive",
                 "D": "decision"}.get(celex[5], "act")
     return "act"
