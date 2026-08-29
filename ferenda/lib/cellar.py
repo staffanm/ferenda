@@ -26,6 +26,8 @@ from collections import defaultdict
 from pathlib import Path
 from urllib.parse import quote, unquote
 
+import requests
+
 from . import compress
 from .net import request
 
@@ -708,8 +710,20 @@ def store_document(session, target, celex, wdate, selection, eurovoc,
     stored = []
     for code, candidates in selection:
         for filetype, url, accept in candidates:
-            response = request(session, "GET", url, timeout=180,
-                               headers={"Accept": accept} if accept else None)
+            try:
+                response = request(session, "GET", url, timeout=180,
+                                   headers={"Accept": accept} if accept else None)
+            except requests.HTTPError as exc:
+                # CELLAR's graph can name an item whose content is gone: the
+                # 1992-04-13 consolidation of 01992L0022 lists a DOC_1 that
+                # answers "Resource not found". A dangling item is a definitive
+                # per-resource answer, so it degrades to the next candidate the
+                # way a failed content check does -- one ghost must not kill a
+                # 19,000-document sweep. Anything but a 404 still raises: the
+                # transport already retried what is retryable.
+                if exc.response is None or exc.response.status_code != 404:
+                    raise
+                continue
             if not _content_ok(filetype, response.content):
                 continue                # placeholder for this type: try the next
             name = content_filename(code, filetype, response.content)

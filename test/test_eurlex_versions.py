@@ -158,3 +158,24 @@ def test_lydelse_page_banner_matches_its_temporality(roots, tmp_path,
     html = _rendered(tmp_path, monkeypatch, art)
     assert "Kommande lydelse" in html and "kommande lydelse" in html
     assert "Äldre lydelse" not in html
+
+
+def test_a_broken_newest_version_is_skipped_and_the_older_serves(roots,
+                                                                 tmp_path,
+                                                                 monkeypatch):
+    """CELLAR's scanned-era consolidations include zips whose .xml member
+    holds TIFF bytes (31994L0062's 2015-05-26, among 13 of 172,043 measured).
+    A broken version must cost neither the act's page (the next older wording
+    stands in) nor its whole history (the versions stage records the skip) --
+    and both paths pick the served wording by the same rule."""
+    broken = roots / ".versions" / "2025-01-01"
+    broken.mkdir(parents=True)
+    (broken / "swe.fmx4").write_bytes(b"II*\x00 not xml at all")
+    (broken / "notice.ttl").write_bytes(NOTICE)
+    art = parse_dir(roots, "32014R0910")
+    assert art["consolidation"]["date"] == "2024-10-18"    # the older serves
+    sidecar = eurlex_versions.build("32014R0910")
+    assert [e["version"] for e in sidecar["versions"]] == ["2014-09-17"]
+    errors = {s["version"]: s["error"] for s in sidecar["skipped"]}
+    assert "XMLSyntaxError" in errors["2025-01-01"]
+    assert errors["2003-01-01"].startswith("no Formex")

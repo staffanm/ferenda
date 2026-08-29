@@ -22,6 +22,8 @@ import re
 from datetime import date
 from pathlib import Path
 
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
+
 from ..lib import compress, eucasenaming, layout, markup, patch
 from ..lib.cellar import notice_relations, notice_repeal_date, notice_work_date
 from ..lib.datasets import NAMEDACTS
@@ -566,8 +568,19 @@ def parse_dir(doc_dir, celex):
     # (base_preamble); the superseded wordings become /konsolidering/ pages
     # via the versions stage.
     for version, vdir in reversed(version_dirs(doc_dir)):
-        cons = parse_consolidation(vdir, celex, version,
-                                   preamble=base_preamble(doc))
+        try:
+            cons = parse_consolidation(vdir, celex, version,
+                                       preamble=base_preamble(doc))
+        except (ValueError, etree.XMLSyntaxError):
+            # CELLAR's scanned-era consolidations include zips whose .xml
+            # member holds TIFF bytes, corrigendum-only packets, and DOC
+            # format manifests beside scanned pages (13 of 172,043 version
+            # sets measured). A broken *version* must not cost the act its
+            # page: the next older wording stands in, and the versions stage
+            # records the skip. Narrow on purpose -- a KeyError here would
+            # be a parser bug and must surface, not silently serve the
+            # 20-year-old base text corpus-wide.
+            continue
         if cons:
             cons.version = None       # the latest is the document, not a lydelse
             doc = cons

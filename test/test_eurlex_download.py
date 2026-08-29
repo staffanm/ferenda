@@ -9,10 +9,11 @@ the want-list the citation-driven backfill harvests from
 from datetime import date, timedelta
 
 import pytest
+import requests
 
 from ferenda.eurlex import download as D
-from ferenda.lib import cellar as C
 from ferenda.lib import catalog
+from ferenda.lib import cellar as C
 
 TIFF = b"II*\x00\x12p\x00\x00"          # little-endian TIFF magic + noise
 
@@ -660,3 +661,68 @@ def test_sync_acts_sweep_ends_with_the_consolidation_walk(tmp_path, monkeypatch)
     assert (seen, stored) == (1, 1)
     vdir = D.version_dir(tmp_path, "32014R0910", "2024-10-18")
     assert (vdir / "notice.ttl").exists() or (vdir / "notice.ttl.br").exists()
+
+
+def test_store_document_degrades_past_a_dangling_404_item(tmp_path,
+                                                          monkeypatch):
+    """CELLAR's graph can name an item whose content is gone (the 1992-04-13
+    consolidation of 01992L0022 lists a DOC_1 answering "Resource not found").
+    A 404 is a definitive per-resource answer: degrade to the next candidate
+    like a failed content check, instead of one ghost killing a whole sweep.
+    Any other status still raises."""
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+
+    def fake_request(session, method, url, **kw):
+        if url == "u-gone":
+            r = requests.Response()
+            r.status_code = 404
+            raise requests.HTTPError("HTTP 404", response=r)
+        if url == "u-boom":
+            r = requests.Response()
+            r.status_code = 500
+            raise requests.HTTPError("HTTP 500", response=r)
+        return Resp()
+
+    monkeypatch.setattr(C, "request", fake_request)
+    target = tmp_path / "1992" / "01992L0022-19920413"
+    selection = [("swe", [("fmx4", "u-gone", None),
+                          ("xhtml", "u-ok", None)])]
+    stored = C.store_document(object(), target, "01992L0022-19920413",
+                              "1992-04-13", selection, [])
+    assert stored == ["swe"]
+    assert (target / "swe.xhtml").exists()
+    with pytest.raises(requests.HTTPError, match="500"):
+        C.store_document(object(), tmp_path / "x", "31999R0001", "1999-01-01",
+                         [("swe", [("xhtml", "u-boom", None)])], [])
+
+
+def test_consolidation_sweep_survives_a_persistent_500(tmp_path, monkeypatch):
+    """CELLAR holds objects that answer 500 after every transport retry. The
+    sweep records the version as failed and continues -- the missing notice
+    marker makes the next run re-attempt it -- instead of one broken remote
+    object aborting a 20,000-version walk."""
+    monkeypatch.setattr(D, "fetch_consolidations", lambda s, c: {
+        "32014R0910": ["02014R0910-20240520", "02014R0910-20241018"]})
+    monkeypatch.setattr(D, "fetch_selection", lambda s, celexes, langs: {
+        c: [("swe", [("xhtml", "u-" + c, None)])] for c in celexes})
+
+    class Resp:
+        content = b"<?xml version='1.0'?><html/>"
+
+    def fake_request(session, method, url, **kw):
+        if url == "u-02014R0910-20240520":
+            r = requests.Response()
+            r.status_code = 500
+            raise requests.HTTPError("HTTP 500", response=r)
+        return Resp()
+
+    monkeypatch.setattr(C, "request", fake_request)
+    seen, stored, skipped, empty, failed = D.download_consolidations(
+        object(), tmp_path, ["32014R0910"], ("swe",), 0)
+    assert (seen, stored, skipped, empty, failed) == (2, 1, 0, 0, 1)
+    # the failed version left no marker, so a rerun re-attempts exactly it
+    assert not (D.version_dir(tmp_path, "32014R0910", "2024-05-20")
+                / "notice.ttl").exists()
+    assert (D.version_dir(tmp_path, "32014R0910", "2024-10-18")
+            / "notice.ttl").exists()

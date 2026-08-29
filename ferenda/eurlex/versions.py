@@ -36,27 +36,36 @@ def build(basefile):
     even empty -- an existing sidecar is what marks the stage's output built).
     Returns the sidecar dict.
 
-    The newest Formex-bearing version is excluded: it is the main artifact
-    (`parse.parse_dir`), and its /konsolidering/ page would duplicate the
-    act's own. Everything older -- the as-published base text included --
-    becomes a lydelse page."""
+    The first version (newest-first) that parses is excluded: it is what
+    `parse.parse_dir` presents as the main artifact -- same order, same
+    success test, so the two agree by construction even when the newest
+    download is broken -- and its /konsolidering/ page would duplicate the
+    act's own. Everything else -- the as-published base text included --
+    becomes a lydelse page, or a recorded skip."""
     doc_dir = layout.eurlex_dir(basefile)
     versions, skipped = [], []
     downloads = version_dirs(doc_dir)
-    latest = _latest_formex(downloads)
     preamble = _base_preamble(doc_dir, basefile)
+    main = None            # the wording the act's own page shows
     # a heavily amended act is minutes of work (CRR: 21 versions of 786
     # articles), so the live line moves per version, not per basefile
     rep = util.stage_reporter()
-    for i, (version, vdir) in enumerate(downloads, 1):
+    for i, (version, vdir) in enumerate(reversed(downloads), 1):
         rep.update(i, len(downloads), scope=basefile, note=version)
-        if version == latest:
+        try:
+            doc = parse_consolidation(vdir, basefile, version,
+                                      preamble=preamble)
+        except Exception as exc:  # noqa: BLE001 — per-version resilience point, mirroring sfs.versions: a scanned-era broken version (TIFF bytes in a .xml member, a corrigendum-only packet, a DOC format manifest) becomes a recorded skip, not an act whose whole history can never build (rule:no-catch-log-continue)
+            skipped.append({"version": version, "error": "%s: %s"
+                            % (type(exc).__name__, exc)})
             continue
-        doc = parse_consolidation(vdir, basefile, version, preamble=preamble)
         if doc is None:
             skipped.append({"version": version, "error": "no Formex "
                             "manifestation (pre-Formex consolidations are "
                             "PDF-only)"})
+            continue
+        if main is None:
+            main = version
             continue
         art = to_artifact(doc)
         out = layout.eurlex_version_artifact(basefile, version)
@@ -65,6 +74,8 @@ def build(basefile):
                                             sort_keys=True),
                             encodings=compress.ARTIFACT_ENCODINGS)
         versions.append({"version": version, "uri": art["uri"]})
+    versions.sort(key=lambda e: e["version"])
+    skipped.sort(key=lambda e: e["version"])
     rep.clear()          # the driver's own per-basefile line takes over
     sidecar = {"versions": versions, "skipped": skipped}
     out = layout.eurlex_versions_sidecar(basefile)
@@ -72,16 +83,6 @@ def build(basefile):
     util.write_atomic(out, json.dumps(sidecar, ensure_ascii=False, indent=2,
                                       sort_keys=True).encode())
     return sidecar
-
-
-def _latest_formex(downloads):
-    """The version id the main artifact presents: the newest downloaded
-    consolidation whose best content file is Formex, or None."""
-    for version, vdir in reversed(downloads):
-        _path, _lang, route = content_file(vdir)
-        if route == "fmx4":
-            return version
-    return None
 
 
 def _base_preamble(doc_dir, basefile):

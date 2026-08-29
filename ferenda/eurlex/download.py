@@ -53,6 +53,7 @@ from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
+import requests
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress
@@ -386,14 +387,15 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
     ``.versions/`` trees -- all versions, not only the latest, each selected
     with the same language and format preferences (and content verification)
     as the acts themselves (`fetch_selection`/`store_document`). Returns
-    (versions found, stored, already on disk, without swe/eng content).
+    (versions found, stored, already on disk, without swe/eng content,
+    failed on a persistent CELLAR error).
 
     Incremental like the act harvest: a version whose dir already holds a
     notice.ttl is skipped unless `full`. A consolidation is immutable once
     published (a later amendment is a *new* version with its own date), so
     re-fetching one buys nothing."""
     found = fetch_consolidations(session, sorted(set(celexes)))
-    seen = stored = skipped = empty = 0
+    seen = stored = skipped = empty = failed = 0
     pending = []
     for base in sorted(found):
         for cons in found[base]:
@@ -415,18 +417,31 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
                                 languages) if pending else {}
     rep = Reporter()
     for done, (cons, version, target) in enumerate(pending, 1):
-        if store_document(session, target, cons, version,
-                          selection.get(cons, []), []):
-            stored += 1
-        else:
-            empty += 1
-            print("%s: no manifestation in %s"
-                  % (cons, "/".join(languages)), flush=True)
+        try:
+            if store_document(session, target, cons, version,
+                              selection.get(cons, []), []):
+                stored += 1
+            else:
+                empty += 1
+                print("%s: no manifestation in %s"
+                      % (cons, "/".join(languages)), flush=True)
+        except requests.HTTPError as exc:
+            # CELLAR holds objects that answer a *persistent* 5xx (the
+            # transport already retried the transient kind five times).
+            # One broken remote object must not abort a 20,000-version
+            # sweep: the version is recorded and left unstored -- no
+            # notice marker -- so the next run re-attempts it. A network
+            # failure (ConnectionError, timeout) still aborts: every
+            # remaining version would fail the same way, and a sweep that
+            # grinds through them all only buries the real problem.
+            failed += 1
+            print("%s: CELLAR error, version left unstored: %s"
+                  % (cons, exc), flush=True)
         time.sleep(delay)
         rep.update(done, len(pending), scope="konsolideringar", actual=stored,
-                   stored=stored, no_content=empty)
+                   stored=stored, no_content=empty, failed=failed)
     rep.done()
-    return seen, stored, skipped, empty
+    return seen, stored, skipped, empty, failed
 
 
 # --------------------------------------------------------------------------
@@ -833,12 +848,14 @@ def sync(root, sector_name, full=False, since=None, limit=None, delay=0.3,
     # whose point is to avoid the SPARQL endpoint this discovery queries.
     if sector.consolidations and source == "sparql" and not limit:
         bases = [c for c in list_basefiles(root) if RE_PLAIN_ACT.match(c)]
-        v_seen, v_stored, v_skipped, v_empty = download_consolidations(
-            session, root, bases, languages, delay, full=full)
+        v_seen, v_stored, v_skipped, v_empty, v_failed = \
+            download_consolidations(session, root, bases, languages, delay,
+                                    full=full)
         print("eurlex %s: %d consolidated version(s) known, %d stored, "
-              "%d already on disk, %d with no %s manifestation"
+              "%d already on disk, %d with no %s manifestation, %d failed "
+              "on a CELLAR error (re-attempted next run)"
               % (sector_name, v_seen, v_stored, v_skipped, v_empty,
-                 "/".join(languages)), flush=True)
+                 "/".join(languages), v_failed), flush=True)
         # versions are downloads like any other: they join the run's counts
         # (and, through them, the ledger's seen/changed pair)
         seen += v_seen
