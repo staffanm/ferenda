@@ -4735,6 +4735,10 @@ SOURCE_RENDERERS = {
 GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "catalog.py",
                  PKG / "lib" / "text.py", PKG / "lib" / "feeds.py",
                  PKG / "lib" / "markdown.py", PKG / "lib" / "layout.py",
+                 # page.py builds its Site indexes (and wiki/render.py its
+                 # ladders) through hierarki; a top-level lib module the
+                 # */render.py glob does not reach
+                 PKG / "lib" / "hierarki.py",
                  PKG / "lib" / "history.py", PKG / "lib" / "casenaming.py",
                  PKG / "lib" / "eu_structure.py", PKG / "lib" / "facets.py",
                  PKG / "lib" / "labels.py", PKG / "lib" / "tpl.py",
@@ -4796,7 +4800,13 @@ def generate_fingerprint():
         # re-render its statute's/act's page (version panel) + the version pages
         + list(layout.SFS_ARTIFACT.glob("*/*.versions.json"))
         + list(layout.artifact_dir("eurlex").glob("*/*.versions.json"))
-        + list(annstore.tree("eurlex").glob("*/*.ann"))
+        # eurlex ai-annotate layers plus, since the ai-hierarki layers
+        # joined (they render onto their doc's rail and their concept's
+        # page), the whole sfs/foreskrift/eurlex ann trees -- one rglob per
+        # tree, superset of the old per-layer globs
+        + list(annstore.tree("sfs").rglob("*.ann"))
+        + list(annstore.tree("foreskrift").rglob("*.ann"))
+        + list(annstore.tree("eurlex").rglob("*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's) -- per page it enters the host's dependency
         # digest (page.site_cross_digests); here it reopens the coarse gate

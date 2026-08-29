@@ -14,6 +14,7 @@ from ..lib.page import (
     PANELS,
     Rail,
     Toc,
+    chain_meta,
     doc_meta,
     footnote_items,
     page_context,
@@ -168,6 +169,7 @@ def render(art, site):
     meta = [
         ("Titel", lb.official_title if lb.official_title != title else None),
         ("Utgivare", md.get("publisher")),
+        ("Normkedja", chain_meta(site, base_uri)),
         ("Beslutad", md.get("beslutsdatum")),
         ("Ikraftträdande", md.get("ikrafttradandedatum")),
         # what has changed this regulation, in the header where the SFS pages

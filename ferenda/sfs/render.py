@@ -20,6 +20,7 @@ from ..lib.page import (
     PANELS,
     Rail,
     Toc,
+    chain_meta,
     citer_name,
     doc_meta,
     ext_link,
@@ -344,6 +345,9 @@ def render(art, site):
         ("Titel", lb.official_title if lb.official_title != title else None),
         ("Ikraftträder", props.get("rpubl:ikrafttradandedatum")),
         ("Upphävd", upphavd),
+        # the document-level norm chain, with this act marked (metadata per
+        # Staffan 2026-08-28: visible on every document on the chain)
+        ("Normkedja", chain_meta(site, art["uri"].split("#")[0])),
         ("Ändring införd t.o.m.",
          Markup("SFS %s") % amended.group(1) + lydelser
          if amended else None),

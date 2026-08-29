@@ -33,10 +33,43 @@
 </section>
 {%- endif -%}
 {%- endmacro -%}
+{#- The regleringshierarki (PRD-regleringshierarki.md): one ladder per
+    chain_root, every ladder foldable (O2), rungs in rung order. A silent rung
+    is a document on the chain that says nothing about the term -- printed,
+    because the gap is information ("förordningen är tyst"). A repealed rung
+    prints dated rather than dropping (O6). -#}
+{%- macro ladder_list(ladders) -%}
+{%- if ladders %}
+<section class="occurrences regleringshierarki">
+<h2>Regleringshierarki <span class="c">{{ ladders | length }}</span></h2>
+{%- for lad in ladders %}
+<details class="ladder" id="{{ lad.anchor_id }}"{% if ladders | length == 1 %} open{% endif %}>
+<summary>{{ lad.kind_label }} — {{ lad.root_citation }}</summary>
+<ol class="rungs">
+{%- for r in lad.rungs %}
+<li{% if r.silent %} class="silent"{% endif %}>
+{%- if r.silent -%}
+{{ r.citation }} <span class="role">är tyst</span>
+{%- else -%}
+<a href="{{ r.href }}">{{ r.citation }}</a>{% if r.role %} <span class="role">{{ r.role }}</span>{% endif %}
+{%- if r.label %} <span class="rh-label">”{{ r.label }}”</span>{% endif %}
+{%- if r.also %} <span class="rh-also">samt {% for a in r.also %}<a href="{{ a.href }}">{{ a.citation }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+{%- endif -%}
+{%- if r.upphavd is not none %} <span class="rh-upphavd">upphävd{% if r.upphavd %} {{ r.upphavd }}{% endif %}</span>{% endif %}
+{%- if r.via_amended %} <span class="rh-amended">bemyndigandet ändrat {{ r.via_amended }}</span>{% endif %}
+</li>
+{%- endfor %}
+</ol>
+</details>
+{%- endfor %}
+</section>
+{%- endif -%}
+{%- endmacro -%}
 {% block body %}
 {%- if has_description -%}
 {{ structure }}
 {{ definition_list(definitions, definition_cap) }}
+{{ ladder_list(ladders) }}
 {%- else -%}
 {#- No description is the normal case (568 of ~28,900 concepts have one), and it
     does not mean the page is empty: the corpus itself is the content. A begrepp
@@ -59,6 +92,7 @@
 <p class="stub-lede">Termen förekommer inte i något dokument i rättskällorna.</p>
 {%- endif -%}
 {{ definition_list(definitions, definition_cap) }}
+{{ ladder_list(ladders) }}
 {%- for g in groups %}
 <section class="occurrences {{ g.key }}">
 <h2>{{ g.label }} <span class="c">{{ g.count }}</span></h2>

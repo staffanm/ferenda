@@ -48,6 +48,7 @@ from . import (
     compress,
     facets,
     facsimile,
+    hierarki,
     history,
     layout,
 )
@@ -81,6 +82,20 @@ class Site:
     # uris whose repeal date has passed -- dropped from inbound-link panels (I3);
     # a future (not-yet-in-force) repeal date is *not* here, so it still shows
     expired: set[str] = field(default_factory=set)
+    # doc uri -> [(anchor, concept uri, ladder anchor id)] -- the provisions
+    # that carry a regleringshierarki row, for the one-line rail entry per
+    # concept (O5). Built once per Site, scoped by target_uris like `fk`
+    hierarki: dict[str, list[tuple[str, str, str]]] = \
+        field(default_factory=dict)
+    # föreskrift uri -> its unambiguous upward chain, for the per-chapter
+    # "Dessa föreskrifter fyller ut ..." rail line (PRD §8); absent where the
+    # chain is missing or ambiguous (several delegation pins -- phase-3 residue)
+    fyller_ut: dict[str, dict] = field(default_factory=dict)
+    # the document-level norm chain, for the "Normkedja" metadata row on every
+    # document on a chain: doc -> [(parent doc, parent level)], and
+    # doc -> {child level: count} for the downward summary
+    chain_up: dict[str, list[tuple[str, int]]] = field(default_factory=dict)
+    chain_down: dict[str, dict[int, list[str]]] = field(default_factory=dict)
     # one-document memo for `catalog.caselaw_anchored` -- the statute-wide
     # case assignment is computed once per rendered statute (render_sfs primes
     # it with the consolidation's live anchor set), then read per anchor as
@@ -126,6 +141,9 @@ class Site:
                    remiss_feedback, remiss_overall, _fk_index(con, target_uris),
                    _graphics_index(),
                    catalog.expired_uris(con, date.today().isoformat()),
+                   hierarki=hierarki.provision_index(con, target_uris),
+                   fyller_ut=hierarki.fyller_ut_index(con, target_uris),
+                   chain_up=_chain_up_index(con), chain_down=_chain_down_index(con),
                    today=date.today().isoformat())
 
     def load_inbound_counts(self, uris):
@@ -353,6 +371,29 @@ def site_cross_digests(site):
     # 2025:400 -> 2001:453 -> 1980:620), every page whose law is a transitive
     # *successor* of the row's new side: editing the 1980:620 layer must
     # re-render the 2025:400 page that now shows its case law
+    # a regleringshierarki row renders on its provision's page (the rail
+    # line) and on its concept's page (the ladder); the fyller-ut line renders
+    # on the föreskrifter standing on a delegation clause -- all read from
+    # derived tables the links-only dependency digest never sees
+    for row in site.con.execute(
+            "SELECT concept, doc_uri, anchor, also, level, kind, role, label, "
+            "chain_root, via, source, stated, upphavd, via_amended "
+            "FROM regleringshierarki"):
+        feed(row[1], "hierarki", row[2], list(row))
+        feed(row[0], "hierarki", row[2], list(row))
+    for fs, l, lp, u, upin in site.con.execute(
+            "SELECT nc.lower_uri, de.lower_uri, de.lower_pin, de.upper_uri, "
+            "de.upper_pin FROM delegation_edge de JOIN norm_chain nc "
+            "ON nc.upper_uri = de.lower_uri AND nc.upper_pin = de.lower_pin "
+            "WHERE nc.lower_level = 3"):
+        feed(fs, "fyller_ut", lp, [l, lp, u, upin])
+    # the Normkedja metadata row renders the doc-level chain on both endpoint
+    # pages, so an edge change must re-render both
+    for lower, upper in site.con.execute(
+            "SELECT DISTINCT lower_uri, upper_uri FROM norm_chain "
+            "UNION SELECT DISTINCT lower_uri, upper_uri FROM delegation_edge"):
+        feed(lower, "normkedja", upper, 1)
+        feed(upper, "normkedja", lower, 1)
     # an amending act's `.ann` maps its recitals onto the *amended* act's
     # article numbers (eurlex ai-annotate over an unpacked amending act), and
     # the renderer draws those links on the amended act's page -- and on every
@@ -1116,6 +1157,151 @@ def _law_title(site, base):
     return " ".join((_doc_title(site, base) or catalog.local(base)).split())
 
 
+def _chain_up_index(con):
+    """doc -> its distinct chain parents [(parent, parent level)], stated
+    edges (norm_chain) and delegation-derived ones alike. Doc-level: the
+    "Normkedja" row names documents, never provisions."""
+    up = {}
+    for lower, upper, ulvl in con.execute(
+            "SELECT DISTINCT lower_uri, upper_uri, upper_level FROM norm_chain"):
+        up.setdefault(lower, {})[upper] = ulvl
+    for lower, upper in con.execute(
+            "SELECT DISTINCT lower_uri, upper_uri FROM delegation_edge"):
+        up.setdefault(lower, {}).setdefault(upper, 1)
+    return {k: sorted(v.items(), key=lambda x: (x[1], x[0]))
+            for k, v in up.items()}
+
+
+def _chain_down_index(con):
+    """doc -> {child level: sorted child uris}, the downward half of the
+    Normkedja row. Children are kept by name, not count: a directive
+    "implemented by 2 lagar" must say which two (Staffan, 2026-08-28)."""
+    down = {}
+    for upper, lower, llvl in con.execute(
+            "SELECT DISTINCT upper_uri, lower_uri, lower_level "
+            "FROM norm_chain"):
+        down.setdefault(upper, {}).setdefault(llvl, set()).add(lower)
+    for upper, lower in con.execute(
+            "SELECT DISTINCT upper_uri, lower_uri FROM delegation_edge"):
+        down.setdefault(upper, {}).setdefault(2, set()).add(lower)
+    return {k: {lvl: sorted(docs) for lvl, docs in v.items()}
+            for k, v in down.items()}
+
+
+
+
+CHAIN_FAN_CAP = 5   # Normkedja entries named inline per level;
+                    # the rest fold behind a +N fler disclosure
+
+
+def chain_meta(site, doc_uri):
+    """The document-level norm chain as one metadata row, the current
+    document marked: "(EU) 2016/679 → Dataskyddslag (2018:218) →
+    **IMYFS 2024:1**". A level with several documents names them all, side
+    by side and uncapped -- "implemented by 2 lagar" must say which two
+    (Staffan, 2026-08-28). Upward, the current document's immediate parents
+    all show; further up the spine follows one deterministic path (lowest
+    level, then uri). Downward, every direct child shows, grouped by rung.
+    None off the chain."""
+    if doc_uri not in site.chain_up and doc_uri not in site.chain_down:
+        return None
+
+    def name(uri):
+        # the citable short id ("2018:218", "IMYFS 2024:1", "(EU) 2016/679"),
+        # never a title -- the strip must fit on one line (Staffan 2026-08-28)
+        row = site.con.execute(
+            "SELECT short_id, label FROM documents WHERE uri = ?",
+            (uri,)).fetchone()
+        return (row and (row[0] or row[1])) or catalog.local(uri)
+
+    def link(uri):
+        return ('<a href="%s">%s</a>' % (escape(href(uri)), escape(name(uri)))
+                if site.has(uri) else escape(name(uri)))
+
+    def fan(uris):
+        # every document on the level is named; past the cap they fold behind
+        # the site's usual "+N fler" disclosure rather than truncating
+        named = ", ".join(link(u) for u in uris[:CHAIN_FAN_CAP])
+        if len(uris) > CHAIN_FAN_CAP:
+            named += (' <details class="more inline"><summary>+%d fler'
+                      '</summary>%s</details>'
+                      % (len(uris) - CHAIN_FAN_CAP,
+                         ", ".join(link(u) for u in uris[CHAIN_FAN_CAP:])))
+        return named
+
+    levels = []
+    parents = site.chain_up.get(doc_uri, [])
+    if parents:
+        levels.append(fan([u for u, _l in parents]))
+        node, seen = parents[0][0], {doc_uri, parents[0][0]}
+        while node in site.chain_up and len(levels) < 4:
+            up = site.chain_up[node]
+            node = up[0][0]
+            if node in seen:
+                break
+            seen.add(node)
+            levels.append(link(node))
+    parts = list(reversed(levels))
+    parts.append('<strong class="here">%s</strong>' % escape(name(doc_uri)))
+    for _lvl, uris in sorted(site.chain_down.get(doc_uri, {}).items()):
+        parts.append(fan(uris))
+    return Markup(" → ".join(parts))
+
+
+def regleringshierarki_margin(site, doc_uri, anchors):
+    """One rail line per concept whose regleringshierarki row sits on (or
+    under) one of this panel's anchors (O5): "betydande incident", linking the
+    ladder at its own anchor on the concept's page. Row anchors sit deeper
+    than the panel node (a definition at K1P2S1N10 under the K1P2 panel), so
+    the match is containment, over the Site's per-document list."""
+    rows = site.hierarki.get(doc_uri)
+    if not rows:
+        return []
+    items, seen = [], set()
+    for row_anchor, concept, aid in rows:
+        if concept in seen or not any(
+                a and hierarki._anchor_within(row_anchor, a) for a in anchors):
+            continue
+        seen.add(concept)
+        term = concept.rsplit("/", 1)[-1].replace("_", " ")
+        items.append('<li><a href="%s#%s">%s</a></li>'
+                     % (escape(href(concept)), escape(aid), escape(term)))
+    if not items:
+        return []
+    return [RailSection("regleringshierarki", "Regleringshierarki",
+                        len(items), "<ul>%s</ul>" % "".join(items))]
+
+
+RE_KAPITEL_ANCHOR = re.compile(r"^K\d+[a-z]?$")
+
+
+def fyller_ut_margin(site, doc_uri, anchors):
+    """The chapter rail line on a föreskrift whose subject no concept anchors
+    (PRD §8): "Dessa föreskrifter fyller ut 7 kap. 2 § fartygssäkerhetslagen,
+    som genomför direktiv 2009/45/EG artikel ...". Document-level wording --
+    the chain is known per document, and "Detta kapitel" would assert a
+    chapter-level fact the data does not hold until the ai-* pass splits the
+    pins (PRD phase 3). Shown once per chapter panel, only where the upward
+    chain is unambiguous (`hierarki.fyller_ut_index`)."""
+    entry = site.fyller_ut.get(doc_uri)
+    if not entry or not any(a and RE_KAPITEL_ANCHOR.match(a) for a in anchors):
+        return []
+    lag, lag_pin = entry["lag"]
+    target = "%s#%s" % (lag, lag_pin) if lag_pin else lag
+    prose = 'Dessa föreskrifter fyller ut <a href="%s">%s%s</a>' % (
+        escape(href(target)),
+        escape(human_fragment(lag_pin) + " " if lag_pin else ""),
+        escape(_law_title(site, lag)))
+    tails = ["artikel %s i %s"
+             % (escape(pinpoint or article),
+                directive_link(site, directive, directive + "#" + article))
+             for directive, article, pinpoint in entry["direktiv"]]
+    if tails:
+        prose += ", som genomför " + ", ".join(tails)
+    return [RailSection("fyller-ut", "Regleringshierarki", 1,
+                        "<ul><li>%s</li></ul>" % prose, flat=True)]
+
+
 def _corr_phrase(relation, scope):
     """How an old paragraf's margin names its successor, from the correspondence's
     relation/scope: "motsvaras numera huvudsakligen av", "har förts över till"."""
@@ -1386,7 +1572,7 @@ RAIL_SECTION_ORDER = (
     "eu-forslag",
     "aldre-rattsfall", "sfs", "forarbete", "foreskrift", "bemyndigande",
     "eurlex", "guidance", "lawreview", "coe", "icrc", "untc", "begrepp",
-    "genomfor", "remiss",
+    "genomfor", "regleringshierarki", "fyller-ut", "remiss",
     "vagledning", "andringar", "skal", "tidigare-beteckning", "motsvarighet")
 
 
@@ -1525,6 +1711,9 @@ class Rail:
                         + renumbered_refs_margin(self.site, uri)
                         + corresponds_margin(self.site, uri)
                         + self._andringar(anchor))]
+        sections += regleringshierarki_margin(self.site, self.doc_uri,
+                                              anchors)
+        sections += fyller_ut_margin(self.site, self.doc_uri, anchors)
         sections += list(extra) + _inbound_groups(
             self.site, uris,
             exclude_before=_reassigned_before(self.site, uris[0]))

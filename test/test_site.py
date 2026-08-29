@@ -3480,7 +3480,7 @@ CONCEPT = {"uri": "https://lagen.nu/begrepp/Dröjsmålsränta",
            "type": "begrepp", "title": "Dröjsmålsränta", "body": []}
 
 # a statute that *defines* the term: the dcterms:subject link a parenthesised
-# legaldefinition mints (sfs/begrepp.term_to_subject), which is what a concept
+# legaldefinition mints (markdown.begrepp_uri), which is what a concept
 # page with no description is an index of
 DEFINING_LAW = {
     "uri": "https://lagen.nu/1975:635",
@@ -3533,7 +3533,9 @@ def test_a_concept_prints_what_each_act_says_the_term_means(tmp_path):
     assert '<section class="occurrences definitions">' in html
     assert "Ränta enligt denna lag utgår som dröjsmålsränta." in html
     assert "Detta gäller även i andra fall" not in html      # the next sentence
-    assert '<a href="https://lagen.nu/1975:635#P6S1">6 § 1 st räntelagen</a>' in html
+    # a local path, not the canonical uri: internal links stay on-site
+    # (adjudicated 2026-08-28 when the ladder links surfaced the fault)
+    assert '<a href="/1975:635#P6S1">6 § 1 st räntelagen</a>' in html
 
 
 def test_a_defining_act_is_not_listed_twice(tmp_path):
@@ -3541,7 +3543,7 @@ def test_a_defining_act_is_not_listed_twice(tmp_path):
     the rail (or in a second body group) the same act prints twice."""
     site = _concept_site(tmp_path)
     html = wiki_render.render(json.loads(json.dumps(CONCEPT)), site)
-    assert html.count("https://lagen.nu/1975:635#P6S1") == 1
+    assert html.count('"/1975:635#P6S1"') == 1
     assert "Legaldefinitioner" in html and html.count("Legaldefinitioner") == 1
 
 

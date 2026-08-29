@@ -6,16 +6,17 @@ Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
 
 from markupsafe import Markup
 
-from ..lib import catalog, tpl
+from ..lib import catalog, hierarki, tpl
 from ..lib.page import (
     PANEL_CAP,
     doc_meta,
     document_body,
+    href,
     ordered_sections,
     page_context,
     render_toc,
 )
-from ..lib.pinpoint import citation
+from ..lib.pinpoint import citation, human_fragment
 
 ENV = tpl.environment("ferenda.wiki")
 
@@ -42,6 +43,69 @@ GROUP_LABEL = {"sfs": "Legaldefinitioner"}
 # reading column or in the margin -- prints the list twice.
 DEFINING_KEYS = frozenset({"sfs", "eurlex", "foreskrift"})
 
+# How a ladder's top rung is named on the page (O3): `documents.kind` for a
+# eurlex root separates a directly applicable förordning from a directive a
+# Swedish law transposes -- they are not the same kind of authority. Total
+# over the eurlex kinds that can top a chain; everything else falls back to
+# the generic label.
+ROOT_KIND_LABEL = {"regulation": "EU-förordning", "directive": "EU-direktiv",
+                   "decision": "EU-beslut", "lag": "Lag",
+                   "forordning": "Förordning"}
+ROOT_KIND_FALLBACK = "EU-rätt"
+
+
+# the ascii role values the table stores, as the reader sees them
+ROLE_LABEL = {"definierar": "definierar", "alagger": "ålägger",
+              "delegerar": "delegerar", "detaljerar": "detaljerar",
+              "namner": "nämner"}
+
+
+def _regleringshierarki(uri, site):
+    """The concept's ladders through the norm levels (O2: all of them, each
+    foldable, grouped under its chain_root): the display rows the template
+    prints, built from `hierarki.concept_ladders`. A silent rung renders as
+    its own line -- "förordningen är tyst" is information (PRD §8)."""
+    keyed = []          # (sort key, display dict) -- grouped by the root's
+    # kind (O2), highest authority first; the most complete ladder leads
+    # within each group. Keyed as a parallel tuple so the sort never reads
+    # the display dict's union-typed values.
+    order = ["EU-förordning", "kompletterar EU-förordning", "EU-direktiv",
+             "EU-beslut", "EU-rätt", "Lag", "Förordning"]
+    for ladder in hierarki.concept_ladders(site.con, uri):
+        rungs = []
+        for r in ladder["rungs"]:
+            target = "%s#%s" % (r["doc"], r["anchor"]) if r["anchor"] \
+                else r["doc"]
+            rungs.append({
+                "href": href(target),
+                "citation": citation(target, r["descriptive"]),
+                "role": ROLE_LABEL.get(r["role"]),
+                "label": r["label"], "silent": r["silent"],
+                "upphavd": (None if not r["upphavd"] else
+                            "" if r["upphavd"] == catalog.EXPIRED_UNDATED
+                            else r["upphavd"]),
+                "via_amended": r["via_amended"],
+                # bare pinpoints: the row's own citation already names the
+                # law, and "10 kap. 1 §, 10 kap. 6 §" is how multiple
+                # citations into one law are written
+                "also": [{"href": href("%s#%s" % (r["doc"], a)),
+                          "citation": human_fragment(a) or a}
+                         for a in r["also"]]})
+        root = next(r for r in ladder["rungs"]
+                    if r["doc"] == ladder["chain_root"])
+        kind_label = ROOT_KIND_LABEL.get(ladder["root_kind"],
+                                         ROOT_KIND_FALLBACK)
+        if ladder["kompletterar"] and ladder["root_kind"] == "regulation":
+            kind_label = "kompletterar EU-förordning"
+        root_citation = citation(ladder["chain_root"], root["descriptive"])
+        rank = order.index(kind_label) if kind_label in order else len(order)
+        keyed.append(((rank, -len(rungs), root_citation),
+                      {"anchor_id": ladder["anchor_id"],
+                       "kind_label": kind_label,
+                       "root_citation": root_citation,
+                       "rungs": rungs}))
+    return [lad for _key, lad in sorted(keyed, key=lambda t: t[0])]
+
 
 def _definitions(uri, site):
     """What every act that defines this term says it means: the act's own
@@ -50,7 +114,7 @@ def _definitions(uri, site):
     Read from the catalog, which relate filled while it had the artifact open
     (`catalog.definition_sentences`) -- a term defined in a hundred acts would
     otherwise open a hundred artifacts, on every one of ~28,900 concept pages."""
-    return [{"href": "%s#%s" % (act, anchor) if anchor else act,
+    return [{"href": href("%s#%s" % (act, anchor) if anchor else act),
              "citation": citation("%s#%s" % (act, anchor or ""), descriptive),
              "term": term, "sentence": sentence}
             for act, anchor, descriptive, term, sentence
@@ -74,6 +138,7 @@ def render(art, site):
     structure, toc, rail = document_body(art, site, key="body")
     has_description = bool(art.get("body"))
     definitions = _definitions(art["uri"], site)
+    ladders = _regleringshierarki(art["uri"], site)
     if definitions:
         rail.drop_document_sections(DEFINING_KEYS)
     groups, uses, island = [], 0, rail.island()
@@ -98,4 +163,4 @@ def render(art, site):
         toc=render_toc(toc, title), eyebrow="Begrepp", island=island,
         structure=structure, has_description=has_description,
         definitions=definitions, definition_cap=PANEL_CAP,
-        groups=groups, uses=uses))
+        ladders=ladders, groups=groups, uses=uses))
