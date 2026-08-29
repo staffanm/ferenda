@@ -1323,9 +1323,9 @@ def card_endpoint(uri: str = Query(
 
     One parameter names the place, in either of the two forms the site writes:
     the uri everything else here speaks (`/graph?uri=`, a search hit's `uri`),
-    or the page path the browser has in an href -- which is not a prefix of the
-    uri (an EU act is served at /celex/<id> and identified as celex/<id>),
-    so a client holding one cannot be asked to compose the other."""
+    or the page path the browser has in an href. The path is the uri's own
+    path, but it carries no host, so a client holding one is not asked to
+    compose the other."""
     if uri.startswith("/"):
         path, _, frag = uri.partition("#")
         uri = layout.page_uri(path) + (("#" + frag) if frag else "")

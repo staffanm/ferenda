@@ -912,8 +912,8 @@ def page_uri(path: str) -> str:
 
 def url_to_relpath(path: str) -> str | None:
     """Inverse of page_url: the on-disk static file for a public lagen.nu URL path.
-    The path is a document's URI local form, so reattach the host and reuse the
-    page_relpath rule; /celex/<id> is the public address of celex/<id>."""
+    The path is a document's URI local form, so reattach the host and reuse
+    the page_relpath rule."""
     # the path is an attacker-controlled request: refuse traversal-shaped
     # segments here (no rewrite -> the miss stays a 404) rather than relying
     # on the static server's containment check alone

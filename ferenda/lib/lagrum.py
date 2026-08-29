@@ -1545,11 +1545,15 @@ def celex_year(value):
 
 
 def celex_of(uri):
-    """The CELEX an `celex/` uri names, without its fragment
+    """The CELEX a lagen.nu uri names, without its fragment
     ("…/celex/32016R0679#23" -> "32016R0679"), or None for a uri that names
-    no CELEX. The read half of `celex_uri`."""
-    return uri.split('celex/')[1].split('#')[0] \
-        if 'celex/' in uri else None
+    no CELEX. The read half of `celex_uri`.
+
+    Keyed on `CELEX_BASE`, not on a bare "celex/" substring: since the ext/
+    segment went, the namespace is an ordinary word that any path could
+    contain, and the constant is what keeps this spelling in one place."""
+    return uri[len(CELEX_BASE):].split('#')[0] \
+        if uri.startswith(CELEX_BASE) else None
 
 
 def celex_uri(attrs, base='https://lagen.nu/'):

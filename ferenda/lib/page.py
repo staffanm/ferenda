@@ -481,8 +481,8 @@ def href(uri):
 
 
 def _external_href(uri):
-    """Where an ``ext/`` reference we don't host resolves -- EUR-Lex for a
-    CELEX (the EU act on the official site), else the uri itself."""
+    """Where a publisher-number reference we don't host resolves -- EUR-Lex
+    for a CELEX (the EU act on the official site), else the uri itself."""
     if uri.startswith(CELEX):
         return EURLEX % catalog.local(uri)[len("celex/"):].split("#")[0]
     if uri.startswith(COE):
@@ -893,8 +893,9 @@ def render_runs(runs, site):
             link = ('<a%s href="%s">%s</a>'
                     % (cls, escape(href(uri)), escape(run["text"])))
         elif _is_external(uri):
-            # an ext/ reference we don't host -- out to the external service
-            # (EUR-Lex for a CELEX); becomes a local link once we parse it
+            # a publisher-number reference we don't host -- out to the
+            # publisher (EUR-Lex for a CELEX); becomes a local link once we
+            # parse it
             link = ('<a class="ext" href="%s" rel="external">%s</a>'
                     % (escape(_external_href(uri)), escape(run["text"])))
         elif uri.startswith(BASE):
@@ -2517,8 +2518,9 @@ def ref_link(site, uri, name_unknown=None, name=None):
     naming the convention "EKMR" rather than the treaty's full official title).
 
     The external branch fires only for a target the site does not host: the
-    `ext/` namespace also holds documents we parse and serve (the CoE treaties),
-    and short-circuiting on the prefix alone rendered every hudoc judgment's
+    publisher-number namespaces also hold documents we parse and serve (the
+    CoE treaties), and short-circuiting on the namespace alone rendered every
+    hudoc judgment's
     article references as raw fragment ids ("005#A8") linking out to the
     Treaty Office instead of to our own article anchors."""
     base, _, frag = uri.partition("#")

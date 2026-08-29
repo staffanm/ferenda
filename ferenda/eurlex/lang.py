@@ -146,7 +146,11 @@ _ANNEX_SPLIT = re.compile(r"\s+-\s+")
 # 6-12-letter wildcard backtracks exponentially on a long all-letter line that
 # almost matches -- 31987R2273's annex glues 1,243 characters of country names
 # ("AlbaniaAlbanienAlbanía..."), and one such line cost an hour of CPU and
-# read as a hung rebuild. The scan accepts exactly the same language: at each
+# read as a hung rebuild. The scan accepts the same language on every shape
+# measured (3,510 cases, the glued forms included), narrowing only where the
+# regex leaned on `$` before a trailing newline or on the lookahead reaching a
+# non-ASCII character that *ends* the run -- both fail toward "not an annex
+# strip", the pre-fix reading. At each
 # reachable position, every annex word and every 6-12-letter mojibake run
 # (with the same some-non-ASCII-ahead condition) advances, an optional
 # roman/arabic numeral tail rides each unit, and the whole text must be

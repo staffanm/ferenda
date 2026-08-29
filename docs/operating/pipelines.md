@@ -6,6 +6,18 @@ prerequisites and `config.yml` these commands need, read
 [`README.md`](README.md). For the modules behind them, read
 [`../developing/source-map.md`](../developing/source-map.md).
 
+**Pending since 2026-08-29: the corpus must be reparsed and related.** The
+canonical uri of the `celex`, `coe`, `icrc`, `untc`, `icc` and `icj`
+namespaces lost its `ext/` segment (the uri's path is now the served path).
+Every artifact, catalog row and search unit written before that carries the
+old form, and the mismatch is silent, not loud: a stale artifact's EU or
+treaty citation renders as **plain text with no link and no publisher
+fallback**, because the uri no longer reads as one of those namespaces. The
+served pages are unaffected — they never carried the prefix — so nothing
+needs a redirect. Run a full `parse` → `relate` → `index` → `generate` over
+the corpus (`lagen all rebuild`); an already-current source is skipped, so
+the cost falls on the sources whose artifacts hold such citations.
+
 **SFS** (operates on `site/data/{downloaded,artifact}/sfs/`, validated against
 the golden corpus in the sibling reference checkout, `../ferenda.old/data/sfs/parsed/`):
 

@@ -372,9 +372,9 @@ for a **fragment uri** it is that provision's own text under its pinpoint
 ("1 kap. 5 § Konungen eller drottning som enligt successionsordningen …"),
 which costs one artifact read. `uri` takes either form the site writes — the
 uri (`https://lagen.nu/1962:700#K3P1`) or the page path for the same place
-(`/1962:700#K3P1`), which is what a browser has in an href and cannot compose
-the uri from (an EU act is served at `/celex/<id>` and identified as
-`celex/<id>`). The site's link popovers use it for every target outside
+(`/1962:700#K3P1`), which is what a browser has in an href. The path is the
+uri's own path; it simply carries no host. The site's link popovers use it
+for every target outside
 the page in hand, instead of fetching that page. The graph payload
 deliberately does not carry these fields — of 300 neighbours one gets
 selected, and this is the call for that one.

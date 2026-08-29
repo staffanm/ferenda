@@ -818,7 +818,7 @@ def _scan(text, parser, spans=()):
 
 # the year a lagen.nu citation target carries in its uri: an SFS number
 # (https://lagen.nu/1984:437#P3) or a förarbete id (…/prop/1992/93:100); other
-# namespaces (dom/, avg/, ext/…) carry no comparable year and are never checked
+# namespaces (dom/, avg/, celex/…) carry no comparable year and are never checked
 RE_TARGET_YEAR = re.compile(
     r"^https://lagen\.nu/(?:(?:prop|sou|ds|dir|skr|bet|so|fm|pm|lr)/)?(\d{4})[:/]")
 

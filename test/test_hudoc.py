@@ -460,7 +460,7 @@ def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
     assert "Example v. Sweden" in html      # the rail prints the citing form
     assert 'id="A8"' in html
     # the citing side names the article, never the raw fragment id: the treaty
-    # lives under ext/ but is hosted here, so the reference links to our own
+    # is keyed by its CETS number but hosted here, so the reference links to our own
     # article anchor with the curated short name (X3)
     case_html = hudoc_render.render(case, site)
     assert "artikel 8 EKMR" in case_html
