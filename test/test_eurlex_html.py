@@ -2,6 +2,7 @@
 localized vocabulary (eng + swe), including the recital-table heuristic and the
 old-flavour text-structure fallback."""
 
+import time
 from pathlib import Path
 
 from ferenda.eurlex import lang as L
@@ -488,6 +489,25 @@ def test_annex_strip_variants_and_non_matches():
     assert L.annex_strip("Före 2000 skall bilaga II del B ändras", swe) is None
     assert L.annex_strip("BILAGA I", swe) is None
     assert L.annex_strip("FÖRSTA - ANDRA - TREDJE", swe) is None
+
+
+def test_annex_run_scan_is_linear_on_a_glued_letter_wall():
+    """31987R2273's annex glues 1,243 characters of country names into one
+    line ("AlbaniaAlbanienAlbanía..."); the obvious {3,}-repetition regex
+    backtracks exponentially on it -- one such line cost an hour of CPU and
+    read as a hung rebuild. The linear scan answers instantly, and still
+    reads the documented glued cases the regex did."""
+    swe = L.vocab("swe").annex_words
+    wall = ("AlbaniaAlbanienAlbaníaBulgariaBulgarienBozlgaríaHungríaUngarn"
+            "OzggaríaPoloniaPolenPolvníaRumaniaRumaenienRozmanía") * 12 + "Q7Q"
+    t0 = time.perf_counter()
+    assert L.annex_strip(wall, swe) is None
+    assert time.perf_counter() - t0 < 1.0
+    # the glued readings survive the rewrite: Danish BILAG + German ANHANG
+    # abut, and per-unit numerals ride along
+    assert L._annex_run("BILAGANHANGANNEX")
+    assert L._annex_run("ANNEXIANNEXIIANNEXIII")
+    assert not L._annex_run("ANNEXANNEX")          # two units are not a strip
 
 
 def test_signature_closes_the_last_article():

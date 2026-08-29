@@ -140,9 +140,66 @@ _ANNEX_SPLIT = re.compile(r"\s+-\s+")
 # "BILAGA" -- so the run stands as its own heading text. Recognising it is what
 # matters: it closes the last article, which is otherwise left swallowing every
 # annex in the act.
-_ANNEX_RUN = re.compile(
-    r"^(?:(?:%s|%s)(?:\s*[IVXLC]+|\s*\d+)?){3,}$"
-    % ("|".join(_ANNEX_WORDS), _MOJIBAKE), re.I)
+#
+# Recognised by a linear scan, NOT by the obvious regex
+# `^(?:(?:WORD|MOJIBAKE)(?:\s*[IVXLC]+|\s*\d+)?){3,}$`: that repetition over a
+# 6-12-letter wildcard backtracks exponentially on a long all-letter line that
+# almost matches -- 31987R2273's annex glues 1,243 characters of country names
+# ("AlbaniaAlbanienAlbanía..."), and one such line cost an hour of CPU and
+# read as a hung rebuild. The scan accepts exactly the same language: at each
+# reachable position, every annex word and every 6-12-letter mojibake run
+# (with the same some-non-ASCII-ahead condition) advances, an optional
+# roman/arabic numeral tail rides each unit, and the whole text must be
+# consumed by three or more units.
+_ANNEX_WORD_RES = [re.compile(re.escape(w), re.I) for w in _ANNEX_WORDS]
+_LETTER = re.compile(r"[^\W\d_]")
+_WORDCHAR = re.compile(r"\w")
+_NUM_TAIL = re.compile(r"\s*([IVXLC]+|\d+)", re.I)
+
+
+def _annex_run(text):
+    """Whether `text` is a glued multilingual annex strip (three or more
+    annex words / mojibake segments run together, each with an optional
+    numeral tail, nothing else)."""
+    n = len(text)
+    # the MOJIBAKE lookahead `(?=\w*[^\x00-\x7f])`: from position i, the
+    # unbroken \w run ahead must hold at least one non-ASCII character
+    nonascii_ahead = [False] * (n + 1)
+    run_has = False
+    for i in range(n - 1, -1, -1):
+        if _WORDCHAR.match(text, i):
+            run_has = (ord(text[i]) > 0x7f) or run_has
+        else:
+            run_has = False
+        nonascii_ahead[i] = run_has
+    # units[i] = the most units consumable to reach position i, -1 unreachable
+    units = [-1] * (n + 1)
+    units[0] = 0
+    for i in range(n):
+        if units[i] < 0:
+            continue
+        ends = set()
+        for pattern in _ANNEX_WORD_RES:
+            m = pattern.match(text, i)
+            if m:
+                ends.add(m.end())
+        if nonascii_ahead[i]:
+            for length in range(6, 13):
+                if i + length <= n and all(
+                        _LETTER.match(text, j) for j in range(i, i + length)):
+                    ends.add(i + length)
+        for end in ends:
+            tails = {end}
+            m = _NUM_TAIL.match(text, end)
+            if m:
+                # the numeral run may be taken at any length, as the regex's
+                # backtracking would ("ANNEXIVANNEX" splits IV, but I alone
+                # must stay available)
+                start = m.start(1)
+                tails.update(range(start + 1, m.end(1) + 1))
+            for j in tails:
+                units[j] = max(units[j], units[i] + 1)
+    return units[n] >= 3
 
 
 def annex_strip(text, annex_words):
@@ -155,7 +212,7 @@ def annex_strip(text, annex_words):
     if len(segs) >= 3 and all(_ANNEX_SEG.match(s) for s in segs):
         own = [s for s in segs if s.upper().startswith(annex_words)]
         return own[0] if own else text
-    return text if len(segs) == 1 and _ANNEX_RUN.match(text) else None
+    return text if len(segs) == 1 and _annex_run(text) else None
 
 
 # how a rubric run onto an article heading line may open (`Vocab.article_heading`):
