@@ -7,7 +7,7 @@ import pytest
 from ferenda.eurlex import correspond as C
 from ferenda.lib import catalog
 
-BASE = "https://lagen.nu/ext/celex/"
+BASE = "https://lagen.nu/celex/"
 
 
 def _link(text, uri):

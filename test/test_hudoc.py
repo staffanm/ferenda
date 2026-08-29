@@ -23,14 +23,14 @@ FIXTURES = Path(__file__).parent / "files" / "hudoc"
 
 
 def test_hudoc_article_codes_map_to_treaty_office_uris():
-    assert coe.hudoc_article("8") == "https://lagen.nu/ext/coe/005#A8"
-    assert coe.hudoc_article("6-3-d") == "https://lagen.nu/ext/coe/005#A6P3Ld"
-    assert coe.hudoc_article("P1-1") == "https://lagen.nu/ext/coe/009#A1"
-    assert coe.hudoc_article("P7-4") == "https://lagen.nu/ext/coe/117#A4"
+    assert coe.hudoc_article("8") == "https://lagen.nu/coe/005#A8"
+    assert coe.hudoc_article("6-3-d") == "https://lagen.nu/coe/005#A6P3Ld"
+    assert coe.hudoc_article("P1-1") == "https://lagen.nu/coe/009#A1"
+    assert coe.hudoc_article("P7-4") == "https://lagen.nu/coe/117#A4"
     assert coe.hudoc_article("P99-1") is None
     assert coe.hudoc_articles("14+3") == [
-        "https://lagen.nu/ext/coe/005#A14",
-        "https://lagen.nu/ext/coe/005#A3",
+        "https://lagen.nu/coe/005#A14",
+        "https://lagen.nu/coe/005#A3",
     ]
 
 
@@ -276,8 +276,8 @@ def test_parse_hudoc_fixture_to_artifact():
                 if node["type"] == "rubrik"]
     assert headings == ["THE FACTS", "THE LAW"]
     targets = {ref["uri"] for ref in art["references"]}
-    assert "https://lagen.nu/ext/coe/005#A8" in targets
-    assert "https://lagen.nu/ext/coe/117#A4" in targets
+    assert "https://lagen.nu/coe/005#A8" in targets
+    assert "https://lagen.nu/coe/117#A4" in targets
 
 
 def test_toc_entries_are_removed_without_dropping_the_judgment_and_css_headings():
@@ -418,7 +418,7 @@ def test_hudoc_layout_and_catalog():
 
 
 def test_metadata_references_join_generic_graph():
-    target = "https://lagen.nu/ext/coe/005#A8"
+    target = "https://lagen.nu/coe/005#A8"
     art = {"uri": "https://lagen.nu/dom/echr/001-123456",
            "references": [{"uri": target, "predicate": "dcterms:references",
                            "text": "8"}]}
@@ -430,8 +430,8 @@ def test_metadata_references_join_generic_graph():
 
 
 def test_hudoc_case_is_inbound_on_treaty_article(tmp_path):
-    target = "https://lagen.nu/ext/coe/005#A8"
-    treaty = {"uri": "https://lagen.nu/ext/coe/005", "number": "005",
+    target = "https://lagen.nu/coe/005#A8"
+    treaty = {"uri": "https://lagen.nu/coe/005", "number": "005",
               "identifier": "ETS No. 005", "doctype": "treaty",
               "title": "European Convention on Human Rights",
               "date": "1950-11-04",
@@ -554,14 +554,14 @@ def test_treaty_short_forms_link_convention_and_protocols():
     article pinpoints anchor because the targets are curated instruments."""
     text = ("a violation of Article 8 of the Convention "
             "and of Article 1 of Protocol No. 1")
-    assert [(r.text, r.uri.replace("https://lagen.nu/ext/", "")) for r in
+    assert [(r.text, r.uri.replace("https://lagen.nu/", "")) for r in
             treaties.refs(text)] == [
         ("Article 8", "coe/005#A8"), ("the Convention", "coe/005"),
         ("Article 1", "coe/009#A1"), ("Protocol No. 1", "coe/009")]
     # a longer title keeps naming its own instrument: the guard pattern
     # stands down before "Convention on ..."
     crc = treaties.refs("relying on the Convention on the Rights of the Child")
-    assert [r.uri for r in crc] == ["https://lagen.nu/ext/untc/I-27531"]
+    assert [r.uri for r in crc] == ["https://lagen.nu/untc/I-27531"]
 
 
 def test_the_court_capitalises_the_word_that_continues_a_title():
@@ -570,7 +570,7 @@ def test_the_court_capitalises_the_word_that_continues_a_title():
     A lower-case-only guard read both as the ECHR, which cost 41 judgments
     their parse and filed 46 citations of the ECHR the text never makes."""
     def refs(text):
-        return [(r.text, r.uri.replace("https://lagen.nu/ext/", ""))
+        return [(r.text, r.uri.replace("https://lagen.nu/", ""))
                 for r in treaties.refs(text)]
 
     assert refs("provisions in Article 3 of the Convention Against Torture") \

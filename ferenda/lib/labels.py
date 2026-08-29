@@ -161,7 +161,7 @@ def _eurlex(art):
     # carries none -- the legacy court pages open straight into the parties,
     # with no line naming the document -- and the fallback must then be the
     # document's identity, never the URI tail: `_local(uri)` stood in here, so
-    # 3 373 judgments were headed "ext/celex/61979CJ0155" instead of "C-155/79".
+    # 3 373 judgments were headed "celex/61979CJ0155" instead of "C-155/79".
     title = art.get("title") or ""
     label = art.get("label") or ""
     shortname, abbr = art.get("shortname"), art.get("abbr")

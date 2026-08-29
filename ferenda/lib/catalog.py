@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS concept_redirect (
 CREATE TABLE IF NOT EXISTS genomforande (
     sfs_uri    TEXT NOT NULL,       -- the statute paragraf transposing the article
     sfs_anchor TEXT NOT NULL,       -- its fragment id (P3 / K2P1)
-    directive  TEXT NOT NULL,       -- the EU directive uri (ext/celex/...)
+    directive  TEXT NOT NULL,       -- the EU directive uri (celex/...)
     article    TEXT NOT NULL,       -- the directive article number
     prop_uri   TEXT NOT NULL,       -- the proposition stating the relation
     prop_label TEXT,                -- its identifier, for display
@@ -2198,7 +2198,7 @@ def dangling_anchors(con, sources):
     same defect turned up far from the commentary layer: 126 treaty references
     pointed at an `#A42` on a Hague Convention that anchors its Regulations'
     articles under `#Annex42`, and every count involved looked healthy. (The
-    curated table now targets the 1907 Convention, `ext/icrc/195`, so that exact
+    curated table now targets the 1907 Convention, `icrc/195`, so that exact
     uri no longer occurs -- the shape of the failure is the point.)
 
     `sources` is not a convenience filter: the audit is only *answerable* for a
@@ -2492,7 +2492,7 @@ def document_inbound_counts(con: sqlite3.Connection) -> dict[str, int]:
 # uris per `inbound_counts_for` query. SQLite binds one variable per uri and
 # caps them at SQLITE_MAX_VARIABLE_NUMBER, 32 766 on this build; asking for
 # more raises OperationalError("too many SQL variables"), which reaches a
-# caller as an unhandled 500. The ECHR (`ext/coe/005`) alone has 50 626
+# caller as an unhandled 500. The ECHR (`coe/005`) alone has 50 626
 # citers, and the next four roots are 19 570 / 15 013 / 13 656 / 12 018, so the
 # corpus is one nightly growth away from more. Well under the cap rather than
 # at it, because the margin costs nothing: 50 626 citers is six queries.

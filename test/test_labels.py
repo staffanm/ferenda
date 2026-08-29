@@ -26,7 +26,7 @@ def test_sfs_unnamed_law_short_title_drops_the_designation():
 
 
 def test_eurlex_act_short_id_is_the_designation():
-    art = {"uri": "https://lagen.nu/ext/celex/32016R0679", "celex": "32016R0679",
+    art = {"uri": "https://lagen.nu/celex/32016R0679", "celex": "32016R0679",
            "doctype": "regulation", "shortname": "dataskyddsförordningen",
            "abbr": "GDPR",
            "title": "Europaparlamentets och rådets förordning (EU) 2016/679 av den "
@@ -46,7 +46,7 @@ def test_eurlex_citing_form_keeps_the_designation_it_can_read():
     """The short name is only spliced onto a designation the *label* carries.
     Rebuilding from `short_id` unconditionally would print raw CELEX
     ("32003L0097") where the label already has "2003/97/EG"."""
-    art = {"uri": "https://lagen.nu/ext/celex/32003L0097", "celex": "32003L0097",
+    art = {"uri": "https://lagen.nu/celex/32003L0097", "celex": "32003L0097",
            "doctype": "directive", "shortname": "Text av betydelse för EES.",
            "title": "Europaparlamentets och rådets direktiv 2003/97/EG",
            "label": "2003/97/EG Text av betydelse för EES."}
@@ -56,7 +56,7 @@ def test_eurlex_citing_form_keeps_the_designation_it_can_read():
 
 
 def test_eurlex_unnamed_judgment_has_number_but_no_name():
-    art = {"uri": "https://lagen.nu/ext/celex/62018CJ0001", "celex": "62018CJ0001",
+    art = {"uri": "https://lagen.nu/celex/62018CJ0001", "celex": "62018CJ0001",
            "doctype": "judgment", "shortname": "C-1/18", "label": "C-1/18",
            "title": "Domstolens dom (femte avdelningen) den 20 juni 2019"}
     lb = labels.document_labels("eurlex", art)
@@ -68,17 +68,17 @@ def test_eurlex_unnamed_judgment_has_number_but_no_name():
 def test_eurlex_titleless_judgment_falls_back_to_its_case_number():
     # the legacy court pages open straight into the parties, so the artifact
     # carries no title -- the name to show is then the case number, never the
-    # URI tail (which headed 3 373 judgments "ext/celex/61979CJ0155")
-    art = {"uri": "https://lagen.nu/ext/celex/61979CJ0155", "celex": "61979CJ0155",
+    # URI tail (which headed 3 373 judgments "celex/61979CJ0155")
+    art = {"uri": "https://lagen.nu/celex/61979CJ0155", "celex": "61979CJ0155",
            "doctype": "judgment", "shortname": "C-155/79", "label": "C-155/79",
            "title": ""}
     lb = labels.document_labels("eurlex", art)
     assert lb.short_id == lb.official_title == "C-155/79"
-    assert "ext/celex" not in lb.official_title
+    assert "celex" not in lb.official_title
 
 
 def test_eurlex_named_judgment_splits_number_and_name():
-    art = {"uri": "https://lagen.nu/ext/celex/62018CJ0311", "celex": "62018CJ0311",
+    art = {"uri": "https://lagen.nu/celex/62018CJ0311", "celex": "62018CJ0311",
            "doctype": "judgment", "shortname": "Schrems II",
            "label": "C-311/18 (Schrems II)",
            "title": "Domstolens dom (stora avdelningen) den 16 juli 2020"}
@@ -91,14 +91,14 @@ def test_eurlex_treaty_uses_the_curated_name():
     # a founding/consolidated treaty carries no extractable short title, so the
     # curated Swedish name stands in as both short and official title; short_id is
     # the CELEX, and the revision '(NN)' suffix is stripped before the lookup (E1)
-    art = {"uri": "https://lagen.nu/ext/celex/12016M/TXT", "celex": "12016M/TXT",
+    art = {"uri": "https://lagen.nu/celex/12016M/TXT", "celex": "12016M/TXT",
            "doctype": "treaty", "title": "12016M/TXT"}
     lb = labels.document_labels("eurlex", art)
     assert lb.short_id == "12016M/TXT"
     assert lb.short_title == "Fördraget om Europeiska unionen (konsoliderad version 2016)"
     assert lb.official_title == lb.short_title
     revised = {**art, "celex": "12019W/TXT(02)",
-               "uri": "https://lagen.nu/ext/celex/12019W/TXT(02)"}
+               "uri": "https://lagen.nu/celex/12019W/TXT(02)"}
     assert labels.document_labels("eurlex", revised).short_title.startswith(
         "Avtalet om Förenade kungarikets utträde")
 
@@ -148,7 +148,7 @@ def test_hudoc_eyebrow_is_the_application_number():
 
 
 def test_coe_treaty_name_comes_from_the_dataset():
-    art = {"uri": "https://lagen.nu/ext/coe/005", "number": "005",
+    art = {"uri": "https://lagen.nu/coe/005", "number": "005",
            "identifier": "ETS No. 005",
            "title": "Convention for the Protection of Human Rights and "
                     "Fundamental Freedoms"}
@@ -158,7 +158,7 @@ def test_coe_treaty_name_comes_from_the_dataset():
 
 
 def test_icrc_eyebrow_is_the_acronym():
-    art = {"uri": "https://lagen.nu/ext/icrc/375", "number": "375",
+    art = {"uri": "https://lagen.nu/icrc/375", "number": "375",
            "title": "Convention (III) relative to the Treatment of Prisoners of War."}
     lb = labels.document_labels("icrc", art)
     assert lb.short_id == "GK III"
@@ -169,7 +169,7 @@ def test_icrc_eyebrow_is_the_acronym():
 def test_untc_eyebrow_is_the_acronym():
     # keyed on the UNTS registration, which is what an untc artifact's `number`
     # carries since the identity moved off the MTDSG chapter id
-    art = {"uri": "https://lagen.nu/ext/untc/I-24841", "number": "I-24841",
+    art = {"uri": "https://lagen.nu/untc/I-24841", "number": "I-24841",
            "title": "Convention against Torture and Other Cruel, Inhuman or "
                     "Degrading Treatment or Punishment"}
     lb = labels.document_labels("untc", art)
@@ -179,7 +179,7 @@ def test_untc_eyebrow_is_the_acronym():
 
 
 def test_icc_eyebrow_is_the_case_not_the_document():
-    art = {"uri": "https://lagen.nu/ext/icc/ICC-01_14-01_18-403",
+    art = {"uri": "https://lagen.nu/icc/ICC-01_14-01_18-403",
            "docnumber": "ICC-01/14-01/18-403",
            "title": "The Prosecutor v. Alfred Yekatom and Patrice-Edouard Ngaïssona",
            "metadata": {"caseNumber": "ICC-01/14-01/18",

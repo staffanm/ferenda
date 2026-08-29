@@ -378,8 +378,8 @@ def _fa_year(r):
 
 
 def _eu_celex(r):
-    # 'ext/celex/32016R0679' -> '32016R0679'; a treaty carries a '/TXT' document
-    # suffix ('ext/celex/11992M/TXT'), so take the segment after 'celex/', not the last
+    # 'celex/32016R0679' -> '32016R0679'; a treaty carries a '/TXT' document
+    # suffix ('celex/11992M/TXT'), so take the segment after 'celex/', not the last
     return r.local[len(lagrum.CELEX_LOCAL):].split("/")[0]
 
 

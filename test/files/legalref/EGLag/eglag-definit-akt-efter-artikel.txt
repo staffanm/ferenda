@@ -1,8 +1,8 @@
 Enligt artikel 30 i förordningen (EG) nr 765/2008 om krav för ackreditering gäller de allmänna principerna. Bestämmelser finns även i förordning (EG) nr 45/2001. Enligt artikel 5 i förordningen gäller detta. Se därtill direktivets skäl 82 samt artikel 30.3 förordning (EEG) nr 339/93 om kontroll.
 
 <list>
-  <Link uri="https://lagen.nu/ext/celex/32008R0765#30">artikel 30 i förordningen (EG) nr 765/2008</Link>
-  <Link uri="https://lagen.nu/ext/celex/32001R0045">förordning (EG) nr 45/2001</Link>
-  <Link uri="https://lagen.nu/ext/celex/32001R0045#5">artikel 5 i förordningen</Link>
-  <Link uri="https://lagen.nu/ext/celex/31993R0339">(EEG) nr 339/93</Link>
+  <Link uri="https://lagen.nu/celex/32008R0765#30">artikel 30 i förordningen (EG) nr 765/2008</Link>
+  <Link uri="https://lagen.nu/celex/32001R0045">förordning (EG) nr 45/2001</Link>
+  <Link uri="https://lagen.nu/celex/32001R0045#5">artikel 5 i förordningen</Link>
+  <Link uri="https://lagen.nu/celex/31993R0339">(EEG) nr 339/93</Link>
 </list>

@@ -46,7 +46,7 @@ def test_stem_grammar_and_uri():
     assert parts == {"case": "070", "date": "1986-06-27", "kind": "JUD",
                      "part": "01", "sub": "00"}
     assert decision_uri("070-19860627-JUD-01-00") == \
-        "https://lagen.nu/ext/icj/070-19860627-JUD-01-00"
+        "https://lagen.nu/icj/070-19860627-JUD-01-00"
 
 
 def test_the_one_underscored_filename_normalises():
@@ -474,7 +474,7 @@ def test_record_metadata_reaches_the_artifact():
         case_name=record["case_name"], kind=record["kind"],
         title=record["title"], date=record["date"],
         procedure=record["procedure"], pdf_url=record["url"]).to_artifact()
-    assert art["uri"] == "https://lagen.nu/ext/icj/070-19860627-JUD-01-00"
+    assert art["uri"] == "https://lagen.nu/icj/070-19860627-JUD-01-00"
     assert art["type"] == "avgorande" and art["court"] == "icj"
     assert art["title"].startswith("Military and Paramilitary Activities")
     assert art["avgorandedatum"] == "1986-06-27"
@@ -500,9 +500,9 @@ def test_a_decision_cites_the_treaties_it_applies():
         "Punishment of the Crime of Genocide and Article 31 of the Vienna "
         "Convention on the Law of Treaties. See also UNCLOS.")
     assert [r["uri"] for r in refs] == [
-        "https://lagen.nu/ext/untc/I-1021#AII",     # Genocide Convention art. II
-        "https://lagen.nu/ext/untc/I-18232#A31",    # VCLT art. 31
-        "https://lagen.nu/ext/untc/I-31363"]        # UNCLOS, no article named
+        "https://lagen.nu/untc/I-1021#AII",     # Genocide Convention art. II
+        "https://lagen.nu/untc/I-18232#A31",    # VCLT art. 31
+        "https://lagen.nu/untc/I-31363"]        # UNCLOS, no article named
     assert all(r["predicate"] == "dcterms:references" for r in refs)
     assert refs[2]["text"] == "UNCLOS"
 
@@ -511,7 +511,7 @@ def test_the_court_s_own_short_form_counts():
     """The Court names an instrument in full once and by its short form after
     that, so matching the title alone would miss most of a judgment."""
     refs = treaties.references("Israel is bound by the Genocide Convention.")
-    assert [r["uri"] for r in refs] == ["https://lagen.nu/ext/untc/I-1021"]
+    assert [r["uri"] for r in refs] == ["https://lagen.nu/untc/I-1021"]
 
 
 def test_the_bare_word_convention_cites_nothing():
@@ -541,10 +541,10 @@ def test_references_reach_the_artifact():
         body=[Block("stycke", "Text.", number="1")])
     art = decision.to_artifact()
     assert [r["uri"] for r in art["references"]] == \
-        ["https://lagen.nu/ext/untc/I-1021"]
+        ["https://lagen.nu/untc/I-1021"]
     # and the catalog's generic reference contract picks them up as links
     assert [run["uri"] for _anchor, _page, run in catalog.artifact_links(art)] == \
-        ["https://lagen.nu/ext/untc/I-1021"]
+        ["https://lagen.nu/untc/I-1021"]
 
 
 # --------------------------------------------------------------------------
@@ -552,7 +552,7 @@ def test_references_reach_the_artifact():
 # --------------------------------------------------------------------------
 
 def test_icj_layout_round_trips_and_catalog_row():
-    uri = "https://lagen.nu/ext/icj/070-19860627-JUD-01-00"
+    uri = "https://lagen.nu/icj/070-19860627-JUD-01-00"
     assert layout.page_url(uri) == "/icj/070-19860627-JUD-01-00"
     assert layout.page_relpath(uri) == "icj/070_19860627_JUD_01_00.html"
     assert str(layout.url_to_relpath("/icj/070-19860627-JUD-01-00")) == \

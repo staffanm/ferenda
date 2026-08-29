@@ -7,7 +7,7 @@ Additional Protocols, the Hague law, and the weapons/cultural-property regimes
 `field_treaty_content` paragraphs are the authentic article text (no PDF parse)
 and its `field_treaty_state_parties` paragraphs the per-state participation.
 
-The URI grammar (``ext/icrc/<number>``) is kept here rather than in ``lib``:
+The URI grammar (``icrc/<number>``) is kept here rather than in ``lib``:
 the ICRC vertical is its only producer today, and nothing in ``lib`` mints an
 ICRC target (the folkrätt renderer reads the stored number back off the uri).
 If the citation engine later links "Genèvekonventionen artikel 3" it becomes a
@@ -43,7 +43,7 @@ RE_ARTICLE_ORDINAL = re.compile(r"Article\s+(\S+)", re.I)
 
 
 def treaty_uri(number):
-    return "%sext/icrc/%s" % (BASE, str(number))
+    return "%sicrc/%s" % (BASE, str(number))
 
 
 @dataclass

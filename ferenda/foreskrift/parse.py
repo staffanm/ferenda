@@ -214,7 +214,7 @@ RE_FS_SERIES = re.compile(
 #      never be mistaken for a possessive agency prefix.
 RE_FS_TITLE = re.compile(
     r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s\s+(?:[Ff]öreskrift(?:er)?|[Aa]llmänna\s+råd)\b")
-RE_DIREKTIV_CELEX = re.compile(r"/ext/celex/\d+L\d")    # a directive (…L…), not a reg (…R…)
+RE_DIREKTIV_CELEX = re.compile(r"/celex/\d+L\d")    # a directive (…L…), not a reg (…R…)
 # the "Jfr … direktiv …" implementation footnote; the directive right after "Jfr"
 # is the one the föreskrift genomför (any further directives in the clause are ones
 # *it* amends, not ones this föreskrift implements).

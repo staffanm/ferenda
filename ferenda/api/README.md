@@ -489,7 +489,7 @@ kostar en artefaktläsning. `uri` tar båda formerna sajten skriver: URI:n
 (`https://lagen.nu/1962:700#K3P1`) eller sidadressen för samma plats
 (`/1962:700#K3P1`) -- det en webbläsare har i en href och inte kan bilda
 URI:n av (en EU-rättsakt serveras på `/celex/<id>` och identifieras som
-`ext/celex/<id>`). Sajtens länk-popovers använder anropet för varje mål
+`celex/<id>`). Sajtens länk-popovers använder anropet för varje mål
 utanför sidan läsaren är på, i stället för att hämta den sidan. Grafsvaret
 bär avsiktligt inte dessa fält: av 300 grannar väljs en, och detta är
 anropet för den.
@@ -508,14 +508,14 @@ Färre kommer tillbaka när grafen inte håller fler slingfria kedjor.
 
 ```sh
 curl -G http://127.0.0.1:8001/api/v1/graph \
-     --data-urlencode "uri=https://lagen.nu/ext/coe/005#A6" \
+     --data-urlencode "uri=https://lagen.nu/coe/005#A6" \
      --data-urlencode "groups=Rättsfall,Förarbeten"
 ```
 
 ```json
 {
-  "uri": "https://lagen.nu/ext/coe/005#A6",
-  "root": "https://lagen.nu/ext/coe/005",
+  "uri": "https://lagen.nu/coe/005#A6",
+  "root": "https://lagen.nu/coe/005",
   "anchor": "A6",
   "unit": "A6",
   "pinpoint": "artikel 6",

@@ -87,7 +87,7 @@ def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
     art_dir.mkdir()
     cra = art_dir / "cra.json"
     cra.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/celex/32024R2847", "celex": "32024R2847",
+        "uri": "https://lagen.nu/celex/32024R2847", "celex": "32024R2847",
         "doctype": "regulation", "shortname": "Cyberresiliensförordningen",
         "abbr": "CRA",
         "title": "Europaparlamentets och rådets förordning (EU) 2024/2847 ... "
@@ -96,7 +96,7 @@ def test_doc_actions_display_uses_shortname_and_abbr(tmp_path):
     cat = tmp_path / "catalog.sqlite"
     catalog.rebuild(cat, "eurlex", [cra])
     con = catalog.connect(cat)
-    uri = "https://lagen.nu/ext/celex/32024R2847"
+    uri = "https://lagen.nu/celex/32024R2847"
     row = catalog.document(con, uri)
     row = (*row[:5], str(catalog.data_root(con) / row[5]))   # stored path is relative
     doc, frag = list(search.doc_actions(row, 0))

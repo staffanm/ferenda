@@ -63,7 +63,7 @@ from .util import fold_swedish, number_slug, own_number_slug
 # owns it because `celex_uri` mints these uris, and it is low enough in the
 # import graph for every consumer to reach (rule:second-use-goes-to-lib -- it
 # had reached seven hand-written copies).
-CELEX_LOCAL = 'ext/celex/'
+CELEX_LOCAL = 'celex/'
 CELEX_BASE = 'https://lagen.nu/' + CELEX_LOCAL
 
 # the Strasbourg case-law namespace, spelled once for the same reason: a case's
@@ -1545,11 +1545,11 @@ def celex_year(value):
 
 
 def celex_of(uri):
-    """The CELEX an `ext/celex/` uri names, without its fragment
-    ("…/ext/celex/32016R0679#23" -> "32016R0679"), or None for a uri that names
+    """The CELEX an `celex/` uri names, without its fragment
+    ("…/celex/32016R0679#23" -> "32016R0679"), or None for a uri that names
     no CELEX. The read half of `celex_uri`."""
-    return uri.split('ext/celex/')[1].split('#')[0] \
-        if 'ext/celex/' in uri else None
+    return uri.split('celex/')[1].split('#')[0] \
+        if 'celex/' in uri else None
 
 
 def celex_uri(attrs, base='https://lagen.nu/'):
@@ -1577,7 +1577,7 @@ def celex_uri(attrs, base='https://lagen.nu/'):
               'rekommendation': 'H', 'beslut': 'D',
               'directive': 'L', 'regulation': 'R',
               'recommendation': 'H', 'decision': 'D'}[attrs['akttyp'].lower()]
-    uri = base + 'ext/celex/3%04d%s%04d' % (year, letter, number)
+    uri = base + 'celex/3%04d%s%04d' % (year, letter, number)
     # the sub-article, stycke and lettered point, for an act cited by number as
     # well as by name ("artikel 125.4 a i förordning (EU) nr 1303/2013")
     frag = eu_fragment(Pinpoint(attrs.get('artikel'), attrs.get('underartikel'),
@@ -2446,7 +2446,7 @@ class LagrumParser:
     # --- EU ---
 
     def _eu_celex_uri(self, celex, pin=NO_PINPOINT, remember=True):
-        """ext/celex/<CELEX> deep-linked to what `pin` names inside it. Names the
+        """celex/<CELEX> deep-linked to what `pin` names inside it. Names the
         act as the document's current EU act (for later anaphora) unless
         `remember` is false (an anaphoric ref must not refresh what it points at).
         The fragment is the dotted grammar the eurlex renderer mints for the
@@ -2454,15 +2454,15 @@ class LagrumParser:
         if remember:
             self.state.remember_eu_act(celex)
         frag = eu_fragment(pin)
-        return self.base + 'ext/celex/' + celex + ('#' + frag if frag else '')
+        return self.base + 'celex/' + celex + ('#' + frag if frag else '')
 
     def _treaty_uri(self, path, pin=NO_PINPOINT):
-        """ext/<path> (celex/12016E/TXT, coe/005) deep-linked to what `pin` names,
+        """<path> (celex/12016E/TXT, coe/005) deep-linked to what `pin` names,
         like _eu_celex_uri but for a primary-law instrument keyed by name. A treaty
         is never remembered as the anaphora act in focus. An EU instrument
         fragments its article the CELEX way (#16.2); a Council-of-Europe treaty
         uses the CoE article grammar its own artifact mints (#A8, #A6P1)."""
-        uri = self.base + 'ext/' + path
+        uri = self.base + path
         if not pin.artikel:
             return uri
         if path.startswith('coe/'):
@@ -2833,7 +2833,7 @@ class LagrumParser:
         year, lopnr = _token_text(inner)[1:].split('L')
         if len(year) == 2:
             year = '19' + year
-        return '%sext/celex/3%sL%s' % (self.base, year, lopnr)
+        return '%scelex/3%sL%s' % (self.base, year, lopnr)
 
     def context_doc_uri(self, context):
         if not all(k in context for k in ('type', 'year', 'no')):
@@ -2868,7 +2868,7 @@ class LagrumParser:
             raise NoLink()
         celex = '6%sC%s%04d' % (year, self.ECJ_DESCRIPTOR[decision],
                                 int(serial))
-        out.append({'_uri': self.base + 'ext/celex/' + celex})
+        out.append({'_uri': self.base + 'celex/' + celex})
 
     # --- MYNDIGHETSBESLUT (authority decisions) ---
 

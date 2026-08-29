@@ -773,21 +773,26 @@ REMISSER_ANALYSED = REMISSER_DOWNLOADED / ".analysed.json"
 FORARBETE = ("prop/", "sou/", "ds/", "dir/", "fm/", "skr/", "so/", "lr/",
              "bet/", "rskr/")
 
-# the ext/<ns>/ uri namespaces: documents identified by a foreign publisher's own
-# id (a CELEX, a CETS number, an ICRC/UNTC/ICC number), which is why they sit
-# under ext/ in the uri space -- but each gets its own top-level segment on the
-# web and its own dir on disk. ext/celex/32016R0679 is the file
-# eurlex/32016R0679.html served at /celex/32016R0679. One table drives all three
-# rules (page_relpath, page_url, url_to_relpath) so a new namespace is a row,
-# not three edits: namespace -> (generated-page dir, file-name slug rule). Only
-# celex deviates -- its dir is the source name and a CELEX's own '/' (12016E/TXT)
-# is the only character to fold, so it keeps the id's case.
+# uri namespaces keyed by the number the publisher prints -- a CELEX, a CETS
+# number, an ICRC/UNTC/ICC/ICJ number -- each its own top-level segment, which
+# is also the served path: celex/32016R0679 is the file eurlex/32016R0679.html
+# served at /celex/32016R0679. (Until 2026-08-29 these ids carried an extra
+# ext/ segment in the *canonical uri* only; identifier and address are now one
+# grammar.) One table drives the location rules (page_relpath, url_to_relpath)
+# so a new namespace is a row, not three edits: namespace -> (generated-page
+# dir, file-name slug rule). Only celex deviates -- its dir is the source name
+# and a CELEX's own '/' (12016E/TXT) is the only character to fold, so it keeps
+# the id's case.
 _EXT_NS = {"celex": ("eurlex", lambda rest: rest.replace("/", "_")),
            "coe": ("coe", _alnum_slug),
            "icrc": ("icrc", _alnum_slug),
            "untc": ("untc", _alnum_slug),
            "icc": ("icc", _alnum_slug),
            "icj": ("icj", _alnum_slug)}
+# ... the segment names alone, for the one consumer that asks whether a uri is
+# in a namespace whose publisher has a page to link out to when the corpus does
+# not hold the document (`page._is_external`)
+EXT_NAMESPACES = frozenset(_EXT_NS)
 
 
 # --------------------------------------------------------------------------
@@ -844,9 +849,8 @@ def page_relpath(uri: str) -> str:
     named by its bare SFS id with the colon kept (2018:585 -> 2018:585.html), so
     it is served at lagen.nu's /2018:585 address (see `page_url`)."""
     loc = local(strip_fragment(uri))
-    ns, _, rest = loc[len("ext/"):].partition("/") if loc.startswith("ext/") \
-        else ("", "", "")
-    if ns in _EXT_NS:
+    ns, sep, rest = loc.partition("/")
+    if sep and ns in _EXT_NS:
         directory, slug = _EXT_NS[ns]
         return "%s/%s.html" % (directory, slug(rest))
     if loc.startswith("dom/"):
@@ -892,32 +896,24 @@ def page_relpath(uri: str) -> str:
 def page_url(uri: str) -> str:
     """The public URL a link points at -- lagen.nu's URI grammar: the document's
     host-stripped local path, served bare (no .html). A statute is /2018:585, a
-    proposition /prop/2020/21:22, a case /dom/ad/1993:100. An EU act lives under
-    /celex/<celexid> (its ext/celex/ namespace collapsed). The static server maps
-    these back to the flattened on-disk files (see url_to_relpath, api.app.SiteFiles)."""
-    loc = local(strip_fragment(uri))
-    # an ext/ namespace is served bare (/celex/32016R0679): the namespace is
-    # itself lagen.nu's top-level segment, so only the ext/ prefix drops
-    if loc.startswith("ext/") and loc[len("ext/"):].partition("/")[0] in _EXT_NS:
-        return "/" + loc[len("ext/"):]
-    return "/" + loc
+    proposition /prop/2020/21:22, a case /dom/ad/1993:100, an EU act
+    /celex/<celexid>. The canonical uri's path IS the served path -- the old
+    ext/ identifier prefix is gone. The static server maps these back to the
+    flattened on-disk files (see url_to_relpath, api.app.SiteFiles)."""
+    return "/" + local(strip_fragment(uri))
 
 
 def page_uri(path: str) -> str:
     """Inverse of page_url: the document uri a public lagen.nu URL path
-    addresses. /celex/<id> is the public form of ext/celex/<id>, and the
-    other ext/ namespaces likewise."""
-    loc = unquote(path).lstrip("/")
-    ns, sep, _rest = loc.partition("/")
-    if sep and ns in _EXT_NS:
-        loc = "ext/" + loc
-    return BASE + loc
+    addresses -- the path reattached to the host, since uri path and served
+    path are one grammar."""
+    return BASE + unquote(path).lstrip("/")
 
 
 def url_to_relpath(path: str) -> str | None:
     """Inverse of page_url: the on-disk static file for a public lagen.nu URL path.
     The path is a document's URI local form, so reattach the host and reuse the
-    page_relpath rule; /celex/<id> is the public address of ext/celex/<id>."""
+    page_relpath rule; /celex/<id> is the public address of celex/<id>."""
     # the path is an attacker-controlled request: refuse traversal-shaped
     # segments here (no rewrite -> the miss stays a 404) rather than relying
     # on the static server's containment check alone

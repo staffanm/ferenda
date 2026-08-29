@@ -101,14 +101,14 @@ def test_extract_definitions_anchors_points_and_maps_terms():
 def test_term_refs_are_suffix_tolerant_and_skip_self():
     matcher, index = build_matcher({"sårbarhet": "5.2", "incident": "5.1"}, "swe")
     refs = term_refs("hantering av sårbarheter och incidenter.",
-                     matcher, index, "https://lagen.nu/ext/celex/X", None)
+                     matcher, index, "https://lagen.nu/celex/X", None)
     found = {(r.text, r.uri.rsplit("#", 1)[1]) for r in refs}
     assert found == {("sårbarheter", "5.2"), ("incidenter", "5.1")}
     assert all(r.kind == "term" for r in refs)
     # inside the definition of "sårbarhet" (anchor 5.2) its own term is skipped,
     # but a different defined term it mentions is still linked
     self_refs = term_refs("sårbarhet: en svaghet som en incident utnyttjar.",
-                          matcher, index, "https://lagen.nu/ext/celex/X", "5.2")
+                          matcher, index, "https://lagen.nu/celex/X", "5.2")
     assert [r.text for r in self_refs] == ["incident"]
 
 
@@ -119,7 +119,7 @@ def test_build_matcher_prefers_longer_term():
         {"cybersäkerhet": "6.3", "storskalig cybersäkerhetsincident": "6.7"},
         "swe")
     refs = term_refs("en storskalig cybersäkerhetsincident inträffade.",
-                     matcher, index, "https://lagen.nu/ext/celex/X", None)
+                     matcher, index, "https://lagen.nu/celex/X", None)
     assert [(r.text, r.uri.rsplit("#", 1)[1]) for r in refs] \
         == [("storskalig cybersäkerhetsincident", "6.7")]
 
@@ -147,8 +147,8 @@ def test_to_artifact_definitions_and_uses():
                 and "Riktlinjer" in _runs(b)[0])
     links = [r for r in _runs(para) if isinstance(r, dict)]
     assert {(r["text"], r["uri"]) for r in links if r.get("kind") == "term"} == {
-        ("sårbarheter", "https://lagen.nu/ext/celex/32022L2555#5.2"),
-        ("incidenter", "https://lagen.nu/ext/celex/32022L2555#5.1")}
+        ("sårbarheter", "https://lagen.nu/celex/32022L2555#5.2"),
+        ("incidenter", "https://lagen.nu/celex/32022L2555#5.1")}
 
     # the "sårbarhet" definition links the "incident" it mentions but not itself
     defn = by_id["5.2"]

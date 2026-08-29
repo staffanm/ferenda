@@ -24,7 +24,7 @@ def _gci():
 # --------------------------------------------------------------------------
 
 def test_treaty_uri_and_kind():
-    assert treaty_uri("365") == "https://lagen.nu/ext/icrc/365"
+    assert treaty_uri("365") == "https://lagen.nu/icrc/365"
     assert Treaty("365", "Geneva Convention (I) …",
                   treaty_type="geneva_conventions").kind == "treaty"
     assert Treaty("470", "Additional Protocol (I) to the Geneva Conventions",
@@ -41,7 +41,7 @@ def test_treaty_uri_and_kind():
 
 def test_parse_treaty_metadata():
     art = _gci()
-    assert art["uri"] == "https://lagen.nu/ext/icrc/365"
+    assert art["uri"] == "https://lagen.nu/icrc/365"
     assert art["type"] == "internationell-overenskommelse"
     assert art["doctype"] == "treaty"
     assert art["number"] == "365"
@@ -151,7 +151,7 @@ def test_enumerate_dedupes_and_completes_across_page_boundaries(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_icrc_layout_round_trips_and_catalog_row():
-    uri = "https://lagen.nu/ext/icrc/365"
+    uri = "https://lagen.nu/icrc/365"
     assert layout.page_url(uri) == "/icrc/365"
     assert layout.page_relpath(uri) == "icrc/365.html"
     assert str(layout.url_to_relpath("/icrc/365")) == "icrc/365.html"
@@ -329,11 +329,11 @@ def test_cross_treaty_citations_link_and_self_is_excluded():
     art = parse.artifact(treaty)
     # the first "Geneva Conventions" is bound by common article 3; the second
     # (inside the Protocol I citation) is unbound and references the family
-    assert sorted(r["uri"].replace("https://lagen.nu/ext/", "")
+    assert sorted(r["uri"].replace("https://lagen.nu/", "")
                   for r in art["references"]) == \
         ["icrc/365", "icrc/365#A3", "icrc/370", "icrc/370#A3",
          "icrc/375", "icrc/375#A3", "icrc/380", "icrc/380#A3", "icrc/470"]
     runs = art["structure"][0]["children"][0]["text"]
-    assert [(run["text"], run["uri"].replace("https://lagen.nu/ext/", ""))
+    assert [(run["text"], run["uri"].replace("https://lagen.nu/", ""))
             for run in runs if isinstance(run, dict)] == \
         [("Protocol I", "icrc/470")]

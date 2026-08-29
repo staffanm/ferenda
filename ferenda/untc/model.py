@@ -12,7 +12,7 @@ The curated instrument list (``data/treaties.json``) drives one harvest engine
 over every treaty (rule:configured-by-data): it supplies the authoritative
 English title (the page headline is generic), the Swedish name/acronym and the
 subject group shown in the folkrätt listing, and where the authentic text
-lives.  The URI grammar (``ext/untc/<unts>``) is kept here -- ``untc`` is its
+lives.  The URI grammar (``untc/<unts>``) is kept here -- ``untc`` is its
 only producer. The identity is the **UNTS registration number** in the UN's own
 form (``I-14668``, as in ``volume-999-I-14668-English.pdf``): it is what the
 UNTS cites itself by, and it survives for an instrument whose depositary is not
@@ -59,7 +59,7 @@ def by_mtdsg():
 
 
 def treaty_uri(unts):
-    return "%sext/untc/%s" % (BASE, unts)
+    return "%suntc/%s" % (BASE, unts)
 
 
 @dataclass

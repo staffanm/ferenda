@@ -55,12 +55,12 @@ def test_dv_cases_sort_by_referat_number_not_popular_name():
 
 def test_eu_only_latest_corrected_revision_lists():
     # base + (01) + (02) of the same CELEX collapse to the highest revision (E2)
-    base = row(U + "ext/celex/12019W/TXT")
-    r1 = row(U + "ext/celex/12019W/TXT(01)")
-    r2 = row(U + "ext/celex/12019W/TXT(02)")
-    other = row(U + "ext/celex/32016R0679")
+    base = row(U + "celex/12019W/TXT")
+    r1 = row(U + "celex/12019W/TXT(01)")
+    r2 = row(U + "celex/12019W/TXT(02)")
+    other = row(U + "celex/32016R0679")
     kept = {r.local for r in facets._keep_latest_eu_revision([base, r1, r2, other])}
-    assert kept == {"ext/celex/12019W/TXT(02)", "ext/celex/32016R0679"}
+    assert kept == {"celex/12019W/TXT(02)", "celex/32016R0679"}
 
 
 def test_sfs_initial_files_under_subject_not_designation():
@@ -119,9 +119,9 @@ def test_forarbete_type_and_year():
 
 def test_eurlex_kind_and_year():
     # the type facet is the catalog's stored doctype, not re-derived from CELEX
-    assert facets._catalog_kind(row(U + "ext/celex/32016R0679", kind="regulation")) == "regulation"
-    assert facets._eu_year(row(U + "ext/celex/32016R0679")) == "2016"
-    assert facets._eu_year(row(U + "ext/celex/61989CJ0074")) == "1989"
+    assert facets._catalog_kind(row(U + "celex/32016R0679", kind="regulation")) == "regulation"
+    assert facets._eu_year(row(U + "celex/32016R0679")) == "2016"
+    assert facets._eu_year(row(U + "celex/61989CJ0074")) == "1989"
     # an order files with the judgments; an opinion that surfaces stands on its own
     assert facets._eu_kind(row(U + "x", kind="order")) == "judgment"
     assert facets._eu_kind(row(U + "x", kind="opinion")) == "opinion"
@@ -137,8 +137,8 @@ def test_eurlex_treaty_groups_by_family_not_year():
     assert facets._treaty_family("11997D/TXT") == "amending"
     assert facets._treaty_family("11994N/TXT") == "accession"
     assert facets._treaty_family("12020W/TXT") == "withdrawal"
-    assert facets._eu_second(row(U + "ext/celex/12016M/TXT", kind="treaty")) == "teu"
-    assert facets._eu_second(row(U + "ext/celex/32016R0679", kind="regulation")) == "2016"
+    assert facets._eu_second(row(U + "celex/12016M/TXT", kind="treaty")) == "teu"
+    assert facets._eu_second(row(U + "celex/32016R0679", kind="regulation")) == "2016"
     # families order by the curated reading order; years newest-first
     assert facets._eu_second_order(["accession", "teu", "charter"]) == [
         "teu", "charter", "accession"]
@@ -147,8 +147,8 @@ def test_eurlex_treaty_groups_by_family_not_year():
 
 def test_eurlex_treaty_bucket_sorts_newest_first():
     # the current consolidated version tops its family (E1)
-    old = row(U + "ext/celex/11992M/TXT", kind="treaty")
-    new = row(U + "ext/celex/12016M/TXT", kind="treaty")
+    old = row(U + "celex/11992M/TXT", kind="treaty")
+    new = row(U + "celex/12016M/TXT", kind="treaty")
     assert sorted([old, new], key=facets._eu_doc_sort) == [new, old]
 
 
@@ -183,11 +183,11 @@ def _catalog(tmp_path, rows):
 
 def test_group_buckets_and_drops_corrigenda(tmp_path):
     con = _catalog(tmp_path, [
-        (U + "ext/celex/32016R0679", "eurlex", "regulation", "32016R0679", "GDPR"),
-        (U + "ext/celex/32022R2554", "eurlex", "regulation", "32022R2554", "DORA"),
-        (U + "ext/celex/32016L0680", "eurlex", "directive", "32016L0680", "LED"),
+        (U + "celex/32016R0679", "eurlex", "regulation", "32016R0679", "GDPR"),
+        (U + "celex/32022R2554", "eurlex", "regulation", "32022R2554", "DORA"),
+        (U + "celex/32016L0680", "eurlex", "directive", "32016L0680", "LED"),
         # a corrigendum -- must not appear as its own browse entry
-        (U + "ext/celex/32011R0524R(01)", "eurlex", "regulation", "x", "rättelse"),
+        (U + "celex/32011R0524R(01)", "eurlex", "regulation", "x", "rättelse"),
     ])
     buckets = facets.group(con, "eurlex")
     assert ("regulation", "2016") in buckets
@@ -342,16 +342,16 @@ def test_browse_view_attaches_documents_to_a_leaf_above_the_last_level(tmp_path)
 def test_browse_view_attaches_leaf_documents(tmp_path):
     title = "Förordning (EU) 2016/679 om skydd (allmän dataskyddsförordning)"
     con = _catalog(tmp_path, [
-        (U + "ext/celex/32016R0679", "eurlex", "regulation", "32016R0679", title,
+        (U + "celex/32016R0679", "eurlex", "regulation", "32016R0679", title,
          "Dataskyddsförordningen (GDPR)"),      # stored display = short name + acronym
-        (U + "ext/celex/32016L0680", "eurlex", "directive", "32016L0680", "LED"),
+        (U + "celex/32016L0680", "eurlex", "directive", "32016L0680", "LED"),
     ])
     view = facets.browse_view(con, "eurlex")
     reg = next(b for b in view["buckets"] if b["key"] == "regulation")
     leaf = reg["children"][0]                       # the 2016 year bucket
     assert leaf["key"] == "2016" and leaf["children"] is None
     doc = leaf["documents"][0]
-    assert doc["uri"] == U + "ext/celex/32016R0679"
+    assert doc["uri"] == U + "celex/32016R0679"
     assert doc["url"] == "/celex/32016R0679"     # eurlex's public /celex/ grammar
     # the listing handle is the stored reader-facing heading -- the same display
     # the page and search show (catalog.display_title), not the bare CELEX

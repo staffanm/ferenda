@@ -124,7 +124,7 @@ def host_uri(annotates):
     """The annotated document's uri from an `annotates:` value. An SFS number
     ("2009:400") is a lagen.nu top-level page; a HUDOC item id ("001-159324") is
     a Strasbourg judgment or decision; a CELEX ("32024R2847", no colon) is
-    the ext/celex act the eurlex source publishes -- so a single annotation layer
+    the celex act the eurlex source publishes -- so a single annotation layer
     serves any host (PRD Step 2)."""
     a = str(annotates)
     if layout.HUDOC_ITEMID.match(a):

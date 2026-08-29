@@ -76,7 +76,7 @@ def test_anchor_text_reaches_what_the_artifact_stamps_no_id_on():
     the renderer mints `25.1` and `recital-83` from the block's own type and
     number. A resolved "GDPR (83" pinned the right anchor and showed the act
     with no words under it, because the id lookup finds no recital at all."""
-    act = {"uri": "https://lagen.nu/ext/celex/32099R0001", "structure": [
+    act = {"uri": "https://lagen.nu/celex/32099R0001", "structure": [
         {"type": "recital", "num": "82", "text": ["Om att styrka efterlevnad."]},
         {"type": "recital", "num": "83", "text": ["Om att upprätthålla "
                                                   "säkerheten."]},
@@ -166,7 +166,7 @@ def test_a_footnote_reaches_the_indexed_document_text():
 
 
 def test_provision_heading_reads_the_types_that_print_one():
-    art = {"uri": "https://lagen.nu/ext/coe/005", "structure": [
+    art = {"uri": "https://lagen.nu/coe/005", "structure": [
         {"type": "artikel", "id": "A6", "ordinal": "6",
          "text": ["Article 6 – Right to a fair trial"],
          "children": [{"type": "stycke", "id": "A6S1",

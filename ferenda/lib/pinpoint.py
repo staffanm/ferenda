@@ -177,7 +177,7 @@ def citation(uri, descriptive):
     räntelagen".
 
     A document the catalog cannot name descriptively falls back to its own
-    local path ("ext/coe/005"), never to an invented name: the reader is then
+    local path ("coe/005"), never to an invented name: the reader is then
     shown an address, and knows it. The host is stripped here rather than
     against `catalog.BASE`, so this module keeps importing nothing."""
     root, _, frag = uri.partition("#")

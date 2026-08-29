@@ -97,14 +97,14 @@ def test_projection_anchors_instruments_and_resolves_treaty_uris():
     # the base convention anchors at the bare bilaga fragment, the first protocol
     # at #B1P1; incorporates.json resolves each to its CoE treaty URI
     base, protocol = projected["children"]
-    assert (base["id"], base["uri"]) == ("B1", "https://lagen.nu/ext/coe/005")
+    assert (base["id"], base["uri"]) == ("B1", "https://lagen.nu/coe/005")
     assert (protocol["id"], protocol["uri"]) == \
-        ("B1P1", "https://lagen.nu/ext/coe/009")
+        ("B1P1", "https://lagen.nu/coe/009")
     article = next(child for child in base["children"]
                    if child["type"] == "konventionsartikel"
                    and child["ordinal"] == "2")
     assert article["id"] == "B1A2"
-    assert article["uri"] == "https://lagen.nu/ext/coe/005#A2"
+    assert article["uri"] == "https://lagen.nu/coe/005#A2"
 
 
 def test_uncurated_statute_gets_anchors_but_no_treaty_uris():
@@ -197,7 +197,7 @@ def test_render_lays_the_appendix_out_in_one_column_per_language(tmp_path):
     for number in ("005", "009"):
         path = tmp_path / (number + ".json")
         path.write_text(json.dumps({
-            "uri": "https://lagen.nu/ext/coe/" + number,
+            "uri": "https://lagen.nu/coe/" + number,
             "number": number, "identifier": "ETS No. " + number,
             "doctype": "treaty", "title": "Treaty " + number, "structure": []}))
         treaties.append(path)

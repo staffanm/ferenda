@@ -193,7 +193,7 @@ def test_extract_metadata_lifts_dates_bemyndigande_and_directive():
     assert meta["ikrafttradandedatum"] == "2013-07-22"
     assert "https://lagen.nu/2013:587#P4" in meta["bemyndigande"]
     assert "https://lagen.nu/2013:587#P5" in meta["bemyndigande"]
-    assert meta["genomfor"] == ["https://lagen.nu/ext/celex/32011L0061"]
+    assert meta["genomfor"] == ["https://lagen.nu/celex/32011L0061"]
 
 
 # --- ikraftträdande: which of the printed dates is the document's own -------

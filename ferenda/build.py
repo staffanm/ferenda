@@ -2624,7 +2624,7 @@ def eurlex_backfill(args):
                  "(default sector 3, the legislation sector)")
     con = catalog.connect_ro(CATALOG)
     wanted = catalog.dangling_targets(
-        con, "%sext/celex/%s" % (layout.BASE, sector))
+        con, "%scelex/%s" % (layout.BASE, sector))
     con.close()
     if RUN.limit:
         wanted = wanted[:RUN.limit]
@@ -2645,7 +2645,7 @@ def eurlex_backfill(args):
     reporter = util.Reporter()
     for seen, (uri, _links, _docs) in enumerate(wanted, 1):
         # the basefile is the bare CELEX; `catalog.local` would keep the whole
-        # "ext/celex/…" local path the uri grammar puts in front of it
+        # "celex/…" local path the uri grammar puts in front of it
         if eurlex_download.download_document(
                 session, layout.EURLEX_DOWNLOADED, uri.rsplit("/", 1)[-1],
                 eurlex_download.LANGUAGES, POLITENESS):

@@ -143,7 +143,7 @@ def test_repeated_coe_designators_get_contextual_unique_ids():
 def test_parse_treaty_artifact_and_sfs_bridge():
     record = _records()["005"]
     art = parse.parse_record(record, parse.pdf_paragraphs(FIXTURES / "009.pdf"))
-    assert art["uri"] == "https://lagen.nu/ext/coe/005"
+    assert art["uri"] == "https://lagen.nu/coe/005"
     assert art["identifier"] == "ETS No. 005"
     assert art["date"] == "1950-11-04"
     assert art["metadata"]["swedishImplementation"] == \
@@ -153,7 +153,7 @@ def test_parse_treaty_artifact_and_sfs_bridge():
 
 
 def test_coe_layout_and_catalog():
-    uri = "https://lagen.nu/ext/coe/005"
+    uri = "https://lagen.nu/coe/005"
     assert layout.relpath("coe", "005").as_posix() == "005"
     assert layout.page_relpath(uri) == "coe/005.html"
     assert layout.page_url(uri) == "/coe/005"
@@ -165,7 +165,7 @@ def test_coe_layout_and_catalog():
 
 
 def _treaty(number, title, doctype="treaty"):
-    return {"uri": "https://lagen.nu/ext/coe/" + number, "number": number,
+    return {"uri": "https://lagen.nu/coe/" + number, "number": number,
             "identifier": "ETS No. " + number, "doctype": doctype,
             "title": title, "date": "19%s-01-01" % number[:2], "structure": []}
 
@@ -232,7 +232,7 @@ def test_body_links_the_sibling_treaty_it_names_but_not_itself():
     runs = art["structure"][0]["children"][0]["text"]
     links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
     assert links == [("Convention for the Protection of Human Rights and "
-                      "Fundamental Freedoms", "https://lagen.nu/ext/coe/005")]
+                      "Fundamental Freedoms", "https://lagen.nu/coe/005")]
 
 
 def test_body_links_its_own_articles_but_only_ones_it_holds():
@@ -249,7 +249,7 @@ def test_body_links_its_own_articles_but_only_ones_it_holds():
          ("No one shall be deprived of his life.", False)])
     runs = art["structure"][0]["children"][0]["text"]
     links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
-    assert links == [("Article 2", "https://lagen.nu/ext/coe/005#A2")]
+    assert links == [("Article 2", "https://lagen.nu/coe/005#A2")]
     # the heading of article 2 itself carries no link
     heading = art["structure"][1]["text"]
     assert all(isinstance(run, str) for run in heading)
@@ -268,6 +268,6 @@ def test_external_article_citation_wins_over_the_bare_internal_match():
     runs = art["structure"][0]["children"][0]["text"]
     links = [(run["text"], run["uri"]) for run in runs if isinstance(run, dict)]
     assert links == [
-        ("Article 6", "https://lagen.nu/ext/coe/005#A6"),
+        ("Article 6", "https://lagen.nu/coe/005#A6"),
         ("Convention for the Protection of Human Rights and Fundamental "
-         "Freedoms", "https://lagen.nu/ext/coe/005")]
+         "Freedoms", "https://lagen.nu/coe/005")]

@@ -98,7 +98,7 @@ def test_versions_stage_builds_sidecar_and_lydelse_artifacts(roots):
     # PDF-only tail is recorded, not parsed
     assert [e["version"] for e in sidecar["versions"]] == ["2014-09-17"]
     assert sidecar["versions"][0]["uri"] == (
-        "https://lagen.nu/ext/celex/32014R0910/konsolidering/2014-09-17")
+        "https://lagen.nu/celex/32014R0910/konsolidering/2014-09-17")
     assert [s["version"] for s in sidecar["skipped"]] == ["2003-01-01"]
     art = compress.read_json(
         layout.eurlex_version_artifact("32014R0910", "2014-09-17"))
@@ -112,7 +112,7 @@ def test_versions_stage_builds_sidecar_and_lydelse_artifacts(roots):
 
 def test_version_endpoints_dispatch_by_uri():
     assert _versioned_document("https://lagen.nu/1998:204") == ("sfs", "1998:204")
-    assert _versioned_document("https://lagen.nu/ext/celex/32014R0910") \
+    assert _versioned_document("https://lagen.nu/celex/32014R0910") \
         == ("eurlex", "32014R0910")
     with pytest.raises(HTTPException):
         _versioned_document("https://lagen.nu/dom/nja/2015s1")

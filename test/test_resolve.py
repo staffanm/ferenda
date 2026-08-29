@@ -149,14 +149,14 @@ def test_two_concurrent_queries_do_not_share_parser_state(monkeypatch):
 
 def test_eu_shortname_plus_article():
     assert (resolve.resolve_eu("GDPR art 32")
-            == "https://lagen.nu/ext/celex/32016R0679#32")
+            == "https://lagen.nu/celex/32016R0679#32")
 
 
 def test_eu_swedish_label_and_artikel():
     # a curated Swedish nickname (the act has no naming parenthetical in its
     # title, so the nickname stays in the dataset) + a Swedish "artikel" tail
     assert (resolve.resolve_eu("DORA-förordningen artikel 5")
-            == "https://lagen.nu/ext/celex/32022R2554#5")
+            == "https://lagen.nu/celex/32022R2554#5")
 
 
 def test_eu_recital_pinpoint():
@@ -164,7 +164,7 @@ def test_eu_recital_pinpoint():
     # already jumps to "(83" from the act's own page. Naming the act must reach
     # the same place from anywhere -- in the act's own numbering "(83)", in
     # Swedish and in English.
-    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    gdpr = "https://lagen.nu/celex/32016R0679"
     assert resolve.resolve_eu("GDPR (83") == gdpr + "#recital-83"
     assert resolve.resolve_eu("GDPR (83)") == gdpr + "#recital-83"
     assert resolve.resolve_eu("GDPR skäl 83") == gdpr + "#recital-83"
@@ -176,13 +176,13 @@ def test_eu_recital_pinpoint():
 
 
 def test_eu_bare_shortname_is_the_act_root():
-    assert resolve.resolve_eu("IPRED") == "https://lagen.nu/ext/celex/32004L0048"
+    assert resolve.resolve_eu("IPRED") == "https://lagen.nu/celex/32004L0048"
 
 
 def test_eu_terse_article_pins_like_the_sfs_form():
     # "GDPR 28" is the same law-first terseness as "avtalslagen 36" -- a reader
     # used to the SFS form must not be silently downgraded to the act root (K4)
-    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    gdpr = "https://lagen.nu/celex/32016R0679"
     assert resolve.resolve_eu("GDPR 28") == gdpr + "#28"
     assert resolve.resolve_eu("dataskyddsförordningen 28") == gdpr + "#28"
     assert resolve.resolve_eu("gdpr 6.1") == gdpr + "#6.1"
@@ -196,7 +196,7 @@ def test_eu_terse_article_pins_like_the_sfs_form():
 def test_treaty_shortname_plus_article():
     # "EKMR 6" means the convention's article 6 (/coe/005#A6), not 6 § of the
     # incorporation act 1994:1219 -- an anchor that does not exist (K4)
-    ekmr = "https://lagen.nu/ext/coe/005"
+    ekmr = "https://lagen.nu/coe/005"
     assert resolve.resolve_treaty("EKMR 6") == ekmr + "#A6"
     assert resolve.resolve_treaty("EKMR 6.3") == ekmr + "#A6P3"
     assert resolve.resolve_treaty("Europakonventionen artikel 6") == ekmr + "#A6"
@@ -212,7 +212,7 @@ def test_bare_treaty_name_stays_with_the_incorporation_act():
 
 def test_treaty_article_outranks_the_sfs_reading():
     hits = resolve.resolve("EKMR 6")
-    assert hits[0] == {"uri": "https://lagen.nu/ext/coe/005#A6", "source": "coe"}
+    assert hits[0] == {"uri": "https://lagen.nu/coe/005#A6", "source": "coe"}
 
 
 def test_eu_unknown_does_not_resolve():
@@ -225,11 +225,11 @@ def test_eu_abbr_and_label_resolve_to_same_act():
     # includes acts whose short title also lives in the official title's
     # parenthesis (GDPR) -- the labels are listed explicitly so the citation
     # engine can link them in running text.
-    dora = "https://lagen.nu/ext/celex/32022R2554"
+    dora = "https://lagen.nu/celex/32022R2554"
     assert resolve.resolve_eu("DORA") == dora                 # abbr
     assert resolve.resolve_eu("DORA-förordningen") == dora    # label
     assert resolve.resolve_eu("DORA art 5") == dora + "#5"    # abbr + article
-    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    gdpr = "https://lagen.nu/celex/32016R0679"
     assert resolve.resolve_eu("GDPR") == gdpr                 # abbr
     assert resolve.resolve_eu("dataskyddsförordningen") == gdpr  # label
 
@@ -253,7 +253,7 @@ def test_resolve_dispatches_and_tags_source():
     assert resolve.resolve("avtalslagen 36") == [
         {"uri": "https://lagen.nu/1915:218#P36", "source": "sfs"}]
     assert resolve.resolve("GDPR art 32") == [
-        {"uri": "https://lagen.nu/ext/celex/32016R0679#32", "source": "eurlex"}]
+        {"uri": "https://lagen.nu/celex/32016R0679#32", "source": "eurlex"}]
     assert resolve.resolve("Instagrambilden") == [
         {"uri": "https://lagen.nu/dom/nja/2020s273", "source": "dv"}]
 

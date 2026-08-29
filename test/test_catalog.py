@@ -106,7 +106,7 @@ def test_a_provision_counts_its_subdivisions_and_no_neighbour(tmp_path):
     for the other 722."""
     path = tmp_path / "catalog.sqlite"
     con = catalog.connect(path)
-    root = "https://lagen.nu/ext/coe/005"
+    root = "https://lagen.nu/coe/005"
     for frag in ("A6", "A6P1", "A60", "A6.2"):
         con.execute("INSERT INTO links (from_uri, predicate, to_uri, to_root) "
                     "VALUES ('https://lagen.nu/a', 'dcterms:references', ?, ?)",
@@ -317,16 +317,16 @@ def _corpus(tmp_path, target_ids, cited_anchor):
     art.mkdir()
     target = art / "target.json"
     target.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/icrc/195",
+        "uri": "https://lagen.nu/icrc/195",
         "metadata": {"properties": {"dcterms:title": "Hague Convention (IV)"}},
         "structure": [{"type": "artikel", "id": nid, "text": ["Text."]}
                       for nid in target_ids]}))
     citing = art / "citing.json"
     citing.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/icc/0001",
+        "uri": "https://lagen.nu/icc/0001",
         "metadata": {"properties": {"dcterms:title": "A decision"}},
         "structure": [{"type": "stycke", "id": "S1", "text": [
-            "See ", {"uri": "https://lagen.nu/ext/icrc/195#" + cited_anchor,
+            "See ", {"uri": "https://lagen.nu/icrc/195#" + cited_anchor,
                      "text": "article 42"}, "."]}]}))
     path = tmp_path / "catalog.sqlite"
     catalog.rebuild(path, "icrc", [target, citing])
@@ -389,7 +389,7 @@ def test_an_eu_definition_point_reaches_past_its_own_colon():
     """A definitions-article point is the definition whole -- except where the
     definition is a sub-list and the point's own text stops at the colon
     (NIS2 art. 6.1). Then the sub-list is what the act says."""
-    art = {"uri": "https://lagen.nu/ext/celex/32022L2555", "lang": "swe",
+    art = {"uri": "https://lagen.nu/celex/32022L2555", "lang": "swe",
            "structure": [{"type": "article", "num": "6", "children": [
                {"type": "paragraph", "id": "6.9", "defines": "risk",
                 "text": ["risk: risk för förlust orsakad av en incident."]},
@@ -441,7 +441,7 @@ def test_a_definition_folds_onto_the_canonical_concept(tmp_path):
 def test_an_english_act_states_no_swedish_concept():
     """The begrepp namespace is Swedish, so an English manifestation's terms are
     not concepts here -- the rule `definition_links` already applies."""
-    english = {"uri": "https://lagen.nu/ext/celex/32022L2555", "lang": "eng",
+    english = {"uri": "https://lagen.nu/celex/32022L2555", "lang": "eng",
                "structure": [{"type": "paragraph", "id": "6.9", "defines": "risk",
                               "text": ["risk: risk of loss caused by an incident."]}]}
     assert catalog.definition_sentences(english) == []
@@ -451,7 +451,7 @@ def test_a_definition_with_no_body_is_listed_with_nothing_to_quote():
     """32015R0104 art. 3 f is "total tillåten fångstmängd (TAC): " and stops --
     the source left the body out. The act still defines the term, so the row
     stays with an empty sentence; dropping it hid 863 concepts' occurrences."""
-    empty = {"uri": "https://lagen.nu/ext/celex/32015R0104", "lang": "swe",
+    empty = {"uri": "https://lagen.nu/celex/32015R0104", "lang": "swe",
              "structure": [{"type": "point", "id": "3.f",
                             "defines": "total tillåten fångstmängd (TAC)",
                             "text": ["total tillåten fångstmängd (TAC): "]}]}
@@ -480,7 +480,7 @@ def test_an_anchor_the_target_does_not_hold_is_reported(tmp_path):
     `#Annex42`, and every count involved looked healthy."""
     con = _corpus(tmp_path, ["Annex42"], "A42")
     assert catalog.dangling_anchors(con, ("icrc",)) == [
-        ("https://lagen.nu/ext/icc/0001", "https://lagen.nu/ext/icrc/195#A42", 1)]
+        ("https://lagen.nu/icc/0001", "https://lagen.nu/icrc/195#A42", 1)]
     con.close()
 
 
@@ -497,7 +497,7 @@ def test_anchor_glob_covers_both_fragment_grammars(tmp_path):
     digits (K4P70, 6.10). The dot grammar held 299 060 point/stycke-level
     link targets when the miss was found."""
     con = catalog.connect(tmp_path / "catalog.sqlite")
-    law, eu = "https://lagen.nu/x", "https://lagen.nu/ext/celex/32016R0679"
+    law, eu = "https://lagen.nu/x", "https://lagen.nu/celex/32016R0679"
     citer = "https://lagen.nu/citer"
     for uri in (law, eu, citer):
         con.execute("INSERT INTO documents (uri, source, kind, label, title, "
@@ -517,8 +517,8 @@ def test_anchor_glob_covers_both_fragment_grammars(tmp_path):
     # ...and an unresolved target still counts in the anchor-level totals
     con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
                 "to_root) VALUES (?, '6.1', 'dcterms:references', "
-                "'https://lagen.nu/ext/celex/39999R9999', "
-                "'https://lagen.nu/ext/celex/39999R9999')", (eu,))
+                "'https://lagen.nu/celex/39999R9999', "
+                "'https://lagen.nu/celex/39999R9999')", (eu,))
 
     rows = catalog.graph_anchor_inbound(con, law, "K4P7")
     assert [(r[0], r[1]) for r in rows] == [(citer, 2)]     # not the K4P70 row
@@ -560,7 +560,7 @@ def test_document_snippet_uses_what_each_source_has():
     long = "Skyddet för fysiska personer vid behandling av personuppgifter är en grundläggande rättighet som var och en har."
     # an EU act's preamble formalities are furniture; the first recital wins,
     # led by its own number
-    act = {"uri": "https://lagen.nu/ext/celex/32016R0679",
+    act = {"uri": "https://lagen.nu/celex/32016R0679",
            "structure": [{"type": "preamble", "children": [
         {"type": "citation", "text": ["med beaktande av fördraget om Europeiska unionens funktionssätt, särskilt artiklarna 16 och 114"]},
         {"type": "recital", "num": "1", "text": [long]}]}]}
@@ -591,7 +591,7 @@ def test_document_snippet_uses_what_each_source_has():
     # capped -- never the keyword strings or the quoted act's recitals
     # case law is the CELEX's own sector: a 6-leading number (AG opinions
     # included), no doctype needed
-    dom = {"uri": "https://lagen.nu/ext/celex/62021CJ0001", "structure": [
+    dom = {"uri": "https://lagen.nu/celex/62021CJ0001", "structure": [
         {"type": "keyword", "text": ["Begäran om förhandsavgörande"]},
         {"type": "recital", "num": "1", "text": [long]},
         {"type": "paragraph", "num": "1", "text": [
@@ -629,7 +629,7 @@ def test_document_snippet_uses_what_each_source_has():
     opening = ("The Financial Protocol between the European Economic "
                "Community and Malta shall be concluded on behalf of the "
                "Community.")
-    pre_formex = {"uri": "https://lagen.nu/ext/celex/31976R0939",
+    pre_formex = {"uri": "https://lagen.nu/celex/31976R0939",
                   "title": echo,
                   "structure": [{"type": "stycke", "text": [echo]},
                                 {"type": "stycke", "text": [opening]}]}
@@ -642,7 +642,7 @@ def test_document_snippet_uses_what_each_source_has():
     spaced = "Regulation of the Council concerning the common approach to x"
     assert spaced[59] == " "
     assert catalog._document_snippet(
-        {"uri": "https://lagen.nu/ext/celex/31976R0940", "title": spaced,
+        {"uri": "https://lagen.nu/celex/31976R0940", "title": spaced,
          "structure": [{"type": "stycke", "text": [
              spaced + " and enough further words to clear the eighty "
              "character prose floor"]}]},

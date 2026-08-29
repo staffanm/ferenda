@@ -74,7 +74,7 @@ BEGREPP_RULES = begrepp.Rules(scopes=(
 # SFS statutes that incorporate an external treaty as a parallel-text appendix:
 # an instrument's local fragment (`{sfs}#B1`, `{sfs}#B1P4`) → the `source/number`
 # of the treaty it reproduces (eg. `coe/046`). The projection resolves this into
-# the `ext/{source}/{number}` URI so the incorporated articles become citable.
+# the `{source}/{number}` URI so the incorporated articles become citable.
 INCORPORATES = json.loads(
     (Path(__file__).parent / "data" / "incorporates.json")
     .read_text(encoding="utf-8"))
@@ -83,7 +83,7 @@ INCORPORATES = json.loads(
 def incorporated_uri(basefile, fragment):
     """The URI of the treaty an incorporated instrument reproduces, or None."""
     spec = INCORPORATES.get("%s#%s" % (basefile, fragment))
-    return "%sext/%s" % (BASE, spec) if spec else None
+    return "%s%s" % (BASE, spec) if spec else None
 
 
 def to_normalform(doc, basefile, now=None, refparser=None,

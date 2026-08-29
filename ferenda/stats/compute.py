@@ -349,10 +349,10 @@ def _group_a(con, s):
         xlabel="plats i längdordning (logaritmisk)", ylabel="tecken",
         points=_rank_profile([t[0] for t in eu_own], log=True),
         rows=([Row("Art. %s — %s" % (t[1], t[2]["title"][:70] or t[2]["celex"]),
-                   t[0], BASE + "ext/celex/" + t[2]["celex"], group="Längst")
+                   t[0], BASE + "celex/" + t[2]["celex"], group="Längst")
                for t in sorted(eu_own, key=lambda t: -t[0])[:5]]
               + [Row("Art. %s — %s" % (t[1], t[2]["title"][:70] or t[2]["celex"]),
-                     t[0], BASE + "ext/celex/" + t[2]["celex"], group="Kortast")
+                     t[0], BASE + "celex/" + t[2]["celex"], group="Kortast")
                  for t in sorted(eu_own, key=lambda t: t[0])[:5]]))
 
     titled = sorted((r for r in laws if r["clean_title"]),
@@ -399,10 +399,10 @@ def _group_a(con, s):
         xlabel="plats i längdordning", ylabel="tecken",
         points=_rank_profile(eu_tl),
         rows=([Row(_shorten(a["title"]), len(a["title"]),
-                   BASE + "ext/celex/" + a["celex"], group="Längst")
+                   BASE + "celex/" + a["celex"], group="Längst")
                for a in eu_titled[-5:][::-1]]
               + [Row(a["title"], len(a["title"]),
-                     BASE + "ext/celex/" + a["celex"], group="Kortast")
+                     BASE + "celex/" + a["celex"], group="Kortast")
                  for a in eu_titled[:5]]))
 
     named = [r for r in laws if r["alternate"]]
@@ -987,7 +987,7 @@ EURLEX_UNFILTERED_SQL = (
     "SELECT 1 FROM documents WHERE source = 'eurlex' AND NOT EXISTS "
     "(SELECT 1 FROM links WHERE predicate IN ('rpubl:andrar', "
     "'rinfoex:genomforRattsakt') AND from_uri LIKE "
-    "'https://lagen.nu/ext/celex/%') LIMIT 1")
+    "'https://lagen.nu/celex/%') LIMIT 1")
 
 
 def _base_acts(con, graph):
@@ -1387,7 +1387,7 @@ def _group_g(con, s):
         rows=[Row("Artikel " + u.split("#A")[-1].replace("P", ".") , c, u)
               for u, c in
               _q(con, "SELECT to_uri, count(*) c FROM links "
-                      "WHERE to_uri LIKE '%ext/coe/005#%' "
+                      "WHERE to_uri LIKE '%coe/005#%' "
                       "GROUP BY 1 ORDER BY c DESC LIMIT 12")])
 
     cases = s["remisser"]

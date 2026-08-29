@@ -356,8 +356,8 @@ def test_generate_survives_a_citation_target_that_is_not_a_document_uri(
     con.execute("INSERT INTO links (from_uri, from_anchor, predicate, to_uri, "
                 "to_root) VALUES (?,?,?,?,?)",
                 (LAW["uri"], "P6S1", "rpubl:genomforDirektiv",
-                 "https://lagen.nu/ext/celex/31995L0046#8.4.a#2",
-                 "https://lagen.nu/ext/celex/31995L0046#8.4.a"))
+                 "https://lagen.nu/celex/31995L0046#8.4.a#2",
+                 "https://lagen.nu/celex/31995L0046#8.4.a"))
     con.commit()
     con.close()
 
@@ -531,7 +531,7 @@ def test_render_runs_outbound_link(tmp_path):
 def test_celex_renders_as_external_eurlex_link(tmp_path):
     site = page.Site.from_catalog(build_catalog(tmp_path))
     html = page.render_runs(
-        ["enligt ", {"uri": "https://lagen.nu/ext/celex/31995L0046",
+        ["enligt ", {"uri": "https://lagen.nu/celex/31995L0046",
                      "text": "direktiv 95/46/EG"}], site)
     assert 'class="ext"' in html
     assert ("href=\"https://eur-lex.europa.eu/legal-content/SV/TXT/"
@@ -813,8 +813,8 @@ ANDRINGSFS = {
                           "(ÅFS 1999:1) om expediering",
                  "andrar": ["https://lagen.nu/aafs/2005:5"],
                  "upphaver": ["https://lagen.nu/aafs/1999:1"],
-                 "genomfor": ["https://lagen.nu/ext/celex/32011L0061"],
-                 "genomfor_akt": ["https://lagen.nu/ext/celex/32001R2580"],
+                 "genomfor": ["https://lagen.nu/celex/32011L0061"],
+                 "genomfor_akt": ["https://lagen.nu/celex/32001R2580"],
                  "andradAv": ["https://lagen.nu/aafs/2007:2"]},
     "structure": [],
 }
@@ -849,11 +849,11 @@ def test_relation_links_publishes_typed_predicates():
                 "predicate": "rpubl:andrar", "text": "ÅFS 2006:11"}),
         (None, {"uri": "https://lagen.nu/aafs/1999:1",
                 "predicate": "rpubl:upphaver", "text": "ÅFS 2006:11"}),
-        (None, {"uri": "https://lagen.nu/ext/celex/32011L0061",
+        (None, {"uri": "https://lagen.nu/celex/32011L0061",
                 "predicate": "rpubl:genomforDirektiv", "text": "ÅFS 2006:11"}),
         # the EU's own implementing relation, deliberately not
         # genomforDirektiv: a genomförandeförordning carries out a regulation
-        (None, {"uri": "https://lagen.nu/ext/celex/32001R2580",
+        (None, {"uri": "https://lagen.nu/celex/32001R2580",
                 "predicate": "rinfoex:genomforRattsakt", "text": "ÅFS 2006:11"}),
         (None, {"uri": "https://lagen.nu/aafs/2007:2",
                 "predicate": "rinfoex:andradAv", "text": "ÅFS 2006:11"})]
@@ -881,7 +881,7 @@ def test_foreskrift_relation_edges_and_inbound_mirrors(tmp_path):
     assert con.execute(
         "SELECT from_uri FROM links WHERE to_uri = ? "
         "AND predicate = 'rpubl:genomforDirektiv'",
-        ("https://lagen.nu/ext/celex/32011L0061",)).fetchone() == (
+        ("https://lagen.nu/celex/32011L0061",)).fetchone() == (
         ANDRINGSFS["uri"],)
 
 
@@ -2493,15 +2493,15 @@ PROP = {
     ],
     "implements": [{
         "predicate": "rpubl:genomforDirektiv",
-        "directive": "https://lagen.nu/ext/celex/32022L2555",
+        "directive": "https://lagen.nu/celex/32022L2555",
         "articles": ["21"], "pinpoints": ["21.1", "21.2"],
-        "uris": ["https://lagen.nu/ext/celex/32022L2555#21"],
+        "uris": ["https://lagen.nu/celex/32022L2555#21"],
         "partial": False, "law": "Cybersäkerhetslag", "chapter": "2",
         "paragraf": "1", "page": 100,
         "sentence": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"}],
 }
 DIRECTIVE = {
-    "uri": "https://lagen.nu/ext/celex/32022L2555",
+    "uri": "https://lagen.nu/celex/32022L2555",
     "celex": "32022L2555", "doctype": "directive", "title": "NIS 2-direktivet",
     "structure": [{"type": "article", "id": "21", "num": "21",
                    "text": ["Riskhanteringsåtgärder"], "children": []}],
@@ -2524,7 +2524,7 @@ def test_implements_links_emits_genomfor_edges():
     # and carrying that printed page as the citation's own (S4)
     assert catalog.implements_links(PROP) == [
         ("sid100", 100,
-         {"uri": "https://lagen.nu/ext/celex/32022L2555#21",
+         {"uri": "https://lagen.nu/celex/32022L2555#21",
           "predicate": "rpubl:genomforDirektiv",
           "text": "Paragrafen genomför artikel 21.1-21.2 i NIS 2-direktivet"})]
 
@@ -2533,7 +2533,7 @@ def test_genomfor_edge_is_inbound_on_directive_article(tmp_path):
     # the killer feature for EU law: the directive article shows which Swedish
     # förarbete implements it, pinpointed to the page of the statement
     con = build_eu_catalog(tmp_path)
-    assert catalog.inbound(con, "https://lagen.nu/ext/celex/32022L2555#21") == [
+    assert catalog.inbound(con, "https://lagen.nu/celex/32022L2555#21") == [
         ("https://lagen.nu/prop/2023/24:1", "sid100",
          "Prop. 2023/24:1", "Cybersäkerhetslag", "forarbete")]
 
@@ -2571,7 +2571,7 @@ def test_genomforande_panel_absent_without_implements(tmp_path):
 
 # --- genomför-direktiv pinned to SFS paragrafs ----------------------------
 
-DIR = "https://lagen.nu/ext/celex/32022L2555"
+DIR = "https://lagen.nu/celex/32022L2555"
 
 
 def _impl(law, chapter, paragraf, pinpoint, partial=False):
@@ -2708,7 +2708,7 @@ def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
     # transposes artikel 21 (2 kap. 1 § cybersäkerhetslagen here) -- while an
     # AG opinion citing the same article does not (an opinion is not practice)
     judgment = {
-        "uri": "https://lagen.nu/ext/celex/62020CJ0001",
+        "uri": "https://lagen.nu/celex/62020CJ0001",
         "celex": "62020CJ0001", "doctype": "judgment",
         "title": "Domstolens dom i mål C-1/20", "date": "2021-05-06",
         "structure": [{"type": "paragraph", "id": "p30", "text": [
@@ -2716,7 +2716,7 @@ def test_paragraf_rail_shows_eu_caselaw_via_genomforande(tmp_path):
                         "text": "artikel 21", "uri": DIR + "#21"},
             " i direktivet gäller följande."], "children": []}]}
     opinion = {
-        "uri": "https://lagen.nu/ext/celex/62020CC0002",
+        "uri": "https://lagen.nu/celex/62020CC0002",
         "celex": "62020CC0002", "doctype": "opinion",
         "title": "Förslag till avgörande i mål C-2/20", "date": "2021-01-01",
         "structure": [{"type": "paragraph", "id": "p5", "text": [
@@ -2740,14 +2740,14 @@ def test_paragraf_rail_joins_subarticle_pinpoints_not_prefixes(tmp_path):
     # its claiming paragraf -- see test_eurlex_correspond) -- while #210 is a
     # different article and must not leak in
     subarticle = {
-        "uri": "https://lagen.nu/ext/celex/62020CJ0003",
+        "uri": "https://lagen.nu/celex/62020CJ0003",
         "celex": "62020CJ0003", "doctype": "judgment",
         "title": "Domstolens dom i mål C-3/20", "date": "2021-05-06",
         "structure": [{"type": "paragraph", "id": "p12", "text": [
             {"predicate": "dcterms:references", "text": "artikel 21.4",
              "uri": DIR + "#21.4"}], "children": []}]}
     other_article = {
-        "uri": "https://lagen.nu/ext/celex/62020CJ0004",
+        "uri": "https://lagen.nu/celex/62020CJ0004",
         "celex": "62020CJ0004", "doctype": "judgment",
         "title": "Domstolens dom i mål C-4/20", "date": "2021-06-01",
         "structure": [{"type": "paragraph", "id": "p9", "text": [
@@ -2767,7 +2767,7 @@ def test_paragraf_rail_renders_every_case_overflow_collapsed(tmp_path):
     # 41 cases per paragraf and showed 5. Every case must be on the page; the
     # overflow only starts collapsed.
     judgments = tuple(
-        {"uri": "https://lagen.nu/ext/celex/62020CJ%04d" % n,
+        {"uri": "https://lagen.nu/celex/62020CJ%04d" % n,
          "celex": "62020CJ%04d" % n, "doctype": "judgment",
          "title": "Domstolens dom i mål C-%d/20" % n,
          "date": "20%02d-05-06" % (10 + n),
@@ -2875,7 +2875,7 @@ def test_prop_page_highlights_fk_commentary_blocks(tmp_path):
 # a small regulation: two grouped recitals, an article with a numbered paragraph
 # and a lettered point, plus the .ann editorial layer linking them both ways
 ACT = {
-    "uri": "https://lagen.nu/ext/celex/32099R0001", "celex": "32099R0001",
+    "uri": "https://lagen.nu/celex/32099R0001", "celex": "32099R0001",
     "doctype": "regulation", "title": "Testförordning",
     "structure": [
         {"type": "recital", "num": "1", "text": ["Bakgrund."]},
@@ -3019,7 +3019,7 @@ def test_act_toc_has_preamble_section_with_group_titles(monkeypatch, tmp_path):
 # an act divided Kapitel > Avsnitt > Artikel, which is how the GDPR writes its
 # chapters III, IV, VI and VII -- and how any EU act with a section level does
 DIVIDED_ACT = {
-    "uri": "https://lagen.nu/ext/celex/32099R0002", "celex": "32099R0002",
+    "uri": "https://lagen.nu/celex/32099R0002", "celex": "32099R0002",
     "doctype": "regulation", "title": "Indelad testförordning",
     "structure": [
         {"type": "heading", "level": 1, "label": "KAPITEL I",
@@ -3117,7 +3117,7 @@ def test_act_structural_markers_and_hanging_indent(monkeypatch, tmp_path):
 # an act shaped like the GDPR's artikel 6.1 (a numbered paragraph with lettered
 # points), and the six kinds of document that cite an EU act in the real corpus
 CITED_ACT = {
-    "uri": "https://lagen.nu/ext/celex/32099R0003", "celex": "32099R0003",
+    "uri": "https://lagen.nu/celex/32099R0003", "celex": "32099R0003",
     "doctype": "regulation", "title": "Testförordning om behandling",
     "date": "2099-04-27",
     "structure": [
@@ -3151,14 +3151,14 @@ def _build_eu_inbound_catalog(tmp_path):
         w("act.json", CITED_ACT),
         # two judgments, the older one first on disk -- the panel must still read
         # newest-first (a case number sorts alphabetically into nonsense)
-        w("j20.json", _eu_citer("https://lagen.nu/ext/celex/62099CJ0002", "judgment",
+        w("j20.json", _eu_citer("https://lagen.nu/celex/62099CJ0002", "judgment",
                                 "C-2/20", "2020-06-01", [ACT_URI + "#6.1"])),
-        w("j24.json", _eu_citer("https://lagen.nu/ext/celex/62099CJ0001", "judgment",
+        w("j24.json", _eu_citer("https://lagen.nu/celex/62099CJ0001", "judgment",
                                 "C-1/24", "2024-06-01", [ACT_URI + "#6.1"])),
-        w("ag.json", _eu_citer("https://lagen.nu/ext/celex/62099CC0001", "opinion",
+        w("ag.json", _eu_citer("https://lagen.nu/celex/62099CC0001", "opinion",
                                "", "2024-01-15", [ACT_URI + "#6.1"],
                                shortname="Generaladvokatens förslag i C-1/24")),
-        w("reg.json", _eu_citer("https://lagen.nu/ext/celex/32099R0004", "regulation",
+        w("reg.json", _eu_citer("https://lagen.nu/celex/32099R0004", "regulation",
                                 "(EU) 2099/4 om ändring", "2099-01-01",
                                 [ACT_URI + "#6.1"])),
     ])
@@ -3254,7 +3254,7 @@ def test_defined_term_links_to_begrepp_page(tmp_path):
         "aliases": ["https://lagen.nu/begrepp/Personuppgifter"]}))
     catalog.rebuild(db, "begrepp", [concept])
     act = {
-        "uri": "https://lagen.nu/ext/celex/32099R0002", "celex": "32099R0002",
+        "uri": "https://lagen.nu/celex/32099R0002", "celex": "32099R0002",
         "doctype": "regulation", "title": "T",
         "structure": [
             {"type": "article", "id": "4", "num": "4", "text": ["Artikel 4"],

@@ -1,9 +1,9 @@
 I artikel 30 i barnkonventionen anges att ett barn som tillhör en minoritet inte ska förvägras rätten till sitt eget språk. Enligt artikel 2 i folkmordskonventionen avses med folkmord vissa gärningar. Detta följer även av artikel 74 i Romstadgan för Internationella brottmålsdomstolen och av artikel 27 i konventionen om medborgerliga och politiska rättigheter. Kravet i artikel 99 i barnkonventionen finns inte. Sverige har ratificerat barnkonventionen.
 
 <list>
-  <Link uri="https://lagen.nu/ext/untc/I-27531#A30">artikel 30 i barnkonventionen</Link>
-  <Link uri="https://lagen.nu/ext/untc/I-1021#AII">artikel 2 i folkmordskonventionen</Link>
-  <Link uri="https://lagen.nu/ext/icrc/585#A74">artikel 74 i Romstadgan för Internationella brottmålsdomstolen</Link>
-  <Link uri="https://lagen.nu/ext/untc/I-14668#A27">artikel 27 i konventionen om medborgerliga och politiska rättigheter</Link>
-  <Link uri="https://lagen.nu/ext/untc/I-27531">artikel 99 i barnkonventionen</Link>
+  <Link uri="https://lagen.nu/untc/I-27531#A30">artikel 30 i barnkonventionen</Link>
+  <Link uri="https://lagen.nu/untc/I-1021#AII">artikel 2 i folkmordskonventionen</Link>
+  <Link uri="https://lagen.nu/icrc/585#A74">artikel 74 i Romstadgan för Internationella brottmålsdomstolen</Link>
+  <Link uri="https://lagen.nu/untc/I-14668#A27">artikel 27 i konventionen om medborgerliga och politiska rättigheter</Link>
+  <Link uri="https://lagen.nu/untc/I-27531">artikel 99 i barnkonventionen</Link>
 </list>

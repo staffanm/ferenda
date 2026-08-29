@@ -15,7 +15,7 @@ from ferenda.forarbete.structure import flatten, nest
 from ferenda.forarbete.parse import PARSE_TYPES
 from ferenda.lib.lagrum import sfs_parser
 
-CELEX = "https://lagen.nu/ext/celex/"
+CELEX = "https://lagen.nu/celex/"
 
 
 def test_fk_section_slices_matching_proposed_law():

@@ -22,7 +22,7 @@ def test_sfs_and_eurlex_schemes_resolve():
     assert markdown.target_uri("sfs:1949:381") == "https://lagen.nu/1949:381"
     assert markdown.target_uri("sfs:1845:50_s.1") == "https://lagen.nu/1845:50_s.1"
     assert markdown.target_uri("eurlex:32016R0679") \
-        == "https://lagen.nu/ext/celex/32016R0679"
+        == "https://lagen.nu/celex/32016R0679"
 
 
 def test_list_basefiles():

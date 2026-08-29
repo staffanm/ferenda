@@ -698,7 +698,7 @@ def chapter_collapse_key(source, uri, own_base):
 # A well-formed sector-3 CELEX in Ferenda's URI: 3 + year(4) + type
 # (1-2 letters) + number(4, zero-padded), with an optional pinpoint fragment.
 re_celex_uri = re.compile(
-    r"(.*/ext/celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
+    r"(.*/(?:ext/)?celex/)3(\d{4})([A-Z]{1,2})(\d{4})(#.*)?$")
 
 
 def celex_descramble(uri):

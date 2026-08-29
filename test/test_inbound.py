@@ -194,11 +194,11 @@ def test_scope_tree_reads_the_eu_and_treaty_grammars_too():
     """The EU grammar separates with dots (`9.2` -> `9.2.S2` stycke, `9.2.a`
     point) and the treaty one with uppercase segments (`A5P1` -> `A5P1La`
     litera). Both are subtrees; `9.20` is a different article."""
-    eu = "https://lagen.nu/ext/celex/32016R0679#"
+    eu = "https://lagen.nu/celex/32016R0679#"
     rows = [_row(target=eu + t) for t in ("9.2", "9.2.S2", "9.2.a", "9.20")]
     assert [r["target"].rsplit("#", 1)[1] for r in inbound.scoped(rows, eu + "9.2")] \
         == ["9.2", "9.2.S2", "9.2.a"]
-    coe = "https://lagen.nu/ext/coe/echr#"
+    coe = "https://lagen.nu/coe/echr#"
     rows = [_row(target=coe + t) for t in ("A5P1", "A5P1La", "A5P10")]
     assert [r["target"].rsplit("#", 1)[1] for r in inbound.scoped(rows, coe + "A5P1")] \
         == ["A5P1", "A5P1La"]

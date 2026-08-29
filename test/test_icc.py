@@ -34,7 +34,7 @@ def _ntaganda():
 def test_identity_and_curated_types():
     assert doc_basefile("ICC-01/04-02/06-2359") == "ICC-01_04-02_06-2359"
     assert decision_uri("ICC-01/04-02/06-2359") == \
-        "https://lagen.nu/ext/icc/ICC-01_04-02_06-2359"
+        "https://lagen.nu/icc/ICC-01_04-02_06-2359"
     types = load_types()
     assert types["793"]["kind"] == "judgment"        # the Art 74 verdict facet
     for facet, entry in types.items():
@@ -162,7 +162,7 @@ def test_to_artifact_numbers_paragraphs_and_ids():
 
 def test_parse_metadata_without_body():
     art = _ntaganda()
-    assert art["uri"] == "https://lagen.nu/ext/icc/ICC-01_04-02_06-2359"
+    assert art["uri"] == "https://lagen.nu/icc/ICC-01_04-02_06-2359"
     assert art["type"] == "avgorande" and art["court"] == "icc"
     assert art["doctype"] == "judgment"
     assert art["title"] == "The Prosecutor v. Bosco Ntaganda"
@@ -212,7 +212,7 @@ def test_iso_date():
 # --------------------------------------------------------------------------
 
 def test_icc_layout_round_trips_and_catalog_row():
-    uri = "https://lagen.nu/ext/icc/ICC-01_04-02_06-2359"
+    uri = "https://lagen.nu/icc/ICC-01_04-02_06-2359"
     assert layout.page_url(uri) == "/icc/ICC-01_04-02_06-2359"
     assert layout.page_relpath(uri) == "icc/ICC_01_04_02_06_2359.html"
     assert str(layout.url_to_relpath("/icc/ICC-01_04-02_06-2359")) == \
@@ -374,7 +374,7 @@ def test_sibling_filing_citations_link_held_decisions(tmp_path):
             "but not ICC-01/04-01/07-9999 nor ICC-01/04-01/07-2288, "
             "applying article 74 of the Statute")
     refs = treaties.refs(text, "ICC-01/04-01/07-2288", tmp_path)
-    uris = [r.uri.replace("https://lagen.nu/ext/", "") for r in refs]
+    uris = [r.uri.replace("https://lagen.nu/", "") for r in refs]
     assert "icc/ICC-01_04-01_07-1788" in uris
     assert "icc/ICC-01_04-01_07-55-Red" in uris
     assert not any(u.endswith("9999") or u.endswith("2288") for u in uris)

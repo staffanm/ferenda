@@ -233,7 +233,7 @@ def test_documents_hides_a_repealed_act_unless_asked(client):
             "INSERT INTO documents (uri, source, kind, label, title, path, "
             " source_url, content_hash, expired, display) "
             "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            ("https://lagen.nu/ext/celex/31995L0046", "eurlex", "directive",
+            ("https://lagen.nu/celex/31995L0046", "eurlex", "directive",
              "31995L0046", "Dataskyddsdirektivet", "", None, "x",
              "2018-05-24", "Dataskyddsdirektivet"))
         # a repeal that has not taken effect yet is not a repeal
@@ -241,7 +241,7 @@ def test_documents_hides_a_repealed_act_unless_asked(client):
             "INSERT INTO documents (uri, source, kind, label, title, path, "
             " source_url, content_hash, expired, display) "
             "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            ("https://lagen.nu/ext/celex/32099L0001", "eurlex", "directive",
+            ("https://lagen.nu/celex/32099L0001", "eurlex", "directive",
              "32099L0001", "Ännu gällande", "", None, "x",
              "2099-01-01", "Ännu gällande"))
     con.close()
@@ -255,7 +255,7 @@ def test_documents_hides_a_repealed_act_unless_asked(client):
     assert both["total"] == 2
 
     assert client.get("/api/v1/document",
-                      params={"uri": "https://lagen.nu/ext/celex/31995L0046"}
+                      params={"uri": "https://lagen.nu/celex/31995L0046"}
                       ).status_code == 200
 
 
@@ -1158,7 +1158,7 @@ def test_card_answers_names_address_and_opening_words(client):
 
     # one parameter, in either form the site writes: a page path names the same
     # place as the uri (popovers hold hrefs, and /celex/<id> is not a prefix of
-    # ext/celex/<id>, so the client cannot compose the uri itself)
+    # celex/<id>, so the client cannot compose the uri itself)
     d = client.get("/api/v1/card", params={"uri": "/1962:700#K3P1"}).json()
     assert d["root"] == bb and d["pinpoint"] == "3 kap. 1 §"
 

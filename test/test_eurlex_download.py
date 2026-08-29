@@ -147,7 +147,7 @@ def test_manifestation_url_rejects_a_non_item_url():
 
 # --- the backfill want-list ------------------------------------------------
 
-CELEX = "https://lagen.nu/ext/celex/"
+CELEX = "https://lagen.nu/celex/"
 
 
 def _corpus(tmp_path):

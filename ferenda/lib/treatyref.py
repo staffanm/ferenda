@@ -10,10 +10,10 @@ knows nothing about a vertical (rule:lib-never-imports-vertical).
 Two kinds of reference come out, and the difference matters to a reader:
 
   * **article-level** -- "article 74 of the Statute" resolves to the provision,
-    `ext/icrc/585#A74`. This is what the ICC's own text is made of: 13,887
+    `icrc/585#A74`. This is what the ICC's own text is made of: 13,887
     article citations across 244 of its 269 decisions.
   * **instrument-level** -- the decision names the treaty but not a provision,
-    or the target holds no article anchors. `ext/icrc/585`.
+    or the target holds no article anchors. `icrc/585`.
 
 A caller may add its own unambiguous short forms: inside an ICC decision "the
 Statute" is the Rome Statute and nothing else, where the same words in an ICJ
@@ -91,7 +91,7 @@ CONTEXT_WINDOW = 150
 
 
 def treaty_uri(target):
-    return "%sext/%s" % (BASE, target)
+    return "%s%s" % (BASE, target)
 
 
 # _arabic / article_fragment live in the dependency-free `lib.treaty_ids`

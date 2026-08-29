@@ -10,7 +10,7 @@ document and to resolve pinpoint citations ("Article 5 of Directive ...") to a
 fragment, without the bookkeeping of a tree.
 
 The document URI is the language-neutral CELEX URI the citation engine mints
-for EU references (`https://lagen.nu/ext/celex/{CELEX}`), so a citation to an
+for EU references (`https://lagen.nu/celex/{CELEX}`), so a citation to an
 act and the act itself agree by construction.
 """
 
@@ -21,7 +21,7 @@ from ..lib.formex import Block
 
 # the language-neutral CELEX URI the citation engine mints for EU references, so
 # a citation to an act and the act itself agree by construction
-BASE = "https://lagen.nu/ext/celex/%s"
+BASE = "https://lagen.nu/celex/%s"
 
 
 # --------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def looks_like_act_title(text):
 @dataclass
 class EurlexDoc:
     celex: str
-    uri: str                   # https://lagen.nu/ext/celex/{CELEX}
+    uri: str                   # https://lagen.nu/celex/{CELEX}
     doctype: str               # regulation | directive | decision | judgment
                                # | treaty | act
     lang: str                  # 3-letter code (swe, eng)

@@ -412,7 +412,7 @@ def site_cross_digests(site):
             "WHERE predicate = 'rpubl:andrar'"):
         amended.setdefault(from_uri, []).append(to_uri)
     for p in annstore.tree("eurlex").rglob("*.ann"):
-        hosts = amended.get(BASE + "ext/celex/" + p.stem.replace("_", "/"))
+        hosts = amended.get(BASE + "celex/" + p.stem.replace("_", "/"))
         if hosts:
             digest = hashlib.sha256(p.read_bytes()).hexdigest()
             for host in hosts:
@@ -454,18 +454,23 @@ def _split_uri(uri):
 doc_relpath = layout.page_relpath
 
 
-EXT = BASE + "ext/"                          # the "external reference" namespace
-CELEX = BASE + "ext/celex/"
-COE = BASE + "ext/coe/"
+# the namespaces keyed by a publisher's printed number (celex/, coe/, …): a
+# uri in one may name a document the corpus does not hold, and the publisher
+# then has a page to link out to
+_EXT_PREFIXES = tuple(BASE + ns + "/" for ns in sorted(layout.EXT_NAMESPACES))
+CELEX = BASE + "celex/"
+COE = BASE + "coe/"
 EURLEX = "https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:%s"
 COE_TREATY = ("https://www.coe.int/en/web/conventions/full-list2"
               "?module=treaty-detail&treatynum=%s")
 
 
 def _is_external(uri):
-    """A lagen.nu `ext/` URI identifies a document the site doesn't host
-    (EU acts via CELEX, …) -- it resolves to an external service, not a page."""
-    return uri.startswith(EXT)
+    """Whether a URI is in one of the publisher-number namespaces (EU acts by
+    CELEX, treaties by CETS/UNTS number, …). The site does not necessarily
+    hold the document; when it doesn't, the link goes to the publisher rather
+    than becoming a dead local link."""
+    return uri.startswith(_EXT_PREFIXES)
 
 
 def href(uri):
@@ -479,9 +484,9 @@ def _external_href(uri):
     """Where an ``ext/`` reference we don't host resolves -- EUR-Lex for a
     CELEX (the EU act on the official site), else the uri itself."""
     if uri.startswith(CELEX):
-        return EURLEX % catalog.local(uri)[len("ext/celex/"):].split("#")[0]
+        return EURLEX % catalog.local(uri)[len("celex/"):].split("#")[0]
     if uri.startswith(COE):
-        return COE_TREATY % catalog.local(uri)[len("ext/coe/"):].split("#")[0]
+        return COE_TREATY % catalog.local(uri)[len("coe/"):].split("#")[0]
     return uri
 
 

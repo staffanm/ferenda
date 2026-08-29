@@ -153,7 +153,7 @@ def _recital_links_sections(recitals, external=(), titles=None):
                     for n in recitals or ())
     links += "".join(
         '<a href="%s#recital-%d">skäl %d i %s</a>'
-        % (escape(href(catalog.BASE + "ext/celex/" + celex)), n, n,
+        % (escape(href(catalog.BASE + "celex/" + celex)), n, n,
            escape(_act_designation(celex, (titles or {}).get(celex)) or celex))
         for celex, n in external)
     count = len(recitals or ()) + len(external)
@@ -241,7 +241,7 @@ def _act_link(celex, titles, site):
     """One amending act as link-or-text html, linked where the corpus holds
     its page."""
     label = _act_label(celex, titles.get(celex))
-    uri = catalog.BASE + "ext/celex/" + celex
+    uri = catalog.BASE + "celex/" + celex
     return ('<a href="%s">%s</a>' % (escape(href(uri)), escape(label))
             if site.has(uri) else escape(label))
 
@@ -280,7 +280,7 @@ def _versions_panel(celex, own_version, versions):
     return PANELS.versions_panel(
         [{"value": v, "label": v, "note": ""} for v, _u in reversed(versions)],
         "denna" if own_version else "aktuell",
-        catalog.BASE + "ext/celex/" + celex, own_version or "",
+        catalog.BASE + "celex/" + celex, own_version or "",
         own_version or "")
 
 
@@ -646,7 +646,7 @@ def _eurlex_opinion_href(art, site):
     celex = art.get("celex") or ""
     if art.get("doctype") != "judgment" or celex[5:7] != "CJ":
         return None
-    opinion = catalog.BASE + "ext/celex/" + celex[:5] + "CC" + celex[7:]
+    opinion = catalog.BASE + "celex/" + celex[:5] + "CC" + celex[7:]
     return href(opinion) if site.has(opinion) else None
 
 
@@ -694,10 +694,10 @@ def render(art, site):
     # and popover.js previews/split-views the links like any internal link
     preamble_note = None
     if cons and cons.get("amending"):
-        held = [{"url": href(catalog.BASE + "ext/celex/" + m["celex"]),
+        held = [{"url": href(catalog.BASE + "celex/" + m["celex"]),
                  "label": _act_label(m["celex"], m.get("title"))}
                 for m in cons["amending"]
-                if site.has(catalog.BASE + "ext/celex/" + m["celex"])]
+                if site.has(catalog.BASE + "celex/" + m["celex"])]
         if held:
             preamble_note = NODES.eu_preamble_note(held)
     toc = Toc()
@@ -765,15 +765,15 @@ def render(art, site):
         macro = (BANNERS.eurlex_future_version_banner if future
                  else BANNERS.eurlex_version_banner)
         banner = macro(version,
-                       href(catalog.BASE + "ext/celex/" + art["celex"]))
+                       href(catalog.BASE + "celex/" + art["celex"]))
         body_class = " inaktuell"
     elif expired:
         banner = BANNERS.eurlex_expired_banner(expired)
         body_class = " expired expired-eu"
     elif cons and cons.get("amending"):
         banner = BANNERS.eurlex_consolidated_banner(
-            [{"url": (href(catalog.BASE + "ext/celex/" + m["celex"])
-                      if site.has(catalog.BASE + "ext/celex/" + m["celex"])
+            [{"url": (href(catalog.BASE + "celex/" + m["celex"])
+                      if site.has(catalog.BASE + "celex/" + m["celex"])
                       else None),
               "label": _act_label(m["celex"], m.get("title"))}
              for m in cons["amending"]])

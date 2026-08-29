@@ -258,7 +258,7 @@ def test_ecj_letterless_form_is_year_bounded():
     assert [r.uri for r in refs] == ["https://lagen.nu/dom/echr/001-58257"]
     refs = parser.parse_text("se mål 31/87 om offentlig upphandling")
     assert [r.uri for r in refs] == [
-        "https://lagen.nu/ext/celex/61987CJ0031"]
+        "https://lagen.nu/celex/61987CJ0031"]
 
 
 def test_jo_arsberattelse_form_resolves_via_snapshot():
@@ -455,12 +455,12 @@ def test_yield_overlaps_term_yields_to_citation():
 # output, and the files are UTF-8 (U+2011) while the harness reads
 # windows-1252. Validate EURATTSFALL against a hand-authored table instead.
 EURATTSFALL_CASES = [
-    ("In Case C-176/09 the court", "https://lagen.nu/ext/celex/62009CJ0176"),
-    ("mål C-197/09 RX-II,", "https://lagen.nu/ext/celex/62009CJ0197"),
-    ("By order in Case F-23/07", "https://lagen.nu/ext/celex/62007CW0023"),
-    ("i mål T-201/04", "https://lagen.nu/ext/celex/62004CA0201"),
-    ("C-176/09", "https://lagen.nu/ext/celex/62009CJ0176"),
-    ("Case C‑197/09", "https://lagen.nu/ext/celex/62009CJ0197"),
+    ("In Case C-176/09 the court", "https://lagen.nu/celex/62009CJ0176"),
+    ("mål C-197/09 RX-II,", "https://lagen.nu/celex/62009CJ0197"),
+    ("By order in Case F-23/07", "https://lagen.nu/celex/62007CW0023"),
+    ("i mål T-201/04", "https://lagen.nu/celex/62004CA0201"),
+    ("C-176/09", "https://lagen.nu/celex/62009CJ0176"),
+    ("Case C‑197/09", "https://lagen.nu/celex/62009CJ0197"),
 ]
 
 
@@ -475,8 +475,8 @@ def test_eurattsfall(text, uri):
 # "31/87" must not link) and the court defaults to the ECJ
 EURATTSFALL_OLD_CASES = [
     ("in Case 31/87, REFERENCE to the Court",
-     ["https://lagen.nu/ext/celex/61987CJ0031"]),
-    ("se mål 45/87, Dundalk", ["https://lagen.nu/ext/celex/61987CJ0045"]),
+     ["https://lagen.nu/celex/61987CJ0031"]),
+    ("se mål 45/87, Dundalk", ["https://lagen.nu/celex/61987CJ0045"]),
     ("delivered on 31/87 items", []),
 ]
 
@@ -493,15 +493,15 @@ def test_eurattsfall_old_numbering(text, uris):
 # parenthesised sub-article convention the old judgments use ("Article 29 (5)").
 EULAGSTIFTNING_ENG_CASES = [
     ("Council Directive 71/305/EEC of 26 July 1971 is intended to secure",
-     ["https://lagen.nu/ext/celex/31971L0305"]),
+     ["https://lagen.nu/celex/31971L0305"]),
     ("Article 29 (5) of Directive 71/305/EEC provides",
-     ["https://lagen.nu/ext/celex/31971L0305#29.5"]),
+     ["https://lagen.nu/celex/31971L0305#29.5"]),
     ("As stated in Article 1(2) of Directive 92/50/EEC.",
-     ["https://lagen.nu/ext/celex/31992L0050#1.2"]),
+     ["https://lagen.nu/celex/31992L0050#1.2"]),
     ("Regulation (EEC) No 2092/91 applies.",
-     ["https://lagen.nu/ext/celex/31991R2092"]),
+     ["https://lagen.nu/celex/31991R2092"]),
     ("Commission Recommendation 2003/361/EC",
-     ["https://lagen.nu/ext/celex/32003H0361"]),
+     ["https://lagen.nu/celex/32003H0361"]),
     # a Treaty article refuses to link (no English treaty grammar) -- correct-
     # but-unlinked, never anaphora-pinned onto the last named act
     ("Article 177 of the EEC Treaty by the Raad van State", []),
@@ -509,15 +509,15 @@ EULAGSTIFTNING_ENG_CASES = [
     # the act named by number, the recital coordinated with an article that
     # names it, and the definite generic noun referring back
     ("Recital 19 of Directive 71/305/EEC states",
-     ["https://lagen.nu/ext/celex/31971L0305#recital-19",
-      "https://lagen.nu/ext/celex/31971L0305"]),
+     ["https://lagen.nu/celex/31971L0305#recital-19",
+      "https://lagen.nu/celex/31971L0305"]),
     ("Recital 19 and Article 29 (5) of Directive 71/305/EEC provide",
-     ["https://lagen.nu/ext/celex/31971L0305#recital-19",
-      "https://lagen.nu/ext/celex/31971L0305#29.5"]),
+     ["https://lagen.nu/celex/31971L0305#recital-19",
+      "https://lagen.nu/celex/31971L0305#29.5"]),
     ("Regulation (EEC) No 2092/91 applies. See recital 4 of the regulation.",
-     ["https://lagen.nu/ext/celex/31991R2092",
-      "https://lagen.nu/ext/celex/31991R2092#recital-4",
-      "https://lagen.nu/ext/celex/31991R2092"]),
+     ["https://lagen.nu/celex/31991R2092",
+      "https://lagen.nu/celex/31991R2092#recital-4",
+      "https://lagen.nu/celex/31991R2092"]),
     ("The court gave recital 5 no weight.", []),
 ]
 
@@ -537,11 +537,11 @@ def test_english_anaphora_links_the_directive_and_bare_articles():
     got = parser.parse_text("Under Articles 20 and 26 of the directive, "
                             "criteria are laid down.", context={})
     assert [r.uri for r in got] == [
-        "https://lagen.nu/ext/celex/31971L0305#20",
-        "https://lagen.nu/ext/celex/31971L0305#26"]
+        "https://lagen.nu/celex/31971L0305#20",
+        "https://lagen.nu/celex/31971L0305#26"]
     bare = parser.parse_text("Article 29 provides for that examination.",
                              context={})
-    assert [r.uri for r in bare] == ["https://lagen.nu/ext/celex/31971L0305#29"]
+    assert [r.uri for r in bare] == ["https://lagen.nu/celex/31971L0305#29"]
 
 
 # EU legislation CELEX minting. The act-number's year/number order differs by
@@ -551,39 +551,39 @@ def test_english_anaphora_links_the_directive_and_bare_articles():
 EULAGSTIFTNING_CASES = [
     # post-2015: "(EU) <year>/<number>", year-first for every act type
     ("Europaparlamentets och rådets direktiv (EU) 2016/1148",
-     "https://lagen.nu/ext/celex/32016L1148"),
+     "https://lagen.nu/celex/32016L1148"),
     ("Europaparlamentets och rådets förordning (EU) 2016/679",
-     "https://lagen.nu/ext/celex/32016R0679"),
+     "https://lagen.nu/celex/32016R0679"),
     # the sequence number can exceed the year range -- only the year is checked
     ("Europaparlamentets och rådets direktiv (EU) 2022/2555",
-     "https://lagen.nu/ext/celex/32022L2555"),
+     "https://lagen.nu/celex/32022L2555"),
     # pre-2015 directive: "<year>/<number>/<coop>" (2- and 4-digit years)
-    ("rådets direktiv 85/337/EEG", "https://lagen.nu/ext/celex/31985L0337"),
+    ("rådets direktiv 85/337/EEG", "https://lagen.nu/celex/31985L0337"),
     ("Europaparlamentets och rådets direktiv 95/46/EG",
-     "https://lagen.nu/ext/celex/31995L0046"),
+     "https://lagen.nu/celex/31995L0046"),
     # pre-2015 regulation: "(coop) nr <number>/<year>", number-first
     ("rådets förordning (EEG) nr 1234/85",
-     "https://lagen.nu/ext/celex/31985R1234"),
+     "https://lagen.nu/celex/31985R1234"),
     # a *bare* act-type word (no "rådets"/"kommissionens" institution) before a
     # parenthesised designation still sets the sector letter -- "direktiv" -> L,
     # "förordning" -> R. Regression for the CRA recital-125 bug, where a bare
     # "direktiv (EU) 2022/2555" minted a regulation (32022R2555) because only the
     # institution-prefixed alternative captured the act type.
     ("ändras genom direktiv (EU) 2022/2555 och",
-     "https://lagen.nu/ext/celex/32022L2555"),
+     "https://lagen.nu/celex/32022L2555"),
     ("som avses i direktiv (EU) 2018/1808",
-     "https://lagen.nu/ext/celex/32018L1808"),
+     "https://lagen.nu/celex/32018L1808"),
     ("enligt förordning (EU) 2022/2554 ska",
-     "https://lagen.nu/ext/celex/32022R2554"),
+     "https://lagen.nu/celex/32022R2554"),
     # absent any act-type word, a parenthesised "(EU) <year>/<number>" still
     # defaults to a regulation -- the correct pre-2015 behaviour (only regulations
     # used the parenthesised form), and the safe default post-2015
-    ("i (EU) 2019/1020 anges", "https://lagen.nu/ext/celex/32019R1020"),
+    ("i (EU) 2019/1020 anges", "https://lagen.nu/celex/32019R1020"),
     # non-directive/-regulation act types carry their own CELEX sector letter: a
     # recommendation is H (not a directive's L), a decision D
     ("kommissionens rekommendation 2003/361/EG",
-     "https://lagen.nu/ext/celex/32003H0361"),
-    ("rådets beslut 2010/48/EG", "https://lagen.nu/ext/celex/32010D0048"),
+     "https://lagen.nu/celex/32003H0361"),
+    ("rådets beslut 2010/48/EG", "https://lagen.nu/celex/32010D0048"),
 ]
 
 
@@ -597,17 +597,17 @@ def test_eulagstiftning_celex(text, uri):
 # consolidated text (12016E/TXT for TFEU, 12012P/TXT for the Charter, coe/005 for
 # the ECHR), the article/sub-article riding as a #-fragment. The "i" is optional.
 TREATY_CASES = [
-    ("artikel 16.2 i EUF-fördraget", "https://lagen.nu/ext/celex/12016E/TXT#16.2"),
-    ("artikel 263 i EUF-fördraget", "https://lagen.nu/ext/celex/12016E/TXT#263"),
-    ("artikel 267 FEUF", "https://lagen.nu/ext/celex/12016E/TXT#267"),
-    ("artikel 47 i stadgan", "https://lagen.nu/ext/celex/12012P/TXT#47"),
+    ("artikel 16.2 i EUF-fördraget", "https://lagen.nu/celex/12016E/TXT#16.2"),
+    ("artikel 263 i EUF-fördraget", "https://lagen.nu/celex/12016E/TXT#263"),
+    ("artikel 267 FEUF", "https://lagen.nu/celex/12016E/TXT#267"),
+    ("artikel 47 i stadgan", "https://lagen.nu/celex/12012P/TXT#47"),
     # a sentence-initial "Artikel" (capitalised) and the Charter's full name
     ("Artikel 8.1 i Europeiska unionens stadga om de grundläggande rättigheterna",
-     "https://lagen.nu/ext/celex/12012P/TXT#8.1"),
+     "https://lagen.nu/celex/12012P/TXT#8.1"),
     # the ECHR (a Council-of-Europe treaty) uses the CoE article grammar its own
     # artifact mints -- "A6", paragraph "A6P1" -- not the EU "#6.1" form
-    ("artikel 6 i europakonventionen", "https://lagen.nu/ext/coe/005#A6"),
-    ("artikel 6.1 i EKMR", "https://lagen.nu/ext/coe/005#A6P1"),
+    ("artikel 6 i europakonventionen", "https://lagen.nu/coe/005#A6"),
+    ("artikel 6.1 i EKMR", "https://lagen.nu/coe/005#A6P1"),
 ]
 
 
@@ -621,15 +621,15 @@ def test_treaty_and_charter_articles(text, uri):
 # ("12–15") links its endpoints; each on its own number span
 EU_LIST_RANGE_CASES = [
     ("artiklarna 101 och 102 i EUF-fördraget",
-     ["https://lagen.nu/ext/celex/12016E/TXT#101",
-      "https://lagen.nu/ext/celex/12016E/TXT#102"]),
+     ["https://lagen.nu/celex/12016E/TXT#101",
+      "https://lagen.nu/celex/12016E/TXT#102"]),
     ("artiklarna 12, 13 och 14 i stadgan",
-     ["https://lagen.nu/ext/celex/12012P/TXT#12",
-      "https://lagen.nu/ext/celex/12012P/TXT#13",
-      "https://lagen.nu/ext/celex/12012P/TXT#14"]),
+     ["https://lagen.nu/celex/12012P/TXT#12",
+      "https://lagen.nu/celex/12012P/TXT#13",
+      "https://lagen.nu/celex/12012P/TXT#14"]),
     ("artiklarna 12–15 i EUF-fördraget",
-     ["https://lagen.nu/ext/celex/12016E/TXT#12",
-      "https://lagen.nu/ext/celex/12016E/TXT#15"]),
+     ["https://lagen.nu/celex/12016E/TXT#12",
+      "https://lagen.nu/celex/12016E/TXT#15"]),
 ]
 
 
@@ -647,11 +647,11 @@ def test_eu_sarskilt_names_instrument_first():
         "med beaktande av fördraget om Europeiska unionens funktionssätt, "
         "särskilt artikel 16,", context={})
     assert [(r.uri, r.text) for r in refs] == [
-        ("https://lagen.nu/ext/celex/12016E/TXT#16", "artikel 16")]
+        ("https://lagen.nu/celex/12016E/TXT#16", "artikel 16")]
     # also after an act cited by number, and with a coordinated list
     assert [r.uri for r in parser.parse_text(
         "direktiv 2000/31/EG, särskilt artikel 5", context={})] == [
-        "https://lagen.nu/ext/celex/32000L0031#5"]
+        "https://lagen.nu/celex/32000L0031#5"]
 
 
 def test_gdpr_preamble_reference_patterns():
@@ -661,8 +661,8 @@ def test_gdpr_preamble_reference_patterns():
     p = LagrumParser({}, basefile="celex", parse_types=[EULAGSTIFTNING])
     p.reset()
     p.state.self_eu_act = "32016R0679"
-    T = "https://lagen.nu/ext/celex/12016E/TXT"
-    C = "https://lagen.nu/ext/celex/12012P/TXT"
+    T = "https://lagen.nu/celex/12016E/TXT"
+    C = "https://lagen.nu/celex/12012P/TXT"
 
     def uris(text):
         return [r.uri for r in p.parse_text(text, context={})]
@@ -672,7 +672,7 @@ def test_gdpr_preamble_reference_patterns():
                 "särskilt artikel 16,") == ["%s#16" % T]
     # a bare self-reference still resolves to the GDPR
     assert uris("påverkar inte tillämpningen av artikel 98") \
-        == ["https://lagen.nu/ext/celex/32016R0679#98"]
+        == ["https://lagen.nu/celex/32016R0679#98"]
     # Charter (full name, capitalised) and TFEU sub-article
     assert uris("Artikel 8.1 i Europeiska unionens stadga om de grundläggande "
                 "rättigheterna") == ["%s#8.1" % C]
@@ -680,11 +680,11 @@ def test_gdpr_preamble_reference_patterns():
     # a directive named, then a range anaphora back to it
     p.parse_text("Europaparlamentets och rådets direktiv 2000/31/EG", context={})
     assert uris("ansvar i artiklarna 12–15 i det direktivet") == [
-        "https://lagen.nu/ext/celex/32000L0031#12",
-        "https://lagen.nu/ext/celex/32000L0031#15"]
+        "https://lagen.nu/celex/32000L0031#12",
+        "https://lagen.nu/celex/32000L0031#15"]
     # a recommendation keeps its own CELEX sector letter (H, not a directive's L)
     assert uris("artikel 2 i bilagan till kommissionens rekommendation 2003/361/EG") \
-        == ["https://lagen.nu/ext/celex/32003H0361"]
+        == ["https://lagen.nu/celex/32003H0361"]
 
 
 def test_eu_range_anaphora_to_named_directive():
@@ -696,14 +696,14 @@ def test_eu_range_anaphora_to_named_directive():
                       context={})
     got = [r.uri for r in parser.parse_text(
         "ansvar i artiklarna 12–15 i det direktivet", context={})]
-    assert got == ["https://lagen.nu/ext/celex/32000L0031#12",
-                   "https://lagen.nu/ext/celex/32000L0031#15"]
+    assert got == ["https://lagen.nu/celex/32000L0031#12",
+                   "https://lagen.nu/celex/32000L0031#15"]
 
 
 # EU acts cited by Swedish short name (load_namedacts), with article anaphora.
 # Each tuple is (text, [expected uris]); a parser threads one document so the
 # anaphora cases see the act named by the line before them.
-GDPR = "https://lagen.nu/ext/celex/32016R0679"
+GDPR = "https://lagen.nu/celex/32016R0679"
 EU_NAMEDACT_SEQUENCE = [
     # explicit name -> article pinpoint, the determiner/adjective absorbed
     ("Enligt artikel 6 i dataskyddsförordningen ska", ["%s#6" % GDPR]),
@@ -722,14 +722,14 @@ EU_NAMEDACT_SEQUENCE = [
     # a treaty / the Charter / the ECHR links onto its OWN consolidated text --
     # never mis-pinned onto the act in focus (the "i" before the instrument is
     # optional). The ECHR is a Council-of-Europe treaty (coe/005), the others CELEX.
-    ("artikel 6.1 europakonventionen och", ["https://lagen.nu/ext/coe/005#A6P1"]),
+    ("artikel 6.1 europakonventionen och", ["https://lagen.nu/coe/005#A6P1"]),
     ("artikel 267 EUF-fördraget för",
-     ["https://lagen.nu/ext/celex/12016E/TXT#267"]),
+     ["https://lagen.nu/celex/12016E/TXT#267"]),
     # a coordinated list before the Charter (indefinite/determiner-led name) links
     # each member onto the Charter's consolidated text
     ("rätten till privatliv enligt artikel 7 och 8.1 i EU:s rättighetsstadga",
-     ["https://lagen.nu/ext/celex/12012P/TXT#7",
-      "https://lagen.nu/ext/celex/12012P/TXT#8.1"]),
+     ["https://lagen.nu/celex/12012P/TXT#7",
+      "https://lagen.nu/celex/12012P/TXT#8.1"]),
 ]
 
 
@@ -749,12 +749,12 @@ def test_eu_namedact_articles_and_anaphora():
 EU_GENERIC_KIND_SEQUENCE = [
     ("enligt förordning (EU) 2016/679 gäller", [GDPR]),
     ("och enligt direktiv 95/46/EG gällde",
-     ["https://lagen.nu/ext/celex/31995L0046"]),
+     ["https://lagen.nu/celex/31995L0046"]),
     # the directive is the act most recently named; "förordningen" still means
     # the regulation
     ("artikel 23 i förordningen har följande lydelse", ["%s#23" % GDPR]),
     ("artikel 28.3 i direktivet angav",
-     ["https://lagen.nu/ext/celex/31995L0046#28.3"]),
+     ["https://lagen.nu/celex/31995L0046#28.3"]),
 ]
 
 
@@ -774,10 +774,10 @@ def test_eu_generic_noun_names_a_kind_on_the_english_surface_too():
     uris = lambda t: [r.uri for r in parser.parse_text(t, context={})]
     assert uris("under Regulation (EU) 2016/679") == [GDPR]
     assert uris("and under Directive 95/46/EC") == \
-        ["https://lagen.nu/ext/celex/31995L0046"]
+        ["https://lagen.nu/celex/31995L0046"]
     assert uris("Article 23 of the regulation reads") == ["%s#23" % GDPR]
     assert uris("Article 28(3) of the directive provided") == \
-        ["https://lagen.nu/ext/celex/31995L0046#28.3"]
+        ["https://lagen.nu/celex/31995L0046#28.3"]
 
 
 def test_the_kindless_generic_noun_still_takes_the_last_act_named():
@@ -788,7 +788,7 @@ def test_the_kindless_generic_noun_still_takes_the_last_act_named():
     parser.parse_text("och enligt direktiv 95/46/EG gällde", context={})
     assert [r.uri for r in parser.parse_text(
         "artikel 28 i rättsakten angav", context={})] == \
-        ["https://lagen.nu/ext/celex/31995L0046#28"]
+        ["https://lagen.nu/celex/31995L0046#28"]
 
 
 def test_eu_generic_noun_refuses_when_no_act_of_that_kind_was_named():
@@ -920,24 +920,24 @@ def test_eu_lettered_point_pinpoints(text, want):
 # citation degraded to an act-level link -- adding the word made the link worse.
 EU_STYCKE_PINPOINTS = [
     ("artikel 9.2 andra stycket i direktiv 2005/85/EG",
-     ["https://lagen.nu/ext/celex/32005L0085#9.2.S2"]),
+     ["https://lagen.nu/celex/32005L0085#9.2.S2"]),
     ("artikel 93.1 andra stycket i direktiv 2014/65/EU",
-     ["https://lagen.nu/ext/celex/32014L0065#93.1.S2"]),
+     ["https://lagen.nu/celex/32014L0065#93.1.S2"]),
     # an article's own stycken, with no numbered paragraph between
     ("artikel 8 andra stycket i direktiv 98/34/EG",
-     ["https://lagen.nu/ext/celex/31998L0034#8.S2"]),
+     ["https://lagen.nu/celex/31998L0034#8.S2"]),
     ("artikel 12 första stycket i direktiv 98/34/EG",
-     ["https://lagen.nu/ext/celex/31998L0034#12.S1"]),
+     ["https://lagen.nu/celex/31998L0034#12.S1"]),
     # a lettered point is anchored by its paragraph whichever stycke holds it --
     # which is also the only form the acts write ("artikel 11 a") -- so the point
     # takes the fragment and the stycke drops out
     ("artikel 3.1 tredje stycket a i förordning (EG) nr 1272/2008",
-     ["https://lagen.nu/ext/celex/32008R1272#3.1.a"]),
+     ["https://lagen.nu/celex/32008R1272#3.1.a"]),
     ("artikel 9.2 b i direktiv 2005/85/EG",
-     ["https://lagen.nu/ext/celex/32005L0085#9.2.b"]),
+     ["https://lagen.nu/celex/32005L0085#9.2.b"]),
     # ... and an article cited with no stycke is untouched
     ("artikel 2.1 i direktiv (EU) 2015/1535",
-     ["https://lagen.nu/ext/celex/32015L1535#2.1"]),
+     ["https://lagen.nu/celex/32015L1535#2.1"]),
 ]
 
 
@@ -961,9 +961,9 @@ def test_eu_stycke_link_spans_the_whole_phrase():
     # coe_ids.article_fragment, which has always taken one. Without this the
     # grammar swallows "c" into the link span and still lands on A6P3, so the
     # citation reads as pinpointed while pointing a level short.
-    ("artikel 6.3 c i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6P3Lc"]),
-    ("artikel 5.1 d i Europakonventionen", ["https://lagen.nu/ext/coe/005#A5P1Ld"]),
-    ("artikel 6.1 i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6P1"]),
+    ("artikel 6.3 c i Europakonventionen", ["https://lagen.nu/coe/005#A6P3Lc"]),
+    ("artikel 5.1 d i Europakonventionen", ["https://lagen.nu/coe/005#A5P1Ld"]),
+    ("artikel 6.1 i Europakonventionen", ["https://lagen.nu/coe/005#A6P1"]),
 ])
 def test_coe_lettered_point_uses_the_treaty_fragment_grammar(text, want):
     assert [r.uri for r in _eu_parser().parse_text(text, context={})] == want
@@ -975,13 +975,13 @@ def test_coe_lettered_point_uses_the_treaty_fragment_grammar(text, want):
     # (Reg. 469/2009 art. 3, the skyddsgrund directive's art. 2) are what the
     # corpus mostly cites this way
     ("artikel 143 b i direktiv 2006/112/EG",
-     ["https://lagen.nu/ext/celex/32006L0112#143.b"]),
+     ["https://lagen.nu/celex/32006L0112#143.b"]),
     ("artikel 143 b och c i direktiv 2006/112/EG",
-     ["https://lagen.nu/ext/celex/32006L0112#143.b",
-      "https://lagen.nu/ext/celex/32006L0112#143.c"]),
+     ["https://lagen.nu/celex/32006L0112#143.b",
+      "https://lagen.nu/celex/32006L0112#143.c"]),
     # the same on the named-act and treaty paths, which is where gating the
     # letter on a sub-article cost the entire citation rather than the pinpoint
-    ("artikel 6 c i Europakonventionen", ["https://lagen.nu/ext/coe/005#A6Lc"]),
+    ("artikel 6 c i Europakonventionen", ["https://lagen.nu/coe/005#A6Lc"]),
     ("artikel 3 a i dataskyddsförordningen", ["%s#3.a" % GDPR]),
 ])
 def test_letter_without_a_subarticle_is_read_as_a_point(text, want):
@@ -1058,7 +1058,7 @@ def test_a_recital_still_leaves_the_act_linked_and_in_focus():
     assert [text[r.start:r.end] for r in refs] == ["skäl 19", "direktiv 95/46/EG"]
     # ... and the act is still what a later bare article binds to
     assert [r.uri for r in parser.parse_text("artikel 3.1", context={})] == \
-        ["https://lagen.nu/ext/celex/31995L0046#3.1"]
+        ["https://lagen.nu/celex/31995L0046#3.1"]
 
 
 def test_eu_single_lettered_point_spans_the_whole_phrase():
@@ -1114,7 +1114,7 @@ def test_eu_self_act_bare_article():
     parser.state.self_eu_act = "32016R0679"
     assert [r.uri for r in parser.parse_text(
         "i enlighet med artikel 28.2 i förordning (EG) nr 45/2001", context={})] \
-        == ["https://lagen.nu/ext/celex/32001R0045#28.2"]  # explicit external ref
+        == ["https://lagen.nu/celex/32001R0045#28.2"]  # explicit external ref
     assert [r.uri for r in parser.parse_text(
         "påverkar inte tillämpningen av artikel 98", context={})] \
         == ["%s#98" % GDPR]  # bare article self-refers, despite the recital above

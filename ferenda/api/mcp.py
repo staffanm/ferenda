@@ -197,7 +197,7 @@ CitationArg = Annotated[str, Field(
     "rättsfråga -- för den, använd `search`.")]
 DocUriArg = Annotated[str, Field(
     description="Dokumentets fullständiga lagen.nu-URI, t.ex. "
-    "'https://lagen.nu/1962:700' eller 'https://lagen.nu/ext/celex/62024CJ0199'. "
+    "'https://lagen.nu/1962:700' eller 'https://lagen.nu/celex/62024CJ0199'. "
     "Hämta den från `search`, `resolve_citation` eller ett tidigare "
     "verktygsresultat; ange inte en sökfråga här.")]
 PinpointArg = Annotated[str | None, Field(

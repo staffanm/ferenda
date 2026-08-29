@@ -37,6 +37,11 @@ relative URLs — there is no separate API host to configure.
   nothing else.
 - **Document URIs are always a `uri` query parameter**, never a path segment —
   lagen.nu URIs contain `:` and `/`.
+- **A URI's path is the document's page path.** `https://lagen.nu/celex/32016R0679`
+  is both the identifier and the address; strip the host to get the page, add it
+  to get the identifier. (Until 2026-08-29 the `celex`, `coe`, `icrc`, `untc`,
+  `icc` and `icj` namespaces carried an extra `ext/` segment in the identifier
+  only. A consumer holding those older URIs must drop it.)
 - **Errors:** `{"detail": <message>}` JSON. A `404` or a `5xx` adds
   `"error_id": "<id>"`, which names the entry in the server's error ledger —
   quote it in a bug report. The key is `null` if the ledger itself could not be
@@ -369,7 +374,7 @@ which costs one artifact read. `uri` takes either form the site writes — the
 uri (`https://lagen.nu/1962:700#K3P1`) or the page path for the same place
 (`/1962:700#K3P1`), which is what a browser has in an href and cannot compose
 the uri from (an EU act is served at `/celex/<id>` and identified as
-`ext/celex/<id>`). The site's link popovers use it for every target outside
+`celex/<id>`). The site's link popovers use it for every target outside
 the page in hand, instead of fetching that page. The graph payload
 deliberately does not carry these fields — of 300 neighbours one gets
 selected, and this is the call for that one.
@@ -542,7 +547,7 @@ layout: `children` are `rad` rows with two-element `cells` (inline-run lists,
 citation-scanned), the header row flagged `th` — the same table shape SFS
 artifacts use.
 
-**eurlex (EU law)** — `{ uri (…/ext/celex/{CELEX}), celex, doctype
+**eurlex (EU law)** — `{ uri (…/celex/{CELEX}), celex, doctype
 (regulation|directive|decision|judgment|treaty|act), lang, title, date, structure
 }`, optional `label, shortname, abbr, ecli, oj`. Blocks carry `type`, `text`,
 `num?`, `id?` (= the citation anchor, e.g. article `"5"`), `defines?` (a
@@ -565,10 +570,10 @@ paragraph (`stycke`, `id: "P{n}"`) blocks. If numbering restarts in an
 operative part, annex or separate opinion, later occurrences are suffixed
 (`P1-2`) while the first `P1` stays canonical. `references` is the top-level
 `dcterms:references` link list into the cited Convention/Protocol
-provisions — CoE Treaty Office fragments (`ext/coe/{ETS}#A…`), the same
+provisions — CoE Treaty Office fragments (`coe/{ETS}#A…`), the same
 inbound-citation contract every other source uses.
 
-**coe (Council of Europe treaties)** — `{ uri (…/ext/coe/{number}), type:
+**coe (Council of Europe treaties)** — `{ uri (…/coe/{number}), type:
 "internationell-overenskommelse", doctype (treaty|protocol), number,
 identifier, title, date, metadata, references, structure }`. `structure` is
 a nested `rubrik`/`artikel`/`sektion`/`stycke`/`punkt` tree with stable,

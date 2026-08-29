@@ -341,7 +341,7 @@ def test_kommentar_per_article_guidance_attaches_to_section(tmp_path):
     assert section["guidance"] == [
         {"label": "Vägledning till artikel 5", "href": "https://ec.europa.eu/art5"}]
     # the heading links the commentary to the EU article (the kommentar->article edge)
-    assert section["text"][0]["uri"] == "https://lagen.nu/ext/celex/32024R2847#5"
+    assert section["text"][0]["uri"] == "https://lagen.nu/celex/32024R2847#5"
 
 
 def test_guidance_under_unanchorable_heading_is_rejected(tmp_path):
@@ -374,7 +374,7 @@ def test_dangling_anchors_flags_mismatched_sections():
 
 
 def test_kommentar_guidance_celex_host(tmp_path):
-    # an annotation whose `annotates:` is a CELEX resolves to the ext/celex act
+    # an annotation whose `annotates:` is a CELEX resolves to the celex act
     # the eurlex source publishes, and its `## Externa länkar` block -> guidance field
     md = ("---\nannotates: 32024R2847\n---\n"
           "## Externa länkar\n"
@@ -383,7 +383,7 @@ def test_kommentar_guidance_celex_host(tmp_path):
     p = tmp_path / "32024R2847.md"
     p.write_text(md)
     art = wiki.kommentar_artifact(str(p))
-    assert art["annotates"] == "https://lagen.nu/ext/celex/32024R2847"
+    assert art["annotates"] == "https://lagen.nu/celex/32024R2847"
     assert art["uri"] == "https://lagen.nu/kommentar/32024R2847"
     assert art["guidance"] == [
         {"label": "CRA Implementation FAQ",
@@ -456,7 +456,7 @@ def test_eurlex_guidance_renders_in_document_rail(tmp_path):
     ad.mkdir()
     act = ad / "act.json"
     act.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/celex/32024R2847",
+        "uri": "https://lagen.nu/celex/32024R2847",
         "celex": "32024R2847", "doctype": "regulation",
         "title": "Cyberresiliensförordningen", "shortname": "Cyberresiliensförordningen",
         "abbr": "CRA",
@@ -501,7 +501,7 @@ def test_eurlex_per_article_guidance_and_commentary_render_in_article_rail(tmp_p
     # a CELEX with no editorial .ann, so article panels are commentary/guidance
     # only -- hermetic, no real recital layer leaking in
     act.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/celex/32024R9999",
+        "uri": "https://lagen.nu/celex/32024R9999",
         "celex": "32024R9999", "doctype": "regulation",
         "title": "Testförordningen", "shortname": "Testförordningen",
         "abbr": "TF",
@@ -564,7 +564,7 @@ def test_ai_guidance_ann_renders_on_subarticle_and_recital_rails(tmp_path,
     ad.mkdir()
     act = ad / "act.json"
     act.write_text(json.dumps({
-        "uri": "https://lagen.nu/ext/celex/32024R9998",
+        "uri": "https://lagen.nu/celex/32024R9998",
         "celex": "32024R9998", "doctype": "regulation",
         "title": "Dataförordningen", "shortname": "Dataförordningen", "abbr": "DF",
         "structure": [

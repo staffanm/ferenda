@@ -700,7 +700,7 @@ def test_artikel_29_gruppen_is_a_body_not_a_reference_to_artikel_29(refparser):
     refparser.reset()
     assert [r.uri for r in refparser.parse_text(
         "artikel 29 i förordning (EU) 2016/679", context={})] \
-        == ["https://lagen.nu/ext/celex/32016R0679#29"]
+        == ["https://lagen.nu/celex/32016R0679#29"]
 
 
 # --------------------------------------------------------------------------

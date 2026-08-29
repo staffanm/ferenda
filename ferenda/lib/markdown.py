@@ -353,7 +353,7 @@ def target_uri(target):
         # rule, not site-specific: any source can now write `[FB](sfs:1949:381)`.
         return "https://lagen.nu/" + target[len("sfs:"):]
     if target.startswith("eurlex:"):
-        # an EU act by CELEX -> its ext/celex document uri (render's `href` maps
+        # an EU act by CELEX -> its celex document uri (render's `href` maps
         # it to the public /celex/<CELEX> URL, the same page the eurlex source
         # builds). Symmetric with `sfs:` -- the content names the source, not the
         # URL path, so `[GDPR](eurlex:32016R0679)` mirrors `[FB](sfs:1949:381)`.

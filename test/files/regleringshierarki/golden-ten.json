@@ -16,7 +16,7 @@
       "name": "betydande-incident",
       "concept": "betydande incident",
       "docs": [
-        "https://lagen.nu/ext/celex/32022L2555",
+        "https://lagen.nu/celex/32022L2555",
         "https://lagen.nu/2025:1506",
         "https://lagen.nu/2025:1507",
         "https://lagen.nu/mcffs/2026:8"
@@ -71,7 +71,7 @@
       ],
       "rungs": [
         {
-          "doc": "https://lagen.nu/ext/celex/32022L2555",
+          "doc": "https://lagen.nu/celex/32022L2555",
           "anchor": "23",
           "roles": [
             "definierar"
@@ -121,7 +121,7 @@
       "name": "sakerhetsatgarder",
       "concept": "säkerhetsåtgärd",
       "docs": [
-        "https://lagen.nu/ext/celex/32022L2555",
+        "https://lagen.nu/celex/32022L2555",
         "https://lagen.nu/2025:1506",
         "https://lagen.nu/2025:1507",
         "https://lagen.nu/mcffs/2026:11"
@@ -129,7 +129,7 @@
       "a_clauses": [],
       "rungs": [
         {
-          "doc": "https://lagen.nu/ext/celex/32022L2555",
+          "doc": "https://lagen.nu/celex/32022L2555",
           "anchor": "21",
           "roles": [
             "alagger"
@@ -178,7 +178,7 @@
       "name": "brandskydd",
       "concept": "brandskydd",
       "docs": [
-        "https://lagen.nu/ext/celex/32009L0045",
+        "https://lagen.nu/celex/32009L0045",
         "https://lagen.nu/2003:364",
         "https://lagen.nu/2003:438",
         "https://lagen.nu/tsfs/2019:120"
@@ -197,7 +197,7 @@
       ],
       "rungs": [
         {
-          "doc": "https://lagen.nu/ext/celex/32009L0045",
+          "doc": "https://lagen.nu/celex/32009L0045",
           "anchor": "bilaga-1",
           "roles": [
             "alagger",
@@ -243,7 +243,7 @@
       "name": "sakkunnig",
       "concept": "sakkunnig",
       "docs": [
-        "https://lagen.nu/ext/celex/32001L0083",
+        "https://lagen.nu/celex/32001L0083",
         "https://lagen.nu/1992:859",
         "https://lagen.nu/1992:1752",
         "https://lagen.nu/lvfs/2004:7"
@@ -265,7 +265,7 @@
       ],
       "rungs": [
         {
-          "doc": "https://lagen.nu/ext/celex/32001L0083",
+          "doc": "https://lagen.nu/celex/32001L0083",
           "anchor": "48",
           "roles": [
             "alagger"

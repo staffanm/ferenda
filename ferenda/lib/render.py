@@ -168,7 +168,7 @@ def _render_feed_index(con):
 # the sources whose pages carry inline-editable content. A logged-in user edits
 # the *commentary* (kommentar rail) on a host act's node -- the official body text
 # stays read-only -- so the editable ref is the host's `annotates` basefile: the
-# uri's local part, bar eurlex's `ext/celex/` prefix (the bare CELEX the
+# uri's local part, bar eurlex's `celex/` prefix (the bare CELEX the
 # commentary frontmatter keys on). A concept page edits its own body.
 KOMMENTAR_HOSTS = ("sfs", "eurlex", "foreskrift", "forarbete")
 
@@ -190,7 +190,7 @@ def _document_edit_meta(source, art):
     uri = art["uri"]
     if source in KOMMENTAR_HOSTS:
         local = catalog.local(uri)
-        ref = local[len("ext/celex/"):] if local.startswith("ext/celex/") else local
+        ref = local[len("celex/"):] if local.startswith("celex/") else local
         # the host act's own basefile is `ref`; every KOMMENTAR_HOSTS source is
         # patchable, so pass its identity through for the patch-source button
         return edit_meta("kommentar", ref, uri, source=source, basefile=ref)
@@ -326,7 +326,7 @@ def _render_index(con):
 # --------------------------------------------------------------------------
 
 def _ext_number(uri):
-    return uri.rsplit("/", 1)[-1]                 # '…/ext/coe/005' -> '005'
+    return uri.rsplit("/", 1)[-1]                 # '…/coe/005' -> '005'
 
 
 def _treaty_rows(con, source):

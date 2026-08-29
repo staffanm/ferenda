@@ -71,7 +71,7 @@ def test_sfs_presented_consolidation_replaces_the_base_structure():
 
 def test_eurlex_shape_reads_as_an_eu_act():
     art = {
-        "uri": "https://lagen.nu/ext/celex/32016R0679",
+        "uri": "https://lagen.nu/celex/32016R0679",
         "title": "Europaparlamentets och rådets förordning (EU) 2016/679",
         "structure": [
             {"type": "citation", "text": ["med beaktande av fördraget,"]},

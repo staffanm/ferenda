@@ -17,7 +17,7 @@ in order:
     the front, normalise the terse pinpoint that follows ("36" -> "36 §", "12:1"
     -> "12 kap. 1 §"), and resolve it against that law's context.
   * EU  -- a named act ("GDPR", "IPRED") + an optional "art N"/"artikel N" tail
-    -> ext/celex/<CELEX>#<N>.
+    -> celex/<CELEX>#<N>.
   * DV  -- a case nickname ("Instagrambilden") -> the published NJA case URI.
 
 Pure and catalog-free: it maps a string to a URI. Whether that URI is hosted
@@ -208,7 +208,7 @@ def resolve_eu(q):
 
 
 # --------------------------------------------------------------------------
-# CoE -- treaty short name + article ("EKMR 6" -> ext/coe/005#A6)
+# CoE -- treaty short name + article ("EKMR 6" -> coe/005#A6)
 # --------------------------------------------------------------------------
 
 _TREATY_ART = re.compile(r"(?:art(?:ikel|icle)?\.?\s*)?(\d+)(?:[.\s:]+(\d+))?",
@@ -228,7 +228,7 @@ def _named_treaties():
 def resolve_treaty(q):
     """A CoE treaty article URI when the query is a treaty short name plus an
     article pinpoint ("EKMR 6", "Europakonventionen artikel 6.1" ->
-    ext/coe/005#A6 / #A6P1), else None. Only fires *with* a pinpoint: a bare
+    coe/005#A6 / #A6P1), else None. Only fires *with* a pinpoint: a bare
     treaty name keeps resolving to the Swedish incorporation act (the SFS
     resolver), but "EKMR 6" means the convention's article 6, not 6 § of lag
     (1994:1219) -- an anchor that does not even exist there (K4)."""

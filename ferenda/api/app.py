@@ -822,7 +822,7 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
 # "1827:60 s.1007", "2003:466" -- one colon, no path-shaped characters, so it
 # can safely become the filesystem segments the layout rules mint
 _RE_SFS_ID = re.compile(r"^[^/\\:]+:[^/\\:]+$")
-# a CELEX as it may appear behind an ext/celex/ uri ("32014R0910",
+# a CELEX as it may appear behind an celex/ uri ("32014R0910",
 # "12016E/TXT") -- the character set the layout slug folds, no '..' possible
 _RE_CELEX = re.compile(r"^[0-9][0-9A-Z/().]+$")
 # a eurlex version id: the ISO date the consolidated wording began to apply
@@ -834,8 +834,8 @@ def _versioned_document(uri):
     the two sources the pipeline consolidates over time: SFS statutes and EU
     acts (CONSLEG wordings)."""
     local = catalog.local(catalog.strip_fragment(uri))
-    if local.startswith("ext/celex/"):
-        basefile = local[len("ext/celex/"):]
+    if local.startswith("celex/"):
+        basefile = local[len("celex/"):]
         if _RE_CELEX.match(basefile) and ".." not in basefile:
             return "eurlex", basefile
     elif _RE_SFS_ID.match(local) and ".." not in local:
@@ -918,7 +918,7 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute "
     is not in the list -- it is what /document returns, and it is what /diff
     compares against when `to` is omitted."""
     source, basefile = _versioned_document(uri)
-    doc_uri = (catalog.BASE + "ext/celex/" + basefile if source == "eurlex"
+    doc_uri = (catalog.BASE + "celex/" + basefile if source == "eurlex"
                else catalog.BASE + basefile)
     if source == "sfs":
         row = catalog.document(con, doc_uri)
@@ -1324,7 +1324,7 @@ def card_endpoint(uri: str = Query(
     One parameter names the place, in either of the two forms the site writes:
     the uri everything else here speaks (`/graph?uri=`, a search hit's `uri`),
     or the page path the browser has in an href -- which is not a prefix of the
-    uri (an EU act is served at /celex/<id> and identified as ext/celex/<id>),
+    uri (an EU act is served at /celex/<id> and identified as celex/<id>),
     so a client holding one cannot be asked to compose the other."""
     if uri.startswith("/"):
         path, _, frag = uri.partition("#")

@@ -105,7 +105,7 @@ ACT_XML = """<ACT>
 def test_parse_act_metadata_and_title():
     doc = parse_formex(ET.fromstring(ACT_XML), "32022L2555", "swe")
     assert doc.doctype == "directive"
-    assert doc.uri == "https://lagen.nu/ext/celex/32022L2555"
+    assert doc.uri == "https://lagen.nu/celex/32022L2555"
     assert doc.date == "20221214"
     assert doc.oj == "L 333"
     assert doc.title == "Direktiv (EU) 2022/2555 om cybersäkerhet"
@@ -838,7 +838,7 @@ def test_a_quotations_bare_article_pins_to_the_act_it_quotes():
     uris = [run["uri"] for block in flatten_structure(art["structure"])
             if block.get("type") == "citat"
             for run in block.get("text", []) if isinstance(run, dict)]
-    assert uris == ["https://lagen.nu/ext/celex/31995L0046#31.2"]
+    assert uris == ["https://lagen.nu/celex/31995L0046#31.2"]
     # ... and the quotation's own act is not left in the judgment's focus
     # afterwards: the acts a quoted document names are its business, not the
     # court's
@@ -926,8 +926,8 @@ def test_hearing_report_stands_in_for_the_oldest_judgments():
     art = to_artifact(doc)
     uris = [run["uri"] for block in flatten_structure(art["structure"])
             for run in block.get("text", []) if isinstance(run, dict)]
-    assert "https://lagen.nu/ext/celex/31971L0305" in uris
-    assert "https://lagen.nu/ext/celex/31971L0305#29.5" in uris
+    assert "https://lagen.nu/celex/31971L0305" in uris
+    assert "https://lagen.nu/celex/31971L0305#29.5" in uris
 
 
 def test_judgment_without_title_date_has_none_not_the_referral_date():
@@ -952,7 +952,7 @@ def test_act_oj_number_is_unpadded():
 
 def test_to_artifact_shape_and_runs():
     art = to_artifact(parse_formex(ET.fromstring(ACT_XML), "32022L2555", "swe"))
-    assert art["uri"] == "https://lagen.nu/ext/celex/32022L2555"
+    assert art["uri"] == "https://lagen.nu/celex/32022L2555"
     assert art["celex"] == "32022L2555" and art["oj"] == "L 333"
     assert art["date"] == "2022-12-14"     # compact Formex DATE@ISO, dashed out
     # every block text is an inline-run list (plain strings / link dicts)
@@ -1106,8 +1106,8 @@ def test_parse_dir_publishes_what_the_act_amends_and_implements(tmp_path):
         {"amends": ["32002R0881"], "implements": ["32001R2580"]}))
     art = parse_dir(d, "32008R0803")
     assert art["metadata"] == {
-        "andrar": ["https://lagen.nu/ext/celex/32002R0881"],
-        "genomfor_akt": ["https://lagen.nu/ext/celex/32001R2580"]}
+        "andrar": ["https://lagen.nu/celex/32002R0881"],
+        "genomfor_akt": ["https://lagen.nu/celex/32001R2580"]}
 
 
 def test_parse_dir_leaves_no_metadata_key_on_a_base_act(tmp_path):
@@ -1613,7 +1613,7 @@ def test_parse_dir_serves_the_latest_consolidation(tmp_path):
     `consolidation`, and the per-article provenance as `mod` -- with no
     `version` key, since the latest wording *is* the document."""
     art = parse_dir(_consolidated_doc_dir(tmp_path), "32014R0910")
-    assert art["uri"] == "https://lagen.nu/ext/celex/32014R0910"
+    assert art["uri"] == "https://lagen.nu/celex/32014R0910"
     assert "version" not in art
     assert art["date"] == "2014-07-23"          # the act's date, not the version's
     assert art["consolidation"]["date"] == "2024-10-18"
@@ -1636,7 +1636,7 @@ def test_a_superseded_version_parses_to_a_konsolidering_uri(tmp_path):
                               "32014R0910", "2024-10-18")
     art = project(doc)
     assert art["version"] == "2024-10-18"
-    assert art["uri"] == ("https://lagen.nu/ext/celex/32014R0910"
+    assert art["uri"] == ("https://lagen.nu/celex/32014R0910"
                           "/konsolidering/2024-10-18")
 
 
@@ -1715,8 +1715,8 @@ def test_a_quoted_bare_article_links_into_the_amended_act():
     targets = {run["uri"] for run in quoted}
     # the quoted heading's own "Artikel 5a" and the body's "artikel 2" both
     # resolve into the amended act (a glued letter carries no pinpoint today)
-    assert targets == {"https://lagen.nu/ext/celex/32014R0910#2",
-                       "https://lagen.nu/ext/celex/32014R0910#5"}
+    assert targets == {"https://lagen.nu/celex/32014R0910#2",
+                       "https://lagen.nu/celex/32014R0910#5"}
 
 
 def test_amending_act_markdown_keys_on_the_quoted_articles():

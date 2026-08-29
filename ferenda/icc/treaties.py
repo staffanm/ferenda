@@ -1,6 +1,6 @@
 """Which instruments an ICC decision applies.
 
-The Court's own constitutive treaty is in the corpus as ``ext/icrc/585`` with
+The Court's own constitutive treaty is in the corpus as ``icrc/585`` with
 its 128 articles anchored, and until now nothing pointed at it: all 269
 decisions carried an empty `references`, so the Rome Statute -- and every one
 of the 111 ICRC treaties -- had zero inbound links. The decisions are made of

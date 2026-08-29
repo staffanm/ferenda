@@ -12,7 +12,7 @@ import re
 from ferenda.lib import treatyref
 
 STATUTE = (("the Statute", "icrc/585"),)
-EXT = "https://lagen.nu/ext/"
+EXT = "https://lagen.nu/"
 
 
 def _refs(text, extra=()):
@@ -168,7 +168,7 @@ def test_spans_link_each_enumerated_number_inline():
     folds in the leading "articles", later numbers link their own token, and
     the bound instrument name links to the instrument itself."""
     text = "pursuant to articles 15, 53 and 54 of the Statute"
-    got = [(text[s:e], uri.replace("https://lagen.nu/ext/", ""))
+    got = [(text[s:e], uri.replace("https://lagen.nu/", ""))
            for s, e, uri in treatyref.spans(text, extra=STATUTE)]
     assert got == [("articles 15", "icrc/585#A15"), ("53", "icrc/585#A53"),
                    ("54", "icrc/585#A54"), ("the Statute", "icrc/585")]
@@ -180,7 +180,7 @@ def test_spans_skip_a_range_interior_and_an_ambiguous_binding():
     Conventions" names four instruments at one span: linking would guess."""
     text = "articles 6 to 8 of the Rome Statute"
     uris = [uri.split("#")[-1] for _s, _e, uri in treatyref.spans(text)]
-    assert uris == ["A6", "A8", "https://lagen.nu/ext/icrc/585"]
+    assert uris == ["A6", "A8", "https://lagen.nu/icrc/585"]
     assert [r["uri"].split("#")[-1] for r in treatyref.references(text)
             if "#" in r["uri"]] == ["A6", "A7", "A8"]
     ambiguous = "common article 3 of the Geneva Conventions"

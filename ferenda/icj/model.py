@@ -68,7 +68,7 @@ def doc_basefile(stem):
 
 
 def decision_uri(basefile):
-    return "%sext/icj/%s" % (BASE, basefile)
+    return "%sicj/%s" % (BASE, basefile)
 
 
 def case_uri(case):

@@ -29,7 +29,7 @@ def _vclt():
 # --------------------------------------------------------------------------
 
 def test_treaty_uri_and_kind():
-    assert treaty_uri("I-18232") == "https://lagen.nu/ext/untc/I-18232"
+    assert treaty_uri("I-18232") == "https://lagen.nu/untc/I-18232"
     assert Treaty("XXIII-1", "I-18232", "23",
                   "Vienna Convention on the Law of Treaties").kind \
         == "treaty"
@@ -60,7 +60,7 @@ def test_curated_list_is_complete_and_well_formed():
 
 def test_parse_metadata():
     art = _vclt()
-    assert art["uri"] == "https://lagen.nu/ext/untc/I-18232"
+    assert art["uri"] == "https://lagen.nu/untc/I-18232"
     assert art["type"] == "internationell-overenskommelse"
     assert art["doctype"] == "treaty"
     assert art["number"] == "I-18232"
@@ -309,7 +309,7 @@ def test_a_status_page_without_its_text_raises():
 # --------------------------------------------------------------------------
 
 def test_untc_layout_round_trips_and_catalog_row():
-    uri = "https://lagen.nu/ext/untc/I-18232"
+    uri = "https://lagen.nu/untc/I-18232"
     assert layout.page_url(uri) == "/untc/I-18232"
     assert layout.page_relpath(uri) == "untc/I_18232.html"
     assert str(layout.url_to_relpath("/untc/I-18232")) == "untc/I_18232.html"

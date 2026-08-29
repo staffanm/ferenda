@@ -657,10 +657,10 @@ def test_the_eu_title_measure_renders_beside_its_swedish_twin():
                         {"x": "28 227", "y": 56}],
              "rows": [{"label": "Kommissionens genomförandeförordning …",
                        "value": 1361, "group": "Längst",
-                       "uri": "https://lagen.nu/ext/celex/32020R0421"},
+                       "uri": "https://lagen.nu/celex/32020R0421"},
                       {"label": "Rådets direktiv 75/442/EEG … om avfall",
                        "value": 56, "group": "Kortast",
-                       "uri": "https://lagen.nu/ext/celex/31975L0442"}]}]})
+                       "uri": "https://lagen.nu/celex/31975L0442"}]}]})
     assert html.index('id="m5"') < html.index('id="m6"')
     assert "Rubriklängd i svenska författningar" in html
     assert "Rubriklängd i EU-rätten" in html
@@ -917,8 +917,8 @@ def test_base_acts_refuses_a_catalog_that_cannot_filter_the_eu_acts(tmp_path):
     `lagen eurlex refresh-metadata`, then parse and relate."""
     path = tmp_path / "eu.sqlite"
     con = catalog.connect(path)
-    acts = ["https://lagen.nu/ext/celex/32002R0881",
-            "https://lagen.nu/ext/celex/32008R0803"]
+    acts = ["https://lagen.nu/celex/32002R0881",
+            "https://lagen.nu/celex/32008R0803"]
     for uri in acts:
         con.execute("INSERT INTO documents (uri, source, kind, label, title, "
                     "short_id, path) VALUES (?, 'eurlex', 'regulation', 'L', "

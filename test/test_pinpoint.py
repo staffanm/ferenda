@@ -98,9 +98,9 @@ def test_citation_falls_back_to_the_address_it_cannot_name():
         == "6 § räntelagen"
     # a document the catalog cannot name descriptively shows its own path --
     # the reader is given an address and can see that it is one
-    assert citation("https://lagen.nu/ext/coe/005#A6", None) \
-        == "Artikel 6 ext/coe/005"
-    assert citation("https://lagen.nu/ext/coe/005#A6", "Europakonventionen") \
+    assert citation("https://lagen.nu/coe/005#A6", None) \
+        == "Artikel 6 coe/005"
+    assert citation("https://lagen.nu/coe/005#A6", "Europakonventionen") \
         == "Artikel 6 Europakonventionen"
 
 

@@ -136,9 +136,9 @@ def test_division_title_keeps_the_links_inside_it():
     _, title = _division_label(
         {"label": "KAPITEL II",
          "text": ["DATADELNING MELLAN ",
-                  {"text": "FÖRETAG", "uri": "https://lagen.nu/ext/celex/X#2.24"}]},
+                  {"text": "FÖRETAG", "uri": "https://lagen.nu/celex/X#2.24"}]},
         _case_map(blocks))
-    assert title[1]["uri"] == "https://lagen.nu/ext/celex/X#2.24"
+    assert title[1]["uri"] == "https://lagen.nu/celex/X#2.24"
     assert title[1]["text"] == "företag"
 
 

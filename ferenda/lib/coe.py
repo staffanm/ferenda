@@ -92,7 +92,7 @@ def treaty_number(value):
 
 
 def treaty_uri(number):
-    return "%sext/coe/%s" % (BASE, treaty_number(number))
+    return "%scoe/%s" % (BASE, treaty_number(number))
 
 
 def _article_uri(number, article, paragraph=None, letter=None):

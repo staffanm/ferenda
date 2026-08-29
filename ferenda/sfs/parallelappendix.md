@@ -101,7 +101,7 @@ base convention at the bilaga fragment `#B1`, each protocol at `#B1P<n>` (`#B1P4
 for Protocol No. 4). Treaty identity is then a **table**, not code: the curated
 `sfs/data/incorporates.json` maps `{sfs}#{fragment}` to the `source/number` of
 the treaty an instrument reproduces (`"1994:1219#B1P4": "coe/046"`), which the
-projection resolves to an `ext/coe/046` URI so the articles become citable
+projection resolves to an `coe/046` URI so the articles become citable
 `/coe/046#Ax` targets. The `source` prefix keeps it general — other treaty series
 than CoE can be added. An instrument absent from the map still anchors
 structurally but mints no treaty URI; no SFS-number branching lives in the

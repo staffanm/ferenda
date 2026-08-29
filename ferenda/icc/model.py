@@ -5,7 +5,7 @@ the curated substantive set (by Rome-Statute article) and give each record's
 document number; the ICC Legal Tools API (legal-tools.org) resolves that number
 to the decision's metadata and its PDF, whose text becomes the article tree.
 
-The document-number grammar (``ext/icc/<doc-number>``, slashes flattened) is
+The document-number grammar (``icc/<doc-number>``, slashes flattened) is
 kept here -- ``icc`` is its only producer.
 """
 
@@ -40,7 +40,7 @@ def doc_basefile(doc_number):
 
 
 def decision_uri(doc_number):
-    return "%sext/icc/%s" % (BASE, doc_basefile(doc_number))
+    return "%sicc/%s" % (BASE, doc_basefile(doc_number))
 
 
 @dataclass

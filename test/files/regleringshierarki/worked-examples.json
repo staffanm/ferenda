@@ -14,7 +14,7 @@
     {
       "name": "brandskydd-pa-passagerarfartyg",
       "documents": [
-        {"uri": "https://lagen.nu/ext/celex/32009L0045", "source": "eurlex",
+        {"uri": "https://lagen.nu/celex/32009L0045", "source": "eurlex",
          "kind": "directive", "date": "2009-05-06"},
         {"uri": "https://lagen.nu/2003:364", "source": "sfs", "kind": "lag",
          "date": "2003-06-05"},
@@ -26,7 +26,7 @@
       "norm_chain": [
         ["https://lagen.nu/tsfs/2019:120", null, "https://lagen.nu/2003:438",
          "K2P1", "rpubl:bemyndigande", 3, 2],
-        ["https://lagen.nu/2003:364", "K7P2", "https://lagen.nu/ext/celex/32009L0045",
+        ["https://lagen.nu/2003:364", "K7P2", "https://lagen.nu/celex/32009L0045",
          "6", "rpubl:genomforDirektiv", 1, 0]
       ],
       "links": [
@@ -37,7 +37,7 @@
       ],
       "genomforande": [
         {"sfs_uri": "https://lagen.nu/2003:364", "sfs_anchor": "K7P2",
-         "directive": "https://lagen.nu/ext/celex/32009L0045", "article": "6",
+         "directive": "https://lagen.nu/celex/32009L0045", "article": "6",
          "pinpoint": null}
       ],
       "expected_delegation_edges": [
@@ -47,7 +47,7 @@
         "https://lagen.nu/tsfs/2019:120": {
           "forordning": ["https://lagen.nu/2003:438", "K2P1"],
           "lag": ["https://lagen.nu/2003:364", "K7P2"],
-          "direktiv": [["https://lagen.nu/ext/celex/32009L0045", "6", null]]
+          "direktiv": [["https://lagen.nu/celex/32009L0045", "6", null]]
         }
       },
       "expected_rows": []
@@ -56,7 +56,7 @@
       "name": "betydande-incident",
       "concept": "https://lagen.nu/begrepp/Betydande_incident",
       "documents": [
-        {"uri": "https://lagen.nu/ext/celex/32022L2555", "source": "eurlex",
+        {"uri": "https://lagen.nu/celex/32022L2555", "source": "eurlex",
          "kind": "directive", "date": "2022-12-14"},
         {"uri": "https://lagen.nu/2025:1506", "source": "sfs", "kind": "lag",
          "date": "2025-11-20"},
@@ -68,7 +68,7 @@
       "norm_chain": [
         ["https://lagen.nu/mcffs/2026:8", null, "https://lagen.nu/2025:1507",
          "P37", "rpubl:bemyndigande", 3, 2],
-        ["https://lagen.nu/2025:1506", "K2P5", "https://lagen.nu/ext/celex/32022L2555",
+        ["https://lagen.nu/2025:1506", "K2P5", "https://lagen.nu/celex/32022L2555",
          "23", "rpubl:genomforDirektiv", 1, 0]
       ],
       "links": [
@@ -81,7 +81,7 @@
         ["https://lagen.nu/2025:1507", "P37", "https://lagen.nu/2025:1506", "K2P5"]
       ],
       "expected_rows": [
-        {"phase": 3, "doc": "https://lagen.nu/ext/celex/32022L2555",
+        {"phase": 3, "doc": "https://lagen.nu/celex/32022L2555",
          "anchor": "23.3", "role": "definierar",
          "_quote": "En incident ska anses vara betydande om den har orsakat eller kan orsaka allvarliga driftsstörningar för tjänsterna eller ekonomiska förluster för den berörda entiteten"},
         {"phase": 3, "doc": "https://lagen.nu/2025:1506", "anchor": "K2P5",

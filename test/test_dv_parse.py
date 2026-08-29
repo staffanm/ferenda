@@ -480,7 +480,7 @@ def test_footnotes_reach_the_artifact_and_are_citation_scanned():
     body_links = [r for r in flatten(art["structure"])[0]["text"]
                   if isinstance(r, dict)]
     ecj = [r for r in body_links
-           if r["uri"] == "https://lagen.nu/ext/celex/62021CJ0268"]
+           if r["uri"] == "https://lagen.nu/celex/62021CJ0268"]
     assert ecj and ecj[0]["text"].endswith("C-268/21")
     # the inline marker became a zero-width footnote run
     assert {"predicate": "dcterms:references", "uri": "#fn-3",

@@ -29,7 +29,7 @@ def con():
             (FORORDNING, "sfs", "forordning"),
             (FORESKRIFT, "foreskrift", "tsfs"),
             (RF, "sfs", "lag"),
-            ("https://lagen.nu/ext/celex/32009L0045", "eurlex", "directive")]
+            ("https://lagen.nu/celex/32009L0045", "eurlex", "directive")]
     con.executemany("INSERT INTO documents (uri, source, kind, path) "
                     "VALUES (?,?,?,'x')", docs)
     return con
@@ -81,7 +81,7 @@ def test_only_lag_level_targets_qualify(con):
     chain_row(con, FORESKRIFT, None, FORORDNING, "P4",
               "rpubl:bemyndigande", 3, 2)
     link(con, FORORDNING, "P4", "dcterms:references",
-         "https://lagen.nu/ext/celex/32009L0045#9.2")
+         "https://lagen.nu/celex/32009L0045#9.2")
     link(con, FORORDNING, "P4S2", "dcterms:references", LAG + "#K7P2")
     assert hierarki.derive_delegation_edges(con) == (1, 0)
     assert _edges(con) == [(FORORDNING, "P4", LAG, "K7P2")]
@@ -201,7 +201,7 @@ def test_a_stated_parent_needs_no_name_edge(con):
 # rebuild_regleringshierarki: the ladder rows
 # --------------------------------------------------------------------------
 
-DIREKTIV = "https://lagen.nu/ext/celex/32022L2555"     # NIS2
+DIREKTIV = "https://lagen.nu/celex/32022L2555"     # NIS2
 CSL = "https://lagen.nu/2025:1506"                     # cybersäkerhetslagen
 CSF = "https://lagen.nu/2025:1507"                     # cybersäkerhetsförordningen
 MCFFS = "https://lagen.nu/mcffs/2026:8"
@@ -405,7 +405,7 @@ def test_the_begreppssida_renders_the_ladder_grouped_and_marked(tmp_path):
     art = {"uri": CONCEPT, "title": "Betydande incident"}
     html = wiki_render.render(art, _site(con))
     assert '<section class="occurrences regleringshierarki">' in html
-    assert 'id="rh-ext-celex-32022L2555"' in html
+    assert 'id="rh-celex-32022L2555"' in html
     assert "EU-direktiv" in html
     assert "upphävd 2015-07-01" in html
     assert "bemyndigandet ändrat 2026-07-01" in html
@@ -422,7 +422,7 @@ def test_the_rail_prints_one_line_per_concept_at_the_ladder_anchor(tmp_path):
     [section] = page.regleringshierarki_margin(site, CSL, ["K2P5"])
     assert section.key == "regleringshierarki"
     assert "Betydande incident" in section.html
-    assert "#rh-ext-celex-32022L2555" in section.html
+    assert "#rh-celex-32022L2555" in section.html
     # a definition anchored below the panel node still attaches (containment)
     assert page.regleringshierarki_margin(site, CSF, ["P37"])
     # a provision with no row stays silent
