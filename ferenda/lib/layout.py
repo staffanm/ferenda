@@ -487,6 +487,86 @@ def sfs_versions_sidecar(basefile: str) -> Path:
     return SFS_ARTIFACT / rel.with_name(rel.name + ".versions.json")
 
 
+# --------------------------------------------------------------------------
+# eurlex versions -- the consolidated wordings (CONSLEG) of an EU act, keyed by
+# the ISO date each wording began to apply ("2024-10-18", CELLAR's own version
+# key). The raw download of a version lives under its *base act's* document dir
+# (downloaded/eurlex/{year}/{celex}/.versions/{date}/, the same notice.ttl +
+# content-per-language layout as the act itself); the parsed version artifacts
+# live in an archive/ subtree like sfs's, so `artifacts()` never reads one as a
+# corpus document.
+# --------------------------------------------------------------------------
+
+RE_EURLEX_VERSION = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _eurlex_version_id(version: str) -> str:
+    """A eurlex version id, checked: the consolidation date, ISO-dashed. It
+    becomes a path segment and a uri segment, so anything else raises."""
+    if not RE_EURLEX_VERSION.match(version):
+        raise ValueError("not a eurlex consolidation date: %r" % version)
+    return version
+
+
+def eurlex_version_artifact(basefile: str, version: str) -> Path:
+    """A parsed consolidated version: the archive-subtree mirror of the sfs
+    shape, so `_is_document_artifact` excludes it from the corpus."""
+    rel = relpath("eurlex", basefile)
+    return (artifact_dir("eurlex") / "archive" / rel / ".versions"
+            / ("%s.json" % _eurlex_version_id(version)))
+
+
+def eurlex_versions_sidecar(basefile: str) -> Path:
+    """The per-act version index -- the eurlex versions stage's output, a
+    sidecar next to the main artifact (the eurlex counterpart of
+    `sfs_versions_sidecar`)."""
+    rel = relpath("eurlex", basefile)
+    return artifact_dir("eurlex") / rel.with_name(rel.name + ".versions.json")
+
+
+def eurlex_sidecar_basefile(path: Path) -> str:
+    """Inverse of eurlex_versions_sidecar: the CELEX a sidecar file names."""
+    return path.name[:-len(".versions.json")].replace("_", "/")
+
+
+# --------------------------------------------------------------------------
+# versions, per source -- the one dispatch the version-history consumers (the
+# renderer's compare panel, /api/v1/document/versions, /document/diff) go
+# through, so a second consolidating source is a row here rather than a copy
+# of the sfs plumbing in each consumer.
+# --------------------------------------------------------------------------
+
+VERSIONED_SOURCES = ("sfs", "eurlex")
+
+
+def versions_sidecar(source: str, basefile: str) -> Path:
+    if source == "sfs":
+        return sfs_versions_sidecar(basefile)
+    if source == "eurlex":
+        return eurlex_versions_sidecar(basefile)
+    raise ValueError("source %r keeps no version history" % source)
+
+
+def version_artifact(source: str, basefile: str, version: str) -> Path:
+    if source == "sfs":
+        return sfs_version_artifact(basefile, version)
+    if source == "eurlex":
+        return eurlex_version_artifact(basefile, version)
+    raise ValueError("source %r keeps no version history" % source)
+
+
+def version_key(source: str, version: str):
+    """Chronological sort key for a version id. A eurlex id is the ISO
+    consolidation date, which sorts as itself. Raises like its sibling
+    dispatchers: a third versioned source must choose its ordering here,
+    not inherit string sorting silently."""
+    if source == "sfs":
+        return sfs_version_key(version)
+    if source == "eurlex":
+        return version
+    raise ValueError("source %r keeps no version history" % source)
+
+
 def foreskrift_grund_artifact(basefile: str) -> Path:
     """The as-enacted sidecar beside a föreskrift's main artifact: the base
     structure re-projected as its own page artifact (uri ``…/grund``), written

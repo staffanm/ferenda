@@ -20,6 +20,7 @@ import functools
 import json
 import re
 from datetime import date
+from pathlib import Path
 
 from ..lib import compress, eucasenaming, layout, markup, patch
 from ..lib.cellar import notice_relations, notice_repeal_date, notice_work_date
@@ -28,16 +29,23 @@ from ..lib.errors import SkipDocument
 from ..lib.eu_structure import doctype, revision_base
 from ..lib.formex import (
     QUOTATION,
+    TABLE,
     _text,
     act_metadata,
     append_annex,
     collect_notes,
+    cons_metadata,
+    cons_provenance,
+    cons_register,
     formex_roots,
     judgment_metadata,
+    load_cons,
     parse_act,
+    parse_cons_act,
     parse_hearing_report,
     parse_judgment,
     parse_opinion,
+    strip_pis,
     walk_content,
 )
 from ..lib.lagrum import (
@@ -90,6 +98,12 @@ def parse_formex(root, celex, lang):
         contents = root.find("CONTENTS")
         if contents is not None:
             walk_content(contents, doc.body)
+    elif root.tag == "CONS.ACT":            # a consolidated wording (CONSLEG)
+        # the structural branch only: the register, the provenance spans and
+        # the version identity are read by parse_consolidation, which owns the
+        # PI-bearing parse this root may or may not have come from
+        _cons_date, doc.date, doc.oj = cons_metadata(root)
+        doc.title = parse_cons_act(root, doc.body)
     else:                                   # ACT (legislation, treaties)
         doc.date, doc.oj = act_metadata(root)
         doc.title = parse_act(root, doc.body)
@@ -107,6 +121,77 @@ def parse_document(roots, celex, lang):
         else:
             walk_content(root, doc.body, level=1)
         collect_notes(root, doc.body)
+    return doc
+
+
+# --------------------------------------------------------------------------
+# consolidated wordings (CONSLEG) -- the .versions tree under a document dir
+# --------------------------------------------------------------------------
+
+def version_dirs(doc_dir):
+    """The downloaded consolidations under a document dir, as sorted
+    (version, dir) pairs -- oldest first, the ISO version date sorting
+    chronologically. A dir counts once its notice.ttl marks the download
+    stored, the same marker the act itself uses."""
+    return sorted((p.parent.name, p.parent)
+                  for p in compress.glob(Path(doc_dir) / ".versions",
+                                         "*/notice.ttl"))
+
+
+
+
+# the base act's own preamble block kinds -- what precedes the enacting terms
+_PREAMBLE_KINDS = ("citation", "recital", "preamble")
+
+
+def base_preamble(doc):
+    """The base act's own preamble blocks (visas, recitals, framing text), in
+    order. A consolidated text carries none -- its Formex PREAMBLE is present
+    but empty -- while the base act's recitals are still the act's legislative
+    reasoning and are citation targets (`#recital-N`) in their own right, so
+    the consolidated artifact keeps them. Only the base act's own: an amending
+    act's recitals explain the amendment and stay on that act's page."""
+    out = []
+    for b in doc.body:
+        if b.kind in _PREAMBLE_KINDS:
+            out.append(b)
+        elif b.kind in ("heading", "article"):
+            break
+    return out
+
+
+def parse_consolidation(vdir, celex, version, preamble=()):
+    """One downloaded consolidation dir -> EurlexDoc: the consolidated text
+    with `preamble` (the base act's own, see base_preamble) spliced in front,
+    the FAM.COMP amendment register and the per-article provenance spans.
+    None when the version's best content is not Formex -- the pre-2005 tail is
+    PDF-only, and those versions are recorded as skipped rather than parsed.
+
+    The document keeps the *act's* identity: `celex` is the base act, the date
+    is the act's own, and `version` (the consolidation date, the dir name) is
+    the wording's key."""
+    path, lang, route = content_file(vdir)
+    if path is None or route != "fmx4":
+        return None
+    roots = load_cons(path)
+    cons_date, act_date, oj = cons_metadata(roots[0])
+    doc = EurlexDoc(celex=celex, uri=BASE % celex, doctype=doctype(celex),
+                    lang=lang)
+    doc.consolidation = {"date": version} | cons_register(roots[0])
+    doc.provenance = cons_provenance(roots[0])
+    doc.version = version
+    doc.date, doc.oj = act_date, oj
+    for root in roots:
+        strip_pis(root)
+    doc.title = parse_cons_act(roots[0], doc.body)
+    collect_notes(roots[0], doc.body)
+    for root in roots[1:]:
+        if root.tag == "ANNEX":
+            append_annex(doc.body, root)
+        else:
+            walk_content(root, doc.body, level=1)
+        collect_notes(root, doc.body)
+    doc.body = list(preamble) + doc.body
     return doc
 
 
@@ -143,16 +228,45 @@ def _isodate(value):
     return value
 
 
-def _last_eu_act(cites):
+def _last_eu_act(cites, own=None):
     """The CELEX of the last EU *act* a block's citations name -- the act a
     quotation following that block reproduces. None where the block names no
     act: a judgment, a treaty and a Charter article all carry no act type, and
-    none of them is something a quotation of this shape reproduces."""
+    none of them is something a quotation of this shape reproduces.
+
+    `own` is the citing document itself, excluded: an amending act's "Artikel 1
+    ska ersättas med följande:" self-resolves its bare article, and taking that
+    self-link as the quoted act pinned every quotation's articles back onto the
+    amending act instead of the act it rewrites (which the lead-in named)."""
     for ref in reversed(cites):
         celex = celex_of(str(ref.uri))
-        if celex and eu_akttyp(celex):
+        if celex and celex != own and eu_akttyp(celex):
             return celex
     return None
+
+
+def _table_node(b, scan):
+    """A `tabell` block -> its artifact node: a `tabell` whose children are
+    `rad`s, each carrying its cells as inline-run lists.
+
+    This is the node pair sfs, förarbete and föreskrift already write, so
+    `lib.page` renders it, `lib.mdtext` prints it and `lib.catalog` walks its
+    links with no EU-specific branch. The two additions the OJ needs are the
+    spans -- written only where a cell actually spans, since 4 839 of the
+    226 510 cells in a 400-act sample do -- and the table's own caption, which
+    rides as the node's `text` the way a förarbete table's does."""
+    rows = []
+    for row in b.rows:
+        rad = {"type": "rad", "cells": [scan(cell.text) for cell in row.cells]}
+        if row.header:
+            rad["th"] = True
+        for key in ("rowspan", "colspan"):
+            spans = [getattr(cell, key) for cell in row.cells]
+            if any(span > 1 for span in spans):
+                rad[key] = spans
+        rows.append(rad)
+    return {"type": "tabell", "text": scan(b.text) if b.text else [],
+            "children": rows}
 
 
 def to_artifact(doc):
@@ -170,9 +284,23 @@ def to_artifact(doc):
         parser.state.self_eu_act = doc.celex
     matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
                                    doc.lang)
+
+    def scan(text, anchor=None):
+        """One run of text -> its inline-run list, links and all."""
+        cites = parser.parse_text(text, context={})
+        return interleave(text, cites + yield_overlaps(
+            term_refs(text, matcher, index, doc.uri, anchor), cites))
+
     body = []
     lead_act = None
     for b in doc.body:
+        if b.kind == TABLE:
+            # a table is scanned cell by cell, so a citation can never span a
+            # cell boundary and each cell keeps its own runs -- the `tabell`/
+            # `rad` node pair the renderer, the markdown projection and the
+            # link walk already read from the other sources
+            body.append(_table_node(b, scan))
+            continue
         # inside a verbatim quotation, a bare "artikel N" is an article of the
         # *quoted* act -- the act the paragraph introducing the quotation named
         # ("Artikel 23 i förordningen har följande lydelse:"). Left to the
@@ -191,11 +319,19 @@ def to_artifact(doc):
         # its own bare "artikel N" is that act's article.
         borrowed = b.kind in ("keyword", QUOTATION)
         focus = parser.state.eu_focus() if borrowed else None
-        if b.kind == QUOTATION and lead_act:
-            parser.state.remember_eu_act(lead_act)
+        self_act = parser.state.self_eu_act
+        if b.kind == QUOTATION:
+            if lead_act:
+                parser.state.remember_eu_act(lead_act)
+            # the quotation is another act's text: its bare "artikel N" is that
+            # act's article, never this document's own -- with the self-act
+            # left set, an amending act's quoted "Artikel 1" linked to the
+            # amending act itself instead of the act it rewrites
+            parser.state.self_eu_act = None
         cites = parser.parse_text(b.text, context={})
         if borrowed:
             parser.state.restore_eu_focus(focus)
+            parser.state.self_eu_act = self_act
         # term-use links yield to a citation wherever the spans overlap (a
         # citation is the stronger, cross-document link)
         uses = yield_overlaps(
@@ -204,6 +340,12 @@ def to_artifact(doc):
         for key in ("num", "level", "depth", "label", "quoted"):
             if getattr(b, key) is not None:
                 block[key] = getattr(b, key)
+        # a consolidated article says what changed it: the provenance span the
+        # CONSLEG text itself carries (action + the amending acts' CELEX)
+        if b.kind == "article" and doc.provenance:
+            mod = doc.provenance.get(b.anchor)
+            if mod:
+                block["mod"] = mod
         # the citation anchor is the artifact `id` -- the key the catalog
         # registers fragments under and the renderer emits as the element id, so
         # a citation to `<celex>#<article>` (or `#<article>.<point>` for a
@@ -218,11 +360,19 @@ def to_artifact(doc):
             # ("I artikel 3 i direktiv 95/46", then "i detta direktiv", "i
             # nämnda direktiv"), so the act carries forward until a later
             # paragraph names another one
-            lead_act = _last_eu_act(cites) or lead_act
+            lead_act = _last_eu_act(cites, own=doc.celex) or lead_act
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": _isodate(doc.date),
            "structure": nest(body)}
+    if doc.consolidation:
+        art["consolidation"] = doc.consolidation
+    if doc.version:
+        # a historical lydelse: its own uri and the version key the renderer,
+        # the panel and the diff endpoint go by. The latest consolidation
+        # carries `consolidation` but no `version` -- it *is* the document.
+        art["version"] = doc.version
+        art["uri"] = "%s/konsolidering/%s" % (doc.uri, doc.version)
     # a short, distinctive human handle shown instead of the bare CELEX (the page
     # heading, the browse index / search, an inbound-citation label). The two
     # document families derive it differently:
@@ -403,6 +553,25 @@ def parse_dir(doc_dir, celex):
     if path is None:
         return None
     doc = parse_content(path, route, celex, lang)
+    # an act with downloaded consolidations serves its *latest* consolidated
+    # wording at its own uri -- the 2014 text with no sign it was amended is
+    # the wrong answer to "what does this act say". The newest Formex-bearing
+    # version wins, its date be what it may: an EU act has no single
+    # in-force day (adoption, entry into force, transposition deadline,
+    # staggered applicability), so a forward-dated wording -- Solvens II
+    # carries one per 2027-01-30 -- serves too, and the reader reads the fine
+    # print (per Staffan 2026-08-28; the panel's dated lydelser and the
+    # "Konsoliderad t.o.m." row are that fine print). The pre-2005 PDF-only
+    # tail never swaps in; the base act's own preamble rides in front
+    # (base_preamble); the superseded wordings become /konsolidering/ pages
+    # via the versions stage.
+    for version, vdir in reversed(version_dirs(doc_dir)):
+        cons = parse_consolidation(vdir, celex, version,
+                                   preamble=base_preamble(doc))
+        if cons:
+            cons.version = None       # the latest is the document, not a lydelse
+            doc = cons
+            break
     if (doc.date is None or not _plausible_date(doc.date)
             or RE_CORRIGENDUM.search(celex)):
         doc.date = notice_work_date(doc_dir) or doc.date

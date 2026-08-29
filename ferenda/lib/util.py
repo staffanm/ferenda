@@ -1,6 +1,7 @@
 """Small shared utilities (ported from ferenda.util)."""
 
 import json
+import multiprocessing
 import os
 import re
 import shutil
@@ -440,6 +441,17 @@ class Reporter:
             progress_break()
             self._shown = False
         self._last = time.perf_counter()
+
+
+def stage_reporter():
+    """A live Reporter for a stage recipe's *inner* loop -- one line per
+    sub-item, e.g. each consolidation version the versions stage parses, so a
+    multi-minute basefile shows progress instead of a line that sits still.
+    Silenced inside a pool worker: the parallel driver redraws its own
+    aggregate line, and a second '\\r' line from every worker would fight it
+    (the NullReporter's own rationale)."""
+    return Reporter() if multiprocessing.parent_process() is None \
+        else NullReporter()
 
 
 class NullReporter:

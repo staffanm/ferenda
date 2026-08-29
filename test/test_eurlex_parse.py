@@ -1537,6 +1537,65 @@ CONS_NOTICE = (b'<x> <http://publications.europa.eu/ontology/cdm#'
                b'work_date_document> "2024-10-18" .\n')
 
 
+def _consolidated_doc_dir(tmp_path):
+    (tmp_path / "swe.fmx4").write_bytes(BASE_ACT_XML.encode())
+    (tmp_path / "notice.ttl").write_bytes(NOTICE_TTL)
+    vdir = tmp_path / ".versions" / "2024-10-18"
+    vdir.mkdir(parents=True)
+    (vdir / "swe.fmx4").write_bytes(CONS_XML.encode())
+    (vdir / "notice.ttl").write_bytes(CONS_NOTICE)
+    return tmp_path
+
+
+def test_parse_dir_serves_the_latest_consolidation(tmp_path):
+    """An act with a downloaded consolidation presents that wording at its own
+    uri: the consolidated articles, the base act's own preamble in front (its
+    recitals are citation targets, `#recital-N`), the FAM.COMP register as
+    `consolidation`, and the per-article provenance as `mod` -- with no
+    `version` key, since the latest wording *is* the document."""
+    art = parse_dir(_consolidated_doc_dir(tmp_path), "32014R0910")
+    assert art["uri"] == "https://lagen.nu/ext/celex/32014R0910"
+    assert "version" not in art
+    assert art["date"] == "2014-07-23"          # the act's date, not the version's
+    assert art["consolidation"]["date"] == "2024-10-18"
+    assert [m["celex"] for m in art["consolidation"]["amending"]] \
+        == ["32022L2555", "32024R1183"]
+    blocks = flatten_structure(art["structure"])
+    kinds = [b["type"] for b in blocks]
+    assert "recital" in kinds and "citation" in kinds   # the base preamble rides
+    mods = {b["id"]: b["mod"] for b in blocks
+            if b["type"] == "article" and b.get("mod")}
+    assert mods["5a"]["action"] == "inserted"
+    assert mods["19"] == {"action": "deleted", "by": ["32022L2555"]}
+
+
+def test_a_superseded_version_parses_to_a_konsolidering_uri(tmp_path):
+    from ferenda.eurlex.parse import parse_consolidation
+    from ferenda.eurlex.parse import to_artifact as project
+    _consolidated_doc_dir(tmp_path)
+    doc = parse_consolidation(tmp_path / ".versions" / "2024-10-18",
+                              "32014R0910", "2024-10-18")
+    art = project(doc)
+    assert art["version"] == "2024-10-18"
+    assert art["uri"] == ("https://lagen.nu/ext/celex/32014R0910"
+                          "/konsolidering/2024-10-18")
+
+
+def test_a_pdf_only_version_never_swaps_in(tmp_path):
+    """The pre-2005 consolidation tail is PDF-only; the base text keeps
+    serving and the version is left to the versions stage's skipped list."""
+    (tmp_path / "swe.fmx4").write_bytes(BASE_ACT_XML.encode())
+    (tmp_path / "notice.ttl").write_bytes(NOTICE_TTL)
+    vdir = tmp_path / ".versions" / "1999-01-01"
+    vdir.mkdir(parents=True)
+    (vdir / "swe.pdf").write_bytes(b"%PDF-1.4 not formex")
+    (vdir / "notice.ttl").write_bytes(CONS_NOTICE)
+    art = parse_dir(tmp_path, "32014R0910")
+    assert "consolidation" not in art
+    assert runs_text(flatten_structure(art["structure"])[-1]["text"]) \
+        == "Ursprunglig text."
+
+
 # --------------------------------------------------------------------------
 # an amending act's quoted articles, lifted as citat blocks (the act path)
 # --------------------------------------------------------------------------
@@ -1608,6 +1667,24 @@ def test_article_number_takes_the_printed_letter_case():
     # an identifier the title does not corroborate stays as written
     xml = """<ARTICLE IDENTIFIER="005A"><TI.ART>Artikel 6</TI.ART></ARTICLE>"""
     assert _article_number(_lxml(xml)) == "5A"
+
+
+def test_the_newest_version_swaps_in_whatever_its_date(tmp_path):
+    """CELLAR publishes a consolidation on adoption, dated the day its wording
+    begins to apply -- which can lie ahead (Solvens II carries one per
+    2027-01-30). The newest wording serves anyway: an EU act has no single
+    in-force day (adoption, entry into force, transposition deadline,
+    staggered applicability), so the reader gets the latest text and reads
+    the fine print (per Staffan 2026-08-28)."""
+    _consolidated_doc_dir(tmp_path)
+    future = tmp_path / ".versions" / "2100-01-01"
+    future.mkdir(parents=True)
+    (future / "swe.fmx4").write_bytes(
+        CONS_XML.replace('START.DATE="20241018"',
+                         'START.DATE="21000101"').encode())
+    (future / "notice.ttl").write_bytes(CONS_NOTICE)
+    art = parse_dir(tmp_path, "32014R0910")
+    assert art["consolidation"]["date"] == "2100-01-01"
 
 
 def test_expand_celex_normalises_the_short_conslegs_form():

@@ -145,7 +145,11 @@ def build(basefile, refparser=None):
     # duplicate of the same consolidation loses to the authoritative key
     files = sorted(layout.sfs_version_downloads(basefile),
                    key=lambda vp: (":" not in vp[0], vp[0]))
-    for version, path in files:
+    # a long history is minutes of work (1999:1229: 1,454 s), so the live
+    # line moves per version, not per statute
+    rep = util.stage_reporter()
+    for i, (version, path) in enumerate(files, 1):
+        rep.update(i, len(files), scope=basefile, note=version)
         try:
             recovered, art = parse_version(basefile, version, path, refparser)
         except SkipDocument as exc:
@@ -168,6 +172,7 @@ def build(basefile, refparser=None):
         if recovered != version:
             entry["archived_as"] = version
         versions.append(entry)
+    rep.clear()          # the driver's own per-statute line takes over
     versions.sort(key=lambda e: layout.sfs_version_key(e["version"]))
     sidecar = {"versions": versions, "skipped": skipped}
     out = layout.sfs_versions_sidecar(basefile)

@@ -77,6 +77,7 @@ from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
 from .eurlex import parse as eurlex_parse
 from .eurlex import render as eurlex_render
+from .eurlex import versions as eurlex_versions_mod
 from .forarbete import aigenomforande as fa_aigenomforande
 from .forarbete import download as fa_download
 from .forarbete import fk as fa_fk
@@ -2349,6 +2350,40 @@ def eurlex_parse_run(basefile):
     write_artifact("eurlex", basefile, art)
 
 
+EURLEX_VERSIONS_CODE = EURLEX_CODE + (PKG / "eurlex" / "versions.py",)
+
+
+def eurlex_version_contents(basefile):
+    """The content files of every downloaded consolidation of an act -- a new
+    version arriving (or a better manifestation replacing one) restales both
+    the parse (which presents the latest) and the versions stage."""
+    inputs = []
+    for _version, vdir in eurlex_parse.version_dirs(layout.eurlex_dir(basefile)):
+        path, _lang, _route = eurlex_parse.content_file(vdir)
+        if path:
+            inputs.append(path)
+    return inputs
+
+
+def eurlex_versions_sidecar(basefile):
+    return layout.eurlex_versions_sidecar(basefile)
+
+
+def eurlex_versions_inputs(basefile):
+    """Freshness inputs of the eurlex versions stage: every consolidation's
+    content file, plus the base act's own (its preamble is spliced into every
+    version artifact)."""
+    return eurlex_content(basefile) + eurlex_version_contents(basefile)
+
+
+def eurlex_versions_run(basefile):
+    """Parse every superseded consolidation of one act into per-version
+    artifacts + the sidecar index (see eurlex.versions). The sidecar is
+    written even when the act has no consolidations, marking the stage
+    built."""
+    eurlex_versions_mod.build(basefile)
+
+
 def eurlex_download_run(basefile):
     """Fetch one CELEX (tree notice + best content per language) from CELLAR.
     Discovery of new CELEX is eurlex_harvest (bare `lagen eurlex download`)."""
@@ -2565,8 +2600,15 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     "parse": Stage("parse", eurlex_parse_run,
                    functools.partial(layout.artifact, "eurlex"),
                    inputs=lambda bf: eurlex_content(bf)
+                   + eurlex_version_contents(bf)
                    + eurlex_parse_notices(bf) + _patch_input("eurlex", bf),
                    depends="download", code=EURLEX_CODE),
+    # superseded consolidated wordings (CONSLEG) -> per-version artifacts + a
+    # sidecar index, feeding the lydelse pages, the compare panel and the diff
+    # view -- the eurlex counterpart of the sfs versions stage
+    "versions": Stage("versions", eurlex_versions_run, eurlex_versions_sidecar,
+                      inputs=eurlex_versions_inputs,
+                      code=EURLEX_VERSIONS_CODE),
 }, harvest=eurlex_harvest, origin=_origin(eurlex_download.SOAP_ENDPOINT),
    scopes=frozenset(eurlex_download.SECTORS),
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
@@ -2581,6 +2623,8 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
          "  notice.ttl (validity, work date, eurovoc) without refetching content\n"
          "backfill [<sector>] [--limit N]: download the acts the corpus cites but\n"
          "  does not hold, most-cited first (bulk dumps ship only acts in force)\n"
+         "download acts also sweeps every held R/L act's consolidated versions\n"
+         "  (CONSLEG) into its .versions/ tree; a per-CELEX download does the same\n"
          "casenames: refresh the named-EU-cases snapshot from Wikidata")
 
 
@@ -4712,8 +4756,9 @@ def generate_fingerprint():
         # must reopen the coarse gate
         list(annstore.tree("sfs").glob("*/*.corr"))
         # the versions-stage sidecars: a new historical consolidation must
-        # re-render its statute's page (version panel) + the version pages
+        # re-render its statute's/act's page (version panel) + the version pages
         + list(layout.SFS_ARTIFACT.glob("*/*.versions.json"))
+        + list(layout.artifact_dir("eurlex").glob("*/*.versions.json"))
         + list(annstore.tree("eurlex").glob("*/*.ann"))
         # the kommentar ai-annotate guidance layer rides a *different* document's
         # rail (the host act's) -- per page it enters the host's dependency
@@ -4750,6 +4795,23 @@ def sfs_version_pages(sidecars):
             rows.append((entry["uri"], "sfs",
                          str(layout.sfs_version_artifact(basefile, version)),
                          "SFS %s i lydelse enligt SFS %s" % (basefile, version)))
+    return rows
+
+
+def eurlex_version_pages(sidecars):
+    """The EU-act lydelse pages to render, one (uri, source, path, title) row
+    per parsed consolidated version -- the eurlex counterpart of
+    `sfs_version_pages`, appended to the generate plan the same way."""
+    rows = []
+    for sc in sidecars:
+        if not sc.exists():
+            continue
+        basefile = layout.eurlex_sidecar_basefile(sc)
+        for entry in json.loads(sc.read_text())["versions"]:
+            version = entry["version"]
+            rows.append((entry["uri"], "eurlex",
+                         str(layout.eurlex_version_artifact(basefile, version)),
+                         "%s i lydelse per %s" % (basefile, version)))
     return rows
 
 
@@ -4907,6 +4969,14 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
             sorted(layout.SFS_ARTIFACT.glob("*/*.versions.json")))
     else:
         extra = []
+    # ... and the EU-act lydelse pages whenever the run covers eurlex
+    if only is not None:
+        extra += eurlex_version_pages(
+            [Path(p).with_suffix(".versions.json") for p in only
+             if Path(p).is_relative_to(layout.artifact_dir("eurlex"))])
+    elif source in (None, "eurlex"):
+        extra += eurlex_version_pages(
+            sorted(layout.artifact_dir("eurlex").glob("*/*.versions.json")))
     # likewise the föreskrift /grund pages (the as-enacted base text beside a
     # presented consolidation) whenever the run covers foreskrift
     if only is not None:

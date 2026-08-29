@@ -156,3 +156,10 @@ class EurlexDoc:
     ecli: str | None = None    # case law
     oj: str | None = None      # Official Journal reference (e.g. "L 333")
     body: list[Block] = field(default_factory=list)   # document order
+    # a consolidated wording (CONSLEG): which one, what it folds in, and what
+    # changed each article. `version` is set only on a *historical* lydelse --
+    # the latest consolidation serves at the act's own uri and is marked by
+    # `consolidation` alone.
+    version: str | None = None        # this lydelse's date ("2024-10-18")
+    consolidation: dict | None = None # the FAM.COMP register + this text's date
+    provenance: dict | None = None    # article number -> {action, by}
