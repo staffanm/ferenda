@@ -1,0 +1,706 @@
+{
+  "_comment": [
+    "Hand-keyed golden for the PRD's ten worked example chains (artifact",
+    "'Ämneskedjor i normhierarkin', d5f08ae9), anchors verified against the",
+    "dev corpus 2026-08-27. `a_clauses` freeze every subject a delegation",
+    "clause names (the task-A key, full lists -- read and keyed by hand).",
+    "`rungs` freeze the expected ladder rows for chains that carry a concept",
+    "(the end-to-end key for tasks B/C); a chain whose subject is not a",
+    "defined term (brandskydd, mönstring) expects no rows -- PRD §5 rule 4.",
+    "A rung marked \"hand\" is one the source artifact itself says was found",
+    "by hand (no machine-readable link); it scores separately, never in",
+    "recall."
+  ],
+  "chains": [
+    {
+      "name": "betydande-incident",
+      "concept": "betydande incident",
+      "docs": [
+        "https://lagen.nu/ext/celex/32022L2555",
+        "https://lagen.nu/2025:1506",
+        "https://lagen.nu/2025:1507",
+        "https://lagen.nu/mcffs/2026:8"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P37",
+          "subjects": [
+            "säkerhetsåtgärder",
+            "betydande incident",
+            "informationsskyldighet",
+            "avgift",
+            "register"
+          ],
+          "extra_ok": [
+            "vad som utgör en betydande incident"
+          ]
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P39",
+          "subjects": [
+            "säkerhetsåtgärder",
+            "betydande incident",
+            "informationsskyldighet"
+          ],
+          "extra_ok": [
+            "vad som utgör en betydande incident"
+          ]
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P38",
+          "subjects": [
+            "undantag",
+            "huvudsakligt etableringsställe",
+            "kriterier",
+            "anmälningsskyldigheten",
+            "utbildning",
+            "incidentrapportering",
+            "säkerhetsrevisioner",
+            "säkerhetsskanningar"
+          ],
+          "extra_ok": [
+            "undantag från skyldigheterna",
+            "vad som utgör huvudsakligt etableringsställe",
+            "kriterier för när verksamhetsutövare ska omfattas",
+            "säkerhetsrevisioner och säkerhetsskanningar"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/ext/celex/32022L2555",
+          "anchor": "23",
+          "roles": [
+            "definierar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2025:1506",
+          "anchor": "K2P5",
+          "roles": [
+            "alagger",
+            "definierar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P37",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P39",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/mcffs/2026:8",
+          "anchor": "K3P1",
+          "roles": [
+            "detaljerar",
+            "definierar"
+          ],
+          "label": "betydande incident som har orsakat allvarlig driftstörning"
+        }
+      ],
+      "d_subjects": [
+        "betydande incident"
+      ]
+    },
+    {
+      "name": "sakerhetsatgarder",
+      "concept": "säkerhetsåtgärd",
+      "docs": [
+        "https://lagen.nu/ext/celex/32022L2555",
+        "https://lagen.nu/2025:1506",
+        "https://lagen.nu/2025:1507",
+        "https://lagen.nu/mcffs/2026:11"
+      ],
+      "a_clauses": [],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/ext/celex/32022L2555",
+          "anchor": "21",
+          "roles": [
+            "alagger"
+          ],
+          "label": "riskhanteringsåtgärder"
+        },
+        {
+          "doc": "https://lagen.nu/2025:1506",
+          "anchor": "K2P3",
+          "roles": [
+            "definierar",
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P37",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2025:1507",
+          "anchor": "P39",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/mcffs/2026:11",
+          "anchor": "K1P1",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "säkerhetsåtgärder"
+      ]
+    },
+    {
+      "name": "brandskydd",
+      "concept": "brandskydd",
+      "docs": [
+        "https://lagen.nu/ext/celex/32009L0045",
+        "https://lagen.nu/2003:364",
+        "https://lagen.nu/2003:438",
+        "https://lagen.nu/tsfs/2019:120"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2003:438",
+          "anchor": "K2P1",
+          "subjects": [
+            "hur ett fartyg skall vara konstruerat, byggt, utrustat och hållet i stånd"
+          ],
+          "extra_ok": [
+            "hur ett fartyg skall vara konstruerat"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/ext/celex/32009L0045",
+          "anchor": "bilaga-1",
+          "roles": [
+            "alagger",
+            "detaljerar",
+            "namner"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2003:364",
+          "anchor": "K7P2",
+          "roles": [
+            "delegerar",
+            "namner"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2003:438",
+          "anchor": "K2P1",
+          "roles": [
+            "delegerar",
+            "namner"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/tsfs/2019:120",
+          "anchor": "P3",
+          "roles": [
+            "detaljerar",
+            "definierar",
+            "namner"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "brandskydd"
+      ]
+    },
+    {
+      "name": "sakkunnig",
+      "concept": "sakkunnig",
+      "docs": [
+        "https://lagen.nu/ext/celex/32001L0083",
+        "https://lagen.nu/1992:859",
+        "https://lagen.nu/1992:1752",
+        "https://lagen.nu/lvfs/2004:7"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/1992:1752",
+          "anchor": "P17",
+          "subjects": [],
+          "kind": "verkstallighet",
+          "extra_ok": [
+            "verkställigheten",
+            "skydda människors eller djurs hälsa eller miljön",
+            "människors eller djurs hälsa",
+            "miljön",
+            "hälsa"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/ext/celex/32001L0083",
+          "anchor": "48",
+          "roles": [
+            "alagger"
+          ],
+          "label": "person med den särskilda kompetens",
+          "note": "hand"
+        },
+        {
+          "doc": "https://lagen.nu/1992:859",
+          "anchor": "P9b",
+          "roles": [
+            "alagger"
+          ],
+          "label": null,
+          "note": "hand"
+        },
+        {
+          "doc": "https://lagen.nu/lvfs/2004:7",
+          "anchor": "P7",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": null,
+          "note": "hand"
+        }
+      ],
+      "d_subjects": [
+        "sakkunnig"
+      ]
+    },
+    {
+      "name": "bidragsgrundande-inkomst",
+      "concept": "bidragsgrundande inkomst",
+      "docs": [
+        "https://lagen.nu/2010:110",
+        "https://lagen.nu/1993:739",
+        "https://lagen.nu/rffs/1996:12"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/1993:739",
+          "anchor": "P4",
+          "subjects": [
+            "ansökningsförfarandet",
+            "bidragsgrundande inkomst",
+            "beräkningen av bidragets storlek",
+            "beräkning av bostadskostnadens storlek",
+            "anmälningsskyldighet",
+            "utbetalning av bidrag",
+            "återbetalning av bidrag",
+            "tillägg och avgift"
+          ],
+          "extra_ok": [
+            "verkställigheten",
+            "bostadsbidrag",
+            "vad som gäller när bostaden utgör del av upplåtarens bostad",
+            "tillägg",
+            "avgift",
+            "tillägg och avgift enligt 98 kap. 7 § socialförsäkringsbalken"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2010:110",
+          "anchor": "K95P3",
+          "roles": [
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/1993:739",
+          "anchor": "P4",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/rffs/1996:12",
+          "anchor": "P3",
+          "roles": [
+            "detaljerar",
+            "namner"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "bidragsgrundande inkomst"
+      ]
+    },
+    {
+      "name": "monstring",
+      "concept": "mönstring",
+      "docs": [
+        "https://lagen.nu/1994:1809",
+        "https://lagen.nu/1995:238",
+        "https://lagen.nu/trmfs/2017:1"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/1995:238",
+          "anchor": "K9P1",
+          "subjects": [
+            "uppgiftsskyldighet",
+            "grundutbildningens och repetitionsutbildningens längd",
+            "krigsplacering",
+            "hämtning",
+            "upplysningsskyldighet"
+          ],
+          "kind": "verkstallighet",
+          "extra_ok": [
+            "verkställigheten",
+            "grundutbildningens och repetitionsutbildningens längd och genomförande",
+            "uppgiftsskyldighet enligt 3 kap. 14 §"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/1994:1809",
+          "anchor": "K1P3",
+          "roles": [
+            "definierar",
+            "alagger",
+            "namner"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/1995:238",
+          "anchor": "K4P1",
+          "roles": [
+            "alagger",
+            "namner"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/trmfs/2017:1",
+          "anchor": "K2P3",
+          "roles": [
+            "detaljerar",
+            "namner"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "mönstring"
+      ]
+    },
+    {
+      "name": "bedomningsstod",
+      "concept": "nationellt bedömningsstöd",
+      "docs": [
+        "https://lagen.nu/2010:800",
+        "https://lagen.nu/2011:185",
+        "https://lagen.nu/skolfs/2024:598"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2011:185",
+          "anchor": "K9P22c",
+          "subjects": [
+            "nationella bedömningsstöd"
+          ],
+          "extra_ok": [
+            "användningen",
+            "nationella bedömningsstöd och användningen av dessa"
+          ]
+        },
+        {
+          "doc": "https://lagen.nu/2011:185",
+          "anchor": "K10P12",
+          "subjects": [
+            "nationella bedömningsstöd"
+          ],
+          "extra_ok": [
+            "användningen",
+            "nationella bedömningsstöd och om användningen av dem"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2010:800",
+          "anchor": "K3P4",
+          "roles": [
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2011:185",
+          "anchor": "K9P22b",
+          "roles": [
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2011:185",
+          "anchor": "K9P22c",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2011:185",
+          "anchor": "K10P12",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/skolfs/2024:598",
+          "anchor": "P1",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "nationella bedömningsstöd",
+        "nationellt bedömningsstöd",
+        "bedömningsstöd"
+      ]
+    },
+    {
+      "name": "flygcertifikat",
+      "concept": "flygcertifikat",
+      "docs": [
+        "https://lagen.nu/2010:500",
+        "https://lagen.nu/2010:770",
+        "https://lagen.nu/tsfs/2013:13"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2010:770",
+          "anchor": "K4P5",
+          "subjects": [
+            "ålderskrav",
+            "krav i fråga om kunskaper, erfarenhet och skicklighet",
+            "förutsättningar",
+            "särskild behörighet",
+            "krav i fråga om hälsotillstånd"
+          ],
+          "extra_ok": [
+            "flygcertifikat",
+            "elevtillstånd",
+            "certifikat",
+            "medicinskt intyg",
+            "hälsotillstånd",
+            "ålderskrav som gäller för att ett elevtillstånd eller flygcertifikat ska kunna utfärdas",
+            "kunskaper, erfarenhet och skicklighet",
+            "särskild behörighet för att en certifikatinnehavare ska få fullgöra vissa uppgifter",
+            "krav i fråga om hälsotillstånd samt fysiska och psykiska förhållanden"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2010:500",
+          "anchor": "K4P1",
+          "roles": [
+            "alagger"
+          ],
+          "label": null,
+          "note": "hand"
+        },
+        {
+          "doc": "https://lagen.nu/2010:770",
+          "anchor": "K4P5",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/tsfs/2013:13",
+          "anchor": "P1",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": "certifikat"
+        }
+      ],
+      "d_subjects": [
+        "flygcertifikat"
+      ]
+    },
+    {
+      "name": "betesmark",
+      "concept": "betesmark",
+      "docs": [
+        "https://lagen.nu/2007:481",
+        "https://lagen.nu/sjvfs/2007:42"
+      ],
+      "a_clauses": [],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2007:481",
+          "anchor": "K1P4",
+          "roles": [
+            "definierar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/sjvfs/2007:42",
+          "anchor": "K3P6",
+          "roles": [
+            "detaljerar",
+            "namner"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "betesmark"
+      ]
+    },
+    {
+      "name": "varmeutbyte",
+      "concept": "solfångarens årliga värmeutbyte",
+      "docs": [
+        "https://lagen.nu/2008:1247",
+        "https://lagen.nu/bfs/2009:2"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2008:1247",
+          "anchor": "P13",
+          "subjects": [
+            "kvalitetskrav",
+            "hur solfångarens årliga värmeutbyte ska bestämmas",
+            "ansökan om stöd och begäran om utbetalning"
+          ],
+          "extra_ok": [
+            "solfångarens årliga värmeutbyte",
+            "kvalitetskrav som solvärmeanordningen ska uppfylla",
+            "ansökan om stöd",
+            "begäran om utbetalning"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2008:1247",
+          "anchor": "P3",
+          "roles": [
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2008:1247",
+          "anchor": "P13",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/bfs/2009:2",
+          "anchor": "P2",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "solfångarens årliga värmeutbyte",
+        "årliga värmeutbyte",
+        "värmeutbyte"
+      ]
+    },
+    {
+      "name": "nedsattning",
+      "concept": "nedsättning av återbetalningsbelopp",
+      "docs": [
+        "https://lagen.nu/2018:1118",
+        "https://lagen.nu/csnfs/2018:5"
+      ],
+      "a_clauses": [
+        {
+          "doc": "https://lagen.nu/2018:1118",
+          "anchor": "P25",
+          "subjects": [
+            "vilka uppgifter och handlingar sådana låntagare ska lämna"
+          ],
+          "extra_ok": [
+            "kontroll av inkomster",
+            "uppgifter och handlingar",
+            "vilka uppgifter och handlingar sådana låntagare ska lämna till Centrala studiestödsnämnden för kontroll av inkomster"
+          ]
+        }
+      ],
+      "rungs": [
+        {
+          "doc": "https://lagen.nu/2018:1118",
+          "anchor": "P24",
+          "roles": [
+            "alagger"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/2018:1118",
+          "anchor": "P25",
+          "roles": [
+            "delegerar"
+          ],
+          "label": null
+        },
+        {
+          "doc": "https://lagen.nu/csnfs/2018:5",
+          "anchor": "P15",
+          "roles": [
+            "detaljerar"
+          ],
+          "label": null
+        }
+      ],
+      "d_subjects": [
+        "nedsättning av återbetalningsbelopp",
+        "nedsättning"
+      ]
+    }
+  ]
+}

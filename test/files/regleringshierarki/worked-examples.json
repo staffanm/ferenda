@@ -1,0 +1,99 @@
+{
+  "_comment": [
+    "Frozen from the PRD's ten worked examples (artifact 'Ämneskedjor i",
+    "normhierarkin', d5f08ae9, measured 2026-08-27), quotes verbatim from the",
+    "provisions. Two chains carry the shapes the unit tests do not already",
+    "lock: brandskydd (a subject no concept anchors -- the fyller-ut line,",
+    "fully mechanical) and betydande incident (the delegation mechanics are",
+    "mechanical; the concept rows await the ai-* pass, phase 3, because the",
+    "defining provisions write 'En incident är betydande om ...' -- a",
+    "predicative shape no mechanical mode reads, and never a phrase we may",
+    "compose a name from)."
+  ],
+  "examples": [
+    {
+      "name": "brandskydd-pa-passagerarfartyg",
+      "documents": [
+        {"uri": "https://lagen.nu/ext/celex/32009L0045", "source": "eurlex",
+         "kind": "directive", "date": "2009-05-06"},
+        {"uri": "https://lagen.nu/2003:364", "source": "sfs", "kind": "lag",
+         "date": "2003-06-05"},
+        {"uri": "https://lagen.nu/2003:438", "source": "sfs",
+         "kind": "forordning", "date": "2003-06-12"},
+        {"uri": "https://lagen.nu/tsfs/2019:120", "source": "foreskrift",
+         "kind": "tsfs", "date": "2019-12-06"}
+      ],
+      "norm_chain": [
+        ["https://lagen.nu/tsfs/2019:120", null, "https://lagen.nu/2003:438",
+         "K2P1", "rpubl:bemyndigande", 3, 2],
+        ["https://lagen.nu/2003:364", "K7P2", "https://lagen.nu/ext/celex/32009L0045",
+         "6", "rpubl:genomforDirektiv", 1, 0]
+      ],
+      "links": [
+        {"from_uri": "https://lagen.nu/2003:438", "from_anchor": "K2P1S1",
+         "predicate": "dcterms:references",
+         "to_uri": "https://lagen.nu/2003:364#K7P2",
+         "_quote": "Transportstyrelsen får meddela föreskrifter enligt 7 kap. 2 § 1 fartygssäkerhetslagen (2003:364) om hur ett fartyg skall vara konstruerat, byggt, utrustat och hållet i stånd."}
+      ],
+      "genomforande": [
+        {"sfs_uri": "https://lagen.nu/2003:364", "sfs_anchor": "K7P2",
+         "directive": "https://lagen.nu/ext/celex/32009L0045", "article": "6",
+         "pinpoint": null}
+      ],
+      "expected_delegation_edges": [
+        ["https://lagen.nu/2003:438", "K2P1", "https://lagen.nu/2003:364", "K7P2"]
+      ],
+      "expected_fyller_ut": {
+        "https://lagen.nu/tsfs/2019:120": {
+          "forordning": ["https://lagen.nu/2003:438", "K2P1"],
+          "lag": ["https://lagen.nu/2003:364", "K7P2"],
+          "direktiv": [["https://lagen.nu/ext/celex/32009L0045", "6", null]]
+        }
+      },
+      "expected_rows": []
+    },
+    {
+      "name": "betydande-incident",
+      "concept": "https://lagen.nu/begrepp/Betydande_incident",
+      "documents": [
+        {"uri": "https://lagen.nu/ext/celex/32022L2555", "source": "eurlex",
+         "kind": "directive", "date": "2022-12-14"},
+        {"uri": "https://lagen.nu/2025:1506", "source": "sfs", "kind": "lag",
+         "date": "2025-11-20"},
+        {"uri": "https://lagen.nu/2025:1507", "source": "sfs",
+         "kind": "forordning", "date": "2025-12-04"},
+        {"uri": "https://lagen.nu/mcffs/2026:8", "source": "foreskrift",
+         "kind": "mcffs", "date": "2026-05-01"}
+      ],
+      "norm_chain": [
+        ["https://lagen.nu/mcffs/2026:8", null, "https://lagen.nu/2025:1507",
+         "P37", "rpubl:bemyndigande", 3, 2],
+        ["https://lagen.nu/2025:1506", "K2P5", "https://lagen.nu/ext/celex/32022L2555",
+         "23", "rpubl:genomforDirektiv", 1, 0]
+      ],
+      "links": [
+        {"from_uri": "https://lagen.nu/2025:1507", "from_anchor": "P37S1",
+         "predicate": "dcterms:references",
+         "to_uri": "https://lagen.nu/2025:1506#K2P5",
+         "_quote": "ytterligare föreskrifter om vad som utgör en betydande incident enligt 2 kap. 5 § samma lag"}
+      ],
+      "expected_delegation_edges": [
+        ["https://lagen.nu/2025:1507", "P37", "https://lagen.nu/2025:1506", "K2P5"]
+      ],
+      "expected_rows": [
+        {"phase": 3, "doc": "https://lagen.nu/ext/celex/32022L2555",
+         "anchor": "23.3", "role": "definierar",
+         "_quote": "En incident ska anses vara betydande om den har orsakat eller kan orsaka allvarliga driftsstörningar för tjänsterna eller ekonomiska förluster för den berörda entiteten"},
+        {"phase": 3, "doc": "https://lagen.nu/2025:1506", "anchor": "K2P5",
+         "role": "definierar",
+         "_quote": "En incident ska anses vara betydande om den har orsakat eller kan orsaka allvarlig driftsstörning för den erbjudna tjänsten eller ekonomisk skada"},
+        {"phase": 3, "doc": "https://lagen.nu/2025:1507", "anchor": "P37",
+         "role": "delegerar",
+         "_quote": "ytterligare föreskrifter om vad som utgör en betydande incident enligt 2 kap. 5 § samma lag"},
+        {"phase": 3, "doc": "https://lagen.nu/mcffs/2026:8", "anchor": "K3P1",
+         "role": "detaljerar",
+         "_quote": "Med betydande incident som har orsakat allvarlig driftstörning ... avses en incident där ... sektorsverksamhet endast har kunnat bedrivas i begränsad utsträckning i mer än 12 timmar"}
+      ]
+    }
+  ]
+}

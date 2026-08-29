@@ -25,6 +25,7 @@ folded so `på Internet` / `på internet` are one concept.
 """
 
 import json
+import re
 from pathlib import Path
 
 from .util import normalize_fold as _norm
@@ -62,6 +63,42 @@ def _last_word_bases(form):
     de-inflected, the rest kept (the head inflects in this corpus's terms)."""
     parts = form.split(" ")
     return {" ".join(parts[:-1] + [b]) for b in _bases(parts[-1])} if parts else set()
+
+
+def _word_variants(word: str) -> set[str]:
+    """The inflected surface forms one word of a term may take in text:
+    itself, its candidate bases, the reversible ending classes forward from
+    each, the genitive -s, the agent-noun forms, and the adjectival/weak "a"
+    ("sakkunnig" -> "den sakkunniga") -- forward-only, so `cluster`'s
+    reversing is never loosened (`_ENDINGS` stays as it is)."""
+    variants = set()
+    for stem in {word} | _bases(word):
+        variants.add(stem)
+        variants.add(stem + "s")
+        if stem.endswith("are"):                 # agent noun: -aren, -arna
+            variants.update((stem + "n", stem[:-1] + "na"))
+        if len(stem) >= 3:
+            for end in (*_ENDINGS, "a"):
+                variants.add(stem + end)
+                variants.add(stem + end + "s")
+    return variants
+
+
+def term_pattern(term):
+    """A compiled regex matching `term` or an inflected surface form of it in
+    `util.normalize_fold`ed running text, every word inflection-wide and
+    word-bounded: "betydande incident" matches "betydande incidenten";
+    "nationellt bedömningsstöd" matches "nationella bedömningsstöd" (the
+    attributive adjective agrees with its noun, so a last-word-only pattern
+    missed every plural-context use -- measured on the golden-ten bench,
+    where it cost all five bedömningsstöd rungs). Never "incidentrapport" (a
+    compound is a different word)."""
+    parts = []
+    for word in _norm(term).split(" "):
+        alt = "|".join(re.escape(v) for v in
+                       sorted(_word_variants(word), key=len, reverse=True))
+        parts.append("(?:" + alt + ")")
+    return re.compile(r"\b" + r"\s+".join(parts) + r"\b")
 
 
 

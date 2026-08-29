@@ -131,6 +131,7 @@ from .lib import (
     errorlog,
     eu_structure,
     harvest,
+    hierarki,
     labels,
     layout,
     llm,
@@ -4159,13 +4160,27 @@ def _swap_catalog(scratch, dest):
     os.close(dfd)
 
 
+# the code the relate cross-passes run -- their own recipe, apart from
+# RELATE_CODE: an edit here re-runs only the __corr__ block (cheap), where an
+# entry in RELATE_CODE re-extracts every document of every source
+CORR_CODE = (PKG / "lib" / "hierarki.py",
+             PKG / "forarbete" / "genomforande.py",
+             PKG / "forarbete" / "fk.py")
+
+
 def _corr_watermark():
-    """The fingerprint over the authored layers the relate cross-passes read
-    (SFS .corr correspondence + förarbete genomförande/fk .ann) -- the gate for
-    re-running them, shared by cmd_relate and the targeted relate check
-    (_catalog_current_for), so both notice the same layer edits."""
+    """The fingerprint over what the relate cross-passes read: the authored
+    layers (SFS .corr correspondence + förarbete genomförande/fk .ann) and
+    their own code (CORR_CODE) -- the gate for re-running them, shared by
+    cmd_relate and the targeted relate check (_catalog_current_for), so both
+    notice the same layer or code edits."""
     return file_fingerprint(sorted(annstore.tree("sfs").glob("*/*.corr"))
-                            + sorted(annstore.tree("forarbete").rglob("*.ann")))
+                            + sorted(annstore.tree("forarbete").rglob("*.ann"))
+                            # the ai-hierarki layers (regleringshierarki rows)
+                            + sorted(annstore.tree("sfs").rglob("*.ann"))
+                            + sorted(annstore.tree("foreskrift").rglob("*.ann"))
+                            + sorted(annstore.tree("eurlex").rglob("*.ann"))
+                            + list(CORR_CODE))
 
 
 def cmd_relate(names, force=None):
@@ -4249,6 +4264,13 @@ def cmd_relate(names, force=None):
         # every source related (a chain crosses EU -> lag -> förordning ->
         # föreskrift), so it runs here rather than per source.
         chain = catalog.rebuild_norm_chain(con)
+        # ordering invariant: rebuild_norm_chain DELETEs its table, so the
+        # derived delegation edges always re-insert after it; the ladder rows
+        # store canonical concept uris, so they build after
+        # canonicalize_concepts (above) -- never join its UPDATE loop
+        delegated, deleg_dup = hierarki.derive_delegation_edges(con)
+        ladder_stats = hierarki.rebuild_regleringshierarki(
+            con, curated=hierarki.hierarki_layers())
         anchor_warnings = kommentar_anchor_warnings(con)
         # The same question `kommentar_anchor_warnings` asks of one commentary
         # and its host act, asked of the whole citation graph: a link whose
@@ -4274,6 +4296,18 @@ def cmd_relate(names, force=None):
         record_fingerprint(store, "relate", "__corr__", corr_wm)
         dirty = True
         print("relate: %d norm-chain relations" % chain)
+        print("relate: %d förordning->lag delegation edges derived from the "
+              "delegation clauses (%d already stated)" % (delegated, deleg_dup))
+        print("relate: %d regleringshierarki rows over %d ladders "
+              "(verbatim %d, aligned labels %d, genomförande %d; %d chain "
+              "documents offer no concept, %d definitions sit off the chain, "
+              "%d lone ladders dropped)"
+              % (ladder_stats["rows"], ladder_stats["ladders"],
+                 ladder_stats["verbatim"], ladder_stats["aligned_labels"],
+                 ladder_stats["genomforande"],
+                 ladder_stats["chain_docs_no_concept"],
+                 ladder_stats["defs_off_chain"],
+                 ladder_stats["single_dropped"]))
         print("relate: %d genomför-direktiv relations pinned to SFS paragrafs"
               % pinned)
         print("relate: %d författningskommentar entries pinned to SFS "

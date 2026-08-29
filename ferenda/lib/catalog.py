@@ -127,6 +127,49 @@ CREATE TABLE IF NOT EXISTS norm_chain (
 );
 CREATE INDEX IF NOT EXISTS idx_chain_lower ON norm_chain(lower_uri);
 CREATE INDEX IF NOT EXISTS idx_chain_upper ON norm_chain(upper_uri);
+CREATE TABLE IF NOT EXISTS delegation_edge (
+    -- förordning->lag edges read out of the delegation clause: the empowering
+    -- provision's own text cites the lag it delegates under ("... får meddela
+    -- föreskrifter enligt 7 kap. 2 § 1 fartygssäkerhetslagen om ..."), and
+    -- those citations are already links rows. Derived at relate by
+    -- lib/hierarki.py, never stated by the lower document itself -- kept out
+    -- of norm_chain so its contract (typed authority edges from `links`)
+    -- holds. Column meanings as in norm_chain.
+    lower_uri   TEXT NOT NULL,      -- the förordning
+    lower_pin   TEXT NOT NULL,      -- its delegation provision
+    upper_uri   TEXT NOT NULL,      -- the lag the clause cites
+    upper_pin   TEXT                -- the cited lag provision, when pinned
+);
+CREATE INDEX IF NOT EXISTS idx_delegation_lower ON delegation_edge(lower_uri);
+CREATE TABLE IF NOT EXISTS regleringshierarki (
+    -- one row per (concept, provision): the ladder a subject climbs through
+    -- the norm levels. Rebuilt whole at relate by lib/hierarki.py, strictly
+    -- after canonicalize_concepts (concept is stored canonical) and after
+    -- rebuild_norm_chain + delegation_edge (via paths reference their rows).
+    concept     TEXT NOT NULL,      -- canonical begrepp uri
+    doc_uri     TEXT NOT NULL,      -- the document carrying the row (no fragment)
+    anchor      TEXT,               -- the provision (K2P5 / 23.3); NULL = whole doc
+    also        TEXT,               -- JSON [anchor...]: same-document restatements
+    level       INTEGER NOT NULL,   -- rung, from NORM_LEVEL
+    kind        TEXT,               -- documents.kind of the rung's doc (splits EU)
+    role        TEXT NOT NULL,      -- definierar|alagger|delegerar|detaljerar|namner
+    label       TEXT,               -- the phrase this rung uses, when it differs
+    chain_root  TEXT NOT NULL,      -- top-rung document uri; one ladder per root
+    via         TEXT,               -- JSON [[lower,lpin,upper,upin,pred]...]: the
+                                    -- chain edges from this row's document up to
+                                    -- chain_root, bottom-up; NULL on the root
+    source      TEXT NOT NULL,      -- verbatim|genomforande|llm (a delegation-clause hit is role
+                                -- delegerar, source verbatim)
+    stated      TEXT,               -- date of the doc at the lower end of the top
+                                    -- via edge (the one that read the delegation)
+    upphavd     TEXT,               -- rung repeal date; EXPIRED_UNDATED when
+                                    -- undated; NULL = in force
+    via_amended TEXT                -- ikraftträdande of an amendment touching the
+                                    -- upward pin after `stated`; NULL = not known
+                                    -- shaken
+);
+CREATE INDEX IF NOT EXISTS idx_hierarki_concept ON regleringshierarki(concept);
+CREATE INDEX IF NOT EXISTS idx_hierarki_doc ON regleringshierarki(doc_uri, anchor);
 CREATE TABLE IF NOT EXISTS correspondence (
     new_uri  TEXT NOT NULL,         -- the new statute paragraf (full uri, doc#id)
     old_uri  TEXT NOT NULL,         -- the old paragraf it corresponds to (a
@@ -906,7 +949,7 @@ def definition_links(art):
 # it puts one:
 #
 #   SFS     an inline `dcterms:subject` term run over the definiendum's own span
-#           (`sfs.begrepp`). The node around it is a whole stycke and often
+#           (`lib.begrepp`). The node around it is a whole stycke and often
 #           holds more than the definition -- brottsbalken 10 kap. 8 § 1 st runs
 #           "Fullgör man ej ... dömes för fyndförseelse till böter. Underlåter
 #           man ..." -- so the unit stored is the *sentence* carrying the term.
