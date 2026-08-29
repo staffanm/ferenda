@@ -2,9 +2,10 @@
 
 The download keeps every consolidated wording (CONSLEG) of an act under
 ``downloaded/eurlex/{year}/{celex}/.versions/{date}/`` (see
-`download.download_consolidations`). The *latest* Formex-bearing one already
+`download.download_consolidations`). The newest one that parses already
 serves at the act's own uri (`parse.parse_dir` swaps it in); this stage gives
-each earlier wording the same treatment, writing
+every other wording the same treatment -- or records why it could not --
+writing
 
   artifact/eurlex/archive/{year}/{celex}/.versions/{date}.json   one per version
   artifact/eurlex/{year}/{celex}.versions.json                   the index
@@ -18,6 +19,8 @@ than parsed.
 """
 
 import json
+
+from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, layout, util
 from .parse import (
@@ -55,7 +58,15 @@ def build(basefile):
         try:
             doc = parse_consolidation(vdir, basefile, version,
                                       preamble=preamble)
-        except Exception as exc:  # noqa: BLE001 — per-version resilience point, mirroring sfs.versions: a scanned-era broken version (TIFF bytes in a .xml member, a corrigendum-only packet, a DOC format manifest) becomes a recorded skip, not an act whose whole history can never build (rule:no-catch-log-continue)
+        except (ValueError, etree.XMLSyntaxError) as exc:
+            # exactly the pair `parse.parse_dir` skips a version on, so the
+            # two pick the same wording as the act's own: the scanned-era
+            # breakages (TIFF bytes inside a .xml member, a corrigendum-only
+            # packet, a DOC format manifest -- 13 of 172,043 measured) become
+            # a recorded skip. Anything else -- a truncated zip, a corrupt
+            # download, a KeyError from a parser bug -- fails this act's
+            # stage loudly, where the driver records it per document, rather
+            # than being buried as a skip that silently renames `main`.
             skipped.append({"version": version, "error": "%s: %s"
                             % (type(exc).__name__, exc)})
             continue

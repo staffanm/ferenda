@@ -721,7 +721,10 @@ def store_document(session, target, celex, wdate, selection, eurovoc,
                 # way a failed content check does -- one ghost must not kill a
                 # 19,000-document sweep. Anything but a 404 still raises: the
                 # transport already retried what is retryable.
-                if exc.response is None or exc.response.status_code != 404:
+                # `net.raise_for_status` is the single place this package
+                # turns a failed response into an HTTPError, and it always
+                # attaches the response -- so this reads it without a guard
+                if exc.response.status_code != 404:
                     raise
                 continue
             if not _content_ok(filetype, response.content):

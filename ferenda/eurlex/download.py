@@ -430,10 +430,18 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
             # transport already retried the transient kind five times).
             # One broken remote object must not abort a 20,000-version
             # sweep: the version is recorded and left unstored -- no
-            # notice marker -- so the next run re-attempts it. A network
-            # failure (ConnectionError, timeout) still aborts: every
-            # remaining version would fail the same way, and a sweep that
-            # grinds through them all only buries the real problem.
+            # notice marker -- so the next run re-attempts it.
+            #
+            # Only a 5xx. A 4xx here is our own bug (a malformed
+            # manifestation url), not a broken remote object -- 404 is
+            # already absorbed per candidate by `store_document` -- and
+            # counting it as `failed` for all 20,000 versions would hide it
+            # behind a clean-looking run. A network failure
+            # (ConnectionError, timeout) likewise still aborts: every
+            # remaining version would fail the same way, and grinding
+            # through them all only buries the real problem.
+            if exc.response.status_code < 500:
+                raise
             failed += 1
             print("%s: CELLAR error, version left unstored: %s"
                   % (cons, exc), flush=True)

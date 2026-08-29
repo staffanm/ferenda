@@ -721,6 +721,17 @@ def test_consolidation_sweep_survives_a_persistent_500(tmp_path, monkeypatch):
     seen, stored, skipped, empty, failed = D.download_consolidations(
         object(), tmp_path, ["32014R0910"], ("swe",), 0)
     assert (seen, stored, skipped, empty, failed) == (2, 1, 0, 0, 1)
+    # a 4xx is our own bug (a malformed manifestation url), not a broken
+    # remote object -- it must surface, not be counted as one more failure
+    def bad_request(session, method, url, **kw):
+        r = requests.Response()
+        r.status_code = 403
+        raise requests.HTTPError("HTTP 403", response=r)
+
+    monkeypatch.setattr(C, "request", bad_request)
+    with pytest.raises(requests.HTTPError, match="403"):
+        D.download_consolidations(object(), tmp_path / "other",
+                                  ["32014R0910"], ("swe",), 0)
     # the failed version left no marker, so a rerun re-attempts exactly it
     assert not (D.version_dir(tmp_path, "32014R0910", "2024-05-20")
                 / "notice.ttl").exists()
