@@ -172,3 +172,52 @@ def test_a_lag_states_neither_formula():
     structure = [_node(["Denna lag gäller för den som bedriver verksamhet."])]
     assert bemyndigande.extract(structure, "https://lagen.nu/2018:585") == {
         "bemyndigande": [], "kompletterar": []}
+
+
+def test_a_lag_that_complements_an_eu_act_carries_the_edge():
+    """Dataskyddslagen 1 kap. 1 § opens "Denna lag kompletterar
+    Europaparlamentets och rådets förordning (EU) 2016/679" -- the GDPR shape,
+    an EU förordning detailed by Swedish law. The förordning-only alternation
+    left 0 lagar with the edge, hiding the whole family from the chain."""
+    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    verb = [_node(["Denna lag kompletterar ",
+                   _ref(gdpr, "Europaparlamentets och rådets förordning (EU) "
+                              "2016/679"), "."])]
+    assert bemyndigande.extract(verb, "https://lagen.nu/2018:218") == {
+        "bemyndigande": [], "kompletterar": [gdpr]}
+    ingress = [_node(["Denna lag innehåller kompletterande bestämmelser "
+                      "till ", _ref(gdpr, "EU:s dataskyddsförordning"), "."])]
+    assert bemyndigande.extract(ingress, "https://lagen.nu/2018:218") == {
+        "bemyndigande": [], "kompletterar": [gdpr]}
+
+
+def test_lag_to_eu_regulation_kompletterar_reaches_the_chain(con):
+    """The lag->EU rung: kompletterar at levels 1 -> 0, the same walk the
+    bemyndigande edge makes at 3 -> 2."""
+    con.execute("INSERT INTO documents (uri, source, kind, path) VALUES "
+                "('https://lagen.nu/ext/celex/32016R0679','eurlex',"
+                "'regulation','x')")
+    con.execute("INSERT INTO documents (uri, source, kind, path) VALUES "
+                "('https://lagen.nu/2018:218','sfs','lag','x')")
+    link(con, "https://lagen.nu/2018:218", None, "rinfoex:kompletterar",
+         "https://lagen.nu/ext/celex/32016R0679")
+    assert catalog.rebuild_norm_chain(con) == 1
+    assert [(r[0], r[2], r[5], r[6]) for r in _rows(con)] == [
+        ("https://lagen.nu/2018:218", "https://lagen.nu/ext/celex/32016R0679",
+         1, 0)]
+
+
+def test_a_reference_embedded_in_the_cited_acts_title_is_not_complemented():
+    """The GDPR's full title itself cites direktiv 95/46/EG ("... och om
+    upphävande av direktiv 95/46/EG"). That reference is part of the cited
+    act's name, and must not become a second kompletterar edge."""
+    gdpr = "https://lagen.nu/ext/celex/32016R0679"
+    old = "https://lagen.nu/ext/celex/31995L0046"
+    structure = [_node([
+        "Denna lag kompletterar ",
+        _ref(gdpr, "Europaparlamentets och rådets förordning (EU) 2016/679"),
+        " om skydd för fysiska personer och om upphävande av direktiv ",
+        _ref(old, "95/46/EG"),
+        " (allmän dataskyddsförordning)."])]
+    assert bemyndigande.extract(structure, "https://lagen.nu/2018:218") == {
+        "bemyndigande": [], "kompletterar": [gdpr]}

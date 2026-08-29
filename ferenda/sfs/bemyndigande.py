@@ -15,7 +15,10 @@ read from the text, where Swedish drafting states it in two fixed forms:
 
 * the **kompletterar ingress** -- "Denna förordning innehåller kompletterande
   bestämmelser till säkerhetsskyddslagen (2018:585)". Document-level only, but it
-  is what an older förordning (2021:955) states where it states anything.
+  is what an older förordning (2021:955) states where it states anything. A *lag*
+  states this form too, against an EU act: "Denna lag kompletterar
+  Europaparlamentets och rådets förordning (EU) 2016/679" (dataskyddslagen) --
+  the family of Swedish laws detailing a directly applicable EU förordning.
 
 Neither is universal: of 8,179 förordningar, 654 carry the first and ~50 the
 second. That is why they cannot decide *whether* a document is a förordning
@@ -39,11 +42,29 @@ from ..lib.text import runs_text
 # stöd av *only* regeringsformen has no delegating lag above it.
 REGERINGSFORMEN = BASE + "1974:152"
 
+# only a förordning/kungörelse is *meddelad* -- a lag is enacted, never issued
+# under a delegation, so the upplysning formula stays förordning-only
 RE_UPPLYSNING = re.compile(
     r"[Dd]enna\s+(?:förordning|kungörelse)\s+(?:är|har)\s+meddelad")
+# a lag states the kompletterar relation too: dataskyddslagen (2018:218) 1 kap.
+# 1 § opens "Denna lag kompletterar Europaparlamentets och rådets förordning
+# (EU) 2016/679" -- the GDPR shape, an EU förordning with directive-like leeway
+# detailed by Swedish law. 16 of 300 sampled gällande lagar open this way, and
+# with the förordning-only alternation the whole family was invisible to the
+# norm chain (0 lagar carried the edge).
 RE_KOMPLETTERAR = re.compile(
-    r"[Dd]enna\s+(?:förordning|kungörelse)\s+innehåller\s+"
+    r"[Dd]enna\s+(?:lag|balk|förordning|kungörelse)\s+innehåller\s+"
     r"(?:kompletterande|verkställighets)\w*\s+bestämmelser\s+till")
+# the bare-verb form of the same statement ("Denna lag kompletterar ...")
+RE_KOMPLETTERAR_VERB = re.compile(
+    r"[Dd]enna\s+(?:lag|balk|förordning|kungörelse)\s+kompletterar\b")
+# an EU act's full title cites the acts it repeals or amends ("förordning (EU)
+# 2016/679 ... och om upphävande av direktiv 95/46/EG"), and the citation
+# engine links that embedded act too. A reference whose preceding text ends in
+# this tail is part of the cited act's own name, not a complemented act.
+RE_TITLE_EMBED = re.compile(
+    r"(?:upphävande|ändring)\s+av\s+(?:rådets\s+|kommissionens\s+)?"
+    r"(?:direktiv|förordning|beslut|rambeslut)?\s*$")
 
 
 def _links(node):
@@ -52,6 +73,22 @@ def _links(node):
             for run in node.get("text") or []
             if isinstance(run, dict) and run.get("uri")
             and run.get("predicate", "").endswith("references")]
+
+
+def _kompletterar_links(node):
+    """The act references of a kompletterar sentence, minus any embedded in a
+    cited act's own title (RE_TITLE_EMBED): dataskyddslagen's ingress cites the
+    GDPR by full name, and that name itself cites direktiv 95/46/EG."""
+    out, preceding = [], ""
+    for run in node.get("text") or []:
+        if isinstance(run, dict):
+            if (run.get("uri") and run.get("predicate", "").endswith("references")
+                    and not RE_TITLE_EMBED.search(preceding)):
+                out.append(run["uri"])
+            preceding = ""
+        else:
+            preceding = run
+    return out
 
 
 def _walk(nodes, out=None):
@@ -74,15 +111,18 @@ def extract(structure, self_uri):
     carries an empty list. ``kompletterar`` is the acts the ingress says this
     förordning completes, document uris, no fragment.
 
-    Both are empty for a lag, for a förordning that states neither formula, and
-    for one whose only authority is regeringsformen -- an empty result is the
-    document being silent, never a failure to look."""
+    Both are empty for a förordning that states neither formula and for one
+    whose only authority is regeringsformen; ``bemyndigande`` is always empty
+    for a lag, but a lag that says it complements an EU act carries the
+    ``kompletterar`` edge. An empty result is the document being silent, never
+    a failure to look."""
     nodes = _walk(structure)
     bemyndigande, kompletterar = [], []
     for node in nodes:
         text = runs_text(node.get("text") or [])
-        if RE_KOMPLETTERAR.search(text):
-            kompletterar += [strip_fragment(uri) for uri, _ in _links(node)
+        if RE_KOMPLETTERAR.search(text) or RE_KOMPLETTERAR_VERB.search(text):
+            kompletterar += [strip_fragment(uri)
+                             for uri in _kompletterar_links(node)
                              if strip_fragment(uri)
                              not in (self_uri, REGERINGSFORMEN)]
         if not RE_UPPLYSNING.search(text):
