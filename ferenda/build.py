@@ -1663,6 +1663,8 @@ def sfs_ai_hierarki(basefiles):
                  "reaches a föreskrift -- one component per lag")
     llm.start_record()
     eligible = aihierarki.layer_sources(con)
+    t0 = time.perf_counter()
+    paid = 0            # components actually run (skips are instant)
     for i, bf in enumerate(basefiles, 1):
         docs, clauses = aihierarki.component(con, catalog.BASE + bf)
         if RUN.dry_run:
@@ -1683,13 +1685,19 @@ def sfs_ai_hierarki(basefiles):
                                                batched=True)
         written = aihierarki.write_layers(con, rows, force=RUN.force,
                                           all_docs=docs)
+        paid += 1
+        # rough ETA: elapsed over the components actually run, extrapolated
+        # to what remains -- component sizes vary widely, so read it as an
+        # order of magnitude, not a promise
+        remaining = (time.perf_counter() - t0) / paid * (len(basefiles) - i)
         tasks = ("a", "b1", "b2", "c", "d")
         print("(%d/%d) %s: %d rows over %d documents -> %d layers "
-              "(%d calls, %d discarded, %d+%d tokens)"
+              "(%d calls, %d discarded, %d+%d tokens)  ETA %dh%02dm"
               % (i, len(basefiles), bf, len(rows), len(docs), written,
                  sum(stats[t + "_calls"] for t in tasks),
                  sum(stats[t + "_discarded"] for t in tasks),
-                 llm.USAGE["prompt_tokens"], llm.USAGE["completion_tokens"]),
+                 llm.USAGE["prompt_tokens"], llm.USAGE["completion_tokens"],
+                 remaining // 3600, remaining % 3600 // 60),
               flush=True)
     con.close()
 
