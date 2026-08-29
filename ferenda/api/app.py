@@ -215,14 +215,15 @@ _diff_cache = {}
 _DIFF_CACHE_MAX = 512
 
 
-def _cached_diff_html(basefile, from_version, to):
-    key = (basefile, from_version, to)
+def _cached_diff_html(source, basefile, from_version, to):
+    key = (source, basefile, from_version, to)
     with _diff_lock:
         cached = _diff_cache.get(key)
     if cached is not None:
         return cached
-    html, _changed = diff.diff_html(_version_artifact(basefile, from_version),
-                                    _version_artifact(basefile, to))
+    html, _changed = diff.diff_html(
+        _version_artifact(source, basefile, from_version),
+        _version_artifact(source, basefile, to))
     if to is not None:
         with _diff_lock:
             if len(_diff_cache) >= _DIFF_CACHE_MAX:
@@ -821,36 +822,50 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
 # "1827:60 s.1007", "2003:466" -- one colon, no path-shaped characters, so it
 # can safely become the filesystem segments the layout rules mint
 _RE_SFS_ID = re.compile(r"^[^/\\:]+:[^/\\:]+$")
+# a CELEX as it may appear behind an ext/celex/ uri ("32014R0910",
+# "12016E/TXT") -- the character set the layout slug folds, no '..' possible
+_RE_CELEX = re.compile(r"^[0-9][0-9A-Z/().]+$")
+# a eurlex version id: the ISO date the consolidated wording began to apply
+_RE_EURLEX_VERSION = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def _sfs_basefile(uri):
-    """The statute basefile behind a document uri, for the version endpoints
-    (only statutes have archived consolidations)."""
-    basefile = catalog.local(catalog.strip_fragment(uri))
-    if not _RE_SFS_ID.match(basefile) or ".." in basefile:
-        raise HTTPException(404, "%r is not a statute uri -- only SFS "
-                                 "documents carry versions" % uri)
-    return basefile
+def _versioned_document(uri):
+    """(source, basefile) behind a document uri, for the version endpoints --
+    the two sources the pipeline consolidates over time: SFS statutes and EU
+    acts (CONSLEG wordings)."""
+    local = catalog.local(catalog.strip_fragment(uri))
+    if local.startswith("ext/celex/"):
+        basefile = local[len("ext/celex/"):]
+        if _RE_CELEX.match(basefile) and ".." not in basefile:
+            return "eurlex", basefile
+    elif _RE_SFS_ID.match(local) and ".." not in local:
+        return "sfs", local
+    raise HTTPException(404, "%r is not a statute or EU-act uri -- only "
+                             "those carry versions" % uri)
 
 
-def _validate_version_id(version):
-    """Raise 400 unless `version` is a well-formed consolidation cutoff -- as
-    strictly checked as `_sfs_basefile`'s uri (no ``..`` segment) so a version
-    id can't smuggle a path-traversal-shaped value past the one place both
-    become filesystem segments (`layout.sfs_version_artifact`)."""
+def _validate_version_id(source, version):
+    """Raise 400 unless `version` is a well-formed version id for `source` --
+    as strictly checked as `_versioned_document`'s uri (no ``..`` segment) so
+    a version id can't smuggle a path-traversal-shaped value past the one
+    place both become filesystem segments (`layout.version_artifact`)."""
+    if source == "eurlex":
+        if not _RE_EURLEX_VERSION.match(version):
+            raise HTTPException(400, "bad version id %r" % version)
+        return
     if (not _RE_SFS_ID.match(version) or ".." in version) \
             and not version.isdigit():
         raise HTTPException(400, "bad version id %r" % version)
 
 
-def _version_artifact(basefile, version):
+def _version_artifact(source, basefile, version):
     """A consolidation's parsed artifact: a named historical version from the
     archive, or the current one (version None)."""
     if version is None:
-        path = layout.artifact("sfs", basefile)
+        path = layout.artifact(source, basefile)
     else:
-        _validate_version_id(version)
-        path = layout.sfs_version_artifact(basefile, version)
+        _validate_version_id(source, version)
+        path = layout.version_artifact(source, basefile, version)
     if not compress.exists(path):
         raise HTTPException(404, "no %s consolidation of %s -- see "
                                  "/api/v1/document/versions"
@@ -887,59 +902,72 @@ class VersionList(BaseModel):
 
 @app.get("/api/v1/document/versions", response_model=VersionList,
          tags=["document"],
-         summary="A statute's archived consolidations")
-def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
+         summary="A document's archived consolidations")
+def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute "
+                                       "or EU-act uri"),
                       con: sqlite3.Connection = Depends(get_con)):
-    """A statute's archived historical consolidations (lydelser), oldest
+    """A document's archived historical consolidations (lydelser), oldest
     first -- each one browsable at its own page and diffable via
-    /api/v1/document/diff. Amendment dates and preparatory works are joined
-    in from the statute's register where known.
+    /api/v1/document/diff.
 
-    Statutes only: SFS is the one source the pipeline consolidates over time,
-    so any other uri is a 404. The *current* consolidation is not in the list
-    -- it is what /document returns, and it is what /diff compares against when
-    `to` is omitted."""
-    basefile = _sfs_basefile(uri)
-    row = catalog.document(con, catalog.BASE + basefile)
-    info = (history.amendment_info(
-                catalog.load_artifact(catalog.data_root(con), row[5]))
-            if row else {})
-    return VersionList(uri=catalog.BASE + basefile, versions=[
+    Two sources are consolidated over time: SFS statutes (a version id is the
+    SFS number of the last amendment folded in, with amendment dates and
+    preparatory works joined in from the register where known) and EU acts (a
+    version id is the ISO date the consolidated wording began to apply, which
+    is also its `ikraft`). Any other uri is a 404. The *current* consolidation
+    is not in the list -- it is what /document returns, and it is what /diff
+    compares against when `to` is omitted."""
+    source, basefile = _versioned_document(uri)
+    doc_uri = (catalog.BASE + "ext/celex/" + basefile if source == "eurlex"
+               else catalog.BASE + basefile)
+    if source == "sfs":
+        row = catalog.document(con, doc_uri)
+        info = (history.amendment_info(
+                    catalog.load_artifact(catalog.data_root(con), row[5]))
+                if row else {})
+    else:
+        info = {}
+    return VersionList(uri=doc_uri, versions=[
         VersionInfo(version=v, uri=vuri, url=layout.page_url(vuri),
-                    ikraft=info.get(v, (None, []))[0],
+                    ikraft=info.get(v, (v if source == "eurlex" else None,
+                                        []))[0],
                     forarbeten=info.get(v, (None, []))[1])
-        for v, vuri in history.versions(basefile)])
+        for v, vuri in history.versions(source, basefile)])
 
 
 @app.get("/api/v1/document/diff", response_class=HTMLResponse,
          tags=["document"],
          summary="Two consolidations compared, as marked-up HTML")
-def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute uri"),
+def diff_endpoint(uri: str = Query(..., description="full lagen.nu statute "
+                                   "or EU-act uri"),
                   from_version: str = Query(..., alias="from",
-                                            description="older version id, e.g. 2003:466"),
+                                            description="older version id, e.g. "
+                                            "2003:466 (SFS) or 2024-05-20 (EU)"),
                   to: str | None = Query(None, description="newer version id "
                                          "(default: the current consolidation)")):
-    """Compare two consolidations of a statute: the newer text in document
+    """Compare two consolidations of a document: the newer text in document
     order with every difference from the older marked up (<ins>/<del>) -- an
     HTML fragment, ready to swap into the page (the old ?diff=true view).
     Version ids are consolidation cutoffs from /api/v1/document/versions.
     Direction is always older -> newer regardless of argument order (the
     current consolidation is by definition newest); the fragment leads with a
     note naming both endpoints."""
-    basefile = _sfs_basefile(uri)
-    _validate_version_id(from_version)
+    source, basefile = _versioned_document(uri)
+    _validate_version_id(source, from_version)
     if to is not None:
-        _validate_version_id(to)
+        _validate_version_id(source, to)
     if to is not None and \
-            layout.sfs_version_key(from_version) > layout.sfs_version_key(to):
+            layout.version_key(source, from_version) > \
+            layout.version_key(source, to):
         from_version, to = to, from_version
-    html = _cached_diff_html(basefile, from_version, to)
-    note = ('<div class="diff-note">Ändringar från lydelsen enligt '
-            'SFS %s till %s. <ins>Tillagd</ins> och <del>borttagen</del> '
+    html = _cached_diff_html(source, basefile, from_version, to)
+    label = ("lydelsen per %s" if source == "eurlex"
+             else "lydelsen enligt SFS %s")
+    note = ('<div class="diff-note">Ändringar från %s till %s. '
+            '<ins>Tillagd</ins> och <del>borttagen</del> '
             'text är markerad.</div>'
-            % (escape(from_version),
-               "lydelsen enligt SFS %s" % escape(to) if to
-               else "den gällande lydelsen"))
+            % (label % escape(from_version),
+               label % escape(to) if to else "den gällande lydelsen"))
     return HTMLResponse(note + html)
 
 

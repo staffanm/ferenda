@@ -22,6 +22,12 @@ from .text import runs_text
 # left out, a repealed paragraf's notice — and with it the paragraf's whole
 # visible content — vanishes from "jämför med tidigare lydelser"
 _LEAF = ("stycke", "punkt", "listelement", "upphavd", "moment", "redaktionell")
+# ... and the EU-act artifact's own vocabulary (eurlex konsolidering pages
+# diff through the same view). `stycke` sits in both lists; an eurlex
+# `paragraph`/`point` is a container too (its stycken and points nest under
+# it), so it renders its own text and recurses like a leaf-with-children
+_EU_LEAF = ("recital", "paragraph", "point", "citat", "preamble", "citation",
+            "ruling", "note", "keyword")
 
 
 def blocks(nodes):
@@ -37,13 +43,38 @@ def blocks(nodes):
             out.append({"kind": "rubrik", "level": node.get("level") or 2,
                         "id": node.get("id"), "marker": "",
                         "text": runs_text(node.get("text", []))})
+        elif kind == "heading":
+            # an EU act's division heading: designation + title, one line --
+            # and, unlike an SFS rubrik, a container (its articles nest under it)
+            out.append({"kind": "rubrik", "level": (node.get("level") or 1) + 1,
+                        "id": node.get("id"), "marker": "",
+                        "text": " ".join(x for x in (
+                            node.get("label"),
+                            runs_text(node.get("text", []))) if x)})
+            out += blocks(node.get("children", []))
+        elif kind == "article":
+            # the article heading is its own block, so an inserted article
+            # reads as inserted from its designation down
+            out.append({"kind": "rubrik", "level": 2, "id": node.get("id"),
+                        "marker": "",
+                        "text": " ".join(x for x in (
+                            node.get("label"),
+                            runs_text(node.get("text", []))) if x)})
+            out += blocks(node.get("children", []))
+        elif kind in _EU_LEAF:
+            out.append({"kind": kind, "id": node.get("id"),
+                        "marker": str(node.get("num") or ""),
+                        "text": runs_text(node.get("text", []))})
+            out += blocks(node.get("children", []))
         elif kind == "tabell":
             for rad in node.get("children", []):
                 out.append({"kind": "rad", "id": rad.get("id"), "marker": "",
                             "text": " | ".join(runs_text(c)
                                                for c in rad.get("cells", []))})
         elif kind in _LEAF:
-            marker = node.get("beteckning") or node.get("ordinal") or ""
+            # `num` is the eurlex vocabulary's marker (a stycke ordinal)
+            marker = (node.get("beteckning") or node.get("ordinal")
+                      or node.get("num") or "")
             out.append({"kind": kind, "id": node.get("id"),
                         "marker": str(marker),
                         "text": runs_text(node.get("text", []))})

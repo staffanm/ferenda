@@ -135,3 +135,31 @@ def test_diff_keeps_new_side_ids_for_anchors():
     new = _art(_paragraf("1", _stycke("Ny.", "P1S1")))
     html, _ = diff_html(old, new)
     assert 'id="P1S1"' in html
+
+
+def test_eurlex_vocabulary_flattens_and_diffs():
+    """An EU act's konsolidering pages diff through the same view: the eurlex
+    node vocabulary (article/heading/paragraph/point/recital) flattens to the
+    same block shape the SFS types do, markers included."""
+    old = {"structure": [
+        {"type": "heading", "level": 1, "label": "Kapitel I",
+         "text": ["Allmänna bestämmelser"], "children": [
+             {"type": "article", "id": "5", "label": "Artikel 5",
+              "text": ["Elektronisk identifiering"], "children": [
+                  {"type": "paragraph", "num": "1", "id": "5.1",
+                   "text": ["Ett anmält system krävs."], "children": []}]}]}]}
+    new = {"structure": [
+        {"type": "heading", "level": 1, "label": "Kapitel I",
+         "text": ["Allmänna bestämmelser"], "children": [
+             {"type": "article", "id": "5", "label": "Artikel 5",
+              "text": ["Elektronisk identifiering"], "children": [
+                  {"type": "paragraph", "num": "1", "id": "5.1",
+                   "text": ["Ett certifierat system krävs."],
+                   "children": []}]}]}]}
+    flat = blocks(new["structure"])
+    assert [b["kind"] for b in flat] == ["rubrik", "rubrik", "paragraph"]
+    assert flat[0]["text"] == "Kapitel I Allmänna bestämmelser"
+    assert flat[2]["marker"] == "1"
+    html, changed = diff_html(old, new)
+    assert changed == 1
+    assert "<del>anmält</del>" in html and "<ins>certifierat</ins>" in html
