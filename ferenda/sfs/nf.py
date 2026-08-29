@@ -37,10 +37,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from ..lib import lagrum, util
+from ..lib import begrepp, lagrum, util
 from ..lib.catalog import BASE
 from ..lib.coe_ids import article_fragment
-from . import begrepp, bemyndigande, graphics, redaktionell
+from ..lib.markdown import begrepp_uri
+from . import bemyndigande, graphics, redaktionell
 from . import register as register_mod
 from .model import (
     Avdelning,
@@ -63,6 +64,12 @@ from .model import (
     UpphavdParagraf,
     UpphavtKapitel,
 )
+
+# the scope phrases that open an SFS term-list paragraf ("I denna lag avses
+# med ..."); all four detection modes apply to statute text
+BEGREPP_RULES = begrepp.Rules(scopes=(
+    "lagen", "förordningen", "balken", "denna lag", "denna förordning",
+    "denna balk", "denna paragraf", "detta kapitel"))
 
 # SFS statutes that incorporate an external treaty as a parallel-text appendix:
 # an instrument's local fragment (`{sfs}#B1`, `{sfs}#B1P4`) → the `source/number`
@@ -265,7 +272,7 @@ class Projection:
             if (idx := text.find(subject_term)) >= 0:
                 spans.append(lagrum.Ref(idx, idx + len(subject_term),
                                         subject_term, "dcterms:subject",
-                                        begrepp.term_to_subject(subject_term),
+                                        begrepp_uri(subject_term),
                                         kind="term"))
         for span in spans:
             refs += lagrum.yield_overlaps([span], refs)
@@ -669,7 +676,7 @@ def project_konventionsbilaga(node, frag, proj, live=True):
 def project_paragraf(paragraf, pairs, proj, frag, live=True, satt_av=None,
                      in_appendix=False):
     gov = graphics.governing_sfs(paragraf.children) or satt_av
-    mode = begrepp.paragraf_mode([getattr(s, "text", "") or ""
+    mode = BEGREPP_RULES.paragraf_mode([getattr(s, "text", "") or ""
                                   for s in paragraf.children], in_appendix)
     out = []
     for node in paragraf.children:
@@ -698,7 +705,7 @@ def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None, satt_av=None,
     node_id = proj.minter.mint(pairs, stycke)
     eff = node_id or frag
     text = util.normalize_space(stycke.text)
-    terms = (begrepp.defined_terms(text, mode, "stycke", in_appendix)
+    terms = (BEGREPP_RULES.defined_terms(text, mode, "stycke", in_appendix)
              if mode else [])
     nf = {"type": "stycke", "id": node_id,
           "text": proj.inline(text, eff, live, subject_terms=terms)}
@@ -726,7 +733,7 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
         item_id = proj.minter.mint(sub, item)
         eff = item_id or frag
         text = util.normalize_space(item.text)
-        terms = begrepp.defined_terms(text, mode, "listelement") if mode else []
+        terms = BEGREPP_RULES.defined_terms(text, mode, "listelement") if mode else []
         out.append({"type": "punkt", "id": item_id, "ordinal": item.ordinal,
                     "text": proj.inline(text, eff, live, subject_terms=terms)})
         submode = None if terms else mode
@@ -740,7 +747,7 @@ def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None):
     rows = []
     for row in tabell.rows:
         # only the first cell of a row can name a term
-        terms = (begrepp.defined_terms(util.normalize_space(row.cells[0]),
+        terms = (BEGREPP_RULES.defined_terms(util.normalize_space(row.cells[0]),
                                        mode, "tabellrad")
                  if mode and row.cells else [])
         cells = [proj.inline(util.normalize_space(cell), context, live,

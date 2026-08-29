@@ -1,15 +1,19 @@
-"""Begreppsdefinitioner detection (ferenda.sfs.begrepp) -- the ported
-find_definitions heuristics. Unit tests over the five definition cases plus
-mode detection and URI minting; no corpus needed."""
+"""Begreppsdefinitioner detection (ferenda.lib.begrepp) -- the ported
+find_definitions heuristics, exercised through the SFS rule set. Unit tests
+over the five definition cases plus mode detection and URI minting; no
+corpus needed."""
 
-from ferenda.sfs import begrepp as b
+from ferenda.lib.markdown import begrepp_uri
+from ferenda.sfs.nf import BEGREPP_RULES as b
 
 
-def test_term_to_subject():
-    assert b.term_to_subject("antisladdsystem") == \
+def test_term_uri_is_the_shared_mint():
+    """The term-run URI comes from markdown.begrepp_uri -- the one concept
+    mint -- since the hand-rolled sfs copy (term_to_subject) was deleted."""
+    assert begrepp_uri("antisladdsystem") == \
         "https://lagen.nu/begrepp/Antisladdsystem"
     # capitalise first letter, spaces -> underscores
-    assert b.term_to_subject("allmän plats") == "https://lagen.nu/begrepp/Allmän_plats"
+    assert begrepp_uri("allmän plats") == "https://lagen.nu/begrepp/Allmän_plats"
 
 
 def test_paragraf_mode_triggers():
@@ -200,3 +204,31 @@ def test_parenthetical_clarifier_names_the_head_not_the_paren():
 def test_term_never_starts_with_a_preposition():
     # a mis-captured prepositional fragment is dropped, not minted as a concept
     assert b.defined_terms("av personuppgifter: data", "normal", "stycke") == []
+
+
+def test_ska_forstas_keeps_the_auxiliary_out_of_the_term():
+    """PMFS 2017:10 writes "Med utbildningsverksamhet ska förstås ..." -- the
+    auxiliary belongs to the verb, not the definiendum. Found in the 50-term
+    föreskrift adjudication sample (2026-08-27)."""
+    assert b.defined_terms("Med utbildningsverksamhet ska förstås bedrivandet "
+                           "av föreskriven utbildning.", None, "stycke") == \
+        ["utbildningsverksamhet"]
+    assert b.defined_terms("Med butikskontroll skall förstås personell "
+                           "bevakning.", None, "stycke") == ["butikskontroll"]
+
+
+def test_a_table_cells_trailing_colon_is_not_part_of_the_term():
+    # SKSFS 2010:3 sets its definition table as "Naturvårdsbränning: ..." cells
+    assert b.defined_terms("Naturvårdsbränning:", "normal", "tabellrad") == \
+        ["Naturvårdsbränning"]
+
+
+def test_a_letterless_term_is_a_designation_not_a_concept():
+    """ELSÄK-FS 2018:1 sets a definitions-mode table whose first column holds
+    författningsnummer; "2019:1" minted as a term and crashed relate's
+    sentence-finder. A term must contain at least one letter."""
+    assert b.defined_terms("2019:1", "normal", "tabellrad") == []
+    assert b.defined_terms("1. 2019:1 om elsäkerhet", "normal",
+                           "listelement") == []
+    assert b.defined_terms("Förskingring", "normal", "tabellrad") == \
+        ["Förskingring"]

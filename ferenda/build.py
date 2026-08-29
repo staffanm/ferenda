@@ -1016,8 +1016,9 @@ CASENUMBER_CODE = (PKG / "lib" / "malnummer.py",
                    PKG / "dv" / "data" / "casenumbers.json")
 SFS_CODE = tuple(PKG / "sfs" / ("%s.py" % m) for m in (
     "__init__", "extract", "reader", "tokenizer", "assembler", "model", "nf",
-    "parallelappendix", "register", "begrepp", "bemyndigande",
+    "parallelappendix", "register", "bemyndigande",
     "graphics")) + (PKG / "lib" / "lagrum.py", PKG / "lib" / "emdref.py",
+                    PKG / "lib" / "begrepp.py", PKG / "lib" / "markdown.py",
                     *CITATION_DATA)
 
 

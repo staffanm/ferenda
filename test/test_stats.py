@@ -213,7 +213,7 @@ def test_an_amending_act_and_a_runaway_article_are_flagged(tmp_path):
 
 
 def test_every_marked_term_states_a_definition():
-    """All four of `sfs.begrepp`'s modes state one. A brottsrubricering and a
+    """All four of `lib.begrepp`'s modes state one. A brottsrubricering and a
     parenthesised coinage say what the term means without setting the definition
     off from the sentence around it, and cutting at a boundary that is not there
     would lose the definition rather than trim it. The text has one job here --

@@ -50,7 +50,7 @@ RE_CHAIN = re.compile(r"om ändring i ", re.I)
 #
 # A definition is whatever the corpus marks as one: an eurlex definitions-article
 # point (`eurlex.definitions` stamps `defines` at parse time) and every SFS term
-# run `sfs.begrepp` mints, in all four of its modes. A brottsrubricering ("…
+# run `lib.begrepp` mints, in all four of its modes. A brottsrubricering ("…
 # dömes för fyndförseelse till böter") and a parenthesised coinage ("… (dödning)")
 # state a definition too -- the hard part is only telling which words of the
 # sentence *are* the definition, and these measures never need to know.
@@ -315,7 +315,7 @@ def scan_sfs(path):
             return          # the publisher's note, not the statute's text
         chars += len(_own_text(node))
         superseded = superseded or superseded_variant(node)
-        # a defined term is marked inline (`sfs.begrepp` mints the dcterms:subject
+        # a defined term is marked inline (`lib.begrepp` mints the dcterms:subject
         # run over the definiendum's own span), so the statement defining it is
         # the node the run sits in and the paragraf is the citable place. Only
         # the definitions skip a superseded wording: the character and paragraf
