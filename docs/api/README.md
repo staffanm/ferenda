@@ -269,9 +269,12 @@ production disk the whole-law query is minutes of scattered reads.
 document makes; `uri` is the **cited target**. `hosted: false` marks a target not
 (yet) in the corpus (then `source`/`label`/`title` are null).
 
-**Version history — `GET /api/v1/document/versions?uri=…`** (statutes only) — a
-statute's archived historical consolidations (*lydelser*), oldest first, current
-excluded. `404` if the uri isn't a statute.
+**Version history — `GET /api/v1/document/versions?uri=…`** (statutes and EU
+acts only) — a document's archived historical consolidations (*lydelser*),
+oldest first, current excluded. `404` if the uri isn't a statute or an EU act.
+A statute's `version` is the SFS number of the last amendment folded in; an EU
+act's is the ISO date its consolidated wording (CONSLEG) began to apply, which
+is also its `ikraft`.
 
 ```jsonc
 // VersionList
@@ -290,10 +293,11 @@ excluded. `404` if the uri isn't a statute.
 ```
 
 **Diff between versions — `GET /api/v1/document/diff?uri=…&from=…&to=…`** —
-compares two consolidations. `from` (required) = older version id; `to`
-(optional) = newer, **default the current consolidation**. **Returns an HTML
-fragment** (`text/html`), not JSON: a leading `<div class="diff-note">` then the
-newer text marked up with `<ins>`/`<del>`. Direction is always older→newer.
+compares two consolidations of a statute or an EU act. `from` (required) =
+older version id; `to` (optional) = newer, **default the current
+consolidation**. **Returns an HTML fragment** (`text/html`), not JSON: a
+leading `<div class="diff-note">` then the newer text marked up with
+`<ins>`/`<del>`. Direction is always older→newer.
 
 **Page facsimile — `GET /api/v1/facsimile?uri=…&sid=N`** — a PNG of one
 printed page of the document's source PDF (`image/png`), for every

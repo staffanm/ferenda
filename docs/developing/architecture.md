@@ -158,7 +158,8 @@ parallelisable with `-j`:
   **New documents enter only through `harvest`** — the per-doc download stage
   can only re-touch known ids, never discover new ones.
 - `parse` — every source has one; raw → artifact.
-- `versions` — SFS only (a second per-doc stage: historical consolidations).
+- `versions` — sfs and eurlex only (a second per-doc stage: historical
+  consolidations).
 
 **Corpus-level verbs** — not Stages, single functions over whole sources:
 `relate` (build the SQLite catalog), `index` (OpenSearch), `dump` (NDJSON),
@@ -313,8 +314,8 @@ to follow when sources are similar.
 ## Adding a source-specific action
 
 An action is a verb beyond the standard stages (`ai-annotate`, `import-legacy`,
-`discover-guidance`, …). (`versions` looks like an action but is a real SFS
-Stage — see §3.) Mechanism: add an entry to the source's
+`discover-guidance`, …). (`versions` looks like an action but is a real
+Stage on sfs and eurlex — see §3.) Mechanism: add an entry to the source's
 `actions` dict mapping a verb name to a callable taking the raw `basefiles`
 list:
 

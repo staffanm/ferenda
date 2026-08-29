@@ -8,6 +8,10 @@ site/data/downloaded/sfs/                     # SFS raw (beta JSON + legacy sfst
 site/data/downloaded/sfs/pdf/                 # mirrored official SFS PDFs (1998–; the graphic-crop source)
 site/data/artifact/sfs/                       # parsed JSON artifacts (+ .versions.json sidecars)
 site/data/{downloaded,artifact}/sfs/archive/  # superseded consolidations, raw + parsed
+site/data/downloaded/eurlex/                  # CELLAR harvest: {year}/{celex}/notice.ttl + content per language
+site/data/downloaded/eurlex/*/*/.versions/    # consolidated wordings (CONSLEG), one dated dir per version
+site/data/artifact/eurlex/                    # parsed JSON artifacts (+ .versions.json sidecars)
+site/data/artifact/eurlex/archive/            # superseded consolidations, parsed (lydelse pages)
 site/data/downloaded/dom/                     # DV new-API harvest (per court)
 site/data/downloaded/dv/                      # DV legacy feed (.doc/.docx)
 site/data/artifact/dom/identity-index.json    # canonical case -> source records

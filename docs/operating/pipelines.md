@@ -105,6 +105,32 @@ uv run python -m ferenda.build sfs history-as-git /path/to/repo --rebuild-histor
 uv run python -m ferenda.build sfs history-as-git /path/to/repo 1998:204   # separately scoped partial repo
 ```
 
+**eurlex version history** (consolidated wordings / lydelse pages / diff): the
+eurlex counterpart of the SFS machinery above, over the CONSLEG consolidations
+CELLAR maintains for a base act. The consolidation walk rides `download`: the
+acts sweep ends by discovering every consolidated version of every held plain
+sector-3 R/L act, all versions and not only the latest, into
+`site/data/downloaded/eurlex/{year}/{celex}/.versions/{date}/` (a per-CELEX
+`download <CELEX> --force` fetches that one act's versions the same way). A
+version already on disk is skipped, so the walk is resumable, and a version is
+immutable once published, so a re-fetch buys nothing; a `--limit` or
+`--source soap` run skips the sweep. `parse` then serves the
+*latest* Formex-bearing consolidation at the act's own uri, with the base
+act's own preamble spliced in front; the `versions` stage parses every
+superseded wording into `artifact/eurlex/archive/…/.versions/{date}.json` plus
+a `{celex}.versions.json` sidecar, and `generate` renders one page per
+historical lydelse at `/celex/{celex}/konsolidering/{date}`, banner and all —
+the act's own page grows the same "Jämför lydelser" panel the SFS page has,
+and `GET /api/v1/document/diff`/`/document/versions` serve EU acts alongside
+statutes.
+
+```sh
+uv run python -m ferenda.build eurlex download acts               # year walk + the consolidation sweep
+uv run python -m ferenda.build eurlex download 32014R0910 --force # one act + its versions
+uv run python -m ferenda.build eurlex parse                       # picks up the latest downloaded consolidation
+uv run python -m ferenda.build eurlex versions                    # incremental, all acts with consolidations
+```
+
 **DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):
 
 ```sh
