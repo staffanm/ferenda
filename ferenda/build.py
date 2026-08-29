@@ -2980,7 +2980,9 @@ FORESKRIFT_CODE = (PKG / "foreskrift" / "parse.py",
                    PKG / "lib" / "tabell.py", PKG / "lib" / "artifact.py",
                    # picks the presented consolidation, which decides whether
                    # the parse run emits a .grund.json sidecar
-                   PKG / "lib" / "text.py")
+                   PKG / "lib" / "text.py",
+                   # definition detection (term runs) and the concept-URI mint
+                   PKG / "lib" / "begrepp.py", PKG / "lib" / "markdown.py")
 
 
 def foreskrift_record(basefile):

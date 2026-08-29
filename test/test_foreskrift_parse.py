@@ -1010,3 +1010,104 @@ def test_a_presented_consolidation_prints_its_own_notes_not_the_bases():
     html = fs_render.render(art, Site(con, set()))
     assert "Konsolideringens egen not." in html
     assert "Basregelns egen not." not in html
+
+
+# --- begreppsdefinitioner: term runs on föreskrift provisions ---------------
+
+def _term_runs(node):
+    """Every (uri, text) of the kind="term" runs in one node's subtree."""
+    out = []
+    if isinstance(node, dict):
+        runs = list(node.get("text") or [])
+        for cell in node.get("cells", []):        # a tabell rad holds cells
+            runs += cell
+        for run in runs:
+            if isinstance(run, dict) and run.get("kind") == "term":
+                out.append((run["uri"], run["text"]))
+        for child in node.get("children", []):
+            out += _term_runs(child)
+    return out
+
+
+def test_a_term_list_paragraf_marks_its_colon_terms():
+    """"I dessa föreskrifter avses med" opens normal mode (the SFS phrasing
+    matched zero föreskrifter -- the scope phrase differs), and each following
+    colon stycke marks its term as a dcterms:subject run at the paragraf's own
+    anchor. The announcing stycke itself yields no term."""
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    tree = fp._structure(
+        [Block("paragraf", "2 § I dessa föreskrifter avses med", 1, num="2"),
+         Block("stycke", "angreppsindikatorer: teknisk information om "
+                         "angrepp mot nätverk.", 1),
+         Block("stycke", "incident: en händelse med faktisk negativ "
+                         "inverkan.", 1)],
+        parser)
+    [para] = tree
+    assert para["id"] == "P2"
+    assert _term_runs(para) == [
+        ("https://lagen.nu/begrepp/Angreppsindikatorer", "angreppsindikatorer"),
+        ("https://lagen.nu/begrepp/Incident", "incident")]
+
+
+def test_a_lista_under_the_announcing_paragraf_marks_each_punkt():
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    tree = fp._structure(
+        [Block("paragraf", "1 § I dessa föreskrifter avses med", 1, num="1"),
+         Block("lista", "", 1, children=[
+             Block("punkt", "1. behörig myndighet: den myndighet som avses", 1),
+             Block("punkt", "2. leverantör: den som tillhandahåller", 1)])],
+        parser)
+    assert _term_runs(tree[0]) == [
+        ("https://lagen.nu/begrepp/Behörig_myndighet", "behörig myndighet"),
+        ("https://lagen.nu/begrepp/Leverantör", "leverantör")]
+
+
+def test_loptext_definition_marks_its_definiendum():
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    tree = fp._structure(
+        [Block("paragraf", "3 § Med driftstörning avses i dessa föreskrifter "
+                           "en oplanerad händelse.", 1, num="3")],
+        parser)
+    assert _term_runs(tree[0]) == [
+        ("https://lagen.nu/begrepp/Driftstörning", "driftstörning")]
+
+
+def test_a_paragraf_without_a_mode_marks_nothing():
+    """The coinage modes are off for föreskrifter (measured noisy on
+    PDF-extracted text), so a mid-sentence parenthesis marks no term, and a
+    colon outside a term-list paragraf stays plain text."""
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    tree = fp._structure(
+        [Block("paragraf", "4 § Verksamhetsutövaren (leverantören) ska "
+                           "anmäla följande: adress och namn.", 1, num="4")],
+        parser)
+    assert _term_runs(tree[0]) == []
+
+
+def test_a_definitions_table_marks_first_cells_only():
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    tree = fp._structure(
+        [Block("paragraf", "5 § I dessa föreskrifter används följande "
+                           "begrepp med nedan angiven betydelse.", 1, num="5"),
+         Block("tabell", "", 1, th=True,
+               rows=[["Begrepp", "Betydelse"],
+                     ["nätverk", "ett system av sammankopplade enheter"]])],
+        parser)
+    assert _term_runs(tree[0]) == [("https://lagen.nu/begrepp/Nätverk", "nätverk")]
+
+
+def test_foreskrift_definitions_reach_the_catalog():
+    """`catalog.definition_sentences` is source-agnostic (it reads kind="term"
+    runs off `text.body_sections`), so a marked föreskrift artifact yields
+    definitions rows with no catalog change at all."""
+    parser = sfs_parser("foreskrift", PARSE_TYPES)
+    structure_ = fp._structure(
+        [Block("paragraf", "2 § I dessa föreskrifter avses med", 1, num="2"),
+         Block("stycke", "incident: en händelse med faktisk negativ "
+                         "inverkan på säkerheten.", 1)],
+        parser)
+    art = {"uri": "https://lagen.nu/mcffs/2026:8", "type": "foreskrift",
+           "metadata": {}, "structure": structure_, "amendments": []}
+    assert catalog.definition_sentences(art) == [
+        ("https://lagen.nu/begrepp/Incident", "P2", "incident",
+         "incident: en händelse med faktisk negativ inverkan på säkerheten.")]

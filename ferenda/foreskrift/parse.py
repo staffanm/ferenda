@@ -31,16 +31,19 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import tabell
+from ..lib import begrepp, tabell
 from ..lib.artifact import footnote_nodes
 from ..lib.lagrum import (
     EULAGSTIFTNING,
     FORESKRIFT,
     KORTLAGRUM,
     LAGRUM,
+    Ref,
     interleave,
     sfs_parser,
+    yield_overlaps,
 )
+from ..lib.markdown import begrepp_uri
 from ..lib.pdftext import (
     RE_KAP_MARK,
     RE_PARA_MARK,
@@ -52,7 +55,17 @@ from ..lib.pdftext import (
 from ..lib.util import MONTHS, approximate_date, confine, fold_swedish
 from .agencies import AAFS_SERIES, REGISTRY
 from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
-from .structure import nest
+from .structure import RE_LEAD_PARA, nest
+
+# The definition-detection rules for föreskriftstext (lib.begrepp). The scope
+# phrases are what a föreskrift writes where an SFS writes "I denna lag ..."
+# ("I dessa föreskrifter avses med ..."). Only the announced modes run: the
+# coinage modes (parantes, brottsrubricering) were measured noisy on
+# PDF-extracted text and a föreskrift never states an offence.
+BEGREPP_RULES = begrepp.Rules(
+    scopes=("dessa föreskrifter", "föreskrifterna", "dessa allmänna råd",
+            "denna författning", "detta kapitel", "denna paragraf"),
+    modes=("normal", "loptext"))
 
 # a föreskrift cites SFS (the empowering law), EU directives (what it
 # implements) and its siblings -- an agency's regulations cross-refer constantly
@@ -595,30 +608,94 @@ def extract_metadata(text, declaration, parser):
 # record -> Regulation -> artifact
 # --------------------------------------------------------------------------
 
-def _node(block, parser):
+def _definition_marks(blocks):
+    """id(Block) -> the terms that block defines (``lib.begrepp``), computed
+    over the flat run because that is where the paragraf grouping is still
+    visible as block order: a ``paragraf`` block (its own text is the first
+    stycke) plus the ``stycke``/``lista``/``tabell`` blocks that follow it up
+    to the next structural block, mirroring :func:`structure.nest`'s sink. The
+    mode is per paragraf; a lista or tabell right after a stycke that yielded
+    terms is suppressed, mirroring the SFS stop-on-first-hit recursion. A
+    ``lista`` maps its ``punkt`` children; a ``tabell`` maps to one term list
+    per row (only the first cell can name a term)."""
+    marks = {}
+    groups, current = [], None
+    for b in blocks:
+        if b.kind == "paragraf":
+            current = [b]
+            groups.append(current)
+        elif b.kind in ("kapitel", "rubrik", "ingress"):
+            current = None
+        elif current is not None and b.kind in ("stycke", "lista", "tabell"):
+            current.append(b)
+    for blocks_in in groups:
+        para_text = RE_LEAD_PARA.sub("", blocks_in[0].text, count=1).lstrip()
+        texts = [para_text] + [b.text for b in blocks_in[1:]
+                               if b.kind == "stycke"]
+        mode = BEGREPP_RULES.paragraf_mode(texts)
+        if not mode:
+            continue
+        prev_terms = []
+        for b in blocks_in:
+            if b.kind in ("paragraf", "stycke"):
+                text = para_text if b is blocks_in[0] else b.text
+                prev_terms = BEGREPP_RULES.defined_terms(text, mode, "stycke")
+                if prev_terms:
+                    marks[id(b)] = prev_terms
+            elif b.kind == "lista":
+                if not prev_terms:
+                    for p in b.children:
+                        terms = BEGREPP_RULES.defined_terms(p.text, mode,
+                                                            "listelement")
+                        if terms:
+                            marks[id(p)] = terms
+                prev_terms = []
+            elif b.kind == "tabell":
+                if not prev_terms:
+                    marks[id(b)] = [
+                        BEGREPP_RULES.defined_terms(row[0], mode, "tabellrad")
+                        if row else [] for row in b.rows or []]
+                prev_terms = []
+    return marks
+
+
+def _node(block, parser, marks):
     """One :class:`Block` -> its artifact node dict, its text scanned for SFS/EU
     citations and spliced into inline runs. A ``tabell`` carries cells instead of
-    text; a container (``lista``, ``allmanna_rad``) carries its children."""
-    def scan(text):
-        return interleave(text, parser.parse_text(text, context={}))
+    text; a container (``lista``, ``allmanna_rad``) carries its children.
+    `marks` (:func:`_definition_marks`) names the terms a block defines; each
+    becomes a ``dcterms:subject`` run over its own span (``kind="term"``),
+    yielding to any citation it overlaps."""
+    def scan(text, terms=()):
+        refs = parser.parse_text(text, context={})
+        for term in terms:
+            if (idx := text.find(term)) >= 0:
+                span = Ref(idx, idx + len(term), term, "dcterms:subject",
+                           begrepp_uri(term), kind="term")
+                refs += yield_overlaps([span], refs)
+        return interleave(text, refs)
 
     if block.kind == "tabell":
         # `th` sits on the header *row*, the way a förarbete lydelse table
         # carries it, so the shared row renderer needs no table-level state
-        rows = [dict({"type": "rad", "cells": [scan(c) for c in row]},
+        row_terms = marks.get(id(block), [])
+        rows = [dict({"type": "rad",
+                      "cells": [scan(c, row_terms[i] if j == 0 and
+                                     i < len(row_terms) else ())
+                                for j, c in enumerate(row)]},
                      **({"th": True} if i == 0 and block.th else {}))
                 for i, row in enumerate(block.rows or [])]
         return {"type": "tabell", "page": block.page, "children": rows}
     node = {"type": block.kind, "page": block.page}
     if block.children:
-        node["children"] = [_node(c, parser) for c in block.children]
+        node["children"] = [_node(c, parser, marks) for c in block.children]
     # a råd carries both: its children and its own printed heading. The heading
     # goes under `text` like any other node's words, not a key of its own --
     # `lib.text` collects `text`, and the whole document's plain text is what
     # feeds the search index; and the heading names a provision ("Allmänna råd
     # till 2 kap. 1 § häkteslagen (2010:611)"), so it is scanned for citations.
     if block.kind == "allmanna_rad" or not block.children:
-        node["text"] = scan(block.text)
+        node["text"] = scan(block.text, marks.get(id(block), ()))
     if block.num:
         node["num"] = block.num
     if block.level:
@@ -628,7 +705,8 @@ def _node(block, parser):
 
 def _structure(blocks, parser):
     """A :class:`Block` run -> the nested ``structure`` list."""
-    return nest([_node(b, parser) for b in blocks])
+    marks = _definition_marks(blocks)
+    return nest([_node(b, parser, marks) for b in blocks])
 
 
 def _full_text(blocks):

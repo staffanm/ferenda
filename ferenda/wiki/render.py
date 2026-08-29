@@ -34,11 +34,13 @@ EDITORIAL_KEYS = frozenset({"begrepp", "kommentar", "vagledning"})
 GROUP_LABEL = {"sfs": "Legaldefinitioner"}
 
 # The sources that reach a concept by *defining* the term: an SFS
-# begreppsdefinition, an EU act's definitions article. The page prints what each
-# of them says the term means (`_definitions`), so listing the same acts again
-# as bare citations -- in the reading column or in the margin -- prints the list
-# twice.
-DEFINING_KEYS = frozenset({"sfs", "eurlex"})
+# begreppsdefinition, a föreskrift's (the same lib.begrepp marking), an EU
+# act's definitions article. Their subject links are minted only on defining
+# sentences, so each source's whole group here is the defining acts and
+# nothing else. The page prints what each of them says the term means
+# (`_definitions`), so listing the same acts again as bare citations -- in the
+# reading column or in the margin -- prints the list twice.
+DEFINING_KEYS = frozenset({"sfs", "eurlex", "foreskrift"})
 
 
 def _definitions(uri, site):
