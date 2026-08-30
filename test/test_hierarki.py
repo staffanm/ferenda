@@ -649,3 +649,43 @@ def test_b_and_d_validators_ground_every_output(monkeypatch):
                         lambda prompt, validate, **kw: validate('{"amnen": 7}'))
     with pytest.raises(ValueError):
         aihierarki.run_d("text", aihierarki.new_stats())
+
+
+def test_an_unanchored_definition_never_becomes_a_ladder_row(tmp_path,
+                                                             monkeypatch):
+    """171 of the corpus's 54,132 definition rows carry no anchor -- the
+    parse found the definition but could not place it. Such a row can be
+    rendered on no provision, and mixing it with anchored rows crashed the
+    whole component ("'<' not supported between NoneType and str", hit on
+    1949:381's "registermyndigheten"). The term still earns rows where it
+    verbatim occurs, so the definition is not lost, only its unplaceable
+    row."""
+    uri = "https://lagen.nu/1949:381"
+    art = {"uri": uri, "structure": [
+        {"type": "paragraf", "id": "P1", "children": [
+            {"type": "stycke", "text": ["Ansökan görs hos registermyndigheten."]}]}]}
+    _write(tmp_path, "sfs/1949-381.json", art)
+    con = catalog.connect(tmp_path / "catalog.db", data_root=tmp_path)
+    con.execute("INSERT INTO documents (uri, source, kind, path, descriptive) "
+                "VALUES (?,?,?,?,?)", (uri, "sfs", "lag", "sfs/1949-381.json",
+                                       "Föräldrabalken"))
+    con.executemany(
+        "INSERT INTO definitions (concept, from_uri, anchor, term, sentence) "
+        "VALUES (?,?,?,?,?)",
+        # the unanchored one, and an ordinary anchored one beside it: the
+        # crash needs both, since sorting one row alone compares nothing
+        [("https://lagen.nu/begrepp/Registermyndigheten", uri, None,
+          "registermyndigheten", "Med registermyndigheten avses ..."),
+         ("https://lagen.nu/begrepp/Ansokan", uri, "P1", "ansökan",
+          "Med ansökan avses ...")])
+    # every LLM pass answers empty: the rows under test come from the
+    # definitions table and the verbatim scan, not from the model
+    monkeypatch.setattr(aihierarki.llm, "author",
+                        lambda prompt, validate, **kw: validate("{}"))
+
+    rows, _stats = aihierarki.run_component(con, [uri], [], batched=True)
+    assert all(anchor is not None for _doc, anchor, *_rest in rows)
+    # both terms are on the ladder at the provision that carries them -- the
+    # unanchored definition kept its concept, only its unplaceable row went
+    assert sorted((a, term) for _d, a, term, *_r in rows) \
+        == [("P1", "ansökan"), ("P1", "registermyndigheten")]

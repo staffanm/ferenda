@@ -441,7 +441,15 @@ def run_component(con, docs, clauses, batched, cache=None,
     patterns = {f: concepts.term_pattern(t) for f, t in terms.items()}
     for doc in docs:
         for folded, pattern in patterns.items():
-            if (doc, folded) in defs:
+            # an *anchored* definition is the authoritative row and stands
+            # in for the term's other occurrences. 171 of the corpus's 54,132
+            # definition rows carry no anchor (the parse found the definition
+            # but could not place it), and such a row can neither render on a
+            # provision nor sort against the anchored ones -- it crashed the
+            # ladder with "'<' not supported between NoneType and str". Those
+            # fall through to the verbatim pass, which finds where the term
+            # actually occurs.
+            if defs.get((doc, folded)):
                 add(doc, defs[(doc, folded)], folded, role="definierar")
                 continue
             hits = [a for a, t in frags[doc]
