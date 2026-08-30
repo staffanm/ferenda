@@ -812,3 +812,22 @@ def test_a_version_that_gains_content_drops_its_no_content_marker(tmp_path,
         object(), tmp_path, ["32014R0910"], ("swe",), 0, full=True)
     assert stored == 1
     assert not (target / D.NO_CONTENT).exists()
+
+
+def test_an_unreadable_or_future_marker_is_not_believed(tmp_path):
+    """The marker decides whether a version is asked about again, so a value
+    we could not have written must never settle it. Compared as strings --
+    the first cut of this -- "corrupt" and a skewed-clock "2030-01-01" both
+    sort above the cutoff and would have skipped that wording for ever,
+    silently: the exact permanent-skip failure the marker exists to remove."""
+    target = tmp_path / "v"
+    target.mkdir()
+    fresh = date.today().isoformat()
+    stale = (date.today() - D.NO_CONTENT_TTL - timedelta(days=1)).isoformat()
+    for value, settled in ((fresh, True),
+                           (stale, False),
+                           ("corrupt", False),
+                           ("", False),
+                           ("2030-01-01", False)):   # ahead of any run
+        (target / D.NO_CONTENT).write_text(value)
+        assert D.version_settled(target) is settled, value

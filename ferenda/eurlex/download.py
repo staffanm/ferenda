@@ -395,19 +395,30 @@ NO_CONTENT = ".no-content"
 # (rule:respect-source-temporality).
 
 
-def version_settled(target, today=None):
+def version_settled(target):
     """Whether this version needs no attempt this run: its content is stored
     (the notice marks that, as for an act), or CELLAR answered that it has
     none recently enough to believe (`NO_CONTENT_TTL`).
 
-    A marker we cannot read as a date is treated as absent -- asking again
-    is the recovery, and the answer rewrites it."""
+    A marker that does not parse as a date is treated as absent, which asks
+    CELLAR again and rewrites it -- the choice is spelled out because the
+    alternative is silent and permanent: compared as a *string*, anything
+    that is not a date ("corrupt", a future date from a skewed clock) sorts
+    above the cutoff and would settle that version for ever."""
     if compress.exists(target / "notice.ttl"):
         return True
     marker = target / NO_CONTENT
-    return (marker.exists()
-            and marker.read_text().strip()
-            >= ((today or date.today()) - NO_CONTENT_TTL).isoformat())
+    if not marker.exists():
+        return False
+    try:
+        asked = date.fromisoformat(marker.read_text().strip())
+    except ValueError:
+        return False
+    # a date we could not have written -- one ahead of today, from a skewed
+    # clock or a hand edit -- would otherwise settle the version until that
+    # day arrives, so it counts as unreadable too
+    today = date.today()
+    return today - NO_CONTENT_TTL <= asked <= today
 
 
 def version_dir(root, celex, version):
