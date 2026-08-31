@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import compress, markdown
+from ferenda.lib import compress, layout, markdown
 from ferenda.lib import render as lib_render
 from ferenda.site import parse, render
 
@@ -27,7 +27,8 @@ def test_sfs_and_eurlex_schemes_resolve():
 
 def test_list_basefiles():
     assert parse.list_basefiles(FIX) == [
-        "frontpage", "sitenews", "om/index", "om/lankning"]
+        "frontpage", "sitenews", "om/index", "om/lankning",
+        "subdomain/lagen.nu/jante"]
 
 
 def test_frontpage_parse_categories_bold_and_link():
@@ -159,6 +160,45 @@ def test_an_empty_link_label_names_the_basefile():
         parse.blocks("se [](/a) här", "om/x")
 
 
+def test_subdomain_page_relpath_is_explicit_not_a_passthrough():
+    assert layout.page_relpath("subdomain/lagen.nu/jante") == \
+        "subdomain/lagen.nu/jante.html"
+
+
+def test_subdomain_record_finds_the_zone_nested_path():
+    assert parse.record(FIX, "subdomain/lagen.nu/jante") == (
+        Path(FIX) / "site" / "subdomain" / "lagen.nu" / "jante.md")
+
+
+def test_subdomain_parse_zone_slug_title_and_body():
+    art = parse.artifact("subdomain/lagen.nu/jante", FIX)
+    assert art["type"] == "subdomain"
+    assert (art["zone"], art["slug"], art["title"]) == (
+        "lagen.nu", "jante", "Jantelagen")
+    assert art["blocks"][0]["type"] == "stycke"
+    assert art["blocks"][1] == {"text": "Jantelagens strafflag",
+                                "level": 2, "type": "rubrik"}
+
+
+def test_subdomain_page_without_a_title_names_the_basefile(tmp_path):
+    # every site page is titled by its frontmatter, never by a body heading
+    # (PRD-subdomains.md) -- jante.md/kamomilla.md originally shipped with a
+    # bare `# Title` body heading and no frontmatter, which this rejects
+    # rather than silently promoting the heading.
+    d = tmp_path / "site" / "subdomain" / "lagen.nu"
+    d.mkdir(parents=True)
+    (d / "kamomilla.md").write_text("# Kamomillalag\n\n1 § ...\n", encoding="utf-8")
+    with pytest.raises(ValueError,
+                       match="subdomain/lagen.nu/kamomilla: no frontmatter"):
+        parse.artifact("subdomain/lagen.nu/kamomilla", tmp_path)
+
+
+def test_subdomain_render_matches_an_about_page_shape():
+    html = render.render_subdomain(parse.artifact("subdomain/lagen.nu/jante", FIX))
+    assert "<h2>Jantelagens strafflag</h2>" in html
+    assert "<title>Jantelagen" in html
+
+
 def _flat(runs):
     return "".join(r if isinstance(r, str) else r["text"] for r in runs)
 
@@ -261,7 +301,7 @@ def test_write_site_emits_expected_paths(tmp_path, monkeypatch):
     artdir = tmp_path / "art"
     artdir.mkdir()
     paths = []
-    for bf in ("frontpage", "sitenews", "om/index"):
+    for bf in ("frontpage", "sitenews", "om/index", "subdomain/lagen.nu/jante"):
         p = artdir / (bf.replace("/", "_") + ".json")
         p.write_text(json.dumps(parse.artifact(bf, FIX)))
         paths.append(p)
@@ -273,5 +313,6 @@ def test_write_site_emits_expected_paths(tmp_path, monkeypatch):
     # the logical path to whichever variant is on disk
     assert compress.exists(out / "index.html")
     assert compress.exists(out / "om" / "index.html")
+    assert compress.exists(out / "subdomain" / "lagen.nu" / "jante.html")
     assert compress.exists(out / "dataset" / "sitenews" / "feed" / "index.html")
     assert compress.exists(out / "dataset" / "sitenews" / "feed.atom")

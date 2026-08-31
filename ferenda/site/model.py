@@ -85,6 +85,19 @@ class AboutPage:
 
 
 @dataclass
+class SubdomainPage:
+    """A definite-form subdomain's standalone page (PRD-subdomains.md,
+    section 8: an easter egg like `jante.lagen.nu`) -- the `AboutPage` block
+    model, namespaced by zone so it can never become reachable just by
+    sitting in the general `om/` about-page folder."""
+    zone: str
+    slug: str
+    title: str
+    blocks: list[Block]
+    type: str = "subdomain"
+
+
+@dataclass
 class NewsItem:
     id: str                     # anchor + Atom entry id, minted from the datetime
     published: str              # "2020-09-17 23:00:00" (naive local, as authored)

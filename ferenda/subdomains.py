@@ -3,9 +3,12 @@
 straight from the curated name tables the citation engine already reads, not
 a separately maintained list.
 
-Only the *whole-act* kind is generated (PRD-subdomains.md section 6); the
-chapter and standalone kinds are curated in the lagen-wiki content repo and
-are not this module's concern.
+The whole-act kind is generated (PRD-subdomains.md section 6); the standalone
+kind is curated in the lagen-wiki content repo, but even there nothing is
+separately *listed* -- a `site/subdomain/<zone>/<slug>.md` file existing is
+itself the registration (`standalone_rows`). The chapter kind still needs an
+explicit registry (a target act/fragment, not a page of its own) and is not
+implemented yet.
 """
 
 import json
@@ -15,6 +18,7 @@ from pathlib import Path
 
 from .lib import compress, layout
 from .lib.lagrum import load_namedlaws
+from .site import parse as site_parse
 
 SFS_NAMEDLAWS = Path(__file__).parent / "sfs" / "data" / "namedlaws.json"
 EU_NAMEDACTS = Path(__file__).parent / "eurlex" / "data" / "namedacts.json"
@@ -88,6 +92,20 @@ def whole_act_rows():
     return {host: target for host, (target, _source) in rows.items()}
 
 
+def standalone_rows(wiki_root=None):
+    """slug.zone -> target URI, one row per `site/subdomain/<zone>/<slug>.md`
+    file in the wiki content repo (PRD-subdomains.md section 8). The file
+    existing *is* the registration -- nothing else lists it, so there is
+    nothing to drift out of sync with it."""
+    wiki_root = layout.WIKI_ROOT if wiki_root is None else wiki_root
+    rows = {}
+    for basefile in site_parse.list_basefiles(str(wiki_root)):
+        if basefile.startswith("subdomain/"):
+            zone, slug = basefile[len("subdomain/"):].rsplit("/", 1)
+            rows[f"{slug}.{zone}"] = f"/{basefile}"
+    return rows
+
+
 def _ascii_fold(label):
     """`label` with its combining marks dropped after NFKD normalization --
     "upphovsrätts" -> "upphovsratts" (PRD-subdomains.md section 4, O5: the
@@ -126,7 +144,15 @@ def write_sub_tree(generated_root, rows=None):
     stale -- is skipped, not an error: this runs after the whole-act rows are
     already fixed, and a missing page is a normal, transient build state, not
     a defect in the row itself."""
-    rows = whole_act_rows() if rows is None else rows
+    if rows is None:
+        acts, standalone = whole_act_rows(), standalone_rows()
+        collisions = acts.keys() & standalone.keys()
+        if collisions:
+            raise ValueError(
+                f"{sorted(collisions)!r} would be both a generated whole-act "
+                "row and a curated standalone page"
+            )
+        rows = {**acts, **standalone}
     generated_root = Path(generated_root)
     sub_root = generated_root / "_sub"
     sub_root.mkdir(parents=True, exist_ok=True)

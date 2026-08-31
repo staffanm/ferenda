@@ -2,7 +2,9 @@
 
 import json
 
-from ferenda.subdomains import whole_act_rows, write_sub_tree
+import pytest
+
+from ferenda.subdomains import standalone_rows, whole_act_rows, write_sub_tree
 
 
 def test_whole_act_rows_matches_the_worked_examples():
@@ -102,3 +104,44 @@ def test_write_sub_tree_does_not_collide_two_zones_folding_to_one_label(tmp_path
     assert "dataskydds.lagen.nu dataskydds.lagen.nu;" in map_text
     assert "dataskydds.xn--frordningen-rfb.nu dataskydds.forordningen.nu;" in map_text
     assert "dataskydds.forordningen.nu dataskydds.forordningen.nu;" in map_text
+
+
+def test_standalone_rows_one_row_per_subdomain_page(tmp_path):
+    # the file existing under site/subdomain/<zone>/ is the registration --
+    # nothing else lists jante.lagen.nu anywhere
+    d = tmp_path / "site" / "subdomain" / "lagen.nu"
+    d.mkdir(parents=True)
+    (d / "jante.md").write_text("---\ntitle: Jantelagen\n---\n\nprosa.\n",
+                                encoding="utf-8")
+    assert standalone_rows(tmp_path) == {"jante.lagen.nu": "/subdomain/lagen.nu/jante"}
+
+
+def test_write_sub_tree_merges_whole_act_and_standalone_by_default(tmp_path, monkeypatch):
+    # whole_act_rows() reads real repo-wide data (namedlaws.json/namedacts.json)
+    # regardless of tmp_path, so this only has to prove the *merge* -- that a
+    # standalone page becomes a real row without anyone passing `rows=`
+    (tmp_path / "site" / "subdomain" / "lagen.nu").mkdir(parents=True)
+    (tmp_path / "site" / "subdomain" / "lagen.nu" / "jante.md").write_text(
+        "---\ntitle: Jantelagen\n---\n\nprosa.\n", encoding="utf-8")
+    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", tmp_path)
+
+    generated = tmp_path / "generated"
+    (generated / "subdomain" / "lagen.nu").mkdir(parents=True)
+    (generated / "subdomain" / "lagen.nu" / "jante.html").write_text(
+        "<html>Jantelagen</html>", encoding="utf-8")
+
+    write_sub_tree(generated)
+
+    served = json.loads((generated / "subdomains.json").read_text(encoding="utf-8"))
+    assert served["jante.lagen.nu"] == "/subdomain/lagen.nu/jante"
+    assert (generated / "_sub" / "jante.lagen.nu" / "index.html").is_symlink()
+
+
+def test_write_sub_tree_rejects_a_whole_act_and_standalone_name_collision(tmp_path, monkeypatch):
+    (tmp_path / "site" / "subdomain" / "lagen.nu").mkdir(parents=True)
+    (tmp_path / "site" / "subdomain" / "lagen.nu" / "avtals.md").write_text(
+        "---\ntitle: Avtals\n---\n\nprosa.\n", encoding="utf-8")
+    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="avtals.lagen.nu"):
+        write_sub_tree(tmp_path / "generated")

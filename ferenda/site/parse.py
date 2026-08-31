@@ -1,11 +1,18 @@
 """Parse the editorial ``site/`` markdown (in the ``lagen-wiki`` content repo)
-into JSON artifacts. Three fixed basefiles:
+into JSON artifacts. Four fixed basefiles:
 
-  * ``frontpage``       <- ``site/frontpage.md``   -> a ``Frontpage`` (the curated
-    law list: ``## <Category>`` headings + ``- [Label](sfs:…)`` bullets)
-  * ``om/<slug>``       <- ``site/om/<slug>.md``   -> an ``AboutPage``
-  * ``sitenews``        <- ``site/sitenews.md``    -> a ``Sitenews`` (its body is
-    split into dated ``NewsItem``s on the ``## YYYY-MM-DD HH:MM:SS Title`` heads)
+  * ``frontpage``            <- ``site/frontpage.md``   -> a ``Frontpage`` (the
+    curated law list: ``## <Category>`` headings + ``- [Label](sfs:…)`` bullets)
+  * ``om/<slug>``            <- ``site/om/<slug>.md``   -> an ``AboutPage``
+  * ``subdomain/<zone>/<slug>`` <- ``site/subdomain/<zone>/<slug>.md`` -> a
+    ``SubdomainPage`` (PRD-subdomains.md section 8: a definite-form
+    subdomain's own standalone page, e.g. the `jante.lagen.nu` easter egg).
+    Namespaced by zone, and deliberately its own basefile rather than an
+    ``om/<slug>`` page: nothing should make a subdomain resolve just because
+    a same-named file exists in the general about-page folder.
+  * ``sitenews``             <- ``site/sitenews.md``    -> a ``Sitenews`` (its
+    body is split into dated ``NewsItem``s on the
+    ``## YYYY-MM-DD HH:MM:SS Title`` heads)
 
 Editorial content needs the whole ordinary markdown vocabulary -- tables,
 ordered lists, emphasis -- which the legal-prose parser (``lib.markdown``:
@@ -41,6 +48,7 @@ from .model import (
     Paragraph,
     Rule,
     Sitenews,
+    SubdomainPage,
     Table,
 )
 
@@ -274,6 +282,18 @@ def about_artifact(slug, path):
                      blocks=blocks(body, "om/" + slug))
 
 
+def subdomain_artifact(zone, slug, path):
+    where = "subdomain/%s/%s" % (zone, slug)
+    meta, body = _read(path)
+    if "title" not in meta:
+        raise ValueError(
+            "%s: no frontmatter `title` -- every site page is titled by its "
+            "frontmatter, never by a body heading (rule:errors-drive-retry-"
+            "use-raise)" % where)
+    return SubdomainPage(zone=zone, slug=slug, title=meta["title"],
+                         blocks=blocks(body, where))
+
+
 def sitenews_artifact(path):
     meta, body = _read(path)
     items, head, buf = [], None, []
@@ -310,7 +330,8 @@ def _site_dir(root):
 
 def list_basefiles(root):
     """The site basefiles present on disk: ``frontpage``, ``sitenews`` (when
-    their file exists), and ``om/<slug>`` for each ``site/om/*.md``."""
+    their file exists), ``om/<slug>`` for each ``site/om/*.md``, and
+    ``subdomain/<zone>/<slug>`` for each ``site/subdomain/<zone>/*.md``."""
     d = _site_dir(root)
     out = []
     if (d / "frontpage.md").exists():
@@ -318,6 +339,9 @@ def list_basefiles(root):
     if (d / "sitenews.md").exists():
         out.append("sitenews")
     out += ["om/" + p.stem for p in sorted((d / "om").glob("*.md"))]
+    out += ["subdomain/%s/%s" % (zonedir.name, p.stem)
+            for zonedir in sorted((d / "subdomain").glob("*")) if zonedir.is_dir()
+            for p in sorted(zonedir.glob("*.md"))]
     return out
 
 
@@ -328,8 +352,11 @@ def record(root, basefile):
         return d / "frontpage.md"
     if basefile == "sitenews":
         return d / "sitenews.md"
-    assert basefile.startswith("om/"), "unknown site basefile %r" % basefile
-    return d / "om" / (basefile[len("om/"):] + ".md")
+    if basefile.startswith("om/"):
+        return d / "om" / (basefile[len("om/"):] + ".md")
+    assert basefile.startswith("subdomain/"), "unknown site basefile %r" % basefile
+    zone, slug = basefile[len("subdomain/"):].rsplit("/", 1)
+    return d / "subdomain" / zone / (slug + ".md")
 
 
 def artifact(basefile, root):
@@ -339,6 +366,9 @@ def artifact(basefile, root):
         art = frontpage_artifact(path)
     elif basefile == "sitenews":
         art = sitenews_artifact(path)
-    else:
+    elif basefile.startswith("om/"):
         art = about_artifact(basefile[len("om/"):], path)
+    else:
+        zone, slug = basefile[len("subdomain/"):].rsplit("/", 1)
+        art = subdomain_artifact(zone, slug, path)
     return dataclasses.asdict(art)

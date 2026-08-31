@@ -127,6 +127,13 @@ def render_about(art):
                 solo=True, body_class=" site")
 
 
+def render_subdomain(art):
+    """A definite-form subdomain's standalone page (PRD-subdomains.md
+    section 8) -- the same shape as an /om page, single column."""
+    return page(art["title"], "", "", _blocks_html(art["blocks"]),
+                solo=True, body_class=" site")
+
+
 def render_sitenews(art):
     """The news listing: every item in full, each an ``<article>`` anchored by
     its id so the Atom feed's per-entry links resolve to it.
@@ -208,9 +215,10 @@ def _editable(html, basefile):
 
 def write_site(out_root):
     """Write every parsed site artifact to its page(s) under `out_root`: the
-    frontpage to ``index.html``, each about page to ``om/<slug>.html``, and the
-    sitenews listing + Atom feed under ``dataset/sitenews/feed``. Driven purely
-    by which artifacts exist (an empty site source writes nothing)."""
+    frontpage to ``index.html``, each about page to ``om/<slug>.html``, each
+    subdomain page to ``subdomain/<zone>/<slug>.html``, and the sitenews
+    listing + Atom feed under ``dataset/sitenews/feed``. Driven purely by
+    which artifacts exist (an empty site source writes nothing)."""
     out = Path(out_root)
     page_fmt = compress.PAGE_ENCODINGS
     for path in layout.artifacts("site"):
@@ -222,6 +230,12 @@ def write_site(out_root):
             dest = out / "om" / (art["slug"] + ".html")
             dest.parent.mkdir(parents=True, exist_ok=True)
             compress.write_text(dest, _editable(render_about(art), "om/" + art["slug"]),
+                                page_fmt)
+        elif art["type"] == "subdomain":
+            basefile = "subdomain/%s/%s" % (art["zone"], art["slug"])
+            dest = out / "subdomain" / art["zone"] / (art["slug"] + ".html")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            compress.write_text(dest, _editable(render_subdomain(art), basefile),
                                 page_fmt)
         elif art["type"] == "sitenews":
             feed = out / "dataset" / "sitenews" / "feed"
