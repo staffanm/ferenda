@@ -51,7 +51,7 @@ from urllib.parse import quote, urlsplit
 
 import requests
 
-from . import browse, config, patchsource
+from . import browse, config, patchsource, subdomains
 from .api import app as api_app
 from .api import edit as api_edit
 from .api import errors as api_errors
@@ -4892,6 +4892,17 @@ GENERATE_CODE = (PKG / "lib" / "page.py", PKG / "lib" / "catalog.py",
                  # markup edit has to re-stale the browse pages, not leave the
                  # coarse gate reporting "up to date -- skipped".
                  PKG / "browse.py",
+                 # subdomains.py (PRD-subdomains.md): a logic change here must
+                 # re-run the coarse gate too. Its two curated data sources,
+                 # namedlaws.json/namedacts.json, are deliberately NOT listed
+                 # here -- every file in this tuple invalidates every page's
+                 # own freshness entry (recipe_version is one combined hash),
+                 # and a 200-row lookup table edit must not force a full
+                 # corpus re-render. write_sub_tree() itself always runs on a
+                 # full generate regardless (below), so this only affects how
+                 # soon a data-only edit is picked up when nothing else in
+                 # the corpus has changed.
+                 PKG / "subdomains.py",
                  # the shipped static chrome (incl. the self-hosted fonts):
                  # a stylesheet/script/font edit must re-stale generate
                  # exactly like a renderer edit
@@ -5186,6 +5197,14 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         # `lagen all rebuild` always computes first, so there it always renders.
         if compress.exists(layout.artifact("stats", stats_render.ARTIFACT_BASEFILE)):
             stats_render.write_stats(GENERATED)
+        # the definite-form subdomain map (PRD-subdomains.md): whole-act rows
+        # only, generated fresh from namedlaws.json/namedacts.json every
+        # full-corpus run rather than gated by the manifest -- cheap (a few
+        # hundred rows, no catalog read), and the up-to-date fast path above
+        # only fingerprints GENERATE_CODE + the catalog, not those two data
+        # files, so a same-day edit to either would otherwise go unnoticed
+        # until something else also changed.
+        subdomains.write_sub_tree(GENERATED)
     sys.stderr.write("\n")
     if updates:
         manifest.update(updates)

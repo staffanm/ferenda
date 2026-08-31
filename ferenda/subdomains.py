@@ -96,6 +96,12 @@ def _ascii_fold(label):
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+# förordningen.nu and forordningen.nu are two registered domains for the same
+# zone (PRD-subdomains.md section 4) -- every row in one belongs in both.
+# lagen.nu and direktivet.nu have no such registered twin.
+_ZONE_TWINS = {"förordningen.nu": "forordningen.nu"}
+
+
 def write_sub_tree(generated_root, rows=None):
     """Write `generated/_sub/<slug>/index.html[.br|.gz]` as a symlink to each
     whole act's own generated file, and `generated/subdomains.map` for nginx
@@ -105,10 +111,16 @@ def write_sub_tree(generated_root, rows=None):
     than decompressing: nginx serves the `.br` sibling directly, stamping
     its own `Content-Encoding` (`docker/nginx/subdomains.conf`).
 
-    The on-disk directory name, and the ASCII-fold twin's own map entry, use
-    the folded slug (`upphovsratts`); the map's *keys* are the A-label a
-    browser actually sends in `Host`/SNI for a non-ASCII slug -- nginx never
-    sees the U-label a reader types (section 4).
+    The on-disk directory name is the ascii-folded *host* (label and zone),
+    not just the label -- two different zones sharing a label
+    ("dataskyddslagen" and "Dataskyddsförordningen" both fold to
+    "dataskydds") must not collide on one directory, silently pointing one
+    zone's subdomain at the other's act. The map's *keys* fan out over every
+    ASCII-reachable spelling of the host: the reader's U-label idna-encoded,
+    its ascii-fold twin, and -- for förordningen.nu -- the same two again
+    under its registered ascii-twin zone forordningen.nu. All of them are one
+    A-label a browser can actually put in `Host`/SNI; nginx never sees the
+    U-label a reader types (section 4).
 
     An act with no generated page at all -- not yet built, or the row is
     stale -- is skipped, not an error: this runs after the whole-act rows are
@@ -120,7 +132,7 @@ def write_sub_tree(generated_root, rows=None):
     sub_root.mkdir(parents=True, exist_ok=True)
 
     served = {}
-    map_lines = []
+    map_entries: dict[str, str] = {}
     for host, target in sorted(rows.items()):
         relpath = layout.page_relpath(target.lstrip("/"))
         source = compress.resolve(generated_root / relpath)
@@ -128,7 +140,8 @@ def write_sub_tree(generated_root, rows=None):
             continue
 
         label, _, zone = host.partition(".")
-        slug = _ascii_fold(label)
+        ascii_zone = _ZONE_TWINS.get(zone, zone)
+        slug = f"{_ascii_fold(label)}.{ascii_zone}"
         link_dir = sub_root / slug
         link_dir.mkdir(exist_ok=True)
         suffix = source.name[len(Path(relpath).name):]  # "" or ".br"/".gz"
@@ -136,12 +149,19 @@ def write_sub_tree(generated_root, rows=None):
         if link.is_symlink() or link.exists():
             link.unlink()
         link.symlink_to(source)
-
         served[host] = target
-        a_label = label.encode("idna").decode("ascii")
-        map_lines.append(f"{a_label}.{zone} {slug};")
-        if slug != a_label:
-            map_lines.append(f"{slug}.{zone} {slug};")
+
+        zones = {zone, _ZONE_TWINS.get(zone, zone)}
+        labels = {label, _ascii_fold(label)}
+        for z in zones:
+            for lbl in labels:
+                a_label_host = f"{lbl}.{z}".encode("idna").decode("ascii")
+                if a_label_host in map_entries and map_entries[a_label_host] != slug:
+                    raise ValueError(
+                        f"{a_label_host!r} would point at both "
+                        f"{map_entries[a_label_host]!r} and {slug!r}"
+                    )
+                map_entries[a_label_host] = slug
 
     # The inspectable artifact (section 6): what is actually live, not merely
     # what the source tables say should be -- a row whose generated page
@@ -153,6 +173,7 @@ def write_sub_tree(generated_root, rows=None):
         json.dumps(served, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    map_lines = [f"{host} {slug};" for host, slug in sorted(map_entries.items())]
     (generated_root / "subdomains.map").write_text(
         "\n".join(map_lines) + "\n" if map_lines else "", encoding="utf-8"
     )
