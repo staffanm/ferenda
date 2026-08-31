@@ -370,31 +370,38 @@ here. Two matches for the same slug is a build-time error, not a silent pick
 own `_comment` entries), so widening coverage later means adding entries
 there, which the citation engine already reads them for anyway.
 
-**Curated (chapter and standalone).** A slug that names part of a law, or no
-law at all, cannot be derived — `hyreslagen` is a media nickname for 12 kap.
-of Jordabalken, not that act's own populärnamn, and `jante` names no act. This
-half of the table lives as data in the `lagen-wiki` content repo, alongside
-the kommentar/begrepp/site markdown it already holds
-(`docker-compose.yml`'s `/wiki` mount), not in this module, in two pieces:
+**Curated (chapter and standalone), done 2026-08-31.** A slug that names part
+of a law, or no law at all, cannot be derived — `hyreslagen` is a media
+nickname for 12 kap. of Jordabalken, not that act's own populärnamn, and
+`jante` names no act. This half of the table lives as data in the
+`lagen-wiki` content repo, alongside the kommentar/begrepp/site markdown it
+already holds (`docker-compose.yml`'s `/wiki` mount), not in this module, in
+two pieces:
 
-- The chapter kind's target (act + fragment) is one row per slug in a fourth
-  fixed basefile added to the existing editorial `site` source,
-  `site/subdomains.md` (`ferenda/site/parse.py` already has exactly three —
-  `frontpage`, `om/<slug>`, `sitenews` — in the same curated-markdown-list
-  style as `frontpage.md`'s law list).
+- The chapter kind's target (act + fragment) is one row per bullet in
+  `site/subdomains.md` — `- [hyres.lagen.nu](sfs:1970:994#K12)`. Not a site
+  basefile (it is pure config, not a page with a catalog row of its own):
+  `ferenda.subdomains.chapter_rows()` reads it directly, reusing
+  `site.parse.blocks()` as a bare utility — the same bullet-list parser
+  `frontpage.md`'s law list already goes through — rather than a second,
+  one-off parser for "a list of links."
 - The standalone kind's actual content is **not** an `om/<slug>` page,
   deliberately: `om/` is the general about-page mechanism (`/om/mcp`, and
   whatever else lands there), and an easter egg's markdown must not become
   reachable just by existing in that folder — nothing should make
   `mcp.lagen.nu` resolve because `om/mcp.md` happens to exist. So it is its
-  own fifth fixed basefile pattern, namespaced by zone:
-  `site/subdomain/<zone>/<slug>.md` → `site/subdomain/lagen.nu/jante.md`.
-  Reachable as a subdomain only because `generated/subdomains.json` says so,
-  same as every other kind — never by folder convention alone.
+  own fourth fixed `site` basefile, namespaced by zone:
+  `site/subdomain/<zone>/<slug>.md` → `site/subdomain/lagen.nu/jante.md`
+  (`ferenda/site/parse.py` had exactly three — `frontpage`, `om/<slug>`,
+  `sitenews` — before this). Reachable as a subdomain only because the file
+  exists at all (`standalone_rows()`), same self-registering principle as
+  every other kind — never by folder convention alone.
 
-`ferenda/subdomains.py` merges both halves into `generated/subdomains.json`
-and is added to `build.GENERATE_CODE` (`ferenda/build.py:4866`), so editing
-either the SFS/eurlex tables, `site/subdomains.md`, or a
+`ferenda/subdomains.py` merges both halves (`whole_act_rows`,
+`standalone_rows`, `chapter_rows`) into `generated/subdomains.json`, raising
+on a collision between any two rather than picking one silently, and is
+added to `build.GENERATE_CODE` (`ferenda/build.py:4866`), so editing either
+the SFS/eurlex tables, `site/subdomains.md`, or a
 `site/subdomain/<zone>/<slug>.md` file re-stales the pages it produces. The
 nginx host map (section 5) is a further, mechanical projection of this same
 file — A-label hostname → directory name — generated alongside it, not a
@@ -403,14 +410,20 @@ second source of truth.
 | Kind | Example | How the page is made |
 | --- | --- | --- |
 | whole act | `avtals` → `/1915:218` | `generate` writes `_sub/avtals/index.html` as a **symlink** to the act's own generated file. The file name is stable across builds, so the link never goes stale and no bytes are copied. |
-| chapter | `hyres` → `/1970:994#K12` | Filter the **artifact**, not the HTML: give `sfs.render.render` a node filter (`ferenda/sfs/render.py:316`) and render the chapter as its own page. |
+| chapter | `hyres` → `/1970:994#K12` | Filter the **artifact**, not the HTML: `sfs.render.render_chapter(art, site, node_id)` finds the `K12` node and calls the exact same `render_node`/`Toc`/`Rail` walk `render()` uses, just on that one node — neither is hardwired to "all of `art['structure']`", so that call alone is the whole filter. `write_chapter_pages` (`ferenda/subdomains.py`) writes the result to `generated/subdomain/<zone>/<slug>.html`, the same path shape the standalone kind uses, so `write_sub_tree` finds it the same way; going through `page_relpath`/`compress.resolve` on the target act's own uri instead would strip the `#fragment` and silently symlink to the *whole* act — a real bug this caught before it shipped, not a hypothetical one. |
 | standalone page | `jante`, `kamomilla` → `/subdomain/lagen.nu/jante`, `/subdomain/lagen.nu/kamomilla` | The `site` source renders `site/subdomain/<zone>/<slug>.md` the same way it already renders an `om/<slug>.md` page (same block-tree model, a new namespace, not new rendering logic). |
 
 The introduction on a chapter page is a `kommentar` on the chapter node — the
 hand-written, git-backed markdown layer that already exists and already has an
-editing surface (`ferenda/lib/render.py:196`). `site/subdomains.md` names
-*where* `hyres.lagen.nu` points; the kommentar is what explains, on the page
-itself, that it is part of a larger law. Neither is a new authoring path.
+editing surface (`ferenda/lib/render.py:196`), and needed no new mechanism:
+`Rail._commentary` already looks up `(doc_uri, node_id)`, so a kommentar
+authored on `K12` already shows in the rail the moment `render_chapter` walks
+that node — the same lookup `render()`'s whole-document walk already uses.
+`site/subdomains.md` names *where* `hyres.lagen.nu` points; the kommentar is
+what explains, on the page itself, that it is part of a larger law. The page
+title stays the act's own name (`lb.short_title`, e.g. "Jordabalken") rather
+than a popular nickname invented with nothing authored behind it — that
+framing is exactly what the kommentar is for.
 
 Filtering the artifact rather than post-processing the generated HTML matters:
 `api/pdf.py` already prunes a generated page's DOM for print, and a second
@@ -452,6 +465,17 @@ laws. Different legal basis from Jantelagen: not a licence to work around, but
 överensstämmelse med god sed och i den omfattning som motiveras av
 ändamålet"). That permits quoting the town's actual laws, in the amount the
 easter egg's purpose justifies, not reproducing the book.
+
+**Framför lagen.** Kafka's "Vor dem Gesetz" ("Before the Law") — the parable,
+in Swedish translation, ends with a link to the source (de.wikisource.org).
+Kafka died in 1924; the work is in the public domain everywhere copyright
+runs from death, no citaträtt needed.
+
+**Buffélagen.** A parody statute from a 2025 blog post
+(juridik.blog/buffelagen-2025-lex-katrineholm), quoting only its first
+chapter heading and its first two paragrafer, then linking to the rest —
+the same 22 § citaträtt basis as Kamomilla: a proportionate excerpt with
+attribution and a link onward, not a copy of the post.
 
 ## 9. Decisions (2026-08-31, were open questions)
 
@@ -500,10 +524,15 @@ easter egg's purpose justifies, not reproducing the book.
    abbreviation matches its zone — `avtals.lagen.nu`, `upphovsrätts.lagen.nu`,
    `dataskydds.förordningen.nu`, `nis2.direktivet.nu` and
    `cer.direktivet.nu` among them — and needs no renderer work.
-2. **Chapter kind.** The fourth `site` basefile, `site/subdomains.md`
-   (section 6), the node filter in `sfs.render.render`, plus the `kommentar`
-   introduction on the chapter node. Delivers `hyres` and `samtyckes`.
-3. **Standalone page.** `jante` and `kamomilla`, once each one's licence
-   question is settled (section 8) — the fifth `site` basefile,
-   `site/subdomain/<zone>/<slug>`, reuses the `om/<slug>` rendering, so this
-   is a small parser addition plus content, not a new rendering path.
+2. **Chapter kind, done 2026-08-31.** `site/subdomains.md`, `sfs.render.
+   render_chapter`, `ferenda/subdomains.py`'s `chapter_rows`/
+   `write_chapter_pages`, plus the `kommentar` introduction on the chapter
+   node (no new mechanism — already node-scoped). Delivers `hyres` and
+   `samtyckes`; pending push/deploy and a corpus regenerate to actually
+   populate `generated/subdomain/lagen.nu/{hyres,samtyckes}.html` on prod.
+3. **Standalone page, done 2026-08-31.** `jante`, `kamomilla`, `framför` and
+   `buffe`, each with its licence basis settled (section 8) rather than
+   blocking. The fourth `site` basefile, `site/subdomain/<zone>/<slug>`,
+   reuses the `om/<slug>` rendering — a small parser addition plus content,
+   not a new rendering path. Same pending-deploy caveat as phase 2: content
+   exists in `lagen-wiki`, not yet parsed/generated on prod.
