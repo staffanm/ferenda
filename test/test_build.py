@@ -6,8 +6,10 @@ temp files -- no real corpus, no JVM, fast."""
 import json
 import os
 import shutil
+import signal
 import socket
 import sqlite3
+from concurrent.futures import Future, ProcessPoolExecutor
 from urllib.parse import urlparse
 
 import pytest
@@ -1121,7 +1123,6 @@ def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
     monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
-    monkeypatch.setattr(build, "load_manifest", lambda: {})
     source = build.Source("syn", lambda: ["a", "b"], {})
 
     with pytest.raises(RuntimeError, match=r"no worker result.*outstanding"):
@@ -1147,18 +1148,18 @@ def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
     monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
-    monkeypatch.setattr(build, "load_manifest", lambda: {})
     source = build.Source("syn", lambda: ["ds/2010-47"], {})
 
     with pytest.raises(RuntimeError, match="ds/2010-47"):
         build._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)
 
 
-def test_a_dead_workers_doc_is_rebuilt_serially(tmp_path, monkeypatch):
+def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
     """The recovery path: a slot file (see _worker) whose pid is not among the
     pool's live workers attributes the crashed worker's in-flight doc; once
     everything still outstanding is attributed, the parent stops waiting and
-    rebuilds those docs in-parent instead of raising -- the run completes."""
+    rebuilds those docs in fresh subprocesses instead of raising -- the run
+    completes."""
     inflight = tmp_path / "inflight"
 
     class LosesOneResult:
@@ -1185,21 +1186,22 @@ def test_a_dead_workers_doc_is_rebuilt_serially(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "INFLIGHT", inflight)
-    monkeypatch.setattr(build, "load_manifest", lambda: {})
     rebuilt = []
 
-    def fake_build_one(source, action, bf, manifest):
-        rebuilt.append(bf)
+    def fake_rebuild(source, action, bf, options):
+        rebuilt.append((bf, options))
         return build.Result()
 
-    monkeypatch.setattr(build, "build_one", fake_build_one)
+    monkeypatch.setattr(build, "_rebuild_isolated", fake_rebuild)
+    monkeypatch.setattr(build, "RUN", build.RunOptions())
     source = build.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
 
     build._run_parallel(source, "parse", ["a", "b"], 2,
-                        lambda res, bf: absorbed.append(bf))
+                        lambda res, bf: absorbed.append(bf), force=True)
 
-    assert rebuilt == ["b"]
+    # the rebuilt doc runs under the same force override the pool's workers got
+    assert rebuilt == [("b", build.RunOptions(force=True))]
     assert sorted(absorbed) == ["a", "b"]
 
 
@@ -1236,8 +1238,7 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
 
     monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
     monkeypatch.setattr(build, "INFLIGHT", inflight)
-    monkeypatch.setattr(build, "load_manifest", lambda: {})
-    monkeypatch.setattr(build, "build_one",
+    monkeypatch.setattr(build, "_rebuild_isolated",
                         lambda *a: pytest.fail("nothing should be rebuilt"))
     source = build.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
@@ -1246,6 +1247,96 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
                         lambda res, bf: absorbed.append(bf))
 
     assert sorted(absorbed) == ["a", "b"]
+
+
+def _crash_hard(_job):
+    """A worker that dies the way the heap corruption kills one: no exception,
+    no result, just a dead process."""
+    os.kill(os.getpid(), signal.SIGSEGV)
+
+
+def test_a_segfaulted_child_is_reported_not_waited_for():
+    """The premise `_rebuild_isolated` rests on, checked against a real dead
+    process rather than a stand-in: ProcessPoolExecutor turns a child that
+    dies without answering into BrokenProcessPool, where multiprocessing.Pool
+    -- whose silence is the whole reason for the corpse sweep -- would wait
+    for a result that is never coming. This is not idle: the driver already
+    once assumed a ProcessPoolExecutor mechanism (max_tasks_per_child) behaved
+    a way it did not, and deadlocked."""
+    with ProcessPoolExecutor(max_workers=1) as pool:
+        with pytest.raises(build.BrokenProcessPool):
+            pool.submit(_crash_hard, None).result()
+    # and the executor after it is unaffected -- one death costs one attempt
+    with ProcessPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(abs, -1).result() == 1
+
+
+class _OneShotPool:
+    """A ProcessPoolExecutor stand-in whose single submit follows a script:
+    "crash" raises BrokenProcessPool the way a segfaulted child does (the real
+    thing is checked above), anything else is the (basefile, Result) a live
+    worker returns. Every constructor keyword is recorded, since what the child
+    is initialised with is the part a stand-in would otherwise hide."""
+
+    def __init__(self, script, spawned, jobs=None):
+        self._script, self._spawned = script, spawned
+        self._jobs = [] if jobs is None else jobs
+
+    def __call__(self, *a, **kw):        # stands in for the class itself
+        self._spawned.append(kw)
+        return self
+
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+    def submit(self, fn, job):
+        self._jobs.append((fn, job))
+        step = self._script.pop(0)
+        fut = Future()
+        if step == "crash":
+            fut.set_exception(build.BrokenProcessPool("child died"))
+        else:
+            fut.set_result((job[2], step))
+        return fut
+
+
+def test_a_rebuild_that_crashes_once_is_retried_in_a_new_subprocess(monkeypatch):
+    """The parallel driver's parent builds no document itself: a lost doc is
+    rebuilt in a throwaway subprocess, and the heap corruption that lost it is
+    not document-deterministic, so a fresh heap finishes it."""
+    done = build.Result()
+    done.done.append(("parse", "b"))
+    script, spawned, jobs = ["crash", done], [], []
+    monkeypatch.setattr(build, "ProcessPoolExecutor",
+                        _OneShotPool(script, spawned, jobs))
+    options = build.RunOptions(force=True)
+    source = build.Source("syn", lambda: ["b"], {})
+
+    res = build._rebuild_isolated(source, "parse", "b", options)
+
+    assert res.done == [("parse", "b")]
+    assert script == []                       # both attempts were used
+    # each attempt is its own subprocess, and each carries the run options and
+    # the faulthandler that makes the next crash legible
+    assert [kw["initializer"] for kw in spawned] == [build._worker_init] * 2
+    assert [kw["initargs"] for kw in spawned] == [(options,)] * 2
+    # the job tuple's field order is what the child indexes into SOURCES with:
+    # swap two fields and production raises KeyError inside the child
+    assert jobs == [(build._worker, ("syn", "parse", "b"))] * 2
+
+
+def test_a_rebuild_that_always_crashes_is_an_error_not_a_dead_run(monkeypatch):
+    """A second crash must cost the document, not the hours of results the
+    parent is holding -- so it is recorded like any other per-doc failure."""
+    script = ["crash"] * build.REBUILD_ATTEMPTS
+    monkeypatch.setattr(build, "ProcessPoolExecutor", _OneShotPool(script, []))
+    source = build.Source("syn", lambda: ["b"], {})
+
+    res = build._rebuild_isolated(source, "parse", "b", build.RunOptions())
+
+    assert res.done == []
+    assert [(stage, bf) for stage, bf, _msg, _tb in res.errors] == [("parse", "b")]
+    assert "BrokenProcessPool" in res.errors[0][2]
 
 
 def test_an_always_stage_is_never_fresh(tmp_path):

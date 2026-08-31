@@ -41,6 +41,8 @@ import sys
 import time
 import traceback
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
@@ -687,6 +689,49 @@ LOST_RESULT_TIMEOUT = 3600
 # without waking a busy parent (a tick only happens when results have paused).
 WORKER_POLL = 60
 
+# How many times a lost document is retried in a fresh subprocess before it is
+# recorded as an error. The crash that lost it is not document-deterministic
+# (the same document rebuilds fine), so a second heap almost always finishes
+# it; a document that dies twice in a row is a real defect and belongs in the
+# error list, not in a third attempt.
+REBUILD_ATTEMPTS = 2
+
+
+def _rebuild_isolated(source, action, basefile, options):
+    """Rebuild one lost document in a single-use subprocess and return its
+    `Result`. `options` is the run options the child runs under, built once by
+    the caller so the pool's workers and this rebuild get the same `force`.
+
+    The parallel driver's parent builds no document itself (the serial path at
+    `run_action` still does -- with no pool, a crash there costs only itself).
+    The parent holds the run's absorbed results and its manifest checkpoints,
+    and the heap corruption chronicled at MAX_DOCS_PER_WORKER kills whichever
+    process meets it: in-parent, a second crash would throw away hours of
+    completed work at the very end of a run. A crash here costs one
+    subprocess. ProcessPoolExecutor reports a dead child as BrokenProcessPool
+    (public API, unlike Pool's silent wait), so the retry is a plain loop, and
+    REBUILD_ATTEMPTS failures become an error record like any other
+    per-document failure."""
+    for attempt in range(1, REBUILD_ATTEMPTS + 1):
+        with ProcessPoolExecutor(max_workers=1, initializer=_worker_init,
+                                 initargs=(options,)) as pool:
+            try:
+                return pool.submit(_worker,
+                                   (source.name, action, basefile)).result()[1]
+            except BrokenProcessPool:
+                print("\n%s %s: isolated rebuild of %s crashed (attempt %d/%d)"
+                      % (source.name, action, basefile, attempt,
+                         REBUILD_ATTEMPTS), file=sys.stderr)
+    res = Result()
+    # the evidence is the child's faulthandler stack on this run's stderr (see
+    # _worker_init) -- the error record can only name where to find it, since
+    # the process that held the traceback is gone
+    msg = ("BrokenProcessPool: the worker died in each of %d isolated rebuild "
+           "attempts; the crash stacks are on this run's stderr"
+           % REBUILD_ATTEMPTS)
+    res.errors.append((action, basefile, msg, msg + "\n"))
+    return res
+
 
 def _run_parallel(source, action, order, jobs, absorb, force=None):
     """Fan the basefiles out across `jobs` worker processes, absorbing each
@@ -700,7 +745,6 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
     `order` is already in dispatch order -- descending expected duration, with
     the never-built document first (`expected_secs`). This starts the slow tail
     early, so the final straggler is a fast document rather than a long scan."""
-    manifest = load_manifest()
     jobs_list = [(source.name, action, bf) for bf in order]
     # A worker that dies hard (a C-extension segfault) before it hits
     # maxtasksperchild loses its in-flight result, and imap_unordered then waits
@@ -720,9 +764,9 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
     # result is never coming. pool._pool is private but has been the worker
     # list since 2.6; there is no public liveness API. Once everything still
     # outstanding is attributed to a corpse, stop waiting and rebuild those
-    # documents serially in-parent below -- the crashes are rare and not
-    # document-deterministic (the same doc rebuilds fine), so the run
-    # completes instead of aborting at 99.99% after an hour-long stall.
+    # documents one at a time in fresh subprocesses below -- the crashes are
+    # rare and not document-deterministic (the same doc rebuilds fine), so the
+    # run completes instead of aborting at 99.99% after an hour-long stall.
     # LOST_RESULT_TIMEOUT stays as the hang backstop (rule:fail-fast); the
     # serial `--jobs 1` path takes no pool and remains the diagnostic fallback.
     INFLIGHT.mkdir(parents=True, exist_ok=True)
@@ -731,9 +775,11 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
     outstanding = {bf for _source, _action, bf in jobs_list}
     lost = set()                           # attributed to a dead worker
     quiet = 0.0                            # seconds since the last result
+    # every child of this run -- the pool's workers and the isolated rebuilds
+    # below -- runs under these, so the force override cannot drift between them
+    options = RUN if force is None else replace(RUN, force=force)
     with multiprocessing.Pool(processes=jobs, initializer=_worker_init,
-                              initargs=(RUN if force is None
-                                        else replace(RUN, force=force),),
+                              initargs=(options,),
                               maxtasksperchild=MAX_DOCS_PER_WORKER) as pool:
         results = pool.imap_unordered(_worker, jobs_list, chunksize=1)
         while len(outstanding) > len(lost):
@@ -752,7 +798,7 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
                     if bf in outstanding and bf not in lost:
                         lost.add(bf)
                         print("\n%s %s: worker died building %s; queued "
-                              "for serial rebuild once the pool drains"
+                              "for an isolated rebuild once the pool drains"
                               % (source.name, action, bf), file=sys.stderr)
                 if quiet >= LOST_RESULT_TIMEOUT:
                     raise RuntimeError(
@@ -773,15 +819,11 @@ def _run_parallel(source, action, order, jobs, absorb, force=None):
     # (an imap accounting anomaly delivering StopIteration with residue) must
     # crash with a diagnosis here, not be papered over by the rebuild below
     assert outstanding == lost, (outstanding, lost)
-    # the in-parent rebuild runs under the same force the pool's workers got;
-    # with nothing overridden the call is build_one's own default (RUN.force)
-    rebuild = build_one if force is None \
-        else functools.partial(build_one, force=force)
     for bf in sorted(outstanding):
-        # every doc still outstanding lost its worker; one serial in-parent
-        # rebuild completes the run (a second crash here kills the run --
-        # rare^2, and then genuinely a case for the --jobs 1 fallback)
-        absorb(rebuild(source, action, bf, manifest), bf)
+        # every doc still outstanding lost its worker: rebuild it one at a
+        # time in a fresh subprocess, under the same force the pool's workers
+        # got. A crash there costs the document, never the run.
+        absorb(_rebuild_isolated(source, action, bf, options), bf)
 
 
 def expected_secs(source_name, action, basefiles, manifest):

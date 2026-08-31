@@ -84,6 +84,22 @@ must not kill a corpus run:
   with its traceback and the run ends red with a summary naming it; the
   other scopes complete
 - the build driver's per-document boundary (`build.py`)
+- the build driver's lost-document rebuild (`build.py`) — a worker that dies
+  hard (the heap corruption at `MAX_DOCS_PER_WORKER`, about one document in
+  100 000) loses its in-flight result. `_rebuild_isolated` retries that one
+  document in a fresh subprocess. This catches a *named* exception, not
+  `Exception`: `concurrent.futures.process.BrokenProcessPool`, which means the
+  child died without answering. Everything a recipe can raise is already
+  absorbed by `ensure`, so only process death reaches here, and a real bug in
+  `_worker` still propagates and ends the run. A bug in `_worker_init` is the
+  one fault this catch cannot tell from a crash — an exception in a
+  `ProcessPoolExecutor` initializer also arrives as `BrokenProcessPool` — but
+  the pool's workers run the same initializer, so such a bug ends the run long
+  before any document is lost. After
+  `REBUILD_ATTEMPTS` deaths the document is recorded in `res.errors` like any
+  other failure, naming the run's stderr where the child's faulthandler stacks
+  are — the alternative is a crash in the parent that throws away every result
+  the run has absorbed
 - the golden-validation harness (`sfs/_validate.py`)
 - the legacy-stats CLI (`dv/legacy.py`)
 - the versions stage's per-version boundary (`sfs/versions.py`) — one
