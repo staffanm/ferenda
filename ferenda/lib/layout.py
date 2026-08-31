@@ -893,6 +893,13 @@ def page_relpath(uri: str) -> str:
         # already filesystem-safe). Explicit rather than leaning on the SFS
         # else-branch's incidental passthrough.
         return "%s.html" % loc
+    elif loc.startswith("subdomain/"):
+        # a definite-form subdomain's own standalone page
+        # (PRD-subdomains.md): subdomain/lagen.nu/jante ->
+        # subdomain/lagen.nu/jante.html, so ferenda/subdomains.py's symlink
+        # step finds it the same way it finds every other whole-act target.
+        # Explicit for the same reason the om/ branch is.
+        return "%s.html" % loc
     else:
         # SFS: a top-level page, the SFS id kept verbatim (colon and all). The id
         # is already filesystem-safe (digits, ':', '_', '.'): 1827:60_s.1007.
