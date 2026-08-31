@@ -11,3 +11,4 @@ COPY options-ssl-nginx.conf /etc/ssl-options/options-nginx-ssl.conf
 COPY ssl-dhparams.pem /etc/ssl-options/ssl-dhparams.pem
 COPY default.conf /etc/nginx/conf.d/default.conf
 COPY ferenda.lagen.nu.conf /etc/nginx/conf.d/ferenda.lagen.nu.conf
+COPY subdomains.conf /etc/nginx/conf.d/subdomains.conf

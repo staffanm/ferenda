@@ -244,11 +244,15 @@ services:
   #
   # One-time wildcard cert for the zones already delegated to Cloudflare
   # (lagen.nu is NOT among them yet -- add `-d lagen.nu -d '*.lagen.nu'` once
-  # it moves too, then re-run this once):
-  #   docker compose run --rm --entrypoint certbot certbot certonly \
+  # it moves too, then re-run this once). Runs as `docker exec` against the
+  # already-running container, NOT `docker compose run --entrypoint certbot`:
+  # that overrides entrypoint.sh, which is the only place cloudflare.ini gets
+  # written, and a run without it fails on a missing credentials file.
+  #   docker exec ferenda-certbot-1 certbot certonly \
   #     --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
   #     --dns-cloudflare-propagation-seconds 30 \
   #     --cert-name wildcard-lagen \
+  #     --deploy-hook /usr/local/bin/deploy-hook.sh \
   #     -d direktivet.nu -d '*.direktivet.nu' \
   #     -d forordningen.nu -d '*.forordningen.nu' \
   #     -d xn--frordningen-rfb.nu -d '*.xn--frordningen-rfb.nu' \
@@ -260,7 +264,15 @@ services:
   certbot:
     image: certbot/dns-cloudflare:v3.1.0
     profiles: [prod]
-    env_file: .env   # CLOUDFLARE_API_KEY, scoped to the four subdomain zones
+    environment:
+      # Renamed on the way in on purpose: the `cloudflare` Python client (a
+      # certbot-dns-cloudflare dependency) auto-detects any environment
+      # variable literally named CLOUDFLARE_API_KEY as a legacy Global-API-Key
+      # credential, which collides with the scoped token in cloudflare.ini and
+      # fails every issuance with "confused info - both key and token
+      # defined" -- discovered 2026-08-31. .env keeps the name
+      # CLOUDFLARE_API_KEY; only this container sees it under a different one.
+      - LAGEN_CLOUDFLARE_TOKEN=${CLOUDFLARE_API_KEY:?set CLOUDFLARE_API_KEY in .env}
     volumes:
       - /mnt/data/lagen/letsencrypt:/etc/letsencrypt        # certbot's own state: account + live/archive certs
       - certbot-webroot:/var/www/certbot                    # shared ACME http-01 webroot with nginx
@@ -296,10 +308,16 @@ services:
       # data_root, served as static files by the ferenda.lagen.nu vhost's
       # /dumps/ block (multi-GB files nginx should stream, not uvicorn)
       - /mnt/forstor/ferenda/dumps:/usr/share/nginx/dumps:ro
+      # the subdomain landing pages (generated/_sub/) and the host->slug map
+      # ferenda/subdomains.py writes (PRD-subdomains.md); not yet implemented,
+      # so today this is an empty placeholder map and an empty _sub/ tree --
+      # every subdomain answers the apex redirect in subdomains.conf.
+      - /mnt/forstor/ferenda/generated:/usr/share/nginx/generated:ro
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates/
       - certbot-webroot:/var/www/certbot                    # serves ACME http-01 challenges for certbot
       - /home/staffan/wds/ferenda/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - /home/staffan/wds/ferenda/docker/nginx/ferenda.lagen.nu.conf:/etc/nginx/conf.d/ferenda.lagen.nu.conf:ro
+      - /home/staffan/wds/ferenda/docker/nginx/subdomains.conf:/etc/nginx/conf.d/subdomains.conf:ro
     depends_on:
       - ferenda-legacy
       - mediawiki
