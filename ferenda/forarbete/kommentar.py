@@ -107,6 +107,24 @@ SUBJECT_RES = {
 }
 
 
+# The EU-note Swedish drafting puts as a footnote on the lagförslag itself:
+# "Jfr Europaparlamentets och rådets direktiv 2012/18/EU av den 4 juli 2012 om
+# åtgärder ... i den ursprungliga lydelsen." It names the directive the proposed
+# law transposes, in a formal citation the reference parser reads, and it says
+# so at document level -- which is what a prop that never writes "Paragrafen
+# genomför artikel N" (prop. 2014/15:60, the Seveso III bill) otherwise never
+# states in any machine-readable form. Measured over 1,200 random prop/fm
+# artifacts: 14 carry one, 11 of them have no författningskommentar statement at
+# all, and where a document-level default already existed the note corrects it
+# in 6 of 14 (prop. 2008/09:147's default was IPPC, the note says the emissions-
+# trading directive the bill actually transposes).
+EU_FOOTNOTE_RE = re.compile(r"^\s*Jfr\b", re.IGNORECASE)
+
+# the footnote is a full formal citation, not a sentence, and it lands in
+# `links.text` as the edge's display text
+FOOTNOTE_TEXT_CAP = 200
+
+
 def plain(runs):
     return "".join(r if isinstance(r, str) else r.get("text", "") for r in runs)
 
@@ -162,7 +180,37 @@ def _sentence_start(text, pos):
     return ends[-1] if ends else 0
 
 
-def resolve_directives(blocks, parser, typ):
+def eu_footnote(blocks, parser):
+    """``(directive uri, footnote text, page)`` for the lagförslag's EU-note
+    (`EU_FOOTNOTE_RE`), or None. The first such footnote wins: a proposition
+    repeats it verbatim in its lagrådsremiss annex, and the one on the bill's
+    own lagtext is the statement about *this* enactment.
+
+    The note's subject is the act it cites *first*, and only a directive can be
+    transposed. A note whose subject is a förordning names a directive further
+    along -- prop. 2010/11:44's reads "Jfr Europaparlamentets och rådets
+    förordning (EG) nr 1394/2007 ... och om ändring av direktiv 2001/83/EG" --
+    and taking that one would have the bill transposing an act it only adapts
+    Swedish law to. Rejected rather than resolved to the next candidate: the
+    directive it would pick also becomes the document's default for every bare
+    "direktivet" in the författningskommentar."""
+    for b in blocks:
+        if b.get("type") != "fotnot":
+            continue
+        text = " ".join(plain(b["text"]).split())
+        if not EU_FOOTNOTE_RE.match(text):
+            continue
+        subject = next((r.uri.partition("#")[0]
+                        for r in parser.parse_text(text, context={})), None)
+        if subject and is_directive(subject):
+            return subject, text[:FOOTNOTE_TEXT_CAP], b.get("page")
+    return None
+
+
+_UNREAD = object()      # "the caller has not looked", where None means "looked, found none"
+
+
+def resolve_directives(blocks, parser, typ, note=_UNREAD):
     """Map each directive alias used in the document (a proposition or
     förordningsmotiv) to a CELEX uri, plus a 'default' for a bare "direktivet".
     A defining sentence is one ending in
@@ -211,7 +259,14 @@ def resolve_directives(blocks, parser, typ):
             uri = _first_directive(parser, text[m.start():m.end() + 200])
             if uri:
                 subjects.append(uri)
-    default = (max(set(subjects), key=subjects.count) if subjects else
+    # the lagförslag's own EU-note beats both: it is the drafter's statement of
+    # what this enactment transposes, where the subject sentence is a phrasing
+    # guess and the alias count is a popularity contest a repealed predecessor
+    # can win
+    if note is _UNREAD:
+        note = eu_footnote(blocks, parser)
+    default = (note[0] if isinstance(note, tuple) else
+               max(set(subjects), key=subjects.count) if subjects else
                max(set(aliases.values()), key=list(aliases.values()).count)
                if aliases else None)
     if default:
@@ -396,13 +451,24 @@ def extract(art):
     if typ not in {"prop", "fm"}:
         return []
     blocks = flatten(art["structure"])      # document-order flat view of the tree
+    parser = _refparser()
+    # the document-level relation first, from the lagförslag's EU-note: no
+    # paragraf, so `genomforande.resolve` pins nothing on it, but it is a true
+    # statement about the enactment and it carries the document's genomför-edge
+    # into `links` -- the one signal that says this proposition transposes this
+    # directive at all
+    out = []
+    if (note := eu_footnote(blocks, parser)):
+        uri, sentence, page = note
+        out.append({"predicate": "rpubl:genomforDirektiv", "directive": uri,
+                    "articles": [], "pinpoints": [], "uris": [uri],
+                    "partial": False, "law": None, "chapter": None,
+                    "paragraf": None, "sentence": sentence, "page": page})
     span = find_kommentar(blocks) if typ == "fm" else fk_span(blocks)
     if span is None:                      # no författningskommentar (most types)
-        return []
-    parser = _refparser()
-    aliases = resolve_directives(blocks, parser, typ)
+        return out
+    aliases = resolve_directives(blocks, parser, typ, note)
     implements_re = IMPLEMENTS_RES[typ]
-    out = []
     chapter = paragraf = None
     law = fm_law(blocks) if typ == "fm" else None   # fm names its förordning up top
     for i in range(*span):

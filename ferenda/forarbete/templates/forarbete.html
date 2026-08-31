@@ -7,7 +7,7 @@
 {%- if implements -%}
 <section class="genomforande"><h2>Genomför EU-direktiv</h2><ul>
 {%- for it in implements -%}
-<li>{{ it.where }}genomför{% if it.partial %} delvis{% endif %} artikel {{ it.ref }} i {{ it.link }}</li>
+<li>{{ it.where }}genomför{% if it.partial %} delvis{% endif %}{% if it.ref %} artikel {{ it.ref }} i{% endif %} {{ it.link }}</li>
 {%- endfor -%}
 </ul></section>
 {%- endif -%}

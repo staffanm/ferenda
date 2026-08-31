@@ -410,3 +410,85 @@ def test_extract_survives_in_fk_chapter_pseudo_rubrik():
     [rec] = extract(art)
     assert rec["pinpoints"] == ["37.13"]
     assert rec["paragraf"] == "32"
+
+
+def _jfr_footnote(celex="2012/18/EU"):
+    return {"type": "fotnot", "page": 9, "text": [
+        "Jfr Europaparlamentets och rådets direktiv %s av den 4 juli 2012 om "
+        "åtgärder för att förebygga och begränsa faran för allvarliga "
+        "olyckshändelser där farliga ämnen ingår, i den ursprungliga "
+        "lydelsen." % celex]}
+
+
+def test_eu_footnote_is_the_document_level_implements_statement():
+    # prop. 2014/15:60 (Seveso III) never writes "Paragrafen genomför artikel N"
+    # anywhere, so the footnote on its lagtext is the only machine-readable
+    # statement that the bill transposes the directive at all.
+    prop = {"uri": "https://lagen.nu/prop/2014/15:60", "doctype": "prop",
+            "structure": [
+                _jfr_footnote(),
+                {"type": "rubrik", "level": 1, "text": ["13 Författningskommentar"]},
+                {"type": "rubrik", "level": 2,
+                 "text": ["13.2 Förslaget till lag om ändring i lagen (1999:381) "
+                          "om åtgärder"]},
+                {"type": "paragraf", "num": "3", "text": ["3 §"]},
+                {"type": "stycke", "text": [
+                    "I andra stycket har ordet förväntade ersatt ordet möjliga."]}]}
+    recs = extract(prop)
+    assert len(recs) == 1
+    rec = recs[0]
+    assert rec["directive"] == CELEX + "32012L0018"
+    assert rec["uris"] == [CELEX + "32012L0018"]    # the act, no article fragment
+    assert rec["paragraf"] is None                  # document-level: pins nothing
+    assert rec["articles"] == [] and rec["pinpoints"] == []
+    assert rec["sentence"].startswith("Jfr Europaparlamentets")
+
+
+def test_eu_footnote_survives_a_missing_forfattningskommentar():
+    prop = {"uri": "https://lagen.nu/prop/2014/15:60", "doctype": "prop",
+            "structure": [_jfr_footnote(),
+                          {"type": "stycke", "text": ["Ingen kommentar här."]}]}
+    assert len(extract(prop)) == 1
+
+
+def test_eu_footnote_beats_the_alias_count_for_the_default_directive():
+    # the bill transposes 2012/18/EU; SEA-direktivet is merely discussed, and
+    # won the count fallback (prop. 2014/15:60 resolved its default to it)
+    blocks = flatten(nest([
+        _jfr_footnote(),
+        {"type": "stycke", "text": [
+            "Europaparlamentets och rådets direktiv 2001/42/EG om bedömning av "
+            "vissa planers och programs miljöpåverkan (SEA-direktivet) berörs."]},
+        {"type": "stycke", "text": ["SEA-direktivet nämns återkommande."]}]))
+    aliases = resolve_directives(
+        blocks, sfs_parser("forarbete", PARSE_TYPES), "prop")
+    assert aliases["sea-direktivet"] == CELEX + "32001L0042"
+    assert aliases["default"] == CELEX + "32012L0018"
+
+
+def test_a_footnote_naming_no_directive_yields_no_record():
+    prop = {"uri": "https://lagen.nu/prop/2014/15:60", "doctype": "prop",
+            "structure": [
+                {"type": "fotnot", "page": 9,
+                 "text": ["Jfr rådets förordning (EG) nr 1234/2007."]},
+                {"type": "stycke", "text": ["Ingen kommentar här."]}]}
+    assert extract(prop) == []
+
+
+def test_a_footnote_whose_subject_is_a_forordning_yields_nothing():
+    """prop. 2010/11:44's note reads "Jfr … förordning (EG) nr 1394/2007 …
+    och om ändring av direktiv 2001/83/EG": the bill adapts Swedish law to a
+    regulation and transposes nothing. Taking the directive further along
+    would both mint a false genomför edge and make 2001/83/EG the document's
+    default for every bare "direktivet"."""
+    prop = {"uri": "https://lagen.nu/prop/2010/11:44", "doctype": "prop",
+            "structure": [
+                {"type": "fotnot", "page": 5, "text": [
+                    "Jfr Europaparlamentets och rådets förordning (EG) nr "
+                    "1394/2007 av den 13 november 2007 om läkemedel för "
+                    "avancerad terapi och om ändring av direktiv 2001/83/EG."]},
+                {"type": "rubrik", "level": 1, "text": ["13 Författningskommentar"]},
+                {"type": "rubrik", "level": 2,
+                 "text": ["13.1 Förslaget till lag om ändring i läkemedelslagen"]},
+                {"type": "stycke", "text": ["Ingen genomförandemening."]}]}
+    assert extract(prop) == []
