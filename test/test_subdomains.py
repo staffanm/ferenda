@@ -1,6 +1,7 @@
 """Tests for the definite-form subdomain generation (PRD-subdomains.md)."""
 
 import json
+import os
 
 import pytest
 
@@ -46,10 +47,12 @@ def test_write_sub_tree_symlinks_a_br_only_page_and_keeps_the_suffix(tmp_path):
     avtals_link = tmp_path / "_sub" / "avtals.lagen.nu" / "index.html.br"
     assert avtals_link.is_symlink()
     assert avtals_link.resolve() == (tmp_path / "1915:218.html.br").resolve()
+    assert not os.path.isabs(os.readlink(avtals_link))
 
     dataskydds_link = tmp_path / "_sub" / "dataskydds.forordningen.nu" / "index.html.br"
     assert dataskydds_link.is_symlink()
     assert dataskydds_link.resolve() == (tmp_path / "eurlex" / "32016R0679.html.br").resolve()
+    assert not os.path.isabs(os.readlink(dataskydds_link))
 
     map_text = (tmp_path / "subdomains.map").read_text(encoding="utf-8")
     assert "avtals.lagen.nu avtals.lagen.nu;" in map_text
@@ -145,3 +148,29 @@ def test_write_sub_tree_rejects_a_whole_act_and_standalone_name_collision(tmp_pa
 
     with pytest.raises(ValueError, match="avtals.lagen.nu"):
         write_sub_tree(tmp_path / "generated")
+
+
+def test_write_sub_tree_symlink_resolves_under_a_different_mount_prefix(tmp_path):
+    # ferenda/subdomains.py runs inside the `ferenda` container, which mounts
+    # the data root at /app/site/data; nginx mounts the SAME host directory
+    # at /usr/share/nginx/generated. An absolute symlink target resolves for
+    # whichever container wrote it and is a dangling link for the other one
+    # reading it over its own bind mount of the identical directory -- found
+    # running this for real on prod (nis2.direktivet.nu 301ed to the apex
+    # because nginx's symlink pointed at a path that only existed inside the
+    # ferenda container).
+    real_root = tmp_path / "real"
+    (real_root / "eurlex").mkdir(parents=True)
+    (real_root / "eurlex" / "32022L2555.html.br").write_bytes(b"brotli bytes")
+
+    write_sub_tree(real_root, rows={"nis2.direktivet.nu": "/celex/32022L2555"})
+
+    link = real_root / "_sub" / "nis2.direktivet.nu" / "index.html.br"
+    assert not os.path.isabs(os.readlink(link))
+
+    # a second, differently-rooted view of the identical directory -- the
+    # nginx container's own mount of the same host path
+    other_mount = tmp_path / "other-mount-prefix"
+    other_mount.symlink_to(real_root)
+    other_view_link = other_mount / "_sub" / "nis2.direktivet.nu" / "index.html.br"
+    assert other_view_link.read_bytes() == b"brotli bytes"

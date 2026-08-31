@@ -12,6 +12,7 @@ implemented yet.
 """
 
 import json
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -129,6 +130,13 @@ def write_sub_tree(generated_root, rows=None):
     than decompressing: nginx serves the `.br` sibling directly, stamping
     its own `Content-Encoding` (`docker/nginx/subdomains.conf`).
 
+    The symlink target is relative (`os.path.relpath`), not the absolute path
+    `compress.resolve` returns: this writer runs inside the `ferenda`
+    container, which mounts the data root at `/app/site/data`, while nginx
+    mounts the same host directory at `/usr/share/nginx/generated` -- an
+    absolute target resolves for whichever container wrote it and is a
+    dangling link for every other one reading it over the same bind mount.
+
     The on-disk directory name is the ascii-folded *host* (label and zone),
     not just the label -- two different zones sharing a label
     ("dataskyddslagen" and "Dataskyddsförordningen" both fold to
@@ -174,7 +182,7 @@ def write_sub_tree(generated_root, rows=None):
         link = link_dir / f"index.html{suffix}"
         if link.is_symlink() or link.exists():
             link.unlink()
-        link.symlink_to(source)
+        link.symlink_to(os.path.relpath(source, link.parent))
         served[host] = target
 
         zones = {zone, _ZONE_TWINS.get(zone, zone)}
