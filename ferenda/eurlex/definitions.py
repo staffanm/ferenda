@@ -26,12 +26,14 @@ bulk of modern acts). Definitions stated inline in running prose ("'X' means
 
 import re
 
+from ..lib.begrepp import TERM_PRED
 from ..lib.eu_structure import Anchors
 from ..lib.lagrum import Ref
 
-# the relation a use-of-a-defined-term run carries; internal to the act, so the
-# catalog's self-citation filter keeps these out of inbound panels
-TERM_PRED = "dcterms:references"
+# The matcher over an act's own defined terms -- `build_matcher`, its suffix
+# table and `TERM_PRED`, the relation a use-of-a-defined-term run carries --
+# moved to lib.begrepp when SFS became the second source to interlink its own
+# definitions. This module keeps the extraction, which is EU-act shaped.
 
 # per-language cues for the dedicated definitions article: words that appear in
 # its title, and phrases that frame its intro paragraph. Unknown language falls
@@ -49,11 +51,6 @@ DEFN_VOCAB = {
 # inflectional endings tolerated on the final word of a term occurrence, so a
 # defined noun matches its inflected uses (longest first when building the
 # pattern, so the fullest surface form is captured)
-SUFFIXES = {
-    "swe": ("ernas", "arnas", "ornas", "erna", "arna", "orna", "ens", "ets",
-            "er", "ar", "or", "en", "et", "na", "ns", "s"),
-    "eng": ("es", "s"),
-}
 
 _COLON = re.compile(r"\s*:\s*")
 _TERM_MAX = 80   # a definition's lead term is short; a long head means the colon
@@ -156,28 +153,6 @@ def extract_definitions(body, lang):
                 continue
         i += 1
     return terms
-
-
-def _term_regex(term, suffixes):
-    """A pattern matching `term` (whitespace-flexible) with an optional
-    inflectional ending on its final word."""
-    body = r"\s+".join(re.escape(tok) for tok in term.split())
-    return r"%s(?:%s)?" % (body, "|".join(suffixes))
-
-
-def build_matcher(terms, lang):
-    """Compile a single combined matcher for all defined `terms` and a
-    group-name -> anchor index. Terms are tried longest-first so a phrase wins
-    over a term nested inside it. Returns (None, {}) when there are no terms."""
-    if not terms:
-        return None, {}
-    suffixes = SUFFIXES.get(lang, SUFFIXES["eng"])
-    parts, index = [], {}
-    for i, term in enumerate(sorted(terms, key=len, reverse=True)):
-        group = "t%d" % i
-        parts.append("(?P<%s>%s)" % (group, _term_regex(term, suffixes)))
-        index[group] = terms[term]
-    return re.compile(r"\b(?:%s)\b" % "|".join(parts), re.IGNORECASE), index
 
 
 def term_refs(text, matcher, index, doc_uri, self_anchor):

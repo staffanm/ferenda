@@ -120,6 +120,13 @@
 
   function fragLabel(el) {
     var n = el.querySelector('.paragraf-gutter .n, h2, h3, h4');
+    // a stycke has no heading of its own; its paragraf's number names it
+    // ("5 §"), where the raw fragment id ("K1P5S1") names nothing a reader
+    // knows
+    if (!n) {
+      var par = el.closest('.paragraf');
+      n = par && par.querySelector('.paragraf-gutter .n');
+    }
     if (n) return n.textContent.trim();
     // a target with no heading of its own (an övergångsbestämmelse section)
     // is named by its enclosing ändring block's heading ("Ändring, SFS
@@ -134,6 +141,14 @@
   // stripped, ids dropped so the clone can never shadow the page's own anchors
   function excerpt(el) {
     var c = el.cloneNode(true);
+    // a row lifted out of its table renders as loose cell text; an SFS
+    // definition row is anchored on its own (sfs.nf mints an id for the row
+    // that defines a term), so give it a table to live in
+    if (c.tagName === 'TR') {
+      var table = el.ownerDocument.createElement('table');
+      table.appendChild(c);
+      c = table;
+    }
     var junk = c.querySelectorAll('.pilcrow');
     for (var i = 0; i < junk.length; i++) junk[i].remove();
     var ids = c.querySelectorAll('[id]');

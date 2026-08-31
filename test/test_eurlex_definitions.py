@@ -2,10 +2,11 @@
 
 from xml.etree import ElementTree as ET
 
-from ferenda.eurlex.definitions import (_term_of, build_matcher,
+from ferenda.eurlex.definitions import (_term_of,
                                              extract_definitions, term_refs)
 from ferenda.eurlex.model import Block
 from ferenda.eurlex.parse import parse_formex, to_artifact
+from ferenda.lib.begrepp import build_matcher
 from ferenda.lib.eu_structure import flatten
 
 

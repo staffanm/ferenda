@@ -2176,10 +2176,14 @@ def _render_rad(node, site, doc_uri, image_column):
     # a pending/expiring row variant carries the temporal marker itself
     # (a 2007:90 road-sign row amended with deferred entry into force);
     # printed as a marker row above, spanning the full width
+    # a definition row carries an id (sfs.nf mints one for the row that defines
+    # a term, so a term link can anchor the definition rather than the sentence
+    # announcing the list); no pilcrow -- it is a target, not a citable unit
     return NODES.rad(_temporal_notice(node),
                      len(node.get("cells", [])) + (1 if grafik_cell else 0),
                      grafik_cell, cells,
-                     "th" if node.get("th") else "td")
+                     "th" if node.get("th") else "td",
+                     node.get("id"))
 
 
 def _render_cell(runs, site, row, i):

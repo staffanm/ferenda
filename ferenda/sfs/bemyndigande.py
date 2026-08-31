@@ -68,10 +68,18 @@ RE_TITLE_EMBED = re.compile(
 
 
 def _links(node):
-    """The reference runs of one node's text, as (uri, text)."""
+    """The *citation* runs of one node's text, as (uri, text).
+
+    A use of a term the act defines carries the same predicate and points into
+    this very document (`sfs.nf.interlink_definitions`), so without the `kind`
+    test it reads as a provision the delegation covers: "den ideella föreningen
+    Svenskt Friluftsliv" put `#P3S4` into 2010:2008's provisions list off the
+    word *Friluftsliv*, and `catalog._sfs_authority_links` anchors the whole
+    bemyndigande edge on that. 12 of 500 artifacts with an edge were affected."""
     return [(run["uri"], run.get("text") or "")
             for run in node.get("text") or []
             if isinstance(run, dict) and run.get("uri")
+            and run.get("kind") != "term"
             and run.get("predicate", "").endswith("references")]
 
 
@@ -82,7 +90,8 @@ def _kompletterar_links(node):
     out, preceding = [], ""
     for run in node.get("text") or []:
         if isinstance(run, dict):
-            if (run.get("uri") and run.get("predicate", "").endswith("references")
+            if (run.get("uri") and run.get("kind") != "term"
+                    and run.get("predicate", "").endswith("references")
                     and not RE_TITLE_EMBED.search(preceding)):
                 out.append(run["uri"])
             preceding = ""

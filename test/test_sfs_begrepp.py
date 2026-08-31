@@ -3,7 +3,13 @@ find_definitions heuristics, exercised through the SFS rule set. Unit tests
 over the five definition cases plus mode detection and URI minting; no
 corpus needed."""
 
+import json
+from datetime import datetime
+
+from ferenda.lib.begrepp import build_matcher
 from ferenda.lib.markdown import begrepp_uri
+from ferenda.sfs import nf
+from ferenda.sfs.model import Tabell, Tabellrad
 from ferenda.sfs.nf import BEGREPP_RULES as b
 
 
@@ -232,3 +238,127 @@ def test_a_letterless_term_is_a_designation_not_a_concept():
                            "listelement") == []
     assert b.defined_terms("Förskingring", "normal", "tabellrad") == \
         ["Förskingring"]
+
+
+# --------------------------------------------------------------------------
+# in-act interlinking: a use of a defined term links to its definition
+# --------------------------------------------------------------------------
+
+DOC = "https://lagen.nu/2021:1172"
+
+
+def _structure():
+    """1 kap. 5 § defines the term in a table row (how SFS sets a term list);
+    3 kap. 1 § uses it, inflected, in running text."""
+    return [
+        {"type": "kapitel", "id": "K1", "children": [
+            {"type": "paragraf", "id": "K1P5", "children": [
+                {"type": "stycke", "id": "K1P5S1", "children": [
+                    {"type": "tabell", "children": [
+                        {"type": "rad", "cells": [
+                            [{"predicate": "dcterms:subject", "kind": "term",
+                              "text": "Uppgiftssamling",
+                              "uri": "https://lagen.nu/begrepp/Uppgiftssamling"}],
+                            ["en samling personuppgifter"]]}]}]}]}]},
+        {"type": "kapitel", "id": "K3", "children": [
+            {"type": "paragraf", "id": "K3P1", "children": [
+                {"type": "stycke", "id": "K3P1S1", "text": [
+                    "Personuppgifter får behandlas i uppgiftssamlingar om det "
+                    "behövs, se ", {"predicate": "dcterms:references",
+                                    "uri": "https://lagen.nu/2021:1172#K2",
+                                    "text": "2 kap."}, " om uppgiftssamlingen."]}]}]},
+    ]
+
+
+def test_a_later_use_of_a_defined_term_links_to_its_definition():
+    """What eurlex has always done and SFS did not: 3 kap. 1 § said
+    "uppgiftssamlingar" in plain text though 1 kap. 5 § defines it (Staffan,
+    2026-08-30). The match is suffix-tolerant, so the plural links too."""
+    structure = _structure()
+    nf.interlink_definitions(structure, DOC)
+    runs = structure[1]["children"][0]["children"][0]["text"]
+    terms = [r for r in runs if isinstance(r, dict)
+             and r.get("kind") == "term"]
+    assert [(t["text"], t["uri"]) for t in terms] == [
+        ("uppgiftssamlingar", DOC + "#K1P5S1"),
+        ("uppgiftssamlingen", DOC + "#K1P5S1")]
+    # the citation in the same stycke is untouched -- a use inside a link run
+    # is never rewritten
+    assert any(isinstance(r, dict) and r["text"] == "2 kap." for r in runs)
+
+
+def test_the_definitions_own_row_keeps_its_concept_link():
+    """The defining span already links to the concept page; the pass must not
+    overwrite it, and must not link the term to the line it is written on."""
+    structure = _structure()
+    nf.interlink_definitions(structure, DOC)
+    cell = structure[0]["children"][0]["children"][0]["children"][0][
+        "children"][0]["cells"][0]
+    assert cell == [{"predicate": "dcterms:subject", "kind": "term",
+                     "text": "Uppgiftssamling",
+                     "uri": "https://lagen.nu/begrepp/Uppgiftssamling"}]
+
+
+def test_an_act_that_defines_nothing_is_left_alone():
+    structure = [{"type": "stycke", "id": "P1S1",
+                  "text": ["En uppgiftssamling utan definition."]}]
+    before = json.loads(json.dumps(structure))
+    nf.interlink_definitions(structure, DOC)
+    assert structure == before
+
+
+def test_headings_are_not_marked():
+    structure = _structure()
+    structure[1]["children"].insert(
+        0, {"type": "rubrik", "text": ["Om uppgiftssamlingar"]})
+    nf.interlink_definitions(structure, DOC)
+    assert structure[1]["children"][0]["text"] == ["Om uppgiftssamlingar"]
+
+
+def test_a_definition_row_gets_its_own_anchor():
+    """SFS sets a term list as one stycke plus a table, and the rows carried no
+    ids -- so a term link could only anchor "I denna lag används följande ord
+    och uttryck", which says nothing about the term (Staffan, 2026-08-30).
+    A row that defines a term now mints one, T for tabellrad. An ordinary row
+    stays anchorless."""
+    proj = nf.Projection(minter=nf.IdMinter(continuous=False,
+                                            now=datetime(2026, 1, 1)),
+                         refparser=None, basefile="2021:1172", roadsigns=False)
+    tabell = Tabell(rows=[
+        Tabellrad(cells=["Uppgiftssamling", "En samling personuppgifter."]),
+        Tabellrad(cells=["Mottagare", "Den som tar emot personuppgifter."])])
+    node = nf.tabell_nf(tabell, proj, "K1P5S1", mode="normal",
+                        pairs=(("K", "1"), ("P", "5"), ("S", "1")))
+    assert [r.get("id") for r in node["children"]] == ["K1P5S1T1", "K1P5S1T2"]
+
+
+def test_a_row_that_defines_nothing_stays_anchorless():
+    proj = nf.Projection(minter=nf.IdMinter(continuous=False,
+                                            now=datetime(2026, 1, 1)),
+                         refparser=None, basefile="2021:1172", roadsigns=False)
+    tabell = Tabell(rows=[Tabellrad(cells=["Kolumn", "Värde"])])
+    node = nf.tabell_nf(tabell, proj, "K1P5S1", mode=None,
+                        pairs=(("K", "1"), ("P", "5"), ("S", "1")))
+    assert node["children"][0].get("id") is None
+
+
+def test_a_closed_class_word_is_never_a_term():
+    """1985:1101's definition list mangled into a term "den", and marking its
+    uses put 30 links on "träder i kraft *den* 1 juli 1986". Eight such words
+    hold 33 definitions rows over 32 documents, every one an extraction slip."""
+    for word in ("den", "det", "de", "som", "och"):
+        assert b.defined_terms(word, "normal", "tabellrad") == []
+
+
+def test_a_term_whose_uses_read_as_an_ordinary_word_is_not_marked():
+    """Mervärdesskattelagen defines "vara" (goods). The definition stands --
+    it is a real legaldefinition and keeps its concept link -- but every
+    infinitive of *att vara* reads the same, 112 of them in one sampled act,
+    so later uses are left unmarked."""
+    matcher, _index = build_matcher({"vara": "K1P1S1"}, "swe")
+    assert matcher is None
+    matcher, index = build_matcher({"vara": "K1P1S1",
+                                    "uppgiftssamling": "K1P5S1T3"}, "swe")
+    hits = [m.group() for m in matcher.finditer(
+        "en uppgiftssamling ska vara sådan att den kan vara läsbar")]
+    assert hits == ["uppgiftssamling"]

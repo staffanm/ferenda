@@ -123,7 +123,35 @@ NOT_A_CONCEPT = frozenset({
     # ... (allmän dataskyddsförordning)", and a concept page collecting them
     # lists 170 acts saying nothing about a concept
     "allmän dataskyddsförordning",
+    # closed-class words a definition heuristic picks up off a mangled list or
+    # a stray colon -- an act does not define "och". These eight hold 33
+    # `definitions` rows over 32 documents, every one an extraction slip, and
+    # each costs one false link per occurrence once the uses are marked
+    # (`mark_term_uses`): 1985:1101's "den" alone marked 30 spans, "träder i
+    # kraft *den* 1 juli 1986" among them
+    "den", "det", "de", "denna", "detta", "en", "som", "och",
 })
+
+# Terms that ARE definitions but whose *uses* cannot be told apart from an
+# ordinary word: mervärdesskattelagen defines "vara" (goods), and every
+# infinitive of *att vara* reads the same -- 112 spans in one sampled act,
+# all of them wrong. The definition stands and its own span keeps its concept
+# link; only the marking of later uses is withheld, because no test available
+# here separates the two senses (a part-of-speech tagger would).
+AMBIGUOUS_USE = frozenset({"vara"})
+
+
+def _markable(term):
+    """Whether a defined term's *later uses* can be marked safely.
+
+    Two shapes cannot. A word in `AMBIGUOUS_USE` carries a second, ordinary
+    meaning. And an abbreviation set in capitals is the same case one letter at
+    a time: mervärdesskattelagen (2023:200) defines "EU", and marking its uses
+    put 382 links in that one act -- on the union's name in every act name,
+    every EU-institution mention, every directive number's tail. The definition
+    itself stands either way; only the marking of later uses is withheld."""
+    return (term.lower() not in AMBIGUOUS_USE
+            and not (len(term) <= 4 and term.isupper()))
 
 # --- helpers for term extraction ---
 re_sfsid = re.compile(r'\((\d{4}:\d+)\)').search          # old re_SearchSfsId
@@ -326,3 +354,98 @@ def _paren_term(text, m):
         return paren
     head = text[:m.start()].strip().split()
     return ("%s %s" % (head[-1], paren)) if head else None
+
+
+# --------------------------------------------------------------------------
+# using a defined term elsewhere in the same act
+# --------------------------------------------------------------------------
+#
+# An act that defines a term goes on using it, and the reader who meets
+# "uppgiftssamlingar" in 3 kap. 1 § lagen (2021:1172) om behandling av
+# personuppgifter vid Försvarets radioanstalt has to remember that 1 kap. 5 §
+# said what one is. Marking every later use as a link into the defining
+# provision hands the definition to the popover instead (Staffan, 2026-08-30:
+# "sfs does not yet, cf. its non-markup of uppgiftssamling").
+#
+# eurlex has done this since its parse was written; these two functions are
+# that code, moved here when SFS became the second source to want it
+# (rule:second-use-goes-to-lib).
+
+# an inflectional ending a Swedish term picks up where it is *used* --
+# "uppgiftssamling" -> "uppgiftssamlingar", "incident" -> "incidenten". Longest
+# first, so the regex alternation prefers the longest ending that fits.
+SUFFIXES = {
+    "swe": ("ernas", "arnas", "ornas", "erna", "arna", "orna", "ens", "ets",
+            "er", "ar", "or", "en", "et", "na", "ns", "s"),
+    "eng": ("es", "s"),
+}
+
+# a use links to the definition with the same predicate an ordinary citation
+# uses; `kind="term"` is what tells the renderer to draw it as a term link
+TERM_PRED = "dcterms:references"
+
+
+def _term_regex(term, suffixes):
+    """One term as a regex: its words separated by any whitespace, with an
+    optional inflectional ending on its final word.
+
+    `\b` alone does not end a Swedish compound: it let "EU" match the first
+    half of "EU-land" (269 of 3,597 links in a 400-artifact sample) and the
+    tail of a directive number the citation parser had not claimed
+    ("direktiv 2010/66/EU"). A use is a whole word: no word character, hyphen
+    or slash on either side of it."""
+    body = r"\s+".join(re.escape(tok) for tok in term.split())
+    return r"(?<![\w/-])%s(?:%s)?(?![\w-])" % (body, "|".join(suffixes))
+
+
+def build_matcher(terms, lang):
+    """Compile a single combined matcher for all defined `terms` and a
+    group-name -> anchor index. Terms are tried longest-first so a phrase wins
+    over a term nested inside it, and a term whose uses cannot be told from
+    ordinary text (`_markable`) is left out. Returns (None, {}) when nothing
+    is left to match."""
+    terms = {t: a for t, a in terms.items() if _markable(t)}
+    if not terms:
+        return None, {}
+    suffixes = SUFFIXES[lang]
+    parts, index = [], {}
+    for i, term in enumerate(sorted(terms, key=len, reverse=True)):
+        group = "t%d" % i
+        parts.append("(?P<%s>%s)" % (group, _term_regex(term, suffixes)))
+        index[group] = terms[term]
+    return re.compile(r"\b(?:%s)\b" % "|".join(parts), re.IGNORECASE), index
+
+
+def mark_term_uses(runs, matcher, index, doc_uri, self_anchor=None):
+    """One node's inline-run list with every use of a defined term linked to
+    the provision defining it.
+
+    Only *plain* runs are scanned: a use inside an existing link run is left
+    alone, which is the same rule eurlex applies with `yield_overlaps` -- a
+    citation is the stronger, cross-document link, and the defining occurrence
+    is already a `dcterms:subject` link to the concept page. A term whose
+    definition sits in this very node links nowhere (`self_anchor`): SFS gathers
+    a whole term list in one stycke, so every sibling definition would otherwise
+    link to the line it is written on. Returns `runs` itself when nothing
+    matched, so an unchanged artifact stays byte-identical."""
+    if not matcher:
+        return runs
+    out, hit = [], False
+    for run in runs:
+        if not isinstance(run, str):
+            out.append(run)
+            continue
+        pos = 0
+        for m in matcher.finditer(run):
+            anchor = index[m.lastgroup]
+            if anchor == self_anchor:
+                continue
+            if m.start() > pos:
+                out.append(run[pos:m.start()])
+            out.append({"predicate": TERM_PRED,
+                        "uri": "%s#%s" % (doc_uri, anchor),
+                        "text": m.group(), "kind": "term"})
+            pos, hit = m.end(), True
+        if pos < len(run):
+            out.append(run[pos:])
+    return out if hit else runs

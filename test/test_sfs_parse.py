@@ -295,8 +295,13 @@ def norm_uri(uri):
 
 
 def collect_runs(runs, out):
+    """The citation runs of one inline list. A `kind="term"` run is an in-act
+    use of a term the act defines (nf.interlink_definitions), not a citation
+    the old reference projection ever emitted -- it carries the same predicate
+    but belongs to the definition machinery, and has its own tests."""
     for run in runs if isinstance(runs, list) else []:
-        if isinstance(run, dict) and run["predicate"] == "dcterms:references":
+        if (isinstance(run, dict) and run["predicate"] == "dcterms:references"
+                and run.get("kind") != "term"):
             out.append((run["text"], norm_uri(run["uri"])))
 
 

@@ -102,6 +102,7 @@ def to_normalform(doc, basefile, now=None, refparser=None,
                 if register is not None and sfst_header is not None
                 else {"uri": None, "properties": {}, "secondary": {}})
     uri = register_mod.amendment_uri(basefile, BASE)
+    interlink_definitions(structure, uri.split("#", 1)[0])
     return {
         "uri": uri,
         "metadata": metadata,
@@ -115,6 +116,74 @@ def to_normalform(doc, basefile, now=None, refparser=None,
     }
 
 
+# the node types the term-use pass leaves alone: a heading is navigation, an
+# upphavd placeholder is our own editorial note. Same exclusion the reference
+# projection applies (`inline_references`)
+NO_TERM_USES = frozenset({"rubrik", "upphavd"})
+
+
+def _defined_terms(nodes, terms, frag=""):
+    """{term: the fragment defining it} over a built structure, read off the
+    ``dcterms:subject`` runs the definition pass already minted."""
+    for node in nodes:
+        eff = node.get("id") or frag
+        for runs in _term_run_lists(node):
+            for run in runs:
+                if (isinstance(run, dict) and run.get("kind") == "term"
+                        and run["predicate"] == "dcterms:subject"):
+                    terms.setdefault(run["text"], eff)
+        _defined_terms(node.get("children") or [], terms, eff)
+    return terms
+
+
+def _term_run_lists(node):
+    """The inline-run lists a node holds: its own text, and a table row's
+    cells."""
+    if node["type"] in NO_TERM_USES:
+        return []
+    return ([node["text"]] if node.get("text") else []) + list(
+        node.get("cells") or [])
+
+
+def interlink_definitions(structure, doc_uri):
+    """Link every later use of a term this act defines to the provision that
+    defines it -- what eurlex has always done for EU acts, and what SFS did
+    not: "uppgiftssamlingar" in 3 kap. 1 § lagen (2021:1172) about behandling
+    av personuppgifter vid Försvarets radioanstalt was plain text, though
+    1 kap. 5 § says what one is (Staffan, 2026-08-30).
+
+    Measured over 400 random SFS artifacts: 6,786 links in 86 documents.
+    Density stays under what the EU pages already carry -- NIS2 marks one term
+    link per 40 words, skollagen (the sample's heaviest, 4,387 links off its 46
+    defined terms) one per 133.
+
+    Runs after the whole structure is built, because a term defined in the
+    first chapter is used in the last. The definition's own span keeps the
+    `dcterms:subject` link to the concept page it already had; a use is a
+    `dcterms:references` link into this act, marked `kind="term"` so the
+    renderer draws it with the hover preview (`lib.page`)."""
+    terms = _defined_terms(structure, {})
+    matcher, index = begrepp.build_matcher(terms, "swe")
+    if not matcher:
+        return
+
+    def walk(nodes, frag=""):
+        for node in nodes:
+            eff = node.get("id") or frag
+            if node["type"] not in NO_TERM_USES:
+                if node.get("text"):
+                    node["text"] = begrepp.mark_term_uses(
+                        node["text"], matcher, index, doc_uri, eff)
+                if node.get("cells"):
+                    node["cells"] = [
+                        begrepp.mark_term_uses(cell, matcher, index, doc_uri,
+                                               eff)
+                        for cell in node["cells"]]
+            walk(node.get("children") or [], eff)
+
+    walk(structure)
+
+
 def inline_links(inline, source):
     """The (source, predicate, uri, context) tuples of the reference links in
     one inline-list text value. `context` is the *full text* of the node the
@@ -123,8 +192,12 @@ def inline_links(inline, source):
     eller 10 § … yttrandefrihetsgrundlagen" is what makes a bare "10 §" resolve
     to that law's chapter 3, and judging the link needs that context."""
     context = "".join(r if isinstance(r, str) else r["text"] for r in inline)
+    # a use of a term this act defines is not a citation: it carries
+    # `dcterms:references` but the reference projection never emitted one, and
+    # `lagen sfs validate` reported 1,322 of them as unexplained extras
     return [(source, run["predicate"], run["uri"], context)
-            for run in inline if isinstance(run, dict)]
+            for run in inline
+            if isinstance(run, dict) and run.get("kind") != "term"]
 
 
 def inline_references(nodes, frag=""):
@@ -718,7 +791,8 @@ def stycke_nf(stycke, pairs, proj, frag, live=True, mode=None, satt_av=None,
                                       proj, eff, live, mode=submode))
         elif isinstance(child, Tabell):
             items.append(tabell_nf(child, proj, eff, live, mode=submode,
-                                   satt_av=satt_av))
+                                   satt_av=satt_av,
+                                   pairs=pairs if node_id else None))
     if items:
         nf["children"] = items
     return nf
@@ -743,17 +817,32 @@ def flatten_list(lista, pairs, proj, frag, live=True, mode=None):
     return out
 
 
-def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None):
+def tabell_nf(tabell, proj, context, live=True, mode=None, satt_av=None,
+              pairs=None):
+    """`pairs` is the enclosing stycke's id chain, and only a row that *defines
+    a term* mints an id from it ("K1P5S1T3", the T for tabellrad).
+
+    An SFS act sets its term list as a table under one announcing sentence, so
+    without a row anchor every definition in it shares the stycke's id and a
+    link to a defined term lands on "I denna lag används följande ord och
+    uttryck" -- which says nothing about the term (Staffan, 2026-08-30). An
+    ordinary table row stays anchorless: an id exists where something
+    addressable lives, and minting one per row of every SFS table would restate
+    the whole golden corpus to no reader's benefit."""
     rows = []
-    for row in tabell.rows:
+    for n, row in enumerate(tabell.rows, 1):
         # only the first cell of a row can name a term
         terms = (BEGREPP_RULES.defined_terms(util.normalize_space(row.cells[0]),
                                        mode, "tabellrad")
                  if mode and row.cells else [])
-        cells = [proj.inline(util.normalize_space(cell), context, live,
-                             subject_terms=(terms if i == 0 else []))
+        row_id = (proj.minter.mint(extend(pairs, "T", str(n)), row)
+                  if terms and pairs is not None else None)
+        cells = [proj.inline(util.normalize_space(cell), row_id or context,
+                             live, subject_terms=(terms if i == 0 else []))
                  for i, cell in enumerate(row.cells)]
         rad = {"type": "rad", "cells": cells, **temporal_fields(row)}
+        if row_id:
+            rad["id"] = row_id
         # a road-sign designator cell (2007:90) is the trace of a dropped sign
         # image; no marker exists, so the code itself flags the gap
         code = (graphics.roadsign_code(util.normalize_space(row.cells[0]))
