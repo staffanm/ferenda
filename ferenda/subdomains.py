@@ -7,8 +7,9 @@ The whole-act kind is generated (PRD-subdomains.md section 6); the standalone
 kind is curated in the lagen-wiki content repo, but even there nothing is
 separately *listed* -- a `site/subdomain/<zone>/<slug>.md` file existing is
 itself the registration (`standalone_rows`). The chapter kind still needs an
-explicit registry (a target act/fragment, not a page of its own) and is not
-implemented yet.
+explicit registry, `site/subdomains.md` (`chapter_rows`): unlike a standalone
+page, a chapter/paragraf has no page of its own to register by existing --
+only a target act and a fragment to name.
 """
 
 import json
@@ -17,8 +18,10 @@ import re
 import unicodedata
 from pathlib import Path
 
-from .lib import compress, layout
+from .lib import catalog, compress, layout
 from .lib.lagrum import load_namedlaws
+from .lib.page import Site
+from .sfs import render as sfs_render
 from .site import parse as site_parse
 
 SFS_NAMEDLAWS = Path(__file__).parent / "sfs" / "data" / "namedlaws.json"
@@ -107,6 +110,61 @@ def standalone_rows(wiki_root=None):
     return rows
 
 
+def chapter_rows(wiki_root=None):
+    """slug.zone -> target act+fragment, one row per bullet in
+    `site/subdomains.md` (PRD-subdomains.md section 6) -- `- [hyres.lagen.nu]
+    (sfs:1970:994#K12)`. Reuses the `site` vertical's own markdown-list
+    parser (the same one `frontpage.md`'s curated law list goes through)
+    rather than a second, drifting one-off parser for "a bullet list of
+    links"."""
+    wiki_root = layout.WIKI_ROOT if wiki_root is None else wiki_root
+    path = Path(wiki_root) / "site" / "subdomains.md"
+    if not path.exists():
+        return {}
+    rows = {}
+    for block in site_parse.blocks(path.read_text(encoding="utf-8"), "subdomains"):
+        if block.type != "lista":
+            continue
+        for item in block.items:
+            run = item[0]
+            host = run["text"]
+            uri = run["uri"]
+            if not uri.startswith(catalog.BASE):
+                raise ValueError(
+                    f"site/subdomains.md: {host!r} targets {uri!r}, not a "
+                    f"{catalog.BASE}... document"
+                )
+            rows[host] = "/" + uri[len(catalog.BASE):]
+    return rows
+
+
+def write_chapter_pages(generated_root, con):
+    """Render each `chapter_rows()` target to its own file,
+    `generated/subdomain/<zone>/<slug>.html` -- the one subdomain kind
+    `write_sub_tree` cannot just symlink to an existing page, since the
+    target is part of a document, not a document of its own.
+
+    Needs a live catalog connection, unlike every other function in this
+    module: `sfs.render.render_chapter`'s rail (kommentar, citations) reads
+    it via a `lib.page.Site`. `site/subdomains.md` only ever names an SFS
+    act today (`sfs:<id>#<fragment>`), so this only knows how to render
+    that one source's chapters -- widening it is real work for whenever a
+    chapter of some other source's act is actually asked for, not before."""
+    generated_root = Path(generated_root)
+    site = Site.from_catalog(con)
+    for host, target in chapter_rows().items():
+        sfsid, _, node_id = target.lstrip("/").partition("#")
+        art_path = layout.artifact("sfs", sfsid)
+        if not compress.exists(art_path):
+            continue
+        art = compress.read_json(art_path)
+        html = sfs_render.render_chapter(art, site, node_id)
+        label, _, zone = host.partition(".")
+        dest = generated_root / "subdomain" / zone / (label + ".html")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        compress.write_text(dest, html, compress.PAGE_ENCODINGS)
+
+
 def _ascii_fold(label):
     """`label` with its combining marks dropped after NFKD normalization --
     "upphovsrätts" -> "upphovsratts" (PRD-subdomains.md section 4, O5: the
@@ -153,14 +211,17 @@ def write_sub_tree(generated_root, rows=None):
     already fixed, and a missing page is a normal, transient build state, not
     a defect in the row itself."""
     if rows is None:
-        acts, standalone = whole_act_rows(), standalone_rows()
-        collisions = acts.keys() & standalone.keys()
-        if collisions:
-            raise ValueError(
-                f"{sorted(collisions)!r} would be both a generated whole-act "
-                "row and a curated standalone page"
-            )
-        rows = {**acts, **standalone}
+        parts = {"whole-act": whole_act_rows(), "standalone": standalone_rows(),
+                 "chapter": chapter_rows()}
+        rows = {}
+        for kind, part in parts.items():
+            collisions = rows.keys() & part.keys()
+            if collisions:
+                raise ValueError(
+                    f"{sorted(collisions)!r} would be both an earlier kind "
+                    f"and a {kind} row"
+                )
+            rows.update(part)
     generated_root = Path(generated_root)
     sub_root = generated_root / "_sub"
     sub_root.mkdir(parents=True, exist_ok=True)
@@ -168,12 +229,21 @@ def write_sub_tree(generated_root, rows=None):
     served = {}
     map_entries: dict[str, str] = {}
     for host, target in sorted(rows.items()):
-        relpath = layout.page_relpath(target.lstrip("/"))
+        label, _, zone = host.partition(".")
+        if "#" in target:
+            # chapter kind: its own file (not yet written by anything -- the
+            # real chapter renderer this needs is not implemented), never the
+            # target act's whole page. page_relpath strips a fragment, so
+            # resolving `target` directly here would silently symlink to the
+            # WHOLE act instead of just its chapter -- wrong content behind a
+            # working-looking link, not a missing page.
+            relpath = layout.page_relpath(f"subdomain/{zone}/{label}")
+        else:
+            relpath = layout.page_relpath(target.lstrip("/"))
         source = compress.resolve(generated_root / relpath)
         if source is None:
             continue
 
-        label, _, zone = host.partition(".")
         ascii_zone = _ZONE_TWINS.get(zone, zone)
         slug = f"{_ascii_fold(label)}.{ascii_zone}"
         link_dir = sub_root / slug

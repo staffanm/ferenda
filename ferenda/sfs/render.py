@@ -404,3 +404,61 @@ def render(art, site):
         banner=Markup(banner), forarbeten=Markup(forarbeten),
         has_lydelser=bool(lydelser), structure=structure,
         andringar=andringar))
+
+
+def _find_node(nodes, node_id):
+    """The structure node with this id, searched depth-first, or None."""
+    for node in nodes:
+        if node.get("id") == node_id:
+            return node
+        found = _find_node(node.get("children", []), node_id)
+        if found is not None:
+            return found
+    return None
+
+
+def render_chapter(art, site, node_id):
+    """One chapter or provision of an act, as its own page
+    (PRD-subdomains.md section 6, the chapter kind: `hyres.lagen.nu` ->
+    `1970:994#K12`, `samtyckes.lagen.nu` -> `1962:700#K6P1`) -- a
+    definite-form subdomain slug that names *part* of a law, not the whole
+    of it.
+
+    Filters the artifact, not the HTML: `render_node`/`Toc`/`Rail` are
+    already a pure walk over whichever nodes they are handed, each entry
+    keyed by its own node id, not hardwired to "all of art['structure']" --
+    so calling them on just the target node, instead of the whole
+    `art['structure']` loop `render()` runs, is the entire filter. In
+    particular `Rail._commentary` looks up `(doc_uri, nid)`, so a kommentar
+    authored on this very node id already renders in the rail exactly where
+    the page opens -- the "editorial explanation that this is part of a
+    larger law" the PRD asks for is that existing mechanism, generalized;
+    nothing new to build for it.
+
+    The act's amendment register, its own preparatory-works list and the
+    äldre-lydelse/upphävd banner are left out on purpose: they are about the
+    whole act's history, not this excerpt of it. The page title stays the
+    *act's* own name (`lb.short_title`, e.g. "Jordabalken") -- honest about
+    what document this is -- rather than a popular nickname invented here
+    with nothing authored behind it; that framing is exactly what a
+    kommentar on this node is for."""
+    node = _find_node(art.get("structure", []), node_id)
+    if node is None:
+        raise ValueError(
+            "%s: no node %r in this act's structure (site/subdomains.md "
+            "names an id this act does not have)" % (art["uri"], node_id))
+    lb = labels.document_labels("sfs", art)
+    toc = Toc()
+    rail = Rail(site, art["uri"])
+    site.caselaw_memo.clear()
+    site.caselaw_memo[art["uri"]] = catalog.caselaw_anchored(
+        site.con, art["uri"], live=_node_id_set(art.get("structure", [])))
+    structure = Markup(render_node(node, site, art["uri"], toc, rail))
+    return ENV.get_template("sfs.html").render(page_context(
+        lb.short_title, "Författning", doc_meta([], art.get("source_url")),
+        toc=render_toc(toc, lb.short_id),
+        eyebrow=lb.short_id,
+        island=rail.island(),
+        banner=Markup(""), forarbeten=Markup(""),
+        has_lydelser=False, structure=structure,
+        andringar=Markup("")))

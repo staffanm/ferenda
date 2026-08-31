@@ -3391,6 +3391,80 @@ def test_commentary_shows_in_paragraph_rail_not_as_page(tmp_path):
     assert catalog.inbound(con, "https://lagen.nu/1962:700#K3P1") == []
 
 
+# --- render_chapter (PRD-subdomains.md section 6, the chapter kind) -------
+
+CHAPTERED_LAW = {
+    "uri": "https://lagen.nu/1970:994",
+    "metadata": {"properties": {"dcterms:title": "Jordabalk (1970:994)"}},
+    "structure": [
+        {"type": "kapitel", "id": "K11", "ordinal": "11", "children": [
+            {"type": "rubrik", "level": 1, "text": ["11 kap. Annat kapitel"]},
+            {"type": "paragraf", "id": "K11P1", "ordinal": "1", "children": [
+                {"type": "stycke", "id": "K11P1S1", "beteckning": "1 §",
+                 "text": ["Text i ett helt annat kapitel."]},
+            ]},
+        ]},
+        {"type": "kapitel", "id": "K12", "ordinal": "12", "children": [
+            {"type": "rubrik", "level": 1, "text": ["12 kap. Hyra"]},
+            {"type": "paragraf", "id": "K12P1", "ordinal": "1", "children": [
+                {"type": "stycke", "id": "K12P1S1", "beteckning": "1 §",
+                 "text": ["Detta kapitel gäller hyra av fast egendom."]},
+            ]},
+        ]},
+    ],
+}
+
+
+def test_render_chapter_shows_only_the_target_chapter(tmp_path):
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    assert "12 kap. Hyra" in html
+    assert "hyra av fast egendom" in html
+    assert "Annat kapitel" not in html                  # the sibling stays out
+    assert "helt annat kapitel" not in html
+    assert "Jordabalk" in html                           # the act's own name, honestly
+
+
+def test_render_chapter_omits_whole_act_sections(tmp_path):
+    # the amendment register / förarbeten / äldre-lydelse banner are about the
+    # whole act's history, not this excerpt -- PRD-subdomains.md section 6
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    assert "Ändringar och övergångsbestämmelser" not in html
+    assert 'id="dokument"' in html
+
+
+def test_render_chapter_unknown_node_names_the_act(tmp_path):
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    with pytest.raises(ValueError, match="1970:994.*K99"):
+        sfs_render.render_chapter(CHAPTERED_LAW, site, "K99")
+
+
+def test_render_chapter_shows_a_kommentar_on_the_chapter_node(tmp_path):
+    # the PRD's "editorial explanation that this is part of a larger law" --
+    # the existing per-node kommentar mechanism, unchanged, now reached by
+    # rendering just the K12 node instead of the whole document
+    ad = tmp_path / "art"
+    ad.mkdir()
+    law = ad / "law.json"
+    law.write_text(json.dumps(CHAPTERED_LAW))
+    komm = ad / "komm.json"
+    komm.write_text(json.dumps({
+        "uri": "https://lagen.nu/kommentar/1970:994", "type": "kommentar",
+        "annotates": "https://lagen.nu/1970:994", "author": "Foo Bar",
+        "body": [{"type": "sektion", "id": "K12", "heading": "12 kap.",
+                  "text": ["12 kap."],
+                  "children": [{"text": ["Kallas i dagligt tal hyreslagen."]}]}]}))
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [law])
+    catalog.rebuild(db, "kommentar", [komm])
+    site = page.Site.from_catalog(catalog.connect(db))
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    island = re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1)
+    assert "Kallas i dagligt tal hyreslagen." in island
+    assert "Foo Bar" in island
+
+
 def test_law_level_commentary_is_the_rail_default_panel(tmp_path):
     # commentary before the first section heading is about the statute as a whole;
     # it becomes the rail's default panel (key '') -- shown when no paragraph is

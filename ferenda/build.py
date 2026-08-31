@@ -5197,6 +5197,15 @@ def cmd_generate(only=None, source=None, jobs=1, force=False):
         # `lagen all rebuild` always computes first, so there it always renders.
         if compress.exists(layout.artifact("stats", stats_render.ARTIFACT_BASEFILE)):
             stats_render.write_stats(GENERATED)
+        # the chapter kind's own pages (PRD-subdomains.md section 6:
+        # hyres.lagen.nu, samtyckes.lagen.nu) -- the one subdomain kind
+        # write_sub_tree cannot just symlink, since the target is part of a
+        # document, not a document of its own. Needs a live connection,
+        # unlike everything else this run does for subdomains: the rail
+        # context (kommentar, citations) a chapter page shows comes from it.
+        con = catalog.connect(CATALOG)
+        subdomains.write_chapter_pages(GENERATED, con)
+        con.close()
         # the definite-form subdomain map (PRD-subdomains.md): whole-act rows
         # only, generated fresh from namedlaws.json/namedacts.json every
         # full-corpus run rather than gated by the manifest -- cheap (a few

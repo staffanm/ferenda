@@ -5,7 +5,15 @@ import os
 
 import pytest
 
-from ferenda.subdomains import standalone_rows, whole_act_rows, write_sub_tree
+from ferenda.lib import catalog, compress
+from ferenda.subdomains import (
+    chapter_rows,
+    layout,
+    standalone_rows,
+    whole_act_rows,
+    write_chapter_pages,
+    write_sub_tree,
+)
 
 
 def test_whole_act_rows_matches_the_worked_examples():
@@ -174,3 +182,78 @@ def test_write_sub_tree_symlink_resolves_under_a_different_mount_prefix(tmp_path
     other_mount.symlink_to(real_root)
     other_view_link = other_mount / "_sub" / "nis2.direktivet.nu" / "index.html.br"
     assert other_view_link.read_bytes() == b"brotli bytes"
+
+
+def test_chapter_rows_reads_the_registry(tmp_path):
+    (tmp_path / "site").mkdir()
+    (tmp_path / "site" / "subdomains.md").write_text(
+        "- [hyres.lagen.nu](sfs:1970:994#K12)\n"
+        "- [samtyckes.lagen.nu](sfs:1962:700#K6P1)\n",
+        encoding="utf-8")
+    assert chapter_rows(tmp_path) == {
+        "hyres.lagen.nu": "/1970:994#K12",
+        "samtyckes.lagen.nu": "/1962:700#K6P1",
+    }
+
+
+def test_chapter_rows_empty_without_a_registry_file(tmp_path):
+    assert chapter_rows(tmp_path) == {}
+
+
+CHAPTERED_ACT = {
+    "uri": "https://lagen.nu/1970:994",
+    "metadata": {"properties": {"dcterms:title": "Jordabalk (1970:994)"}},
+    "structure": [
+        {"type": "kapitel", "id": "K12", "ordinal": "12", "children": [
+            {"type": "rubrik", "level": 1, "text": ["12 kap. Hyra"]},
+            {"type": "paragraf", "id": "K12P1", "ordinal": "1", "children": [
+                {"type": "stycke", "id": "K12P1S1", "beteckning": "1 §",
+                 "text": ["Detta kapitel gäller hyra av fast egendom."]},
+            ]},
+        ]},
+    ],
+}
+
+
+def test_write_chapter_pages_renders_the_target_chapter(tmp_path, monkeypatch):
+    wiki_root = tmp_path / "wiki"
+    (wiki_root / "site").mkdir(parents=True)
+    (wiki_root / "site" / "subdomains.md").write_text(
+        "- [hyres.lagen.nu](sfs:1970:994#K12)\n", encoding="utf-8")
+    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", wiki_root)
+
+    artifact_root = tmp_path / "artifact"
+    monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", artifact_root)
+    art_path = layout.artifact("sfs", "1970:994")
+    art_path.parent.mkdir(parents=True, exist_ok=True)
+    art_path.write_text(json.dumps(CHAPTERED_ACT), encoding="utf-8")
+
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [art_path])
+    con = catalog.connect(db)
+
+    generated = tmp_path / "generated"
+    write_chapter_pages(generated, con)
+
+    dest = generated / "subdomain" / "lagen.nu" / "hyres.html"
+    assert compress.exists(dest)
+    html = compress.read_text(dest)
+    assert "12 kap. Hyra" in html
+    assert "hyra av fast egendom" in html
+
+
+def test_write_chapter_pages_skips_a_row_whose_act_is_not_built_yet(tmp_path, monkeypatch):
+    wiki_root = tmp_path / "wiki"
+    (wiki_root / "site").mkdir(parents=True)
+    (wiki_root / "site" / "subdomains.md").write_text(
+        "- [hyres.lagen.nu](sfs:1970:994#K12)\n", encoding="utf-8")
+    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", wiki_root)
+    monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", tmp_path / "artifact")
+
+    db = str(tmp_path / "catalog.sqlite")
+    catalog.rebuild(db, "sfs", [])
+    con = catalog.connect(db)
+
+    generated = tmp_path / "generated"
+    write_chapter_pages(generated, con)   # no artifact on disk -- must not raise
+    assert not (generated / "subdomain").exists()
