@@ -50,6 +50,15 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{#- PRD-subdomains.md section 2: every generated page carries this, not just
+    a subdomain's landing page -- the file is the same bytes either way
+    (subdomains.py symlinks to it, it never copies or patches it), so the fix
+    has to be host-independent. Harmless when the page is loaded at its own
+    URL (already the same origin); when the identical bytes are loaded via
+    e.g. avtals.lagen.nu, every root-relative href/asset/fetch in the page
+    resolves to the real site instead of a path that only exists there.
+    CUTOVER: -> https://lagen.nu/ #}
+<base href="https://ferenda.lagen.nu/">
 <title>{{ title }}</title>
 {{ head }}
 <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
