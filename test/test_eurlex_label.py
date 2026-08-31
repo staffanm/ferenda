@@ -107,3 +107,49 @@ def test_official_short_title_none_without_naming_parenthesis():
 def test_empty_title_is_none():
     assert short_label("") is None
     assert short_label(None) is None
+
+
+# the NIS2 corrigendum: its title names the act it corrects and ends with that
+# act's OJ coordinate, which read as a short title labelled 1 644 corrigenda
+# "(EU) 2022/2555 Europeiska unionens officiella tidning L 333 av den 27
+# december 2022"
+CORRIGENDUM_TITLE = (
+    "Rättelse till Europaparlamentets och rådets direktiv (EU) 2022/2555 av den "
+    "14 december 2022 om åtgärder för en hög gemensam cybersäkerhetsnivå i hela "
+    "unionen, om ändring av förordning (EU) nr 910/2014 och direktiv (EU) "
+    "2018/1972 och om upphävande av direktiv (EU) 2016/1148 (NIS 2-direktivet) "
+    "(Europeiska unionens officiella tidning L 333 av den 27 december 2022)")
+
+
+def test_corrigendum_reads_the_corrected_acts_name_not_its_oj_coordinate():
+    assert short_label(CORRIGENDUM_TITLE) == \
+        "(EU) 2022/2555 Rättelse till NIS 2-direktivet"
+    assert official_short_title(CORRIGENDUM_TITLE) == \
+        "Rättelse till NIS 2-direktivet"
+
+
+def test_corrigendum_without_a_short_title_keeps_the_subject():
+    assert short_label(
+        "Rättelse till kommissionens genomförandeförordning (EU) 2022/2105 av "
+        "den 29 juli 2022 om fastställande av bestämmelser om kontroller av "
+        "överensstämmelse av handelsnormer för olivolja "
+        "(Europeiska unionens officiella tidning L 284 av den 4 november 2022)"
+    ) == ("(EU) 2022/2105 Rättelse till fastställande av bestämmelser om "
+          "kontroller av överensstämmelse av handelsnormer för olivolja")
+
+
+def test_a_c_series_corrigendum_prints_its_own_number_after_the_coordinate():
+    # 12016E/TXTR(04): "… (EUT C 202 av den 7 juni 2016) 2017/C 059/01"
+    assert short_label(
+        "Rättelse till konsoliderade versioner av fördraget om Europeiska "
+        "unionen och fördraget om Europeiska unionens funktionssätt "
+        "(Europeiska unionens officiella tidning C 202 av den 7 juni 2016) "
+        "2017/C 059/01"
+    ) == ("Rättelse till konsoliderade versioner av fördraget om Europeiska "
+          "unionen och fördraget om Europeiska unionens funktionssätt")
+
+
+def test_an_acts_own_oj_note_is_not_mistaken_for_a_corrigendums():
+    # the boilerplate strip must not fire on an act that merely ends in a
+    # parenthesis of its own
+    assert official_short_title(CRA_TITLE) == "Cyberresiliensförordningen"

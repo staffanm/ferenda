@@ -1242,6 +1242,11 @@ def test_eurlex_source_url_derives_eli():
     # a judgment has no ELI -> the stable CELEX legal-content url
     assert (layout.source_url("eurlex", "62019CJ0311")
             == "https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:62019CJ0311")
+    # nor does a corrigendum: it is published under the corrected act's ELI, and
+    # ".../eli/dir/2022/2555R(04)/oj" is a 404 on EUR-Lex
+    assert (layout.source_url("eurlex", "32022L2555R(04)")
+            == "https://eur-lex.europa.eu/legal-content/SV/TXT/"
+               "?uri=CELEX:32022L2555R(04)")
     # sources with no rule derive nothing (their url is downloader-recorded)
     assert layout.source_url("forarbete", "prop/2024/25:1") is None
 

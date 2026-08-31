@@ -3,8 +3,8 @@ publishes an EU document as -- into an ordered list of typed blocks.
 
 Formex has several roots: `ACT` (regulations, directives, decisions, treaties,
 and the ESRB's own beslut), `GENERAL` (a notice printed in the C series),
-`JUDGMENT` and `CONCLUSION` (Court of Justice case law), `REPORT.HEARING` and
-`ANNEX`. Each carries a bibliographic header, an optional preamble (recitals +
+`JUDGMENT` and `CONCLUSION` (Court of Justice case law), `REPORT.HEARING`,
+`CORR` (a corrigendum) and `ANNEX`. Each carries a bibliographic header, an optional preamble (recitals +
 visas) and a body (enacting terms / judgment contents + ruling). This module
 walks the known structure into `Block`s; inline markup (highlights, dates, OJ
 references) is flattened to text and footnote NOTEs are dropped from the running
@@ -69,6 +69,10 @@ class Block:
                                # heading carries no designation of its own.
     anchor: str | None = None  # citation-target fragment (e.g. article "5")
     defines: str | None = None # a definitions-article point: the term it defines
+    defines_inline: bool = False # ... and whether that term was named in
+                               # passing, in a parenthesis inside ordinary
+                               # prose, rather than listed in a definitions
+                               # article (see eurlex.definitions)
     quoted: str | None = None  # a `citat` block: the kind it had inside the
                                # quotation -- "recital", "paragraph", "point",
                                # "article", "heading" or "row" -- which is what
@@ -111,6 +115,12 @@ SKIP_INLINE = {"NOTE"}
 # ("...2022/2555" + "av den..." -> "...2022/2555 av den...")
 INLINE = {"HT", "IE", "FT", "DATE", "QUOT.START", "QUOT.END", "QUOT.S",
           "REF.DOC.OJ", "REF.NP.ECR", "REF.DOC.ECR", "NAME.CASE"}
+# the empty elements that stand for the quotation marks the OJ prints. They
+# carry the mark as a codepoint (CODE="201D"), and the text has to carry it
+# too: without it "alla förekomster av ”leverantörer av hanterade tjänster”
+# ersättas med ”leverantörer av utlokaliserade driftstjänster”" reads as one
+# unbroken sentence with no sign of where either term begins or ends.
+QUOTE_MARKS = {"QUOT.START", "QUOT.END"}
 # regions whose inner structure belongs to something other than the act's own
 # outline: the verbatim quotation an amending act inserts (text of *another* act)
 # and a table (a cell's list is the cell's). A list inside one of these is read as
@@ -154,10 +164,15 @@ def formex_members(path):
     """The raw Formex members of a downloaded manifestation as ``(name, bytes)``
     in document order (main act/judgment first, then annexes) -- a single
     ``.fmx4`` yields one member, a ``.fmx4.zip`` its sorted ``.xml`` members (the
-    ``.doc.xml`` wrappers skipped). The byte-level split that `load_formex`
-    parses and the patch/editor path reads the main act's source XML from.
-    Reads through `compress` (a bare ``.fmx4`` is brotli-compressed on disk; a
-    ``.fmx4.zip`` is stored plain, but is checked by content, not suffix).
+    ``.doc.xml`` wrappers and the OJ issue's ``.toc.fmx.xml`` table of contents
+    skipped). The byte-level split that `load_formex` parses and the
+    patch/editor path reads the main act's source XML from. Reads through
+    `compress` (a bare ``.fmx4`` is brotli-compressed on disk; a ``.fmx4.zip``
+    is stored plain, but is checked by content, not suffix).
+
+    The table of contents is the *issue's*, not the document's: walked as
+    content it opened 7 706 documents with the two stray headings "Europeiska
+    unionens officiella tidning" and the OJ section name ("Rättelser").
 
     Filename order is OJ page order, and in 8 documents (32015R0228 among them)
     an annex is printed on an earlier page than the act itself, so the sort
@@ -171,7 +186,8 @@ def formex_members(path):
     if zipfile.is_zipfile(io.BytesIO(data)):
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             names = sorted(n for n in zf.namelist()
-                           if n.endswith(".xml") and not n.endswith(".doc.xml"))
+                           if n.endswith(".xml")
+                           and not n.endswith((".doc.xml", ".toc.fmx.xml")))
             if not names:
                 raise ValueError("%s: zip has no Formex member" % path)
             members = [(m, zf.read(m)) for m in names]
@@ -230,6 +246,10 @@ def flatten(elem, skip=SKIP_INLINE, drop=()):
     space-separated, element tails kept, whitespace normalised. `skip` widens the
     dropped set to the nested lists a caller emits as their own blocks.
 
+    A ``QUOT.START``/``QUOT.END`` is an empty element naming a quotation mark by
+    codepoint, and spliced in as that character -- the mark is part of what the
+    OJ prints, not markup around it.
+
     `drop` leaves out `elem`'s children at those *indices*, for text a caller
     emits elsewhere -- the block quotations `_lifted_quotations` finds. By
     index rather than by element because lxml frees an element proxy as soon as
@@ -241,6 +261,8 @@ def flatten(elem, skip=SKIP_INLINE, drop=()):
     for i, child in enumerate(elem):
         if i in drop or child.tag in skip:
             pass
+        elif child.tag in QUOTE_MARKS:
+            parts.append(chr(int(child.get("CODE"), 16)))
         elif child.tag in ATOMIC:
             # the widened skip stops at an atomic region -- `_sublists` does not
             # descend into one either, so a list in there is neither emitted as a
@@ -1078,7 +1100,13 @@ def _quoted_unit(el, blocks):
             _emit_dlist(child, blocks)
         elif tag == "TBL":
             _emit_table(child, blocks)
-        elif tag in ("TITLE", "TI", "STI"):
+        elif tag == "TOC":
+            _emit_toc(child, blocks)
+        elif tag in ("TITLE", "TI", "STI", "TI.ART", "STI.ART"):
+            # TI.ART/STI.ART reach here only when the quotation carries them
+            # without their ARTICLE wrapper (2019/2033's corrigendum quotes
+            # "Artikel 9" and its title that way); inside an ARTICLE the branch
+            # above reads them as the article's designation and title
             text = flatten(child)
             if text:
                 blocks.append(Block("heading", text, level=1))
@@ -1119,7 +1147,11 @@ def parse_quotation(quot, blocks):
         if b.kind == TABLE:
             # a quoted act's table: the quotation is another document's text and
             # gets no table markup of its own, so each row is one quoted run
-            # with its cells joined, which is what the page has always printed
+            # with its cells joined, which is what the page has always printed.
+            # Its caption leads, or the quoted table loses its own heading
+            # ("3. Kreditkostnader", 2008/48's bilaga II)
+            if b.text:
+                blocks.append(Block(QUOTATION, b.text, quoted="heading"))
             blocks.extend(Block(QUOTATION,
                                 " | ".join(c.text for c in row.cells),
                                 quoted="row")
@@ -1209,6 +1241,130 @@ def judgment_metadata(root):
 
 
 # --------------------------------------------------------------------------
+# CORR (a corrigendum -- the OJ's own correction notice)
+# --------------------------------------------------------------------------
+
+# the wrappers a correction nests its lead-in and its wording in. Their parts
+# are what carry the text, so the walk descends into them -- but only while the
+# wrapper says nothing itself: 575/2013 writes a quoted stycke as an ALINEA with
+# direct text and no P, and descending into that emitted nothing at all.
+# Everything else is flattened as it stands (a TERM holding an italic HT is one
+# run of text, not a wrapper, and descending into it would drop the text around
+# the HT)
+_CORR_WRAPPERS = {"DLIST", "DLIST.ITEM", "DEFINITION", "LIST", "ITEM",
+                  "PARAG", "ALINEA", "GR.SEQ"}
+
+
+def _is_quoted(el):
+    """True when `el` is the corrected wording rather than the lead-in that
+    introduces it. The OJ prints the wording in quotation marks and Formex
+    writes those as a `QUOT.S` block or as a `QUOT.START`/`QUOT.END` pair
+    inside the `P` -- which is the only thing that tells the two apart, since
+    both sit in the same `OLD.CORR`/`NEW.CORR` as plain `P`s."""
+    return el.tag == "QUOT.S" or el.find("QUOT.START") is not None
+
+
+def _corr_child(el, blocks):
+    """One element of a correction's before/after side -> its blocks: the
+    lead-in ("I stället för:") as a `stycke`, the wording it introduces as
+    `citat`, so the page sets the two apart the way the OJ page does."""
+    tag = el.tag
+    if tag == "QUOT.S":
+        parse_quotation(el, blocks)
+    elif tag == "TBL":                      # a replacement table
+        _emit_table(el, blocks)
+    elif tag == "NP":
+        # a numbered item: its NO.P is the number the OJ prints it under and its
+        # TXT the place it corrects ("1. Sidan 24, skäl 116"). Both the
+        # DESCRIPTION of a correction and, in 14 corrigenda, the OLD.CORR
+        # itself are written this way
+        no = el.find("NO.P")
+        blocks.append(Block("paragraph", _text(el, "TXT"),
+                            num=_marker(flatten(no)) if no is not None else None))
+        for child in el:
+            if child.tag not in ("NO.P", "TXT"):
+                _corr_child(child, blocks)
+    elif tag in _CORR_WRAPPERS and len(el) and not (el.text or "").strip():
+        for child in el:
+            _corr_child(child, blocks)
+    elif tag == "TOC":                      # a table of contents it inserts
+        _emit_toc(el, blocks)
+    elif tag in ("NOTE", "GR.NOTES", "INCL.ELEMENT"):
+        # footnotes are collected separately; an INCL.ELEMENT is a reference to
+        # a replacement annex, which rides in the manifestation as its own
+        # Formex member and is walked there
+        pass
+    else:
+        # a `P` that only wraps the quotation is the quotation (2010/1261 writes
+        # a whole replacement table that way); read as prose it folded the
+        # table's every cell into one run of text
+        drop, quotations = _lifted_quotations(el)
+        text = flatten(el, drop=drop)
+        if text:
+            blocks.append(Block(QUOTATION, text, quoted="paragraph")
+                          if _is_quoted(el) else Block("stycke", text))
+        for quotation in quotations:
+            parse_quotation(quotation, blocks)
+
+
+def _corr_description(desc, blocks):
+    """A CORRECTION's DESCRIPTION -> the numbered lead the OJ prints it under
+    ("1. Sidan 24, skäl 116"), which the whole correction then hangs off.
+
+    Two thirds of them say it in the element's own text; the rest write an `NP`
+    whose `NO.P` carries the item number. A description that quotes the wording
+    it replaces ("... ska alla förekomster av "x" ersättas med "y"") keeps the
+    quotation in its own text -- it is a sentence, not a block quotation."""
+    if desc.find("NP") is None:
+        drop, quotations = _lifted_quotations(desc)
+        # the item's marker is part of the text here: the block carries no
+        # `num` of its own for it to repeat ("(1) Mjölkprotein ...")
+        blocks.append(Block("paragraph", flatten(desc, _LEAD_SKIP, drop=drop)))
+        for quotation in quotations:
+            parse_quotation(quotation, blocks)
+        _emit_sublists(desc, blocks, 1)
+        for tbl in desc.findall("TBL"):
+            _emit_table(tbl, blocks)
+        return
+    for child in desc:                      # one NP per numbered item
+        _corr_child(child, blocks)
+
+
+def _corrections(elem, blocks):
+    """`CONTENTS.CORR` (or one `GR.CORRECTION` group inside it) -> the blocks of
+    every correction it holds, in document order."""
+    for child in elem:
+        tag = child.tag
+        if tag in ("CORRECTION", "GR.CORRECTION"):
+            _corrections(child, blocks)
+        elif tag == "DESCRIPTION":
+            _corr_description(child, blocks)
+        elif tag in ("OLD.CORR", "NEW.CORR"):
+            for part in child:
+                _corr_child(part, blocks)
+
+
+def parse_corrigendum(root, blocks):
+    """A `CORR` root -- the OJ's own correction notice -- -> title + body blocks.
+
+    A corrigendum is a numbered list of corrections. Each one names the place it
+    corrects ("1. Sidan 24, skäl 116") and then gives the wording twice: an
+    `OLD.CORR` ("I stället för: ...") and a `NEW.CORR` ("ska det stå: ...").
+
+    Read as an ACT it published nothing at all: `parse_act_body` walks
+    `ENACTING.TERMS`, and a corrigendum has none, so all 1 531 corrigenda in the
+    corpus printed their title over an empty page."""
+    title = _text(root.find("TITLE"), "TI", "P") or _text(root, "TITLE")
+    contents = root.find("CONTENTS.CORR")
+    if contents is None:
+        # a recorded per-document parse failure, not a broken program
+        # (rule:errors-drive-retry-use-raise)
+        raise ValueError("CORR %r has no CONTENTS.CORR" % title)
+    _corrections(contents, blocks)
+    return title
+
+
+# --------------------------------------------------------------------------
 # annexes (embedded as part of the single document) and footnotes
 # --------------------------------------------------------------------------
 
@@ -1260,6 +1416,30 @@ def _cell_text(cell):
     close()
     return "\n".join(line for line in
                      (" ".join(raw.split()) for raw in lines) if line)
+
+
+def _emit_toc(toc, blocks, depth=0):
+    """A ``TOC`` -- a table of contents printed as part of the text -- as a point
+    per entry: its ``NO.ITEM`` designation as the marker, the entry and the page
+    it refers to as the text, and each nested ``TOC.BLK`` a level deeper.
+
+    Three corrigenda insert one into the act they correct (2022/1440's runs to
+    184 entries). Read as an unknown wrapper, the walk descended to leaves it
+    has no branch for and emitted none of them."""
+    for child in toc:
+        tag = child.tag
+        if tag == "TITLE":
+            text = flatten(child)
+            if text:
+                blocks.append(Block("heading", text, level=1))
+        elif tag == "TOC.BLK":
+            _emit_toc(child, blocks, depth + 1)
+        elif tag == "TOC.ITEM":
+            no = child.find("NO.ITEM")
+            blocks.append(Block("point",
+                                flatten(child, SKIP_INLINE | {"NO.ITEM"}),
+                                num=_marker(flatten(no)) if no is not None else None,
+                                depth=depth if depth > 1 else None))
 
 
 def _emit_table(tbl, blocks):
@@ -1316,6 +1496,8 @@ def walk_content(elem, blocks, level=2):
             _emit_dlist(child, blocks)
         elif tag == "TBL":
             _emit_table(child, blocks)
+        elif tag == "TOC":
+            _emit_toc(child, blocks)
         elif tag == "DIVISION":
             parse_division(child, level, blocks)
         elif tag == "ARTICLE":

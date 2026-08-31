@@ -1,10 +1,11 @@
 """Parse an EU document from Formex (the structured XML manifestation) into the
 EurlexDoc model and project it to a JSON artifact.
 
-Formex has two roots we handle: `ACT` (regulations, directives, decisions,
+Formex has two main roots we handle: `ACT` (regulations, directives, decisions,
 treaties) and `JUDGMENT` (Court of Justice case law). Both carry a
 bibliographic header, an optional preamble (recitals + visas) and a body
-(enacting terms / judgment contents + ruling). We walk the known structure into
+(enacting terms / judgment contents + ruling). `CORR` -- the OJ's own
+corrigendum notice -- carries a list of corrections instead. We walk the known structure into
 an ordered list of typed blocks; inline markup (highlights, dates, OJ
 references) is flattened to text and footnote NOTEs are dropped from the running
 text. A `.fmx4.zip` manifestation bundles the main act with its annexes as
@@ -45,6 +46,7 @@ from ..lib.formex import (
     load_cons,
     parse_act,
     parse_cons_act,
+    parse_corrigendum,
     parse_hearing_report,
     parse_judgment,
     parse_opinion,
@@ -61,7 +63,11 @@ from ..lib.lagrum import (
     yield_overlaps,
 )
 from .correspond import correspondence
-from .definitions import extract_definitions, term_refs
+from .definitions import (
+    extract_definitions,
+    inline_definitions,
+    term_refs,
+)
 from .model import BASE, EurlexDoc, official_short_title, short_label
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf
@@ -92,6 +98,9 @@ def parse_formex(root, celex, lang):
         # judgment body rather than rendering an empty page
         doc.date, doc.ecli = judgment_metadata(root)
         doc.title = parse_hearing_report(root, doc.body)
+    elif root.tag == "CORR":                # a corrigendum (the OJ's own notice)
+        doc.date, doc.oj = act_metadata(root)
+        doc.title = parse_corrigendum(root, doc.body)
     elif root.tag == "ANNEX":
         # some older acts expose only an annex as their Formex manifestation;
         # render it rather than an empty page (a fuller manifestation, if any,
@@ -237,10 +246,13 @@ def _last_eu_act(cites, own=None):
     act: a judgment, a treaty and a Charter article all carry no act type, and
     none of them is something a quotation of this shape reproduces.
 
-    `own` is the citing document itself, excluded: an amending act's "Artikel 1
-    ska ersättas med följande:" self-resolves its bare article, and taking that
-    self-link as the quoted act pinned every quotation's articles back onto the
-    amending act instead of the act it rewrites (which the lead-in named)."""
+    `own` is the act the citing document speaks as, excluded: an amending act's
+    "Artikel 1 ska ersättas med följande:" self-resolves its bare article, and
+    taking that self-link as the quoted act pinned every quotation's articles
+    back onto the amending act instead of the act it rewrites (which the lead-in
+    named). For a corrigendum that is the act it corrects, not its own CELEX --
+    32021R2268R(02) otherwise took its self-links as the quoted act and moved
+    13 quoted articles off 2017/653 and onto the act that amends it."""
     for ref in reversed(cites):
         celex = celex_of(str(ref.uri))
         if celex and celex != own and eu_akttyp(celex):
@@ -282,11 +294,21 @@ def to_artifact(doc):
     # a legislative act's own body cites its own articles by a bare "artikel N";
     # tell the parser its identity so those self-refer to it rather than
     # anaphora-pinning onto an external act a recital named (a judgment has no
-    # such self-act -- its bare articles do refer to the act under discussion)
+    # such self-act -- its bare articles do refer to the act under discussion).
+    # A corrigendum speaks about the act it corrects and never about itself:
+    # "Sidan 34, artikel 6.22" is NIS2's article 6(22), so the *corrected* act
+    # is its self-act, and the wordings it quotes inherit it as their lead act.
+    self_act = revision_base(doc.celex) or doc.celex
     if doc.doctype != "judgment":
-        parser.state.self_eu_act = doc.celex
-    matcher, index = build_matcher(extract_definitions(doc.body, doc.lang),
-                                   doc.lang)
+        parser.state.self_eu_act = self_act
+    # the definitions article first, then the terms the act only names in
+    # passing (NIS2's "betydande incident", art. 23.1) -- the second pass is
+    # told what the first found, so a listed term is never re-read from a
+    # parenthesis. Both feed one matcher, so a use links to its definition
+    # whichever way the act stated it.
+    defined = extract_definitions(doc.body, doc.lang)
+    defined.update(inline_definitions(doc.body, doc.lang, defined))
+    matcher, index = build_matcher(defined, doc.lang)
 
     def scan(text, anchor=None):
         """One run of text -> its inline-run list, links and all."""
@@ -322,7 +344,7 @@ def to_artifact(doc):
         # its own bare "artikel N" is that act's article.
         borrowed = b.kind in ("keyword", QUOTATION)
         focus = parser.state.eu_focus() if borrowed else None
-        self_act = parser.state.self_eu_act
+        own_act = parser.state.self_eu_act
         if b.kind == QUOTATION:
             if lead_act:
                 parser.state.remember_eu_act(lead_act)
@@ -334,7 +356,7 @@ def to_artifact(doc):
         cites = parser.parse_text(b.text, context={})
         if borrowed:
             parser.state.restore_eu_focus(focus)
-            parser.state.self_eu_act = self_act
+            parser.state.self_eu_act = own_act
         # term-use links yield to a citation wherever the spans overlap (a
         # citation is the stronger, cross-document link)
         uses = yield_overlaps(
@@ -357,13 +379,15 @@ def to_artifact(doc):
             block["id"] = b.anchor
         if b.defines is not None:
             block["defines"] = b.defines
+            if b.defines_inline:
+                block["defines_inline"] = True
         if b.kind == "paragraph":
             # only a numbered paragraph introduces a quotation, and a run of
             # them is usually introduced once and referred back to thereafter
             # ("I artikel 3 i direktiv 95/46", then "i detta direktiv", "i
             # nämnda direktiv"), so the act carries forward until a later
             # paragraph names another one
-            lead_act = _last_eu_act(cites, own=doc.celex) or lead_act
+            lead_act = _last_eu_act(cites, own=self_act) or lead_act
         body.append(block)
     art = {"uri": doc.uri, "celex": doc.celex, "doctype": doc.doctype,
            "lang": doc.lang, "title": doc.title, "date": _isodate(doc.date),

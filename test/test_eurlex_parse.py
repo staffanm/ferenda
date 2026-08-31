@@ -53,6 +53,17 @@ def test_flatten_keeps_inline_drops_footnotes():
     assert _flat(xml) == "See Directive of 6 July 2016 on cybersecurity."
 
 
+def test_flatten_splices_the_quotation_marks_the_oj_prints():
+    # QUOT.START/QUOT.END are empty elements naming the mark by codepoint;
+    # dropped, a corrigendum's "alla förekomster av X ersättas med Y" gave no
+    # sign of where either term began or ended
+    assert _flat('<TXT>ersätt <QUOT.START CODE="201D"/>hanterade tjänster'
+                 '<QUOT.END CODE="201D"/> med.</TXT>') \
+        == "ersätt \u201dhanterade tjänster\u201d med."
+    assert _flat('<TXT>read <QUOT.START CODE="2018"/>a<QUOT.END CODE="2019"/>'
+                 '.</TXT>') == "read \u2018a\u2019."
+
+
 def test_flatten_separates_block_children():
     # adjacent block elements (P) must not glue together
     assert _flat("<TI><P>Directive 2022/2555</P><P>of 14 December</P></TI>") \
@@ -1784,3 +1795,201 @@ def test_provenance_rejects_a_broken_span_pairing():
         '      ACTIVE.DOC="32024R1183" ACTIVE.LOC="AR:1;PT:5"?>', "")
     with pytest.raises(ValueError, match="CLG.MDFC with no open"):
         cons_provenance(etree.fromstring(stray.encode(), CONS_PARSER))
+
+
+# the NIS2 corrigendum (32022L2555R(04)), trimmed: a numbered correction that
+# gives the wording twice, and a closing one that is an instruction only
+CORR_XML = """<CORR>
+  <BIB.INSTANCE>
+    <DOCUMENT.REF><COLL>L</COLL><NO.OJ>333</NO.OJ></DOCUMENT.REF>
+    <DATE ISO="20231222">20231222</DATE>
+  </BIB.INSTANCE>
+  <TITLE><TI>
+    <P>Rättelse till Europaparlamentets och rådets direktiv (EU) 2022/2555
+      (NIS 2-direktivet)</P>
+    <P><HT TYPE="ITALIC">(<REF.DOC.OJ COLL="L" NO.OJ="333">Europeiska unionens
+      officiella tidning L 333 av den 27 december 2022</REF.DOC.OJ>)</HT></P>
+  </TI></TITLE>
+  <CONTENTS.CORR>
+    <CORRECTION>
+      <DESCRIPTION><NP><NO.P>2.</NO.P><TXT>Sidan 34, artikel 6.22</TXT></NP></DESCRIPTION>
+      <OLD.CORR FOR.READ="YES">
+        <P>I stället för:</P>
+        <QUOT.S LEVEL="1"><P><QUOT.START CODE="201D"/>en registrar som verkar på
+          uppdrag av en regeringsenhet.<QUOT.END CODE="201D"/></P></QUOT.S>
+      </OLD.CORR>
+      <NEW.CORR FOR.READ="YES">
+        <P>ska det stå:</P>
+        <QUOT.S LEVEL="1"><P><QUOT.START CODE="201D"/>en registrar som verkar på
+          uppdrag av en registreringsenhet.<QUOT.END CODE="201D"/></P></QUOT.S>
+      </NEW.CORR>
+    </CORRECTION>
+    <CORRECTION>
+      <DESCRIPTION><NP><NO.P>6.</NO.P><TXT>I hela direktivet ska alla
+        förekomster av leverantörer av hanterade tjänster ersättas.</TXT></NP>
+      </DESCRIPTION>
+    </CORRECTION>
+  </CONTENTS.CORR>
+</CORR>"""
+
+
+def test_formex_members_skips_the_oj_issues_table_of_contents(tmp_path):
+    # a .toc.fmx.xml member is the OJ issue's own table of contents, not the
+    # document's; walked as content it opened 7 706 documents with the stray
+    # headings "Europeiska unionens officiella tidning" and "Rättelser"
+    bundle = tmp_path / "swe.fmx4.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("L_202390206SV.000101.fmx.xml", CORR_XML)
+        zf.writestr("L_202390206SV.toc.fmx.xml",
+                    "<PUBLICATION><OJ><BIB.OJ><TITLE><TI>"
+                    "<P>Europeiska unionens</P><P>officiella tidning</P>"
+                    "</TI></TITLE></BIB.OJ><VOLUME><SECTION><TITLE><TI>"
+                    "<P>Rättelser</P></TI></TITLE></SECTION></VOLUME>"
+                    "</OJ></PUBLICATION>")
+    assert [name for name, _ in formex_members(bundle)] \
+        == ["L_202390206SV.000101.fmx.xml"]
+    doc = parse_document(load_formex(bundle), "32022L2555R(04)", "swe")
+    assert not [b for b in doc.body if b.text == "Rättelser"]
+
+
+def test_corrigendum_publishes_its_corrections():
+    # read as an ACT this published nothing at all: parse_act_body walks
+    # ENACTING.TERMS, and a corrigendum has none, so all 1 531 corrigenda in
+    # the corpus printed their title over an empty page
+    doc = parse_formex(ET.fromstring(CORR_XML), "32022L2555R(04)", "swe")
+    assert doc.date == "20231222" and doc.oj == "L 333"
+    assert doc.title.startswith("Rättelse till Europaparlamentets och rådets")
+    assert [(b.kind, b.num, b.text) for b in doc.body] == [
+        ("paragraph", "2", "Sidan 34, artikel 6.22"),
+        ("stycke", None, "I stället för:"),
+        ("citat", None,
+         "\u201den registrar som verkar på uppdrag av en regeringsenhet.\u201d"),
+        ("stycke", None, "ska det stå:"),
+        ("citat", None,
+         "\u201den registrar som verkar på uppdrag av en "
+         "registreringsenhet.\u201d"),
+        ("paragraph", "6", "I hela direktivet ska alla förekomster av "
+                           "leverantörer av hanterade tjänster ersättas."),
+    ]
+
+
+def test_a_corrections_wording_hangs_off_the_item_that_names_the_place():
+    # the numbered item is what the OJ prints the correction under, so the
+    # lead-in and both wordings nest inside it
+    doc = parse_formex(ET.fromstring(CORR_XML), "32022L2555R(04)", "swe")
+    item = to_artifact(doc)["structure"][0]
+    assert (item["type"], item["num"]) == ("paragraph", "2")
+    assert [c["type"] for c in item["children"]] == \
+        ["stycke", "citat", "stycke", "citat"]
+
+
+def test_a_corrigendums_articles_are_the_corrected_acts():
+    # "Sidan 34, artikel 6.22" names NIS2's article 6(22), not an article of the
+    # corrigendum -- which has none. The corrected act is the corrigendum's
+    # self-act, so its bare pinpoints resolve there
+    doc = parse_formex(ET.fromstring(CORR_XML), "32022L2555R(04)", "swe")
+    item = to_artifact(doc)["structure"][0]
+    assert [(r["text"], r["uri"]) for r in item["text"] if isinstance(r, dict)] \
+        == [("artikel 6.22", "https://lagen.nu/celex/32022L2555#6.22")]
+
+
+def test_a_corrigendum_without_contents_is_a_document_failure():
+    with pytest.raises(ValueError, match="no CONTENTS.CORR"):
+        parse_formex(ET.fromstring("<CORR><TITLE><TI><P>Rättelse</P></TI>"
+                                   "</TITLE></CORR>"), "32022L2555R(04)", "swe")
+
+
+# 2022/1440 inserts a whole table of contents into the annex it corrects; read
+# as an unknown wrapper the walk descended to leaves it has no branch for and
+# emitted none of its 184 entries
+TOC_CORR_XML = """<CORR>
+  <BIB.INSTANCE><DATE ISO="20220901">20220901</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Rättelse till kommissionens förordning (EU) 2022/1440</P></TI></TITLE>
+  <CONTENTS.CORR><CORRECTION><DESCRIPTION>
+    <P>På sidan 46 ska följande innehållsförteckning införas:</P>
+    <P><QUOT.S LEVEL="1"><TOC>
+      <TITLE><TI><P>Innehållsförteckning</P></TI></TITLE>
+      <TOC.BLK>
+        <TOC.ITEM><ITEM.CONT>INLEDNING TILL DEL B</ITEM.CONT></TOC.ITEM>
+        <TOC.ITEM><NO.ITEM>1.</NO.ITEM><ITEM.CONT>Sökandens identitet</ITEM.CONT></TOC.ITEM>
+        <TOC.BLK>
+          <TOC.ITEM><NO.ITEM>1.1</NO.ITEM><ITEM.CONT>Sökande</ITEM.CONT></TOC.ITEM>
+        </TOC.BLK>
+      </TOC.BLK>
+    </TOC></QUOT.S></P>
+  </DESCRIPTION></CORRECTION></CONTENTS.CORR>
+</CORR>"""
+
+
+def test_an_inserted_table_of_contents_keeps_its_entries():
+    doc = parse_formex(ET.fromstring(TOC_CORR_XML), "32022R1440R(01)", "swe")
+    assert [(b.kind, b.num, b.depth, b.text) for b in doc.body] == [
+        ("paragraph", None, None, "På sidan 46 ska följande "
+                                  "innehållsförteckning införas:"),
+        ("citat", None, None, "Innehållsförteckning"),
+        ("citat", None, 1, "INLEDNING TILL DEL B"),
+        ("citat", "1", 1, "Sökandens identitet"),
+        ("citat", "1.1", 2, "Sökande"),
+    ]
+
+
+# 2008/48's bilaga II: a corrigendum replaces a whole table, caption included
+TABLE_CORR_XML = """<CORR>
+  <BIB.INSTANCE><DATE ISO="20080522">20080522</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Rättelse till direktiv 2008/48/EG</P></TI></TITLE>
+  <CONTENTS.CORR><CORRECTION>
+    <DESCRIPTION><NP><NO.P>1.</NO.P><TXT>Sidan 24, bilaga II</TXT></NP></DESCRIPTION>
+    <NEW.CORR FOR.READ="YES">
+      <P>ska det stå:</P>
+      <QUOT.S LEVEL="1"><TBL>
+        <TITLE>3. Kreditkostnader</TITLE>
+        <ROW><CELL TYPE="HEADER">Ränta</CELL></ROW>
+        <ROW><CELL>5 %</CELL></ROW>
+      </TBL></QUOT.S>
+    </NEW.CORR>
+  </CORRECTION></CONTENTS.CORR>
+</CORR>"""
+
+
+def test_a_quoted_tables_caption_leads_the_quoted_rows():
+    # a quoted table gets no table markup of its own -- each row is one quoted
+    # run -- and without its caption as a leading row, the replacement table
+    # loses the heading the OJ prints it under
+    doc = parse_formex(ET.fromstring(TABLE_CORR_XML), "32008L0048R(02)", "swe")
+    quoted = [(b.kind, b.quoted, b.text) for b in doc.body if b.kind == "citat"]
+    assert quoted == [
+        ("citat", "heading", "3. Kreditkostnader"),
+        ("citat", "row", "Ränta"),
+        ("citat", "row", "5 %"),
+    ]
+
+
+# 2019/2033's corrigendum quotes "Artikel 9" and its title without the ARTICLE
+# wrapper that carries them everywhere else
+BARE_ARTICLE_TITLE_CORR_XML = """<CORR>
+  <BIB.INSTANCE><DATE ISO="20191211">20191211</DATE></BIB.INSTANCE>
+  <TITLE><TI><P>Rättelse till förordning (EU) 2019/2033</P></TI></TITLE>
+  <CONTENTS.CORR><CORRECTION>
+    <DESCRIPTION><NP><NO.P>1.</NO.P><TXT>Sidan 12, artikel 9</TXT></NP></DESCRIPTION>
+    <NEW.CORR FOR.READ="YES">
+      <P>ska det stå:</P>
+      <QUOT.S LEVEL="1">
+        <TI.ART>Artikel 9</TI.ART>
+        <STI.ART>Befogenhet</STI.ART>
+      </QUOT.S>
+    </NEW.CORR>
+  </CORRECTION></CONTENTS.CORR>
+</CORR>"""
+
+
+def test_a_quoted_bare_article_designation_is_read_as_a_heading():
+    # inside an ARTICLE wrapper TI.ART/STI.ART are read as the article's own
+    # designation and title; quoted bare, with no ARTICLE around them, each is
+    # its own heading run instead of being silently dropped
+    doc = parse_formex(ET.fromstring(BARE_ARTICLE_TITLE_CORR_XML),
+                       "32019R2033R(01)", "swe")
+    quoted = [(b.kind, b.quoted, b.text) for b in doc.body if b.kind == "citat"]
+    assert quoted == [
+        ("citat", "heading", "Artikel 9"),
+        ("citat", "heading", "Befogenhet"),
+    ]

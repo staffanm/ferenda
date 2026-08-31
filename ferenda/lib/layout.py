@@ -25,6 +25,7 @@ from urllib.parse import quote, unquote
 from .. import config
 from . import compress
 from .catalog import BASE, local, strip_fragment
+from .eu_structure import revision_base
 from .util import basefile_slug, confine
 
 DATA = config.DATA
@@ -823,10 +824,16 @@ def _eurlex_source_url(celex: str) -> str:
     """An EU act's canonical EUR-Lex address from its CELEX. Sector-3
     regulations, directives and decisions have an ELI -- e.g. 32023R2854 ->
     https://eur-lex.europa.eu/eli/reg/2023/2854/oj (leading zeros stripped from
-    the number). Everything else (judgments, treaties, other act descriptors)
-    has no ELI, so fall back to the stable CELEX legal-content url."""
+    the number). Everything else (judgments, treaties, other act descriptors,
+    and a corrigendum, which is published under the corrected act's own ELI and
+    has none of its own) has no ELI, so fall back to the stable CELEX
+    legal-content url.
+
+    The revision test is what keeps 32022L2555R(04) off
+    ".../eli/dir/2022/2555R(04)/oj", which EUR-Lex answers 404: every one of the
+    corpus's corrigenda was linked to a page that does not exist."""
     eli_type = _ELI_TYPE.get(celex[5]) if len(celex) > 5 else None
-    if celex.startswith("3") and eli_type:
+    if celex.startswith("3") and eli_type and not revision_base(celex):
         return EURLEX_ELI % (eli_type, celex[1:5], celex[6:].lstrip("0") or "0")
     return EURLEX_CELEX % celex
 

@@ -53,6 +53,31 @@ _LABEL_TAIL = re.compile(
 # the connector that introduces the subject ("om …"/"on …"), with any stray
 # leading punctuation (a comma sometimes follows the date)
 _LABEL_LEAD = re.compile(r"^[\s,;:.]*(?:om|on)\b\s*", re.IGNORECASE)
+# a corrigendum names the act it corrects: it opens with "Rättelse till …" and
+# closes with that act's own OJ coordinate in parentheses. The coordinate is not
+# a short title -- read as one it labelled 1 644 corrigenda "(EU) 2022/2555
+# Europeiska unionens officiella tidning L 333 av den 27 december 2022" -- and
+# the opening words are the only thing that tells a corrigendum apart from the
+# act, so they stay in front of the name it derives.
+_LABEL_CORRIGENDUM = re.compile(
+    r"^\s*(rättelser? (?:till|av)|rättelseprotokoll till|erratum till|"
+    r"corrigend(?:um|a) to)\s+", re.IGNORECASE)
+_LABEL_OJREF = re.compile(
+    r"\s*\(\s*(?:Europeiska (?:unionens|gemenskapernas) officiella tidning|"
+    r"Official Journal|EUT|EGT|OJ)\b[^()]*\)"
+    # a C-series corrigendum prints its own OJ number after the coordinate
+    # ("… (EUT C 202 av den 7 juni 2016) 2017/C 059/01")
+    r"(?:\s*\(?\d{4}/C\s?\d+/\d+\)?)?\s*$", re.IGNORECASE)
+
+
+def _corrigendum(title):
+    """(opening words, title) of a corrigendum: the "Rättelse till" it opens
+    with, which the label keeps, and the corrected act's title with the trailing
+    OJ coordinate removed. Any other title comes back as ('', title)."""
+    m = _LABEL_CORRIGENDUM.match(title)
+    if not m:
+        return "", title
+    return m.group(0).strip() + " ", _LABEL_OJREF.sub("", title[m.end():])
 
 
 def official_short_title(title):
@@ -67,13 +92,20 @@ def official_short_title(title):
     title when it contains a lowercase letter -- so an all-caps marker like "(SUB)"
     is rejected -- and is not itself an act-number designation. A single-word short
     title ("cyberresiliensförordningen") is accepted: Swedish compounds the whole
-    name into one word, so a space must not be required."""
-    title = _LABEL_BOILERPLATE.sub("", re.sub(r"\s+", " ", title or "").strip()).strip()
+    name into one word, so a space must not be required.
+
+    A corrigendum keeps its opening words and reads the short title of the act it
+    corrects: "Rättelse till … (NIS 2-direktivet) (Europeiska unionens officiella
+    tidning L 333 …)" -> "Rättelse till NIS 2-direktivet"."""
+    prefix, title = _corrigendum(re.sub(r"\s+", " ", title or "").strip())
+    title = _LABEL_BOILERPLATE.sub("", title).strip()
     m = re.search(r"\(([^()]{3,})\)\s*$", title)
     if (m and re.search(r"[a-zåäöéèüæø]", m.group(1))
             and not _LABEL_DESIGNATION.search(m.group(0))):
         name = m.group(1).strip()
-        return name[:1].upper() + name[1:]
+        # after "Rättelse till" the name reads on in the same sentence, so it
+        # keeps the case the act writes it in
+        return prefix + name if prefix else name[:1].upper() + name[1:]
     return None
 
 
@@ -94,6 +126,7 @@ def short_label(title):
     title = re.sub(r"\s+", " ", title or "").strip()
     if not title:
         return None
+    prefix, title = _corrigendum(title)
     short = official_short_title(title)
     title = _LABEL_BOILERPLATE.sub("", title).strip()
     d = _LABEL_DESIGNATION.search(title)
@@ -106,7 +139,7 @@ def short_label(title):
     else:
         name = _LABEL_TAIL.sub("", title).strip().rstrip(".")
     name = re.sub(r"\s+", " ", name)
-    name = name[:1].upper() + name[1:] if name else name
+    name = prefix + name if prefix else (name[:1].upper() + name[1:] if name else name)
     return "%s %s" % (designation, name) if designation else name
 
 
