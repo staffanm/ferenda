@@ -3559,7 +3559,8 @@ def test_a_long_definition_list_collapses_like_the_rail_row_it_replaced(
     is actually handed over: rendering the template directly would pass either
     way."""
     site = _concept_site(tmp_path)
-    many = [{"href": "https://lagen.nu/1975:635#P%d" % i,
+    many = [{"act": "https://lagen.nu/1975:635", "ladder": None,
+             "href": "https://lagen.nu/1975:635#P%d" % i,
              "citation": "%d § räntelagen" % i, "term": "dröjsmålsränta",
              "sentence": "Definition %d." % i} for i in range(5)]
     monkeypatch.setattr(wiki_render, "_definitions", lambda uri, site: many)

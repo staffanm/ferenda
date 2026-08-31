@@ -11,6 +11,31 @@
     `details.more` disclosure the rail rows use. Without it a term defined in
     173 acts (allmän dataskyddsförordning) replaces a 20-line panel with 65 kB
     of prose. The cap decides what is collapsed, never what is published. -#}
+{#- One ladder's rungs. `here` marks the definition the ladder is nested
+    under, the way lib/page.chain_meta marks the current document in the
+    Normkedja row -- a chain shared by two definitions is one chain seen from
+    two rungs, not two chains. -#}
+{%- macro rung_list(rungs) -%}
+<ol class="rungs">
+{%- for r in rungs %}
+<li{% if r.silent %} class="silent"{% elif r.here %} class="here"{% endif %}>
+{%- if r.silent -%}
+{{ r.citation }} <span class="role">är tyst</span>
+{%- elif r.here -%}
+<strong class="here"><a href="{{ r.href }}">{{ r.citation }}</a></strong>{% if r.role %} <span class="role">{{ r.role }}</span>{% endif %}
+{%- else -%}
+<a href="{{ r.href }}">{{ r.citation }}</a>{% if r.role %} <span class="role">{{ r.role }}</span>{% endif %}
+{%- endif -%}
+{%- if not r.silent %}
+{%- if r.label %} <span class="rh-label">”{{ r.label }}”</span>{% endif %}
+{%- if r.also %} <span class="rh-also">samt {% for a in r.also %}<a href="{{ a.href }}">{{ a.citation }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+{%- endif -%}
+{%- if r.upphavd is not none %} <span class="rh-upphavd">upphävd{% if r.upphavd %} {{ r.upphavd }}{% endif %}</span>{% endif %}
+{%- if r.via_amended %} <span class="rh-amended">bemyndigandet ändrat {{ r.via_amended }}</span>{% endif %}
+</li>
+{%- endfor %}
+</ol>
+{%- endmacro -%}
 {%- macro definition_rows(rows) -%}
 <dl>
 {%- for d in rows %}
@@ -18,6 +43,14 @@
 {#- a definition the source left empty is still a definition: the act is listed,
     there is just nothing to quote under it -#}
 {%- if d.sentence %}<dd>{{ d.sentence }}</dd>{% endif -%}
+{#- the chain this definition sits in, seen from its own rung. The ladder keeps
+    its own id: the provision rail links straight to it (page.regleringshierarki_margin). -#}
+{%- if d.ladder %}
+<dd class="rh-nested"><details class="ladder" id="{{ d.ladder.anchor_id }}">
+<summary>Normkedja: {{ d.ladder.kind_label }} — {{ d.ladder.root_citation }}</summary>
+{{ rung_list(d.ladder.rungs) }}
+</details></dd>
+{%- endif -%}
 {%- endfor %}
 </dl>
 {%- endmacro -%}
@@ -33,33 +66,17 @@
 </section>
 {%- endif -%}
 {%- endmacro -%}
-{#- The regleringshierarki (PRD-regleringshierarki.md): one ladder per
-    chain_root, every ladder foldable (O2), rungs in rung order. A silent rung
-    is a document on the chain that says nothing about the term -- printed,
-    because the gap is information ("förordningen är tyst"). A repealed rung
-    prints dated rather than dropping (O6). -#}
+{#- The ladders no legaldefinition hosts: 66 of 5,202 have no definierar rung
+    at all, so there is no definition to nest them under. They are still the
+    concept's chains and still carry the anchor the provision rail links to. -#}
 {%- macro ladder_list(ladders) -%}
 {%- if ladders %}
 <section class="occurrences regleringshierarki">
-<h2>Regleringshierarki <span class="c">{{ ladders | length }}</span></h2>
+<h2>Övriga normkedjor <span class="c">{{ ladders | length }}</span></h2>
 {%- for lad in ladders %}
 <details class="ladder" id="{{ lad.anchor_id }}"{% if ladders | length == 1 %} open{% endif %}>
 <summary>{{ lad.kind_label }} — {{ lad.root_citation }}</summary>
-<ol class="rungs">
-{%- for r in lad.rungs %}
-<li{% if r.silent %} class="silent"{% endif %}>
-{%- if r.silent -%}
-{{ r.citation }} <span class="role">är tyst</span>
-{%- else -%}
-<a href="{{ r.href }}">{{ r.citation }}</a>{% if r.role %} <span class="role">{{ r.role }}</span>{% endif %}
-{%- if r.label %} <span class="rh-label">”{{ r.label }}”</span>{% endif %}
-{%- if r.also %} <span class="rh-also">samt {% for a in r.also %}<a href="{{ a.href }}">{{ a.citation }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
-{%- endif -%}
-{%- if r.upphavd is not none %} <span class="rh-upphavd">upphävd{% if r.upphavd %} {{ r.upphavd }}{% endif %}</span>{% endif %}
-{%- if r.via_amended %} <span class="rh-amended">bemyndigandet ändrat {{ r.via_amended }}</span>{% endif %}
-</li>
-{%- endfor %}
-</ol>
+{{ rung_list(lad.rungs) }}
 </details>
 {%- endfor %}
 </section>

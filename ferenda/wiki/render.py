@@ -64,7 +64,14 @@ def _regleringshierarki(uri, site):
     """The concept's ladders through the norm levels (O2: all of them, each
     foldable, grouped under its chain_root): the display rows the template
     prints, built from `hierarki.concept_ladders`. A silent rung renders as
-    its own line -- "förordningen är tyst" is information (PRD §8)."""
+    its own line -- "förordningen är tyst" is information (PRD §8).
+
+    Each ladder also carries `defining`, the documents that give the term a
+    legaldefinition on it: `render` nests the ladder under each of those
+    definitions (Staffan, 2026-08-30). A defining act sits in exactly one
+    ladder per concept -- 24,796 of 24,796 rows measured -- so the nesting is
+    unambiguous from the definition's side, while a ladder with two defining
+    acts prints under both, each time from that act's own rung."""
     keyed = []          # (sort key, display dict) -- grouped by the root's
     # kind (O2), highest authority first; the most complete ladder leads
     # within each group. Keyed as a parallel tuple so the sort never reads
@@ -72,11 +79,20 @@ def _regleringshierarki(uri, site):
     order = ["EU-förordning", "kompletterar EU-förordning", "EU-direktiv",
              "EU-beslut", "EU-rätt", "Lag", "Förordning"]
     for ladder in hierarki.concept_ladders(site.con, uri):
+        # a chain every rung of which is repealed states no law any more, and
+        # goes the way a repealed citer goes from the inbound panel (I3):
+        # 172 of 5,202 ladders. A chain that merely *starts* in a repealed act
+        # stays -- 706 of those still have a förordning or a föreskrift in
+        # force under them, and O6 marks a repealed rung rather than hiding it
+        if all(r["doc"] in site.expired for r in ladder["rungs"]):
+            continue
         rungs = []
         for r in ladder["rungs"]:
             target = "%s#%s" % (r["doc"], r["anchor"]) if r["anchor"] \
                 else r["doc"]
             rungs.append({
+                "doc": r["doc"],        # what the nesting marks "here" on
+                "here": False,          # set per definition by `_nest_ladders`
                 "href": href(target),
                 "citation": citation(target, r["descriptive"]),
                 "role": ROLE_LABEL.get(r["role"]),
@@ -103,6 +119,8 @@ def _regleringshierarki(uri, site):
                       {"anchor_id": ladder["anchor_id"],
                        "kind_label": kind_label,
                        "root_citation": root_citation,
+                       "defining": {r["doc"] for r in ladder["rungs"]
+                                    if r["role"] == "definierar"},
                        "rungs": rungs}))
     return [lad for _key, lad in sorted(keyed, key=lambda t: t[0])]
 
@@ -114,11 +132,62 @@ def _definitions(uri, site):
     Read from the catalog, which relate filled while it had the artifact open
     (`catalog.definition_sentences`) -- a term defined in a hundred acts would
     otherwise open a hundred artifacts, on every one of ~28,900 concept pages."""
-    return [{"href": href("%s#%s" % (act, anchor) if anchor else act),
+    # A repealed act's definition is dropped, the way a repealed citer is
+    # dropped from the inbound panel (I3): it no longer says what the term
+    # means. 1,691 of the 3,247 defining SFS are repealed, so the gällande
+    # ones would otherwise read as a minority view of their own vocabulary.
+    #
+    # `site.expired` is SFS and eurlex only -- a föreskrift carries no
+    # `expired`, its repeal is an inbound rpubl:upphaver link -- so 1,733
+    # definitions from 808 repealed föreskrifter still show. Closing that gap
+    # means widening `catalog.expired_uris`, which also decides the browse
+    # listings, the feeds, the facets and the inbound panel.
+    #
+    # `ladder` is filled by `_nest_ladders`; the key is always present because
+    # the template's undefined is strict
+    return [{"act": act, "ladder": None,
+             "href": href("%s#%s" % (act, anchor) if anchor else act),
              "citation": citation("%s#%s" % (act, anchor or ""), descriptive),
              "term": term, "sentence": sentence}
             for act, anchor, descriptive, term, sentence
-            in catalog.concept_definitions(site.con, uri)]
+            in catalog.concept_definitions(site.con, uri)
+            if act not in site.expired]
+
+
+def _nest_ladders(definitions, ladders):
+    """Put each ladder under the legaldefinition it belongs to, seen from that
+    definition's own rung, and return the ladders that found no home.
+
+    One word is regulated in several regimes at once -- "verksamhetsutövare"
+    is defined by three EU acts and seven lagar, in seven separate chains --
+    and a flat list of chains beside a flat list of definitions leaves the
+    reader to pair them (Staffan, 2026-08-30). Nested, each definition carries
+    the chain it sits in, with itself marked the way the document pages mark
+    the current document in their Normkedja row. A chain shared by two
+    definitions prints under both, each time marked at that definition's rung,
+    so it reads as one chain seen twice rather than as two chains.
+
+    The 66 ladders (of 5,202) whose rungs include no definierar row have no
+    definition to sit under; they stay in a section of their own."""
+    homed = set()
+    for d in definitions:
+        for lad in ladders:
+            if d["act"] not in lad["defining"]:
+                continue
+            # one document can hold several rungs of the same chain (it defines
+            # the term in one provision, imposes a duty in another). The mark
+            # belongs on the defining rung, not on all of them
+            mine = [i for i, r in enumerate(lad["rungs"])
+                    if r["doc"] == d["act"]]
+            at = next((i for i in mine
+                       if lad["rungs"][i]["role"] == ROLE_LABEL["definierar"]),
+                      mine[0])
+            d["ladder"] = {**lad,
+                           "rungs": [{**r, "here": i == at}
+                                     for i, r in enumerate(lad["rungs"])]}
+            homed.add(lad["anchor_id"])
+            break
+    return [lad for lad in ladders if lad["anchor_id"] not in homed]
 
 
 def render(art, site):
@@ -138,7 +207,7 @@ def render(art, site):
     structure, toc, rail = document_body(art, site, key="body")
     has_description = bool(art.get("body"))
     definitions = _definitions(art["uri"], site)
-    ladders = _regleringshierarki(art["uri"], site)
+    ladders = _nest_ladders(definitions, _regleringshierarki(art["uri"], site))
     if definitions:
         rail.drop_document_sections(DEFINING_KEYS)
     groups, uses, island = [], 0, rail.island()

@@ -404,15 +404,21 @@ def test_the_begreppssida_renders_the_ladder_grouped_and_marked(tmp_path):
     hierarki.rebuild_regleringshierarki(con)
     art = {"uri": CONCEPT, "title": "Betydande incident"}
     html = wiki_render.render(art, _site(con))
-    assert '<section class="occurrences regleringshierarki">' in html
-    assert 'id="rh-celex-32022L2555"' in html
-    assert "EU-direktiv" in html
-    assert "upphävd 2015-07-01" in html
-    assert "bemyndigandet ändrat 2026-07-01" in html
-    # the described branch carries the section too
+    # the ladder is nested under the legaldefinition it belongs to, inside the
+    # definitions section -- not a list of its own beside them
+    defs = re.search(r'<section class="occurrences definitions">.*?</section>',
+                     html, re.S).group(0)
+    assert '<dd class="rh-nested">' in defs
+    assert 'id="rh-celex-32022L2555"' in defs
+    assert "EU-direktiv" in defs
+    assert "upphävd 2015-07-01" in defs
+    assert "bemyndigandet ändrat 2026-07-01" in defs
+    # both defining rungs host the same chain, each marked at its own rung
+    assert defs.count('<strong class="here">') == 2
+    assert "Övriga normkedjor" not in html      # every ladder found a home
+    # the described branch nests it too
     art["body"] = [{"type": "stycke", "text": ["En beskrivning."]}]
-    assert '<section class="occurrences regleringshierarki">' \
-        in wiki_render.render(art, _site(con))
+    assert '<dd class="rh-nested">' in wiki_render.render(art, _site(con))
 
 
 def test_the_rail_prints_one_line_per_concept_at_the_ladder_anchor(tmp_path):
@@ -545,6 +551,60 @@ def test_the_normkedja_meta_row_marks_you_are_here(tmp_path):
     assert page.chain_meta(site, "https://lagen.nu/begrepp/X") is None
 
 
+def test_a_repealed_acts_definition_does_not_render(tmp_path):
+    """A repealed act no longer says what the term means, so its legaldefinition
+    goes the way a repealed citer goes from the inbound panel (page.py I3).
+    Staffan off the live Verksamhetsutövare page, 2026-08-30: lagen (2004:1199)
+    om handel med utsläppsrätter was still stating a definition."""
+    con = _ladder_con(tmp_path)
+    hierarki.rebuild_regleringshierarki(con)
+    art = {"uri": CONCEPT, "title": "Betydande incident"}
+    before = re.search(r'<section class="occurrences definitions">.*?</section>',
+                       wiki_render.render(art, _site(con)), re.S).group(0)
+    assert 'href="/2025:1506#K2P5"' in before      # the lag states a definition
+    con.execute("UPDATE documents SET expired = '2020-01-01' WHERE uri = ?",
+                (CSL,))
+    con.commit()
+    after = re.search(r'<section class="occurrences definitions">.*?</section>',
+                      wiki_render.render(art, _site(con)), re.S)
+    assert after is None or '<dt><a href="/2025:1506#K2P5"' not in after.group(0)
+
+
+def test_a_wholly_repealed_ladder_does_not_render(tmp_path):
+    """172 of 5,202 ladders have every rung repealed; they state no law. A
+    chain that merely starts in a repealed act stays -- 706 of those still
+    have a förordning or föreskrift in force below (O6 marks, never hides)."""
+    con = _ladder_con(tmp_path)
+    hierarki.rebuild_regleringshierarki(con)
+    art = {"uri": CONCEPT, "title": "Betydande incident"}
+    con.execute("UPDATE documents SET expired = '2020-01-01' WHERE uri = ?",
+                (DIREKTIV,))
+    con.commit()
+    assert "rh-celex-32022L2555" in wiki_render.render(art, _site(con))
+    con.execute("UPDATE documents SET expired = '2020-01-01'")   # every rung
+    con.commit()
+    html = wiki_render.render(art, _site(con))
+    assert "rh-celex-32022L2555" not in html
+    assert "Övriga normkedjor" not in html
+
+
+def test_a_ladder_no_definition_hosts_keeps_its_own_section(tmp_path):
+    """66 of 5,202 ladders have no definierar rung, so no legaldefinition can
+    host them. They keep a section of their own rather than disappearing."""
+    con = _ladder_con(tmp_path)
+    hierarki.rebuild_regleringshierarki(con)
+    # the shape the 66 have: rungs that name the term without defining it
+    con.execute("UPDATE regleringshierarki SET role = 'namner' "
+                "WHERE role = 'definierar'")
+    con.commit()
+    html = wiki_render.render({"uri": CONCEPT, "title": "Betydande incident"},
+                              _site(con))
+    assert "Övriga normkedjor" in html
+    assert 'id="rh-celex-32022L2555"' in html
+    assert '<dd class="rh-nested">' not in html
+    assert '<strong class="here">' not in html      # no definition to stand on
+
+
 def test_internal_ladder_links_are_local_paths(tmp_path):
     """The canonical uri is the identifier; an internal href is a local path
     ("/1994:1809#K1P3", never "https://lagen.nu/..."). Reported by Staffan
@@ -553,8 +613,9 @@ def test_internal_ladder_links_are_local_paths(tmp_path):
     hierarki.rebuild_regleringshierarki(con)
     html = wiki_render.render({"uri": CONCEPT, "title": "Betydande incident"},
                               _site(con))
-    section = re.search(r'<section class="occurrences regleringshierarki">'
+    section = re.search(r'<section class="occurrences definitions">'
                         r'.*?</section>', html, re.S).group(0)
+    assert '<dd class="rh-nested">' in section       # the ladder lives here now
     assert 'href="https://lagen.nu/' not in section
     assert 'href="/' in section
 
