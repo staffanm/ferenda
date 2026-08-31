@@ -217,36 +217,57 @@ services:
         max-size: "10m"
         max-file: "10"
 
-  # --- prod: ACME cert issuance/renewal (lagen.nu + ferenda.lagen.nu) ------
-  # Official, actively maintained certbot image -- replaces the certbot 0.30.2
-  # baked into the old andreilhicas/nginx-letsencrypt nginx image, which is
-  # ACME-API-incompatible with current Let's Encrypt (missing Content-Type
-  # header on POST-as-GET; every renewal failed). Certbot only writes files
-  # here -- it does not serve anything -- via two volumes shared with nginx:
-  # the ACME http-01 webroot (challenge files nginx serves back to LE) and the
-  # cert output dir nginx's ssl_certificate directives read from.
+  # --- prod: ACME cert issuance/renewal (lagen.nu + ferenda.lagen.nu, plus
+  # the wildcard subdomain lineage) --------------------------------------
+  # Official, actively maintained certbot image, built with the Cloudflare DNS
+  # plugin so ONE image serves both lineages: the original webroot (HTTP-01)
+  # lineage below, and a second DNS-01 lineage for the wildcard subdomains
+  # (PRD-subdomains.md). The image swap from plain certbot/certbot is
+  # additive -- dns-cloudflare ships the full certbot, so the webroot lineage
+  # is unaffected.
+  #
+  # Certbot only writes files here -- it does not serve anything -- via three
+  # volumes shared with nginx: the ACME http-01 webroot (challenge files nginx
+  # serves back to LE), the cert output dir nginx's ssl_certificate directives
+  # read from, and the two helper scripts below.
   #
   # One-time SAN cert covering both vhosts (run once; `renew` below only
   # renews an existing cert, it doesn't create one):
-  #   docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+  #   docker compose run --rm --entrypoint certbot certbot certonly \
+  #     --webroot -w /var/www/certbot \
   #     -d lagen.nu -d ferenda.lagen.nu \
   #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
   #
   # CUTOVER: add `-d old.lagen.nu` to that list and re-run it once, after
   # old.lagen.nu resolves to this host. Certbot expands the existing
   # certificate in place, so nginx's ssl_certificate paths do not change.
+  #
+  # One-time wildcard cert for the zones already delegated to Cloudflare
+  # (lagen.nu is NOT among them yet -- add `-d lagen.nu -d '*.lagen.nu'` once
+  # it moves too, then re-run this once):
+  #   docker compose run --rm --entrypoint certbot certbot certonly \
+  #     --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini \
+  #     --dns-cloudflare-propagation-seconds 30 \
+  #     --cert-name wildcard-lagen \
+  #     -d direktivet.nu -d '*.direktivet.nu' \
+  #     -d forordningen.nu -d '*.forordningen.nu' \
+  #     -d xn--frordningen-rfb.nu -d '*.xn--frordningen-rfb.nu' \
+  #     --email staffan.malmgren@gmail.com --agree-tos --non-interactive
+  #
+  # nginx then reads the wildcard from certificates/wildcard/ (deploy-hook.sh
+  # keys the copy destination on $RENEWED_LINEAGE) -- wire that into the
+  # subdomain server block per PRD-subdomains.md section 5, separately.
   certbot:
-    image: certbot/certbot:v3.1.0
+    image: certbot/dns-cloudflare:v3.1.0
     profiles: [prod]
+    env_file: .env   # CLOUDFLARE_API_KEY, scoped to the four subdomain zones
     volumes:
       - /mnt/data/lagen/letsencrypt:/etc/letsencrypt        # certbot's own state: account + live/archive certs
       - certbot-webroot:/var/www/certbot                    # shared ACME http-01 webroot with nginx
       - /mnt/data/lagen/certificates:/usr/share/nginx/certificates  # nginx's cert dir; deploy-hook copies here
-    entrypoint: >
-      sh -c "trap exit TERM; while :; do
-      certbot renew --webroot -w /var/www/certbot --quiet
-      --deploy-hook 'cp /etc/letsencrypt/live/lagen.nu/fullchain.pem /etc/letsencrypt/live/lagen.nu/privkey.pem /usr/share/nginx/certificates/';
-      sleep 12h & wait $${!}; done"
+      - ./docker/certbot/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./docker/certbot/deploy-hook.sh:/usr/local/bin/deploy-hook.sh:ro
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
     restart: unless-stopped
     logging:
       options:
