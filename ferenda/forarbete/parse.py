@@ -47,7 +47,7 @@ from ..lib.pdftext import (
 from ..lib.util import approximate_date, basefile_slug
 from . import kbtitles, legacy_formats, lydelse, volumes
 from .model import Block, Forarbete
-from .structure import RE_LEAD_NUM, RE_TRAILING_PAREN, nest
+from .structure import RE_LEAD_NUM, RE_TRAILING_PAREN, beredning, nest
 
 # förarbeten cite across the whole spectrum, like court decisions
 PARSE_TYPES = ALL_PARSE_TYPES
@@ -915,4 +915,6 @@ def to_artifact(fa):
     if abbrevs := parser.local_abbreviations():
         art["local_abbreviations"] = abbrevs
     art["structure"] = nest(blocks)
+    if fa.type == "prop" and (bere := beredning(art["structure"])):
+        art["beredning"] = bere
     return art

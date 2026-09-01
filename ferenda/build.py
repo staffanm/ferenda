@@ -4344,7 +4344,8 @@ def _swap_catalog(scratch, dest):
 # entry in RELATE_CODE re-extracts every document of every source
 CORR_CODE = (PKG / "lib" / "hierarki.py",
              PKG / "forarbete" / "genomforande.py",
-             PKG / "forarbete" / "fk.py")
+             PKG / "forarbete" / "fk.py",
+             PKG / "sfs" / "register.py")
 
 
 def _corr_watermark():

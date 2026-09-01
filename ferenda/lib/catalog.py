@@ -116,6 +116,17 @@ CREATE TABLE IF NOT EXISTS fk_kommentar (
     text       TEXT NOT NULL        -- the commentary prose
 );
 CREATE INDEX IF NOT EXISTS idx_fk_sfs ON fk_kommentar(sfs_uri, sfs_anchor);
+CREATE TABLE IF NOT EXISTS prop_omfattning (
+    -- how substantially a proposition changed each law it amended, derived at
+    -- relate time (sfs.register.resolve_omfattning) from every SFS document's
+    -- own Omfattning register field. Lets the förarbeten panel (sfs.render)
+    -- tell a proposition's principal law from a same-prop follow-up change to
+    -- an unrelated law without re-reading the proposition itself.
+    prop_ident TEXT PRIMARY KEY,    -- "Prop. 2017/18:89"
+    max_n      INTEGER NOT NULL,    -- the largest distinct-paragraf count the
+                                    -- prop reached in any one law it amended
+    law_count  INTEGER NOT NULL     -- how many distinct laws it amended
+);
 CREATE TABLE IF NOT EXISTS norm_chain (
     lower_uri   TEXT NOT NULL,  -- the subordinate document (no fragment)
     lower_pin   TEXT,           -- the provision of it the relation names, if any
@@ -354,6 +365,10 @@ def connect(path: Path | str, data_root: Path | None = None,
         con.execute("ALTER TABLE documents ADD COLUMN inbound_count INTEGER")
     if "snippet" not in cols:
         con.execute("ALTER TABLE documents ADD COLUMN snippet TEXT")
+    if "beredning_ident" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN beredning_ident TEXT")
+    if "beredning_uri" not in cols:
+        con.execute("ALTER TABLE documents ADD COLUMN beredning_uri TEXT")
     corr_cols = {row[1] for row in con.execute("PRAGMA table_info(correspondence)")}
     if "ikrafttrader" not in corr_cols:
         con.execute("ALTER TABLE correspondence ADD COLUMN ikrafttrader TEXT")
@@ -1610,12 +1625,17 @@ def _index_document(con, art, path, source):
     # keeping the listing display in step with the page header
     display = (lb.official_title if source == "eurlex" and art.get("doctype") == "treaty"
                else display_title(art, row[4]))
+    # a proposition's own preceding SOU/Ds (forarbete.structure.beredning),
+    # stamped here so the SFS förarbeten panel can name it without re-reading
+    # the proposition's artifact for every law it touched
+    beredning = art.get("beredning")
     con.execute(
         "INSERT OR REPLACE INTO documents "
         "(uri, source, kind, label, title, path, source_url, content_hash, "
         " expired, display, date, publisher, descriptive, "
-        " short_id, short_title, description, snippet) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " short_id, short_title, description, snippet, "
+        " beredning_ident, beredning_uri) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (*row, art.get("source_url"),
          None,                 # content_hash filled by the caller (holds bytes)
          _expired_date(art),
@@ -1626,7 +1646,9 @@ def _index_document(con, art, path, source):
          # source's own one-line description (a case's sammanfattning)
          lb.descriptive_label, lb.short_id, lb.short_title,
          _document_description(art, source),
-         _document_snippet(art, source)))
+         _document_snippet(art, source),
+         beredning["identifier"] if beredning else None,
+         beredning["uri"] if beredning else None))
     # the metadata producers describe the document, not a place in it, so they
     # pad the body walk's (anchor, page, run) shape with a pageless entry
     edges = artifact_links(art) + [
@@ -2585,6 +2607,33 @@ def document_meta(con, uri):
     return con.execute(
         "SELECT kind, label, title, date FROM documents WHERE uri = ?",
         (uri,)).fetchone()
+
+
+def document_beredning(con, uri):
+    """(identifier, uri) of the proposition's own preceding SOU/Ds, or None --
+    either it named none in its "Ärendet och dess beredning" section, or `uri`
+    is not a hosted proposition."""
+    row = con.execute(
+        "SELECT beredning_ident, beredning_uri FROM documents WHERE uri = ?",
+        (uri,)).fetchone()
+    return row if row and row[0] else None
+
+
+def set_prop_omfattning(con, rows):
+    """Replace the per-proposition Omfattning-magnitude summary. Each row is
+    (prop_ident, max_n, law_count) -- see the table comment. Derived
+    cross-document at relate time (sfs.register.resolve_omfattning)."""
+    con.execute("DELETE FROM prop_omfattning")
+    con.executemany("INSERT INTO prop_omfattning VALUES (?,?,?)", rows)
+    con.commit()
+
+
+def prop_omfattning(con, prop_ident):
+    """(max_n, law_count) for a proposition identifier, or None when relate has
+    not yet seen any SFS amendment citing it (a future or unenacted prop)."""
+    return con.execute(
+        "SELECT max_n, law_count FROM prop_omfattning WHERE prop_ident = ?",
+        (prop_ident,)).fetchone()
 
 
 def document_display(con, uri):

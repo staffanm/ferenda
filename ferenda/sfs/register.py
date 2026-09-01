@@ -25,7 +25,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
-from ..lib import compress, lagrum, layout, util
+from ..lib import catalog, compress, lagrum, layout, util
 from ..lib.catalog import BASE
 from ..lib.datasets import NAMEDLAWS as NAMEDLAWS_JSON
 from ..lib.errors import SkipDocument
@@ -466,3 +466,50 @@ def amendment_properties(act, basefile, omfattning_parser, base):
             props[key] = (value if key in ALWAYS_LIST or len(value) != 1
                           else value[0])
     return props
+
+
+def omfattning_size(props):
+    """How many distinct paragrafer/kapitel one amendment touched: the union of
+    its ändr./upph./ny Omfattning targets (`amendment_properties`'s
+    rpubl:ersatter/upphaver/inforsI). A pure renumbering ("nuvarande X
+    betecknas Y") mints no predicate and so is never counted -- it changes
+    where a provision lives, not what it says. None when the row carries no
+    Omfattning field at all -- the grundförfattning's own row (there is
+    nothing to compare a law's creation against) -- so a caller can tell "no
+    provisions touched" from "not a judgeable amendment". The measure
+    `resolve_omfattning` and `sfs.render.forarbeten_section` both judge
+    substantiality by."""
+    if "rpubl:andrar" not in props:
+        return None
+    return len(set(props.get("rpubl:ersatter", []))
+              | set(props.get("rpubl:upphaver", []))
+              | set(props.get("rpubl:inforsI", [])))
+
+
+def resolve_omfattning(con):
+    """Re-derive `prop_omfattning`: for every proposition cited as an SFS
+    amendment's förarbete, the largest `omfattning_size` it reached in any one
+    law and how many distinct laws it amended. A law whose only citing row is
+    ungraded (`omfattning_size` None -- typically the prop that created it)
+    does not count toward either figure: it carries no signal either way, and
+    counting it would understate how concentrated the prop's real amendments
+    were. Runs at relate time over every related SFS document -- the
+    Omfattning breakdown lives only in each SFS document's own `amendments`,
+    not in the catalog. Returns the row count."""
+    by_prop = {}
+    for uri, path in con.execute(
+            "SELECT uri, path FROM documents WHERE source = 'sfs'"):
+        art = compress.read_json(catalog.data_root(con) / path)
+        for amendment in art.get("amendments", []):
+            n = omfattning_size(amendment.get("properties", {}))
+            if n is None:
+                continue
+            for ident in amendment.get("forarbeten", []):
+                if not ident.startswith("Prop"):
+                    continue
+                max_n, laws = by_prop.setdefault(ident, (0, set()))
+                by_prop[ident] = (max(max_n, n), laws | {uri})
+    rows = [(ident, max_n, len(laws))
+            for ident, (max_n, laws) in by_prop.items()]
+    catalog.set_prop_omfattning(con, rows)
+    return len(rows)

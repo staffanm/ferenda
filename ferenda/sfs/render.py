@@ -33,6 +33,7 @@ from ..lib.page import (
     render_runs,
     render_toc,
 )
+from .register import omfattning_size
 
 ENV = tpl.environment("ferenda.sfs")
 
@@ -59,31 +60,88 @@ def forarbete_identifier_uri(identifier):
     return refs[0].uri if refs else None
 
 
+# A proposition's touch on a law it did not principally rewrite: a follow-up
+# fixing a cross-reference or a responsible-agency name is typically 1
+# paragraf. Calibrated by sampling 15 multi-law propositions at random
+# (1980s-2020s) and reading the split their own Omfattning counts drew --
+# see the commit introducing this constant for the sample. A prop that
+# amended only this one law is never judged this way (SUBSTANTIAL_FLOOR
+# below): the question "was this the prop's real subject" only has meaning
+# once there is a sibling law to compare against.
+SUBSTANTIAL_FLOOR = 2       # a 1-paragraf touch is never substantial
+SUBSTANTIAL_FRACTION = 0.25  # ...nor is one under a quarter of the prop's
+                             # biggest touch, elsewhere in the same prop
+
+
+def _prop_substantial(con, ident, n):
+    """Did this proposition change *this* law enough to be listed as one of
+    its own preparatory works, rather than only as a same-prop follow-up to
+    whatever law the proposition was principally about? `n` is this law's own
+    omfattning_size, or None when none of this law's citing rows carry one
+    (typically the prop that created the law outright, which has nothing to
+    compare against) -- never judged, always shown. A proposition relate has
+    not yet seen cite any SFS amendment (a future or unenacted bill) is not
+    judged either."""
+    if n is None:
+        return True
+    row = catalog.prop_omfattning(con, ident)
+    if row is None:
+        return True
+    max_n, law_count = row
+    if law_count <= 1:
+        return True
+    return n >= max(SUBSTANTIAL_FLOOR, SUBSTANTIAL_FRACTION * max_n)
+
+
 def forarbeten_section(site, art):
     """The statute's own preparatory works, top-billed above the citation panel.
     Every förarbete of the grundförfattning and every ändringsförfattning is
     listed once (prop→sou→ds→lagrådsremiss→bet, oldest-first): the ones we host
     link to their page under the preferred full-title label, the rest (a
     betänkande/riksdagsskrivelse we do not host) show as their bare identifier.
+    A proposition that only made a same-prop follow-up change here (see
+    `_prop_substantial`) is left out; its own preceding SOU/Ds, where known,
+    trails a substantial proposition's entry ("Prop. 2017/18:89 ... (SOU
+    2015:25)").
 
-    Returns `(html, own_uris)` -- `own_uris` are the hosted förarbete uris,
-    excluded from the citation panel so a creating proposition reads as a
-    preparatory work here, not as a generic inbound reference below."""
-    idents, seen = [], set()
+    Returns `(html, own_uris)` -- `own_uris` are the hosted förarbete uris
+    actually shown here, excluded from the citation panel so a creating
+    proposition reads as a preparatory work here, not as a generic inbound
+    reference below. A demoted same-prop follow-up is not in `own_uris`: it
+    stays out of this panel but still surfaces as a citation below, since it
+    genuinely amended the law -- just not enough to be top-billed."""
+    idents, seen, local_n = [], set(), {}
     for amendment in art.get("amendments", []):
+        n = omfattning_size(amendment.get("properties", {}))
         for ident in amendment.get("forarbeten", []):
             if ident not in seen:
                 seen.add(ident)
                 idents.append(ident)
+            if n is not None:
+                local_n[ident] = max(local_n.get(ident, n), n)
     entries, own_uris = [], set()
     for ident in idents:
         uri = forarbete_identifier_uri(ident)
         meta = catalog.document_meta(site.con, uri) if uri else None
         if meta and site.has(uri):
             kind, label, title, dt = meta
+            if kind == "prop" and not _prop_substantial(site.con, ident, local_n.get(ident)):
+                continue             # a same-prop follow-up: demoted from this
+                                     # law's own panel, but still a genuine
+                                     # citation -- stays out of own_uris so it
+                                     # surfaces in the citation panel below
             own_uris.add(uri)
             html = '<a href="%s">%s</a>' % (
                 escape(href(uri)), escape(citer_name("forarbete", kind, label, title)))
+            if kind == "prop" and (bere := catalog.document_beredning(site.con, uri)):
+                bere_ident, bere_uri = bere
+                if site.has(bere_uri):
+                    own_uris.add(bere_uri)  # shown here -- keep it out of the
+                                            # citation panel below too, same as
+                                            # the prop it precedes
+                    html += ' (<a href="%s">%s</a>)' % (escape(href(bere_uri)), escape(bere_ident))
+                else:
+                    html += ' (%s)' % escape(bere_ident)
         else:                       # unhosted (bet./rskr.) -> bare identifier
             # kind from the identifier prefix ("Bet. …" -> bet) so it still sorts
             # into its precedence block; date unknown, so it trails its dated peers

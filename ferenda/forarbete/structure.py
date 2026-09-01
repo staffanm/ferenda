@@ -88,6 +88,27 @@ def ingress(structure):
     return None
 
 
+def beredning(structure):
+    """A proposition's own preceding SOU or Ds -- `{identifier, uri}` of the
+    first SOU/Ds citation inside its "Ärendet och dess beredning" section, or
+    None when the section is absent (pre-1970s propositions carry no numbered
+    TOC) or names no utredning (a bill drafted without one). The citation is
+    already a link run (`_scan` in parse.py ran the FORARBETEN grammar over
+    every block before `nest` built this tree), so no re-parsing is needed."""
+    for node in structure:
+        if node.get("type") != "avsnitt":
+            continue
+        if "beredning" in runs_text(node["text"]).lower():
+            for block in flatten(node["children"]):
+                for run in block.get("text") or []:
+                    if not isinstance(run, dict):
+                        continue
+                    uri = run.get("uri", "")
+                    if uri.startswith(("https://lagen.nu/sou/", "https://lagen.nu/ds/")):
+                        return {"identifier": run["text"], "uri": uri}
+    return None
+
+
 def flatten(structure):
     """The inverse of `nest`: the document-order flat block list, with each
     `avsnitt` turned back into its `rubrik` heading block followed by its

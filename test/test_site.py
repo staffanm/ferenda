@@ -18,6 +18,7 @@ from ferenda.eurlex import render as eurlex_render
 from ferenda.forarbete import render as forarbete_render
 from ferenda.foreskrift import render as foreskrift_render
 from ferenda.sfs import render as sfs_render
+from ferenda.sfs.register import resolve_omfattning
 from ferenda.wiki import render as wiki_render
 
 
@@ -2459,6 +2460,162 @@ def test_forarbeten_section_top_billed_above_citation_panel(tmp_path):
     # cites the act is rail context, so the column carries no citation panel (S5)
     assert '<section class="forarbeten">' in html
     assert "Prop. 2023/24:9" not in html[:html.index('id="lagen-context"')]
+
+
+def _law_amended_by(uri, title, sfsnr, andrar, paragraf_uris, prop_ident,
+                    extra_amendment=None):
+    """A minimal SFS artifact: one grundförfattning row (no Omfattning), then
+    one change act citing `prop_ident` with the given Omfattning breakdown."""
+    amendments = [{"properties": {"dcterms:identifier": "SFS " + uri.rsplit("/", 1)[-1]}}]
+    if extra_amendment:
+        amendments.append(extra_amendment)
+    amendments.append({
+        "forarbeten": [prop_ident],
+        "properties": {"dcterms:identifier": "SFS " + sfsnr, "rpubl:andrar": andrar,
+                       "rpubl:ersatter": paragraf_uris}})
+    return {"uri": uri, "metadata": {"properties": {"dcterms:title": title}},
+            "amendments": amendments}
+
+
+def test_forarbeten_section_drops_a_same_prop_follow_up_change(tmp_path):
+    # one prop substantially amends "huvudlagen" (3 paragrafs) and only
+    # tangentially touches "bilagen" (1 paragraf) as a follow-up
+    huvudlagen = _law_amended_by(
+        "https://lagen.nu/2020:301", "Huvudlagen (2020:301)", "2022:1",
+        "ändr. 1, 2, 3 §§", ["https://lagen.nu/2020:301#P1",
+                             "https://lagen.nu/2020:301#P2",
+                             "https://lagen.nu/2020:301#P3"],
+        "Prop. 2021/22:50")
+    bilagen = _law_amended_by(
+        "https://lagen.nu/2020:302", "Bilagen (2020:302)", "2022:2",
+        "ändr. 5 §", ["https://lagen.nu/2020:302#P5"], "Prop. 2021/22:50")
+    # cites both laws it amended, so the demoted bilagen link is a genuine
+    # citation edge -- not just an entry in `amendments`
+    prop = {"uri": "https://lagen.nu/prop/2021/22:50", "doctype": "prop",
+           "identifier": "Prop. 2021/22:50", "title": "Den stora reformen",
+           "date": "2022-01-01",
+           "structure": [{"type": "avsnitt", "id": "a1.1", "children": [
+               {"type": "stycke", "text": [
+                   "se ", {"predicate": "dcterms:references", "text": "huvudlagen",
+                           "uri": "https://lagen.nu/2020:301"}, " och ",
+                   {"predicate": "dcterms:references", "text": "bilagen",
+                    "uri": "https://lagen.nu/2020:302"}, "."]}]}]}
+
+    db = str(tmp_path / "catalog.sqlite")
+    for name, art in (("huvudlagen", huvudlagen), ("bilagen", bilagen)):
+        (tmp_path / (name + ".json")).write_text(json.dumps(art))
+    (tmp_path / "prop.json").write_text(json.dumps(prop))
+    catalog.rebuild(db, "sfs", [tmp_path / "huvudlagen.json", tmp_path / "bilagen.json"])
+    catalog.rebuild(db, "forarbete", [tmp_path / "prop.json"])
+    con = catalog.connect(db)
+    assert resolve_omfattning(con) == 1
+
+    site = page.Site.from_catalog(con)
+    huvud_section, huvud_own = sfs_render.forarbeten_section(site, huvudlagen)
+    bilaga_section, bilaga_own = sfs_render.forarbeten_section(site, bilagen)
+    assert "Prop. 2021/22:50" in huvud_section
+    assert "Prop. 2021/22:50" not in bilaga_section
+    # huvudlagen: shown here, so excluded from its own citation panel below
+    assert huvud_own == {"https://lagen.nu/prop/2021/22:50"}
+    # bilagen: demoted, not in own_uris -- a real citation, so it must still
+    # surface in the generic citation panel rather than vanishing outright
+    assert bilaga_own == set()
+    panel = page.render_rail_sections(
+        page.document_inbound(site, "https://lagen.nu/2020:302", bilaga_own))
+    assert "Prop. 2021/22:50" in panel
+
+
+def test_forarbeten_section_keeps_a_single_law_props_own_small_change(tmp_path):
+    # a prop that amended only this one law is always its own preparatory
+    # work, however small the change -- there is no sibling to compare against
+    law = _law_amended_by(
+        "https://lagen.nu/2020:303", "Enslagen (2020:303)", "2022:3",
+        "ändr. 1 §", ["https://lagen.nu/2020:303#P1"], "Prop. 2021/22:60")
+    prop = _citer("https://lagen.nu/prop/2021/22:60", "Prop. 2021/22:60",
+                  "Den lilla justeringen", "2022-02-01", ["a1.1"])
+
+    db = str(tmp_path / "catalog.sqlite")
+    (tmp_path / "law.json").write_text(json.dumps(law))
+    (tmp_path / "prop.json").write_text(json.dumps(prop))
+    catalog.rebuild(db, "sfs", [tmp_path / "law.json"])
+    catalog.rebuild(db, "forarbete", [tmp_path / "prop.json"])
+    con = catalog.connect(db)
+    resolve_omfattning(con)
+
+    site = page.Site.from_catalog(con)
+    section, _ = sfs_render.forarbeten_section(site, law)
+    assert "Prop. 2021/22:60" in section
+
+
+def test_forarbeten_section_keeps_the_creating_prop_despite_follow_ups_elsewhere(tmp_path):
+    # the same prop both creates "nyalagen" outright (no Omfattning on that
+    # row -- nothing to compare a creation against) and substantially amends
+    # "huvudlagen" elsewhere: the creating law must still show its own prop
+    nyalagen = {"uri": "https://lagen.nu/2020:304",
+               "metadata": {"properties": {"dcterms:title": "Nyalagen (2020:304)"}},
+               "amendments": [{"forarbeten": ["Prop. 2021/22:70"],
+                               "properties": {"dcterms:identifier": "SFS 2020:304"}}]}
+    huvudlagen = _law_amended_by(
+        "https://lagen.nu/2020:305", "Huvudlagen (2020:305)", "2022:4",
+        "ändr. 1, 2, 3 §§", ["https://lagen.nu/2020:305#P1",
+                             "https://lagen.nu/2020:305#P2",
+                             "https://lagen.nu/2020:305#P3"],
+        "Prop. 2021/22:70")
+    prop = _citer("https://lagen.nu/prop/2021/22:70", "Prop. 2021/22:70",
+                  "Den nya lagen, med följdändring", "2022-03-01", ["a1.1"])
+
+    db = str(tmp_path / "catalog.sqlite")
+    for name, art in (("nyalagen", nyalagen), ("huvudlagen", huvudlagen)):
+        (tmp_path / (name + ".json")).write_text(json.dumps(art))
+    (tmp_path / "prop.json").write_text(json.dumps(prop))
+    catalog.rebuild(db, "sfs", [tmp_path / "nyalagen.json", tmp_path / "huvudlagen.json"])
+    catalog.rebuild(db, "forarbete", [tmp_path / "prop.json"])
+    con = catalog.connect(db)
+    resolve_omfattning(con)
+
+    site = page.Site.from_catalog(con)
+    section, _ = sfs_render.forarbeten_section(site, nyalagen)
+    assert "Prop. 2021/22:70" in section
+
+
+def test_forarbeten_section_names_the_preceding_sou(tmp_path):
+    law_uri = "https://lagen.nu/2020:306"
+    law = _law_amended_by(
+        law_uri, "Sourlagen (2020:306)", "2022:5",
+        "ändr. 1 §", ["https://lagen.nu/2020:306#P1"], "Prop. 2021/22:80")
+    prop = _citer("https://lagen.nu/prop/2021/22:80", "Prop. 2021/22:80",
+                  "Förslaget", "2022-04-01", ["a1.1"])
+    prop["beredning"] = {"identifier": "SOU 2020:44",
+                         "uri": "https://lagen.nu/sou/2020:44"}
+    # the SOU also cites the law directly (the ordinary case: an utredning
+    # quotes/discusses the exact provisions it proposes to change) -- must not
+    # then double-list, once here and again in the generic citation panel
+    sou = {"uri": "https://lagen.nu/sou/2020:44", "doctype": "sou",
+          "identifier": "SOU 2020:44", "title": "Utredningens betänkande",
+          "date": "2020-09-01",
+          "structure": [{"type": "avsnitt", "id": "a2.1", "children": [
+              {"type": "stycke", "text": [
+                  "se ", {"predicate": "dcterms:references", "text": "lagen",
+                          "uri": law_uri}, "."]}]}]}
+
+    db = str(tmp_path / "catalog.sqlite")
+    (tmp_path / "law.json").write_text(json.dumps(law))
+    (tmp_path / "prop.json").write_text(json.dumps(prop))
+    (tmp_path / "sou.json").write_text(json.dumps(sou))
+    catalog.rebuild(db, "sfs", [tmp_path / "law.json"])
+    catalog.rebuild(db, "forarbete", [tmp_path / "prop.json", tmp_path / "sou.json"])
+    con = catalog.connect(db)
+    resolve_omfattning(con)
+
+    site = page.Site.from_catalog(con)
+    section, own = sfs_render.forarbeten_section(site, law)
+    assert ('<a href="/prop/2021/22:80">Prop. 2021/22:80: Förslaget</a> '
+           '(<a href="/sou/2020:44">SOU 2020:44</a>)') in section
+    # the SOU is shown here, so it must be excluded from the citation panel
+    # below rather than appearing a second time as its own inbound row
+    assert own == {"https://lagen.nu/prop/2021/22:80", "https://lagen.nu/sou/2020:44"}
+    panel = page.render_rail_sections(page.document_inbound(site, law_uri, own))
+    assert "SOU 2020:44" not in panel
 
 
 def test_inbound_panel_overflow_is_expandable(tmp_path, monkeypatch):

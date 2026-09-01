@@ -22,6 +22,7 @@ from ferenda.sfs.register import (
     lfragment,
     lookup_resource,
     omfattning_predicate,
+    omfattning_size,
     parse_forarbeten,
     register_from_source,
     resource_map,
@@ -174,6 +175,30 @@ def test_omfattning_predicate():
     assert omfattning_predicate("ny 3 §") == "rpubl:inforsI"
     assert omfattning_predicate("tillägg 7 §") == "rpubl:inforsI"
     assert omfattning_predicate("nuvarande 2 § betecknas 3 §") is None
+
+
+def test_omfattning_size_counts_distinct_paragrafs():
+    # ändr. + ny, one paragraf shared -> 3 distinct: K1P9, K1P10, K2P22
+    props = {"rpubl:andrar": "ändr. 1 kap. 9, 10 §§, 2 kap. 22 §; ny 1 kap. 9 §",
+             "rpubl:ersatter": ["https://lagen.nu/2011:1029#K1P9",
+                               "https://lagen.nu/2011:1029#K1P10",
+                               "https://lagen.nu/2011:1029#K2P22"],
+             "rpubl:inforsI": ["https://lagen.nu/2011:1029#K1P9"]}
+    assert omfattning_size(props) == 3
+
+
+def test_omfattning_size_none_without_an_omfattning_field():
+    # the grundförfattning's own amendment row: nothing to compare a law's
+    # creation against, so it must not read as "0 paragrafs touched"
+    assert omfattning_size({"dcterms:identifier": "SFS 2018:585"}) is None
+
+
+def test_omfattning_size_zero_for_a_pure_renumbering():
+    # "nuvarande X betecknas Y" mints no rpubl:ersatter/upphaver/inforsI entry
+    # (omfattning_predicate returns None for it), so the field is present but
+    # empty -- distinct from the grundförfattning's missing field above
+    props = {"rpubl:andrar": "nuvarande 2 § betecknas 3 §"}
+    assert omfattning_size(props) == 0
 
 
 # --- register parsing ---------------------------------------------------

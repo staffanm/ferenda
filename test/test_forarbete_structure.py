@@ -1,7 +1,7 @@
 """Förarbete hierarchy: the flat block run grouped into a nested section tree
 (ferenda/forarbete/structure.py)."""
 
-from ferenda.forarbete.structure import flatten, nest
+from ferenda.forarbete.structure import beredning, flatten, nest
 
 
 def _blocks():
@@ -64,3 +64,45 @@ def test_flatten_is_the_inverse_document_order():
     assert [b["type"] for b in flat] == [b["type"] for b in blocks]
     assert [b["text"] for b in flat] == [b["text"] for b in blocks]
     assert [b.get("page") for b in flat] == [b.get("page") for b in blocks]
+
+
+def _sou_ref(text):
+    return {"predicate": "dcterms:references", "text": text,
+            "uri": "https://lagen.nu/%s/%s" % (
+                ("sou" if text.startswith("SOU") else "ds"), text.split(" ", 1)[1])}
+
+
+def test_beredning_finds_the_first_sou_in_the_beredning_section():
+    root = nest([
+        {"type": "rubrik", "level": 1, "text": ["1 Förslag till riksdagsbeslut"]},
+        {"type": "rubrik", "level": 1, "text": ["2 Ärendet och dess beredning"]},
+        {"type": "stycke", "text": ["Utredningen lämnade betänkandet ",
+                                    _sou_ref("SOU 2015:25"), "."]},
+        {"type": "stycke", "text": ["Se även ", _sou_ref("SOU 2010:1"), "."]},
+        {"type": "rubrik", "level": 1, "text": ["3 Förslaget"]},
+        {"type": "stycke", "text": ["Regeringen föreslår ", _sou_ref("SOU 1999:9"), "."]},
+    ])
+    assert beredning(root) == {"identifier": "SOU 2015:25",
+                               "uri": "https://lagen.nu/sou/2015:25"}
+
+
+def test_beredning_finds_a_ds_too():
+    root = nest([
+        {"type": "rubrik", "level": 1, "text": ["2 Ärendet och dess beredning"]},
+        {"type": "stycke", "text": ["Förslaget bygger på ", _sou_ref("Ds 2020:1"), "."]},
+    ])
+    assert beredning(root) == {"identifier": "Ds 2020:1",
+                               "uri": "https://lagen.nu/ds/2020:1"}
+
+
+def test_beredning_none_without_a_beredning_section():
+    root = nest([{"type": "rubrik", "level": 1, "text": ["1 Bakgrund"]},
+                 {"type": "stycke", "text": [_sou_ref("SOU 2015:25")]}])
+    assert beredning(root) is None
+
+
+def test_beredning_none_when_the_section_names_no_utredning():
+    root = nest([{"type": "rubrik", "level": 1, "text": ["2 Ärendet och dess beredning"]},
+                 {"type": "stycke", "text": ["Förslaget har tagits fram inom "
+                                             "Regeringskansliet."]}])
+    assert beredning(root) is None
