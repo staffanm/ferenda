@@ -394,20 +394,22 @@ NO_CONTENT = ".no-content"
 # that window, so keying on it would mark almost every version dead on sight
 # (rule:respect-source-temporality).
 
+# A CELLAR object can also be broken outright: the graph names it, but every
+# fetch of it answers a persistent 5xx ("Cannot retrieve FILE metadata").
+# That is dated and cached the same way as NO_CONTENT -- most of these are old
+# consolidations (2004-2013) unlikely to be repaired soon, and re-running the
+# full retry backoff on the same 20 broken versions every sweep costs minutes
+# for nothing. The TTL still asks again eventually, in case CELLAR heals it.
+FAILED = ".cellar-error"
 
-def version_settled(target):
-    """Whether this version needs no attempt this run: its content is stored
-    (the notice marks that, as for an act), or CELLAR answered that it has
-    none recently enough to believe (`NO_CONTENT_TTL`).
 
-    A marker that does not parse as a date is treated as absent, which asks
+def _marker_recent(marker):
+    """Whether `marker` holds a date within `NO_CONTENT_TTL` of today. A
+    marker that does not parse as a date is treated as absent, which asks
     CELLAR again and rewrites it -- the choice is spelled out because the
     alternative is silent and permanent: compared as a *string*, anything
     that is not a date ("corrupt", a future date from a skewed clock) sorts
     above the cutoff and would settle that version for ever."""
-    if compress.exists(target / "notice.ttl"):
-        return True
-    marker = target / NO_CONTENT
     if not marker.exists():
         return False
     try:
@@ -419,6 +421,17 @@ def version_settled(target):
     # day arrives, so it counts as unreadable too
     today = date.today()
     return today - NO_CONTENT_TTL <= asked <= today
+
+
+def version_settled(target):
+    """Whether this version needs no attempt this run: its content is stored
+    (the notice marks that, as for an act), CELLAR answered that it has none
+    recently enough to believe (`NO_CONTENT`), or a fetch of it recently hit
+    a persistent CELLAR-side error (`FAILED`) -- both dated markers checked
+    against `NO_CONTENT_TTL`."""
+    if compress.exists(target / "notice.ttl"):
+        return True
+    return _marker_recent(target / NO_CONTENT) or _marker_recent(target / FAILED)
 
 
 def version_dir(root, celex, version):
@@ -449,8 +462,9 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
     dated, and skipped until that answer ages out (`NO_CONTENT_TTL`) -- so
     the wordings CELLAR never translated are asked about once a window
     instead of once a run, while one that gains a translation is still found.
-    A version whose fetch *failed* is left unrecorded: that is a CELLAR
-    fault, not an answer about the wording, so it always retries."""
+    A version whose fetch hit a persistent CELLAR-side error (`FAILED`) is
+    recorded the same way: asked about once a window instead of grinding
+    through the same broken object's retry backoff on every sweep."""
     found = fetch_consolidations(session, sorted(set(celexes)))
     seen = stored = skipped = empty = failed = 0
     pending = []
@@ -482,6 +496,7 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
                 # the wording gained a text: the recorded negative is now a
                 # lie, and it is what the operator reads off the tree
                 (target / NO_CONTENT).unlink(missing_ok=True)
+                (target / FAILED).unlink(missing_ok=True)
             else:
                 empty += 1
                 # record the answer, dated: the next run skips this version
@@ -491,10 +506,14 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
                       % (cons, "/".join(languages)), flush=True)
         except requests.HTTPError as exc:
             # CELLAR holds objects that answer a *persistent* 5xx (the
-            # transport already retried the transient kind five times).
-            # One broken remote object must not abort a 20,000-version
-            # sweep: the version is recorded and left unstored -- no
-            # notice marker -- so the next run re-attempts it.
+            # transport already retried the transient kind, briefly --
+            # `store_document`'s content fetch uses `retries=2`, not the
+            # usual five, since this is a per-object fault a longer backoff
+            # cannot fix). One broken remote object must not abort a
+            # 20,000-version sweep: the version is left unstored, and the
+            # failure is recorded and dated (`FAILED`) so the next run skips
+            # it until `NO_CONTENT_TTL` -- the same "ask once a window"
+            # treatment as a no-content answer, not a retry on every sweep.
             #
             # Only a 5xx. A 4xx here is our own bug (a malformed
             # manifestation url), not a broken remote object -- 404 is
@@ -507,6 +526,7 @@ def download_consolidations(session, root, celexes, languages=LANGUAGES,
             if exc.response.status_code < 500:
                 raise
             failed += 1
+            write_atomic(target / FAILED, date.today().isoformat())
             print("%s: CELLAR error, version left unstored: %s"
                   % (cons, exc), flush=True)
         if fetched:

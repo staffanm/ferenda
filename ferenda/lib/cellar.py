@@ -711,7 +711,11 @@ def store_document(session, target, celex, wdate, selection, eurovoc,
     for code, candidates in selection:
         for filetype, url, accept in candidates:
             try:
-                response = request(session, "GET", url, timeout=180,
+                # retries=2 (one retry, not the usual five): a broken CELLAR
+                # object answers 500 with a body naming the missing DOC_1 --
+                # a definitive per-object fault, not a transient overload, so
+                # burning a minute of exponential backoff on it buys nothing.
+                response = request(session, "GET", url, timeout=180, retries=2,
                                    headers={"Accept": accept} if accept else None)
             except requests.HTTPError as exc:
                 # CELLAR's graph can name an item whose content is gone: the
