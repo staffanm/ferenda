@@ -11,6 +11,7 @@ write-then-clobber). The sitenews listing lives at ``/dataset/sitenews/feed``
 -- the URLs the legacy site published.
 """
 
+import re
 from pathlib import Path
 
 from markupsafe import Markup
@@ -18,6 +19,14 @@ from markupsafe import Markup
 from ..lib import compress, feeds, layout, tpl
 from ..lib.page import BRAND, escape, href, page
 from ..lib.render import edit_meta
+
+# a stycke opening "7 §" (jante.md, kamomilla.md -- a definite-form subdomain
+# quoting a "law" for a chapter kind's own act, PRD-subdomains.md section 8)
+# gets the same hanging-numeral gutter a real SFS paragraf renders with
+# (nodes.html's `paragraf` macro, whose CSS is keyed on the class names alone
+# -- no rail/toc wiring needed for a page with no other paragrafer to link
+# between), rather than reading as an ordinary sentence starting with a digit.
+_PARAGRAF_MARKER = re.compile(r"^(\d+)\s*§\.?\s*")
 
 FEED_URL = "https://lagen.nu/dataset/sitenews/feed"
 
@@ -87,7 +96,16 @@ def _block_html(block):
         lvl = min(max(block["level"], 2), 4)
         return "<h%d>%s</h%d>" % (lvl, escape(block["text"]), lvl)
     if t == "stycke":
-        return "<p>%s</p>" % _runs_html(block["runs"])
+        runs = block["runs"]
+        first = runs[0] if runs else None
+        if isinstance(first, str) and (m := _PARAGRAF_MARKER.match(first)):
+            rest = first[m.end():]
+            body = ([rest] if rest else []) + runs[1:]
+            return ('<section class="paragraf"><div class="paragraf-gutter">'
+                    '<span class="n">%s §</span></div>'
+                    '<div class="paragraf-body"><p>%s</p></div></section>'
+                    % (escape(m.group(1)), _runs_html(body)))
+        return "<p>%s</p>" % _runs_html(runs)
     if t == "lista":
         tag = "ol" if block["ordered"] else "ul"
         return "<%s>%s</%s>" % (tag, "".join(
