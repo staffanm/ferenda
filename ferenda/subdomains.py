@@ -3,13 +3,16 @@
 straight from the curated name tables the citation engine already reads, not
 a separately maintained list.
 
-The whole-act kind is generated (PRD-subdomains.md section 6); the standalone
-kind is curated in the lagen-wiki content repo, but even there nothing is
-separately *listed* -- a `site/subdomain/<zone>/<slug>.md` file existing is
-itself the registration (`standalone_rows`). The chapter kind still needs an
-explicit registry, `site/subdomains.md` (`chapter_rows`): unlike a standalone
-page, a chapter/paragraf has no page of its own to register by existing --
-only a target act and a fragment to name.
+The whole-act kind is generated (PRD-subdomains.md section 6); the chapter
+kind is too, from the same `namedlaws.json` -- a name is a whole-act name or
+a span name exactly as its entry says (a bare `label`/`abbr`, or a `spans`
+entry naming *part* of the act, `lib.lagrum.load_named_spans`), cut to a
+hostname by the same `_cut` rule either way. The standalone kind is curated
+in the lagen-wiki content repo instead, but even there nothing is separately
+*listed* -- a `site/subdomain/<zone>/<slug>.md` file existing is itself the
+registration (`standalone_rows`); unlike a span, a standalone page (a curated
+easter egg, not a name for part of a real act) has no act to derive a name
+from.
 """
 
 import json
@@ -19,8 +22,9 @@ import unicodedata
 from pathlib import Path
 
 from .lib import catalog, compress, layout
-from .lib.lagrum import load_namedlaws
+from .lib.lagrum import load_named_spans, load_namedlaws
 from .lib.page import Site
+from .lib.render import edit_meta
 from .sfs import render as sfs_render
 from .site import parse as site_parse
 
@@ -110,55 +114,64 @@ def standalone_rows(wiki_root=None):
     return rows
 
 
-def chapter_rows(wiki_root=None):
-    """slug.zone -> target act+fragment, one row per bullet in
-    `site/subdomains.md` (PRD-subdomains.md section 6) -- `- [hyres.lagen.nu]
-    (sfs:1970:994#K12)`. Reuses the `site` vertical's own markdown-list
-    parser (the same one `frontpage.md`'s curated law list goes through)
-    rather than a second, drifting one-off parser for "a bullet list of
-    links"."""
-    wiki_root = layout.WIKI_ROOT if wiki_root is None else wiki_root
-    path = Path(wiki_root) / "site" / "subdomains.md"
-    if not path.exists():
-        return {}
-    rows = {}
-    for block in site_parse.blocks(path.read_text(encoding="utf-8"), "subdomains"):
-        if block.type != "lista":
-            continue
-        for item in block.items:
-            run = item[0]
-            host = run["text"]
-            uri = run["uri"]
-            if not uri.startswith(catalog.BASE):
-                raise ValueError(
-                    f"site/subdomains.md: {host!r} targets {uri!r}, not a "
-                    f"{catalog.BASE}... document"
-                )
-            rows[host] = "/" + uri[len(catalog.BASE):]
-    return rows
+def _named_spans():
+    """host -> (name, NamedSpan), for every `namedlaws.json` span whose name
+    cuts to a hostname the same way a whole act's name does ("hyreslagen" ->
+    "hyres", exactly as "avtalslagen" -> "avtals", `whole_act_rows`). Reuses
+    `_cut`/`_add`: a span is not a separately registered subdomain, it is
+    what a `namedlaws.json` entry's `spans` key already says."""
+    rows: dict[str, tuple] = {}
+    for name, span in load_named_spans(SFS_NAMEDLAWS).items():
+        if slug := _cut(name, "lagen"):
+            _add(rows, f"{slug}.lagen.nu", (name, span), name)
+        elif slug := _cut(name, "förordningen"):
+            _add(rows, f"{slug}.förordningen.nu", (name, span), name)
+    return {host: pair for host, (pair, _source) in rows.items()}
+
+
+def named_span_rows():
+    """slug.zone -> "/lawid#first-last" (PRD-subdomains.md section 6) -- the
+    routing half of `_named_spans()`, the shape `write_sub_tree` needs
+    alongside `whole_act_rows`/`standalone_rows`. `first`/`last` are dash-
+    joined here purely as this module's own internal wire format between
+    this and `write_chapter_pages`/`write_sub_tree` (which dispatch on
+    whether a target carries a `#fragment` at all) -- `namedlaws.json` itself
+    keeps them as separate fields; no node id ever contains a dash."""
+    return {host: f"/{span.lawid}#{span.first}-{span.last}"
+            for host, (_name, span) in _named_spans().items()}
 
 
 def write_chapter_pages(generated_root, con):
-    """Render each `chapter_rows()` target to its own file,
+    """Render each `_named_spans()` target to its own file,
     `generated/subdomain/<zone>/<slug>.html` -- the one subdomain kind
     `write_sub_tree` cannot just symlink to an existing page, since the
     target is part of a document, not a document of its own.
 
     Needs a live catalog connection, unlike every other function in this
     module: `sfs.render.render_chapter`'s rail (kommentar, citations) reads
-    it via a `lib.page.Site`. `site/subdomains.md` only ever names an SFS
-    act today (`sfs:<id>#<fragment>`), so this only knows how to render
-    that one source's chapters -- widening it is real work for whenever a
-    chapter of some other source's act is actually asked for, not before."""
+    it via a `lib.page.Site`. `namedlaws.json` only ever names an SFS act
+    today, so this only knows how to render that one source's spans --
+    widening it is real work for whenever a span of some other source's act
+    is actually asked for, not before.
+
+    `render_chapter` itself stays ignorant of editing (it is also called by
+    tests against a bare artifact); the `<meta name="lagen-doc">` that turns
+    on editor.js's kommentar ✎ buttons is grafted on here, the same
+    `edit_meta` call `render_document` makes for every full-document page --
+    the node ids kommentar keys on (an act's kaprubrik/paragraf anchors) do
+    not change when only part of the act is shown."""
     generated_root = Path(generated_root)
     site = Site.from_catalog(con)
-    for host, target in chapter_rows().items():
-        sfsid, _, node_id = target.lstrip("/").partition("#")
-        art_path = layout.artifact("sfs", sfsid)
+    for host, (name, span) in _named_spans().items():
+        art_path = layout.artifact("sfs", span.lawid)
         if not compress.exists(art_path):
             continue
         art = compress.read_json(art_path)
-        html = sfs_render.render_chapter(art, site, node_id)
+        html = sfs_render.render_chapter(art, site, span.first, span.last,
+                                         name, span.reason)
+        ref = catalog.local(art["uri"])
+        meta = edit_meta("kommentar", ref, art["uri"], source="sfs", basefile=ref)
+        html = html.replace("</head>", meta + "</head>", 1)
         label, _, zone = host.partition(".")
         dest = generated_root / "subdomain" / zone / (label + ".html")
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -212,7 +225,7 @@ def write_sub_tree(generated_root, rows=None):
     a defect in the row itself."""
     if rows is None:
         parts = {"whole-act": whole_act_rows(), "standalone": standalone_rows(),
-                 "chapter": chapter_rows()}
+                 "chapter": named_span_rows()}
         rows = {}
         for kind, part in parts.items():
             collisions = rows.keys() & part.keys()
@@ -231,12 +244,12 @@ def write_sub_tree(generated_root, rows=None):
     for host, target in sorted(rows.items()):
         label, _, zone = host.partition(".")
         if "#" in target:
-            # chapter kind: its own file (not yet written by anything -- the
-            # real chapter renderer this needs is not implemented), never the
-            # target act's whole page. page_relpath strips a fragment, so
-            # resolving `target` directly here would silently symlink to the
-            # WHOLE act instead of just its chapter -- wrong content behind a
-            # working-looking link, not a missing page.
+            # chapter kind: `write_chapter_pages` already rendered its own
+            # file at this path, never the target act's whole page.
+            # page_relpath strips a fragment, so resolving `target` directly
+            # here would silently symlink to the WHOLE act instead of just
+            # its span -- wrong content behind a working-looking link, not a
+            # missing page.
             relpath = layout.page_relpath(f"subdomain/{zone}/{label}")
         else:
             relpath = layout.page_relpath(target.lstrip("/"))
@@ -270,9 +283,7 @@ def write_sub_tree(generated_root, rows=None):
     # The inspectable artifact (section 6): what is actually live, not merely
     # what the source tables say should be -- a row whose generated page
     # doesn't exist yet is absent from both this and the nginx map, not
-    # listed as a promise. Only the whole-act half exists yet; the chapter
-    # and standalone kinds (curated in lagen-wiki) are a caller's job to
-    # merge in once that half is implemented.
+    # listed as a promise.
     (generated_root / "subdomains.json").write_text(
         json.dumps(served, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

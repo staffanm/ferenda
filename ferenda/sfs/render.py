@@ -12,7 +12,7 @@ from html import escape
 
 from markupsafe import Markup
 
-from ..lib import catalog, history, labels, lagrum, layout, tpl
+from ..lib import catalog, history, labels, lagrum, layout, markdown, tpl
 from ..lib.catalog import BASE
 from ..lib.page import (
     BANNERS,
@@ -30,6 +30,7 @@ from ..lib.page import (
     prop_link,
     register_anchor,
     render_node,
+    render_runs,
     render_toc,
 )
 
@@ -406,59 +407,92 @@ def render(art, site):
         andringar=andringar))
 
 
-def _find_node(nodes, node_id):
-    """The structure node with this id, searched depth-first, or None."""
+def _sibling_range(nodes, first_id, last_id):
+    """The chain of ancestors down to (and including) the common parent whose
+    *own children* run from `first_id` to `last_id`, plus that slice of
+    children, first to last inclusive -- or None if no level of `nodes` holds
+    both. `render_chapter` needs the chain, not just the slice: a range that
+    bottoms out inside a chapter (samtyckeslagen's K6P1..K6P1) still shows
+    that chapter's own heading above it, and one spanning whole chapters
+    (a hypothetical arrendelagen's K7..K11) still shows the avdelning's.
+
+    Matched by position, not by counting ids: a `rubrik`/repealed `upphavd`
+    sibling between the two carries no id of its own (ipred-lagen's 53 a and
+    53 g are both repealed stubs sitting between 53 and 53 h) and still
+    belongs in the slice."""
+    ids = [n.get("id") for n in nodes]
+    if first_id in ids and last_id in ids:
+        i, j = ids.index(first_id), ids.index(last_id)
+        if i > j:
+            raise ValueError(
+                "%r sorts after %r among their common parent's children" %
+                (first_id, last_id))
+        return [], nodes[i:j + 1]
     for node in nodes:
-        if node.get("id") == node_id:
-            return node
-        found = _find_node(node.get("children", []), node_id)
+        found = _sibling_range(node.get("children", []), first_id, last_id)
         if found is not None:
-            return found
+            ancestors, node_slice = found
+            return [node] + ancestors, node_slice
     return None
 
 
-def render_chapter(art, site, node_id):
-    """One chapter or provision of an act, as its own page
-    (PRD-subdomains.md section 6, the chapter kind: `hyres.lagen.nu` ->
-    `1970:994#K12`, `samtyckes.lagen.nu` -> `1962:700#K6P1`) -- a
-    definite-form subdomain slug that names *part* of a law, not the whole
-    of it.
+def render_chapter(art, site, first_id, last_id, name, reason):
+    """One named span of an act, as its own page (PRD-subdomains.md section
+    6: `hyreslagen` -> `1970:994#K12..K12`, a hypothetical `arrendelagen` ->
+    `1970:994#K7..K11`) -- `name`/`reason` from that act's `namedlaws.json`
+    entry (`lib.lagrum.NamedSpan`), a definite-form subdomain slug that names
+    *part* of a law, not the whole of it, and says why.
 
     Filters the artifact, not the HTML: `render_node`/`Toc`/`Rail` are
     already a pure walk over whichever nodes they are handed, each entry
     keyed by its own node id, not hardwired to "all of art['structure']" --
-    so calling them on just the target node, instead of the whole
-    `art['structure']` loop `render()` runs, is the entire filter. In
-    particular `Rail._commentary` looks up `(doc_uri, nid)`, so a kommentar
-    authored on this very node id already renders in the rail exactly where
-    the page opens -- the "editorial explanation that this is part of a
-    larger law" the PRD asks for is that existing mechanism, generalized;
-    nothing new to build for it.
+    so calling them on just the target slice, instead of the whole
+    `art['structure']` loop `render()` runs, is the entire filter.
+    `_sibling_range` finds that slice and re-wraps each ancestor above it
+    keeping only its own title child (if it has one) plus the path down to
+    the slice, so render_node's existing "kapitel" branch emits each real
+    ancestor heading exactly as it would on the full document page, with
+    none of a sibling chapter's own paragrafer pulled in beside it.
+
+    Unlike `commentary/sfs/`'s per-provision prose (what a paragraf means),
+    `reason` says why this slice carries this name -- the naming's own
+    rationale, rendered as a note banner with a link out to the act's own
+    page at `first_id`, so a reader can see the same text in its full
+    context. The H1 is the popular name itself (curated, sourced -- unlike
+    an invented nickname, honest to show), with the act's own official title
+    moved into the meta panel.
 
     The act's amendment register, its own preparatory-works list and the
     äldre-lydelse/upphävd banner are left out on purpose: they are about the
-    whole act's history, not this excerpt of it. The page title stays the
-    *act's* own name (`lb.short_title`, e.g. "Jordabalken") -- honest about
-    what document this is -- rather than a popular nickname invented here
-    with nothing authored behind it; that framing is exactly what a
-    kommentar on this node is for."""
-    node = _find_node(art.get("structure", []), node_id)
-    if node is None:
+    whole act's history, not this excerpt of it."""
+    found = _sibling_range(art.get("structure", []), first_id, last_id)
+    if found is None:
         raise ValueError(
-            "%s: no node %r in this act's structure (site/subdomains.md "
-            "names an id this act does not have)" % (art["uri"], node_id))
+            "%s: %r..%r is not a valid sibling range in this act's "
+            "structure (a namedlaws.json span names ids this act does not "
+            "have, or that are not siblings)" % (art["uri"], first_id, last_id))
+    ancestors, nodes = found
+    for ancestor in reversed(ancestors):
+        kids = ancestor.get("children", [])
+        title = kids[0] if kids and kids[0].get("type") == "rubrik" else None
+        nodes = [{**ancestor, "children": ([title] if title else []) + nodes}]
     lb = labels.document_labels("sfs", art)
     toc = Toc()
     rail = Rail(site, art["uri"])
     site.caselaw_memo.clear()
     site.caselaw_memo[art["uri"]] = catalog.caselaw_anchored(
         site.con, art["uri"], live=_node_id_set(art.get("structure", [])))
-    structure = Markup(render_node(node, site, art["uri"], toc, rail))
+    structure = Markup("".join(
+        render_node(n, site, art["uri"], toc, rail) for n in nodes))
+    banner = BANNERS.named_span_banner(
+        lb.short_title, Markup(render_runs(markdown.to_runs(reason), site)),
+        href(art["uri"] + "#" + first_id))
     return ENV.get_template("sfs.html").render(page_context(
-        lb.short_title, "Författning", doc_meta([], art.get("source_url")),
+        name[:1].upper() + name[1:], "Författning",
+        doc_meta([("Titel", lb.official_title)], art.get("source_url")),
         toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id,
         island=rail.island(),
-        banner=Markup(""), forarbeten=Markup(""),
+        banner=banner, forarbeten=Markup(""),
         has_lydelser=False, structure=structure,
         andringar=Markup("")))

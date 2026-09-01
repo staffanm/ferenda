@@ -44,6 +44,39 @@ def test_sfs_unknown_term_does_not_resolve():
     assert resolve.resolve_sfs("skadestånd") is None
 
 
+def test_sfs_bare_span_name_resolves_to_its_first_node():
+    # unlike a whole act's name, a named span ("hyreslagen" for 12 kap.
+    # jordabalken) always carries an implicit pinpoint -- typed bare, it
+    # means the span's own first node, never the act's root
+    # (PRD-subdomains.md section 6)
+    assert resolve.resolve_sfs("hyreslagen") == "https://lagen.nu/1970:994#K12"
+    assert (resolve.resolve_sfs("samtyckeslagen")
+            == "https://lagen.nu/1962:700#K6P1")
+
+
+def test_resolve_carries_a_named_spans_reason_as_plain_text():
+    # the naming's own rationale rides along with the resolved hit (so a
+    # search result can show it, not just the pin) -- as plain text, since a
+    # search snippet is not rich HTML: a `[label](sfs:...)` cross-reference
+    # in the reason (mobiltelefonlagen disambiguating against skollagen)
+    # must not leak its raw markdown brackets into a result list
+    hits = resolve.resolve("cookielagen")
+    assert len(hits) == 1
+    assert hits[0]["uri"] == "https://lagen.nu/2022:482#K9P28"
+    assert hits[0]["source"] == "sfs"
+    assert "en abonnents terminalutrustning" in hits[0]["reason"]
+    assert "[" not in hits[0]["reason"]
+
+    hits = resolve.resolve("mobiltelefonlagen")
+    assert "[" not in hits[0]["reason"]
+    assert "5 kap. 4 § skollagen" in hits[0]["reason"]
+
+
+def test_resolve_carries_no_reason_for_a_whole_act_name():
+    hits = resolve.resolve("avtalslagen")
+    assert hits == [{"uri": "https://lagen.nu/1915:218", "source": "sfs"}]
+
+
 def test_sfs_relative_citation_without_base_does_not_mint_sentinel():
     # "3 § skadestånd" carries a relative pinpoint but no resolvable base
     # law -- it must return None, never a garbage URI under the "query"

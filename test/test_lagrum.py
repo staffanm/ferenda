@@ -47,6 +47,7 @@ from ferenda.lib.lagrum import (
     interleave,
     is_placeholder_sfsid,
     load_abbreviations,
+    load_named_spans,
     load_namedacts,
     load_namedlaws,
     with_indefinite_aliases,
@@ -1389,6 +1390,25 @@ def _dataset(tmp_path, data=None):
     p.write_text(json.dumps(data or _SOL_DATASET, ensure_ascii=False),
                  encoding="utf-8")
     return p
+
+
+# ---- a name for part of an act, not the whole of it -------------------------
+
+def test_load_named_spans_reads_the_spans_entry(tmp_path):
+    data = {
+        "1970:994": {"label": "jordabalken", "spans": {
+            "hyreslagen": {"first": "K12", "last": "K12",
+                          "reason": "Jordabalkens tolfte kapitel, om hyra."}}},
+        "1962:700": {"label": "brottsbalken"},   # no spans -- must contribute none
+    }
+    spans = load_named_spans(_dataset(tmp_path, data))
+    assert spans == {"hyreslagen": ("1970:994", "K12", "K12",
+                                    "Jordabalkens tolfte kapitel, om hyra.")}
+
+
+def test_load_named_spans_empty_without_any_spans_entry(tmp_path):
+    spans = load_named_spans(_dataset(tmp_path, _SOL_DATASET))
+    assert spans == {}
 
 
 def test_a_named_law_resolves_to_the_act_that_bore_the_name_then(tmp_path):

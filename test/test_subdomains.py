@@ -7,8 +7,8 @@ import pytest
 
 from ferenda.lib import catalog, compress
 from ferenda.subdomains import (
-    chapter_rows,
     layout,
+    named_span_rows,
     standalone_rows,
     whole_act_rows,
     write_chapter_pages,
@@ -184,20 +184,41 @@ def test_write_sub_tree_symlink_resolves_under_a_different_mount_prefix(tmp_path
     assert other_view_link.read_bytes() == b"brotli bytes"
 
 
-def test_chapter_rows_reads_the_registry(tmp_path):
-    (tmp_path / "site").mkdir()
-    (tmp_path / "site" / "subdomains.md").write_text(
-        "- [hyres.lagen.nu](sfs:1970:994#K12)\n"
-        "- [samtyckes.lagen.nu](sfs:1962:700#K6P1)\n",
-        encoding="utf-8")
-    assert chapter_rows(tmp_path) == {
-        "hyres.lagen.nu": "/1970:994#K12",
-        "samtyckes.lagen.nu": "/1962:700#K6P1",
+def test_named_span_rows_matches_the_worked_examples():
+    # the real namedlaws.json, not a fixture -- hyreslagen/samtyckeslagen are
+    # curated entries, not test data (PRD-subdomains.md section 6)
+    rows = named_span_rows()
+    assert rows["hyres.lagen.nu"] == "/1970:994#K12-K12"
+    assert rows["samtyckes.lagen.nu"] == "/1962:700#K6P1-K6P1"
+
+
+def _write_namedlaws(path, spans):
+    path.write_text(json.dumps({
+        lawid: {"label": lawid, "spans": {
+            name: {"first": first, "last": last, "reason": reason}}}
+        for lawid, name, first, last, reason in spans
+    }), encoding="utf-8")
+
+
+def test_named_span_rows_reads_namedlaws_json(tmp_path, monkeypatch):
+    namedlaws = tmp_path / "namedlaws.json"
+    _write_namedlaws(namedlaws, [
+        ("1970:994", "hyreslagen", "K12", "K12", "..."),
+        ("1962:700", "samtyckeslagen", "K6P1", "K6P1", "..."),
+    ])
+    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
+    assert named_span_rows() == {
+        "hyres.lagen.nu": "/1970:994#K12-K12",
+        "samtyckes.lagen.nu": "/1962:700#K6P1-K6P1",
     }
 
 
-def test_chapter_rows_empty_without_a_registry_file(tmp_path):
-    assert chapter_rows(tmp_path) == {}
+def test_named_span_rows_empty_without_any_spans(tmp_path, monkeypatch):
+    namedlaws = tmp_path / "namedlaws.json"
+    namedlaws.write_text(json.dumps({"1970:994": {"label": "jordabalken"}}),
+                         encoding="utf-8")
+    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
+    assert named_span_rows() == {}
 
 
 CHAPTERED_ACT = {
@@ -216,11 +237,12 @@ CHAPTERED_ACT = {
 
 
 def test_write_chapter_pages_renders_the_target_chapter(tmp_path, monkeypatch):
-    wiki_root = tmp_path / "wiki"
-    (wiki_root / "site").mkdir(parents=True)
-    (wiki_root / "site" / "subdomains.md").write_text(
-        "- [hyres.lagen.nu](sfs:1970:994#K12)\n", encoding="utf-8")
-    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", wiki_root)
+    namedlaws = tmp_path / "namedlaws.json"
+    _write_namedlaws(namedlaws, [
+        ("1970:994", "hyreslagen", "K12", "K12",
+         "Hyreslagen är jordabalkens tolfte kapitel."),
+    ])
+    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
 
     artifact_root = tmp_path / "artifact"
     monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", artifact_root)
@@ -240,14 +262,16 @@ def test_write_chapter_pages_renders_the_target_chapter(tmp_path, monkeypatch):
     html = compress.read_text(dest)
     assert "12 kap. Hyra" in html
     assert "hyra av fast egendom" in html
+    assert "Hyreslagen" in html
+    assert "jordabalkens tolfte kapitel" in html
 
 
 def test_write_chapter_pages_skips_a_row_whose_act_is_not_built_yet(tmp_path, monkeypatch):
-    wiki_root = tmp_path / "wiki"
-    (wiki_root / "site").mkdir(parents=True)
-    (wiki_root / "site" / "subdomains.md").write_text(
-        "- [hyres.lagen.nu](sfs:1970:994#K12)\n", encoding="utf-8")
-    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", wiki_root)
+    namedlaws = tmp_path / "namedlaws.json"
+    _write_namedlaws(namedlaws, [
+        ("1970:994", "hyreslagen", "K12", "K12", "..."),
+    ])
+    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
     monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", tmp_path / "artifact")
 
     db = str(tmp_path / "catalog.sqlite")

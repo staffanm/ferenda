@@ -1318,6 +1318,32 @@ def load_namedlaws(path):
     return _named_index(json.loads(Path(path).read_text(encoding='utf-8')), "label")
 
 
+class NamedSpan(NamedTuple):
+    """A popular name for *part* of an act ("hyreslagen" for 12 kap.
+    jordabalken, "samtyckeslagen" for 6 kap. 1 § brottsbalken) -- unlike a
+    whole act's name, this one always carries an implicit pinpoint: typed
+    bare, it means `first`, not the act's own root. `reason` is markdown,
+    the naming's own rationale, not commentary on what the provision means."""
+    lawid: str
+    first: str
+    last: str
+    reason: str
+
+
+def load_named_spans(path):
+    """name -> NamedSpan, from the same named-law dataset's optional `spans`
+    entry (law id -> {..., spans?: {name -> {first, last, reason}}}).
+    `resolve.resolve_sfs` reads this beside `load_namedlaws` so a bare span
+    name resolves fragment-deep; `subdomains.py` reads it to route a
+    definite-form subdomain at a part of an act, with no separate registry
+    to keep in sync (PRD-subdomains.md section 6)."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    return {name: NamedSpan(lawid.replace('_', ' '), span["first"],
+                            span["last"], span["reason"])
+            for lawid, entry in data.items()
+            for name, span in (entry.get("spans") or {}).items()}
+
+
 def _named_index(data, key):
     """`NamedLaws` over one naming key of the dataset -- `label` for the spelled
     names, `abbr` for the acronyms, which move between acts with them (SoL named

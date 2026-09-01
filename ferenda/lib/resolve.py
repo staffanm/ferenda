@@ -30,7 +30,7 @@ import functools
 import re
 import threading
 
-from . import datasets
+from . import datasets, markdown, text
 from .coe import treaty_uri
 from .coe_ids import article_fragment
 from .labels import treaty_names
@@ -39,6 +39,7 @@ from .lagrum import (
     LagrumParser,
     lagrum_uri,
     load_abbreviations,
+    load_named_spans,
     load_namedacts,
     load_namedlaws,
 )
@@ -78,6 +79,20 @@ def _leading_laws():
     pairs = list(load_namedlaws(datasets.NAMEDLAWS).items())
     pairs += list(load_abbreviations(datasets.NAMEDLAWS).items())
     return sorted(pairs, key=lambda p: len(p[0]), reverse=True)
+
+
+@functools.cache
+def _named_spans():
+    """Every named span (`lagrum.NamedSpan`), keyed by its lower-cased name --
+    "hyreslagen", "samtyckeslagen". Kept separate from `_leading_laws()`: a
+    span's name is never fed to `LagrumParser` as a leading-law alias, since
+    resolving a *pinpoint* after it ("hyreslagen 3 §") would need the parser to
+    read "3 §" as relative to the span's own chapter, not to the whole act --
+    real work this does not do. Only the bare name resolves here; a name with
+    a pinpoint tail falls through to the ordinary resolvers below, same as any
+    other unrecognised leading word."""
+    return {name.lower(): span
+            for name, span in load_named_spans(datasets.NAMEDLAWS).items()}
 
 
 def _split_leading_law(q):
@@ -131,7 +146,12 @@ def resolve_sfs(q):
     12:1") by peeling the leading law and resolving the pinpoint in its context;
     falls back to parsing the query as a plain citation ("12 kap. 1 § brottsbalken").
     A bare SFS number ("2022:818", "SFS 1962:700 3:1") is peeled the same way
-    a nickname is."""
+    a nickname is. A named span ("hyreslagen") typed bare resolves straight to
+    its own first node -- unlike a whole act's name, it never means the act's
+    root."""
+    span = _named_spans().get(q.strip().lower())
+    if span:
+        return lagrum_uri({"law": span.lawid}) + "#" + span.first
     parser = _fresh_sfs_parser()
     split = _split_leading_law(q) or _split_sfsnr(q)
     if split:
@@ -277,5 +297,18 @@ def resolve(q):
                        ("eurlex", resolve_eu), ("dv", resolve_dv)):
         uri = fn(q)
         if uri and uri not in [o["uri"] for o in out]:
-            out.append({"uri": uri, "source": source})
+            hit = {"uri": uri, "source": source}
+            # a bare span name's own rationale ("cookielagen" -> why 9 kap.
+            # 28 § LEK carries that name) is worth more to a reader than the
+            # provision's own words, which is what a resolved hit shows by
+            # default (pins.resolved_results) -- so it rides along here
+            # rather than requiring a second lookup keyed on the same query.
+            if span := _named_spans().get(q.lower()):
+                # plain text, not the markdown `render_chapter`'s banner
+                # renders it as: a search snippet is never rich HTML, and a
+                # `[label](sfs:...)` cross-reference (mobiltelefonlagen's
+                # disambiguation against skollagen) would otherwise show its
+                # raw markdown brackets to the reader
+                hit["reason"] = text.runs_text(markdown.to_runs(span.reason))
+            out.append(hit)
     return out

@@ -104,6 +104,14 @@
     date is CELLAR's own end-of-validity for the act. -#}
 <div class="expired-banner"><strong>Rättsakten gäller inte längre</strong><span>EUR-Lex anger att rättsakten upphörde att gälla {{ when }}.</span></div>
 {%- endmacro -%}
+{%- macro named_span_banner(act_name, reason, act_url) -%}
+{#- a definite-form subdomain naming *part* of an act ("hyreslagen" for 12
+    kap. jordabalken) rather than a document of its own -- `reason` is the
+    naming's own rationale (namedlaws.json's `spans` entry), already rendered
+    to HTML; `act_url` anchors at the first real provision, so the reader can
+    step out into the act's own page and see the same text in context. -#}
+<div class="note-banner"><strong>Del av {{ act_name }}</strong><span>{{ reason }} <a href="{{ act_url }}">Se bestämmelserna i sitt sammanhang i {{ act_name }}</a>.</span></div>
+{%- endmacro -%}
 {%- macro foreskrift_repealed_banner(links) -%}
 <div class="expired-banner"><strong>Upphävd eller ersatt</strong><span>Denna föreskrift anges som upphävd eller ersatt av {% for l in links %}<a href="{{ l.url }}">{{ l.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</span></div>
 {%- endmacro -%}

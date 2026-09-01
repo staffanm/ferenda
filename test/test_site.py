@@ -3415,21 +3415,40 @@ CHAPTERED_LAW = {
 }
 
 
+HYRESLAGEN_REASON = ("Hyreslagen är inte en egen lag, utan jordabalkens "
+                     "tolfte kapitel, om hyra.")
+
+
 def test_render_chapter_shows_only_the_target_chapter(tmp_path):
     site = page.Site.from_catalog(build_catalog(tmp_path))
-    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12", "K12",
+                                     "hyreslagen", HYRESLAGEN_REASON)
     assert "12 kap. Hyra" in html
     assert "hyra av fast egendom" in html
     assert "Annat kapitel" not in html                  # the sibling stays out
     assert "helt annat kapitel" not in html
-    assert "Jordabalk" in html                           # the act's own name, honestly
+    assert "Hyreslagen" in html                          # the popular name, as H1
+    assert "Jordabalk" in html                           # the act's own name, in the meta panel
+
+
+def test_render_chapter_names_why_the_span_carries_its_name(tmp_path):
+    # the naming's own rationale (namedlaws.json's `spans` entry) renders as
+    # a note banner, with a link back to the full act at the first real node
+    # -- not commentary on what the provision means (PRD-subdomains.md
+    # section 6)
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12", "K12",
+                                     "hyreslagen", HYRESLAGEN_REASON)
+    assert HYRESLAGEN_REASON in html
+    assert 'href="/1970:994#K12">Se bestämmelserna i sitt sammanhang' in html
 
 
 def test_render_chapter_omits_whole_act_sections(tmp_path):
     # the amendment register / förarbeten / äldre-lydelse banner are about the
     # whole act's history, not this excerpt -- PRD-subdomains.md section 6
     site = page.Site.from_catalog(build_catalog(tmp_path))
-    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12", "K12",
+                                     "hyreslagen", HYRESLAGEN_REASON)
     assert "Ändringar och övergångsbestämmelser" not in html
     assert 'id="dokument"' in html
 
@@ -3437,7 +3456,25 @@ def test_render_chapter_omits_whole_act_sections(tmp_path):
 def test_render_chapter_unknown_node_names_the_act(tmp_path):
     site = page.Site.from_catalog(build_catalog(tmp_path))
     with pytest.raises(ValueError, match="1970:994.*K99"):
-        sfs_render.render_chapter(CHAPTERED_LAW, site, "K99")
+        sfs_render.render_chapter(CHAPTERED_LAW, site, "K99", "K99", "x", "x")
+
+
+def test_render_chapter_renders_a_range_of_whole_siblings(tmp_path):
+    # a hypothetical arrendelagen-shaped span covering two whole chapters --
+    # both real, unrelated siblings show, not just the range's own text
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K11", "K12",
+                                     "testlagen", "En span över två hela kapitel.")
+    assert "11 kap. Annat kapitel" in html
+    assert "helt annat kapitel" in html
+    assert "12 kap. Hyra" in html
+    assert "hyra av fast egendom" in html
+
+
+def test_render_chapter_range_out_of_order_raises(tmp_path):
+    site = page.Site.from_catalog(build_catalog(tmp_path))
+    with pytest.raises(ValueError, match="K12.*K11"):
+        sfs_render.render_chapter(CHAPTERED_LAW, site, "K12", "K11", "x", "x")
 
 
 def test_render_chapter_shows_a_kommentar_on_the_chapter_node(tmp_path):
@@ -3459,7 +3496,8 @@ def test_render_chapter_shows_a_kommentar_on_the_chapter_node(tmp_path):
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "kommentar", [komm])
     site = page.Site.from_catalog(catalog.connect(db))
-    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12")
+    html = sfs_render.render_chapter(CHAPTERED_LAW, site, "K12", "K12",
+                                     "hyreslagen", HYRESLAGEN_REASON)
     island = re.search(r'id="lagen-context">(.*?)</script>', html, re.S).group(1)
     assert "Kallas i dagligt tal hyreslagen." in island
     assert "Foo Bar" in island

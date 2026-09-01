@@ -47,6 +47,13 @@ def resolved_results(con, q, source=None, kind=None):
         # name + acronym where the artifact has them, else the title) -- stored
         # on the documents row at relate, so no artifact load per resolved hit
         display = catalog.document_display(con, root) or title
+        pin = _pin(con, _path, root, frag) if frag else None
+        if pin and hit.get("reason"):
+            # a named span's own rationale outranks the provision's own words
+            # as the hit's snippet -- a reader who typed "cookielagen" wants
+            # to know why 9 kap. 28 § LEK carries that name, not to read the
+            # paragraf itself (they can already follow the pin there)
+            pin["highlight"] = [hit["reason"]]
         out.append({
             "uri": root, "url": layout.page_url(root),
             "identifier": label, "title": title, "display": display,
@@ -69,7 +76,7 @@ def resolved_results(con, q, source=None, kind=None):
             # `fragments`, and the client could not tell a resolved provision
             # from a place the words happened to occur -- so "dataförordningen"
             # linked into article 47 of the EU Data Act.
-            "pin": _pin(con, _path, root, frag) if frag else None,
+            "pin": pin,
             "fragments": [],
         })
     return out
