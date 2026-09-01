@@ -2,11 +2,13 @@
 
 Callers: the inline editor's commit engine (`api/editcart.py`), the patch-file
 editor (`api/patch.py`), the ops dashboard's push-state probe (`api/ops.py`),
-the one-time MediaWiki history importer (`tools/migrations/mediawiki_to_markdown.py`) and
-the SFS history export. They need the same `git -C <repo> …` invocation with
-fail-fast errors, so it lives here rather than as copies
-(rule:second-use-goes-to-lib) -- as does `commit_as`, the attributed commit both
-editors make.
+the one-time MediaWiki history importer (`tools/migrations/mediawiki_to_markdown.py`),
+and the history-as-git exports (`sfs/asgit.py`, `eurlex/asgit.py`) -- both
+through `lib/gitledger.py`'s shared ledger, and `sfs/asgit.py` itself again for
+its legacy-trailer detection (`legacy_ledger`). They need the same
+`git -C <repo> …` invocation with fail-fast errors, so it lives here rather
+than as copies (rule:second-use-goes-to-lib) -- as does `commit_as`, the
+attributed commit both editors make.
 """
 
 import os

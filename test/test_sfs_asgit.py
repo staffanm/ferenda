@@ -8,27 +8,28 @@ import subprocess
 
 import pytest
 
-from ferenda.lib import layout
+from ferenda.lib import gitledger, layout
 from ferenda.sfs.asgit import (
     Change,
     Event,
     RebuildRequired,
     collect,
     cycle_members,
-    misfiled_as,
-    refinable,
-    resolve_order_conflicts,
-    ungroup,
     email_slug,
     event_dates,
     existing_ledger,
     export,
     identities,
     message,
+    misfiled_as,
     ordered_events,
+    refinable,
+    resolve_order_conflicts,
     scope_id,
     snapshot_text,
     stream,
+    transition_records,
+    ungroup,
 )
 
 PROP_META = {
@@ -96,9 +97,12 @@ def test_message_composition():
     assert "innefattar även SFS 2021:498" in msg           # archive-gap caveat
     assert "SFS 1998:204: upphävd genom SFS 2018:218" in msg
     assert "Författardatum är ikraftträdandedatum" in msg  # date substitution
-    assert "Lagen-Event: Prop. 2020/21:194" in msg
+    assert "Lagen-" not in msg      # the ledger lives in a sidecar file, not here
     assert ("Co-authored-by: Mikael Damberg <mikael.damberg@lagen.nu>"
             in msg)
+    records = transition_records(ev, _meta)
+    assert {r["id"] for r in records} == {
+        "write:2018:585@2021:952", "delete:1998:204@2018:218"}
 
 
 def test_message_add_commit_notes_consolidation_caveat():
@@ -326,17 +330,12 @@ def test_stream_golden(tmp_path):
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 930830400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 930830400 +0000
-data 498
+data 148
 SFS 1999:175: Testlag (1999:175)
 
 SFS 1999:175: Testlag (1999:175)
 
 Författardatum är ikraftträdandedatum (utfärdandedatum saknas i registret).
-
-Lagen-History-Format: 3
-Lagen-Scope: full
-Lagen-Event: SFS 1999:175
-Lagen-Transition: {"basefile":"1999:175","body":"3ac7bd549a70b015cb19de21fb124eeb12339f5e2bc98e6fcfdcc4baef3ededc","cutoff":"1999:175","event":"SFS 1999:175","id":"write:1999:175@1999:175","metadata":"f56ae4b17cf92c441a5a37901905316007557e2426439826ca53a98ec771e9ed","op":"write"}
 
 M 644 inline 1999/175.txt
 data 26
@@ -345,15 +344,10 @@ data 26
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 979214400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 981028800 +0000
-data 436
+data 94
 SFS 2001:9: Testlag (1999:175)
 
 SFS 1999:175: Testlag (1999:175) -- ändrad t.o.m. SFS 2001:9
-
-Lagen-History-Format: 3
-Lagen-Scope: full
-Lagen-Event: SFS 2001:9
-Lagen-Transition: {"basefile":"1999:175","body":"91b338fb696624b474f8a79b73cb529b5b668b7412a453310d9fe62e71890087","cutoff":"2001:9","event":"SFS 2001:9","id":"write:1999:175@2001:9","metadata":"2e5b5782b147647a31d600a98ee9576894953d315c798de184bcaa41d347e538","op":"write"}
 
 M 644 inline 1999/175.txt
 data 22
@@ -362,17 +356,12 @@ data 22
 commit refs/heads/main
 author Regeringen <regeringen@lagen.nu> 1109678400 +0000
 committer Riksdagen <riksdagen@lagen.nu> 1109678400 +0000
-data 440
+data 150
 SFS 2005:100: upphävande
 
 SFS 1999:175: upphävd genom SFS 2005:100
 
 Författardatum är ikraftträdandedatum (utfärdandedatum saknas i registret).
-
-Lagen-History-Format: 3
-Lagen-Scope: full
-Lagen-Event: SFS 2005:100
-Lagen-Transition: {"basefile":"1999:175","body":null,"cutoff":"2005:100","event":"SFS 2005:100","id":"delete:1999:175@2005:100","metadata":"4d4ef825ea307a82a4e0886ec3d7ce81ff76a2954bdaf3b294648e0e191ef3a6","op":"delete"}
 
 D 1999/175.txt
 """
@@ -381,7 +370,7 @@ D 1999/175.txt
 def test_stream_roundtrips_through_git_fast_import(tmp_path):
     """The stream is what git itself accepts: import it, and the history has
     the three events in order, the file exists after the amendment and is
-    gone at the tip, and the trailers read back as the idempotency ledger."""
+    gone at the tip."""
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "-C", repo, "init", "-q", "-b", "main"], check=True)
@@ -403,8 +392,6 @@ def test_stream_roundtrips_through_git_fast_import(tmp_path):
                               check=True, capture_output=True,
                               text=True).stdout
     assert tip_tree == ""                     # repealed: the file is deleted
-    assert existing_ledger(repo)[1] == {"SFS 1999:175", "SFS 2001:9",
-                                        "SFS 2005:100"}
 
 
 def test_snapshot_text_normalizes_trailing_newline(tmp_path):
@@ -515,7 +502,8 @@ def test_export_rebuilds_changed_proposition_attribution(export_corpus):
         export([basefile], repo, forarbete_meta=_meta)
 
     export([basefile], repo, forarbete_meta=_meta, rebuild=True)
-    assert existing_ledger(repo)[1] == {"Prop. 2020/21:194"}
+    assert {r["event"] for r in existing_ledger(repo)[0].values()} == {
+        "Prop. 2020/21:194"}
 
 
 def test_export_rebuilds_late_transition_joining_existing_event(export_corpus):
@@ -533,6 +521,36 @@ def test_export_rebuilds_late_transition_joining_existing_event(export_corpus):
 
     assert export([basefile], repo, forarbete_meta=_meta, rebuild=True) == 1
     assert _git(repo, "show", "main:1999/175.txt") == "1 § Senare text."
+
+
+def test_export_appends_a_new_event_and_ledger_file_stays_invisible(export_corpus):
+    """The normal, non-rebuild path: a genuinely new, later amendment is
+    just appended (one more commit, not a rewrite of the first), and the
+    ledger the append decision reads back lives at gitledger.path -- a file
+    inside .git/ untouched by git add/commit, invisible in the worktree."""
+    basefile, repo = "1999:175", export_corpus / "repo"
+    _write_current(basefile, "2001:1", "1 § Ursprunglig text.")
+    _write_artifact(basefile, ("2001:1", "Prop. 2020/21:194"))
+    assert export([basefile], repo, forarbete_meta=_meta) == 1
+    first_tip = _git(repo, "rev-parse", "main")
+
+    ledger_path = gitledger.path(repo)
+    assert ledger_path.exists()
+    assert ledger_path.is_relative_to(repo / ".git")
+    assert _git(repo, "status", "--porcelain") == ""
+    assert _git(repo, "ls-files") == "1999/175.txt"
+
+    _write_archive(basefile, "2001:1", "1 § Ursprunglig text.")
+    _write_current(basefile, "2002:1", "1 § Senare text.")
+    _write_artifact(basefile, ("2001:1", "Prop. 2020/21:194"),
+                    ("2002:1", "Prop. 2021/22:1"))
+    assert export([basefile], repo, forarbete_meta=_meta) == 1
+    assert _git(repo, "rev-parse", "main^") == first_tip
+    assert _git(repo, "show", "main:1999/175.txt") == "1 § Senare text."
+    transitions, scope = existing_ledger(repo)
+    assert {r["event"] for r in transitions.values()} == {
+        "Prop. 2020/21:194", "Prop. 2021/22:1"}
+    assert scope == "full"
 
 
 def test_export_rebuilds_historical_backfill_without_regressing_tip(export_corpus):
@@ -600,9 +618,9 @@ def test_export_migrates_legacy_event_only_ledger(export_corpus):
         export([basefile], repo, forarbete_meta=_meta)
 
     assert export([basefile], repo, forarbete_meta=_meta, rebuild=True) == 1
-    transitions, _events_seen, scopes = existing_ledger(repo)
+    transitions, scope = existing_ledger(repo)
     assert set(transitions) == {"write:1999:175@2001:1"}
-    assert scopes == {"full"}
+    assert scope == "full"
 
 
 def test_export_refuses_foreign_repository(export_corpus):
@@ -637,7 +655,7 @@ def test_export_rebuilds_on_scope_change(export_corpus):
 
     assert export([basefile], repo, forarbete_meta=_meta, scope=partial,
                   rebuild=True) == 1
-    assert existing_ledger(repo)[2] == {partial}
+    assert existing_ledger(repo)[1] == partial
 
 
 def test_export_refuses_bare_and_non_main_targets(export_corpus):

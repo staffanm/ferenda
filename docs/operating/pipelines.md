@@ -140,13 +140,18 @@ a `{celex}.versions.json` sidecar, and `generate` renders one page per
 historical lydelse at `/celex/{celex}/konsolidering/{date}`, banner and all —
 the act's own page grows the same "Jämför lydelser" panel the SFS page has,
 and `GET /api/v1/document/diff`/`/document/versions` serve EU acts alongside
-statutes.
+statutes. The whole history is also exportable as a git repository
+(`history-as-git`, `eurlex/asgit.py`), the eurlex counterpart of
+`sfs history-as-git`, per the module docstring of `ferenda/eurlex/asgit.py`.
 
 ```sh
 uv run python -m ferenda.build eurlex download acts               # year walk + the consolidation sweep
 uv run python -m ferenda.build eurlex download 32014R0910 --force # one act + its versions
 uv run python -m ferenda.build eurlex parse                       # picks up the latest downloaded consolidation
 uv run python -m ferenda.build eurlex versions                    # incremental, all acts with consolidations
+uv run python -m ferenda.build eurlex history-as-git /path/to/repo                   # every held sector-3 R/L act; strict append-only updates
+uv run python -m ferenda.build eurlex history-as-git /path/to/repo --rebuild-history # recreate corrected/backfilled history
+uv run python -m ferenda.build eurlex history-as-git /path/to/repo 32014R0910        # one act only
 ```
 
 **DV** (operates on `site/data/downloaded/dom/` (API) and `site/data/downloaded/dv/` (legacy)):

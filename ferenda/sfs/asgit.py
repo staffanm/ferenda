@@ -37,14 +37,13 @@ import hashlib
 import heapq
 import json
 import re
-import subprocess
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..lib import compress, git, layout
-from ..lib.errors import SkipDocument
+from ..lib import compress, git, gitledger, layout
+from ..lib.errors import RebuildRequired, SkipDocument
 from . import register as register_mod
 from .extract import extract_body, sniff_encoding
 from .versions import archival_header, header_cutoff
@@ -52,15 +51,16 @@ from .versions import archival_header, header_cutoff
 BRANCH = "main"
 BRANCH_REF = "refs/heads/" + BRANCH
 STAGING_REF = "refs/lagen/history-as-git-staging"
-FORMAT = "3"
+FORMAT = "4"
+# format 3 and earlier kept the ledger as `Lagen-Event:`/`Lagen-Transition:`
+# commit-message trailers; format 4 moved it to `gitledger`'s sidecar file
+# (`.git/lagen-ledger.json`), invisible to a plain `git log` the way
+# Staffan asked ("not normally shown to a user, like an X- header in
+# mime/http"). RE_EVENT still finds an old-format repo's trailers -- not to
+# rebuild the ledger from them, only to tell "legacy, needs
+# --rebuild-history" apart from "not an export repo at all".
 RE_EVENT = re.compile(r"^Lagen-Event: (.+)$", re.MULTILINE)
-RE_TRANSITION = re.compile(r"^Lagen-Transition: (.+)$", re.MULTILINE)
-RE_SCOPE = re.compile(r"^Lagen-Scope: (.+)$", re.MULTILINE)
 RE_SFS_NR = re.compile(r"(\d+:\d+)")
-
-
-class RebuildRequired(ValueError):
-    """The current corpus changes history rather than extending it."""
 
 
 @dataclass
@@ -636,16 +636,13 @@ def message(event, forarbete_meta, scope="full"):
     if substituted:
         lines += ["", "Författardatum är ikraftträdandedatum (utfärdandedatum "
                       "saknas i registret)."]
-    trailers = ["Lagen-History-Format: " + FORMAT,
-                "Lagen-Scope: " + scope,
-                "Lagen-Event: " + event.key]
-    if prop_meta:
-        for name in prop_meta.get("signers", [])[1:]:
-            trailers.append("Co-authored-by: %s <%s>" % (name, email_slug(name)))
-    trailers.extend("Lagen-Transition: " + json.dumps(
-        record, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-        for record in transition_records(event, forarbete_meta))
-    return "\n".join(lines) + "\n\n" + "\n".join(trailers) + "\n"
+    coauthors = ["Co-authored-by: %s <%s>" % (name, email_slug(name))
+                for name in (prop_meta.get("signers", [])[1:] if prop_meta else [])]
+    if coauthors:
+        lines += [""] + coauthors
+    return "\n".join(lines) + "\n"
+
+
 
 
 def identities(event, forarbete_meta):
@@ -755,90 +752,40 @@ def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
             yield b"D %s\n" % path.encode()
 
 
-def emit(repodir, events, forarbete_meta, *, tip=None, scope="full",
-         ref=BRANCH_REF):
-    """Pipe the event stream into `git fast-import` and return commit count.
-
-    Callers materialize the worktree only after a successful append or atomic
-    replacement of `main`; import itself must never choose a parent from an
-    unrelated ref.
-    """
-    proc = subprocess.Popen(["git", "-C", str(repodir), "fast-import",
-                             "--quiet"], stdin=subprocess.PIPE)
-    out = proc.stdin
-    assert out is not None, "Popen(stdin=PIPE) always yields a pipe"
-    try:
-        for chunk in stream(events, forarbete_meta, tip, scope, ref):
-            out.write(chunk)
-    except BaseException:
-        out.close()
-        proc.wait()
-        raise
-    out.close()
-    if proc.wait() != 0:
-        raise RuntimeError("git fast-import failed (exit %d)" % proc.returncode)
-    return len(events)
-
-
-def _branch_tip(repodir):
-    """`main`'s tip, or ``""`` for an unborn branch, never another ref."""
-    return git.run(repodir, "rev-parse", "--verify", "-q", BRANCH_REF,
-                   capture=True, check=False)
-
-
 def existing_ledger(repodir):
-    """``(transitions, events, scopes)`` reachable from the export's main.
+    """`(transitions, scope)` from the ledger file (`gitledger`), or
+    `({}, None)` for a fresh repo, or one predating this format (format < 4
+    -- `legacy_ledger` is the caller's way to tell those two apart).
 
-    A malformed trailer is a corrupted ledger, not an excuse to guess which
-    source transition it meant.
-    """
-    if not _branch_tip(repodir):
-        return {}, set(), set()
-    messages = git.run(repodir, "log", "--format=%B", BRANCH, capture=True)
-    records = {}
-    for raw in RE_TRANSITION.findall(messages):
-        try:
-            record = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError("invalid Lagen-Transition trailer: %s" % raw) from exc
+    A malformed ledger is corruption, not an excuse to guess which source
+    transition it meant."""
+    ledger = gitledger.read(repodir)
+    if ledger is None or ledger.get("format") != FORMAT:
+        return {}, None
+    if set(ledger) != {"format", "scope", "transitions"} \
+            or not isinstance(ledger["transitions"], dict):
+        raise ValueError("invalid ledger file: %s" % gitledger.path(repodir))
+    records = ledger["transitions"]
+    for record in records.values():
         if (not isinstance(record, dict)
                 or set(record) != {"id", "basefile", "cutoff", "op", "event", "body",
                            "metadata"}
                 or record["op"] not in ("write", "delete")):
-            raise ValueError("invalid Lagen-Transition trailer: %s" % raw)
+            raise ValueError("invalid ledger transition: %s" % record)
         if (not all(isinstance(record[key], str)
                     for key in ("id", "basefile", "cutoff", "op", "event", "metadata"))
                 or record["body"] is not None and not isinstance(record["body"], str)):
-            raise ValueError("invalid Lagen-Transition trailer: %s" % raw)
-        old = records.setdefault(record["id"], record)
-        if old != record:
-            raise ValueError("conflicting ledger records for %s" % record["id"])
-    return (records, set(RE_EVENT.findall(messages)),
-            set(RE_SCOPE.findall(messages)))
+            raise ValueError("invalid ledger transition: %s" % record)
+    return records, ledger["scope"]
 
 
-def _prepare_repo(repodir):
-    """Validate a clean dedicated worktree before a history ref can move."""
-    if repodir.exists() and not repodir.is_dir():
-        raise ValueError("history-as-git target is not a directory: %s" % repodir)
-    if not repodir.exists():
-        repodir.mkdir(parents=True)
-    dotgit = repodir / ".git"
-    if not dotgit.exists():
-        if any(repodir.iterdir()):
-            raise ValueError("history-as-git target is not an empty directory: %s"
-                             % repodir)
-        git.run(repodir, "init", "-q", "-b", BRANCH)
-    if git.run(repodir, "rev-parse", "--is-bare-repository", capture=True) == "true":
-        raise ValueError("history-as-git target must have a worktree: %s" % repodir)
-    head = git.run(repodir, "symbolic-ref", "-q", "--short", "HEAD",
-                   capture=True, check=False)
-    if head != BRANCH:
-        raise ValueError("history-as-git target must have %s checked out" % BRANCH)
-    dirty = git.run(repodir, "status", "--porcelain", capture=True)
-    if dirty:
-        raise ValueError("history-as-git target has uncommitted changes")
-    return _branch_tip(repodir)
+def legacy_ledger(repodir):
+    """Whether `main` carries the pre-ledger-file (format <= 3)
+    `Lagen-Event:` commit-message trailers -- only to tell "needs
+    --rebuild-history" apart from "not an export repository at all" when
+    `existing_ledger` finds nothing."""
+    messages = git.run(repodir, "log", "--format=%B", BRANCH_REF, capture=True)
+    return bool(RE_EVENT.findall(messages))
 
 
 def _transition_order(record):
@@ -904,11 +851,6 @@ def _require_complete(basefiles, events, skipped, gaps, log):
         raise ValueError("history-as-git complete corpus produced no events")
 
 
-def _materialize(repodir):
-    """The checked-out branch is known clean before its ref has been moved."""
-    git.run(repodir, "reset", "--hard", BRANCH)
-
-
 def _cached_meta(forarbete_meta):
     """Keep one export's signatures stable while avoiding repeated artifact I/O."""
     cache = {}
@@ -921,22 +863,20 @@ def _cached_meta(forarbete_meta):
     return lookup
 
 
-def _publish(repodir, events, forarbete_meta, scope, old_tip, parent):
-    """Import to a staging ref, then atomically move `main` on success."""
-    git.run(repodir, "update-ref", "-d", STAGING_REF)
-    commits = emit(repodir, events, forarbete_meta, tip=parent, scope=scope,
-                   ref=STAGING_REF)
-    if not commits:
+def _publish(repodir, events, forarbete_meta, scope, old_tip, parent, *,
+            reclaim=False):
+    """Import to a staging ref, then atomically move `main` on success
+    (`gitledger.publish`). Does not touch the ledger file -- the caller
+    writes that only once this has actually succeeded (see `gitledger`'s
+    module docstring for why the order matters)."""
+    if not events:
         return 0
-    new_tip = git.run(repodir, "rev-parse", "--verify", STAGING_REF,
-                      capture=True)
-    args = ["update-ref", BRANCH_REF, new_tip]
-    if old_tip:
-        args.append(old_tip)
-    git.run(repodir, *args)
-    git.run(repodir, "update-ref", "-d", STAGING_REF)
-    _materialize(repodir)
-    return commits
+    gitledger.publish(
+        repodir, stream(events, forarbete_meta, tip=parent, scope=scope,
+                        ref=STAGING_REF),
+        branch_ref=BRANCH_REF, staging_branch_ref=STAGING_REF, old_tip=old_tip,
+        reclaim=reclaim)
+    return len(events)
 
 
 def export(basefiles, repodir, *, forarbete_meta, scope="full", rebuild=False,
@@ -952,20 +892,25 @@ def export(basefiles, repodir, *, forarbete_meta, scope="full", rebuild=False,
     _require_complete(basefiles, events, skipped, gaps, log)
     forarbete_meta = _cached_meta(forarbete_meta)
     desired = event_records(events, forarbete_meta)
-    tip = _prepare_repo(repodir)
-    existing, legacy_events, scopes = existing_ledger(repodir)
+    tip = gitledger.prepare_repo(repodir, BRANCH)
+    existing, existing_scope = existing_ledger(repodir)
     if tip and not existing:
-        if legacy_events:
+        if legacy_ledger(repodir):
             if not rebuild:
                 raise RebuildRequired(
                     "history-as-git ledger is legacy; rerun with --rebuild-history")
         else:
             raise ValueError("history-as-git target is not an export repository")
-    if existing and scopes != {scope} and not rebuild:
+    if existing and existing_scope != scope and not rebuild:
         raise RebuildRequired("history-as-git scope changed; rerun with "
                               "--rebuild-history")
     if rebuild:
-        return _publish(repodir, events, forarbete_meta, scope, tip, None)
+        commits = _publish(repodir, events, forarbete_meta, scope, tip, None,
+                           reclaim=True)
+        if commits:
+            gitledger.write(repodir, {"format": FORMAT, "scope": scope,
+                                      "transitions": desired})
+        return commits
     reasons = _append_reasons(existing, desired)
     if reasons:
         raise RebuildRequired("history-as-git requires rebuild: %s; rerun with "
@@ -973,4 +918,11 @@ def export(basefiles, repodir, *, forarbete_meta, scope="full", rebuild=False,
     existing_event_keys = {record["event"] for record in existing.values()}
     fresh = {key: event for key, event in events.items()
              if key not in existing_event_keys}
-    return _publish(repodir, fresh, forarbete_meta, scope, tip, tip)
+    commits = _publish(repodir, fresh, forarbete_meta, scope, tip, tip)
+    if commits:
+        # `desired` already includes every unchanged existing record plus
+        # the fresh ones just published (that is what `_append_reasons`
+        # finding no reasons means), so it is the correct new ledger as-is
+        gitledger.write(repodir, {"format": FORMAT, "scope": scope,
+                                  "transitions": desired})
+    return commits

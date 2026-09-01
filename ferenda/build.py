@@ -74,6 +74,7 @@ from .dv import paths as dv_paths
 from .dv import render as dv_render
 from .dv.parse import api_member, parse_api_record, parse_pdf_record, to_artifact
 from .eurlex import annotate as eurlex_annotate
+from .eurlex import asgit as eurlex_asgit
 from .eurlex import bulk as eurlex_bulk
 from .eurlex import casenames as eurlex_casenames_mod
 from .eurlex import download as eurlex_download
@@ -172,6 +173,7 @@ from .sfs import pdfmirror as sfs_pdfmirror
 from .sfs import render as sfs_render
 from .sfs import versions as sfs_versions_mod
 from .sfs.nf import to_normalform
+from .sfs.register import resolve_omfattning as sfs_resolve_omfattning
 from .site import parse as site_parse
 from .site import render as site_render
 from .stats import compute as stats_compute
@@ -552,6 +554,7 @@ class RunOptions:
     every: bool = False            # eurlex refresh-metadata: the whole corpus,
                                    # repealed acts included, not just the audit
     update: bool = False         # remisser ai-analyze: refresh every open ärende
+    matching: str | None = None  # remisser ai-analyze: select ärenden by basefile prefix
     jobs: int = 1                # worker count for harvests that fan out (foreskrift)
 
 
@@ -2717,6 +2720,28 @@ def eurlex_casenames(args=()):
           % (len(cases), NAMEDEUCASES_JSON))
 
 
+def eurlex_history_as_git(args):
+    """`lagen eurlex history-as-git <repodir> [<CELEX> ...]` -- build or
+    update a git repository holding every sector-3 R/L act's
+    consolidated-version history as plaintext, one file per act, one commit
+    per wording CELLAR has published (see eurlex.asgit). A re-run appends
+    only the new tail entries of an unchanged corpus; corrected renderings,
+    changed artifacts and a repo predating the ledger require
+    --rebuild-history."""
+    if not args:
+        sys.exit("usage: lagen eurlex history-as-git <repodir> [<CELEX> ...]")
+    repodir, requested = args[0], args[1:]
+    targets = list(requested) or [
+        bf for bf in eurlex_download.list_basefiles(layout.EURLEX_DOWNLOADED)
+        if eurlex_download.RE_PLAIN_ACT.match(bf)]
+    if RUN.dry_run:
+        print("eurlex history-as-git: would consider %d act(s) for %s"
+              % (len(targets), repodir))
+        return
+    commits = eurlex_asgit.export(repodir, targets, rebuild=RUN.rebuild_history)
+    print("eurlex history-as-git: %d commit(s) into %s" % (commits, repodir))
+
+
 SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
     layout.EURLEX_DOWNLOADED), {
     "download": Stage("download", eurlex_download_run, eurlex_notice),
@@ -2746,7 +2771,8 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
    actions={"unpack-bulk": eurlex_unpack, "ai-annotate": eurlex_ai_annotate,
             "prune-empty": eurlex_prune, "casenames": eurlex_casenames,
             "backfill": eurlex_backfill,
-            "refresh-metadata": eurlex_refresh_metadata},
+            "refresh-metadata": eurlex_refresh_metadata,
+            "history-as-git": eurlex_history_as_git},
    notes="download flags: --since YYYY-MM-DD, --lang swe,eng, --source sparql|soap\n"
          "unpack-bulk <dir|zip>: import a CELLAR bulk legislation dump\n"
          "prune-empty: remove download dirs with only a notice.ttl (no swe/eng doc)\n"
@@ -2757,7 +2783,10 @@ SOURCES["eurlex"] = Source("eurlex", lambda: eurlex_download.list_basefiles(
          "  does not hold, most-cited first (bulk dumps ship only acts in force)\n"
          "download acts also sweeps every held R/L act's consolidated versions\n"
          "  (CONSLEG) into its .versions/ tree; a per-CELEX download does the same\n"
-         "casenames: refresh the named-EU-cases snapshot from Wikidata")
+         "casenames: refresh the named-EU-cases snapshot from Wikidata\n"
+         "history-as-git <repodir> [<CELEX> ...]: build/update a git repo of\n"
+         "  sector-3 R/L acts' consolidated-version history (append by default,\n"
+         "  --rebuild-history to force a full rebuild)")
 
 
 # --------------------------------------------------------------------------
@@ -3750,7 +3779,14 @@ def remisser_ai_analyze(basefiles):
     collects answers over months, so the second run over one is normally "the
     twelve that arrived since", not 50 re-analyses. A directly named answer is
     always re-run (that is what naming it asks for); `--force` re-runs
-    everything and is what overwrites a hand-verified layer."""
+    everything and is what overwrites a hand-verified layer.
+
+    `--matching <prefix>` selects every ärende whose basefile starts with the
+    prefix (e.g. "sou/") instead of naming basefiles, most-recently-updated
+    first."""
+    if RUN.update and RUN.matching:
+        sys.exit("--update and --matching both select the ärenden themselves; "
+                 "use one")
     if RUN.update:
         if basefiles:
             sys.exit("--update selects the ärenden itself (every analysed one "
@@ -3760,9 +3796,19 @@ def remisser_ai_analyze(basefiles):
               % len(basefiles))
         if not basefiles:
             return
+    elif RUN.matching:
+        if basefiles:
+            sys.exit("--matching selects the ärenden itself; don't also name "
+                     "basefiles")
+        basefiles = remisser_analyze.matching(RUN.matching)
+        print("remisser ai-analyze --matching %s: %d ärende(n), most recent first"
+              % (RUN.matching, len(basefiles)))
+        if not basefiles:
+            return
     elif not basefiles:
         sys.exit("usage: lagen remisser ai-analyze <basefile> [<basefile> ...]\n"
-                 "       lagen remisser ai-analyze --update")
+                 "       lagen remisser ai-analyze --update\n"
+                 "       lagen remisser ai-analyze --matching <prefix>")
     targets = []
     for arg in basefiles:
         if not remisser_analyze.is_arende(arg):   # one answer -- always (re)run it
@@ -3862,6 +3908,9 @@ SOURCES["remisser"] = Source("remisser", remisser_list, {
           "<basefile> is one answer (sou/2026-21/domstolsverket) or a whole "
           "ärende (sou/2026-21), which analyzes every answer still lacking a "
           "layer\n"
+          "ai-analyze --matching <prefix>: analyze every ärende whose basefile "
+          "starts with <prefix> (e.g. sou/), most-recently-updated first, "
+          "instead of naming basefiles\n"
           "this source is never related/generated -- it feeds the referred "
           "förarbete's rail, not its own pages")
 
@@ -4385,6 +4434,7 @@ def cmd_relate(names, force=None):
         con = catalog.connect(target, data_root=DATA, exclusive=full_rebuild)
         pinned = fa_genomforande.resolve(con, fa_genomforande.genomforande_layers())
         fk_rows = fa_fk.resolve(con)
+        omfattning_rows = sfs_resolve_omfattning(con)
         corr = [row for p in annstore.tree("sfs").glob("*/*.corr")
                 for row in sfs_correspond.corr_rows(json.loads(p.read_text()))]
         catalog.set_correspondence(con, corr)
@@ -4443,6 +4493,8 @@ def cmd_relate(names, force=None):
               % pinned)
         print("relate: %d författningskommentar entries pinned to SFS "
               "paragrafs" % fk_rows)
+        print("relate: %d propositions' Omfattning magnitude summarized "
+              "across the laws they amend" % omfattning_rows)
         print("relate: %d old->new paragraf correspondences loaded from .corr "
               "layers" % len(corr))
         print("relate: %d inflected concept variants folded onto canonical begrepp"
@@ -5525,10 +5577,14 @@ def main(argv=None):
                    help="remisser ai-analyze: re-analyze every ärende already "
                         "analysed whose remissperiod is still open, picking up "
                         "answers that arrived since")
+    p.add_argument("--matching", metavar="PREFIX",
+                   help="remisser ai-analyze: select every ärende whose basefile "
+                        "starts with PREFIX (e.g. 'sou/'), most-recently-updated "
+                        "first, instead of naming basefiles")
     p.add_argument("--rebuild-history", action="store_true",
-                   help="sfs history-as-git: rebuild main from the complete "
-                        "current corpus when corrected or backfilled history "
-                        "cannot be appended safely")
+                   help="sfs/eurlex history-as-git: rebuild main from the "
+                        "complete current corpus when corrected or backfilled "
+                        "history cannot be appended safely")
     p.add_argument("--all", action="store_true", dest="every",
                    help="eurlex refresh-metadata: re-read every downloaded "
                         "document, repealed ones included -- the one-off "
@@ -5551,6 +5607,7 @@ def main(argv=None):
     RUN.rebuild_history = args.rebuild_history
     RUN.every = args.every
     RUN.update = args.update
+    RUN.matching = args.matching
     # the parallelisable steps default to all cores; -j1 serialises
     jobs = args.jobs if args.jobs is not None else (os.cpu_count() or 1)
     RUN.jobs = jobs      # harvests that fan out (foreskrift's per-agency pool) read it
