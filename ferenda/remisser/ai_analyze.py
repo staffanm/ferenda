@@ -316,6 +316,23 @@ def updatable(today=None):
                     compress.read_text(layout.remisser_arende(a)))), today)]
 
 
+def matching(prefix):
+    """Every downloaded ärende whose basefile starts with `prefix`
+    (e.g. "sou/"), most-recently-updated first -- what `--matching` expands to,
+    so a scope like "just the SOUs" doesn't need naming ärenden by hand.
+
+    Ordered by `uppdaterad`, falling back to `publicerad`; an ärende with
+    neither (never observed, but the fields are optional) sorts last rather
+    than raising."""
+    arenden = []
+    for path in compress.glob(layout.REMISSER_DOWNLOADED, "*/*.json"):
+        remiss = Remiss.from_dict(compress.read_json(path))
+        if remiss.basefile.startswith(prefix):
+            arenden.append(remiss)
+    arenden.sort(key=lambda r: r.uppdaterad or r.publicerad or "", reverse=True)
+    return [r.basefile for r in arenden]
+
+
 def answer_chars(basefile):
     """How much prose one parsed answer carries -- the measure the length floor
     is applied to, read off the artifact rather than the PDF so it is the text
