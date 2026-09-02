@@ -263,7 +263,7 @@ def build_index(sites=GUIDANCE_SITES, progress=None, limit=None, force=False,
     is fresh). `stats` is `{fetched, total, failed:[(url, err)]}`. `progress(done,
     total, url)` is called as pages resolve; `limit` caps pages (a quick check).
     `delay` is the pause each worker takes between its own fetches, defaulting to
-    `build.POLITENESS` (rule:respect-politeness)."""
+    `stage.POLITENESS` (rule:respect-politeness)."""
     sess = _session()
     pages = []
     for sitemap_url, pattern in sites:

@@ -82,7 +82,7 @@ def test_a_decision_with_no_recorded_date_stays_sortable(monkeypatch, tmp_path):
 
 
 def test_write_reports_whether_the_file_changed(monkeypatch, tmp_path):
-    # the snapshot is a parse input (build.CASENUMBER_CODE): new content
+    # the snapshot is a parse input (stage.CASENUMBER_CODE): new content
     # re-stales five sources' parses, identical content costs nothing, and a
     # full-source dv parse says which of the two happened
     monkeypatch.setattr(casenumbers.layout, "artifacts", lambda source: [])
