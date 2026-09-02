@@ -18,5 +18,5 @@ a pure projection of one. It also keeps the architecture's rule intact -- the
 artifact on disk is the source of truth, the page is derived.
 
 Like ``site`` and ``remisser`` this carries no citation graph, so it is absent
-from ``build.ARTIFACTS`` and is never related, indexed or dumped.
+no ``artifacts`` lister and is never related, indexed or dumped.
 """

@@ -222,7 +222,7 @@ def _myndighet_buckets(con, source):
 
 def render_document(art, source, site, renderers):
     """One document's page. `renderers` maps a source key to that source's own
-    `render(art, site) -> str` (`build.SOURCE_RENDERERS`) -- lib cannot import a
+    `render(art, site) -> str` (its `Source.render` field) -- lib cannot import a
     source, so the registry is composed by the caller and handed in. A source
     with no entry is a programming error, not a document to skip: the index
     access raises (rule:fail-fast).
@@ -812,7 +812,7 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
                   record=None, only=None, source=None, jobs=1, extra=None,
                   write_index=True):
     """Render every catalogued document to static HTML. `renderers` maps a source
-    key to that source's own `render(art, site) -> str` (`build.SOURCE_RENDERERS`);
+    key to that source's own `render(art, site) -> str` (its `Source.render`);
     lib cannot import a source, so the registry is composed by the caller. Its
     values must be module-level functions -- they are pickled by qualified name
     into each pool worker. `fresh(uri, out_path,
@@ -1076,10 +1076,10 @@ def render_aggregates(con, out_root, write_index=True):
 
     The faceted browse tree is *not* written here: it is generated as a client
     of the REST API and so lives outside lib/ (`ferenda.browse`).
-    `build.cmd_generate` calls `browse.generate_all` alongside the full-corpus
+    `corpus.cmd_generate` calls `browse.generate_all` alongside the full-corpus
     generate -- it is the one place that composes the two.
     `write_index=False` skips the generic corpus-stats frontpage -- the caller
-    (build.cmd_generate) then writes a curated editorial frontpage in its place,
+    (corpus.cmd_generate) then writes a curated editorial frontpage in its place,
     so this never write-then-clobbers `index.html`."""
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)

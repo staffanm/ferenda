@@ -5,5 +5,5 @@ artifacts and rendered into the generated static site during ``generate``.
 
 Unlike the document verticals it carries no citation graph, so it is registered
 as a source (parse + generate) but is never related/indexed/dumped -- like
-``remisser``, it is absent from ``build.ARTIFACTS``.
+``remisser``, it registers no ``artifacts`` lister.
 """
