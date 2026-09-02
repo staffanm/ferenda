@@ -3,10 +3,13 @@ lagrummet.se list (the per-county samlingar excluded) as configuration over the
 shared harvest engine (:mod:`harvest`). Each entry is an
 :class:`~harvest.Agency`: a författningssamling code, the issuing org, its index
 URL, and the architecture (an ``enumerate`` + a ``resolve``) that fits its site,
-plus ``params``. 71 fs codes are registered -- 66 live-harvested, the rest
-closed series with no live harvester (RSFS, SOSFS/HSLF-FS, SJVFS, SVKFS): their
-documents live in the corpus. SKVFS and MTFS select a detached headful-Chrome
-transport in config; ordinary agencies stay on HTTP.
+plus ``params``. 76 harvest *scopes* are registered over 71
+författningssamlingar: 70 samlingar one agency owns outright (``Agency.scope``
+is None, so the fs code is the scope name) -- 66 live-harvested and 4 closed
+series with no live harvester (RSFS, SOSFS, SJVFS, SVKFS), whose documents live
+in the corpus -- plus the six sites that all publish into HSLF-FS, which is one
+samling with seven issuing agencies (:mod:`hslffs`). SKVFS and MTFS select a
+detached headful-Chrome transport in config; ordinary agencies stay on HTTP.
 
 An agency is *config*, not a pipeline. Many sites are covered by the three
 generic enumerate shapes (``indexed``/``paginated``/``json``) plus a
@@ -51,7 +54,7 @@ from ..lib.harvest import write_record
 from ..lib.net import BROWSER_UA, is_not_found, request
 from ..lib.util import basefile_slug as slug
 from ..lib.util import document_extension, record_path
-from . import harvest, mtfs, skvfs
+from . import harvest, hslffs, mtfs, skvfs
 from .harvest import (
     Agency,
     DocRef,
@@ -2256,16 +2259,14 @@ PFS = Agency(
 
 
 # --------------------------------------------------------------------------
-# Closed and browser-gated författningssamlingar. Socialstyrelsen's SOSFS /
-# HSLF-FS are closed series (no live harvester; their documents live in the
-# corpus). SKVFS is live but must use detached headful Chrome because F5 rejects
-# both HTTP clients and Playwright-instrumented navigation; its Agency.browser
-# flag selects that transport without affecting any other agency. The one SKVFS
-# register also enumerates the closed RSFS predecessor (cited "RSFS 1985:20", so
-# its own code + URIs) into its own namespace, so RSFS needs no second sweep.
-# HSLF-FS is slugged `hslffs` (hyphen stripped) -- the ELSÄK-FS -> `elsakfs`
-# precedent and the `^[a-zåäö]+fs/…` layout locator agree; the `designation`
-# carries the printed "HSLF-FS" the identifier needs.
+# Closed and browser-gated författningssamlingar. Socialstyrelsen's SOSFS is a
+# closed series (no live harvester; its documents live in the corpus, and its
+# successor HSLF-FS is harvested by the six scopes below). SKVFS is live but
+# must use detached headful Chrome because F5 rejects both HTTP clients and
+# Playwright-instrumented navigation; its Agency.browser flag selects that
+# transport without affecting any other agency. The one SKVFS register also
+# enumerates the closed RSFS predecessor (cited "RSFS 1985:20", so its own code
+# + URIs) into its own namespace, so RSFS needs no second sweep.
 # --------------------------------------------------------------------------
 
 def frozen_agency(fs, name, publisher, designation, site):
@@ -2322,14 +2323,162 @@ RSFS = frozen_agency("rsfs", "Riksskatteverket", "Skatteverket", "RSFS",
                      "https://www.skatteverket.se")
 SOSFS = frozen_agency("sosfs", "Socialstyrelsen", "Socialstyrelsen", "SOSFS",
                       "https://www.socialstyrelsen.se")
-HSLFFS = frozen_agency(
-    "hslffs", "Gemensamma författningssamlingen (hälso- och sjukvård m.m.)",
-    "Socialstyrelsen", "HSLF-FS", "https://www.socialstyrelsen.se")
 
 
-# fs code -> Agency. New agencies append here; a new *site shape* is a new
-# enumerate/classify in harvest.py, not a new pipeline.
-REGISTRY = {a.fs: a for a in (
+# --------------------------------------------------------------------------
+# HSLF-FS -- the one samling with several publishers. Seven agencies issue into
+# Gemensamma författningssamlingen avseende hälso- och sjukvård, socialtjänst,
+# läkemedel, folkhälsa m.m., each publishing on its own site, so the samling is
+# six entries rather than one: they share ``fs="hslffs"`` (every document lands
+# under the one samling, identified "HSLF-FS <år>:<nr>") and are told apart by
+# their ``scope``, which is the registry key and the CLI scope name. The
+# ``publisher`` is the agency that runs the listing; the issuing agency of a
+# single document is the one its PDF masthead names, which the parser reads
+# (Socialstyrelsen's list carries Rättsmedicinalverkets and E-hälsomyndighetens
+# föreskrifter too).
+#
+# ``samlingar`` is the scope's own allow-list of what it may file: every site
+# still lists the closed predecessor samling its agency took over, and each
+# document goes under its own printed designation (the ``fs_from_designation``
+# rule, here spelled per scope so an unexpected samling raises).
+#
+# The samling is slugged `hslffs` (hyphen stripped) -- the ELSÄK-FS ->
+# `elsakfs` precedent and the `^[a-zåäö]+fs/…` layout locator agree; every
+# entry's `designation` carries the printed "HSLF-FS" the identifier needs.
+# --------------------------------------------------------------------------
+
+HSLFFS_SOS = Agency(
+    fs="hslffs", scope="hslffs-sos", name="Socialstyrelsen",
+    publisher="Socialstyrelsen", designation="HSLF-FS",
+    base_url="https://www.socialstyrelsen.se",
+    index_url="https://www.socialstyrelsen.se/kunskapsstod-och-regler/"
+              "regler-och-riktlinjer/foreskrifter-och-allmanna-rad/",
+    enumerate=hslffs.sos_enumerate, resolve=hslffs.resolve_page,
+    params={
+        "samlingar": {"hslffs": "HSLF-FS", "sosfs": "SOSFS"},
+        "konsoliderade_url": "https://www.socialstyrelsen.se/kunskapsstod-och-"
+                             "regler/regler-och-riktlinjer/foreskrifter-och-"
+                             "allmanna-rad/konsoliderade-foreskrifter/",
+        "konsoliderade_select":
+            'a.page-sub-navigation__link[href*="/konsoliderade-foreskrifter/"]',
+        # the publication page links its own PDF under an artikelkatalog GUID;
+        # the older `/globalassets/…/artikelkatalog/<articleNumber>.pdf` form
+        # the frozen records were imported under now redirects to the
+        # publication index, so the page is read rather than the URL guessed
+        "body_url": hslffs.css_url(
+            'a.publication-wrapper__main-doc[href$=".pdf"]'),
+        # a Socialstyrelsen konsoliderad page *is* the consolidated text, and
+        # its "Ladda ner" register is the only place the amendments are listed
+        "consolidation_form": "page",
+        "consolidation_amendments": hslffs.sos_amendments,
+    },
+)
+
+HSLFFS_FOHM = Agency(
+    fs="hslffs", scope="hslffs-fohm", name="Folkhälsomyndigheten",
+    publisher="Folkhälsomyndigheten", designation="HSLF-FS",
+    base_url="https://www.folkhalsomyndigheten.se",
+    index_url="https://www.folkhalsomyndigheten.se/publikationer-och-material/"
+              "publikationer/?type%5B%5D=F%C3%B6reskrifter&sort%5B%5D=date",
+    enumerate=hslffs.fohm_enumerate, resolve=hslffs.resolve_page,
+    params={
+        "samlingar": {"hslffs": "HSLF-FS", "fohmfs": "FoHMFS", "fhifs": "FHIFS"},
+        "page_url": "https://www.folkhalsomyndigheten.se/publikationer-och-"
+                    "material/publikationer/?type%5B%5D=F%C3%B6reskrifter"
+                    "&sort%5B%5D=date&pn={page}",
+        "row_select": 'a.headline--linked[href*="/publikationsarkiv/"]',
+        # 25 rows a page over 115 rows; the cap is the pager-does-not-terminate
+        # trip, not the expected depth
+        "page_cap": 40,
+        "body_url": hslffs.css_url('a.link.file.pdf[href$=".pdf"]'),
+        # a konsoliderad row publishes no PDF at all: the listed page carries a
+        # "Läs publikation" button over a `?pub=<id>` view, and *that* view is
+        # server-rendered with the consolidated text plus the family's printed
+        # PDFs. The reader is stored as the consolidation, the same HTML route
+        # Socialstyrelsen's pages take. (The button's own /pubreader/api/read
+        # and /pubreader/api/download endpoints 404 a plain GET.)
+        "consolidation_form": "page",
+        "consolidation_page_url": hslffs.css_url("a.publication-open[href]"),
+        "consolidation_amendments": hslffs.fohm_amendments,
+    },
+)
+
+HSLFFS_IVO = Agency(
+    fs="hslffs", scope="hslffs-ivo", name="Inspektionen för vård och omsorg",
+    publisher="Inspektionen för vård och omsorg", designation="HSLF-FS",
+    base_url="https://www.ivo.se",
+    index_url="https://www.ivo.se/aktuellt/publikationer/foreskrifter/",
+    enumerate=hslffs.enumerate_files, resolve=resolve_direct,
+    params={
+        "samlingar": {"hslffs": "HSLF-FS"},
+        "link_select": 'a[href*="/publikationer/foreskrifter/"][href$=".pdf"]',
+    },
+)
+
+# The stibodirect shop is the one known gap: HSLF-FS 2025:65 is published only
+# at https://mfof.stibodirect.com/categorynav.aspx?catid=2597, which redirects
+# to itself without a cookie, and is not on the page harvested here.
+HSLFFS_MFOF = Agency(
+    fs="hslffs", scope="hslffs-mfof",
+    name="Myndigheten för familjerätt och föräldraskapsstöd",
+    publisher="Myndigheten för familjerätt och föräldraskapsstöd",
+    designation="HSLF-FS",
+    base_url="https://mfof.se",
+    index_url="https://mfof.se/sarskilda-innehallssidor/"
+              "foreskrifter-och-allmanna-rad.html",
+    enumerate=hslffs.enumerate_files, resolve=resolve_direct,
+    params={
+        "samlingar": {"hslffs": "HSLF-FS"},
+        "link_select": 'p.mfof-link-text-medium a[href$=".pdf"]',
+        # one title is split across two anchors ("… (HSLF-FS" + "2022:25) (pdf)"),
+        # so the number is read off the paragraph that holds them both -- where
+        # the download chrome sits between the designation and the number, and
+        # only the bare number survives in one piece
+        "unit": "p",
+        "bare_numbers": True,
+    },
+)
+
+HSLFFS_TLV = Agency(
+    fs="hslffs", scope="hslffs-tlv",
+    name="Tandvårds- och läkemedelsförmånsverket",
+    publisher="Tandvårds- och läkemedelsförmånsverket", designation="HSLF-FS",
+    base_url="https://www.tlv.se",
+    index_url="https://www.tlv.se/om-tlv/regelverk/foreskrifter.html",
+    enumerate=hslffs.tlv_enumerate, resolve=resolve_direct,
+    params={
+        "samlingar": {"hslffs": "HSLF-FS", "tlvfs": "TLVFS", "lfnfs": "LFNFS"},
+        # one collapsible panel per base act, its files under the
+        # "Grundföreskrift:" / "Konsoliderad:" / "Ändrad:" headings inside it
+        "panel_select": "div.sv-collapsible-content",
+        "link_select": 'a[href*="/download/"][href$=".pdf"]',
+    },
+)
+
+HSLFFS_LV = Agency(
+    fs="hslffs", scope="hslffs-lv", name="Läkemedelsverket",
+    publisher="Läkemedelsverket", designation="HSLF-FS",
+    base_url="https://www.lakemedelsverket.se",
+    index_url="https://www.lakemedelsverket.se/sv/lagar-och-regler/foreskrifter",
+    enumerate=hslffs.lv_enumerate, resolve=hslffs.resolve_page,
+    params={
+        # LVFS is Läkemedelsverkets own closed samling; the register also
+        # carries the SOSFS föreskrifter Socialstyrelsen issued on medicines
+        # before the responsibility moved (SOSFS 1991:5 is the one on the list)
+        "samlingar": {"hslffs": "HSLF-FS", "lvfs": "LVFS", "sosfs": "SOSFS"},
+        "feed_url": hslffs.LV_FEED_URL,
+        "body_url": hslffs.lv_body_url,
+        "consolidation_form": "file",
+    },
+)
+
+
+# scope name -> Agency: the CLI's `lagen foreskrift download <scope>` names,
+# and the keys `download.sync` fans out over. The scope is the fs code for the
+# 65 samlingar one agency owns outright, and `hslffs-<publisher>` for the six
+# sites that all publish into HSLF-FS. New agencies append here; a new *site
+# shape* is a new enumerate/classify in harvest.py, not a new pipeline.
+REGISTRY = {a.scope or a.fs: a for a in (
     FFFS, SSMFS, NFS, KIFS, BFS,                       # first wave (5)
     ELSAKFS, RGKFS, LMFS, KOVFS, PTSFS, MCFFS,         # second wave (10):
     LIVSFS, STEMFS, TFS, SIFS,                         #   ELSÄK-FS … SIFS
@@ -2348,5 +2497,17 @@ REGISTRY = {a.fs: a for a in (
     AFFS, AGVFS, FKFS, PFS,
     SJVFS, SVKFS,                                      # closed: no public documents/register
     MTFS, SKVFS,                                       # live: detached Chrome for the F5 wall
-    RSFS, SOSFS, HSLFFS,                               # closed series; RSFS also emitted by SKVFS
+    RSFS, SOSFS,                                       # closed series; RSFS also emitted by SKVFS
+    HSLFFS_SOS, HSLFFS_FOHM, HSLFFS_IVO,               # one samling, six publishing
+    HSLFFS_MFOF, HSLFFS_TLV, HSLFFS_LV,                #   sites (fs="hslffs")
 )}
+
+# fs code -> the Agency that speaks for that samling: its printed designation
+# and the org behind it. Not the same map as REGISTRY, which is keyed by scope
+# -- six scopes share `hslffs`, and everything keyed by *samling* rather than by
+# publisher (`model.printed_designation`, the parser's designation->slug table)
+# wants one row per fs. The first scope registered for an fs is that row, so
+# HSLF-FS is spoken for by Socialstyrelsen, which runs the samling.
+SAMLINGAR: dict[str, Agency] = {}
+for _agency in REGISTRY.values():
+    SAMLINGAR.setdefault(_agency.fs, _agency)

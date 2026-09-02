@@ -252,6 +252,24 @@ lagen sfs parse 2018:585      # one argument → parse just that document
 lagen dv parse                # each source's parse has its own specifics (DV is driven by its identity index)
 ```
 
+A scope names one sub-corpus to walk, and for most sources that is one
+publisher. `lagen foreskrift download fffs` walks Finansinspektionens
+författningssamling. HSLF-FS is the exception: seven agencies issue into that
+one samling and each publishes on its own site, so it has six scopes named
+after the publisher, not the samling.
+
+```sh
+lagen foreskrift download fffs         # one agency, one författningssamling
+lagen foreskrift download hslffs-ivo   # one of HSLF-FS's six publishing sites
+lagen foreskrift download hslffs-sos --only hslffs/2025:25    # one document
+```
+
+Every document any of the six yields is filed under `hslffs/` and identified
+"HSLF-FS <år>:<nr>". Each site also still lists the closed samling its agency
+took over, and those documents keep their own designation — Socialstyrelsen's
+SOSFS, Folkhälsomyndighetens FoHMFS and FHIFS, Läkemedelsverkets LVFS, TLV:s
+TLVFS and LFNFS. `lagen foreskrift -h` lists every scope.
+
 Beyond those standard actions, a source can define **source-specific actions**
 that do something meaningful only for that source. For example, `lagen sfs
 versions` builds a statute's historical consolidations.

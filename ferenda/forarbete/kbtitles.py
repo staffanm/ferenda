@@ -135,8 +135,9 @@ def untuple(title):
 
 def dehyphenate(title):
     """`title` with the OCR line-break hyphens joined, the body's rule. Not
-    `lib.util.normalize_hints`, which *removes* U+00AD (and the zero-width
-    space) from a title a CMS set with break hints -- here the character is a
+    `lib.util.normalize_hints`, which *removes* U+00AD (and the other
+    invisible break hints: the zero-width, joiner and direction marks) from a
+    title a CMS set with break hints -- here the character is a
     hyphenation the OCR read off the printed page, and joining the two halves
     is the repair."""
     return RE_LINE_HYPHEN.sub(
@@ -278,7 +279,7 @@ def reader_title(title, body):
     hyphen is repaired wherever it stands: 47 titles outside propkb carry one
     (45 U+00AD from a CMS heading, 2 U+00AC), and on 45 of them this gives what
     `lib.util.normalize_hints` gives at harvest time. The 2 differ because
-    `normalize_hints` removes U+00AD and the zero-width space and knows nothing
+    `normalize_hints` removes U+00AD and the invisible break hints and knows nothing
     about U+00AC -- that character class, not the capitalization branch, is why
     it cannot stand in for `dehyphenate` here.
 

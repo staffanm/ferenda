@@ -79,17 +79,28 @@ class DocRef:
 
 @dataclass
 class Agency:
-    """A författningssamling as configuration over the shared engine. ``enumerate``
-    and ``resolve`` name the architecture; everything else is per-agency data the
-    architecture reads (URLs, the org behind ``dcterms:publisher``, selectors).
-    ``enumerate``/``resolve`` are None for a **closed** författningssamling
-    (SOSFS): a static series with no live harvester, its documents already in the
-    corpus; :func:`download.sync` skips it as a no-op."""
+    """A publisher's författningssamling as configuration over the shared engine.
+    ``enumerate`` and ``resolve`` name the architecture; everything else is
+    per-agency data the architecture reads (URLs, the org behind
+    ``dcterms:publisher``, selectors). ``enumerate``/``resolve`` are None for a
+    **closed** författningssamling (SOSFS): a static series with no live
+    harvester, its documents already in the corpus; :func:`download.sync` skips
+    it as a no-op.
+
+    One entry is one *scope* -- one listing to walk -- not necessarily one
+    samling. HSLF-FS is issued into by seven agencies off six sites, so it is
+    six entries sharing ``fs="hslffs"`` and differing in ``scope``."""
     fs: str                                # författningssamling code, "fffs"
     name: str                              # "Finansinspektionen"
     publisher: str                         # issuing-org label / uri
     base_url: str                          # scheme://host (for relative hrefs)
     index_url: str                         # the listing entry point
+    scope: str | None = None               # the registry key and CLI scope name;
+                                           # None = `fs`, the common case where one
+                                           # agency owns one samling. Several
+                                           # publishers issue into HSLF-FS, each off
+                                           # its own site, so they share `fs` and are
+                                           # told apart here ("hslffs-sos", "hslffs-ivo")
     enumerate: Callable | None = None      # (session, agency) -> Iterator[DocRef]; None = closed series
     resolve: Callable | None = None        # (session, agency, ref, root) -> record; None = closed series
     params: dict = field(default_factory=dict)   # architecture-specific config
@@ -99,6 +110,16 @@ class Agency:
     http2: bool = False                    # use the HTTP/2 client (Cloudflare front that 403s HTTP/1.1: KKVFS)
     browser: bool = False                  # detached headful Chrome instead of HTTP (F5: SKVFS/MTFS)
     browser_settle: float = 20.0           # CDP-free seconds per protected browser navigation
+
+
+def fs_code(designation):
+    """The samling slug a printed designation names: lowercased and stripped of
+    every separator ("HSLF-FS" -> ``hslffs``, "ELSÄK-FS" -> ``elsakfs``,
+    "RA-MS" -> ``rams``). The one spelling of that rule -- :func:`ref` mints a
+    routed document's fs with it, the HSLF-FS scopes file every document with
+    it, and `parse._fs_key` folds a citation's designation with it before the
+    registry's own designation->slug rows get their say."""
+    return re.sub(r"[^0-9a-zåäö]", "", designation.lower())
 
 
 def absolute(base_url, href):
@@ -234,6 +255,30 @@ def classify_default_regulation(a, fs, base_ars, base_lop):
 DOWNLOAD_ROLES = frozenset({"regulation", "consolidation"})
 
 
+def fetch_pdf(session, root, fs, ref, url, name, *, delay=0.5, log=print,
+              rejects=None):
+    """Download one document body into ``<root>/<fs>/<name>`` and return that
+    name, or None when the bytes are not a PDF.
+
+    Every resolver needs the same three things of a body: fetch it, refuse it
+    when a WAF challenge or an error page came back 200 under a document URL
+    (a magic-byte sniff -- the served content type is not evidence), and pace
+    the next fetch. A refusal is logged and, when the harvest passes its
+    ``rejects`` ledger, counted there -- never silently dropped while the record
+    is still written, which used to mask the document with zero trace."""
+    data = request(session, "GET", url).content
+    if document_extension(data) != ".pdf":
+        msg = "%s %s: %s served a non-PDF body, skipped (%s)" % (
+            fs, ref.basefile, name, url)
+        log("  " + msg)
+        if rejects is not None:
+            rejects.append(msg)
+        return None
+    compress.write_download(Path(root) / fs / name, data)
+    time.sleep(delay)
+    return name
+
+
 def save_single_pdf_record(root, agency, ref, pdf_url, pdf_data, *, source_url=None):
     """Store one direct official PDF and its ordinary föreskrift record.
 
@@ -313,24 +358,17 @@ def resolve_landing(session, agency, ref, root, delay=0.5, *, log=print, rejects
                                              for e in files[role]):
                 files[role].append(ref_entry)       # dedup repeated links by identifier
             continue
-        data = request(session, "GET", ref_entry["url"]).content
-        if document_extension(data) != ".pdf":     # the link wasn't a PDF after all
-            msg = "%s %s: %s link served a non-PDF body, skipped (%s)" % (
-                fs, ref.basefile, role, ref_entry["url"])
-            log("  " + msg)
-            if rejects is not None:
-                rejects.append(msg)
-            continue
         name = "%s-%s.pdf" % (slug(ref.basefile), role) if role == "regulation" \
             else "%s-%s-%s_%s.pdf" % (slug(ref.basefile), role,
                                       ars or "x", lop or len(files[role]))
-        compress.write_download(Path(root) / fs / name, data)
+        if not fetch_pdf(session, root, fs, ref, ref_entry["url"], name,
+                         delay=delay, log=log, rejects=rejects):
+            continue                               # the link wasn't a PDF after all
         entry = dict(ref_entry, name=name)
         if role == "regulation":
             files["regulation"] = entry
         else:
             files[role].append(entry)
-        time.sleep(delay)
 
     compress.write_download(Path(root) / fs / (slug(ref.basefile) + ".html"), landing)
     record = {
@@ -356,28 +394,19 @@ def resolve_direct(session, agency, ref, root, delay=0.5, *, log=print, rejects=
     files: dict[str, Any] = {"regulation": None, "consolidation": [], "amendment": [],
              "memo": [], "attachment": []}
 
-    def fetch_pdf(url, name):
-        data = request(session, "GET", url).content
-        if document_extension(data) != ".pdf":
-            msg = "%s %s: %s served a non-PDF body, skipped (%s)" % (
-                fs, ref.basefile, name, url)
-            log("  " + msg)
-            if rejects is not None:
-                rejects.append(msg)
-            return None
-        compress.write_download(Path(root) / fs / name, data)
-        time.sleep(delay)
-        return name
+    def fetch(url, name):
+        return fetch_pdf(session, root, fs, ref, url, name, delay=delay, log=log,
+                         rejects=rejects)
 
     if extra.get("regulation_url"):
-        name = fetch_pdf(extra["regulation_url"], "%s-regulation.pdf" % slug(ref.basefile))
+        name = fetch(extra["regulation_url"], "%s-regulation.pdf" % slug(ref.basefile))
         if name:
             files["regulation"] = {"name": name, "url": extra["regulation_url"],
                                    "identifier": ref.identifier}
     for i, c in enumerate(extra.get("consolidations", [])):
         if not c.get("url"):
             continue
-        name = fetch_pdf(c["url"], "%s-consolidation-%d.pdf" % (slug(ref.basefile), i))
+        name = fetch(c["url"], "%s-consolidation-%d.pdf" % (slug(ref.basefile), i))
         if name:
             files["consolidation"].append({"name": name, "url": c["url"]})
     files["amendment"] = [{"identifier": a.get("identifier"), "url": a.get("url")}
@@ -439,7 +468,7 @@ def ref(agency, ident_text, href, seen, title=None, direct=False):
         # the printed designation verbatim -- uppercasing would mangle the
         # mixed-case series (SiSFS, SiSUVFS)
         designation = fsm.group(1)
-        fs = doc_fs = re.sub(r"[^0-9a-zåäö]", "", designation.lower())
+        fs = doc_fs = fs_code(designation)
         identifier = "%s %s:%s" % (designation, arsutgava, lopnummer)
     basefile = "%s/%s:%s" % (fs, arsutgava, lopnummer)
     if basefile in seen:
@@ -612,8 +641,15 @@ INCREMENTAL_BUDGET = 300.0
 def _harvest_session(agency, root, session, full, only, limit, delay, log,
                      reporter=None):
     """Run the shared walk over an already-selected HTTP or browser transport."""
+    # Records are filed by samling, but a *walk* is one publisher's listing, so
+    # the watermark is per scope: six agencies issue into HSLF-FS, and one
+    # publisher catching up says nothing about the other five. The unsuffixed
+    # name is the one-agency case's existing file -- renaming it would restage
+    # 66 agencies as first-run backfills.
+    scope = agency.scope or agency.fs
+    suffix = "" if scope == agency.fs else "-" + scope
     marker = Path(root) / agency.fs / ".complete"
-    watermark_path = Path(root) / agency.fs / ".watermark.json"
+    watermark_path = Path(root) / agency.fs / (".watermark%s.json" % suffix)
 
     # Migrate legacy complete marker to watermark
     if marker.exists() and not watermark_path.exists():
@@ -653,14 +689,14 @@ def _harvest_session(agency, root, session, full, only, limit, delay, log,
 
     result = walk(agency.enumerate(session, agency), resolve=resolve,
                   item_key=item_key, watermark=watermark, full=full, only=only,
-                  limit=limit, budget=INCREMENTAL_BUDGET, scope=agency.fs,
+                  limit=limit, budget=INCREMENTAL_BUDGET, scope=scope,
                   log=log, reporter=reporter)
 
     if rejects:
         log("  %s: %d file(s) served a non-PDF body and were skipped"
-            % (agency.fs, len(rejects)))
+            % (scope, len(rejects)))
     if result.errors:
         log("  %s: %d download error(s) -- the store stays dirty, so the next "
             "run walks past the already-downloaded backlog and retries them"
-            % (agency.fs, result.errors))
+            % (scope, result.errors))
     return result.seen, result.new

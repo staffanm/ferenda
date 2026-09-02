@@ -981,7 +981,8 @@ def url_to_relpath(path: str) -> str | None:
 # the författningssamling slug alphabet: every registered series slug ends in
 # -fs except BFNAR (Bokföringsnämndens allmänna råd) and RA-MS ("rams") --
 # test_layout_grammar_covers_every_registered_fs keeps this in lock-step with
-# foreskrift.agencies.REGISTRY (layout cannot import the vertical itself)
+# foreskrift.agencies.SAMLINGAR -- the registry keyed by *samling*, not by the
+# publisher scope a CLI harvest names (layout cannot import the vertical itself)
 _FS_SLUG = r"(?:[a-zåäö]+fs|bfnar|rams)"
 _FORESKRIFT_LOC = re.compile(r"^%s/\d{4}:\d+$" % _FS_SLUG)
 # a HUDOC item id ("001-159324"): the identity the Strasbourg case law is filed

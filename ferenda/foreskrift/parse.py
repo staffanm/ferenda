@@ -31,7 +31,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import begrepp, tabell
+from ..lib import begrepp, compress, tabell
 from ..lib.artifact import footnote_nodes
 from ..lib.lagrum import (
     EULAGSTIFTNING,
@@ -53,7 +53,8 @@ from ..lib.pdftext import (
     ruled_footnotes,
 )
 from ..lib.util import MONTHS, approximate_date, confine, fold_swedish
-from .agencies import AAFS_SERIES, REGISTRY
+from .agencies import AAFS_SERIES, SAMLINGAR
+from .harvest import fs_code
 from .model import Amendment, Block, Consolidation, Regulation, regulation_uri
 from .structure import RE_LEAD_PARA, nest
 
@@ -214,6 +215,15 @@ RE_FS_SERIES = re.compile(
 #      never be mistaken for a possessive agency prefix.
 RE_FS_TITLE = re.compile(
     r"([A-ZÅÄÖ][a-zåäö0-9 .-]{2,55}?)s\s+(?:[Ff]öreskrift(?:er)?|[Aa]llmänna\s+råd)\b")
+# HSLF-FS is the one samling several agencies issue into, and its masthead is
+# the samling's rather than the document's: the series line reads "Gemensamma
+# författningssamlingen avseende hälso- och sjukvård, socialtjänst, läkemedel,
+# folkhälsa m.m." and the Utgivare line names its editor at Socialstyrelsen --
+# over Inspektionen för vård och omsorgs, Läkemedelsverkets and TLV:s
+# föreskrifter alike. Both signals therefore say Socialstyrelsen for every
+# HSLF-FS document, so a masthead that names the shared samling keeps only the
+# document's own "<agency>s föreskrifter".
+RE_GEMENSAM_SAMLING = re.compile(r"Gemensamma\s+författningssamlingen")
 RE_DIREKTIV_CELEX = re.compile(r"/celex/\d+L\d")    # a directive (…L…), not a reg (…R…)
 # the "Jfr … direktiv …" implementation footnote; the directive right after "Jfr"
 # is the one the föreskrift genomför (any further directives in the clause are ones
@@ -517,8 +527,22 @@ def extract_publisher(masthead):
     Tries, in order: the ``Utgivare:`` line's agency, the "<agency>s
     författningssamling" masthead title, then the föreskrift's own
     "<agency>s föreskrifter" name (see the ``RE_*`` patterns above). ``None`` when
-    the masthead yields none of them, so the caller keeps the harvest-time label."""
+    the masthead yields none of them, so the caller keeps the harvest-time label.
+
+    The first two signals belong to the *samling*, which is one agency's for all
+    but HSLF-FS -- seven agencies issue into that one, so its masthead names
+    Socialstyrelsen as its editor over every document in it and only the third
+    signal speaks for the issuer (:data:`RE_GEMENSAM_SAMLING`)."""
     flat = re.sub(r"\s+", " ", masthead)       # two-column extraction breaks lines
+    if RE_GEMENSAM_SAMLING.search(flat):
+        # only the document's own name speaks here, and that name is the part
+        # the second column interrupts -- "Föreskrifter om ändring i Tandvårds-
+        # och | Utkom från trycket | läkemedelsförmånsverkets föreskrifter"
+        # otherwise names "Utkom från trycket läkemedelsförmånsverket" as the
+        # issuer. The other samlingar are read as before, seam and all, because
+        # their Utgivare line answers first and never reaches this pattern.
+        m = RE_FS_TITLE.search(" ".join(RE_MASTHEAD_COLUMN.sub(" ", flat).split()))
+        return m.group(1).strip(" .,-") if m else None
     for rx in (RE_UTGIVARE, RE_FS_SERIES, RE_FS_TITLE):
         m = rx.search(flat)
         if m:
@@ -938,18 +962,19 @@ def parse_pdf(path, identifier, parser, patch_key=None, harvest_title=None):
 # transliteration: 'ÅFS' -> aafs (afs is Arbetsmiljöverkets samling) and its
 # predecessor 'RÅFS' -> raafs (rafs is Riksarkivets RA-FS)
 _DESIGNATION_SLUGS = {
-    **{a.designation.lower().replace("-", "").replace(" ", ""): fs
-       for fs, a in REGISTRY.items() if a.designation},
+    **{fs_code(a.designation): fs
+       for fs, a in SAMLINGAR.items() if a.designation},
     **{d.lower(): fs for d, (fs, _) in AAFS_SERIES.items()},
 }
 
 
 def _fs_key(designation):
-    """Fold an FS designation to its slug form for matching -- lowercase, drop
-    the hyphen/spaces, then let the registry's own designation->slug rows
-    override the åäö transliteration ('ÅFS' folds to ``aafs``, never ``afs``;
-    'ELSÄK-FS' matches the agency's ``elsakfs`` slug either way)."""
-    key = designation.lower().replace("-", "").replace(" ", "")
+    """Fold an FS designation to its slug form for matching -- `harvest.fs_code`
+    (lowercase, drop every separator), then let the registry's own
+    designation->slug rows override the åäö transliteration ('ÅFS' folds to
+    ``aafs``, never ``afs``; 'ELSÄK-FS' matches the agency's ``elsakfs`` slug
+    either way)."""
+    key = fs_code(designation)
     return _DESIGNATION_SLUGS.get(key, fold_swedish(key))
 
 
@@ -997,34 +1022,54 @@ def parse_consolidation(path, identifier, fs, base_ars, base_lop, parser):
             masthead_amendments(masthead, fs, base_ars, base_lop))
 
 
-# a Socialstyrelsen "Senaste version av …" page lists its incorporated
-# amendments on one preamble line -- "Ändrad: t.o.m. HSLF-FS 2017:27" or just
-# "Ändrad: SOSFS 2014:9" -- each ref under its own samling designation (a
+# a konsoliderad page states the amendments it incorporates on one preamble
+# line: Socialstyrelsen's "Senaste version av …" page writes "Ändrad: t.o.m.
+# HSLF-FS 2017:27" or just "Ändrad: SOSFS 2014:9", and Folkhälsomyndighetens
+# publication reader writes "Senaste lydelse gäller från och med: 1 juni 2026
+# (HSLF-FS 2026:13)". Each ref stands under its own samling designation (a
 # SOSFS base consolidated t.o.m. an HSLF-FS amendment is the 2015 series
 # transition, not an error)
-RE_ANDRAD = re.compile(r"Ändrad:")
-# the boilerplate lines every such page opens with (page metadata, not body)
-RE_HTML_PREAMBLE = re.compile(r"(?:Observera att|Senaste lydelse:)")
+RE_ANDRAD = re.compile(r"Ändrad:|Senaste lydelse gäller")
+# the boilerplate lines these pages open with (page metadata, not body):
+# Socialstyrelsen's two, plus the reader's publication date, its standing
+# explanation of what a konsoliderad version is, and the base act's own entry
+# into force -- which is not the cutoff RE_ANDRAD reads
+RE_HTML_PREAMBLE = re.compile(
+    r"(?:Observera att|Senaste lydelse:|Publicerad:"
+    r"|Detta är den senaste internetversionen|Grundförfattning gäller)")
+# where the reader stops being the författning: it closes with a list of the
+# printed PDFs ("Grundförfattning: HSLF-FS 2025:14"), which is the page's own
+# register of the family rather than text of the act
+RE_HTML_END = re.compile(r"Tryckta versioner")
 
 
 def parse_consolidation_html(path, parser):
-    """A Socialstyrelsen consolidated HTML page from the retained SOSFS/HSLF-FS
-    ``konsolidering`` corpus -> the same (structure, footnotes,
-    konsolideradTom, masthead refs) contract as :func:`parse_consolidation`. The page is
-    regular: ``<main>`` holds an h1 page title, three preamble lines, then
-    h2/h3 headings over ``p``/``li`` body text -- headings classify as bold
-    paragraphs, everything else by its textual ``N §``/``N kap.`` markers."""
-    soup = BeautifulSoup(path.read_text("utf-8"), "html.parser")
-    main = soup.select_one("main")
-    if main is None:
-        raise ValueError("no <main> content in konsoliderad page %s" % path)
+    """A consolidated HTML page -> the same (structure, footnotes,
+    konsolideradTom, masthead refs) contract as :func:`parse_consolidation`.
+
+    Two agencies publish a konsoliderad version as a page rather than a PDF, and
+    both pages are regular: an h1 page title, a few preamble lines, then h2/h3
+    headings over ``p``/``li`` body text -- headings classify as bold
+    paragraphs, everything else by its textual ``N §``/``N kap.`` markers.
+    Socialstyrelsen renders the text as the page's ``<main>``;
+    Folkhälsomyndighetens ``?pub=`` view renders it into a publication reader
+    (``div.pubr-reader-body``) whose own ``<main>`` wraps that reader, and
+    closes with a list of the printed PDFs that is not text of the act."""
+    # through `compress`: a live harvest stores the page brotli-compressed like
+    # every other download, while the frozen SOSFS/HSLF-FS import wrote it plain
+    soup = BeautifulSoup(compress.read_text(path), "html.parser")
+    body = soup.select_one("div.pubr-reader-body") or soup.select_one("main")
+    if body is None:
+        raise ValueError("no consolidated text in konsoliderad page %s" % path)
     paras, refs = [], []
-    for el in main.find_all(["h2", "h3", "h4", "p", "li"]):
+    for el in body.find_all(["h2", "h3", "h4", "p", "li"]):
         if el.find_parent(["p", "li"]):
             continue                       # a p/li nested in a li: parent has it
         text = " ".join(el.get_text(" ", strip=True).split())
         if not text:
             continue
+        if RE_HTML_END.match(text):
+            break                          # the printed-PDF register, not the act
         if RE_ANDRAD.match(text):
             refs += [(f, y, str(int(n))) for f, y, n in RE_FS_REF.findall(text)]
             continue

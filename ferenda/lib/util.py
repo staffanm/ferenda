@@ -517,9 +517,11 @@ def normalize_space(s: str) -> str:
     return " ".join((s or "").split())
 
 
-# the invisible line-breaking hints a CMS sets its headings with: a soft hyphen
-# and a zero-width space
-RE_BREAK_HINT = re.compile("[\u00ad\u200b]")
+# the invisible characters a CMS sets its headings with: the line-breaking hints
+# (a soft hyphen, a zero-width space) plus the joiners, directional marks and
+# byte-order mark that travel with them -- Läkemedelsverket writes its own
+# designation "HSLF\u200d-\u200dFS", which must read as "HSLF-FS"
+RE_BREAK_HINT = re.compile("[\u00ad\u200b-\u200f\u2060\ufeff]")
 
 
 def normalize_hints(s: str) -> str:

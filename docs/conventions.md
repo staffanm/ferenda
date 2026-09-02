@@ -32,7 +32,7 @@ artifact) and exposes only its artifacts plus the tiny orchestrator
 protocol. No source base class, no inheritance, and no framework hooks.
 Share behaviour as small
 `lib/` functions configured by **data**, not by subclassing:
-`foreskrift/agencies.py` drives one harvest engine for 17 agencies; that
+`foreskrift/agencies.py` drives one harvest engine for 76 agency scopes; that
 is the template for variation between sources.
 
 ### rule:own-typed-model

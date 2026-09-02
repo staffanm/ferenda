@@ -44,8 +44,8 @@ These boundaries are load-bearing rules, not suggestions:
   source. Shared code never calls back into a source.
 - **No source base class, no inheritance for sources.** Share behaviour as
   small functions in `lib/`, configured by *data*, not by subclassing
-  (e.g. `foreskrift/agencies.py` drives one harvest engine for 17 agencies
-  rather than 17 bespoke pipelines). A source exposes only its artifacts
+  (e.g. `foreskrift/agencies.py` drives one harvest engine for 76 agency
+  scopes rather than 76 bespoke pipelines). A source exposes only its artifacts
   plus a tiny orchestrator protocol.
 - **Each source owns a typed model** — dataclasses using Swedish domain
   vocabulary (`Forfattning`, `Kapitel`, `Paragraf`, `Avgorande`, …). Don't

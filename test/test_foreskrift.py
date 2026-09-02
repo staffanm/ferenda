@@ -349,10 +349,10 @@ def test_publisher_prose_allmanna_rad_is_not_a_possessive_agency():
 
 
 def test_closed_series_agencies_registered_without_a_live_harvester():
-    # RSFS/SOSFS/HSLF-FS are closed series: registered (their documents live in
-    # the corpus) but with no live enumerate/resolve, so a harvest skips them.
-    for fs, designation in (("rsfs", "RSFS"), ("sosfs", "SOSFS"),
-                            ("hslffs", "HSLF-FS")):
+    # RSFS/SOSFS are closed series: registered (their documents live in the
+    # corpus) but with no live enumerate/resolve, so a harvest skips them.
+    # HSLF-FS is not one of them any more -- see test_foreskrift_hslffs.py.
+    for fs, designation in (("rsfs", "RSFS"), ("sosfs", "SOSFS")):
         assert fs in REGISTRY
         assert REGISTRY[fs].enumerate is None and REGISTRY[fs].resolve is None
         assert REGISTRY[fs].designation == designation

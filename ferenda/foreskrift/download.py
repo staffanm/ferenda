@@ -1,8 +1,12 @@
 """Download entry point for the föreskrift vertical -- wires the agency registry
-to the shared download engine. ``lagen foreskrift download [fs...]`` downloads
-the named författningssamlingar (default all); ``--full`` re-walks and refreshes
+to the shared download engine. ``lagen foreskrift download [scope...]``
+downloads the named scopes (default all); ``--full`` re-walks and refreshes
 existing base regulations (new amendments / consolidations), ``--only BASEFILE``
-fetches one (needs a single fs scope)."""
+fetches one (needs a single scope).
+
+A scope is one *listing to walk*, which is the författningssamling code for the
+70 samlingar one agency owns outright (``fffs``) and ``hslffs-<publisher>`` for
+the six sites that all publish into HSLF-FS (see `Agency.scope`)."""
 
 import re
 from pathlib import Path
@@ -16,37 +20,36 @@ from .agencies import REGISTRY
 
 
 def browser_scopes():
-    """The författningssamlingar whose sites gate public documents behind a
+    """The scopes whose sites gate public documents behind a
     headful-browser (F5/Shape) WAF, so they need the slow, serial DetachedChrome
     transport (skvfs, mtfs). Kept out of the default parallel `download` and run
     on their own schedule via the `browser-download` action -- concurrent Chrome
     would fight over the process-global DISPLAY and Playwright's single-thread
     sync API."""
-    return [fs for fs in REGISTRY if REGISTRY[fs].browser]
+    return [scope for scope in REGISTRY if REGISTRY[scope].browser]
 
 
 def default_scopes():
-    """Every författningssamling except the browser-shielded ones -- what a bare
-    `download` fans out across the pool."""
-    return [fs for fs in REGISTRY if not REGISTRY[fs].browser]
+    """Every scope except the browser-shielded ones -- what a bare `download`
+    fans out across the pool."""
+    return [scope for scope in REGISTRY if not REGISTRY[scope].browser]
 
 
-def _one(fs, root, full, only, delay, log, reporter):
-    """Harvest a single agency, returning (fs, (seen, new)). Closed/static
+def _one(scope, root, full, only, delay, log, reporter):
+    """Harvest a single scope, returning (scope, (seen, new)). Closed/static
     författningssamlingar (no live downloader) are a no-op."""
-    agency = REGISTRY[fs]
+    agency = REGISTRY[scope]
     if agency.enumerate is None:
         log("foreskrift %s: no live downloader -- a closed series, its "
-            "documents already in the corpus" % fs)
-        return fs, (0, 0)
-    return fs, harvest.harvest(agency, root, full=full, only=only, delay=delay,
-                               log=log, reporter=reporter)
+            "documents already in the corpus" % scope)
+        return scope, (0, 0)
+    return scope, harvest.harvest(agency, root, full=full, only=only, delay=delay,
+                                  log=log, reporter=reporter)
 
 
 def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1):
-    """Download the named författningssamlingar (default all in the registry),
-    printing each agency's own summary line as it finishes. Returns {fs: (seen,
-    new)}.
+    """Download the named scopes (default all in the registry), printing each
+    one's own summary line as it finishes. Returns {scope: (seen, new)}.
 
     The fan-out itself is `lib.harvest.fan_out`, shared with every other
     multi-scope source (avg's organs, rs's agencies): with ``jobs > 1`` the
@@ -54,20 +57,20 @@ def sync(root, scopes=None, full=False, only=None, delay=0.5, log=print, jobs=1)
     the wall time drops from the sum of every site to roughly the slowest single
     one. This vertical supplies only what is its own -- which agencies exist,
     which are browser-shielded, and how to harvest one."""
-    fslist = list(scopes or REGISTRY)
+    scopelist = list(scopes or REGISTRY)
     quiet = NullReporter()
 
-    def one(fs, into):
+    def one(scope, into):
         # a worker's live progress line would collide with the others', so a
         # parallel run reports through NullReporter and writes into `into`; the
         # sequential path gets the real Reporter and prints as it goes
-        parallel = jobs > 1 and not only and len(fslist) > 1
-        return _one(fs, root, full, only, delay, into,
+        parallel = jobs > 1 and not only and len(scopelist) > 1
+        return _one(scope, root, full, only, delay, into,
                     quiet if parallel else Reporter())[1]
 
     return harvest_lib.fan_out(
-        fslist, one, jobs=jobs, label="foreskrift",
-        serial=[fs for fs in fslist if REGISTRY[fs].browser], log=log)
+        scopelist, one, jobs=jobs, label="foreskrift",
+        serial=[s for s in scopelist if REGISTRY[s].browser], log=log)
 
 
 def list_basefiles(root, fs):
@@ -83,7 +86,7 @@ def stored_series(root):
     return sorted(p.name for p in Path(root).iterdir() if p.is_dir())
 
 
-def superseded(root, scopes=None):
+def superseded(root, series=None):
     """Harvested records that a *later* run has re-filed under another
     författningssamling, as ``{basefile: (winning basefile, landing url)}``.
 
@@ -103,7 +106,7 @@ def superseded(root, scopes=None):
     they are one document, and the one whose stored designation the landing slug
     does not corroborate is the leftover."""
     claims = {}
-    for fs in (scopes or stored_series(root)):
+    for fs in (series or stored_series(root)):
         for basefile in _list_basefiles(root, fs):
             url = compress.read_json(
                 record_path(root, fs, basefile)).get("url")

@@ -39,38 +39,41 @@ def foreskrift_list():
 
 
 def foreskrift_harvest(scopes):
-    """Bulk harvest of the agency författningssamlingar (scopes = fs codes, e.g.
-    'fffs'; empty = all *non-browser* agencies). The browser-shielded ones
-    (skvfs, mtfs) are excluded from the default sweep -- they need the slow,
-    serial DetachedChrome transport, so they run on their own schedule via
-    `lagen foreskrift browser-download`. Naming one explicitly still harvests it.
-    `--force` re-walks and refreshes existing base regulations; `--only
-    fs/year:num` (one scope) fetches a single one."""
+    """Bulk harvest of the agency författningssamlingar (scopes = the registry's
+    scope names -- the fs code for a samling one agency owns, 'fffs', and
+    'hslffs-<publisher>' for the six sites that publish into HSLF-FS; empty =
+    all *non-browser* scopes). The browser-shielded ones (skvfs, mtfs) are
+    excluded from the default sweep -- they need the slow, serial DetachedChrome
+    transport, so they run on their own schedule via `lagen foreskrift
+    browser-download`. Naming one explicitly still harvests it. `--force`
+    re-walks and refreshes existing base regulations; `--only fs/year:num` (one
+    scope) fetches a single one."""
     if not scopes:
         skipped = download.browser_scopes()
         scopes = download.default_scopes()
         if skipped:
-            print("foreskrift download: skipping %d browser-shielded agenc%s (%s) "
+            print("foreskrift download: skipping %d browser-shielded scope%s (%s) "
                   "-- run `lagen foreskrift browser-download` on its own schedule"
-                  % (len(skipped), "y" if len(skipped) == 1 else "ies",
+                  % (len(skipped), "" if len(skipped) == 1 else "s",
                      ", ".join(skipped)))
     # report=False: sync prints each agency's own summary as it finishes and,
     # with jobs>1, fans the agencies out across a thread pool (each hits a
     # different host)
     return scoped_harvest("foreskrift", download,
-                          str(layout.FORESKRIFT_DOWNLOADED), scopes, noun="fs",
+                          str(layout.FORESKRIFT_DOWNLOADED), scopes,
+                          noun="författningssamling",
                           example="lagen foreskrift download fffs "
                                   "--only fffs/2013:10",
-                          label="every non-browser agency", report=False,
+                          label="every non-browser scope", report=False,
                           jobs=protocol.RUN.jobs)
 
 
 def foreskrift_browser_download(_basefiles):
     """`lagen foreskrift browser-download`: harvest only the browser-shielded
-    författningssamlingar (skvfs, mtfs), which need the slow headful-Chrome
-    transport and are kept off the default parallel sweep. Run sequentially (they
-    share the process-global DISPLAY and Playwright's single-thread sync API), on
-    its own, less frequent schedule."""
+    scopes (skvfs, mtfs), which need the slow headful-Chrome transport and are
+    kept off the default parallel sweep. Run sequentially (they share the
+    process-global DISPLAY and Playwright's single-thread sync API), on its own,
+    less frequent schedule."""
     scopes = download.browser_scopes()
     if protocol.RUN.dry_run:
         print("foreskrift browser-download: would download %s into %s"
@@ -242,10 +245,12 @@ SOURCES: tuple[Source, ...] = (Source("foreskrift", foreskrift_list, {
     origin="the %d agency sites in foreskrift/agencies.py"
            % len(FORESKRIFT_AGENCIES),
     scopes=frozenset(FORESKRIFT_AGENCIES),
-    notes="download flag: --only fs/year:num (fetch one; needs one fs scope)\n"
-          "scopes are författningssamling codes (fffs, …); empty = all non-browser "
-          "agencies\n"
-          "browser-download: harvest just the headful-Chrome agencies (skvfs, "
+    notes="download flag: --only fs/year:num (fetch one; needs one scope)\n"
+          "scopes are författningssamling codes (fffs, …), plus the six sites "
+          "that publish into the shared HSLF-FS samling (hslffs-sos, "
+          "hslffs-fohm, hslffs-ivo, hslffs-lv, hslffs-mfof, hslffs-tlv); "
+          "empty = all non-browser scopes\n"
+          "browser-download: harvest just the headful-Chrome scopes (skvfs, "
           "mtfs), kept off the default sweep for a separate schedule\n"
           "reap: remove records an fs reassignment left behind under the old "
           "författningssamling (--dry-run lists them)"),)

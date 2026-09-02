@@ -29,7 +29,7 @@ page list the regulations issued under it.
 from dataclasses import dataclass, field
 
 from ..lib.artifact import prune
-from .agencies import REGISTRY
+from .agencies import SAMLINGAR
 
 BASE = "https://lagen.nu"
 
@@ -52,7 +52,7 @@ def printed_designation(uri):
     fs, _, number = rest.partition("/")
     if not number or "/" in number:
         return None
-    agency = REGISTRY.get(fs)
+    agency = SAMLINGAR.get(fs)
     return "%s %s" % ((agency.designation if agency and agency.designation
                        else fs.upper()), number)
 

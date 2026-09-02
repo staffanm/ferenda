@@ -22,7 +22,7 @@ from ferenda.forarbete import soukb as fa_soukb
 from ferenda.forarbete import source as forarbete_source
 from ferenda.foreskrift import parse as foreskrift_parse
 from ferenda.foreskrift import source as foreskrift_source
-from ferenda.foreskrift.agencies import REGISTRY
+from ferenda.foreskrift.agencies import SAMLINGAR
 from ferenda.foreskrift.model import Consolidation, Regulation
 from ferenda.lib import (
     annstore,
@@ -522,7 +522,9 @@ def test_layout_grammar_covers_every_registered_fs():
     # every registered författningssamling -- a slug it misses falls through to
     # the SFS page branch and crashes grund-sidecar decoding, as bfnar and rams
     # once did. New series: extend layout._FS_SLUG's exceptions if needed.
-    for fs in REGISTRY:
+    # SAMLINGAR, not REGISTRY: a registry key is a harvest *scope*
+    # ("hslffs-ivo"), which is never a document's fs.
+    for fs in SAMLINGAR:
         assert layout.page_relpath("https://lagen.nu/%s/2020:1" % fs) \
             == "%s/2020_1.html" % fs, fs
         assert layout.page_relpath("https://lagen.nu/%s/2020:1/grund" % fs) \
