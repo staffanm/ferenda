@@ -1,8 +1,15 @@
-# ferenda.lagen.nu is a preview host. Crawling is ALLOWED on purpose: search engines
-# must fetch each page to see the host-level `X-Robots-Tag: noindex, nofollow`
-# (docker/vps/nginx/common-headers.conf), which keeps these URLs out of the index
-# so they are never mistaken for the canonical lagen.nu ones. A blanket
-# `Disallow: /` would hide that noindex and risk the URLs being indexed url-only.
-# If this site becomes canonical, drop the noindex header.
+# lagen.nu's crawl policy. Every page a reader can open is crawlable. What is
+# kept out is machinery, not content: the JSON API and its docs, the MCP
+# endpoint, the search shell (an unbounded query space), the editor login and
+# the bulk dumps. Nothing here says noindex: on the preview host
+# (ferenda.lagen.nu) that is nginx's X-Robots-Tag header, which a crawler only
+# sees by fetching the page -- so this file must never Disallow the pages.
 User-agent: *
-Disallow:
+Disallow: /api/
+Disallow: /mcp
+Disallow: /docs
+Disallow: /sok
+Disallow: /admin/
+Disallow: /dumps/
+Disallow: /matomo/
+Sitemap: https://lagen.nu/sitemap.xml

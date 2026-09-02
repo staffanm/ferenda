@@ -62,7 +62,25 @@
     document), so a bare `#anchor` link (the TOC, a pilcrow permalink)
     resolves against the document instead of the site root #}
 <base href="https://ferenda.lagen.nu{{ base_path }}">
-<title>{{ title }}</title>
+<title>{{ head_title }}</title>
+{#- the search-engine and link-preview head. canonical/og:url name the public
+    host whatever host served the bytes (see page_context); og:image is one
+    site-wide card (assets/og-image.png, written by tools/corpus/og_image.py) -- a
+    preview scraper does not resolve <base>, so it is absolute. -#}
+{%- if canonical %}
+<link rel="canonical" href="{{ canonical }}">
+<meta property="og:url" content="{{ canonical }}">{% endif %}
+{%- if description %}
+<meta name="description" content="{{ description }}">
+<meta property="og:description" content="{{ description }}">{% endif %}
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:locale" content="sv_SE">
+<meta property="og:type" content="{{ 'article' if canonical else 'website' }}">
+<meta property="og:title" content="{{ head_title }}">
+<meta property="og:image" content="{{ og_image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 {{ head }}
 <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <link rel="stylesheet" href="/style.css">

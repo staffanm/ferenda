@@ -53,7 +53,8 @@ def render(art, site):
     return ENV.get_template("rs.html").render(page_context(
         lb.short_title or ident, "Rättsligt ställningstagande",
         doc_meta(meta, art.get("source_url")),
-        doc_uri=art["uri"],
+        doc_uri=art["uri"], short_id=ident,
+        description=site.snippet(art["uri"]),
         toc=render_toc(toc, ident), eyebrow=ident,
         summary_text=art.get("sammanfattning"),
         banner=Markup(banner),

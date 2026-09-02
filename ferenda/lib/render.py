@@ -24,6 +24,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import date
 from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 from markupsafe import Markup
 
@@ -312,7 +313,8 @@ def _render_index(con):
     body = LISTS.index_body(sum(n.values()), sum(1 for s in n if n[s]),
                              list(_index_rows(n)), cols)
     return page("lagen.nu", "Start", "", body, title_html=BRAND,
-                eyebrow="Sveriges lagar, med kontext", solo=True, mark=True)
+                eyebrow="Sveriges lagar, med kontext", solo=True, mark=True,
+                description="Sveriges lagar, med kontext")
 
 
 # --------------------------------------------------------------------------
@@ -993,10 +995,59 @@ def generate_site(catalog_path, out_root, renderers, progress=None, fresh=None,
     if only is None and source is None:          # corpus-wide pages on a full run
         _sync_inbound_tree(con, root, progress is not None)
         render_aggregates(con, out_root, write_index=write_index)
+        write_sitemaps(con, out_root, renderers)
     if progress:
         progress(total, total, "", rendered)
     con.close()
     return total, rendered
+
+
+SITEMAP_URLS = 50_000      # the sitemap protocol's cap per file
+
+
+def _sitemap_url(uri, mtime_ns):
+    # the protocol wants an escaped URL: non-ASCII percent-encoded (the case
+    # ids carry Å/Ä/Ö), then XML-escaped
+    loc = escape(quote(uri, safe=":/@!$&'()*+,;=%"), quote=True)
+    lastmod = ("<lastmod>%s</lastmod>"
+               % date.fromtimestamp(mtime_ns / 1e9).isoformat()
+               if mtime_ns else "")
+    return "<url><loc>%s</loc>%s</url>\n" % (loc, lastmod)
+
+
+def write_sitemaps(con, out_root, sources):
+    """/sitemap.xml, an index over /sitemap-N.xml: one <url> per catalogued
+    document that has a page (`sources` = the renderer keys -- kommentar and
+    lawreview rows reach the reader through rails, not pages), `SITEMAP_URLS`
+    per file. lastmod is the artifact's mtime, since the page is re-rendered
+    when the artifact changes. Every URL is on the public host (the catalog's
+    uris), so the file describes lagen.nu whichever host serves it. A file left
+    over from a larger corpus is removed, so the index and the files agree."""
+    out_root = Path(out_root)
+    sources = sorted(sources)
+    rows = con.execute(
+        "SELECT uri, art_mtime_ns FROM documents WHERE source IN (%s) "
+        "ORDER BY source, uri" % ",".join("?" * len(sources)), sources).fetchall()
+    names = []
+    for start in range(0, len(rows), SITEMAP_URLS):
+        name = "sitemap-%d.xml" % (len(names) + 1)
+        compress.write_text(
+            out_root / name,
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n%s'
+            '</urlset>\n' % "".join(_sitemap_url(uri, mtime) for uri, mtime
+                                     in rows[start:start + SITEMAP_URLS]))
+        names.append(name)
+    for stale in out_root.glob("sitemap-*.xml*"):
+        if stale.name.split(".xml")[0] + ".xml" not in names:
+            stale.unlink()
+    compress.write_text(
+        out_root / "sitemap.xml",
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n%s'
+        '</sitemapindex>\n' % "".join("<sitemap><loc>%s%s</loc></sitemap>\n"
+                                       % (catalog.BASE, name) for name in names))
+    return len(rows)
 
 
 # The browser chrome from lib/assets/, in the order the page loads them:
@@ -1046,7 +1097,9 @@ def write_assets(out_root):
     # compressed, so they are stored plain.
     compress.write_text(out_root / "favicon.svg",
                         (ASSETS / "favicon.svg").read_text(encoding="utf-8"))
-    for icon in ("favicon.ico", "apple-touch-icon.png"):
+    # og-image.png is the link-preview card every page's og:image names
+    # (tools/corpus/og_image.py renders it from the mark and the wordmark)
+    for icon in ("favicon.ico", "apple-touch-icon.png", "og-image.png"):
         compress.write_bytes(out_root / icon, (ASSETS / icon).read_bytes(),
                              encodings=())
     # style.css ships the self-hosted @font-face set first (assets/fonts/,

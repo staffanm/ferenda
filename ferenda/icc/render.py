@@ -34,7 +34,8 @@ def render(art, site):
         "avgörandet", art.get("source_url"), "Internationella brottmålsdomstolen")
     return ENV.get_template("icc.html").render(page_context(
         lb.short_title or lb.short_id, "Internationella brottmålsdomstolen",
-        doc_meta(meta, art.get("source_url")), doc_uri=art["uri"],
+        doc_meta(meta, art.get("source_url")), doc_uri=art["uri"], short_id=lb.short_id,
+        description=site.snippet(art["uri"]),
         toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(), structure=structure,
         banner=banner))

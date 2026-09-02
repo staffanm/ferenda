@@ -181,7 +181,8 @@ def render(art, site):
     rail.add_document()
     return ENV.get_template("dv.html").render(page_context(
         title, "Rättsfall", doc_meta(meta, art.get("source_url")),
-        doc_uri=art["uri"],
+        doc_uri=art["uri"], short_id=lb.short_id,
+        description=site.snippet(art["uri"]),
         toc=render_toc(toc, lb.short_id), eyebrow=eyebrow,
         summary_text=md.get("sammanfattning"),
         island=rail.island(),

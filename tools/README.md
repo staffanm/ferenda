@@ -16,6 +16,7 @@ calls them. Run each one from the repository root, through `uv run`.
 | `pii_worklist.py` | `pii_scan.py`'s candidates | one ranked review row per document | no |
 | `icj_vocabulary.py` | the harvested I.C.J. Reports PDFs | `ferenda/icj/data/vocabulary.txt` | overwrites that dataset |
 | `namedlaws_history.py` | the SFS artifacts | the dates each named law held its name; `--write` updates the dataset | only with `--write` |
+| `og_image.py` | the mark, the fonts and the palette under `ferenda/lib/assets/` | `ferenda/lib/assets/og-image.png`, the link-preview card every page's `og:image` names | overwrites that image |
 
 The golden comparison is a change-detector, not an oracle. Read
 [`../docs/developing/testing.md`](../docs/developing/testing.md) before acting

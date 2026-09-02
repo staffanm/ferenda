@@ -773,7 +773,8 @@ def render(art, site):
         body_class = ""
     return ENV.get_template("eurlex.html").render(page_context(
         title, kind, doc_meta(meta, art.get("source_url")),
-        doc_uri=art["uri"],
+        doc_uri=art["uri"], short_id=lb.short_id,
+        description=site.snippet(art["uri"]),
         toc=render_toc(toc, lb.short_id),
         eyebrow=("%s · %s lydelse" % (lb.short_id,
                                       "kommande" if future else "äldre")

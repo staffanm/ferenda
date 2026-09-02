@@ -148,6 +148,11 @@ class Site:
                    chain_up=margins._chain_up_index(con), chain_down=margins._chain_down_index(con),
                    today=date.today().isoformat())
 
+    def snippet(self, uri):
+        """The document's opening words (catalog.snippet), for the page head's
+        description and link preview."""
+        return catalog.snippet(self.con, uri)
+
     def load_inbound_counts(self, uris):
         """Fill `inbound_counts` for `uris` that are not memoized yet. A uri
         nothing cites is recorded as 0 rather than left absent, so the same page
@@ -1861,10 +1866,40 @@ BANNERS = ENV.get_template("partials/banners.html").module
 PANELS = ENV.get_template("partials/panels.html").module
 _RAIL = ENV.get_template("partials/rail.html").module
 NODES = ENV.get_template("nodes.html").module
+SITE_NAME = "lagen.nu"
+DESCRIPTION_MAX = 300     # what a search result or a link preview shows of it
+
+
+def head_title(title, short_id=None):
+    """The `<title>` (and og:title): the identifier the document is cited by,
+    then its name, then the site -- "NJA 2015 s. 180 – Hovrättens dagboksblad |
+    lagen.nu", "SFS 2010:800 – Skollagen | lagen.nu". The h1 keeps the name
+    alone; the title tag is what a search engine ranks on, and a reader
+    searches for the number as often as the name. An identifier the name
+    already carries is not repeated ("HFD 2012 ref. 21 | lagen.nu"). The
+    frontpage is the site speaking as itself and is titled by `page_context`
+    (its `mark` flag), never by this function guessing from the title."""
+    if short_id and short_id not in title:
+        title = "%s – %s" % (short_id, title)
+    return "%s | %s" % (title, SITE_NAME)
+
+
+def description_text(text):
+    """A snippet cut to `DESCRIPTION_MAX` on a word boundary, whitespace
+    folded -- the meta description. None when there is nothing to say."""
+    if not text:
+        return None
+    text = " ".join(text.split())
+    if len(text) <= DESCRIPTION_MAX:
+        return text
+    return text[:DESCRIPTION_MAX].rsplit(" ", 1)[0] + "…"
+
+
 def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                  summary="", summary_text=None, island="", solo=False,
                  body_class="", head="", own_h1=False, title_html=None,
-                 mark=False, doc_uri=None, **extra):
+                 mark=False, doc_uri=None, short_id=None, description=None,
+                 **extra):
     """The page-shell context every render goes through (page.html and the
     sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
     `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
@@ -1877,10 +1912,20 @@ def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
     to its served path, so a bare `#anchor` link (the TOC, a pilcrow
     permalink) resolves against the document instead of the site root; a
     `solo` page (browse, frontpage) has no single document and leaves it
-    unset. `extra` carries a source template's own variables (pre-rendered
-    fragments should already be Markup)."""
+    unset. `short_id` is the identifier the document is cited by (`head_title`
+    puts it in the title tag; the h1 stays `title`); `description` its opening
+    words (`Site.snippet`), for the meta description and the link preview. A
+    document page carries a self-referencing `canonical` on the public host,
+    so the preview host, a subdomain landing serving the same bytes, and a
+    `?diff=` variant all resolve to the one lagen.nu address. `extra` carries a
+    source template's own variables (pre-rendered fragments should already be
+    Markup)."""
     base_path = layout.page_url(doc_uri) if doc_uri else ""
     return dict(title=title, kind=kind, meta=Markup(meta), toc=Markup(toc),
+                head_title=SITE_NAME if mark else head_title(title, short_id),
+                canonical=BASE.rstrip("/") + base_path if base_path else None,
+                description=description_text(description),
+                site_name=SITE_NAME, og_image=BASE + "og-image.png",
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
                 body_class=body_class, head=Markup(head), own_h1=own_h1,
@@ -1897,7 +1942,7 @@ BRAND = Markup("lagen<em>.nu</em>")
 
 def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
          summary="", island="", solo=False, body_class="",
-         head="", own_h1=False, title_html=None, mark=False):
+         head="", own_h1=False, title_html=None, mark=False, description=None):
     """Assemble a page (templates/page.html: masthead, frontmatter, grid,
     mobile toolbar). Document pages use the 3-column grid (TOC · reading
     column · context rail); `solo` pages (frontpage, browse indexes) drop the
@@ -1911,7 +1956,7 @@ def page(title, kind, meta, body, toc="", eyebrow=None, subtitle=None,
         title, kind, meta, toc=toc, eyebrow=eyebrow, subtitle=subtitle,
         summary=summary, island=island, solo=solo, body_class=body_class,
         head=head, own_h1=own_h1, title_html=title_html, mark=mark,
-        body=Markup(body)))
+        description=description, body=Markup(body)))
 
 
 def prop_link(site, ident):

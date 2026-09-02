@@ -231,6 +231,7 @@ def render(art, site):
     return ENV.get_template("begrepp.html").render(page_context(
         title, "Begrepp", doc_meta(meta, art.get("source_url")),
         doc_uri=art["uri"],
+        description=site.snippet(art["uri"]),
         toc=render_toc(toc, title), eyebrow="Begrepp", island=island,
         structure=structure, has_description=has_description,
         definitions=definitions, definition_cap=PANEL_CAP,

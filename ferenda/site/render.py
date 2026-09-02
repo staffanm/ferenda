@@ -136,7 +136,7 @@ def render_frontpage(art):
     body = _TPL.frontpage_body(Markup(_blocks_html(art["blocks"])))
     return page(art["title"], "Start", "", body, title_html=BRAND,
                 eyebrow="Sveriges lagar, med kontext", solo=True, mark=True,
-                body_class=" site")
+                body_class=" site", description="Sveriges lagar, med kontext")
 
 
 def render_about(art):

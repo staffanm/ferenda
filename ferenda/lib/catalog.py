@@ -2052,6 +2052,11 @@ def document(con: sqlite3.Connection, uri: str) -> dict | None:
         "FROM documents WHERE uri = ?", (uri,)).fetchone()
 
 
+# the document's opening words: `snippet` as relate stamped it, else the
+# older `description` column -- one rule, read by /card and by the page head
+OPENING_WORDS = "COALESCE(NULLIF(snippet, ''), NULLIF(description, ''))"
+
+
 def card_row(con: sqlite3.Connection, uri: str):
     """The columns an identity card is built from (api/reads.card): naming,
     citedness, the publisher's own address and the opening words -- `snippet`
@@ -2060,10 +2065,21 @@ def card_row(con: sqlite3.Connection, uri: str):
     hold."""
     return con.execute(
         "SELECT source, kind, label, title, descriptive, short_id, "
-        "       NULLIF(source_url, ''), "
-        "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')), "
+        "       NULLIF(source_url, ''), " + OPENING_WORDS + ", "
         "       inbound_count, path FROM documents WHERE uri = ?",
         (uri,)).fetchone()
+
+
+def snippet(con: sqlite3.Connection, uri: str) -> str | None:
+    """The document's opening words as relate stamped them -- what the page's
+    meta description and link preview say, the same text /card answers with
+    (`card_row`'s COALESCE, so a catalog stamped before the snippet column still
+    describes every court decision). None for a uri the catalog does not hold
+    or a document with no prose to open with."""
+    row = con.execute(
+        "SELECT " + OPENING_WORDS + " FROM documents WHERE uri = ?",
+        (uri,)).fetchone()
+    return row[0] if row else None
 
 
 def link_count(con: sqlite3.Connection, from_uri: str, to_root: str) -> int:
