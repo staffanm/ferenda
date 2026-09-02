@@ -3,6 +3,7 @@
 temp files -- no real corpus, no JVM, fast."""
 
 
+import dataclasses
 import json
 import os
 import shutil
@@ -13,21 +14,42 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from urllib.parse import urlparse
 
 import pytest
+import requests
 
 from ferenda import build, config
-from ferenda.build import RunOptions, Source, Stage, build_one, is_fresh
+from ferenda.dv import source as dv_source
+from ferenda.forarbete import soukb as fa_soukb
+from ferenda.forarbete import source as forarbete_source
+from ferenda.foreskrift import parse as foreskrift_parse
+from ferenda.foreskrift import source as foreskrift_source
 from ferenda.foreskrift.agencies import REGISTRY
 from ferenda.foreskrift.model import Consolidation, Regulation
-from ferenda.lib import annstore, catalog, compress, layout, runlog
+from ferenda.lib import (
+    annstore,
+    catalog,
+    compress,
+    corpus,
+    freshness,
+    layout,
+    runlog,
+    stage,
+)
 from ferenda.lib.errors import SkipDocument
+from ferenda.lib.freshness import build_one, is_fresh
+from ferenda.lib.stage import RunOptions, Source, Stage
+from ferenda.remisser import ai_analyze
+from ferenda.remisser import source as remisser_source
+from ferenda.sfs import source as sfs_source
+from ferenda.site import source as site_source
+from ferenda.wiki import source as wiki_source
 
 
 @pytest.fixture(autouse=True)
 def reset_run():
-    build.RUN = RunOptions()
-    build.recipe_version.cache_clear()
+    stage.set_run(RunOptions())
+    freshness.recipe_version.cache_clear()
     yield
-    build.RUN = RunOptions()
+    stage.set_run(RunOptions())
 
 
 def make_source(tmp_path, version_file=None):
@@ -66,7 +88,7 @@ def apply(manifest, res):
 def test_manifest_get_update_and_json_migration(tmp_path, monkeypatch):
     # the SQLite manifest mirrors the dict the JSON manifest loaded into:
     # get/update roundtrip, upsert on re-update, None for an absent key
-    m = build.Manifest(tmp_path / "m.sqlite")
+    m = freshness.Manifest(tmp_path / "m.sqlite")
     assert m.get("syn/parse/a") is None
     m.update({"syn/parse/a": {"inputs": "x", "version": "1", "secs": 2.5}})
     assert m.get("syn/parse/a") == {"inputs": "x", "version": "1", "secs": 2.5}
@@ -78,10 +100,10 @@ def test_manifest_get_update_and_json_migration(tmp_path, monkeypatch):
     # cannot rot beside the live store
     legacy = {"syn/parse/b": {"inputs": "z", "version": "3"}}
     _isolate_manifest(tmp_path, monkeypatch)
-    build.MANIFEST.write_text(json.dumps(legacy))
-    migrated = build.load_manifest()
+    freshness.MANIFEST.write_text(json.dumps(legacy))
+    migrated = freshness.load_manifest()
     assert migrated.get("syn/parse/b") == legacy["syn/parse/b"]
-    assert not build.MANIFEST.exists()
+    assert not freshness.MANIFEST.exists()
 
 
 def test_build_then_skip(tmp_path):
@@ -105,19 +127,19 @@ def test_fresh_skip_heals_stale_error(tmp_path, monkeypatch):
     manifest = {}
     apply(manifest, build_one(src, "parse", "a", manifest))   # now fresh on disk
 
-    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
-    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
-    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
-    monkeypatch.setattr(build, "RUN_ID", "run-2")
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "run-2")
     # an earlier transient run recorded a failure for this (now-fresh) doc
-    runlog.apply_outcomes(build.ERRORS, "syn",
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
                           [("parse", "a", "OSError: gone", "tb")], [], "run-1")
-    assert "syn/parse/a" in runlog.read_errors(build.ERRORS)
+    assert "syn/parse/a" in runlog.read_errors(freshness.ERRORS)
 
     res2 = build_one(src, "parse", "a", manifest)
     assert res2.planned == [] and ("parse", "a") in res2.fresh   # skipped as fresh
-    build.report(src, "parse", res2, 1, True)                   # folds fresh -> clear
-    assert "syn/parse/a" not in runlog.read_errors(build.ERRORS)
+    corpus.report(src, "parse", res2, 1, True)                   # folds fresh -> clear
+    assert "syn/parse/a" not in runlog.read_errors(freshness.ERRORS)
 
 
 def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, capsys):
@@ -128,21 +150,21 @@ def test_stage_gate_skips_when_fingerprint_unchanged(tmp_path, monkeypatch, caps
     _isolate_manifest(tmp_path, monkeypatch)
     # settle downloads first (as `download` before `parse` does in real use), so a
     # later parse touches no inputs and the recorded fingerprint stays valid
-    build.run_action(src, "parse", src.list_basefiles(), 1)
+    freshness.run_action(src, "parse", src.list_basefiles(), 1)
     capsys.readouterr()
     store = {}
 
-    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, True)                 # ran + fingerprinted
     assert "up to date -- skipped" not in capsys.readouterr().out
 
-    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, False)                # skipped wholesale
     assert "parse syn: up to date -- skipped" in capsys.readouterr().out
 
     # an input change re-stales the gate -> it runs again
     (tmp_path / "dl" / "a.txt").write_text("CHANGED")
-    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, True)
 
 
@@ -153,16 +175,16 @@ def test_stage_gate_is_not_recorded_by_a_dry_run(tmp_path, monkeypatch, capsys):
     "up to date -- skipped" over the whole stale artifact tree."""
     _, src = make_source(tmp_path)
     _isolate_manifest(tmp_path, monkeypatch)
-    monkeypatch.setattr(build.RUN, "dry_run", True)
+    monkeypatch.setattr(stage.RUN, "dry_run", True)
     store = {}
 
-    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, False)                # planned, not marked
     assert store == {}
 
-    monkeypatch.setattr(build.RUN, "dry_run", False)
+    monkeypatch.setattr(stage.RUN, "dry_run", False)
     capsys.readouterr()
-    errs, recorded = build._run_stage_gated(src, "parse", 1, store)
+    errs, recorded = corpus._run_stage_gated(src, "parse", 1, store)
     assert (errs, recorded) == (False, True)                 # the real run still runs
     assert "up to date -- skipped" not in capsys.readouterr().out
 
@@ -190,23 +212,23 @@ def test_orphan_errors_reconciled_only_on_full_source(tmp_path, monkeypatch):
     lists (orphans that fresh-skip healing can never reach); a targeted run must
     NOT -- else parsing one doc would nuke every other doc's recorded error."""
     _, src = make_source(tmp_path)                       # lists "a", "b"
-    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
-    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
-    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
-    monkeypatch.setattr(build, "RUN_ID", "run-2")
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "run-2")
     # an orphan (basefile with '/', no longer listed) + a different source's entry
-    runlog.apply_outcomes(build.ERRORS, "syn",
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
                           [("parse", "gone/x", "KeyError: 'type'", "tb")], [], "r1")
-    runlog.apply_outcomes(build.ERRORS, "other",
+    runlog.apply_outcomes(freshness.ERRORS, "other",
                           [("parse", "z", "KeyError", "tb")], [], "r1")
 
     # targeted run (full_source=False): reconcile must NOT fire
-    build.report(src, "parse", build.Result(), 1, False)
-    assert "syn/parse/gone/x" in runlog.read_errors(build.ERRORS)
+    corpus.report(src, "parse", freshness.Result(), 1, False)
+    assert "syn/parse/gone/x" in runlog.read_errors(freshness.ERRORS)
 
     # full-source run: the orphan is dropped, other sources untouched
-    build.report(src, "parse", build.Result(), 2, True)
-    errs = runlog.read_errors(build.ERRORS)
+    corpus.report(src, "parse", freshness.Result(), 2, True)
+    errs = runlog.read_errors(freshness.ERRORS)
     assert "syn/parse/gone/x" not in errs
     assert "other/parse/z" in errs                       # never touches another source
 
@@ -215,16 +237,16 @@ def test_report_failing_count_is_source_scoped(tmp_path, monkeypatch, capsys):
     """The `docs failing` line counts only the reported source -- `lagen dv parse`
     must not surface another source's errors."""
     _, src = make_source(tmp_path)                       # source "syn"
-    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
-    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
-    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
-    monkeypatch.setattr(build, "RUN_ID", "r1")
-    runlog.apply_outcomes(build.ERRORS, "syn",
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(freshness, "RUN_ID", "r1")
+    runlog.apply_outcomes(freshness.ERRORS, "syn",
                           [("parse", "a", "E", "tb")], [], "r0")
-    runlog.apply_outcomes(build.ERRORS, "other",     # a different source, 3 errors
+    runlog.apply_outcomes(freshness.ERRORS, "other",     # a different source, 3 errors
                           [("parse", x, "E", "tb") for x in ("x", "y", "z")], [], "r0")
 
-    build.report(src, "parse", build.Result(), 1, False)   # targeted: no reconcile
+    corpus.report(src, "parse", freshness.Result(), 1, False)   # targeted: no reconcile
     out = capsys.readouterr().out
     assert "1 docs failing in syn" in out                  # only syn's error counted
     assert "overall" not in out                            # no misleading global count
@@ -252,7 +274,7 @@ def test_force_rebuilds_named_stage_only(tmp_path):
     manifest = {}
     apply(manifest, build_one(src, "parse", "a", manifest))
 
-    build.RUN.force = True
+    stage.RUN.force = True
     res = build_one(src, "parse", "a", manifest)
     # force hits the named stage; its fresh dependency is not re-run
     assert [s for s, _ in res.planned] == ["parse"]
@@ -267,35 +289,38 @@ def test_recipe_version_invalidates(tmp_path):
     assert is_fresh(manifest, src, src.stages["parse"], "a")
 
     # editing the recipe's own code re-stales the output (no --force needed)
-    build.recipe_version.cache_clear()
+    freshness.recipe_version.cache_clear()
     vfile.write_text("VERSION = 2")
     assert not is_fresh(manifest, src, src.stages["parse"], "a")
 
 
 def test_sfs_graphics_is_part_of_parse_recipe():
-    assert any(path.name == "graphics.py" for path in build.SFS_CODE)
+    assert any(path.name == "graphics.py" for path in sfs_source.SFS_CODE)
 
 
 def test_sfs_conventions_are_part_of_parse_recipe():
-    assert "parallelappendix.py" in {path.name for path in build.SFS_CODE}
+    assert "parallelappendix.py" in {path.name for path in sfs_source.SFS_CODE}
 
 
 def _isolate_manifest(tmp_path, monkeypatch):
-    monkeypatch.setattr(build, "MANIFEST", tmp_path / "manifest.json")
-    monkeypatch.setattr(build, "MANIFEST_DB", tmp_path / "manifest.sqlite")
-    monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
+    monkeypatch.setattr(freshness, "MANIFEST", tmp_path / "manifest.json")
+    monkeypatch.setattr(freshness, "MANIFEST_DB", tmp_path / "manifest.sqlite")
+    monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
 
 
 def test_targeted_generate_refreshes_parse_and_relate(tmp_path, monkeypatch):
     _, src = make_source(tmp_path)
     src.name = "sfs"
+    # a published source (one that registers an artifacts lister) is the only
+    # kind whose targeted generate falls back to relate
+    src.artifacts = lambda: []
     _isolate_manifest(tmp_path, monkeypatch)
     # no catalog in this synthetic world: the targeted gate
     # (_catalog_current_for) must report stale, so relate still runs
-    monkeypatch.setattr(build, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     related = []
-    monkeypatch.setattr(build, "cmd_relate",
-                        lambda names, force=None: related.append(names))
+    monkeypatch.setattr(corpus, "cmd_relate",
+                        lambda sources, names, force=None: related.append(names))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert src.stages["parse"].output("a").read_text() == "HELLO"
@@ -310,8 +335,8 @@ def test_targeted_generate_skips_relate_when_catalog_current(tmp_path, monkeypat
     src.name = "sfs"
     _isolate_manifest(tmp_path, monkeypatch)
     monkeypatch.setattr(build, "_catalog_current_for", lambda name, bfs: True)
-    monkeypatch.setattr(build, "cmd_relate",
-                        lambda names, force=None:
+    monkeypatch.setattr(corpus, "cmd_relate",
+                        lambda sources, names, force=None:
                         pytest.fail("must not relate when current"))
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
@@ -330,19 +355,19 @@ def test_catalog_current_for_matches_rows_against_artifacts(tmp_path, monkeypatc
                                "metadata": {"properties": {}}, "structure": []}))
     db = tmp_path / "catalog.sqlite"
     catalog.rebuild(str(db), "sfs", [art])
-    monkeypatch.setattr(build, "CATALOG", db)
+    monkeypatch.setattr(layout, "CATALOG", db)
     monkeypatch.setattr(build.layout, "artifact", lambda source, bf: art)
-    monkeypatch.setattr(build, "load_fingerprints", lambda: {})
-    monkeypatch.setattr(build, "code_changed", lambda *a: False)
-    monkeypatch.setattr(build, "_corr_watermark", lambda: "wm")
-    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: True)
+    monkeypatch.setattr(freshness, "load_fingerprints", lambda: {})
+    monkeypatch.setattr(freshness, "code_changed", lambda *a: False)
+    monkeypatch.setattr(corpus, "_corr_watermark", lambda sources: "wm")
+    monkeypatch.setattr(freshness, "fingerprint_fresh", lambda *a: True)
 
     assert build._catalog_current_for("sfs", ["1999:1"])
     # an authored .corr/.ann layer (stale __corr__ fingerprint) stales the gate
     # even though the row still matches -- the cross-passes must run
-    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: False)
+    monkeypatch.setattr(freshness, "fingerprint_fresh", lambda *a: False)
     assert not build._catalog_current_for("sfs", ["1999:1"])
-    monkeypatch.setattr(build, "fingerprint_fresh", lambda *a: True)
+    monkeypatch.setattr(freshness, "fingerprint_fresh", lambda *a: True)
 
     art.write_text(art.read_text() + " ")        # bytes drift from the row
     assert not build._catalog_current_for("sfs", ["1999:1"])
@@ -354,10 +379,10 @@ def test_targeted_generate_no_deps_leaves_parse_untouched(tmp_path, monkeypatch)
     _, src = make_source(tmp_path)
     src.name = "sfs"
     _isolate_manifest(tmp_path, monkeypatch)
-    monkeypatch.setattr(build, "cmd_relate",
-                        lambda names, force=None:
+    monkeypatch.setattr(corpus, "cmd_relate",
+                        lambda sources, names, force=None:
                         pytest.fail("must not relate with --no-deps"))
-    monkeypatch.setattr(build.RUN, "no_deps", True)
+    monkeypatch.setattr(stage.RUN, "no_deps", True)
 
     assert not build._prepare_targeted_generate(src, ["a"], 1)
     assert not src.stages["parse"].output("a").exists()
@@ -372,40 +397,40 @@ def test_code_version_gate_for_relate_index(tmp_path):
     code = (vfile,)
     manifest = {}
 
-    assert build.code_changed(manifest, "relate", "sfs", code)      # no record yet
-    build.record_code_version(manifest, "relate", "sfs", code)
-    build.recipe_version.cache_clear()
-    assert not build.code_changed(manifest, "relate", "sfs", code)  # now current
-    assert build.code_changed(manifest, "relate", "dv", code)       # per-source
+    assert freshness.code_changed(manifest, "relate", "sfs", code)      # no record yet
+    freshness.record_code_version(manifest, "relate", "sfs", code)
+    freshness.recipe_version.cache_clear()
+    assert not freshness.code_changed(manifest, "relate", "sfs", code)  # now current
+    assert freshness.code_changed(manifest, "relate", "dv", code)       # per-source
 
     vfile.write_text("v2")                                          # edit the code
-    build.recipe_version.cache_clear()
-    assert build.code_changed(manifest, "relate", "sfs", code)
-    build.RUN.ignore_code_changes = True                           # pinned fresh
-    assert not build.code_changed(manifest, "relate", "sfs", code)
-    build.RUN.ignore_code_changes = False
+    freshness.recipe_version.cache_clear()
+    assert freshness.code_changed(manifest, "relate", "sfs", code)
+    stage.RUN.ignore_code_changes = True                           # pinned fresh
+    assert not freshness.code_changed(manifest, "relate", "sfs", code)
+    stage.RUN.ignore_code_changes = False
 
     # relate and index are independent namespaces
-    build.record_code_version(manifest, "relate", "sfs", code)
-    build.recipe_version.cache_clear()
-    assert build.code_changed(manifest, "index", "sfs", code)
+    freshness.record_code_version(manifest, "relate", "sfs", code)
+    freshness.recipe_version.cache_clear()
+    assert freshness.code_changed(manifest, "index", "sfs", code)
 
 
 def test_file_fingerprint_detects_add_remove_modify(tmp_path):
     a = tmp_path / "a.json"; a.write_text("1")
     b = tmp_path / "b.json"; b.write_text("2")
-    base = build.file_fingerprint([a, b])
-    assert build.file_fingerprint([a, b]) == base          # stable when untouched
+    base = freshness.file_fingerprint([a, b])
+    assert freshness.file_fingerprint([a, b]) == base          # stable when untouched
     b.write_text("22")                                   # modify -> new size/mtime
-    assert build.file_fingerprint([a, b]) != base
-    assert build.file_fingerprint([a]) != base             # remove one
+    assert freshness.file_fingerprint([a, b]) != base
+    assert freshness.file_fingerprint([a]) != base             # remove one
     c = tmp_path / "c.json"; c.write_text("3")
-    assert build.file_fingerprint([a, b, c]) != base       # add one
+    assert freshness.file_fingerprint([a, b, c]) != base       # add one
 
 
 def test_artifacts_excludes_index_sidecars(tmp_path, monkeypatch):
     # layout.artifacts() is the single home for a source's artifact list, and
-    # build.ARTIFACTS["dv"]/["kommentar"] delegate to it. The non-document json
+    # the dv/kommentar `artifacts` listers delegate to it. The non-document json
     # that shares a source's artifact dir -- the case-law identity index, the
     # AI-guidance index, the sfs .versions.json layers -- must never surface as a
     # document, else relate tries to index a JSON list (art["uri"] on a list).
@@ -415,13 +440,13 @@ def test_artifacts_excludes_index_sidecars(tmp_path, monkeypatch):
     case = dom / "NJA_2020_s_1.json"; case.write_text("{}")
     (dom / layout.DOM_INDEX.name).write_text("[]")               # not a document
     assert layout.artifacts("dv") == [case]
-    assert build.ARTIFACTS["dv"]() == [case]                     # build delegates
+    assert build.SOURCES["dv"].artifacts() == [case]             # build delegates
 
     komm = tmp_path / "kommentar" / "sfs"; komm.mkdir(parents=True)
     note = komm / "2009_400.json"; note.write_text("{}")
     (tmp_path / "kommentar" / layout.GUIDANCE_INDEX.name).write_text("{}")
     assert layout.artifacts("kommentar") == [note]
-    assert build.ARTIFACTS["kommentar"]() == [note]
+    assert build.SOURCES["kommentar"].artifacts() == [note]
 
     sfs = tmp_path / "sfs" / "2020"; sfs.mkdir(parents=True)
     law = sfs / "1.json"; law.write_text("{}")
@@ -440,9 +465,9 @@ def test_foreskrift_parse_run_retires_grund_projection(tmp_path, monkeypatch):
     # both go -- generate only plans pages whose sidecar exists, so a surviving
     # page would keep serving as an unrefreshable orphan
     monkeypatch.setattr(layout, "ARTIFACT", tmp_path / "artifact")
-    monkeypatch.setattr(build, "GENERATED", tmp_path / "generated")
+    monkeypatch.setattr(layout, "GENERATED", tmp_path / "generated")
     record = tmp_path / "record.json"; record.write_text("{}")
-    monkeypatch.setattr(build, "foreskrift_record", lambda bf: record)
+    monkeypatch.setattr(foreskrift_source, "foreskrift_record", lambda bf: record)
 
     def reg(consolidations):
         return Regulation(
@@ -452,24 +477,24 @@ def test_foreskrift_parse_run_retires_grund_projection(tmp_path, monkeypatch):
 
     cons = Consolidation(of="https://lagen.nu/fffs/2013:10",
                          structure=[{"id": "P1"}])
-    monkeypatch.setattr(build.foreskrift_parse, "parse_record",
+    monkeypatch.setattr(foreskrift_parse, "parse_record",
                         lambda record, root: reg([cons]))
-    build.foreskrift_parse_run("fffs/2013:10")
+    foreskrift_source.foreskrift_parse_run("fffs/2013:10")
     sidecar = layout.foreskrift_grund_artifact("fffs/2013:10")
     assert compress.exists(sidecar)
-    page = build.GENERATED / "fffs" / "2013_10_grund.html"
+    page = layout.GENERATED / "fffs" / "2013_10_grund.html"
     page.parent.mkdir(parents=True); page.write_text("<html>")
 
-    monkeypatch.setattr(build.foreskrift_parse, "parse_record",
+    monkeypatch.setattr(foreskrift_parse, "parse_record",
                         lambda record, root: reg([]))
-    build.foreskrift_parse_run("fffs/2013:10")
+    foreskrift_source.foreskrift_parse_run("fffs/2013:10")
     assert not compress.exists(sidecar)
     assert not page.exists()
 
 
 def test_foreskrift_grund_pages_enumerates_sidecars(tmp_path, monkeypatch):
     # the /grund sidecars become generate's extra page rows (the föreskrift
-    # counterpart of build.sfs_version_pages): uri, source, path, title
+    # counterpart of sfs_version_pages): uri, source, path, title
     monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
     fs = tmp_path / "foreskrift" / "fffs"; fs.mkdir(parents=True)
     (fs / "2013-10.json").write_text("{}")
@@ -509,10 +534,10 @@ def test_stage_fingerprint_tracks_inputs(tmp_path):
     manifest = {}
     build_one(src, "download", "a", manifest)        # materialise the inputs
     build_one(src, "download", "b", manifest)
-    fp = build.stage_fingerprint(src, "parse")
-    assert build.stage_fingerprint(src, "parse") == fp   # stable while untouched
+    fp = freshness.stage_fingerprint(src, "parse")
+    assert freshness.stage_fingerprint(src, "parse") == fp   # stable while untouched
     (tmp_path / "dl" / "a.txt").write_text("HELLO AGAIN")   # rewrite one input
-    assert build.stage_fingerprint(src, "parse") != fp
+    assert freshness.stage_fingerprint(src, "parse") != fp
 
 
 def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):
@@ -520,23 +545,23 @@ def test_up_to_date_combines_fingerprint_code_and_force(tmp_path):
     code = (vfile,)
     manifest = {}
     wm = "wm-1"
-    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # no record
-    build.record_step(manifest, "relate", "sfs", wm, code)
-    build.recipe_version.cache_clear()
-    assert build.up_to_date(manifest, "relate", "sfs", wm, code)       # now fresh
-    assert not build.up_to_date(manifest, "relate", "sfs", "wm-2", code)  # data moved
-    vfile.write_text("v2"); build.recipe_version.cache_clear()
-    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # code moved
-    vfile.write_text("v1"); build.recipe_version.cache_clear()
-    build.RUN.force = True
-    assert not build.up_to_date(manifest, "relate", "sfs", wm, code)   # --force
+    assert not freshness.up_to_date(manifest, "relate", "sfs", wm, code)   # no record
+    freshness.record_step(manifest, "relate", "sfs", wm, code)
+    freshness.recipe_version.cache_clear()
+    assert freshness.up_to_date(manifest, "relate", "sfs", wm, code)       # now fresh
+    assert not freshness.up_to_date(manifest, "relate", "sfs", "wm-2", code)  # data moved
+    vfile.write_text("v2"); freshness.recipe_version.cache_clear()
+    assert not freshness.up_to_date(manifest, "relate", "sfs", wm, code)   # code moved
+    vfile.write_text("v1"); freshness.recipe_version.cache_clear()
+    stage.RUN.force = True
+    assert not freshness.up_to_date(manifest, "relate", "sfs", wm, code)   # --force
 
 
 def test_no_deps_skips_upstream(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}
 
-    build.RUN.no_deps = True
+    stage.RUN.no_deps = True
     res = build_one(src, "parse", "a", manifest)  # download never run
     # parse's input (download output) is missing -> recipe errors, recorded
     assert res.errors and res.errors[0][0] == "parse"
@@ -547,7 +572,7 @@ def test_dry_run_writes_nothing(tmp_path):
     _, src = make_source(tmp_path)
     manifest = {}
 
-    build.RUN.dry_run = True
+    stage.RUN.dry_run = True
     res = build_one(src, "parse", "a", manifest)
     assert [s for s, _ in res.planned] == ["download", "parse"]
     assert res.updates == {}
@@ -603,15 +628,15 @@ def wire(monkeypatch, tmp_path):
 
     def _wire(src):
         mock_sources[src.name] = src
-        monkeypatch.setattr(build, "RUNS", bd / "runs.ndjson")
-        monkeypatch.setattr(build, "ERRORS", bd / "errors.json")
-        monkeypatch.setattr(build, "STATUS", bd / "status.json")
-        monkeypatch.setattr(build, "MANIFEST", bd / "manifest.json")
-        monkeypatch.setattr(build, "MANIFEST_DB", bd / "manifest.sqlite")
-        monkeypatch.setattr(build, "FINGERPRINTS", bd / "fingerprints.json")
-        monkeypatch.setattr(build, "_MANIFEST_CACHE", None)
-        monkeypatch.setattr(build, "_FINGERPRINTS_CACHE", None)
-        monkeypatch.setattr(build, "RUN_ID", None)
+        monkeypatch.setattr(freshness, "RUNS", bd / "runs.ndjson")
+        monkeypatch.setattr(freshness, "ERRORS", bd / "errors.json")
+        monkeypatch.setattr(freshness, "STATUS", bd / "status.json")
+        monkeypatch.setattr(freshness, "MANIFEST", bd / "manifest.json")
+        monkeypatch.setattr(freshness, "MANIFEST_DB", bd / "manifest.sqlite")
+        monkeypatch.setattr(freshness, "FINGERPRINTS", bd / "fingerprints.json")
+        monkeypatch.setattr(freshness, "_MANIFEST_CACHE", None)
+        monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
+        monkeypatch.setattr(freshness, "RUN_ID", None)
     return _wire
 
 
@@ -633,7 +658,7 @@ def test_run_writes_start_segment_end(wire, tmp_path):
     _materialise_downloads(src)
     build.main(["syn", "parse", "-j1"])
 
-    events = _events(build.RUNS)
+    events = _events(freshness.RUNS)
     assert events[0]["event"] == "run-start"
     assert events[0]["argv"] == ["lagen", "syn", "parse", "-j1"]
     assert events[-1]["event"] == "run-end"
@@ -642,7 +667,7 @@ def test_run_writes_start_segment_end(wire, tmp_path):
     assert seg["step"] == "parse" and seg["source"] == "syn"
     assert seg["total"] == 2 and seg["ran"] == 2 and seg["status"] == "ok"
     # a full-source run writes the cheap status cell
-    cell = runlog.read_status(build.STATUS)["syn"]["parse"]
+    cell = runlog.read_status(freshness.STATUS)["syn"]["parse"]
     assert cell["total"] == 2 and cell["fresh"] == 2 and cell["failed"] == 0
 
 
@@ -652,26 +677,49 @@ def test_failing_recipe_lands_in_errors_and_clears(wire, tmp_path):
     with pytest.raises(SystemExit):        # a failed doc exits non-zero
         build.main(["syn", "parse", "-j1"])
 
-    errors = runlog.read_errors(build.ERRORS)
+    errors = runlog.read_errors(freshness.ERRORS)
     assert "syn/parse/b" in errors and "syn/parse/a" not in errors
     entry = errors["syn/parse/b"]
     assert entry["error"].startswith("ValueError: boom b")
     assert "ValueError" in entry["traceback"]      # a real captured traceback
-    assert _events(build.RUNS)[-1]["ok"] is False
+    assert _events(freshness.RUNS)[-1]["ok"] is False
 
     # fixing the input and re-running heals the entry (self-healing store)
     fail.clear()
     build.main(["syn", "parse", "-j1"])
-    assert "syn/parse/b" not in runlog.read_errors(build.ERRORS)
+    assert "syn/parse/b" not in runlog.read_errors(freshness.ERRORS)
 
 
 def test_dry_run_writes_no_state_files(wire, tmp_path):
     wire(build_source(tmp_path))
     build.main(["syn", "parse", "-n", "-j1"])
-    assert not build.RUNS.exists()
-    assert not build.ERRORS.exists()
-    assert not build.STATUS.exists()
-    assert build.RUN_ID is None            # no run id minted for a dry run
+    assert not freshness.RUNS.exists()
+    assert not freshness.ERRORS.exists()
+    assert not freshness.STATUS.exists()
+    assert freshness.RUN_ID is None            # no run id minted for a dry run
+
+
+def test_dry_run_plans_the_corpus_verbs_and_writes_nothing(wire, tmp_path,
+                                                          monkeypatch):
+    """`lagen all rebuild -n` plans the corpus verbs too. relate/index/dump/
+    generate each print what they would do and return before their first write
+    or network call -- they used to ignore --dry-run entirely and rebuild the
+    catalog, the index, the dumps and the site for real after printing the
+    parse plan."""
+    src = dataclasses.replace(build_source(tmp_path), artifacts=lambda: [])
+    wire(src)
+    data = tmp_path / "corpus"
+    monkeypatch.setattr(layout, "CATALOG", data / "catalog.sqlite")
+    monkeypatch.setattr(corpus, "DUMPS", data / "dumps")
+    monkeypatch.setattr(layout, "GENERATED", data / "generated")
+    stage.RUN.dry_run = True
+
+    def aggregates(con, *, full):
+        raise AssertionError("a dry run must not write the aggregate pages")
+
+    assert corpus.cmd_all({"syn": src}, ["syn"], 1, whole_corpus=True,
+                          aggregates=aggregates) is False
+    assert not data.exists()
 
 
 def test_dry_run_after_pipeline_emits_no_second_run(wire, tmp_path):
@@ -682,10 +730,10 @@ def test_dry_run_after_pipeline_emits_no_second_run(wire, tmp_path):
     wire(src)
     _materialise_downloads(src)
     build.main(["syn", "parse", "-j1"])
-    before = _events(build.RUNS)
+    before = _events(freshness.RUNS)
     build.main(["syn", "parse", "-n", "-j1"])       # dry run
-    assert _events(build.RUNS) == before            # nothing appended
-    assert build.RUN_ID is None
+    assert _events(freshness.RUNS) == before            # nothing appended
+    assert freshness.RUN_ID is None
 
 
 def test_clean_run_reports_ok_despite_prior_unrelated_failures(wire, tmp_path):
@@ -694,38 +742,38 @@ def test_clean_run_reports_ok_despite_prior_unrelated_failures(wire, tmp_path):
     # clean targeted run read as failed
     src = build_source(tmp_path)
     wire(src)
-    runlog.apply_outcomes(build.ERRORS, "other", [("parse", "x", "boom", "tb")],
+    runlog.apply_outcomes(freshness.ERRORS, "other", [("parse", "x", "boom", "tb")],
                           [], "old-run")            # pre-existing unrelated failure
     _materialise_downloads(src)
     build.main(["syn", "parse", "-j1"])
-    end = _events(build.RUNS)[-1]
+    end = _events(freshness.RUNS)[-1]
     assert end["event"] == "run-end"
     assert end["ok"] is True and end["errors"] == 0
     # the corpus-wide failing count still lives in errors.json, untouched
-    assert "other/parse/x" in runlog.read_errors(build.ERRORS)
+    assert "other/parse/x" in runlog.read_errors(freshness.ERRORS)
 
 
 def test_skipdocument_counted_as_skipdoc(wire, tmp_path):
     wire(build_source(tmp_path, skip={"b"}))
     build.main(["syn", "parse", "-j1"])
-    (seg,) = [e for e in _events(build.RUNS) if e["event"] == "segment"]
+    (seg,) = [e for e in _events(freshness.RUNS) if e["event"] == "segment"]
     assert seg["skipdoc"] == 1
     # a deliberate skip is not a failure and leaves no errors.json entry
-    assert "syn/parse/b" not in runlog.read_errors(build.ERRORS)
-    assert runlog.read_status(build.STATUS)["syn"]["parse"]["empty"] == 1
+    assert "syn/parse/b" not in runlog.read_errors(freshness.ERRORS)
+    assert runlog.read_status(freshness.STATUS)["syn"]["parse"]["empty"] == 1
 
 
 def test_targeted_run_leaves_status_cell_untouched(wire, tmp_path):
     wire(build_source(tmp_path))
     build.main(["syn", "parse", "-j1"])            # full run writes the cell
-    before = build.STATUS.read_text()
+    before = freshness.STATUS.read_text()
 
     # a targeted single-basefile run must NOT clobber the source-wide cell
     build.main(["syn", "parse", "a", "-f", "-j1"])
-    assert build.STATUS.read_text() == before
+    assert freshness.STATUS.read_text() == before
     # ... yet it still ran as its own run: the µs-resolution ids keep the two
     # back-to-back runs distinct in the ledger (newest first)
-    runs = runlog.read_runs(build.RUNS)
+    runs = runlog.read_runs(freshness.RUNS)
     assert len(runs) == 2
     assert runs[0]["argv"] == ["lagen", "syn", "parse", "a", "-f", "-j1"]
 
@@ -737,14 +785,14 @@ def test_fingerprint_skipped_step_emits_skipped_segment(wire, tmp_path, monkeypa
     # rebuild's derived steps need the real catalog/layout; stub them out so the
     # test isolates the parse fingerprint gate
     for fn in ("cmd_relate", "cmd_dump", "cmd_generate"):
-        monkeypatch.setattr(build, fn, lambda *a, **k: None)
+        monkeypatch.setattr(corpus, fn, lambda *a, **k: None)
     # cmd_index reports whether any unit failed to index, and cmd_all folds that
     # into the run's verdict -- the stub has to honour the same contract
-    monkeypatch.setattr(build, "cmd_index", lambda *a, **k: False)
+    monkeypatch.setattr(corpus, "cmd_index", lambda *a, **k: False)
     build.main(["syn", "rebuild", "-j1"])          # parse runs, records fingerprint
     build.main(["syn", "rebuild", "-j1"])          # unchanged -> parse skipped
 
-    skipped = [e for e in _events(build.RUNS) if e["event"] == "segment"
+    skipped = [e for e in _events(freshness.RUNS) if e["event"] == "segment"
                and e["step"] == "parse" and e["status"] == "skipped"]
     assert skipped and skipped[-1]["source"] == "syn"
 
@@ -777,9 +825,34 @@ def test_a_download_segment_records_what_the_harvest_found(wire, tmp_path,
                  origin="http://example.com")
     wire(src)
     build.main(["all", "download", "-j1"])
-    seg = [e for e in _events(build.RUNS) if e["event"] == "segment"
+    seg = [e for e in _events(freshness.RUNS) if e["event"] == "segment"
            and e["step"] == "download" and e["source"] == "syn_counts"][-1]
     assert (seg["total"], seg["ran"]) == (312, 7)
+
+
+def test_dv_harvest_fails_the_run_when_the_namedcases_refresh_fails(
+        wire, tmp_path, monkeypatch):
+    """A failed named-rättsfall refresh is an outcome of the harvest, so it
+    fails the source. It used to be caught, logged and swallowed: the ledger
+    kept a red `namedcases` segment while `lagen dv download` exited 0, so a
+    snapshot that had stopped refreshing showed up on no ops surface."""
+    dv = dv_source.SOURCES[0]
+    wire(dv)
+    monkeypatch.setattr(freshness, "RUN_ID", "test-run")
+    monkeypatch.setattr(dv_source.download, "sync", lambda root, full=False: (3, 0))
+    monkeypatch.setattr(dv_source, "DV_INDEX", tmp_path / "index.json")
+    (tmp_path / "index.json").write_text("{}")
+    monkeypatch.setattr(dv_source, "dv_namedcases", _raise_request_error)
+
+    assert corpus._run_harvest(dv, []) is True
+    steps = [(e["step"], e["source"], e["status"]) for e in _events(freshness.RUNS)
+             if e["event"] == "segment"]
+    assert ("namedcases", "dv", "errors") in steps
+    assert ("download", "dv", "errors") in steps
+
+
+def _raise_request_error(*_args, **_kwargs):
+    raise requests.exceptions.ConnectionError("HD's list is unreachable")
 
 
 def test_a_dry_run_harvest_counts_nothing(wire, tmp_path, monkeypatch):
@@ -790,7 +863,7 @@ def test_a_dry_run_harvest_counts_nothing(wire, tmp_path, monkeypatch):
                  origin="http://example.com")
     wire(src)
     build.main(["all", "download", "-j1"])
-    seg = [e for e in _events(build.RUNS) if e["event"] == "segment"
+    seg = [e for e in _events(freshness.RUNS) if e["event"] == "segment"
            and e["step"] == "download" and e["source"] == "syn_none"][-1]
     assert (seg["total"], seg["ran"]) == (None, None)
 
@@ -798,9 +871,9 @@ def test_a_dry_run_harvest_counts_nothing(wire, tmp_path, monkeypatch):
 def test_scope_totals_sum_across_sub_corpora():
     """avg sweeps five organs, rs and föreskrift their agencies, eurlex its
     sectors: each sync answers per scope and the ledger wants the run's total."""
-    assert build._sum_scope_totals(
+    assert stage.sum_scope_totals(
         {"jo": (100, 3), "jk": (50, 1), "arn": (7, 0)}) == (157, 4)
-    assert build._sum_scope_totals({}) == (0, 0)
+    assert stage.sum_scope_totals({}) == (0, 0)
 
 
 def test_all_download_contains_harvest_exceptions(wire, tmp_path, monkeypatch):
@@ -843,10 +916,10 @@ def test_all_all_contains_harvest_exceptions(wire, tmp_path, monkeypatch):
     
     # Stub rebuild's derived steps
     for fn in ("cmd_relate", "cmd_dump", "cmd_generate"):
-        monkeypatch.setattr(build, fn, lambda *a, **k: None)
+        monkeypatch.setattr(corpus, fn, lambda *a, **k: None)
     # cmd_index reports whether any unit failed to index, and cmd_all folds that
     # into the run's verdict -- the stub has to honour the same contract
-    monkeypatch.setattr(build, "cmd_index", lambda *a, **k: False)
+    monkeypatch.setattr(corpus, "cmd_index", lambda *a, **k: False)
         
     with pytest.raises(SystemExit) as exc_info:
         build.main(["all", "all", "-j1"])
@@ -878,20 +951,20 @@ def _opensearch_up():
 def test_cmd_relate_index_dump_skip_non_artifact_sources(monkeypatch, tmp_path):
     # Setup build context (CATALOG, watermarks, etc. mapped to tmp_path)
     monkeypatch.setattr(build, "SOURCES", {})
-    monkeypatch.setattr(build, "CATALOG", tmp_path / "catalog.sqlite")
-    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "fingerprints.json")
-    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
-    monkeypatch.setattr(build, "ERRORS", tmp_path / "errors.json")
-    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "errors.json")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
     
-    # Register a source that has no entry in ARTIFACTS mapping (similar to remisser)
+    # Register a source with no `artifacts` lister (similar to remisser)
     src = Source("non_artifact_src", lambda: [], {})
     monkeypatch.setitem(build.SOURCES, src.name, src)
-    
+
     # Running cmd_relate, cmd_index, cmd_dump should skip it without raising KeyError
-    build.cmd_relate(["non_artifact_src"])
-    build.cmd_index(["non_artifact_src"])
-    build.cmd_dump(["non_artifact_src"])
+    corpus.cmd_relate(build.SOURCES, ["non_artifact_src"])
+    corpus.cmd_index(build.SOURCES, ["non_artifact_src"])
+    corpus.cmd_dump(build.SOURCES, ["non_artifact_src"])
 
 
 def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
@@ -901,14 +974,14 @@ def test_rebuild_after_commit_drives_the_right_stages(monkeypatch):
     # cmd_generate -- must be correct or the commit lands but the page 500s. Spy
     # the pipeline stages (their own coverage is elsewhere) and assert the glue.
     parsed, related, generated = [], [], []
-    monkeypatch.setattr(build, "kommentar_parse_run", lambda bf: parsed.append(("kommentar", bf)))
-    monkeypatch.setattr(build, "begrepp_parse_run", lambda bf: parsed.append(("begrepp", bf)))
-    monkeypatch.setattr(build, "site_parse_run", lambda bf: parsed.append(("site", bf)))
-    monkeypatch.setattr(build, "cmd_relate",
-                        lambda names, force=None: related.append(list(names)))
+    monkeypatch.setattr(wiki_source, "kommentar_parse_run", lambda bf: parsed.append(("kommentar", bf)))
+    monkeypatch.setattr(wiki_source, "begrepp_parse_run", lambda bf: parsed.append(("begrepp", bf)))
+    monkeypatch.setattr(site_source, "site_parse_run", lambda bf: parsed.append(("site", bf)))
+    monkeypatch.setattr(corpus, "cmd_relate",
+                        lambda sources, names, force=None: related.append(list(names)))
     monkeypatch.setattr(
-        build, "cmd_generate",
-        lambda only=None, source=None, jobs=1, force=False:
+        corpus, "cmd_generate",
+        lambda sources, only=None, source=None, jobs=1, force=False, aggregates=None:
             generated.append((only, source, force)))
 
     urls = build.rebuild_after_commit([
@@ -979,7 +1052,8 @@ def test_catalog_records_and_resolves_separated_data_root(tmp_path):
     con2.close()
 
 
-def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_path):
+def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_path,
+                                                               capsys):
     """A missing catalog and (--force + whole corpus) each trigger a full rebuild
     that builds a scratch file and atomically swaps it in, leaving no `.building`
     file behind; an incremental relate writes in place and never makes a scratch."""
@@ -990,34 +1064,36 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     cat = tmp_path / "fast" / "catalog.sqlite"          # parent doesn't exist yet
     scratch = cat.with_name("catalog.sqlite.building")
 
-    monkeypatch.setattr(build, "DATA", data_root)
-    monkeypatch.setattr(build, "CATALOG", cat)
-    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "wm.json")
-    monkeypatch.setattr(build, "RUNS", tmp_path / "runs.ndjson")
-    monkeypatch.setattr(build, "ERRORS", tmp_path / "err.json")
-    monkeypatch.setattr(build, "STATUS", tmp_path / "status.json")
-    # the whole relatable corpus is just this one source, so `relate sfs` == "all"
-    monkeypatch.setattr(build, "ARTIFACTS", {"sfs": lambda: [art]})
-    # neutralise the cross-document post-passes (their own coverage is elsewhere)
+    monkeypatch.setattr(corpus, "DATA", data_root)
+    monkeypatch.setattr(layout, "CATALOG", cat)
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "wm.json")
+    monkeypatch.setattr(freshness, "RUNS", tmp_path / "runs.ndjson")
+    monkeypatch.setattr(freshness, "ERRORS", tmp_path / "err.json")
+    monkeypatch.setattr(freshness, "STATUS", tmp_path / "status.json")
+    # the whole relatable corpus is just this one source, so `relate sfs` == "all".
+    # A second, artifact-less source contributes a stub `relate_cross`, so the
+    # cross-document block's (counts, warnings) contract is exercised; the
+    # corpus-wide passes run over an empty annstore tree.
+    sources = {"sfs": Source("sfs", lambda: [], {}, artifacts=lambda: [art]),
+               "x": Source("x", lambda: [], {}, relate_cross=lambda con: (
+                   {"stub rows contributed": 1}, ["stub warning line"]))}
     empty = tmp_path / "empty"
     empty.mkdir()
     monkeypatch.setattr(annstore, "tree", lambda s: empty)
-    monkeypatch.setattr(build.fa_genomforande, "resolve",
-                        lambda con, layers=None: 0)
-    monkeypatch.setattr(build.fa_fk, "resolve", lambda con: 0)
-    monkeypatch.setattr(build.catalog, "set_correspondence", lambda con, rows: None)
-    monkeypatch.setattr(build, "kommentar_anchor_warnings", lambda con: [])
     # count swaps so we can tell a full rebuild (scratch+swap) from an incremental
     swaps = []
-    real_swap = build._swap_catalog
-    monkeypatch.setattr(build, "_swap_catalog",
+    real_swap = corpus._swap_catalog
+    monkeypatch.setattr(corpus, "_swap_catalog",
                         lambda s, d: (swaps.append(d), real_swap(s, d))[1])
 
     # 1) missing catalog -> full rebuild via scratch+swap
     assert not cat.exists()
-    build.cmd_relate(["sfs"])
+    corpus.cmd_relate(sources, ["sfs"])
     assert cat.exists() and not scratch.exists()
     assert len(swaps) == 1
+    out = capsys.readouterr().out
+    assert "relate: 1 stub rows contributed" in out
+    assert "relate: stub warning line" in out
     con = catalog.connect(cat)
     assert con.execute("SELECT COUNT(*) FROM documents WHERE source='sfs'").fetchone()[0] == 1
     # separated layout -> the corpus root was recorded and resolves
@@ -1025,14 +1101,14 @@ def test_cmd_relate_full_rebuild_builds_via_scratch_and_swaps(monkeypatch, tmp_p
     con.close()
 
     # 2) --force over the whole corpus -> full rebuild again (a second swap)
-    build.RUN.force = True
-    build.cmd_relate(["sfs"])
-    build.RUN.force = False
+    stage.RUN.force = True
+    corpus.cmd_relate(sources, ["sfs"])
+    stage.RUN.force = False
     assert cat.exists() and not scratch.exists()
     assert len(swaps) == 2
 
     # 3) incremental (catalog present, no force) -> in place, no scratch, no swap
-    build.cmd_relate(["sfs"])
+    corpus.cmd_relate(sources, ["sfs"])
     assert not scratch.exists()
     assert len(swaps) == 2
 
@@ -1067,7 +1143,7 @@ def test_swap_catalog_discards_stale_wal_of_old_catalog(tmp_path):
     sc.commit()
     sc.close()
 
-    build._swap_catalog(scratch, dest)
+    corpus._swap_catalog(scratch, dest)
 
     fresh = sqlite3.connect("file:%s?mode=ro" % dest, uri=True)
     assert fresh.execute("SELECT DISTINCT tag FROM d").fetchall() == [("NEW",)]
@@ -1086,9 +1162,9 @@ def test_fa_soukb_scans_passes_politeness(monkeypatch):
         called["delay"] = delay
         return 0, 0
 
-    monkeypatch.setattr(build.fa_soukb, "sync", fake_sync)
-    build.fa_soukb_scans([])
-    assert called.get("delay") == build.POLITENESS
+    monkeypatch.setattr(fa_soukb, "sync", fake_sync)
+    forarbete_source.fa_soukb_scans([])
+    assert called.get("delay") == stage.POLITENESS
 
 
 
@@ -1106,7 +1182,7 @@ def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
         def next(self, timeout=None):
             if self._arrived:
                 return self._arrived.pop(0)
-            raise build.multiprocessing.TimeoutError()
+            raise freshness.multiprocessing.TimeoutError()
 
     class FakePool:
         # the dead-worker sweep reads `pool._pool` for the live workers' pids;
@@ -1118,21 +1194,21 @@ def test_a_lost_worker_result_raises_instead_of_hanging(tmp_path, monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *a): return False
         def imap_unordered(self, _fn, _jobs, chunksize=1):
-            return LosesOneResult([("a", build.Result())])
+            return LosesOneResult([("a", freshness.Result())])
 
-    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
-    monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
-    monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
-    source = build.Source("syn", lambda: ["a", "b"], {})
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(freshness, "INFLIGHT", tmp_path / "inflight")
+    source = stage.Source("syn", lambda: ["a", "b"], {})
 
     with pytest.raises(RuntimeError, match=r"no worker result.*outstanding"):
-        build._run_parallel(source, "parse", ["a", "b"], 2, lambda res, bf: None)
+        freshness._run_parallel(source, "parse", ["a", "b"], 2, lambda res, bf: None)
 
 
 def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch):
     class Blocks:
         def next(self, timeout=None):
-            raise build.multiprocessing.TimeoutError()
+            raise freshness.multiprocessing.TimeoutError()
 
     class FakePool:
         # the dead-worker sweep reads `pool._pool` for the live workers' pids;
@@ -1145,13 +1221,13 @@ def test_the_lost_result_error_names_the_missing_basefiles(tmp_path, monkeypatch
         def __exit__(self, *a): return False
         def imap_unordered(self, _fn, _jobs, chunksize=1): return Blocks()
 
-    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
-    monkeypatch.setattr(build, "LOST_RESULT_TIMEOUT", 0)
-    monkeypatch.setattr(build, "INFLIGHT", tmp_path / "inflight")
-    source = build.Source("syn", lambda: ["ds/2010-47"], {})
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness, "LOST_RESULT_TIMEOUT", 0)
+    monkeypatch.setattr(freshness, "INFLIGHT", tmp_path / "inflight")
+    source = stage.Source("syn", lambda: ["ds/2010-47"], {})
 
     with pytest.raises(RuntimeError, match="ds/2010-47"):
-        build._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)
+        freshness._run_parallel(source, "parse", ["ds/2010-47"], 1, lambda res, bf: None)
 
 
 def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
@@ -1167,13 +1243,13 @@ def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
         the worker before it died -- appears alongside the delivery, naming
         the doc ("b") whose result is never coming."""
         def __init__(self):
-            self._arrived = [("a", build.Result())]
+            self._arrived = [("a", freshness.Result())]
 
         def next(self, timeout=None):
             if self._arrived:
                 (inflight / "99999").write_text("b")
                 return self._arrived.pop(0)
-            raise build.multiprocessing.TimeoutError()
+            raise freshness.multiprocessing.TimeoutError()
 
     class FakePool:
         _pool = ()                  # the crashed worker is gone
@@ -1184,24 +1260,24 @@ def test_a_dead_workers_doc_is_rebuilt_in_a_subprocess(tmp_path, monkeypatch):
         def imap_unordered(self, _fn, _jobs, chunksize=1):
             return LosesOneResult()
 
-    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
-    monkeypatch.setattr(build, "INFLIGHT", inflight)
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness, "INFLIGHT", inflight)
     rebuilt = []
 
     def fake_rebuild(source, action, bf, options):
         rebuilt.append((bf, options))
-        return build.Result()
+        return freshness.Result()
 
-    monkeypatch.setattr(build, "_rebuild_isolated", fake_rebuild)
-    monkeypatch.setattr(build, "RUN", build.RunOptions())
-    source = build.Source("syn", lambda: ["a", "b"], {})
+    monkeypatch.setattr(freshness, "_rebuild_isolated", fake_rebuild)
+    monkeypatch.setattr(stage, "RUN", stage.RunOptions())
+    source = stage.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
 
-    build._run_parallel(source, "parse", ["a", "b"], 2,
-                        lambda res, bf: absorbed.append(bf), force=True)
+    freshness._run_parallel(source, "parse", ["a", "b"], 2,
+                            lambda res, bf: absorbed.append(bf), force=True)
 
     # the rebuilt doc runs under the same force override the pool's workers got
-    assert rebuilt == [("b", build.RunOptions(force=True))]
+    assert rebuilt == [("b", stage.RunOptions(force=True))]
     assert sorted(absorbed) == ["a", "b"]
 
 
@@ -1217,14 +1293,14 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
         """Tick 1: silence, with the corpse's slot naming "a". Then "a"'s
         already-queued result arrives anyway, followed by the rest."""
         def __init__(self):
-            self._script = ["timeout", ("a", build.Result()),
-                            ("b", build.Result())]
+            self._script = ["timeout", ("a", freshness.Result()),
+                            ("b", freshness.Result())]
 
         def next(self, timeout=None):
             step = self._script.pop(0)
             if step == "timeout":
                 (inflight / "99999").write_text("a")
-                raise build.multiprocessing.TimeoutError()
+                raise freshness.multiprocessing.TimeoutError()
             return step
 
     class FakePool:
@@ -1236,15 +1312,15 @@ def test_a_result_delivered_after_its_workers_death_is_not_rebuilt(
         def imap_unordered(self, _fn, _jobs, chunksize=1):
             return DeliversLate()
 
-    monkeypatch.setattr(build.multiprocessing, "Pool", FakePool)
-    monkeypatch.setattr(build, "INFLIGHT", inflight)
-    monkeypatch.setattr(build, "_rebuild_isolated",
+    monkeypatch.setattr(freshness.multiprocessing, "Pool", FakePool)
+    monkeypatch.setattr(freshness, "INFLIGHT", inflight)
+    monkeypatch.setattr(freshness, "_rebuild_isolated",
                         lambda *a: pytest.fail("nothing should be rebuilt"))
-    source = build.Source("syn", lambda: ["a", "b"], {})
+    source = stage.Source("syn", lambda: ["a", "b"], {})
     absorbed = []
 
-    build._run_parallel(source, "parse", ["a", "b"], 2,
-                        lambda res, bf: absorbed.append(bf))
+    freshness._run_parallel(source, "parse", ["a", "b"], 2,
+                            lambda res, bf: absorbed.append(bf))
 
     assert sorted(absorbed) == ["a", "b"]
 
@@ -1264,7 +1340,7 @@ def test_a_segfaulted_child_is_reported_not_waited_for():
     once assumed a ProcessPoolExecutor mechanism (max_tasks_per_child) behaved
     a way it did not, and deadlocked."""
     with ProcessPoolExecutor(max_workers=1) as pool:
-        with pytest.raises(build.BrokenProcessPool):
+        with pytest.raises(freshness.BrokenProcessPool):
             pool.submit(_crash_hard, None).result()
     # and the executor after it is unaffected -- one death costs one attempt
     with ProcessPoolExecutor(max_workers=1) as pool:
@@ -1294,7 +1370,7 @@ class _OneShotPool:
         step = self._script.pop(0)
         fut = Future()
         if step == "crash":
-            fut.set_exception(build.BrokenProcessPool("child died"))
+            fut.set_exception(freshness.BrokenProcessPool("child died"))
         else:
             fut.set_result((job[2], step))
         return fut
@@ -1304,35 +1380,35 @@ def test_a_rebuild_that_crashes_once_is_retried_in_a_new_subprocess(monkeypatch)
     """The parallel driver's parent builds no document itself: a lost doc is
     rebuilt in a throwaway subprocess, and the heap corruption that lost it is
     not document-deterministic, so a fresh heap finishes it."""
-    done = build.Result()
+    done = freshness.Result()
     done.done.append(("parse", "b"))
     script, spawned, jobs = ["crash", done], [], []
-    monkeypatch.setattr(build, "ProcessPoolExecutor",
+    monkeypatch.setattr(freshness, "ProcessPoolExecutor",
                         _OneShotPool(script, spawned, jobs))
-    options = build.RunOptions(force=True)
-    source = build.Source("syn", lambda: ["b"], {})
+    options = stage.RunOptions(force=True)
+    source = stage.Source("syn", lambda: ["b"], {})
 
-    res = build._rebuild_isolated(source, "parse", "b", options)
+    res = freshness._rebuild_isolated(source, "parse", "b", options)
 
     assert res.done == [("parse", "b")]
     assert script == []                       # both attempts were used
     # each attempt is its own subprocess, and each carries the run options and
     # the faulthandler that makes the next crash legible
-    assert [kw["initializer"] for kw in spawned] == [build._worker_init] * 2
+    assert [kw["initializer"] for kw in spawned] == [freshness._worker_init] * 2
     assert [kw["initargs"] for kw in spawned] == [(options,)] * 2
     # the job tuple's field order is what the child indexes into SOURCES with:
     # swap two fields and production raises KeyError inside the child
-    assert jobs == [(build._worker, ("syn", "parse", "b"))] * 2
+    assert jobs == [(freshness._worker, ("syn", "parse", "b"))] * 2
 
 
 def test_a_rebuild_that_always_crashes_is_an_error_not_a_dead_run(monkeypatch):
     """A second crash must cost the document, not the hours of results the
     parent is holding -- so it is recorded like any other per-doc failure."""
-    script = ["crash"] * build.REBUILD_ATTEMPTS
-    monkeypatch.setattr(build, "ProcessPoolExecutor", _OneShotPool(script, []))
-    source = build.Source("syn", lambda: ["b"], {})
+    script = ["crash"] * freshness.REBUILD_ATTEMPTS
+    monkeypatch.setattr(freshness, "ProcessPoolExecutor", _OneShotPool(script, []))
+    source = stage.Source("syn", lambda: ["b"], {})
 
-    res = build._rebuild_isolated(source, "parse", "b", build.RunOptions())
+    res = freshness._rebuild_isolated(source, "parse", "b", stage.RunOptions())
 
     assert res.done == []
     assert [(stage, bf) for stage, bf, _msg, _tb in res.errors] == [("parse", "b")]
@@ -1353,9 +1429,9 @@ def test_an_always_stage_is_never_fresh(tmp_path):
                    always=True)
     source = Source("stats", lambda: ["statistik"], {"compute": always})
     # the manifest entry a completed run leaves behind
-    manifest = {build.manifest_key("stats", "compute", "statistik"): {
-        "inputs": build.hash_files([]),
-        "version": build.recipe_version((code,))}}
+    manifest = {freshness.manifest_key("stats", "compute", "statistik"): {
+        "inputs": freshness.hash_files([]),
+        "version": freshness.recipe_version((code,))}}
     assert is_fresh(manifest, source, gated, "statistik") is True
     assert is_fresh(manifest, source, always, "statistik") is False
 
@@ -1364,6 +1440,62 @@ def test_the_real_stats_compute_stage_is_marked_always():
     # the mark is what keeps `lagen all rebuild` re-measuring the corpus rather
     # than publishing one day's figures for ever
     assert build.SOURCES["stats"].stages["compute"].always is True
+    # and the phase is what puts it after dump rather than in the rebuild's
+    # leading parse loop, where it would measure the previous run's catalog
+    assert build.SOURCES["stats"].stages["compute"].phase == "dump"
+
+
+def test_run_phase_runs_the_stages_that_name_the_verb(tmp_path, monkeypatch):
+    """`run_phase` is how a stage rides a corpus verb. It runs exactly the stages
+    whose `phase` names that verb -- a source's ordinary parse stage keeps the
+    default and must not run here, and a source the run does not name is never
+    reached (which is what keeps `lagen sfs rebuild` from paying for the corpus
+    measurement)."""
+    ran = []
+    out = tmp_path / "out"
+    out.write_text("x")
+
+    def source(name, phase):
+        return Source(name, lambda: ["only"], {
+            "parse": Stage("parse", lambda bf: ran.append((name, "parse")),
+                           lambda bf: out),
+            "measure": Stage("measure", lambda bf: ran.append((name, "measure")),
+                             lambda bf: out, always=True, phase=phase)})
+
+    sources = {"a": source("a", "dump"), "b": source("b", "parse")}
+    _isolate_manifest(tmp_path, monkeypatch)
+
+    assert corpus.run_phase(sources, ["a", "b"], "dump", 1) is False
+    assert ran == [("a", "measure")]
+    ran.clear()
+    assert corpus.run_phase(sources, ["b"], "dump", 1) is False   # not named
+    assert ran == []
+
+
+def test_after_hooks_run_only_for_their_own_verb_and_source():
+    """The corpus-level `after[verb]` hook -- what dv reconciles its artifact
+    tree with once a full parse sweep is through. It fires for the named source
+    on the named verb, and for nothing else."""
+    fired = []
+    sources = {"a": Source("a", lambda: [], {},
+                           after={"parse": (lambda: fired.append("a/parse"),),
+                                  "relate": (lambda: fired.append("a/relate"),)}),
+               "b": Source("b", lambda: [], {})}
+
+    corpus.run_after(sources, ["a", "b"], "parse")
+    assert fired == ["a/parse"]
+    corpus.run_after(sources, ["b"], "relate")           # not this source
+    assert fired == ["a/parse"]
+    corpus.run_after(sources, ["a"], "index")            # not this verb
+    assert fired == ["a/parse"]
+    corpus.run_after(sources, ["a"], "relate")
+    assert fired == ["a/parse", "a/relate"]
+
+
+def test_dv_registers_its_after_parse_hook():
+    # the one live `after` hook: `lagen dv parse` and `lagen all rebuild` both
+    # reconcile the dv artifact tree and refresh the case-number snapshot
+    assert build.SOURCES["dv"].after == {"parse": (dv_source._dv_after_parse,)}
 
 
 # ---- remisser ai-analyze: ärende expansion and per-answer resilience --------
@@ -1373,13 +1505,13 @@ def _analyze_targets(monkeypatch, expansions, outcome, tmp_path):
     `expansions` fakes `answers()`; `outcome` decides per basefile whether the
     analysis raises."""
     monkeypatch.setattr(annstore, "ROOT", tmp_path / "ann")
-    monkeypatch.setattr(build.remisser_analyze, "answers",
+    monkeypatch.setattr(ai_analyze, "answers",
                         lambda arg: expansions[arg])
     # `is_arende` is the predicate `answers` pairs with -- the action asks it
     # first, and it decides by looking for a stored record on disk. Faking the
     # expansion without it left the real filesystem to answer, so these tests
     # only expanded anything on a machine whose corpus held that ärende
-    monkeypatch.setattr(build.remisser_analyze, "is_arende",
+    monkeypatch.setattr(ai_analyze, "is_arende",
                         lambda bf: bf in expansions)
     seen = []
 
@@ -1391,18 +1523,18 @@ def _analyze_targets(monkeypatch, expansions, outcome, tmp_path):
         path.write_text("{}")
         return path
 
-    monkeypatch.setattr(build.remisser_analyze, "analyze", fake_analyze)
+    monkeypatch.setattr(ai_analyze, "analyze", fake_analyze)
     # the helper fakes the analysis, so it must fake the length lookup too --
     # otherwise the length floor reads artifacts that this fixture never wrote.
     # Long enough to clear the floor; a test that cares overrides it after.
-    monkeypatch.setattr(build.remisser_analyze, "answer_chars", lambda _: 10_000)
+    monkeypatch.setattr(ai_analyze, "answer_chars", lambda _: 10_000)
     return seen
 
 
 def test_remisser_ai_analyze_survives_one_unanalyzable_answer(monkeypatch, tmp_path,
                                                               capsys):
     """The model paraphrasing where it was told to quote fails one answer; the
-    other 50 of the ärende must still be analyzed (build.py's per-doc resilience
+    other 50 of the ärende must still be analyzed (the per-doc resilience
     convention), and the failure must be named and exit nonzero. `Unanalyzable`
     is the *only* tolerated failure -- a permanent fault (missing förarbete
     artifact, verified layer, corrupt artifact) propagates instead, so it is
@@ -1411,12 +1543,12 @@ def test_remisser_ai_analyze_survives_one_unanalyzable_answer(monkeypatch, tmp_p
     seen = _analyze_targets(
         monkeypatch, {"sou/2026-21": answers},
         lambda bf: (_ for _ in ()).throw(
-            build.remisser_analyze.Unanalyzable("quote is not verbatim"))
+            ai_analyze.Unanalyzable("quote is not verbatim"))
         if bf.endswith("/b") else None,
         tmp_path)
 
     with pytest.raises(SystemExit) as exc:
-        build.remisser_ai_analyze(["sou/2026-21"])
+        remisser_source.remisser_ai_analyze(["sou/2026-21"])
     assert exc.value.code == 1
     assert seen == answers                       # b's failure did not stop c
     out = capsys.readouterr().out
@@ -1437,7 +1569,7 @@ def test_remisser_ai_analyze_skips_already_analysed_answers_of_an_arende(
     done.parent.mkdir(parents=True, exist_ok=True)
     done.write_text("{}")
 
-    build.remisser_ai_analyze(["sou/2026-21"])
+    remisser_source.remisser_ai_analyze(["sou/2026-21"])
     assert seen == ["sou/2026:21/b"]
     assert "1 already analysed" in capsys.readouterr().out
 
@@ -1452,7 +1584,7 @@ def test_remisser_ai_analyze_reruns_a_directly_named_answer(monkeypatch, tmp_pat
     done.parent.mkdir(parents=True, exist_ok=True)
     done.write_text("{}")
 
-    build.remisser_ai_analyze([bf])
+    remisser_source.remisser_ai_analyze([bf])
     assert seen == [bf]
 
 
@@ -1466,7 +1598,7 @@ def test_remisser_ai_analyze_does_not_swallow_a_permanent_fault(monkeypatch, tmp
         lambda bf: (_ for _ in ()).throw(ValueError("layer is verified")),
         tmp_path)
     with pytest.raises(ValueError, match="verified"):
-        build.remisser_ai_analyze(["sou/2026-21"])
+        remisser_source.remisser_ai_analyze(["sou/2026-21"])
     assert seen == ["sou/2026:21/a"]
 
 
@@ -1475,18 +1607,18 @@ def test_remisser_ai_analyze_update_refuses_named_basefiles(monkeypatch, tmp_pat
     about what the flag does, not a narrowing of it. sys.exit, not assert: a CLI
     misuse check that `-O` strips would silently analyse a different set of
     ärenden at real LLM cost."""
-    monkeypatch.setattr(build.RUN, "update", True)
+    monkeypatch.setattr(stage.RUN, "update", True)
     with pytest.raises(SystemExit, match="don't also name basefiles"):
-        build.remisser_ai_analyze(["sou/2026-21"])
+        remisser_source.remisser_ai_analyze(["sou/2026-21"])
 
 
 def test_remisser_ai_analyze_update_with_nothing_open_is_a_no_op(monkeypatch,
                                                                  tmp_path, capsys):
     """No open ärende is the normal steady state, not a usage error -- it must
     not print the usage line and exit nonzero."""
-    monkeypatch.setattr(build.RUN, "update", True)
-    monkeypatch.setattr(build.remisser_analyze, "updatable", lambda: [])
-    build.remisser_ai_analyze([])
+    monkeypatch.setattr(stage.RUN, "update", True)
+    monkeypatch.setattr(ai_analyze, "updatable", lambda: [])
+    remisser_source.remisser_ai_analyze([])
     assert "0 analysed ärende(n) still open" in capsys.readouterr().out
 
 
@@ -1498,11 +1630,11 @@ def test_remisser_ai_analyze_skips_answers_under_the_length_floor(monkeypatch,
     answers = ["sou/2026:21/short", "sou/2026:21/long"]
     seen = _analyze_targets(monkeypatch, {"sou/2026-21": answers},
                             lambda _: None, tmp_path)
-    monkeypatch.setattr(build.remisser_analyze, "answer_chars",
+    monkeypatch.setattr(ai_analyze, "answer_chars",
                         lambda bf: 100 if bf.endswith("/short") else 9000)
-    build.remisser_ai_analyze(["sou/2026-21"])
+    remisser_source.remisser_ai_analyze(["sou/2026-21"])
     assert seen == ["sou/2026:21/long"]
-    assert "1 under %d chars" % build.remisser_analyze.MIN_ANSWER_CHARS in \
+    assert "1 under %d chars" % ai_analyze.MIN_ANSWER_CHARS in \
         capsys.readouterr().out
 
 
@@ -1511,8 +1643,8 @@ def test_remisser_ai_analyze_runs_a_short_answer_named_directly(monkeypatch,
     """Naming one answer is an explicit request and overrides the floor."""
     bf = "sou/2026-21/short"
     seen = _analyze_targets(monkeypatch, {}, lambda _: None, tmp_path)
-    monkeypatch.setattr(build.remisser_analyze, "answer_chars", lambda _: 100)
-    build.remisser_ai_analyze([bf])
+    monkeypatch.setattr(ai_analyze, "answer_chars", lambda _: 100)
+    remisser_source.remisser_ai_analyze([bf])
     assert seen == [bf]
 
 
@@ -1580,13 +1712,13 @@ def test_a_dry_run_never_records_a_fingerprint_gate(tmp_path, monkeypatch):
     """`lagen … -n` prints a plan. A plan that also writes the coarse gate makes
     the next real run skip the very work it just listed."""
     store = {"parse/__fp__/sfs": {"digest": "abc"}}
-    monkeypatch.setattr(build, "FINGERPRINTS", tmp_path / "fingerprints.json")
-    monkeypatch.setattr(build, "_FINGERPRINTS_CACHE", None)
+    monkeypatch.setattr(freshness, "FINGERPRINTS", tmp_path / "fingerprints.json")
+    monkeypatch.setattr(freshness, "_FINGERPRINTS_CACHE", None)
 
-    monkeypatch.setattr(build.RUN, "dry_run", True)
-    build.save_fingerprints(store)
+    monkeypatch.setattr(stage.RUN, "dry_run", True)
+    freshness.save_fingerprints(store)
     assert not (tmp_path / "fingerprints.json").exists()
 
-    monkeypatch.setattr(build.RUN, "dry_run", False)
-    build.save_fingerprints(store)
+    monkeypatch.setattr(stage.RUN, "dry_run", False)
+    freshness.save_fingerprints(store)
     assert json.loads((tmp_path / "fingerprints.json").read_text()) == store

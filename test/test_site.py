@@ -8,8 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from ferenda import browse, build
-from ferenda.lib import catalog, compress, inbound, page, render
+from ferenda import build
+from ferenda.site import browse
+from ferenda.lib import (catalog, catalog_rows, compress, inbound, margins,
+                         page, render, stage)
 from ferenda.lib.eu_structure import Anchors, subarticle_key
 from ferenda.lib.pinpoint import pinpoint_label
 from ferenda.avg import render as avg_render
@@ -20,6 +22,11 @@ from ferenda.foreskrift import render as foreskrift_render
 from ferenda.sfs import render as sfs_render
 from ferenda.sfs.register import resolve_omfattning
 from ferenda.wiki import render as wiki_render
+
+
+# the page renderers the driver hands `generate_site`: each source's own
+# `render(art, site)`, read off the registry build filled when it was imported
+RENDERERS = {name: src.render for name, src in build.SOURCES.items() if src.render}
 
 
 # a minimal SFS-shaped artifact: one paragraph whose stycke cites another law,
@@ -76,7 +83,7 @@ def test_generate_skips_vanished_artifact(tmp_path, capsys):
     catalog.rebuild(db, "sfs", [law, gone])
     gone.unlink()                                 # its catalog row now dangles
     out = tmp_path / "generated"
-    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS, source="sfs",
+    total, rendered = render.generate_site(db, out, RENDERERS, source="sfs",
                                            write_index=False)
     assert total == 2 and rendered == 1           # the vanished doc skipped, not fatal
     assert compress.exists(str(out / page.doc_relpath(LAW["uri"])))  # live doc rendered
@@ -87,7 +94,7 @@ def test_generate_skips_vanished_artifact(tmp_path, capsys):
 
 def test_collect_links_attributes_to_nearest_id():
     out = []
-    catalog.collect_links(LAW["structure"], None, None, out)
+    catalog_rows.collect_links(LAW["structure"], None, None, out)
     # (anchor, page, run) -- a statute artifact carries no printed page
     assert out == [("P6S1", None,
                     {"predicate": "dcterms:references", "text": "5 §",
@@ -238,7 +245,7 @@ def test_catalog_paths_are_data_root_relative_and_portable(tmp_path):
     # the render layer resolves the relative path against the new root and renders
     out = dst / "generated"
     total, rendered = render.generate_site(str(dst / "catalog.sqlite"), str(out),
-                                           build.SOURCE_RENDERERS)
+                                           RENDERERS)
     assert rendered >= 1
     assert compress.exists(out / page.doc_relpath(LAW["uri"]))   # page stored precompressed
 
@@ -262,7 +269,7 @@ def test_generate_drops_a_colliding_page_and_carries_on(tmp_path, capsys):
     catalog.rebuild(db, "begrepp", [a, b])
     out = tmp_path / "generated"
 
-    total, rendered = render.generate_site(db, str(out), build.SOURCE_RENDERERS)
+    total, rendered = render.generate_site(db, str(out), RENDERERS)
 
     assert total == 2 and rendered == 1        # both counted, one page written
     assert compress.exists(out / page.doc_relpath(
@@ -279,7 +286,7 @@ def test_generate_writes_each_rendered_page_its_inbound_file(tmp_path):
     precisely when its citation relationships changed."""
     build_catalog(tmp_path).close()
     render.generate_site(str(tmp_path / "catalog.sqlite"),
-                         str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+                         str(tmp_path / "generated"), RENDERERS)
 
     rows = inbound.read(tmp_path, LAW["uri"])
     assert [r["uri"] for r in rows] == [CASE["uri"]]
@@ -311,11 +318,11 @@ def test_generate_covers_citation_targets_the_corpus_does_not_hold(tmp_path):
     catalog.rebuild(db, "sfs", [citing])
     gone = "https://lagen.nu/1998:204"
 
-    render.generate_site(db, str(tmp_path / "scoped"), build.SOURCE_RENDERERS,
+    render.generate_site(db, str(tmp_path / "scoped"), RENDERERS,
                          source="sfs")
     assert inbound.read(tmp_path, gone) == []      # scoped: corpus-wide work skipped
 
-    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    render.generate_site(db, str(tmp_path / "generated"), RENDERERS)
     rows = inbound.read(tmp_path, gone)
     assert [(r["uri"], r["target"]) for r in rows] == \
         [("https://lagen.nu/2018:218", gone + "#P9")]
@@ -330,14 +337,14 @@ def test_generate_reaps_inbound_files_the_corpus_no_longer_accounts_for(tmp_path
     forever."""
     build_catalog(tmp_path).close()
     db = str(tmp_path / "catalog.sqlite")
-    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    render.generate_site(db, str(tmp_path / "generated"), RENDERERS)
     assert compress.exists(inbound.path(tmp_path, LAW["uri"]))
 
     orphan = "https://lagen.nu/1999:175"        # never in this catalog
     inbound.write(tmp_path, orphan, inbound.read(tmp_path, LAW["uri"]))
     assert compress.exists(inbound.path(tmp_path, orphan))
 
-    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    render.generate_site(db, str(tmp_path / "generated"), RENDERERS)
     assert not compress.exists(inbound.path(tmp_path, orphan))
     assert compress.exists(inbound.path(tmp_path, LAW["uri"]))   # the real one stays
 
@@ -362,7 +369,7 @@ def test_generate_survives_a_citation_target_that_is_not_a_document_uri(
     con.commit()
     con.close()
 
-    render.generate_site(db, str(tmp_path / "generated"), build.SOURCE_RENDERERS)
+    render.generate_site(db, str(tmp_path / "generated"), RENDERERS)
 
     warning = capsys.readouterr().err
     assert "carry a fragment in their document uri" in warning
@@ -648,7 +655,7 @@ def test_render_document_injects_edit_meta(tmp_path):
     # onto every page: a statute is commentary-editable (kind=kommentar, ref=the
     # SFS number), a case is not (dv hosts no editable content).
     site = page.Site.from_catalog(build_catalog(tmp_path))
-    law = render.render_document(LAW, "sfs", site, build.SOURCE_RENDERERS)
+    law = render.render_document(LAW, "sfs", site, RENDERERS)
     assert '<meta name="lagen-doc" data-kind="kommentar" data-ref="1975:635"' in law
     # a statute is patchable, so its identity rides on the meta for the
     # "patch source" button beside the commentary one
@@ -656,7 +663,7 @@ def test_render_document_injects_edit_meta(tmp_path):
     # editor.js rides in the single concatenated bundle now, so the page links
     # /script.js (not a per-file /editor.js tag)
     assert law.count("</head>") == 1 and '/script.js' in law
-    case = render.render_document(CASE, "dv", site, build.SOURCE_RENDERERS)
+    case = render.render_document(CASE, "dv", site, RENDERERS)
     assert 'name="lagen-doc"' not in case      # court decisions are read-only
     assert '/script.js' in case                # but the bundle still loads (editor inert)
 
@@ -759,7 +766,7 @@ def test_foreskrift_links_come_from_presented_consolidation():
     # the page shows the consolidation, so the graph must carry exactly its
     # citations -- not the superseded base text's, and never both (same §§
     # would double every edge)
-    out = catalog.artifact_links(FORESKRIFT)
+    out = catalog_rows.artifact_links(FORESKRIFT)
     assert [run["uri"] for _, _, run in out] == ["https://lagen.nu/1975:635#P6"]
 
 
@@ -1273,19 +1280,18 @@ def test_dv_source_url_uses_publication_group():
 def test_write_artifact_stamps_source_url(tmp_path, monkeypatch):
     from ferenda.lib import layout
     monkeypatch.setattr(layout, "ARTIFACT", tmp_path)
-    from ferenda import browse, build
 
     # derived: eurlex gets its ELI even with nothing recorded
     out = layout.artifact("eurlex", "32023R2854")
     out.parent.mkdir(parents=True, exist_ok=True)
-    build.write_artifact("eurlex", "32023R2854", {"uri": "x", "celex": "32023R2854"})
+    stage.write_artifact("eurlex", "32023R2854", {"uri": "x", "celex": "32023R2854"})
     assert (json.loads(out.read_text())["source_url"]
             == "https://eur-lex.europa.eu/eli/reg/2023/2854/oj")
 
     # recorded: the downloader's landing url travels into the artifact
     out = layout.artifact("forarbete", "prop/2024/25:1")
     out.parent.mkdir(parents=True, exist_ok=True)
-    build.write_artifact("forarbete", "prop/2024/25:1", {"uri": "y"},
+    stage.write_artifact("forarbete", "prop/2024/25:1", {"uri": "y"},
                          source_url="https://www.regeringen.se/x")
     assert json.loads(out.read_text())["source_url"] == "https://www.regeringen.se/x"
 
@@ -1722,13 +1728,13 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
         manifest[uri] = signature(chash, dep)
         rendered_uris.append(uri)
 
-    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    total, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert total >= 2 and rendered == total          # first run renders every page
     assert LAW["uri"] in rendered_uris and CASE["uri"] in rendered_uris
 
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    _, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert rendered == 0 and rendered_uris == []     # nothing changed -> all skipped
 
@@ -1738,7 +1744,7 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
                    {"dcterms:title": "Räntelag (1975:635), ändrad"}}}))
     catalog.rebuild(db, "sfs", [law])
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    _, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert rendered_uris == [LAW["uri"]]             # only the edited page
 
@@ -1753,7 +1759,7 @@ def test_generate_site_incremental_reuses_content_hash(tmp_path):
                     "uri": "https://lagen.nu/1975:635#P6"}, "."]}]}))
     catalog.rebuild(db, "dv", [case, newcase])
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    _, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris               # cited page re-rendered
     assert "https://lagen.nu/dom/NJA_2001_s_1" in rendered_uris   # the new page
@@ -1804,14 +1810,14 @@ def test_kommentar_edit_rerenders_host_page(tmp_path):
     manifest, rendered_uris = {}, []
     fresh, record = _incremental_harness(manifest, rendered_uris)
 
-    render.generate_site(db, out, build.SOURCE_RENDERERS,
+    render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris
     html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
     assert "Kommentar till 6 §." in html            # prose reached the rail
 
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    _, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert rendered == 0                             # unchanged -> all fresh
 
@@ -1822,7 +1828,7 @@ def test_kommentar_edit_rerenders_host_page(tmp_path):
             {"type": "stycke", "text": ["Omskriven kommentar."]}]}]}))
     catalog.rebuild(db, "kommentar", [komm])
     rendered_uris.clear()
-    render.generate_site(db, out, build.SOURCE_RENDERERS,
+    render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert rendered_uris == [LAW["uri"]]
     html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
@@ -1847,12 +1853,12 @@ def test_generate_site_only_composes_with_source(tmp_path):
     catalog.rebuild(db, "sfs", [law, law2])
     out = tmp_path / "site"
 
-    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    total, rendered = render.generate_site(db, out, RENDERERS,
                                            only={str(law)}, source="sfs")
     assert (total, rendered) == (1, 1)               # exactly the named page
 
     # a scope naming a document outside the source renders nothing
-    total, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    total, rendered = render.generate_site(db, out, RENDERERS,
                                            only={str(law)}, source="dv")
     assert total == 0
 
@@ -1872,8 +1878,8 @@ def test_pooled_generate_matches_serial(tmp_path):
     catalog.rebuild(db, "dv", [case])
 
     serial, pooled = tmp_path / "serial", tmp_path / "pooled"
-    assert render.generate_site(db, serial, build.SOURCE_RENDERERS, jobs=1) \
-        == render.generate_site(db, pooled, build.SOURCE_RENDERERS, jobs=2)
+    assert render.generate_site(db, serial, RENDERERS, jobs=1) \
+        == render.generate_site(db, pooled, RENDERERS, jobs=2)
     for uri in (LAW["uri"], CASE["uri"]):
         rel = page.doc_relpath(uri)
         assert compress.read_text(serial / rel) == compress.read_text(pooled / rel)
@@ -1894,11 +1900,11 @@ def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
     manifest, rendered_uris = {}, []
     fresh, record = _incremental_harness(manifest, rendered_uris)
 
-    render.generate_site(db, out, build.SOURCE_RENDERERS,
+    render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris
     rendered_uris.clear()
-    _, rendered = render.generate_site(db, out, build.SOURCE_RENDERERS,
+    _, rendered = render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert rendered == 0                             # repeal not yet in force
 
@@ -1910,7 +1916,7 @@ def test_repeal_date_passing_rerenders_page(tmp_path, monkeypatch):
     monkeypatch.setattr(render, "date", _after_repeal)      # freshness fold
     monkeypatch.setattr(sfs_render, "date", _after_repeal)  # the upphävd banner
     rendered_uris.clear()
-    render.generate_site(db, out, build.SOURCE_RENDERERS,
+    render.generate_site(db, out, RENDERERS,
                                  fresh=fresh, record=record)
     assert LAW["uri"] in rendered_uris               # status flipped -> re-rendered
     html = compress.read_text(out / page.doc_relpath(LAW["uri"]))
@@ -2366,7 +2372,7 @@ def test_collect_links_carries_the_enclosing_page(tmp_path):
     # S4: the page travels with the edge, so an inbound line can say "s. 45" for
     # an anchor with no citable designator of its own
     out = []
-    catalog.collect_links(
+    catalog_rows.collect_links(
         [{"type": "avsnitt", "id": "a6", "page": 37, "children": [
             {"type": "avsnitt", "id": "sec17", "children": [
                 {"type": "stycke", "page": 39, "text": [
@@ -2684,7 +2690,7 @@ def build_eu_catalog(tmp_path):
 def test_implements_links_emits_genomfor_edges():
     # one edge per transposed article, anchored to the förarbete page (#sid{N})
     # and carrying that printed page as the citation's own (S4)
-    assert catalog.implements_links(PROP) == [
+    assert catalog_rows.implements_links(PROP) == [
         ("sid100", 100,
          {"uri": "https://lagen.nu/celex/32022L2555#21",
           "predicate": "rpubl:genomforDirektiv",
@@ -2796,7 +2802,7 @@ def _primed_margin(site, sfs_uri, anchor):
     # live anchors); a direct margin call primes it the same way
     site.caselaw_memo[sfs_uri] = catalog.caselaw_anchored(site.con, sfs_uri)
     return page.render_rail_sections(
-        page.eu_caselaw_margin(site, sfs_uri, anchor))
+        margins.eu_caselaw_margin(site, sfs_uri, anchor))
 
 
 def build_pin_catalog(tmp_path, extra_eurlex=()):
@@ -3509,7 +3515,7 @@ def test_genomfor_sfs_pinpoint_kept_when_minted_disregarded_when_not(tmp_path):
     # and the margin spells the kept pinpoint out as citation prose
     site = page.Site.from_catalog(con)
     margin = page.render_rail_sections(
-        page.genomfor_margin(site, "https://lagen.nu/1999:100", "P3"))
+        margins.genomfor_margin(site, "https://lagen.nu/1999:100", "P3"))
     assert "första stycket genomför artikel 21.1" in margin
 
 

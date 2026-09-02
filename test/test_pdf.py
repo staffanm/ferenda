@@ -435,7 +435,7 @@ def test_print_toc_drops_the_top_self_entry():
 
 
 def test_kontext_aside_filters_by_kind_and_removes_widgets():
-    island = pdf._island(_doc())
+    island = pdf.island(_doc())
     aside = pdf._kontext_aside(island["P1"], frozenset(["dv"]))
     assert aside.tag == "div"       # the semantic <aside> wraps this panel
     # the flat begrepp section was not requested and is gone
@@ -455,7 +455,7 @@ def test_kontext_block_is_an_article_aside_pair():
     # annotates and a later article must wait for the longer flow.
     doc = _doc()
     para = doc.get_element_by_id("P1")
-    aside = pdf._kontext_aside(pdf._island(doc)["P1"], frozenset(["dv"]))
+    aside = pdf._kontext_aside(pdf.island(doc)["P1"], frozenset(["dv"]))
     block = pdf._attach(para, [aside])
     assert block.tag == "section"
     assert {"kontextblock", "paragrafblock"} <= set(block.get("class").split())
@@ -477,7 +477,7 @@ def test_document_context_starts_beside_the_document_text_after_the_toc():
         '<p id="body-start">Dokumentets första text.</p>'
         '<h2 class="rubrik" id="R1">').replace(
             '{"P1":', '{"":"%s","P1":' % panel)
-    doc = pdf._paper_document(page, toc=True, kinds=frozenset(["dv"]),
+    doc = pdf.paper_document(page, toc=True, kinds=frozenset(["dv"]),
                               amendments=True, columns=1)
     front = doc.find_class("frontmatter")[0]
     toc = front.getnext()
@@ -515,7 +515,7 @@ def test_sfs_stycken_and_points_become_independent_context_rows():
                                          ("P1S2N2", "Punkt två"))})
     island.text = json.dumps(panels)
     page = lxml.html.tostring(source, encoding="unicode")
-    doc = pdf._paper_document(page, toc=False, kinds=frozenset(["dv"]),
+    doc = pdf.paper_document(page, toc=False, kinds=frozenset(["dv"]),
                               amendments=True, columns=1)
     blocks = doc.find_class("kontextblock")
     assert len(blocks) == 3
@@ -548,7 +548,7 @@ def test_sfs_chapter_context_gets_a_row_before_its_first_provision():
         '{"K2":"<div class=\\"rail-sec rail-sec-flat dv\\" '
         'data-sec=\\"dv\\" data-label=\\"Om kapitlet\\" data-n=\\"1\\">'
         '<ul><li>En lång kapitelnote</li></ul></div>","P1":')
-    doc = pdf._paper_document(page, toc=False, kinds=frozenset(["dv"]),
+    doc = pdf.paper_document(page, toc=False, kinds=frozenset(["dv"]),
                               amendments=True, columns=1)
     chapter = doc.find_class("kapitel")[0]
     chapter_row, provision_row = chapter.getchildren()[:2]
@@ -582,7 +582,7 @@ def _page_with_sfs_register():
 
 
 def test_sfs_amendments_keep_legal_text_but_drop_screen_links():
-    doc = pdf._paper_document(_page_with_sfs_register(), toc=True,
+    doc = pdf.paper_document(_page_with_sfs_register(), toc=True,
                               kinds=frozenset(), amendments=True, columns=1)
     register = doc.find_class("print-andringar")[0]
     post = register.find_class("andring")[0]
@@ -600,7 +600,7 @@ def test_sfs_amendments_can_be_omitted_from_the_body_and_toc():
     page = _page_with_sfs_register().replace(
         '<a href="#L" class="lvl2">',
         '<a href="#SPOKE" class="lvl2">Spökavsnitt</a><a href="#L" class="lvl2">')
-    doc = pdf._paper_document(page, toc=True, kinds=frozenset(),
+    doc = pdf.paper_document(page, toc=True, kinds=frozenset(),
                               amendments=False, columns=1)
     assert not doc.find_class("andringar")
     hrefs = [a.get("href") for a in doc.find_class("print-toc")[0].iter("a")]
@@ -616,7 +616,7 @@ def test_two_column_mode_keeps_the_title_wide_and_uses_two_text_columns():
     prose = '<h2 class="rubrik" id="R1">Inledande bestämmelser</h2>' + \
         "".join('<p id="line-%d">En paragraf med lagom mycket text.</p>' % i
                 for i in range(180))
-    doc = pdf._paper_document(PAGE.replace(old, prose), toc=False,
+    doc = pdf.paper_document(PAGE.replace(old, prose), toc=False,
                               kinds=frozenset(["dv"]), amendments=True,
                               columns=2)
     assert "pdf-two-columns" in doc.get("class").split()
@@ -663,7 +663,7 @@ def test_two_column_sfs_table_breaks_between_columns_after_its_opening_text():
         '<div class="paragraf-body"><p id="table-opening">I denna lag används '
         'följande begrepp.</p><table><tr><td>Begrepp</td><td>Betydelse</td></tr>'
         + rows + '</table></div></section></div>')
-    doc = pdf._paper_document(PAGE.replace(old, provision), toc=False,
+    doc = pdf.paper_document(PAGE.replace(old, provision), toc=False,
                               kinds=frozenset(), amendments=True, columns=2)
     assert "print-document" in doc.get_element_by_id(
         "dokument").get("class").split()
@@ -701,7 +701,7 @@ def test_sfs_tables_use_italic_headers_without_row_rules():
         '<td>Betydelse</td></tr><tr><td id="table-body">Sekretess</td>'
         '<td>Ett förbud att röja en uppgift.</td></tr></table>'
         '</div></section></div>')
-    doc = pdf._paper_document(PAGE.replace(old, table), toc=False,
+    doc = pdf.paper_document(PAGE.replace(old, table), toc=False,
                               kinds=frozenset(), amendments=True, columns=1)
     failures = []
     document = weasyprint.HTML(
@@ -845,7 +845,7 @@ def test_weasy_table_rows_mirror_after_linear_layout():
 
 
 def test_paper_stylesheet_removes_known_weasyprint_warning_causes(caplog):
-    assert "font-weight: 400 600" not in pdf._stylesheet()
+    assert "font-weight: 400 600" not in pdf.stylesheet()
     caplog.set_level("INFO")
     failures = []
     weasyprint.HTML(
@@ -902,7 +902,7 @@ def test_every_note_of_one_block_shares_the_margin():
     # §); they stack in the one margin cell, in document order
     doc = _doc()
     para = doc.get_element_by_id("P1")
-    notes = [pdf._kontext_aside(pdf._island(doc)["P1"], frozenset(["dv"]))
+    notes = [pdf._kontext_aside(pdf.island(doc)["P1"], frozenset(["dv"]))
              for _ in range(3)]
     block = pdf._attach(para, notes)
     assert block.find_class("kontextnot")[0].getchildren() == notes
@@ -929,7 +929,7 @@ def test_the_permalink_pilcrow_does_not_reach_paper():
 def test_an_annotated_heading_keeps_its_text():
     doc = _doc()
     heading = doc.get_element_by_id("R1")
-    aside = pdf._kontext_aside(pdf._island(doc)["P1"], frozenset(["dv"]))
+    aside = pdf._kontext_aside(pdf.island(doc)["P1"], frozenset(["dv"]))
     block = pdf._attach(heading, [aside])
     # the break falls after the block now, out of reach of the heading's own
     # break-after: avoid
@@ -1029,7 +1029,7 @@ def test_running_labels_shorten_a_division_heading():
 
 
 def test_kontext_aside_without_requested_kinds_is_none():
-    island = pdf._island(_doc())
+    island = pdf.island(_doc())
     assert pdf._kontext_aside(island["P1"], frozenset(["kommentar"])) is None
 
 
@@ -1086,13 +1086,16 @@ def test_paper_transform_holds_on_a_really_rendered_sfs_page(tmp_path):
     catalog.rebuild(db, "sfs", [law])
     catalog.rebuild(db, "dv", [case])
     out = tmp_path / "generated"
-    render.generate_site(db, out, build.SOURCE_RENDERERS, source="sfs",
+    render.generate_site(db, out,
+                         {name: src.render
+                          for name, src in build.SOURCES.items() if src.render},
+                         source="sfs",
                          write_index=False)
     page = compress.read_text(
         out / page_layout.doc_relpath("https://lagen.nu/1998:9998"))
     assert 'id="lagen-context"' in page and "data-rail" in page
 
-    doc = pdf._paper_document(page, toc=True, kinds=frozenset(["dv"]),
+    doc = pdf.paper_document(page, toc=True, kinds=frozenset(["dv"]),
                               amendments=True, columns=1)
     assert doc.find_class("kontextblock")
     provision = doc.find_class("paragraf")[0]
@@ -1105,7 +1108,7 @@ def test_paper_transform_holds_on_a_really_rendered_sfs_page(tmp_path):
     assert point.get("id") == "P1S1N2"
     assert point.find_class("num")[0].text_content() == "2."
     # and the compact layout, whose asserts read the same three facts
-    compact = pdf._paper_document(page, toc=False, kinds=frozenset(),
+    compact = pdf.paper_document(page, toc=False, kinds=frozenset(),
                                   amendments=True, columns=2)
     start = compact.find_class("paragraf-start")[0]
     assert "paragraf-gutter" in start[0].get("class").split()

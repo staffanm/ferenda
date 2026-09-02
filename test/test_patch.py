@@ -24,8 +24,9 @@ from ferenda.dv import paths as dv_paths
 from ferenda.eurlex import parse as eurlex_parse
 from ferenda.foreskrift import parse as fs_parse
 from ferenda.lib import formex as lib_formex
-from ferenda.lib import harvest, layout, markup, patch, pdftext, util
+from ferenda.lib import harvest, layout, markup, patch, pdftext, stage, util
 from ferenda.lib.errors import SkipDocument
+from ferenda.remisser import source as remisser_source
 
 ORIG = "line one\nSECRET NAME\nline three\nline four\n"
 EDITED = "line one\n[redacted]\nline three\nline four\n"
@@ -392,8 +393,9 @@ def test_patchsource_rejects_non_patchable_source():
 
 
 def test_patchsource_pdf_dispatch(monkeypatch):
-    monkeypatch.setattr(patchsource, "_pdf_xml", lambda p: "<pdf>%s</pdf>" % p)
-    monkeypatch.setattr(patchsource.layout, "remisser_answer",
+    monkeypatch.setattr(remisser_source, "pdf_intermediate",
+                        lambda p: "<pdf>%s</pdf>" % p)
+    monkeypatch.setattr(layout, "remisser_answer",
                         lambda case, org: "/x/%s/%s.pdf" % (case, org))
     text, label = patchsource.intermediate("remisser", "case/org")
     assert text == "<pdf>/x/case/org.pdf</pdf>" and label == "pdftohtml XML"
@@ -435,8 +437,8 @@ def test_cli_mkpatch_and_show(patches, monkeypatch, tmp_path, capsys):
                         lambda s, bf: (patch.patch_if_needed(s, bf, ORIG)[0], "plain text"))
     edited = tmp_path / "edited.txt"
     edited.write_text(EDITED)
-    monkeypatch.setattr(build.RUN, "obfuscated", False)
-    monkeypatch.setattr(build.RUN, "dry_run", False)
+    monkeypatch.setattr(stage.RUN, "obfuscated", False)
+    monkeypatch.setattr(stage.RUN, "dry_run", False)
 
     args = SimpleNamespace(source="sfs", basefiles=["1999:175", str(edited), "OCR fix"])
     build.cmd_mkpatch(args, _Parser())
@@ -450,8 +452,8 @@ def test_cli_mkpatch_and_show(patches, monkeypatch, tmp_path, capsys):
 
 def test_cli_mkpatch_obfuscated_flag(patches, monkeypatch, tmp_path):
     monkeypatch.setattr(patchsource, "intermediate", lambda s, bf: (ORIG, "plain text"))
-    monkeypatch.setattr(build.RUN, "obfuscated", True)
-    monkeypatch.setattr(build.RUN, "dry_run", False)
+    monkeypatch.setattr(stage.RUN, "obfuscated", True)
+    monkeypatch.setattr(stage.RUN, "dry_run", False)
     edited = tmp_path / "e.txt"
     edited.write_text(EDITED)
     build.cmd_mkpatch(SimpleNamespace(source="sfs", basefiles=["1999:175", str(edited)]),
@@ -493,8 +495,8 @@ def webenv(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "EDITORS", {"anna": {
         "name": "Anna Ek", "email": "anna@example.org",
         "pwhash": auth.hash_password("hunter2", rounds=1000)}})
-    monkeypatch.setattr(patchsource, "_INTERMEDIATE",
-                        {"sfs": (lambda bf: ORIG, "plain text")})
+    monkeypatch.setattr(stage.SOURCES["sfs"], "intermediate",
+                        (lambda bf: ORIG, "plain text"))
     reparsed = []
     monkeypatch.setattr(patch_api, "_reparse",
                         lambda s, bf: reparsed.append((s, bf)))
