@@ -57,8 +57,11 @@
     URL (already the same origin); when the identical bytes are loaded via
     e.g. avtals.lagen.nu, every root-relative href/asset/fetch in the page
     resolves to the real site instead of a path that only exists there.
-    CUTOVER: -> https://lagen.nu/ #}
-<base href="https://ferenda.lagen.nu/">
+    CUTOVER: -> https://lagen.nu/ -- `base_path` anchors the href to this
+    document's own served path (empty for a solo page, with no single
+    document), so a bare `#anchor` link (the TOC, a pilcrow permalink)
+    resolves against the document instead of the site root #}
+<base href="https://ferenda.lagen.nu{{ base_path }}">
 <title>{{ title }}</title>
 {{ head }}
 <script>(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>

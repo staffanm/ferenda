@@ -1864,7 +1864,7 @@ NODES = ENV.get_template("nodes.html").module
 def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
                  summary="", summary_text=None, island="", solo=False,
                  body_class="", head="", own_h1=False, title_html=None,
-                 mark=False, **extra):
+                 mark=False, doc_uri=None, **extra):
     """The page-shell context every render goes through (page.html and the
     sources/*.html templates extending it). `meta`/`toc`/`summary`/`island`/
     `head` are pre-rendered HTML and are wrapped as Markup here; `title`/
@@ -1872,14 +1872,19 @@ def page_context(title, kind, meta, *, toc="", eyebrow=None, subtitle=None,
     `own_h1` says the body brings its own <h1> (the browse pages' listing
     heading), so the frontmatter must not emit a second one. `mark` puts the
     lagen.nu mark in the frontmatter's left margin -- the frontpage, which is
-    the site speaking as itself rather than showing a document. `extra` carries a
-    source template's own variables (pre-rendered fragments should already be
-    Markup)."""
+    the site speaking as itself rather than showing a document. `doc_uri` is
+    the document's own uri (`art["uri"]`) -- page.html anchors `<base href>`
+    to its served path, so a bare `#anchor` link (the TOC, a pilcrow
+    permalink) resolves against the document instead of the site root; a
+    `solo` page (browse, frontpage) has no single document and leaves it
+    unset. `extra` carries a source template's own variables (pre-rendered
+    fragments should already be Markup)."""
+    base_path = layout.page_url(doc_uri) if doc_uri else ""
     return dict(title=title, kind=kind, meta=Markup(meta), toc=Markup(toc),
                 eyebrow=eyebrow, subtitle=subtitle, summary=Markup(summary),
                 summary_text=summary_text, island=Markup(island), solo=solo,
                 body_class=body_class, head=Markup(head), own_h1=own_h1,
-                mark=mark,
+                mark=mark, base_path=base_path,
                 title_html=Markup(title_html) if title_html is not None else None,
                 **extra)
 

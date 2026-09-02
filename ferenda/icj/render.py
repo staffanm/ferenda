@@ -53,6 +53,7 @@ def render(art, site):
     banner = scan_banner(md)
     return ENV.get_template("icj.html").render(page_context(
         lb.short_title or lb.short_id, "Internationella domstolen",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
+        doc_meta(meta, art.get("source_url")), doc_uri=art["uri"],
+        toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(), structure=structure,
         banner=banner))

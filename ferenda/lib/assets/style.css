@@ -398,6 +398,13 @@ nav.toc a.toc-top { padding-right: 5.3rem; }
 }
 
 /* -- Frontmatter -- */
+/* every id-bearing node in the reading column is a citable anchor target
+   (stycke/punkt/moment included, via nodes.html's id_attr); the specific
+   selectors below repeat this for elements that need a different clearance
+   (e.g. .konvention-instrument's extra +2rem) and must still win, so this
+   catch-all is written with :where() -- zero specificity of its own -- to
+   leave every later, single-class override in charge */
+:where(.gr-main) [id] { scroll-margin-top: var(--scroll-clear); }
 /* #top -- the TOC's first entry jumps here, so it clears the sticky masthead
    like every other anchor target */
 .frontmatter { margin-bottom: 2rem; padding-bottom: 1.1rem;

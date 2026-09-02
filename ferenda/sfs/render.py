@@ -449,6 +449,7 @@ def render(art, site):
         body_classes.append("parallel-appendix")
     return ENV.get_template("sfs.html").render(page_context(
         title, "Författning", doc_meta(meta, art.get("source_url")),
+        doc_uri=art["uri"],
         toc=render_toc(toc, lb.short_id),
         eyebrow=("%s · äldre lydelse" % lb.short_id if version
                  else lb.short_id),
@@ -542,6 +543,7 @@ def render_chapter(art, site, first_id, last_id, name, reason):
     return ENV.get_template("sfs.html").render(page_context(
         name[:1].upper() + name[1:], "Författning",
         doc_meta([("Titel", lb.official_title)], art.get("source_url")),
+        doc_uri=art["uri"],
         toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id,
         island=rail.island(),

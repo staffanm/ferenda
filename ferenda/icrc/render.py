@@ -56,7 +56,8 @@ def render(art, site):
         "traktaten", art.get("source_url"), "ICRC:s fördragsdatabas")
     return ENV.get_template("icrc.html").render(page_context(
         lb.short_title or lb.official_title, "Internationell humanitär rätt",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
+        doc_meta(meta, art.get("source_url")), doc_uri=art["uri"],
+        toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(),
         lead=art.get("summary"), structure=Markup("".join(parts)),
         banner=banner))

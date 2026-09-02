@@ -111,6 +111,7 @@ def render(art, site):
         md.get("title") or ident,
         SECTION.get((art.get("utgivare"), art.get("serie")), "Vägledning"),
         doc_meta(meta, art.get("source_url")),
+        doc_uri=art["uri"],
         toc=render_toc(toc, ident), eyebrow=ident,
         banner=banner,
         footnotes=footnote_items(art.get("footnotes", []), site,

@@ -217,6 +217,7 @@ def render(art, site):
     rail.add_document(inbound=not grund)
     return ENV.get_template("foreskrift.html").render(page_context(
         title, "Föreskrift", doc_meta(meta, art.get("source_url")),
+        doc_uri=art["uri"],
         toc=render_toc(toc, ident),
         eyebrow=(ident + " · ursprunglig lydelse" if grund else ident),
         island=rail.island(), body_class=" inaktuell" if grund else "",

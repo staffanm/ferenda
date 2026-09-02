@@ -87,7 +87,8 @@ def render(art, site):
     rail.add_document()
     return ENV.get_template("untc.html").render(page_context(
         lb.short_title or lb.official_title, "FN-fördrag",
-        doc_meta(meta, art.get("source_url")), toc=render_toc(toc, lb.short_id),
+        doc_meta(meta, art.get("source_url")), doc_uri=art["uri"],
+        toc=render_toc(toc, lb.short_id),
         eyebrow=lb.short_id, island=rail.island(),
         structure=Markup("".join(parts)),
         parties=_untc_parties(art.get("parties") or [])))
