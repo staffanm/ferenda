@@ -26,6 +26,7 @@ import re
 from pathlib import Path
 
 from ..lib import llm
+from ..lib.sfs_anchor import paragraf_anchor
 from ..lib.util import normalize_fold as _norm
 
 PROMPT = Path(__file__).with_name("correspondence_prompt.txt")
@@ -485,9 +486,7 @@ def _ordinals(text):
 def _anchor(kap, para=None):
     """Mint the fragment anchor for a (kap, para) label the way nf does:
     K4P6, P5b, K12 (a whole chapter)."""
-    if para is None:
-        return "K%s" % kap
-    return ("K%sP%s" % (kap, para)) if kap else ("P%s" % para)
+    return "K%s" % kap if para is None else paragraf_anchor(kap, para)
 
 
 def parse_betecknas(omfattning):

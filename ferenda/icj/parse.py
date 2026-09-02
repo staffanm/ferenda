@@ -21,7 +21,7 @@ artifact as OCR-derived.
 import re
 
 from ..lib import compress
-from ..lib.lagrum import yield_overlaps
+from ..lib.lagrum import merge_refs
 from ..lib.pdftext import (
     join_across_pages,
     pages_with_ocr,
@@ -380,6 +380,5 @@ def _refs(text, basefile, root):
     today, but interleave requires disjoint spans and the treaty side rests
     on curated name data -- so the merge filters like every other two-list
     caller, with the Reports form (the Court's own identity) winning."""
-    rep = reports.refs(text, basefile, root)
-    return sorted(rep + yield_overlaps(treaties.refs(text), rep),
-                  key=lambda ref: ref.start)
+    return merge_refs(reports.refs(text, basefile, root),
+                      treaties.refs(text))

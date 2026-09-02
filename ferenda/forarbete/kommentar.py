@@ -50,6 +50,7 @@ import re
 from ..lib import compress, layout
 from ..lib.catalog import norm_title
 from ..lib.lagrum import EULAGSTIFTNING, LagrumParser
+from ..lib.sfs_anchor import paragraf_anchor
 from ..lib.util import normalize_fold
 from .parse import parse_record, to_artifact
 from .structure import flatten
@@ -557,15 +558,9 @@ def fk_section(prop_art, new_title):
 
 
 def paragraf_fragment(chapter, paragraf):
-    """The SFS fragment id for a commented paragraf, matching the SFS vertical's
-    minting: 'K{kap}P{par}' in a chaptered law, 'P{par}' in a flat one
-    (sub-letters kept, spaces dropped: '7 a' -> 'P7a'). None without a paragraf."""
-    if not paragraf:
-        return None
-    par = re.sub(r"\s+", "", str(paragraf))
-    if chapter:
-        return "K%sP%s" % (re.sub(r"\s+", "", str(chapter)), par)
-    return "P%s" % par
+    """The SFS fragment id for a commented paragraf (`lib.sfs_anchor`), or None
+    without a paragraf -- the extractor records a chapter-only context too."""
+    return paragraf_anchor(chapter, paragraf) if paragraf else None
 
 
 def main():

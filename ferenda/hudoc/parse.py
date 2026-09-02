@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 from ..lib import compress, patch
 from ..lib.errors import SkipDocument
-from ..lib.lagrum import yield_overlaps
+from ..lib.lagrum import merge_refs
 from ..lib.util import normalize_space
 from . import citations, summaries, treaties
 from .download import body_path, record_path
@@ -163,9 +163,8 @@ def _refs(text, basefile, root):
     protocol treaty spans, a case-law span winning any overlap -- the cited
     case's own name may spell out an instrument's words, the filing identity
     is the stronger read."""
-    case = citations.refs(text, basefile, root)
-    treaty = yield_overlaps(treaties.refs(text), case)
-    return sorted(case + treaty, key=lambda ref: ref.start)
+    return merge_refs(citations.refs(text, basefile, root),
+                      treaties.refs(text))
 
 
 def parse(basefile, root):

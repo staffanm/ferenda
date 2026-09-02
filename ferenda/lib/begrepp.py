@@ -1,8 +1,14 @@
-"""Begreppsdefinitioner -- detecting defined terms in författningstext and
-minting nothing itself: the caller turns each term into a ``dcterms:subject``
-inline link (``Ref`` with ``kind="term"``). A faithful port of the old
-``sfs.py`` ``find_definitions`` heuristics, off the framework, moved here from
-``sfs/begrepp.py`` when föreskrift became the second source to mark
+"""Begrepp (defined legal terms) end to end, in the two stages the pipeline
+runs them: **at parse** a source detects the terms a författning defines and
+marks their later uses in the same act; **at relate** the corpus-wide term list
+is de-inflected and clustered onto one canonical concept node.
+
+Parse time -- detecting definitions
+-----------------------------------
+This half mints nothing itself: the caller turns each term into a
+``dcterms:subject`` inline link (``Ref`` with ``kind="term"``). A faithful port
+of the old ``sfs.py`` ``find_definitions`` heuristics, off the framework, moved
+here from ``sfs/begrepp.py`` when föreskrift became the second source to mark
 definitions (rule:second-use-goes-to-lib).
 
 A *paragraf* enters a definition **mode** when its stycken announce one:
@@ -21,11 +27,42 @@ The announcement phrasing and the noise profile differ per source -- a
 föreskrift writes "I dessa föreskrifter avses med", and its PDF-extracted
 text makes the coinage modes noisy -- so each source builds a :class:`Rules`
 with its own scope phrases and its enabled mode set. The term-extraction
-machinery below the class is shared."""
+machinery below the class is shared.
 
+Relate time -- normalisation and clustering
+-------------------------------------------
+Collapse the inflected surface forms of a legal term onto one canonical
+concept, so SFS definitions, DV nyckelord, EU defined terms and the
+hand-authored wiki pages all land on the same `begrepp/<Name>` node.
+
+The vocabulary is bounded (defined legal terms), so this is a hand-rolled,
+**corpus-aware** Swedish noun de-inflector, not a general lemmatizer:
+
+  * `_bases(form)` proposes the plausible base (indefinite-singular) forms of a
+    term by *reversing* each inflectional ending. Ambiguous endings yield several
+    candidates -- notably `-arna`, the definite plural of both an `-are` agent
+    noun (`näringsidkarna` → `näringsidkare`) and an `-ar` plural (`bilarna` →
+    `bil`). A bare `-are` is NEVER stripped: it is the agent *base*, so `domare`
+    does not reduce to `dom`.
+  * `cluster(forms)` unions each form only with candidate bases that are
+    *themselves observed forms* -- so the corpus decides which reading is real.
+    The canonical display/URI form of a group is a wiki-authored form if present
+    (the wiki uses base form by convention), else the most base-like member.
+
+A hand-edited override file (`data/begrepp_aliases.json`) maps stubborn variants and
+true synonyms onto a canonical, and lists forms to KEEP DISTINCT (blocking a
+wrong auto-merge). De-inflection only touches a term's last word (the head in
+this corpus's compounds and `X av/för Y` phrases); casing and whitespace are
+folded so `på Internet` / `på internet` are one concept.
+"""
+
+import json
 import re
+from pathlib import Path
 
 from . import util
+from .lagrum import Ref
+from .util import normalize_fold as _norm
 
 MODES = frozenset({"normal", "brottsrubricering", "parantes", "loptext"})
 
@@ -371,12 +408,22 @@ def _paren_term(text, m):
 # that code, moved here when SFS became the second source to want it
 # (rule:second-use-goes-to-lib).
 
-# an inflectional ending a Swedish term picks up where it is *used* --
-# "uppgiftssamling" -> "uppgiftssamlingar", "incident" -> "incidenten". Longest
-# first, so the regex alternation prefers the longest ending that fits.
+# The inflectional endings a Swedish noun takes -- the definite and plural
+# forms and their genitives. Longest first, so a regex alternation over them
+# prefers the longest ending that fits. One list, because the relate-time half
+# below reads the same domain fact backwards (it *reverses* an ending to reach
+# the base form) and two hand-kept copies drift (rule:second-use-goes-to-lib).
+SWEDISH_NOUN_ENDINGS = ("ernas", "arnas", "ornas", "erna", "arna", "orna",
+                        "ens", "ets", "er", "ar", "or", "en", "et", "na",
+                        "ns", "n", "s", "t")
+
+# what a term picks up where it is *used* -- "uppgiftssamling" ->
+# "uppgiftssamlingar", "incident" -> "incidenten". The two single-letter
+# endings the de-inflector needs are left out here: appending one to a term
+# that does not take it reads as a different word ("avtal" -> "avtalt"), and
+# the definite forms the matcher does need ("-en", "-et") are already listed.
 SUFFIXES = {
-    "swe": ("ernas", "arnas", "ornas", "erna", "arna", "orna", "ens", "ets",
-            "er", "ar", "or", "en", "et", "na", "ns", "s"),
+    "swe": tuple(e for e in SWEDISH_NOUN_ENDINGS if e not in ("n", "t")),
     "eng": ("es", "s"),
 }
 
@@ -416,12 +463,34 @@ def build_matcher(terms, lang):
     return re.compile(r"\b(?:%s)\b" % "|".join(parts), re.IGNORECASE), index
 
 
+def term_refs(text, matcher, index, doc_uri, self_anchor=None):
+    """Occurrences of any defined term in `text` as term-link Refs into the
+    document's own definition points. The point defining a term skips its own
+    term (by anchor), but still links the other terms it mentions.
+
+    The one matching rule both entry points read: a caller with the whole
+    text merges these beside its citations with `lagrum.merge_refs` (eurlex),
+    a caller with a built run list splices them through `mark_term_uses`
+    (sfs)."""
+    if not matcher:
+        return []
+    refs = []
+    for m in matcher.finditer(text):
+        anchor = index[m.lastgroup]
+        if anchor == self_anchor:
+            continue
+        refs.append(Ref(m.start(), m.end(), m.group(), TERM_PRED,
+                        "%s#%s" % (doc_uri, anchor), kind="term"))
+    return refs
+
+
 def mark_term_uses(runs, matcher, index, doc_uri, self_anchor=None):
     """One node's inline-run list with every use of a defined term linked to
-    the provision defining it.
+    the provision defining it -- `term_refs` spliced into the runs a source
+    has already built.
 
     Only *plain* runs are scanned: a use inside an existing link run is left
-    alone, which is the same rule eurlex applies with `yield_overlaps` -- a
+    alone, which is the same rule eurlex applies with `merge_refs` -- a
     citation is the stronger, cross-document link, and the defining occurrence
     is already a `dcterms:subject` link to the concept page. A term whose
     definition sits in this very node links nowhere (`self_anchor`): SFS gathers
@@ -436,16 +505,206 @@ def mark_term_uses(runs, matcher, index, doc_uri, self_anchor=None):
             out.append(run)
             continue
         pos = 0
-        for m in matcher.finditer(run):
-            anchor = index[m.lastgroup]
-            if anchor == self_anchor:
-                continue
-            if m.start() > pos:
-                out.append(run[pos:m.start()])
-            out.append({"predicate": TERM_PRED,
-                        "uri": "%s#%s" % (doc_uri, anchor),
-                        "text": m.group(), "kind": "term"})
-            pos, hit = m.end(), True
+        for ref in term_refs(run, matcher, index, doc_uri, self_anchor):
+            if ref.start > pos:
+                out.append(run[pos:ref.start])
+            out.append({"predicate": ref.predicate, "uri": ref.uri,
+                        "text": ref.text, "kind": ref.kind})
+            pos, hit = ref.end, True
         if pos < len(run):
             out.append(run[pos:])
     return out if hit else runs
+
+
+# --------------------------------------------------------------------------
+# relate-time: normalisation and clustering
+# --------------------------------------------------------------------------
+#
+# The corpus-wide half. Everything above runs per document at parse; what
+# follows reads the whole collected term list at relate and decides which
+# surface forms are one concept.
+
+RES = Path(__file__).resolve().parent / "data" / "begrepp_aliases.json"
+
+# generic inflectional endings reversed to a base (definite singular, plural and
+# definite plural). NOT -are (an agent base) and NOT derivational (-ning/-het/
+# -else), which would merge unrelated words.
+#
+# The shared list minus its genitive members: `_bases` reverses the genitive
+# -s first and de-inflects the plain form it leaves, so reversing "-ens" here
+# too would cut a second ending off the same word.
+_ENDINGS = tuple(e for e in SWEDISH_NOUN_ENDINGS if not e.endswith("s"))
+
+
+def _bases(word):
+    """Candidate base forms of a lower-cased Swedish noun, by reversing each
+    inflectional ending (several when ambiguous); empty when it looks like a base.
+    The corpus picks the real one (`cluster` keeps only observed candidates)."""
+    out = set()
+    forms = {word}
+    if word.endswith("s") and len(word) > 4:     # genitive -> also the plain form
+        forms.add(word[:-1])
+    for w in forms:
+        if w.endswith("arna") and len(w) > 6:    # -are agent noun, definite plural
+            out.add(w[:-4] + "are")              #   näringsidkarna -> näringsidkare
+        if w.endswith("aren") and len(w) > 5:    # -are agent noun, definite singular
+            out.add(w[:-1])                      #   näringsidkaren -> näringsidkare
+        for end in _ENDINGS:                     # generic plural / definite
+            if w.endswith(end) and len(w) - len(end) >= 3:
+                out.add(w[:-len(end)])
+    out.discard(word)
+    return out
+
+
+def _last_word_bases(form):
+    """Candidate base forms of a whole (lower-cased) term: its last word
+    de-inflected, the rest kept (the head inflects in this corpus's terms)."""
+    parts = form.split(" ")
+    return {" ".join(parts[:-1] + [b]) for b in _bases(parts[-1])} if parts else set()
+
+
+def _word_variants(word: str) -> set[str]:
+    """The inflected surface forms one word of a term may take in text:
+    itself, its candidate bases, the reversible ending classes forward from
+    each, the genitive -s, the agent-noun forms, and the adjectival/weak "a"
+    ("sakkunnig" -> "den sakkunniga") -- forward-only, so `cluster`'s
+    reversing is never loosened (`_ENDINGS` stays as it is)."""
+    variants = set()
+    for stem in {word} | _bases(word):
+        variants.add(stem)
+        variants.add(stem + "s")
+        if stem.endswith("are"):                 # agent noun: -aren, -arna
+            variants.update((stem + "n", stem[:-1] + "na"))
+        if len(stem) >= 3:
+            for end in (*_ENDINGS, "a"):
+                variants.add(stem + end)
+                variants.add(stem + end + "s")
+    return variants
+
+
+def term_pattern(term):
+    """A compiled regex matching `term` or an inflected surface form of it in
+    `util.normalize_fold`ed running text, every word inflection-wide and
+    word-bounded: "betydande incident" matches "betydande incidenten";
+    "nationellt bedömningsstöd" matches "nationella bedömningsstöd" (the
+    attributive adjective agrees with its noun, so a last-word-only pattern
+    missed every plural-context use -- measured on the golden-ten bench,
+    where it cost all five bedömningsstöd rungs). Never "incidentrapport" (a
+    compound is a different word)."""
+    parts = []
+    for word in _norm(term).split(" "):
+        alt = "|".join(re.escape(v) for v in
+                       sorted(_word_variants(word), key=len, reverse=True))
+        parts.append("(?:" + alt + ")")
+    return re.compile(r"\b" + r"\s+".join(parts) + r"\b")
+
+
+
+
+def _ucfirst(name):
+    return name[0].upper() + name[1:] if name else name
+
+
+def _base_score(form):
+    """Lower is more base-like: shorter wins, a definite/plural ending is a
+    tie-break penalty (so `Borgenär` beats `Borgenären`)."""
+    inflected = bool(_bases(form.lower()))
+    return (len(form), inflected, form)
+
+
+def _canonical_form(forms):
+    """The display/URI form for a group of surface variants: a wiki-authored form
+    if the group has one, else the most base-like member."""
+    wiki = [f for f in forms if f in _wiki_titles()]
+    return _ucfirst(min(wiki or list(forms), key=_base_score))
+
+
+# --------------------------------------------------------------------------
+# overrides (hand-edited) + the wiki base-form registry
+# --------------------------------------------------------------------------
+
+_OVERRIDES = None
+_WIKI = None
+
+
+def _load():
+    global _OVERRIDES
+    if _OVERRIDES is None:
+        data = json.loads(RES.read_text())
+        _OVERRIDES = {"alias": {_norm(k): v for k, v in data.get("alias", {}).items()},
+                      "distinct": [{_norm(x) for x in p}
+                                   for p in data.get("keep_distinct", [])]}
+    return _OVERRIDES
+
+
+def _wiki_titles():
+    return _WIKI or set()
+
+
+def register_wiki(titles):
+    """Tell the normalizer which display forms are wiki-authored (base form by
+    convention), so they win canonical selection and never silently move."""
+    global _WIKI
+    _WIKI = set(titles)
+
+
+# --------------------------------------------------------------------------
+# clustering -- the corpus-wide canonicalisation
+# --------------------------------------------------------------------------
+
+def cluster(forms):
+    """Group surface `forms` into concepts: `{canonical: sorted([variants])}`. A
+    form unions with a candidate base only when that base is itself observed (or
+    a hand-edited alias target); keep-distinct pairs are split back apart."""
+    over = _load()
+    by_norm = {}
+    for f in forms:
+        by_norm.setdefault(_norm(f), set()).add(f)
+    parent = {k: k for k in by_norm}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        if a in parent and b in parent and find(a) != find(b):
+            parent[find(a)] = find(b)
+
+    for k in list(by_norm):
+        target = over["alias"].get(k)
+        if target:
+            union(k, _norm(target))              # explicit alias wins
+        for cand in _last_word_bases(k):
+            if cand in by_norm:
+                union(k, cand)
+
+    comps = {}
+    for k in by_norm:
+        comps.setdefault(find(k), set()).update(by_norm[k])
+
+    out = {}
+    for members in comps.values():
+        for sub in _split_distinct(members):
+            # an explicit alias target is the canonical (a human decision); else
+            # the wiki form, else the most base-like member
+            targets = sorted(over["alias"][_norm(m)] for m in sub
+                             if _norm(m) in over["alias"])
+            out[_ucfirst(targets[0]) if targets else _canonical_form(sub)] = sorted(sub)
+    return out
+
+
+def _split_distinct(members):
+    """Split a group so no keep-distinct pair shares it (a wrong auto-merge the
+    override forbids). Members off every distinct list stay with the first part."""
+    norms = {m: _norm(m) for m in members}
+    pairs = [d for d in _load()["distinct"]
+             if len(d & set(norms.values())) > 1]
+    if not pairs:
+        return [members]
+    parts = [{m for m in members if norms[m] in d} for d in pairs]
+    rest = {m for m in members if not any(norms[m] in d for d in pairs)}
+    if parts:
+        parts[0] |= rest
+    return [p for p in parts if p]

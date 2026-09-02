@@ -19,7 +19,10 @@ stores, the query on what it is asked.
 import functools
 import re
 
-from . import datasets, util
+# `lagrum` is imported as a module, not `from .lagrum import Ref`: lagrum
+# imports this module for its `spans`, so only the module form survives the
+# cycle (the attribute is read at call time, when lagrum is fully loaded)
+from . import datasets, lagrum, util
 
 # The letter groups a case number may start with, over the 24,995 case numbers
 # the dv corpus holds: B (3,943), Ö (3,912), T (2,100), A (2,051), M (1,307),
@@ -230,3 +233,10 @@ def spans(text, base="https://lagen.nu/"):
         if found:
             out.append((m.start(), m.end(), base + found[2]))
     return out
+
+
+def refs(text, base, predicate, orig):
+    """The `spans` projection as inline `lagrum.Ref`s, the way `treatyref.refs`
+    and `emdref.refs` hand their spans to the merge. Each link's own words are
+    sliced from `orig` (see `lagrum.spans_as_refs`)."""
+    return lagrum.spans_as_refs(spans(text, base), orig, predicate)

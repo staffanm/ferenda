@@ -44,6 +44,7 @@ from lark.exceptions import UnexpectedInput
 
 from . import datasets, emdref, malnummer
 from .coe_ids import article_fragment as coe_article_fragment
+from .sfs_anchor import paragraf_anchor
 from .treaty_ids import article_fragment as treaty_article_fragment
 from .util import fold_swedish, number_slug, own_number_slug
 
@@ -119,7 +120,7 @@ MALNUMMER = 'MALNUMMER'
 # "SFS" before a year:number), and an English chapter/section pinpoint bound
 # to the act reference directly before it ("Miljöbalken, Chapter 5,
 # Section 2" -> #K5P2). Not a grammar type: two fixed shapes, matched by
-# `english_sfs_spans` / `english_pinpoint_spans` and merged in parse_text
+# `_english_sfs_spans` / `english_pinpoint_spans` and merged in parse_text
 # beside the grammar's (grammar wins overlaps). A free-standing English
 # pinpoint never links -- in the pan-Nordic journals "Chapter N, Section N"
 # names Finnish or Norwegian law as often as Swedish, so the anchor
@@ -1032,7 +1033,7 @@ class Pinpoint(NamedTuple):
 NO_PINPOINT = Pinpoint()
 
 
-def eu_fragment(pin):
+def _eu_fragment(pin):
     """An EU act's uri fragment for `pin` -- the dotted grammar the eurlex parser
     mints for the anchor it targets: `6.1`, `6.1.c`, `9.2.S2`, `56.7.S2.a`. ''
     when no article is named.
@@ -1067,6 +1068,33 @@ def yield_overlaps(uses, cites):
     must resolve overlaps here first, not silently inside interleave."""
     return [u for u in uses
             if not any(u.start < c.end and c.start < u.end for c in cites)]
+
+
+def spans_as_refs(spans, orig, predicate):
+    """`(start, end, uri)` spans as inline `Ref`s -- the shape the span-shaped
+    recognisers (`_english_sfs_spans`, `emdref`, `malnummer`) share with the
+    `Ref`-shaped ones.
+
+    Each link's own words are sliced from `orig`: a recogniser scans the
+    space-normalised copy `parse_text` makes (`_SPACE_NORM` translates
+    character for character, so the offsets agree) while the artifact keeps
+    the source's typography."""
+    return [Ref(start, end, orig[start:end], predicate, uri)
+            for start, end, uri in spans]
+
+
+def merge_refs(*lists):
+    """Merge ref lists by precedence into one list sorted by start.
+
+    Each list yields to every list before it (via `yield_overlaps`), so the
+    first list wins any overlap and the last yields to all: a case-law span
+    beats a treaty name that the case's own title spells out, an application
+    number beats the case name printed beside it. `interleave` needs disjoint
+    spans, which is why a two-list merge can never be a plain concatenation."""
+    kept = []
+    for refs in lists:
+        kept += yield_overlaps(refs, kept)
+    return sorted(kept, key=lambda ref: ref.start)
 
 
 def _styled(text, start, end, styles):
@@ -1529,7 +1557,7 @@ RE_ENG_GAP = re.compile(r"[\s,)]{0,6}")
 RE_SFS_URI_TAIL = re.compile(r"/\d{4}:\d{1,4}(?:_s\.\d+)?$")
 
 
-def english_sfs_spans(text, base='https://lagen.nu/'):
+def _english_sfs_spans(text, base='https://lagen.nu/'):
     """Every "SFS <nummer>" citation as (start, end, uri) spans, the whole
     "SFS 1979:429" the link. The prefix is the Swedish-statute marker that
     English text otherwise lacks, so the number needs no other context."""
@@ -1555,10 +1583,8 @@ def english_pinpoint_spans(text, anchors):
             default=None)
         if anchor is None:
             continue
-        fragment = 'K%sP%s' % (m.group(1), m.group(2).replace(' ', ''))
-        if m.group(3):
-            fragment += 'S%s' % m.group(3)
-        out.append((m.start(), m.end(), anchor[1] + '#' + fragment))
+        fragment = paragraf_anchor(m.group(1), m.group(2), m.group(3))
+        out.append((m.start(), m.end(), '%s#%s' % (anchor[1], fragment)))
     return out
 
 
@@ -1610,7 +1636,7 @@ def celex_uri(attrs, base='https://lagen.nu/'):
     uri = base + 'celex/3%04d%s%04d' % (year, letter, number)
     # the sub-article, stycke and lettered point, for an act cited by number as
     # well as by name ("artikel 125.4 a i förordning (EU) nr 1303/2013")
-    frag = eu_fragment(Pinpoint(attrs.get('artikel'), attrs.get('underartikel'),
+    frag = _eu_fragment(Pinpoint(attrs.get('artikel'), attrs.get('underartikel'),
                                 attrs.get('stycke'), attrs.get('punkt')))
     return uri + ('#' + frag if frag else '')
 
@@ -1751,7 +1777,7 @@ def _law_id_span(law_node):
     return (toks[0].start_pos, toks[0].end_pos) if toks else _node_span(law_node)
 
 
-def find_refids(tree):
+def _find_refids(tree):
     """Collect *_ref_id subtree texts into an attribute dict, like the
     old find_attributes (key = production name minus the suffix)."""
     d = {}
@@ -2029,29 +2055,25 @@ class LagrumParser:
             # a just-matched SFS-prefixed one. A span overlapping a grammar
             # match yields to it.
             sfs = yield_overlaps(
-                [Ref(s, e, orig[s:e], predicate, uri)
-                 for s, e, uri in english_sfs_spans(text, self.base)], refs)
+                spans_as_refs(_english_sfs_spans(text, self.base),
+                              orig, predicate), refs)
             pins = yield_overlaps(
-                [Ref(s, e, orig[s:e], predicate, uri)
-                 for s, e, uri in english_pinpoint_spans(
-                     text, [(r.end, r.uri) for r in refs + sfs])],
+                spans_as_refs(english_pinpoint_spans(
+                    text, [(r.end, r.uri) for r in refs + sfs]),
+                    orig, predicate),
                 refs + sfs)
             refs = sorted(refs + sfs + pins, key=lambda r: r.start)
         if self.emd:
             # ECHR citations from the snapshot matcher (see EMDRATTSFALL);
             # a span overlapping a grammar match yields to it
-            emd = [Ref(s, e, orig[s:e], predicate, uri)
-                   for s, e, uri in emdref.spans(text, self.base)]
-            refs = sorted(refs + yield_overlaps(emd, refs),
-                          key=lambda r: r.start)
+            refs = merge_refs(refs, emdref.refs(text, self.base, predicate,
+                                                orig))
         if self.case_numbers:
             # a decision named by case number (see MALNUMMER), same merge: the
             # referat form is the better identity, so "NJA 2009 s. 672 (T 3-08)"
             # links once, on the grammar's span
-            cases = [Ref(s, e, orig[s:e], predicate, uri)
-                     for s, e, uri in malnummer.spans(text, self.base)]
-            refs = sorted(refs + yield_overlaps(cases, refs),
-                          key=lambda r: r.start)
+            refs = merge_refs(refs, malnummer.refs(text, self.base, predicate,
+                                                   orig))
         return refs
 
     def link_spans(self, attrlist, tree, length):
@@ -2189,11 +2211,11 @@ class LagrumParser:
 
     def fmt_change_ref(self, node, match, out, context):
         # the change note links its whole span -- "Lag (2001:1016)."
-        self.emit({'lawref': _normalize_sfsid(find_refids(node)['law'])},
+        self.emit({'lawref': _normalize_sfsid(_find_refids(node)['law'])},
                   match, out, context, span=_node_span(node))
 
     def fmt_sfs_nr(self, node, match, out, context):
-        law = _normalize_sfsid(find_refids(node)['law'])
+        law = _normalize_sfsid(_find_refids(node)['law'])
         if self.nobaseuri:  # the old format_SFSNr learned the base law
             context['law'] = law
         # link just the SFS number, not any enclosing "( … )"
@@ -2213,7 +2235,7 @@ class LagrumParser:
         # 4 kap. 8-9 §§, not the chapterless 8 § the act does not have. An
         # explicit law on the later ref still resets (emit prefers its own
         # attrs), so a cross-act "… samt 5 § lagen (1990:52)" is untouched.
-        ids = find_refids(node)
+        ids = _find_refids(node)
         self.emit(ids, match, out, context, span=_node_span(node))
         if ids.get('chapter'):
             match.currentchapter = ids['chapter']
@@ -2224,20 +2246,20 @@ class LagrumParser:
     def fmt_individual_chapter_section_refs(self, node, match, out, context):
         sections = [c for c in node.children
                     if isinstance(c, Tree) and c.data == 'section_ref']
-        match.currentchapter = find_refids(node.children[0])['chapter']
+        match.currentchapter = _find_refids(node.children[0])['chapter']
         # the chapter prefix ("3 kap.") folds into the first section link
-        self.emit({'section': find_refids(sections[0])['section']},
+        self.emit({'section': _find_refids(sections[0])['section']},
                   match, out, context,
                   span=(_node_span(node.children[0])[0],
                         _node_span(sections[0])[1]))
         for section in sections[1:]:
-            self.emit({'section': find_refids(section)['section']},
+            self.emit({'section': _find_refids(section)['section']},
                       match, out, context, span=_node_span(section))
         # chapter stays sticky (the old formatter never reset it)
 
     def fmt_chapter_section_refs(self, node, match, out, context):
         chapter_ref, sections = node.children
-        match.currentchapter = find_refids(chapter_ref)['chapter']
+        match.currentchapter = _find_refids(chapter_ref)['chapter']
         self.emit({'chapter': match.currentchapter}, match, out, context,
                   span=_node_span(chapter_ref))
         self.dispatch(sections, match, out, context)
@@ -2249,13 +2271,13 @@ class LagrumParser:
 
     def fmt_chapter_section_piece_refs(self, node, match, out, context):
         chapter_ref, section_pieces = node.children
-        match.currentchapter = find_refids(chapter_ref)['chapter']
+        match.currentchapter = _find_refids(chapter_ref)['chapter']
         self.emit({'chapter': match.currentchapter}, match, out, context,
                   span=_node_span(chapter_ref))
         self.dispatch(section_pieces, match, out, context)
 
     def fmt_single_section_ref(self, node, match, out, context):
-        self.emit({'section': find_refids(node)['section']},
+        self.emit({'section': _find_refids(node)['section']},
                   match, out, context, span=_node_span(node))
 
     # only reachable as the final "eller 16 §" of alternate_section_refs;
@@ -2264,31 +2286,31 @@ class LagrumParser:
 
     def fmt_section_piece_refs(self, node, match, out, context):
         section = node.children[0]
-        match.currentsection = find_refids(section)['section']
+        match.currentsection = _find_refids(section)['section']
         pieces = [c for c in node.children[1:] if isinstance(c, Tree)]
         for i, piece in enumerate(pieces):
             # the section prefix ("42 §") folds into the first piece link
             span = ((_node_span(section)[0], _node_span(piece)[1]) if i == 0
                     else _node_span(piece))
-            self.emit(find_refids(piece), match, out, context, span=span)
+            self.emit(_find_refids(piece), match, out, context, span=span)
         match.currentsection = None
 
     def fmt_section_piece_item_range(self, node, match, out, context):
         section, piece = node.children[0], node.children[1]
-        match.currentsection = find_refids(section)['section']
-        match.currentpiece = find_refids(piece)['piece']
+        match.currentsection = _find_refids(section)['section']
+        match.currentpiece = _find_refids(piece)['piece']
         self.emit({'piece': match.currentpiece}, match, out, context,
                   span=(_node_span(section)[0], _node_span(piece)[1]))
         for item in node.children[2:]:
             if isinstance(item, Tree):
-                self.emit(find_refids(item), match, out, context,
+                self.emit(_find_refids(item), match, out, context,
                           span=_node_span(item))
         match.currentsection = None
         match.currentpiece = None
 
     def fmt_section_item_refs(self, node, match, out, context):
         section = node.children[0]
-        match.currentsection = find_refids(section)['section']
+        match.currentsection = _find_refids(section)['section']
         self.emit({'section': match.currentsection}, match, out, context,
                   span=_node_span(section))
         for item in node.children[1:]:
@@ -2296,24 +2318,24 @@ class LagrumParser:
                 # item_ref carries one ref id -- either item_ref_id ("3 a") or
                 # itemnumeric_ref_id ("tredje punkten"); emit whichever it is
                 # (lagrum_uri folds both to the N fragment letter)
-                self.emit(find_refids(item),
+                self.emit(_find_refids(item),
                           match, out, context, span=_node_span(item))
         match.currentsection = None
 
     def fmt_piece_and_item_refs(self, node, match, out, context):
-        self.emit(find_refids(node.children[0]), match, out, context,
+        self.emit(_find_refids(node.children[0]), match, out, context,
                   span=_node_span(node.children[0]))
-        self.emit(find_refids(node.children[-1]), match, out, context,
+        self.emit(_find_refids(node.children[-1]), match, out, context,
                   span=_node_span(node.children[-1]))
 
     def fmt_piece_item_refs(self, node, match, out, context):
         piece = node.children[0]
-        match.currentpiece = find_refids(piece)['piece']
+        match.currentpiece = _find_refids(piece)['piece']
         items = [c for c in node.children[1:] if isinstance(c, Tree)]
         for i, item in enumerate(items):
             span = ((_node_span(piece)[0], _node_span(item)[1]) if i == 0
                     else _node_span(item))
-            self.emit(find_refids(item), match, out, context, span=span)
+            self.emit(_find_refids(item), match, out, context, span=span)
         match.currentpiece = None
 
     def fmt_external_ref(self, node, match, out, context):
@@ -2384,7 +2406,7 @@ class LagrumParser:
         piece = next((c for c in node.children
                       if isinstance(c, Tree) and c.data == 'piece_ref'), None)
         if piece is not None:
-            attrs.update(find_refids(piece))
+            attrs.update(_find_refids(piece))
         self.emit(attrs, match, out, context, span=_node_span(node))
 
     def abbrev_to_sfsid(self, node):
@@ -2444,7 +2466,7 @@ class LagrumParser:
         NoLink for unknown/blacklisted law names: the whole match is
         then consumed without producing links, like the reference scanner."""
         if isinstance(law_node, Tree) and law_node.data != 'same_law':
-            refids = find_refids(law_node)
+            refids = _find_refids(law_node)
             name = next((t.value for t in _tree_tokens(law_node)
                          if t.type == 'NAMED_LAW'), None)
             if 'law' in refids:
@@ -2483,7 +2505,7 @@ class LagrumParser:
         target anchor (#6.1.c, #9.2.S2)."""
         if remember:
             self.state.remember_eu_act(celex)
-        frag = eu_fragment(pin)
+        frag = _eu_fragment(pin)
         return self.base + 'celex/' + celex + ('#' + frag if frag else '')
 
     def _treaty_uri(self, path, pin=NO_PINPOINT):
@@ -2513,7 +2535,7 @@ class LagrumParser:
                 return uri
             return uri + '#' + treaty_article_fragment(
                 pin.artikel, entry.get("anchor", "A"), entry["numerals"])
-        return uri + '#' + eu_fragment(pin)
+        return uri + '#' + _eu_fragment(pin)
 
     def _article_specs(self, node):
         """Per-article ``(Pinpoint, span)``. A single article
@@ -2523,7 +2545,7 @@ class LagrumParser:
 
         A lettered point coordinates *within* one article ("artikel 6.1 c och e"
         -- the form dataskyddslagen uses), so an item carrying several letters
-        expands to one link per letter, each on its own span. `find_refids`
+        expands to one link per letter, each on its own span. `_find_refids`
         collapses same-named subtrees into one dict entry and so cannot see the
         second letter; the letters are read off the item's own subtrees."""
         items = [s for s in node.iter_subtrees_topdown() if s.data == 'artikel_item']
@@ -2543,7 +2565,7 @@ class LagrumParser:
 
         out = []
         for it in items:
-            d = find_refids(it)
+            d = _find_refids(it)
             if len(items) == 1:
                 # from "artikel" to the node end -- the whole "artikel N i
                 # <instrument>" for the article-first order, just "artikel N" when
@@ -2593,7 +2615,7 @@ class LagrumParser:
         items = [it for it in node.iter_subtrees_topdown()
                  if it.data == 'skal_item']
         part = _node_span(subtree(node, 'skal_part'))
-        return [(find_refids(it)['skal'],
+        return [(_find_refids(it)['skal'],
                  part if len(items) == 1 else _node_span(it))
                 for it in items]
 
@@ -2712,7 +2734,7 @@ class LagrumParser:
             return
         # an act cited by number ("(artikel N i) direktiv 2000/31/EG"): celex_uri
         # mints the act, and each cited article pinpoints that same act
-        attrs = find_refids(node)
+        attrs = _find_refids(node)
         tokens = _tree_tokens(node)
         for t in tokens:
             if t.type in ('DIREKTIV', 'FORORDNING', 'REKOMMENDATION', 'BESLUT'):
@@ -2760,22 +2782,22 @@ class LagrumParser:
     # --- RATTSFALL (Swedish case law) ---
 
     def fmt_nja_referat(self, node, match, out, context):
-        a = find_refids(node)
+        a = _find_refids(node)
         out.append({'_uri': '%sdom/nja/%ss%s'
                     % (self.base, a['year'], a['sidnr'])})
 
     def fmt_nja_notis(self, node, match, out, context):
-        a = find_refids(node)
+        a = _find_refids(node)
         out.append({'_uri': '%sdom/nja/%s/not/%s'
                     % (self.base, a['year'], a['notnr'])})
 
     def fmt_court_referat(self, node, match, out, context):
-        a = find_refids(node)
+        a = _find_refids(node)
         out.append({'_uri': self.rattsfall_uri(a['court'], a['year'],
                                                ':' + a['rf_lopnr'])})
 
     def fmt_court_notis(self, node, match, out, context):
-        a = find_refids(node)
+        a = _find_refids(node)
         out.append({'_uri': self.rattsfall_uri(a['court'], a['year'],
                                                '/not/' + a['notnr'])})
 

@@ -26,7 +26,7 @@ from pathlib import Path
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, eucasenaming, layout, markup, patch
-from ..lib.begrepp import build_matcher
+from ..lib.begrepp import build_matcher, term_refs
 from ..lib.cellar import notice_relations, notice_repeal_date, notice_work_date
 from ..lib.datasets import NAMEDACTS
 from ..lib.errors import SkipDocument
@@ -63,11 +63,7 @@ from ..lib.lagrum import (
     yield_overlaps,
 )
 from .correspond import correspondence
-from .definitions import (
-    extract_definitions,
-    inline_definitions,
-    term_refs,
-)
+from .definitions import extract_definitions, inline_definitions
 from .model import BASE, EurlexDoc, official_short_title, short_label
 from .parse_html import parse_html
 from .parse_pdf import parse_pdf

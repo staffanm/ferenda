@@ -33,8 +33,8 @@ import re
 from pathlib import Path
 
 from ..lib import compress
-from ..lib.emdref import fold_party_name
-from ..lib.lagrum import ECHR_BASE, Ref, yield_overlaps
+from ..lib.emdref import fold_party_name, pick
+from ..lib.lagrum import ECHR_BASE, Ref, merge_refs
 from ..lib.util import normalize_space
 from .model import document_kind, record_date
 
@@ -96,23 +96,6 @@ def index(root):
     return by_no, by_name, respondents, identity
 
 
-def _pick(candidates, own, near_date):
-    """The one document a citation means, or None. An exact nearby date wins;
-    else the sole judgment; else the sole document. Several candidates and no
-    date is a chamber/Grand-Chamber guess, and stays unlinked."""
-    candidates = [c for c in candidates if c[2] != own]
-    if near_date:
-        dated = [c for c in candidates if c[1] == near_date]
-        if len(dated) == 1:
-            return dated[0]
-    judgments = [c for c in candidates if c[0] == "judgment"]
-    if len(judgments) == 1:
-        return judgments[0]
-    if not judgments and len(candidates) == 1:
-        return candidates[0]
-    return None
-
-
 def _near_date(text, pos):
     m = RE_NEAR_DATE.match(text, pos)
     if not m:
@@ -132,7 +115,8 @@ def _appno_refs(text, own, by_no, own_appnos):
             # survived the self-exclusion
             if no.group(0) in own_appnos:
                 continue
-            picked = _pick(by_no.get(no.group(0), ()), own, near)
+            picked = pick(by_no.get(no.group(0), ()), near,
+                          judgment_key="judgment", exclude=own)
             if picked:
                 start = m.start(1) + no.start()
                 out.append(Ref(start, start + len(no.group(0)), no.group(0),
@@ -178,7 +162,8 @@ def _name_refs(text, own, by_name, respondents, own_key):
             end = m.end() + resp
             while not text[end - 1].isalnum():
                 end -= 1
-        picked = _pick(by_name[key], own, _near_date(text, end))
+        picked = pick(by_name[key], _near_date(text, end),
+                      judgment_key="judgment", exclude=own)
         if picked is None:
             continue
         start = max(0, m.start() - APPLICANT_WINDOW) + cut
@@ -199,7 +184,5 @@ def refs(text, own, root):
     the number is the stronger identity."""
     by_no, by_name, respondents, identity = index(root)
     own_appnos, own_key = identity.get(own) or (frozenset(), None)
-    numbered = _appno_refs(text, own, by_no, own_appnos)
-    named = yield_overlaps(
-        _name_refs(text, own, by_name, respondents, own_key), numbered)
-    return sorted(numbered + named, key=lambda ref: ref.start)
+    return merge_refs(_appno_refs(text, own, by_no, own_appnos),
+                      _name_refs(text, own, by_name, respondents, own_key))

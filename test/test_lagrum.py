@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import catalog
+from ferenda.lib import catalog, catalog_rows
 from ferenda.lib.datasets import NAMEDACTS
 from ferenda.lib.datasets import NAMEDLAWS as SFS_NAMEDLAWS
 from ferenda.lib.lagrum import (
@@ -50,6 +50,8 @@ from ferenda.lib.lagrum import (
     load_named_spans,
     load_namedacts,
     load_namedlaws,
+    merge_refs,
+    spans_as_refs,
     with_indefinite_aliases,
     yield_overlaps,
 )
@@ -1154,6 +1156,35 @@ def test_lagrum_trigger_bounded_on_pathological_enumeration():
     assert time.time() - start < 1.0
 
 
+def test_merge_refs_lets_each_list_yield_to_the_ones_before_it():
+    """The precedence rule six merge sites used to spell out: the first list
+    wins any overlap, the last yields to every survivor before it, and the
+    result is one list in document order (interleave needs disjoint spans)."""
+    strong = [Ref(0, 6, "NJA I", "dcterms:references", "https://x/nja")]
+    middle = [Ref(3, 9, "I 2009", "dcterms:references", "https://x/mid"),
+              Ref(20, 24, "5 kap", "dcterms:references", "https://x/kap")]
+    weak = [Ref(21, 26, "kap 3", "dcterms:references", "https://x/weak"),
+            Ref(40, 44, "3 § ", "dcterms:references", "https://x/par")]
+    assert [(r.start, r.uri) for r in merge_refs(strong, middle, weak)] == [
+        (0, "https://x/nja"),        # the strongest list is kept whole
+        (20, "https://x/kap"),       # yielded to nothing, so it survives
+        (40, "https://x/par"),       # the weak list's non-overlapping ref
+    ]
+    assert merge_refs() == []
+    assert merge_refs(strong) == strong
+
+
+def test_spans_as_refs_slices_the_links_words_from_the_original_text():
+    """The recognisers scan a space-normalised copy; the artifact keeps the
+    source's typography, so the Ref text comes from the original."""
+    orig = "se NJA\u00a02009 s. 672"
+    text = orig.replace("\u00a0", " ")
+    assert spans_as_refs([(3, 11, "https://x/nja")], orig,
+                         "dcterms:references") == [
+        Ref(3, 11, "NJA\u00a02009", "dcterms:references", "https://x/nja")]
+    assert text[3:11] == "NJA 2009"       # the scanned copy differs
+
+
 def test_interleave_disjoint_refs():
     text = "se 3 § och 5 § nedan"
     refs = [Ref(3, 6, "3 §", "dcterms:references", "https://x/#P3"),
@@ -1215,7 +1246,7 @@ def test_styled_runs_are_not_links():
     text = "se bilaga 1"
     runs = interleave(text, [], styles=[(3, 11, "i")])
     out = []
-    catalog.collect_links({"id": "P1", "text": runs}, None, None, out)
+    catalog_rows.collect_links({"id": "P1", "text": runs}, None, None, out)
     assert out == []
     assert runs_text(runs) == text          # the text itself is still readable
 

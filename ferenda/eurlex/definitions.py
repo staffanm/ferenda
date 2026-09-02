@@ -27,14 +27,12 @@ read by `inline_definitions`.
 
 import re
 
-from ..lib.begrepp import TERM_PRED
 from ..lib.eu_structure import Anchors
-from ..lib.lagrum import Ref
 
 # The matcher over an act's own defined terms -- `build_matcher`, its suffix
-# table and `TERM_PRED`, the relation a use-of-a-defined-term run carries --
-# moved to lib.begrepp when SFS became the second source to interlink its own
-# definitions. This module keeps the extraction, which is EU-act shaped.
+# table, `term_refs` and `TERM_PRED`, the relation a use-of-a-defined-term run
+# carries -- live in lib.begrepp, where SFS reads them too. This module keeps
+# the extraction, which is EU-act shaped.
 
 # per-language cues for the dedicated definitions article: words that appear in
 # its title, and phrases that frame its intro paragraph. Unknown language falls
@@ -300,18 +298,3 @@ def extract_definitions(body, lang):
         i += 1
     return terms
 
-
-def term_refs(text, matcher, index, doc_uri, self_anchor):
-    """Occurrences of any defined term in `text` as term-link Refs into the act's
-    own definition points. The point defining a term skips its own term (by
-    anchor), but still links the other terms it mentions."""
-    if not matcher:
-        return []
-    refs = []
-    for m in matcher.finditer(text):
-        anchor = index[m.lastgroup]
-        if anchor == self_anchor:
-            continue
-        refs.append(Ref(m.start(), m.end(), m.group(), TERM_PRED,
-                        "%s#%s" % (doc_uri, anchor), kind="term"))
-    return refs

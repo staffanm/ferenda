@@ -21,7 +21,10 @@ date is a chamber/Grand-Chamber guess and stays unlinked (rule:fail-fast).
 import functools
 import re
 
-from . import datasets
+# `lagrum` is imported as a module, not `from .lagrum import Ref`: lagrum
+# imports this module for its `spans`, so only the module form survives the
+# cycle (the attribute is read at call time, when lagrum is fully loaded)
+from . import datasets, lagrum
 from .util import MONTHS, normalize_space
 
 PREDICATE = "dcterms:references"
@@ -76,15 +79,25 @@ def _index():
     return by_name, emd["appnos"], respondents_sv
 
 
-def _pick(candidates, near_date):
-    """The one document a citation means, or None -- hudoc.citations._pick:
-    an exact nearby date wins; else the sole judgment; else the sole
-    document. Several candidates and no date stay unlinked."""
+def pick(candidates, near_date, *, judgment_key, exclude=None):
+    """The one document a citation means, or None. An exact nearby date wins;
+    else the sole judgment; else the sole document. Several candidates and no
+    date is a chamber/Grand-Chamber guess, and stays unlinked
+    (rule:fail-fast).
+
+    A candidate is ``(kind, date, itemid)``. `judgment_key` is the kind value
+    that reads as "judgment" on the caller's side: this module matches the
+    committed snapshot, which abbreviates it to "j", while hudoc.citations
+    matches its own records, which spell it "judgment". `exclude` is an
+    itemid the citation cannot mean -- hudoc drops the citing document
+    itself, whose own application number and case name name *this* case."""
+    if exclude is not None:
+        candidates = [c for c in candidates if c[2] != exclude]
     if near_date:
         dated = [c for c in candidates if c[1] == near_date]
         if len(dated) == 1:
             return dated[0]
-    judgments = [c for c in candidates if c[0] == "j"]
+    judgments = [c for c in candidates if c[0] == judgment_key]
     if len(judgments) == 1:
         return judgments[0]
     if not judgments and len(candidates) == 1:
@@ -114,8 +127,9 @@ def _appno_refs(text, base, by_no):
         for no in RE_APPNO.finditer(m.group(1)):
             if _is_year_pair(no.group(0)):
                 continue
-            picked = _pick(by_no.get(no.group(0), ()),
-                           _near_date(text, m.start(), m.end()))
+            picked = pick(by_no.get(no.group(0), ()),
+                          _near_date(text, m.start(), m.end()),
+                          judgment_key="j")
             if picked:
                 start = m.start(1) + no.start()
                 out.append((start, start + len(no.group(0)),
@@ -160,7 +174,8 @@ def _name_refs(text, base, by_name, respondents_sv):
         end = serial.end() if serial else m.end() + resp
         while not text[end - 1].isalnum():
             end -= 1
-        picked = _pick(by_name[key], _near_date(text, m.start(), end))
+        picked = pick(by_name[key], _near_date(text, m.start(), end),
+                      judgment_key="j")
         if picked is None:
             continue
         start = max(0, m.start() - APPLICANT_WINDOW) + cut
@@ -181,3 +196,10 @@ def spans(text, base="https://lagen.nu/"):
     named = [s for s in _name_refs(text, base, by_name, respondents_sv)
              if not any(s[0] < e and n_s < s[1] for n_s, e, _ in numbered)]
     return sorted(numbered + named)
+
+
+def refs(text, base, predicate, orig):
+    """The `spans` projection as inline `lagrum.Ref`s, the way `treatyref.refs`
+    and `malnummer.refs` hand their spans to the merge. Each link's own words
+    are sliced from `orig` (see `lagrum.spans_as_refs`)."""
+    return lagrum.spans_as_refs(spans(text, base), orig, predicate)

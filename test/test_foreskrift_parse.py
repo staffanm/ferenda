@@ -80,6 +80,16 @@ def test_nest_builds_statute_shaped_tree_with_anchors():
     assert tree[1]["children"][1]["id"] == "K2P1"   # § numbering restarts per kap
 
 
+def test_nest_despaces_a_lettered_chapter_number():
+    # "4 a kap." is how the chapter is printed, and RE_KAP_MARK keeps the
+    # space in the ordinal. The anchor must not: a citation to it mints
+    # "K4aP1" (as SFS does), so the spaced "K4 aP1" was uncitable.
+    tree = structure.nest([_b("kapitel", "4 a kap. X", "4 a"),
+                           _b("paragraf", "1 § a", "1")])
+    assert tree[0]["ordinal"] == "4 a"           # the printed number is kept
+    assert tree[0]["children"][1]["id"] == "K4aP1"
+
+
 def test_nest_chapterless_paragraf_anchor_is_bare_p():
     tree = structure.nest([_b("paragraf", "3 § ensam", "3")])
     assert tree[0]["id"] == "P3"

@@ -17,7 +17,7 @@ import functools
 from pathlib import Path
 
 from ..lib import treatyref
-from ..lib.lagrum import Ref, yield_overlaps
+from ..lib.lagrum import Ref, merge_refs
 from .model import RE_DOC_BASE, decision_uri
 
 ROME_STATUTE = "icrc/585"
@@ -67,5 +67,4 @@ def refs(text, doc_number, root):
     # disjoint spans and the treaty side rests on curated name data -- so
     # the merge filters like every other two-list caller, the filing
     # number (the Court's own identity) winning
-    treaty = yield_overlaps(treatyref.refs(text, extra=SHORT_FORMS), numbers)
-    return sorted(numbers + treaty, key=lambda ref: ref.start)
+    return merge_refs(numbers, treatyref.refs(text, extra=SHORT_FORMS))

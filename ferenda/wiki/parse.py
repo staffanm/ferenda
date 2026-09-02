@@ -31,6 +31,7 @@ from pathlib import Path
 from ..lib import layout, markdown
 from ..lib.eu_structure import anchored_blocks
 from ..lib.lagrum import ALL_PARSE_TYPES, CELEX_BASE, ECHR_BASE, sfs_parser
+from ..lib.sfs_anchor import paragraf_anchor
 
 PARSE_TYPES = ALL_PARSE_TYPES
 
@@ -64,13 +65,8 @@ def heading_fragment(heading):
     "Artikel 5.2 a" -> "5.2.a"; "Skäl 13" / "(13)" -> "recital-13"."""
     m = RE_PARA.search(heading)
     if m:
-        frag = ("K%s" % m.group(1)) if m.group(1) else ""
-        frag += "P%s" % m.group(2)
-        if m.group(3):
-            frag += m.group(3)
-        if m.group(4):
-            frag += "S%s" % m.group(4)
-        return frag
+        return paragraf_anchor(m.group(1), m.group(2) + (m.group(3) or ""),
+                               m.group(4))
     m = RE_KAP.match(heading)
     if m:
         return "K%s" % m.group(1)

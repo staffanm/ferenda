@@ -10,7 +10,7 @@ import re
 from ..lib import compress, treatyref
 from ..lib.artifact import unique_id
 from ..lib.coe import article_fragment, treaty_number, treaty_uri
-from ..lib.lagrum import Ref, interleave, yield_overlaps
+from ..lib.lagrum import Ref, interleave, merge_refs
 from ..lib.pdftext import page_paragraphs, pdf_pages
 from ..lib.util import normalize_space
 from .download import body_path, record_path
@@ -167,11 +167,8 @@ def parse_record(record, paragraphs):
                 if node.get("type") == "artikel"}
 
     def refs_for(text):
-        external = treatyref.refs(text, exclude=own)
-        return sorted(
-            external + yield_overlaps(internal_refs(text, own, articles),
-                                      external),
-            key=lambda ref: ref.start)
+        return merge_refs(treatyref.refs(text, exclude=own),
+                          internal_refs(text, own, articles))
 
     treaty = Treaty(
         number=record["number"], title=record["title"],
