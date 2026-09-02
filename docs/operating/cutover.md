@@ -79,10 +79,18 @@ recreates the containers; the volumes and the bind-mounted data do not move.
 3. **Check the redirect target.** Every `ferenda.lagen.nu` path must have a
    working `lagen.nu` twin. They are the same application, so this holds by
    construction, but spot-check `/api/v1/`, `/dumps/` and a document URL.
+4. **The last regenerate before the switch renders for `lagen.nu`.** Every
+   generated page carries `<base href="https://ferenda.lagen.nu...">`
+   (`ferenda/lib/templates/page.html`, marked `CUTOVER`). Change that host to
+   `lagen.nu` and run a full generate (about 30 minutes) before the switch.
+   Until the switch, the preview host's links then lead to the legacy site;
+   after it, every internal link would otherwise pass through the
+   `ferenda.lagen.nu` redirect. The canonical, OpenGraph and sitemap URLs
+   already name `lagen.nu` and need nothing.
 
 ## The switch
 
-Four edits and a reload. Every line to change is marked `CUTOVER` in its file.
+Six edits and a reload. Every line to change is marked `CUTOVER` in its file.
 
 1. `docker/nginx/default.conf` — the legacy vhost. Two `server_name` lines:
    `lagen.nu` becomes `old.lagen.nu`.
@@ -90,7 +98,17 @@ Four edits and a reload. Every line to change is marked `CUTOVER` in its file.
    lines: `ferenda.lagen.nu` becomes `lagen.nu`.
 3. The same file, at its foot: uncomment the two-server redirect block. It
    answers `ferenda.lagen.nu` with `301` to `lagen.nu`.
-4. Reload:
+4. The same file: delete the three `X-Robots-Tag "noindex, nofollow"` lines
+   (server scope, `/dumps/`, the Matomo block). They kept the preview out of
+   the index; left in place they take `lagen.nu` out of it within days.
+5. `docker/nginx/default.conf`: uncomment the `X-Robots-Tag` line. The legacy
+   application at `old.lagen.nu` is a duplicate of the whole site and must not
+   be indexed under its new name. (A `Disallow: /` in its robots.txt would
+   only stop the crawl; a disallowed URL someone links to is still indexed
+   by reference, and a crawler that may not fetch a page never sees a noindex.)
+6. `docker/nginx/subdomains.conf`: the three marked `302` targets become
+   `lagen.nu`.
+7. Reload:
 
    ```sh
    docker compose exec nginx nginx -t
@@ -102,8 +120,8 @@ the safe failure; a config that parses but points the wrong way is not.
 
 ## Rolling back
 
-Put the comment markers back and reload again. The rollback is the same four
-edits in reverse and takes as long as the reload. Nothing else changed, so
+Put the comment markers and the header lines back and reload again. The
+rollback is the same edits in reverse and takes as long as the reload. Nothing else changed, so
 there is nothing else to undo.
 
 ## Keeping the redirect
@@ -113,6 +131,17 @@ months, so search engines and other people's links point at it, and only the
 `301` moves them.
 
 ## Afterwards
+
+Search engines need two things from the switch day:
+
+- `https://lagen.nu/sitemap.xml` (written by every full generate) submitted
+  in Search Console, so the sources the legacy site never had -- EU law,
+  Europadomstolen, föreskrifter -- are found in weeks rather than months.
+- A Search Console property for `ferenda.lagen.nu`, to watch its indexed URLs
+  drain through the `301`. Legacy URLs the rebuilt site does not answer are
+  redirected or answered `410` in `docker/nginx/ferenda.lagen.nu.conf`; a new
+  `404` spike in the coverage report names one that block missed.
+
 
 The legacy site stays reachable at `old.lagen.nu` for as long as it is useful.
 When it is retired, remove the `ferenda-legacy`, `fuseki` and `mediawiki`
