@@ -39,14 +39,12 @@ The jp host answers a rate-limited client with a non-standard WAF status
 
 import re
 import time
-from pathlib import Path
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import normalize_space
 from .euar import euar_sync
 from .ft import ft_sync
 from .journals import JOURNALS, JP, SCOPES, SVJT
@@ -169,21 +167,6 @@ def _svjt_records_from_page(html, year):
     return records
 
 
-def _svjt_records(session, year, delay):
-    """The year page's records, each paired with its article page as its
-    body -- a lazy fetch, so a run that walks a subset fetches only that
-    subset's pages. The listing fetch sleeps `delay` like every other fetch
-    in the walk (the edpb rule): `walk_records` paces only the documents,
-    and a full run reads ~110 year pages back to back without this."""
-    html = net.request(session, "GET",
-                       "%s/arkiv/%s" % (SVJT.base, year)).text
-    time.sleep(delay)
-    return [(r,
-             (lambda u=r["source_url"]:
-              net.request(session, "GET", u).text))
-            for r in _svjt_records_from_page(html, year)]
-
-
 # A WAF challenge page serves no article at all, but so does a listing the
 # mirror serves in an article's place -- and a listing carries the
 # article-node marker as often as an article does (its cards each link one),
@@ -202,48 +185,33 @@ def svjt_sync(root, full=False, only=None, limit=None, delay=0.5):
     that one page is the only listing fetched and the walk stores that one
     document, the watermark untouched."""
     session = net.make_session(net.BROWSER_UA)
-    if only:
-        year = only.split("/", 1)[1][:4]
-        pending = _svjt_records(session, year, delay)
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the svjt archive carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="svjt",
-            document=harvest.page_path, verify=verify_page)
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "svjt" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
+    # newest year first; the basefile names its own year, so an --only run
+    # reads that one year page instead of the archive
+    years = [only.split("/", 1)[1][:4]] if only \
+        else list(reversed(_svjt_years(session)))
 
-    def items():
-        # newest year first; within a year, the cards' own page numbers
-        # newest first -- the year pages set their cards in no order at all
-        for year in reversed(_svjt_years(session)):
-            html = net.request(session, "GET",
-                               "%s/arkiv/%s" % (SVJT.base, year)).text
-            time.sleep(delay)
-            records = _svjt_records_from_page(html, year)
-            records.sort(key=lambda r: (int(r["year"]), int(r["issue"])),
-                         reverse=True)
-            yield from records
+    def records(year):
+        # the listing fetch sleeps `delay` like every other fetch in the
+        # walk (the edpb rule): a full run reads ~110 year pages back to
+        # back without this
+        html = net.request(session, "GET",
+                           "%s/arkiv/%s" % (SVJT.base, year)).text
+        time.sleep(delay)
+        # within a year, the cards' own page numbers newest first -- the
+        # year pages set their cards in no order at all
+        return sorted(_svjt_records_from_page(html, year),
+                      key=lambda r: (int(r["year"]), int(r["issue"])),
+                      reverse=True)
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "svjt", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            # the journal states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "svjt", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            lambda: net.request(session, "GET", record["source_url"]).text,
-            verify_page, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="svjt")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "svjt", years, records,
+        # the article's own page is its document: the journal published no
+        # PDF for the years this walk reaches back over
+        body=lambda record: (lambda: net.request(
+            session, "GET", record["source_url"]).text),
+        missing="the svjt archive carries no article %s",
+        document=harvest.page_path, verify=verify_page,
+        delay=delay, full=full, only=only, limit=limit)
 
 
 # --------------------------------------------------------------------------
@@ -377,24 +345,6 @@ def _jp_records_from_page(html, slug, label):
     return records
 
 
-def _jp_issue_records(session, slug, label, delay):
-    """The issue page's records, each paired with its PDF as its body -- a
-    lazy fetch, so a run that walks a subset fetches only that subset's
-    documents. The listing fetch sleeps `delay` like every other fetch in
-    the walk (the edpb rule) -- this is the host that answers a rate-limited
-    client with 466, so the issue pages are paced rather than ridden out.
-    The `--only` path is the one that takes the page this way: a named issue
-    is the whole run, and a page that serves no article list fails it loud."""
-    html = net.request(session, "GET",
-                       "%s/tidskriften/%s/" % (JP.base, slug)).text
-    time.sleep(delay)
-    records = _jp_records_from_page(html, slug, label)
-    return [(r,
-             (lambda u=r["document_url"]:
-              net.request(session, "GET", u).content))
-            for r in records]
-
-
 def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
     """The journal's whole issue inventory: the one listing page, then the
     issue pages newest-first and every PDF the issue names. A watermark on
@@ -403,66 +353,43 @@ def jp_sync(root, full=False, only=None, limit=None, delay=0.5):
     stored. `--only jp/2025-01-01` names its own issue, which is then the
     only issue page fetched and the walk stores that one document."""
     session = net.make_session(net.BROWSER_UA)
+    # the menu sets the issues newest first: a caught-up run proves its
+    # newest issues are complete and stops, and the backlist is never
+    # re-read. The basefile names its own issue, so an --only run reads that
+    # one issue page instead of the inventory
     issues = _jp_issues(session)
     if only:
         year, code = only.split("/", 1)[1].split("-")[:2]
         issues = [(s, l) for s, l in issues
                   if _jp_issue_code(s, l) == (code, year)]
-        pending = []
-        for slug, label in issues:
-            pending.extend(_jp_issue_records(session, slug, label, delay))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the jp listing carries no document %s"),
-            delay=delay, full=full, limit=limit, scope="jp")
     # the slug rule runs before the walk: a slug shape the registry does not
     # hold is a code gap and fails the run loud, never a skip
     for slug, label in issues:
         _jp_issue_code(slug, label)
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "jp" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
 
-    def items():
-        # the menu sets the issues newest first: a caught-up run proves its
-        # newest issues are complete and stops, and the backlist is never
-        # re-read
-        for slug, label in issues:
-            try:
-                html = net.request(session, "GET",
-                                   "%s/tidskriften/%s/" % (JP.base, slug)).text
-                time.sleep(delay)
-                records = _jp_records_from_page(html, slug, label)
-            except ValueError as err:
-                # a challenged or template-less page can read as an
-                # articleless issue: one issue that serves no page must not
-                # stop the sweep over the others. The Skip is the record of
-                # the miss: `walk` logs it, the store stays dirty, and the
-                # next run re-meets the page
-                yield harvest.Skip("jp %s served no article list: %s"
-                                   % (slug, err))
-                continue
-            yield from records
+    def records(issue):
+        slug, label = issue
+        try:
+            html = net.request(session, "GET",
+                               "%s/tidskriften/%s/" % (JP.base, slug)).text
+            time.sleep(delay)
+            return _jp_records_from_page(html, slug, label)
+        except ValueError as err:
+            # a challenged or template-less page can read as an articleless
+            # issue: one issue that serves no page must not stop the sweep
+            # over the others. The Skip is the record of the miss: `walk`
+            # logs it, the store stays dirty, and the next run re-meets the
+            # page. An --only run of such an issue ends red on its own: the
+            # walk meets the named document nowhere
+            return [harvest.Skip("jp %s served no article list: %s"
+                                 % (slug, err))]
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "jp", record["basefile"]),
-            harvest.pdf_path(root, record["basefile"]),
-            # the journal states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "jp", record["basefile"]),
-            harvest.pdf_path(root, record["basefile"]),
-            lambda: net.request(session, "GET",
-                                record["document_url"]).content,
-            harvest.verify_pdf, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="jp")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "jp", issues, records,
+        body=lambda record: (lambda: net.request(
+            session, "GET", record["document_url"]).content),
+        missing="the jp listing carries no document %s",
+        delay=delay, full=full, only=only, limit=limit)
 
 
 # --------------------------------------------------------------------------

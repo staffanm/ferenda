@@ -33,9 +33,9 @@ from pathlib import Path
 import requests
 
 from ..lib import compress, layout
-from ..lib.harvest import write_record
+from ..lib.harvest import fetch_worklist, write_record
 from ..lib.net import BROWSER_UA, make_session, request
-from ..lib.util import Reporter, basefile_slug
+from ..lib.util import basefile_slug
 
 TYPE = "prop"
 BODY_FORMAT = "skanning2007"    # riksdagen's OCR'd Word-HTML export
@@ -88,10 +88,10 @@ def sync(root, limit=None, delay=0.5, log=print):
     strand the rest (rule:no-catch-log-continue). Rerun to retry -- a record
     that gained a body drops out of `pending`."""
     session = make_session(BROWSER_UA)
-    todo = pending(root)[:limit]
-    rep = Reporter()
-    fetched = empty = 0
-    for seen, record in enumerate(todo, start=1):
+    empty = 0
+
+    def fetch(record):
+        nonlocal empty
         # a bad response is this one document's problem: 1 700+ independent
         # one-shot fetches with nothing chaining them, so one 500 or dropped
         # connection must not strand the rest. Nothing else is caught -- a
@@ -101,12 +101,16 @@ def sync(root, limit=None, delay=0.5, log=print):
             stored = download_one(root, session, record, delay)
         except requests.RequestException as exc:
             log("  %s: %s (retried on a rerun)" % (record["basefile"], exc))
-        else:
-            fetched += stored
-            if not stored:
-                empty += 1
-                log("  %s: riksdagen served an empty body at %s"
-                    % (record["basefile"], record["url"]))
-        rep.update(seen, len(todo), scope="prop bodies", fetched=fetched)
-    rep.done()
-    return len(todo), fetched, empty
+            return False
+        if not stored:
+            empty += 1
+            log("  %s: riksdagen served an empty body at %s"
+                % (record["basefile"], record["url"]))
+        return stored
+
+    # `limit` slices the work-list rather than stopping the walk: every record
+    # here needs a fetch, so the two are the same cut and the progress line's
+    # total is then the run's own
+    seen, fetched = fetch_worklist(pending(root)[:limit], fetch,
+                                   scope="prop bodies")
+    return seen, fetched, empty

@@ -23,7 +23,14 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    flat_path,
+    select_one,
+    walk,
+    write_record,
+)
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import (
@@ -46,11 +53,11 @@ RE_TRANSLATION = re.compile(r"-t[A-Z]{2,4}\b")
 
 
 def record_path(root, basefile):
-    return Path(root) / (basefile + ".json")
+    return flat_path(root, basefile)
 
 
 def body_path(root, basefile):
-    return Path(root) / (basefile + ".pdf")
+    return flat_path(root, basefile, ".pdf")
 
 
 def _row(row):
@@ -168,9 +175,9 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     session = make_session(USER_AGENT)
     records = enumerate_decisions(session)
     if only:
-        record = next((r for r in records if r["base"] == only.upper()), None)
-        if record is None:
-            raise ValueError("ICC lists no curated decision %s" % only)
+        record = select_one(records, lambda record: record["base"],
+                            only.upper(),
+                            "ICC lists no curated decision %s")
         return 1, int(resolve(session, root, record, full=full, delay=delay))
 
     records.sort(key=lambda r: r.get("date") or "", reverse=True)

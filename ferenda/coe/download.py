@@ -16,7 +16,14 @@ from pathlib import Path
 
 from ..lib import compress
 from ..lib.coe import treaty_number
-from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    flat_path,
+    select_one,
+    store_record,
+    walk,
+)
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, mount_legacy_tls, request
 from ..lib.util import document_extension, normalize_space
@@ -92,7 +99,7 @@ def treaty_record(ws, places):
 
 
 def record_path(root, number):
-    return Path(root) / (treaty_number(number) + ".json")
+    return flat_path(root, treaty_number(number))
 
 
 def body_path(root, record):
@@ -130,11 +137,9 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     places = opening_places(session)
     records = [treaty_record(ws, places) for ws in search_treaties(session)]
     if only:
-        number = treaty_number(only)
-        record = next((record for record in records
-                       if record["number"] == number), None)
-        if record is None:
-            raise ValueError("Treaty Office lists no treaty %s" % number)
+        record = select_one(records, lambda record: record["number"],
+                            treaty_number(only),
+                            "Treaty Office lists no treaty %s")
         return 1, int(resolve(root, record, session, full=full, delay=delay))
 
     # newest first, so the watermark lookahead meets fresh treaties before the

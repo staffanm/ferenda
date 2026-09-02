@@ -47,7 +47,13 @@ from datetime import date
 from pathlib import Path
 
 from ..lib import compress, util
-from ..lib.harvest import HarvestWatermark, ItemKey, store_record, walk
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    flat_path,
+    store_record,
+    walk,
+)
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 
@@ -68,11 +74,11 @@ FIELDS = (
 
 
 def record_path(root, itemid):
-    return Path(root) / (itemid + ".json")
+    return flat_path(root, itemid)
 
 
 def body_path(root, itemid):
-    return Path(root) / (itemid + ".html")
+    return flat_path(root, itemid, ".html")
 
 
 # the harvested collections, each its own download scope and its own watermark.

@@ -19,13 +19,11 @@ print-only record.
 
 import re
 import time
-from pathlib import Path
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import normalize_space
 from .journals import URT
 
 __all__ = ["urt_sync"]
@@ -229,32 +227,13 @@ def urt_sync(root, full=False, only=None, limit=None, delay=0.5):
     session = net.make_session(net.BROWSER_UA)
     entries = _urt_entries(session)
     if only:
+        # the basefile names its own issue, so an --only run reads that
+        # issue's article pages instead of the whole listing's
         parts = only.split("/", 1)[1].split("-")
         year, issue, _sida = parts[0], "-".join(parts[1:-1]) or "1", \
             parts[-1]
         entries = [e for e in entries if e["year"] == year
                    and (e["issue"] is None or e["issue"] == issue)]
-        pending = []
-        for entry in entries:
-            page = _urt_article_page(session, entry["url"])
-            time.sleep(delay)
-            if entry["year"] != page["year"]:
-                raise ValueError(
-                    "urt: the listing states %s, the page states %s for %r"
-                    % (entry["year"], page["year"], page["title"][:50]))
-            pending.append((
-                _urt_record(entry, page, page["year"],
-                            entry["issue"] or page["issue"]),
-                (lambda u=page["pdf"]: net.request(session, "GET", u).content)
-                if page["pdf"] else None,
-            ))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the urt listing carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="urt")
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "urt" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
     # newest article first, by the year the listing states and the article's
     # own number in the issue: a caught-up run proves its newest articles
     # are complete and stops, and the archive behind it is never re-read
@@ -262,35 +241,23 @@ def urt_sync(root, full=False, only=None, limit=None, delay=0.5):
                                 int((e["issue"] or "0").split("-")[0]),
                                 int(e["sida"])), reverse=True)
 
-    def items():
-        for entry in entries:
-            page = _urt_article_page(session, entry["url"])
-            time.sleep(delay)
-            if entry["year"] != page["year"]:
-                raise ValueError(
-                    "urt: the listing states %s, the page states %s for %r"
-                    % (entry["year"], page["year"], page["title"][:50]))
-            yield _urt_record(entry, page, page["year"],
-                              entry["issue"] or page["issue"])
+    def records(entry):
+        # the unit the listing enumerates is one article's own page
+        page = _urt_article_page(session, entry["url"])
+        time.sleep(delay)
+        if entry["year"] != page["year"]:
+            raise ValueError(
+                "urt: the listing states %s, the page states %s for %r"
+                % (entry["year"], page["year"], page["title"][:50]))
+        return [_urt_record(entry, page, page["year"],
+                            entry["issue"] or page["issue"])]
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "urt", record["basefile"]),
-            *([harvest.pdf_path(root, record["basefile"])]
-              if record["document_url"] else []),
-            # the journal states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "urt", record["basefile"]),
-            harvest.pdf_path(root, record["basefile"]),
-            ((lambda: net.request(session, "GET",
-                                  record["document_url"]).content)
-             if record["document_url"] else None),
-            harvest.verify_pdf, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="urt")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "urt", entries, records,
+        # the journal sets an article it published no PDF for: the record
+        # alone is that entry
+        body=lambda record: ((lambda: net.request(
+            session, "GET", record["document_url"]).content)
+            if record["document_url"] else None),
+        missing="the urt listing carries no article %s",
+        delay=delay, full=full, only=only, limit=limit)

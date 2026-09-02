@@ -70,14 +70,13 @@ Stored per document under ``site/data/downloaded/guidance/berec/``: a
 """
 
 import re
-import time
 
 from bs4 import BeautifulSoup
 
-from ..lib.harvest import select_pending, walk_records
+from ..lib.harvest import paginated, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
-from ..lib.util import href, normalize_space
+from ..lib.net import fetcher, get_text, make_session
+from ..lib.util import english_date, href, normalize_space
 from .issuers import BEREC
 
 BASE = BEREC.base
@@ -230,24 +229,10 @@ def parse_leaf(leaf_html, url):
 # and as a machine-readable <time datetime> in the listing table. The listing's
 # is what a record takes; this reads the leaf's only to date a document whose
 # listing row carried no <time> at all.
-RE_LEAF_DATE = re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$")
-MONTHS_EN = {"january": 1, "february": 2, "march": 3, "april": 4, "may": 5,
-             "june": 6, "july": 7, "august": 8, "september": 9, "october": 10,
-             "november": 11, "december": 12}
-
-
 def _iso_date(cell):
     if cell is None:
         return None
-    match = RE_LEAF_DATE.match(normalize_space(cell.get_text()))
-    return "%s-%02d-%02d" % (match.group(3), MONTHS_EN[match.group(2).lower()],
-                             int(match.group(1))) if match else None
-
-
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
+    return english_date(normalize_space(cell.get_text()))
 
 
 def walk_listing(session, delay):
@@ -258,21 +243,19 @@ def walk_listing(session, delay):
     that has run past its last row serves the last page again rather than an
     empty one, and a walk that stopped on emptiness would loop (measured on
     another agency's library: 2,006 rows reported for 584 documents)."""
-    rows, seen, total = [], set(), None
-    for page in range(MAX_PAGES):
-        html_text = _fetch(session, "%s?page=%d" % (LISTING, page), delay)
+    total = None
+
+    def page_body(page):
+        nonlocal total
+        html_text = get_text(session, "%s?page=%d" % (LISTING, page), delay)
         if total is None:
             total = declared(html_text)
-        fresh = [row for row in listing_rows(html_text) if row["url"] not in seen]
-        if not fresh:
-            return rows, total
-        seen.update(row["url"] for row in fresh)
-        rows.extend(fresh)
-    raise ValueError("the BEREC guidelines pager ran past %d pages" % MAX_PAGES)
+        return html_text
 
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content
+    rows, _pages = paginated(page_body, listing_rows,
+                             lambda row: row["url"], cap=MAX_PAGES,
+                             what="BEREC guidelines register")
+    return rows, total
 
 
 def berec_sync(root, full=False, only=None, limit=None, delay=0.5):
@@ -305,7 +288,7 @@ def berec_sync(root, full=False, only=None, limit=None, delay=0.5):
         if reason:
             declined[reason] = declined.get(reason, 0) + 1
             continue
-        leaf = parse_leaf(_fetch(session, row["url"], delay), row["url"])
+        leaf = parse_leaf(get_text(session, row["url"], delay), row["url"])
         if leaf["nummer"] != row["nummer"]:
             # `raise`, not `assert`: this is the check whose absence would let
             # the harvest *succeed* with the document filed under a number that
@@ -335,7 +318,7 @@ def berec_sync(root, full=False, only=None, limit=None, delay=0.5):
             "antagen": row["datum"] or leaf["antagen"], "version": None,
             "konsultation_url": None, "amnesord": [],
             "source_url": row["url"], "dokument_url": leaf["dokument_url"],
-        }, _document_fetcher(session, leaf["dokument_url"])))
+        }, fetcher(session, leaf["dokument_url"], timeout=180)))
     print("berec: %d rows declared, %d walked -> %d riktlinjer; declined %s, "
           "%d rows whose register entry has no file, %d number collisions"
           % (total, len(rows), len(pending),

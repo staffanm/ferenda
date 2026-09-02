@@ -57,17 +57,15 @@ Stored per document under ``site/data/downloaded/guidance/esma/``: an
 """
 
 import re
-import tempfile
 import time
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
-from ..lib.harvest import select_pending, walk_records
+from ..lib.harvest import paginated, select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.net import fetcher, get_text, make_session, request
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, href, normalize_space
 from .issuers import ESMA
 
@@ -109,6 +107,11 @@ RE_COVER_RIKTLINJE = re.compile(
 # title. Reading further would find "riktlinjer" in the running text of every
 # slutrapport about one.
 COVER_LINES = 12
+
+# a bound on the pager, so a facet that never repeats itself cannot walk
+# forever. 33 pages of twenty today; the walk still ends on "this page named
+# nothing new", not on this.
+PAGE_CAP = 60
 
 
 def basefile(nummer):
@@ -292,10 +295,7 @@ def cover_names(cover_text, nummer):
 
 
 def _first_page(pdf_bytes):
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        return pdf_first_page_text(Path(tmp.name)) or ""
+    return pdf_first_page_text_bytes(pdf_bytes) or ""
 
 
 def known_documents(root):
@@ -306,19 +306,8 @@ def known_documents(root):
     directory = Path(root) / ESMA.kod
     if not directory.exists():
         return {}
-    return {record["dokument_url"]: (record["nummer"], record["sprak"])
-            for path in sorted(directory.glob("*.json*"))
-            if (record := compress.read_json(path)).get("dokument_url")}
-
-
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content
+    return stored_index(directory, "dokument_url",
+                        lambda record: (record["nummer"], record["sprak"]))
 
 
 def walk_library(session, delay):
@@ -327,16 +316,10 @@ def walk_library(session, delay):
     Stops on a page that names no row this walk has not seen, never on an empty
     one: a Drupal pager answers past its own end, and a walk that trusts the
     page count reports a corpus several times its real size."""
-    rows, seen, page = [], set(), 0
-    while True:
-        fresh = [row for row in library_rows(_fetch(session, listing_url(page),
-                                                    delay))
-                 if (row["reference"], row["source_url"]) not in seen]
-        if not fresh:
-            return rows, page
-        seen |= {(row["reference"], row["source_url"]) for row in fresh}
-        rows += fresh
-        page += 1
+    return paginated(
+        lambda page: get_text(session, listing_url(page), delay), library_rows,
+        lambda row: (row["reference"], row["source_url"]),
+        cap=PAGE_CAP, what="Esma library riktlinjer facet")
 
 
 def group_by_number(rows):
@@ -412,7 +395,7 @@ def esma_sync(root, full=False, only=None, limit=None, delay=0.5):
             "konsultation_url": None, "amnesord": original["amnesord"],
             "source_url": served["source_url"], "dokument_url": url,
         }, (lambda got=body: got) if body is not None
-            else _document_fetcher(session, url)))
+            else fetcher(session, url, timeout=180)))
     print("esma: %d listing pages, %d rows -> %d numbered documents, "
           "%d taken (%d sv, %d en), %d covers read of which %d print the "
           "library's number, declined: %s"

@@ -68,9 +68,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from ..lib import compress
-from ..lib.harvest import pdf_path, walk_records
+from ..lib.harvest import paginated, pdf_path, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import fetcher, make_session, request
 from ..lib.util import MONTHS_EN, href, normalize_space, record_path
 from .issuers import ENISA
 
@@ -235,26 +235,16 @@ def _fetch(session, url, delay):
                      % (url, EMPTY_BODY_RETRIES))
 
 
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=300).content
-
-
 def index_leaves(session, delay):
     """Every publication page the index names, in listing order, and the number
     of index pages walked."""
-    seen, order = set(), []
-    for page in range(INDEX_PAGES_MAX):
-        found = listing_leaves(_fetch(session, "%s?page=%d" % (INDEX, page),
-                                      delay))
-        assert page or found, \
-            "the ENISA publications index named no publications at all"
-        new = [leaf for leaf in found if leaf not in seen]
-        if not new:
-            return order, page + 1
-        seen.update(new)
-        order.extend(new)
-    raise ValueError("the ENISA publications pager still named new rows after "
-                     "%d pages" % INDEX_PAGES_MAX)
+    leaves, pages = paginated(
+        lambda page: _fetch(session, "%s?page=%d" % (INDEX, page), delay),
+        listing_leaves, cap=INDEX_PAGES_MAX, what="ENISA publications")
+    # an index whose first page names nothing is selector rot, not a corpus of
+    # none: every other page's emptiness is the walk's own stop signal
+    assert leaves, "the ENISA publications index named no publications at all"
+    return leaves, pages
 
 
 def _slugged(leaves):
@@ -322,7 +312,7 @@ def _pending(session, root, filed, only, full, delay, counts):
             "antagen": fields["antagen"], "version": None,
             "konsultation_url": None, "amnesord": fields["amnesord"],
             "source_url": url, "dokument_url": fields["dokument"],
-        }, _document_fetcher(session, fields["dokument"]))
+        }, fetcher(session, fields["dokument"], timeout=300))
 
 
 def enisa_sync(root, full=False, only=None, limit=None, delay=0.5):

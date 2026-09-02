@@ -15,7 +15,14 @@ import time
 from pathlib import Path
 
 from ..lib import compress
-from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    flat_path,
+    select_one,
+    walk,
+    write_record,
+)
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 
@@ -46,7 +53,7 @@ def make_api_session():
 
 
 def record_path(root, number):
-    return Path(root) / (str(number) + ".json")
+    return flat_path(root, str(number))
 
 
 def _changed(envelope):
@@ -111,9 +118,8 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     session = make_api_session()
     records = enumerate_treaties(session)
     if only:
-        record = next((r for r in records if r["number"] == str(only)), None)
-        if record is None:
-            raise ValueError("ICRC lists no treaty %s" % only)
+        record = select_one(records, lambda record: record["number"],
+                            str(only), "ICRC lists no treaty %s")
         return 1, int(resolve(session, root, record, full=full, delay=delay))
 
     # newest-changed first, so the watermark lookahead meets freshly-updated

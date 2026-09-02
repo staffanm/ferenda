@@ -57,7 +57,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ..lib import compress, layout, net
-from ..lib.harvest import HarvestWatermark, write_record
+from ..lib.harvest import HarvestWatermark, ItemKey, walk, write_record
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_session
 from ..lib.regeringen import (
@@ -596,6 +596,35 @@ def needs_harvest(root, typ, basefile):
     return not record.get("files")
 
 
+class ListingReporter(Reporter):
+    """The forarbete progress line. `harvest.walk` counts the items it has
+    walked, while the listing's own envelope states how many there are and
+    which page they came from -- so the line takes its total and page from the
+    envelope the walk is currently reading (`_listing_items` keeps them
+    current), and the ETA survives the walk not knowing the length up front."""
+
+    def __init__(self):
+        super().__init__()
+        self.total = None
+        self.page = None
+
+    def update(self, seen, total, **counts):
+        # `total` is what the walk knows (nothing: it is handed a lazy stream);
+        # the envelope's count and page number are what the line shows
+        super().update(seen, self.total, page=self.page, **counts)
+
+
+def _listing_items(pages, rep):
+    """One listing's pages flattened to the item stream `harvest.walk` walks,
+    reporting each page's envelope to `rep` as it goes. The stream is lazy, so
+    a listing that dies mid-walk raises *inside* the walk, where it becomes a
+    recorded Skip for this doctype instead of ending the run for the eight
+    others (`harvest.guarded_enumerate`)."""
+    for items, total, page in pages:
+        rep.total, rep.page = total, page
+        yield from items
+
+
 def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
          only=None):
     """Download the named types (default all).
@@ -614,12 +643,14 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
     document already on disk that falls past the watermark date boundary or
     when the look-ahead limit is reached.
     `only` (a basefile) downloads just that one document, walking the listing until
-    it is found (ignoring the on-disk stop and the watermark). Returns
-    {type: (seen, new)}."""
+    it is found (ignoring the on-disk stop and the watermark); an `only` no
+    listing walked carries is a typo or a document that has gone, and the run
+    says so rather than report itself clean. Returns {type: (seen, new)}."""
     session = make_session(USER_AGENT)
     totals = {}
-    rep = Reporter()
-    for typ in (types or list(TYPES)):
+    rep = ListingReporter()
+    walked = list(types or TYPES)
+    for typ in walked:
         harvest_start("forarbete %s" % typ,
                       "%s/rattsliga-dokument/%s/" % (BASE, TYPES[typ][0]))
         marker = Path(root) / typ / ".complete"
@@ -635,76 +666,40 @@ def sync(root, types=None, full=False, limit=None, delay=0.5, log=print,
         # an edited item near the top; 20 consecutive hits / 14 days of slack
         # absorb those bumps without deep re-walks.
         watermark = HarvestWatermark(watermark_path, lookahead_limit=20, safety_days=14)
-        # a crashed run leaves {"last_harvest": null, "dirty": true}: still a
-        # backfill, so key on the date, not on the file existing
-        backfill = full or watermark.last_harvest is None
-        seen = new = errors = 0
-        done = False
-        newest_date = None
-        if only is None:
-            watermark.begin()
-        for items, total, page in iter_listing(session, typ, delay, log=log):
-            for item in items:
-                seen += 1
-                if only is not None:
-                    if item["basefile"] != only:
-                        continue
-                    new, done = (1 if download_document(session, root, item, delay, log)
-                                 else 0), True
-                    break
 
-                if newest_date is None and item.get("date"):
-                    newest_date = item["date"]
+        def item_key(item, typ=typ):
+            # `so` items whose SÖ number isn't in the listing text carry
+            # basefile None (the landing settles it); they can't match an
+            # on-disk record, so they're never skipped -- the landing check in
+            # download_document dedups/rejects them instead.
+            return ItemKey(item["basefile"],
+                           item["basefile"] is not None
+                           and not needs_harvest(root, typ, item["basefile"]),
+                           date=item.get("date"))
 
-                # `so` items whose SÖ number isn't in the listing text carry
-                # basefile None (the landing settles it); they can't match an
-                # on-disk record, so they're never skipped -- the landing check in
-                # download_document dedups/rejects them instead.
-                is_downloaded = (item["basefile"] is not None
-                                 and not needs_harvest(root, typ, item["basefile"]))
-                if not backfill:
-                    if watermark.should_stop(is_downloaded, item.get("date")):
-                        done = True
-                        break
-                if is_downloaded:
-                    continue
+        # `--full` here means "walk the whole listing again", never "fetch it
+        # all again": a regeringen document is fixed once published, and
+        # re-resolving would refetch every landing page and file of 30 000
+        # documents to store bytes already on disk (harvest.walk's `deep`).
+        result = walk(_listing_items(iter_listing(session, typ, delay, log=log),
+                                     rep),
+                      resolve=lambda item: download_document(session, root, item,
+                                                             delay, log),
+                      item_key=item_key, watermark=watermark, deep=full,
+                      only=only, limit=limit, scope=typ, log=log, reporter=rep)
 
-                try:
-                    if download_document(session, root, item, delay, log):
-                        new += 1
-                except requests.HTTPError as exc:
-                    errors += 1
-                    log("  %s %s: %s" % (typ, item["url"], exc))
-                if limit and new >= limit:
-                    done = True
-                    break
-            rep.update(seen, total, scope=typ, page=page, new=new)
-            if done:
-                break
-
-        if only is None:
-            truncated = bool(limit) and new >= limit
-            if not truncated:
-                # complete() advances the date even with errors (the
-                # date-conclusive stop bounds how deep future runs walk, so a
-                # permanently-broken document never forces ever-deeper
-                # re-walks), but a per-doc failure or a zero-item walk
-                # (indistinguishable from selector rot) leaves the store
-                # dirty: the next run walks past the consecutive-hit stop
-                # down to the date boundary and retries what was stranded.
-                watermark.complete(newest_date,
-                                   errors=errors if errors else int(seen == 0),
-                                   log=log)
-            # a --limit-truncated run just leaves the dirty flag begin() set --
-            # the un-fetched backlog below the cap is re-walked next run
-
-        rep.done()
-        if errors:
+        if result.errors:
             log("  %s: %d download error(s) -- the store stays dirty, so the "
                 "next run re-walks down to the watermark boundary and retries "
-                "them (--only <basefile> forces one now)" % (typ, errors))
+                "them (--only <basefile> forces one now)" % (typ, result.errors))
         # summary right after this type's own start line + progress, so each
         # subtype reads as one self-contained block (not all summaries at the end)
-        log("forarbete %s: %d seen, %d new" % (typ, seen, new))
-        totals[typ] = (seen, new)
+        log("forarbete %s: %d seen, %d new" % (typ, result.seen, result.new))
+        totals[typ] = (result.seen, result.new)
+    if only is not None and not any(new for _, new in totals.values()):
+        # user-typed --only: load-bearing validation raises, never asserts --
+        # without this the run walks every listing to the bottom and reports a
+        # clean "0 new", which reads as "nothing to do", not as a typo
+        raise ValueError("--only %s names no document in the forarbete "
+                         "listings walked (%s)" % (only, ", ".join(walked)))
     return totals

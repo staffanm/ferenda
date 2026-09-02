@@ -54,7 +54,8 @@ fetch: it is not part of any incremental build and no other phase depends on it.
 import time
 from pathlib import Path
 
-from ..lib import compress, layout, util
+from ..lib import compress, layout
+from ..lib.harvest import fetch_worklist
 from ..lib.net import BROWSER_UA, make_session, request
 
 TYPE = "prop"
@@ -113,14 +114,6 @@ def sync(root, limit=None, delay=0.5):
     worklist = [r for r in (compress.read_json(p)
                             for p in sorted(compress.glob(Path(root) / TYPE, "*/*.json")))
                 if wanted(r)]
-    rep = util.Reporter()
-    seen = fetched = 0
-    for record in worklist:
-        seen += 1
-        if download_one(session, root, record, delay):
-            fetched += 1
-        rep.update(seen, len(worklist), scope="propkb", fetched=fetched)
-        if limit and fetched >= limit:
-            break
-    rep.done()
-    return seen, fetched
+    return fetch_worklist(
+        worklist, lambda record: download_one(session, root, record, delay),
+        scope="propkb", limit=limit)

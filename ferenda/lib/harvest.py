@@ -23,15 +23,27 @@ un-fetched records. This module is the one hardened mechanism they share:
   * :class:`Skip` / :func:`guarded_enumerate` -- an enumeration hole (a flaky
     index page) becomes a recorded Skip that withholds a clean completion,
     instead of aborting the run or being lost.
+  * :func:`paginated` -- the walk over a ``?page=N`` listing view, which ends
+    on a page that names no row the walk has not seen. A Drupal view serves
+    its last page again past its end, so stopping on an *empty* page never
+    stops (six agency libraries in guidance grew this loop).
   * :func:`record_unchanged` / :func:`write_record` / :func:`store_record` --
     the harvest record on disk. Rewriting a record that has not changed would
     re-stale the whole downstream parse for nothing, so every downloader
     compares before writing; this is that comparison, once.
+  * :func:`flat_path` / :func:`select_one` -- the flat store the treaty and
+    case-law sources keep (the file name is the basefile), and the ``--only``
+    guard over the enumeration such a source has just read.
   * :func:`pdf_path` / :func:`page_path` / :func:`select_pending` /
     :func:`walk_records` -- the whole download half of a source whose upstream
     is a short, complete listing of records that each name one document (edpb,
     rs): where the record and its document go, how ``--only`` narrows the
     listing, and the walk that stores both.
+  * :func:`fetch_worklist` -- the repair pass over an enumerated work-list
+    (the bodies a harvested record still lacks), on one progress line.
+  * :func:`issue_walk` -- the whole download half of a source published in
+    *issues*: a journal's archive names its issues, each issue names its
+    articles, and the walk stops once the newest issues are on disk in full.
   * :func:`fan_out` / :func:`dispatch_scopes` -- one harvest per scope of a
     multi-scope source (its agencies, organs or series), concurrently across
     the separate hosts, each runner pacing its own. With ``strict=False`` a
@@ -54,11 +66,21 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Any, Callable, Container, Iterable, Iterator, Mapping, Sequence
+from typing import (
+    Any,
+    Callable,
+    Container,
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 
 from . import compress, net
 from .util import (
     Reporter,
+    approximate_date,
     basefile_slug,
     confine,
     document_extension,
@@ -200,20 +222,33 @@ class ItemKey:
     """What :func:`walk` needs to read off one enumerated item to place it: its
     stable ``basefile`` (for ``--only`` matching and logging), whether it is
     already on disk, and its own publication ``date`` (ISO, drives the
-    watermark's date-conclusive stop; None when the item carries no date)."""
+    watermark's date-conclusive stop; None when the item carries no date).
+
+    ``provisional`` splits "on disk" from "evidence of having caught up", for
+    an upstream that lists a document before it publishes it. Such a
+    placeholder record is current -- the walk must not re-fetch it -- but it is
+    no proof the walk has reached the caught-up depth, because its date is the
+    *planned* one and can post-date documents published since the last harvest
+    (riksdagen lists a betänkande's planned debate before the printed report
+    exists). ``is_downloaded`` therefore stays "on disk AND conclusive": it
+    alone feeds the watermark gate, while either bit means "do not fetch"."""
     basefile: str
     is_downloaded: bool
     date: str | None = None
+    provisional: bool = False
 
 
 @dataclass
 class WalkResult:
     """The tally of one :func:`walk`: items enumerated, items newly fetched (or
-    changed), per-doc errors, and enumeration Skips."""
+    changed), per-doc errors, enumeration Skips, and the newest date the walk
+    saw (the watermark date it saved, or the one a caller that drives its own
+    watermark over several walks needs back)."""
     seen: int
     new: int
     errors: int
     skips: int
+    newest_date: str | None = None
 
 
 def guarded_enumerate(items: Iterable[Any], log: Callable[[str], Any] = print) -> Iterator[Any]:
@@ -239,8 +274,9 @@ def guarded_enumerate(items: Iterable[Any], log: Callable[[str], Any] = print) -
 def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
          item_key: Callable[[Any], ItemKey | None],
          watermark: HarvestWatermark | None,
-         full: bool = False, only: str | None = None, limit: int | None = None,
-         budget: float | None = None,
+         full: bool = False, deep: bool = False, only: str | None = None,
+         limit: int | None = None, budget: float | None = None,
+         dates_watermark: Callable[[Any], bool] = lambda item: True,
          scope: str = "", count_label: str = "new", total: int | None = None,
          log: Callable[[str], Any] = print, reporter: Reporter | None = None) -> WalkResult:
     """Run the shared newest-first download loop over ``items``.
@@ -252,6 +288,20 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     wrote something new/changed (counted into ``new``). ``full`` re-resolves
     items already on disk; ``only`` fetches just the one matching basefile;
     ``limit`` caps the number of new fetches.
+
+    ``deep`` walks the whole listing without re-resolving anything -- what a
+    source means by ``--full`` when its documents never change once published
+    and its listing runs to tens of thousands of them (forarbete): the point is
+    to reach everything the incremental stop has been skipping past, not to
+    fetch the corpus again. ``full`` implies it.
+
+    ``dates_watermark`` says which items may advance the watermark date, which
+    is otherwise the newest date any item carried. An upstream that lists a
+    document *before* it publishes it dates that entry by its planned debate,
+    in the future: saving that as "how far we have caught up" would erode the
+    safety margin, so the source passes a predicate that names the published
+    items (see :class:`ItemKey`'s ``provisional`` for the same split applied to
+    the stop signal).
 
     ``budget`` (seconds) is the sanity trip for the routine case: an
     *incremental* run still walking past it stops as if ``--limit``-truncated
@@ -277,7 +327,7 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
     current* (:func:`record_unchanged`), not merely whether some file exists, so
     an upstream metadata edit is picked up while an unchanged entry costs
     nothing. Returns a :class:`WalkResult`."""
-    backfill = full or watermark is None or watermark.last_harvest is None
+    backfill = full or deep or watermark is None or watermark.last_harvest is None
     rep = reporter or Reporter()
     seen = new = errors = skips = 0
     newest_date: str | None = None
@@ -311,13 +361,13 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
             new = 1
             break
 
-        if key.date:
+        if key.date and dates_watermark(item):
             newest_date = key.date if newest_date is None else max(newest_date, key.date)
 
         if not backfill and watermark.should_stop(key.is_downloaded, key.date):
             break                             # (watermark is not None here:
                                               #  backfill is True without one)
-        if key.is_downloaded and not full:
+        if (key.is_downloaded or key.provisional) and not full:
             continue                          # on disk already; --full re-resolves
 
         try:
@@ -344,7 +394,51 @@ def walk(items: Iterable[Any], *, resolve: Callable[[Any], object],
         # a truncated run just leaves the dirty flag begin() set -- the un-fetched
         # backlog below the cap is retried (past the consecutive-hit stop) next run
 
-    return WalkResult(seen, new, errors, skips)
+    return WalkResult(seen, new, errors, skips, newest_date)
+
+
+# --------------------------------------------------------------------------
+# a paged listing view
+# --------------------------------------------------------------------------
+
+def paginated(fetch_page: Callable[[int], str], rows: Callable[[str], list],
+              key: Callable[[Any], Hashable] = lambda r: r, *,
+              cap: int, what: str = "listing") -> tuple[list, int]:
+    """Walk a ``?page=N`` view until a page names no row the walk has not seen
+    -- never until a page is empty: a Drupal pager serves its last page again.
+
+    Returns ``(every row in listing order, how many pages were fetched)``. The
+    stop page counts: the walk had to read it to learn it was the end.
+
+    A view that stopped on emptiness would loop instead of ending, since past
+    its last row the site keeps serving the view shell rather than a 404
+    (measured on one agency's library: 2,006 rows reported for 584 documents).
+    The same rule also absorbs the other way a Drupal view repeats itself --
+    rows shifting between pages while the walk runs, because the view sorts by
+    publication date and the agency inserts into it.
+
+    `rows` reads one page body into its rows and `key` reads one row's
+    identity, defaulting to the row itself for a listing whose rows are their
+    own URLs. A row already seen is dropped, so a shifted row is not filed
+    twice.
+
+    `cap` is required: an un-capped walk over a pager that never repeats is a
+    hang, so the walk raises after `cap` pages. `what` is the source's own noun
+    for the listing, for that message."""
+    found: list = []
+    seen: set[Hashable] = set()
+    for page in range(cap):
+        fresh = [row for row in rows(fetch_page(page)) if key(row) not in seen]
+        if not fresh:
+            return found, page + 1
+        seen.update(key(row) for row in fresh)
+        found.extend(fresh)
+    # a pager that never repeats is a changed site, not a large corpus, and the
+    # walk must say so rather than crawl on (rule:errors-drive-retry-use-raise:
+    # under -O an assert here would let the harvest run unbounded)
+    raise ValueError("the %s pager still named new rows after %d pages "
+                     "(%d so far) -- it no longer terminates"
+                     % (what, cap, len(found)))
 
 
 # --------------------------------------------------------------------------
@@ -383,6 +477,29 @@ def store_record(path: Path, record: dict, *companions: Path,
         return False
     write_record(path, record)
     return True
+
+
+def stored_index(directory: Path, key: str, value: Callable[[dict], Any],
+                 document: Callable[[dict], Path] | None = None) -> dict[Any, Any]:
+    """``{record[key]: value(record)}`` over the records already stored in
+    `directory` -- what a harvest asks before it fetches anything, so a document
+    it has already read is not read again.
+
+    Records that carry no `key` are skipped, which is how a source with more
+    than one kind of record picks out the ones this index is about. The listing
+    is `compress.glob`, so a record stored as ``.json.br`` is seen like any
+    other (rule:second-use-goes-to-lib: acer, edps, eiopa, esma and rs each had
+    this loop).
+
+    `document` names one record's document file, and drops the record when that
+    file is not on disk. A source whose record is only an assertion *about* a
+    document (easa: the record says which annex a leaf holds, the annex PDF is
+    the document) must not skip a leaf whose PDF never stored -- the run would
+    report it known and never fetch it again."""
+    return {record[key]: value(record)
+            for path in sorted(compress.glob(directory, "*.json"))
+            if (record := compress.read_json(path)).get(key)
+            and (document is None or compress.exists(document(record)))}
 
 
 def document_item_key(record: dict, record_file: Path, *documents: Path,
@@ -431,6 +548,38 @@ def resolve_document(record: dict, record_file: Path, document_file: Path,
 #: one listing entry: the record to store, and how to fetch the document it
 #: names (None where it names none)
 Pending = tuple[dict, Callable[[], bytes | str] | None]
+
+
+def flat_path(root: Path | str, basefile: str, suffix: str = ".json") -> Path:
+    """One file in a *flat* harvest store, where the file name IS the basefile
+    ("001-58876" -> ``<root>/001-58876.json``).
+
+    The treaty and case-law sources (coe, icrc, icc, icj, untc, hudoc) file
+    every document of theirs in one directory under an identifier the publisher
+    already made unique -- an item id, a treaty number, a document number -- so
+    there is no subdirectory to place it in and nothing to slug. That is what
+    :func:`compress.list_stems` reads back, and what makes `list_basefiles` a
+    directory listing rather than a walk that opens every record."""
+    return Path(root) / confine(Path(basefile + suffix), basefile, str(root))
+
+
+def select_one(records: Sequence[Any], key_of: Callable[[Any], Any],
+               only: Any, missing: str) -> Any:
+    """The one record `only` names by `key_of`, for a source whose ``--only``
+    picks out of an enumeration it has just read.
+
+    `missing` is the source's own message for "the listing carries no such
+    document", %-formatted with `only` -- an ``--only`` that names nothing is a
+    typo or a document that has gone, and either way the run has nothing to do
+    and says which. The caller normalises `only` into the form `key_of`
+    returns, so the message names the identifier actually looked for."""
+    record = next((record for record in records if key_of(record) == only),
+                  None)
+    if record is None:
+        # user-typed --only: load-bearing validation raises, never asserts --
+        # under python -O an assert here made the run a silent "0 seen" no-op
+        raise ValueError(missing % only)
+    return record
 
 
 def pdf_path(root: Path | str, basefile: str) -> Path:
@@ -585,6 +734,120 @@ def walk_records(root: Path | str, pending: Iterable[Pending | Skip], *,
     result = walk(pending, resolve=resolve, item_key=item_key, watermark=None,
                   full=full, limit=limit, scope=scope, count_label="changed",
                   total=total)
+    return result.seen, result.new
+
+
+# --------------------------------------------------------------------------
+# a fully enumerated work-list
+# --------------------------------------------------------------------------
+
+def fetch_worklist(worklist: Sequence[Any], fetch: Callable[[Any], object], *,
+                   scope: str, limit: int | None = None,
+                   count_label: str = "fetched",
+                   reporter: Reporter | None = None) -> tuple[int, int]:
+    """Fetch every item of an already enumerated `worklist`, counting what it
+    stored, on one live progress line. Returns ``(seen, fetched)``.
+
+    This is the *repair* pass, not the harvest: the documents are known and on
+    the catalog already, and what is missing is their bodies (the KB scans
+    behind the pre-1971 propositioner, the SOU facsimiles, the riksdagen prop
+    bodies). There is nothing to enumerate incrementally and no watermark to
+    keep -- an item whose body is on disk is simply not on the list, which is
+    what makes an interrupted run resumable by re-running it.
+
+    The list is materialised up front so the line carries a real total and an
+    ETA (rule:one-line-progress). `fetch` stores one item and returns a truthy
+    value when it wrote something; `limit` stops the run after that many items
+    actually fetched (a test slice), leaving the rest for the next run."""
+    rep = reporter or Reporter()
+    seen = fetched = 0
+    for item in worklist:
+        seen += 1
+        if fetch(item):
+            fetched += 1
+        rep.update(seen, len(worklist), scope=scope, **{count_label: fetched})
+        if limit and fetched >= limit:
+            break
+    rep.done()
+    return seen, fetched
+
+
+# --------------------------------------------------------------------------
+# an archive published in issues
+# --------------------------------------------------------------------------
+
+def issue_walk(root: Path | str, scope: str, issues: Iterable[Any],
+               records: Callable[[Any], Iterable[Any]], *,
+               body: Callable[[dict], Callable[[], bytes | str] | None],
+               missing: str, delay: float, full: bool = False,
+               only: str | None = None, limit: int | None = None,
+               document: Callable[[Path | str, str], Path] = pdf_path,
+               verify: Callable[[bytes | str], None] = verify_pdf,
+               date: Callable[[dict], str | None] =
+               lambda record: approximate_date(record["year"]),
+               ) -> tuple[int, int]:
+    """Harvest an archive whose upstream is a listing of *issues*, each naming
+    the records it holds, newest issue first. Returns ``(seen, new)``.
+
+    This is the periodical's shape: a journal's archive page names its issues,
+    each issue page names its articles, and each article is one record plus one
+    document (a PDF, or the article's own web page). The archive runs back
+    decades and nothing in it changes once published, so the walk is
+    :func:`walk` with a watermark: a run whose newest issues are on disk in
+    full has caught up and stops there, and the backlist behind it is never
+    re-read. `issues` is anything the source enumerates, in the order it wants
+    walked -- an issue handle, a year page, one article's own page -- and
+    `records` reads one of them into its records (or into a :class:`Skip`, for
+    an issue page the upstream failed to serve).
+
+    `body` says how to fetch one record's document, and returns None for a
+    record that names none (an article the journal lists but publishes on
+    paper only): the record alone is then that entry's state, exactly as in
+    :func:`walk_records`. `document` and `verify` say where the document goes
+    and what it must be -- :func:`pdf_path`/:func:`verify_pdf` for a journal
+    that publishes PDFs, :func:`page_path` and a :func:`page_verifier` for one
+    that publishes its articles as pages.
+
+    `date` is what dates a record for the watermark; the default reads the
+    year the journal states, since a journal dates by issue and not by day.
+
+    `only` narrows to the one basefile, watermark untouched, and raises
+    `missing` (%-formatted with `only`) when the walk met no such record --
+    the same load-bearing validation as :func:`select_pending`, which an
+    ``--only`` run of a lazy walk cannot make against a materialised list. The
+    source narrows `issues` itself where its basefile names its issue, so
+    ``--only`` costs one issue page rather than the whole archive."""
+    # a journal's issues are months apart and its archive is deep, so a short
+    # run of hits is already conclusive while the date window must be generous
+    watermark = HarvestWatermark(Path(root) / scope / ".watermark.json",
+                                 lookahead_limit=3, safety_days=30)
+
+    def item_key(record: dict) -> ItemKey:
+        basefile = record["basefile"]
+        return document_item_key(
+            record, record_path(root, scope, basefile),
+            # a record whose document the journal never published is current on
+            # its own; one that names a document is not current without it
+            *((document(root, basefile),) if body(record) is not None else ()),
+            date=date(record))
+
+    def resolve(record: dict) -> bool:
+        basefile = record["basefile"]
+        return resolve_document(record, record_path(root, scope, basefile),
+                                document(root, basefile), body(record), verify,
+                                full=full, delay=delay)
+
+    def stream() -> Iterator[Any]:
+        for issue in issues:
+            yield from records(issue)
+
+    result = walk(stream(), resolve=resolve, item_key=item_key,
+                  watermark=watermark, full=full, limit=limit, only=only,
+                  scope=scope)
+    if only is not None and result.new == 0:
+        # user-typed --only: load-bearing validation raises, never asserts --
+        # under python -O an assert here made the run a silent "0 seen" no-op
+        raise ValueError(missing % only)
     return result.seen, result.new
 
 

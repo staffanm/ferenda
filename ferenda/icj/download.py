@@ -25,7 +25,15 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from ..lib import browser, compress
-from ..lib.harvest import HarvestWatermark, ItemKey, verify_pdf, walk, write_record
+from ..lib.harvest import (
+    HarvestWatermark,
+    ItemKey,
+    flat_path,
+    select_one,
+    verify_pdf,
+    walk,
+    write_record,
+)
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from ..lib.util import normalize_space
@@ -61,11 +69,11 @@ def in_scope(row):
 
 
 def record_path(root, basefile):
-    return Path(root) / (basefile + ".json")
+    return flat_path(root, basefile)
 
 
 def body_path(root, basefile):
-    return Path(root) / (basefile + ".pdf")
+    return flat_path(root, basefile, ".pdf")
 
 
 def list_basefiles(root):
@@ -190,10 +198,8 @@ def sync(root, full=False, only=None, limit=None, delay=0.3, log=print):
     root = Path(root)
     records = enumerate_decisions(make_session(USER_AGENT))
     if only:
-        record = next((r for r in records if r["basefile"] == only), None)
-        if record is None:
-            raise ValueError("ICJ lists no in-scope decision %s" % only)
-        records = [record]
+        records = [select_one(records, lambda record: record["basefile"],
+                              only, "ICJ lists no in-scope decision %s")]
 
     watermark = HarvestWatermark(root / ".watermark.json",
                                  lookahead_limit=30, safety_days=30)

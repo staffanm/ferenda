@@ -12,6 +12,7 @@ from ferenda.lib.harvest import (
     Skip,
     dispatch_scopes,
     fan_out,
+    paginated,
     pdf_path,
     select_pending,
     walk,
@@ -430,6 +431,47 @@ def test_walk_records_full_refetches_and_rewrites(tmp_path):
         tmp_path, [(record, lambda: fetched.append(1) or b"%PDF-1.7 b")],
         delay=0, full=True) == (1, 1)
     assert fetched == [1]
+
+
+def _pager(pages):
+    """Serve `pages` (a page body per ?page=N, its rows space-separated) and
+    repeat the last one for ever after -- what a Drupal view does past its own
+    end."""
+    return lambda page: pages[min(page, len(pages) - 1)]
+
+
+def test_paginated_stops_on_a_page_that_names_nothing_new():
+    # page 1 repeats one of page 0's rows (the view sorts by date and the
+    # publisher inserts into it), and page 2 is the last one served again
+    rows, pages = paginated(_pager(["a b", "b c", "c"]), str.split,
+                            cap=40, what="fake")
+    assert rows == ["a", "b", "c"]
+    assert pages == 3               # the stop page was fetched to learn it ends
+
+
+def test_paginated_counts_an_empty_first_page_as_one_page_of_nothing():
+    assert paginated(_pager([""]), str.split, cap=40, what="fake") == ([], 1)
+
+
+def test_paginated_refuses_a_pager_that_never_repeats():
+    # an un-capped walk over a pager that keeps naming new rows is a hang
+    with pytest.raises(ValueError, match="no longer terminates"):
+        paginated(lambda page: "row-%d" % page, str.split, cap=7, what="fake")
+
+
+def test_paginated_keys_rows_by_their_identity():
+    # rows that are records, not their own urls: two pages that name the same
+    # article file it once
+    def cells(body):
+        return [dict(zip(("reference", "source_url"), pair.split(":"),
+                         strict=True))
+                for pair in body.split()]
+
+    rows, pages = paginated(_pager(["1:x", "1:x 2:y"]), cells,
+                            lambda row: (row["reference"], row["source_url"]),
+                            cap=40, what="fake")
+    assert [row["reference"] for row in rows] == ["1", "2"]
+    assert pages == 3
 
 
 def test_select_pending_narrows_to_one_basefile():

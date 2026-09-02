@@ -341,6 +341,55 @@ def test_sync_limit_truncation_leaves_store_dirty(tmp_path, monkeypatch):
     assert state["dirty"] is True                    # backlog below the cap remains
 
 
+def _one_prop(basefile="2025/26:279", date="2026-06-09"):
+    return {"type": "prop", "basefile": basefile, "date": date,
+            "identifier": "Prop. " + basefile, "url": "http://example.com/1"}
+
+
+def test_sync_only_that_names_no_document_raises(tmp_path, monkeypatch):
+    """An `--only` the listings do not carry is a typo or a document that has
+    gone. Without the guard the run walks every listing to the bottom and
+    reports a clean "0 new", which reads as "nothing to do"."""
+    monkeypatch.setattr(download, "iter_listing",
+                        lambda session, typ, delay, log=None: [([_one_prop()], 1, 1)])
+    monkeypatch.setattr(download, "download_document",
+                        lambda *a, **kw: pytest.fail("nothing should be fetched"))
+    with pytest.raises(ValueError, match="--only prop/1999:1 names no document"):
+        download.sync(tmp_path, types=["prop"], delay=0, only="prop/1999:1")
+
+
+def test_sync_a_broken_listing_does_not_stop_the_next_doctype(tmp_path, monkeypatch):
+    """`iter_listing` raises on a truncated listing (rule:fail-fast). That
+    raise used to escape the per-doctype loop, so one broken listing skipped
+    the eight doctypes below it; inside the walk it is a recorded Skip that
+    leaves prop's store dirty and lets ds run."""
+    def listings(session, typ, delay, log=None):
+        if typ == "prop":
+            raise ValueError("prop: listing page 1 is empty but TotalCount=4352")
+        yield ([{"type": "ds", "basefile": "2026:5", "identifier": "Ds 2026:5",
+                 "date": "2026-05-01", "url": "http://example.com/2"}], 1, 1)
+
+    downloads = []
+
+    def mock_download_document(session, root, item, delay, log=print):
+        downloads.append(item["basefile"])
+        write_atomic(layout.fa_record_file(root, item["type"], item["basefile"]),
+                     json.dumps({"type": item["type"], "files": ["x.pdf"]}))
+        return {"basefile": item["basefile"]}
+
+    monkeypatch.setattr(download, "iter_listing", listings)
+    monkeypatch.setattr(download, "download_document", mock_download_document)
+    logged = []
+    totals = download.sync(tmp_path, types=["prop", "ds"], delay=0,
+                           log=logged.append)
+    assert totals == {"prop": (0, 0), "ds": (1, 1)}
+    assert downloads == ["2026:5"]
+    assert any("TotalCount=4352" in line for line in logged)
+    # the missed listing is retried: prop's store is left dirty
+    assert json.loads(
+        (tmp_path / "prop" / ".watermark.json").read_text())["dirty"] is True
+
+
 # --------------------------------------------------------------------------
 # walk termination keys on the RAW item count, not the type-filtered one:
 # category 1325 mixes ds and pm, so a page consisting entirely of the sibling

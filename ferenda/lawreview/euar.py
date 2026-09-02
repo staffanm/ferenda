@@ -31,15 +31,13 @@ no record, and the run stays clean around it.
 
 import re
 import time
-from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import normalize_space
 from .journals import EUAR
 
 __all__ = ["euar_sync"]
@@ -208,65 +206,36 @@ def euar_sync(root, full=False, only=None, limit=None, delay=0.5):
     session = net.make_session(net.BROWSER_UA)
     issues = _euar_issues(session)
     if only:
+        # the basefile names its own issue, so an --only run reads that one
+        # issue page instead of the archive
         parts = only.split("/", 1)[1].split("-")
         year, issue = parts[0], "-".join(parts[1:-1])
         issues = [u for u in issues
                   if _euar_issue_code(u) == (issue, year)]
-        pending = []
-        for url in issues:
-            # the named issue is the whole run: a page that is gone (the
-            # journal has taken it offline) fails the run loud
-            html = net.request(session, "GET", url).text
-            time.sleep(delay)
-            for r in _euar_records_from_page(html, url):
-                u = r["document_url"]
-                pending.append(
-                    (r, (lambda u=u: net.request(session, "GET", u).text)))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the euar index carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="euar",
-            document=harvest.page_path, verify=verify_page)
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "euar" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
     # newest issue first: a caught-up run proves its newest issues are
     # complete and stops, and the archive behind it is never re-read
     issues.sort(key=_euar_sort_key, reverse=True)
 
-    def items():
-        for url in issues:
-            try:
-                html = net.request(session, "GET", url).text
-            except requests.exceptions.HTTPError as exc:
-                # the journal has taken an issue page offline: one dead
-                # page must not stop the sweep over the rest, and the skip
-                # is the record of the miss (the index still lists the
-                # issue, so the store stays dirty until the walk runs
-                # clean)
-                if exc.response is None or exc.response.status_code != 404:
-                    raise
-                yield harvest.Skip("euar %s is gone (HTTP 404)" % url)
-                continue
-            time.sleep(delay)
-            yield from _euar_records_from_page(html, url)
+    def records(url):
+        try:
+            html = net.request(session, "GET", url).text
+        except requests.exceptions.HTTPError as exc:
+            # the journal has taken an issue page offline: one dead page
+            # must not stop the sweep over the rest, and the skip is the
+            # record of the miss (the index still lists the issue, so the
+            # store stays dirty until the walk runs clean). An --only run
+            # of a dead issue ends red on its own: the walk meets the named
+            # article nowhere
+            if exc.response is None or exc.response.status_code != 404:
+                raise
+            return [harvest.Skip("euar %s is gone (HTTP 404)" % url)]
+        time.sleep(delay)
+        return _euar_records_from_page(html, url)
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "euar", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            # the journal states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "euar", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            lambda: net.request(session, "GET",
-                                record["document_url"]).text,
-            verify_page, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="euar")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "euar", issues, records,
+        body=lambda record: (lambda: net.request(
+            session, "GET", record["document_url"]).text),
+        missing="the euar index carries no article %s",
+        document=harvest.page_path, verify=verify_page,
+        delay=delay, full=full, only=only, limit=limit)

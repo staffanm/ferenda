@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from ferenda.build import SOURCE_RENDERERS, UNSEARCHED
+from ferenda.build import SOURCES
 from ferenda.lawreview import download, euar, ft, lod, njel, nmt, parse, siplr, urt
 from ferenda.lawreview.journals import BY_KOD, JOURNALS
 from ferenda.lawreview.model import Artikel
@@ -481,6 +481,29 @@ class TestFtSync:
                           .read_text(encoding="utf-8"))
         assert mark["dirty"] is False
         assert mark["last_harvest"]
+
+    def test_only_reads_the_named_issue_and_leaves_the_watermark(
+            self, monkeypatch, tmp_path):
+        # the basefile names its own issue, so an --only run reads the
+        # archive page and that one issue page, and stores that one document
+        made = []
+        self._request(monkeypatch, made)
+        seen, new = ft.ft_sync(tmp_path, delay=0, only="ft/2026-1-01")
+        assert new == 1
+        assert made == [ft.FT.listings[0],
+                        "https://www.forvaltningsrattslig.org/Journal/31",
+                        "https://www.forvaltningsrattslig.org/"
+                        "Articles/downloadopenaccess/311.pdf"]
+        assert not (tmp_path / "ft" / ".watermark.json").exists()
+
+    def test_only_that_names_no_article_raises(self, monkeypatch, tmp_path):
+        # an --only the archive carries no article for is a typo or an
+        # article that has gone: the run says which rather than store
+        # nothing and report itself clean
+        self._request(monkeypatch, [])
+        with pytest.raises(ValueError,
+                           match="the ft archive carries no article"):
+            ft.ft_sync(tmp_path, delay=0, only="ft/2026-1-09")
 
 
 # --------------------------------------------------------------------------
@@ -1695,7 +1718,7 @@ class TestParse:
             json.dumps(rec), encoding="utf-8")
         art = parse.parse("siplr/2024-2-07", tmp_path)
         assert art["identifier"] == "SIPLR 2024 #2-07"
-        assert art["structure"] == []
+        assert "structure" not in art      # prune() drops the empty list
 
     def test_lod_parse(self, tmp_path):
         root = tmp_path / "lod"
@@ -1796,12 +1819,12 @@ class TestRailContract:
     breach, so the wiring is pinned here rather than by eyeball."""
 
     def test_no_page_tree_frontpage_feed_or_index_of_its_own(self):
-        assert "lawreview" not in SOURCE_RENDERERS          # no page of its own
+        assert SOURCES["lawreview"].render is None          # no page of its own
         assert "lawreview" not in render.SOURCE_ORDER       # not on the frontpage
         assert "lawreview" not in facets.SCHEMES            # no browse tree
         assert "lawreview" not in facets.SOURCE_LABELS
         assert "lawreview" not in feeds.BY_SOURCE           # no feed
-        assert "lawreview" in UNSEARCHED                    # no search hits
+        assert SOURCES["lawreview"].searchable is False     # no search hits
 
     def test_the_rail_line_links_to_the_journal_page(self):
         # the line names the article with its short_id and author, and the

@@ -59,18 +59,16 @@ Stored per document under ``site/data/downloaded/guidance/acer/``: an
 """
 
 import re
-import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
-from ..lib.harvest import select_pending, walk_records
+from ..lib.harvest import select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.net import fetcher, get_text, make_session
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     document_extension,
     english_date,
@@ -259,10 +257,7 @@ def cover_text(pdf_bytes):
     publishing date."""
     if document_extension(pdf_bytes) != ".pdf":
         return None
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        return pdf_first_page_text(Path(tmp.name), pages=2)
+    return pdf_first_page_text_bytes(pdf_bytes, pages=2)
 
 
 def cover_numbers(text):
@@ -312,11 +307,9 @@ def stored_documents(root):
     directory = Path(root) / ACER.kod
     if not directory.exists():
         return {}
-    return {record["dokument_url"]: (record["basefile"], record["nummer"],
-                                     record["antagen"])
-            for record in (compress.read_json(path)
-                           for path in sorted(directory.glob("*.json*")))
-            if record.get("dokument_url")}
+    return stored_index(directory, "dokument_url",
+                        lambda record: (record["basefile"], record["nummer"],
+                                        record["antagen"]))
 
 
 class _Counts:
@@ -353,24 +346,20 @@ class _Counts:
                    self.covers, self.silent, len(self.renamed)))
 
 
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=60).content
-
-
 def _listing_pages(session, url, delay):
     """Every page of one listing, in order. A page that names no document the
     walk has not seen ends it, whatever the pager claims -- a naive pager walk
-    of a Drupal view can report several times the documents there are."""
+    of a Drupal view can report several times the documents there are.
+
+    Not `harvest.paginated`, which accumulates the *rows* a page names and
+    stops on that one signal: this walk accumulates the page bodies (the two
+    hand-built listings state nothing a row-level reader could carry) and
+    stops on ACER's own ``rel="next"`` as well, because either signal alone
+    has been wrong somewhere in this source."""
     pages, seen = [], set()
     for number in range(MAX_PAGES):
-        text = _fetch(session, url + ("?page=%d" % number if number else ""),
-                      delay)
+        text = get_text(session, url + ("?page=%d" % number if number else ""),
+                        delay)
         fresh = {link for _, link in linked_documents(text, url)} \
             | {card[2] for card in card_documents(text, url)}
         if number and not fresh - seen:
@@ -464,8 +453,8 @@ def _resolve(session, stored, serie, listed, titel, link, counts):
     if link in stored:
         # resolved from these bytes on an earlier run: the identity and the
         # date it settled on are the record's, and nothing is fetched
-        return (*stored[link], _document_fetcher(session, link))
-    body = _document_fetcher(session, link)()
+        return (*stored[link], fetcher(session, link, timeout=60))
+    body = fetcher(session, link, timeout=60)()
     text = cover_text(body)
     if text is None:
         # a .pdf address that served an error page. Not this harvest's to

@@ -32,14 +32,12 @@ set aside by their names, and name no record.
 import re
 import time
 import unicodedata
-from pathlib import Path
 from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import normalize_space
 from .journals import SIPLR
 
 __all__ = ["siplr_sync"]
@@ -283,29 +281,13 @@ def siplr_sync(root, full=False, only=None, limit=None, delay=0.5):
     session = net.make_session(net.BROWSER_UA)
     issues = _siplr_issues(session)
     if only:
+        # the basefile names its own issue, so an --only run reads that one
+        # issue page instead of the archive
         year, issue, _seq = only.split("/", 1)[1].split("-")
-        url = next((u for u in issues
-                    if _siplr_issue_code(u) == (issue, year)), None)
-        if url is None:
+        issues = [u for u in issues if _siplr_issue_code(u) == (issue, year)]
+        if not issues:
             raise ValueError("the siplr archive carries no issue %s %s"
                              % (year, issue))
-        html = net.request(session, "GET", url).text
-        time.sleep(delay)
-        records = _siplr_records_from_page(html, url, year, issue)
-        pending = []
-        for r in records:
-            u = r["document_url"]
-            pending.append((r,
-                            (lambda u=u:
-                             net.request(session, "GET", u).content)
-                            if u else None))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the siplr archive carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="siplr")
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "siplr" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
     # newest issue first: the journal publishes its articles in issues, so a
     # caught-up run proves its newest issue is complete and stops, and the
     # archive behind it is never re-read. The key is the issue code read off
@@ -313,31 +295,18 @@ def siplr_sync(root, full=False, only=None, limit=None, delay=0.5):
     # issue 2 of an older year ahead of issue 1 of the newest one
     issues.sort(key=lambda u: _siplr_issue_code(u)[::-1], reverse=True)
 
-    def items():
-        for url in issues:
-            html = net.request(session, "GET", url).text
-            time.sleep(delay)
-            year, issue = _siplr_page_code(html, url)
-            yield from _siplr_records_from_page(html, url, year, issue)
+    def records(url):
+        html = net.request(session, "GET", url).text
+        time.sleep(delay)
+        year, issue = _siplr_page_code(html, url)
+        return _siplr_records_from_page(html, url, year, issue)
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "siplr", record["basefile"]),
-            *([harvest.pdf_path(root, record["basefile"])]
-              if record["document_url"] else []),
-            # the journal states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "siplr", record["basefile"]),
-            harvest.pdf_path(root, record["basefile"]),
-            ((lambda: net.request(session, "GET",
-                                  record["document_url"]).content)
-             if record["document_url"] else None),
-            harvest.verify_pdf, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="siplr")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "siplr", issues, records,
+        # the journal sets an article it published no PDF for: the record
+        # alone is that entry
+        body=lambda record: ((lambda: net.request(
+            session, "GET", record["document_url"]).content)
+            if record["document_url"] else None),
+        missing="the siplr archive carries no article %s",
+        delay=delay, full=full, only=only, limit=limit)

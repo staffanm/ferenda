@@ -71,15 +71,19 @@ Stored per document under ``site/data/downloaded/guidance/easa/``: an
 """
 
 import re
-import time
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
-from ..lib.harvest import pdf_path, select_pending, walk_records
+from ..lib.harvest import (
+    paginated,
+    pdf_path,
+    select_pending,
+    stored_index,
+    walk_records,
+)
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import fetcher, get_text, make_session
 from ..lib.util import href, normalize_space
 from .issuers import EASA
 
@@ -186,12 +190,6 @@ def parse_leaf(html_text, url):
     }
 
 
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
-
-
 def walk_library(session, delay, log=print):
     """Every document page the library names, walked page by page until a page
     adds nothing new. Returns ``(pages, how many pages were walked)``.
@@ -202,18 +200,11 @@ def walk_library(session, delay, log=print):
     page can repeat its predecessor's; and past the last page of rows the site
     keeps serving the view shell rather than a 404. Walking to the empty page
     and counting rows reported 571 rows for 566 documents on 2026-08-21."""
-    seen: dict[str, None] = {}
-    for page in range(PAGE_CAP):
-        fresh = [url for url in leaf_pages(
-            _fetch(session, "%s?page=%d" % (LIBRARY, page), delay))
-            if url not in seen]
-        if not fresh:
-            log("easa: stopped at page %d, which named no new document" % page)
-            return list(seen), page + 1
-        seen.update(dict.fromkeys(fresh))
-    raise ValueError(
-        "the EASA document library still named new documents after %d pages "
-        "(%d so far) -- its pager no longer terminates" % (PAGE_CAP, len(seen)))
+    leaves, walked = paginated(
+        lambda page: get_text(session, "%s?page=%d" % (LIBRARY, page), delay),
+        leaf_pages, cap=PAGE_CAP, what="EASA document library")
+    log("easa: stopped at page %d, which named no new document" % (walked - 1))
+    return leaves, walked
 
 
 def already_stored(root):
@@ -231,16 +222,9 @@ def already_stored(root):
     An annex EASA revises under the same leaf is therefore picked up by
     ``--force``, not by the nightly run -- the trade `eba_download` and
     `enisa_download` already make, and the reason ``--force`` exists."""
-    directory = Path(root) / EASA.kod
-    if not directory.exists():
-        return {}
-    known = {}
-    for path in sorted(directory.glob("easa-*.json*")):
-        record = compress.read_json(path)
-        if record.get("source_url") and compress.exists(
-                pdf_path(root, record["basefile"])):
-            known[record["source_url"]] = (record["serie"], record["nummer"])
-    return known
+    return stored_index(Path(root) / EASA.kod, "source_url",
+                        lambda record: (record["serie"], record["nummer"]),
+                        lambda record: pdf_path(root, record["basefile"]))
 
 
 def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
@@ -273,7 +257,7 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
             taken.add(known[BASE + url])
             redan += 1
             continue
-        fields = parse_leaf(_fetch(session, BASE + url, delay), BASE + url)
+        fields = parse_leaf(get_text(session, BASE + url, delay), BASE + url)
         identity = series_number(fields["titel"])
         if not fields["bilaga"]:
             declined["ej bilaga"] += 1
@@ -300,7 +284,7 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
                 "amnesord": fields["amnesord"],
                 "source_url": BASE + url,
                 "dokument_url": fields["dokument_url"],
-            }, _document_fetcher(session, fields["dokument_url"])))
+            }, fetcher(session, fields["dokument_url"], timeout=180)))
     print("easa: %d listing pages, %d documents, %d already stored -> %s; "
           "declined %s"
           % (pages, len(leaves), redan,
@@ -310,7 +294,3 @@ def easa_sync(root, full=False, only=None, limit=None, delay=0.5):
         root, select_pending(
             pending, only, "the EASA document library carries no document %s"),
         delay=delay, full=full, limit=limit, scope=EASA.kod)
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content

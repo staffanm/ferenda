@@ -63,18 +63,16 @@ Stored per document under ``site/data/downloaded/guidance/eiopa/``: an
 """
 
 import re
-import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import compress
-from ..lib.harvest import select_pending, walk_records
+from ..lib.harvest import paginated, select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.net import fetcher, get_text, make_session, request
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, href, normalize_space
 from .issuers import EIOPA
 
@@ -84,6 +82,12 @@ LIBRARY = BASE + "/document-library/%s_en"
 # a leaf: one publication page. The library links nothing else under
 # /publications/, and the leaf is where the files live.
 RE_LEAF = re.compile(r'"(/publications/[^"#?]+)"')
+
+# a bound on the pager, so a library facet that never repeats itself cannot
+# walk forever. Five pages of guidelines and one of recommendations today
+# (twenty rows to a page); the walk still ends on "this page named nothing
+# new", not on this.
+PAGE_CAP = 60
 
 # Eiopa's own number as its covers print it. The separator between the parts is
 # a hyphen, a slash, a space or an en dash -- and, on the type-1 covers of
@@ -241,10 +245,7 @@ def cover_text(pdf_bytes):
     served something that is not a PDF."""
     if document_extension(pdf_bytes) != ".pdf":
         return None
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        return pdf_first_page_text(Path(tmp.name))
+    return pdf_first_page_text_bytes(pdf_bytes)
 
 
 def known_documents(root):
@@ -255,34 +256,18 @@ def known_documents(root):
     directory = Path(root) / EIOPA.kod
     if not directory.exists():
         return {}
-    return {record["identitet_url"]: (record["serie"], record["nummer"])
-            for path in sorted(directory.glob("*.json*"))
-            if (record := compress.read_json(path)).get("identitet_url")}
-
-
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content
+    return stored_index(directory, "identitet_url",
+                        lambda record: (record["serie"], record["nummer"]))
 
 
 def walk_library(session, doctype, delay):
-    """Every leaf one facet names, in listing order. Stops on a page that names
-    no leaf this walk has not already seen -- never on an empty page, which is
-    how a pager that repeats past its end runs a walk forever."""
-    leaves, page = [], 0
-    while True:
-        fresh = [url for url in leaf_pages(
-            _fetch(session, listing_url(doctype, page), delay))
-            if url not in leaves]
-        if not fresh:
-            return leaves, page
-        leaves += fresh
-        page += 1
+    """Every leaf one facet names, in listing order, and how many library pages
+    that took. Stops on a page that names no leaf this walk has not already
+    seen -- never on an empty page, which is how a pager that repeats past its
+    end runs a walk forever."""
+    return paginated(
+        lambda page: get_text(session, listing_url(doctype, page), delay),
+        leaf_pages, cap=PAGE_CAP, what="Eiopa document library")
 
 
 def eiopa_sync(root, full=False, only=None, limit=None, delay=0.5):
@@ -318,7 +303,7 @@ def eiopa_sync(root, full=False, only=None, limit=None, delay=0.5):
             both += url in leaves
             leaves.setdefault(url, serie)
     for url, listed_under in leaves.items():
-        leaf = parse_leaf(_fetch(session, url, delay), url)
+        leaf = parse_leaf(get_text(session, url, delay), url)
         for titel, identity_url, swedish in leaf["files"]:
             if not is_document_title(titel):
                 declined["titel"] += 1
@@ -353,7 +338,7 @@ def eiopa_sync(root, full=False, only=None, limit=None, delay=0.5):
                 "identitet_url": identity_url,
             }, None if swedish else body))
     taken = [(record, (lambda got=body: got) if body is not None
-              else _document_fetcher(session, record["dokument_url"]))
+              else fetcher(session, record["dokument_url"], timeout=180))
              for serie, nummer, record, body in found
              if sum(1 for other in found if other[:2] == (serie, nummer)) == 1]
     declined["nummerkrock"] = len(found) - len(taken)

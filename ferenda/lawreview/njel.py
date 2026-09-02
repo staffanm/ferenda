@@ -18,13 +18,11 @@ it and states no document, so the parse mines nothing behind it.
 
 import re
 import time
-from pathlib import Path
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import approximate_date, normalize_space, record_path
+from ..lib.util import normalize_space
 from .journals import NJEL
 
 __all__ = ["njel_sync"]
@@ -161,60 +159,29 @@ def njel_sync(root, full=False, only=None, limit=None, delay=0.5):
     session = net.make_session(net.BROWSER_UA)
     issues = _njel_issues(session)
     if only:
+        # the basefile names its own issue, so an --only run reads that one
+        # issue page instead of the archive
         year, issue, _seq = only.split("/", 1)[1].split("-")
         issues = [i for i in issues
                   if (i["year"], i["issue"]) == (year, issue)]
-        pending = []
-        for i in issues:
-            url = "%s/issue/view/%s" % (NJEL.base, i["id"])
-            html = net.request(session, "GET", url).text
-            time.sleep(delay)
-            records = _njel_records_from_page(html, url, i["year"],
-                                              i["issue"])
-            for r in records:
-                u = r["document_url"]
-                pending.append((r,
-                                (lambda u=u:
-                                 net.request(session, "GET", u).content)
-                                if u else None))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the njel archive carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="njel")
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "njel" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
     # newest issue first: the journal publishes its articles in issues, so a
     # caught-up run proves its newest issue is complete and stops, and the
     # archive behind it is never re-read
     issues.sort(key=lambda i: (i["year"], i["issue"]), reverse=True)
 
-    def items():
-        for issue in issues:
-            url = "%s/issue/view/%s" % (NJEL.base, issue["id"])
-            html = net.request(session, "GET", url).text
-            time.sleep(delay)
-            yield from _njel_records_from_page(
-                html, url, issue["year"], issue["issue"])
+    def records(issue):
+        url = "%s/issue/view/%s" % (NJEL.base, issue["id"])
+        html = net.request(session, "GET", url).text
+        time.sleep(delay)
+        return _njel_records_from_page(html, url, issue["year"],
+                                       issue["issue"])
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "njel", record["basefile"]),
-            *([harvest.pdf_path(root, record["basefile"])]
-              if record["document_url"] else []),
-            # the platform states the year, not the day: the year's middle
-            date=approximate_date(record["year"]))
-
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "njel", record["basefile"]),
-            harvest.pdf_path(root, record["basefile"]),
-            ((lambda: net.request(session, "GET",
-                                  record["document_url"]).content)
-             if record["document_url"] else None),
-            harvest.verify_pdf, full=full, delay=delay)
-
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="njel")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "njel", issues, records,
+        # the journal lists an article it never published a PDF for: the
+        # record alone is that entry
+        body=lambda record: ((lambda: net.request(
+            session, "GET", record["document_url"]).content)
+            if record["document_url"] else None),
+        missing="the njel archive carries no article %s",
+        delay=delay, full=full, only=only, limit=limit)

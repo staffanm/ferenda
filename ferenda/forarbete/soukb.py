@@ -37,6 +37,7 @@ import time
 from bs4 import BeautifulSoup, NavigableString
 
 from ..lib import compress, layout, util
+from ..lib.harvest import fetch_worklist
 from ..lib.net import BROWSER_UA, make_session, request
 
 TYPE = "sou"
@@ -143,15 +144,7 @@ def sync(root, limit=None, delay=0.5):
     caller prints the final stdout summary. `--limit` stops after that many entries
     actually fetched (a test slice)."""
     session = make_session(BROWSER_UA)
-    worklist = walk_index(session)
-    rep = util.Reporter()
-    seen = fetched = 0
-    for entry in worklist:
-        seen += 1
-        if download_one(session, root, entry, delay):
-            fetched += 1
-        rep.update(seen, len(worklist), scope="soukb", fetched=fetched)
-        if limit and fetched >= limit:
-            break
-    rep.done()
-    return seen, fetched
+    return fetch_worklist(
+        walk_index(session),
+        lambda entry: download_one(session, root, entry, delay),
+        scope="soukb", limit=limit)

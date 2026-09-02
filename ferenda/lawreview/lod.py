@@ -36,14 +36,12 @@ percent-encoded, so everything downstream handles one form.
 
 import re
 import time
-from pathlib import Path
 from urllib.parse import quote
 
 from bs4 import BeautifulSoup
 
 from ..lib import harvest, net
-from ..lib.harvest import select_pending
-from ..lib.util import normalize_hints, record_path
+from ..lib.util import normalize_hints
 from .journals import LOD
 
 __all__ = ["lod_sync"]
@@ -187,65 +185,48 @@ def lod_sync(root, full=False, only=None, limit=None, delay=0.5):
     that one issue page is the only listing fetched and the walk stores that
     one document, the watermark untouched."""
     session = net.make_session(net.BROWSER_UA)
-    if only:
-        year, issue = only.split("/", 1)[1].split("-")[:2]
-        url = "%s/journal/%s/%s" % (LOD.base, year, issue)
-        html = net.request(session, "GET", url).text
-        time.sleep(delay)
-        pending = []
-        for r in _lod_records_from_page(html, url):
-            u = r["document_url"]
-            pending.append(
-                (r, (lambda u=u: net.request(session, "GET", u).text)))
-        return harvest.walk_records(
-            root, select_pending(pending, only,
-                                 "the lod listing carries no article %s"),
-            delay=delay, full=full, limit=limit, scope="lod",
-            document=harvest.page_path, verify=verify_page)
-    watermark = harvest.HarvestWatermark(
-        Path(root) / "lod" / ".watermark.json",
-        lookahead_limit=3, safety_days=30)
 
-    def items():
+    def issues():
+        """Every issue page's address, newest first. The site's own index is
+        the newest year's page as well, so its issue cards come first and the
+        other years follow behind its year navigation -- which names the
+        newest year too, and `walked` keeps its issues from being read
+        twice."""
         index_html = net.request(session, "GET", LOD.listings[0]).text
         time.sleep(delay)
         walked = set()
 
-        def issue_records(page_html):
+        def fresh(page_html):
             for issue_url in _issue_links(page_html):
-                if issue_url in walked:
-                    continue
-                walked.add(issue_url)
-                html = net.request(session, "GET", issue_url).text
-                time.sleep(delay)
-                yield from _lod_records_from_page(html, issue_url)
+                if issue_url not in walked:
+                    walked.add(issue_url)
+                    yield issue_url
 
-        # the index page doubles as the newest year's page: its own issue
-        # cards first, then the other years behind the navigation (which
-        # names the newest year too -- `walked` keeps its issues from being
-        # read twice)
-        yield from issue_records(index_html)
+        yield from fresh(index_html)
         for year_url in _year_links(index_html):
             year_html = net.request(session, "GET", year_url).text
             time.sleep(delay)
-            yield from issue_records(year_html)
+            yield from fresh(year_html)
 
-    def item_key(record):
-        return harvest.document_item_key(
-            record, record_path(root, "lod", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            # the issue's own publication day, off its page's H2
-            date=record["date"])
+    def records(issue_url):
+        html = net.request(session, "GET", issue_url).text
+        time.sleep(delay)
+        return _lod_records_from_page(html, issue_url)
 
-    def resolve(record):
-        return harvest.resolve_document(
-            record, record_path(root, "lod", record["basefile"]),
-            harvest.page_path(root, record["basefile"]),
-            lambda: net.request(session, "GET",
-                                record["document_url"]).text,
-            verify_page, full=full, delay=delay)
+    if only:
+        # the basefile names its own issue, whose address the site's scheme
+        # states outright, so an --only run reads that one issue page
+        year, issue = only.split("/", 1)[1].split("-")[:2]
+        walk_these = ["%s/journal/%s/%s" % (LOD.base, year, issue)]
+    else:
+        walk_these = issues()
 
-    result = harvest.walk(
-        items(), resolve=resolve, item_key=item_key, watermark=watermark,
-        full=full, limit=limit, only=only, scope="lod")
-    return result.seen, result.new
+    return harvest.issue_walk(
+        root, "lod", walk_these, records,
+        body=lambda record: (lambda: net.request(
+            session, "GET", record["document_url"]).text),
+        missing="the lod listing carries no article %s",
+        document=harvest.page_path, verify=verify_page,
+        # the issue's own publication day, off its page's H2
+        date=lambda record: record["date"],
+        delay=delay, full=full, only=only, limit=limit)

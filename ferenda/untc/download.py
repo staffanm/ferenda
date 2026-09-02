@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 
 from ..lib import browser, compress
-from ..lib.harvest import ItemKey, verify_pdf, walk
+from ..lib.harvest import ItemKey, flat_path, verify_pdf, walk
 from ..lib.net import HARVESTER_UA as USER_AGENT
 from ..lib.net import make_session, request
 from .model import DETAIL, load_treaties
@@ -41,14 +41,14 @@ OHCHR_MARKER = "Article"
 
 
 def page_path(root, unts):
-    return Path(root) / (unts + ".html")
+    return flat_path(root, unts, ".html")
 
 
 def text_path(root, entry):
     """The treaty's authentic text, beside its status page. The suffix follows
     the reader the curated entry names, so `parse` needs no sniffing."""
     suffix = ".pdf" if entry["text"]["reader"] == "pdf" else ".text.html"
-    return Path(root) / (entry["unts"] + suffix)
+    return flat_path(root, entry["unts"], suffix)
 
 
 def fetch_page(session, entry):
