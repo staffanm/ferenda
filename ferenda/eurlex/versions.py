@@ -18,8 +18,6 @@ is not Formex (the pre-2005 tail is PDF-only) is recorded as skipped rather
 than parsed.
 """
 
-import json
-
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from ..lib import compress, layout, util
@@ -79,20 +77,14 @@ def build(basefile):
             main = version
             continue
         art = to_artifact(doc)
-        out = layout.eurlex_version_artifact(basefile, version)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        compress.write_text(out, json.dumps(art, ensure_ascii=False, indent=2,
-                                            sort_keys=True),
-                            encodings=compress.ARTIFACT_ENCODINGS)
+        compress.write_json(layout.eurlex_version_artifact(basefile, version),
+                            art)
         versions.append({"version": version, "uri": art["uri"]})
     versions.sort(key=lambda e: e["version"])
     skipped.sort(key=lambda e: e["version"])
     rep.clear()          # the driver's own per-basefile line takes over
     sidecar = {"versions": versions, "skipped": skipped}
-    out = layout.eurlex_versions_sidecar(basefile)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    util.write_atomic(out, json.dumps(sidecar, ensure_ascii=False, indent=2,
-                                      sort_keys=True).encode())
+    util.write_json_atomic(layout.eurlex_versions_sidecar(basefile), sidecar)
     return sidecar
 
 

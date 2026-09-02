@@ -39,7 +39,6 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ..lib import compress, git, gitledger, layout
@@ -48,8 +47,8 @@ from . import register as register_mod
 from .extract import extract_body, sniff_encoding
 from .versions import archival_header, header_cutoff
 
-BRANCH = "main"
-BRANCH_REF = "refs/heads/" + BRANCH
+BRANCH = gitledger.BRANCH
+BRANCH_REF = gitledger.BRANCH_REF
 STAGING_REF = "refs/lagen/history-as-git-staging"
 FORMAT = "4"
 # format 3 and earlier kept the ledger as `Lagen-Event:`/`Lagen-Transition:`
@@ -476,13 +475,6 @@ def email_slug(name):
     return re.sub(r"[^a-z0-9]+", ".", ascii_name.lower()).strip(".") + "@lagen.nu"
 
 
-def _epoch(date):
-    """A date-only string as a fast-import timestamp (noon UTC -- the sources
-    carry no time of day)."""
-    d = datetime.fromisoformat(date).replace(hour=12, tzinfo=timezone.utc)
-    return "%d +0000" % int(d.timestamp())
-
-
 def event_dates(event):
     """(author_date, committer_date, substituted): utfärdandedatum ->
     ikraftträdandedatum -> July 1 of the event's SFS year, per the fallback
@@ -662,11 +654,6 @@ def identities(event, forarbete_meta):
     return author, committer
 
 
-def _data(text):
-    payload = text.encode() if isinstance(text, str) else text
-    return b"data %d\n%s\n" % (len(payload), payload)
-
-
 def order_graph(evs):
     """The per-statute precedence over `evs`: `(successors, indegree)`, an edge
     from each of a statute file's transitions to the next in cutoff order, and
@@ -735,9 +722,9 @@ def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
         yield ("commit %s\n"
                "author %s <%s> %s\n"
                "committer %s <%s> %s\n"
-               % (ref, a_name, a_mail, _epoch(author_date),
-                  c_name, c_mail, _epoch(committer_date))).encode()
-        yield _data(message(ev, forarbete_meta, scope))
+               % (ref, a_name, a_mail, gitledger.epoch(author_date),
+                  c_name, c_mail, gitledger.epoch(committer_date))).encode()
+        yield gitledger.data_payload(message(ev, forarbete_meta, scope))
         if first and tip:
             yield b"from %s\n" % tip.encode()
         first = False
@@ -747,7 +734,7 @@ def stream(events, forarbete_meta, tip=None, scope="full", ref=BRANCH_REF):
                 raise RuntimeError("snapshot changed during history export: %s"
                                    % c.src)
             yield b"M 644 inline %s\n" % c.path.encode()
-            yield _data(text)
+            yield gitledger.data_payload(text)
         for path, _, _ in sorted(ev.deletes):
             yield b"D %s\n" % path.encode()
 

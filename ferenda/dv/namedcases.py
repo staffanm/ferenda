@@ -22,10 +22,8 @@ for completeness, but they only start resolving once their page is set.
 
 import json
 import re
-import subprocess
-import tempfile
 
-from ..lib import net, util
+from ..lib import net, pdftext, util
 from ..lib.casenaming import case_uri
 from ..lib.datasets import NAMEDCASES
 from .download import USER_AGENT
@@ -39,16 +37,6 @@ URL = ("https://www.domstol.se/globalassets/filer/domstol/hogstadomstolen/"
 _ROW = re.compile(r"^\s*\d+\s+(\d{4} s\. .+?)\s{2,}(.+?)\s*$")
 _NJA_REF = re.compile(r"^\d{4} s\. ")
 _COLGAP = re.compile(r"\s{2,}")
-
-
-def _pdf_text(pdf_bytes):
-    """The PDF laid out as text (``pdftotext -layout``), preserving the column
-    alignment the row parse keys on."""
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
-        f.write(pdf_bytes)
-        f.flush()
-        return subprocess.run(["pdftotext", "-layout", f.name, "-"],
-                              capture_output=True, check=True).stdout.decode("utf-8")
 
 
 def parse_rows(text):
@@ -77,7 +65,7 @@ def parse_rows(text):
 def parse(pdf_bytes):
     """The case records in the named-rättsfall PDF (parse_rows over its laid-out
     text)."""
-    return parse_rows(_pdf_text(pdf_bytes))
+    return parse_rows(pdftext.pdf_layout_text_bytes(pdf_bytes))
 
 
 def harvest(out_path=NAMEDCASES, session=None):

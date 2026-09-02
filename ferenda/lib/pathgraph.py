@@ -14,12 +14,11 @@ catalog sits on a ~80-IOPS virtual disk):
   (same directory, same rsync).
 """
 
-import sqlite3
 from array import array
 from collections import deque
 from pathlib import Path
 
-from . import facets
+from . import catalog, facets
 
 # every flow group gets a small integer; BFS filters on these
 GROUP_ID = {name: i for i, name in enumerate(facets.FLOW_GROUP_NAMES)}
@@ -121,7 +120,7 @@ def sidecar_path(catalog_path):
 def write_sidecar(catalog_path):
     """Build the graph from the catalog and store it beside it. Called at the
     end of every relate that changed anything, so the two move together."""
-    con = sqlite3.connect("file:%s?mode=ro" % catalog_path, uri=True)
+    con = catalog.connect_ro(catalog_path)
     try:
         g = build(con)
     finally:
@@ -178,7 +177,7 @@ def load(catalog_path):
     g = load_sidecar(catalog_path)
     if g is not None:
         return g
-    con = sqlite3.connect("file:%s?mode=ro" % catalog_path, uri=True)
+    con = catalog.connect_ro(catalog_path)
     try:
         return build(con)
     finally:

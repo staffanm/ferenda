@@ -48,14 +48,16 @@ riktlinje is fixed, so `WALKED` remembers every page read and a steady run reads
 the 37 index pages plus whatever is new. ``--force`` looks at all of it again.
 
 Stored under ``site/data/downloaded/guidance/eba/``: an
-``eba-<serie>-<slug>.json`` record and the ``.pdf`` document per document, plus
-the one ``.walked.json`` memo for the whole source.
+``eba-<serie>-<slug>.json`` record and the ``.pdf`` document per document. The
+one memo for the whole source sits *beside* that directory, as
+``site/data/downloaded/guidance/eba.walked.json`` -- a record directory holds
+records only, which is what lets this source read it back with the shared
+`harvest.stored_index`.
 """
 
 import functools
 import json
 import re
-import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urljoin
@@ -67,11 +69,12 @@ from ..lib import compress
 from ..lib.harvest import (
     pdf_path,
     select_pending,
+    stored_index,
     walk_records,
 )
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request, set_deadline
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.net import fetcher, get_text, make_session, set_deadline
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     Reporter,
     document_extension,
@@ -204,11 +207,7 @@ def cover_identity(pdf_bytes):
         # (an error page, most often). Not this harvest's to repair, and not
         # a document either: the caller counts it and moves on.
         return None
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        text = pdf_first_page_text(Path(tmp.name))
-    return cover_number(text or "")
+    return cover_number(pdf_first_page_text_bytes(pdf_bytes) or "")
 
 
 def cover_number(text):
@@ -231,25 +230,16 @@ def cover_number(text):
 
 
 def known_identities(root):
-    """``{leaf url: (nummer, dokument url)}`` from the records already stored.
+    """``{leaf url: (serie, nummer, dokument url)}`` from the records already
+    stored.
 
     What makes re-reading a cover unnecessary on a steady run: a leaf whose
     address and whose linked document are both unchanged is the document we
     already named, so its number is taken from the record rather than from a
-    fresh download.
-
-    ``eba-*.json*`` and not ``*.json*``: `WALKED` sits in the same directory and
-    is not a record."""
-    directory = Path(root) / EBA.kod
-    if not directory.exists():
-        return {}
-    known = {}
-    for path in sorted(directory.glob("eba-*.json*")):
-        record = compress.read_json(path)
-        if record.get("source_url"):
-            known[record["source_url"]] = (record["serie"], record["nummer"],
-                                           record.get("dokument_url"))
-    return known
+    fresh download."""
+    return stored_index(Path(root) / EBA.kod, "source_url",
+                        lambda record: (record["serie"], record["nummer"],
+                                        record.get("dokument_url")))
 
 
 # Every leaf and version page this harvest has read, stored beside the records.
@@ -265,7 +255,10 @@ def known_identities(root):
 # `settled_leaves`. Recording a page as read while its document failed to store
 # would strand the document forever, which is the failure `lib.harvest`'s
 # watermark exists to prevent and which this source has no watermark to catch.
-WALKED = ".walked.json"
+# Named after the issuer and placed beside its record directory, not in it:
+# `harvest.stored_index` reads that directory as records, and a memo filed among
+# them is not one.
+WALKED = EBA.kod + ".walked.json"
 
 # Our adjudication of which candidate files are gone for good -- see the file's
 # own `_comment`. A leaf whose only unresolved candidate 404s is deliberately
@@ -286,7 +279,7 @@ def dead_candidates():
 
 
 def _memo(root, full):
-    path = Path(root) / EBA.kod / WALKED
+    path = Path(root) / WALKED
     return {} if full or not path.exists() else json.loads(path.read_text())
 
 
@@ -314,7 +307,7 @@ def read_covers(root, full=False):
 
 
 def write_walked(root, leaves, covers):
-    write_atomic(Path(root) / EBA.kod / WALKED,
+    write_atomic(Path(root) / WALKED,
                  json.dumps({"leaves": sorted(leaves),
                              "covers": {url: list(v) if v else None
                                         for url, v in sorted(covers.items())}},
@@ -449,12 +442,6 @@ def parse_leaf(html_text, url):
     }
 
 
-def _fetch(session, url, delay):
-    text = request(session, "GET", url, timeout=120).text
-    time.sleep(delay)
-    return text
-
-
 # What the single-rulebook walk may cost before it is stuck rather than slow.
 # The EBA's robots.txt asks 10 seconds between requests and its pages take about
 # two more, so a request costs ~12 s (measured 2026-08-22). A steady run reads
@@ -520,13 +507,13 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
         # whose cost is bounded by the list it is handed.
         set_deadline(session, started + WALK_BUDGET + DEADLINE_GRACE)
         rep = Reporter()
-        topics = topic_pages(_fetch(session, SINGLE_RULEBOOK, delay))
+        topics = topic_pages(get_text(session, SINGLE_RULEBOOK, delay))
         leaves = set()
         # reported page by page: 36 ämnessidor at the EBA's Crawl-delay is six
         # minutes, and a first run's walk below is hours. A run that prints nothing
         # until it ends cannot be told from one that has stopped.
         for read, topic in enumerate(topics, 1):
-            leaves.update(leaf_pages(_fetch(session, topic, delay)))
+            leaves.update(leaf_pages(get_text(session, topic, delay)))
             rep.update(read, len(topics), scope="eba ämnessidor", leaves=len(leaves))
         rep.done()
         pending, carries_none, fetched, dead, versions = [], 0, 0, 0, 0
@@ -557,7 +544,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
                       flush=True)
                 break
             url = queue.pop(0)
-            page = _fetch(session, url, delay)
+            page = get_text(session, url, delay)
             for other in version_pages(page, url):
                 # the current version is the one at the bare path; everything with
                 # a ?version= is a wording the EBA has since replaced
@@ -607,7 +594,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
                     chosen = (*read_before, sprak, document, None)
                     break
                 try:
-                    body = _document_fetcher(session, document)()
+                    body = fetcher(session, document, timeout=180)()
                 except requests.HTTPError:
                     # a candidate that is not there is not the document -- the older
                     # leaves link consultation responses that the EBA has since
@@ -655,7 +642,7 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
                     "ersatt_av": superseded_by.get(url),
                     "ersatt_av_identifier": None, "ersatt_av_url": None,
                 }, (lambda got=body: got) if body is not None
-                    else _document_fetcher(session, document)))
+                    else fetcher(session, document, timeout=180)))
             # a first run is hours of requests and prints nothing of its own until
             # it ends. `queued` grows as the version dropdowns are read, so the
             # total rises while the counter runs.
@@ -737,7 +724,3 @@ def eba_sync(root, full=False, only=None, limit=None, delay=0.5):
             print("eba: the walk did not finish, so %s is unchanged -- a page it "
                   "read may have named a version page it never reached"
                   % WALKED, flush=True)
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content

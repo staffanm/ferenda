@@ -62,7 +62,7 @@ from bs4 import BeautifulSoup
 from ..lib import compress
 from ..lib.harvest import pdf_path, select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import fetcher, make_session, request
 from ..lib.util import document_extension, href, normalize_space
 from .edpb_data import NEWSROOM, WP29, WP29_DUPLICATE_PAGES
 from .issuers import EDPB
@@ -259,15 +259,12 @@ def edpb_sync(root, serie, full=False, only=None, limit=None, delay=0.5):
             "source_url": langs.get("sv" if published is swedish else "en"),
             "dokument_url": published["document"],
         }
-        pending.append((record, _document_fetcher(session, published["document"])))
+        pending.append((record, fetcher(session, published["document"],
+                                        timeout=180)))
     return walk_records(
         root, select_pending(pending, only,
                              "the EDPB index carries no document %s"),
         delay=delay, full=full, limit=limit, scope=serie)
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content
 
 
 # --------------------------------------------------------------------------
@@ -381,7 +378,7 @@ def wp29_sync(root, full=False, only=None, limit=None, delay=0.5):
             held += 1
             continue
         lang, document_url, fetch = (
-            ("en", wp.document, _document_fetcher(session, wp.document))
+            ("en", wp.document, fetcher(session, wp.document, timeout=180))
             if wp.document else
             _wp_document(session, NEWSROOM % wp.item, wp.number, delay))
         pending.append(({

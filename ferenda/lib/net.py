@@ -668,3 +668,28 @@ def request(session, method, url, *, parse_json=False, retries=RETRIES, **kwargs
                   % (attempt + 1, retries - 1, wait, status or "-"),
                   file=sys.stderr, flush=True)
             time.sleep(wait)
+
+
+def get_text(session, url: str, delay: float) -> str:
+    """One page fetched as text, followed by the source's own politeness delay.
+
+    The listing walk every HTML harvest repeats, written once
+    (rule:second-use-goes-to-lib): acer, berec, easa, eba, eiopa and esma each
+    carried a byte-identical copy. The delay follows the fetch, so a walk that
+    stops on this page has already paid for the one it read; the host's own
+    Crawl-delay is a floor under it, applied by `request`."""
+    text = request(session, "GET", url, timeout=120).text
+    time.sleep(delay)
+    return text
+
+
+# no return annotation: the pending lists this feeds are typed `list[Pending]`,
+# whose fetcher slot is `Callable[[], bytes | str] | None`, and `list` is
+# invariant -- a list of exactly-typed fetchers is then not a `list[Pending]`
+def fetcher(session, url: str, *, timeout: float):
+    """A callable that downloads `url`'s body -- what `lib.harvest.walk_records`
+    takes for a document it may or may not decide to fetch.
+
+    `timeout` is the source's own: the agencies differ by a factor of five in
+    how long a large PDF takes them to serve."""
+    return lambda: request(session, "GET", url, timeout=timeout).content

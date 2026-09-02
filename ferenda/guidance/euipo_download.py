@@ -78,7 +78,7 @@ from collections import Counter
 
 from ..lib.harvest import select_pending, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
+from ..lib.net import fetcher, make_session, request
 from ..lib.util import normalize_space
 from .issuers import EUIPO
 
@@ -309,10 +309,6 @@ def _parts(session, pub, delay):
     return out
 
 
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=300).content
-
-
 def _record(serie, nummer, titel, publication, source_url, ref):
     """One harvest record. The identity is a coordinate, not a number, so the
     citation is the name the volume states for the unit, the way EASA:s and
@@ -381,8 +377,8 @@ def euipo_sync(root, full=False, only=None, limit=None, delay=0.5):
         publication = pick_publication(publications, serie.doctype)
         counts["%s: %s %s" % (serie.kod, publication["ProductReleaseVersion"][0],
                               publication["Language"])] += 1
-        pending.extend((record, _document_fetcher(session,
-                                                  record["dokument_url"]))
+        pending.extend((record, fetcher(session, record["dokument_url"],
+                                        timeout=300))
                        for record in _family_pending(session, serie.kod,
                                                      publication, delay,
                                                      counts))

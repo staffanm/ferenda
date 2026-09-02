@@ -64,17 +64,16 @@ Stored per document under ``site/data/downloaded/guidance/edps/``: an
 """
 
 import re
-import tempfile
 import time
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..lib import browser, compress
-from ..lib.harvest import select_pending, walk_records
+from ..lib import browser
+from ..lib.harvest import select_pending, stored_index, walk_records
 from ..lib.net import BROWSER_UA as USER_AGENT
-from ..lib.net import make_session, request
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.net import fetcher, make_session
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import document_extension, english_date, href, normalize_space
 from .issuers import EDPS, LOPNUMMER_FORST, number_slug
 
@@ -260,10 +259,7 @@ def cover_nummer(pdf_bytes):
         # served something that is not a PDF behind a .pdf address. Not a
         # document, and not this harvest's to repair: the caller counts it.
         return None
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        return printed_nummer(pdf_first_page_text(Path(tmp.name)))
+    return printed_nummer(pdf_first_page_text_bytes(pdf_bytes))
 
 
 def known_identities(root):
@@ -275,14 +271,10 @@ def known_identities(root):
     directory = Path(root) / EDPS.kod
     if not directory.exists():
         return {}
-    known = {}
-    for path in sorted(directory.glob("*.json*")):
-        record = compress.read_json(path)
-        if record.get("source_url"):
-            known[record["source_url"]] = (
-                record["serie"], record["nummer"], record["sprak"],
-                record.get("dokument_url"))
-    return known
+    return stored_index(directory, "source_url",
+                        lambda record: (record["serie"], record["nummer"],
+                                        record["sprak"],
+                                        record.get("dokument_url")))
 
 
 def _navigate(chrome, url):
@@ -316,10 +308,6 @@ def walk_view(chrome, doctype, delay):
         quiet = quiet + 1 if not fresh else 0
         page += 1
     return rows
-
-
-def _document_fetcher(session, url):
-    return lambda: request(session, "GET", url, timeout=180).content
 
 
 def edps_sync(root, full=False, only=None, limit=None, delay=0.5):
@@ -360,7 +348,7 @@ def edps_sync(root, full=False, only=None, limit=None, delay=0.5):
         if known.get(row["url"], (None, None, None, None))[3] == document:
             nummer = known[row["url"]][1]
         else:
-            body = _document_fetcher(session, document)()
+            body = fetcher(session, document, timeout=180)()
             counts["covers read"] += 1
             time.sleep(delay)
             nummer = _nummer(row, cover_nummer(body), counts)
@@ -372,7 +360,7 @@ def edps_sync(root, full=False, only=None, limit=None, delay=0.5):
             "konsultation_url": None, "amnesord": row["amnesord"],
             "source_url": row["url"], "dokument_url": document,
         }, (lambda got=body: got) if body is not None
-            else _document_fetcher(session, document)))
+            else fetcher(session, document, timeout=180)))
     print("edps: %s" % ", ".join("%d %s" % (n, name)
                                  for name, n in counts.items()))
     return walk_records(

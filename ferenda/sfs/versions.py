@@ -22,7 +22,6 @@ twice and is skipped.
 """
 
 import html
-import json
 import re
 
 from ..lib import compress, layout, util
@@ -163,11 +162,8 @@ def build(basefile, refparser=None):
             skipped.append({"version": version, "duplicate_of": recovered})
             continue
         seen.add(recovered)
-        out = layout.sfs_version_artifact(basefile, recovered)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        compress.write_text(out, json.dumps(art, ensure_ascii=False, indent=2,
-                                            sort_keys=True),
-                            encodings=compress.ARTIFACT_ENCODINGS)
+        compress.write_json(layout.sfs_version_artifact(basefile, recovered),
+                            art)
         entry = {"version": recovered, "uri": art["uri"]}
         if recovered != version:
             entry["archived_as"] = version
@@ -175,8 +171,5 @@ def build(basefile, refparser=None):
     rep.clear()          # the driver's own per-statute line takes over
     versions.sort(key=lambda e: layout.sfs_version_key(e["version"]))
     sidecar = {"versions": versions, "skipped": skipped}
-    out = layout.sfs_versions_sidecar(basefile)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    util.write_atomic(out, json.dumps(sidecar, ensure_ascii=False, indent=2,
-                                      sort_keys=True).encode())
+    util.write_json_atomic(layout.sfs_versions_sidecar(basefile), sidecar)
     return sidecar

@@ -22,8 +22,36 @@ never happened, silently dropping that event from every future run."""
 
 import json
 import subprocess
+from datetime import datetime, timezone
 
 from . import git, util
+
+BRANCH = "main"
+BRANCH_REF = "refs/heads/" + BRANCH
+
+
+def epoch(date, *, clamp=False):
+    """A date-only string as a fast-import timestamp (noon UTC -- the sources
+    carry no time of day).
+
+    `clamp=True` floors the timestamp at the Unix epoch: git's own ident-line
+    parser cannot read back a negative timestamp (`git log` shows 1970-01-01
+    for one instead, confirmed against a pre-1970 EU regulation -- not merely
+    a display quirk, since `git fsck` calls the commit corrupt). The clamp
+    only affects the git-native date; eurlex still prints the true date in the
+    commit message. sfs does not clamp: its corpus is full of pre-1970
+    statutes, so clamping there would move thousands of author dates to
+    1970-01-01, and that is a decision for that export to make, not a side
+    effect of sharing this helper."""
+    d = datetime.fromisoformat(date).replace(hour=12, tzinfo=timezone.utc)
+    stamp = int(d.timestamp())
+    return "%d +0000" % (max(0, stamp) if clamp else stamp)
+
+
+def data_payload(text):
+    """One fast-import `data` block for `text` (str or bytes)."""
+    payload = text.encode() if isinstance(text, str) else text
+    return b"data %d\n%s\n" % (len(payload), payload)
 
 
 def path(repodir):

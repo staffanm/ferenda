@@ -42,7 +42,7 @@ from pathlib import Path
 import brotli
 
 from .. import config
-from .util import write_atomic
+from .util import json_canonical, write_atomic
 
 # encoding token (the HTTP `Content-Encoding` / `Accept-Encoding` name) -> the
 # on-disk suffix, in *preference order* (best ratio first). nginx's
@@ -270,6 +270,15 @@ def write_text(path: Path | str, text: str,
                encodings: Sequence[str] = PAGE_ENCODINGS,
                encoding: str = "utf-8") -> None:
     write_bytes(path, text.encode(encoding), encodings=encodings)
+
+
+def write_json(path: Path | str, obj,
+               *, encodings: Sequence[str] = ARTIFACT_ENCODINGS) -> None:
+    """`obj` as canonical JSON (`util.json_canonical`) at a logical `path`,
+    through the compressed write funnel. The one way an artifact reaches disk,
+    so every artifact is the same bytes by construction rather than by call
+    sites keeping the same four json.dumps flags in step."""
+    write_text(path, json_canonical(obj), encodings=encodings)
 
 
 def download_encodings(path: Path | str) -> tuple[str, ...]:

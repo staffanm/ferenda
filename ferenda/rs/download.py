@@ -80,7 +80,6 @@ Stored per ställningstagande under ``site/data/downloaded/rs/{org}/``: a
 """
 
 import re
-import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urljoin
@@ -94,11 +93,12 @@ from ..lib.harvest import (
     page_path,
     pdf_path,
     select_pending,
+    stored_index,
     walk_records,
 )
 from ..lib.net import BROWSER_UA as USER_AGENT
 from ..lib.net import make_http2_session, make_session, mount_aia_chain, request
-from ..lib.pdftext import pdf_first_page_text
+from ..lib.pdftext import pdf_first_page_text_bytes
 from ..lib.util import (
     Reporter,
     document_extension,
@@ -414,10 +414,8 @@ def stored_numbers(root, org, key):
     on the record field `key`. It is what makes an incremental run cheap for the
     two agencies whose number lives in the *document*: without it every run
     would re-download every PDF just to re-read a number that has not moved."""
-    return {record[key]: record["nummer"]
-            for path in compress.glob(Path(root) / org, "*.json")
-            for record in [compress.read_json(path)]
-            if key in record}
+    return stored_index(Path(root) / org, key,
+                        lambda record: record["nummer"])
 
 
 def self_named_document(root, org, url, session, delay, extract, listed=None):
@@ -438,10 +436,7 @@ def self_named_document(root, org, url, session, delay, extract, listed=None):
         print("rs: %s: %s served a non-PDF body, skipping" % (org, url),
               flush=True)
         return None
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as staged:
-        staged.write(response.content)
-        staged.flush()
-        printed = extract(pdf_first_page_text(staged.name))
+    printed = extract(pdf_first_page_text_bytes(response.content))
     if printed and listed and printed != listed:
         print("%s: %s is listed as %s but names itself %s -- filed as the latter"
               % (org, url.rsplit("/", 1)[-1][:60], listed, printed), flush=True)

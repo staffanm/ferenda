@@ -37,7 +37,6 @@ independent."""
 import hashlib
 import json
 import textwrap
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ..lib import compress, gitledger, layout
@@ -45,8 +44,8 @@ from ..lib.errors import RebuildRequired
 from ..lib.mdtext import document_markdown, node_markdown
 from .download import RE_PLAIN_ACT
 
-BRANCH = "main"
-BRANCH_REF = "refs/heads/" + BRANCH
+BRANCH = gitledger.BRANCH
+BRANCH_REF = gitledger.BRANCH_REF
 STAGING_REF = "refs/lagen/eurlex-history-as-git-staging"
 AUTHOR = ("EUR-Lex", "eurlex@lagen.nu")
 FORMAT = "1"
@@ -110,8 +109,8 @@ def message(art, date):
     gets re-read -- a key:value block would only be decoration, and plain
     sentences read better. `date` (the commit's own, from `_version_date`)
     still earns a sentence of its own when it predates 1970: the git ident
-    date clamps there (`_epoch`), so this is the one place such an act's
-    true date survives unmangled."""
+    date clamps there (`gitledger.epoch`), so this is the one place such
+    an act's true date survives unmangled."""
     subject = _act_name(art)
     recital = _first_recital(art.get("structure"))
     lines = [subject] + (["", _recital_text(recital)] if recital is not None else [])
@@ -262,25 +261,6 @@ def _append_reasons(existing, desired, basefiles):
     return reasons
 
 
-def _epoch(date):
-    """A date-only string as a fast-import timestamp (noon UTC -- the
-    artifacts carry no time of day), clamped at the Unix epoch: git's own
-    ident-line parser cannot read back a negative timestamp (`git log` shows
-    1970-01-01 for one instead, confirmed against a pre-1970 EU regulation --
-    not merely a display quirk, since `git fsck` calls the commit corrupt).
-    The clamp only affects the git-native date; the true date still stands
-    unmangled in the commit message (see `message`), and EU secondary
-    legislation only starts in 1952 (ECSC), so the affected acts are early
-    1950s-60s customs/agricultural regulations, not the corpus at large."""
-    d = datetime.fromisoformat(date).replace(hour=12, tzinfo=timezone.utc)
-    return "%d +0000" % max(0, int(d.timestamp()))
-
-
-def _data(text):
-    payload = text.encode() if isinstance(text, str) else text
-    return b"data %d\n%s\n" % (len(payload), payload)
-
-
 def _emit_commits(basefile, kept, ref, tip_box, expected):
     """The fast-import commit(s) for `kept` ((art, date, md) triples) of one
     act, in order. `expected` (the matching slice of `_desired`'s records,
@@ -303,16 +283,17 @@ def _emit_commits(basefile, kept, ref, tip_box, expected):
             if digest != expected[i]["body"]:
                 raise RuntimeError(
                     "artifact changed during history export: %s" % basefile)
+        stamp = gitledger.epoch(date, clamp=True)
         yield ("commit %s\n"
               "author %s <%s> %s\n"
               "committer %s <%s> %s\n"
-              % (ref, name, email, _epoch(date), name, email, _epoch(date))).encode()
-        yield _data(message(art, date))
+              % (ref, name, email, stamp, name, email, stamp)).encode()
+        yield gitledger.data_payload(message(art, date))
         if tip_box[0]:
             yield b"from %s\n" % tip_box[0].encode()
             tip_box[0] = None
         yield b"M 644 inline %s\n" % path.encode()
-        yield _data(md)
+        yield gitledger.data_payload(md)
 
 
 def stream(basefiles, ref=BRANCH_REF, desired=None, log=print):
