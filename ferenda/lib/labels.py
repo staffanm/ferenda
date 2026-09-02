@@ -29,14 +29,10 @@ from typing import NamedTuple
 from . import datasets
 from .text import sentences
 
-# the document-uri prefix, mirrored from catalog.BASE. labels sits *below* catalog
-# (catalog imports labels to stamp the `descriptive` column), so it cannot import
-# it back; the local-id strip is one line, duplicated here to keep the layering acyclic.
-_BASE = "https://lagen.nu/"
-
-
-def _local(uri):
-    return uri[len(_BASE):] if uri.startswith(_BASE) else uri
+# labels sits *below* catalog (catalog imports labels to stamp the `descriptive`
+# column), so it takes the strip from util rather than importing catalog back.
+# Aliased: `local` is also a variable name in this module.
+from .util import local as _local
 
 
 class Labels(NamedTuple):
@@ -219,7 +215,7 @@ def dv_fallback_label(art):
     ("Meteoriten (NJA 2025 s. 897)"), or -- for an artifact parsed before that
     field -- the referat, else "{court} {målnummer}", else the court, else the uri
     tail. The single source of this fallback chain for both the label derivation
-    here and catalog.dv_document (which is a pure consumer of it)."""
+    here and catalog_rows.dv_document (which is a pure consumer of it)."""
     referat, malnr = art.get("referat") or [], art.get("malnummer") or []
     return art.get("label") or (
         referat[0] if referat
@@ -257,7 +253,7 @@ def _generic(art):
 
 def _kommentar(art):
     # deliberately inert: a kommentar is never a page of its own (absent from
-    # build.SOURCE_RENDERERS by design) and no rail prints its name -- the rails
+    # registers no page renderer, by design) and no rail prints its name -- the rails
     # embed its *content* on the commented document's page, and the inbound
     # panel excludes the source (page.INBOUND_ORDER). Fixed forms here keep the
     # catalog columns stable ("Kommentar" + the author line, what the inbound

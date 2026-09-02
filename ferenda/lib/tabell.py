@@ -40,7 +40,7 @@ RE_MARGIN = re.compile(
     r"^(?:Prop\. \d{4}(?:/\d{2,4})?:\d+|Bilaga \d+|SOU \d{4}:\d+|Ds \d{4}:\d+)$")
 
 
-def line_cells(line):
+def _line_cells(line):
     """One Line -> [(left, right, text)] cells: runs gap-split at CELL_GAP,
     margin-marker runs dropped. A lone page number is no cell line at all."""
     if line.text.strip().isdigit():
@@ -160,19 +160,19 @@ def split_generic(lines):
         j = i
         left = None
         while j < len(lines) and not RE_DOTS.search(lines[j].text):
-            cells = line_cells(lines[j])
+            cells = _line_cells(lines[j])
             if len(cells) >= 2:
                 left = cells[0][0] if left is None else min(left, cells[0][0])
                 j += 1
             elif (len(cells) == 1 and left is not None
                   and cells[0][0] > left + CELL_GAP
                   and j + 1 < len(lines)
-                  and len(line_cells(lines[j + 1])) >= 2):
+                  and len(_line_cells(lines[j + 1])) >= 2):
                 j += 1                              # wrapped cell mid-table
             else:
                 break
         region = lines[i:j]
-        cell_lines = [line_cells(l) for l in region]
+        cell_lines = [_line_cells(l) for l in region]
         cols = _columns(cell_lines) if len(region) >= MIN_ROWS else []
         if len(cols) >= 2 and _consistent(cell_lines, cols):
             if plain:
@@ -226,7 +226,7 @@ def _two_col_cells(line, left, right):
     None where a run falls left of both.
 
     Placed run by run against the known column positions, not by
-    :func:`line_cells`' gap split: a long term reaches to within a few units of
+    :func:`_line_cells`' gap split: a long term reaches to within a few units of
     the gutter ("information i behov av utökat" ends at 395, the definition
     column starts at 414), and the gap rule then reads the whole line as one
     cell and loses the column boundary the page is actually set on."""
@@ -258,7 +258,7 @@ def _two_col_start(lines, i):
     """The (left, right) column positions a two-column region starting at
     `lines[i]` would use, or None: the line splits into exactly two cells with a
     gutter between them, and its left cell is short enough to be a term."""
-    cells = line_cells(lines[i])
+    cells = _line_cells(lines[i])
     if len(cells) != 2 or cells[1][0] - cells[0][1] < GUTTER:
         return None
     return None if len(cells[0][2]) > TERM_MAX else (cells[0][0], cells[1][0])

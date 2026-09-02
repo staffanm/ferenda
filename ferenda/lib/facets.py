@@ -835,7 +835,7 @@ def _is_browsable(source, local):
 
 def _browse_label(row):
     """The handle shown for a document in a listing -- the same reader-facing
-    heading the page and search hits use (catalog.display_title, stamped onto the
+    heading the page and search hits use (catalog_rows.display_title, stamped onto the
     `display` column at relate): an act's short name + acronym where it has them,
     else its title; a law/concept by name; everything else by its identifier.
     Falls back to label/local for a row predating the column (display still
@@ -956,11 +956,11 @@ def group(con, source):
     # sometimes was: `_sfs_sortname` finds the digits in an EDPB title, so
     # "Riktlinjer 3/2018" about förordning (EU) 2016/679 sorted on 1679
     for rows in buckets.values():
-        rows.sort(key=row_sort(source))
+        rows.sort(key=_row_sort(source))
     return buckets
 
 
-def row_sort(source):
+def _row_sort(source):
     """How one bucket's documents are ordered for display. Shared with
     `browse_view`, which re-collects a leaf that spans several buckets and has
     to put the result back in this order."""
@@ -1174,7 +1174,7 @@ def browse_view(con, source):
                 continue
             rows = [r for path, under in grouped.items()
                     if path[:len(keypath)] == keypath for r in under]
-            rows.sort(key=row_sort(source))
+            rows.sort(key=_row_sort(source))
             n["documents"] = [entry(r) for r in rows]
 
     attach(view["buckets"], ())

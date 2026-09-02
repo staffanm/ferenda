@@ -106,10 +106,10 @@ def cited_articles(match):
     interior lost 49 citations across the ICC corpus. A range that runs
     backwards, or wider than `MAX_RANGE`, keeps its two ends -- it is a
     sentence this reader misread, not a decision applying 200 articles."""
-    return [number for number, _span in cited_article_spans(match)]
+    return [number for number, _span in _cited_article_spans(match)]
 
 
-def cited_article_spans(match):
+def _cited_article_spans(match):
     """`cited_articles`, with each number's own (start, end) span in the text
     -- the anchor an *inline* link needs. A range interior ("7" in "articles 6
     to 8") appears in no text and carries None: it is a relation the document
@@ -346,7 +346,7 @@ def spans(text, extra=(), article_level=True):
                 continue
             target = winners[0][2]
             first = True
-            for number, span in cited_article_spans(match):
+            for number, span in _cited_article_spans(match):
                 if span is None:
                     continue
                 # the first number folds in the leading "article(s)" word,

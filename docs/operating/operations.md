@@ -1,7 +1,7 @@
 # Operations
 
 `lib/runlog.py` owns three state files under `DATA/.build/`. The run ledger and
-error store are written by `build.py` on every *pipeline* `lagen` invocation (a
+error store are written by `build.py` (run start and end) and `lib/freshness.py` (segments, per-document outcomes) on every *pipeline* `lagen` invocation (a
 no-op under `--dry-run`, and for the non-pipeline verbs `serve`/`runs`, which
 carry no run id). `status` is the deliberate exception: it too carries no run id
 and never touches the ledger, but it writes the authoritative `status.json`

@@ -12,10 +12,11 @@ ordered, labelled documents) through an in-process ``TestClient`` and writes
 static HTML, rather than querying the catalog directly. One projection, so the
 static pages and the live API cannot drift.
 
-That is also why this module is not in ``lib/``: it imports ``api.app``, and
-``lib/`` may not (rule:lib-never-imports-vertical). Here, beside ``build.py`` in
-the composing layer, importing both the API and the render layer is the normal
-direction -- which is what retired the checker's last allowlist entry.
+The import of ``api.app`` is the one sanctioned inversion of the layer rule
+(``docs/developing/architecture.md``, "One sanctioned inversion"): a vertical
+may not import ``api``, so ``.claude/hooks/check-layers.py`` carries the single
+``("site/browse.py", "api.app")`` allowlist entry for it. The inversion is
+one-way and confined to aggregate-page generation.
 """
 
 from pathlib import Path
@@ -23,10 +24,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from markupsafe import Markup
 
-from .api import app as api_service
-from .lib import catalog, compress, facets, feeds
-from .lib.page import page
-from .lib.render import (
+from ..api import app as api_service
+from ..lib import catalog, compress, facets, feeds
+from ..lib.page import page
+from ..lib.render import (
     LISTS,
     SOURCE_LABEL,
     browse_dir,

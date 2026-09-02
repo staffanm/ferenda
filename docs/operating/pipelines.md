@@ -587,8 +587,10 @@ declares no per-document `inputs` and is marked `always=True`, so there is no
 freshness gate: every invocation re-measures, `--force` or not, and archives a
 dated copy under `artifact/stats/archive/`. `generate` raises if no artifact
 has been computed; a statistics page without measurements would publish an
-empty claim. `lagen all rebuild` runs `compute` automatically on a whole-corpus
-run, between `dump` and `generate` (not on a single-source rebuild).
+empty claim. A `rebuild` that names `stats` runs `compute` automatically,
+between `dump` and `generate` — that covers both `lagen all rebuild` and
+`lagen stats rebuild`; a single-source rebuild of a different source (`lagen
+sfs rebuild`) does not.
 
 **Measure 56 needs the EU amendment relations first.** "Längst mellan två
 författningar" walks base acts only, and it knows which EU acts merely amend or

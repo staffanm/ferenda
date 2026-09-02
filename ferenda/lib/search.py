@@ -38,7 +38,7 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from opensearchpy.exceptions import ConnectionTimeout, TransportError
 
 from .. import config
-from . import catalog, compress, facets, layout, malnummer, text
+from . import catalog, catalog_rows, compress, facets, layout, malnummer, text
 from .pinpoint import acronym, pinpoint_label
 
 INDEX = "lagen"
@@ -46,7 +46,7 @@ INDEX = "lagen"
 # copy_to catch-all (see SEARCH_FIELDS) -- a mapping change, so the index has to
 # be recreated rather than migrated, and every unit re-emitted into it. 6: a
 # document whose label is its own title, with no number in it, no longer emits
-# `identifier` (see citation_identifier) -- emitted-unit change only, so an
+# `identifier` (see _citation_identifier) -- emitted-unit change only, so an
 # ordinary incremental index pass refreshes the affected units. 7: a fragment
 # unit carries the `heading` its document prints over it, which names a passage
 # whose anchor has no citation grammar (a förarbete's "sec745"). A new field,
@@ -232,7 +232,7 @@ MAPPING = {
             "pinpoint":      {"type": "keyword"},
             "inbound_count": {"type": "long"},
             "is_doc":        {"type": "boolean"},    # whole-document unit vs fragment
-            # the human heading shown for a hit (catalog.display_title: short name
+            # the human heading shown for a hit (catalog_rows.display_title: short name
             # + acronym where the artifact has them, else the full title). Display
             # only -- the full `title` stays the searchable field, so changing the
             # shown label never costs findability.
@@ -286,7 +286,7 @@ HIGHLIGHT = {"fields": {"text": {}, "title": {}},
 _LABEL_NUMBER = re.compile(r"\d")
 
 
-def citation_identifier(label, title):
+def _citation_identifier(label, title):
     """The `identifier` to index for a document -- or None when its label is not a
     citation identity at all.
 
@@ -339,7 +339,7 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     # whole-value match, so a single word never hits it), `identifier` is the
     # x16-boosted text field and is emitted only for a real citation identity
     identity = {"label": label, "title": title}
-    if identifier := citation_identifier(label, title):
+    if identifier := _citation_identifier(label, title):
         identity["identifier"] = identifier
     if year:
         shared["year"] = year
@@ -358,12 +358,12 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     art = json.loads(raw)
     # the year facet reads the one-date projection, not the raw "date" key --
     # a court decision's date is "avgorandedatum", a väglednings "antagen"
-    doc_date = catalog.document_date(art)
+    doc_date = catalog_rows.document_date(art)
     if "year" not in shared and doc_date and re.match(r"\d{4}", doc_date):
         shared["year"] = doc_date[:4]
     # the reader-facing heading, shared with the page and listings: short name +
     # acronym where the artifact carries them, else the full title (catalog)
-    display = catalog.display_title(art, title)
+    display = catalog_rows.display_title(art, title)
     frags = [(fu, ft, fh) for fu, ft, fh
              in text.fragment_texts_and_headings(art) if ft]
     # The whole-document unit also carries the complete body: result paging then
@@ -392,7 +392,7 @@ def doc_actions(row, inbound_count, version=None, expired=None):
     yield {"_id": uri, "_source": doc}
     # a fragment carries the document's label as `doc_label` -- index:false, so it
     # is the hit's display identifier and never a scored field; the amplification
-    # citation_identifier removes cannot arise here
+    # _citation_identifier removes cannot arise here
     for frag_uri, frag_text, frag_heading in frags:
         unit = {**shared, "uri": frag_uri, "is_doc": False,
                 "text": frag_text,
@@ -677,7 +677,7 @@ def strip_stopword_highlights(fragments):
     return kept or marks_only[:1]
 
 
-def hit_highlight(h):
+def _hit_highlight(h):
     """The snippets to show for a hit -- the body's, or the title's where the body
     has none -- with the function-word marks removed."""
     hl = h.get("highlight", {})
@@ -759,7 +759,7 @@ def parse_hit(h):
         "abbr": acronym(src.get("display")) or None,
         "source": src.get("source"), "kind": src.get("kind"),
         "score": h.get("_score"), "inbound_count": src.get("inbound_count", 0),
-        "highlight": hit_highlight(h),
+        "highlight": _hit_highlight(h),
         "pin": None,
         "fragments": [],
     }
@@ -1211,7 +1211,7 @@ class SearchIndex:
             highlight_res = _retry(lambda: self.client.search(
                 index=self.index, body=document_highlight_body(q, doc_uris)),
                 "document highlight")
-            snippets = {hit["_source"]["uri"]: hit_highlight(hit)
+            snippets = {hit["_source"]["uri"]: _hit_highlight(hit)
                         for hit in highlight_res["hits"]["hits"]}
             for result in results:
                 result["highlight"] = snippets.get(result["uri"], [])

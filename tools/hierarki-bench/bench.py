@@ -23,7 +23,7 @@ import json
 import time
 from pathlib import Path
 
-from ferenda.lib import aihierarki, catalog, concepts
+from ferenda.lib import aihierarki, begrepp, catalog
 from ferenda.lib.hierarki import _anchor_within
 from ferenda.lib.util import normalize_fold
 
@@ -73,9 +73,9 @@ def _matches_concept(term, concept):
     """Inflection-aware: the row term "säkerhetsåtgärder" is the golden
     concept "säkerhetsåtgärd" (term_pattern covers the ending classes)."""
     return (_contains(term, concept)
-            or bool(concepts.term_pattern(concept)
+            or bool(begrepp.term_pattern(concept)
                     .search(normalize_fold(term)))
-            or bool(concepts.term_pattern(term)
+            or bool(begrepp.term_pattern(term)
                     .search(normalize_fold(concept))))
 
 

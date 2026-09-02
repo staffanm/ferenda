@@ -21,15 +21,16 @@ import re
 import unicodedata
 from pathlib import Path
 
-from .lib import catalog, compress, layout
-from .lib.lagrum import load_named_spans, load_namedlaws
-from .lib.page import Site
-from .lib.render import edit_meta
-from .sfs import render as sfs_render
-from .site import parse as site_parse
+from ..lib import catalog, compress, datasets, layout
+from ..lib.lagrum import load_named_spans, load_namedlaws
+from ..lib.page import Site
+from ..lib.render import edit_meta
+from . import parse as site_parse
 
-SFS_NAMEDLAWS = Path(__file__).parent / "sfs" / "data" / "namedlaws.json"
-EU_NAMEDACTS = Path(__file__).parent / "eurlex" / "data" / "namedacts.json"
+# the two curated name tables, read from the one place that locates them
+# (lib/datasets) rather than re-derived from this module's own location
+SFS_NAMEDLAWS = datasets.NAMEDLAWS
+EU_NAMEDACTS = datasets.NAMEDACTS
 
 # A hostname label: lowercase ASCII plus the Swedish letters this codebase
 # treats as citable running text. A name that survives suffix-cutting into
@@ -141,18 +142,22 @@ def named_span_rows():
             for host, (_name, span) in _named_spans().items()}
 
 
-def write_chapter_pages(generated_root, con):
+def write_chapter_pages(generated_root, con, render_chapter):
     """Render each `_named_spans()` target to its own file,
     `generated/subdomain/<zone>/<slug>.html` -- the one subdomain kind
     `write_sub_tree` cannot just symlink to an existing page, since the
     target is part of a document, not a document of its own.
 
     Needs a live catalog connection, unlike every other function in this
-    module: `sfs.render.render_chapter`'s rail (kommentar, citations) reads
-    it via a `lib.page.Site`. `namedlaws.json` only ever names an SFS act
-    today, so this only knows how to render that one source's spans --
-    widening it is real work for whenever a span of some other source's act
-    is actually asked for, not before.
+    module: `render_chapter`'s rail (kommentar, citations) reads it via a
+    `lib.page.Site`. `namedlaws.json` only ever names an SFS act today, so
+    this renders one source's spans -- widening it is real work for whenever
+    a span of some other source's act is actually asked for, not before.
+
+    `render_chapter(art, site, first, last, name, reason)` is passed in
+    rather than imported: this module is `site/`, and a vertical may not
+    import a sibling (rule:lib-never-imports-vertical), so `build.py`
+    composes `sfs.render.render_chapter` in.
 
     `render_chapter` itself stays ignorant of editing (it is also called by
     tests against a bare artifact); the `<meta name="lagen-doc">` that turns
@@ -167,8 +172,8 @@ def write_chapter_pages(generated_root, con):
         if not compress.exists(art_path):
             continue
         art = compress.read_json(art_path)
-        html = sfs_render.render_chapter(art, site, span.first, span.last,
-                                         name, span.reason)
+        html = render_chapter(art, site, span.first, span.last,
+                              name, span.reason)
         ref = catalog.local(art["uri"])
         meta = edit_meta("kommentar", ref, art["uri"], source="sfs", basefile=ref)
         html = html.replace("</head>", meta + "</head>", 1)

@@ -25,7 +25,7 @@ builds the two derived catalog tables that make the ladder renderable:
   PRD-regleringshierarki.md: verbatim descent (P2), genomförande pairing
   (P3), and delegation-clause subjects (P4's mechanical half).
 
-Both rebuild whole at relate, in ``build.cmd_relate``'s cross-document block,
+Both rebuild whole at relate, in ``corpus.cmd_relate``'s cross-document block,
 strictly after ``canonicalize_concepts`` (rows store canonical concept uris)
 and after ``rebuild_norm_chain`` (which DELETEs its table, so the derived
 edges must always be re-inserted after it).
@@ -34,7 +34,7 @@ edges must always be re-inserted after it).
 import json
 import re
 
-from . import annstore, catalog, concepts, history, text
+from . import annstore, begrepp, catalog, catalog_rows, history, text
 from .util import normalize_fold, split_numalpha
 
 # a förordning issued under the government's own residual power (8 kap. RF)
@@ -337,7 +337,7 @@ def rebuild_regleringshierarki(con, curated=None):
             for concept, term, _anchor in defs.get(anc, ()):
                 key = (concept, term)
                 if key not in patterns:
-                    patterns[key] = concepts.term_pattern(term)
+                    patterns[key] = begrepp.term_pattern(term)
                 out.append((concept, term, patterns[key]))
         return out
 
@@ -579,7 +579,7 @@ def _repeal_dates(con, info, art):
         if repealed in info and repealed not in out and repealer in info:
             ikraft = (art(repealer).get("metadata") or {}).get(
                 "ikrafttradandedatum")
-            out[repealed] = ikraft or catalog.EXPIRED_UNDATED
+            out[repealed] = ikraft or catalog_rows.EXPIRED_UNDATED
     return out
 
 

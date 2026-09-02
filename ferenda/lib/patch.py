@@ -28,9 +28,9 @@ This module is deliberately *mechanical* -- locate / read / apply / create a
 patch over a text string it is handed. It knows nothing about any source (lib
 never imports a vertical). Each vertical's parser calls
 ``patch_if_needed(source, basefile, text)`` at its intermediate-text choke
-point; ``ferenda.patchsource`` (which *may* import the verticals) knows how
-to produce the pristine intermediate text for the ``mkpatch`` CLI and the web
-editor.
+point, and declares the provider of its pristine intermediate text as
+``Source.intermediate``; ``ferenda.patchsource`` reads that field back for the
+``mkpatch`` CLI and the web editor.
 """
 
 import io

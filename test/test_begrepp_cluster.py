@@ -1,23 +1,24 @@
 """Concept normalization -- the corpus-aware Swedish noun de-inflector that
-collapses inflected surface forms onto one canonical begrepp (lib/concepts.py)."""
+collapses inflected surface forms onto one canonical begrepp (the relate-time
+half of lib/begrepp.py)."""
 
 import pytest
 
-from ferenda.lib import concepts
+from ferenda.lib import begrepp
 
 
 @pytest.fixture(autouse=True)
 def _fresh():
     # isolate each test from the on-disk override file + wiki registry
-    concepts._OVERRIDES = {"alias": {}, "distinct": []}
-    concepts._WIKI = set()
+    begrepp._OVERRIDES = {"alias": {}, "distinct": []}
+    begrepp._WIKI = set()
     yield
-    concepts._OVERRIDES = None
-    concepts._WIKI = None
+    begrepp._OVERRIDES = None
+    begrepp._WIKI = None
 
 
 def canon(forms):
-    return {c: v for c, v in concepts.cluster(forms).items()}
+    return {c: v for c, v in begrepp.cluster(forms).items()}
 
 
 def test_generic_inflection_collapses_to_base():
@@ -62,23 +63,23 @@ def test_multiword_head_inflection_on_the_last_word():
 
 
 def test_wiki_form_wins_canonical_selection():
-    concepts.register_wiki({"Näringsidkare"})
+    begrepp.register_wiki({"Näringsidkare"})
     # even though "näringsidkare" (lower) sorts first, the wiki display form wins
-    g = concepts.cluster({"näringsidkare", "Näringsidkarna"})
+    g = begrepp.cluster({"näringsidkare", "Näringsidkarna"})
     assert g == {"Näringsidkare": ["Näringsidkarna", "näringsidkare"]}
 
 
 def test_alias_override_forces_a_merge():
-    concepts._OVERRIDES = {"alias": {"ab": "Aktiebolag"}, "distinct": []}
-    g = concepts.cluster({"Aktiebolag", "AB"})
+    begrepp._OVERRIDES = {"alias": {"ab": "Aktiebolag"}, "distinct": []}
+    g = begrepp.cluster({"Aktiebolag", "AB"})
     assert g == {"Aktiebolag": ["AB", "Aktiebolag"]}
 
 
 def test_keep_distinct_blocks_a_wrong_merge():
-    concepts._OVERRIDES = {"alias": {},
+    begrepp._OVERRIDES = {"alias": {},
                            "distinct": [{"talan", "talerätt"}]}
     # were they to share a key, keep_distinct splits them back apart
-    g = concepts.cluster({"Talan", "Talerätt"})
+    g = begrepp.cluster({"Talan", "Talerätt"})
     assert set(g) == {"Talan", "Talerätt"}
 
 
@@ -90,9 +91,9 @@ def test_shipped_punctuation_aliases_fold_onto_the_hyphen():
     artifact slug turns every non-alnum character into `_`, so one silently
     dropped the other. The aliases fold them; this asserts the shipped data
     does it, since every other test here stubs `_OVERRIDES` out."""
-    concepts._OVERRIDES = None          # force a real load of the data file
+    begrepp._OVERRIDES = None          # force a real load of the data file
     try:
-        groups = concepts.cluster([
+        groups = begrepp.cluster([
             "Fartyg från en icke-avtalsslutande part",
             "Fartyg från en icke avtalsslutande part",
             "Kapitel och HS-nummer eller nummer",
@@ -100,7 +101,7 @@ def test_shipped_punctuation_aliases_fold_onto_the_hyphen():
             "Värdepappers- eller råvarulån",
             "Värdepappers\u2013 eller råvarulån"])
     finally:
-        concepts._OVERRIDES = None
+        begrepp._OVERRIDES = None
     assert len(groups) == 3, groups
     for canonical, members in groups.items():
         assert len(members) == 2, (canonical, members)

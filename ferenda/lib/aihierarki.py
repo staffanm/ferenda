@@ -23,7 +23,7 @@ import hashlib
 import re
 import time
 
-from . import annstore, catalog, concepts, llm, text
+from . import annstore, begrepp, catalog, llm, text
 from .hierarki import RE_LOPTEXT_PHRASE, _anchor_within
 from .markdown import begrepp_uri
 from .util import normalize_fold
@@ -411,7 +411,7 @@ def run_component(con, docs, clauses, batched, cache=None,
         for phrase in phrases:
             folded = normalize_fold(phrase)
             hit = next((f for f in terms
-                        if concepts.term_pattern(terms[f]).fullmatch(folded)),
+                        if begrepp.term_pattern(terms[f]).fullmatch(folded)),
                        None)
             key = hit or folded
             if not hit:
@@ -433,12 +433,12 @@ def run_component(con, docs, clauses, batched, cache=None,
             "\n".join("%s: %s" % r for r in rows_)))
     for phrase in run_d("\n\n".join(material), stats, cache, progress):
         folded = normalize_fold(phrase)
-        if not any(concepts.term_pattern(terms[f]).fullmatch(folded)
+        if not any(begrepp.term_pattern(terms[f]).fullmatch(folded)
                    for f in terms):
             terms[folded] = phrase
 
     # verbatim pass: every term matched over every chain document
-    patterns = {f: concepts.term_pattern(t) for f, t in terms.items()}
+    patterns = {f: begrepp.term_pattern(t) for f, t in terms.items()}
     for doc in docs:
         for folded, pattern in patterns.items():
             # an *anchored* definition is the authoritative row and stands

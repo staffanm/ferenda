@@ -40,6 +40,7 @@ import brotli
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 
 from . import layout, patch
+from .errors import SkipDocument
 from .util import normalize_space, write_atomic
 
 RE_DOTS = re.compile(r"\.{4,}")                       # TOC dotted leaders
@@ -75,7 +76,7 @@ class Run:
     bold: bool
     italic: bool
     size: int = 0
-    # the run's typeface, folded to its family (`base_family`): the signal that
+    # the run's typeface, folded to its family (`_base_family`): the signal that
     # separates a chart's axis labels from the prose around them
     font: str = ""
 
@@ -113,7 +114,7 @@ class Para:
     # style spans over `text`, carried across the lines it was reflowed from
     spans: list[tuple[int, int, str]] = field(default_factory=list)
     boxed: bool = False   # set to a narrower measure than the body: a ruta
-    font: str = ""        # its typeface (`base_family`), 0-length when unknown
+    font: str = ""        # its typeface (`_base_family`), 0-length when unknown
 
 
 def command_digest(args):
@@ -206,6 +207,18 @@ def pdftohtml_xml(pdf_path, hidden=False):
             "-nodrm", str(pdf_path)]
     kind = "hidden.xml" if hidden else "xml"
     return _converted(pdf_path, layout.pdf_conversion(pdf_path, kind), args)
+
+
+def pdf_intermediate(pdf_path):
+    """A PDF's ``pdftohtml -xml`` output as text -- the intermediate the
+    PDF-bodied sources patch, and what their `Source.intermediate` provider
+    returns. Seven sources' whole provider (`lib.pdftext` rather than each
+    source's own, rule:second-use-goes-to-lib). A record that names a body the
+    store does not hold is a document with nothing to patch, not a broken
+    store, so it raises `SkipDocument`."""
+    if not Path(pdf_path).exists():
+        raise SkipDocument("no body PDF at %s" % pdf_path)
+    return pdftohtml_xml(pdf_path).decode("utf-8", "replace")
 
 
 def ocr_pdf(path, lang):
@@ -314,6 +327,31 @@ def pdf_first_page_text(pdf_path, pages=1):
     return normalize_space(out)
 
 
+def _pdftotext_stdin(pdf_bytes, *options):
+    """``pdftotext`` over bytes that are not (yet) a file. poppler reads the PDF
+    from stdin when the input name is ``-``, so a downloader holding a
+    just-fetched body needs no temporary file of its own -- five guidance
+    harvests, `rs` and `dv.namedcases` each staged one
+    (rule:second-use-goes-to-lib)."""
+    return subprocess.run(["pdftotext", *options, "-", "-"], input=pdf_bytes,
+                          capture_output=True, check=True).stdout
+
+
+def pdf_first_page_text_bytes(pdf_bytes, pages=1):
+    """:func:`pdf_first_page_text` over the bytes of a PDF, for the downloaders
+    that read a cover to name the document before they store it."""
+    return normalize_space(
+        _pdftotext_stdin(pdf_bytes, "-f", "1", "-l", str(pages))
+        .decode("utf-8", "replace"))
+
+
+def pdf_layout_text_bytes(pdf_bytes):
+    """A whole PDF's text with its physical layout preserved (``-layout``), over
+    bytes. For a document whose meaning is in its columns -- the HD named-cases
+    table, parsed per line by column gap."""
+    return _pdftotext_stdin(pdf_bytes, "-layout").decode("utf-8")
+
+
 def pdf_pages(pdf_path, patch_key=None, hidden=False):
     """(pageno, [Line]) per page via `pdftohtml -xml`. Each <text> fragment is
     one font run carrying <b>/<i>; fragments on the same baseline are one visual
@@ -336,7 +374,7 @@ def pdf_pages(pdf_path, patch_key=None, hidden=False):
     # (global ids, declared on the page each is first used on)
     sizes = {f.get("id"): int(f.get("size") or 0)
              for f in root.iter("fontspec")}
-    fonts = {f.get("id"): base_family(f.get("family"))
+    fonts = {f.get("id"): _base_family(f.get("family"))
              for f in root.iter("fontspec")}
     for page in root.findall("page"):
         spans = []
@@ -683,7 +721,7 @@ _FONT_STYLE_TOKENS = ("bolditalicmt", "boldmt", "italicmt", "psmt", "mt", "ps",
                       "regu")
 
 
-def base_family(name):
+def _base_family(name):
     """A pdftohtml font name folded to its typeface, lowercased: the subset tag
     and style suffixes dropped. `""` where the source names no font."""
     fam = re.sub(r"[^a-z]", "", RE_FONT_SUBSET.sub("", name or "").lower())
@@ -1925,7 +1963,7 @@ MAX_HEADING_LEVEL = 4
 RE_SUSPENDED_HYPHEN = re.compile(r"-\s*,.*-$")
 
 
-def modal_size(paras):
+def _modal_size(paras):
     """The running-text font size: the commonest size among the non-bold
     paragraphs. It is the yardstick everything else in a letterhead document is
     read against -- smaller is a footnote or the masthead, bold-and-larger is a
@@ -1981,7 +2019,7 @@ def classify_letterhead(paras, margin, masthead, by_size=False):
     larger than the body -- see :func:`heading_levels`), and consecutive headings
     of one level are one heading, which is how a title set across three lines
     arrives."""
-    body = modal_size(paras)
+    body = _modal_size(paras)
     levels = heading_levels(paras, body, by_size)
     blocks = []
     for p in paras:
@@ -2044,7 +2082,7 @@ def letterhead_footnotes(paras, margin, masthead):
 
     Additive on purpose: the block stream every caller already consumes is
     unchanged, so a vertical opts into footnotes by calling this as well."""
-    body = modal_size(paras)
+    body = _modal_size(paras)
     notes = []
     for p in paras:
         if not (body and p.size and p.size < body):
@@ -2111,7 +2149,7 @@ def ruled_footnotes(lines):
     note. So the lines below the rule must *also* be set smaller than the page's
     running size, which is what separates the two uses. A page with no rule, or
     whose rule has body-size text under it, comes back unchanged."""
-    body = modal_size(lines)
+    body = _modal_size(lines)
     if not body:
         return lines, []
     for i, l in enumerate(lines):

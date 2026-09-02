@@ -9,7 +9,8 @@ a vertical (or `api`); a vertical must never import a sibling vertical or
 Violations already known when this checker was introduced (review
 2026-07-01 §3.1) are allowlisted until their planned fixes land; in
 package-wide mode, entries that no longer match are reported as stale so
-the allowlist can only shrink.
+the allowlist can only shrink. The allowlist holds exactly one entry, the
+sanctioned browse-through-the-API inversion (see ALLOWLIST below).
 
 Usage:
     check-layers.py                    # whole package + stale-entry check
@@ -25,17 +26,19 @@ import sys
 from pathlib import Path
 
 VERTICALS = {"sfs", "dv", "eurlex", "forarbete", "foreskrift", "avg", "wiki",
-             "remisser", "site", "hudoc", "coe", "icrc", "untc", "icc", "edpb",
-             "rs", "stats"}
+             "remisser", "site", "hudoc", "coe", "icrc", "untc", "icc", "icj",
+             "guidance", "lawreview", "rs", "stats"}
 RESTRICTED = VERTICALS | {"api"}
 
 # (module file relative to the package, imported ferenda-submodule
 # truncated to two components). Review §3.1 OPEN items; delete entries as
-# the fixes land. Empty since the browse generator -- the last lib/ module that
-# imported api.app, to render the browse pages through the in-process REST
-# client -- moved out of lib/ into ferenda/browse.py, where importing both
-# the API and the render layer is the normal direction.
-ALLOWLIST: set[tuple[str, str]] = set()
+# the fixes land. One entry: the browse generator renders the corpus-wide
+# browse pages through the in-process REST client, so the static listings are
+# byte-for-byte what the API serves and cannot drift from it. That is the one
+# sanctioned inversion of the layer rule (docs/developing/architecture.md,
+# "One sanctioned inversion"); it is one-way and confined to aggregate-page
+# generation.
+ALLOWLIST: set[tuple[str, str]] = {("site/browse.py", "api.app")}
 
 
 def zone(rel: Path) -> str:

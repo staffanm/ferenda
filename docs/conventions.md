@@ -56,7 +56,7 @@ home for anything generic — the `foreskrift` harvest engine belongs in
 ### rule:respect-politeness
 
 Every action for any source that downloads more than a single resource
-must respect `ferenda.build.POLITENESS` (or accept a `delay` parameter
+must respect `ferenda.lib.stage.POLITENESS` (or accept a `delay` parameter
 that defaults to it). Multi-item network operations — harvests, scan
 downloads, index walks, and body refetches — must sleep between network
 fetches to avoid overwhelming upstream servers or triggering rate limits.
@@ -83,8 +83,12 @@ must not kill a corpus run:
 - the shared download walk, and `fan_out`'s scope boundary (`lib/harvest.py`) — one broken host's scope is reported
   with its traceback and the run ends red with a summary naming it; the
   other scopes complete
-- the build driver's per-document boundary (`build.py`)
-- the build driver's lost-document rebuild (`build.py`) — a worker that dies
+- the build driver's per-document boundary (`lib/freshness.py`, `ensure`)
+- the build driver's per-source download boundary (`lib/corpus.py`,
+  `_run_harvest`) — one source's harvest failure must not abort the remaining
+  sources of `lagen all download`; the traceback is printed, the ledger segment
+  records `status="errors"`, and the run exits nonzero at the end
+- the build driver's lost-document rebuild (`lib/freshness.py`) — a worker that dies
   hard (the heap corruption at `MAX_DOCS_PER_WORKER`, about one document in
   100 000) loses its in-flight result. `_rebuild_isolated` retries that one
   document in a fresh subprocess. This catches a *named* exception, not
@@ -111,8 +115,9 @@ must not kill a corpus run:
   works around, the same answer the versions stage gives a corrupt archive
   file; an unreadable *current* download refuses the corpus rather than
   writing a history that a later repair would append out of order
-- `remisser ai-analyze`'s per-answer boundary (`build.py`) — one answer the
-  model twice fails to analyse usably must not abandon the other fifty of
+- `remisser ai-analyze`'s per-answer boundary (`remisser/ai_analyze.py`,
+  `analyze_all`) — one answer the model twice fails to analyse usably
+  must not abandon the other fifty of
   its ärende. This one catches a *named* exception, not `Exception`:
   `remisser.ai_analyze.Unanalyzable`, raised only where `llm.author` gives
   up after its retry. Everything else `analyze` can raise is permanent (a

@@ -182,7 +182,7 @@ def document_text(art):
     return " ".join(p for p in parts if p).strip()
 
 
-def id_nodes(node):
+def _id_nodes(node):
     """Every id-bearing node in a body subtree, in document order.
 
     The one walk behind `fragment_ids`, `fragment_texts` and `fragment_text`
@@ -196,15 +196,15 @@ def id_nodes(node):
         if node.get("id"):
             yield node
         for value in node.values():
-            yield from id_nodes(value)
+            yield from _id_nodes(value)
     elif isinstance(node, list):
         for item in node:
-            yield from id_nodes(item)
+            yield from _id_nodes(item)
 
 
 def _body_id_nodes(art):
     for nodes in body_sections(art):
-        yield from id_nodes(nodes)
+        yield from _id_nodes(nodes)
 
 
 def fragment_ids(art):
@@ -212,7 +212,7 @@ def fragment_ids(art):
     K1P2S1N4, …) -- the id vocabulary an authored layer's pinpoint is checked
     against (forarbete.genomforande.resolve).
 
-    Shares `body_sections` and the `id_nodes` walk with `fragment_texts` and
+    Shares `body_sections` and the `_id_nodes` walk with `fragment_texts` and
     `fragment_text`; that walk's docstring states the invariant."""
     return {node["id"] for node in _body_id_nodes(art)}
 

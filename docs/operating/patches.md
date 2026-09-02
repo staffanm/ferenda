@@ -63,7 +63,7 @@ pushes it automatically.
 The six folkrätt sources — `hudoc`, `coe`, `icrc`, `untc`, `icc`, `icj` — apply a patch
 at parse time the same way (`patch.apply` on the stored record/HTML text for
 `hudoc`/`icrc`/`untc`, a `patch_key` threaded into `lib.pdftext.pdf_pages` for the
-PDF-bodied `coe`/`icc`/`icj`), but none has a `patchsource.py` `_INTERMEDIATE` entry, so
+PDF-bodied `coe`/`icc`/`icj`), but none sets `Source.intermediate` on its registration, so
 `mkpatch`/the web editor cannot generate a pristine intermediate to diff against
 for them — only a hand-written diff against the stored source text applies.
 

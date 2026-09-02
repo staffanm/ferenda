@@ -582,7 +582,7 @@ def parse_article(article, blocks):
     num = _article_number(article)
     # TI.ART is the article's designation ("Artikel 5"), STI.ART its title --
     # which most articles do not have. Kept apart: the page hangs the
-    # designation in a gutter beside the title (see parse_division).
+    # designation in a gutter beside the title (see _parse_division).
     blocks.append(Block("article", _text(article, "STI.ART"), num=num, anchor=num,
                         label=_text(article, "TI.ART") or None))
     parags = article.findall("PARAG")
@@ -624,7 +624,7 @@ def _emit_stycken(alineas, num, blocks, start):
     return 0 if num else start + len(units)
 
 
-def parse_division(division, level, blocks):
+def _parse_division(division, level, blocks):
     # the source keeps the designation and the title apart -- <TI>KAPITEL I</TI>
     # beside <STI>ALLMÄNNA BESTÄMMELSER</STI> -- and the page sets them apart
     # too, so the block keeps them apart rather than flattening the pair into
@@ -637,12 +637,12 @@ def parse_division(division, level, blocks):
         blocks.append(Block("heading", title, level=level, label=designation))
     for child in division:
         if child.tag == "DIVISION":
-            parse_division(child, level + 1, blocks)
+            _parse_division(child, level + 1, blocks)
         elif child.tag == "ARTICLE":
             parse_article(child, blocks)
 
 
-def parse_preamble(preamble, blocks):
+def _parse_preamble(preamble, blocks):
     for child in preamble:
         if child.tag == "PREAMBLE.INIT" or child.tag == "PREAMBLE.FINAL":
             text = flatten(child)
@@ -685,11 +685,11 @@ def parse_act_body(elem, blocks):
     restates the document title, so it is not emitted as a heading."""
     for child in elem:
         if child.tag == "DIVISION":
-            parse_division(child, 1, blocks)
+            _parse_division(child, 1, blocks)
         elif child.tag == "ARTICLE":
             parse_article(child, blocks)
         elif child.tag == "PREAMBLE":
-            parse_preamble(child, blocks)
+            _parse_preamble(child, blocks)
         elif child.tag == "PREAMBLE.GEN":       # the Charter's "Ingress"
             walk_content(child, blocks)
         elif child.tag in ("ENACTING.TERMS", "GR.SEQ"):
@@ -939,7 +939,7 @@ def parse_judgment(root, blocks):
         blocks.append(Block("paragraph", flatten(init)))
     preamble = root.find("PREAMBLE")
     if preamble is not None:
-        parse_preamble(preamble, blocks)
+        _parse_preamble(preamble, blocks)
     contents = root.find("CONTENTS.JUDGMENT")
     if contents is not None:
         _case_contents(contents, blocks)
@@ -1080,7 +1080,7 @@ def _quoted_unit(el, blocks):
                                  blocks)
         elif tag == "CONSID":
             # a quoted recital numbers itself "(6)" inside its own NP, the way
-            # `parse_preamble` reads it for an act: the number is the block's
+            # `_parse_preamble` reads it for an act: the number is the block's
             # marker, not the opening of its text
             np = child.find("NP")
             if np is None:
@@ -1499,7 +1499,7 @@ def walk_content(elem, blocks, level=2):
         elif tag == "TOC":
             _emit_toc(child, blocks)
         elif tag == "DIVISION":
-            parse_division(child, level, blocks)
+            _parse_division(child, level, blocks)
         elif tag == "ARTICLE":
             parse_article(child, blocks)
         elif tag in ("NOTE", "GR.NOTES", "BIB.INSTANCE"):

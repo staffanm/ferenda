@@ -6,7 +6,8 @@ import os
 import pytest
 
 from ferenda.lib import catalog, compress
-from ferenda.subdomains import (
+from ferenda.sfs.render import render_chapter
+from ferenda.site.subdomains import (
     layout,
     named_span_rows,
     standalone_rows,
@@ -134,7 +135,7 @@ def test_write_sub_tree_merges_whole_act_and_standalone_by_default(tmp_path, mon
     (tmp_path / "site" / "subdomain" / "lagen.nu").mkdir(parents=True)
     (tmp_path / "site" / "subdomain" / "lagen.nu" / "jante.md").write_text(
         "---\ntitle: Jantelagen\n---\n\nprosa.\n", encoding="utf-8")
-    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", tmp_path)
+    monkeypatch.setattr("ferenda.site.subdomains.layout.WIKI_ROOT", tmp_path)
 
     generated = tmp_path / "generated"
     (generated / "subdomain" / "lagen.nu").mkdir(parents=True)
@@ -152,14 +153,14 @@ def test_write_sub_tree_rejects_a_whole_act_and_standalone_name_collision(tmp_pa
     (tmp_path / "site" / "subdomain" / "lagen.nu").mkdir(parents=True)
     (tmp_path / "site" / "subdomain" / "lagen.nu" / "avtals.md").write_text(
         "---\ntitle: Avtals\n---\n\nprosa.\n", encoding="utf-8")
-    monkeypatch.setattr("ferenda.subdomains.layout.WIKI_ROOT", tmp_path)
+    monkeypatch.setattr("ferenda.site.subdomains.layout.WIKI_ROOT", tmp_path)
 
     with pytest.raises(ValueError, match="avtals.lagen.nu"):
         write_sub_tree(tmp_path / "generated")
 
 
 def test_write_sub_tree_symlink_resolves_under_a_different_mount_prefix(tmp_path):
-    # ferenda/subdomains.py runs inside the `ferenda` container, which mounts
+    # ferenda/site/subdomains.py runs inside the `ferenda` container, which mounts
     # the data root at /app/site/data; nginx mounts the SAME host directory
     # at /usr/share/nginx/generated. An absolute symlink target resolves for
     # whichever container wrote it and is a dangling link for the other one
@@ -206,7 +207,7 @@ def test_named_span_rows_reads_namedlaws_json(tmp_path, monkeypatch):
         ("1970:994", "hyreslagen", "K12", "K12", "..."),
         ("1962:700", "samtyckeslagen", "K6P1", "K6P1", "..."),
     ])
-    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
+    monkeypatch.setattr("ferenda.site.subdomains.SFS_NAMEDLAWS", namedlaws)
     assert named_span_rows() == {
         "hyres.lagen.nu": "/1970:994#K12-K12",
         "samtyckes.lagen.nu": "/1962:700#K6P1-K6P1",
@@ -217,7 +218,7 @@ def test_named_span_rows_empty_without_any_spans(tmp_path, monkeypatch):
     namedlaws = tmp_path / "namedlaws.json"
     namedlaws.write_text(json.dumps({"1970:994": {"label": "jordabalken"}}),
                          encoding="utf-8")
-    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
+    monkeypatch.setattr("ferenda.site.subdomains.SFS_NAMEDLAWS", namedlaws)
     assert named_span_rows() == {}
 
 
@@ -242,10 +243,10 @@ def test_write_chapter_pages_renders_the_target_chapter(tmp_path, monkeypatch):
         ("1970:994", "hyreslagen", "K12", "K12",
          "Hyreslagen är jordabalkens tolfte kapitel."),
     ])
-    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
+    monkeypatch.setattr("ferenda.site.subdomains.SFS_NAMEDLAWS", namedlaws)
 
     artifact_root = tmp_path / "artifact"
-    monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", artifact_root)
+    monkeypatch.setattr("ferenda.site.subdomains.layout.ARTIFACT", artifact_root)
     art_path = layout.artifact("sfs", "1970:994")
     art_path.parent.mkdir(parents=True, exist_ok=True)
     art_path.write_text(json.dumps(CHAPTERED_ACT), encoding="utf-8")
@@ -255,7 +256,7 @@ def test_write_chapter_pages_renders_the_target_chapter(tmp_path, monkeypatch):
     con = catalog.connect(db)
 
     generated = tmp_path / "generated"
-    write_chapter_pages(generated, con)
+    write_chapter_pages(generated, con, render_chapter)
 
     dest = generated / "subdomain" / "lagen.nu" / "hyres.html"
     assert compress.exists(dest)
@@ -271,13 +272,13 @@ def test_write_chapter_pages_skips_a_row_whose_act_is_not_built_yet(tmp_path, mo
     _write_namedlaws(namedlaws, [
         ("1970:994", "hyreslagen", "K12", "K12", "..."),
     ])
-    monkeypatch.setattr("ferenda.subdomains.SFS_NAMEDLAWS", namedlaws)
-    monkeypatch.setattr("ferenda.subdomains.layout.ARTIFACT", tmp_path / "artifact")
+    monkeypatch.setattr("ferenda.site.subdomains.SFS_NAMEDLAWS", namedlaws)
+    monkeypatch.setattr("ferenda.site.subdomains.layout.ARTIFACT", tmp_path / "artifact")
 
     db = str(tmp_path / "catalog.sqlite")
     catalog.rebuild(db, "sfs", [])
     con = catalog.connect(db)
 
     generated = tmp_path / "generated"
-    write_chapter_pages(generated, con)   # no artifact on disk -- must not raise
+    write_chapter_pages(generated, con, render_chapter)   # no artifact: must not raise
     assert not (generated / "subdomain").exists()
