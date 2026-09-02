@@ -16,7 +16,7 @@ extend time-limits are out -- see `download.in_scope`.
 import re
 from dataclasses import dataclass, field
 
-from ..lib.artifact import numbered_nodes
+from ..lib.artifact import Block, numbered_nodes
 from ..lib.catalog import BASE
 
 COURT_EN = "International Court of Justice"
@@ -75,14 +75,6 @@ def case_uri(case):
     """The Court's own page for a case ("070" -> .../case/70). The case number
     is zero-padded in filenames and bare in URLs."""
     return "%s/case/%d" % (SITE, int(case))
-
-
-@dataclass
-class Block:
-    kind: str                    # rubrik | stycke
-    text: str
-    level: int = 1
-    number: str | None = None
 
 
 @dataclass

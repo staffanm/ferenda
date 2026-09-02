@@ -17,8 +17,8 @@ second consumer and the grammar moves to ``lib`` then (rule:second-use-goes-to-l
 import re
 from dataclasses import dataclass, field
 
+from ..lib.artifact import provision_nodes, prune
 from ..lib.catalog import BASE
-from ..lib.lagrum import interleave
 
 PUBLISHER = "International Committee of the Red Cross"
 SITE = "https://ihl-databases.icrc.org"
@@ -50,7 +50,10 @@ def treaty_uri(number):
 class Provision:
     """One node of a treaty's content tree.  `kind` is the artifact node type
     (``artikel`` for operative provisions, ``rubrik`` for structural headings);
-    `paragraphs` is the article body split into its stycken (empty for a heading)."""
+    `paragraphs` is the article body split into its stycken (empty for a
+    heading). Names its fields as `lib.artifact.provision_nodes` reads them, so
+    the projection takes this class as it is; `section` is the ICRC's own raw
+    label, which only the parse cares about."""
     kind: str
     section: str                 # raw ICRC section: Article / Annex / Chapter …
     heading: str                 # "Article 1 - Respect for the Convention"
@@ -119,25 +122,6 @@ class Treaty:
     def source_url(self):
         return SITE + "/en" + self.slug if self.slug else None
 
-    def _structure(self, refs_for=None):
-        def runs(text):
-            return interleave(text, refs_for(text)) if refs_for else [text]
-        structure = []
-        for prov in self.provisions:
-            if prov.kind == "rubrik":
-                structure.append({"type": "rubrik", "level": 1,
-                                  "text": [prov.heading]})
-                continue
-            children = [{"type": "stycke", "id": "%sS%d" % (prov.fragment, i),
-                         "text": runs(para)}
-                        for i, para in enumerate(prov.paragraphs, 1)]
-            node = {"type": "artikel", "id": prov.fragment,
-                    "text": [prov.heading], "children": children}
-            if prov.ordinal:
-                node["ordinal"] = prov.ordinal
-            structure.append(node)
-        return structure
-
     def to_artifact(self, refs_for=None, references=()):
         metadata = {
             "title": self.title,
@@ -152,7 +136,7 @@ class Treaty:
             "statesParties": len(self.parties),
             "historical": self.historical,
         }
-        art = {
+        return prune({
             "uri": self.uri,
             "type": "internationell-overenskommelse",
             "doctype": self.kind,
@@ -162,11 +146,8 @@ class Treaty:
             "date": self.adoption_date,
             "metadata": metadata,
             "references": list(references),
-            "structure": self._structure(refs_for),
+            "structure": provision_nodes(self.provisions, refs_for),
             "parties": [party.to_dict() for party in self.parties],
-        }
-        if self.summary:
-            art["summary"] = self.summary
-        if self.source_url:
-            art["source_url"] = self.source_url
-        return art
+            "summary": self.summary,
+            "source_url": self.source_url,
+        })

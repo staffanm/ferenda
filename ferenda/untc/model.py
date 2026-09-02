@@ -25,7 +25,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..lib.artifact import unique_id
+from ..lib.artifact import Provision as ArtifactProvision
+from ..lib.artifact import provision_nodes, prune
 from ..lib.catalog import BASE
 
 PUBLISHER = "United Nations"
@@ -112,32 +113,23 @@ class Treaty:
         return DETAIL % (self.mtdsg_no, self.chapter)
 
     def _structure(self):
-        """The treaty's articles as the node shape `icrc` already mints, so both
-        treaty corpora anchor a citation the same way: an ``artikel`` node keyed
-        on its fragment (``A5``, ``AII``) over one ``stycke`` per paragraph.
+        """The treaty's articles as the shared provision projection mints them,
+        which is the node shape `icrc` mints too, so both treaty corpora anchor
+        a citation the same way: an ``artikel`` node keyed on its fragment
+        (``A5``, ``AII``) over one ``stycke`` per paragraph.
 
-        Anchors run through `unique_id` because a treaty numbers Article 1 more
-        than once: UNCLOS restarts at 1 in each of its nine annexes.
-        `text.provisions` scopes every annex it reads, so no anchor in the
-        fourteen needs a suffix today; this stays as the net, because an
-        ambiguous anchor is one unreachable article."""
-        structure, ids = [], {}
-        for provision in self.provisions:
-            base = provision.fragment or "Preamble"
-            anchor = unique_id(base, ids)
-            children = [{"type": "stycke", "id": "%sS%d" % (anchor, index),
-                         "text": [paragraph]}
-                        for index, paragraph in enumerate(provision.paragraphs, 1)]
-            node = {"type": "artikel", "id": anchor,
-                    "text": [provision.heading], "children": children}
-            # only an article has an ordinal; an annex that carries text of its
-            # own ("AnnexI", UNCLOS's list of highly migratory species) is a
-            # provision under its own name and numbers nothing
-            match = RE_ORDINAL.match((provision.fragment or "").rsplit("_", 1)[-1])
-            if match:
-                node["ordinal"] = match.group(1)
-            structure.append(node)
-        return structure
+        This source's own `Provision` states no ordinal -- the article number is
+        read back out of the fragment here, since only an article has one: an
+        annex that carries text of its own ("AnnexI", UNCLOS's list of highly
+        migratory species) is a provision under its own name and numbers
+        nothing."""
+        return provision_nodes(
+            ArtifactProvision(
+                heading=provision.heading, fragment=provision.fragment,
+                ordinal=(match.group(1) if (match := RE_ORDINAL.match(
+                    (provision.fragment or "").rsplit("_", 1)[-1])) else None),
+                paragraphs=provision.paragraphs)
+            for provision in self.provisions)
 
     def to_artifact(self):
         metadata = {
@@ -153,7 +145,7 @@ class Treaty:
             "statesParties": sum(1 for p in self.parties if p.action),
             "signatories": sum(1 for p in self.parties if p.signature),
         }
-        art = {
+        return prune({
             "uri": self.uri,
             "type": "internationell-overenskommelse",
             "doctype": self.kind,
@@ -166,5 +158,4 @@ class Treaty:
             "structure": self._structure(),
             "parties": [party.to_dict() for party in self.parties],
             "source_url": self.source_url,
-        }
-        return art
+        })

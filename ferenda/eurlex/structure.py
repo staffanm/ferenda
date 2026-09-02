@@ -27,6 +27,7 @@ block-kind constants come back from there so producer and consumers share one
 vocabulary.
 """
 
+from ..lib.artifact import nest_by_level
 from ..lib.eu_structure import ARTICLE as _ARTICLE
 from ..lib.eu_structure import PARAGRAPH as _PARAGRAPH
 from ..lib.eu_structure import POINT as _POINT
@@ -42,49 +43,45 @@ _CLOSERS = ("ruling", "signature")
 
 def nest(blocks):
     """Flat EU-act block dicts -> a nested `structure` list."""
-    root = []
-    divs = []                 # open division nodes, increasing `level`
     article = parag = None    # current open article / paragraph
 
-    def parent():
-        return divs[-1]["children"] if divs else root
+    def division(b):
+        """A division opens a fresh run: the article it interrupts is closed."""
+        nonlocal article, parag
+        article = parag = None
+        return {**b, "children": []}
 
-    for b in blocks:
+    def content(b, siblings):
+        """Everything below the division level, into `siblings` -- the open
+        division's children, or the root."""
+        nonlocal article, parag
         t = b.get("type")
-        if t == _DIVISION:
-            level = b.get("level") or 1
-            while divs and (divs[-1].get("level") or 1) >= level:  # ty: ignore[unsupported-operator]  # artifact block dicts are untyped; level is int when present
-                divs.pop()
-            node = {**b, "children": []}
-            parent().append(node)
-            divs.append(node)
-            article = parag = None
-        elif t == _ARTICLE:
-            node = {**b, "children": []}
-            parent().append(node)
-            article, parag = node, None
+        if t == _ARTICLE:
+            article, parag = {**b, "children": []}, None
+            siblings.append(article)
         elif t == _PARAGRAPH:
-            node = {**b, "children": []}
-            (article["children"] if article else parent()).append(node)
-            parag = node
-        elif t == _STYCKE:
-            # a further sub-paragraph of the open paragraph (or of the article,
-            # when its stycken sit directly under it); it does not open a new
-            # paragraph, so the points that follow keep hanging off the same one
+            parag = {**b, "children": []}
+            (article["children"] if article else siblings).append(parag)
+        elif t in (_STYCKE, _POINT):
+            # a stycke is a further sub-paragraph of the open paragraph (or of
+            # the article, when its stycken sit directly under it); it opens no
+            # new paragraph, so the points that follow keep hanging off the same
+            # one, and a point takes the same parent
             target = parag or article
-            (target["children"] if target else parent()).append(dict(b))
-        elif t == _POINT:
-            target = parag or article
-            (target["children"] if target else parent()).append(dict(b))
+            (target["children"] if target else siblings).append(dict(b))
         elif t == _QUOTATION:
             # an act quoted verbatim belongs to the paragraph that introduces
             # it ("I artikel 25 i detta direktiv föreskrevs följande:"), so it
             # hangs off that paragraph rather than off the section around it.
             # It opens nothing: the paragraph stays current, and the quoted
             # act's own points are already inside the quotation's own blocks
-            (parag["children"] if parag else parent()).append(dict(b))
+            (parag["children"] if parag else siblings).append(dict(b))
         else:
-            parent().append(dict(b))
+            siblings.append(dict(b))
             if t in _CLOSERS:
                 article = parag = None
-    return root
+
+    return nest_by_level(
+        blocks,
+        lambda b: (b.get("level") or 1) if b.get("type") == _DIVISION else None,
+        division, content)

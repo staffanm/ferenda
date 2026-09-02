@@ -28,6 +28,7 @@ page list the regulations issued under it.
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import prune
 from .agencies import REGISTRY
 
 BASE = "https://lagen.nu"
@@ -148,8 +149,11 @@ class Regulation:
 
     def to_artifact(self):
         """The on-disk artifact: a plain dict, the source of truth, shaped like
-        the other verticals' artifacts (a typed envelope the catalog walks)."""
-        art = {
+        the other verticals' artifacts (a typed envelope the catalog walks).
+        `prune` drops the keys a given föreskrift has nothing for -- an
+        unparsed body, no consolidation, no ändringsföreskrifter -- so the
+        JSON says what that document has (rule:artifact-is-truth)."""
+        return prune({
             "type": "foreskrift",
             "uri": self.uri,
             "identifier": self.identifier,
@@ -183,9 +187,6 @@ class Regulation:
                  "beslutsdatum": a.beslutsdatum}
                 for a in self.amendments
             ],
-        }
-        if self.footnotes:
-            art["footnotes"] = self.footnotes
-        if self.source_url:
-            art["source_url"] = self.source_url
-        return art
+            "footnotes": self.footnotes,
+            "source_url": self.source_url,
+        })

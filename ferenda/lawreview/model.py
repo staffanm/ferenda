@@ -23,7 +23,7 @@ page), ``jp/2026-01-03`` (issue, then place in the issue), ``urt/2026-1-147``
 
 from dataclasses import dataclass, field
 
-from ..lib.artifact import scanned_nodes
+from ..lib.artifact import prune, scanned_nodes
 from ..lib.catalog import BASE
 from ..lib.util import approximate_date
 from .journals import BY_KOD, SCOPES
@@ -103,27 +103,20 @@ class Artikel:
         euar items' "Publicerad" line) stands as it is, and a bare year is
         widened to a representative day (`lib.util.approximate_date` fills
         its middle). The issue's year stays a separate field."""
-        structure = scanned_nodes(self.body, scanner)
-        metadata = {"title": self.titel, "publisher": self.publisher,
-                    "year": self.year}
-        if self.kind:
-            metadata["typ"] = self.kind
-        if self.fattare:
-            metadata["fattare"] = self.fattare
-        if self.sida:
-            metadata["sida"] = self.sida
-        art = {"uri": self.uri, "type": "juridisk_artikel",
-               "journal": self.journal,
-               "date": self.date or approximate_date(self.year),
-               "identifier": self.identifier,
-               "metadata": metadata, "structure": structure}
-        if self.sammanfattning:
-            art["sammanfattning"] = self.sammanfattning
-        if self.source_url:
-            art["source_url"] = self.source_url
-        if self.document_url:
-            art["document_url"] = self.document_url
-        return art
+        return prune({
+            "uri": self.uri, "type": "juridisk_artikel",
+            "journal": self.journal,
+            "date": self.date or approximate_date(self.year),
+            "identifier": self.identifier,
+            "metadata": prune({"title": self.titel, "publisher": self.publisher,
+                               "year": self.year,
+                               "typ": self.kind,
+                               "fattare": self.fattare,
+                               "sida": self.sida}),
+            "structure": scanned_nodes(self.body, scanner),
+            "sammanfattning": self.sammanfattning,
+            "source_url": self.source_url,
+            "document_url": self.document_url})
 
 
 # --------------------------------------------------------------------------

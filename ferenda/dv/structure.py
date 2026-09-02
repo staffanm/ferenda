@@ -30,10 +30,13 @@ the golden compares; paragraph membership for rendering is a later concern.
 
 import re
 
+from ..lib.artifact import flatten as flatten_nodes
+
 # nesting depth of each structural kind (outermost = 1)
 RANK = {"delmal": 1, "instans": 2,
         "betankande": 3, "dom": 3, "skiljaktig": 3, "tillagg": 3,
         "domskal": 4, "domslut": 4}
+WRAPPERS = frozenset(RANK)      # the structural kinds, as `flatten` reads them
 
 # a court name in its full form (the form the golden records on an instans).
 # Ordered longest-first within each family so the fullest surface form wins.
@@ -308,11 +311,7 @@ def nest(blocks):
 def flatten(structure):
     """Document-order prose leaves of a content-bearing DV structure -- the
     structural wrapper nodes (instans/dom/domskäl/…) are transparent, their prose
-    children hoisted -- for the linear renderer."""
-    out = []
-    for node in structure:
-        if node.get("type") in RANK:          # a structural wrapper -> descend
-            out.extend(flatten(node["children"]))
-        else:
-            out.append(node)
-    return out
+    children hoisted -- for the linear renderer. A wrapper carries no block of
+    its own (it is opened by a marker that stays with the prose), so it needs no
+    `marker` and simply disappears."""
+    return flatten_nodes(structure, containers=WRAPPERS)

@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..lib.artifact import numbered_nodes
+from ..lib.artifact import Block, numbered_nodes, prune
 from ..lib.catalog import BASE
 
 COURT = "International Criminal Court"
@@ -41,14 +41,6 @@ def doc_basefile(doc_number):
 
 def decision_uri(doc_number):
     return "%sicc/%s" % (BASE, doc_basefile(doc_number))
-
-
-@dataclass
-class Block:
-    kind: str                    # rubrik | stycke
-    text: str
-    level: int = 1
-    number: str | None = None
 
 
 @dataclass
@@ -87,7 +79,7 @@ class Decision:
             "chamber": self.chamber,
             "decisionType": self.decision_type,
         }
-        art = {
+        return prune({
             "uri": self.uri,
             "type": "avgorande",
             "court": "icc",
@@ -100,5 +92,4 @@ class Decision:
             "references": self.references,
             "structure": structure,
             "source_url": self.source_url,
-        }
-        return art
+        })

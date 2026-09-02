@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from ..lib.artifact import prune
 from ..lib.coe import treaty_number, treaty_uri
 
 TREATY_OFFICE = "Council of Europe Treaty Office"
@@ -51,7 +52,7 @@ class Treaty:
             metadata["swedishImplementation"] = SFS_ECHR
             references.append({"uri": SFS_ECHR, "predicate": "rdfs:seeAlso",
                                "text": "SFS 1994:1219"})
-        art = {
+        return prune({
             "uri": self.uri,
             "type": "internationell-overenskommelse",
             "doctype": self.kind,
@@ -62,9 +63,6 @@ class Treaty:
             "metadata": metadata,
             "references": references,
             "structure": self.structure,
-        }
-        if self.summary:
-            art["summary"] = self.summary
-        if self.source_url:
-            art["source_url"] = self.source_url
-        return art
+            "summary": self.summary,
+            "source_url": self.source_url,
+        })

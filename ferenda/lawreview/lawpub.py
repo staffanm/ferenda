@@ -50,7 +50,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from ..lib import compress, net
-from ..lib.artifact import scanned_nodes
+from ..lib.artifact import prune, scanned_nodes
 from ..lib.harvest import (
     HarvestWatermark,
     document_item_key,
@@ -396,26 +396,20 @@ class Artikel:
         carries none -- the catalog lists undated documents last and prints
         no date, and an invented date would missort them. `journal` is the
         scope, the axis the catalog's lawreview kind projection reads."""
-        structure = scanned_nodes(self.body, scanner)
-        metadata = {"title": self.titel, "publisher": self.publisher,
-                    "utgivare": self.utgivare}
-        if self.utgava:
-            metadata["utgava"] = self.utgava
-        if self.fattare:
-            metadata["fattare"] = self.fattare
-        if self.sida:
-            metadata["sida"] = self.sida
-        art = {"uri": self.uri, "type": "juridisk_artikel",
-               "journal": "lawpub",
-               "identifier": self.identifier,
-               "metadata": metadata, "structure": structure}
-        if self.date:
-            art["date"] = self.date
-        if self.source_url:
-            art["source_url"] = self.source_url
-        if self.document_url:
-            art["document_url"] = self.document_url
-        return art
+        return prune({
+            "uri": self.uri, "type": "juridisk_artikel",
+            "journal": "lawpub",
+            "date": self.date,
+            "identifier": self.identifier,
+            "metadata": prune({"title": self.titel,
+                               "publisher": self.publisher,
+                               "utgivare": self.utgivare,
+                               "utgava": self.utgava,
+                               "fattare": self.fattare,
+                               "sida": self.sida}),
+            "structure": scanned_nodes(self.body, scanner),
+            "source_url": self.source_url,
+            "document_url": self.document_url})
 
 
 def parse(basefile, root):

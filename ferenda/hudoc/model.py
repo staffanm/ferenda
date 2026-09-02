@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ..lib.artifact import numbered_nodes
+from ..lib.artifact import Block, numbered_nodes, prune
 from ..lib.coe import hudoc_articles
 from ..lib.lagrum import ECHR_BASE
 
@@ -46,14 +46,6 @@ def document_kind(collection):
         if token in values:
             return kind
     return "case-law"
-
-
-@dataclass
-class Block:
-    kind: str                    # rubrik | stycke | note
-    text: str
-    level: int = 1
-    number: str | None = None
 
 
 @dataclass
@@ -117,7 +109,7 @@ class HudocCase:
             "articles": self.article_codes,
             "conclusions": self.conclusions,
         }
-        art = {
+        return prune({
             "uri": self.uri,
             "type": "avgorande",
             "court": "echr",
@@ -129,13 +121,12 @@ class HudocCase:
             "references": references,
             "structure": structure,
             "source_url": ITEM_URL % self.itemid,
-        }
-        if self.ecli:
-            art["ecli"] = self.ecli
-        if self.summary:
-            # both keys are an invariant of the sidecar `summaries.store` writes;
-            # reading them straight makes a sidecar-shape change fail loudly
-            art["summary"] = {"itemid": self.summary["itemid"],
-                              "title": self.summary["docname"],
-                              "url": ITEM_URL % self.summary["itemid"]}
-        return art
+            "ecli": self.ecli,
+            # both summary keys are an invariant of the sidecar
+            # `summaries.store` writes; reading them straight makes a
+            # sidecar-shape change fail loudly
+            "summary": {"itemid": self.summary["itemid"],
+                        "title": self.summary["docname"],
+                        "url": ITEM_URL % self.summary["itemid"]}
+                       if self.summary else None,
+        })

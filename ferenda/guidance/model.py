@@ -37,7 +37,7 @@ the address.
 
 from dataclasses import dataclass, field
 
-from ..lib.artifact import footnote_nodes, scanned_nodes
+from ..lib.artifact import Fotnot, footnote_nodes, prune, scanned_nodes
 from ..lib.catalog import BASE
 from .issuers import BY_KOD, BY_SERIE, publisher_of
 
@@ -87,17 +87,6 @@ class Block:
 
 
 @dataclass
-class Fotnot:
-    """A note set below the running text. `mark` is the marker the document
-    printed; `text` is the note body, citation-linked like any other. These
-    carry the guidance's own apparatus -- the yttranden it builds on, the
-    EU-domstolens judgments it reads -- which is much of what a riktlinje cites
-    outside the rättsakt itself."""
-    mark: str
-    text: str
-
-
-@dataclass
 class Vagledning:
     utgivare: str                       # issuers.KODER
     serie: str | None                   # the issuer's series kod, or None
@@ -133,7 +122,7 @@ class Vagledning:
                                         # it governed conduct while it stood --
                                         # but it no longer states current
                                         # practice, so it drops out of every
-                                        # listing (`catalog._expired_date`)
+                                        # listing (`catalog_rows._expired_date`)
     ersatt_av_url: str | None = None    # the *body's* own page for that later
                                         # wording. Kept apart from `ersatt_av`
                                         # because a harvest can know that a
@@ -180,41 +169,33 @@ class Vagledning:
         for b, node in zip(self.body, structure, strict=True):
             if b.punkt:
                 node["punkt"] = b.punkt
-        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
-        metadata = {"title": self.titel, "publisher": self.publisher,
-                    "nummer": self.nummer, "sprak": self.sprak}
-        if self.ersatt_av or self.ersatt_av_url:
-            # the shared repeal vocabulary (`catalog._expired_date`), which is
-            # what drops a superseded document from the browse trees, the feeds,
-            # the search results and other documents' citation rails while
-            # leaving its page reachable by direct link. The EBA states no date
-            # for it -- its version pages carry no repeal marker at all -- so
-            # `status` stands alone and the column takes its date-free form.
-            metadata["status"] = "upphävt"
-            if self.ersatt_av:
-                metadata["ersattAv"] = self.ersatt_av
-            if self.ersatt_av_url:
-                metadata["ersattAvKalla"] = self.ersatt_av_url
-            if self.ersatt_av_identifier:
-                metadata["ersattAvIdentifier"] = self.ersatt_av_identifier
-        for key, value in (("antagen", self.antagen),
-                           ("version", self.version),
-                           ("revision", self.revision),
-                           ("celex", self.celex),
-                           ("beslut", self.beslut),
-                           ("konsultation", self.konsultation_url)):
-            if value:
-                metadata[key] = value
-        if self.amnesord:
-            metadata["amnesord"] = self.amnesord
-        art = {"uri": self.uri, "type": "vagledning",
-               "utgivare": self.utgivare, "serie": self.serie,
-               "identifier": self.identifier, "metadata": metadata,
-               "structure": structure}
-        if footnotes:
-            art["footnotes"] = footnotes
-        if self.source_url:
-            art["source_url"] = self.source_url
-        if self.document_url:
-            art["document_url"] = self.document_url
-        return art
+        # the shared repeal vocabulary (`catalog_rows._expired_date`), which is what
+        # drops a superseded document from the browse trees, the feeds, the
+        # search results and other documents' citation rails while leaving its
+        # page reachable by direct link. The EBA states no date for it -- its
+        # version pages carry no repeal marker at all -- so `status` stands
+        # alone and the column takes its date-free form. The identifier of the
+        # successor is provenance for the link, so it goes only where the link
+        # itself does.
+        repeal = ({"status": "upphävt", "ersattAv": self.ersatt_av,
+                   "ersattAvKalla": self.ersatt_av_url,
+                   "ersattAvIdentifier": self.ersatt_av_identifier}
+                  if self.ersatt_av or self.ersatt_av_url else {})
+        return prune({
+            "uri": self.uri, "type": "vagledning",
+            "utgivare": self.utgivare, "serie": self.serie,
+            "identifier": self.identifier,
+            "metadata": prune({"title": self.titel, "publisher": self.publisher,
+                               "nummer": self.nummer, "sprak": self.sprak,
+                               **repeal,
+                               "antagen": self.antagen,
+                               "version": self.version,
+                               "revision": self.revision,
+                               "celex": self.celex,
+                               "beslut": self.beslut,
+                               "konsultation": self.konsultation_url,
+                               "amnesord": self.amnesord}),
+            "structure": structure,
+            "footnotes": footnote_nodes(self.fotnoter, scanner),
+            "source_url": self.source_url,
+            "document_url": self.document_url})

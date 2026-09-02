@@ -23,7 +23,7 @@ later did with the decision, which becomes the head of the document body.
 
 from dataclasses import dataclass, field
 
-from ..lib.artifact import footnote_nodes, scanned_nodes
+from ..lib.artifact import Fotnot, footnote_nodes, prune, scanned_nodes
 from ..lib.catalog import BASE
 
 ORGS = ("jo", "jk", "arn", "imy", "kkv")
@@ -54,22 +54,6 @@ class Block:
     kind: str            # "rubrik" | "stycke"
     text: str
     level: int = 1       # rubrik nesting (1 section, 2 subsection)
-
-
-@dataclass
-class Fotnot:
-    """A note set below the running text. `mark` is the marker digit the
-    document printed (``""`` where it printed none); `text` is the note body,
-    citation-linked downstream like any other text.
-
-    Worth carrying because of what these notes hold: IMY names a vägledning in
-    prose ("Europeiska dataskyddsstyrelsens riktlinjer om samtycke") and grounds
-    it with the number in the note below ("Riktlinjer 05/2020"). Discard the
-    notes and the decision cites nothing a citation scan can resolve -- which is
-    exactly what happened: 43 of the 83 IMY-beslut that name this guidance carry
-    its number, and not one of those numbers reached the artifact."""
-    mark: str
-    text: str
 
 
 @dataclass
@@ -121,34 +105,27 @@ class Beslut:
         """The JSON artifact: shared node convention (`structure` of
         rubrik/stycke nodes with inline-run text) so catalog/render/search reuse
         their generic walkers; every text scanned for citations."""
-        structure = scanned_nodes(self.body, scanner)
-        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
-        metadata = {"title": self.titel,
-                    "publisher": ORG_NAME[self.org],
-                    "diarienummer": self.diarienummer}
-        for key, value in (("beslutsdatum", self.beslutsdatum),
-                           ("avgjordAv", self.avgjord_av),
-                           ("officialReport", self.official_report),
-                           ("nyckelord", self.nyckelord),
-                           ("dokument", self.delar),
-                           ("tillsyner", self.tillsyner),
-                           ("arendetyp", self.arendetyp),
-                           ("motpart", self.motpart),
-                           ("bransch", self.bransch),
-                           ("beslutstyp", self.beslutstyp),
-                           ("referatUrl", self.referat_url),
-                           ("artal", self.artal),
-                           ("praxis", self.praxis),
-                           ("sanktionsavgift", self.sanktionsavgift)):
-            if value:
-                metadata[key] = value
-        art = {"uri": self.uri, "type": "avgorande", "org": self.org,
-               "identifier": self.identifier, "metadata": metadata,
-               "structure": structure}
-        if footnotes:
-            art["footnotes"] = footnotes
-        if self.sammanfattning:
-            art["sammanfattning"] = self.sammanfattning
-        if self.source_url:
-            art["source_url"] = self.source_url
-        return art
+        return prune({
+            "uri": self.uri, "type": "avgorande", "org": self.org,
+            "identifier": self.identifier,
+            "metadata": prune({"title": self.titel,
+                               "publisher": ORG_NAME[self.org],
+                               "diarienummer": self.diarienummer,
+                               "beslutsdatum": self.beslutsdatum,
+                               "avgjordAv": self.avgjord_av,
+                               "officialReport": self.official_report,
+                               "nyckelord": self.nyckelord,
+                               "dokument": self.delar,
+                               "tillsyner": self.tillsyner,
+                               "arendetyp": self.arendetyp,
+                               "motpart": self.motpart,
+                               "bransch": self.bransch,
+                               "beslutstyp": self.beslutstyp,
+                               "referatUrl": self.referat_url,
+                               "artal": self.artal,
+                               "praxis": self.praxis,
+                               "sanktionsavgift": self.sanktionsavgift}),
+            "structure": scanned_nodes(self.body, scanner),
+            "footnotes": footnote_nodes(self.fotnoter, scanner),
+            "sammanfattning": self.sammanfattning,
+            "source_url": self.source_url})

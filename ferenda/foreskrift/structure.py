@@ -5,9 +5,10 @@ Unlike a förarbete (a flat outline of numbered headings -- see
 ``kapitel`` -> ``paragraf`` -> ``stycke``, with ``rubrik`` headings labelling
 groups of paragrafer. So the nesting here is statute-shaped, and the anchor it
 mints on each paragraf is the SFS one lagen.nu has always used -- ``K2P3`` (2
-kap. 3 §) or ``P3`` (a chapterless föreskrift's 3 §). That anchor is what makes a
-föreskrift paragraf a *citation target*: a statute's ``bemyndigande`` edge, or a
-cross-reference from another regulation, resolves to ``…/fffs/2013:10#K2P3``.
+kap. 3 §) or ``P3`` (a chapterless föreskrift's 3 §), spelled by the shared
+``lib.sfs_anchor``. That anchor is what makes a föreskrift paragraf a *citation
+target*: a statute's ``bemyndigande`` edge, or a cross-reference from another
+regulation, resolves to ``…/fffs/2013:10#K2P3``.
 
 A ``rubrik`` does not contain paragrafer (a heading just precedes the paragrafer
 it introduces); only a ``kapitel`` does. Loose stycken before the first paragraf
@@ -17,20 +18,10 @@ all) stay at the top level, so a body without a single § still renders.
 
 import re
 
+from ..lib.artifact import flatten as flatten_nodes
+from ..lib.sfs_anchor import unique_paragraf_anchor
+
 RE_LEAD_PARA = re.compile(r"^(\d+\s*[a-z]?)\s*§")     # "3 §" / "3 a §" leading a block
-
-
-def _para_anchor(kap, num, seen):
-    """The SFS paragraf anchor: 'K2P3' under 2 kap., else 'P3'; the §-number is
-    de-spaced ('3 a' -> '3a'). A '-2' suffix breaks the rare clash (a föreskrift
-    that restarts § numbering without a chapter)."""
-    pnum = re.sub(r"\s+", "", num)
-    base = ("K%sP%s" % (kap, pnum)) if kap else ("P%s" % pnum)
-    anchor, n = base, 2
-    while anchor in seen:
-        anchor, n = "%s-%d" % (base, n), n + 1
-    seen.add(anchor)
-    return anchor
 
 
 def _strip_marker(runs):
@@ -75,7 +66,8 @@ def nest(blocks):
             root.append(kap)
         elif t == "paragraf":
             para = {"type": "paragraf",
-                    "id": _para_anchor(kapnum, b.get("num") or "", seen),
+                    "id": unique_paragraf_anchor(kapnum, b.get("num") or "",
+                                                 seen),
                     "ordinal": b.get("num"), "page": b.get("page"),
                     "children": [{"type": "stycke", "text": _strip_marker(b["text"]),
                                   "page": b.get("page")}]}
@@ -89,16 +81,19 @@ def nest(blocks):
     return root
 
 
+# the two containers `nest` opens, each rebuilt from the marker block it read
+CONTAINERS = ("kapitel", "paragraf")
+_MARKER_KEYS = ("type", "id", "ordinal", "page")
+
+
+def _marker(node):
+    """The kapitel/paragraf marker block a container was built from: its own
+    identity fields, without the children that follow it."""
+    return {k: node[k] for k in _MARKER_KEYS if k in node}
+
+
 def flatten(structure):
     """The inverse of :func:`nest`: the document-order flat block list, each
     container turned back into its own marker block followed by its children.
     Lets a linear consumer walk a nested artifact."""
-    out = []
-    for node in structure:
-        if node.get("type") in ("kapitel", "paragraf"):
-            out.append({k: node[k]
-                        for k in ("type", "id", "ordinal", "page") if k in node})
-            out.extend(flatten(node.get("children", [])))
-        else:
-            out.append(node)
-    return out
+    return flatten_nodes(structure, containers=CONTAINERS, marker=_marker)

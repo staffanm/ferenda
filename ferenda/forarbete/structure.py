@@ -19,12 +19,16 @@ författningskommentar extractor in `kommentar.py`.
 
 import re
 
+from ..lib.artifact import flatten as flatten_nodes
+from ..lib.artifact import nest_by_level
 from ..lib.text import runs_text
 
 RE_LEAD_NUM = re.compile(r"^(\d+(?:\.\d+)*)\b")        # "14" / "14.3.4" leading a heading
 # a signer line's departement parenthetical: "Mikael Damberg
 # (Justitiedepartementet)" -- shared with parse._is_signer_name
 RE_TRAILING_PAREN = re.compile(r"\s*\([^)]*\)$")
+
+SECTIONS = frozenset({"avsnitt"})       # the one container kind `nest` opens
 
 
 def _section_id(num, counter, seen):
@@ -40,28 +44,27 @@ def _section_id(num, counter, seen):
 
 def nest(blocks):
     """Flat förarbete block dicts ({type, text, page, level?, num?}) -> a nested
-    `structure` list. `rubrik` blocks become `avsnitt` containers; the rest are
-    their content, in document order."""
-    root, stack, seen, counter = [], [], set(), 0
-    for b in blocks:
-        if b.get("type") == "rubrik":
-            counter += 1
-            level = b.get("level") or 1
-            m = RE_LEAD_NUM.match(runs_text(b["text"]))
-            num = m.group(1) if m else None
-            node = {"type": "avsnitt", "id": _section_id(num, counter, seen),
-                    "level": level, "text": b["text"], "children": []}
-            if b.get("page") is not None:   # a page-less (text/tml) body omits page
-                node["page"] = b["page"]
-            if num:
-                node["num"] = num
-            while stack and stack[-1]["level"] >= level:
-                stack.pop()
-            (stack[-1]["children"] if stack else root).append(node)
-            stack.append(node)
-        else:
-            (stack[-1]["children"] if stack else root).append(b)
-    return root
+    `structure` list. `rubrik` blocks become `avsnitt` containers, each under the
+    nearest open section of lower level; the rest are their content, in document
+    order."""
+    seen, counter = set(), 0
+
+    def avsnitt(b):
+        nonlocal counter
+        counter += 1
+        num = m.group(1) if (m := RE_LEAD_NUM.match(runs_text(b["text"]))) else None
+        node = {"type": "avsnitt", "id": _section_id(num, counter, seen),
+                "level": b.get("level") or 1, "text": b["text"], "children": []}
+        if b.get("page") is not None:   # a page-less (text/tml) body omits page
+            node["page"] = b["page"]
+        if num:
+            node["num"] = num
+        return node
+
+    return nest_by_level(
+        blocks,
+        lambda b: (b.get("level") or 1) if b.get("type") == "rubrik" else None,
+        avsnitt)
 
 
 def signers(structure):
@@ -109,21 +112,18 @@ def beredning(structure):
     return None
 
 
+def _rubrik(node):
+    """An `avsnitt` back as the `rubrik` block `nest` built it from."""
+    head = {"type": "rubrik", "level": node.get("level"), "text": node["text"]}
+    if node.get("page") is not None:
+        head["page"] = node["page"]
+    if "num" in node:
+        head["num"] = node["num"]
+    return head
+
+
 def flatten(structure):
     """The inverse of `nest`: the document-order flat block list, with each
     `avsnitt` turned back into its `rubrik` heading block followed by its
     children. Lets a linear consumer (kommentar.py) walk a nested artifact."""
-    out = []
-    for node in structure:
-        if node.get("type") == "avsnitt":
-            head = {"type": "rubrik", "level": node.get("level"),
-                    "text": node["text"]}
-            if node.get("page") is not None:
-                head["page"] = node["page"]
-            if "num" in node:
-                head["num"] = node["num"]
-            out.append(head)
-            out.extend(flatten(node["children"]))
-        else:
-            out.append(node)
-    return out
+    return flatten_nodes(structure, containers=SECTIONS, marker=_rubrik)

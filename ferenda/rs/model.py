@@ -52,7 +52,7 @@ document.
 
 from dataclasses import dataclass, field
 
-from ..lib.artifact import footnote_nodes, scanned_nodes
+from ..lib.artifact import Fotnot, footnote_nodes, prune, scanned_nodes
 from ..lib.catalog import BASE
 from .agencies import BY_ORG, ORGS, number_slug
 
@@ -102,15 +102,6 @@ class Block:
 
 
 @dataclass
-class Fotnot:
-    """A note the letterhead sets below the running text. `mark` is the marker
-    the document printed; `text` is the note body, citation-linked like any
-    other -- an agency grounds a reference it makes in prose down here."""
-    mark: str
-    text: str
-
-
-@dataclass
 class Stallningstagande:
     org: str                            # agencies.ORGS
     nummer: str                         # the agency's own number, verbatim
@@ -155,31 +146,22 @@ class Stallningstagande:
         rubrik/stycke nodes with inline-run text), every text scanned for
         citations -- which is what puts a ställningstagande on the rail of the
         paragraf it interprets."""
-        structure = scanned_nodes(self.body, scanner)
-        footnotes = footnote_nodes([(f.mark, f.text) for f in self.fotnoter], scanner)
-        metadata = {"title": self.titel, "publisher": self.publisher,
-                    "nummer": self.nummer, "status": self.status}
-        for key, value in (("beslutsdatum", self.beslutsdatum),
-                           ("diarienummer", self.diarienummer),
-                           ("upphavd", self.upphavd),
-                           ("ersattAv", self.ersatt_av),
-                           ("ersatter", self.ersatter),
-                           ("version", self.version),
-                           ("foregaendeVersion", self.foregaende_version)):
-            if value:
-                metadata[key] = value
-        if self.nyckelord:
-            metadata["nyckelord"] = self.nyckelord
-        art = {"uri": self.uri, "type": "stallningstagande", "org": self.org,
-               "doctype": self.doktyp, "identifier": self.identifier,
-               "designation": self.designation,
-               "metadata": metadata, "structure": structure}
-        if footnotes:
-            art["footnotes"] = footnotes
-        if self.sammanfattning:
-            art["sammanfattning"] = self.sammanfattning
-        if self.source_url:
-            art["source_url"] = self.source_url
-        if self.document_url:
-            art["document_url"] = self.document_url
-        return art
+        return prune({
+            "uri": self.uri, "type": "stallningstagande", "org": self.org,
+            "doctype": self.doktyp, "identifier": self.identifier,
+            "designation": self.designation,
+            "metadata": prune({"title": self.titel, "publisher": self.publisher,
+                               "nummer": self.nummer, "status": self.status,
+                               "beslutsdatum": self.beslutsdatum,
+                               "diarienummer": self.diarienummer,
+                               "upphavd": self.upphavd,
+                               "ersattAv": self.ersatt_av,
+                               "ersatter": self.ersatter,
+                               "version": self.version,
+                               "foregaendeVersion": self.foregaende_version,
+                               "nyckelord": self.nyckelord}),
+            "structure": scanned_nodes(self.body, scanner),
+            "footnotes": footnote_nodes(self.fotnoter, scanner),
+            "sammanfattning": self.sammanfattning,
+            "source_url": self.source_url,
+            "document_url": self.document_url})

@@ -28,6 +28,8 @@ measure that misleads.
 
 from dataclasses import asdict, dataclass, field
 
+from ..lib.artifact import prune
+
 
 @dataclass
 class Row:
@@ -125,8 +127,4 @@ class Report:
         on all 53, which makes the artifact three times its size and makes a diff
         between two builds unreadable -- and the diff is the point of storing it."""
         return {"generated": self.generated,
-                "measures": [_prune(asdict(m)) for m in self.measures]}
-
-
-def _prune(d):
-    return {k: v for k, v in d.items() if v not in (None, "", [], {})}
+                "measures": [prune(asdict(m)) for m in self.measures]}
