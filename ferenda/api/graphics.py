@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from ..lib import facsimile, layout, tpl
+from ..lib import facsimile, tpl
 from . import editcart, facsimiles, graphicsedit
 from .auth import Editor, require_editor
 
@@ -70,13 +70,6 @@ def queue_endpoint(editor: Editor = Depends(require_editor)):
     return {"pending": graphicsedit.queue()}
 
 
-def _source_pdf(src):
-    pdf = layout.sfs_pdf(src)
-    if not pdf.exists():
-        raise HTTPException(404, "source SFS %s is not mirrored" % src)
-    return pdf
-
-
 @router.get("/page", response_class=FileResponse,
             responses={200: {"content": {"image/png": {}}}})
 def page_endpoint(sfs: str = Query(..., description="provenance SFS basefile"),
@@ -85,9 +78,9 @@ def page_endpoint(sfs: str = Query(..., description="provenance SFS basefile"),
     """The whole source page, for drawing the rectangle on and for paging
     through when the model picked the wrong page. Rendered at the same DPI as
     a facsimile, so client coordinates convert with one scale factor."""
-    return facsimiles.png_response("sfs", sfs, _source_pdf(sfs), page, None,
-                                   "SFS %s has no page %d" % (sfs, page),
-                                   dpi=facsimile.DPI)
+    return facsimiles.png_response(
+        "sfs", sfs, facsimiles.sfs_source_pdf(sfs), page, None,
+        "SFS %s has no page %d" % (sfs, page), dpi=facsimile.DPI)
 
 
 @router.get("/pagesize")
@@ -96,7 +89,7 @@ def pagesize_endpoint(sfs: str = Query(...), page: int = Query(..., ge=1),
     """The page's size in PDF points. The browser drags in image pixels; a bbox
     is stored in points from the top-left, and this is the other half of that
     conversion (the rendered PNG's pixel size is the first)."""
-    width, height = facsimile.page_size(_source_pdf(sfs), page)
+    width, height = facsimile.page_size(facsimiles.sfs_source_pdf(sfs), page)
     return {"width": width, "height": height, "dpi": facsimile.DPI}
 
 
@@ -109,8 +102,8 @@ def crop_endpoint(sfs: str = Query(...), page: int = Query(..., ge=1),
     string rather than the layer, so the reviewer sees a dragged rectangle
     before carting it."""
     return facsimiles.png_response(
-        "sfs", sfs, _source_pdf(sfs), page, facsimiles.parse_bbox(bbox),
-        "SFS %s has no page %d" % (sfs, page),
+        "sfs", sfs, facsimiles.sfs_source_pdf(sfs), page,
+        facsimiles.parse_bbox(bbox), "SFS %s has no page %d" % (sfs, page),
         client_bbox=True, dpi=facsimile.CROP_DPI)
 
 

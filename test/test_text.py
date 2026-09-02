@@ -1,6 +1,6 @@
 """The shared artifact text flattener (ferenda/lib/text.py)."""
 
-from ferenda.lib import catalog, text
+from ferenda.lib import catalog_rows, text
 
 ART = {
     "uri": "https://lagen.nu/1962:700",
@@ -157,7 +157,7 @@ def test_footnotes_are_walked_as_presented_body():
 
 
 def test_a_footnote_citation_reaches_the_link_graph():
-    uris = [run["uri"] for _anchor, _page, run in catalog.artifact_links(FOOTNOTED)]
+    uris = [run["uri"] for _anchor, _page, run in catalog_rows.artifact_links(FOOTNOTED)]
     assert "https://lagen.nu/edpb/riktlinjer/05-2020" in uris
 
 

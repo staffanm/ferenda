@@ -15,7 +15,10 @@ that curls a document url wants the same body a browser's tab would show.
 
 The handlers are installed by `install`, called at import by both apps --
 api.app for the public one and api.internal for the internal one, which is a
-mounted sub-app and so has exception middleware of its own.
+mounted sub-app and so has exception middleware of its own. `install` also
+maps the PDF export's three typed failures (`pdf.PageNotGenerated`,
+`pdf.InvalidExportRequest`, `pdfjob.QueueFull`) onto 404/422/503, so the five
+routes that serve an export answer them identically on both apps.
 """
 
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -25,6 +28,7 @@ from .. import config
 from ..lib import errorlog
 from ..lib.page import page_context
 from ..lib.tpl import ENV
+from . import pdf, pdfjob
 
 # The ledger lives under CATALOG_ROOT -- the path config already guarantees is
 # local disk -- and NOT under the data root beside the run ledger.
@@ -153,12 +157,45 @@ async def unhandled_exception_handler(request, exc):
     return HTMLResponse(_page(500, error_id), status_code=500)
 
 
+async def page_not_generated_handler(request, exc):
+    """A PDF export asked for a page the site does not have -- 404, naming the
+    path the request used."""
+    return await http_exception_handler(request, StarletteHTTPException(
+        404, "no generated page at %r" % exc.path))
+
+
+async def invalid_export_handler(request, exc):
+    """A PDF export request that does not add up -- 422, with the message the
+    validation wrote. The caller's mistake, so no page and no ledger entry
+    (see `http_exception_handler`)."""
+    return await http_exception_handler(
+        request, StarletteHTTPException(422, str(exc)))
+
+
+async def queue_full_handler(request, exc):
+    """The bounded PDF render queue is full -- 503 with a Retry-After, the
+    honest answer to "come back shortly"."""
+    return await http_exception_handler(request, StarletteHTTPException(
+        503, str(exc), headers={"Retry-After": "30"}))
+
+
 def install(app):
-    """Register both handlers on the app.
+    """Register the handlers on the app.
 
     `Exception` is the catch-all Starlette routes through
     ServerErrorMiddleware, which calls the handler and then re-raises, so
     registering it only replaces the response body -- the traceback still
-    reaches the process log."""
+    reaches the process log.
+
+    The three PDF exceptions are mapped here rather than in a `try` block per
+    route: five routes across the public and internal apps answered the same
+    three conditions, each with its own copy. The copies were already saying
+    different things -- `/samling/inspektera` printed the path the exception
+    carried, `/jobb` printed the path the request named. One typed exception
+    per condition maps once, and a `FileNotFoundError` or `ValueError` the
+    export did not raise on purpose stays the 500 it is (rule:fail-fast)."""
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
+    app.add_exception_handler(pdf.PageNotGenerated, page_not_generated_handler)
+    app.add_exception_handler(pdf.InvalidExportRequest, invalid_export_handler)
+    app.add_exception_handler(pdfjob.QueueFull, queue_full_handler)

@@ -15,7 +15,7 @@ from ferenda.hudoc import (
     treaties,
 )
 from ferenda.hudoc import render as hudoc_render
-from ferenda.lib import catalog, coe, facets, layout, page
+from ferenda.lib import catalog, catalog_rows, coe, facets, layout, page
 from ferenda.lib.errors import SkipDocument
 from ferenda.wiki import parse as wiki_parse
 
@@ -412,7 +412,7 @@ def test_hudoc_layout_and_catalog():
     assert page.human_fragment("AII.1") == "artikel II.1"
     art = {"uri": uri, "itemid": "001-123456", "doctype": "judgment",
            "title": "CASE OF EXAMPLE v. SWEDEN"}
-    row = catalog.hudoc_document(art, "case.json")
+    row = catalog_rows.hudoc_document(art, "case.json")
     assert row[1:5] == ("hudoc", "judgment", "001-123456",
                         "CASE OF EXAMPLE v. SWEDEN")
 
@@ -424,7 +424,7 @@ def test_metadata_references_join_generic_graph():
                            "text": "8"}]}
     # (anchor, page, run) -- a metadata reference belongs to the document, so
     # it carries neither an anchor nor a printed page
-    assert catalog.artifact_links(art) == [
+    assert catalog_rows.artifact_links(art) == [
         (None, None,
          {"uri": target, "predicate": "dcterms:references", "text": "8"})]
 

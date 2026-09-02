@@ -11,10 +11,13 @@ process whose first catalog touch was `/ops` selected a column an older catalog
 lacks. One path, one connect, here. (`build.py` keeps its own constant: it
 *writes* the catalog, and takes a read-write `catalog.connect`.)
 
-`base_sha` sits here for the same reason: the markdown editor
-(`api/editcontent.py`) and the patch editor (`api/patch.py`) fingerprint the
-text an edit was based on identically, and a drift guard that differs between
-the two write surfaces is a bug waiting for the first divergence.
+`or_404` and `base_sha` sit here for the same reason as the connection: one
+wording, one place. `/document`, `/graph`, `/card` and `/path` each answer a
+uri the catalog does not hold, and each raised its own copy of the message two
+lines after its read returned None. The markdown editor (`api/editcontent.py`)
+and the patch editor (`api/patch.py`) fingerprint the text an edit was based on
+identically, and a drift guard that differs between the two write surfaces is a
+bug waiting for the first divergence.
 """
 
 import hashlib
@@ -22,10 +25,7 @@ from contextlib import contextmanager
 
 from fastapi import HTTPException
 
-from .. import config
-from ..lib import catalog
-
-CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
+from ..lib import catalog, layout
 
 NOT_BUILT = "catalog not built -- run `lagen all relate`"
 
@@ -35,7 +35,7 @@ def catalog_ready():
     take `get_con` (503 when absent); the ones that merely enrich an answer with
     it (the citation pinning behind /search, a dv facsimile's stamped PDF path)
     ask this first and go without."""
-    return CATALOG.exists()
+    return layout.CATALOG.exists()
 
 
 @contextmanager
@@ -45,7 +45,7 @@ def connection():
     and both FastAPI and the MCP SDK run sync handlers in a threadpool);
     `catalog.connect_ro` applies the additive schema migrations once per process
     before the first one is handed out."""
-    con = catalog.connect_ro(CATALOG)
+    con = catalog.connect_ro(layout.CATALOG)
     try:
         yield con
     finally:
@@ -60,6 +60,15 @@ def get_con():
         raise HTTPException(503, NOT_BUILT)
     with connection() as con:
         yield con
+
+
+def or_404(data, uri):
+    """`data`, or the one 404 a uri the catalog does not hold earns. `uri` is
+    what the message names -- the document uri, so a fragment request reports
+    the document that is missing."""
+    if data is None:
+        raise HTTPException(404, "no document %r in the catalog" % uri)
+    return data
 
 
 def base_sha(text):

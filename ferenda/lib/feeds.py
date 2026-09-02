@@ -25,7 +25,7 @@ from urllib.parse import urlencode
 
 from markupsafe import Markup
 
-from . import catalog, facets, labels, layout, util
+from . import catalog, catalog_rows, facets, labels, layout, util
 from .page import page
 from .tpl import ENV
 
@@ -208,7 +208,7 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
         # filtering itself is catalog-only, including publisher filters.
         art = catalog.load_artifact(root, row[5])
         updated = _mtime(row[8]) or _rfc3339(row[7]) or "1970-01-01T00:00:00Z"
-        published = _rfc3339(row[7] or catalog.document_date(art))
+        published = _rfc3339(row[7] or catalog_rows.document_date(art))
         title = row[6] or row[4] or row[3] or catalog.local(row[0])
         summary = (art.get("sammanfattning")
                    or art.get("metadata", {}).get("sammanfattning") or title)
@@ -223,7 +223,7 @@ def entries(con, item, rdf_type=None, rpubl_rattsfallspublikation=None,
     # the artifact mtime instead stamped it with the day we last parsed it: all
     # 200 föreskrifter on the myndfs feed read "2026-08-20", and 39 undated SOUs
     # led the förarbete feed ahead of this year's propositioner (rule:fail-fast
-    # -- `catalog.document_date` returns None because the corpus cannot answer,
+    # -- `catalog_rows.document_date` returns None because the corpus cannot answer,
     # and the reader is owed that answer, not a manufactured one).
     out.sort(key=lambda entry: (entry.published is not None, entry.published or "",
                                 entry.updated, entry.uri), reverse=True)

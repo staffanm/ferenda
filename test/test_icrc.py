@@ -10,7 +10,8 @@ from pathlib import Path
 from ferenda.icrc import download, parse
 from ferenda.icrc import render as icrc_render
 from ferenda.icrc.model import Treaty, treaty_uri
-from ferenda.lib import catalog, compress, facets, layout, page, render
+from ferenda.lib import (catalog, catalog_rows, compress, facets, layout,
+                         page, render)
 
 FIXTURES = Path(__file__).parent / "files" / "icrc"
 
@@ -158,7 +159,7 @@ def test_icrc_layout_round_trips_and_catalog_row():
     assert layout.relpath("icrc", "365") == Path("365")
     assert "icrc" in facets.sources()
     art = _gci()
-    row = catalog.icrc_document(art, "artifact/icrc/365.json")
+    row = catalog_rows.icrc_document(art, "artifact/icrc/365.json")
     assert row[:3] == (uri, "icrc", "treaty")
     assert row[3].startswith("Geneva Convention (I)")     # label = identifier
 

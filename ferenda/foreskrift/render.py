@@ -1,7 +1,8 @@
 """Föreskriftssidan: the regulation text, its ändringsföreskrifter
 and consolidation banners.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 from html import escape
@@ -9,12 +10,12 @@ from html import escape
 from markupsafe import Markup
 
 from ..lib import catalog, labels, layout, tpl
+from ..lib.margins import chain_meta
 from ..lib.page import (
     BANNERS,
     PANELS,
     Rail,
     Toc,
-    chain_meta,
     doc_meta,
     footnote_items,
     page_context,

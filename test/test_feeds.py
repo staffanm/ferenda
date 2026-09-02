@@ -4,7 +4,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-from ferenda.lib import catalog, feeds, render
+from ferenda.lib import catalog, catalog_rows, feeds, render
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 
@@ -172,7 +172,7 @@ def test_feed_index_names_its_series_from_the_facet_scheme(tmp_path):
 
 
 def test_document_date_covers_every_source_field_with_stable_precedence():
-    """catalog.document_date is the one home for the date-field policy (feeds
+    """catalog_rows.document_date is the one home for the date-field policy (feeds
     ordering, documents.date at relate, chronology panels). Each source's field
     must resolve, in the documented precedence order."""
     chain = [
@@ -189,7 +189,7 @@ def test_document_date_covers_every_source_field_with_stable_precedence():
     ]
     # each field alone resolves
     for art, expected in chain:
-        assert catalog.document_date(art) == expected
+        assert catalog_rows.document_date(art) == expected
     # all fields at once: the chain's head wins
     everything = {
         "date": "2024-01-01", "avgorandedatum": "2024-02-02",
@@ -198,8 +198,8 @@ def test_document_date_covers_every_source_field_with_stable_precedence():
                      "properties": {"rpubl:utfardandedatum": "2024-05-05",
                                     "rpubl:avgorandedatum": "2024-06-06",
                                     "rpubl:beslutsdatum": "2024-07-07"}}}
-    assert catalog.document_date(everything) == "2024-01-01"
-    assert catalog.document_date({"metadata": {"properties": {}}}) is None
+    assert catalog_rows.document_date(everything) == "2024-01-01"
+    assert catalog_rows.document_date({"metadata": {"properties": {}}}) is None
 
 
 def test_an_expired_document_leaves_the_feed(tmp_path):

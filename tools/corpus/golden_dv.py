@@ -36,6 +36,7 @@ from ferenda.dv.structure import flatten
 from ferenda.lib import (
     casenaming,
     catalog,
+    catalog_rows,
     compress,
     layout,
 )
@@ -118,7 +119,7 @@ def new_refs(art):
     (much of the old graph is editor-derived and never cited verbatim in the
     prose -- a curated-projection concern, not a scanner limitation)."""
     return ({strip_eu_frag(run["uri"])
-             for _, run in catalog.artifact_links(art)},
+             for _, run in catalog_rows.artifact_links(art)},
             {strip_eu_frag(run["uri"])
              for _, run in catalog.curated_links(art)})
 

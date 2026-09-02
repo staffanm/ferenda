@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import catalog, compress, facets, layout, page, render
+from ferenda.lib import (catalog, catalog_rows, compress, facets, layout,
+                         page, render)
 from ferenda.untc import download, parse
 from ferenda.untc import render as untc_render
 from ferenda.untc import text as untc_text
@@ -315,7 +316,7 @@ def test_untc_layout_round_trips_and_catalog_row():
     assert str(layout.url_to_relpath("/untc/I-18232")) == "untc/I_18232.html"
     assert layout.relpath("untc", "I-18232") == Path("I-18232")
     assert "untc" in facets.sources()
-    row = catalog.untc_document(_vclt(), "artifact/untc/I-18232.json")
+    row = catalog_rows.untc_document(_vclt(), "artifact/untc/I-18232.json")
     assert row[:3] == (uri, "untc", "treaty")
     assert row[3] == "Vienna Convention on the Law of Treaties"
 

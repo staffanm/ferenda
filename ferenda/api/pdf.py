@@ -44,6 +44,8 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
+from pathlib import Path
 from urllib.parse import unquote, unquote_to_bytes, urlsplit
 
 import lxml.html
@@ -116,7 +118,7 @@ _FONT_WEIGHT_RANGE = re.compile(r"(font-weight:\s*\d+)\s+\d+(\s*;)")
 def parse_kinds(kontext: str) -> frozenset[str]:
     """The ``kontext`` query parameter as a set of rail section slugs.
     Empty means no context; ``alla`` means every kind; an unknown slug is the
-    caller's error and raises ValueError naming the valid ones."""
+    caller's error and raises `InvalidExportRequest` naming the valid ones."""
     if not kontext:
         return frozenset()
     if kontext == "alla":
@@ -124,9 +126,9 @@ def parse_kinds(kontext: str) -> frozenset[str]:
     kinds = frozenset(k.strip() for k in kontext.split(",") if k.strip())
     unknown = kinds - frozenset(RAIL_SECTION_ORDER)
     if unknown:
-        raise ValueError("okända kontextslag: %s (giltiga: %s, eller 'alla')"
-                         % (", ".join(sorted(unknown)),
-                            ", ".join(RAIL_SECTION_ORDER)))
+        raise InvalidExportRequest(
+            "okända kontextslag: %s (giltiga: %s, eller 'alla')"
+            % (", ".join(sorted(unknown)), ", ".join(RAIL_SECTION_ORDER)))
     return kinds
 
 
@@ -137,7 +139,7 @@ def filename_for(path: str) -> str:
     return (slug or "dokument") + ".pdf"
 
 
-def _stylesheet() -> str:
+def stylesheet() -> str:
     """What the site serves as /style.css, minus the editor layer (inert
     without a session, and WeasyPrint has nothing to log in with). Read per
     render, never memoized: an `--assets-only` publish must reach a running
@@ -152,22 +154,22 @@ def _stylesheet() -> str:
     return fonts + (ASSETS / "style.css").read_text(encoding="utf-8")
 
 
-def _drop(doc, *classes):
-    """Remove every <script> and every element carrying one of `classes` --
-    the chrome the print CSS only hides; gone here, WeasyPrint neither lays
+def _drop(doc, *class_names):
+    """Remove every <script> and every element carrying one of `class_names`
+    -- the chrome the print CSS only hides; gone here, WeasyPrint neither lays
     it out nor fetches into it."""
     doomed = list(doc.iter("script"))
-    doomed += [el for cls in classes for el in doc.find_class(cls)]
+    doomed += [el for cls in class_names for el in doc.find_class(cls)]
     for el in doomed:
         el.getparent().remove(el)
 
 
 # a large statute's context island is a >10 MB text node; libxml2's default
 # cap silently *empties* such a node, so the parser must be told up front
-_PARSER = lxml.html.HTMLParser(huge_tree=True)
+PARSER = lxml.html.HTMLParser(huge_tree=True)
 
 
-def _island(doc):
+def island(doc):
     """The rail's pre-rendered context panels, keyed by node id ('' is the
     document-level panel), or {} on a page without the island."""
     el = doc.get_element_by_id("lagen-context", None)
@@ -363,25 +365,25 @@ def _column_block(el, main):
     # its note an outer table cell around every provision. A nested provision
     # can then start before that outer note ends. Use the direct heading as
     # the chapter's independent row instead.
-    if "kontextrot" in _classes(el):
+    if "kontextrot" in classes(el):
         heading = next((child for child in el
                         if child.tag in _HEADINGS), None)
         if heading is not None:
             el = heading
     while (el is not None and el.getparent() is not main
-           and "kontextrot" not in _classes(el.getparent())):
+           and "kontextrot" not in classes(el.getparent())):
         el = el.getparent()
     return el
 
 
-def _classes(el) -> set[str]:
+def classes(el) -> set[str]:
     """The classes on `el`, also for a missing parent while walking upward."""
     return set((el.get("class") or "").split()) if el is not None else set()
 
 
 def _add_class(el, name: str) -> None:
     """Add one class without changing the order of existing classes."""
-    if name not in _classes(el):
+    if name not in classes(el):
         el.set("class", " ".join(filter(None, (el.get("class"), name))))
 
 
@@ -422,7 +424,7 @@ def _provision_chunks(body):
         groups = [[]]
         for item in list(child):
             assert child.tag != "ol" or any(  # rule:fail-fast
-                "num" in _classes(part) for part in item), (
+                "num" in classes(part) for part in item), (
                 "point %r writes no number of its own to survive a split"
                 % item.get("id"))
             if item.get("data-rail") and groups[-1]:
@@ -455,7 +457,7 @@ def _split_sfs_provisions(doc, main) -> None:
                   if el.tag == "section"]
     for provision in provisions:
         body = next((el for el in provision.getchildren()
-                     if "paragraf-body" in _classes(el)), None)
+                     if "paragraf-body" in classes(el)), None)
         assert body is not None, (  # rule:fail-fast
             "SFS provision %r has no paragraf-body" % provision.get("id"))
         chunks = _provision_chunks(body)
@@ -505,20 +507,21 @@ def _attach(el, asides):
     The text and its notes are one article/aside grid pair, so the note stays
     level with what it annotates. Both occupy the same grid row. The row ends
     only when both flows end, and a later article cannot pass a longer note."""
-    classes = ["kontextblock"]
+    block_classes = ["kontextblock"]
     if el.tag in _HEADINGS:
         # the break falls after the block, out of reach of the heading's own
         # break-after: avoid
-        classes.append("rubrikblock")
-        if "artikel" in _classes(el):
-            classes.append("artikelblock")
-        elif "kaprubrik" in _classes(el):
-            classes.append("kaprubrikblock")
-    if "paragraf" in _classes(el):
-        classes.append("paragrafblock")
-        if "paragraf-fortsatt" in _classes(el):
-            classes.append("fortsattblock")
-    block = lxml.html.Element("section", {"class": " ".join(classes)})
+        block_classes.append("rubrikblock")
+        if "artikel" in classes(el):
+            block_classes.append("artikelblock")
+        elif "kaprubrik" in classes(el):
+            block_classes.append("kaprubrikblock")
+    if "paragraf" in classes(el):
+        block_classes.append("paragrafblock")
+        if "paragraf-fortsatt" in classes(el):
+            block_classes.append("fortsattblock")
+    block = lxml.html.Element("section",
+                              {"class": " ".join(block_classes)})
     el.addprevious(block)
     block.tail, el.tail = el.tail, None
     etree.SubElement(block, "article", {"class": "kontextsp"}).append(el)
@@ -546,6 +549,26 @@ def _paper_html(doc) -> str:
 PDF_FORMAT = 7
 
 
+class PageNotGenerated(FileNotFoundError):
+    """The export was asked for a public page path the site holds no generated
+    file for -- an address that is not a page address at all, or one whose page
+    has not been generated. `path` is what the request named. A FileNotFoundError
+    so the message keeps naming the missing thing; typed so the API answers 404
+    for *this* miss and not for any file the render happens to open."""
+
+    def __init__(self, path):
+        super().__init__(path)
+        self.path = path
+
+
+class InvalidExportRequest(ValueError):
+    """The export request itself does not add up: an unknown context kind, a
+    document path that is not one, the same document twice, two columns asked
+    for together with context. A ValueError because the message is the answer
+    the caller gets; typed so the API answers 422 for a caller's mistake and
+    still 500 for a ValueError that is our bug."""
+
+
 class SubresourceUnavailable(RuntimeError):
     """A same-origin subresource (image, font, stylesheet) failed to fetch.
     WeasyPrint renders on without the resource, so left alone this would
@@ -562,12 +585,12 @@ def _cache_key(stored: bytes, toc, kinds, amendments, columns):
     thereby unreachable, never served."""
     raw = repr((hashlib.sha256(stored).hexdigest(), toc, sorted(kinds),
                 amendments, columns,
-                hashlib.sha256(_stylesheet().encode()).hexdigest(),
+                hashlib.sha256(stylesheet().encode()).hexdigest(),
                 weasyprint.VERSION, PDF_FORMAT))
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def _prune(cache, cap=CACHE_MAX_BYTES):
+def prune(cache, cap=CACHE_MAX_BYTES):
     """Drop the least-recently-used entries until the cache fits `cap`.
     Recency is mtime: a hit re-touches its entry (`export`)."""
     entries = []
@@ -588,14 +611,17 @@ def _prune(cache, cap=CACHE_MAX_BYTES):
 
 def generated_page(path: str):
     """The generated file a public page path names -- ``/prop/2020/21:22`` ->
-    ``DATA/generated/forarbete/prop/2020/21_22.html``. None when the path is
-    not a page address, and equally when the site holds no such page: an
-    export can do nothing with either."""
+    ``DATA/generated/forarbete/prop/2020/21_22.html``. `PageNotGenerated` when
+    the path is not a page address, and equally when the site holds no such
+    page: an export can do nothing with either, and every caller answered both
+    with the same 404."""
     rel = layout.url_to_relpath(path)
     if rel is None:
-        return None
+        raise PageNotGenerated(path)
     page = config.DATA / "generated" / rel
-    return page if compress.resolve(page) is not None else None
+    if compress.resolve(page) is None:
+        raise PageNotGenerated(path)
+    return page
 
 
 def cache_dir():
@@ -608,10 +634,11 @@ def cache_dir():
 def cache_entry(page, *, toc: bool, kinds: frozenset[str],
                 amendments: bool, columns: int):
     """The cache file this export lands in -- present means the PDF is ready
-    to serve. FileNotFoundError if `page` is not generated."""
+    to serve. `PageNotGenerated` if `page` is not generated -- which after
+    `generated_page` means it went away between the two calls."""
     resolved = compress.resolve(page)
     if resolved is None:
-        raise FileNotFoundError(str(page))
+        raise PageNotGenerated(str(page))
     return cache_dir() / (_cache_key(resolved.read_bytes(), toc, kinds,
                                      amendments, columns) + ".pdf")
 
@@ -622,30 +649,38 @@ def cache_entry(page, *, toc: bool, kinds: frozenset[str],
 _render_lock = util.KeyedLocks()
 
 
-def export(page, *, toc: bool, kinds: frozenset[str], subresource,
-           amendments: bool, columns: int, progress=None) -> bytes:
-    """`render_pdf` behind the disk cache. `page` is the logical generated
-    file (compress resolves the stored variant); FileNotFoundError if the
-    page is not generated. `progress`, when given, is told the page estimate
-    and then follows the render (api/pdfjob.Job)."""
-    entry = cache_entry(page, toc=toc, kinds=kinds, amendments=amendments,
-                        columns=columns)
+def cached_render(entry: Path, render: Callable[[], bytes]) -> bytes:
+    """`render`'s bytes, from the disk cache at `entry` when it is already
+    there. Every export goes through here -- a single document and a
+    collection cache in the same directory under the same LRU policy."""
     entry.parent.mkdir(parents=True, exist_ok=True)
     with _render_lock(entry.name):
         if entry.is_file():
             try:
-                os.utime(entry)             # LRU recency for _prune
+                os.utime(entry)             # LRU recency for prune
                 return entry.read_bytes()
             except FileNotFoundError:
                 pass                        # a sibling worker pruned it: render
-        data = render_pdf(compress.read_text(page), toc=toc, kinds=kinds,
-                          subresource=subresource, progress=progress,
-                          amendments=amendments, columns=columns)
+        data = render()
         tmp = entry.with_name(entry.name + ".tmp-%d" % os.getpid())
         tmp.write_bytes(data)
         os.replace(tmp, entry)              # concurrent processes: last wins
-    _prune(entry.parent)
+    prune(entry.parent)
     return data
+
+
+def export(page, *, toc: bool, kinds: frozenset[str], subresource,
+           amendments: bool, columns: int, progress=None) -> bytes:
+    """`render_pdf` behind the disk cache. `page` is the logical generated
+    file (compress resolves the stored variant); `PageNotGenerated` if the
+    page is not generated. `progress`, when given, is told the page estimate
+    and then follows the render (api/pdfjob.Job)."""
+    return cached_render(
+        cache_entry(page, toc=toc, kinds=kinds, amendments=amendments,
+                    columns=columns),
+        lambda: render_pdf(compress.read_text(page), toc=toc, kinds=kinds,
+                           subresource=subresource, progress=progress,
+                           amendments=amendments, columns=columns))
 
 
 # A printed page holds about this much of a document. Two terms, because
@@ -673,7 +708,7 @@ def estimate_pages(doc) -> int:
     blocks = sum(len(doc.findall(".//" + tag)) for tag in _BLOCK_TAGS)
     pages = (len(doc.text_content()) / CHARS_PER_PAGE
              + blocks / BLOCKS_PER_PAGE)
-    if "pdf-two-columns" in _classes(doc):
+    if "pdf-two-columns" in classes(doc):
         pages /= TWO_COLUMN_PAGE_FACTOR
     return max(1, round(pages))
 
@@ -735,9 +770,9 @@ def _compact_sfs_provisions(doc) -> None:
     for provision in [el for el in document.find_class("paragraf")
                       if el.tag == "section"]:
         gutter = next((el for el in provision
-                       if "paragraf-gutter" in _classes(el)), None)
+                       if "paragraf-gutter" in classes(el)), None)
         body = next((el for el in provision
-                     if "paragraf-body" in _classes(el)), None)
+                     if "paragraf-body" in classes(el)), None)
         assert gutter is not None and body is not None, (  # rule:fail-fast
             "SFS provision %r lacks its gutter or body" % provision.get("id"))
         first = next(iter(body), None)
@@ -750,13 +785,13 @@ def _compact_sfs_provisions(doc) -> None:
         start.append(first)
 
 
-def _paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
+def paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
                     amendments: bool, columns: int):
     """Parse and recast one generated page as the DOM used for paper."""
     assert columns in (1, 2), "PDF columns must be 1 or 2"  # rule:fail-fast
     if columns == 2:
         kinds = frozenset()
-    doc = lxml.html.document_fromstring(html_text, parser=_PARSER)
+    doc = lxml.html.document_fromstring(html_text, parser=PARSER)
     body = doc.find("body")
     assert body is not None, "generated page has no body"  # rule:fail-fast
     _add_class(body, "pdf-weasy")
@@ -768,21 +803,21 @@ def _paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
     if document is not None:
         _add_class(document, "print-document")
     dropped = _paper_amendments(doc, amendments)
-    island = _island(doc) if kinds else {}
+    panels = island(doc) if kinds else {}
     # the TOC aside is harvested before the chrome it sits in is dropped
     nav = _print_toc(doc, dropped) if toc else None
     _drop(doc, "masthead", "toc-col", "rail", "mobile-bar")
     _running_labels(doc)
     front = next(iter(doc.find_class("frontmatter")), None)
     annotated = {}
-    if island and front is not None:
+    if panels and front is not None:
         main = front.getparent()
         _split_sfs_provisions(doc, main)
         # The document-level panel starts beside the document text, after
         # the title and the optional TOC. The remaining panels hang off the
         # blocks that carry their rail markers.
-        if island.get(""):
-            aside = _kontext_aside(island[""], kinds)
+        if panels.get(""):
+            aside = _kontext_aside(panels[""], kinds)
             if aside is not None:
                 first = front.getnext()
                 assert first is not None, (  # rule:fail-fast
@@ -792,7 +827,7 @@ def _paper_document(html_text: str, *, toc: bool, kinds: frozenset[str],
                     "document text sits outside the reading column")
                 annotated.setdefault(block, []).append(aside)
         for el in doc.xpath("//*[@data-rail]"):
-            panel = island.get(el.get("data-rail"))
+            panel = panels.get(el.get("data-rail"))
             aside = _kontext_aside(panel, kinds) if panel else None
             if aside is not None:
                 block = _column_block(el, main)
@@ -837,7 +872,7 @@ def _mirror_margin_notes(document) -> None:
             cells = [child for child in row.children
                      if type(child).__name__ == "TableCellBox"]
             cell = next((child for child in cells
-                         if "kontextnot" in _classes(getattr(child, "element",
+                         if "kontextnot" in classes(getattr(child, "element",
                                                              None))), None)
             if cell is None:
                 continue
@@ -851,7 +886,7 @@ def _mirror_margin_notes(document) -> None:
             for note in boxes:
                 element = getattr(note, "element", None)
                 if (type(note).__name__ != "BlockBox" or element is None
-                        or "print-kontext" not in _classes(element)):
+                        or "print-kontext" not in classes(element)):
                     continue
                 border = note.border_left_width
                 padding = note.padding_left
@@ -869,7 +904,7 @@ def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
                progress=None) -> bytes:
     """The page as PDF bytes. `subresource` answers an in-site path+query
     with (bytes, mime) -- the app answering for itself in-process."""
-    doc = _paper_document(html_text, toc=toc, kinds=kinds,
+    doc = paper_document(html_text, toc=toc, kinds=kinds,
                           amendments=amendments, columns=columns)
     return render_document(doc, subresource=subresource, progress=progress)
 
@@ -877,7 +912,7 @@ def render_pdf(html_text: str, *, toc: bool, kinds: frozenset[str],
 def render_document(doc, *, subresource, progress=None) -> bytes:
     """A transformed paper DOM as PDF bytes.
 
-    Single-page export builds this DOM in ``_paper_document``.  A collection
+    Single-page export builds this DOM in ``paper_document``.  A collection
     builds it by combining several such document fragments, then uses the same
     estimator, fetch policy, mirrored-note pass and failure contract here.
     """
@@ -933,7 +968,7 @@ def _fetcher(subresource, failures):
                 raise ValueError("extern URL hämtas inte: %s" % url)
             if u.path == "/style.css":
                 return URLFetcherResponse(
-                    url, body=_stylesheet(),
+                    url, body=stylesheet(),
                     headers={"content-type": "text/css; charset=utf-8"})
             if u.path.startswith("/fonts/"):
                 font = ASSETS / "fonts" / u.path.removeprefix("/fonts/")

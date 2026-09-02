@@ -5,8 +5,8 @@ editor's session (auth.require_editor), so tests log in as an editor rather than
 present a token. No network, no build driver."""
 
 import json
-import re
 import os
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,8 +14,8 @@ from opensearchpy.exceptions import OpenSearchException
 
 from ferenda import config
 from ferenda.api import app as api
-from ferenda.api import auth, db, ops
-from ferenda.lib import catalog, runlog
+from ferenda.api import auth, ops
+from ferenda.lib import catalog, layout, runlog
 
 
 @pytest.fixture
@@ -97,7 +97,7 @@ def ledger(tmp_path, monkeypatch, editor_auth):
     monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", errors)
     monkeypatch.setattr(ops, "STATUS", status)
-    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")  # absent
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")  # absent
     return {"good": good, "bad": bad, "dir": build}
 
 
@@ -168,7 +168,7 @@ def test_overview_reads_stage_cells_from_the_ledger_not_the_snapshot(
     monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
     monkeypatch.setattr(ops, "STATUS", build / "status.json")   # deliberately absent
-    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     body = _login(TestClient(api.app)).get("/ops").text
     for step in ("relate", "index", "dump", "generate"):
         assert "<th>%s</th>" % step in body
@@ -217,7 +217,7 @@ def test_corpus_section_lists_docs_and_size_per_source(client, tmp_path, monkeyp
          ("u3", "dv", "case", "C1", "T3", "p3", 500)])
     con.commit()
     con.close()
-    monkeypatch.setattr(db, "CATALOG", cat)
+    monkeypatch.setattr(layout, "CATALOG", cat)
     body = client.get("/ops").text
     assert "3.0 kB" in body                          # sfs: 1000 + 2000
     assert "500 B" in body                           # dv
@@ -244,7 +244,7 @@ def test_a_one_source_step_is_listed_not_given_a_column(tmp_path, monkeypatch,
     monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
     monkeypatch.setattr(ops, "STATUS", build / "status.json")
-    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     body = _login(TestClient(api.app)).get("/ops").text
     assert "versions" not in _health_columns(body)  # not a column
     assert "parse" in _health_columns(body)         # the common spine still is
@@ -279,7 +279,7 @@ def test_runs_table_names_the_host_and_will_not_guess_a_foreign_pid(
     monkeypatch.setattr(ops, "RUNS", runs)
     monkeypatch.setattr(ops, "ERRORS", build / "errors.json")
     monkeypatch.setattr(ops, "STATUS", build / "status.json")
-    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     body = _login(TestClient(api.app)).get("/ops/runs").text
     assert "otherbox" in body
     assert "ran elsewhere" in body
@@ -342,7 +342,7 @@ def test_empty_states_render_without_files(tmp_path, monkeypatch, editor_auth):
     monkeypatch.setattr(ops, "RUNS", empty / "runs.ndjson")
     monkeypatch.setattr(ops, "ERRORS", empty / "errors.json")
     monkeypatch.setattr(ops, "STATUS", empty / "status.json")
-    monkeypatch.setattr(db, "CATALOG", tmp_path / "catalog.sqlite")
+    monkeypatch.setattr(layout, "CATALOG", tmp_path / "catalog.sqlite")
     c = _login(TestClient(api.app))
     assert "no runs recorded yet" in c.get("/ops").text
     assert c.get("/ops/runs").status_code == 200

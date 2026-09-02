@@ -61,7 +61,8 @@ REGISTRY = EDPB.series
 
 def number_slug(number):
     return _number_slug(number, LOPNUMMER_FORST)
-from ferenda.lib import catalog, facets, labels, layout, render, tpl
+from ferenda.lib import (catalog, catalog_rows, facets, labels, layout,
+                         render, tpl)
 from ferenda.lib.lagrum import (
     EULAGSTIFTNING,
     VAGLEDNING,
@@ -717,7 +718,7 @@ def test_layout_files_a_document_under_its_series():
 
 def test_catalog_rows_carry_the_series_as_the_kind():
     art = _artifact()
-    uri, source, kind, label, title, path = catalog.document_row(
+    uri, source, kind, label, title, path = catalog_rows.document_row(
         art, "x.json", "guidance")
     assert (source, kind, label) == ("guidance", "riktlinjer",
                                      "Riktlinjer 05/2020")
@@ -1299,7 +1300,7 @@ def _easa_pager(pages, monkeypatch):
             '<a class="easa_node_link" href="%s">x</a></td></tr></tbody>'
             '</table></div>' % path
             for path in pages[min(n, len(pages) - 1)])
-    monkeypatch.setattr(easa_download, "_fetch", fetch)
+    monkeypatch.setattr(easa_download, "get_text", fetch)
 
 
 def test_easa_walk_library_stops_on_no_new_document(monkeypatch):
@@ -1953,7 +1954,7 @@ def test_a_superseded_vagledning_carries_the_repeal_vocabulary():
         "https://lagen.nu/guidance/eba/gl/2026-05"
     assert art["metadata"]["ersattAvIdentifier"] == "EBA/GL/2026/05"
     assert "upphavd" not in art["metadata"]
-    assert catalog._expired_date(art) == catalog.EXPIRED_UNDATED
+    assert catalog_rows._expired_date(art) == catalog_rows.EXPIRED_UNDATED
 
 
 def test_a_current_vagledning_says_nothing_about_repeal():
@@ -1961,7 +1962,7 @@ def test_a_current_vagledning_says_nothing_about_repeal():
                      titel="Riktlinjer").to_artifact(
         edpb_parse._fresh_parser("sv"))
     assert "status" not in art["metadata"]
-    assert catalog._expired_date(art) is None
+    assert catalog_rows._expired_date(art) is None
 
 
 # --------------------------------------------------------------------------
@@ -2102,13 +2103,13 @@ def test_eba_sync_stores_a_previous_version_as_its_own_document(
             [leaf],
             [("sv", "/x/Guidelines%20%28EBA-GL-2016-07%29_SV.pdf")]),
     }
-    monkeypatch.setattr(eba_download, "_fetch",
+    monkeypatch.setattr(eba_download, "get_text",
                         lambda _s, url, _d: pages[url])
     # a stand-in the walk can hang its `deadline` on, the way a real session does
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
     eba_download.eba_sync(tmp_path, delay=0)
 
     stored = {compress.read_json(p)["nummer"]: compress.read_json(p)
@@ -2151,13 +2152,13 @@ def test_eba_sync_stops_when_the_walk_outruns_its_budget(tmp_path, monkeypatch):
         clock["t"] += 1000.0
         return pages[url]
 
-    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "get_text", fetch)
     monkeypatch.setattr(eba_download.time, "monotonic", lambda: clock["t"])
     monkeypatch.setattr(eba_download, "WALK_BUDGET", 2500.0)
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
     eba_download.eba_sync(tmp_path, delay=0)
 
     stored = sorted(compress.read_json(p)["nummer"]
@@ -2249,11 +2250,11 @@ def test_eba_sync_reads_each_leaf_page_once(tmp_path, monkeypatch):
         read.append(url)
         return pages[url]
 
-    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "get_text", fetch)
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
 
     eba_download.eba_sync(tmp_path, delay=0)
     assert eba_download.BASE + leaf in read
@@ -2290,19 +2291,19 @@ def test_eba_sync_does_not_remember_a_leaf_whose_document_failed_to_store(
         read.append(url)
         return pages[url]
 
-    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "get_text", fetch)
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
     # the EBA serves an error page under the .pdf address: walk_records' verify
     # rejects it, counts the error and writes no record
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"<html>error</html>"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"<html>error</html>"))
     eba_download.eba_sync(tmp_path, delay=0)
     assert not list((tmp_path / "eba").glob("eba-*.json*"))
 
     read.clear()
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
     eba_download.eba_sync(tmp_path, delay=0)
     assert eba_download.BASE + leaf in read, \
         "the leaf was memoized although its document never stored"
@@ -2331,15 +2332,15 @@ def test_eba_sync_does_not_remember_a_leaf_whose_candidate_file_vanished(
         read.append(url)
         return pages[url]
 
-    def gone(_session, _url):
+    def gone(_session, _url, **_kwargs):
         def fetch_document():
             raise requests.HTTPError("404 Not Found")
         return fetch_document
 
-    monkeypatch.setattr(eba_download, "_fetch", fetch)
+    monkeypatch.setattr(eba_download, "get_text", fetch)
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
-    monkeypatch.setattr(eba_download, "_document_fetcher", gone)
+    monkeypatch.setattr(eba_download, "fetcher", gone)
 
     eba_download.eba_sync(tmp_path, delay=0)
     read.clear()
@@ -2363,11 +2364,11 @@ def test_eba_sync_does_not_remember_the_leaves_a_limit_left_unfetched(
             [("sv", "/x/Guidelines%%20%%28EBA-GL-201%d-01%%29_SV.pdf" % n)])
            for n, leaf in enumerate(leaves)},
     }
-    monkeypatch.setattr(eba_download, "_fetch", lambda _s, url, _d: pages[url])
+    monkeypatch.setattr(eba_download, "get_text", lambda _s, url, _d: pages[url])
     monkeypatch.setattr(eba_download, "make_session",
                         lambda _ua: types.SimpleNamespace())
-    monkeypatch.setattr(eba_download, "_document_fetcher",
-                        lambda _s, _url: (lambda: b"%PDF-1.4 x"))
+    monkeypatch.setattr(eba_download, "fetcher",
+                        lambda _s, _url, **_kw: (lambda: b"%PDF-1.4 x"))
 
     eba_download.eba_sync(tmp_path, limit=1, delay=0)
     stored = sorted(compress.read_json(p)["nummer"]

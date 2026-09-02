@@ -1,7 +1,8 @@
 """Förarbetessidan: the proposition/SOU/Ds body and the genomförande
 margin.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 import re
@@ -11,11 +12,11 @@ from urllib.parse import quote
 from markupsafe import Markup
 
 from ..lib import labels, tpl
+from ..lib.margins import directive_link
 from ..lib.page import (
     NODES,
     Rail,
     Toc,
-    directive_link,
     doc_meta,
     page_context,
     plain,

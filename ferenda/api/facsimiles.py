@@ -31,6 +31,7 @@ must fail loudly rather than read to a caller as "no such page".
 import json
 import re
 import subprocess
+from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from fastapi import HTTPException
@@ -199,7 +200,7 @@ def _dv_pdf(local):
         return None
     with db.connection() as con:
         row = catalog.document(con, catalog.BASE + local)
-        art = catalog.load_artifact(catalog.data_root(con), row[5]) if row else {}
+        art = catalog.artifact_for(con, row[5]) if row else {}
     ref = art.get("facsimile_pdf")
     if not ref:
         return None
@@ -237,6 +238,15 @@ def facsimile_response(local, sid, bbox=None):
                         media_type="image/png", headers=FAX_HEADERS)
 
 
+def sfs_source_pdf(src: str) -> Path:
+    """The mirrored published PDF of SFS `src`, which is where an sfs-graphic
+    region is cropped from -- a 404 when the mirror does not hold it."""
+    pdf = layout.sfs_pdf(src)
+    if not pdf.exists():
+        raise HTTPException(404, "source SFS %s is not mirrored" % src)
+    return pdf
+
+
 # sfs-graphic: a crop of the graphic/formula/map the consolidated SFS text drops
 # but the published PDF carries. Unlike a facsimile the client sends only the
 # viewed statute + gap id; the reviewed .graphics layer holds the geometry AND
@@ -265,9 +275,7 @@ def sfs_graphic_path(local, node, dpi):
     if bbox is not None:
         assert facsimile.valid_bbox(bbox), \
             "%s/%s: invalid graphics bbox %r" % (local, node, bbox)
-    pdf = layout.sfs_pdf(src)
-    if not pdf.exists():
-        raise HTTPException(404, "source SFS %s is not mirrored" % src)
+    pdf = sfs_source_pdf(src)
     # an entry with no bbox *is* the whole page, which has one resolution: there
     # is no larger render to ask for, so `stor` cannot apply to it
     return png_path("sfs", src, pdf, page, bbox,
@@ -312,7 +320,7 @@ def subresource(path_qs):
     if url.path not in _SUBRESOURCE_PATHS:
         raise ValueError("no subresource at %s" % url.path)
     query = parse_qs(url.query)
-    local = catalog.local(catalog.strip_fragment(_one(query, "uri", url.path)))
+    local = catalog.uri_local(_one(query, "uri", url.path))
     if url.path == "/api/v1/facsimile":
         raw = query.get("bbox", [None])[0]
         png = facsimile_path(local, int(_one(query, "sid", url.path)),

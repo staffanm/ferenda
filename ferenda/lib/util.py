@@ -70,6 +70,21 @@ def shouted(text: str) -> bool:
     return bool(letters) and sum(c.isupper() for c in letters) / len(letters) > 0.8
 
 
+def json_canonical(obj) -> str:
+    """The artifact tree's one JSON serialization: no ASCII escaping, stable
+    key order, two-space indent -- so two builds of the same data diff
+    readably. `compress.write_json` and `write_json_atomic` are its two
+    writers; nothing on disk should be dumped with a different set of flags."""
+    return json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def write_json_atomic(path: Path | str, obj) -> None:
+    """`obj` as canonical JSON at `path`, written atomically. The plain-file
+    counterpart of `compress.write_json`, for a sidecar that is never stored
+    compressed."""
+    write_atomic(path, json_canonical(obj).encode())
+
+
 def write_atomic(path: Path | str, data: bytes | str) -> None:
     """Write `data` (bytes or str) to `path` via a same-directory temp file +
     atomic rename, so an interrupted run never leaves a partial file behind.
@@ -471,6 +486,22 @@ class NullReporter:
 
     def done(self):
         pass
+
+
+# --------------------------------------------------------------------------
+# document uris
+# --------------------------------------------------------------------------
+
+# every document uri this site mints starts here
+BASE = "https://lagen.nu/"
+
+
+def local(uri: str) -> str:
+    """The local id a document uri names -- the site base stripped off. An
+    off-site uri is returned unchanged. `util` is the bottom of `lib`, so the
+    modules below catalog (labels, catalog_rows) reach the one copy without
+    importing catalog back."""
+    return uri[len(BASE):] if uri.startswith(BASE) else uri
 
 
 ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}

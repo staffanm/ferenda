@@ -1,16 +1,17 @@
 """Europadomstolssidan: the judgment body and its article metadata.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 
 from markupsafe import Markup
 
 from ..lib import datasets, labels, tpl
+from ..lib.margins import ext_link
 from ..lib.page import (
     doc_meta,
     document_body,
-    ext_link,
     page_context,
     ref_list,
     render_toc,

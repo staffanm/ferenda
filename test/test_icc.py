@@ -17,7 +17,7 @@ from ferenda.icc.model import (
     doc_basefile,
     load_types,
 )
-from ferenda.lib import catalog, facets, layout, page, render
+from ferenda.lib import catalog, catalog_rows, facets, layout, page, render
 from ferenda.lib.pdftext import Line
 
 FIXTURES = Path(__file__).parent / "files" / "icc"
@@ -173,7 +173,9 @@ def test_parse_metadata_without_body():
     assert md["caseNumber"] == "ICC-01/04-02/06"
     assert md["documentNumber"] == "ICC-01/04-02/06-2359"
     assert md["chamber"] == "Trial Chamber VI"
-    assert art["structure"] == []                          # no PDF on disk -> metadata only
+    # no PDF on disk -> metadata only, and an empty body writes no `structure`
+    # key at all (`lib.artifact.prune`)
+    assert "structure" not in art
     assert art["source_url"] == \
         "https://www.icc-cpi.int/court-record/icc-01/04-02/06-2359"
 
@@ -218,7 +220,7 @@ def test_icc_layout_round_trips_and_catalog_row():
     assert str(layout.url_to_relpath("/icc/ICC-01_04-02_06-2359")) == \
         "icc/ICC_01_04_02_06_2359.html"
     assert "icc" in facets.sources()
-    row = catalog.icc_document(_ntaganda(), "artifact/icc/ICC-01_04-02_06-2359.json")
+    row = catalog_rows.icc_document(_ntaganda(), "artifact/icc/ICC-01_04-02_06-2359.json")
     assert row[:3] == (uri, "icc", "judgment")
     assert row[3] == "ICC-01/04-02/06-2359"                # label = document number
 

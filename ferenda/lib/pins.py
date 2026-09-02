@@ -40,7 +40,7 @@ def resolved_results(con, q, source=None, kind=None):
                 root = row[0]
         if not row:
             continue
-        _uri, src, kind_, label, title, _path, descriptive = row
+        _uri, src, kind_, label, title, _path, descriptive, _url = row
         if kind and kind_ != kind:
             continue
         # the same reader-facing heading the page and full-text hits show (short

@@ -11,14 +11,13 @@ a field, which it did twice while these tests were being written."""
 import sqlite3
 
 from ferenda.lib import catalog, page
-from ferenda.lib.page import (
-    _inbound_groups,
+from ferenda.lib.margins import (
     _reassigned_before,
     corresponding_cases_margin,
     corresponds_margin,
-    render_rail_sections,
     renumbered_refs_margin,
 )
+from ferenda.lib.page import _inbound_groups, render_rail_sections
 
 L = "https://lagen.nu/"
 

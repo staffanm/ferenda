@@ -22,7 +22,7 @@ from ferenda.icj.model import (
     doc_basefile,
     parse_stem,
 )
-from ferenda.lib import catalog, facets, layout, render
+from ferenda.lib import catalog, catalog_rows, facets, layout, render
 from ferenda.lib.page import BANNERS
 from ferenda.lib.pdftext import (
     Line,
@@ -543,7 +543,7 @@ def test_references_reach_the_artifact():
     assert [r["uri"] for r in art["references"]] == \
         ["https://lagen.nu/untc/I-1021"]
     # and the catalog's generic reference contract picks them up as links
-    assert [run["uri"] for _anchor, _page, run in catalog.artifact_links(art)] == \
+    assert [run["uri"] for _anchor, _page, run in catalog_rows.artifact_links(art)] == \
         ["https://lagen.nu/untc/I-1021"]
 
 
@@ -563,7 +563,7 @@ def test_icj_layout_round_trips_and_catalog_row():
                              "against Nicaragua",
                    kind="judgment", title="Judgment of 27 June 1986",
                    date="1986-06-27").to_artifact()
-    row = catalog.icj_document(art, "artifact/icj/070-19860627-JUD-01-00.json")
+    row = catalog_rows.icj_document(art, "artifact/icj/070-19860627-JUD-01-00.json")
     assert row[:3] == (uri, "icj", "dom")
     assert row[3] == "ICJ 70 (Judgment, 1986-06-27)"
 

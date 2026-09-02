@@ -30,6 +30,8 @@ from .util import basefile_slug, confine
 
 DATA = config.DATA
 GENERATED = DATA / "generated"
+# may live off data_root (config.yml: catalog_root, a fast local disk)
+CATALOG = config.CATALOG_ROOT / "catalog.sqlite"
 
 # --------------------------------------------------------------------------
 # Stage-first layout: <stage>/<source>/…  (e.g. downloaded/sfs, artifact/dom).
@@ -71,7 +73,8 @@ def artifact_dir(source: str) -> Path:
 # and catalogue nothing, each on purpose: `remisser` holds 80k consultation
 # responses we do not publish, `site` and `stats` render editorial pages rather
 # than corpus documents. Named here, next to the artifact layout both readers
-# share, because two of them ask: `build.ARTIFACTS` builds relate/index/dump's
+# share, because two of them ask: each source's `artifacts` lister (the set
+# `build.py` asserts against this tuple) builds relate/index/dump's
 # work list from it, and the ops dashboard reads it to tell "parsed but never
 # catalogued" (a real fault) from "parsed and never meant to be" (these three).
 CATALOGUED_SOURCES = ("sfs", "dv", "forarbete", "kommentar", "begrepp",
@@ -161,57 +164,93 @@ def relpath(source: str, basefile: str) -> Path:
     return confine(_relpath(source, basefile), basefile, source)
 
 
+def _relpath_sfs(basefile):
+    year, nr = _sfs_parts(basefile)
+    return Path(year) / nr
+
+
+def _relpath_dv(basefile):
+    return Path(case_slug(basefile))
+
+
+def _relpath_forarbete(basefile):
+    typ, rest = basefile.split("/", 1)
+    return Path(typ) / _fa_year(rest) / rest
+
+
+def _relpath_eurlex(basefile):
+    return Path(basefile[1:5]) / basefile.replace("/", "_")
+
+
+def _relpath_foreskrift(basefile):
+    fs, rest = basefile.split("/", 1)            # "fffs/2013:10"
+    return Path(fs) / rest.replace(":", "-").replace(" ", "_")
+
+
+def _relpath_org(basefile):
+    """avg, rs and lawreview: "jo/2340-2025", "jk/2024/8082" -- and, for rs, the
+    agency's own ställningstagande number: "fk/2025:01", "kfm/1-23-VER"; for
+    lawreview, the journal's issue coordinates: "svjt/2026-104",
+    "jp/2025-01-03"."""
+    org, rest = basefile.split("/", 1)
+    return Path(org) / rest.replace("/", "-").replace(":", "-")
+
+
+def _relpath_verbatim(basefile):
+    """The basefile is already a clean, filesystem-safe path, used as it stands:
+
+    * guidance -- "<utgivare>/<serie>/<nummer>" (the series slug normalises the
+      number), kept nested rather than flattened so the artifact tree reads like
+      the URI: guidance/edpb/riktlinjer/05-2020, guidance/eba/gl/2021-05
+    * the folkrätt sources -- one identifier per document
+    * site and stats -- editorial pages under fixed basefiles (`frontpage`,
+      `sitenews`, `om/<slug>`) and the single corpus-measurement artifact
+      (`statistik`)
+    """
+    return Path(basefile)
+
+
+def _relpath_remisser(basefile):
+    """``<typ>/<referred document id>/<org-slug>`` -- the ärende is keyed on the
+    document it sends out ("sou/2026:14", "pm/LI2026/01339"), so the id itself
+    may contain a slash; the org is always the last segment."""
+    typ, rest = basefile.split("/", 1)
+    ident, _, org = rest.rpartition("/")
+    return Path(typ) / basefile_slug(ident) / org
+
+
+def _relpath_kommentar(basefile):
+    """File the annotation under its host source, reusing that source's
+    transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on SFS
+    2009:400 and one on a same-slug act in another source never collide."""
+    host = kommentar_host(basefile)
+    return Path(host) / _relpath(host, basefile)
+
+
+def _relpath_begrepp(basefile):
+    """Concept names are their own namespace (no host); keep the flat slug."""
+    return Path(_alnum_slug(basefile))
+
+
+# source -> its basefile→sub-path rule. Half the sources share `_relpath_verbatim`.
+_RELPATH = {"sfs": _relpath_sfs, "dv": _relpath_dv,
+            "forarbete": _relpath_forarbete, "eurlex": _relpath_eurlex,
+            "foreskrift": _relpath_foreskrift, "avg": _relpath_org,
+            "rs": _relpath_org, "lawreview": _relpath_org,
+            "guidance": _relpath_verbatim, "hudoc": _relpath_verbatim,
+            "coe": _relpath_verbatim, "icrc": _relpath_verbatim,
+            "untc": _relpath_verbatim, "icc": _relpath_verbatim,
+            "icj": _relpath_verbatim, "site": _relpath_verbatim,
+            "stats": _relpath_verbatim, "remisser": _relpath_remisser,
+            "kommentar": _relpath_kommentar, "begrepp": _relpath_begrepp}
+
+
 def _relpath(source: str, basefile: str) -> Path:
-    if source == "sfs":
-        year, nr = _sfs_parts(basefile)
-        return Path(year) / nr
-    if source == "dv":
-        return Path(case_slug(basefile))
-    if source == "forarbete":
-        typ, rest = basefile.split("/", 1)
-        return Path(typ) / _fa_year(rest) / rest
-    if source == "eurlex":
-        return Path(basefile[1:5]) / basefile.replace("/", "_")
-    if source == "foreskrift":
-        fs, rest = basefile.split("/", 1)        # "fffs/2013:10"
-        return Path(fs) / rest.replace(":", "-").replace(" ", "_")
-    if source in ("avg", "rs", "lawreview"):
-        # "jo/2340-2025", "jk/2024/8082" -- and, for rs, the agency's own
-        # ställningstagande number: "fk/2025:01", "kfm/1-23-VER"; for
-        # lawreview, the journal's issue coordinates: "svjt/2026-104",
-        # "jp/2025-01-03"
-        org, rest = basefile.split("/", 1)
-        return Path(org) / rest.replace("/", "-").replace(":", "-")
-    if source == "guidance":
-        # "<utgivare>/<serie>/<nummer>" -- already a clean path (the series
-        # slug normalises the number), and kept nested rather than flattened
-        # so the artifact tree reads like the URI: guidance/edpb/riktlinjer/
-        # 05-2020, guidance/eba/gl/2021-05
-        return Path(basefile)
-    if source in ("hudoc", "coe", "icrc", "untc", "icc", "icj"):
-        return Path(basefile)
-    if source == "remisser":
-        # "<typ>/<referred document id>/<org-slug>" -- the ärende is keyed on the
-        # document it sends out ("sou/2026:14", "pm/LI2026/01339"), so the id
-        # itself may contain a slash; the org is always the last segment.
-        typ, rest = basefile.split("/", 1)
-        ident, _, org = rest.rpartition("/")
-        return Path(typ) / basefile_slug(ident) / org
-    if source == "kommentar":
-        # file the annotation under its host source, reusing that source's
-        # transform: sfs/2009/400, eurlex/2023/32023R2854 -- so a commentary on
-        # SFS 2009:400 and one on a same-slug act in another source never collide
-        host = kommentar_host(basefile)
-        return Path(host) / _relpath(host, basefile)
-    if source == "begrepp":
-        # concept names are their own namespace (no host); keep the flat slug
-        return Path(_alnum_slug(basefile))
-    if source in ("site", "stats"):
-        # editorial pages under fixed basefiles (`frontpage`, `sitenews`,
-        # `om/<slug>`) and the single corpus-measurement artifact (`statistik`);
-        # the basefile is already filesystem-safe, used verbatim
-        return Path(basefile)
-    raise ValueError("unknown source %r" % source)
+    try:
+        rule = _RELPATH[source]
+    except KeyError:
+        raise ValueError("unknown source %r" % source) from None
+    return rule(basefile)
 
 
 def artifact(source: str, basefile: str) -> Path:
@@ -231,7 +270,7 @@ def stats_snapshot(generated: str) -> Path:
     computes in one day settle on that day's figure rather than accumulating.
 
     The `archive/` subdirectory is safe here only because nothing walks the
-    stats artifact tree: `stats` is absent from ARTIFACTS and its source lists
+    stats artifact tree: `stats` registers no artifacts lister and its source lists
     the single basefile `statistik` verbatim, so relate/dump never glob it. Do
     not copy this layout into a source whose artifacts *are* walked."""
     return artifact_dir("stats") / "archive" / ("statistik-%s.json" % generated)
@@ -537,23 +576,28 @@ def eurlex_sidecar_basefile(path: Path) -> str:
 # of the sfs plumbing in each consumer.
 # --------------------------------------------------------------------------
 
-VERSIONED_SOURCES = ("sfs", "eurlex")
+# source -> (versions sidecar, version artifact, version sort key)
+_VERSIONED = {"sfs": (sfs_versions_sidecar, sfs_version_artifact,
+                      sfs_version_key),
+              "eurlex": (eurlex_versions_sidecar, eurlex_version_artifact,
+                         lambda version: version)}
+
+VERSIONED_SOURCES = tuple(_VERSIONED)
+
+
+def _versioned(source: str, part: int):
+    try:
+        return _VERSIONED[source][part]
+    except KeyError:
+        raise ValueError("source %r keeps no version history" % source) from None
 
 
 def versions_sidecar(source: str, basefile: str) -> Path:
-    if source == "sfs":
-        return sfs_versions_sidecar(basefile)
-    if source == "eurlex":
-        return eurlex_versions_sidecar(basefile)
-    raise ValueError("source %r keeps no version history" % source)
+    return _versioned(source, 0)(basefile)
 
 
 def version_artifact(source: str, basefile: str, version: str) -> Path:
-    if source == "sfs":
-        return sfs_version_artifact(basefile, version)
-    if source == "eurlex":
-        return eurlex_version_artifact(basefile, version)
-    raise ValueError("source %r keeps no version history" % source)
+    return _versioned(source, 1)(basefile, version)
 
 
 def version_key(source: str, version: str):
@@ -561,11 +605,7 @@ def version_key(source: str, version: str):
     consolidation date, which sorts as itself. Raises like its sibling
     dispatchers: a third versioned source must choose its ordering here,
     not inherit string sorting silently."""
-    if source == "sfs":
-        return sfs_version_key(version)
-    if source == "eurlex":
-        return version
-    raise ValueError("source %r keeps no version history" % source)
+    return _versioned(source, 2)(version)
 
 
 def foreskrift_grund_artifact(basefile: str) -> Path:
@@ -800,7 +840,7 @@ EXT_NAMESPACES = frozenset(_EXT_NS)
 # authoritative source url -- a document's canonical location at the publisher,
 # where one is derivable by rule from its identity. Sources whose source url is
 # *not* rule-derivable (e.g. a regeringen.se landing page) record it at download
-# time instead; source_url returns None for them and build.write_artifact stamps
+# time instead; source_url returns None for them and stage.write_artifact stamps
 # the recorded url. Either way the artifact ends up with one uniform
 # `source_url` key, which the renderer turns into the page's "Källa" link.
 # --------------------------------------------------------------------------
@@ -841,7 +881,7 @@ def _eurlex_source_url(celex: str) -> str:
 def source_url(source: str, basefile: str) -> str | None:
     """The authoritative publisher url for a document, derived by rule from its
     identity where possible, else None -- in which case the downloader-recorded
-    url is used instead (see build.write_artifact)."""
+    url is used instead (see stage.write_artifact)."""
     if source == "eurlex":
         return _eurlex_source_url(basefile)
     if source == "sfs":

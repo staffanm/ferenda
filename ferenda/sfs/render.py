@@ -1,7 +1,8 @@
 """Författningssidan: the statute text, its ändringsregister, the lydelse
 panel and the way-back banners.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 import functools
@@ -14,16 +15,15 @@ from markupsafe import Markup
 
 from ..lib import catalog, history, labels, lagrum, layout, markdown, tpl
 from ..lib.catalog import BASE
+from ..lib.margins import chain_meta, ext_link
 from ..lib.page import (
     BANNERS,
     EURLEX,
     PANELS,
     Rail,
     Toc,
-    chain_meta,
     citer_name,
     doc_meta,
-    ext_link,
     forarb_sort_key,
     href,
     page_context,
@@ -32,6 +32,7 @@ from ..lib.page import (
     render_node,
     render_runs,
     render_toc,
+    versions_panel,
 )
 from .register import omfattning_size
 
@@ -212,16 +213,9 @@ def _versions_panel(art, base_id, own_version, versions):
     the consolidation cutoff it compares against ("Ändring införd t.o.m. SFS
     2026:880 · Jämför lydelser"), and a full-width box above the text pushed the
     statute itself below the fold for no gain (S1)."""
-    versions = [(v, u) for v, u in versions if v != own_version]
-    if not versions:
-        return ""
-    notes = _version_notes(art)
-    return PANELS.versions_panel(
-        [{"value": v, "label": "SFS %s" % v, "note": notes.get(v, "")}
-         for v, _vuri in reversed(versions)],          # newest first
-        "denna" if own_version else "aktuell",
-        BASE + base_id, own_version or "",
-        "SFS %s" % own_version if own_version else "")
+    return versions_panel(BASE + base_id, own_version, versions,
+                          label=lambda v: "SFS %s" % v,
+                          notes=_version_notes(art))
 
 
 def _act_source_links(nr):

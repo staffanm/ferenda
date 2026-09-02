@@ -57,7 +57,7 @@ def webenv(tmp_path, monkeypatch):
     png.write_bytes(b"\x89PNG\r\n\x1a\n")
     monkeypatch.setattr(facsimile, "cached",
                         lambda *a, **kw: png)
-    monkeypatch.setattr("ferenda.api.graphics._source_pdf",
+    monkeypatch.setattr("ferenda.api.facsimiles.sfs_source_pdf",
                         lambda src: tmp_path / "fake.pdf")
     return p
 

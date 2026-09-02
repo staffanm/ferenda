@@ -12,7 +12,7 @@ curated store (lib.annstore), and keys the feedback onto the förarbete's own ur
 import json
 
 from ferenda.lib import annstore, catalog, layout, render
-from ferenda.lib import page
+from ferenda.lib import margins, page
 from ferenda.forarbete import render as forarbete_render
 
 
@@ -156,7 +156,7 @@ def test_the_sentiment_bands_meet_where_the_table_says():
     an edge belongs to the band above it -- which makes the scale asymmetric
     about zero (-0.15 is neutral, +0.15 is positiv). Deliberate or not, it is now
     stated in one place, and this is that place's test."""
-    band = lambda s: page._sentiment_level(s)[1]        # noqa: E731
+    band = lambda s: margins._sentiment_level(s)[1]        # noqa: E731
     assert band(-1.0) == "sentiment-neg-strong"
     assert band(-0.6) == "sentiment-neg"        # the edge falls upward
     assert band(-0.15) == "sentiment-neutral"

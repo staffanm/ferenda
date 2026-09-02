@@ -13,7 +13,6 @@ PDF concatenator cannot recover after documents have been laid out separately.
 
 import hashlib
 import json
-import os
 import re
 from datetime import date
 from html import unescape
@@ -25,7 +24,7 @@ import lxml.html
 from lxml import etree  # ty: ignore[unresolved-import]  # lxml ships no stubs
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..lib import compress, tpl, util
+from ..lib import compress, tpl
 from . import pdf
 
 MAX_DOCUMENTS = 1000
@@ -72,41 +71,38 @@ class InspectRequest(BaseModel):
 def _canonical_path(path: str) -> str:
     """One public document path, with no query or fragment."""
     if not path.startswith("/") or "?" in path or "#" in path or "\\" in path:
-        raise ValueError("ogiltig dokumentsökväg: %r" % path)
-    page = pdf.generated_page(path)
-    if page is None:
-        raise FileNotFoundError(path)
+        raise pdf.InvalidExportRequest("ogiltig dokumentsökväg: %r" % path)
     return path
 
 
-def _page_identity(path: str) -> Path:
-    page = pdf.generated_page(_canonical_path(path))
-    assert page is not None, "validated collection path disappeared"
-    resolved = compress.resolve(page)
-    assert resolved is not None, "validated collection page disappeared"
+def _resolved_page(path: str) -> Path:
+    """The stored file behind one collection row: the generated page the public
+    path names, with `compress` resolving the variant on disk. It is the
+    identity a row is de-duplicated and cache-keyed by *and* the file the row's
+    text is read from, so one lookup answers all three -- where three copies
+    stood, each re-resolving and asserting the same thing.
+    `pdf.PageNotGenerated` when the site holds no page there."""
+    resolved = compress.resolve(pdf.generated_page(_canonical_path(path)))
+    assert resolved is not None, "generated page disappeared while reading it"
     return resolved
 
 
 def validate(manifest: CollectionManifest) -> CollectionManifest:
     """Validate facts that span several Pydantic fields."""
     paths = [_canonical_path(item.path) for item in manifest.items]
-    if len(paths) != len(set(_page_identity(path) for path in paths)):
-        raise ValueError("samma dokument får inte förekomma flera gånger")
+    if len(paths) != len(set(_resolved_page(path) for path in paths)):
+        raise pdf.InvalidExportRequest(
+            "samma dokument får inte förekomma flera gånger")
     pdf.parse_kinds(",".join(manifest.context))
     if manifest.columns == 2 and manifest.context:
-        raise ValueError("två kolumner kan inte kombineras med kontext")
+        raise pdf.InvalidExportRequest(
+            "två kolumner kan inte kombineras med kontext")
     return manifest
-
-
-def _page(path: str) -> tuple[Path, str]:
-    page = pdf.generated_page(_canonical_path(path))
-    assert page is not None, "validated collection path has no generated page"
-    return page, compress.read_text(page)
 
 
 def _inside_class(el, class_name: str) -> bool:
     while el is not None:
-        if class_name in pdf._classes(el):
+        if class_name in pdf.classes(el):
             return True
         el = el.getparent()
     return False
@@ -142,7 +138,7 @@ def _outline(doc) -> list[dict]:
 
 
 def _context_kinds(doc) -> list[dict]:
-    island = pdf._island(doc)
+    island = pdf.island(doc)
     seen = set()
     answer = []
     for panel in island.values():
@@ -159,12 +155,13 @@ def _context_kinds(doc) -> list[dict]:
 
 def inspect(paths: list[str]) -> list[dict]:
     """Current labels, options and selectable headings for collection rows."""
-    if len(paths) != len(set(_page_identity(path) for path in paths)):
-        raise ValueError("samma dokument får inte förekomma flera gånger")
+    if len(paths) != len(set(_resolved_page(path) for path in paths)):
+        raise pdf.InvalidExportRequest(
+            "samma dokument får inte förekomma flera gånger")
     answer = []
     for path in paths:
-        _page_path, text = _page(path)
-        doc = lxml.html.document_fromstring(text, parser=pdf._PARSER)
+        doc = lxml.html.document_fromstring(
+            compress.read_text(_resolved_page(path)), parser=pdf.PARSER)
         front = next(iter(doc.find_class("frontmatter")), None)
         assert front is not None, (  # rule:fail-fast
             "generated collection document %r has no frontmatter" % path)
@@ -321,12 +318,12 @@ def assemble(manifest: CollectionManifest, generated: date):
     toc_entries = []
     kinds = frozenset(manifest.context)
     for number, item in enumerate(manifest.items, 1):
-        _path, text = _page(item.path)
-        raw = lxml.html.document_fromstring(text, parser=pdf._PARSER)
+        raw = lxml.html.document_fromstring(
+            compress.read_text(_resolved_page(item.path)), parser=pdf.PARSER)
         _select_sections(raw, item.sections)
         if not item.preamble:
             _drop_preamble(raw)
-        paper = pdf._paper_document(
+        paper = pdf.paper_document(
             lxml.html.tostring(raw, encoding="unicode"), toc=False, kinds=kinds,
             amendments=item.amendments, columns=manifest.columns)
         source_body = paper.find("body")
@@ -334,7 +331,7 @@ def assemble(manifest: CollectionManifest, generated: date):
         wrapper_classes = ["collection-document", "start-" + item.start]
         if number == 1:
             wrapper_classes.append("collection-first-document")
-        wrapper_classes.extend(c for c in pdf._classes(source_body)
+        wrapper_classes.extend(c for c in pdf.classes(source_body)
                                if c not in ("gr-root", "pdf-weasy",
                                             "pdf-two-columns"))
         wrapper = etree.SubElement(main, "section", {
@@ -389,16 +386,11 @@ def _manifest_bytes(manifest: CollectionManifest) -> bytes:
 
 
 def _cache_key(manifest: CollectionManifest, generated: date) -> str:
-    inputs = []
-    for item in manifest.items:
-        page = pdf.generated_page(item.path)
-        assert page is not None, "validated collection path disappeared"
-        resolved = compress.resolve(page)
-        assert resolved is not None, "validated collection page disappeared"
-        inputs.append(hashlib.sha256(resolved.read_bytes()).hexdigest())
+    inputs = [hashlib.sha256(_resolved_page(item.path).read_bytes()).hexdigest()
+              for item in manifest.items]
     raw = repr((hashlib.sha256(_manifest_bytes(manifest)).hexdigest(),
                 generated.isoformat(), inputs,
-                hashlib.sha256(pdf._stylesheet().encode()).hexdigest(),
+                hashlib.sha256(pdf.stylesheet().encode()).hexdigest(),
                 pdf.weasyprint.VERSION, pdf.PDF_FORMAT, COLLECTION_FORMAT))
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -409,28 +401,14 @@ def cache_entry(manifest: CollectionManifest, generated: date) -> Path:
                               + ".pdf")
 
 
-_render_lock = util.KeyedLocks()
-
-
 def export(manifest: CollectionManifest, *, subresource, generated: date,
            progress=None) -> bytes:
     """Render behind the shared disk cache."""
-    entry = cache_entry(manifest, generated)
-    entry.parent.mkdir(parents=True, exist_ok=True)
-    with _render_lock(entry.name):
-        if entry.is_file():
-            try:
-                os.utime(entry)
-                return entry.read_bytes()
-            except FileNotFoundError:
-                pass
-        data = pdf.render_document(assemble(manifest, generated),
-                                   subresource=subresource, progress=progress)
-        temporary = entry.with_name(entry.name + ".tmp-%d" % os.getpid())
-        temporary.write_bytes(data)
-        os.replace(temporary, entry)
-    pdf._prune(entry.parent)
-    return data
+    return pdf.cached_render(
+        cache_entry(manifest, generated),
+        lambda: pdf.render_document(assemble(manifest, generated),
+                                    subresource=subresource,
+                                    progress=progress))
 
 
 def filename(manifest: CollectionManifest) -> str:

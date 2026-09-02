@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 import requests
 
-from ferenda import patchsource
 from ferenda.lib import (
     catalog,
+    catalog_rows,
     compress,
     facets,
     labels,
@@ -30,6 +30,7 @@ from ferenda.lib.pdftext import Para, classify_letterhead
 from ferenda.lib.util import record_path
 from ferenda.rs import download as rs_download
 from ferenda.rs import parse as rs_parse
+from ferenda.rs import source as rs_source
 from ferenda.rs import render as rs_render
 from ferenda.rs import skv
 from ferenda.rs.agencies import (
@@ -639,7 +640,7 @@ def test_layout_grammar(basefile, artifact_rel, page):
 def test_catalog_row():
     art = artifact(org="migr", nummer="RS/028/2021", titel="Hantering av "
                    "återkallande")
-    uri, source, kind, label, title, path = catalog.document_row(
+    uri, source, kind, label, title, path = catalog_rows.document_row(
         art, "/x.json", "rs")
     assert (source, kind, label) == ("rs", "migr", "RS/028/2021")
     assert title == "Hantering av återkallande"
@@ -782,7 +783,8 @@ def test_parse_without_a_document(tmp_path):
     path.parent.mkdir(parents=True, exist_ok=True)
     compress.write_download(path, json.dumps(record, ensure_ascii=False))
     art = rs_parse.parse("kkv/2023:3", tmp_path)
-    assert art["structure"] == []
+    # an empty body writes no `structure` key at all (`lib.artifact.prune`)
+    assert "structure" not in art
     assert art["metadata"]["status"] == "upphävt"
     assert art["identifier"] == "Konkurrensverkets ställningstagande 2023:3"
 
@@ -849,7 +851,10 @@ def test_skv_page_is_the_patchable_intermediate(tmp_path, monkeypatch):
     record = next(r for r in records if r["basefile"] == "skv/8-492402")
     basefile = store_skv(tmp_path, record, "skv-page.html")
     monkeypatch.setattr(layout, "RS_DOWNLOADED", tmp_path)
-    text, label = patchsource.intermediate("rs", basefile)
+    # the pair rs registers as `Source.intermediate`, which is what
+    # `patchsource.intermediate` hands the CLI and the web editor
+    provider, label = rs_source.SOURCES[0].intermediate
+    text = provider(basefile)
     assert "web page" in label
     lines = text.split("\n")
     # every block on its own line, and a paragraph whole on one of them
@@ -1218,7 +1223,7 @@ def test_a_withdrawn_stallningstagande_declares_when_it_stopped(
         status, upphavd, expired):
     art = artifact(org="skv", nummer="8-1", titel="x", status=status,
                    upphavd=upphavd)
-    assert catalog._expired_date(art) == expired
+    assert catalog_rows._expired_date(art) == expired
 
 
 def test_a_withdrawn_stallningstagande_leaves_the_context_rail(tmp_path):

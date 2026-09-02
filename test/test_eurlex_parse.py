@@ -27,7 +27,7 @@ from ferenda.lib.formex import (
     formex_members,
     load_formex,
 )
-from ferenda.lib import catalog
+from ferenda.lib import catalog, catalog_rows
 from ferenda.lib.errors import SkipDocument
 from ferenda.lib.eu_structure import anchored_blocks
 from ferenda.lib.eu_structure import flatten as flatten_structure
@@ -1388,11 +1388,11 @@ def test_parse_dir_stamps_the_repeal_date_on_the_artifact(tmp_path):
               b'^^<http://www.w3.org/2001/XMLSchema#date> .\n')
     art = parse_dir(_doc_dir(tmp_path, xml, notice), "31995L0046")
     assert art["expired"] == "2018-05-24"
-    assert catalog._expired_date(art) == "2018-05-24"
+    assert catalog_rows._expired_date(art) == "2018-05-24"
     # an act still in force carries no such key at all
     art = parse_dir(_doc_dir(tmp_path, xml, NOTICE_NT), "31995L0046")
     assert "expired" not in art
-    assert catalog._expired_date(art) is None
+    assert catalog_rows._expired_date(art) is None
 
 
 @pytest.mark.parametrize("celex,base", [

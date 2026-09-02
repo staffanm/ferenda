@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import aihierarki, annstore, catalog, hierarki, page
-from ferenda.lib.concepts import term_pattern
+from ferenda.lib import aihierarki, annstore, catalog, hierarki, margins, page
+from ferenda.lib.begrepp import term_pattern
 from ferenda.lib.util import normalize_fold
 from ferenda.wiki import render as wiki_render
 
@@ -425,26 +425,26 @@ def test_the_rail_prints_one_line_per_concept_at_the_ladder_anchor(tmp_path):
     con = _ladder_con(tmp_path)
     hierarki.rebuild_regleringshierarki(con)
     site = _site(con)
-    [section] = page.regleringshierarki_margin(site, CSL, ["K2P5"])
+    [section] = margins.regleringshierarki_margin(site, CSL, ["K2P5"])
     assert section.key == "regleringshierarki"
     assert "Betydande incident" in section.html
     assert "#rh-celex-32022L2555" in section.html
     # a definition anchored below the panel node still attaches (containment)
-    assert page.regleringshierarki_margin(site, CSF, ["P37"])
+    assert margins.regleringshierarki_margin(site, CSF, ["P37"])
     # a provision with no row stays silent
-    assert page.regleringshierarki_margin(site, CSL, ["K9P9"]) == []
+    assert margins.regleringshierarki_margin(site, CSL, ["K9P9"]) == []
 
 
 def test_the_fyller_ut_line_sits_on_chapter_panels_only(tmp_path):
     con = _ladder_con(tmp_path)
     hierarki.rebuild_regleringshierarki(con)
     site = _site(con)
-    [section] = page.fyller_ut_margin(site, MCFFS, ["K3"])
+    [section] = margins.fyller_ut_margin(site, MCFFS, ["K3"])
     assert section.key == "fyller-ut"
     assert "Dessa föreskrifter fyller ut" in section.html
     assert "1 kap. 15 §" in section.html
-    assert page.fyller_ut_margin(site, MCFFS, ["K3P1"]) == []
-    assert page.fyller_ut_margin(site, CSL, ["K2"]) == []
+    assert margins.fyller_ut_margin(site, MCFFS, ["K3P1"]) == []
+    assert margins.fyller_ut_margin(site, CSL, ["K2"]) == []
 
 
 def test_an_ambiguous_chain_yields_no_fyller_ut_line(tmp_path):
@@ -540,15 +540,15 @@ def test_the_normkedja_meta_row_marks_you_are_here(tmp_path):
     ("→ 1 föreskrift") -- Staffan 2026-08-28."""
     con = _ladder_con(tmp_path)
     site = _site(con)
-    row = page.chain_meta(site, MCFFS)
+    row = margins.chain_meta(site, MCFFS)
     assert "here" in row and "→" in row
     assert row.index("32022L2555") < row.index("2025:1506") \
         < row.index("2025:1507")
-    top = page.chain_meta(site, DIREKTIV)
+    top = margins.chain_meta(site, DIREKTIV)
     assert "2025:1506" in top      # the child is named, never only counted
-    assert page.chain_meta(site, "https://lagen.nu/2003:364") is None \
-        or "här" not in str(page.chain_meta(site, "https://lagen.nu/2003:364"))
-    assert page.chain_meta(site, "https://lagen.nu/begrepp/X") is None
+    assert margins.chain_meta(site, "https://lagen.nu/2003:364") is None \
+        or "här" not in str(margins.chain_meta(site, "https://lagen.nu/2003:364"))
+    assert margins.chain_meta(site, "https://lagen.nu/begrepp/X") is None
 
 
 def test_a_repealed_acts_definition_does_not_render(tmp_path):

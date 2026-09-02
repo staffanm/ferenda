@@ -1,12 +1,13 @@
 """Begreppssidan: the concept definition and what cites it.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 
 from markupsafe import Markup
 
-from ..lib import catalog, hierarki, tpl
+from ..lib import catalog, catalog_rows, hierarki, tpl
 from ..lib.page import (
     PANEL_CAP,
     doc_meta,
@@ -98,7 +99,7 @@ def _regleringshierarki(uri, site):
                 "role": ROLE_LABEL.get(r["role"]),
                 "label": r["label"], "silent": r["silent"],
                 "upphavd": (None if not r["upphavd"] else
-                            "" if r["upphavd"] == catalog.EXPIRED_UNDATED
+                            "" if r["upphavd"] == catalog_rows.EXPIRED_UNDATED
                             else r["upphavd"]),
                 "via_amended": r["via_amended"],
                 # bare pinpoints: the row's own citation already names the

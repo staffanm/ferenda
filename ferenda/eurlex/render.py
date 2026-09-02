@@ -1,7 +1,8 @@
 """EU-rättsaktssidan: articles, recitals and the editorial annotation
 layer.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 import json
@@ -14,15 +15,14 @@ from markupsafe import Markup
 from ..lib import annstore, catalog, history, labels, tpl
 from ..lib.eu_structure import Anchors, citable, first_stycke, revision_base
 from ..lib.eu_structure import flatten as eurlex_flatten
+from ..lib.margins import chain_meta
 from ..lib.markdown import begrepp_uri
 from ..lib.page import (
     BANNERS,
     NODES,
-    PANELS,
     Rail,
     RailSection,
     Toc,
-    chain_meta,
     doc_meta,
     href,
     page_context,
@@ -31,6 +31,7 @@ from ..lib.page import (
     render_tabell,
     render_toc,
     swedish_join,
+    versions_panel,
 )
 from ..lib.pinpoint import eu_article_label, human_fragment
 from ..lib.text import runs_text
@@ -268,20 +269,6 @@ def _load_amending_editorials(cons):
     it rewrites), so they join this page's keys directly."""
     return [(m["celex"], e) for m in (cons or {}).get("amending", [])
             if (e := _load_editorial(m["celex"]))]
-
-
-def _versions_panel(celex, own_version, versions):
-    """The compare panel for an EU act's consolidated wordings -- the same
-    `details.lydelser` affordance the SFS page carries, version ids being the
-    ISO consolidation dates."""
-    versions = [(v, u) for v, u in versions if v != own_version]
-    if not versions:
-        return ""
-    return PANELS.versions_panel(
-        [{"value": v, "label": v, "note": ""} for v, _u in reversed(versions)],
-        "denna" if own_version else "aktuell",
-        catalog.BASE + "celex/" + celex, own_version or "",
-        own_version or "")
 
 
 def _eurlex_marker(t, num):
@@ -682,7 +669,10 @@ def render(art, site):
               for m in (cons or {}).get("amending", [])}
     versions = (history.versions("eurlex", art["celex"])
                 if cons or version else [])
-    lydelser = _versions_panel(art["celex"], version, versions)
+    # the same `details.lydelser` affordance the SFS page carries -- an EU
+    # version id is the ISO consolidation date, so it reads as its own label
+    lydelser = versions_panel(catalog.BASE + "celex/" + art["celex"],
+                              version, versions)
     if cons:
         meta.append(("Konsoliderad t.o.m.",
                      Markup(escape(cons["date"])) + lydelser))

@@ -220,7 +220,8 @@ _threads: dict[int, Job] = {}       # rendering thread -> the job it serves
 
 
 class QueueFull(RuntimeError):
-    """The bounded PDF render queue has no slot for a new unique job."""
+    """The bounded PDF render queue has no slot for a new unique job. Answered
+    503 with a Retry-After by `api/errors`, on both apps."""
 
 
 class _Handler(logging.Handler):
@@ -292,9 +293,10 @@ def _start(entry, filename, run) -> Job:
 
 def start(page, *, toc: bool, kinds: frozenset[str], subresource,
           amendments: bool, columns: int) -> Job:
-    """Start -- or join -- the export of `page`. Raises FileNotFoundError if
-    the page is not generated. A job whose result is already cached comes
-    back finished, having rendered nothing."""
+    """Start -- or join -- the export of `page`. Raises `pdf.PageNotGenerated`
+    if the page is not generated, `QueueFull` when the bounded queue has no
+    slot. A job whose result is already cached comes back finished, having
+    rendered nothing."""
     entry = pdf.cache_entry(page, toc=toc, kinds=kinds,
                             amendments=amendments, columns=columns)
     return _start(entry, pdf.filename_for(page.name),
@@ -340,19 +342,15 @@ router = APIRouter(prefix="/pdf", tags=["pdf"])
 
 
 def parse_request(path: str, kontext: str, columns: int):
-    """The generated file and the context kinds an export request names, or
-    the HTTP error it earns. Shared by all three routes of the feature --
-    `/api/v1/pdf`, its job and its waiting screen answer one contract, and
-    a second copy of it would drift the moment the contract moved."""
+    """The generated file and the context kinds an export request names.
+    Shared by all three routes of the feature -- `/api/v1/pdf`, its job and its
+    waiting screen answer one contract, and a second copy of it would drift the
+    moment the contract moved. An unknown context kind and a path with no page
+    behind it raise `pdf.InvalidExportRequest` / `pdf.PageNotGenerated`, which
+    `api/errors` answers 422 and 404 for on both apps."""
     assert columns in (1, 2), "PDF columns must be 1 or 2"  # rule:fail-fast
-    try:
-        kinds = pdf.parse_kinds(kontext)
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
-    page = pdf.generated_page(path)
-    if page is None:
-        raise HTTPException(404, "no generated page at %r" % path)
-    return page, frozenset() if columns == 2 else kinds
+    kinds = pdf.parse_kinds(kontext)
+    return pdf.generated_page(path), frozenset() if columns == 2 else kinds
 
 TPL = tpl.environment("ferenda.api").get_template("pdf_wait.html").module
 
@@ -397,29 +395,16 @@ def pdf_collection_wait_page():
 @router.post("/samling/inspektera")
 def pdf_collection_inspect(request: pdfcollection.InspectRequest):
     """Labels, options and selectable headings for the collection editor."""
-    try:
-        return {"documents": pdfcollection.inspect(request.paths)}
-    except FileNotFoundError as exc:
-        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
+    return {"documents": pdfcollection.inspect(request.paths)}
 
 
 @router.post("/samling/jobb")
 def pdf_collection_job_start(manifest: pdfcollection.CollectionManifest):
     """Start one stateless collection render and return its background job."""
-    try:
-        pdfcollection.validate(manifest)
-        job = start_collection(
-            manifest, subresource=facsimiles.subresource,
-            generated=datetime.now(ZoneInfo("Europe/Stockholm")).date())
-    except FileNotFoundError as exc:
-        raise HTTPException(404, "no generated page at %r" % exc.args[0]) from None
-    except QueueFull as exc:
-        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
-    except ValueError as exc:
-        raise HTTPException(422, str(exc)) from None
-    return job.status()
+    pdfcollection.validate(manifest)
+    return start_collection(
+        manifest, subresource=facsimiles.subresource,
+        generated=datetime.now(ZoneInfo("Europe/Stockholm")).date()).status()
 
 
 @router.get("/jobb/{job_id}/resultat")
@@ -453,15 +438,9 @@ def pdf_job_start(
     with its full context runs well past nginx's proxy timeout, and a reader
     who waited on it got a 504 for work that had in fact succeeded."""
     generated, kinds = parse_request(path, kontext, kolumner)
-    try:
-        job = start(generated, toc=toc, kinds=kinds,
-                    subresource=facsimiles.subresource,
-                    amendments=andringar, columns=kolumner)
-    except FileNotFoundError:
-        raise HTTPException(404, "no generated page at %r" % path) from None
-    except QueueFull as exc:
-        raise HTTPException(503, str(exc), headers={"Retry-After": "30"}) from None
-    return job.status()
+    return start(generated, toc=toc, kinds=kinds,
+                 subresource=facsimiles.subresource,
+                 amendments=andringar, columns=kolumner).status()
 
 
 @router.get("/jobb/{job_id}")

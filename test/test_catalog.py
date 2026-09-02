@@ -15,7 +15,7 @@ import sqlite3
 
 import pytest
 
-from ferenda.lib import catalog
+from ferenda.lib import catalog, catalog_rows
 
 
 def _plan_of_last_query(con, call):
@@ -540,17 +540,17 @@ def test_first_prose_skips_headings_and_cuts_at_a_word(tmp_path):
             {"type": "paragraf", "text": ["Kort."]},
             {"type": "paragraf", "text": [long[:50], {"uri": "x", "text": long[50:]}]},
         ]}]}
-    got = catalog.first_prose(art)
+    got = catalog_rows.first_prose(art)
     assert got.startswith("Den som med uppsåt")
-    assert len(got) <= catalog._SNIPPET_LEN + 2
+    assert len(got) <= catalog_rows._SNIPPET_LEN + 2
     # nothing prose-like: no snippet, not a heading masquerading as one
-    assert catalog.first_prose({"structure": [
+    assert catalog_rows.first_prose({"structure": [
         {"type": "rubrik", "text": ["Bara rubriker här i detta dokument, inga stycken alls någonstans"]}]}) is None
     # a författningssamling masthead and OCR debris off a scanned page are
     # not prose; the digits-heavy lagtext right after them is
     lagtext = ("1 § I denna lag finns bestämmelser om 1. avgifter enligt "
                "8 § andra stycket lagen (2016:960), 2. tillsyn enligt 16 §.")
-    assert catalog.first_prose({"structure": [
+    assert catalog_rows.first_prose({"structure": [
         {"type": "stycke", "text": ["ISSN 1102-5468 Ansvarig utgivare: Charlotte Havermark, Skogsstyrelsen"]},
         {"type": "stycke", "text": [".-lascs.srii<~nt I J / ,,;: --- ~~ .. ;;~ !! ((\\ // )) [[ ]] ** ++ == ?? .. ,, ;; :: '' <<>>"]},
         {"type": "stycke", "text": [lagtext]}]}) == lagtext
@@ -564,7 +564,7 @@ def test_document_snippet_uses_what_each_source_has():
            "structure": [{"type": "preamble", "children": [
         {"type": "citation", "text": ["med beaktande av fördraget om Europeiska unionens funktionssätt, särskilt artiklarna 16 och 114"]},
         {"type": "recital", "num": "1", "text": [long]}]}]}
-    assert catalog._document_snippet(act, "eurlex").startswith("(1) Skyddet")
+    assert catalog_rows._document_snippet(act, "eurlex").startswith("(1) Skyddet")
     # an författning opens on its first paragraf, designation included, with
     # every heading before it skipped
     law = {"structure": [
@@ -573,9 +573,9 @@ def test_document_snippet_uses_what_each_source_has():
             {"type": "rubrik", "text": ["1 kap. Inledande bestämmelser"]},
             {"type": "paragraf", "id": "K1P1", "children": [
                 {"type": "stycke", "text": ["Fast egendom är jord."]}]}]}]}
-    assert catalog._document_snippet(law, "sfs") \
+    assert catalog_rows._document_snippet(law, "sfs") \
         == "1 kap. 1 § Fast egendom är jord."
-    assert catalog._document_snippet(law, "foreskrift") \
+    assert catalog_rows._document_snippet(law, "foreskrift") \
         == "1 kap. 1 § Fast egendom är jord."
     # a stycke that introduces a list quotes its first item, ellipsis after
     listy = {"structure": [{"type": "paragraf", "id": "P1", "children": [
@@ -584,7 +584,7 @@ def test_document_snippet_uses_what_each_source_has():
          "children": [
              {"type": "punkt", "text": ["8 § andra stycket lagen (2016:960) om arbetstid,"]},
              {"type": "punkt", "text": ["16 § samma lag."]}]}]}]}
-    assert catalog._document_snippet(listy, "sfs") \
+    assert catalog_rows._document_snippet(listy, "sfs") \
         == ("1 § Denna förordning är meddelad med stöd av "
             "8 § andra stycket lagen (2016:960) om arbetstid, …")
     # an EU court decision opens on its first numbered ground, 50-word
@@ -600,7 +600,7 @@ def test_document_snippet_uses_what_each_source_has():
             "2003/4/EG av den 28 januari 2003 om allmänhetens tillgång till "
             "miljöinformation och om upphävande av rådets direktiv "
             "90/313/EEG (EUT L 41, 2003, s. 26)."]}]}
-    got = catalog._document_snippet(dom, "eurlex")
+    got = catalog_rows._document_snippet(dom, "eurlex")
     assert got.startswith("Begäran om förhandsavgörande avser tolkningen")
     assert len(got.split()) <= 51
 
@@ -608,18 +608,18 @@ def test_document_snippet_uses_what_each_source_has():
     icj = {"structure": [
         {"type": "stycke", "text": ["Present: President Donoghue; Vice-President Gevorgian; Judges Tomka, Abraham, Bennouna, Yusuf and Xue"]},
         {"type": "stycke", "text": [long]}]}
-    assert catalog._document_snippet(icj, "icj").startswith("Skyddet")
+    assert catalog_rows._document_snippet(icj, "icj").startswith("Skyddet")
     # the wiki concepts keep their tree under `body`
-    assert catalog._document_snippet({"body": [{"type": "stycke",
+    assert catalog_rows._document_snippet({"body": [{"type": "stycke",
         "text": [long]}]}, "begrepp").startswith("Skyddet")
     # hudoc answers with its conclusions, never the procedural boilerplate
     case = {"metadata": {"conclusions": ["Violation of P1-1",
                                          "Pecuniary damage - financial award"]},
             "structure": [{"type": "stycke", "text": [
                 "The European Court of Human Rights, sitting on 11 October as a Committee composed of judges"]}]}
-    assert catalog._document_snippet(case, "hudoc") \
+    assert catalog_rows._document_snippet(case, "hudoc") \
         == "Violation of P1-1; Pecuniary damage - financial award"
-    assert catalog._document_snippet({"structure": case["structure"],
+    assert catalog_rows._document_snippet({"structure": case["structure"],
                                       "metadata": {}}, "hudoc") is None
     # a pre-Formex act whose first text node is its own title: the guard
     # skips past the echo to the next paragraph, and gives None only when
@@ -633,15 +633,15 @@ def test_document_snippet_uses_what_each_source_has():
                   "title": echo,
                   "structure": [{"type": "stycke", "text": [echo]},
                                 {"type": "stycke", "text": [opening]}]}
-    assert catalog._document_snippet(pre_formex, "eurlex") == opening
-    assert catalog._document_snippet(
+    assert catalog_rows._document_snippet(pre_formex, "eurlex") == opening
+    assert catalog_rows._document_snippet(
         {**pre_formex, "structure": pre_formex["structure"][:1]},
         "eurlex") is None
     # the echo still fires when the 60-char slice lands on a word boundary
     # (a trailing space on one side must not defeat the comparison)
     spaced = "Regulation of the Council concerning the common approach to x"
     assert spaced[59] == " "
-    assert catalog._document_snippet(
+    assert catalog_rows._document_snippet(
         {"uri": "https://lagen.nu/celex/31976R0940", "title": spaced,
          "structure": [{"type": "stycke", "text": [
              spaced + " and enough further words to clear the eighty "
@@ -649,8 +649,8 @@ def test_document_snippet_uses_what_each_source_has():
         "eurlex") is None
     # a journal article takes its first paragraph, capped at 50 words
     fifty_plus = " ".join("ord%d" % i for i in range(60))
-    art50 = catalog._document_snippet(
+    art50 = catalog_rows._document_snippet(
         {"structure": [{"type": "stycke", "text": [fifty_plus]}]}, "lawreview")
     assert art50.endswith("ord49 …") and len(art50.split()) == 51
-    assert catalog._document_snippet({"structure": [{"type": "stycke",
+    assert catalog_rows._document_snippet({"structure": [{"type": "stycke",
         "text": [long]}]}, "lawreview") == long

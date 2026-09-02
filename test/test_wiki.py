@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from ferenda.lib import annstore, catalog, markdown
+from ferenda.lib import annstore, catalog, catalog_rows, markdown
 from ferenda.wiki import annotate
 from ferenda.wiki import parse as wiki
 from ferenda.lib import page
@@ -622,7 +622,7 @@ def test_subject_links_from_nyckelord():
     # a case's nyckelord (metadata, not body) become dcterms:subject concept edges
     art = {"uri": "https://lagen.nu/dom/x",
            "metadata": {"nyckelord": ["Laga förfall", "  ", "Preskription"]}}
-    assert catalog.subject_links(art) == [
+    assert catalog_rows.subject_links(art) == [
         (None, {"uri": "https://lagen.nu/begrepp/Laga_förfall",
                 "predicate": "dcterms:subject", "text": "Laga förfall"}),
         (None, {"uri": "https://lagen.nu/begrepp/Preskription",

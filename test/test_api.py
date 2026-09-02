@@ -13,8 +13,8 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 
 from ferenda import config
 from ferenda.api import app as api
-from ferenda.api import db, reads
-from ferenda.lib import catalog, compress, facets, inbound, pathgraph
+from ferenda.api import reads
+from ferenda.lib import catalog, compress, facets, inbound, layout, pathgraph
 
 
 @pytest.fixture
@@ -85,12 +85,12 @@ def client(tmp_path):
     # than taking the request connection (a missing catalog must not fail a
     # full-text search, so it is best-effort, with no Depends/503) -- point it
     # at the fixture too, or a pinned hit reads the developer's real corpus
-    real_catalog, db.CATALOG = db.CATALOG, cat
+    real_catalog, layout.CATALOG = layout.CATALOG, cat
 
     client = TestClient(api.app)
     client.catalog_path = cat            # for tests that add rows directly
     yield client
-    db.CATALOG = real_catalog
+    layout.CATALOG = real_catalog
     api.app.dependency_overrides.clear()
 
 

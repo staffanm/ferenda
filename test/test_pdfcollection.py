@@ -79,8 +79,8 @@ def test_inspect_reports_options_and_excludes_amendment_outline(client):
 
 
 def test_selection_keeps_separate_heading_subtree_and_frontmatter(client):
-    _path, text = pdfcollection._page("/1998:1")
-    doc = lxml.html.document_fromstring(text, parser=pdfcollection.pdf._PARSER)
+    text = compress.read_text(pdfcollection._resolved_page("/1998:1"))
+    doc = lxml.html.document_fromstring(text, parser=pdfcollection.pdf.PARSER)
     pdfcollection._select_sections(doc, ["R2"])
     assert doc.get_element_by_id("top").findtext("h1") == "Första lagen"
     assert doc.get_element_by_id("R1", None) is None
@@ -113,8 +113,8 @@ def test_selection_prunes_sibling_chapters_inside_a_shared_division():
 
 
 def test_selection_keeps_two_nonadjacent_sections(client):
-    _path, text = pdfcollection._page("/1998:2")
-    doc = lxml.html.document_fromstring(text, parser=pdfcollection.pdf._PARSER)
+    text = compress.read_text(pdfcollection._resolved_page("/1998:2"))
+    doc = lxml.html.document_fromstring(text, parser=pdfcollection.pdf.PARSER)
     pdfcollection._select_sections(doc, ["R1", "R3"])
     assert doc.get_element_by_id("R1") is not None
     assert doc.get_element_by_id("R2", None) is None
@@ -215,6 +215,27 @@ def test_collection_job_is_rejected_when_the_pdf_queue_is_full(
                            json=_manifest().model_dump())
     assert response.status_code == 503
     assert response.headers["retry-after"] == "30"
+
+
+def test_collection_requests_map_missing_pages_and_bad_recipes(client):
+    """The 404/422 answers the collection routes give now come from the typed
+    export exceptions `api/errors` maps, not from a try/except per route."""
+    missing = client.post("/internal-api/v1/pdf/samling/jobb",
+                          json=_manifest(items=[{"path": "/1998:0"}]).model_dump())
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == "no generated page at '/1998:0'"
+    assert client.post("/internal-api/v1/pdf/samling/inspektera",
+                       json={"paths": ["/1998:0"]}).status_code == 404
+    twice = client.post(
+        "/internal-api/v1/pdf/samling/jobb",
+        json=_manifest(items=[{"path": "/1998:1"},
+                              {"path": "/1998:1"}]).model_dump())
+    assert twice.status_code == 422
+    assert twice.json()["detail"] == "samma dokument får inte förekomma flera gånger"
+    assert client.post(
+        "/internal-api/v1/pdf/samling/jobb",
+        json=_manifest(items=[{"path": "1998:1?x=1"}]).model_dump()
+    ).status_code == 422
 
 
 def test_collection_pages_are_real_reloadable_addresses(client):
