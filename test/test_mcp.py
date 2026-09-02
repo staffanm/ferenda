@@ -17,10 +17,10 @@ from opensearchpy.exceptions import ConnectionError as OpenSearchConnectionError
 from starlette.testclient import TestClient
 
 from ferenda import config
-from ferenda.api import analytics, db, reads
+from ferenda.api import analytics, reads
 from ferenda.api import app as api
 from ferenda.api import mcp as mcpmod
-from ferenda.lib import catalog, facets, inbound
+from ferenda.lib import catalog, facets, inbound, layout
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def corpus(tmp_path, monkeypatch):
 
     # point the tools at the fixture catalog (catalog.connect_ro tracks its
     # one-time migration per path, so a fresh tmp catalog needs no flag reset)
-    monkeypatch.setattr(db, "CATALOG", cat)
+    monkeypatch.setattr(layout, "CATALOG", cat)
 
     # a fake search backend -- the tools must not require a live OpenSearch.
     # Same call surface as the REST fake: reads.search drives both faces
@@ -90,7 +90,7 @@ def corpus(tmp_path, monkeypatch):
 
 
 def test_search_combines_fulltext_and_pins(corpus):
-    res = mcpmod.search("mord", source="sfs")
+    res = anyio.run(lambda: mcpmod.search("mord", source="sfs"))
     assert res["query"] == "mord"
     hit = res["results"][0]
     assert hit["identifier"] == "SFS 1962:700"
@@ -108,7 +108,7 @@ def test_every_tool_url_is_absolute(corpus):
     The site's own pages keep linking relatively (`layout.page_url`) -- this is
     the MCP boundary's job, so it is checked on every tool that emits a url."""
     base = config.PUBLIC_BASE_URL
-    urls = [mcpmod.search("mord", source="sfs")["results"][0]["url"],
+    urls = [anyio.run(lambda: mcpmod.search("mord", source="sfs"))["results"][0]["url"],
             mcpmod.resolve_citation("brottsbalken 3 kap. 1 §")["results"][0]["url"],
             mcpmod.fetch("https://lagen.nu/1962:700#K3P1")["url"],
             mcpmod.fetch("https://lagen.nu/1962:700")["url"]]
@@ -128,7 +128,7 @@ def test_search_fails_visibly_without_opensearch(corpus):
             raise OpenSearchConnectionError("no cluster")
     mcpmod._index = Down()
     with pytest.raises(reads.SearchUnavailable, match="unavailable"):
-        mcpmod.search("mord")
+        anyio.run(lambda: mcpmod.search("mord"))
     # and through the server it is a tool error carrying the same reason (the
     # transport turns a ToolError into the client's isError result)
     with pytest.raises(ToolError, match="unavailable"):
@@ -286,7 +286,7 @@ def test_search_and_fetch_satisfy_the_openai_contract(corpus):
     answers with, so meeting the contract narrows nothing: the hit keeps its
     citation-graph payload, and a citation-shaped query ids the provision it
     resolved rather than costing a whole-statute read."""
-    hit = mcpmod.search("mord", source="sfs")["results"][0]
+    hit = anyio.run(lambda: mcpmod.search("mord", source="sfs"))["results"][0]
     assert {"id", "title", "url"} <= set(hit)
     # full text finds documents: the id is the document, and the passages it
     # matched inside it ride along for the model to read
@@ -327,7 +327,7 @@ def test_hit_id_falls_back_to_the_document_for_a_document_level_match(corpus):
                 "highlight": [], "pin": None, "fragments": []}]}
     mcpmod._index = DocLevel()
 
-    hit = mcpmod.search("förvaltning")["results"][0]
+    hit = anyio.run(lambda: mcpmod.search("förvaltning"))["results"][0]
     assert hit["id"] == "https://lagen.nu/2018:585"
     assert mcpmod.fetch(hit["id"])["metadata"]["pinpoint"] is None
 

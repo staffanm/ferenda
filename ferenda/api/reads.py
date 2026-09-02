@@ -11,11 +11,14 @@ own presentation (pydantic models and facet labels on REST, search-hit `id`s
 on MCP) and its own error idiom for the typed failures raised here.
 """
 
+import asyncio
 import collections
+import functools
+from concurrent.futures import ThreadPoolExecutor
 
 from opensearchpy.exceptions import OpenSearchException
 
-from ..lib import catalog, facets, inbound, layout, pathgraph, pins, text
+from ..lib import catalog, catalog_rows, facets, inbound, layout, pathgraph, pins, text
 from ..lib.pinpoint import (
     citation_label,
     is_change_marker,
@@ -69,6 +72,47 @@ def search(index, query, *, source=None, kind=None, year=None, limit,
             "facets": res["facets"], "results": results}
 
 
+# --------------------------------------------------------------------------
+# search's own thread pool
+# --------------------------------------------------------------------------
+#
+# Both faces call `search` from an `async def` handler so the call itself
+# costs no thread from the app's shared default pool (Starlette's
+# `run_in_threadpool` and the MCP SDK's `anyio.to_thread.run_sync` both draw
+# from the same process-wide anyio limiter). The blocking OpenSearch call
+# inside `search` still needs a thread -- SEARCH_WORKERS bounds it to a pool
+# of its own, so a slow or degraded cluster can only starve search, never the
+# rest of the site. This is what was missing on 2026-09-01: every route ran
+# sync `def` on that one shared pool, so a burst of slow searches (each
+# eligible for lib/search.py's 60s timeout x 3 retries) exhausted it and
+# every other endpoint queued behind them.
+
+SEARCH_WORKERS = 20   # concurrent OpenSearch calls in flight; searches are
+                      # I/O-bound (waiting on the cluster, not the CPU), so
+                      # this can run well above pdfjob.py's CPU-bound WORKERS
+
+_pool: ThreadPoolExecutor | None = None
+
+
+def _install() -> ThreadPoolExecutor:
+    """The worker pool, created on first use -- serving-only machinery,
+    started at import time it would spin up threads inside every build
+    process that imports this module (rule:serve-only-in-serve)."""
+    global _pool
+    if _pool is None:
+        _pool = ThreadPoolExecutor(SEARCH_WORKERS, thread_name_prefix="search")
+    return _pool
+
+
+async def search_async(index, query, **kwargs):
+    """`search`, run on search's own thread pool instead of the caller's.
+    Same arguments, same return shape, same exceptions -- await this from an
+    `async def` route/tool instead of calling `search` directly."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        _install(), functools.partial(search, index, query, **kwargs))
+
+
 def documents(con, *, source=None, kind=None, limit, offset,
               include_expired=False):
     """The catalog index page: {total, limit, offset, documents} with one
@@ -91,10 +135,10 @@ def document(con, uri):
     row = catalog.document(con, uri)
     if not row:
         return None
-    uri, source, kind, label, title, path, _descriptive = row
+    uri, source, kind, label, title, path, _descriptive, _url = row
     # synthesized begrepp stubs are real catalog rows with no artifact file
     # (path='') -- served as an empty artifact, like the rendered shell pages
-    art = catalog.load_artifact(catalog.data_root(con), path)
+    art = catalog.artifact_for(con, path)
     return {"uri": uri, "source": source, "kind": kind, "label": label,
             "title": title, "source_url": art.get("source_url"),
             "inbound_count": catalog.document_inbound_count(con, uri),
@@ -401,17 +445,16 @@ def _pinpoint_snippet(con, path, unit, document_snippet):
     only when the uri carries a fragment; a fragment the presented body
     publishes no anchor for -- and a stub row with no artifact at all, which
     `load_artifact` answers with `{}` -- keeps the document's own snippet."""
-    body = text.anchor_text(
-        catalog.load_artifact(catalog.data_root(con), path), unit)
+    body = text.anchor_text(catalog.artifact_for(con, path), unit)
     if not body:
         return document_snippet
     where = pinpoint_label(unit)
     if not where:
-        return catalog.cut_snippet(body)
+        return catalog_rows.cut_snippet(body)
     # the pinpoint opens the line, so its first letter is raised -- the rule
     # citation_label states for a citation standing on its own ("Skäl 83 För
     # att …"). An SFS pinpoint opens with its number and is unaffected.
-    return catalog.cut_snippet("%s%s %s" % (where[:1].upper(), where[1:], body))
+    return catalog_rows.cut_snippet("%s%s %s" % (where[:1].upper(), where[1:], body))
 
 
 def card(con, uri):
@@ -425,12 +468,7 @@ def card(con, uri):
     of this -- of 300 neighbours one gets selected, and this is the call for
     that one. None for a uri the catalog does not hold."""
     root, _, frag = uri.partition("#")
-    row = con.execute(
-        "SELECT source, kind, label, title, descriptive, short_id, "
-        "       NULLIF(source_url, ''), "
-        "       COALESCE(NULLIF(snippet, ''), NULLIF(description, '')), "
-        "       inbound_count, path FROM documents WHERE uri = ?",
-        (root,)).fetchone()
+    row = catalog.card_row(con, root)
     if not row:
         return None
     (source, kind, label, title, descriptive,
@@ -466,7 +504,7 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
     row = catalog.document(con, root)
     if not row:
         return None
-    _uri, source, kind, label, title, _path, descriptive = row
+    _uri, source, kind, label, title, _path, descriptive, source_url = row
     unit = unit_anchor(frag) if frag else None
     if frag:
         # keyed on the *unit*, not the raw fragment: a deep arrival anchor
@@ -477,9 +515,6 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         out_rows = catalog.graph_outbound(con, root)
         raw_links, _raw_docs = catalog.graph_out_totals(con, root)
     unresolved = raw_links - sum(r[1] for r in out_rows)
-    extras = con.execute(
-        "SELECT NULLIF(source_url, '') FROM documents WHERE uri = ?",
-        (root,)).fetchone()
     result = {
         "uri": uri, "root": root, "anchor": frag or None, "unit": unit,
         "pinpoint": (pinpoint_label(unit) or unit) if unit else None,
@@ -495,7 +530,7 @@ def graph(con, uri, *, direction="both", groups=None, limit=20,
         # (tidskriftsartiklar -- page.CITER_STYLE's one external=True), this
         # is where a reader opens the document; the site's /lawreview/ path
         # serves nothing and must never be handed out as a link.
-        "source_url": extras[0],
+        "source_url": source_url,
         "inbound": None, "outbound": None, "internal": None,
     }
     # under a deeper view the whole per-side limit is a budget across the

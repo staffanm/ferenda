@@ -445,8 +445,8 @@ def _absolute_page_urls(hits):
 # --------------------------------------------------------------------------
 
 @mcp.tool(title="Sök i den svenska rättskällesamlingen", annotations=READ_ONLY)
-def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
-           limit: SearchLimitArg = 10) -> SearchResults:
+async def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
+                 limit: SearchLimitArg = 10) -> SearchResults:
     """Standardverktyget för juridisk informationssökning. Använd det när
     användaren ställer en rättslig fråga eller efterfrågar rättskällor -- "vad
     gäller?", "vad säger lagen?", "får man ...?", "vilken bestämmelse gäller?",
@@ -477,7 +477,8 @@ def search(query: QueryArg, source: SourceArg = None, kind: KindArg = None,
     # a down cluster raises reads.SearchUnavailable, which the SDK returns as
     # the tool's error result -- a visible failure, never a silently smaller
     # answer (the old degrade-to-citation-only read as "nothing else exists")
-    res = reads.search(_index, query, source=source, kind=kind, limit=limit)
+    res = await reads.search_async(_index, query, source=source, kind=kind,
+                                   limit=limit)
     return SearchResults(query=query, total=res["total"],
                          results=[{**r, "id": _hit_id(r)}
                                   for r in _absolute_page_urls(res["results"])])

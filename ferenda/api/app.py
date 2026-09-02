@@ -129,7 +129,7 @@ async def _lifespan(application):
     # 503 until it lands. Skipped when no catalog is built (dev serve on an
     # empty tree).
     if db.catalog_ready():
-        paths.graph_if_ready(db.CATALOG)
+        paths.graph_if_ready(layout.CATALOG)
     async with mcp_server.lifespan(application):
         yield
 
@@ -579,7 +579,7 @@ class DumpInfo(BaseModel):
 
 @app.get("/api/v1/search", response_model=SearchResponse, tags=["search"],
          summary="Search the corpus, with citations resolved")
-def search_endpoint(
+async def search_endpoint(
         q: str = Query(..., description="free-text query"),
         source: str | None = Query(None, description="restrict to one source "
                                    "-- any name /api/v1/sources lists (sfs, "
@@ -625,9 +625,9 @@ def search_endpoint(
     if cursor and offset is not None:
         raise HTTPException(422, "cursor and offset are mutually exclusive")
     try:
-        res = reads.search(_index, q, source=source, kind=kind, year=year,
-                           limit=limit, offset=offset, cursor=cursor,
-                           sort=sort)
+        res = await reads.search_async(_index, q, source=source, kind=kind,
+                                       year=year, limit=limit, offset=offset,
+                                       cursor=cursor, sort=sort)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except reads.SearchUnavailable as exc:
@@ -808,9 +808,7 @@ def document_endpoint(uri: str = Query(..., description="full lagen.nu document 
     The same object comes back per line in the bulk dumps, so a consumer
     reprocessing the whole corpus should take the dumps and never call this
     endpoint in a loop. See docs/api/README.md for the per-source shapes."""
-    data = reads.document(con, uri)
-    if data is None:
-        raise HTTPException(404, "no document %r in the catalog" % uri)
+    data = db.or_404(reads.document(con, uri), uri)
     if format == "md":
         art = data.pop("artifact")
         return MarkdownDocument(**data, markdown=mdtext.document_markdown(
@@ -833,7 +831,7 @@ def _versioned_document(uri):
     """(source, basefile) behind a document uri, for the version endpoints --
     the two sources the pipeline consolidates over time: SFS statutes and EU
     acts (CONSLEG wordings)."""
-    local = catalog.local(catalog.strip_fragment(uri))
+    local = catalog.uri_local(uri)
     if local.startswith("celex/"):
         basefile = local[len("celex/"):]
         if _RE_CELEX.match(basefile) and ".." not in basefile:
@@ -922,8 +920,7 @@ def versions_endpoint(uri: str = Query(..., description="full lagen.nu statute "
                else catalog.BASE + basefile)
     if source == "sfs":
         row = catalog.document(con, doc_uri)
-        info = (history.amendment_info(
-                    catalog.load_artifact(catalog.data_root(con), row[5]))
+        info = (history.amendment_info(catalog.artifact_for(con, row[5]))
                 if row else {})
     else:
         info = {}
@@ -1249,17 +1246,15 @@ def graph_endpoint(uri: str = Query(..., description="document or fragment uri")
     # citations-ranking and grouplimit come off the arrays instead of a
     # 12k-row documents join. depth 1 falls back to the joined path while
     # the graph loads; depth > 1 cannot answer without it and says so
-    csr = paths.graph_if_ready(db.CATALOG)
+    csr = paths.graph_if_ready(layout.CATALOG)
     if depth > 1 and csr is None:
         raise HTTPException(
             503, "the citation graph is still loading -- try again "
                  "shortly", headers={"Retry-After": "30"})
-    data = reads.graph(con, uri, direction=direction, groups=wanted,
-                       limit=limit, internal=internal, sort=sort,
-                       grouplimit=grouplimit, depth=depth, csr=csr)
-    if data is None:
-        raise HTTPException(404, "no document %r in the catalog" % uri)
-    return GraphResponse(**data)
+    return GraphResponse(**db.or_404(
+        reads.graph(con, uri, direction=direction, groups=wanted,
+                    limit=limit, internal=internal, sort=sort,
+                    grouplimit=grouplimit, depth=depth, csr=csr), uri))
 
 
 def _parse_groups(groups):
@@ -1329,11 +1324,8 @@ def card_endpoint(uri: str = Query(
     if uri.startswith("/"):
         path, _, frag = uri.partition("#")
         uri = layout.page_uri(path) + (("#" + frag) if frag else "")
-    data = reads.card(con, uri)
-    if data is None:
-        raise HTTPException(404, "no document %r in the catalog"
-                            % uri.partition("#")[0])
-    return CardResponse(**data)
+    return CardResponse(**db.or_404(reads.card(con, uri),
+                                    uri.partition("#")[0]))
 
 
 class PathStep(BaseModel):
@@ -1421,10 +1413,9 @@ def path_endpoint(from_uri: str = Query(..., alias="from",
     ends = []
     for uri in (from_uri, to_uri):
         root = uri.partition("#")[0]
-        if not catalog.document(con, root):
-            raise HTTPException(404, "no document %r in the catalog" % root)
+        db.or_404(catalog.document(con, root), root)
         ends.append(root)
-    g = paths.graph_if_ready(db.CATALOG)
+    g = paths.graph_if_ready(layout.CATALOG)
     if g is None:
         raise HTTPException(
             503, "the citation graph is still loading -- try again shortly",
@@ -1461,14 +1452,11 @@ def _hop_count(con, a, b, direction):
     """(citations, forward) for one hop of a chain: how many links carry it,
     and in which citing direction. A 'both' walk prefers the forward reading
     when the two documents cite each other."""
-    count = lambda x, y: con.execute(
-        "SELECT count(*) FROM links WHERE from_uri = ? AND to_root = ?",
-        (x, y)).fetchone()[0]
     if direction != "in":
-        fwd = count(a, b)
+        fwd = catalog.link_count(con, a, b)
         if fwd:
             return fwd, True
-    return count(b, a), False
+    return catalog.link_count(con, b, a), False
 
 
 # --------------------------------------------------------------------------
@@ -1495,8 +1483,9 @@ def facsimile_endpoint(
     (förarbeten, myndighetsföreskrifter, avgöranden), rendered at retina
     resolution (150 DPI) on first request and cached on disk. `bbox` crops to a
     region of that page -- what a figure inside a förarbete is."""
-    return facsimiles.facsimile_response(catalog.local(catalog.strip_fragment(uri)), sid,
-                               facsimiles.parse_bbox(bbox) if bbox else None)
+    return facsimiles.facsimile_response(
+        catalog.uri_local(uri), sid,
+        facsimiles.parse_bbox(bbox) if bbox else None)
 
 
 _DV_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
@@ -1554,8 +1543,6 @@ def pdf_endpoint(
         data = pdf.export(generated, toc=toc, kinds=kinds,
                           subresource=facsimiles.subresource,
                           amendments=andringar, columns=kolumner)
-    except FileNotFoundError:
-        raise HTTPException(404, "no generated page at %r" % path) from None
     except pdf.SubresourceUnavailable as exc:
         # a degraded PDF is never served or cached; the failure is usually
         # transient (facsimile render, NFS), so the client should retry
@@ -1607,7 +1594,7 @@ def sfs_graphic_endpoint(
     signs asks for hundreds of the first and one of the second, so serving the
     large one to both would cost the reader megabytes nothing on screen uses."""
     return facsimiles.sfs_graphic_response(
-        catalog.local(catalog.strip_fragment(uri)), node,
+        catalog.uri_local(uri), node,
         facsimile.CROP_DPI_LARGE if stor else facsimile.CROP_DPI)
 
 
