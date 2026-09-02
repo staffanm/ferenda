@@ -1,6 +1,7 @@
 """Ställningstagandesidan: the agency's legal position and its siblings.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 

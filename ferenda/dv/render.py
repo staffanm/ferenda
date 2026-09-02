@@ -1,7 +1,8 @@
 """Rättsfallssidan: the referat/dom body, its keywords and the ursprunglig
 dom link.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 from urllib.parse import quote

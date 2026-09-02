@@ -37,7 +37,7 @@ def test_paths():
 
 
 def test_beteckning_with_space_in_number(tmp_path):
-    # the space maps to "_" on disk; build.sfs_list maps it back when
+    # the space maps to "_" on disk; sfs/source.sfs_list maps it back when
     # enumerating basefiles for the driver
     dl = tmp_path / "downloaded"
     d.save_document(dl, src("1976:725 s.1", None, "x"))

@@ -6,9 +6,8 @@ of a legacy-only case, and -- for a verdict published before its referat -- the
 court's own PDF attachment. Resolving which one is dv's own knowledge, not the
 build driver's, so it lives here.
 
-That placement is what lets `patchsource` import these directly. It used to
-reach them through `build`, which imports `patchsource` back (via `api.patch`),
-so the only way in was an in-function import inside the cycle."""
+That placement is what lets `dv/source.py` reach them from both the parse
+stage and `dv_intermediate`, the patch provider it registers."""
 
 import functools
 import json

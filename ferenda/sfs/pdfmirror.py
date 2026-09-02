@@ -40,7 +40,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from ..lib import compress, layout
+from ..lib import compress, freshness, layout, util
 from ..lib.net import is_not_found, request
 from ..lib.util import write_atomic
 
@@ -239,3 +239,52 @@ def _sort_key(beteckning):
     year, nr = beteckning.split(":", 1)
     digits = re.match(r"\d+", nr)
     return (int(year), int(digits.group()) if digits else 0, nr)
+
+
+def mirror(session, targets, *, force, dry_run):
+    """Mirror `targets`, reporting what each of the three outcomes cost. `force`
+    is taken as an argument rather than read off the run options: it means
+    "re-fetch every PDF already on disk and re-ask about every act the upstream
+    once denied", which is what `mirror-pdf --force` asks for, and must not be
+    inferred from a `--force` that was aimed at another action (`sfs download
+    --force` means walk the corpus for discovery, not re-download tens of
+    thousands of facsimiles)."""
+    if dry_run:
+        print("sfs mirror-pdf: would mirror %d SFS PDF(s)" % len(targets))
+        return
+    util.harvest_start("sfs mirror-pdf", SVENSK)
+    state = MirrorState(layout.sfs_pdf_dir())
+    fetched = no_pdf = print_only = 0
+    reporter = util.Reporter()
+    for seen, beteckning in enumerate(targets, 1):
+        # no delay= here: the two publishers have very different patience, and
+        # pdfmirror is what knows which one an act's number will reach
+        if fetch_one(session, state, beteckning, force=force):
+            fetched += 1
+        elif not has_facsimile(beteckning):
+            print_only += 1        # predates every source -- never asked about
+        elif not compress.exists(layout.sfs_pdf(beteckning)):
+            no_pdf += 1            # a source covers the act; it has no PDF for it
+        reporter.update(seen, len(targets), scope="sfs mirror-pdf",
+                        actual=fetched + no_pdf,  # print_only/on-disk are ~0s skips
+                        fetched=fetched, no_pdf=no_pdf, print_only=print_only)
+    reporter.done()
+    print("sfs mirror-pdf: %d fetched, %d without a published PDF, %d older than "
+          "any facsimile source, %d target(s)"
+          % (fetched, no_pdf, print_only, len(targets)))
+
+
+def mirror_on_demand(session, beteckningar):
+    """Mirror each of `beteckningar` whose PDF is not on disk yet, one attempt
+    apiece. Returns those still missing afterwards: an act that predates every
+    facsimile source (never asked -- there is nothing to ask), and one the
+    publisher turns out to have no PDF for."""
+    if not beteckningar:
+        return []
+    state = MirrorState(layout.sfs_pdf_dir())
+    for beteckning in beteckningar:
+        if not has_facsimile(beteckning):
+            continue
+        freshness.vlog("sfs ai-includegraphics: mirroring source PDF %s" % beteckning)
+        fetch_one(session, state, beteckning)
+    return [b for b in beteckningar if not compress.exists(layout.sfs_pdf(b))]

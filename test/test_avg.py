@@ -12,7 +12,7 @@ import pytest
 from ferenda.avg import download as avg_download
 from ferenda.avg import parse as avg_parse
 from ferenda.avg.model import Beslut, Block, Fotnot, beslut_uri
-from ferenda.lib import catalog, compress, facets, layout
+from ferenda.lib import catalog, catalog_rows, compress, facets, layout
 from ferenda.lib.lagrum import MYNDIGHETSBESLUT, LagrumParser
 from ferenda.lib.pdftext import Para
 from ferenda.lib.util import document_extension, record_path, write_atomic
@@ -209,7 +209,7 @@ def test_catalog_row():
     art = {"uri": "https://lagen.nu/avg/jo/2340-2025", "org": "jo",
            "identifier": "JO dnr 2340-2025",
            "metadata": {"title": "Allvarlig kritik"}}
-    uri, source, kind, label, title, path = catalog.document_row(art, "p.json", "avg")
+    uri, source, kind, label, title, path = catalog_rows.document_row(art, "p.json", "avg")
     assert (source, kind, label, title) == \
         ("avg", "jo", "JO dnr 2340-2025", "Allvarlig kritik")
 
@@ -382,7 +382,7 @@ def test_arn_catalog_and_uri():
     art = {"uri": "https://lagen.nu/avg/arn/1992-3657", "org": "arn",
            "identifier": "ARN 1992-3657",
            "metadata": {"title": "Fråga om återbetalning"}}
-    uri, source, kind, label, title, path = catalog.document_row(art, "p.json", "avg")
+    uri, source, kind, label, title, path = catalog_rows.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "arn", "ARN 1992-3657")
     assert layout.relpath("avg", "arn/1992-3657").as_posix() == "arn/1992-3657"
 
@@ -928,7 +928,7 @@ def test_imy_layout_catalog_and_facets():
     assert layout.page_relpath(uri) == "avg/imy_IMY-2024-2904.html"
     art = {"uri": uri, "org": "imy", "identifier": "IMY dnr IMY-2024-2904",
            "metadata": {"title": "Polismyndigheten, VIS och gränsförordningen"}}
-    _uri, source, kind, label, title, _path = catalog.document_row(art, "p.json", "avg")
+    _uri, source, kind, label, title, _path = catalog_rows.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "imy", "IMY dnr IMY-2024-2904")
     assert title == "Polismyndigheten, VIS och gränsförordningen"
 
@@ -1314,7 +1314,7 @@ def test_kkv_layout_catalog_and_facets():
     assert layout.url_to_relpath("/avg/kkv/558/2026") == "avg/kkv_558_2026.html"
     art = {"uri": uri, "org": "kkv", "identifier": "KKV dnr 558/2026",
            "metadata": {"title": "Anmälan om företagskoncentration"}}
-    _uri, source, kind, label, _title, _path = catalog.document_row(art, "p.json", "avg")
+    _uri, source, kind, label, _title, _path = catalog_rows.document_row(art, "p.json", "avg")
     assert (source, kind, label) == ("avg", "kkv", "KKV dnr 558/2026")
 
     class R:
@@ -1338,13 +1338,15 @@ def test_kkv_layout_catalog_and_facets():
 
 def test_avg_patch_intermediate_routes_the_new_organs(tmp_path, monkeypatch):
     # a patch is authored against the *intermediate the parse reads*, so adding
-    # organs to avg means teaching patchsource their document routes -- without
-    # this, an imy/kkv basefile fell through to the ARN path
-    from ferenda import patchsource
+    # organs to avg means teaching its `Source.intermediate` provider their
+    # document routes -- without this, an imy/kkv basefile fell through to the
+    # ARN path
+    from ferenda.avg import source as avg_source
     from ferenda.lib import layout
     from ferenda.lib.errors import SkipDocument
     monkeypatch.setattr(layout, "AVG_DOWNLOADED", tmp_path)
-    monkeypatch.setattr(patchsource, "_pdf_xml", lambda p: "<pdf2xml>%s</pdf2xml>" % Path(p).name)
+    monkeypatch.setattr(avg_source, "pdf_intermediate",
+                        lambda p: "<pdf2xml>%s</pdf2xml>" % Path(p).name)
 
     def store(basefile, record, docs=()):
         compress.write_download(record_path(tmp_path, basefile.split("/")[0], basefile),
@@ -1356,24 +1358,24 @@ def test_avg_patch_intermediate_routes_the_new_organs(tmp_path, monkeypatch):
     store("kkv/1/2020", {"diarienummer": "1/2020",
                          "dokument": {"fil": "20-0001.pdf", "url": "u"}},
           [(avg_download.kkv_body_path(tmp_path, "20-0001.pdf"), b"%PDF-1.7\n")])
-    assert "20-0001.pdf" in patchsource._avg_intermediate("kkv/1/2020")
+    assert "20-0001.pdf" in avg_source.avg_intermediate("kkv/1/2020")
     # kkv, the pre-2006 HTML route -- its intermediate is the decoded markup
     store("kkv/2/2003", {"diarienummer": "2/2003",
                          "dokument": {"fil": "03-0002.htm", "url": "u"}},
           [(avg_download.kkv_body_path(tmp_path, "03-0002.htm"),
             '<html><head><meta charset=windows-1252></head><body><p>Beslut</p>'
             '</body></html>'.encode("cp1252"))])
-    assert "<p>Beslut</p>" in patchsource._avg_intermediate("kkv/2/2003")
+    assert "<p>Beslut</p>" in avg_source.avg_intermediate("kkv/2/2003")
     # a case with no document, and a Word one, are refused with a reason rather
     # than routed to a path that does not exist
     store("kkv/3/2015", {"diarienummer": "3/2015"})
     with pytest.raises(SkipDocument, match="no document"):
-        patchsource._avg_intermediate("kkv/3/2015")
+        avg_source.avg_intermediate("kkv/3/2015")
     store("kkv/4/2015", {"diarienummer": "4/2015",
                          "dokument": {"fil": "15-0004.docx", "url": "u"}},
           [(avg_download.kkv_body_path(tmp_path, "15-0004.docx"), b"PK\x03\x04zzzz")])
     with pytest.raises(SkipDocument, match="Word"):
-        patchsource._avg_intermediate("kkv/4/2015")
+        avg_source.avg_intermediate("kkv/4/2015")
 
     # imy: one Swedish part is patchable; several are not, because parse threads
     # the same patch through every part and it could only apply to one
@@ -1381,12 +1383,12 @@ def test_avg_patch_intermediate_routes_the_new_organs(tmp_path, monkeypatch):
                         "delar": [{"fil": "a.pdf", "sprak": "sv"},
                                   {"fil": "b.pdf", "sprak": "en"}]},
           [(avg_download.imy_pdf_path(tmp_path, "a.pdf"), b"%PDF-1.7\n")])
-    assert "a.pdf" in patchsource._avg_intermediate("imy/IMY-1")
+    assert "a.pdf" in avg_source.avg_intermediate("imy/IMY-1")
     store("imy/IMY-2", {"diarienummer": "IMY-2",
                         "delar": [{"fil": "c.pdf", "sprak": "sv"},
                                   {"fil": "d.pdf", "sprak": "sv"}]})
     with pytest.raises(SkipDocument, match="one patch cannot span"):
-        patchsource._avg_intermediate("imy/IMY-2")
+        avg_source.avg_intermediate("imy/IMY-2")
 
 
 # --------------------------------------------------------------------------

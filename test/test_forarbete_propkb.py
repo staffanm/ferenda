@@ -87,7 +87,8 @@ def test_download_one_writes_the_scan_and_never_touches_the_record(
         monkeypatch, propdir):
     """The whole design in one assertion: the scan lands at the
     `fa_facsimile_pdf` slot and the record is left byte-identical. A record
-    rewrite would re-stale 17k parses (`build.fa_parse_inputs` hashes it) and,
+    rewrite would re-stale 17k parses (`forarbete/source.fa_parse_inputs` hashes
+    it) and,
     if it reached `files`, flip the body off the ABBYY OCR."""
     monkeypatch.setattr(propkb, "request", _fake_request(b"%PDF-1.4 scan"))
     record = dict(RECORD)

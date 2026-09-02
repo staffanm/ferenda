@@ -1,6 +1,7 @@
 """FN-fördragssidan: the instrument, its text and its parties.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 
 The text comes from the depositary and the participation from the MTDSG, so

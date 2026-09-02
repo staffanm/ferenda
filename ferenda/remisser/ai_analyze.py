@@ -24,6 +24,7 @@ named basefile -- never from a corpus-wide parse/relate/generate.
 
 import difflib
 import json
+import traceback
 from datetime import date
 from pathlib import Path
 
@@ -438,3 +439,77 @@ def analyze(basefile, force=False):
     return annstore.write(out, result,
                           {**annstore.artifact_input("remisser", basefile),
                            **annstore.artifact_input("forarbete", fa_slug)}, force)
+
+
+def select(basefiles, *, force, dry_run):
+    """The answers one `ai-analyze` run should analyze, out of the ärenden and
+    answers its arguments name, reporting each ärende's expansion as it goes.
+
+    An expanded ärende skips answers that already carry a layer -- a remiss
+    collects answers over months, so the second run over one is normally "the
+    twelve that arrived since", not 50 re-analyses. A directly named answer is
+    always re-run (that is what naming it asks for); `force` re-runs everything
+    and is what overwrites a hand-verified layer."""
+    targets = []
+    for arg in basefiles:
+        if not is_arende(arg):   # one answer -- always (re)run it
+            targets.append(arg)
+            continue
+        # `answers` reads the stored record, so a typoed basefile raises there;
+        # an ärende that legitimately has no fetched answers yet comes back empty
+        expanded = answers(arg)
+        fresh = [b for b in expanded
+                 if force or not annstore.path("remisser", b).exists()]
+        # the pass costs the same per answer whatever its length, so the shortest
+        # are the worst value -- see MIN_ANSWER_CHARS for what the floor buys and
+        # what it gives up. Only when expanding an ärende: a directly named answer
+        # is an explicit request and always runs. `force` is one too, and outranks
+        # the floor -- applying it there would leave the short answers' *existing*
+        # layers untouched by a re-run meant to rewrite every layer after a prompt
+        # or model change, and say so only as a count.
+        short = set() if force else {
+            b for b in fresh if answer_chars(b) < MIN_ANSWER_CHARS}
+        fresh = [b for b in fresh if b not in short]
+        print("remisser ai-analyze %s: %d answers, %d already analysed, "
+              "%d under %d chars, %d to analyze"
+              % (arg, len(expanded), len(expanded) - len(fresh) - len(short),
+                 len(short), MIN_ANSWER_CHARS, len(fresh)))
+        # marked whatever the count: an ärende analysed before its first answer
+        # arrived leaves no layer, and --update has to come back for it later
+        if not dry_run:
+            mark_analysed(arg)   # tracked even at zero answers
+        targets.extend(fresh)
+    return targets
+
+
+def analyze_all(targets, *, force, dry_run):
+    """Analyze every answer in `targets`, returning those the model twice failed
+    to answer usably about. No layer is written for a failure, so a re-run
+    retries exactly those."""
+    failed = []
+    for basefile in targets:
+        if dry_run:
+            print("remisser ai-analyze: would analyze %s -> %s"
+                  % (basefile, annstore.path("remisser", basefile)))
+            continue
+        # one provenance window per answer, opened here rather than left to
+        # `annstore.write`'s rearm: an Unanalyzable answer below writes no layer,
+        # and its spent calls must not be stamped onto the next answer's
+        llm.start_record()
+        try:
+            out = analyze(basefile, force=force)
+        except Unanalyzable:
+            # Exactly one failure is tolerated here: the model twice failing to
+            # answer usably about one answer, which must not abandon the other 50
+            # of its ärende. No layer is written, so a re-run retries exactly
+            # these -- worth doing, since sampling is stochastic. Everything else
+            # `analyze` can raise is a permanent fault (a missing förarbete
+            # artifact, an empty `remitterat`, a verified layer refused by
+            # `annstore.guard`, a corrupt artifact) and propagates, because
+            # reporting those as "re-run to retry" would promise a retry that can
+            # never succeed (rule:narrow-what-you-catch).
+            traceback.print_exc()
+            failed.append(basefile)
+            continue
+        print("remisser ai-analyze %s: wrote %s" % (basefile, out))
+    return failed

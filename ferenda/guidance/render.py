@@ -1,6 +1,7 @@
 """Vägledningssidan: an EU-level body's guidance, its body and its sections.
 
-Registered as this source's page renderer in `build.SOURCE_RENDERERS`;
+Registered as this source's page renderer (the `render=` field of its
+`build.py` registration);
 `render` is the `(art, site) -> str` the generate driver calls.
 """
 

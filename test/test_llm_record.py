@@ -7,10 +7,10 @@ import json
 
 import pytest
 
-from ferenda import build
-from ferenda.build import RunOptions
-from ferenda.lib import annstore, layout, llm
+from ferenda.lib import annstore, layout, llm, stage
+from ferenda.lib.stage import RunOptions
 from ferenda.remisser import ai_analyze as remisser_analyze
+from ferenda.remisser import source as remisser_source
 
 
 @pytest.fixture
@@ -177,10 +177,10 @@ def test_a_document_that_writes_no_layer_does_not_taint_the_next(
 
     monkeypatch.setattr(remisser_analyze, "analyze", fake_analyze)
     monkeypatch.setattr(remisser_analyze, "is_arende", lambda arg: False)
-    monkeypatch.setattr(build, "RUN", RunOptions())
+    monkeypatch.setattr(stage, "RUN", RunOptions())
     # the command exits 1 because one answer failed; the other still wrote
     with pytest.raises(SystemExit):
-        build.remisser_ai_analyze(["doomed", "good"])
+        remisser_source.remisser_ai_analyze(["doomed", "good"])
 
     run = json.loads(written["good"].read_text())["meta"]["run"]
     assert run["calls"] == 1 and run["prompt_tokens"] == 7, \
